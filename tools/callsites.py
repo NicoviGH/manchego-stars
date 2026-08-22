@@ -93,9 +93,18 @@ def scan(source, target, path, params=None):
         if name != target:
             continue
         bound, positional = {}, set()
+        # A `*splat` makes every LATER position unknowable -- it may stand for any number of
+        # arguments -- so binding what follows it to the next parameter name would be a guess
+        # that reads like a fact. After a star, positions are reported under their own index
+        # and never claim a parameter. Each star gets a distinct key so two do not clobber.
+        starred, stars = False, 0
         for i, arg in enumerate(node.args):
             if isinstance(arg, ast.Starred):
-                key = '*args'
+                stars += 1
+                starred = True
+                key = '*args' if stars == 1 else '*args%d' % stars
+            elif starred:
+                key = 'arg%d+' % i
             else:
                 key = params[i] if i < len(params) else 'arg%d' % i
             bound[key] = ast.unparse(arg)
@@ -125,14 +134,29 @@ def main(argv=None):
     args = ap.parse_args(argv)
 
     paths = sorted(glob.glob(args.path)) or [args.path]
-    found = 0
+    texts = {}
     for path in paths:
         try:
-            source = open(path, encoding='utf-8').read()
+            texts[path] = open(path, encoding='utf-8').read()
         except OSError as exc:
             sys.exit('ERROR: %s' % exc)
+
+    # Resolve each signature ONCE, from whichever of these files DEFINES the function, and
+    # apply it to all of them. Without this, a call in another module has no local definition
+    # to bind against and its positional width prints as `arg1=29` -- the exact form this tool
+    # exists to surface, unsurfaced.
+    known = {}
+    for target in args.targets:
+        for path, source in texts.items():
+            params = signature(source, target, path)
+            if params:
+                known[target] = params
+                break
+
+    found = 0
+    for path, source in texts.items():
         for target in args.targets:
-            sites = scan(source, target, path)
+            sites = scan(source, target, path, params=known.get(target))
             if sites:
                 found += len([s for s in sites if s.kind == 'call'])
                 print(render(sites))

@@ -151,14 +151,25 @@ def _tileset_from_dir(d):
                    os.path.join(d, name + '.bin'))
 
 
-def _asset_names(decomp_root):
+def _asset_names(decomp_root, vanilla=False):
+    """The asset-name table. `vanilla=True` reads HEAD.
+
+    Both callers need a DIFFERENT tree and the difference is load-bearing: an editor listing
+    what it can edit must see the maps WE registered (`_register_chapter_map` appends here),
+    while a lookup that resolves a VANILLA layout id must not, or our appended entries shift
+    the indices it is about to match against vanilla chapter settings."""
     names = []
-    # CURRENT-TREE: same reason as gen_map_editor -- our registered maps live here too.
-    with open(os.path.join(decomp_root, 'data/data_8B363C.s')) as source:
-        for line in source:
-            match = re.match(r'\s*\.word\s+(\w+)', line)
-            if match:
-                names.append(match.group(1))
+    if vanilla:
+        source = _vanilla_decomp_text(decomp_root, 'data/data_8B363C.s').splitlines()
+    else:
+        # CURRENT-TREE: the editor must see the maps WE registered -- vanilla's copy would
+        # not list our own chapters.
+        with open(os.path.join(decomp_root, 'data/data_8B363C.s')) as fh:
+            source = fh.readlines()
+    for line in source:
+        match = re.match(r'\s*\.word\s+(\w+)', line)
+        if match:
+            names.append(match.group(1))
     return names
 
 
@@ -166,15 +177,16 @@ def _vanilla_tileconfig_path(decomp_root, layout_name):
     """Return the tile config selected by a vanilla layout's chapter settings."""
     default = os.path.join(decomp_root, 'graphics/map/TileConfiguration1.bin')
     try:
-        names = _asset_names(decomp_root)
+        # BOTH READS COME FROM HEAD, and that is the whole correctness of this function. It
+        # says VANILLA, and `_retarget_host_chapter` rewrites host slots in chapter_settings
+        # while `_register_chapter_map` appends to the asset table -- so read from the working
+        # tree, a vanilla layout name resolves against OUR repointed chapters, silently misses,
+        # and falls back to TileConfiguration1 with a warning. `vanilla_layout_data` then
+        # decodes metatiles against the wrong TSA. (#300)
+        names = _asset_names(decomp_root, vanilla=True)
         layout_id = names.index(layout_name)
-        # CURRENT-TREE, and this one is SUSPECT rather than settled (#300): the function
-        # says VANILLA, but `_retarget_host_chapter` rewrites host slots in this very file,
-        # so a vanilla layout name can resolve to a chapter WE repointed. Marked to keep the
-        # guard honest and raised on #300 rather than quietly changed by someone who has not
-        # read the map pipeline.
-        with open(os.path.join(decomp_root, 'src/data/chapter_settings.json')) as source:
-            settings = json.load(source)
+        settings = json.loads(
+            _vanilla_decomp_text(decomp_root, 'src/data/chapter_settings.json'))
         for chapter in settings['chapters']:
             map_data = chapter.get('map') or {}
             if map_data.get('mainLayerId') == layout_id:

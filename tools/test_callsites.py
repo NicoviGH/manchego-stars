@@ -95,6 +95,53 @@ class MethodCalls(unittest.TestCase):
                          .bound['width'])
 
 
+class StarredArguments(unittest.TestCase):
+    """A `*args` splat makes every later position UNKNOWABLE -- the star may stand for any
+    number of arguments. Binding what follows it to the next parameter name is a guess that
+    reads like a fact, and this feeds the width guard."""
+
+    STARRED = textwrap.dedent("""
+        def wrap(text, width=200, measure=px):
+            return text
+        a = wrap(*args, 29)
+        b = wrap(*args, *more)
+        c = wrap(*args, width=29)
+    """)
+
+    def test_a_positional_AFTER_a_star_is_not_bound_to_a_parameter_name(self):
+        call = _call_on(self.STARRED, 'wrap', 'wrap(*args, 29)')
+        self.assertNotIn('width', call.bound,
+                         'the star may stand for any number of args -- this is a guess')
+
+    def test_two_stars_do_not_clobber_each_other(self):
+        call = _call_on(self.STARRED, 'wrap', 'wrap(*args, *more)')
+        self.assertEqual(2, len([k for k in call.bound if k.startswith('*')]))
+
+    def test_a_KEYWORD_after_a_star_is_still_exact(self):
+        """A keyword names its own parameter, so a splat before it changes nothing."""
+        call = _call_on(self.STARRED, 'wrap', 'wrap(*args, width=29)')
+        self.assertEqual('29', call.bound['width'])
+
+
+class TheCommandLine(unittest.TestCase):
+    def test_it_binds_positionals_across_FILES(self):
+        """The tool's headline case. A call in another module has no local definition, so
+        without resolving the signature from the defining file the CLI prints `arg1=29` --
+        the positional-width form this tool exists to surface, unsurfaced."""
+        import tempfile
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, 'defs.py'), 'w') as fh:
+            fh.write('def wrap(text, width=200):\n    return text\n')
+        with open(os.path.join(d, 'uses.py'), 'w') as fh:
+            fh.write("import defs\ndefs.wrap('x', 29)\n")
+        import io, contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            callsites.main([os.path.join(d, '*.py'), 'wrap'])
+        self.assertIn('width=29', buf.getvalue())
+        self.assertNotIn('arg1=29', buf.getvalue())
+
+
 class Reporting(unittest.TestCase):
     def test_render_names_the_file_the_line_and_the_binding(self):
         out = callsites.render(callsites.scan(SAMPLE, 'helper', 'x.py'))

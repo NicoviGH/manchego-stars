@@ -166,6 +166,18 @@ class WrapWidthsArePixels(unittest.TestCase):
     def test_a_forwarded_width_is_not_a_literal_and_is_left_alone(self):
         self.assertEqual([], self._fail("_wrap_fe_lines(text, width, measure)"))
 
+    def test_an_unresolvable_signature_fails_LOUDLY(self):
+        """`signature()` returns [] for a function build_campaign.py does not define, and an
+        empty params list silently switches positional binding OFF -- so `f(text, 29)` sails
+        through while `f(text, width=29)` is caught. A guard that quietly stops guarding is
+        worse than no guard."""
+        fail = []
+        check.check_wrap_widths_are_pixels(
+            fail, sources={'x.py': '_nope(text, 29)'},
+            funcs={'_nope_not_defined_anywhere': 'width'})
+        self.assertTrue(fail)
+        self.assertIn('_nope_not_defined_anywhere', fail[0])
+
     def test_the_live_tree_is_clean(self):
         fail = []
         check.check_wrap_widths_are_pixels(fail)
@@ -209,6 +221,33 @@ class VanillaReadsComeFromHEAD(unittest.TestCase):
         it turns a silent assumption into a claim someone made and can be challenged on."""
         self.assertEqual([], self._fail(
             "open(os.path.join(DECOMP, 'texts/texts.txt'))  # CURRENT-TREE: ours on purpose"))
+
+    def test_a_marker_does_not_shadow_the_lines_BELOW_it(self):
+        """The marker exempts the read it annotates, not the neighbourhood. A window that
+        simply looks N lines back lets one honest annotation cover every unmarked read for
+        the next N lines -- and both markers this landed with created such a shadow."""
+        shadowed = ("# CURRENT-TREE: deliberate\n"
+                    "open(os.path.join(D, 'texts/texts.txt'))\n"
+                    "\n"
+                    "x = 1\n"
+                    "open(os.path.join(D, 'src/bmunit.c'))\n")
+        bad = self._fail(shadowed)
+        self.assertTrue(bad, 'the second, unmarked read must still be caught')
+        self.assertIn('src/bmunit.c', bad[0])
+
+    def test_a_marker_in_the_comment_block_directly_above_still_counts(self):
+        """The reason is usually a few sentences; forcing it onto the call line would make
+        the honest annotation the ugly one."""
+        self.assertEqual([], self._fail(
+            "# CURRENT-TREE: the editor must see the maps WE registered --\n"
+            "# vanilla's copy would not list our own chapters.\n"
+            "open(os.path.join(D, 'texts/texts.txt'))\n"))
+
+    def test_the_injectors_and_the_playtest_harness_are_scanned_too(self):
+        """A non-recursive tools/*.py glob skips tools/inject/ and tools/playtest/ entirely."""
+        scanned = check._guarded_python_sources()
+        self.assertTrue(any(p.startswith('tools/playtest/') for p in scanned),
+                        'tools/playtest/ is not scanned')
 
     def test_the_live_tree_is_clean(self):
         fail = []

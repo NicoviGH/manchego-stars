@@ -1275,7 +1275,29 @@ PIXEL_WIDTH_FUNCS = {
 PIXEL_WIDTH_FLOOR = 100
 
 
-def check_wrap_widths_are_pixels(fail, sources=None):
+def _guarded_python_sources():
+    """Every python source these two guards police: `tools/**`, RECURSIVELY.
+
+    A non-recursive `tools/*.py` skipped `tools/inject/` and `tools/playtest/` outright --
+    including `engine_hooks.py`, whose whole job is decomp files. Two things are exempt and
+    both for the same stated reason: `build_campaign.py` and `tools/inject/` DO the patching,
+    so naming a patched path is their function rather than a mistake, and `check.py` hosts the
+    registry itself.
+    """
+    out = {}
+    for path in sorted(glob.glob(os.path.join(REPO, 'tools', '**', '*.py'), recursive=True)):
+        rel = os.path.relpath(path, REPO)
+        base = os.path.basename(path)
+        if base.startswith('test_') or base in ('build_campaign.py', 'check.py'):
+            continue
+        if rel.startswith('tools/inject/'):
+            continue
+        with open(path, encoding='utf-8') as fh:
+            out[rel] = fh.read()
+    return out
+
+
+def check_wrap_widths_are_pixels(fail, sources=None, funcs=None):
     """Guard: no call site passes a CHARACTER count to a parameter that now means PIXELS.
 
     A parameter that changes NAME breaks every stale caller loudly. A parameter that changes
@@ -1292,24 +1314,28 @@ def check_wrap_widths_are_pixels(fail, sources=None):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     import callsites
 
+    funcs = PIXEL_WIDTH_FUNCS if funcs is None else funcs
     if sources is None:
-        sources = {}
-        for path in sorted(glob.glob(os.path.join(REPO, 'tools', '*.py'))):
-            if os.path.basename(path).startswith('test_'):
-                continue
-            with open(path, encoding='utf-8') as fh:
-                sources[os.path.relpath(path, REPO)] = fh.read()
+        sources = _guarded_python_sources()
 
     # Resolve each signature ONCE from the file that defines it, then apply it everywhere.
     # Without this a call in another module has no local definition to bind its positional
     # arguments against -- and a positional width is precisely the form that shipped.
     with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
         defining = fh.read()
-    signatures = {f: callsites.signature(defining, f, 'build_campaign.py')
-                  for f in PIXEL_WIDTH_FUNCS}
+    signatures = {f: callsites.signature(defining, f, 'build_campaign.py') for f in funcs}
+    # An unresolvable signature switches positional binding OFF (scan falls back to arg0/arg1),
+    # so the guard would quietly stop guarding exactly the form that shipped. Say so instead.
+    for func, params in sorted(signatures.items()):
+        if not params:
+            fail.append('check_wrap_widths_are_pixels: %s is registered in PIXEL_WIDTH_FUNCS '
+                        'but build_campaign.py does not define it, so its POSITIONAL widths '
+                        'cannot be bound. Fix the name or drop the entry.' % func)
 
     for path, source in sources.items():
-        for func, param in PIXEL_WIDTH_FUNCS.items():
+        for func, param in funcs.items():
+            if not signatures.get(func):
+                continue
             try:
                 sites = callsites.scan(source, func, path, params=signatures[func])
             except callsites.ParseError:
@@ -1352,15 +1378,7 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
 
     patched = list(bc.PATCHED_DECOMP_FILES)
     if sources is None:
-        sources = {}
-        for path in sorted(glob.glob(os.path.join(REPO, 'tools', '*.py'))):
-            base = os.path.basename(path)
-            # build_campaign.py DEFINES the helper and does the patching; check.py hosts this
-            # registry. Both name these paths for legitimate reasons.
-            if base.startswith('test_') or base in ('build_campaign.py', 'check.py'):
-                continue
-            with open(path, encoding='utf-8') as fh:
-                sources[os.path.relpath(path, REPO)] = fh.read()
+        sources = _guarded_python_sources()
 
     # A tool may legitimately want the CURRENT tree -- the map editor has to see the maps WE
     # registered, not vanilla's. Saying so at the site is the price, exactly as `measure=len`
@@ -1371,11 +1389,20 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
         for lineno, line in enumerate(lines, 1):
             if 'open(' not in line:
                 continue
-            # The marker may sit on the line or in the comment block immediately above it --
+            # The marker may sit on the line, or in the comment block DIRECTLY above it --
             # the reason is usually a sentence or three, and forcing it onto the call line
-            # would make the honest annotation the ugly one.
-            window = lines[max(0, lineno - 7):lineno]
-            if any('CURRENT-TREE' in w for w in window):
+            # would make the honest annotation the ugly one. Walking up only through
+            # CONTIGUOUS comment lines is what stops it shadowing: a fixed N-line window lets
+            # one honest annotation exempt every unmarked read for the next N lines.
+            if 'CURRENT-TREE' in line:
+                continue
+            marked, i = False, lineno - 2
+            while i >= 0 and lines[i].lstrip().startswith('#'):
+                if 'CURRENT-TREE' in lines[i]:
+                    marked = True
+                    break
+                i -= 1
+            if marked:
                 continue
             for rel in patched:
                 if rel in line:
