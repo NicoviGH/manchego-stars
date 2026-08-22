@@ -38,7 +38,11 @@ difficulty:
 # Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
 # so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list
 # is the decision, not the absence of one: the tomb depression is open ground.
-# Row shape: {type, x, y} plus optional item/count/turn. Types: build_campaign TRAP_TYPES.
+# Row shape: {type, x, y} plus optional item/count/turn. Placeable types live in
+# build_campaign TRAP_TYPES -- which is what LoadTrapData actually PLACES, not the
+# bmtrick.h enum (four of those either do nothing or fall through). Coordinates are
+# range-checked as bytes only; nothing here knows the map, so an on-byte-range tile
+# can still be off the map.
 traps: []
                               # (first chapter at the FE8-Ch5 reward tier: stat-boosters + a promotion item unlock here)
 

@@ -2144,7 +2144,7 @@ donor group carried — the same silent-inheritance shape as the goal window/sta
 (#207), the battle grounds, and the difficulty numbers (#303).
 
 **It was one chapter from biting.** ch05 fills `Ch6Events`, which is clean. But the hosting
-pattern puts ch06 on slot 7 filling `Ch7Events`, and vanilla Ch7 carries **two ballistae, at
+pattern puts ch06 on slot 7 filling `Ch7EventData`, and vanilla Ch7 carries **two ballistae, at
 (17,8) and (2,10)**. ch06 would have shipped with enemy ballistae at another chapter's
 coordinates, in every difficulty mode, chosen by nobody and explained by nothing.
 
@@ -2160,6 +2160,14 @@ impossible by construction rather than by luck. **`traps: []` is a DECISION and 
 declaring nothing is what the guard catches, and only when the donor actually carries something —
 `inherited_traps_undeclared` is a prompt, not a safety net, because keeping another chapter's
 ballistae is a choice that should be made out loud.
+
+**Two traps in the trap pass itself, both worth the entry.** The type whitelist must be what
+`LoadTrapData` (bmtrap.c:245) actually PLACES, not what `bmtrick.h` names: `TRAP_OBSTACLE`,
+`TRAP_TORCHLIGHT` and `TRAP_LIGHT_RUNE` have no case at all, and `TRAP_LIGHTARROW` falls
+THROUGH into `AddGorgonEggTrap` because its `break` sits behind `#if BUGFIX`, which is defined
+nowhere in the submodule — a declared light arrow would also hatch an undeclared gorgon egg. And
+a file the build PATCHES must be in `PATCHED_DECOMP_FILES`, or the previous build's rows survive
+a rehost or a branch switch: the same silent inheritance, moved one level up.
 
 **The general rule, now with four instances: filling an event group does not empty it.** Every
 field of a ChapterEventGroup our injectors do not write is inherited from whichever vanilla

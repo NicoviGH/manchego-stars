@@ -6827,8 +6827,8 @@ class ChapterTraps(unittest.TestCase):
     the group but never wrote that field, so a chapter kept whatever its donor carried.
 
     It was one chapter away from biting. ch05 fills `Ch6Events`, which is clean -- but the
-    hosting pattern puts ch06 on slot 7 filling `Ch7Events`, and vanilla Ch7 carries TWO
-    ballistae, at (17,8) and (2,10). ch06 would have shipped with enemy ballistae at another
+    hosting pattern puts ch06 on slot 7 filling `Ch7Events`, and vanilla Ch7 (group `Ch7EventData`) carries
+    TWO ballistae, at (17,8) and (2,10). ch06 would have shipped with enemy ballistae at another
     chapter's coordinates, in every mode, chosen by nobody.
 
     The build now WRITES the declaration every time, so inheritance is impossible by
@@ -6851,9 +6851,59 @@ class ChapterTraps(unittest.TestCase):
         with self.assertRaises(SystemExit):
             bc.chapter_traps({'traps': [{'type': 'bear-trap', 'x': 1, 'y': 1}]})
 
-    def test_a_trap_off_the_map_is_refused(self):
+    def test_only_types_the_engine_actually_places_are_offered(self):
+        # `LoadTrapData` (bmtrap.c:245) has NO case for TRAP_OBSTACLE / TRAP_TORCHLIGHT /
+        # TRAP_LIGHT_RUNE -- declaring one builds green and places nothing, the exact
+        # silent runtime behaviour the whitelist exists to prevent. And TRAP_LIGHTARROW
+        # falls THROUGH into AddGorgonEggTrap, because its `break` sits behind `#if BUGFIX`
+        # and BUGFIX is defined nowhere in the submodule: a light arrow also hatches an
+        # undeclared gorgon egg. None of the four are offerable.
+        for token in ('obstacle', 'torchlight', 'light-rune', 'light-arrow'):
+            self.assertNotIn(token, bc.TRAP_TYPES, '%s is not placeable' % token)
+        for token in ('ballista', 'firetile', 'gas', 'mine', 'gorgon-egg'):
+            self.assertIn(token, bc.TRAP_TYPES)
+
+    def test_a_coordinate_outside_the_byte_range_is_refused(self):
         with self.assertRaises(SystemExit):
             bc.chapter_traps({'traps': [{'type': 'gas', 'x': 999, 'y': 1}]})
+
+    def test_a_ballista_without_ammunition_is_refused(self):
+        # AddBallista (bmarch.c:89) takes `subtype` as the ITEM, and 0 means zero uses --
+        # a ballista nothing can fire, with no build error.
+        with self.assertRaises(SystemExit):
+            bc.chapter_traps({'traps': [{'type': 'ballista', 'x': 1, 'y': 1}]})
+
+    def test_more_traps_than_the_engine_has_slots_is_refused(self):
+        # AddTrap (bmtrick.c:113) scans sTrapPool for a free slot with NO bound.
+        rows = [{'type': 'gas', 'x': 1, 'y': 1}] * (bc.TRAP_MAX_COUNT + 1)
+        with self.assertRaises(SystemExit):
+            bc.chapter_traps({'traps': rows})
+
+    def test_a_non_integer_count_exits_cleanly(self):
+        # Bare int() raised an uncaught ValueError traceback instead of a build error.
+        with self.assertRaises(SystemExit):
+            bc.chapter_traps({'traps': [{'type': 'gas', 'x': 1, 'y': 1, 'count': 'two'}]})
+
+    def test_a_count_that_truncates_in_a_u8_is_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.chapter_traps({'traps': [{'type': 'gas', 'x': 1, 'y': 1, 'count': 9999}]})
+
+    def test_two_chapters_sharing_a_trap_symbol_is_refused(self):
+        # chapter_trap_tables keys by SYMBOL, so a collision would silently drop one
+        # chapter's declaration in a real build.
+        real = bc._chapter_trap_symbol
+        bc._chapter_trap_symbol = lambda group: 'TrapData_Event_Ch1'
+        try:
+            with self.assertRaises(SystemExit):
+                bc.chapter_trap_tables('rime-of-the-frostmaiden')
+        finally:
+            bc._chapter_trap_symbol = real
+
+    def test_the_patched_file_is_restored_between_builds(self):
+        # The pass rewrites events_trapdata.c every build. Without it in the restore list
+        # the previous build's rows survive a rehost or a branch switch -- the same silent
+        # inheritance this change removes, moved one level up.
+        self.assertIn('src/events_trapdata.c', bc.PATCHED_DECOMP_FILES)
 
     def test_every_hosted_chapter_declares_or_inherits_nothing(self):
         # Today all six donor tables are empty, so nothing is owed. The guard exists for

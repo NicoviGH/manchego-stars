@@ -435,6 +435,11 @@ FE_NAME_MAX = 12
 # of every build so injection always runs from a clean base -- idempotent across
 # repeated `make`s, and stat-donor growths/ranks always read vanilla values.
 PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrait_data.c',
+                        # #302 traps: apply_chapter_traps rewrites this every build, so it
+                        # must reset -- otherwise a rehost or a branch switch carries the
+                        # PREVIOUS build's rows into the ROM, which is the very inheritance
+                        # the pass exists to remove, one level up.
+                        'src/events_trapdata.c',
                         # #265 Arena presentation: campaign palette + chapter face selectors
                         # are generated into the real ArenaUi_Init translation unit; combat
                         # backdrop palettes bind through the Arena's cycling translation unit.
@@ -6640,22 +6645,27 @@ def _register_chapter_map(maps_dir, layout, comment):
 
 
 TRAPDATA_C = os.path.join(DECOMP, 'src', 'events_trapdata.c')
-# Our trap-type token -> the decomp enum (include/bmtrick.h). Deliberately a SHORT list:
-# these are the types a tactics map plausibly wants. Add a row when a chapter needs one --
-# an unknown token is refused rather than passed through, because a bad type byte is a
-# silent runtime behaviour, not a build error.
+# Our trap-type token -> the decomp enum. The list is exactly what `LoadTrapData`
+# (bmtrap.c:245) has a working case for, which is NOT the same as the bmtrick.h enum:
+#   * TRAP_OBSTACLE / TRAP_TORCHLIGHT / TRAP_LIGHT_RUNE have no case at all -- declaring
+#     one builds green and places nothing.
+#   * TRAP_LIGHTARROW falls THROUGH into AddGorgonEggTrap: its `break` sits behind
+#     `#if BUGFIX`, and BUGFIX is defined nowhere in the submodule. A light arrow would
+#     also hatch an undeclared gorgon egg at the same tile.
+# So the whitelist is what the ENGINE does, not what the enum names. Adding a row means
+# reading LoadTrapData first, because every failure here is silent at runtime.
 TRAP_TYPES = {
-    'ballista':    'TRAP_BALLISTA',
-    'obstacle':    'TRAP_OBSTACLE',      # walls & snags
-    'firetile':    'TRAP_FIRETILE',
-    'gas':         'TRAP_GAS',
-    'light-arrow': 'TRAP_LIGHTARROW',
-    'torchlight':  'TRAP_TORCHLIGHT',
-    'mine':        'TRAP_MINE',
-    'gorgon-egg':  'TRAP_GORGON_EGG',
-    'light-rune':  'TRAP_LIGHT_RUNE',
+    'ballista':   'TRAP_BALLISTA',
+    'firetile':   'TRAP_FIRETILE',
+    'gas':        'TRAP_GAS',
+    'mine':       'TRAP_MINE',
+    'gorgon-egg': 'TRAP_GORGON_EGG',
 }
-TRAP_MAX_COORD = 255                     # xPos/yPos are u8 in the ROM table
+TRAP_MAX_COORD = 255      # the u8 range of the ROM field. NOT a map-bounds check: the map
+                          # is not loaded here, so a coordinate can be legal-but-off-map and
+                          # this will not catch it. Say "byte range", never "off the map".
+TRAP_MAX_COUNT = 64       # sTrapPool is TRAP_MAX_COUNT wide (bmtrick.h:6) and AddTrap
+                          # (bmtrick.c:113) scans it for a free slot with NO bound
 
 
 def chapter_traps(chap):
@@ -6664,24 +6674,43 @@ def chapter_traps(chap):
     `.traps` is a ChapterEventGroup field, so a hosted chapter inherits whatever its donor
     group carries unless the build writes it -- the same silent-inheritance shape as the
     goal text ids (#207), the battle grounds and the difficulty numbers. It was one chapter
-    from biting: ch06 fills `Ch7Events`, and vanilla Ch7 carries two ballistae at (17,8)
+    from biting: ch06 fills `Ch7EventData`, and vanilla Ch7 carries two ballistae at (17,8)
     and (2,10), which would have appeared on our map having been chosen by nobody.
 
     Declaring nothing is a valid declaration and means NO traps -- the build writes
     TRAP_NONE either way, so inheritance is impossible by construction."""
+    rows = chap.get('traps') or []
+    if len(rows) > TRAP_MAX_COUNT:
+        sys.exit('ERROR: chapter %s declares %d traps -- the engine has %d slots and AddTrap '
+                 'scans for a free one WITHOUT a bound, so the surplus walks past the pool'
+                 % (chap.get('id', '?'), len(rows), TRAP_MAX_COUNT))
     out = []
-    for row in chap.get('traps') or []:
+    for row in rows:
         token = row.get('type')
         if token not in TRAP_TYPES:
-            sys.exit('ERROR: chapter %s declares trap type %r -- known types are %s'
+            sys.exit('ERROR: chapter %s declares trap type %r -- placeable types are %s '
+                     '(the list is what LoadTrapData has a working case for, not the enum)'
                      % (chap.get('id', '?'), token, ', '.join(sorted(TRAP_TYPES))))
         for axis in ('x', 'y'):
             value = row.get(axis)
-            if not isinstance(value, int) or not 0 <= value <= TRAP_MAX_COORD:
-                sys.exit('ERROR: chapter %s trap %s has %s=%r -- must be 0..%d'
+            if not isinstance(value, int) or isinstance(value, bool) \
+                    or not 0 <= value <= TRAP_MAX_COORD:
+                sys.exit('ERROR: chapter %s trap %s has %s=%r -- must be an integer 0..%d '
+                         '(the ROM field is a u8; map bounds are NOT checked here)'
                          % (chap.get('id', '?'), token, axis, value, TRAP_MAX_COORD))
+        for field in ('count', 'turn'):
+            value = row.get(field, 0)
+            if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= 255:
+                sys.exit('ERROR: chapter %s trap %s has %s=%r -- must be an integer 0..255 '
+                         '(it is emitted into a u8 array and would truncate)'
+                         % (chap.get('id', '?'), token, field, value))
+        item = row.get('item')
+        if token == 'ballista' and not item:
+            sys.exit('ERROR: chapter %s declares a ballista with no `item` -- AddBallista '
+                     'reads it as the AMMUNITION, and 0 means zero uses, so the ballista '
+                     'exists and can never fire' % chap.get('id', '?'))
         out.append({'type': TRAP_TYPES[token], 'x': row['x'], 'y': row['y'],
-                    'item': row.get('item', 0), 'count': int(row.get('count', 0)),
+                    'item': item or 0, 'count': int(row.get('count', 0)),
                     'turn': int(row.get('turn', 0))})
     return out
 
@@ -6726,7 +6755,7 @@ def inherited_traps_undeclared(campaign):
     Writing the declaration already makes inheritance impossible, so this is not a safety
     net -- it is a prompt. A donor carrying real traps means a real decision is being made
     silently (keep vanilla's ballistae, or clear the field), and the build should stop and
-    ask rather than pick one. ch06 on `Ch7Events` is the founding case."""
+    ask rather than pick one. ch06 on `Ch7EventData` is the founding case."""
     from inject.hosts import hosted_chapters
     stranded = []
     for chapter in hosted_chapters():
@@ -6750,6 +6779,10 @@ def chapter_trap_tables(campaign):
             sys.exit('ERROR: %s fills %s, which declares no `.traps` field -- the trap table '
                      'cannot be written and the chapter would inherit silently'
                      % (chapter.name, chapter.event_group))
+        if symbol in out:
+            sys.exit('ERROR: %s and another chapter both resolve to %s -- keying the write by '
+                     'SYMBOL would silently drop one chapter\'s declaration'
+                     % (chapter.name, symbol))
         out[symbol] = trap_data_body(chapter_traps(chap))
     return out
 
@@ -13801,7 +13834,7 @@ def main():
         print('difficulty modes (#303):')
         apply_chapter_difficulty(args.campaign, verbose=True)
         # Same pass, same reason: `.traps` is a ChapterEventGroup field our injectors fill
-        # but never wrote, so a chapter kept its donor's. ch06 fills Ch7Events, and vanilla
+        # but never wrote, so a chapter kept its donor's. ch06 fills Ch7EventData, and vanilla
         # Ch7 carries two ballistae -- writing the declaration makes that impossible (#302).
         print('traps (#302):')
         apply_chapter_traps(args.campaign, verbose=True)
