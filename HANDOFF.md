@@ -13,15 +13,21 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**PR #305** — the playtest gate switches from Tutorial to NORMAL by default. Harness-side
-only, CI green, ready to merge. **Merging it re-baselines every existing verdict** (enemies
-arrive 2 levels under the authored table on Normal where they arrived 4 under on Tutorial),
-so the matrix re-run after it lands is Nicolas's call, not a background task.
+**Nothing.** `main` is at **#306**, CI green, no open PRs.
+
+⚠️ **The next matrix run will look unusual, and both reasons are expected.** #305 switched the
+gate default from Tutorial to NORMAL, so (a) every checkpoint re-mints once — checkpoint validity
+is now `(rom, mode)`, and the old single-hash stamps mismatch by design — and (b) scenarios now
+grade a HARDER force than any run before them (Normal is 2 levels under the authored table where
+Tutorial was 4). A scenario that fails there is a real finding about content only ever verified
+on the easiest mode; it is not #305 misbehaving. `bootToMap` asserts the live mode on every boot,
+so a run in the wrong mode fails loudly instead of quietly.
 
 ## Next task
 
-**#303 is done and merged (#304).** All three difficulty modes are declared per chapter and
-proved in-engine; only #305 remains and it is open. Details on the issue.
+**#303 is done (#304/#305) and the traps half of #302 landed (#306).** Difficulty modes are
+declared per chapter and proved in-engine; the gate grades Normal; traps are declared instead of
+inherited.
 
 **Next is the `#302` epic: chapter as code.** Do the AUDIT first (its first child), and ground
 it in the history rather than in recollection — the premise is measured, and it is that the
@@ -43,6 +49,14 @@ character wrap is retired (pixels, per renderer, #298). We support all three dif
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **Traps are DECLARED, not inherited** (#302/#306) — `.traps` is a ChapterEventGroup field our
+  injectors filled but never wrote, so ch06 (on `Ch7EventData`) would have shipped vanilla Ch7's
+  two ballistae at its coordinates. ⚠️ Three traps in `decisions.md`: the placeable-type list is
+  what `LoadTrapData` PLACES, not what `bmtrick.h` names (four enum values either do nothing or
+  fall through — `TRAP_LIGHTARROW` hatches a gorgon egg); a file the build PATCHES must be in
+  `PATCHED_DECOMP_FILES` or the previous build's rows survive; and **still owed on #302: the
+  encounter-choice fields** (`playerUnits/enemyUnitsChoice{1,2,3}InEncounter`) are inherited on
+  ch03 and ch05 — six vanilla skirmish rosters each, dormant only while we expose no world map.
 - **All three difficulty modes, declared and proved in-engine** (#303/#304) — every chapter
   YAML declares its triple, `difficulty.py --mode` grades a named mode on both sides, and the
   `difficulty` scenario reads the red force off the map. ⚠️ Four traps recorded in
