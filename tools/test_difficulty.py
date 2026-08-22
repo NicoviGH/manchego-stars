@@ -1331,5 +1331,68 @@ class ChapterForceInMode(unittest.TestCase):
         self.assertTrue(all(n.hp < p.hp for n, p in zip(normal, plain)))
 
 
+class ChapterPressureInMode(unittest.TestCase):
+    """`_chapter_pressure` graded in a named mode (#303).
+
+    The point of the flag is that a verdict says WHICH configuration it graded. Before
+    this, every parity line read as general while grading the authored table -- and the
+    authored table is a configuration no player meets in any chapter whose normal malus
+    is non-zero.
+
+    Both sides shift, each by its own chapter's declared numbers, so a mode read is
+    still two tuned tables being compared rather than one tuned against one shifted.
+    """
+
+    def _ch(self, chid='ch05'):
+        return df.load_field('rime-of-the-frostmaiden', chid)[0]
+
+    def test_default_is_the_unshifted_authored_table(self):
+        chap = self._ch()
+        self.assertAlmostEqual(df._chapter_pressure(chap)['ours'][0],
+                               df._chapter_pressure(chap, mode=None)['ours'][0])
+
+    def test_a_mode_read_names_the_mode_it_graded(self):
+        self.assertEqual(df._chapter_pressure(self._ch(), mode='normal')['mode'], 'normal')
+
+    def test_normal_grades_a_weaker_force_than_the_authored_table(self):
+        chap = self._ch()
+        self.assertLess(df._chapter_pressure(chap, mode='normal')['ours'][0],
+                        df._chapter_pressure(chap)['ours'][0])
+
+    def test_parity_holds_in_the_two_modes_players_actually_pick(self):
+        # The claim #303 rests on: adopting the twin's numbers means the verdict does not
+        # depend on which mode is graded. True for Normal and Difficult in every chapter.
+        # Tutorial is exempted deliberately -- the next test pins WHY.
+        for chid in ('ch00', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'):
+            chap = df.load_field('rime-of-the-frostmaiden', chid)[0]
+            for mode in (None, 'normal', 'difficult'):
+                p = df._chapter_pressure(chap, mode=mode)
+                self.assertEqual(p['verdict']['verdict'], 'OK',
+                                 '%s graded %s is %s' % (chid, mode, p['verdict']['verdict']))
+
+    def test_ch05_tutorial_drifts_because_our_force_is_level_uniform(self):
+        """ch05 on TUTORIAL reads OFF, and the cause is structural, not a wrong number.
+
+        ch05 declares 4/2/3 -- vanilla Ch5's own triple, and the same numbers it already
+        inherited -- so this predates #303 and is REVEALED by mode grading, not caused by it.
+
+        The malus floors at baseLevel (`UnitAutolevelPenalty` skips the re-autolevel unless
+        `level - malus > baseLevel`), so a level-5 unit under malus 4 lands on pure class
+        base. Our ch05 force is level-UNIFORM -- 20 of 23 bodies at level 5 -- so Tutorial
+        collapses almost all of it to base, while vanilla Ch5's force spreads 4..8 and keeps
+        twice as many units above the floor. Clear-load drops to x0.69, under the 0.75 band;
+        threat is unaffected (x1.01) because the boss carries it.
+
+        Pinned rather than fixed: Tutorial is the beginner mode and being gentler there is
+        defensible. This test exists so the drift cannot change size unnoticed -- if it moves,
+        either the roster's level spread or the declared malus moved with it.
+        """
+        chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
+        p = df._chapter_pressure(chap, mode='tutorial')
+        self.assertEqual(p['verdict']['verdict'], 'OFF')
+        self.assertAlmostEqual(p['ours'][1] / p['vanilla'][1], 0.69, places=2)
+        self.assertGreater(p['ours'][0] / p['vanilla'][0], 0.95)   # threat is fine
+
+
 if __name__ == '__main__':
     unittest.main()

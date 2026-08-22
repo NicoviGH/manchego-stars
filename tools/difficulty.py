@@ -998,16 +998,24 @@ def report(campaign, ch):
     _print_dynamics(chap)
 
 
-def _chapter_pressure(chap, band=0.25):
+def _chapter_pressure(chap, band=0.25, mode=None):
     """Enemy-pressure parity for one loaded chapter dict: our force vs its parity_reference's
     vanilla force, threat/slot + clear-load/slot, with a verdict. `vanilla` is None when the
-    reference isn't curated yet (#48 registry)."""
+    reference isn't curated yet (#48 registry).
+
+    `mode` grades a DIFFICULTY MODE instead of the authored table (#303). Each side is
+    shifted by its own chapter's numbers -- ours from the YAML `difficulty:` block, the
+    reference's from vanilla chapter_settings -- so a mode read still compares two tuned
+    tables. None (the default) is the authored table, which is what every parity verdict
+    before #303 graded; the difference matters because a chapter whose normal malus is
+    non-zero ships a force the authored read never describes."""
     deploy_cap = chapter_deploy_limit(chap, len(ROSTER))
-    ours_force = chapter_enemy_force(chap)
+    shifts = bc.chapter_difficulty_shifts(chap) if mode else None
+    ours_force = chapter_enemy_force(chap, mode=mode, shifts=shifts)
     ours = enemy_pressure(ours_force, deploy_cap)
     ref = chap.get('parity_reference')
-    van = vanilla_enemies(ref)
-    out = {'reference': ref, 'deploy_cap': deploy_cap, 'ours': ours,
+    van = vanilla_enemies(ref, mode=mode)
+    out = {'reference': ref, 'deploy_cap': deploy_cap, 'ours': ours, 'mode': mode,
            'n_ours': len(ours_force), 'vanilla': None,
            'dropped': unmodeled_enemies(chap)}
     if van is not None:
@@ -1688,16 +1696,23 @@ def curve_gate_failures(rows):
                                 or r.get('role'))]
 
 
-def curve_report(campaign, band=0.25):
+def curve_report(campaign, band=0.25, mode=None):
     """Campaign-wide enemy-pressure curve: one row per authored chapter, ours vs its vanilla
     reference, so spikes/sags across the arc are visible at a glance (#48). Returns the per-chapter
-    rows (label / has_ref / verdict / boss_drop) so the --check gate can act on them."""
+    rows (label / has_ref / verdict / boss_drop) so the --check gate can act on them.
+
+    `mode` grades a difficulty mode on BOTH sides instead of the authored table (#303). The
+    banner says which, because a verdict that does not name its configuration is the thing
+    #303 set out to fix."""
     paths = sorted(glob.glob(os.path.join(
         bc.REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml')))
     bar = '=' * 86
     print(bar)
     print('CAMPAIGN ENEMY-PRESSURE CURVE -- ours vs vanilla parity_reference   '
           '[STATIC proxy]')
+    print('  difficulty mode: %s'
+          % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
+             if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
     print(bar)
     print('  %-22s %-13s %-15s %-17s %s'
           % ('chapter', 'reference', 'threat/slot', 'clear-load/slot', 'verdict'))
@@ -1730,7 +1745,7 @@ def curve_report(campaign, band=0.25):
                 print('  %-22s %-13s %4.1f (target)    %4.1f (target)      planned%s'
                       % (label[:22], ref[:13], proj['threat'], proj['clearload'], note))
             continue
-        p = _chapter_pressure(chap, band)
+        p = _chapter_pressure(chap, band, mode=mode)
         ot, ol = p['ours']
         boss_drop = any(d['is_boss'] for d in p['dropped'])
         any_dropped_boss = any_dropped_boss or boss_drop
@@ -1809,6 +1824,11 @@ def main():
                          'balance_locked chapter is off-parity, unreliably measured, '
                          'missing its reference, or carrying an open per-unit role '
                          'finding (UNLOCKED chapters never gate)')
+    ap.add_argument('--mode', choices=MODES,
+                    help='grade a DIFFICULTY MODE instead of the authored table (#303). Both '
+                         'sides are shifted by their own chapter\'s declared numbers, so the '
+                         'read still compares two tuned tables. Omitted = the authored table, '
+                         'which is what every verdict before #303 graded')
     ap.add_argument('--lord-floor', action='store_true',
                     help='emit the per-lord survivability-floor table instead of the parity report')
     ap.add_argument('--target', type=float, default=3.5, help='floor: target bulk rounds-to-down')
@@ -1817,7 +1837,7 @@ def main():
     ap.add_argument('--hp-cap', type=int, default=12, help='floor: max +HP')
     args = ap.parse_args()
     if args.curve:
-        rows = curve_report(args.campaign)
+        rows = curve_report(args.campaign, mode=args.mode)
         if args.check:
             fails = curve_gate_failures(rows)
             if fails:
