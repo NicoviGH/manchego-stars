@@ -13,25 +13,23 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#320** (`1ec511e`), CI green, no open PRs.
+**Nothing.** `main` is at **#321** (`6b47e31`), CI green, no open PRs.
 
 ## Next task
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308 and #310 are done**, and **#309 is half done** — its phase 1 landed
-(#320), phase 2 is re-priced and still open.
+(#308-#315); **#308, #309 and #310 are done** — #309's phase 2 (ELF patching) was priced
+against the new gate and deliberately NOT built.
 
 **#311 is next** — scene preview + golden master, seeing a scene without building a ROM. Then
 #312, then the declarative half (#313, #314, #315), then ch06 through it.
 
-**Owed on #309 before phase 2: ONE gate run.** Both halves of the 24m51s baseline have moved —
-#310 took the runs (3.2x) and #320 took ~26s off each of the five builds — so the number is stale
-in two directions and phase 2 (ELF patching) has to be priced against the new one. Spend that run
-deliberately, not folded into a debugging session. Phase 2's ceiling is unchanged and small: the
-boot target is patchable, but the armed party seed each `--chNN-boot` LOADs must be runtime-gated
-first, and `testch` / `ch05lupinboot` / `montage` / the ch05 debug boots inject DATA and never can
-be — 2 of 5 builds at best.
+**The gate is now 6m48s, 21/21 PASS** (2026-08-23, re-baselined against the old headed/serial
+24m51s — 3.7x). 832 seconds of scenario time inside a 408-second wall, 5 builds, nothing cached.
+Builds are ~2 minutes of that, which is why **#309's phase 2 is decided and closed unbuilt**: ELF
+patching could serve 2 of the 5 configs for ~50s (~12%) and would cost a runtime-gated party seed
+plus a verdict key over patched bytes. Reopen only if a chapter's build count grows.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
@@ -49,6 +47,14 @@ ELF and stamp — every checkpoint builder runs on canonical, so verifying #317 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **A new scenario no longer kills its running siblings** (#310, PR #321) — `run.sh` opened every
+  run with `pkill -9 -i mgba`, so with four scenarios in flight each new dispatch SIGKILLed the
+  ones already going; the first full gate lost `ch01`, `ch04moose` and `ch04packmath` to it, all
+  reporting `mGBA exited early` as though the ROM were broken. The kill is scoped to the
+  scenario's own `/tmp/playtest-<name>/` now, and `gen_symbols.py` writes its three shared tables
+  through a rename. ⚠️ `decisions.md` → "A blanket `pkill` is a serial-world habit": **the
+  4-scenario measurement that justified the parallel default could not have caught this**, because
+  the first wave of four always survives — measure a fan-out change ABOVE its own concurrency.
 - **A config switch stopped costing a whole build** (#302/#309 phase 1, PR #320) — the two
   battle-anim injection steps were 26 of the injector's ~35 seconds and no boot flag reaches
   either, so every one of the twelve `rom_configs` paid them for byte-identical data. They now
