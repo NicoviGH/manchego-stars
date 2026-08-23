@@ -38,11 +38,18 @@ tier that catches a chapter which left the gate breaking three chapters later.
 with procs that never change — which looks exactly like broken input and is not. Restore the ROM,
 the ELF **and** `.build-config.json` from the same cache entry, then re-run `gen_symbols.py`.
 
-**Tree state: the ROM is now `canonical`** (was ch03boot), restored from cache with its matching
-ELF and stamp — every checkpoint builder runs on canonical, so verifying #317 needed it.
-`tools/playtest/states/` now holds valid **`prep`** and **`ch02start`** (105,705 and 128,940 bytes,
-99.4–99.5% non-zero, stamped `a44afcc2ac09:normal`); it was empty before, and four scenarios need
-`ch02start`. A dead state is exactly **397,312 bytes of zeros** — that size is the tell.
+**Tree state: the ROM in the tree is `ch05lupinboot`** (`600f8241`, CH05BOOT+CH05LUPIN) — the last
+build of the 2026-08-23 gate run, not canonical. `tools/playtest/states/` holds valid **`prep`**
+and **`ch02start`** (105,705 and 128,940 bytes, 99.4–99.5% non-zero) stamped for the CANONICAL ROM
+`a44afcc2ac09:normal`, so anything wanting them needs canonical back in the tree first. A dead
+state is exactly **397,312 bytes of zeros** — that size is the tell.
+
+**The ROM cache is warm for all five gate configurations.** Nothing since the gate run has touched
+a `ROM_INPUT_PATHS` entry (`campaigns`, `engine`, `tools/inject`, `tools/build_campaign.py`,
+`tools/portrait_tool.py`, `tools/feditor_to_banim.py`, `Makefile`) — the last commits were docs,
+`check.py` and `matrix.yaml`, none of which are ROM inputs. So the next `SUITE=gate` restores five
+ROMs instead of building them, and the injection cache is warm underneath that for whatever does
+rebuild.
 
 ## Recently landed — do not redo
 
