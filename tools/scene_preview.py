@@ -40,9 +40,8 @@ def read_scene(body):
     body = body.replace('\n', '')
     podium, faces, out = None, {}, []
     lines, cur, pos = [], '', 0
-    pressed = False       # the previous tag was [A]: the next one decides page or new block
-    preamble = True       # still before this block's first box, so [OpenX] names its speaker
-    block = None          # the podium this block speaks from; None is faceless
+    pressed = False   # the previous tag was [A]: the next one decides page or new block
+    block = None      # the podium this block SPEAKS from; None is faceless
     for m in _TAG.finditer(body):
         cur += body[pos:m.start()]
         pos = m.end()
@@ -50,21 +49,26 @@ def read_scene(body):
         if pressed:
             # `_script_to_message` joins a turn's pages with `[A][LF]`, so an [LF] here is the
             # PAGE BREAK and the block continues. Reading it as a line would open every
-            # continued box with a phantom blank. Anything else starts a fresh block -- and a
-            # fresh block's podium is UNKNOWN until an [OpenX] names it, because a faceless
-            # speaker deliberately emits none and must not inherit the last speaker's seat.
+            # continued box with a phantom blank. Anything else starts a fresh block.
             pressed = False
             if tag == 'LF':
                 continue
-            preamble, block = True, None
+            block = None
         if tag.startswith('Open'):
-            podium = tag
-            if preamble:
-                block = tag       # face management runs first; the speaker's own [OpenX] is last
+            # An [OpenX] is either a speaker opening their own box or an anchor for the
+            # [LoadFace]/[ClearFace] that FOLLOWS it, and only the first names who is talking.
+            # Taking the most recent one regardless seats a faceless beat at whichever podium
+            # was last managed -- a silent `present:` listener, or the podium an `exits:` just
+            # vacated -- and captions narration with someone who never said a word. So an
+            # [OpenX] is a speaker's until the next tag proves it was face management.
+            podium = block = tag
         elif tag.startswith('FID_'):
             faces[podium] = tag[len('FID_'):]
         elif tag == 'ClearFace':
             out.append(Stage('exit', podium, faces.pop(podium, None), [], None))
+            block = None
+        elif tag == 'LoadFace':
+            block = None
         elif tag == 'BreakTalk':
             out.append(Stage('pause', None, None, [], None))
         elif tag == 'LF':
@@ -74,7 +78,7 @@ def read_scene(body):
             lines.append(cur)
             out.append(Box('box', block, faces.get(block), lines, None))
             lines, cur = [], ''
-            pressed, preamble = True, False
+            pressed = True
     return out
 
 
@@ -111,41 +115,57 @@ BATTLE = fe8_talk_font.BATTLE_QUOTE_BUDGET_PX
 # for. The titles are the chapter's own -- `CH05_*_SLOT` rows carry them.
 
 
+def _claim(reg, key, title, msg_id, builder, width):
+    """Register one scene, refusing to overwrite a key already claimed.
+
+    The generated opening keys and the hand-written ones share a namespace, so a new
+    CH05_OPENING_SLOTS row can generate a key a later line then silently replaces -- and the
+    scene it replaced vanishes from the tool and from the golden book without failing anything.
+    """
+    if key in reg:
+        raise KeyError('two scenes claim %r: %r and %r -- one of them would vanish from '
+                       '--list, from `make scene` and from the golden book'
+                       % (key, reg[key][0], title))
+    reg[key] = (title, msg_id, builder, width)
+
+
 def _ch05_registry():
     arrival = bc.CH05_ARRIVAL_SLOT
     join = bc.CH05_BASIL_JOIN_SLOT
     alone = bc.CH05_SAHNAR_ALONE_SLOT
     moose = bc.CH05_MOOSE_CHARGE_SLOT
+    talk = bc.ch05_sahnar_talk_messages
+    ending = bc.ch05_ending_messages
     reg = collections.OrderedDict()
     for n, (_slot, msg, _boxes, what) in enumerate(bc.CH05_OPENING_SLOTS, 1):
-        reg['ch05/%d' % n] = (what, msg, bc.ch05_opening_messages, TALK)
-    reg['ch05/4'] = (arrival[3], arrival[1], bc.ch05_opening_messages, TALK)
-    reg['ch05/4-no-lupin'] = (arrival[3] + ' (no Lupin)', bc.CH05_ARRIVAL_NO_LUPIN_MSG,
-                              bc.ch05_opening_messages, TALK)
-    reg['ch05/5'] = (join[3], join[1], bc.ch05_basil_join_messages, TALK)
-    reg['ch05/5-no-lupin'] = (join[3] + ' (no Lupin)', bc.CH05_BASIL_JOIN_NO_LUPIN_MSG,
-                              bc.ch05_basil_join_messages, TALK)
-    reg['ch05/6'] = (alone[3], alone[1], bc.ch05_sahnar_alone_message, TALK)
-    reg['ch05/7'] = (moose[3], moose[1], bc.ch05_moose_charge_message, TALK)
-    reg['ch05/7-quip'] = (moose[3] + ' (the punchline)', bc.CH05_MOOSE_QUIP_MSG,
-                          bc.ch05_moose_charge_message, TALK)
-    reg['ch05/talk-recruit'] = ('Basil talks Sahnar out of the sarcophagus',
-                                bc.CH05_SAHNAR_TALK_MSG, bc.ch05_sahnar_talk_messages, TALK)
-    reg['ch05/talk-recruit-no-lupin'] = (
-        'Basil talks Sahnar out of the sarcophagus (no Lupin)',
-        bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG, bc.ch05_sahnar_talk_messages, TALK)
-    reg['ch05/eruption'] = ('Ravisin warns the party, turn 2', bc.CH05_ERUPTION_MSG,
-                            bc.ch05_eruption_message, TALK)
-    reg['ch05/ravisin-taunt'] = ('Ravisin, first engagement', bc.CH05_RAVISIN_TAUNT_MSG,
-                                 bc.ch05_ravisin_taunt_message, BATTLE)
-    reg['ch05/ravisin-death'] = ('Ravisin dies', bc.CH05_RAVISIN_DEATH_MSG,
-                                 bc.ch05_ravisin_death_message, BATTLE)
-    reg['ch05/ending'] = ('the ending, Sahnar recruited', bc.CH05_ENDING_MSGS[True],
-                          bc.ch05_ending_messages, TALK)
-    reg['ch05/ending-no-sahnar'] = ('the ending, the berry exchange cut',
-                                    bc.CH05_ENDING_MSGS[False], bc.ch05_ending_messages, TALK)
-    reg['ch05/ending-basil-died'] = ('the ending, over Basil\'s body', bc.CH05_ENDING_LOST_MSG,
-                                     bc.ch05_ending_messages, TALK)
+        _claim(reg, 'ch05/%d' % n, what, msg, bc.ch05_opening_messages, TALK)
+    _claim(reg, 'ch05/4', arrival[3], arrival[1], bc.ch05_opening_messages, TALK)
+    _claim(reg, 'ch05/4-no-lupin', arrival[3] + ' (no Lupin)',
+           bc.CH05_ARRIVAL_NO_LUPIN_MSG, bc.ch05_opening_messages, TALK)
+    _claim(reg, 'ch05/5', join[3], join[1], bc.ch05_basil_join_messages, TALK)
+    _claim(reg, 'ch05/5-no-lupin', join[3] + ' (no Lupin)',
+           bc.CH05_BASIL_JOIN_NO_LUPIN_MSG, bc.ch05_basil_join_messages, TALK)
+    _claim(reg, 'ch05/6', alone[3], alone[1], bc.ch05_sahnar_alone_message, TALK)
+    _claim(reg, 'ch05/7', moose[3], moose[1], bc.ch05_moose_charge_message, TALK)
+    _claim(reg, 'ch05/7-quip', moose[3] + ' (the punchline)',
+           bc.CH05_MOOSE_QUIP_MSG, bc.ch05_moose_charge_message, TALK)
+    _claim(reg, 'ch05/talk-recruit', 'Basil talks Sahnar out of the sarcophagus',
+           bc.CH05_SAHNAR_TALK_MSG, talk, TALK)
+    _claim(reg, 'ch05/talk-recruit-no-lupin',
+           'Basil talks Sahnar out of the sarcophagus (no Lupin)',
+           bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG, talk, TALK)
+    _claim(reg, 'ch05/eruption', 'Ravisin warns the party, turn 2',
+           bc.CH05_ERUPTION_MSG, bc.ch05_eruption_message, TALK)
+    _claim(reg, 'ch05/ravisin-taunt', 'Ravisin, first engagement',
+           bc.CH05_RAVISIN_TAUNT_MSG, bc.ch05_ravisin_taunt_message, BATTLE)
+    _claim(reg, 'ch05/ravisin-death', 'Ravisin dies',
+           bc.CH05_RAVISIN_DEATH_MSG, bc.ch05_ravisin_death_message, BATTLE)
+    _claim(reg, 'ch05/ending', 'the ending, Sahnar recruited',
+           bc.CH05_ENDING_MSGS[True], ending, TALK)
+    _claim(reg, 'ch05/ending-no-sahnar', 'the ending, the berry exchange cut',
+           bc.CH05_ENDING_MSGS[False], ending, TALK)
+    _claim(reg, 'ch05/ending-basil-died', "the ending, over Basil's body",
+           bc.CH05_ENDING_LOST_MSG, ending, TALK)
     # DELIBERATELY absent: the arena tutorial (`ch05_arena_messages`). Its two boxes are locked
     # to vanilla MSG_9D5/9D6 VERBATIM and the builder proves that by reading them out of the
     # decomp's texts.txt -- so previewing it would put a decomp read inside the one tool whose
@@ -293,9 +313,15 @@ def main():
         ap.error('name a scene (ch05/1), a chapter (ch05), --list or --write')
     if '/' in args.scene:
         print(format_scene(preview(args.scene, args.campaign)), end='')
-    else:
-        for key in [k for k in registry() if k.split('/')[0] == args.scene]:
-            print(format_scene(preview(key, args.campaign)))
+        return 0
+    keys = [k for k in registry() if k.split('/')[0] == args.scene]
+    if not keys:
+        # Silence and exit 0 is the wrong answer to a typo: `make scene SCENE=ch04` would
+        # read as "that chapter has no scenes" rather than "the preview does not know it".
+        ap.error('no scenes registered for %r -- known chapters: %s (use --list)'
+                 % (args.scene, ', '.join(sorted({k.split('/')[0] for k in registry()}))))
+    for key in keys:
+        print(format_scene(preview(key, args.campaign)))
     return 0
 
 

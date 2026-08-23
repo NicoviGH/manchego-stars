@@ -86,6 +86,25 @@ class StageBeatsThatCostNoPress(unittest.TestCase):
         self.assertIsNone(narration.face)
         self.assertIsNone(narration.podium)
 
+    def test_narration_after_a_SILENT_face_is_not_attributed_to_it_either(self):
+        """The same trap one move earlier. `present:`/`preload` seat silent listeners before
+        the first bubble opens, so the last [OpenX] the reader saw is a face-management open
+        and not a speaker's -- and a faceless beat after it inherits a listener who never
+        said a word."""
+        narration, = sp.read_boxes('[OpenFarLeft][LoadFace][FID_Artur]\n'
+                                   'The snow does not stop.[A][X]')
+        self.assertIsNone(narration.face)
+        self.assertIsNone(narration.podium)
+
+    def test_narration_after_a_face_LEAVES_is_not_seated_at_the_vacated_podium(self):
+        """`exits:` emits [OpenX][ClearFace] -- also face management, also not a speaker."""
+        _spoken, _exit, narration = sp.read_scene('[OpenMidRight][LoadFace][FID_Marisa]\n'
+                                                  '[OpenMidRight]Go on, now.[A]\n'
+                                                  '[OpenMidRight][ClearFace]\n'
+                                                  'And there she stays.[A][X]')
+        self.assertIsNone(narration.face)
+        self.assertIsNone(narration.podium)
+
 
 class TheRegistry(unittest.TestCase):
     """The preview reads the chapter's OWN message builders, so it cannot disagree with the
@@ -138,6 +157,17 @@ class StaticChecksTheRomCannotCheaplyGive(unittest.TestCase):
                              '%s and %s both claim MSG_%03X' % (seen.get(msg_id), key, msg_id))
             seen[msg_id] = key
 
+    def test_claiming_a_key_twice_is_refused(self):
+        """ch05/1..3 are generated from CH05_OPENING_SLOTS while ch05/4 onward are written by
+        hand, so a FOURTH opening slot would generate a `ch05/4` the hand-written row then
+        overwrites -- dropping that scene from --list, from `make scene` and from the golden
+        book, with its message id reachable from no key at all. Silent, until someone goes
+        looking for a scene that is simply not there."""
+        reg = {}
+        sp._claim(reg, 'ch05/4', 'first', 0x1, None, sp.TALK)
+        with self.assertRaises(KeyError):
+            sp._claim(reg, 'ch05/4', 'second', 0x2, None, sp.TALK)
+
     def test_every_branched_scene_registers_BOTH_arms(self):
         """An arm nobody can look at is an arm nobody proofreads -- and the no-Lupin arms are
         the ones that never play on the plain boot ROM, so film does not cover them either."""
@@ -170,10 +200,14 @@ class TheGoldenMaster(unittest.TestCase):
     (Feathers/Falco). The generated book IS the golden: `check_generated_indexes_fresh` already
     regenerates docs/CHAPTERS.md in memory and diffs it, so a scene book needs no new machinery."""
 
-    def test_the_book_holds_every_registered_scene_in_registry_order(self):
+    def test_a_book_holds_that_chapter_s_scenes_in_registry_order(self):
+        """Scoped to the chapter, because registering ch06 must not fail ch05's book -- and
+        checked as an ORDERED list, because `assertIn` on a key passes trivially against its
+        own `-no-lupin` twin."""
         book = sp.generate('ch05')
-        for key in sp.registry():
-            self.assertIn(key, book, key)
+        want = [k for k in sp.registry() if k.split('/')[0] == 'ch05']
+        found = [ln.split('  ')[0] for ln in book.split('\n') if ln.startswith('ch05/')]
+        self.assertEqual(want, found)
 
     def test_the_book_is_deterministic(self):
         """It is diffed against a committed file, so anything unstable in it -- a dict order,
@@ -181,15 +215,24 @@ class TheGoldenMaster(unittest.TestCase):
         regenerate without reading the diff."""
         self.assertEqual(sp.generate('ch05'), sp.generate('ch05'))
 
-    def test_the_committed_book_matches_what_the_yaml_renders_today(self):
+    def test_every_committed_book_matches_what_the_yaml_renders_today(self):
         """The regression gate: a wrap or staging change that moves a box fails HERE, with no
-        ROM build and no playtest run."""
-        path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            'docs', 'scenes', 'ch05.md')
-        with open(path, encoding='utf-8') as fh:
-            self.assertEqual(fh.read(), sp.generate('ch05'),
-                             'docs/scenes/ch05.md is stale -- regenerate: '
-                             'python3 tools/scene_preview.py --write')
+        ROM build and no playtest run.
+
+        Every REGISTERED chapter, not a hardcoded ch05 -- `--write` writes a book per chapter,
+        so naming one here would let a second chapter's book be generated and then never
+        diffed, which is a golden that exists and guards nothing."""
+        chapters = sorted({k.split('/')[0] for k in sp.registry()})
+        self.assertTrue(chapters)
+        for chapter in chapters:
+            path = sp.book_path(chapter)
+            self.assertTrue(os.path.isfile(path),
+                            '%s has no committed book -- regenerate: '
+                            'python3 tools/scene_preview.py --write' % chapter)
+            with open(path, encoding='utf-8') as fh:
+                self.assertEqual(fh.read(), sp.generate(chapter),
+                                 'docs/scenes/%s.md is stale -- regenerate: '
+                                 'python3 tools/scene_preview.py --write' % chapter)
 
 
 if __name__ == '__main__':

@@ -12120,8 +12120,9 @@ def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid,
 
     Shared by the three tomb scenes, the arrival (which brings its own podium set, being the
     first one the PARTY speaks in) and the join, so a further scene costs a table row rather
-    than a second loop. `width` is the CHANNEL and nothing else: 42 for the full-screen
-    backdrop beats, 29 for the on-map bubbles.
+    than a second loop. `width` is the CHANNEL and nothing else -- a PIXEL budget, taken from
+    `fe8_talk_font`: the talk bubble's for a faced beat, the auto-centered box's for faceless
+    narration.
     """
     script = _chapter_event_by_slot(chap, 'chapter_start', slot,
                                     'ch05 opening (%s)' % what)['script']

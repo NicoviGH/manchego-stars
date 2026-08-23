@@ -94,11 +94,15 @@ DEAD_CONCEPTS = [
     # first, and DEAD_CONCEPTS would flag that warning too -- a guard that rejects its own warning
     # is worse than none. The durable fix is a pointer in CLAUDE.md's Source-of-Truth table.
     #
-    # retired by #298 (2026-08-21) and swept out of the last two docstrings by #311: a scene's
-    # wrap is a PIXEL budget, so no channel has a width of "42" any more. Deliberately narrow --
-    # `_script_to_message` still explains, correctly and in the past tense, that the parameter
-    # used to invite "~42 for a full-screen scenic BG", and that sentence is the warning.
-    r"width 42\b", r"backdrop's 42",
+    # retired by #298 (2026-08-21), and #311 found THREE docstrings still asserting it: a
+    # scene's wrap is a PIXEL budget, so no channel is "42" or "29" wide any more. The first
+    # sweep matched only two of the three, which is why the patterns below are keyed on the
+    # numbers next to a channel word rather than on the sentences that happened to survive.
+    # Deliberately not matching `_script_to_message`, which explains in the PAST TENSE that
+    # this parameter used to invite "~42 for a full-screen scenic BG" -- that sentence is the
+    # warning, and a guard that rejects its own warning is worse than none.
+    r"width 42\b", r"backdrop's 42", r"\b42 for the full-screen",
+    r"\b29 for the on-map",
 ]
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as
