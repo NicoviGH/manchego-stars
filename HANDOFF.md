@@ -13,13 +13,13 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#316**, CI green, no open PRs.
+**Nothing.** `main` is at **#317** (`8b3b951`), CI green, no open PRs.
 
 ## Next task
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); #308 is done.
+(#308-#315); **#308 is done** (#316 + #317).
 
 **#310 is next and is now UNBLOCKED** — the 3.2x is already measured and sitting on the issue
 (71s serial -> 22s at `--jobs 4`, zero deadline blowouts, per-scenario times identical). What is
@@ -47,6 +47,20 @@ ELF and stamp — every checkpoint builder runs on canonical, so verifying #317 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **Verdict scenarios run HEADLESS** (#302/#308, PRs #316 + #317) — a `kind: verdict` scenario
+  asserts on memory and needs no pixels, so it runs with no window and stops costing a watched
+  run; `record`/`diagnostic` stay headed because their output IS the picture. `headless` is a
+  DECLARED `matrix.yaml` field (`auto` derives it from `kind`), and `tools/build_mgba_headless.sh`
+  builds the binary — nobody ships a macOS mGBA with headless AND Lua. ⚠️ **Nine traps in
+  `decisions.md`** → "A verdict scenario needs no pixels", and three are the kind that bite
+  silently: `emu:saveStateFile()` is broken headless (returns false, writes **397,312 bytes of
+  zeros**, and every call site ignored the return, so a checkpoint builder run headless would have
+  stamped a dead state VALID forever); **a verdict glob on the bare word matched a FAIL** whose
+  reason text contained it, which is how the stamp got written anyway — classification is now one
+  `verdict_passed()` helper, because four copies is why it was wrong in four places at once; and a
+  failed rebuild must not delete a checkpoint it did not write. **Reading the code proved the guard
+  fired; it did not prove what the caller did with the verdict.** Both directions are now proved by
+  running them.
 - **Traps are DECLARED, not inherited** (#302/#306) — `.traps` is a ChapterEventGroup field our
   injectors filled but never wrote, so ch06 (on `Ch7EventData`) would have shipped vanilla Ch7's
   two ballistae at its coordinates. ⚠️ Three traps in `decisions.md`: the placeable-type list is
