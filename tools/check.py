@@ -536,12 +536,13 @@ def _injection_call_sequence(text):
     hoists one earlier).
 
     A step wrapped for build-scope attribution (`_scopes.run(inject_ch05, ...)`, #255
-    phase 2) is the same step in the same place, so it counts as a call to itself --
-    otherwise every wrapped chapter injector silently drops out of this gate."""
+    phase 2) or for injection caching (`_anims.run(inject_battle_anims, ...)`, #309) is the
+    same step in the same place, so it counts as a call to itself -- otherwise every wrapped
+    injector silently drops out of this gate, taking its ordering constraints with it."""
     m = re.search(r'\ndef main\(\):.*', text, re.S)
     if not m:
         return []
-    names = re.findall(r'^\s+(?:engine_hooks\.)?(?:_scopes\.run\()?(\w+)[(,]',
+    names = re.findall(r'^\s+(?:engine_hooks\.)?(?:_\w+\.run\()?(\w+)[(,]',
                        m.group(0), re.M)
     seen, order = set(), []
     for n in names:
@@ -564,6 +565,50 @@ def _injection_order_violations(order):
             msgs.append('build_campaign.main(): %s must run before %s -- %s'
                         % (before, after, why))
     return msgs
+
+
+def _cached_step_violations(text):
+    """A cached injection step must run before anything that reads a boot flag (#309).
+
+    The injection cache restores a step's output ACROSS ROM configurations, which is only
+    sound while nothing configuration-dependent has run yet. That is a property of main()'s
+    ORDER, so it is checked against main()'s order rather than trusted to a comment.
+
+    The flag names are read out of main()'s own `_requested_flags` table -- the one place
+    that already lists every boot flag -- so adding a flag cannot quietly widen the gap.
+    """
+    m = re.search(r'\ndef main\(\):.*', text, re.S)
+    if not m:
+        return []
+    body = m.group(0).splitlines()
+    flags = set(re.findall(r'args\.(\w+)',
+                           re.search(r'_requested_flags = \{.*?\}', m.group(0), re.S).group(0)
+                           if re.search(r'_requested_flags = \{.*?\}', m.group(0), re.S) else ''))
+    if not flags:
+        return ['build_campaign.main() has no _requested_flags table to read boot flags from']
+    call = re.compile(r'^\s+(?:_\w+\.run\()?((?:inject|_configure|chain)\w*)[(,]')
+    flagged = []          # (line no, step) for every injector that reads a boot flag
+    problems = []
+    for i, line in enumerate(body):
+        hit = call.match(line)
+        if not hit:
+            continue
+        step = hit.group(1)
+        if '_anims.run(' in line:
+            for at, earlier in flagged:
+                problems.append(
+                    'injection cache: %s (line %d of main) is cached across ROM configurations, '
+                    'but %s reads a boot flag at line %d and runs FIRST -- a restored output '
+                    'would then depend on which config built it (#309)' % (step, i, earlier, at))
+        elif any(('args.' + f) in line for f in flags):
+            flagged.append((i, step))
+    return problems
+
+
+def check_cached_steps_are_config_invariant(fail):
+    """The ordering the injection cache's soundness rests on (#309)."""
+    path = os.path.join(REPO, 'tools', 'build_campaign.py')
+    fail.extend(_cached_step_violations(open(path, encoding='utf-8').read()))
 
 
 def check_injection_order(fail):
@@ -1515,7 +1560,8 @@ def main():
                   check_tests_pass, check_yaml_parses,
                   check_chapter_status, check_chapter_deployment_schema,
                   check_personal_line_injection_routes,
-                  check_injection_order, check_playtest_matrix,
+                  check_injection_order, check_cached_steps_are_config_invariant,
+                  check_playtest_matrix,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,
                   check_tool_refs_exist, check_no_dead_concepts,

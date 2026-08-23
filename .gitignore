@@ -61,5 +61,8 @@ campaigns/*/battle_anims/*/.paint/
 # matrix verdict cache (earned PASS verdicts + their artifacts, keyed by input fingerprint)
 .matrix-verdictcache/
 
+# injection step cache (what a config-invariant injection step wrote, keyed on its inputs)
+.injectcache/
+
 # matrix build-scope manifest (what each injection step wrote; describes the build, not the source)
 .build-scopes.json

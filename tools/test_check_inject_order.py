@@ -24,7 +24,7 @@ def main():
     engine_hooks._inject_lord_floor_engine()
     inject_map_sprites(c)
     inject_enemy_class_reskins(c)
-    inject_enemy_class_battle_anims(c)
+    _anims.run(inject_enemy_class_battle_anims, c)
     inject_winter_tileset(c)
     inject_ch01(c)
     inject_ch03(c)
@@ -42,6 +42,15 @@ class TestCallSequence(unittest.TestCase):
         order = check._injection_call_sequence(GOOD)
         self.assertLess(order.index('inject_ch01'), order.index('inject_prologue'))
         self.assertIn('_inject_lord_select_engine', order)   # engine_hooks. prefix stripped
+
+    def test_a_cached_step_still_counts_as_itself(self):
+        """A step run through the injection cache (`_anims.run(inject_x, ...)`, #309) is the
+        same step in the same place -- exactly like `_scopes.run`. If the parser missed it,
+        the step would silently drop out of this gate and its ordering constraints with it."""
+        order = check._injection_call_sequence(GOOD)
+        self.assertIn('inject_enemy_class_battle_anims', order)
+        self.assertLess(order.index('inject_enemy_class_reskins'),
+                        order.index('inject_enemy_class_battle_anims'))
 
     def test_ignores_calls_outside_main(self):
         # helper()'s inject_prologue must not count as the first call.
@@ -90,6 +99,46 @@ class TestRealBuildCampaign(unittest.TestCase):
         check.check_injection_order(fail)
         self.assertEqual(fail, [])
 
+
+
+CACHED_GOOD = """
+def main():
+    _requested_flags = {'TESTCH': args.test_chapter, 'CH05BOOT': args.ch05_boot}
+    if args.ch05_moose and not args.ch05_boot:
+        sys.exit('--ch05-moose needs --ch05-boot')
+    _anims.run(inject_enemy_class_battle_anims, args.campaign)
+    _anims.run(inject_battle_anims, args.campaign)
+    _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot)
+    if args.ch05_boot:
+        _configure_boot(CH05_HOST_INDEX)
+"""
+
+CACHED_BAD = """
+def main():
+    _requested_flags = {'TESTCH': args.test_chapter, 'CH05BOOT': args.ch05_boot}
+    _scopes.run(inject_ch05, args.campaign, boot=args.ch05_boot)
+    _anims.run(inject_battle_anims, args.campaign)
+"""
+
+
+class TestCachedStepsAreConfigInvariant(unittest.TestCase):
+    """A cached step's output is restored across ROM configurations, so nothing that reads a
+    boot flag may run before it (#309). Ordering is what makes the cache sound; a comment
+    saying so is not."""
+
+    def test_a_cached_step_ahead_of_every_flagged_injector_passes(self):
+        self.assertEqual(check._cached_step_violations(CACHED_GOOD), [])
+
+    def test_a_flagged_injector_ahead_of_a_cached_step_is_a_violation(self):
+        msgs = check._cached_step_violations(CACHED_BAD)
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn('inject_battle_anims', msgs[0])
+        self.assertIn('inject_ch05', msgs[0])
+
+    def test_the_real_build_campaign_satisfies_it(self):
+        fail = []
+        check.check_cached_steps_are_config_invariant(fail)
+        self.assertEqual(fail, [])
 
 if __name__ == '__main__':
     unittest.main()
