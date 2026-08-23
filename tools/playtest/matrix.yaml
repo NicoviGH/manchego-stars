@@ -434,6 +434,14 @@ suites:
   # Deliberately tight: the controller contract, the ch00/ch01 spine, the SMS budget,
   # and the current chapter. ch02/ch03 stay out because their checkpoints and routs
   # cost more than a gate should -- run those with their chapter suite or --all.
+  # THE MERGE GATE = the spine + the two most recently hosted chapters. It is bounded on
+  # purpose: an accumulating gate is ~130 scenarios and ~18 builds by ch18, which is a gate
+  # nobody runs, and an unrun gate protects nothing. Depth is not deleted when a chapter ages
+  # out -- it moves to that chapter's own suite below and still runs in the `--all` sweep
+  # before a playtest build. Two chapters rather than one because the CHAIN is where the
+  # coupling lives (chain_ch04_to_ch05 rewrites ch04's landing; chapters share donor slots,
+  # one SMS id pool and one message-id space). `check.py check_gate_chapter_window` derives
+  # the window from the host registry, so HOSTING ch06 is what ages ch04 out.
   gate:
     - controller_turn
     - win
