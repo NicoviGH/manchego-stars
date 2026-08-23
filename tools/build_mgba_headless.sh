@@ -60,11 +60,22 @@ cp "$SRC"/build/libmgba.*.dylib "$DEST/" 2>/dev/null || true
 install_name_tool -add_rpath "@loader_path" "$DEST/mgba-headless" 2>/dev/null || true
 
 echo "==> verifying Lua is really in there"
+# The emulator runs until killed -- there is no SWI in a stock FE8 ROM to exit on -- so the
+# probe MUST be backgrounded and reaped. Running it in the foreground hangs this script at
+# its last step forever, which is the whole point of the check being here.
 probe=$(mktemp /tmp/mgba-probe-XXXX.lua)
 out=$(mktemp /tmp/mgba-probe-XXXX.txt)
 printf 'local f=io.open("%s","w") f:write("ok") f:close()\n' "$out" > "$probe"
 : > "$out"
-"$DEST/mgba-headless" --script "$probe" "$REPO/fireemblem8u/baserom.gba" >/dev/null 2>&1 || true
+"$DEST/mgba-headless" --script "$probe" -l 0 "$REPO/fireemblem8u/baserom.gba" >/dev/null 2>&1 &
+probe_pid=$!
+for _ in $(seq 1 20); do
+    [ -s "$out" ] && break
+    kill -0 "$probe_pid" 2>/dev/null || break
+    sleep 1
+done
+kill "$probe_pid" 2>/dev/null || true
+wait "$probe_pid" 2>/dev/null || true
 if [ "$(cat "$out")" = "ok" ]; then
     echo "mgba-headless installed and running Lua: $DEST/mgba-headless"
 else

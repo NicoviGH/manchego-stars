@@ -175,33 +175,38 @@ MX_RESOLVED="$(python3 "$HERE/matrix.py" resolve "$SCENARIO")" || {
     echo "run.sh: '$SCENARIO' has no row in tools/playtest/matrix.yaml" >&2; exit 2; }
 eval "$MX_RESOLVED"
 
-# Which mGBA runs this scenario, decided by what the scenario ASSERTS (#308).
+# Which mGBA runs a given invocation, decided by the manifest's `headless` field (#308).
 #
-# A `kind: verdict` scenario proves memory state -- INSPECT.units, activeMsg, flags -- and
-# needs no pixels, so it runs under mgba-headless and never appears on screen. That is the
-# whole point: Nicolas watches every headed run, and 49% of ch05's commits were the session
-# churn that batching-by-one-watched-run produced (#302).
+# A headless scenario asserts on MEMORY -- INSPECT.units, activeMsg, flags -- and needs no
+# pixels, so it runs with no window and stops costing Nicolas's attention. `record` and
+# `diagnostic` scenarios, and the two verdict scenarios that also drop frames, declare
+# `headless: false` and keep the Qt frontend, because their output IS the picture.
 #
-# `record` and `diagnostic` scenarios stay HEADED on purpose -- their output IS the picture,
-# and eyes-on is how presentation defects get caught (#279's letterbox bar, Sahnar's exit).
-# `checkpoint` builders stay headed too: they mint save states, and are already the slow path.
-#
-# mgba-headless attaches no video renderer, so emu:screenshot() segfaults inside
-# PNGWritePixels -- harness.lua skips shots when PLAYTEST_HEADLESS=1. Build the binary with
-# tools/build_mgba_headless.sh; if it is absent we fall back to headed rather than fail, so
-# a fresh checkout still works.
+# TWO things mgba-headless cannot do, because it attaches no video renderer:
+#   * emu:screenshot() null-derefs inside PNGWritePixels -- harness.lua skips it.
+#   * emu:saveStateFile() returns false and writes an all-zeros file (measured: 397312
+#     bytes of zeros). Every saveState() call site discards that return, so a CHECKPOINT
+#     BUILDER run headless would mint a dead state, PASS on its own assertions, and get
+#     its .romhash stamped VALID -- poisoning the checkpoint permanently.
+# So the engine is chosen PER INVOCATION, not once: run_mgba takes it as an argument and
+# the checkpoint builder below always passes `headed`.
 HEADLESS_APP="$REPO/tools/emulator/mgba-headless"
-PLAYTEST_HEADLESS=0
-if [ "${MX_KIND:-verdict}" = "verdict" ] && [ -z "${PT_HEADED:-}" ]; then
+HEADED_APP="$APP"
+SCENARIO_HEADLESS=0
+if [ -n "${MX_HEADLESS:-}" ] && [ "${PT_HEADED:-0}" = "0" ]; then
     if [ -x "$HEADLESS_APP" ]; then
-        APP="$HEADLESS_APP"
-        PLAYTEST_HEADLESS=1
+        SCENARIO_HEADLESS=1
     else
-        echo "note: $HEADLESS_APP not built -- running HEADED." >&2
-        echo "      tools/build_mgba_headless.sh builds it (one-time, ~10 min)." >&2
+        # Do NOT silently fall back to headed. Which engine ran is not in the verdict-cache
+        # key, so a silent fallback would let a headed PASS be served for a headless run and
+        # vice versa -- the exact collision the key exists to prevent. Refuse in 0s instead.
+        echo "run.sh: '$SCENARIO' is declared headless but $HEADLESS_APP is not built." >&2
+        echo "        Build it once:  tools/build_mgba_headless.sh   (~10 min)" >&2
+        echo "        Or force the Qt frontend for this run:  PT_HEADED=1 tools/playtest/run.sh $SCENARIO" >&2
+        exit 2
     fi
 fi
-[ "$PLAYTEST_HEADLESS" = "1" ] || ensure_headed_app
+[ "$SCENARIO_HEADLESS" = "1" ] || ensure_headed_app
 
 # The most expensive failure in this repo is a scenario that FAILs because the tree
 # holds the wrong ROM (a CH04BOOT=1 build cannot reach ch02's map). Refuse in 0s
@@ -233,9 +238,13 @@ python3 "$HERE/gen_symbols.py"
 pkill -9 -i mgba 2>/dev/null || true
 ROMHASH=$(shasum "$ROM" | cut -c1-12)
 
-# run_mgba <scenario> <fps> <vsync> <deadline_s>  -> echoes log, sets global VERDICT.
+# run_mgba <scenario> <fps> <vsync> <deadline_s> [headless|headed]
+#   -> echoes log, sets global VERDICT. The engine is an ARGUMENT because a checkpoint
+#      builder must stay headed even when the scenario that needs it is headless.
 run_mgba() {
-    local scen=$1 fps=$2 vsync=$3 deadline=$4
+    local scen=$1 fps=$2 vsync=$3 deadline=$4 mode=${5:-headed}
+    local app hl=0
+    if [ "$mode" = "headless" ]; then app="$HEADLESS_APP"; hl=1; else app="$HEADED_APP"; ensure_headed_app; fi
     local out="/tmp/playtest-$scen" log
     log="$out/playtest.log"
     rm -rf "$out" && mkdir -p "$out"
@@ -259,7 +268,7 @@ PLAYTEST_SPEED = "${PT_SPEED:-}"
 PLAYTEST_MAXFRAMES = "${PT_MAXFRAMES:-}"
 PLAYTEST_PRESSEVERY = "${PT_PRESSEVERY:-}"
 PLAYTEST_SHOTEVERY = "${PT_SHOTEVERY:-}"
-PLAYTEST_HEADLESS = "$PLAYTEST_HEADLESS"
+PLAYTEST_HEADLESS = "$hl"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
@@ -269,7 +278,9 @@ EOF
     # audioSync on with it, because sound played against a free-running video clock stutters.
     local mute=1 async=0
     if [ -n "${PT_SOUND:-}" ] && [ "${PT_SOUND}" != "0" ]; then mute=0; async=1; fi
-    "$APP" --script "$wrapper" \
+    # -l 0: mgba-headless logs every BIOS SWI and DMA otherwise -- 5.4MB in 6s, which is
+    # ~1GB over a 600s scenario, all of it captured into mgba-stdout.log and none of it read.
+    "$app" --script "$wrapper" -l 0 \
         -C mute=$mute -C fpsTarget="$fps" -C audioSync=$async -C videoSync="$vsync" \
         "$ROM" >"$out/mgba-stdout.log" 2>&1 &
     local pid=$!
@@ -318,7 +329,9 @@ CHECKPOINT_STAMP="$ROMHASH:${PT_DIFFICULTY:-normal}"
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$CHECKPOINT_STAMP" ]; then
         echo "== checkpoint '$CKPT' missing/stale for $CHECKPOINT_STAMP -> building at top speed (240fps) =="
-        run_mgba "$BUILDER" 240 0 "$MX_CHECKPOINT_DEADLINE"  # ch02start plays the whole ch00->ch01->ch02 chain
+        run_mgba "$BUILDER" 240 0 "$MX_CHECKPOINT_DEADLINE" headed  # HEADED always: saveStateFile is
+        # broken under mgba-headless (see the engine-selection note above). ch02start
+        # replays the whole ch00->ch01->ch02 chain.
         case "$VERDICT" in
             *PASS*) echo "$CHECKPOINT_STAMP" > "$STATE_DIR/$CKPT.romhash" ;;
             *) echo "checkpoint build FAILED -- aborting"; exit 1 ;;
@@ -335,7 +348,8 @@ FPS="$MX_FPS"; VSYNC="$MX_VSYNC"; DEADLINE_S="$MX_DEADLINE"
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
 if [ -n "${PT_FPS:-}" ]; then FPS="$PT_FPS"; [ "$PT_FPS" -ge 240 ] && VSYNC=0; fi
-run_mgba "$SCENARIO" "$FPS" "$VSYNC" "$DEADLINE_S"
+run_mgba "$SCENARIO" "$FPS" "$VSYNC" "$DEADLINE_S" \
+    "$([ "$SCENARIO_HEADLESS" = "1" ] && echo headless || echo headed)"
 # Tell the sidecar the run is over: serve() drains any pending request, saves its
 # transcript (record mode), and exits -- without this it polls forever and a recorded
 # transcript would only be saved by a clean Ctrl-C.

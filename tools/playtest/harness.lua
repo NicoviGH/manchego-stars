@@ -290,6 +290,16 @@ local function saveState(name)
     local ok = false
     pcall(function() ok = emu:saveStateFile(statePath(name)) end)
     log("saveState " .. name .. " -> " .. tostring(ok))
+    -- Every call site discards this return, and a checkpoint builder that "succeeds"
+    -- while writing nothing is the worst shape of failure here: run.sh stamps the
+    -- .romhash on the builder's PASS, so a dead state then looks FRESH forever and the
+    -- scenario that needs it fails on every future run. mgba-headless does exactly this
+    -- (returns false, writes 397312 bytes of zeros), which is why run.sh keeps checkpoint
+    -- builders headed -- but the guard belongs here too, where the failure is visible.
+    if not ok then
+        controllerFault = "saveStateFile failed for '" .. name .. "' -- refusing to let a "
+            .. "checkpoint build report PASS with no state written"
+    end
     return ok
 end
 local function loadState(name)
