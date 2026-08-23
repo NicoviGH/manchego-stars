@@ -1790,8 +1790,11 @@ beside it. Decisions worth keeping:
   the way rather than blocking.
 - **A failed build blocks only its own group**, and a failed scenario does not stop the matrix — one broken
   configuration must not hide the state of the others.
-- **Sequential by construction.** mGBA runs share emulator/save state, and two ROM builds in one tree corrupt
-  each other, so neither is parallelised; the win comes from not rebuilding and not re-earning checkpoints.
+- **Builds are sequential by construction; runs are not.** Two ROM builds in one tree corrupt each other and
+  the tree holds ONE `fireemblem8.gba`, so a build never overlaps anything. Scenario RUNS are independent
+  processes: headless ones run concurrently (see “Headless flipped the parallel-dispatch default”, #310),
+  while headed runs and checkpoint builders stay serial — they contend for the compositor and for
+  `states/<name>.ss` respectively. The biggest win is still not rebuilding and not re-earning checkpoints.
 - **Suites are curated, not derived.** `gate` is deliberately tight (controller contract + ch00/ch01 spine +
   SMS budget + the current chapter); the per-chapter suites are each a single ROM build; `--all` runs every
   non-manual verdict scenario. `llm` is `manual` (external sidecar) and never auto-selected.
@@ -2259,6 +2262,50 @@ re-running green scenes to obtain a number is exactly the cost this ADR exists t
 **Not a licence to re-run green scenes.** Headless removes the ATTENTION cost, not the time cost,
 and "never run anything after a merge" still stands. What it buys is that a run no longer has to be
 watched -- which is what makes batching scene work possible at all (#311).
+
+### Headless flipped the parallel-dispatch default — 3.2x (2026-08-23, #302, #310)
+
+`--jobs` had been off since 2026-08-09, and for a good reason: 444s serial against 439s at
+`jobs=4`, with four scenarios blowing their WALL-CLOCK deadlines and reporting ERROR/FAIL. That
+measurement was never wrong. It was **conditional on being HEADED** — four Qt mGBA windows
+contending for one compositor, each still rendering every frame, which is exactly what a 1.01x
+with deadline blowouts looks like. #308 deleted the rendering, so the condition changed and the
+number had to be re-taken rather than respected or assumed away (`decisions.md` → inherited leads
+are hypotheses).
+
+Re-taken on the same Mac (8 logical / 4 performance cores), same four ch03boot verdict scenarios,
+one build, `--no-verdict-cache`:
+
+| | wall | per-scenario |
+|---|---|---|
+| `--jobs 1` | **71s** | 15s / 14s / 20s / 20s |
+| `--jobs 4` | **22s** | 15s / 15s / 21s / 21s |
+
+**3.2x, all four PASS, zero deadline blowouts.** The interesting column is the second one: the
+per-scenario times are essentially IDENTICAL serial and parallel. There is no contention left to
+find — which is what you would expect once no process is rendering.
+
+**Parallelism is gated on `headless`, per SCENARIO, not per group.** `scenario_lanes` now pulls a
+headed scenario into the serial lane the same way a checkpointed one has always been pulled
+(`states/<name>.ss` is a shared file two scenarios would race to mint). A MIXED group is therefore
+not forced serial whole: its headless scenarios still run concurrently and the headed ones run
+afterwards, alone, on the caller's thread — so a headed run never overlaps anything and the
+2026-08-09 measurement stays the live one for exactly the runs it was taken on.
+
+**The default is derived from the machine, capped at what was measured.** `resolve_jobs` is
+`--jobs`, else `MX_JOBS`, else `cpus // 2` floored at 1 and capped at `MEASURED_JOBS = 4`. Half
+the logical cores is the performance-core count on the Mac this was measured on; an unthrottled
+mGBA at `fps: 240` is CPU-bound enough that a box without spare cores would only divide the same
+throughput, which is the 2026-08-09 result restated for small machines. The cap is there because 4
+is what somebody actually ran: a 32-core machine may claim more only once it has been measured
+there.
+
+Proved end to end with the default and no flag — three canonical verdict scenarios, 15s + 18s +
+18s of scenario time, **18s wall**, all PASS, cached ROM, no build.
+
+**This does not license re-running green scenes.** It makes the runs that must happen cheaper; it
+does not make a run free, and "never run the full gate locally, never after a merge" still stands.
+The other half of the gate's 24m51s is the five BUILDS, which is #309's problem, not this one's.
 
 ### A chapter declares its traps; `.traps` is the fourth inherited field (2026-08-22, #302)
 
