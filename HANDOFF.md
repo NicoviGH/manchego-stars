@@ -13,20 +13,25 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#319** (`0125d88`), CI green, no open PRs.
+**Nothing.** `main` is at **#320** (`1ec511e`), CI green, no open PRs.
 
 ## Next task
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308 and #310 are done** (#316, #317, #318, #319).
+(#308-#315); **#308 and #310 are done**, and **#309 is half done** — its phase 1 landed
+(#320), phase 2 is re-priced and still open.
 
-**#309 is next** — patch the linked ELF instead of rebuilding. Nine `rom_configs` are nine
-compiles, and the gate's 24m51s is 5 builds plus 21 runs; #308 and #310 took the runs, this takes
-the builds. Its last scope box (*measure the gate before/after*) is also where the gate's new
-baseline comes from — #310 deliberately did not re-run the gate to get it, since #309 is about to
-move the other half of that number. Then #311 / #312, then the declarative half (#313, #314,
-#315), then ch06 through it.
+**#311 is next** — scene preview + golden master, seeing a scene without building a ROM. Then
+#312, then the declarative half (#313, #314, #315), then ch06 through it.
+
+**Owed on #309 before phase 2: ONE gate run.** Both halves of the 24m51s baseline have moved —
+#310 took the runs (3.2x) and #320 took ~26s off each of the five builds — so the number is stale
+in two directions and phase 2 (ELF patching) has to be priced against the new one. Spend that run
+deliberately, not folded into a debugging session. Phase 2's ceiling is unchanged and small: the
+boot target is patchable, but the armed party seed each `--chNN-boot` LOADs must be runtime-gated
+first, and `testch` / `ch05lupinboot` / `montage` / the ch05 debug boots inject DATA and never can
+be — 2 of 5 builds at best.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
@@ -44,6 +49,15 @@ ELF and stamp — every checkpoint builder runs on canonical, so verifying #317 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **A config switch stopped costing a whole build** (#302/#309 phase 1, PR #320) — the two
+  battle-anim injection steps were 26 of the injector's ~35 seconds and no boot flag reaches
+  either, so every one of the twelve `rom_configs` paid them for byte-identical data. They now
+  restore 639 files instead of recomputing them: a config switch is **49.0s → 25.2s**, a
+  same-config rebuild 59.7s → 25.5s. ⚠️ Traps in `decisions.md` → "A build is 50 seconds": the
+  cache key is the argument and the `pre`/`post` digest map is the CHECK on it (a `pre`-only rule
+  looked right and would have hit exactly never — nothing wipes the decomp between builds); and a
+  step wrapped in `_x.run(...)` DROPS OUT of `check_injection_order` unless its parser is told,
+  which has now bitten twice. `NO_INJECT_CACHE=1` turns the cache off.
 - **Headless runs made parallel dispatch pay** (#302/#310, PRs #318 + #319) — the parallel lane is
   gated on `headless` per SCENARIO (a mixed group parallelises its headless half and runs the headed
   ones after, alone), and `--jobs` now defaults to `cpus // 2` capped at 4 instead of 1. 3.2x on the
