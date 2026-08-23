@@ -50,6 +50,9 @@ import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
+sys.path.insert(0, os.path.join(REPO, 'tools'))     # build_scopes, inject.hosts
+import build_scopes                                 # noqa: E402  the build's own bookkeeping
+
 MANIFEST = os.path.join(HERE, 'matrix.yaml')
 HARNESS = os.path.join(HERE, 'harness.lua')
 RUN_SH = os.path.join(HERE, 'run.sh')
@@ -675,18 +678,14 @@ STAMP_PATH = os.path.join(REPO, '.build-config.json')
 # What build_campaign.py recorded each injection step as having written (#255 phase 2).
 SCOPES_PATH = os.path.join(REPO, '.build-scopes.json')
 ROM_CACHE_DIR = os.path.join(REPO, '.matrix-romcache')
-ROM_INPUT_PATHS = ('campaigns', 'engine', 'tools/inject', 'tools/build_campaign.py',
-                   'tools/portrait_tool.py', 'tools/feditor_to_banim.py', 'Makefile')
+ROM_INPUT_PATHS = build_scopes.ROM_INPUT_PATHS
 
 
 def rom_input_hash(make_flags, paths=None):
     """A digest of everything the ROM is built from, for cache keying.
 
-    Files are fingerprinted by (path, size, mtime_ns) rather than content: hashing the whole
-    campaign tree on every run would cost more than it saves, and the failure mode is the safe
-    one -- a touched-but-identical file forces a needless REBUILD, never a stale ROM. The
-    unsafe direction (edited content landing on a byte-identical size AND timestamp) does not
-    happen with real editors or with git.
+    The file fingerprint itself is `build_scopes.fingerprint_paths` -- shared with the
+    injection step cache (#309), because "have the inputs moved" must have one answer.
     """
     h = hashlib.sha256()
     h.update(('flags:' + ' '.join(make_flags) + '|campaign:' + CAMPAIGN + '\n').encode())
@@ -696,25 +695,7 @@ def rom_input_hash(make_flags, paths=None):
         h.update(b'decomp:' + head)
     except (subprocess.CalledProcessError, OSError):
         return None             # cannot pin the decomp -> refuse to cache rather than guess
-    for rel in (ROM_INPUT_PATHS if paths is None else paths):
-        path = os.path.join(REPO, rel)
-        if os.path.isfile(path):
-            files = [path]
-        elif os.path.isdir(path):
-            files = [os.path.join(root, name)
-                     for root, dirs, names in os.walk(path)
-                     for name in names
-                     if not name.startswith('.')
-                     and not any(d in root for d in ('__pycache__', '.git'))]
-        else:
-            continue
-        for f in sorted(files):
-            try:
-                st = os.stat(f)
-            except OSError:
-                continue
-            h.update(('%s|%d|%d\n' % (os.path.relpath(f, REPO), st.st_size,
-                                      st.st_mtime_ns)).encode())
+    build_scopes.fingerprint_paths(REPO, ROM_INPUT_PATHS if paths is None else paths, into=h)
     return h.hexdigest()[:32]
 
 
@@ -945,9 +926,6 @@ PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'P
 #
 # Slot numbers come from `tools/inject/hosts.py`, the file that ENROLS a chapter, so adding
 # ch06 is one line there and nothing here.
-sys.path.insert(0, os.path.join(REPO, 'tools'))     # build_scopes, inject.hosts
-
-
 def _host_slots():
     """{host slot -> build scope}, read from the injector's own enrolment constants."""
     from inject import hosts
@@ -1245,7 +1223,6 @@ class VerdictCache(object):
 
     def _scope_manifest(self, rom, digest, fresh=False):
         """The build's own account of what it wrote, or None (fall back to the ROM key)."""
-        import build_scopes
         if fresh:
             return build_scopes.load_manifest(SCOPES_PATH)
         if digest is None:

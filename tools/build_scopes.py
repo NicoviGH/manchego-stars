@@ -39,6 +39,49 @@ SCOPE_ROOTS = ('src', 'data', 'include', 'graphics', 'scripts')
 _CHAPTER = re.compile(r'ch\d\d')
 
 
+# Everything the ROM is built FROM. Lives here rather than in the playtest runner because
+# both caches key on it: the matrix's ROM cache (can this whole BUILD be restored) and
+# inject.step_cache (can this one injection STEP be).
+ROM_INPUT_PATHS = ('campaigns', 'engine', 'tools/inject', 'tools/build_campaign.py',
+                   'tools/portrait_tool.py', 'tools/feditor_to_banim.py', 'Makefile')
+
+
+def fingerprint_paths(root, paths, into=None):
+    """Fold (relpath, size, mtime_ns) for every file under `paths` into a hash.
+
+    Shared by the two caches that ask "have the ROM's inputs moved" -- `matrix.rom_input_hash`
+    (which decides whether a whole BUILD can be restored) and `inject.step_cache` (whether one
+    injection STEP can be). They must answer that question the same way or one of them is
+    wrong; this is the one implementation.
+
+    Files are fingerprinted by stat rather than by content deliberately: hashing the whole
+    campaign tree on every build would cost more than it saves, and the failure mode is the
+    safe one -- a touched-but-identical file forces a needless recompute, never a stale
+    artifact.
+    """
+    h = into if into is not None else hashlib.sha256()
+    for rel in paths:
+        path = os.path.join(root, rel)
+        if os.path.isfile(path):
+            files = [path]
+        elif os.path.isdir(path):
+            files = [os.path.join(dirpath, name)
+                     for dirpath, dirs, names in os.walk(path)
+                     for name in names
+                     if not name.startswith('.')
+                     and not any(d in dirpath for d in ('__pycache__', '.git'))]
+        else:
+            continue
+        for f in sorted(files):
+            try:
+                st = os.stat(f)
+            except OSError:
+                continue
+            h.update(('%s|%d|%d\n' % (os.path.relpath(f, root), st.st_size,
+                                      st.st_mtime_ns)).encode())
+    return h
+
+
 def scope_of_step(name):
     """The scope a step's writes belong to, read off the step's own function name.
 

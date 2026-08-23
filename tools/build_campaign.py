@@ -56,6 +56,7 @@ from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitive
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE,
     WEAPON_ITEM_ENUM, fe_item_enum)  # shared weapon<->ITEM map (used by inject_prologue)
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
+from inject import step_cache  # noqa: E402  restore a config-invariant step (#309)
 
 # PyYAML's pure-Python scanner walks a document one character at a time through a chain of
 # Python calls, which made YAML parsing ~22s of a 51s injection (6M reader.forward calls) for
@@ -640,6 +641,42 @@ BUILD_STAMP = os.path.join(REPO, '.build-config.json')
 # which scenarios a change can possibly have affected (#255 phase 2). Gitignored for the
 # same reason as the build stamp: it describes this tree's build, not the source.
 BUILD_SCOPES_PATH = os.path.join(REPO, '.build-scopes.json')
+# Where a config-invariant injection step's output is kept between builds (#309). Gitignored
+# for the same reason as the two above: it describes builds, not source. `NO_INJECT_CACHE=1`
+# turns it off, the way `MX_NO_ROM_CACHE` turns off the matrix's ROM cache.
+INJECT_CACHE_DIR = os.path.join(REPO, '.injectcache')
+# Where the battle-anim steps write, used ONLY to bootstrap the first entry's pre-state hashes
+# (step_cache derives the real path list from what the step actually wrote). `src` and
+# `include` are in it because both steps also touch a handful of shared tables there.
+BANIM_ROOTS = ('data/banim', 'graphics/banim', 'src', 'include')
+
+
+def _anim_step_cache(campaign, verbose=True):
+    """The cache the two battle-anim steps run through (#309).
+
+    Keyed on everything the ROM is built from EXCEPT the boot flags -- which is precisely the
+    claim being made: these steps cannot see a flag, so two configurations of the same source
+    must produce the same anim data. The decomp revision is in the key too, because a submodule
+    bump moves the tables they append to.
+
+    Falls back to running the steps outright when the key cannot be pinned (no git) or when
+    `NO_INJECT_CACHE=1` says to -- the same escape hatch shape as `MX_NO_ROM_CACHE`.
+    """
+    if os.environ.get('NO_INJECT_CACHE'):
+        if verbose:
+            print('  (NO_INJECT_CACHE=1 -- battle anims will be re-injected)')
+        return step_cache.disabled()
+    h = hashlib.sha256()
+    h.update(('campaign:' + campaign + '\n').encode())
+    try:
+        head = subprocess.check_output(['git', '-C', DECOMP, 'rev-parse', 'HEAD'],
+                                       stderr=subprocess.DEVNULL)
+    except (subprocess.CalledProcessError, OSError):
+        return step_cache.disabled()   # cannot pin the decomp -> recompute rather than guess
+    h.update(b'decomp:' + head)
+    build_scopes.fingerprint_paths(REPO, build_scopes.ROM_INPUT_PATHS, into=h)
+    return step_cache.StepCache(DECOMP, INJECT_CACHE_DIR, h.hexdigest()[:32],
+                                roots=BANIM_ROOTS, verbose=verbose)
 
 
 def _stamp_build_config(campaign, flags):
@@ -13714,6 +13751,7 @@ def main():
     # every scenario depends on, so the conservative answer is also the default one.
     _scopes = build_scopes.BuildScopes(
         DECOMP, previous=build_scopes.load_manifest(BUILD_SCOPES_PATH))
+    _anims = _anim_step_cache(args.campaign)
     print('portraits:')
     inject_portraits(args.campaign)
     inject_arena_attendant_portraits(args.campaign)
@@ -13769,10 +13807,15 @@ def main():
         print('enemy class reskins (#21):')
         inject_enemy_class_reskins(args.campaign)  # after map sprites (SMS ids), before ch01
         sms_alloc_report()
+        # The two most expensive steps in the build (17.1s + 8.5s of a ~50s `make`, measured
+        # 2026-08-23) and the two that NO boot flag reaches -- every ROM configuration pays
+        # them to produce byte-identical data, and the matrix builds five for one gate. So
+        # they are cached on their inputs (#309). Both run BEFORE the first flag-dependent
+        # step, which is what makes them config-invariant; `check.py` holds that ordering.
         print('enemy class battle anims (#90):')
-        inject_enemy_class_battle_anims(args.campaign)  # after reskins (binds the clone class)
+        _anims.run(inject_enemy_class_battle_anims, args.campaign)  # after reskins (binds the clone)
         print('battle anims (#65):')
-        inject_battle_anims(args.campaign)
+        _anims.run(inject_battle_anims, args.campaign)
         print('winter tileset:')
         inject_winter_tileset(args.campaign)
         print('battle platforms (#65):')
