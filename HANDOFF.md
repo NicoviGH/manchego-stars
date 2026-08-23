@@ -6,30 +6,27 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-22 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-08-23 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Five gotchas that lived ONLY here were migrated into `decisions.md` first — check that
 a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#317** (`8b3b951`), CI green, no open PRs.
+**Nothing.** `main` is at **#319** (`0125d88`), CI green, no open PRs.
 
 ## Next task
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308 is done** (#316 + #317).
+(#308-#315); **#308 and #310 are done** (#316, #317, #318, #319).
 
-**#310 is next and is now UNBLOCKED** — the 3.2x is already measured and sitting on the issue
-(71s serial -> 22s at `--jobs 4`, zero deadline blowouts, per-scenario times identical). What is
-left is raising the default for groups whose scenarios all resolve headless, keeping `jobs=1`
-wherever a group contains a headed scenario, and retiring the "parallelism does not pay here" note
-in `matrix.py` in the same commit.
-
-**Then #309** — patch the linked ELF instead of rebuilding. Nine `rom_configs` are nine compiles,
-and the gate's 24m51s is 5 builds plus 21 runs; headless took the runs, this takes the builds.
-Then #311 / #312, then the declarative half (#313, #314, #315), then ch06 through it.
+**#309 is next** — patch the linked ELF instead of rebuilding. Nine `rom_configs` are nine
+compiles, and the gate's 24m51s is 5 builds plus 21 runs; #308 and #310 took the runs, this takes
+the builds. Its last scope box (*measure the gate before/after*) is also where the gate's new
+baseline comes from — #310 deliberately did not re-run the gate to get it, since #309 is about to
+move the other half of that number. Then #311 / #312, then the declarative half (#313, #314,
+#315), then ch06 through it.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
@@ -47,6 +44,12 @@ ELF and stamp — every checkpoint builder runs on canonical, so verifying #317 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **Headless runs made parallel dispatch pay** (#302/#310, PRs #318 + #319) — the parallel lane is
+  gated on `headless` per SCENARIO (a mixed group parallelises its headless half and runs the headed
+  ones after, alone), and `--jobs` now defaults to `cpus // 2` capped at 4 instead of 1. 3.2x on the
+  re-measurement; the 2026-08-09 "does not pay" note is retired in `decisions.md` and in `matrix.py`.
+  Scenarios also report on COMPLETION now, because dispatch lines stopped being progress once four
+  of them started at once.
 - **Verdict scenarios run HEADLESS** (#302/#308, PRs #316 + #317) — a `kind: verdict` scenario
   asserts on memory and needs no pixels, so it runs with no window and stops costing a watched
   run; `record`/`diagnostic` stay headed because their output IS the picture. `headless` is a
