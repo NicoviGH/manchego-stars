@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# Run ONE automated playtest scenario in mGBA (headed, but fully scripted).
+# Run ONE automated playtest scenario in mGBA, fully scripted.
+#
+# A `kind: verdict` scenario runs HEADLESS (no window) under tools/emulator/mgba-headless --
+# it asserts on memory and needs no pixels. `record` and `diagnostic` scenarios run HEADED,
+# because their output IS the picture. PT_HEADED=1 forces headed; see #308.
 #
 #   tools/playtest/run.sh <scenario> [--keep-open]
 #
