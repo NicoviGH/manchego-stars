@@ -360,5 +360,36 @@ class TestDifficultyGateDefault(unittest.TestCase):
                       'checkpoint validity must include the difficulty mode, not just ROMHASH')
 
 
+
+RUN_SH = os.path.join(REPO, 'tools/playtest/run.sh')
+
+
+class TestNoBlanketEmulatorKill(unittest.TestCase):
+    """Scenarios run FOUR AT A TIME by default since #310, so anything run.sh kills by name
+    kills its siblings."""
+
+    def source(self):
+        with open(RUN_SH, encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_run_sh_never_kills_every_mgba(self):
+        """`pkill -9 -i mgba` at startup SIGKILLed three scenarios in one gate run: each was
+        executing while the pool dispatched the next, and the newcomer killed it. The kill has
+        to name THIS scenario's process, never the program."""
+        for line in self.source().splitlines():
+            stripped = line.strip()
+            if stripped.startswith('#') or 'pkill' not in stripped:
+                continue
+            self.assertNotRegex(
+                stripped, r'pkill[^|]*\s-i\s',
+                'run.sh kills mGBA by NAME, which reaches other scenarios: %s' % stripped)
+            self.assertIn('playtest-', stripped,
+                          'a kill in run.sh must be scoped to one scenario: %s' % stripped)
+
+    def test_the_leftover_kill_is_still_there(self):
+        """Scoped, not deleted: a leftover emulator from an interrupted run of the SAME
+        scenario still has to be cleared, or it holds the ROM the next run wants."""
+        self.assertIn('pkill', self.source())
+
 if __name__ == '__main__':
     unittest.main()

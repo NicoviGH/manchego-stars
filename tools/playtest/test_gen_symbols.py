@@ -109,5 +109,42 @@ class RenderLua(unittest.TestCase):
         self.assertRegex(out, r'PROCSCR = \{')
 
 
+
+class WriteAtomic(unittest.TestCase):
+    """Since #310 four scenarios start at once, and every run.sh regenerates these three
+    files. A half-written symbols.lua read by a sibling is a scenario that dies for reasons
+    nobody can reproduce."""
+
+    def setUp(self):
+        import shutil
+        import tempfile
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.path = os.path.join(self.tmp, 'symbols.lua')
+
+    def test_it_writes_the_whole_file(self):
+        gs.write_atomic(self.path, 'SYM = {}\n')
+        with open(self.path) as fh:
+            self.assertEqual(fh.read(), 'SYM = {}\n')
+
+    def test_a_failed_write_leaves_the_previous_file_intact(self):
+        """The point of writing through a temp file: a reader never sees a partial one, and a
+        writer that dies leaves the last good table in place."""
+        gs.write_atomic(self.path, 'GOOD\n')
+
+        class Boom(str):
+            def encode(self, *a, **k):
+                raise RuntimeError('disk full')
+
+        with self.assertRaises(RuntimeError):
+            gs.write_atomic(self.path, Boom('PARTIAL'))
+
+        with open(self.path) as fh:
+            self.assertEqual(fh.read(), 'GOOD\n')
+
+    def test_the_temp_file_does_not_survive(self):
+        gs.write_atomic(self.path, 'SYM = {}\n')
+        self.assertEqual(os.listdir(self.tmp), ['symbols.lua'])
+
 if __name__ == '__main__':
     unittest.main()
