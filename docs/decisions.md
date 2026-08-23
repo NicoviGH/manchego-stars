@@ -2136,6 +2136,68 @@ _Decided: 2026-06-17_
 
 ## Distribution & Scope
 
+### A verdict scenario needs no pixels, so it runs HEADLESS (2026-08-22, #302, #308)
+
+**The measurement that reordered the epic.** #302 began by counting `CH0N_*` constants (37 -> 48 ->
+78 across ch03/ch04/ch05) and concluded the injector was the problem. Then we counted where ch05's
+**102 first-parent commits** actually went: **50 of them (49%) touched only `docs/` or
+`HANDOFF.md`**. By lines added, injector + tests + playtest scaffolding was 69%, against 3.4% for
+the chapter YAML. Only 4 commits were rework -- ch05 was not bug-plagued, it was SLOW.
+
+The cadence is visible in the log with no interpretation: `docs: point the next session at ch05's
+scene 5` -> `Wire ch05's scene 5 (#280)` -> `docs: point the next session at ch05's scene 6` -> ...
+Fifteen scenes, one per session, a handoff commit on each side.
+
+The cause is upstream of all of it:
+
+```
+verification is a watched GUI run  ->  batch size = 1 scene per session
+                                   ->  ~15 changeovers
+                                   ->  50 handoff commits (49% of ch05)
+```
+
+Theory of Constraints: every system has one constraint, and optimising a non-constraint adds
+nothing to throughput. **The constraint is verification cost measured in Nicolas's attention.**
+`inject_ch05` was never the constraint; it was the visible thing.
+
+**So: a `kind: verdict` scenario runs headless.** It asserts on MEMORY -- `INSPECT.units`,
+`activeMsg()`, flags -- and needs no pixels at all. `kind: record` and `diagnostic` stay HEADED on
+purpose: their output IS the picture, and eyes-on is how presentation defects get caught (#279's
+letterbox bar and Sahnar's exit were both eyes-on finds). `matrix.yaml` already typed every
+scenario with exactly that field, so the switch keys off data that already existed.
+
+Measured on the ch03boot ROM: `ch03prep` 14s, `ch03chest` 14s, `ch03talk` 21s, `ch03midmap` 21s,
+all PASS, no window. (The headed comparison for the same scenarios was deliberately NOT run --
+re-running green scenes to obtain a number is exactly the cost this ADR exists to remove.)
+
+**Three traps, each of which cost a step:**
+
+1. **Nobody ships a macOS binary that has both headless AND Lua.** mGBA's own nightly DMG contains
+   only `mGBA.app`, the Qt GUI frontend, whose `--help` has no headless option. pokeemerald-
+   expansion vendors a prebuilt `tools/mgba/mgba-rom-test-mac` which advertises `--script` in its
+   option parser and **has no Lua compiled in** -- their tests are C in the ROM, so they never
+   needed it, and a three-line `hello.lua` fails to load with `Failed to load script`. Upstream
+   `BUILD_HEADLESS` defaults to OFF. `tools/build_mgba_headless.sh` builds it; the script verifies
+   Lua actually loads afterwards, because a Lua-less binary builds fine and still takes `--script`.
+
+2. **`emu:screenshot()` segfaults headless, and `pcall` cannot catch it.** No video renderer is
+   attached, so `mCore_screenshot` -> `PNGWritePixels` -> `KERN_INVALID_ADDRESS at 0x0`. That is a C
+   segfault, not a Lua error, so `shot()`'s existing `pcall` wrapper is no protection whatsoever --
+   the call has to not happen. `harness.lua` skips it on `PLAYTEST_HEADLESS=1` and logs the
+   intent. A guard rejecting `shot()` inside verdict scenarios was drafted and **dropped as wrong**:
+   the skip degrades gracefully, and `ch03prep` calls `shot()` three times and passes.
+
+3. **The symbols must come from the ELF that built the ROM you are running.** `gen_symbols.py`
+   hardcodes `fireemblem8u/fireemblem8.elf`, so pointing the harness at a `.matrix-romcache` ROM
+   from a different build reads shifted addresses and hangs at `boot stuck` with procs that never
+   change -- which looks exactly like an input failure and is not one. Input was verified
+   independently: `emu:addKey`/`clearKey` round-trip correctly headless (START = 8) and IWRAM
+   advances. Run the tree's ROM, or regenerate symbols against the ROM you mean to run.
+
+**Not a licence to re-run green scenes.** Headless removes the ATTENTION cost, not the time cost,
+and "never run anything after a merge" still stands. What it buys is that a run no longer has to be
+watched -- which is what makes batching scene work possible at all (#311).
+
 ### A chapter declares its traps; `.traps` is the fourth inherited field (2026-08-22, #302)
 
 `.traps` is a **ChapterEventGroup** field (chapterdata.h:32), not a `chapter_settings` one. Our

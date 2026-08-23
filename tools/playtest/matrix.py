@@ -67,7 +67,7 @@ class Scenario(object):
     """One fully resolved row: defaults + class rules + the scenario's own entry."""
 
     FIELDS = ('rom', 'host_chapter', 'fps', 'vsync', 'deadline', 'checkpoint',
-              'kind', 'manual')
+              'kind', 'manual', 'headless')
 
     def __init__(self, name, values, rom_configs, checkpoint_deadline):
         self.name = name
@@ -78,6 +78,16 @@ class Scenario(object):
         self.deadline = int(values['deadline'])
         self.kind = values['kind']
         self.manual = bool(values.get('manual', False))
+        # Headless is DECLARED, not inferred at run time (#308). `auto` derives it from
+        # kind -- a verdict scenario asserts on memory and needs no pixels -- but a
+        # scenario may say `headless: false` outright, and two do: recordunitlist and
+        # recordsupply are verdict scenarios BY WHAT THEY ASSERT (decisions.md -> set
+        # kind by what a scenario asserts, never by its name prefix) while still dropping
+        # frames for make_gif.py. Deriving from kind alone would silently strip those.
+        headless = values.get('headless', 'auto')
+        if headless == 'auto':
+            headless = (values['kind'] == 'verdict')
+        self.headless = bool(headless)
         self.checkpoint_deadline = checkpoint_deadline
         ckpt = values.get('checkpoint')
         # recordscene picks its checkpoint at runtime from PT_STATE; there is no
@@ -440,6 +450,7 @@ def export_env(scenario):
         ('MX_CHECKPOINT_DYNAMIC', '1' if scenario.dynamic_checkpoint else ''),
         ('MX_CHECKPOINT_DEADLINE', scenario.checkpoint_deadline),
         ('MX_KIND', scenario.kind),
+        ('MX_HEADLESS', '1' if scenario.headless else ''),
     ]
     return '\n'.join("%s='%s'" % (k, '' if v is None else v) for k, v in pairs)
 
@@ -876,7 +887,13 @@ PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'P
                      # list honest cannot tell a harmless knob from a decisive one and should
                      # not have to. The cost is one extra run when a listen-through follows a
                      # muted PASS, which is exactly when you wanted to run it again.
-                     'PT_SOUND')
+                     'PT_SOUND',
+                     # PT_HEADED forces a verdict scenario back onto the Qt frontend (#308).
+                     # It genuinely changes the run: headed restores emu:screenshot(), which
+                     # harness.lua skips under mgba-headless. Serving a headed PASS for a
+                     # headless run -- or the reverse -- would cache across two different
+                     # execution paths, which is precisely what this key exists to prevent.
+                     'PT_HEADED')
 
 
 # -- what a scenario can possibly depend on (#255 phase 2) ------------------

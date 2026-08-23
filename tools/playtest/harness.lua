@@ -128,10 +128,24 @@ local function result(verdict, why)
     end
     log("RESULT: " .. verdict .. " -- " .. why)
 end
+-- PLAYTEST_HEADLESS is set by run.sh when the scenario runs under mgba-headless, which
+-- attaches NO video renderer: emu:screenshot() then null-derefs inside PNGWritePixels
+-- (mCore_screenshot -> PNGWritePixels -> KERN_INVALID_ADDRESS at 0x0). That is a C
+-- segfault, so the pcall below cannot catch it -- the call has to not happen at all.
+-- This is the designed split, not a workaround: a `kind: verdict` scenario asserts on
+-- MEMORY (INSPECT.units, activeMsg) and needs no pixels, while `record` and `diagnostic`
+-- scenarios stay headed precisely because their output IS the picture.
+-- Read as a GLOBAL, deliberately: this file is one Lua chunk against a 200-local ceiling
+-- (decisions.md -> "`harness.lua` is ONE Lua chunk, at the 200-local ceiling"), and binding
+-- this to a top-level local spent one of the last free slots for no benefit.
 local nshot = 0
 local function shot(tag)
     nshot = nshot + 1
     local p = string.format("%s/%04d-%s.png", PLAYTEST_SHOTDIR, nshot, tag)
+    if PLAYTEST_HEADLESS == "1" then
+        log("screenshot SKIPPED (headless): " .. p)
+        return
+    end
     pcall(function() emu:screenshot(p) end)
     log("screenshot: " .. p)
 end
@@ -276,6 +290,16 @@ local function saveState(name)
     local ok = false
     pcall(function() ok = emu:saveStateFile(statePath(name)) end)
     log("saveState " .. name .. " -> " .. tostring(ok))
+    -- Every call site discards this return, and a checkpoint builder that "succeeds"
+    -- while writing nothing is the worst shape of failure here: run.sh stamps the
+    -- .romhash on the builder's PASS, so a dead state then looks FRESH forever and the
+    -- scenario that needs it fails on every future run. mgba-headless does exactly this
+    -- (returns false, writes 397312 bytes of zeros), which is why run.sh keeps checkpoint
+    -- builders headed -- but the guard belongs here too, where the failure is visible.
+    if not ok then
+        controllerFault = "saveStateFile failed for '" .. name .. "' -- refusing to let a "
+            .. "checkpoint build report PASS with no state written"
+    end
     return ok
 end
 local function loadState(name)

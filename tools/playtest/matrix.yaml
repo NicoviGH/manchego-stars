@@ -18,6 +18,9 @@ defaults:
   vsync: 0
   deadline: 420         # seconds before run.sh calls the run timed-out
   kind: verdict         # verdict | record | checkpoint | diagnostic
+  headless: auto        # auto = derive from kind (verdict -> headless). `false` pins it
+                        # HEADED: mgba-headless attaches no video renderer, so a scenario
+                        # that produces FRAMES must say so even when it is a verdict (#308).
   manual: false         # true = never auto-selected (needs a human or a sidecar)
 
 # Checkpoint builders always ran at 240fps with a long deadline: ckpt_ch02start
@@ -121,6 +124,8 @@ scenarios:
     checkpoint: prep
   recordsupply:                                        # asserts bench/deploy/count/Supply
     checkpoint: lordpinky
+    headless: false     # a verdict by what it ASSERTS, but it still drops frames for
+                        # make_gif.py -- headless has no renderer and would strip them.
   recordrescue:
     kind: record
     checkpoint: prep
@@ -200,6 +205,8 @@ scenarios:
     kind: record
   recordunitlist:                                      # FAILs if the SMS counters cross
     rom: testch
+    headless: false     # verdict by assertion, but run.sh documents
+                        # `make_gif.py recordunitlist unitlist` over its frames.
   recordcast:                                          # PT_CHAR=<id>: bust + map sprite (#25)
     rom: testch
     kind: record        # a capture for a human look-test, same as recordanim -- not a machine
