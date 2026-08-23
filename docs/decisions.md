@@ -2213,6 +2213,31 @@ re-running green scenes to obtain a number is exactly the cost this ADR exists t
    a missing binary must REFUSE, never fall back to headed: which engine ran is not in the verdict
    key, so a silent fallback serves a headed PASS for a headless run.
 
+6. **A verdict glob on the bare word matched a FAIL, and that is how the stamp got written.**
+   `run.sh` classified every verdict with `case "$VERDICT" in *PASS*)`, and `VERDICT` is the whole
+   `RESULT: ...` LINE -- reason text included. The first guard message said "refusing to let a
+   checkpoint build report PASS with no state written", so the FAIL it produced *matched the PASS
+   arm*: run.sh stamped `prep.romhash` valid off a build that had written 397312 bytes of zeros.
+   Four globs were fragile, and the last one is the EXIT CODE line, so a failure could have exited
+   0. All four now match `*"RESULT: PASS"*`, and the guard message no longer contains the word.
+   **This was found only by RUNNING the negative case** -- forcing a checkpoint builder headless
+   and watching what it wrote. Reading the code proved the guard fired; it did not prove what the
+   caller then did with that verdict. A failed build now also deletes its partial `.ss`, because a
+   397KB file in `states/` reads as a real checkpoint to whoever looks next.
+
+   Proof, both directions, on the canonical ROM (2026-08-23):
+
+   ```
+   builder forced headless:  engine: headless -> saveState prep -> false
+                             RESULT: FAIL ... -> checkpoint build FAILED -- aborting
+                             states/: no .romhash written, partial .ss removed
+   normal (ch02, headless):  engine: headed (mGBA)      -> saveState ch02start -> true  -> PASS
+                             engine: headless           -> ch02 PASS
+   ```
+
+   A real state is ~105-129KB at 99.4-99.5% non-zero; the broken one is exactly 397312 bytes of
+   zeros. That size is the tell.
+
 **Not a licence to re-run green scenes.** Headless removes the ATTENTION cost, not the time cost,
 and "never run anything after a merge" still stands. What it buys is that a run no longer has to be
 watched -- which is what makes batching scene work possible at all (#311).

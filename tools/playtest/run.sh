@@ -245,6 +245,11 @@ run_mgba() {
     local scen=$1 fps=$2 vsync=$3 deadline=$4 mode=${5:-headed}
     local app hl=0
     if [ "$mode" = "headless" ]; then app="$HEADLESS_APP"; hl=1; else app="$HEADED_APP"; ensure_headed_app; fi
+    # Say which engine ran, every time. Which binary served an invocation decides whether
+    # screenshots and saveStateFile work at all, and it was previously invisible -- the
+    # checkpoint builder silently inheriting the headless engine is exactly the bug this
+    # line makes impossible to miss (#308).
+    echo "engine: $mode ($(basename "$app"))"
     local out="/tmp/playtest-$scen" log
     log="$out/playtest.log"
     rm -rf "$out" && mkdir -p "$out"
@@ -303,7 +308,7 @@ EOF
     # of #236 was that the next question after a FAIL should be "which proc do I classify",
     # not "which hypothesis do I rebuild" (#241).
     case "$VERDICT" in
-        *PASS*) ;;
+        *"RESULT: PASS"*) ;;
         *) if grep -q '"event":"inspect"\|"event": "inspect"' "$log" 2>/dev/null; then
                echo "---------------- inspector ----------------"
                python3 "$HERE/inspect_state.py" render "$log" || true
@@ -333,8 +338,12 @@ if [ -n "$BUILDER" ]; then
         # broken under mgba-headless (see the engine-selection note above). ch02start
         # replays the whole ch00->ch01->ch02 chain.
         case "$VERDICT" in
-            *PASS*) echo "$CHECKPOINT_STAMP" > "$STATE_DIR/$CKPT.romhash" ;;
-            *) echo "checkpoint build FAILED -- aborting"; exit 1 ;;
+            *"RESULT: PASS"*) echo "$CHECKPOINT_STAMP" > "$STATE_DIR/$CKPT.romhash" ;;
+            *) # Remove the partial state too. Without its .romhash the next run would
+               # rebuild anyway, but a 397KB file of zeros sitting in states/ reads as a
+               # real checkpoint to anyone looking, and that is how a dead one gets trusted.
+               rm -f "$STATE_DIR/$CKPT.ss"
+               echo "checkpoint build FAILED -- aborting"; exit 1 ;;
         esac
     else
         echo "== checkpoint '$CKPT' valid for $CHECKPOINT_STAMP -> loading =="
@@ -359,7 +368,11 @@ if [ "$SCENARIO" = "llm" ]; then touch "$LLM_DIR/stop"; fi
 # passes through it, and the next `make matrix` would go on reporting the stale PASS for a
 # scenario that is red right now. Nothing else here reads the cache; this only invalidates.
 case "$VERDICT" in
-    *PASS*) ;;
+    *"RESULT: PASS"*) ;;
     *) rm -rf "$REPO/.matrix-verdictcache/$SCENARIO-"* 2>/dev/null || true ;;
 esac
-case "$VERDICT" in *PASS*) exit 0 ;; *) exit 1 ;; esac
+# Match the VERDICT LINE, not the bare word. VERDICT holds the whole `RESULT: ...` line, so
+# a glob on the word alone also matched a FAIL whose REASON happened to contain it -- which
+# stamped a checkpoint VALID off a failed build, and here would have exited 0 on a failure.
+# Caught by forcing a checkpoint builder headless and watching it stamp anyway (#308).
+case "$VERDICT" in *"RESULT: PASS"*) exit 0 ;; *) exit 1 ;; esac
