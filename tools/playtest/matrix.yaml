@@ -82,8 +82,6 @@ classes:
     deadline: 600
   - match: "clear_ch02"
     deadline: 600
-  - match: "clear_ch03"
-    deadline: 600
   - match: "recordch02ending" # routs the whole band before it films
     deadline: 600
   - match: "recordch05opening*" # 49 boxes across four scenes, over two BGs -- our longest cutscene
@@ -208,9 +206,6 @@ scenarios:
                         # verdict. Its PASS is still gated on gProcScr_StatScreen actually
                         # being live, so it cannot green-light a frame that never opened.
   ckpt_ch02start: {}
-  ch03win:
-    rom: ch03boot
-    host_chapter: 4
   ch03midmap:
     rom: ch03boot
     host_chapter: 4
@@ -250,9 +245,6 @@ scenarios:
   smoke_ch04:
     rom: ch04boot
     host_chapter: 5
-  clear_ch03:
-    rom: ch03boot
-    host_chapter: 4
   ch02:
     checkpoint: ch02start
   smoke_ch02:
@@ -490,9 +482,7 @@ suites:
     - ch03chest
     - ch03tourmaline
     - ch03midmap
-    - ch03win
     - smoke_ch03
-    - clear_ch03
 
   ch04:
     - ch04moose

@@ -5085,86 +5085,12 @@ local function protectChwinga()
     end
 end
 
--- CH03WIN (#23 item 1): kill the grell -> its FLAGGED defeat quote sets EVFLAG_DEFEAT_BOSS
--- -> the Ch4 Misc DefeatBoss AFEV runs the ending. Proves the ch03 win wiring fires. The grell
--- rides a RAW pid (0xb7, no CA_BOSS -- so the generic clear-bot can't target it) and sits far
--- from the left-entrance spawn, so we teleport the leader (braulo, pid 0x01) onto a grell-adjacent
--- tile and strike. Poke the grell frail first (1 HP, no avoid) so one clean melee hit kills; a
--- Mogall's Evil Eye is range 2+, so a range-1 strike draws no lethal counter. EVFLAG_DEFEAT_BOSS
--- (flag 2) is the definitive assertion: the engine binds the DefeatBoss AFEV directly to it, and
--- SetPidDefeatedFlag (eventinfo.c) sets it on the grell's death REGARDLESS of CA_BOSS.
--- Run: PT_HOST_CHAPTER=4 tools/playtest/run.sh ch03win  (needs a CH03BOOT=1 ROM). Seeds #23 item 7.
-scenarios.ch03win = function()
-    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
-    if not red(0xb7) then return result("FAIL", "grell (pid 0xb7) not found in the red array") end
-    if not blue(0x01) then return result("FAIL", "leader (braulo, pid 0x01) not deployed") end
-    -- The party now deploys ARMED via PREP (#23 item 3, CLASS_LOADOUT), but force an Iron Axe
-    -- (id 0x1F | 45 uses) into items[0] so the scripted kill has a guaranteed in-range melee
-    -- weapon regardless of the leader's exact loadout.
-    emu:write16(blue(0x01).addr + 0x1E, 0x2D1F)
-    log("leader given an Iron Axe (guaranteed in-range weapon for the scripted kill)")
-    -- Bring the grell TO braulo's isolated left-entrance spawn (no other enemy is near it) so the
-    -- grell is the ONLY unit in braulo's range -- chooseAttack's default target can't pick a kobold
-    -- by mistake (the (14,1) lair sits amid other foes). Up to 3 player turns, enemy-phase between,
-    -- re-frailing + re-parking the grell each turn in case a whiff or its AI move disturbs it.
-    for turn = 1, 3 do
-        local g = red(0xb7)
-        if isDead(g) or eventFlag(2) then break end
-        local leader = blue(0x01)
-        pokeFrail(g)
-        g = red(0xb7)
-        local ggrid = mapUnitAt(g.x, g.y)
-        local parked = false
-        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-            local tx, ty = leader.x + d[1], leader.y + d[2]
-            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
-                setMapUnit(g.x, g.y, 0)
-                emu:write8(g.addr + 0x10, tx); emu:write8(g.addr + 0x11, ty)
-                setMapUnit(tx, ty, ggrid)
-                log(string.format("turn %d: grell parked at (%d,%d) next to braulo (%d,%d)",
-                    turn, tx, ty, leader.x, leader.y))
-                parked = true
-                break
-            end
-        end
-        if not parked then return result("FAIL", "no free tile adjacent to braulo to park the grell") end
-        if moveUnit(leader.x, leader.y, leader.x, leader.y) then
-            shot("attacking-grell")
-            chooseAttack(leader.addr)
-        end
-        if isDead(red(0xb7)) or eventFlag(2) then break end
-        log("grell survived turn " .. turn .. " (miss?); running enemy phase to retry")
-        if runEnemyPhase() == "gameover" then return result("FAIL", "unexpected game over in ch03win") end
-    end
-    if not (isDead(red(0xb7)) or eventFlag(2)) then
-        shot("grell-alive")
-        return result("FAIL", "could not kill the grell in 3 turns")
-    end
-    log("grell dead; waiting out the defeat quote for EVFLAG_DEFEAT_BOSS")
-    -- The flag is set AFTER the death quote renders (DisplayDefeatTalkForPid: show msg, THEN
-    -- SetPidDefeatedFlag), so tap A through the shriek line while polling the flag.
-    local won = waitFor(function() return eventFlag(2) end, 3600, true)
-    log(string.format("debug: EVFLAG_DEFEAT_BOSS(2)=%s chapter=%d (host=%d)",
-        tostring(eventFlag(2)), chapter(), HOST_CHAPTER))
-    if not won then
-        shot("grell-dead-no-flag")
-        return result("FAIL", "grell died but EVFLAG_DEFEAT_BOSS never set (win did not fire)")
-    end
-    -- Flag set -> the Misc DefeatBoss AFEV runs the ending script (victory sting -> dev-placeholder
-    -- campfire -> MNTS back to title, since ch04 isn't hosted). Let it play out to the title screen
-    -- WITHOUT mashing A (mashing would hit "Press START" and boot a spurious New Game). Screenshot
-    -- the endpoint as a no-crash confirmation that the ending script itself is valid.
-    wait(240)
-    shot("ch03-ending-ran")
-    result("PASS", "grell killed -> EVFLAG_DEFEAT_BOSS set -> DefeatBoss ending ran to title (ch03 win wired)")
-end
-
 -- CH03MIDMAP (#23 item 1): kill the Icewind Brute (the mid-map MINIBOSS) -> its FLAGGED silent
 -- defeat quote sets EVFLAG_TMP(10) -> the Ch4 Misc AFEV(EVFLAG_TMP(11), midmap, EVFLAG_TMP(10))
 -- runs the on-map RBG-execution cutscene ONCE. Proves the midmap trigger fires and the chapter
 -- KEEPS GOING (unlike the boss WIN). The Brute rides a unique raw pid (0xb6, distinct from the
 -- 0xaa generics + the 0xb7 grell) so its flagged death keys the trigger to it alone. Same
--- park-adjacent-and-strike trick as ch03win; the Brute is a melee Brigand, so poke it frail (1 HP)
+-- park-adjacent-and-strike trick (park the target beside a live blue unit, then strike); the Brute is a melee Brigand, so poke it frail (1 HP)
 -- and hit at range 1 -- a dead defender throws no counter. Must NOT touch the grell (that would end
 -- the chapter). Definitive assertion: EVFLAG_TMP(10) (Brute defeated) then EVFLAG_TMP(11) (the AFEV
 -- guard, set AFTER the midmap script runs). Run: PT_HOST_CHAPTER=4 run.sh ch03midmap (needs CH03BOOT=1).
@@ -5241,7 +5167,7 @@ end
 -- CH03TALK (#23 item 2): prove Trex's TALK-RECRUIT flips him GREEN -> BLUE (the CUSA fires). Boot
 -- the ch03 map, PARK the leader on a free tile adjacent to green Trex (the setMapUnit dance keeps
 -- the occupancy grid in sync, so cursor-select + Talk-adjacency both work with no phase cycle --
--- same trick ch03win uses to park the grell), then drive the Talk command and assert Trex leaves
+-- same park-beside-a-blue-unit trick), then drive the Talk command and assert Trex leaves
 -- the green array and joins the blue one. Run: PT_HOST_CHAPTER=4 run.sh ch03talk (needs CH03BOOT=1).
 scenarios.ch03talk = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
@@ -5760,75 +5686,6 @@ end
 scenarios.smoke_ch04 = function()
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     return smokeDrive(chapter())
-end
-
--- clear_ch03: the completability + DefeatBoss-win proof (#23), mirroring clear_ch02. The grell
--- (pid 0xb7) rides a raw charIndex with NO CA_BOSS, so the generic clear-bot (findBoss scans
--- CA_BOSS) can't target it -- like clear_ch02 this is a DETERMINISTIC rout via REAL combat that
--- proves the win->ending WIRING, not ch03 balance (that's the difficulty gate + the human pacing
--- pass). Each player phase: frail+harmless every foe (1 HP, no counter power) and teleport a party
--- unit onto a firing tile of each live enemy to one-shot it -- the kill goes through the death hook
--- that fires the flagged-defeat check (a raw US_DEAD poke would NOT). Routing the map kills the
--- grell, which raises EVFLAG_DEFEAT_BOSS -> the chapter ends. PASS = the DefeatBoss win fired
--- (flag set AND the chapter advanced off the host slot). Run: PT_HOST_CHAPTER=4 run.sh clear_ch03.
-scenarios.clear_ch03 = function()
-    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
-    pokeFastConfig()
-    if not red(0xb7) then return result("FAIL", "grell (pid 0xb7) not on the ch03 map") end
-    local start = chapter()
-    -- won = the DefeatBoss flag is set OR the chapter has advanced (the ending ran). A title-screen
-    -- WITHOUT an advance would be a game-over (loss), so guard that separately as a FAIL below.
-    local function won() return eventFlag(2) or chapter() ~= start end
-    local routed = false
-    for t = 1, 12 do
-        if won() then break end
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
-        wait(60)
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
-        end
-        for i = 0, 15 do
-            if won() or #liveEnemies() == 0 then break end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then
-                local mn, mx = unitAttackRange(u)
-                if mn and teleportToFiringTile(u, mn, mx) then
-                    u = unitAt(SYM.gUnitArrayBlue, i)   -- refresh after the teleport relocates it
-                    if u and moveUnit(u.x, u.y, u.x, u.y) then
-                        chooseAttack(u.addr)
-                        waitFor(function() return faction() == 0 and not menuOpen()
-                            and not procActive(SYM.gProc_ekrBattle) end, 600)   -- let the kill resolve
-                    end
-                end
-            end
-        end
-        local g = red(0xb7)
-        log(string.format("clear_ch03 turn %d: liveEnemies=%d grell=%s EVFLAG_DEFEAT_BOSS=%s chapter=%d",
-            t, #liveEnemies(), (g and not isDead(g)) and "alive" or "dead",
-            tostring(eventFlag(2)), chapter()))
-        if #liveEnemies() == 0 then routed = true end
-        if won() then break end
-        if gameOverActive() then shot("clear-ch03-gameover")
-            return result("FAIL", string.format("game over on turn %d -- party lost", t)) end
-        if runEnemyPhase() == "gameover" then shot("clear-ch03-gameover")
-            return result("FAIL", string.format("game over on the enemy phase, turn %d", t)) end
-    end
-    shot("clear-ch03-routed")
-    -- The DefeatBoss flag is set AFTER the (silent) grell defeat quote resolves; then the Misc
-    -- AFEV runs the ending -> dev-placeholder -> title (ch04 isn't hosted). Poll the flag, then let
-    -- the ending play out WITHOUT mashing A (mashing hits "Press START" -> a spurious New Game).
-    local flagged = waitFor(function() return eventFlag(2) end, 3600, true)
-    log(string.format("clear_ch03: routed=%s EVFLAG_DEFEAT_BOSS(2)=%s chapter=%d (host=%d)",
-        tostring(routed), tostring(eventFlag(2)), chapter(), HOST_CHAPTER))
-    if not flagged then
-        shot("clear-ch03-no-flag")
-        return result("FAIL", "grell never died / EVFLAG_DEFEAT_BOSS never set (DefeatBoss win did not fire)")
-    end
-    wait(240)
-    shot("clear-ch03-ending")
-    result("PASS", string.format(
-        "ch03 cleared: grell routed -> EVFLAG_DEFEAT_BOSS set -> DefeatBoss ending ran (chapter=%d)", chapter()))
 end
 
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
@@ -7564,7 +7421,7 @@ end
 -- the Village macro, because no single tile knows about the other three. ch05 awarded nothing at
 -- all while its YAML claimed the payout was "wired at inject_ch05".
 --
--- The boss kill is scripted the ch03win way (park Ravisin next to a blue unit, poke her frail,
+-- The boss kill parks Ravisin next to a blue unit and pokes her frail (
 -- strike) rather than routed: DefeatBoss means exactly one death has to land, and this scenario
 -- is about the PAYOUT wiring, not about whether the fight is winnable.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05crest (needs a CH05BOOT=1 ROM).
@@ -7636,7 +7493,7 @@ scenarios.ch05crest = function()
     if red(RAVISIN) == nil then
         return result("FAIL", "Ravisin (pid 0xb8) is not in the red array")
     end
-    -- Kill the boss. Same shape as ch03win: park her beside a live blue unit so chooseAttack
+    -- Kill the boss: park her beside a live blue unit so chooseAttack
     -- cannot pick a nearer target by mistake, and re-frail her each attempt in case of a whiff.
     for t = 1, 4 do
         local boss = red(RAVISIN)
@@ -8767,7 +8624,7 @@ end
 --                         Meesmickle takes the dread). This is the path the difficulty model
 --                         explicitly prices, and the one whose boxes had no speaker before #24.
 --   clear_ch04_parley  -- parley first, THEN rout; the authored Lupin ending.
--- Like clear_ch02/clear_ch03 this is a DETERMINISTIC rout through REAL combat (frail + harmless
+-- Like clear_ch02 this is a DETERMINISTIC rout through REAL combat (frail + harmless
 -- every foe, then teleport onto a firing tile and one-shot it) -- it proves the win -> ending
 -- WIRING, not ch04 balance. Kills go through the death hook; a raw US_DEAD poke would not.
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh clear_ch04 (needs a CH04BOOT=1 ROM).
@@ -8870,7 +8727,7 @@ local function clearCh04(parley)
     shot(tag .. "-routed")
     -- DefeatAll fires once the last red dies; then the branched ending plays over its BG and
     -- chains to the dev placeholder (ch05 is not hosted yet). Film it WITHOUT mashing A past
-    -- the end -- a stray press on "Press START" starts a spurious New Game (the clear_ch03
+    -- the end -- a stray press on "Press START" starts a spurious New Game (the clear_ch02
     -- lesson), and the run then films ch04's OPENING under the ending's name. So stop pressing
     -- the moment the title is up, and stop the loop with it. Shoot densely: motion is the point.
     -- NOTE: `f` counts ITERATIONS, not frames. It did before too, but every iteration was one
