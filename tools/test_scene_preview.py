@@ -152,7 +152,8 @@ class StaticChecksTheRomCannotCheaplyGive(unittest.TestCase):
         under the right name, and goldens the wrong scene with it. The build's
         `assert_message_ids_unique` guards the injectors; this guards the registry."""
         seen = {}
-        for key, (_title, msg_id, _builder, _width) in sp.registry().items():
+        for key, entry in sp.registry().items():
+            msg_id = entry.msg_id
             self.assertNotIn(msg_id, seen,
                              '%s and %s both claim MSG_%03X' % (seen.get(msg_id), key, msg_id))
             seen[msg_id] = key
@@ -164,9 +165,10 @@ class StaticChecksTheRomCannotCheaplyGive(unittest.TestCase):
         book, with its message id reachable from no key at all. Silent, until someone goes
         looking for a scene that is simply not there."""
         reg = {}
-        sp._claim(reg, 'ch05/4', 'first', 0x1, None, sp.TALK)
+        ev = sp.Event('chapter_start', 'vanilla 0x9BE')
+        sp._claim(reg, 'ch05/4', 'first', 0x1, None, sp.TALK, ev)
         with self.assertRaises(KeyError):
-            sp._claim(reg, 'ch05/4', 'second', 0x2, None, sp.TALK)
+            sp._claim(reg, 'ch05/4', 'second', 0x2, None, sp.TALK, ev)
 
     def test_every_branched_scene_registers_BOTH_arms(self):
         """An arm nobody can look at is an arm nobody proofreads -- and the no-Lupin arms are

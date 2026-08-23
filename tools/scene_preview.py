@@ -115,7 +115,16 @@ BATTLE = fe8_talk_font.BATTLE_QUOTE_BUDGET_PX
 # for. The titles are the chapter's own -- `CH05_*_SLOT` rows carry them.
 
 
-def _claim(reg, key, title, msg_id, builder, width):
+Entry = collections.namedtuple('Entry', 'title msg_id builder width event')
+
+# Which authored EVENT a scene renders: (trigger, slot) as the chapter YAML spells them, or
+# (trigger, None) where the trigger alone identifies it. This is the join key -- it is how
+# `chapter_status` says "this declared event is the one you can preview" without keeping a
+# third copy of the mapping. It comes off the same constants the ids do.
+Event = collections.namedtuple('Event', 'trigger slot')
+
+
+def _claim(reg, key, title, msg_id, builder, width, event):
     """Register one scene, refusing to overwrite a key already claimed.
 
     The generated opening keys and the hand-written ones share a namespace, so a new
@@ -125,8 +134,8 @@ def _claim(reg, key, title, msg_id, builder, width):
     if key in reg:
         raise KeyError('two scenes claim %r: %r and %r -- one of them would vanish from '
                        '--list, from `make scene` and from the golden book'
-                       % (key, reg[key][0], title))
-    reg[key] = (title, msg_id, builder, width)
+                       % (key, reg[key].title, title))
+    reg[key] = Entry(title, msg_id, builder, width, event)
 
 
 def _ch05_registry():
@@ -136,36 +145,48 @@ def _ch05_registry():
     moose = bc.CH05_MOOSE_CHARGE_SLOT
     talk = bc.ch05_sahnar_talk_messages
     ending = bc.ch05_ending_messages
+    opening = lambda slot: Event('chapter_start', slot)
     reg = collections.OrderedDict()
-    for n, (_slot, msg, _boxes, what) in enumerate(bc.CH05_OPENING_SLOTS, 1):
-        _claim(reg, 'ch05/%d' % n, what, msg, bc.ch05_opening_messages, TALK)
-    _claim(reg, 'ch05/4', arrival[3], arrival[1], bc.ch05_opening_messages, TALK)
+    for n, (slot, msg, _boxes, what) in enumerate(bc.CH05_OPENING_SLOTS, 1):
+        _claim(reg, 'ch05/%d' % n, what, msg, bc.ch05_opening_messages, TALK, opening(slot))
+    _claim(reg, 'ch05/4', arrival[3], arrival[1], bc.ch05_opening_messages, TALK,
+           opening(arrival[0]))
     _claim(reg, 'ch05/4-no-lupin', arrival[3] + ' (no Lupin)',
-           bc.CH05_ARRIVAL_NO_LUPIN_MSG, bc.ch05_opening_messages, TALK)
-    _claim(reg, 'ch05/5', join[3], join[1], bc.ch05_basil_join_messages, TALK)
+           bc.CH05_ARRIVAL_NO_LUPIN_MSG, bc.ch05_opening_messages, TALK, opening(arrival[0]))
+    _claim(reg, 'ch05/5', join[3], join[1], bc.ch05_basil_join_messages, TALK,
+           opening(join[0]))
     _claim(reg, 'ch05/5-no-lupin', join[3] + ' (no Lupin)',
-           bc.CH05_BASIL_JOIN_NO_LUPIN_MSG, bc.ch05_basil_join_messages, TALK)
-    _claim(reg, 'ch05/6', alone[3], alone[1], bc.ch05_sahnar_alone_message, TALK)
-    _claim(reg, 'ch05/7', moose[3], moose[1], bc.ch05_moose_charge_message, TALK)
+           bc.CH05_BASIL_JOIN_NO_LUPIN_MSG, bc.ch05_basil_join_messages, TALK,
+           opening(join[0]))
+    _claim(reg, 'ch05/6', alone[3], alone[1], bc.ch05_sahnar_alone_message, TALK,
+           opening(alone[0]))
+    _claim(reg, 'ch05/7', moose[3], moose[1], bc.ch05_moose_charge_message, TALK,
+           opening(moose[0]))
     _claim(reg, 'ch05/7-quip', moose[3] + ' (the punchline)',
-           bc.CH05_MOOSE_QUIP_MSG, bc.ch05_moose_charge_message, TALK)
+           bc.CH05_MOOSE_QUIP_MSG, bc.ch05_moose_charge_message, TALK, opening(moose[0]))
     _claim(reg, 'ch05/talk-recruit', 'Basil talks Sahnar out of the sarcophagus',
-           bc.CH05_SAHNAR_TALK_MSG, talk, TALK)
+           bc.CH05_SAHNAR_TALK_MSG, talk, TALK, Event('sahnar_talk', None))
     _claim(reg, 'ch05/talk-recruit-no-lupin',
            'Basil talks Sahnar out of the sarcophagus (no Lupin)',
-           bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG, talk, TALK)
+           bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG, talk, TALK, Event('sahnar_talk', None))
     _claim(reg, 'ch05/eruption', 'Ravisin warns the party, turn 2',
-           bc.CH05_ERUPTION_MSG, bc.ch05_eruption_message, TALK)
+           bc.CH05_ERUPTION_MSG, bc.ch05_eruption_message, TALK,
+           Event('eruption_turn', None))
     _claim(reg, 'ch05/ravisin-taunt', 'Ravisin, first engagement',
-           bc.CH05_RAVISIN_TAUNT_MSG, bc.ch05_ravisin_taunt_message, BATTLE)
+           bc.CH05_RAVISIN_TAUNT_MSG, bc.ch05_ravisin_taunt_message, BATTLE,
+           Event('boss_battle', None))
     _claim(reg, 'ch05/ravisin-death', 'Ravisin dies',
-           bc.CH05_RAVISIN_DEATH_MSG, bc.ch05_ravisin_death_message, BATTLE)
+           bc.CH05_RAVISIN_DEATH_MSG, bc.ch05_ravisin_death_message, BATTLE,
+           Event('boss_death', None))
     _claim(reg, 'ch05/ending', 'the ending, Sahnar recruited',
-           bc.CH05_ENDING_MSGS[True], ending, TALK)
+           bc.CH05_ENDING_MSGS[True], ending, TALK,
+           Event('chapter_end', bc.CH05_ENDING_SLOT))
     _claim(reg, 'ch05/ending-no-sahnar', 'the ending, the berry exchange cut',
-           bc.CH05_ENDING_MSGS[False], ending, TALK)
+           bc.CH05_ENDING_MSGS[False], ending, TALK,
+           Event('chapter_end', bc.CH05_ENDING_SLOT))
     _claim(reg, 'ch05/ending-basil-died', "the ending, over Basil's body",
-           bc.CH05_ENDING_LOST_MSG, ending, TALK)
+           bc.CH05_ENDING_LOST_MSG, ending, TALK,
+           Event('chapter_end', bc.CH05_ENDING_LOST_SLOT))
     # DELIBERATELY absent: the arena tutorial (`ch05_arena_messages`). Its two boxes are locked
     # to vanilla MSG_9D5/9D6 VERBATIM and the builder proves that by reading them out of the
     # decomp's texts.txt -- so previewing it would put a decomp read inside the one tool whose
@@ -233,7 +254,8 @@ def preview(key, campaign=CAMPAIGN):
     reg = registry()
     if key not in reg:
         raise KeyError('no such scene %r (have: %s)' % (key, ', '.join(reg)))
-    title, msg_id, builder, width = reg[key]
+    entry = reg[key]
+    title, msg_id, builder, width = entry.title, entry.msg_id, entry.builder, entry.width
     chapter = key.split('/')[0]
     if chapter not in CHAPTER_YAML:
         raise KeyError('no chapter YAML registered for %r' % chapter)
@@ -298,8 +320,8 @@ def main():
                     help='regenerate the committed scene book(s) under docs/scenes/')
     args = ap.parse_args()
     if args.list:
-        for key, (title, msg_id, _b, _w) in registry().items():
-            print('%-28s MSG_%03X  %s' % (key, msg_id, title))
+        for key, entry in registry().items():
+            print('%-28s MSG_%03X  %s' % (key, entry.msg_id, entry.title))
         return 0
     if args.write:
         for chapter in sorted({k.split('/')[0] for k in registry()}):

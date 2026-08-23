@@ -9888,6 +9888,42 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     'ch02': (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG),
 }
 
+# The DEAD VANILLA BLOCK each hosted chapter draws its ids from, inclusive. A hosted chapter
+# takes its HOST SLOT's block, which is not the block of the chapter it mines -- ch05 is
+# vanilla Ch5's 1:1 twin and owns vanilla CH6's ids, because it hosts on slot 6 and ch04 has
+# slot 5's already.
+#
+# Declared rather than inferred from what is claimed, and that is the whole point: a range
+# computed from its own contents can only ever report itself as full, so it could never
+# answer the question this exists for -- how much room is LEFT. These ranges were prose in
+# the comments beside each chapter's constants (#312 promoted them to data); a chapter with
+# no entry predates the registry, and "unknown" is reported rather than guessed at.
+#
+# A block's free ids are the ones NOBODY claims, not the ones its owner has not taken: ch05's
+# ending borrowed 0x9C9/0x9CA out of ch04's block, with the reason recorded at CH05_ENDING_MSGS.
+HOSTED_CHAPTER_MESSAGE_BLOCKS = {
+    'ch03': (0x9A3, 0x9B9),   # the dead vanilla Ch4 block (slot 4)
+    'ch04': (0x9BA, 0x9CC),   # the dead vanilla Ch5 block (slot 5)
+    'ch05': (0x9E4, 0x9F5),   # the dead vanilla Ch6 block (slot 6)
+}
+
+
+def assert_message_blocks_disjoint(blocks=None):
+    """Guard: no two hosted chapters may declare OVERLAPPING id blocks.
+
+    `assert_message_ids_unique` catches two chapters writing the same id. This catches the
+    setup that makes that inevitable -- two chapters told to help themselves to the same
+    range -- before either has spent it.
+    """
+    ordered = sorted((blocks if blocks is not None
+                      else HOSTED_CHAPTER_MESSAGE_BLOCKS).items(), key=lambda kv: kv[1])
+    for (a, (a_lo, a_hi)), (b, (b_lo, b_hi)) in zip(ordered, ordered[1:]):
+        if b_lo <= a_hi:
+            sys.exit('ERROR: %s (0x%X-0x%X) and %s (0x%X-0x%X) declare OVERLAPPING message '
+                     'blocks -- two chapters cannot both be free to spend the same ids'
+                     % (a, a_lo, a_hi, b, b_lo, b_hi))
+    return True
+
 
 def assert_message_ids_unique(claims=None):
     """Guard: no two hosted chapters may claim the same message id.
@@ -13833,6 +13869,7 @@ def main():
         # hosted chapters claim one message id -- a double-claim is otherwise silent, since
         # verify_text checks runaway text, not who owns a slot.
         assert_message_ids_unique()
+        assert_message_blocks_disjoint()   # the setup that would make a collision inevitable
         print('chapter 1 (#21):')
         _scopes.run(inject_ch01, args.campaign)  # MUST precede inject_prologue (vanilla goal read)
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
