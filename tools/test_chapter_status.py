@@ -170,5 +170,69 @@ class TheReport(unittest.TestCase):
         self.assertIn('#313', cs.report('ch05'))
 
 
+class DegradedModesMustSayCannotTell(unittest.TestCase):
+    """Every optional import here has a fallback, and a fallback that reports a WRONG number
+    is worse than one that reports none: the whole promise of this command is that its rows
+    are true. Each of these silently lied."""
+
+    def setUp(self):
+        self._preview, self._bc = cs._preview_module, cs._build_campaign
+        self.addCleanup(setattr, cs, '_preview_module', self._preview)
+        self.addCleanup(setattr, cs, '_build_campaign', self._bc)
+        cs._scenes_cache.clear()
+
+    def tearDown(self):
+        cs._scenes_cache.clear()
+
+    def test_without_the_preview_module_scenes_are_unknown_not_unpreviewable(self):
+        cs._preview_module = lambda: None
+        self.assertFalse(any('cannot be previewed' in e for e in cs.loose_ends('ch05')))
+
+    def test_without_build_campaign_a_full_block_is_not_reported_as_undeclared(self):
+        """ch05's block is FULL. Rendering that as 'no host block declared' makes it
+        indistinguishable from ch01, whose block genuinely was never written down."""
+        cs._build_campaign = lambda: None
+        text = cs.report('ch05')
+        self.assertNotIn('no host block declared', text)
+        self.assertIn('cannot tell', text)
+
+    def test_without_build_campaign_box_counts_are_blank_rather_than_wrong(self):
+        """Counting every script entry gives 20 where the truth is 19: stage directions are
+        not boxes. A wrong number in the same column with no marker is the worst option."""
+        cs._build_campaign = lambda: None
+        row = next(r for r in cs.scenes('ch05') if r.slot == 'vanilla 0x9BB')
+        self.assertIsNone(row.boxes)
+
+
+class VerdictsThatCanOnlyEverBePasses(unittest.TestCase):
+    def test_a_failed_scenario_is_not_reported_as_never_run(self):
+        """`store_cached_verdict` writes a slot ONLY on PASS and clears the scenario's slots
+        on a FAIL, so the cache can never say FAIL. Calling an empty slot 'never run' is
+        exactly the unrun-vs-failing blur this is supposed to refuse -- the honest reading of
+        an absent slot is 'no stored PASS'."""
+        rows = cs.scenarios('ch05', cache_dir=os.path.join(os.sep, 'nonexistent-cache'))
+        text = cs.report('ch05', cache_dir=os.path.join(os.sep, 'nonexistent-cache'))
+        self.assertTrue(rows)
+        self.assertNotIn('never run', text)
+        self.assertIn('no stored PASS', text)
+
+
+class CoverageComesFromTheMatrix(unittest.TestCase):
+    def test_a_chapter_suite_names_the_scenarios_that_cover_its_chapter(self):
+        """`host_chapter` is a BOOT HINT defaulting to 1, not an upper bound, so on a cold
+        cache it misses every scenario that boots earlier and plays forward. ch02 has nine
+        declared scenarios and reported none."""
+        rows = cs.scenarios('ch02', cache_dir=os.path.join(os.sep, 'nonexistent-cache'))
+        self.assertTrue(rows)
+        self.assertNotIn('no playtest scenario covers this chapter',
+                         cs.loose_ends('ch02'))
+
+    def test_the_prologue_is_hosted_even_though_it_is_called_ch00(self):
+        """The host registry calls it `prologue`; the YAML calls it ch00. Matching on the
+        short id alone reported the prologue as unhosted, with two false loose ends."""
+        self.assertIsNotNone(cs.host_slot('ch00'))
+        self.assertEqual('Ch1Events', cs.event_group('ch00'))
+
+
 if __name__ == '__main__':
     unittest.main()
