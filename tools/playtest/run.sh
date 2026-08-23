@@ -235,7 +235,14 @@ if [ -z "${MX_SKIP_ROM_CHECK:-}" ]; then
 fi
 
 python3 "$HERE/gen_symbols.py"
-pkill -9 -i mgba 2>/dev/null || true
+# Clear a leftover emulator from an interrupted run of THIS scenario -- it would still hold
+# the ROM this one is about to boot. Scoped to the scenario's own /tmp dir, NEVER `pkill -i
+# mgba`: since #310 the matrix runs four scenarios at a time, and a blanket kill here meant
+# every newly dispatched scenario SIGKILLed the siblings already running. Three of them died
+# that way in one gate (ch01, ch04moose, ch04packmath), each at the exact second the pool
+# started the next scenario, and each reported `mGBA exited early` as though the ROM were
+# broken.
+pkill -9 -f "/tmp/playtest-(ckpt_)?$SCENARIO/" 2>/dev/null || true
 ROMHASH=$(shasum "$ROM" | cut -c1-12)
 
 # Did the last run_mgba PASS? Classify in ONE place. This was four copies of a glob, and
