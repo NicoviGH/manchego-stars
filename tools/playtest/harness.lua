@@ -297,8 +297,9 @@ local function saveState(name)
     -- (returns false, writes 397312 bytes of zeros), which is why run.sh keeps checkpoint
     -- builders headed -- but the guard belongs here too, where the failure is visible.
     if not ok then
-        controllerFault = "saveStateFile failed for '" .. name .. "' -- refusing to let a "
-            .. "checkpoint build report PASS with no state written"
+        -- Deliberately does NOT contain the word "pass": run.sh classifies a verdict by
+        -- matching the RESULT line, and this message travels inside it.
+        controllerFault = "saveStateFile failed for '" .. name .. "' -- no state was written"
     end
     return ok
 end
