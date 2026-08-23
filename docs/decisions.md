@@ -2238,6 +2238,24 @@ re-running green scenes to obtain a number is exactly the cost this ADR exists t
    A real state is ~105-129KB at 99.4-99.5% non-zero; the broken one is exactly 397312 bytes of
    zeros. That size is the tell.
 
+7. **Classify a verdict in ONE place.** The glob above was four copies, so when it was wrong it
+   was wrong four times -- including on the exit-code line. It is now a single `verdict_passed()`
+   helper. The instance was the bug; the duplication was the class.
+
+8. **A failed rebuild must not delete a checkpoint it did not write.** Most builder failures never
+   reach `saveState()` at all -- the builder gives up, the deadline expires, mGBA exits early -- so
+   an unconditional cleanup would destroy the good state belonging to the PREVIOUS stamp whenever a
+   rebuild was triggered by a stamp change alone (`PT_DIFFICULTY=difficult` and back). run.sh
+   compares the state's mtime across the build and removes it only if THIS run wrote it. Proved
+   both ways: a 5s builder deadline leaves the good state byte-identical, while a headless builder
+   (which really does overwrite it with zeros before failing) removes it.
+
+9. **The checkpoint abort has to evict the verdict cache too.** `exit 1` in the checkpoint block
+   skipped the eviction at the foot of `run.sh`, so a direct `run.sh <scenario>` whose checkpoint
+   build failed left a stored green that the next `make matrix` would serve without running
+   anything -- while the same failure UNDER matrix.py did evict. Proved by planting a fake cache
+   entry and watching the abort path remove it.
+
 **Not a licence to re-run green scenes.** Headless removes the ATTENTION cost, not the time cost,
 and "never run anything after a merge" still stands. What it buys is that a run no longer has to be
 watched -- which is what makes batching scene work possible at all (#311).

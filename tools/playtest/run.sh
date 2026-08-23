@@ -238,6 +238,13 @@ python3 "$HERE/gen_symbols.py"
 pkill -9 -i mgba 2>/dev/null || true
 ROMHASH=$(shasum "$ROM" | cut -c1-12)
 
+# Did the last run_mgba PASS? Classify in ONE place. This was four copies of a glob, and
+# when the glob was wrong it was wrong four times -- including on the exit-code line, where a
+# FAIL could have exited 0. Match the whole `RESULT: ...` line, never the bare word: VERDICT
+# carries the failure REASON too, and a guard message that merely CONTAINED the word made a
+# FAIL classify as a pass (#308).
+verdict_passed() { case "$VERDICT" in *"RESULT: PASS"*) return 0 ;; *) return 1 ;; esac; }
+
 # run_mgba <scenario> <fps> <vsync> <deadline_s> [headless|headed]
 #   -> echoes log, sets global VERDICT. The engine is an ARGUMENT because a checkpoint
 #      builder must stay headed even when the scenario that needs it is headless.
@@ -307,13 +314,12 @@ EOF
     # JSON, but reading it meant knowing to run inspect_state.py by hand -- and the point
     # of #236 was that the next question after a FAIL should be "which proc do I classify",
     # not "which hypothesis do I rebuild" (#241).
-    case "$VERDICT" in
-        *"RESULT: PASS"*) ;;
-        *) if grep -q '"event":"inspect"\|"event": "inspect"' "$log" 2>/dev/null; then
-               echo "---------------- inspector ----------------"
-               python3 "$HERE/inspect_state.py" render "$log" || true
-           fi ;;
-    esac
+    if ! verdict_passed; then
+        if grep -q '"event":"inspect"\|"event": "inspect"' "$log" 2>/dev/null; then
+            echo "---------------- inspector ----------------"
+            python3 "$HERE/inspect_state.py" render "$log" || true
+        fi
+    fi
     echo "artifacts: $out"
 }
 
@@ -334,17 +340,35 @@ CHECKPOINT_STAMP="$ROMHASH:${PT_DIFFICULTY:-normal}"
 if [ -n "$BUILDER" ]; then
     if [ ! -f "$STATE_DIR/$CKPT.ss" ] || [ "$(cat "$STATE_DIR/$CKPT.romhash" 2>/dev/null || true)" != "$CHECKPOINT_STAMP" ]; then
         echo "== checkpoint '$CKPT' missing/stale for $CHECKPOINT_STAMP -> building at top speed (240fps) =="
+        # Note what the state file looked like BEFORE the build. Most builder failures never
+        # reach saveState() at all (the builder gives up, the deadline expires, mGBA exits
+        # early), so they write nothing -- and a rebuild triggered only by a STAMP change
+        # (PT_DIFFICULTY=difficult, say) would otherwise delete the perfectly good state
+        # belonging to the previous stamp and force a full re-mint when you switch back.
+        _ss_before=$(stat -f%m "$STATE_DIR/$CKPT.ss" 2>/dev/null || echo none)
         run_mgba "$BUILDER" 240 0 "$MX_CHECKPOINT_DEADLINE" headed  # HEADED always: saveStateFile is
         # broken under mgba-headless (see the engine-selection note above). ch02start
         # replays the whole ch00->ch01->ch02 chain.
-        case "$VERDICT" in
-            *"RESULT: PASS"*) echo "$CHECKPOINT_STAMP" > "$STATE_DIR/$CKPT.romhash" ;;
-            *) # Remove the partial state too. Without its .romhash the next run would
-               # rebuild anyway, but a 397KB file of zeros sitting in states/ reads as a
-               # real checkpoint to anyone looking, and that is how a dead one gets trusted.
-               rm -f "$STATE_DIR/$CKPT.ss"
-               echo "checkpoint build FAILED -- aborting"; exit 1 ;;
-        esac
+        if verdict_passed; then
+            echo "$CHECKPOINT_STAMP" > "$STATE_DIR/$CKPT.romhash"
+        else
+            _ss_after=$(stat -f%m "$STATE_DIR/$CKPT.ss" 2>/dev/null || echo none)
+            if [ "$_ss_after" != "$_ss_before" ]; then
+                # THIS run wrote it and then failed, so what is on disk is partial or dead
+                # (mgba-headless writes 397312 bytes of zeros). Without its .romhash the next
+                # run rebuilds anyway, but a file that size reads as a real checkpoint to
+                # whoever looks next, and that is how a dead one gets trusted.
+                echo "removing the partial '$CKPT' state this run wrote"
+                rm -f "$STATE_DIR/$CKPT.ss"
+            fi
+            # Evict the scenario's stored green before leaving. `exit 1` here skips the
+            # eviction at the bottom of this file, so a direct `run.sh ch02` whose checkpoint
+            # build failed would leave a stale PASS that the next `make matrix` serves without
+            # running anything -- while the same failure UNDER matrix.py does evict. The two
+            # paths have to agree.
+            rm -rf "$REPO/.matrix-verdictcache/$SCENARIO-"* 2>/dev/null || true
+            echo "checkpoint build FAILED -- aborting"; exit 1
+        fi
     else
         echo "== checkpoint '$CKPT' valid for $CHECKPOINT_STAMP -> loading =="
     fi
@@ -367,12 +391,5 @@ if [ "$SCENARIO" = "llm" ]; then touch "$LLM_DIR/stop"; fi
 # it sees a failure, but a scenario run DIRECTLY -- which is how debugging happens -- never
 # passes through it, and the next `make matrix` would go on reporting the stale PASS for a
 # scenario that is red right now. Nothing else here reads the cache; this only invalidates.
-case "$VERDICT" in
-    *"RESULT: PASS"*) ;;
-    *) rm -rf "$REPO/.matrix-verdictcache/$SCENARIO-"* 2>/dev/null || true ;;
-esac
-# Match the VERDICT LINE, not the bare word. VERDICT holds the whole `RESULT: ...` line, so
-# a glob on the word alone also matched a FAIL whose REASON happened to contain it -- which
-# stamped a checkpoint VALID off a failed build, and here would have exited 0 on a failure.
-# Caught by forcing a checkpoint builder headless and watching it stamp anyway (#308).
-case "$VERDICT" in *"RESULT: PASS"*) exit 0 ;; *) exit 1 ;; esac
+verdict_passed || rm -rf "$REPO/.matrix-verdictcache/$SCENARIO-"* 2>/dev/null || true
+verdict_passed && exit 0 || exit 1
