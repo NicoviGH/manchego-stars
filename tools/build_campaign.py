@@ -10005,10 +10005,10 @@ def locked_and_variant(script, fallback, render, err_label, msgs):
     """A branched scene as its TWO rendered bodies: the locked one and its substituted twin.
 
     The pairing every fallback in this campaign takes, kept independent of the CHANNEL because
-    the two channels render nothing alike -- a backdrop scene goes through `_ch05_opening_body`
-    (podium-checked, width 42) while an on-map one goes straight to `_script_to_message` at the
-    bubble's budget. `render` is whatever turns a beat into a body; everything else is the part
-    that must not be written twice.
+    the two channels do not render alike -- a backdrop scene goes through `_ch05_opening_body`
+    (podium-checked) while an on-map one goes straight to `_script_to_message`. `render` is
+    whatever turns a beat into a body; everything else is the part that must not be written
+    twice.
 
     Whole copies rather than a prefix/arm/suffix split, which is vanilla's own economy: ch14a's
     ending branches to `TEXTSHOW(0xa93)` or `TEXTSHOW(0xa95)`, two complete messages, and shares
@@ -10289,7 +10289,7 @@ def _ch05_ending_variants(chap, slot, boxes, what):
 
 
 def ch05_ending_messages(chap):
-    """Both ending scenes as (msg_id, body), rendered at the backdrop's 42.
+    """Both ending scenes as (msg_id, body), at the talk bubble's pixel budget.
 
     Two bodies for scene 16 -- Sahnar recruited or not -- and one for scene 17, which has no
     berry exchange to lose and nothing else to branch on. Each is ONE continuous message, so
@@ -12120,8 +12120,9 @@ def _ch05_opening_scene(chap, slot, boxes, what, podiums, fid,
 
     Shared by the three tomb scenes, the arrival (which brings its own podium set, being the
     first one the PARTY speaks in) and the join, so a further scene costs a table row rather
-    than a second loop. `width` is the CHANNEL and nothing else: 42 for the full-screen
-    backdrop beats, 29 for the on-map bubbles.
+    than a second loop. `width` is the CHANNEL and nothing else -- a PIXEL budget, taken from
+    `fe8_talk_font`: the talk bubble's for a faced beat, the auto-centered box's for faceless
+    narration.
     """
     script = _chapter_event_by_slot(chap, 'chapter_start', slot,
                                     'ch05 opening (%s)' % what)['script']

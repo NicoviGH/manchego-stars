@@ -5157,12 +5157,12 @@ scene ran"). Box counts were standing in for identity only because two ids had a
 length. Prefer `INSPECT.activeMsg()` for any new dialogue gate.
 
 **POSTSCRIPT, same day: the collision is gone, and the rule stands anyway.** Retiring the
-29-character wrap (see the ADR above) means nothing pages itself: presses now equal AUTHORED
-boxes, so these two arms are 16 and 17 and a count *could* tell them apart again. That is a
-happy accident of one scene's arithmetic, not a property anyone should lean on — the next branch
-whose arms are the same length brings the blindness straight back. The gate keeps reading
-`sActiveMsg`. What did change is that a press count is now a fact about the SCRIPT rather than
-about the wrap, which makes it a much better SHAPE check than it was.
+29-character wrap (see the ADR above) gave this scene's every box room to fit in two lines, so
+nothing in *it* pages: the two arms are 16 and 17 presses and a count *could* tell them apart
+again. That is a happy accident of one scene's arithmetic, not a property anyone should lean
+on — the next branch whose arms are the same length brings the blindness straight back, and a
+turn long enough to page brings the wrap back into the count. The gate keeps reading
+`sActiveMsg`.
 
 _Recorded: 2026-08-21, found while wiring the Talk recruit's fallback (#25)._
 
@@ -6909,6 +6909,70 @@ exchange reads browner than a melee one. The twilight tint is the knob if that e
 
 _Decided: 2026-08-16 (Nicolas). Proof: `recordch05platform` PASS, ground index 118 =
 `ms_snowpath`, slab 54–73% colours unique to that platform and 0% of either neighbour._
+
+---
+
+### A scene is readable without a ROM, and a press count is read off the BODY (2026-08-23, #311)
+
+ch05 authored dialogue at **one scene per session for fifteen sessions**, and #302's measurement
+named the cause: verification was a watched GUI run, so the batch size was one scene. Half of
+ch05's 102 commits were the session boundary that cadence produced. Yarn Spinner and ink exist
+for exactly this — *"play through dialogue without importing into a game"* — and we had no scene
+preview at all.
+
+**`make scene SCENE=ch05/1` renders a scene from the chapter YAML: no build, no ROM, no
+emulator, ~0.3s.** What makes it trustworthy is that it renders nothing itself. Each chapter
+scene is already a pure `chap -> [(msg_id, body)]` builder (`ch05_opening_messages` and its
+siblings), so the preview **calls the shipping builder and reads its output back**. A preview
+with its own renderer is a preview that can disagree with the ROM, which is worse than none.
+The only new logic is the body reader, and it is unit-tested against the traps below.
+
+**The press count is read off the rendered body, and that corrected a claim this repo had
+written down twice.** #311's own scope and the postscript above both said *presses == authored
+boxes, the wrapper never invents a page break*. It does: `_script_to_message` pages a turn at
+two lines, and each page is its own [A]. Measured across ch05's opening —
+
+| scene | authored boxes | A-presses | turns wrapping past two lines |
+|---|---|---|---|
+| Basil and Sahnar | 19 | **23** | 4 |
+| Sephek gives Ravisin her orders | 16 | **18** | 2 |
+| Ravisin appraises the blade | 7 | 7 | 0 |
+
+The generalisation came from ONE scene whose every box happened to fit in two lines at 203px
+(the Talk recruit, still 16 and 17). **A press count is a fact about the wrap, not about the
+script** — so it can only be read where the wrap has happened, which is the body.
+
+**Three traps the reader had to be taught, each of which renders a plausible wrong scene:**
+
+1. **`[A][LF]` is the page break, not a line.** Read naively, that trailing `[LF]` opens the
+   next box with a blank first line, and every long turn in the campaign previews with a
+   phantom blank. The first throwaway spike did exactly this.
+2. **A faceless speaker emits NO `[OpenX]`,** on purpose — opening one anchors the window to an
+   absent portrait's mouth. So the last podium the reader saw still belongs to the PREVIOUS
+   speaker, and carrying it forward captions the campaign's narration with whoever spoke before
+   it.
+3. **A face tag names the vanilla SLOT, not the character.** Unmapped, ch05's opening previews
+   as a conversation between "Artur" and "Marisa".
+
+**The golden master is a generated doc, not a new framework.** `docs/scenes/ch05.md` holds every
+registered scene, `--write` regenerates it, and `tools/test_scene_preview.py` regenerates it in
+memory and diffs — which is precisely the shape `check_generated_indexes_fresh` already uses for
+`docs/CHAPTERS.md`. Approve once, diff forever (Feathers/Falco); box rendering is deterministic,
+so a scene verified once stays verified for free. Proved rather than asserted: moving the talk
+budget by **one pixel** fails the gate on 34 lines and flags Sephek's 203px line as over. It is
+also fenced markdown, so the chapter's dialogue is readable on a phone on GitHub.
+
+**Coverage is ch05 only, and that is the decision.** ch01–ch04 render their scenes INLINE inside
+their injectors, so covering them means extracting those call sites into pure builders — real
+surgery on a 13,901-line file whose only honest gate would be the very output diff this tool
+provides. The constraint #302 named is authoring cost GOING FORWARD; ch06 gets the preview
+either way. The extraction is a separate change with its own diff gate, if it is ever worth it.
+
+**The boundary: preview replaces the AUTHORING loop, never the proof.** A scene still gets one
+real run before it ships. The point is one run instead of one run per iteration.
+
+_Decided: 2026-08-23. Proof: 19 unit tests; a 1px budget change moves 34 golden lines; the
+committed book matches what the YAML renders today._
 
 ---
 
