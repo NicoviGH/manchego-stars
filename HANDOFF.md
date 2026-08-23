@@ -33,8 +33,14 @@ Then #311 / #312, then the declarative half (#313, #314, #315), then ch06 throug
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
-with procs that never change — which looks exactly like broken input and is not. The tree holds a
-**ch03boot** build.
+with procs that never change — which looks exactly like broken input and is not. Restore the ROM,
+the ELF **and** `.build-config.json` from the same cache entry, then re-run `gen_symbols.py`.
+
+**Tree state: the ROM is now `canonical`** (was ch03boot), restored from cache with its matching
+ELF and stamp — every checkpoint builder runs on canonical, so verifying #317 needed it.
+`tools/playtest/states/` now holds valid **`prep`** and **`ch02start`** (105,705 and 128,940 bytes,
+99.4–99.5% non-zero, stamped `a44afcc2ac09:normal`); it was empty before, and four scenarios need
+`ch02start`. A dead state is exactly **397,312 bytes of zeros** — that size is the tell.
 
 ## Recently landed — do not redo
 
