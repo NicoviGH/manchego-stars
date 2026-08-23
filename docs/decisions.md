@@ -2194,6 +2194,25 @@ re-running green scenes to obtain a number is exactly the cost this ADR exists t
    independently: `emu:addKey`/`clearKey` round-trip correctly headless (START = 8) and IWRAM
    advances. Run the tree's ROM, or regenerate symbols against the ROM you mean to run.
 
+4. **`emu:saveStateFile()` is broken headless, and it fails in the worst possible shape.**
+   It returns `false` and writes an all-zeros file (measured: 397312 bytes of zeros), while
+   `saveStateBuffer`/`loadStateBuffer` and `loadStateFile` on a valid file all work. Every
+   `saveState()` call site in `harness.lua` DISCARDED that return, so a checkpoint builder run
+   headless would have minted a dead state, PASSed on its own assertions, and had `run.sh` stamp
+   its `.romhash` VALID -- after which the scenario that needs it fails forever, because the
+   stamp looks fresh. Four scenarios sat on this (`ch02`, `ch02baxby`, `clear_ch02`, `smoke_ch02`,
+   all on `ch02start`) with an empty `states/` dir. Two fixes, deliberately overlapping: the
+   engine is chosen PER `run_mgba` INVOCATION and the checkpoint builder passes `headed` as a
+   literal, and `saveState()` now raises `controllerFault` so a build that writes nothing reports
+   FAIL. **The general rule: when a capability degrades under a new execution mode, check what
+   IGNORES its return value, not just what calls it.**
+
+5. **`headless` is DECLARED in `matrix.yaml`, not inferred from `kind`.** The first version derived
+   it (`verdict` -> headless), which silently stripped the frames from `recordsupply` and
+   `recordunitlist` -- both verdict scenarios BY WHAT THEY ASSERT, both feeding `make_gif.py`. And
+   a missing binary must REFUSE, never fall back to headed: which engine ran is not in the verdict
+   key, so a silent fallback serves a headed PASS for a headless run.
+
 **Not a licence to re-run green scenes.** Headless removes the ATTENTION cost, not the time cost,
 and "never run anything after a merge" still stands. What it buys is that a run no longer has to be
 watched -- which is what makes batching scene work possible at all (#311).

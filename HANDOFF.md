@@ -13,29 +13,28 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**PR #316** — `feat/308-headless-playtest`, verdict scenarios run headless. CI pending, not merged.
-Nothing else open.
+**Nothing.** `main` is at **#316**, CI green, no open PRs.
 
 ## Next task
 
-**The #302 epic, re-scoped 2026-08-22 and now carrying eight children (#308-#315).** Read the epic
-body first — it holds the measurement that reordered it, and the board is at
-`https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`.
+**The #302 epic — read its body first.** It carries the measurement that reordered it, and the
+board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
+(#308-#315); #308 is done.
 
-The short version: counting ch05's 102 first-parent commits found **50 of them (49%) touched only
-`docs/` or `HANDOFF.md`**, and only 4 were rework. The constraint was never the injector — it is
-verification cost measured in Nicolas's attention, which forced batch size to one scene per session.
-Full reasoning and the three traps: `docs/decisions.md` -> "A verdict scenario needs no pixels".
+**#310 is next and is now UNBLOCKED** — the 3.2x is already measured and sitting on the issue
+(71s serial -> 22s at `--jobs 4`, zero deadline blowouts, per-scenario times identical). What is
+left is raising the default for groups whose scenarios all resolve headless, keeping `jobs=1`
+wherever a group contains a headed scenario, and retiring the "parallelism does not pay here" note
+in `matrix.py` in the same commit.
 
-**Order:** #316 merges -> **#310** (raise the parallel default; the 3.2x is already measured and on
-the issue, it just cannot land while verdict runs are still headed) -> **#309** (patch the linked
-ELF instead of rebuilding — the gate's other half is its 5 builds) -> **#311** / **#312**, then the
-declarative half (#313, #314, #315), then ch06 through whatever it produces.
+**Then #309** — patch the linked ELF instead of rebuilding. Nine `rom_configs` are nine compiles,
+and the gate's 24m51s is 5 builds plus 21 runs; headless took the runs, this takes the builds.
+Then #311 / #312, then the declarative half (#313, #314, #315), then ch06 through it.
 
-⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Running the harness against a
-`.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck` with
-procs that never change — which looks exactly like broken input and is not. The tree currently
-holds a **ch03boot** build.
+⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
+`.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
+with procs that never change — which looks exactly like broken input and is not. The tree holds a
+**ch03boot** build.
 
 ## Recently landed — do not redo
 
