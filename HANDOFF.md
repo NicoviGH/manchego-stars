@@ -13,17 +13,23 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#322** (`86695aa`), CI green, no open PRs.
+**Nothing.** `main` is at **#323** (`141740d`), CI green, no open PRs.
 
 ## Next task
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308, #309 and #310 are done.** #309's phase 2 (ELF patching) is decided and NOT
-built — `decisions.md` records the two events that would reopen it.
+(#308-#315); **#308, #309, #310 and #311 are done.** #309's phase 2 (ELF patching) is decided and
+NOT built — `decisions.md` records the two events that would reopen it.
 
-**#311 is next** — scene preview + golden master, seeing a scene without building a ROM. Then
-#312, then the declarative half (#313, #314, #315), then ch06 through it.
+**#312 is next** — generated chapter status, `make chapter chNN`, declared-vs-built. Then the
+declarative half (#313, #314, #315), then ch06 through it.
+
+**`make scene SCENE=ch05/1` now shows a scene without building anything** (#311, ~0.3s). Use it
+while authoring; `docs/scenes/ch05.md` is the committed book and `make check` diffs it. It
+replaces the AUTHORING loop and **not the proof** — a scene still gets one real run before it
+ships. ch05 only: ch01–ch04 render their scenes inline inside their injectors, and ch06 is a
+`CHAPTER_YAML` row plus its registry rows.
 
 **The gate is now 6m48s, 21/21 PASS** (2026-08-23, against the old headed/serial 24m51s — 3.7x),
 and **bounded**: `check_gate_chapter_window` holds it to the spine plus the two most recently
@@ -55,6 +61,16 @@ rebuild.
 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
+
+- **A scene is readable without a ROM** (#311, PR #323) — `make scene`, and `docs/scenes/ch05.md`
+  as the golden. It renders nothing itself: each ch05 scene is already a pure
+  `chap -> [(msg_id, body)]` builder, so the preview calls the SHIPPING builder and reads its
+  output back. ⚠️ **`decisions.md` → "A scene is readable without a ROM"** carries the correction
+  that came out of it: *presses == authored boxes* was written down twice (in #311's own scope
+  and in a `decisions.md` postscript) and is **false** — a turn pages at two lines and each page
+  is its own `[A]`, so ch05 scene 1 is 19 authored boxes and costs 23. A press count is a fact
+  about the WRAP, readable only off the body. Same ADR has the three reader traps, each of which
+  renders a plausible wrong scene.
 
 - **The merge gate is bounded** (#302, PR #322) — it was 21 scenarios and 5 builds five chapters
   into an 18-20 chapter game, and an accumulating gate is ~130 scenarios / ~18 builds by ch18: not
