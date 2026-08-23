@@ -2444,13 +2444,17 @@ had already taught this once and the docstring said so; `_anims.run` broke it ag
 was added, and the unit tests were green — `test_repo_main_satisfies_all_constraints` was the one
 that caught it. The parser now sees through any `_x.run(step, ...)` wrapper.
 
-**Phase 2 (ELF patching) is not dead, it is priced.** The boot TARGET really is patchable — a
-hardcoded immediate `_redirect_new_game` writes into `StartBattleMap`. But each `--chNN-boot` also
-LOADs an armed party seed table so a cold New Game has a party to field, and that must not execute
-on the real chain where the party persists; patching means runtime-gating the seed first. And
-`testch`, `lordboot`, `ch05lupinboot`, `montage` and the ch05 debug boots all inject DATA and can
-never be patched. Best case for the gate is **2 of 5 builds**, to be decided against the
-post-phase-1 numbers.
+**Phase 2 (post-link ELF patching) is DECIDED AND NOT BUILT** (2026-08-23, #309 closed). The boot
+TARGET is genuinely patchable — a hardcoded immediate `_redirect_new_game` writes into
+`StartBattleMap` — but each `--chNN-boot` also LOADs an armed party seed that must not execute on
+the real chain, so patching means runtime-gating that seed first, and `testch` / `ch05lupinboot` /
+`montage` / the ch05 debug boots inject DATA and can never be patched at all.
+
+What settles it is not the ratio but the PRIZE: **per-chapter smoke coverage already exists** — the
+`--all` sweep runs every chapter's `smoke_chNN` today. Patching would not buy the coverage, only
+move it into the merge gate, for ~50s of a 408-second gate. Two events would reopen it: the `--all`
+sweep growing slow enough that we stop running it before playtest builds, or a chapter regression
+reaching the players that a gate-tier smoke would have caught.
 
 ### A chapter declares its traps; `.traps` is the fourth inherited field (2026-08-22, #302)
 

@@ -19,19 +19,19 @@ a thing has a home before cutting it.
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308 and #310 are done**; **#309's phase 1 is done and its phase 2 is open
-with a trigger** — build it when we want per-chapter smoke in the gate, not when the gate gets
-slow.
+(#308-#315); **#308, #309 and #310 are done.** #309's phase 2 (ELF patching) is decided and NOT
+built — `decisions.md` records the two events that would reopen it.
 
 **#311 is next** — scene preview + golden master, seeing a scene without building a ROM. Then
 #312, then the declarative half (#313, #314, #315), then ch06 through it.
 
 **The gate is now 6m48s, 21/21 PASS** (2026-08-23, against the old headed/serial 24m51s — 3.7x),
 and **bounded**: `check_gate_chapter_window` holds it to the spine plus the two most recently
-hosted chapters, so hosting ch06 is what ages ch04's six scenarios out into `SUITE=ch04`. Nothing
-moves today. Three tiers now, in `CLAUDE.md`: chapter suite while working, `SUITE=gate` before a
-merge, **`SUITE=all` before any playtest build we send the group** — that last one is the only
-tier that catches a chapter which left the gate breaking three chapters later.
+hosted chapters, so hosting ch06 ages ch04's six scenarios out into `SUITE=ch04`. Nothing moves
+today. Three tiers now, in `CLAUDE.md`: chapter suite while working, `SUITE=gate` before a merge,
+**`SUITE=all` before any playtest build we send the group** — that last tier is the only one that
+catches a chapter which left the gate breaking three chapters later, and it is also what keeps
+#309's phase 2 unnecessary.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
