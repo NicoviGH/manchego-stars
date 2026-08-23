@@ -876,7 +876,13 @@ PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'P
                      # list honest cannot tell a harmless knob from a decisive one and should
                      # not have to. The cost is one extra run when a listen-through follows a
                      # muted PASS, which is exactly when you wanted to run it again.
-                     'PT_SOUND')
+                     'PT_SOUND',
+                     # PT_HEADED forces a verdict scenario back onto the Qt frontend (#308).
+                     # It genuinely changes the run: headed restores emu:screenshot(), which
+                     # harness.lua skips under mgba-headless. Serving a headed PASS for a
+                     # headless run -- or the reverse -- would cache across two different
+                     # execution paths, which is precisely what this key exists to prevent.
+                     'PT_HEADED')
 
 
 # -- what a scenario can possibly depend on (#255 phase 2) ------------------

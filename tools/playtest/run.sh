@@ -153,14 +153,15 @@ if [ "$SCENARIO" = "llm" ]; then
     rm -f "$LLM_DIR"/req-*.json "$LLM_DIR"/resp-*.json "$LLM_DIR"/*.tmp "$LLM_DIR/stop"
 fi
 
-if [ ! -x "$APP" ]; then
+ensure_headed_app() {
+    [ -x "$APP" ] && return 0
     echo "mGBA dev build missing; downloading nightly..."
     curl -fsSL -o /tmp/mgba-nightly.dmg "https://s3.amazonaws.com/mgba/mGBA-build-latest-macos.dmg"
     VOL=$(hdiutil attach /tmp/mgba-nightly.dmg -nobrowse | awk -F'\t' '/\/Volumes\//{print $NF}')
     mkdir -p "$REPO/tools/emulator"
     cp -R "$VOL/mGBA.app" "$REPO/tools/emulator/mGBA-dev.app"
     hdiutil detach "$VOL" -quiet
-fi
+}
 [ -f "$ROM" ] || { echo "ROM not built; run make first" >&2; exit 2; }
 
 # What this scenario needs -- ROM configuration, host chapter, checkpoint, fps/vsync/
@@ -169,6 +170,34 @@ fi
 MX_RESOLVED="$(python3 "$HERE/matrix.py" resolve "$SCENARIO")" || {
     echo "run.sh: '$SCENARIO' has no row in tools/playtest/matrix.yaml" >&2; exit 2; }
 eval "$MX_RESOLVED"
+
+# Which mGBA runs this scenario, decided by what the scenario ASSERTS (#308).
+#
+# A `kind: verdict` scenario proves memory state -- INSPECT.units, activeMsg, flags -- and
+# needs no pixels, so it runs under mgba-headless and never appears on screen. That is the
+# whole point: Nicolas watches every headed run, and 49% of ch05's commits were the session
+# churn that batching-by-one-watched-run produced (#302).
+#
+# `record` and `diagnostic` scenarios stay HEADED on purpose -- their output IS the picture,
+# and eyes-on is how presentation defects get caught (#279's letterbox bar, Sahnar's exit).
+# `checkpoint` builders stay headed too: they mint save states, and are already the slow path.
+#
+# mgba-headless attaches no video renderer, so emu:screenshot() segfaults inside
+# PNGWritePixels -- harness.lua skips shots when PLAYTEST_HEADLESS=1. Build the binary with
+# tools/build_mgba_headless.sh; if it is absent we fall back to headed rather than fail, so
+# a fresh checkout still works.
+HEADLESS_APP="$REPO/tools/emulator/mgba-headless"
+PLAYTEST_HEADLESS=0
+if [ "${MX_KIND:-verdict}" = "verdict" ] && [ -z "${PT_HEADED:-}" ]; then
+    if [ -x "$HEADLESS_APP" ]; then
+        APP="$HEADLESS_APP"
+        PLAYTEST_HEADLESS=1
+    else
+        echo "note: $HEADLESS_APP not built -- running HEADED." >&2
+        echo "      tools/build_mgba_headless.sh builds it (one-time, ~10 min)." >&2
+    fi
+fi
+[ "$PLAYTEST_HEADLESS" = "1" ] || ensure_headed_app
 
 # The most expensive failure in this repo is a scenario that FAILs because the tree
 # holds the wrong ROM (a CH04BOOT=1 build cannot reach ch02's map). Refuse in 0s
@@ -226,6 +255,7 @@ PLAYTEST_SPEED = "${PT_SPEED:-}"
 PLAYTEST_MAXFRAMES = "${PT_MAXFRAMES:-}"
 PLAYTEST_PRESSEVERY = "${PT_PRESSEVERY:-}"
 PLAYTEST_SHOTEVERY = "${PT_SHOTEVERY:-}"
+PLAYTEST_HEADLESS = "$PLAYTEST_HEADLESS"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path

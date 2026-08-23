@@ -128,10 +128,24 @@ local function result(verdict, why)
     end
     log("RESULT: " .. verdict .. " -- " .. why)
 end
+-- PLAYTEST_HEADLESS is set by run.sh when the scenario runs under mgba-headless, which
+-- attaches NO video renderer: emu:screenshot() then null-derefs inside PNGWritePixels
+-- (mCore_screenshot -> PNGWritePixels -> KERN_INVALID_ADDRESS at 0x0). That is a C
+-- segfault, so the pcall below cannot catch it -- the call has to not happen at all.
+-- This is the designed split, not a workaround: a `kind: verdict` scenario asserts on
+-- MEMORY (INSPECT.units, activeMsg) and needs no pixels, while `record` and `diagnostic`
+-- scenarios stay headed precisely because their output IS the picture.
+-- Read as a GLOBAL, deliberately: this file is one Lua chunk against a 200-local ceiling
+-- (decisions.md -> "`harness.lua` is ONE Lua chunk, at the 200-local ceiling"), and binding
+-- this to a top-level local spent one of the last free slots for no benefit.
 local nshot = 0
 local function shot(tag)
     nshot = nshot + 1
     local p = string.format("%s/%04d-%s.png", PLAYTEST_SHOTDIR, nshot, tag)
+    if PLAYTEST_HEADLESS == "1" then
+        log("screenshot SKIPPED (headless): " .. p)
+        return
+    end
     pcall(function() emu:screenshot(p) end)
     log("screenshot: " .. p)
 end
