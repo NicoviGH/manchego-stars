@@ -121,12 +121,17 @@ does not reopen one; the detail is on the issue and in `docs/decisions.md`.
   never ticked; verified against git history, not the checklist), #133 (absorbed into #25's
   retile ADRs). Left OPEN on purpose, each with fresh evidence on the issue: **#244** (ch03win /
   clear_ch03 / clear_ch01 still fail, re-run today, identical signatures — outside the gate suite,
-  so `make matrix` never sees them), **#135** (real v0.1.0 playtester feedback on art consistency
+  so `make matrix` never sees them). ⚠️ **These are HARNESS faults, not unwinnable chapters** —
+  ch03win logs `grell dead → EVFLAG_DEFEAT_BOSS=true → chapter=5 (host=4)`, i.e. it WON and then
+  timed out in `chooseAttack`'s combat wait, because the killing blow starts the win event and the
+  actor is never greyed out (the `stopWhen` shape `winCh00` already uses). `clear_ch01` is the
+  generic CLEAR-BOT stalling, not the chapter: the scripted `ch01win` passes in the gate, **#135** (real v0.1.0 playtester feedback on art consistency
   and difficulty, never triaged), **#30** (`campaign.yaml`'s `chapters:` block is stale, omits the
   prologue and is off-by-one from ch04 on — but nothing reads it). Do NOT re-survey by issue title
   or checkbox: ch03 taught that an unchecked box records intent, not repo state.
-- **ch03's `kobold-slinger` and `svirfneblin-skulk` still wear VANILLA archer/thief art** — the
-  only two ch03 art items never done. Deliberately not reopened; raise a small art issue if wanted.
+- **ch03's `kobold-slinger` and `svirfneblin-skulk` wear VANILLA archer/thief art BY DECISION**
+  (Nicolas, 2026-08-22: "we decided to leave those ch3 enemies as is"). Not owed, not a gap — do
+  not re-raise them as missing art.
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
 - **Checkout: `/Users/Yonick/Projects/manchego-stars`, the ONE tree** (#267). It is clean except
   for the intentionally dirty `fireemblem8u` submodule and Nicolas's untracked `.agents/` +
