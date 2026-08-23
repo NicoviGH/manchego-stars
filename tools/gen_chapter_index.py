@@ -11,16 +11,21 @@ Freshness is enforced by tools/check.py (it imports generate() and diffs the
 committed file). Stdlib + pyyaml only.
 """
 
-import glob
 import os
 import re
 import sys
 
-import yaml
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import campaign_chapters
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CHAPTERS = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/chapters')
+ROOT = campaign_chapters.REPO
+CHAPTERS = campaign_chapters.chapters_dir()
 OUT = os.path.join(ROOT, 'docs/CHAPTERS.md')
+
+# The chapter YAML is read in exactly one place (#312): this index and `make chapter chNN`
+# answer different questions off the same facts, and two readers is two chances to disagree
+# about what a chapter says.
+squish = campaign_chapters.squish
 
 # cadence token (YAML) -> emoji + human label for the table + legend.
 CADENCE = {
@@ -44,10 +49,6 @@ OBJECTIVE = {
     'survive':             'Survive',
     'defeat_boss_or_talk': 'DefeatBoss / Talk',
 }
-
-
-def squish(s):
-    return re.sub(r'\s+', ' ', str(s if s is not None else '')).strip()
 
 
 def chapter_label(num):
@@ -89,12 +90,9 @@ def recruits_label(post):
 
 
 def generate():
-    files = sorted(glob.glob(os.path.join(CHAPTERS, 'ch*.yaml')))
-    if not files:
+    if not campaign_chapters.paths():
         sys.exit('No chapter YAML found in %s' % CHAPTERS)
-
-    chapters = [yaml.safe_load(open(f, encoding='utf-8')) for f in files]
-    chapters.sort(key=lambda c: int(c['chapter_number']))
+    chapters = campaign_chapters.load_all()
     known_numbers = {int(c['chapter_number']) for c in chapters}
 
     rows = []

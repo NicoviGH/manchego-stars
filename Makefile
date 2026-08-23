@@ -29,7 +29,7 @@ export PATH := $(BREW_PY):$(PATH)
 endif
 endif
 
-.PHONY: all clean verify check test matrix difficulty difficulty-gate scene
+.PHONY: all clean verify check test matrix difficulty difficulty-gate scene chapter
 
 all: fireemblem8.gba
 
@@ -102,6 +102,20 @@ ifeq ($(strip $(SCENE)),)
 	@python3 tools/scene_preview.py --list
 else
 	@python3 tools/scene_preview.py $(SCENE)
+endif
+
+# What a chapter has DECLARED against what is actually built (#312) -- scenes, message-id
+# headroom, art, scenarios and their last verdicts, and anything declared but unbuilt.
+# Derived at the moment you ask, so there is nothing to keep up to date:
+#   make chapter CH=ch06        # one chapter, in full
+#   make chapter                # every chapter at a glance
+# This is how a fresh session gets oriented, in place of prose somebody had to remember to
+# write. No ROM build and no emulator.
+chapter:
+ifeq ($(strip $(CH)),)
+	@python3 tools/chapter_status.py
+else
+	@python3 tools/chapter_status.py $(CH)
 endif
 
 clean:
