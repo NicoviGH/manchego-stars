@@ -119,13 +119,12 @@ does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
 - **Backlog swept 2026-08-22.** Closed: #303 (done), #23 (ch03 shipped ages ago — the boxes were
   never ticked; verified against git history, not the checklist), #133 (absorbed into #25's
-  retile ADRs). Left OPEN on purpose, each with fresh evidence on the issue: **#244** (ch03win /
-  clear_ch03 / clear_ch01 still fail, re-run today, identical signatures — outside the gate suite,
-  so `make matrix` never sees them). ⚠️ **These are HARNESS faults, not unwinnable chapters** —
-  ch03win logs `grell dead → EVFLAG_DEFEAT_BOSS=true → chapter=5 (host=4)`, i.e. it WON and then
-  timed out in `chooseAttack`'s combat wait, because the killing blow starts the win event and the
-  actor is never greyed out (the `stopWhen` shape `winCh00` already uses). `clear_ch01` is the
-  generic CLEAR-BOT stalling, not the chapter: the scripted `ch01win` passes in the gate, **#135** (real v0.1.0 playtester feedback on art consistency
+  retile ADRs). Left OPEN on purpose, each with fresh evidence on the issue: **#244** (down to ONE
+  scenario: `clear_ch01`, the generic clear-bot stalling with the boss alive — bot capability,
+  not chapter completability, and it belongs with #63 which replaces `clearDrive`. `ch03win` and
+  `clear_ch03` were RETIRED in #307: both reported the chapter WON and then failed in
+  `chooseAttack`'s combat wait, and a permanently-red pair made `SUITE=ch03` unreadable.
+  `SUITE=ch03` is now 8/8), **#135** (real v0.1.0 playtester feedback on art consistency
   and difficulty, never triaged), **#30** (`campaign.yaml`'s `chapters:` block is stale, omits the
   prologue and is off-by-one from ch04 on — but nothing reads it). Do NOT re-survey by issue title
   or checkbox: ch03 taught that an unchecked box records intent, not repo state.
