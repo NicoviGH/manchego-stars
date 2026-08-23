@@ -650,6 +650,57 @@ def check_recordenemy_knows_every_raw_pid(fail):
                         % (uid, bench[uid], pid))
 
 
+GATE_CHAPTER_WINDOW = 2
+
+
+def _gate_window_violations(boot_slots, hosted, window=GATE_CHAPTER_WINDOW):
+    """Gate scenarios that belong to a chapter which has aged out of the window.
+
+    `boot_slots` is {scenario -> the host slot its ROM configuration boots into}, or None
+    for one that belongs to no chapter (the controller contract, the sandbox). The window
+    is the last `window` entries of the host registry, so HOSTING a chapter is what ages
+    the oldest one out -- there is no list of allowed chapters to remember to edit.
+
+    The spine never ages: the prologue slot carries the ch00/ch01 scenarios every later
+    chapter still chains from.
+    """
+    if not hosted:
+        return []
+    allowed = {None, hosted[0].host_index}
+    allowed.update(h.host_index for h in hosted[-window:])
+    by_slot = dict((h.host_index, h.name) for h in hosted)
+    problems = []
+    for name in sorted(boot_slots):
+        slot = boot_slots[name]
+        if slot in allowed:
+            continue
+        chapter = by_slot.get(slot)
+        where = ('`make matrix SUITE=%s`' % chapter) if chapter else "that chapter's own suite"
+        problems.append(
+            'gate: %s belongs to %s, which is behind the gate window (the spine plus the '
+            'last %d hosted chapters, now %s) -- move it to %s. Nothing is deleted; the '
+            'depth stays in the suite and still runs in the `--all` sweep (decisions.md -> '
+            'the gate is the spine plus the last two chapters)'
+            % (name, chapter or 'host slot %s' % slot, window,
+               ' + '.join(h.name for h in hosted[-window:]), where))
+    return problems
+
+
+def check_gate_chapter_window(fail):
+    """The merge gate must not accumulate chapters (#302)."""
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
+    try:
+        import matrix as mx
+        from inject import hosts
+    except ImportError as exc:                          # covered by check_playtest_matrix
+        fail.append('gate window: cannot import the matrix (%s)' % exc)
+        return
+    m = mx.Manifest.load()
+    slots = mx._host_slots()
+    boots = dict((n, mx._boot_slot(m.resolve(n), slots)) for n in m.select(suite='gate'))
+    fail.extend(_gate_window_violations(boots, hosts.hosted_chapters()))
+
+
 def check_playtest_matrix(fail):
     """tools/playtest/matrix.yaml is the single source of "what does this scenario
     need" (ROM configuration, host chapter, checkpoint, timing) -- so it has to keep
@@ -1561,7 +1612,7 @@ def main():
                   check_chapter_status, check_chapter_deployment_schema,
                   check_personal_line_injection_routes,
                   check_injection_order, check_cached_steps_are_config_invariant,
-                  check_playtest_matrix,
+                  check_playtest_matrix, check_gate_chapter_window,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,
                   check_tool_refs_exist, check_no_dead_concepts,
