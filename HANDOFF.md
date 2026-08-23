@@ -13,23 +13,25 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#321** (`6b47e31`), CI green, no open PRs.
+**Nothing.** `main` is at **#322** (`86695aa`), CI green, no open PRs.
 
 ## Next task
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308, #309 and #310 are done** — #309's phase 2 (ELF patching) was priced
-against the new gate and deliberately NOT built.
+(#308-#315); **#308 and #310 are done**; **#309's phase 1 is done and its phase 2 is open
+with a trigger** — build it when we want per-chapter smoke in the gate, not when the gate gets
+slow.
 
 **#311 is next** — scene preview + golden master, seeing a scene without building a ROM. Then
 #312, then the declarative half (#313, #314, #315), then ch06 through it.
 
-**The gate is now 6m48s, 21/21 PASS** (2026-08-23, re-baselined against the old headed/serial
-24m51s — 3.7x). 832 seconds of scenario time inside a 408-second wall, 5 builds, nothing cached.
-Builds are ~2 minutes of that, which is why **#309's phase 2 is decided and closed unbuilt**: ELF
-patching could serve 2 of the 5 configs for ~50s (~12%) and would cost a runtime-gated party seed
-plus a verdict key over patched bytes. Reopen only if a chapter's build count grows.
+**The gate is now 6m48s, 21/21 PASS** (2026-08-23, against the old headed/serial 24m51s — 3.7x),
+and **bounded**: `check_gate_chapter_window` holds it to the spine plus the two most recently
+hosted chapters, so hosting ch06 is what ages ch04's six scenarios out into `SUITE=ch04`. Nothing
+moves today. Three tiers now, in `CLAUDE.md`: chapter suite while working, `SUITE=gate` before a
+merge, **`SUITE=all` before any playtest build we send the group** — that last one is the only
+tier that catches a chapter which left the gate breaking three chapters later.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
@@ -47,6 +49,13 @@ ELF and stamp — every checkpoint builder runs on canonical, so verifying #317 
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **The merge gate is bounded** (#302, PR #322) — it was 21 scenarios and 5 builds five chapters
+  into an 18-20 chapter game, and an accumulating gate is ~130 scenarios / ~18 builds by ch18: not
+  a slow gate, an unrun one. The window (spine + last two hosted chapters) is DERIVED from
+  `inject/hosts.py`, so hosting a chapter ages the oldest out; depth moves to that chapter's suite
+  and still runs in `--all`. ⚠️ `decisions.md` → "The gate is the spine plus the last two
+  chapters" records what was deliberately NOT added: one smoke per chapter in the gate, because
+  each drags its own ROM build — which is now the stated trigger for #309 phase 2.
 - **A new scenario no longer kills its running siblings** (#310, PR #321) — `run.sh` opened every
   run with `pkill -9 -i mgba`, so with four scenarios in flight each new dispatch SIGKILLed the
   ones already going; the first full gate lost `ch01`, `ch04moose` and `ch04packmath` to it, all
