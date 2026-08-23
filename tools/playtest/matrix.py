@@ -12,8 +12,9 @@ Three things keep it quick, all of which matter because the full matrix used to 
     the one that makes the matrix incremental -- see `scenario_fingerprint` (#255);
   * a ROM CACHE keyed on everything the ROM is built FROM -- a harness-only change
     reuses all four builds instead of remaking them (~170s);
-  * scenarios CAN run in parallel within a configuration (--jobs), though it is off
-    by default -- measured, and it does not pay here. See execute().
+  * scenarios run in PARALLEL within a configuration (--jobs, on by default on a
+    machine with the cores for it) -- 3.2x once verdict runs went headless. Headed
+    scenarios still run one at a time. See execute().
 Use `make matrix SUITE=<chapter>` while iterating; the full matrix is the push gate.
 
     make matrix                        # the merge gate
@@ -52,6 +53,12 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 MANIFEST = os.path.join(HERE, 'matrix.yaml')
 HARNESS = os.path.join(HERE, 'harness.lua')
 RUN_SH = os.path.join(HERE, 'run.sh')
+
+# The most scenarios ever measured running at once (#310, 2026-08-22): 4 headless mGBA
+# processes on 8 logical / 4 performance cores, 3.2x with no per-scenario slowdown. It is a
+# CAP on the derived default, not a target -- a bigger machine may claim more only once
+# somebody has measured it there.
+MEASURED_JOBS = 4
 
 # The `make` invocation the runner builds each configuration with.
 CAMPAIGN = os.environ.get('CAMPAIGN', 'rime-of-the-frostmaiden')
@@ -293,18 +300,44 @@ def scenario_lanes(scenarios):
 
     Scenarios are independent mGBA runs against an already-built ROM, each writing its own
     `/tmp/playtest-<name>` -- so within one ROM configuration they can run concurrently.
-    The exception is a CHECKPOINT: `states/<name>.ss` is a shared file that a scenario will
-    MINT if it is missing or stale for this ROM build, so two scenarios wanting the same
-    checkpoint would race to write it. Those run serially, one checkpoint at a time.
+    Two things pull a scenario back out of that lane:
 
-    (Today every scenario in the gate suite is checkpoint-free, so the gate parallelises
-    whole. The split exists so a future checkpointed scenario cannot silently corrupt a
-    state file the moment somebody adds it to a suite.)
+      * a CHECKPOINT: `states/<name>.ss` is a shared file that a scenario will MINT if it
+        is missing or stale for this ROM build, so two scenarios wanting the same
+        checkpoint would race to write it. Those run serially, one checkpoint at a time;
+      * a HEADED run (#310). Parallelism is gated on `headless`, not on checkpoint-freedom
+        alone: four GUI mGBA windows contend for the compositor and each still renders
+        every frame, which is what the 2026-08-09 measurement caught. A headless run
+        renders nothing and does not contend -- see execute().
+
+    A MIXED group is not forced serial whole: its headless scenarios still run in the
+    parallel lane, and the headed ones run afterwards on the caller's thread, alone. So a
+    headed scenario never overlaps anything, headless or otherwise.
     """
     parallel, serial = [], []
     for s in scenarios:
-        (serial if s.checkpoint else parallel).append(s)
+        (serial if (s.checkpoint or not s.headless) else parallel).append(s)
     return parallel, serial
+
+
+def resolve_jobs(arg=None, env=None, cpus=None):
+    """How many scenarios run at a time when nobody says: `--jobs`, else `MX_JOBS`, else
+    derived from the machine.
+
+    The derived default is `cpus // 2`, capped at MEASURED_JOBS, floored at 1 -- half the
+    logical cores is the performance-core count on the Mac this was measured on (8 logical
+    / 4 performance -> 4), and an unthrottled mGBA is CPU-bound enough that a box without
+    spare cores would only divide the same throughput. The cap is there because 4 is what
+    was actually measured; a bigger machine has to be measured before it may claim more.
+    """
+    if arg:
+        return max(1, int(arg))
+    env = os.environ if env is None else env
+    if env.get('MX_JOBS'):
+        return max(1, int(env['MX_JOBS']))
+    if cpus is None:
+        cpus = os.cpu_count() or 1
+    return max(1, min(MEASURED_JOBS, cpus // 2))
 
 
 def execute(groups, build, run_scenario, jobs=1, lookup_cached=None, after_build=None):
@@ -320,20 +353,23 @@ def execute(groups, build, run_scenario, jobs=1, lookup_cached=None, after_build
     emulator at all (#255). Outcomes are emitted in the group's own order whether they
     ran or not, so the table does not reshuffle itself as the cache fills.
 
-    `jobs` > 1 runs a group's checkpoint-free scenarios concurrently. BUILDS always stay
-    serial and never overlap a run: the tree holds ONE `fireemblem8.gba`, so a second `make`
-    would swap the ROM out from under a live emulator (and two builds in one tree corrupt
-    each other outright -- see CLAUDE.md).
+    `jobs` > 1 runs a group's parallel-lane scenarios concurrently (see `scenario_lanes`:
+    checkpoint-free AND headless). BUILDS always stay serial and never overlap a run: the
+    tree holds ONE `fireemblem8.gba`, so a second `make` would swap the ROM out from under a
+    live emulator (and two builds in one tree corrupt each other outright -- see CLAUDE.md).
 
-    **`jobs` DEFAULTS TO 1 BECAUSE PARALLELISM WAS MEASURED AND DOES NOT PAY HERE** (2026-08-09,
-    8 logical / 4 performance cores). Scenarios run mGBA at `fps: 240` -- deliberately
-    unthrottled, so each one is CPU-bound and already saturates a core. Four at a time simply
-    divided the same throughput: individual scenarios went 10s -> 67s, total wall did NOT move
-    (444s serial vs 439s at jobs=4), and four scenarios blew their WALL-CLOCK deadlines and
-    reported ERROR/FAIL -- turning contention into false red. A gate that fails at random is
-    worse than a slow one. The knob stays because a machine with many more real cores could
-    make it pay, but prove it with a measurement before raising the default. The speed win that
-    DID land is the ROM cache below.
+    **`jobs` DEFAULTS TO PARALLEL, BECAUSE HEADLESS CHANGED THE MEASUREMENT** (#310). The
+    same four verdict scenarios, one build, `--no-verdict-cache`, on the same Mac: 71s at
+    `--jobs 1` against 22s at `--jobs 4`, all four PASS, zero deadline blowouts, and the
+    per-scenario times IDENTICAL serial and parallel (15/14/20/20 against 15/15/21/21) --
+    which is what no contention at all looks like.
+
+    The old result was right and is not being overturned: 2026-08-09 measured 444s serial
+    against 439s at `jobs=4` with four scenarios blowing their WALL-CLOCK deadlines, and
+    that measurement was CONDITIONAL ON BEING HEADED -- four Qt windows contending for the
+    compositor while each rendered every frame. #308 deleted the rendering; the condition
+    changed, not the arithmetic. Which is also why headed scenarios are still serial here:
+    for them the 2026-08-09 number is the live one.
     """
     outcomes = []
     built = []
@@ -1336,10 +1372,11 @@ def cmd_run(args):
     if args.dry_run:
         return 0
 
-    jobs = args.jobs if args.jobs else int(os.environ.get('MX_JOBS', '1'))
+    jobs = resolve_jobs(args.jobs)
     use_cache = not (args.no_rom_cache or os.environ.get('MX_NO_ROM_CACHE'))
     if jobs > 1:
-        print('matrix: running up to %d scenarios at a time (builds stay serial)' % jobs)
+        print('matrix: running up to %d headless scenarios at a time '
+              '(builds and headed runs stay serial)' % jobs)
     report = execute(groups,
                      build=lambda rom, flags: _build(rom, flags, log_dir, use_cache=use_cache),
                      run_scenario=lambda s: verdicts.store(s, _run_scenario(s, log_dir)),
@@ -1402,8 +1439,9 @@ def main(argv=None):
     run.add_argument('--out', default='/tmp/playtest-matrix')
     run.add_argument('--dry-run', action='store_true')
     run.add_argument('--jobs', type=int, default=None,
-                     help='scenarios to run at a time within one ROM config (default 1, '
-                          'or MX_JOBS). MEASURED AND OFF BY DEFAULT -- see execute()')
+                     help='scenarios to run at a time within one ROM config (or MX_JOBS; '
+                          'defaults to half the cores, capped at %d). Headless scenarios '
+                          'only -- headed ones stay serial. See execute()' % MEASURED_JOBS)
     run.add_argument('--no-rom-cache', action='store_true',
                      help='always `make`, never reuse a cached ROM (or MX_NO_ROM_CACHE=1)')
     run.add_argument('--no-verdict-cache', action='store_true',

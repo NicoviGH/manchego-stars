@@ -18,6 +18,7 @@ import re
 import shutil
 import sys
 import tempfile
+import threading
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -598,6 +599,59 @@ class ParallelScenarios(unittest.TestCase):
         second = [i for i, (k, _) in enumerate(rec) if k == 'build'][1]
         first_group = {n for k, n in rec[:second] if k == 'run'}
         self.assertEqual(first_group, {'a', 'b'})
+
+
+    def test_a_headed_scenario_is_forced_serial(self):
+        """Parallelism is gated on HEADLESS, not just on checkpoint-freedom (#310). Four
+        GUI mGBA windows contend for the compositor -- that is what the 2026-08-09
+        measurement caught (1.01x and four blown deadlines). A headless run renders
+        nothing and does not contend, which is why the same measurement re-taken headless
+        came back 3.2x."""
+        m = manifest(scenarios={'a': {}, 'b': {'kind': 'record'}})
+        par, ser = mx.scenario_lanes([m.resolve('a'), m.resolve('b')])
+        self.assertEqual([s.name for s in par], ['a'])
+        self.assertEqual([s.name for s in ser], ['b'])
+
+    def test_a_headed_scenario_never_runs_in_a_worker_thread(self):
+        """A mixed group still parallelises its headless scenarios; the headed one runs
+        alone on the caller's thread, so it never overlaps anything."""
+        m = manifest(scenarios={'a': {}, 'b': {}, 'c': {'kind': 'record'}})
+        threads = {}
+
+        def run_scenario(scn):
+            threads[scn.name] = threading.current_thread()
+            return mx.Outcome(scn.name, scn.rom, 'PASS', 1.0, '', '')
+
+        mx.execute(m.plan(['a', 'b', 'c']), build=lambda rom, flags: True,
+                   run_scenario=run_scenario, jobs=4)
+        main = threading.current_thread()
+        self.assertIs(threads['c'], main)
+        self.assertIsNot(threads['a'], main)
+        self.assertIsNot(threads['b'], main)
+
+
+class JobCount(unittest.TestCase):
+    """How many scenarios run at a time when nobody says (#310)."""
+
+    def test_the_default_is_parallel_now_that_verdict_runs_are_headless(self):
+        """71s serial -> 22s at 4 jobs on this Mac (8 logical / 4 performance cores),
+        all four PASS, per-scenario times identical. Measured 2026-08-22 on #310."""
+        self.assertEqual(mx.resolve_jobs(arg=None, env={}, cpus=8), 4)
+
+    def test_a_small_machine_stays_serial(self):
+        """Unthrottled mGBA saturates a core, so a box without spare cores would just
+        divide the same throughput -- which is the 2026-08-09 result, restated."""
+        self.assertEqual(mx.resolve_jobs(arg=None, env={}, cpus=1), 1)
+        self.assertEqual(mx.resolve_jobs(arg=None, env={}, cpus=2), 1)
+
+    def test_a_big_machine_does_not_go_past_what_was_measured(self):
+        self.assertEqual(mx.resolve_jobs(arg=None, env={}, cpus=64), 4)
+
+    def test_mx_jobs_overrides_the_default(self):
+        self.assertEqual(mx.resolve_jobs(arg=None, env={'MX_JOBS': '1'}, cpus=8), 1)
+
+    def test_an_explicit_flag_beats_the_environment(self):
+        self.assertEqual(mx.resolve_jobs(arg=2, env={'MX_JOBS': '8'}, cpus=8), 2)
 
 
 class RomCache(unittest.TestCase):
