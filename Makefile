@@ -29,7 +29,7 @@ export PATH := $(BREW_PY):$(PATH)
 endif
 endif
 
-.PHONY: all clean verify check test matrix difficulty difficulty-gate
+.PHONY: all clean verify check test matrix difficulty difficulty-gate scene
 
 all: fireemblem8.gba
 
@@ -88,6 +88,21 @@ endif
 # target; chapters opt in as their enemy inventories are authored and playtested.
 difficulty-gate:
 	@python3 tools/difficulty.py --campaign $(CAMPAIGN) --curve --check
+
+# See an authored scene exactly as FE8 will wrap it -- from the chapter YAML, with no ROM
+# build and no emulator (#311). The authoring loop; a scene still gets one real run before
+# it ships.
+#   make scene SCENE=ch05/1     # one scene
+#   make scene SCENE=ch05       # the whole chapter
+#   make scene                  # every scene the preview knows
+# The committed book under docs/scenes/ is regenerated with --write and diffed by
+# tools/test_scene_preview.py, so a wrap or staging regression fails in `make check`.
+scene:
+ifeq ($(strip $(SCENE)),)
+	@python3 tools/scene_preview.py --list
+else
+	@python3 tools/scene_preview.py $(SCENE)
+endif
 
 clean:
 	$(MAKE) -C fireemblem8u clean
