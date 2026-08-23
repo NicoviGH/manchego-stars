@@ -15,13 +15,11 @@ a thing has a home before cutting it.
 
 **Nothing.** `main` is at **#306**, CI green, no open PRs.
 
-⚠️ **The next matrix run will look unusual, and both reasons are expected.** #305 switched the
-gate default from Tutorial to NORMAL, so (a) every checkpoint re-mints once — checkpoint validity
-is now `(rom, mode)`, and the old single-hash stamps mismatch by design — and (b) scenarios now
-grade a HARDER force than any run before them (Normal is 2 levels under the authored table where
-Tutorial was 4). A scenario that fails there is a real finding about content only ever verified
-on the easiest mode; it is not #305 misbehaving. `bootToMap` asserts the live mode on every boot,
-so a run in the wrong mode fails loudly instead of quietly.
+**The gate has been re-baselined on NORMAL and is 21/21 PASS** (2026-08-22, 24m51s, 5 builds,
+0 cached — every checkpoint re-minted, since validity is now `(rom, mode)`). So the mode switch
+in #305 is not a pending risk: nothing in the suite depended on Tutorial's softer enemies.
+`ch05arena` passing is also the independent proof that the arena tutorial ungate works — that
+scenario now runs in a mode where vanilla would never have played it.
 
 ## Next task
 
