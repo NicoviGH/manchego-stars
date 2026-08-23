@@ -654,6 +654,27 @@ class JobCount(unittest.TestCase):
         self.assertEqual(mx.resolve_jobs(arg=2, env={'MX_JOBS': '8'}, cpus=8), 2)
 
 
+class LiveProgress(unittest.TestCase):
+    """With four scenarios dispatched at once, a START line no longer tells you what is
+    still running (#310). Each one reports again when it finishes."""
+
+    def _finished(self, verdict, seconds=15.4):
+        return mx.Outcome('titlecard', 'canonical', verdict, seconds, '/tmp/playtest-titlecard', '')
+
+    def test_a_finished_scenario_reports_its_name_verdict_and_time(self):
+        line = mx.progress_line(self._finished('PASS'))
+        self.assertIn('titlecard', line)
+        self.assertIn('PASS', line)
+        self.assertIn('15s', line)
+
+    def test_a_failure_is_visible_without_waiting_for_the_table(self):
+        self.assertIn('FAIL', mx.progress_line(self._finished('FAIL')))
+
+    def test_the_finish_line_is_distinguishable_from_the_start_line(self):
+        """Both scroll past interleaved; if they read alike, neither is progress."""
+        self.assertNotEqual(mx.progress_line(self._finished('PASS')).split()[0], '--')
+
+
 class RomCache(unittest.TestCase):
     """A harness-only change must not pay for four rebuilds."""
 

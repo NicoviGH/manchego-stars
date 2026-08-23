@@ -1305,6 +1305,15 @@ def parse_verdict(text, returncode):
     return verdict
 
 
+def progress_line(outcome):
+    """What a scenario prints when it FINISHES. Dispatch lines alone stopped being progress
+    the moment four scenarios started at once (#310): they all appear immediately and then
+    nothing moves until the table. This is the other half -- name, verdict and time, in the
+    order they actually complete."""
+    return '   %-8s %-24s %s' % (outcome.verdict, outcome.scenario,
+                                 human_duration(outcome.seconds))
+
+
 def _run_scenario(scenario, log_dir):
     env = dict(os.environ)
     env['PT_HOST_CHAPTER'] = str(scenario.host_chapter)
@@ -1318,8 +1327,10 @@ def _run_scenario(scenario, log_dir):
         fh.write(text)
     verdict = parse_verdict(text, proc.returncode)
     tail = '' if verdict == 'PASS' else '\n'.join(text.strip().splitlines()[-12:])
-    return Outcome(scenario.name, scenario.rom, verdict, seconds,
-                   '/tmp/playtest-%s' % scenario.name, tail)
+    outcome = Outcome(scenario.name, scenario.rom, verdict, seconds,
+                      '/tmp/playtest-%s' % scenario.name, tail)
+    print(progress_line(outcome))
+    return outcome
 
 
 RESULTS_NAME = 'results.json'
