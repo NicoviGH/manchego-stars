@@ -23,9 +23,16 @@ scenario now runs in a mode where vanilla would never have played it.
 
 ## Next task
 
-**#303 is done (#304/#305) and the traps half of #302 landed (#306).** Difficulty modes are
-declared per chapter and proved in-engine; the gate grades Normal; traps are declared instead of
-inherited.
+**The `#302` epic: chapter as code.** #303 is closed (#304/#305) and the traps half of #302
+landed (#306), which hands the epic a worked example rather than a hypothesis: `.traps` was the
+FOURTH field a hosted chapter inherited from its donor group, after the goal text ids (#207), the
+battle grounds, and the difficulty numbers. ch06 would have shipped vanilla Ch7's two ballistae.
+
+⚠️ **#302's audit has a concrete first task waiting**: enumerate every `ChapterEventGroup` field
+and say, per field, whether we WRITE it, inherit it deliberately, or inherit it by accident. The
+four instances so far were each found one at a time, by something else going wrong. One is
+already known and open — the encounter-choice fields carry six vanilla SKIRMISH rosters each on
+ch03 and ch05, dormant only while no world map is exposed (noted on #29).
 
 **Next is the `#302` epic: chapter as code.** Do the AUDIT first (its first child), and ground
 it in the history rather than in recollection — the premise is measured, and it is that the
@@ -110,6 +117,16 @@ does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
 ## Current state
 
+- **Backlog swept 2026-08-22.** Closed: #303 (done), #23 (ch03 shipped ages ago — the boxes were
+  never ticked; verified against git history, not the checklist), #133 (absorbed into #25's
+  retile ADRs). Left OPEN on purpose, each with fresh evidence on the issue: **#244** (ch03win /
+  clear_ch03 / clear_ch01 still fail, re-run today, identical signatures — outside the gate suite,
+  so `make matrix` never sees them), **#135** (real v0.1.0 playtester feedback on art consistency
+  and difficulty, never triaged), **#30** (`campaign.yaml`'s `chapters:` block is stale, omits the
+  prologue and is off-by-one from ch04 on — but nothing reads it). Do NOT re-survey by issue title
+  or checkbox: ch03 taught that an unchecked box records intent, not repo state.
+- **ch03's `kobold-slinger` and `svirfneblin-skulk` still wear VANILLA archer/thief art** — the
+  only two ch03 art items never done. Deliberately not reopened; raise a small art issue if wanted.
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
 - **Checkout: `/Users/Yonick/Projects/manchego-stars`, the ONE tree** (#267). It is clean except
   for the intentionally dirty `fireemblem8u` submodule and Nicolas's untracked `.agents/` +
