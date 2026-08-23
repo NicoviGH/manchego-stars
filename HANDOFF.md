@@ -13,41 +13,29 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#306**, CI green, no open PRs.
-
-**The gate has been re-baselined on NORMAL and is 21/21 PASS** (2026-08-22, 24m51s, 5 builds,
-0 cached — every checkpoint re-minted, since validity is now `(rom, mode)`). So the mode switch
-in #305 is not a pending risk: nothing in the suite depended on Tutorial's softer enemies.
-`ch05arena` passing is also the independent proof that the arena tutorial ungate works — that
-scenario now runs in a mode where vanilla would never have played it.
+**PR #316** — `feat/308-headless-playtest`, verdict scenarios run headless. CI pending, not merged.
+Nothing else open.
 
 ## Next task
 
-**The `#302` epic: chapter as code.** #303 is closed (#304/#305) and the traps half of #302
-landed (#306), which hands the epic a worked example rather than a hypothesis: `.traps` was the
-FOURTH field a hosted chapter inherited from its donor group, after the goal text ids (#207), the
-battle grounds, and the difficulty numbers. ch06 would have shipped vanilla Ch7's two ballistae.
+**The #302 epic, re-scoped 2026-08-22 and now carrying eight children (#308-#315).** Read the epic
+body first — it holds the measurement that reordered it, and the board is at
+`https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`.
 
-⚠️ **#302's audit has a concrete first task waiting**: enumerate every `ChapterEventGroup` field
-and say, per field, whether we WRITE it, inherit it deliberately, or inherit it by accident. The
-four instances so far were each found one at a time, by something else going wrong. One is
-already known and open — the encounter-choice fields carry six vanilla SKIRMISH rosters each on
-ch03 and ch05, dormant only while no world map is exposed (noted on #29).
+The short version: counting ch05's 102 first-parent commits found **50 of them (49%) touched only
+`docs/` or `HANDOFF.md`**, and only 4 were rework. The constraint was never the injector — it is
+verification cost measured in Nicolas's attention, which forced batch size to one scene per session.
+Full reasoning and the three traps: `docs/decisions.md` -> "A verdict scenario needs no pixels".
 
-**Next is the `#302` epic: chapter as code.** Do the AUDIT first (its first child), and ground
-it in the history rather than in recollection — the premise is measured, and it is that the
-marginal cost of a chapter is going UP: ch03→ch04→ch05 ran 58→100→**113** commits and
-37→48→**78** `CH0N_*` constants, while each chapter still writes its own ~350-400-line
-`inject_chNN`. `docs/adding-a-chapter.md` is a recipe to IMITATE, which is why the copy keeps
-growing. #303 hands it a worked example of "declare it rather than inherit it".
+**Order:** #316 merges -> **#310** (raise the parallel default; the 3.2x is already measured and on
+the issue, it just cannot land while verdict runs are still headed) -> **#309** (patch the linked
+ELF instead of rebuilding — the gate's other half is its 5 builds) -> **#311** / **#312**, then the
+declarative half (#313, #314, #315), then ch06 through whatever it produces.
 
-**Then ch06**, which is unhosted; ch05's win lands on the RBG campfire dev placeholder, and that
-is BY DESIGN — the placeholder IS the "next chapter" slot. Build it through whatever #302
-produces, since that is the epic's own definition of done.
-
-**Rulings that are ADRs — do not re-raise.** Reskins keep their donor's class name. The
-character wrap is retired (pixels, per renderer, #298). We support all three difficulty modes
-(#303). Ravisin ships at her authored line, re-barred against Saar's measured 22.8 rounds.
+⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Running the harness against a
+`.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck` with
+procs that never change — which looks exactly like broken input and is not. The tree currently
+holds a **ch03boot** build.
 
 ## Recently landed — do not redo
 
