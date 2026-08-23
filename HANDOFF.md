@@ -117,20 +117,14 @@ does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
 ## Current state
 
-- **Backlog swept 2026-08-22.** Closed: #303 (done), #23 (ch03 shipped ages ago — the boxes were
-  never ticked; verified against git history, not the checklist), #133 (absorbed into #25's
-  retile ADRs). Left OPEN on purpose, each with fresh evidence on the issue: **#244** (down to ONE
-  scenario: `clear_ch01`, the generic clear-bot stalling with the boss alive — bot capability,
-  not chapter completability, and it belongs with #63 which replaces `clearDrive`. `ch03win` and
-  `clear_ch03` were RETIRED in #307: both reported the chapter WON and then failed in
-  `chooseAttack`'s combat wait, and a permanently-red pair made `SUITE=ch03` unreadable.
-  `SUITE=ch03` is now 8/8), **#135** (real v0.1.0 playtester feedback on art consistency
-  and difficulty, never triaged), **#30** (`campaign.yaml`'s `chapters:` block is stale, omits the
-  prologue and is off-by-one from ch04 on — but nothing reads it). Do NOT re-survey by issue title
-  or checkbox: ch03 taught that an unchecked box records intent, not repo state.
-- **ch03's `kobold-slinger` and `svirfneblin-skulk` wear VANILLA archer/thief art BY DECISION**
-  (Nicolas, 2026-08-22: "we decided to leave those ch3 enemies as is"). Not owed, not a gap — do
-  not re-raise them as missing art.
+- **Backlog swept 2026-08-22** — do NOT re-survey it by issue title or checkbox. ch03 taught that
+  an unchecked box records what someone intended, not what the repo contains: #23 read as "7 open
+  items" while git history and the live YAML showed the work shipped long ago. Cross-reference the
+  artifact. Closed in the sweep: #303, #23, #133, #244. Still open and each carrying its own fresh
+  evidence: **#135** (real v0.1.0 playtester feedback on art consistency and difficulty, never
+  triaged) and **#30** (`campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one
+  from ch04 on — nothing reads it, so it misleads rather than breaks; a natural thing for #302 to
+  derive instead of hand-keep).
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
 - **Checkout: `/Users/Yonick/Projects/manchego-stars`, the ONE tree** (#267). It is clean except
   for the intentionally dirty `fireemblem8u` submodule and Nicolas's untracked `.agents/` +
