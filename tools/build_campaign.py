@@ -56,6 +56,7 @@ from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitive
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE,
     WEAPON_ITEM_ENUM, fe_item_enum)  # shared weapon<->ITEM map (used by inject_prologue)
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
+from inject import event_group  # noqa: E402  the ChapterEventGroup census guard (#313)
 from inject import step_cache  # noqa: E402  restore a config-invariant step (#309)
 
 # PyYAML's pure-Python scanner walks a document one character at a time through a chain of
@@ -13919,6 +13920,12 @@ def main():
         # Ch7 carries two ballistae -- writing the declaration makes that impossible (#302).
         print('traps (#302):')
         apply_chapter_traps(args.campaign, verbose=True)
+        # LAST, because it reads what every injector above actually wrote: every
+        # ChapterEventGroup field must be WRITTEN or DECLARED-INHERITED, and anything nobody
+        # has ruled on fails the build here rather than being found by shipping a bug (#313).
+        print('event group census (#313):')
+        event_group.assert_census_declared()
+        print('  every ChapterEventGroup field is written or declared-inherited')
     # Close the scope manifest BEFORE the mtime rewind below: the rewind moves mtimes
     # backwards on byte-identical files, and this attribution watches mtimes.
     _scope_manifest = _scopes.write_manifest(

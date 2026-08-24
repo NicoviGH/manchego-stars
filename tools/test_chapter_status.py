@@ -164,10 +164,18 @@ class TheReport(unittest.TestCase):
             short = chapter['id'].split('-')[0]
             self.assertIn(short, cs.report(short), short)
 
-    def test_the_census_row_says_it_is_pending_313_rather_than_faking_it(self):
-        """#312's ChapterEventGroup written-vs-inherited row shares #313's census data, and
-        #313 is not built. Naming the gap is honest; inventing a second census is not."""
-        self.assertIn('#313', cs.report('ch05'))
+    def test_the_census_row_reports_the_SAME_data_the_build_guard_rules_on(self):
+        """#312 left this row pending #313. Now that the census exists, `make chapter` reports
+        it and the build refuses it off ONE census -- two would be two answers."""
+        from inject import event_group
+        text = cs.report('ch05')
+        self.assertIn('WRITTEN', text)
+        self.assertEqual(event_group.census('ch05'), cs.event_group_census('ch05'))
+
+    def test_every_inherited_field_shown_carries_its_declared_reason(self):
+        """An inherited field with no reason beside it is the silence this replaces."""
+        for field, why in cs.inherited_reasons('ch05').items():
+            self.assertNotEqual('UNRULED', why, field)
 
 
 class DegradedModesMustSayCannotTell(unittest.TestCase):

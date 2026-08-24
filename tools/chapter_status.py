@@ -328,6 +328,36 @@ def _last_verdict(matrix, scenario, cache_dir=None):
     return best
 
 
+def event_group_census(name, campaign=campaign_chapters.CAMPAIGN):
+    """{field: WRITTEN/INHERITED/ABSENT} for this chapter, or None where it cannot be read.
+
+    The SAME data the build guard rules on (#313) -- `make chapter` reports it and the build
+    refuses it, off one census. Two censuses would be two answers, which is the drift this
+    whole area is against.
+    """
+    try:
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject import event_group, hosts
+    except ImportError:
+        return None
+    short = campaign_chapters.short_id(load(name, campaign))
+    if not any(h.name == short for h in hosts.hosted_chapters()):
+        return None
+    try:
+        return event_group.census(short)
+    except (KeyError, OSError):
+        return None
+
+
+def inherited_reasons(name, campaign=campaign_chapters.CAMPAIGN):
+    """{field: declared reason} for what this chapter inherits, from the same registry."""
+    verdicts = event_group_census(name, campaign) or {}
+    from inject import event_group
+    return dict((f, event_group.reason_for(campaign_chapters.short_id(load(name, campaign)), f)
+                 or 'UNRULED')
+                for f, v in verdicts.items() if v != 'WRITTEN')
+
+
 def loose_ends(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     """Anything declared but unbuilt, or built but undeclared. The hand-kept list, derived.
 
@@ -480,9 +510,16 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     out.append('    `python3 tools/playtest/matrix.py run --dry-run` answers that, for free.')
 
     out.append('')
-    out.append('  event group fields  WRITTEN vs INHERITED: pending #313, whose census guard')
-    out.append('                      owns that data. Not faked here -- two censuses would')
-    out.append('                      be two answers.')
+    out.append('  event group fields')
+    verdicts = event_group_census(name, campaign)
+    if verdicts is None:
+        out.append('    (census unavailable here -- it reads the decomp)')
+    else:
+        written = [f for f, v in verdicts.items() if v == 'WRITTEN']
+        out.append('    %d WRITTEN, %d declared-inherited' % (len(written),
+                                                              len(verdicts) - len(written)))
+        for field, why in sorted(inherited_reasons(name, campaign).items()):
+            out.append('    inherits %-30s %s' % (field, why))
 
     ends = loose_ends(name, campaign, cache_dir)
     out.append('')

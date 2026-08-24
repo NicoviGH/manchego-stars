@@ -127,14 +127,22 @@ def _definition(symbol, source):
     return tail[:end if end >= 0 else 4096]
 
 
-def _defining_file(symbol, search_dirs=None):
-    """The decomp-relative path that DEFINES a symbol, or None.
+_ANY_DEFN = re.compile(r'(?:^|\n)[^\n]*?\b(\w+)\s*(?:\[\s*\]\s*)?=', re.M)
 
-    Searched over the event sources and the data tables the groups point into. A symbol we
-    cannot locate is reported as unresolved rather than assumed unchanged -- assuming would
-    turn "I could not check" into "it is fine", which is the failure this guard is about.
+_INDEX = None
+
+
+def _symbol_index(search_dirs=None):
+    """symbol -> the decomp-relative file that defines it, built by ONE pass over the sources.
+
+    Indexed rather than searched per symbol: the census resolves ~20 symbols for each of six
+    hosted chapters, and re-scanning a few hundred files for each of those turned a guard
+    that runs inside every build into a ten-second one.
     """
-    pattern = re.compile(_DEFN % re.escape(symbol))
+    global _INDEX
+    if _INDEX is not None:
+        return _INDEX
+    index = {}
     for rel_dir in (search_dirs or (os.path.join('src', 'events'), 'src')):
         base = os.path.join(DECOMP, rel_dir)
         if not os.path.isdir(base):
@@ -142,15 +150,26 @@ def _defining_file(symbol, search_dirs=None):
         for name in sorted(os.listdir(base)):
             if not (name.endswith('.h') or name.endswith('.c')):
                 continue
-            path = os.path.join(base, name)
+            rel = os.path.join(rel_dir, name)
             try:
-                with open(path, encoding='utf-8', errors='replace') as fh:
+                with open(os.path.join(DECOMP, rel), encoding='utf-8', errors='replace') as fh:
                     text = fh.read()
             except OSError:
                 continue
-            if pattern.search(text):
-                return os.path.join(rel_dir, name)
-    return None
+            for m in _ANY_DEFN.finditer(text):
+                index.setdefault(m.group(1), rel)
+    _INDEX = index
+    return index
+
+
+def _defining_file(symbol, search_dirs=None):
+    """The decomp-relative path that DEFINES a symbol, or None.
+
+    A symbol we cannot locate is reported as unresolved rather than assumed unchanged --
+    assuming would turn "I could not check" into "it is fine", which is the failure class
+    this guard is about.
+    """
+    return _symbol_index(search_dirs).get(symbol)
 
 
 def rewritten_symbols(tokens):
@@ -213,3 +232,118 @@ def census(chapter, hosted=None):
         ours = initializer(row.event_group, fh.read())
     vanilla = initializer(row.event_group, vanilla_header(relpath))
     return classify(fields(), ours, vanilla, rewritten_symbols(ours.values()))
+
+
+# --- the ruling ------------------------------------------------------------------------
+#
+# Every field a hosted chapter INHERITS needs a reason here, and a field with no reason fails
+# the build. That is the whole guard: this failure class has landed five times -- goal text
+# ids (#207), battle grounds (#289), difficulty numbers (#303), `.traps` (#306) -- and every
+# instance was found one at a time, by something else going wrong.
+#
+# These reasons hold for every hosted chapter, because the inherited SET is the same eleven
+# fields on ch01-ch05. A chapter needing its own ruling gets an entry in
+# DECLARED_INHERITED_BY_CHAPTER, which is consulted first.
+DECLARED_INHERITED = {
+    # Vanilla ships these four lists EMPTY -- the bodies are a bare `END_MAIN`. There is no
+    # donor behaviour to leak, so inheriting them is inheriting nothing. Checked, not assumed:
+    # the census compares the TARGET, so if vanilla ever filled one of these the field would
+    # still read INHERITED and this reason would be wrong -- which is why the reason names
+    # the emptiness rather than the field.
+    'specialEventsWhenUnitSelected': 'vanilla ships this list empty (END_MAIN): nothing to leak',
+    'specialEventsWhenDestSelected': 'vanilla ships this list empty (END_MAIN): nothing to leak',
+    'specialEventsAfterUnitMoved':   'vanilla ships this list empty (END_MAIN): nothing to leak',
+    'tutorialEvents':                'vanilla ships this list empty (END_MAIN): nothing to leak',
+    # Same shape, different table: TrapData_Event_ChNHard is TRAP_NONE on every slot we host.
+    # ch05's NORMAL traps ARE written (#306 declared the tomb depression open ground), and the
+    # hard-mode table needs no declaration of its own while it is already empty.
+    'extraTrapsInHard': 'vanilla ships this table as TRAP_NONE on every slot we host',
+
+    # THE SIX SKIRMISH ROSTERS. Nicolas, 2026-08-23: *"Vanilla has those optional skirmishes
+    # so we also should. We can wire them when we get to the world map body of work."* So
+    # these are KEPT deliberately, pending #29, and NOT nulled -- nulling would have foreclosed
+    # a feature we want, and `GetChapterSkirmishLeaderClasses` (worldmap_timemons.c)
+    # dereferences all three enemy rosters unconditionally for any chapter on a spawn node.
+    #
+    # What #29 inherits from this: our own rosters replace vanilla's here, and the engine
+    # already ships the predicate for "does this chapter offer a skirmish" -- `sub_8083424`,
+    # which checks all six for NULL. Nothing in FE8 calls it (verified: no caller in any
+    # .c/.h/.s/.inc and no literal-address reference), so it is an entry point waiting for
+    # one rather than a safety net that is already running.
+    'playerUnitsChoice1InEncounter': 'skirmishes are IN scope; rosters authored with the world map (#29)',
+    'playerUnitsChoice2InEncounter': 'skirmishes are IN scope; rosters authored with the world map (#29)',
+    'playerUnitsChoice3InEncounter': 'skirmishes are IN scope; rosters authored with the world map (#29)',
+    'enemyUnitsChoice1InEncounter':  'skirmishes are IN scope; rosters authored with the world map (#29)',
+    'enemyUnitsChoice2InEncounter':  'skirmishes are IN scope; rosters authored with the world map (#29)',
+    'enemyUnitsChoice3InEncounter':  'skirmishes are IN scope; rosters authored with the world map (#29)',
+}
+
+# chapter -> {field: reason}, consulted before the shared table above.
+DECLARED_INHERITED_BY_CHAPTER = {
+    # FOUND BY THIS GUARD, on the day it was written -- a sixth instance of the failure class,
+    # and the first that was not discovered by something else going wrong. Every other hosted
+    # chapter writes its misc list; ch02 alone keeps the donor's. Checked rather than assumed:
+    # vanilla Ch3's misc list is exactly `CauseGameOverIfLordDies` and nothing else, which IS
+    # ch02's declared lose_condition (`all_player_units_defeated`, the FE8 lord rule), and its
+    # `defeat_all` objective is FE8's default when no DefeatBoss/Seize is declared, so it wants
+    # no misc entry of its own. The donor's value is correct here by coincidence of design, not
+    # by intent -- which is the reason worth writing down.
+    'ch02': {'miscBasedEvents': "vanilla Ch3's misc list is CauseGameOverIfLordDies alone, "
+                                "which is ch02's declared lose_condition; its defeat_all "
+                                "objective needs no misc entry"},
+    # The prologue is the one chapter that does NOT retarget its host slot (inject/hosts.py):
+    # it keeps Ch1Events and writes its scenes into the slot's own scripts, so almost the whole
+    # group reads inherited by construction rather than by oversight.
+    'prologue': dict((f, 'the prologue does not retarget its slot -- it keeps Ch1Events '
+                         '(see inject/hosts.py)') for f in (
+        'turnBasedEvents', 'characterBasedEvents', 'locationBasedEvents', 'miscBasedEvents',
+        'traps', 'playerUnitsInNormal', 'playerUnitsInHard',
+        'beginningSceneEvents', 'endingSceneEvents')),
+}
+
+
+def reason_for(chapter, field):
+    """The declared reason a chapter may inherit a field, or None if nobody has ruled."""
+    per = DECLARED_INHERITED_BY_CHAPTER.get(chapter) or {}
+    return per.get(field) or DECLARED_INHERITED.get(field)
+
+
+def assert_census_declared(censuses=None, declared=None, hosted=None):
+    """Guard: every ChapterEventGroup field is WRITTEN or DECLARED-INHERITED, nothing else.
+
+    Runs in the build, after the injectors, because the census reads what they actually wrote.
+    A field nobody has ruled on -- including one that appears in the struct upstream tomorrow
+    -- fails here rather than being discovered by shipping a bug.
+
+    A declaration for a field we actually WRITE fails too. A reason nobody needs is a reason
+    nobody rechecks, and left standing it is how a field keeps a stale justification after it
+    stops being inherited.
+    """
+    import sys
+    known = set(fields())
+    if censuses is None:
+        from . import hosts
+        rows = hosted if hosted is not None else hosts.hosted_chapters()
+        censuses = dict((h.name, census(h.name, rows)) for h in rows)
+    problems = []
+    for chapter, verdicts in sorted(censuses.items()):
+        for field, verdict in sorted(verdicts.items()):
+            reason = (declared.get(field) if declared is not None
+                      else reason_for(chapter, field))
+            if field not in known:
+                problems.append('%s: %r is not a ChapterEventGroup field -- the census and '
+                                'the struct disagree' % (chapter, field))
+            elif verdict == INHERITED and not reason:
+                problems.append('%s inherits `%s` and nobody has ruled on it. Either write '
+                                'the field or declare why the donor\'s value is correct, in '
+                                'event_group.DECLARED_INHERITED.' % (chapter, field))
+            elif verdict == ABSENT and not reason:
+                problems.append('%s leaves `%s` uninitialised, so C zero-fills it -- which is '
+                                'a third answer nobody chose. Declare it or write it.'
+                                % (chapter, field))
+            elif verdict == WRITTEN and reason and declared is not None:
+                problems.append('%s WRITES `%s` but still declares a reason to inherit it -- '
+                                'the declaration is stale' % (chapter, field))
+    if problems:
+        sys.exit('ERROR: ChapterEventGroup census (#313):\n  - ' + '\n  - '.join(problems))
+    return True

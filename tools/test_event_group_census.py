@@ -140,5 +140,47 @@ class TheLiveCensus(unittest.TestCase):
                 self.assertEqual('INHERITED', got[field], field)
 
 
+class UnclassifiedIsABuildFailure(unittest.TestCase):
+    """The deliverable: the field-inheritance failure class stops being discoverable only by
+    shipping a bug. Five instances found it the hard way -- goal text ids, battle grounds,
+    difficulty numbers, `.traps`, and the encounter rosters."""
+
+    def test_the_live_tree_passes_because_every_inherited_field_is_declared(self):
+        event_group.assert_census_declared()
+
+    def test_an_undeclared_inherited_field_fails_the_build(self):
+        with self.assertRaises(SystemExit) as caught:
+            event_group.assert_census_declared(
+                censuses={'ch05': {'tutorialEvents': event_group.INHERITED}},
+                declared={})
+        self.assertIn('tutorialEvents', str(caught.exception))
+
+    def test_a_declaration_for_a_field_we_actually_WRITE_is_stale_and_fails(self):
+        """A reason nobody needs is a reason nobody rechecks. Left standing, it is how a
+        field that used to be inherited keeps a stale justification after it stops being."""
+        with self.assertRaises(SystemExit) as caught:
+            event_group.assert_census_declared(
+                censuses={'ch05': {'traps': event_group.WRITTEN}},
+                declared={'traps': 'we do not inherit this'})
+        self.assertIn('traps', str(caught.exception))
+
+    def test_a_NEW_struct_field_nobody_has_ruled_on_fails(self):
+        """Scope item three: a field appearing in the struct fails the build until somebody
+        rules on it. That is the whole point -- the guard has to notice what we did not."""
+        with self.assertRaises(SystemExit):
+            event_group.assert_census_declared(
+                censuses={'ch05': {'someNewFieldUpstreamAdded': event_group.INHERITED}},
+                declared={})
+
+    def test_the_six_encounter_rosters_are_declared_KEPT_for_the_world_map(self):
+        """Nicolas, 2026-08-23: vanilla has optional skirmishes, so we do too -- the rosters
+        get authored with the world map (#29). They are DECLARED-INHERITED for that reason,
+        not nulled: nulling would have foreclosed the feature, and `GetChapterSkirmishLeaderClasses`
+        dereferences all three enemy rosters unconditionally anyway."""
+        for field, reason in event_group.DECLARED_INHERITED.items():
+            if 'InEncounter' in field:
+                self.assertIn('#29', reason, field)
+
+
 if __name__ == '__main__':
     unittest.main()
