@@ -528,7 +528,7 @@ source with `ast` and fails the build on an injector that enrols nothing.
 at Lua's 200-local ceiling, and the remaining margin was written as prose — "two free slots" — in
 `harness.lua`, `check.py` and `HANDOFF.md` simultaneously. It was wrong in all three within one PR
 of being written: #240 spent a slot and updated no comment. Measured, the margin was **one**.
-`check_lua_local_headroom` now appends probe locals until the chunk stops compiling, prints the real
+`check_lua_local_headroom` now adds probe locals until the chunk stops compiling, prints the real
 number on every `make check`, and fails at zero. Same reasoning retired the hand-written
 `LUA_CHUNKS` tuple, which listed 4 of the 9 chunks `harness.lua` loads — a syntax error in
 `recorder.lua` or `liveness.lua` killed every scenario with the gate green. **If a number about our
@@ -5488,7 +5488,7 @@ count rather than chapter count._
 
 ### The headroom guard measured one file correctly BY ACCIDENT (2026-08-24, #327)
 
-`lua_local_headroom` appends probe locals until the chunk stops compiling. In Lua `return` must
+`lua_local_headroom` originally APPENDED probe locals until the chunk stopped compiling. In Lua `return` must
 be the last statement in a block, so for any chunk ending `return M` the probe is an instant
 syntax error and the function reported **0 free** — not "no room", a broken measurement. It only
 ever ran against `harness.lua`, which ends in a callback registration rather than a return, so
@@ -5505,14 +5505,29 @@ Three defects, and the second two were found by the fix's own tests:
 spans forty lines, so a regex for a single-line `return M` missed it. The prober now tries
 inserting before the last top-level `return`, then appending, and takes whichever compiles.
 
-**The site must be probed with a REAL local, never with zero of them.** Inserting an empty string
-compiles anywhere, so a zero-probe check accepts the first candidate unconditionally — including
-a `return` sitting at column 0 *inside a function*, where a probe measures that function's budget
-instead of the chunk's.
-
 **The splice needs its own newline.** `test_controller.lua` ends without a trailing newline, so a
 bare append produced `endlocal __headroom_probe0`: a file with 74 locals and plenty of room
 reported as full, which is a build failure.
+
+**And then the whole approach was wrong.** Each repair fixed one shape and left another. Inserting
+before the last column-0 `return` misses an INDENTED one — the same "nearly empty file reported as
+full" lie — and, worse, lands *inside a nested function* when that return is in one, where the
+probe measures the FUNCTION's 200 rather than the chunk's. A chunk sitting at exactly 200 top-level
+locals then reports full headroom and passes the guard **in silence**, which is the failure
+direction that actually matters. Probing with one real local instead of zero does not help: a
+function has its own budget, so the probe compiles there happily.
+
+**So probes are PREPENDED.** A chunk is a block of statements and a local declaration is a valid
+first statement, so a probe at the top is unambiguously chunk-level whatever the file ends with,
+and Lua counts the 200 per function rather than per position. Every end-of-file ambiguity
+disappears at once — trailing return, indented return, nested function, missing newline. The only
+special case left is a `#!` line, which Lua accepts only as line 1.
+
+The general shape: **three rounds of fixing the end of the file, and the answer was the other
+end.** Each round passed its own test and the next shape broke it. What ended the loop was
+enumerating the shapes first — module return, multi-line return, indented return, in-function
+return, no trailing newline, shebang, at-ceiling — and requiring one insertion point to satisfy
+all of them.
 
 **And the ratchet's counter is cross-checked against the prober**, because neither is verifiable
 alone. The counter reads the source, the prober asks the compiler, and `counted + free == 200` is

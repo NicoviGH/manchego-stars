@@ -229,39 +229,36 @@ class LuaChunkError(Exception):
     """A chunk does not compile at all, so its headroom is not a number."""
 
 
-# `return` must be the LAST statement in a Lua block, so a probe appended after one is a
-# syntax error no matter how many slots are free. Every module here ends in a module
-# return, and `ch05.lua`'s spans forty lines -- so the insertion point is found by the
-# LAST top-level `return`, never by matching the shape of the expression after it.
-_TOP_LEVEL_RETURN = re.compile(r'^return\b', re.M)
+# Probes go at the TOP of the chunk, and the reason is worth keeping: every attempt to
+# insert them near the END is ambiguous, and each ambiguity reads as the opposite of the
+# truth.
+#
+#   * appending after a trailing `return` is a syntax error, so every module reported 0 free
+#     -- a nearly empty file reported as full, which FAILS THE BUILD;
+#   * inserting before the last column-0 `return` misses an INDENTED one (same 0-free lie),
+#     and lands inside a nested function when that return is in one -- where the probe
+#     measures the FUNCTION's budget. A chunk sitting at exactly 200 top-level locals then
+#     reports full headroom and sails through the guard, which is the failure that matters
+#     most here;
+#   * a file with no trailing newline turned `end` + `local __p` into `endlocal __p`.
+#
+# The top of a chunk has none of that. A chunk is a block of statements and a local
+# declaration is a valid first statement, so a prepended probe is unambiguously chunk-level
+# whatever the file ends with. Lua counts the 200 per function, not per position, so where
+# in the block they are declared does not change the answer.
+_SHEBANG = re.compile(r'\A#[^\n]*\n')
 
 
-def _probe_sites(body):
-    """Every position `n` probe locals could legally go, best candidate first.
+def _with_probes(body, n):
+    """`body` with `n` chunk-level probe locals prepended.
 
-    Two, and which one is right is DECIDED BY THE COMPILER rather than by a pattern: insert
-    before the last top-level `return` (every module), or append (harness.lua, which ends
-    in a callback registration). `lua_local_headroom` takes the first that compiles with
-    zero probes, so a chunk shaped like neither raises instead of reporting a wrong number.
+    After a `#!` line if there is one -- Lua accepts one only as the very first line.
     """
-    sites = []
-    matches = list(_TOP_LEVEL_RETURN.finditer(body))
-    if matches:
-        sites.append(matches[-1].start())
-    sites.append(len(body))
-    return sites
-
-
-def _with_probes(body, n, at):
-    """`body` with `n` probe locals spliced in at `at`, on a line of their own.
-
-    The leading newline is not cosmetic: `test_controller.lua` ends without one, so a bare
-    splice produced `endlocal __headroom_probe0` and the chunk reported 0 free against 74
-    locals -- a file with plenty of room reported as full, which is a build failure.
-    """
+    if not n:
+        return body
     probes = ''.join('local __headroom_probe%d = %d\n' % (i, i) for i in range(n))
-    if n and at > 0 and body[at - 1] != '\n':
-        probes = '\n' + probes
+    m = _SHEBANG.match(body)
+    at = m.end() if m else 0
     return body[:at] + probes + body[at:]
 
 
@@ -291,20 +288,8 @@ def lua_local_headroom(path, probe_max=8):
     if err is not None:
         raise LuaChunkError('%s does not compile, so it has no headroom to measure: %s'
                             % (os.path.relpath(path, REPO), err))
-    # Choose the site with a REAL probe, never with zero of them: inserting an empty string
-    # compiles anywhere, so a zero-probe check accepts the first candidate unconditionally --
-    # including a `return` that sits at column 0 INSIDE a function, where a probe would
-    # measure that function's budget rather than the chunk's. test_controller.lua has one,
-    # and it reported 0 free against 74 locals until this was fixed.
-    at = None
-    for site in _probe_sites(body):
-        if compiles(_with_probes(body, 1, site)) is None:
-            at = site
-            break
-    if at is None:
-        return 0                     # compiles as it stands, but has no room for one more
     for extra in range(probe_max + 1):
-        if compiles(_with_probes(body, extra + 1, at)) is not None:
+        if compiles(_with_probes(body, extra + 1)) is not None:
             return extra
     return probe_max
 
@@ -415,8 +400,8 @@ def check_lua_local_headroom(fail, paths=None):
             fail.append(
                 '%s has NO room under the 200-local ceiling -- the next top-level local '
                 'stops the whole chunk loading and every scenario dies at once. Hang the '
-                'new helper off an existing table (INSPECT, TUNE) or move it to '
-                'controller.lua.' % rel)
+                'new helper off an existing table in that file, or move it into a NEW '
+                'chunk -- module count has no ceiling (#327).' % rel)
     if roomy:
         print('%d other Lua chunk(s): %d+ slots free' % (roomy, probe_max))
 
