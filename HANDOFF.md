@@ -13,19 +13,17 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#324** (`20f147f`), CI green, no open PRs.
+**Nothing.** `main` is at **#325** (`d4aeafc`), CI green, no open PRs.
 
 ## Next task
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308 through #312 are done.** #309's phase 2 (ELF patching) is decided and NOT
+(#308-#315); **#308 through #313 are done.** #309's phase 2 (ELF patching) is decided and NOT
 built — `decisions.md` records the two events that would reopen it.
 
-**#313 is next** — the `ChapterEventGroup` field census as a build guard, and the original first
-child. It also owns the one #312 scope item left unticked: which fields a chapter WRITES vs
-INHERITS. `make chapter` names that gap and points at #313 rather than growing a second census.
-Then #314, #315, then ch06 through the model.
+**#314 is next** — declarative scenario cases + chapter-declared `matrix.yaml` rows. Then #315,
+then ch06 through the model.
 
 **`make scene SCENE=ch05/1` now shows a scene without building anything** (#311, ~0.3s). Use it
 while authoring; `docs/scenes/ch05.md` is the committed book and `make check` diffs it. It
@@ -64,6 +62,16 @@ rebuild.
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **Every ChapterEventGroup field is WRITTEN or DECLARED-INHERITED** (#313, PR #325) — the
+  build fails on anything nobody has ruled on. ⚠️ `decisions.md` → "Every ChapterEventGroup
+  field is WRITTEN or DECLARED-INHERITED": the census compares the field's **TARGET**, not the
+  initializer token, because our injectors keep the donor's symbol and rewrite what it points
+  at — a token census calls ~20 fields per chapter inherited when almost none are. It is also
+  meaningful **only on an injected tree** (`injected()` gates it; CI runs `make test` before
+  the build). **Nicolas ruled the six skirmish rosters KEPT** — vanilla has optional
+  skirmishes so we do too, wired with the world map (#29), and deliberately not nulled. The
+  guard found a sixth instance of the failure class on its first run: ch02 alone inherits
+  `miscBasedEvents`, correct by coincidence of design rather than intent.
 - **A chapter's status is DERIVED** (#312, PR #324) — `make chapter CH=chNN`, above. ⚠️ Two
   things in `decisions.md` → "A chapter's status is DERIVED": a message BLOCK range must be
   DECLARED and never inferred from the ids a chapter claims (a range computed from its own
