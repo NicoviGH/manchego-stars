@@ -596,3 +596,33 @@ design_notes: >
   gimmick wants — as the FOG SCOUT: a Thief sees +5 tiles in fog (GetUnitFogViewRange),
   so Trex is the one who actually spots the moose and the wolves. Villain thread:
   Ravisin awakened the wolves, the moose, and Messie.
+
+# What this chapter's playtest scenarios PROVE (#314) -- see ch05's block for the shape and
+# tools/playtest/declared.py for what is derived from it.
+playtest:
+  boot: ch04boot                 # CH04BOOT=1; host slot 5 comes from inject/hosts.py
+  cases:
+    - name: ch04village
+      proves: the Lonelywood village hands over its Iron Axe
+      given: [on_map]
+      when:
+        - visit: {x: 8, y: 2}    # villages -> lonelywood
+      then:
+        - gained_item: 0x1F      # ITEM_AXE_IRON
+
+    # Still hand-written Lua. ch04cottage asserts on TERRAIN rather than an item (the
+    # forest cottage's gift is the scene, not a reward), which the v1 vocabulary has no
+    # word for yet.
+    - {name: ch04cottage,        proves: the forest cottage speaks and closes behind you, lua: ch04cottage}
+    - {name: ch04moose,          proves: the White Moose reaches its pen and the hunt fires, lua: ch04moose}
+    - {name: ch04packmath,       proves: the wolf pack's converted count matches the roster, lua: ch04packmath}
+    - {name: ch04snag,           proves: felling the snag turns the river row into a crossing, lua: ch04snag}
+    - {name: clear_ch04_parley,  proves: the parley route clears the chapter, lua: clear_ch04_parley}
+    - {name: smoke_ch04,         proves: ch04 boots and survives a long soak, lua: smoke_ch04}
+    - {name: clear_ch04,         proves: ch04 routs via real combat, lua: clear_ch04}
+    - {name: recordch04parley,   proves: the pack converts in place, lua: recordch04parley}
+    - {name: ch04sprites,        proves: the ch04 map sprites read on the winter tileset, lua: ch04sprites, kind: diagnostic}
+    - {name: recordch04moose,    proves: the moose charge in motion, lua: recordch04moose, kind: record}
+    - {name: recordch04open,     proves: the two-BG Lonelywood opening in motion, lua: recordch04open, kind: record}
+    - {name: recordch04reveal,   proves: the moose reveal in motion, lua: recordch04reveal, kind: record}
+    - {name: recordch04cottage,  proves: the cottage scene in motion, lua: recordch04cottage, kind: record}

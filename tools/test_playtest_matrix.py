@@ -448,8 +448,29 @@ class RealManifest(unittest.TestCase):
                       'the gate must walk the arm ch05recruit cannot reach')
 
     def test_every_manifest_row_still_exists_in_harness(self):
-        stale = sorted(set(self.m.scenarios) - self.harness)
-        self.assertEqual(stale, [], 'matrix.yaml rows for scenarios harness.lua no longer defines')
+        """Every row still names something runnable -- a harness function, or a chapter-
+        declared case (#314).
+
+        A chapter-declared case has no function in harness.lua by design: its body is the
+        chapter YAML's given/when/then and cases.lua runs it. The guard keeps its teeth for
+        everything else, including a `lua:` case whose named function has been deleted --
+        that one IS stale, and it is the failure this test was written for.
+        """
+        import declared
+        bodies = {c['name'] for _s, c in declared.cases() if 'lua' not in c}
+        stale = sorted(set(self.m.scenarios) - self.harness - bodies)
+        self.assertEqual(stale, [], 'matrix rows naming nothing runnable')
+
+    def test_a_declared_case_body_is_the_chapter_yaml_not_a_dead_row(self):
+        """The complement: the three ported cases resolve, and harness.lua does NOT define
+        them. Without this, deleting the derivation would make the test above vacuous."""
+        import declared
+        bodies = {c['name'] for _s, c in declared.cases() if 'lua' not in c}
+        for name in ('ch04village', 'ch05village', 'ch05reliquaries'):
+            self.assertIn(name, bodies, '%s is no longer chapter-declared' % name)
+            self.assertNotIn(name, self.harness,
+                             '%s is declared AND hand-written -- two bodies, one name' % name)
+            self.m.resolve(name)
 
     def test_every_scenario_resolves(self):
         for name in self.m.scenarios:

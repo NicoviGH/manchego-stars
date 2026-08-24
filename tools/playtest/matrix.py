@@ -143,6 +143,28 @@ class Group(object):
         return '<Group %s x%d>' % (self.rom, len(self.scenarios))
 
 
+def merge_declared(data):
+    """Fold chapter-declared rows and suites into a parsed `matrix.yaml` document."""
+    import declared
+
+    rows, suites = declared.matrix_rows(), declared.matrix_suites()
+    clash = sorted(set(rows) & set(data['scenarios'] or {}))
+    if clash:
+        raise ManifestError(
+            'declared in BOTH a chapter YAML and matrix.yaml: %s -- delete the matrix.yaml '
+            'row, the chapter owns it now (#314)' % ', '.join(clash))
+    data['scenarios'] = dict(data['scenarios'] or {}, **rows)
+    have = data.get('suites') or {}
+    clash = sorted(set(suites) & set(have))
+    if clash:
+        raise ManifestError(
+            'suite(s) %s are DERIVED from the chapter YAML now -- delete the matrix.yaml '
+            'copy, which can only fall behind (#314)' % ', '.join(clash))
+    have.update(suites)
+    data['suites'] = have
+    return data
+
+
 class Manifest(object):
     def __init__(self, data):
         self.defaults = data['defaults']
@@ -154,8 +176,20 @@ class Manifest(object):
 
     @classmethod
     def load(cls, path=None):
+        """The manifest as shipped, PLUS every chapter-declared case (#314).
+
+        A chapter YAML's `playtest:` block derives its own rows and its own suite, so
+        `matrix.yaml` no longer carries a hand-written copy of them. Merging here rather
+        than in `__init__` keeps the synthetic manifests the pure tests build from reaching
+        into the campaign.
+
+        A name in both files RAISES. Silently letting one win would recreate exactly the
+        hand-sync this replaced, with the added twist that which copy ran would depend on
+        merge order -- so the scenario could differ from the one someone was reading.
+        """
         with open(path or MANIFEST) as fh:
-            return cls(yaml.safe_load(fh))
+            data = yaml.safe_load(fh)
+        return cls(merge_declared(data))
 
     # -- resolution ---------------------------------------------------------
 
