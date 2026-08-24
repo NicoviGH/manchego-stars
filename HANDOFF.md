@@ -50,15 +50,13 @@ declared, 4 of 4 events unscripted, Messie has no portrait/map sprite/battle ani
 on #302 is model built against a guess until a real chapter runs through it, which is the "golden
 cage" failure the epic names.
 
-**Two things deferred on purpose, and they are NOT the same amount of done:**
+**#327 is CLOSED** — the freeze shipped (#328) and the tail thinning is decided-and-not-built, with
+its two reopen triggers in `decisions.md`. Do not reopen it as a chore; both triggers announce
+themselves.
 
-- **#327 is 3 of 4 boxes done** (PR #328: the probe fix, every-chunk measurement, the ratchet).
-  Only the tail thinning is left, and it is **comfort, not safety** — the ceiling is measured
-  honestly everywhere and frozen, so nothing can break while it waits. It is a ~253-call-site
-  mechanical sweep; freezing first is what makes attempting it safe.
-- **#315 is not started.** Nothing on it has been built. It is deferred because assertion cost was
-  never the bottleneck — watched-run cost was, and #308–#311 fixed that — so the epic's own line
-  applies: let ch06 decide how much of it is real.
+**#315 is not started** — nothing on it has been built. Deferred because assertion cost was never
+the bottleneck (watched-run cost was, and #308–#311 fixed that), so the epic's own line applies:
+let ch06 decide how much of it is real.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`

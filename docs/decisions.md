@@ -5571,6 +5571,21 @@ The ratchet constant is a POLICY threshold, not a fact about the code, so it doe
 number about our own code can be computed, compute it". The computed number is checked against it
 on every run, which is precisely why it cannot drift.
 
+**The tail thinning is DECIDED AND NOT BUILT.** #327's fourth item — moving the 111 locals
+referenced ≤5 times into cohesive modules, taking `harness.lua` to ~87 with ~113 free — is not
+happening, and the issue is closed rather than left open against it. The ratchet already removes the
+failure: the ceiling is measured honestly in every chunk, the count cannot grow, and new
+infrastructure goes into modules, which expand by adding files and so have no ceiling. Thinning
+would buy **slack**, not safety, at the cost of a ~253-call-site mechanical sweep — the exact shape
+that shipped three bugs in one day here and passed all 546 tests, where what caught them was an
+output diff rather than the suite.
+
+Two events would reopen it: the ratchet starting to **block real work** (someone needing a
+top-level local in `harness.lua` and having no reasonable module to put it in), or the module split
+scattering one decision across so many chunks that following the code costs more than the slack
+saved. Neither is speculative to detect — the first shows up as a failing `check_harness_local_ratchet`
+that nobody can satisfy cleanly.
+
 _Recorded: 2026-08-24 (#327)._
 
 ### A scenario is DECLARED by the chapter it tests (2026-08-24, #314)
