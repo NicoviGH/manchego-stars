@@ -343,6 +343,10 @@ def event_group_census(name, campaign=campaign_chapters.CAMPAIGN):
     short = campaign_chapters.short_id(load(name, campaign))
     if not any(h.name == short for h in hosts.hosted_chapters()):
         return None
+    # On an UNINJECTED decomp every field reads INHERITED -- true, and indistinguishable from
+    # a real finding. Say cannot tell rather than report a census of nothing.
+    if not event_group.injected():
+        return None
     try:
         return event_group.census(short)
     except (KeyError, OSError):
@@ -513,7 +517,8 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     out.append('  event group fields')
     verdicts = event_group_census(name, campaign)
     if verdicts is None:
-        out.append('    (census unavailable here -- it reads the decomp)')
+        out.append('    cannot tell -- the decomp is not injected (run `make`), '
+                   'or it could not be read')
     else:
         written = [f for f, v in verdicts.items() if v == 'WRITTEN']
         out.append('    %d WRITTEN, %d declared-inherited' % (len(written),

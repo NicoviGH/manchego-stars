@@ -164,6 +164,8 @@ class TheReport(unittest.TestCase):
             short = chapter['id'].split('-')[0]
             self.assertIn(short, cs.report(short), short)
 
+    @unittest.skipUnless(cs.event_group_census('ch05') is not None,
+                         'the decomp is not injected -- the census reads what a build wrote')
     def test_the_census_row_reports_the_SAME_data_the_build_guard_rules_on(self):
         """#312 left this row pending #313. Now that the census exists, `make chapter` reports
         it and the build refuses it off ONE census -- two would be two answers."""
@@ -172,6 +174,8 @@ class TheReport(unittest.TestCase):
         self.assertIn('WRITTEN', text)
         self.assertEqual(event_group.census('ch05'), cs.event_group_census('ch05'))
 
+    @unittest.skipUnless(cs.event_group_census('ch05') is not None,
+                         'the decomp is not injected -- the census reads what a build wrote')
     def test_every_inherited_field_shown_carries_its_declared_reason(self):
         """An inherited field with no reason beside it is the silence this replaces."""
         for field, why in cs.inherited_reasons('ch05').items():

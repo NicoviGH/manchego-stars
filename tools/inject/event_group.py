@@ -220,8 +220,30 @@ def vanilla_header(relpath):
     return out.stdout
 
 
+def injected(paths=('src/events',)):
+    """Has this build written into the decomp yet?
+
+    The census compares the working tree against HEAD, so on an UNINJECTED tree every field
+    reads INHERITED -- true, and useless. Worse, it is indistinguishable from a real finding,
+    which is how it broke CI: `make test` runs before the build, so the tree was clean and the
+    census reported nine chapters inheriting everything. Callers that can run either side of a
+    build have to ask this first and say "cannot tell" rather than report a census of nothing.
+    """
+    env = dict((k, v) for k, v in os.environ.items()
+               if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX',
+                            'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE',
+                            'GIT_ALTERNATE_OBJECT_DIRECTORIES'))
+    out = subprocess.run(['git', '-C', DECOMP, 'diff', '--name-only', 'HEAD', '--'] +
+                         list(paths), capture_output=True, text=True, env=env)
+    return out.returncode == 0 and bool(out.stdout.strip())
+
+
 def census(chapter, hosted=None):
-    """{field: WRITTEN/INHERITED/ABSENT} for one hosted chapter's ChapterEventGroup."""
+    """{field: WRITTEN/INHERITED/ABSENT} for one hosted chapter's ChapterEventGroup.
+
+    Only meaningful on an INJECTED tree -- see `injected()`. The build guard runs after every
+    injector for exactly that reason.
+    """
     from . import hosts
     rows = hosted if hosted is not None else hosts.hosted_chapters()
     row = next((h for h in rows if h.name == chapter), None)

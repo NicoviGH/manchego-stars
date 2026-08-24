@@ -96,6 +96,13 @@ class Classifying(unittest.TestCase):
         self.assertEqual('ABSENT', got['endingSceneEvents'])
 
 
+INJECTED = event_group.injected()
+NEEDS_BUILD = unittest.skipUnless(
+    INJECTED, 'the decomp is not injected: on a clean tree every field reads INHERITED, '
+              'which is true and useless (CI runs `make test` BEFORE the build)')
+
+
+@NEEDS_BUILD
 class WhatInheritedActuallyMeans(unittest.TestCase):
     """The subtlety this guard turns on, and the one that makes a pointer comparison useless.
 
@@ -130,6 +137,7 @@ class TheLiveCensus(unittest.TestCase):
             path = event_group.header_for(hosted.event_group)
             self.assertTrue(path.endswith('.h'), hosted.event_group)
 
+    @NEEDS_BUILD
     def test_ch05_still_inherits_the_six_encounter_rosters(self):
         """The finding #313 was opened to surface, asserted so it cannot quietly change
         without somebody ruling on it. ch05 hosts on slot 6, so these are vanilla Ch6's
@@ -145,6 +153,7 @@ class UnclassifiedIsABuildFailure(unittest.TestCase):
     shipping a bug. Five instances found it the hard way -- goal text ids, battle grounds,
     difficulty numbers, `.traps`, and the encounter rosters."""
 
+    @NEEDS_BUILD
     def test_the_live_tree_passes_because_every_inherited_field_is_declared(self):
         event_group.assert_census_declared()
 
