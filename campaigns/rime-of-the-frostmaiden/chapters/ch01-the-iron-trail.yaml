@@ -14,7 +14,11 @@ status: active                 # built / in-progress slice; combat data is groun
 milestone: M3
 cadence: full_party_intro       # story-wise: whole cast meets at the Northlook (opening
                                 # scene); the FIELD is 4 units (vanilla Ch1 parity)
-fe8_base_map: "FE8 Ch13a — Fluorspar's Oath (layout only)"  # cadence base = FE8 Ch1
+fe8_base_map: "FE8 Ch13a — Hamill Canyon (layout only)"  # cadence base = FE8 Ch1
+                              # The LAYOUT is Ch13EirikaMap, 25x16, verified: our .mar matches its
+                              # blocked-cell pattern 97.8%. Fluorspar's Oath is Ch13*b* (Ephraim,
+                              # Ch13EphraimMap, 22x22 -- chapters.h CHAPTER_I_13) and is UNUSED by us.
+                              # The old name here read as though ch01 had spent the Ephraim layout.
 fe8_cadence_base: "FE8 Ch1 — Escape! (Seize breather; field counts mirrored 1:1)"
 parity_reference: "FE8 Ch1"   # #48 enemy-pressure parity bar — Escape! — field counts mirrored 1:1 (cadence base, not the Ch13a layout)
 

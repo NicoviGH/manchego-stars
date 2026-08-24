@@ -7272,6 +7272,45 @@ two would be two answers.
 _Decided: 2026-08-23 (Nicolas ruled on the rosters). Proof: 15 unit tests; the guard runs in
 every build; it found ch02's `miscBasedEvents` unruled on first run._
 
+
+### A base-map LABEL is prose — the donor is DERIVED (2026-08-24, #26)
+
+`fe8_base_map` in a chapter YAML is documentation. Nothing reads it, so nothing has ever checked
+it, and ch01's said **"FE8 Ch13a — Fluorspar's Oath"** for months. It is wrong twice over:
+`chapters.h` has `CHAPTER_E_13 // Hamill Canyon` against `CHAPTER_I_13 // Fluorspar's Oath`, so
+13a is the EIRIKA route and Fluorspar's Oath is 13b; and our ch01 map is 25x16, which matches
+`Ch13EirikaMap` and cannot be `Ch13EphraimMap` (22x22) at all.
+
+**Cost when it bit:** during ch06's donor search the label read as *"ch01 already spent the
+Ephraim layout"*, and `Ch13EphraimMap` was nearly struck off the candidate list on the strength of
+a sentence. A retile is the one decision in this repo where the source of truth is a binary we
+own, and we were reading a caption instead.
+
+**Derive it instead.** A retile preserves geometry, so the donor is recoverable from the artifact:
+take our `.mar`, take every vanilla layout of the SAME DIMENSIONS, and compare the blocked-cell
+pattern (terrain in the impassable set, per each layout's own tile config). The real donor scores
+in the high nineties; nothing else of those dimensions comes close. Dimensions alone eliminate
+most candidates before the comparison runs. Run over every chapter it recovers:
+
+| ours | donor | match | |
+|---|---|---|---|
+| ch00 | `PrologueMap` | 100% | The Fall of Renais |
+| ch01 | `Ch13EirikaMap` | 98% | **Hamill Canyon** |
+| ch02 | `Ch2Map` | 100% | The Protected |
+| ch03 | `Ch3Map` | 85% | Borgo — the low score is real, ch03 edited the geometry |
+| ch04 | `Ch4Map` | 100% | Ancient Horrors |
+| ch05 | `Ch5Map` | 100% | The Empire's Reach |
+
+ch03's 85% is the useful half of the result: the method reports how much a chapter DIVERGED from
+its donor, not just which donor it was.
+
+⚠️ **Ask the ledger before claiming a layout is spent, and never a label.** Also surfaced by it:
+ch08's seed claims Hamill Canyon, which ch01 has already used — two chapters on identical geometry
+will read as a repeat. Not a bug today (ch08 is unbuilt); recorded so it is a choice when reached.
+
+_Decided: 2026-08-24. Found during ch06's donor evaluation; ch01's label corrected in the same
+commit._
+
 ---
 
 ## Open Questions (not yet decided)
