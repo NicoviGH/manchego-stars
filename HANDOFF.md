@@ -6,73 +6,76 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-23 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-08-24 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Five gotchas that lived ONLY here were migrated into `decisions.md` first — check that
 a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#328** (`c5d326b`), CI green, no open PRs.
+**ch06 design pass (#26) — brainstorm, nothing built.** `main` is at **#328** (`c5d326b`), CI green,
+no open PRs, no ROM built this session.
+
+**The design board is the store for it:**
+`https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10` — canon vs seed, vanilla Ch6
+examined, the donor evaluation, the art sourcing, and seven numbered decisions with recommendations.
+Read it before reopening any of them; the reasoning is there and is NOT restated here.
+
+**Owed, and the reason it is owed:**
+
+- **PR #329 is open and unreviewed** — `fix/ch01-base-map-name`. ch01's `fe8_base_map` said
+  *"FE8 Ch13a — Fluorspar's Oath"*; 13a is the EIRIKA route (`chapters.h`:
+  `CHAPTER_E_13 // Hamill Canyon`, `CHAPTER_I_13 // Fluorspar's Oath`) and our 25x16 map matches
+  `Ch13EirikaMap`, not the 22x22 `Ch13EphraimMap`. Carries the ADR for the method that replaces the
+  label — `decisions.md` → "A base-map LABEL is prose — the donor is DERIVED". Review + squash-merge.
+- **The ch06 decisions are on the BOARD, not in the repo yet.** Locked so far: Messie is **green**
+  (Loch Ness, not ice-blue, 2026-08-24); the Dorrie sheet's 32x32 icon is a **chibi, not a map
+  sprite** (Nicolas's correction — it is a portrait icon, so it feeds `portrait_tool`'s `chibi_png`
+  slot, and the full-body overworld sprite is still unmade). Phase A writes these into the chapter
+  YAML and #26.
+- **#135's ch01 Guide finding is still untouched** — it was the standing next task and this session
+  went to ch06 instead. Read the triage comment on the issue first. ⚠️ Its central claim (the Guide
+  command is absent ch01–ch04) is a STATIC CHAIN, not an observed run: a headless ch01 verdict
+  scenario settles it for free, because the controller already dumps `menu.items` with `override_id`.
+  Nicolas's bar there is **vanilla parity and nothing more** (2026-08-24).
 
 ## Next task
 
-**#135's ch01 finding — read the triage comment on the issue first.** A v0.1.0 playtester
-reported ch01's enemy healing as *"confusing... or it was a glitch"*. It is neither a glitch nor
-our invention: the 12 fort tiles came with the `Ch13EirikaMap` base layout at identical
-coordinates, and the castle gate at (21,7) is ours, for Seize. Two healing terrains, two vanilla
-rates (20% / 10%).
+**PixelLab MCP — it needs a session restart, and that is the whole fix.** Nicolas registered
+`pixellab` (http, `https://api.pixellab.ai/mcp`, static bearer) under the `/Users/Yonick` project
+scope mid-session, so no `mcp__pixellab__*` tools exist in a session that started before it. There
+is no OAuth step. ⚠️ **Do not try to reach it over `curl` — the auto-mode classifier blocks the
+authenticated request**, and that block is correct; restart instead.
 
-What the triage actually turned up is bigger than the report: **our Guide is effectively empty.**
-We null vanilla's tutorial lists on every hosted slot (`build_campaign.py:3216`, `:7939`), so no
-vanilla `ENUT` ever runs, and `IsGuideLocked()` hides the Guide map-menu command entirely unless
-some entry's `displayFlag` is set. Of the 56 flags the Guide uses, our game sets exactly **one** —
-234 ("Arena"), in ch05's arena beat. So ch01–ch04 appear to have **no Guide command at all**, and
-from ch05 it lists one topic.
+What it is FOR, once connected (the two slots nothing else fills):
 
-⚠️ **That last claim is a STATIC CHAIN, not an observed run — disprove it before building on it.**
-The Guide command is menu id `0x74` (`menu_def.c`) and the controller already dumps `menu.items`
-with `override_id` in every action record, so a headless ch01 verdict scenario settles it for free.
-The fix, if it holds, is our own existing pattern: ch05's arena beat is already a verbatim
-vanilla-shaped tutorial (`CAMERA → CURSOR_FLASHING → TUTORIALTEXTBOXSTART → TEXTSHOW → ENUT`,
-`build_campaign.py:10520`); ch01's is the same shape with `ENUT(206)`.
+- **Map sprite** — a full-body overworld Messie: idle sheet plus a `32x480` walk sheet, background
+  keyed on **GREEN**, not index 0.
+- **Battle anim** — three frames, *ready / windup / peak*, on a COMMON feet anchor, at `88x64` or an
+  INTEGER multiple. The Dorrie body is 82x72 against that frame — it **overhangs by 8px**, so this
+  wants a re-POSE, not a re-shrink (`inject_battle_anims`: never re-shrink already-small art).
 
-**Nicolas's bar here is VANILLA PARITY and nothing more** (2026-08-24): *"we don't need to explain
-it any more than vanilla does. as long as we have that guide players can reference we're good."*
-Vanilla does explain it — a forced Ch1 tutorial box that flashes the tiles and names Breguet on his
-gate — so parity is that beat plus the Guide entry, not a new system.
+Portrait and chibi do not need it: `ref_to_bust.py` takes a 4x reference (its docstring names the
+style — *flat cel-shaded, bold black outlines, ~16 colours, no gradients*) and `portrait_tool.generate`
+emits the chibi.
 
-The art-consistency and prologue-difficulty halves of #135 are still untriaged.
-
-**Then ch06 (#26), which is the #302 epic's own Definition of Done** — "ch06 costs materially fewer
-evenings than ch05 did". `make chapter CH=ch06` is the orientation: not hosted, no difficulty
-declared, 4 of 4 events unscripted, Messie has no portrait/map sprite/battle anim. Everything else
-on #302 is model built against a guess until a real chapter runs through it, which is the "golden
-cage" failure the epic names.
-
-**#327 is CLOSED** — the freeze shipped (#328) and the tail thinning is decided-and-not-built, with
-its two reopen triggers in `decisions.md`. Do not reopen it as a chore; both triggers announce
-themselves.
-
-**#315 is not started** — nothing on it has been built. Deferred because assertion cost was never
-the bottleneck (watched-run cost was, and #308–#311 fixed that), so the epic's own line applies:
-let ch06 decide how much of it is real.
+**Then the rest of ch06's Phase A**, which needs no ROM at all: re-ground the seed YAML against the
+board's decisions, write the six beats as scene builders, `make scene` them, declare the `playtest:`
+block. `make chapter CH=ch06` is the orientation.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
 with procs that never change — which looks exactly like broken input and is not. Restore the ROM,
 the ELF **and** `.build-config.json` from the same cache entry, then re-run `gen_symbols.py`.
 
-**Tree state: the ROM in the tree is `ch05boot`** (CH05BOOT=1) — the last build of the 2026-08-24
-verification runs, not canonical. `tools/playtest/states/` still holds valid **`prep`** and
-**`ch02start`** stamped for the CANONICAL ROM, so anything wanting them needs canonical back in the
-tree first. A dead state is exactly **397,312 bytes of zeros** — that size is the tell.
+**Tree state: the ROM in the tree is still `ch05boot`** (CH05BOOT=1) — nothing was built this
+session. `tools/playtest/states/` still holds valid **`prep`** and **`ch02start`** stamped for the
+CANONICAL ROM, so anything wanting them needs canonical back in the tree first. A dead state is
+exactly **397,312 bytes of zeros** — that size is the tell.
 
 **The ROM cache is WARM** for `canonical`, `testch`, `ch03boot`, `ch04boot`, `ch05boot`,
-`ch05lupinboot`, `ch05mooseboot` and the three ch05 ending arms (2026-08-24). #314 touched
-`Makefile`, `tools/build_campaign.py` and `tools/inject/` — all `ROM_INPUT_PATHS` entries, so
-`rom_input_hash` folded and every configuration missed once; the eight builds that followed
-re-warmed it. #327 touched only `tools/check.py`, which is not an input, so the cache survived it.
+`ch05lupinboot`, `ch05mooseboot` and the three ch05 ending arms (2026-08-24). Untouched since:
+this session built nothing and edited no `ROM_INPUT_PATHS` entry.
 
 ## Recently landed — do not redo
 
