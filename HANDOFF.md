@@ -50,12 +50,14 @@ and **`ch02start`** (105,705 and 128,940 bytes, 99.4–99.5% non-zero) stamped f
 `a44afcc2ac09:normal`, so anything wanting them needs canonical back in the tree first. A dead
 state is exactly **397,312 bytes of zeros** — that size is the tell.
 
-**The ROM cache is warm for all five gate configurations.** Nothing since the gate run has touched
-a `ROM_INPUT_PATHS` entry (`campaigns`, `engine`, `tools/inject`, `tools/build_campaign.py`,
-`tools/portrait_tool.py`, `tools/feditor_to_banim.py`, `Makefile`) — the last commits were docs,
-`check.py` and `matrix.yaml`, none of which are ROM inputs. So the next `SUITE=gate` restores five
-ROMs instead of building them, and the injection cache is warm underneath that for whatever does
-rebuild.
+⚠️ **The ROM cache is COLD as of #311–#313.** Those three touched `Makefile`,
+`tools/build_campaign.py` and `tools/inject/event_group.py`, and all three are `ROM_INPUT_PATHS`
+entries (`campaigns`, `engine`, `tools/inject`, `tools/build_campaign.py`,
+`tools/portrait_tool.py`, `tools/feditor_to_banim.py`, `Makefile`) — `rom_input_hash` folds the
+whole set, so every configuration misses. **The next `SUITE=gate` BUILDS five ROMs rather than
+restoring them; budget for it and do not read the first run's duration as a regression.** The
+per-step injection cache underneath is still warm (it keys on its own inputs, and no art
+changed), so each of those builds is the ~25s cached-injection kind rather than the ~50s one.
 
 ## Recently landed — do not redo
 
