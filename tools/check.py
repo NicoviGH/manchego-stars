@@ -862,7 +862,8 @@ def check_verdict_scenarios_are_guarded(fail):
             # A chapter-declared case has no function here on purpose (#314). It cannot hold
             # a raw press() at all: cases.lua drives the game only through the `api` table,
             # and every input primitive on it is a guarded one. That is asserted directly
-            # below rather than assumed -- see check_declared_cases_are_guarded.
+            # below rather than assumed -- see check_declared_cases, which checks cases.lua
+            # AND the api adapter in harness.lua that it drives the game through.
             if name in declared_bodies:
                 continue
             fail.append('verdict scenario %s has no function in harness.lua, so the '
@@ -892,6 +893,10 @@ def _declared_case_violations(cases, villages, harness_src):
             key, arg = list(entry.items())[0]
             if key != 'visit':
                 continue
+            if not isinstance(arg, dict):
+                problems.append('%s case %s: `visit` takes a mapping with x and y, got %r'
+                                % (short, case['name'], arg))
+                continue
             tile = [arg.get('x'), arg.get('y')]
             if tile not in villages.get(short, []):
                 problems.append(
@@ -899,14 +904,39 @@ def _declared_case_violations(cases, villages, harness_src):
                     'chapter YAML owns that map data, and a case coordinate that drifts '
                     'from it asserts against a tile the chapter does not have'
                     % (short, case['name'], tile[0], tile[1], short))
+        for i, entry in enumerate(case.get('then') or ()):
+            if not isinstance(entry, dict) or len(entry) != 1:
+                problems.append(
+                    '%s case %s: assertion %d is not a single-key mapping (`- spoke: true`, '
+                    'not `- spoke`)' % (short, case['name'], i))
     # cases.lua reaches the game ONLY through the api table it is handed, so it cannot hold
     # a raw press(). Asserting it rather than trusting it: this is the file every future
     # declared case runs through, so one blind press here would un-guard all of them at once
     # (decisions.md -> "A verdict scenario may not drive the UI with a raw press()").
-    if re.search(r'\bpress\(', harness_src):
-        problems.append('tools/playtest/cases.lua drives the UI with a raw press() -- the '
-                        'declared driver may only reach the game through its `api` table')
+    for label, src in sorted(harness_src.items()):
+        if re.search(r'\bpress\(', src):
+            problems.append(
+                '%s drives the UI with a raw press() -- every declared case reaches the game '
+                'through it, so one blind press here un-guards ALL of them at once rather '
+                'than one (decisions.md -> a verdict scenario may not drive the UI with a '
+                'raw press())' % label)
     return problems
+
+
+def _declared_api_adapter(harness):
+    """The `api` table harness.lua hands to cases.lua.
+
+    It is declared INSIDE the runner coroutine so it costs no top-level local slot, which
+    also means `harness_functions` attributes it to whatever scenario precedes it -- a
+    `record` one, which check_verdict_scenarios_are_guarded skips. So it is carved out by
+    name here and checked directly; otherwise the one piece of code every declared case
+    drives the game through is the one piece nothing reviews.
+    """
+    start = harness.find('local function runDeclaredCase')
+    if start < 0:
+        return None
+    end = harness.find('log("scenario: "', start)
+    return harness[start:end if end > start else len(harness)]
 
 
 def check_declared_cases(fail):
@@ -930,8 +960,15 @@ def check_declared_cases(fail):
         short = str(d.get('id', '')).split('-')[0]
         villages[short] = [list(v['tile']) for v in (d.get('villages') or []) if v.get('tile')]
     with open(os.path.join(REPO, 'tools/playtest/cases.lua'), encoding='utf-8') as fh:
-        src = fh.read()
-    fail.extend(_declared_case_violations(cases, villages, src))
+        sources = {'tools/playtest/cases.lua': fh.read()}
+    with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
+        adapter = _declared_api_adapter(fh.read())
+    if adapter is None:
+        fail.append('harness.lua no longer defines runDeclaredCase, so the api table every '
+                    'declared case drives the game through cannot be reviewed')
+    else:
+        sources["harness.lua's declared-case api adapter"] = adapter
+    fail.extend(_declared_case_violations(cases, villages, sources))
 
 
 # GBA address space. 0x04-0x07 are ARCHITECTURAL (MMIO, palette, VRAM, OAM) -- fixed by the

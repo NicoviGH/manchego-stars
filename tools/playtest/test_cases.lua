@@ -27,13 +27,13 @@ local function fakeApi(opts)
     opts = opts or {}
     local items = {}
     for _, id in ipairs(opts.items or {}) do items[#items + 1] = id end
-    local a = {verdict = nil, reason = nil, log = {}, visits = {}, booted = false, settled = 0}
+    local a = {verdict = nil, reason = nil, logged = {}, visits = {}, booted = false, settled = 0}
     a.bootToMap = function() a.booted = true; return opts.boot ~= false end
     a.fastConfig = function() a.fast = true end
     a.settle = function() a.settled = a.settled + 1; return opts.settle ~= false end
     a.collectedItems = function() return items end
     a.eventFlag = function(id) return (opts.flags or {})[id] == true end
-    a.log = function(s) a.log[#a.log + 1] = s end
+    a.log = function(s) a.logged[#a.logged + 1] = s end
     a.shot = function() end
     a.result = function(v, why) a.verdict, a.reason = v, why; return v end
     a.visitVillage = function(x, y)
@@ -175,6 +175,71 @@ do
            ["then"] = {{gained_item = 1}}}, api)
     check(api.verdict, "FAIL", "a map that never settles FAILs")
     contains(api.reason, "player control", "the reason blames the settle, not the visit")
+end
+
+-- A door that hands over ANOTHER door's gift must FAIL. This is the whole reason the gift
+-- rides the step: the gifts are per-tile on purpose, so "some item arrived" is not the
+-- assertion. Rotating the four gifts passed under a whole-case `gained_item` list -- every
+-- id still arrived, just from the wrong door -- which is the defect ch05reliquaries was
+-- written to catch in the first place.
+do
+    local api = fakeApi({visits = {{gives = 0x5D}, {gives = 0x0E}, {gives = 0x60}, {gives = 0x70}}})
+    C.run({name = "ch05reliquaries", given = {"on_map"},
+           ["when"] = {{visit = {x = 5, y = 1, gains = 0x70}},
+                       {visit = {x = 5, y = 6, gains = 0x5D}},
+                       {visit = {x = 12, y = 10, gains = 0x0E}},
+                       {visit = {x = 12, y = 19, gains = 0x60}}},
+           ["then"] = {{spoke = true}}}, api)
+    check(api.verdict, "FAIL", "four doors handing over each other's gifts FAILs")
+    contains(api.reason, "(5,1)", "the reason names the FIRST door that gave the wrong gift")
+    contains(api.reason, "0x70", "the reason names the gift that door owed")
+end
+
+-- The matching happy path: each door gives its own.
+do
+    local api = fakeApi({visits = {{gives = 0x70}, {gives = 0x5D}, {gives = 0x0E}, {gives = 0x60}}})
+    C.run({name = "ch05reliquaries", given = {"on_map"},
+           ["when"] = {{visit = {x = 5, y = 1, gains = 0x70}},
+                       {visit = {x = 5, y = 6, gains = 0x5D}},
+                       {visit = {x = 12, y = 10, gains = 0x0E}},
+                       {visit = {x = 12, y = 19, gains = 0x60}}},
+           ["then"] = {{spoke = true}}}, api)
+    check(api.verdict, "PASS", "each door handing over its own gift PASSes")
+end
+
+-- A step-borne assertion COUNTS as an assertion: a case with `gains` and no `then` is not
+-- the vacuous case the ERROR is for.
+do
+    local api = fakeApi({visits = {{gives = 0x60}}})
+    C.run({name = "ch05village", given = {"on_map"},
+           ["when"] = {{visit = {x = 12, y = 19, gains = 0x60}}}, ["then"] = {}}, api)
+    check(api.verdict, "PASS", "a `gains` step is an assertion, so `then` may be empty")
+end
+
+-- ...but a case with neither still cannot pass.
+do
+    local api = fakeApi({visits = {{gives = 0x60}}})
+    C.run({name = "x", given = {"on_map"}, ["when"] = {{visit = {x = 1, y = 1}}},
+           ["then"] = {}}, api)
+    check(api.verdict, "ERROR", "no `then` and no step assertion is still an ERROR")
+end
+
+-- A malformed entry is an ERROR with a readable reason, not an uncaught Lua error inside
+-- pairs(). `- spoke` instead of `- spoke: true` is the typo this catches.
+do
+    local api = fakeApi({visits = {{gives = 1}}})
+    C.run({name = "x", given = {"on_map"}, ["when"] = {{visit = {x = 1, y = 1, gains = 1}}},
+           ["then"] = {"spoke"}}, api)
+    check(api.verdict, "ERROR", "a bare string in `then` is an ERROR verdict, not a crash")
+    contains(api.reason, "single-key mapping", "the reason explains the shape it wanted")
+end
+
+-- A `visit` whose argument is not a coordinate table fails cleanly too.
+do
+    local api = fakeApi({})
+    C.run({name = "x", given = {"on_map"}, ["when"] = {{visit = "south"}},
+           ["then"] = {{spoke = true}}}, api)
+    check(api.verdict, "FAIL", "a non-table visit argument FAILs rather than crashing")
 end
 
 print(string.format("%d checks, %d failures", tests, fails))

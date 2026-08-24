@@ -1950,29 +1950,29 @@ playtest:
       proves: the south reliquary hands over its Dracoshield
       given: [on_map]
       when:
-        - visit: {x: 12, y: 19}  # villages -> reliquary-south
-      then:
-        - gained_item: 0x60      # ITEM_DRACOSHIELD
+        - visit: {x: 12, y: 19, gains: 0x60}   # reliquary-south -> ITEM_DRACOSHIELD
 
     - name: ch05reliquaries
       proves: all four reliquaries speak and hand over their OWN gift
       # `spoke` is not decoration: a wired-but-empty message would hand the gift over in
       # silence and every item check here would still pass.
+      # `gains` rides the STEP, so each door is pinned to ITS OWN gift causally. The
+      # gifts are per-tile on purpose (vanilla's placement, richest where the eruption
+      # races), so "some item arrived" is not the assertion -- the RIGHT item is, from the
+      # RIGHT door. A whole-case `gained_item` list would pass on four doors handing over
+      # each other's gifts, which is the defect this scenario exists to catch.
+      #
+      # It is still not POSITIONAL: the assertion is inside the step it belongs to, so
+      # inserting a door cannot silently re-target another door's assertion. That was the
+      # flaw in pairing a `then` list against a `when` list by index.
       given: [on_map]
       when:
-        - visit: {x: 5,  y: 1}   # reliquary-north
-        - visit: {x: 5,  y: 6}   # reliquary-west
-        - visit: {x: 12, y: 10}  # reliquary-east
-        - visit: {x: 12, y: 19}  # reliquary-south
-      # Assertions are order-free and evaluated against the WHOLE case, never paired
-      # positionally with a step: `gained_item` means the party gained that item at some
-      # point in this case, `spoke` means EVERY visit raised a text box. Positional pairing
-      # would make inserting a step silently re-target every assertion after it.
+        - visit: {x: 5,  y: 1,  gains: 0x70}   # reliquary-north -> ITEM_TORCH
+        - visit: {x: 5,  y: 6,  gains: 0x5D}   # reliquary-west  -> ITEM_SECRETBOOK
+        - visit: {x: 12, y: 10, gains: 0x0E}   # reliquary-east  -> ITEM_SWORD_ARMORSLAYER
+        - visit: {x: 12, y: 19, gains: 0x60}   # reliquary-south -> ITEM_DRACOSHIELD
+      # Whole-case assertions only: `spoke` is a fact about EVERY visit, not about one.
       then:
-        - gained_item: 0x70      # ITEM_TORCH
-        - gained_item: 0x5D      # ITEM_SECRETBOOK
-        - gained_item: 0x0E      # ITEM_SWORD_ARMORSLAYER
-        - gained_item: 0x60      # ITEM_DRACOSHIELD
         - spoke: true
 
     # Still hand-written Lua. Each names WHY it is the exception rather than the default.

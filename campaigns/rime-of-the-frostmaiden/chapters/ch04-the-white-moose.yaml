@@ -606,9 +606,7 @@ playtest:
       proves: the Lonelywood village hands over its Iron Axe
       given: [on_map]
       when:
-        - visit: {x: 8, y: 2}    # villages -> lonelywood
-      then:
-        - gained_item: 0x1F      # ITEM_AXE_IRON
+        - visit: {x: 8, y: 2, gains: 0x1F}     # lonelywood -> ITEM_AXE_IRON
 
     # Still hand-written Lua. ch04cottage asserts on TERRAIN rather than an item (the
     # forest cottage's gift is the scene, not a reward), which the v1 vocabulary has no

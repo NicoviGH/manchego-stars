@@ -5511,13 +5511,25 @@ may be guessed from a name. What a scenario ASSERTS may not: `recordsupply` and 
 verdict scenarios despite the prefix, and `kind` drives both the headless split and
 `check_verdict_scenarios_are_guarded`.
 
-**Assertions are ORDER-FREE and evaluated against the whole case.** The first draft interleaved
-`then` with `when` so each assertion paired positionally with a step. Inserting a step would then
-silently re-target every assertion after it. `gained_item` now means *the party gained this during
-the case* and `spoke` means *every visit raised a box*.
+**An assertion lives where its subject does, and getting this wrong cost two drafts.** The first
+draft interleaved `then` with `when`, pairing each assertion to a step *by index* — so inserting a
+step silently re-targets every assertion after it. The fix for that made assertions order-free and
+whole-case, and **that was worse**: `ch05reliquaries` stopped asserting that each door hands over
+*its own* gift and only checked that four ids arrived. Rotating the four gifts passed. That is
+exactly the defect the scenario exists to catch — the gifts are per-tile on purpose, richest where
+the eruption races — and it was caught in review, not by the suite.
 
-**`gained_item` counts copies; it does not check presence.** A presence check passes on a reliquary
-that hands over nothing whenever anyone in the party already happens to be carrying one — which is
+So: an assertion about ONE STEP rides that step (`visit: {x, y, gains}`), and `then` holds only
+assertions about the WHOLE case (`spoke`, `event_flag`). Not positional, and not detached from its
+subject. **The general lesson is that weakening an assertion is invisible to every gate we have** —
+the scenario still passes, the diff looks like a simplification, and the coverage is gone.
+
+`declared.py subsumed` depends on this placement directly: it compares `when` and `then` as
+independent multisets, which is sound *only* because a per-step assertion cannot be in `then`. Move
+one back and A silently "covers" B while asserting nothing about what B pinned.
+
+**A gift assertion counts copies; it does not check presence.** A presence check passes on a
+reliquary that hands over nothing whenever anyone in the party already happens to be carrying one —
 exactly the blind spot `ch04village` was written to close (#205).
 
 **A `visit` step's tile is checked against the chapter's own `villages:` block.** The coordinates

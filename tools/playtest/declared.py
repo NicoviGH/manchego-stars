@@ -249,6 +249,14 @@ def subsumes(a, b):
     must boot the same ROM, `a` must do at least everything `b` does, and `a` must assert at
     least everything `b` asserts.
 
+    WHY THE COMPARISON IS SOUND, and what makes it unsound. It compares `when` and `then`
+    as independent multisets, which is only valid because of where assertions live: an
+    assertion ABOUT ONE STEP rides that step (`visit: {x, y, gains}`), and `then` holds only
+    assertions about the WHOLE case (`spoke`, `event_flag`). So if b's steps are a subset of
+    a's and b's whole-case assertions are a subset of a's, a really does prove everything b
+    does. Move a per-step assertion back into `then` and this claim silently breaks -- a
+    would then "cover" b while asserting nothing about the step b pinned.
+
     Coverage, not diagnosis. A subsumed case is often the better ISOLATOR: ch05reliquaries
     visits four doors in sequence, so a broken north door fails it before south is ever
     reached, where ch05village would have named south exactly. That is why this is a REPORT
