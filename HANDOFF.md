@@ -13,17 +13,19 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#323** (`141740d`), CI green, no open PRs.
+**Nothing.** `main` is at **#324** (`20f147f`), CI green, no open PRs.
 
 ## Next task
 
 **The #302 epic — read its body first.** It carries the measurement that reordered it, and the
 board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308, #309, #310 and #311 are done.** #309's phase 2 (ELF patching) is decided and
-NOT built — `decisions.md` records the two events that would reopen it.
+(#308-#315); **#308 through #312 are done.** #309's phase 2 (ELF patching) is decided and NOT
+built — `decisions.md` records the two events that would reopen it.
 
-**#312 is next** — generated chapter status, `make chapter chNN`, declared-vs-built. Then the
-declarative half (#313, #314, #315), then ch06 through it.
+**#313 is next** — the `ChapterEventGroup` field census as a build guard, and the original first
+child. It also owns the one #312 scope item left unticked: which fields a chapter WRITES vs
+INHERITS. `make chapter` names that gap and points at #313 rather than growing a second census.
+Then #314, #315, then ch06 through the model.
 
 **`make scene SCENE=ch05/1` now shows a scene without building anything** (#311, ~0.3s). Use it
 while authoring; `docs/scenes/ch05.md` is the committed book and `make check` diffs it. It
@@ -62,6 +64,13 @@ rebuild.
 Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
 does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
+- **A chapter's status is DERIVED** (#312, PR #324) — `make chapter CH=chNN`, above. ⚠️ Two
+  things in `decisions.md` → "A chapter's status is DERIVED": a message BLOCK range must be
+  DECLARED and never inferred from the ids a chapter claims (a range computed from its own
+  contents can only report itself as full, which is the one question it exists to answer), and
+  a degraded mode must say *cannot tell* rather than report a wrong number — six of the nine
+  review findings on this were fallbacks that lied. The chapter YAML now has ONE reader,
+  `tools/campaign_chapters.py`, shared with the `docs/CHAPTERS.md` generator.
 - **A scene is readable without a ROM** (#311, PR #323) — `make scene`, and `docs/scenes/ch05.md`
   as the golden. It renders nothing itself: each ch05 scene is already a pure
   `chap -> [(msg_id, body)]` builder, so the preview calls the SHIPPING builder and reads its
@@ -179,14 +188,23 @@ does not reopen one; the detail is on the issue and in `docs/decisions.md`.
 
 ## Current state
 
+- **Where a chapter stands is `make chapter CH=chNN`** (#312) — scenes declared vs written vs
+  previewable, message-id headroom, art per named unit, which scenarios cover it and what each
+  last said, and everything declared but unbuilt. `make chapter` with no `CH=` is all nine at a
+  glance. **Do not write any of that into this file again**: it is derived on demand, so a
+  generated answer cannot go stale and prose someone has to remember to update always does.
+  Two things it says today that nobody had computed: **ch05's message block is FULL**
+  (`0x9E4-0x9F5`, all 18 spent — the next ch05 scene costs a redesign, not an id), and **ch01
+  declares five events and has written two.**
 - **Backlog swept 2026-08-22** — do NOT re-survey it by issue title or checkbox. ch03 taught that
   an unchecked box records what someone intended, not what the repo contains: #23 read as "7 open
   items" while git history and the live YAML showed the work shipped long ago. Cross-reference the
   artifact. Closed in the sweep: #303, #23, #133, #244. Still open and each carrying its own fresh
   evidence: **#135** (real v0.1.0 playtester feedback on art consistency and difficulty, never
   triaged) and **#30** (`campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one
-  from ch04 on — nothing reads it, so it misleads rather than breaks; a natural thing for #302 to
-  derive instead of hand-keep).
+  from ch04 on — nothing reads it, so it misleads rather than breaks). #30 is now cheap: since
+  #312 there is one reader for the chapter YAML (`tools/campaign_chapters.py`), so that block
+  can be derived from it rather than hand-kept.
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
 - **Checkout: `/Users/Yonick/Projects/manchego-stars`, the ONE tree** (#267). It is clean except
   for the intentionally dirty `fireemblem8u` submodule and Nicolas's untracked `.agents/` +
