@@ -729,11 +729,29 @@ def check_playtest_matrix(fail):
         fail.append('tools/playtest/matrix.yaml does not load (%s)' % exc)
         return
 
+    # A chapter-declared case (#314) has NO function in harness.lua by design: its body is
+    # the chapter YAML's given/when/then and cases.lua runs it. A `lua:` case is the
+    # exception and still must resolve to a real function -- that is the half of the old
+    # pairing check worth keeping, and it now covers the chapter YAML too.
+    try:
+        sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
+        import declared
+        bodies = {c['name']: c for _s, c in declared.cases()}
+    except Exception as exc:                      # noqa: BLE001 -- report, don't crash the lint
+        fail.append('chapter-declared playtest cases do not load (%s)' % exc)
+        bodies = {}
+    declared_bodies = {n for n, c in bodies.items() if 'lua' not in c}
+
     harness = mx.harness_scenarios()
     for name in sorted(harness - set(m.scenarios)):
         fail.append('harness.lua defines scenario %s with no matrix.yaml row' % name)
-    for name in sorted(set(m.scenarios) - harness):
-        fail.append('matrix.yaml has a row for %s, which harness.lua no longer defines' % name)
+    for name in sorted(set(m.scenarios) - harness - declared_bodies):
+        if name in bodies:
+            fail.append('%s: the chapter YAML names `lua: %s`, which harness.lua no longer '
+                        'defines' % (name, bodies[name]['lua']))
+        else:
+            fail.append('matrix.yaml has a row for %s, which harness.lua no longer defines'
+                        % name)
 
     for name in m.scenarios:
         if name not in harness:
@@ -823,6 +841,12 @@ def check_verdict_scenarios_are_guarded(fail):
         return
     with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
         funcs = mx.harness_functions(fh.read())
+    try:
+        sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
+        import declared
+        declared_bodies = {c['name'] for _s, c in declared.cases() if 'lua' not in c}
+    except Exception:                             # noqa: BLE001 -- check_playtest_matrix reports it
+        declared_bodies = set()
 
     for name in sorted(m.scenarios):
         try:
@@ -835,6 +859,13 @@ def check_verdict_scenarios_are_guarded(fail):
         # again. check_playtest_matrix reports the pairing separately; this refuses to pretend
         # it reviewed something it could not find.
         if name not in funcs:
+            # A chapter-declared case has no function here on purpose (#314). It cannot hold
+            # a raw press() at all: cases.lua drives the game only through the `api` table,
+            # and every input primitive on it is a guarded one. That is asserted directly
+            # below rather than assumed -- see check_declared_cases, which checks cases.lua
+            # AND the api adapter in harness.lua that it drives the game through.
+            if name in declared_bodies:
+                continue
             fail.append('verdict scenario %s has no function in harness.lua, so the '
                         'blind-press gate cannot review it (#238)' % name)
             continue
@@ -848,6 +879,96 @@ def check_verdict_scenarios_are_guarded(fail):
                     'verdict scenario %s drives the UI with %d raw press() call(s) in %s -- '
                     'use guardedInput/selectSemantic, or classify the state it needs (#238)'
                     % (name, count, where))
+
+
+def _declared_case_violations(cases, villages, harness_src):
+    """Pure half of the two declared-case guards (unit-tested in test_check_declared.py)."""
+    problems = []
+    for short, case in cases:
+        for i, entry in enumerate(case.get('when') or ()):
+            if not isinstance(entry, dict) or len(entry) != 1:
+                problems.append('%s case %s: step %d is not a single-key mapping'
+                                % (short, case['name'], i))
+                continue
+            key, arg = list(entry.items())[0]
+            if key != 'visit':
+                continue
+            if not isinstance(arg, dict):
+                problems.append('%s case %s: `visit` takes a mapping with x and y, got %r'
+                                % (short, case['name'], arg))
+                continue
+            tile = [arg.get('x'), arg.get('y')]
+            if tile not in villages.get(short, []):
+                problems.append(
+                    '%s case %s visits (%s,%s), which %s declares no village at -- the '
+                    'chapter YAML owns that map data, and a case coordinate that drifts '
+                    'from it asserts against a tile the chapter does not have'
+                    % (short, case['name'], tile[0], tile[1], short))
+        for i, entry in enumerate(case.get('then') or ()):
+            if not isinstance(entry, dict) or len(entry) != 1:
+                problems.append(
+                    '%s case %s: assertion %d is not a single-key mapping (`- spoke: true`, '
+                    'not `- spoke`)' % (short, case['name'], i))
+    # cases.lua reaches the game ONLY through the api table it is handed, so it cannot hold
+    # a raw press(). Asserting it rather than trusting it: this is the file every future
+    # declared case runs through, so one blind press here would un-guard all of them at once
+    # (decisions.md -> "A verdict scenario may not drive the UI with a raw press()").
+    for label, src in sorted(harness_src.items()):
+        if re.search(r'\bpress\(', src):
+            problems.append(
+                '%s drives the UI with a raw press() -- every declared case reaches the game '
+                'through it, so one blind press here un-guards ALL of them at once rather '
+                'than one (decisions.md -> a verdict scenario may not drive the UI with a '
+                'raw press())' % label)
+    return problems
+
+
+def _declared_api_adapter(harness):
+    """The `api` table harness.lua hands to cases.lua.
+
+    It is declared INSIDE the runner coroutine so it costs no top-level local slot, which
+    also means `harness_functions` attributes it to whatever scenario precedes it -- a
+    `record` one, which check_verdict_scenarios_are_guarded skips. So it is carved out by
+    name here and checked directly; otherwise the one piece of code every declared case
+    drives the game through is the one piece nothing reviews.
+    """
+    start = harness.find('local function runDeclaredCase')
+    if start < 0:
+        return None
+    end = harness.find('log("scenario: "', start)
+    return harness[start:end if end > start else len(harness)]
+
+
+def check_declared_cases(fail):
+    """Chapter-declared playtest cases describe the chapter they live in (#314).
+
+    Two things nothing else can catch. A `visit` step carries a tile, and the chapter YAML
+    already declares its villages with their tiles -- so a coordinate typo produces a case
+    that runs, walks a unit to empty ground, and FAILs blaming the chapter. And cases.lua is
+    the one body every declared case shares, so a raw press() in it would defeat the
+    blind-press contract for every case at once rather than for one.
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
+    try:
+        import declared
+        cases = declared.cases()
+    except Exception as exc:                      # noqa: BLE001 -- report, don't crash the lint
+        fail.append('chapter-declared playtest cases do not load (%s)' % exc)
+        return
+    villages = {}
+    for rel, d in _chapters():
+        short = str(d.get('id', '')).split('-')[0]
+        villages[short] = [list(v['tile']) for v in (d.get('villages') or []) if v.get('tile')]
+    with open(os.path.join(REPO, 'tools/playtest/cases.lua'), encoding='utf-8') as fh:
+        sources = {'tools/playtest/cases.lua': fh.read()}
+    with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
+        adapter = _declared_api_adapter(fh.read())
+    if adapter is None:
+        fail.append('harness.lua no longer defines runDeclaredCase, so the api table every '
+                    'declared case drives the game through cannot be reviewed')
+    else:
+        sources["harness.lua's declared-case api adapter"] = adapter
+    fail.extend(_declared_case_violations(cases, villages, sources))
 
 
 # GBA address space. 0x04-0x07 are ARCHITECTURAL (MMIO, palette, VRAM, OAM) -- fixed by the
@@ -1623,6 +1744,7 @@ def main():
                   check_personal_line_injection_routes,
                   check_injection_order, check_cached_steps_are_config_invariant,
                   check_playtest_matrix, check_gate_chapter_window,
+                  check_declared_cases,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,
                   check_tool_refs_exist, check_no_dead_concepts,

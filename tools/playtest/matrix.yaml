@@ -1,11 +1,20 @@
-# The playtest matrix manifest (#231) -- what every scenario in harness.lua needs.
+# The playtest matrix manifest (#231) -- what a scenario needs to run.
 #
 # This is the SINGLE SOURCE of the scenario -> ROM-configuration / host-chapter /
 # checkpoint / timing table. Both consumers read it:
 #   * tools/playtest/run.sh          (one scenario, via `matrix.py resolve`)
 #   * tools/playtest/matrix.py run   (the grouped matrix)
-# `check.py check_playtest_matrix` proves it still describes harness.lua, so a new
-# scenario without a row here is a drift failure, not a silent default.
+# `check.py check_playtest_matrix` proves it still describes what exists, so a new
+# scenario without a row is a drift failure, not a silent default.
+#
+# WHAT IS NOT HERE (#314). A hosted chapter DECLARES its own scenarios, in its own YAML
+# under `playtest:`, and `tools/playtest/declared.py` derives their rows and their chapter
+# suite from that -- the ROM from the chapter's boot, PT_HOST_CHAPTER from the host-slot
+# registry. Those rows are merged in at load time and are deliberately absent from this
+# file: a name declared in both places RAISES rather than letting one copy quietly win.
+# What stays here is everything a chapter does not own -- the spine, the chapter-generic
+# probes, the checkpoint builders, the ROM configurations, the timing classes, and `gate`
+# (which spans chapters by definition, and is bounded by check_gate_chapter_window).
 #
 # Resolution order:  defaults  <  classes (in order, key by key)  <  the scenario's row.
 # That is a direct port of run.sh's `case "$SCENARIO"` statements, including the fact
@@ -171,19 +180,6 @@ scenarios:
     rom: ch03boot
     host_chapter: 4
     kind: record
-  # The same chapter-generic pan, on ch05 -- the review shot for its enemy reskins (#25):
-  # sixteen risen tomb-guard on the real map, which is the only place the four skeleton
-  # sprites can be judged against each other and against the winter tileset.
-  #
-  # `ch05boot`, the same ROM every other ch05 scenario boots, and the scenario pokes FAST
-  # config before booting -- which is what the two timeouts were about. The opening is 52
-  # boxes; at normal text speed that is past the deadline, and `--ch05-moose` was the wrong
-  # answer to it (bootToMap is documented as the wrong driver on that ROM, since there the
-  # beginning script IS the beat).
-  mapfullch05:
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
   recordopening:
     rom: montage
     kind: record
@@ -249,9 +245,6 @@ scenarios:
   smoke_ch03:
     rom: ch03boot
     host_chapter: 4
-  smoke_ch04:
-    rom: ch04boot
-    host_chapter: 5
   ch02:
     checkpoint: ch02start
   smoke_ch02:
@@ -274,137 +267,10 @@ scenarios:
     rom: ch03boot
     host_chapter: 4
     kind: record
-  recordch04moose:
-    rom: ch04boot
-    host_chapter: 5
-    kind: record
-  ch04moose:
-    rom: ch04boot
-    host_chapter: 5
-  ch04sprites:
-    rom: ch04boot
-    host_chapter: 5
-    kind: diagnostic
-  recordch04parley:                                    # asserts the pack converts in place
-    rom: ch04boot
-    host_chapter: 5
-  ch04packmath:
-    rom: ch04boot
-    host_chapter: 5
-  ch04village:
-    rom: ch04boot
-    host_chapter: 5
-  ch04cottage:
-    rom: ch04boot
-    host_chapter: 5
-  recordch04cottage:
-    rom: ch04boot
-    host_chapter: 5
-    kind: record
-  ch05village:
-    rom: ch05boot
-    host_chapter: 6
-  ch05reliquaries:
-    rom: ch05boot
-    host_chapter: 6
-  ch05arena:
-    rom: ch05boot
-    host_chapter: 6
-  ch05recruit:
-    rom: ch05boot
-    host_chapter: 6
-  # The two CHECK_ALIVE states the Talk recruit's no-Lupin branch turns on, and the only two
-  # #25 still owed. Both ride `ch05lupinboot` -- the ONLY ROM with Lupin on the roster at all --
-  # and differ solely in what the harness does to him before the Talk.
-  ch05lupinbenched:
-    rom: ch05lupinboot
-    host_chapter: 6
-  ch05lupinkilled:
-    rom: ch05lupinboot
-    host_chapter: 6
-  ch05raid:
-    rom: ch05boot
-    host_chapter: 6
-  ch05crest:
-    rom: ch05boot
-    host_chapter: 6
-  recordravisin:
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
-  recordch05eruption:
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
-  recordch05ravisindeath:
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
-  recordch05combatquotes:                              # scenes 12 + 13 in one fight (#25)
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
-  recordch05platform:                                  # what they STAND on, on road (#65)
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
-  recordch05recruit:
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
-  recordch05opening:
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
-  recordch05openinglupin:                              # the same film, Lupin's arm (#25)
-    rom: ch05lupinboot
-    host_chapter: 6
-    kind: record
-  recordch05join:                                      # scene 5, AFTER prep (#25)
-    rom: ch05boot
-    host_chapter: 6
-    kind: record
-  recordch05moose:                                     # scene 7 ALONE, on the debug boot (#25)
-    rom: ch05mooseboot
-    host_chapter: 6
-    kind: record
-  recordch05joinlupin:                                 # the same film, Lupin's arm (#25)
-    rom: ch05lupinboot
-    host_chapter: 6
-    kind: record
-  recordch05ending:                                    # scenes 16 A+B+C, on the debug boot (#25)
-    rom: ch05endingboot
-    host_chapter: 6
-    kind: record
-  recordch05endingnosahnar:                            # the same ending, Sahnar never recruited
-    rom: ch05endingnosahnar
-    host_chapter: 6
-    kind: record
-  recordch05endingbasildied:                           # scene 17 -- the ending over Basil's body
-    rom: ch05endingbasildied
-    host_chapter: 6
-    kind: record
-  ch04snag:
-    rom: ch04boot
-    host_chapter: 5
   attackprobe:                                         # reads whatever map it lands on
     rom: any
     host_chapter: null
     kind: diagnostic
-  clear_ch04:
-    rom: ch04boot
-    host_chapter: 5
-  clear_ch04_parley:
-    rom: ch04boot
-    host_chapter: 5
-  recordch04open:
-    rom: ch04boot
-    host_chapter: 5
-    kind: record
-  recordch04reveal:
-    rom: ch04boot
-    host_chapter: 5
-    kind: record
   recordch03talk:
     rom: ch03boot
     host_chapter: 4
@@ -499,28 +365,7 @@ suites:
     - ch03midmap
     - smoke_ch03
 
-  ch04:
-    - ch04moose
-    - ch04packmath
-    - ch04village
-    - ch04cottage
-    - ch04snag
-    - recordch04parley
-    - smoke_ch04
-    - clear_ch04
-    - clear_ch04_parley
 
-  # Was `ch05village` alone -- the chapter suite never picked up the scenarios that landed in
-  # `gate` after it, so "the one you run while working ch05" was the weakest of the five.
-  ch05:
-    - ch05village
-    - ch05reliquaries
-    - ch05arena
-    - ch05recruit
-    - ch05lupinbenched
-    - ch05lupinkilled
-    - ch05raid
-    - ch05crest
 
   sandbox:
     - recordunitlist

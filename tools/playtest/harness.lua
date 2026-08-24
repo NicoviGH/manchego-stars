@@ -6575,8 +6575,8 @@ end
 -- would have failed on 0 eruption boxes and blamed the warning.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05recruit (needs a CH05BOOT=1 ROM).
 scenarios.ch05recruit = function(opts)
-    local BASIL, SAHNAR = 0x13, 0x16        -- CHARACTER_ARTUR / CHARACTER_MARISA
-    local LUPIN = 0x1D                      -- CHARACTER_DUESSEL, the slot ch05 gives the wolf
+    local CH05 = dofile(PLAYTEST_DIR .. "/ch05.lua")     -- ch05's shared facts (#314)
+    local BASIL, SAHNAR, LUPIN = CH05.PID.BASIL, CH05.PID.SAHNAR, CH05.PID.LUPIN
     -- A-presses the recruit renders to -- now exactly the number of AUTHORED boxes: 16 on the
     -- locked arm, 17 on the substituted one. Nothing pages itself any more, because the wrapper
     -- measures PIXELS at vanilla's own width instead of counting to 29 (`decisions.md` -> "We
@@ -6589,7 +6589,7 @@ scenarios.ch05recruit = function(opts)
     -- arm. The two named states are #25's last two owed CHECK_ALIVE cases and ride
     -- `ch05lupinboot`, whose LOAD1 is the only way any of these ROMs gets a Lupin at all.
     opts = opts or {}
-    local ARM = opts.arm or 0x9D1
+    local ARM = opts.arm or CH05.MSG.RECRUIT_NO_LUPIN
     local RECRUIT_BOXES = (ARM == 0x9E8) and 16 or 17
     local function blueBasil() return findUnit(SYM.gUnitArrayBlue, 20, BASIL) end
     local function redSahnar() return findUnit(SYM.gUnitArrayRed, 24, SAHNAR) end
@@ -6916,117 +6916,6 @@ local function visitVillage(x, y, done, onBox)
     return true, nil, spoke
 end
 
--- ch04village (#205): does the Lonelywood village actually hand over its Iron Axe?
--- It did not, for the whole slice, and NOTHING looked wrong: the map drew a cottage, the chapter
--- compiled and played. FE8 gates the Visit menu item on the TERRAIN under the unit (bmmenu.c:735)
--- before it ever consults the location event, and the snowy reskin had mapped vanilla's village
--- metatile onto ruins. So this checks the two halves that must BOTH hold -- a visitable tile and a
--- wired Village() entry -- by the only evidence that settles it: the axe is in the party's hands
--- afterwards and was not before.
--- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04village (needs a CH04BOOT=1 ROM).
-scenarios.ch04village = function()
-    local VILLAGE_X, VILLAGE_Y, IRON_AXE = 8, 2, 0x1F
-    if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
-    pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
-    local function axes()
-        local n = 0
-        for _, id in ipairs(collectedItems()) do if id == IRON_AXE then n = n + 1 end end
-        return n
-    end
-    local before = axes()
-    log(string.format("ch04village: %d Iron Axe(s) in the party before visiting", before))
-    local ok, why = visitVillage(VILLAGE_X, VILLAGE_Y, function() return axes() > before end)
-    if not ok then return result("FAIL", why) end
-    shot("ch04village")
-    local after = axes()
-    if after <= before then
-        return result("FAIL", string.format(
-            "visited (%d,%d) but the party still holds %d Iron Axe(s) -- the village handed over "
-            .. "nothing (check the tile's terrain AND the Village() entry)",
-            VILLAGE_X, VILLAGE_Y, after))
-    end
-    return result("PASS", string.format(
-        "the Lonelywood village handed over its Iron Axe: %d -> %d in the party", before, after))
-end
-
--- ch05reliquaries (#25): all FOUR reliquary doors -- each one speaks, and each hands over ITS
--- OWN gift. ch05village covers the south door alone, and a scenario's verdict only covers what
--- it actually reads: three doors, three faces and three of the four authored lines had no
--- witness at all, which is the same blind spot that let ch05village pass for months while
--- proving nothing about the recruit. The gifts are per-tile on purpose (vanilla's placement,
--- richest where the eruption races), so "some item arrived" is not the assertion -- the RIGHT
--- item is. `spoke` is checked too: a wired-but-empty message would hand the gift over in
--- silence and every item check would still pass.
--- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05reliquaries (needs a CH05BOOT=1 ROM).
-scenarios.ch05reliquaries = function()
-    local SITES = {
-        {name = "north  Torch",       x = 5,  y = 1,  item = 0x70},
-        {name = "west   Secret Book", x = 5,  y = 6,  item = 0x5D},
-        {name = "east   Armorslayer", x = 12, y = 10, item = 0x0E},
-        {name = "south  Dracoshield", x = 12, y = 19, item = 0x60},
-    }
-    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
-    pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
-    local function held(id)
-        local n = 0
-        for _, got in ipairs(collectedItems()) do if got == id then n = n + 1 end end
-        return n
-    end
-    -- The visit's `done` fires the moment the ITEM lands, but the location event is still
-    -- running behind it (give-item tail, the door's MapChange, EVBIT_T, ENDA). Walking to the
-    -- next door while std_event holds the controller is an illegal input, and the run dies on
-    -- "cursor could not reach" -- which reads like a map problem and is really an impatience
-    -- problem. Settle back to player-idle between doors.
-    local function settle()
-        return waitFor(function()
-            return faction() == 0 and not menuOpen()
-                and not procActive(SYM.ProcScr_StdEventEngine)
-                and controllerState() == "player_map_idle"
-        end, 3000, true)
-    end
-    local silent = {}
-    for _, site in ipairs(SITES) do
-        if not settle() then
-            return result("FAIL", string.format(
-                "the map never returned to player control before %s (%d,%d)",
-                site.name, site.x, site.y))
-        end
-        local before = held(site.item)
-        -- One shot per door by default (enough to prove the face and the first line). Set
-        -- PT_RECORD_BOXES=1 for a full review capture: every box of every door, which is what
-        -- you want when the question is "read the whole scene", not "did it fire".
-        local shown = false
-        local ok, why, spoke = visitVillage(site.x, site.y, function()
-            return held(site.item) > before
-        end, function()
-            if os.getenv("PT_RECORD_BOXES") then
-                shot("box")
-            elseif not shown then
-                shot("reliquary"); shown = true
-            end
-        end)
-        if not ok then
-            return result("FAIL", string.format("%s (%d,%d): %s", site.name, site.x, site.y, why))
-        end
-        if held(site.item) <= before then
-            return result("FAIL", string.format(
-                "%s (%d,%d) was visited but its gift never arrived -- the door ran, the "
-                .. "give-item tail did not", site.name, site.x, site.y))
-        end
-        if not spoke then silent[#silent + 1] = site.name end
-        log(string.format("ch05reliquaries: %s handed over its gift", site.name))
-    end
-    if #silent > 0 then
-        return result("FAIL", "these doors paid out in SILENCE (no text box): "
-            .. table.concat(silent, ", "))
-    end
-    return result("PASS", "all four reliquaries spoke and handed over their own gift")
-end
-
 -- ch05arena (#264): the active onboarding ledger claims a tutorial on the real arena tile.
 -- Park the leader one step away, take the engine's real move+Wait path onto (12,6), and count
 -- the six authored pages. Then step off and back on during the same turn (manually clearing its
@@ -7329,42 +7218,6 @@ scenarios.ch05arena = function()
         wager))
 end
 
--- ch05village (#25): does the SOUTH reliquary at (12,19) actually hand over its Dracoshield?
--- Two things this pins, both of which shipped wrong once. First the same failure ch04village
--- exists for: ch05's Location list was EMPTY, so four villages plus an armory and a vendor sat on
--- intact tiles that nothing pointed at -- a finished-looking map with unreachable rewards.
--- Second, WHICH gift: (12,19) is the south-east site and the turn-2 eruption pair spawns beside
--- it, so vanilla puts its richest gift here and its cheapest at (5,1); ours had them swapped,
--- which no other gate can see (same item set, same total, parity still reads PARITY). Checking
--- the Dracoshield specifically -- not "some item" -- is what makes that visible here too.
--- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05village (needs a CH05BOOT=1 ROM).
-scenarios.ch05village = function()
-    local VILLAGE_X, VILLAGE_Y, DRACOSHIELD = 12, 19, 0x60
-    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
-    pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
-    local function shields()
-        local n = 0
-        for _, id in ipairs(collectedItems()) do if id == DRACOSHIELD then n = n + 1 end end
-        return n
-    end
-    local before = shields()
-    log(string.format("ch05village: %d Dracoshield(s) in the party before visiting", before))
-    local ok, why = visitVillage(VILLAGE_X, VILLAGE_Y, function() return shields() > before end)
-    if not ok then return result("FAIL", why) end
-    shot("ch05village")
-    local after = shields()
-    if after <= before then
-        return result("FAIL", string.format(
-            "visited (%d,%d) but the party still holds %d Dracoshield(s) -- the reliquary handed "
-            .. "over nothing (check the tile's terrain AND the Village() entry)",
-            VILLAGE_X, VILLAGE_Y, after))
-    end
-    return result("PASS", string.format(
-        "the south reliquary handed over its Dracoshield: %d -> %d in the party", before, after))
-end
-
 -- ch05raid (#25): can the party LOSE a reliquary? The chapter has declared a village-raid race
 -- since #196 -- "the eruption's dead race the party for the spread reward-sites" -- and for that
 -- whole time nothing on the map could reach one: every wave was `aggressive`, no site carried an
@@ -7378,9 +7231,14 @@ end
 -- nothing (eventinfo.c), which is exactly why a sacked site cannot count toward the save-all.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05raid (needs a CH05BOOT=1 ROM).
 scenarios.ch05raid = function()
-    local SITE_X, SITE_Y = 12, 19          -- reliquary-south: vanilla's turn-2 pair spawns beside it
-    local VILLAGE_REGULAR, RUINS, DRACOSHIELD = 0x03, 0x25, 0x60
-    local SITE_FLAG = 10                   -- CH05_VILLAGE_FLAGS['reliquary-south']
+    -- reliquary-south, from the chapter chunk: its tile, its gift and its event id were
+    -- three literals here and three more in ch05crest (#314). VILLAGE_REGULAR and RUINS
+    -- stay literals -- they are FE8's terrain ids, not ch05's.
+    local CH05 = dofile(PLAYTEST_DIR .. "/ch05.lua")
+    local SOUTH = CH05.RELIQUARIES[4]
+    local SITE_X, SITE_Y = SOUTH.x, SOUTH.y
+    local VILLAGE_REGULAR, RUINS, DRACOSHIELD = 0x03, 0x25, SOUTH.item
+    local SITE_FLAG = SOUTH.flag
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     pokeFastConfig()
     waitFor(function() return faction() == 0 and not menuOpen()
@@ -7451,13 +7309,12 @@ end
 -- is about the PAYOUT wiring, not about whether the fight is winnable.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05crest (needs a CH05BOOT=1 ROM).
 scenarios.ch05crest = function()
-    local SITES = {
-        { name = "north", x = 5,  y = 1,  item = 0x70, flag = 12 },
-        { name = "west",  x = 5,  y = 6,  item = 0x5D, flag = 11 },
-        { name = "east",  x = 12, y = 10, item = 0x0E, flag = 9  },
-        { name = "south", x = 12, y = 19, item = 0x60, flag = 10 },
-    }
-    local RAVISIN, GUIDING_RING = 0xb8, 0x68
+    -- ch05's shared facts, from the chapter's own chunk (#314). Function-scoped, so it
+    -- costs harness.lua no top-level local slot. The four sites were typed here AND in
+    -- ch05reliquaries before the chapter owned them.
+    local CH05 = dofile(PLAYTEST_DIR .. "/ch05.lua")
+    local SITES = CH05.RELIQUARIES
+    local RAVISIN, GUIDING_RING = CH05.PID.RAVISIN, CH05.REWARD.GUIDING_RING
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     pokeFastConfig()
     -- Take the tomb's teeth out for the duration. Saving all four sites scatters four units to
@@ -9183,10 +9040,63 @@ scenarios.recordch02ending = function()
 end
 
 -- ---------------------------------------------------------------- runner
+-- A DECLARED case (#314) has no function here: its chapter YAML declares what it proves,
+-- `declared.py` emits it as a Lua table into the run directory, and cases.lua runs it. The
+-- api table below is the whole interface -- cases.lua never touches emu, SYM or any global
+-- in this chunk, which is what lets test_cases.lua drive it with a fake.
+--
+-- Declared INSIDE the runner coroutine, not beside it: `harness.lua` is one Lua chunk at
+-- Lua's 200-local ceiling, and a top-level `local function` here would spend one of the two
+-- remaining slots on the very mechanism that exists to stop chapters spending them.
 local co = coroutine.create(function()
+  local function runDeclaredCase(path)
+    local api = {
+        bootToMap = bootToMap,
+        fastConfig = pokeFastConfig,
+        collectedItems = collectedItems,
+        eventFlag = eventFlag,
+        result = result,
+        log = log,
+        shot = shot,
+        -- Weak (post-boot) and strong (pre-visit) settle, matching what the hand-written
+        -- preambles actually waited on. The strong one adds `player_map_idle`, which is the
+        -- lesson ch05reliquaries paid for: a location event's tail still holds the
+        -- controller when the item lands, and moving then dies as "cursor could not reach".
+        settle = function(strong)
+            return waitFor(function()
+                return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+                    and (not strong or controllerState() == "player_map_idle")
+            end, strong and 3000 or 6000, true)
+        end,
+        -- `done` is generic here where a hand-written scenario passed its own item test: the
+        -- step does not know what the case asserts (assertions are order-free), so it stops
+        -- on ANY item arriving and lets the `gained_item` assertion decide whether it was
+        -- the right one. A site that hands over the WRONG item now reads as a wrong item
+        -- rather than as a timeout.
+        visitVillage = function(x, y)
+            local before = 0
+            for _ in ipairs(collectedItems()) do before = before + 1 end
+            return visitVillage(x, y, function()
+                local now = 0
+                for _ in ipairs(collectedItems()) do now = now + 1 end
+                return now ~= before
+            end)
+        end,
+    }
+    return dofile(PLAYTEST_DIR .. "/cases.lua").run(dofile(path), api)
+  end
+
     log("scenario: " .. PLAYTEST_SCENARIO)
     local fn = scenarios[PLAYTEST_SCENARIO]
-    if not fn then return result("ERROR", "unknown scenario " .. tostring(PLAYTEST_SCENARIO)) end
+    if not fn then
+        if PLAYTEST_CASE ~= nil and PLAYTEST_CASE ~= "" then
+            runDeclaredCase(PLAYTEST_CASE)
+            log("declared case returned")
+            return
+        end
+        return result("ERROR", "unknown scenario " .. tostring(PLAYTEST_SCENARIO))
+    end
     fn()
     log("scenario function returned")
 end)

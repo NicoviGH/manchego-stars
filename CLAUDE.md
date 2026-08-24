@@ -16,7 +16,7 @@ The data is the doc — facts live in exactly one place, and indexes are generat
 | Adding a unit's art / battle anim / platform | the **`inject_battle_anims` / `inject_battle_platforms` docstrings** (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (checklist) |
 | Borrowable enemy reskin art (what the FE-Repo has) | **`docs/fe-repo-scouting.md`** (scouting log) + per-unit `skin:` fields in chapter YAML + `campaign.yaml` `enemy_class_reskins` |
 | Hosting a new chapter (map → slot → deploy → win → boot) | **`docs/adding-a-chapter.md`** (the repeatable runbook) + `inject_ch03` (lean reference impl) |
-| What a playtest scenario needs (ROM flag, host chapter, checkpoint, timing) | **`tools/playtest/matrix.yaml`** — the single source; `harness.lua` comments say what a scenario *proves*, not what it needs |
+| What a playtest scenario needs (ROM flag, host chapter, checkpoint, timing) | A hosted chapter's scenarios are DECLARED in its own YAML under `playtest:` and their rows + chapter suite are derived (`tools/playtest/declared.py`, #314). Everything a chapter does not own — the spine, chapter-generic probes, checkpoint builders, ROM configs, timing classes, `gate` — stays in **`tools/playtest/matrix.yaml`**. A name in both RAISES. |
 | Prep screen / deploy cap / force-deployment | `decisions.md` → "How the deploy cap + prep screen are actually wired" + `inject_ch01`'s docstring. **Prep from ch01 on is standing protocol — the CAP is the parity, Pick Units only chooses which PCs fill it. Never re-derive this from the decomp, and never from `hasPrepScreen` (dead FE7 leftover, false everywhere).** |
 | FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |
 | Post-MVP (Act II–V) plan | `docs/roadmap.md` |
@@ -123,7 +123,10 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
 Long form + examples: `docs/decisions.md` → Coordination model. In brief (Cockburn): push each line
 to the desk that owns it; talk over interfaces, never reach into another module's private state; judge
 a boundary by which *named* future changes it makes cheap (don't refactor for futures you can't name —
-e.g. `harness.lua` stays whole; its only likely change is "add a scenario").
+e.g. a chapter's Lua lives in its OWN chunk, because the named future is "add a chapter" and
+it costs top-level `local` slots against a 200-per-chunk ceiling — see `decisions.md` → "A
+CHAPTER costs local slots"; the earlier reading of this same test named "add a scenario",
+which is free, and got the boundary wrong).
 **Code-review rule:** a change that reaches into another desk's cabinet or scatters one decision
 across desks is rejected; localize the decision first.
 

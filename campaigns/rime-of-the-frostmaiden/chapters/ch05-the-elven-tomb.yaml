@@ -1933,3 +1933,73 @@ design_notes: >
   `skin:` names the intended FE-Repo asset (sword/bow guardians = real skeleton anims; lance/axe/
   armor = frost palette-swaps) for the build-slice art track. The wolf ANIMS I scouted (Gwyllgi
   repals, Hellhounds) are logged for CH04's beast pack — see issue #24.
+
+# ---------------------------------------------------------------------------------------
+# What this chapter's playtest scenarios PROVE (#314). Everything mechanical about them --
+# the ROM configuration, PT_HOST_CHAPTER, the `matrix.yaml` row, membership of `SUITE=ch05`
+# -- is DERIVED from this block by tools/playtest/declared.py. Nothing here is restated in
+# matrix.yaml, and a name declared in both files is a check_playtest_matrix failure.
+#
+# A case is EITHER declared (given/when/then, run by tools/playtest/cases.lua) OR `lua:`
+# naming a function in harness.lua. Only the BODY opts out: a `lua:` case still derives its
+# row and its suite membership here, so a chapter declares everything it owns.
+playtest:
+  boot: ch05boot                 # CH05BOOT=1; host slot 6 comes from inject/hosts.py
+  cases:
+    - name: ch05village
+      proves: the south reliquary hands over its Dracoshield
+      given: [on_map]
+      when:
+        - visit: {x: 12, y: 19, gains: 0x60}   # reliquary-south -> ITEM_DRACOSHIELD
+
+    - name: ch05reliquaries
+      proves: all four reliquaries speak and hand over their OWN gift
+      # `spoke` is not decoration: a wired-but-empty message would hand the gift over in
+      # silence and every item check here would still pass.
+      # `gains` rides the STEP, so each door is pinned to ITS OWN gift causally. The
+      # gifts are per-tile on purpose (vanilla's placement, richest where the eruption
+      # races), so "some item arrived" is not the assertion -- the RIGHT item is, from the
+      # RIGHT door. A whole-case `gained_item` list would pass on four doors handing over
+      # each other's gifts, which is the defect this scenario exists to catch.
+      #
+      # It is still not POSITIONAL: the assertion is inside the step it belongs to, so
+      # inserting a door cannot silently re-target another door's assertion. That was the
+      # flaw in pairing a `then` list against a `when` list by index.
+      given: [on_map]
+      when:
+        - visit: {x: 5,  y: 1,  gains: 0x70}   # reliquary-north -> ITEM_TORCH
+        - visit: {x: 5,  y: 6,  gains: 0x5D}   # reliquary-west  -> ITEM_SECRETBOOK
+        - visit: {x: 12, y: 10, gains: 0x0E}   # reliquary-east  -> ITEM_SWORD_ARMORSLAYER
+        - visit: {x: 12, y: 19, gains: 0x60}   # reliquary-south -> ITEM_DRACOSHIELD
+      # Whole-case assertions only: `spoke` is a fact about EVERY visit, not about one.
+      then:
+        - spoke: true
+
+    # Still hand-written Lua. Each names WHY it is the exception rather than the default.
+    - {name: ch05arena,        proves: the arena tutorial is one-shot on EVFLAG_TMP(13),        lua: ch05arena}
+    - {name: ch05recruit,      proves: the Talk recruit converts Sahnar on both CHECK_ALIVE arms, lua: ch05recruit}
+    - {name: ch05lupinbenched, proves: the recruit's no-Lupin arm plays with Lupin BENCHED,     lua: ch05lupinbenched, boot: ch05lupinboot}
+    - {name: ch05lupinkilled,  proves: the recruit's no-Lupin arm plays with Lupin DEAD,        lua: ch05lupinkilled,  boot: ch05lupinboot}
+    - {name: ch05raid,         proves: a raider can SACK a reliquary -- terrain flips to ruins and its event id stays unset, lua: ch05raid}
+    - {name: ch05crest,        proves: saving all four reliquaries pays out the Guiding Ring,   lua: ch05crest}
+
+    # The capture scenarios. `kind: record` because their output IS the picture -- they
+    # stay headed and produce no verdict, so they are not in SUITE=ch05 (matrix_suites
+    # takes verdict cases only). Boots differ: the ending arms and the moose beat each
+    # ride a DEBUG boot that lands New Game straight on the beat, rather than replaying
+    # ~52 approved A-presses to reach ten seconds of footage.
+    - {name: recordch05opening,        proves: the four-scene opening in motion,               lua: recordch05opening,        kind: record}
+    - {name: recordch05openinglupin,   proves: the opening on Lupin's arm,                     lua: recordch05openinglupin,   kind: record, boot: ch05lupinboot}
+    - {name: recordch05join,           proves: "scene 5, the join, after Preparations",          lua: recordch05join,           kind: record}
+    - {name: recordch05joinlupin,      proves: the join on Lupin's arm,                        lua: recordch05joinlupin,      kind: record, boot: ch05lupinboot}
+    - {name: recordch05moose,          proves: "scene 7 alone, the moose charge",                lua: recordch05moose,          kind: record, boot: ch05mooseboot}
+    - {name: recordch05recruit,        proves: the Talk recruit in motion,                     lua: recordch05recruit,        kind: record}
+    - {name: recordch05eruption,       proves: the turn-2 eruption warning in motion,          lua: recordch05eruption,       kind: record}
+    - {name: recordch05combatquotes,   proves: scenes 12 and 13 in one fight,                  lua: recordch05combatquotes,   kind: record}
+    - {name: recordch05ravisindeath,   proves: Ravisin's death quote in motion,                lua: recordch05ravisindeath,   kind: record}
+    - {name: recordch05platform,       proves: "what the cast stand on, on road",                lua: recordch05platform,       kind: record}
+    - {name: recordch05ending,         proves: "scene 16 A+B+C -- Basil alive, Sahnar recruited", lua: recordch05ending,        kind: record, boot: ch05endingboot}
+    - {name: recordch05endingnosahnar, proves: the ending with Sahnar never recruited,         lua: recordch05endingnosahnar, kind: record, boot: ch05endingnosahnar}
+    - {name: recordch05endingbasildied, proves: scene 17 -- the ending over Basil's body,      lua: recordch05endingbasildied, kind: record, boot: ch05endingbasildied}
+    - {name: recordravisin,            proves: Ravisin's battle anim and map sprite,           lua: recordravisin,            kind: record}
+    - {name: mapfullch05,              proves: sixteen risen tomb-guard on the real winter map, lua: mapfullch05,             kind: record}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Regression coverage for state-driven playtest scenario wiring."""
 import os
+import sys
 import re
 import unittest
 
@@ -184,7 +185,7 @@ class TestPlaytestHarness(unittest.TestCase):
 
     def test_ch05arena_proves_the_loaded_winter_palette_and_skeleton_face(self):
         harness = _read_harness()
-        body = _block(harness, 'scenarios.ch05arena = function()', '\n-- ch05village')
+        body = _block(harness, 'scenarios.ch05arena = function()', '\nend')
         self.assertIn('SYM.gFaces', body)
         self.assertIn('ru16(face + 0x3E) == 0x4B', body,
                       'the live Arena face proc must carry the chapter-selected Glen FID')
@@ -267,13 +268,13 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('boxes == 1', body,
                       'the focused proof must require exactly the one locked death box')
 
-        matrix = os.path.join(REPO, 'tools/playtest/matrix.yaml')
-        with open(matrix, encoding='utf-8') as source:
-            registry = source.read()
-        self.assertIn('  recordch05ravisindeath:\n'
-                      '    rom: ch05boot\n'
-                      '    host_chapter: 6\n'
-                      '    kind: record\n', registry)
+        # The row is DERIVED from ch05's chapter YAML now (#314), so this asserts the
+        # resolved row rather than matrix.yaml's text: it checks the value the runner
+        # actually uses, and it keeps holding wherever the declaration lives.
+        sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
+        import matrix as mx
+        row = mx.Manifest.load().resolve('recordch05ravisindeath')
+        self.assertEqual((row.rom, row.host_chapter, row.kind), ('ch05boot', 6, 'record'))
 
     def test_ch04snag_accepts_the_native_fallen_snag_crossing(self):
         harness = _read_harness()

@@ -267,6 +267,17 @@ run_mgba() {
     local out="/tmp/playtest-$scen" log
     log="$out/playtest.log"
     rm -rf "$out" && mkdir -p "$out"
+    # A DECLARED case (#314) has no function in harness.lua: its chapter YAML declares what
+    # it proves and declared.py emits it here, fresh, for every run. Generated into the run
+    # directory rather than committed -- a generated file in the tree is a second copy of the
+    # chapter YAML, and a second copy can be stale.
+    local case=""
+    if python3 "$HERE/declared.py" emit "$scen" > "$out/case.lua" 2>"$out/case.err"; then
+        case="$out/case.lua"
+        echo "case: declared (from the chapter YAML)"
+    else
+        rm -f "$out/case.lua"
+    fi
     local wrapper="$out/wrapper.lua"
     cat > "$wrapper" <<EOF
 PLAYTEST_DIR = "$HERE"
@@ -288,6 +299,7 @@ PLAYTEST_MAXFRAMES = "${PT_MAXFRAMES:-}"
 PLAYTEST_PRESSEVERY = "${PT_PRESSEVERY:-}"
 PLAYTEST_SHOTEVERY = "${PT_SHOTEVERY:-}"
 PLAYTEST_HEADLESS = "$hl"
+PLAYTEST_CASE = "$case"
 dofile("$HERE/harness.lua")
 EOF
     rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
