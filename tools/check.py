@@ -30,7 +30,10 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Docs that carry prose facts (decisions.md is handled specially per-check).
-DOC_GLOBS = ['docs/**/*.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md']
+DOC_GLOBS = ['docs/**/*.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md',
+             '.github/**/*.md']   # issue templates are docs people follow, and they were
+                                  # unscanned until 2026-08-24 -- custom_unit.md still said
+                                  # `clone_into`, a term DEAD_CONCEPTS has listed since #65
 
 # Terms that are NEVER legitimate in vision/ops docs OR hand-written code comments:
 # abandoned tools, dead code symbols, retired implementation phrases. decisions.md
