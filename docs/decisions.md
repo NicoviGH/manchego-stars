@@ -528,7 +528,7 @@ source with `ast` and fails the build on an injector that enrols nothing.
 at Lua's 200-local ceiling, and the remaining margin was written as prose — "two free slots" — in
 `harness.lua`, `check.py` and `HANDOFF.md` simultaneously. It was wrong in all three within one PR
 of being written: #240 spent a slot and updated no comment. Measured, the margin was **one**.
-`check_lua_local_headroom` now appends probe locals until the chunk stops compiling, prints the real
+`check_lua_local_headroom` now adds probe locals until the chunk stops compiling, prints the real
 number on every `make check`, and fails at zero. Same reasoning retired the hand-written
 `LUA_CHUNKS` tuple, which listed 4 of the 9 chunks `harness.lua` loads — a syntax error in
 `recorder.lua` or `liveness.lua` killed every scenario with the gate green. **If a number about our
@@ -5485,6 +5485,93 @@ this file as its own example and has been rewritten with it.
 
 _Recorded: 2026-08-24 (#314). Supersedes the 2026-08 entry, which was measured against scenario
 count rather than chapter count._
+
+### The headroom guard measured one file correctly BY ACCIDENT (2026-08-24, #327)
+
+`lua_local_headroom` originally APPENDED probe locals until the chunk stopped compiling. In Lua `return` must
+be the last statement in a block, so for any chunk ending `return M` the probe is an instant
+syntax error and the function reported **0 free** — not "no room", a broken measurement. It only
+ever ran against `harness.lua`, which ends in a callback registration rather than a return, so
+the one file it measured was the one file whose shape happened to suit it.
+
+That mattered because #314 started pushing growth INTO modules. Redirecting every new local into
+files whose ceiling nobody can measure, with the same all-at-once failure and no warning, is
+moving the landmine rather than clearing it. **A guard is only as trustworthy as the shapes it
+was tried against**, and this one had been tried against exactly one.
+
+Three defects, and the second two were found by the fix's own tests:
+
+**The insertion point is chosen by the COMPILER, not by a pattern.** `ch05.lua`'s module return
+spans forty lines, so a regex for a single-line `return M` missed it. The prober now tries
+inserting before the last top-level `return`, then appending, and takes whichever compiles.
+
+**The splice needs its own newline.** `test_controller.lua` ends without a trailing newline, so a
+bare append produced `endlocal __headroom_probe0`: a file with 74 locals and plenty of room
+reported as full, which is a build failure.
+
+**And then the whole approach was wrong.** Each repair fixed one shape and left another. Inserting
+before the last column-0 `return` misses an INDENTED one — the same "nearly empty file reported as
+full" lie — and, worse, lands *inside a nested function* when that return is in one, where the
+probe measures the FUNCTION's 200 rather than the chunk's. A chunk sitting at exactly 200 top-level
+locals then reports full headroom and passes the guard **in silence**, which is the failure
+direction that actually matters. Probing with one real local instead of zero does not help: a
+function has its own budget, so the probe compiles there happily.
+
+**So probes are PREPENDED.** A chunk is a block of statements and a local declaration is a valid
+first statement, so a probe at the top is unambiguously chunk-level whatever the file ends with,
+and Lua counts the 200 per function rather than per position. Every end-of-file ambiguity
+disappears at once — trailing return, indented return, nested function, missing newline. The only
+special case left is a `#!` line, which Lua accepts only as line 1.
+
+The general shape: **three rounds of fixing the end of the file, and the answer was the other
+end.** Each round passed its own test and the next shape broke it. What ended the loop was
+enumerating the shapes first — module return, multi-line return, indented return, in-function
+return, no trailing newline, shebang, at-ceiling — and requiring one insertion point to satisfy
+all of them.
+
+**And the ratchet's counter is cross-checked against the prober**, because neither is verifiable
+alone. The counter reads the source, the prober asks the compiler, and `counted + free == 200` is
+asserted on the live harness. The counter was wrong by one when written — `\s` matches a newline,
+so `local controllerFault` merged with the `local function log` beneath it — and a counter quietly
+off by one loosens the ratchet by one every time anybody re-measures.
+
+_Recorded: 2026-08-24 (#327)._
+
+### A CHAPTER is not what was filling harness.lua (2026-08-24, #327)
+
+#314 recorded that a chapter costs ~6–7 top-level local slots and concluded the harness would run
+out during ch06. The deadline was right; **the cause was not.** Of the 83 locals added between the
+end of June and 2026-08-24:
+
+| | |
+|---|---|
+| chapter/cast-scoped | **10** |
+| infrastructure | **73** |
+
+The controller contract, headless runs, the verdict cache, guarded input — each capability brought
+its own helpers. So the per-chapter chunk discipline that #314 shipped addresses about **12%** of
+the flow. It was worth doing on its own merits (it deletes real duplication) and it is not the fix
+for the ceiling.
+
+**Adding a scenario is free.** `scenarios.foo = function()` is a table field. The 7,726 lines of
+scenario bodies are 84% of the file and cost **zero** slots, so splitting them out — the obvious
+move, and the one a fresh reader reaches for — buys nothing at all. The mass and the constraint
+are in different places.
+
+**So the count is RATCHETED rather than the file refactored.** `HARNESS_TOP_LEVEL_LOCALS` freezes
+it at 198 and `check_harness_local_ratchet` fails in **both** directions: growth is the
+regression, and a reduction that does not land in the constant loosens the ratchet to whatever the
+file last happened to reach. Frozen, the next helper goes into a module — the pattern harness.lua
+already uses for ten of them — and **module count has no ceiling**. That is what makes this scale.
+Thinning the ≤5-reference tail (111 locals, ~253 call sites) only makes it comfortable, and is
+deliberately a separate change: a mechanical sweep that size is the shape that shipped three bugs
+in one day here, and freezing first is what makes attempting it safe.
+
+The ratchet constant is a POLICY threshold, not a fact about the code, so it does not break "if a
+number about our own code can be computed, compute it". The computed number is checked against it
+on every run, which is precisely why it cannot drift.
+
+_Recorded: 2026-08-24 (#327)._
 
 ### A scenario is DECLARED by the chapter it tests (2026-08-24, #314)
 

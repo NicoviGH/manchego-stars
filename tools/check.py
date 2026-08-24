@@ -225,31 +225,145 @@ def check_lua_chunks_load(fail):
             fail.append('%s does not compile: %s' % (rel, err))
 
 
+class LuaChunkError(Exception):
+    """A chunk does not compile at all, so its headroom is not a number."""
+
+
+# Probes go at the TOP of the chunk, and the reason is worth keeping: every attempt to
+# insert them near the END is ambiguous, and each ambiguity reads as the opposite of the
+# truth.
+#
+#   * appending after a trailing `return` is a syntax error, so every module reported 0 free
+#     -- a nearly empty file reported as full, which FAILS THE BUILD;
+#   * inserting before the last column-0 `return` misses an INDENTED one (same 0-free lie),
+#     and lands inside a nested function when that return is in one -- where the probe
+#     measures the FUNCTION's budget. A chunk sitting at exactly 200 top-level locals then
+#     reports full headroom and sails through the guard, which is the failure that matters
+#     most here;
+#   * a file with no trailing newline turned `end` + `local __p` into `endlocal __p`.
+#
+# The top of a chunk has none of that. A chunk is a block of statements and a local
+# declaration is a valid first statement, so a prepended probe is unambiguously chunk-level
+# whatever the file ends with. Lua counts the 200 per function, not per position, so where
+# in the block they are declared does not change the answer.
+_SHEBANG = re.compile(r'\A#[^\n]*\n')
+
+
+def _with_probes(body, n):
+    """`body` with `n` chunk-level probe locals prepended.
+
+    After a `#!` line if there is one -- Lua accepts one only as the very first line.
+    """
+    if not n:
+        return body
+    probes = ''.join('local __headroom_probe%d = %d\n' % (i, i) for i in range(n))
+    m = _SHEBANG.match(body)
+    at = m.end() if m else 0
+    return body[:at] + probes + body[at:]
+
+
 def lua_local_headroom(path, probe_max=8):
     """How many more top-level `local`s `path` can take before it stops compiling.
 
-    Measured by appending them, because there is no way to ask Lua: the limit counts
-    what the compiler allocates, not what a regex can see (upvalues, `for` control
-    variables, locals inside the chunk's own blocks).
+    Measured by inserting them, because there is no way to ask Lua: the limit counts what
+    the compiler allocates, not what a regex can see (upvalues, `for` control variables,
+    locals inside the chunk's own blocks).
+
+    Raises LuaChunkError if the chunk does not compile as it stands. Reporting that as 0
+    would name the wrong problem -- and 0 is the number that fails the build.
     """
     with open(path, encoding='utf-8') as f:
         body = f.read()
-    for extra in range(probe_max + 1):
-        probe = body + '\n' + ''.join(
-            'local __headroom_probe%d = %d\n' % (i, i) for i in range(extra + 1))
+
+    def compiles(text):
         fd, tmp = tempfile.mkstemp(suffix='.lua')
         try:
             with os.fdopen(fd, 'w') as f:
-                f.write(probe)
-            if lua_compile_error(tmp) is not None:
-                return extra
+                f.write(text)
+            return lua_compile_error(tmp)
         finally:
             os.unlink(tmp)
+
+    err = compiles(body)
+    if err is not None:
+        raise LuaChunkError('%s does not compile, so it has no headroom to measure: %s'
+                            % (os.path.relpath(path, REPO), err))
+    for extra in range(probe_max + 1):
+        if compiles(_with_probes(body, extra + 1)) is not None:
+            return extra
     return probe_max
 
 
+# harness.lua's top-level local count, RATCHETED. It may only go DOWN.
+#
+# This is not a fact about the code that could be computed instead (decisions.md -> "If a
+# number about our own code can be computed, compute it"). It is a POLICY threshold, like a
+# coverage floor: the computed number is checked against it on every run, so it cannot
+# silently drift -- the guard fails in BOTH directions, and a reduction is only accepted
+# once this constant comes down with it.
+#
+# Why a ratchet rather than more headroom: growth was 73 infrastructure locals in one
+# quarter against 2 free slots (#327). Freezing the count redirects the next helper into a
+# module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
+# scale; thinning the tail only makes it comfortable.
+HARNESS_TOP_LEVEL_LOCALS = 198
+
+# `[ \t]`, never `\s`: `\s` matches a NEWLINE, so `local controllerFault` followed by
+# `local function log` merged into one match and the count came out one short. A counter
+# that is quietly off by one is worse than none here -- it is the ratchet's whole input.
+_LUA_TOP_LEVEL_LOCAL = re.compile(
+    r'^local[ \t]+(function[ \t]+)?([A-Za-z0-9_,][A-Za-z0-9_, \t]*)', re.M)
+
+
+def lua_top_level_locals(path):
+    """How many top-level local NAMES a chunk declares.
+
+    Names, not lines: `local a, b, c = 1, 2, 3` spends three slots, and six declarations in
+    harness.lua are multi-name. Counting lines reports 190 where the compiler allocates 198,
+    and the gap is exactly the kind of quiet 8-slot error this file exists to prevent.
+    """
+    with open(path, encoding='utf-8') as fh:
+        body = fh.read()
+    total = 0
+    for m in _LUA_TOP_LEVEL_LOCAL.finditer(body):
+        if m.group(1):                       # `local function foo(` -- one name
+            total += 1
+            continue
+        total += len([n for n in m.group(2).split(',') if n.strip()])
+    return total
+
+
+def check_harness_local_ratchet(fail):
+    """`harness.lua`'s top-level local count may not grow (#327).
+
+    The ceiling kills every scenario at once and there are 2 slots left, so the question is
+    not "is there room today" but "where does the next helper go". Frozen here, it goes into
+    a module -- the pattern harness.lua already uses for ten of them -- and module count has
+    no limit. Without the freeze, the measured rate (73 infrastructure locals per quarter)
+    spends the remaining slack in about a week of tooling work.
+
+    Fails BOTH ways on purpose. Growth is the regression. A reduction is good news that must
+    still land here, or the ratchet quietly loosens to whatever the file happened to reach.
+    """
+    path = os.path.join(REPO, 'tools/playtest/harness.lua')
+    actual = lua_top_level_locals(path)
+    if actual > HARNESS_TOP_LEVEL_LOCALS:
+        fail.append(
+            'harness.lua declares %d top-level locals, up from the ratcheted %d. Lua caps a '
+            'chunk at 200 and breaching it stops every scenario at once, so a new helper '
+            'goes in a MODULE (the file already dofiles ten) or hangs off an existing table '
+            '(INSPECT, TUNE) -- not here (#327).'
+            % (actual, HARNESS_TOP_LEVEL_LOCALS))
+    elif actual < HARNESS_TOP_LEVEL_LOCALS:
+        fail.append(
+            'harness.lua is down to %d top-level locals from %d -- good. Lower '
+            'HARNESS_TOP_LEVEL_LOCALS in tools/check.py to %d in the same commit, or the '
+            'ratchet loosens to whatever the file last happened to reach (#327).'
+            % (actual, HARNESS_TOP_LEVEL_LOCALS, actual))
+
+
 def check_lua_local_headroom(fail, paths=None):
-    """Report the REMAINING local slots in the playtest chunks, and fail at zero.
+    """Report the REMAINING local slots in EVERY playtest chunk, and fail at zero.
 
     The margin used to be prose -- "two free slots", repeated in harness.lua, in this
     file and in HANDOFF.md -- and it was wrong in all three places within one PR of being
@@ -263,16 +377,33 @@ def check_lua_local_headroom(fail, paths=None):
     if shutil.which('lua') is None:
         print('check_lua_local_headroom: skipping (no lua on PATH; brew install lua)')
         return
-    for path in (paths or (os.path.join(REPO, 'tools/playtest/harness.lua'),)):
-        free = lua_local_headroom(path)
+    probe_max, roomy = 8, 0
+    chunks = paths or [os.path.join(REPO, rel) for rel in LUA_CHUNKS]
+    for path in chunks:
         rel = os.path.relpath(path, REPO)
-        print('%s: %d top-level local slot(s) free of Lua\'s 200-local ceiling' % (rel, free))
+        try:
+            free = lua_local_headroom(path, probe_max=probe_max)
+        except LuaChunkError as exc:
+            # check_lua_chunks_load reports the syntax error itself; refusing to print a
+            # number here is the point -- 0 would name the wrong problem and demand the
+            # wrong fix.
+            fail.append('%s: headroom not measurable (%s)' % (rel, exc))
+            continue
+        # Only the tight ones are printed. Twenty lines of "8+" buried the one number that
+        # matters, and a report nobody reads is the same as no report.
+        if free < probe_max:
+            print('%s: %d top-level local slot(s) free of Lua\'s 200-local ceiling'
+                  % (rel, free))
+        else:
+            roomy += 1
         if free == 0:
             fail.append(
                 '%s has NO room under the 200-local ceiling -- the next top-level local '
                 'stops the whole chunk loading and every scenario dies at once. Hang the '
-                'new helper off an existing table (INSPECT, TUNE) or move it to '
-                'controller.lua.' % rel)
+                'new helper off an existing table in that file, or move it into a NEW '
+                'chunk -- module count has no ceiling (#327).' % rel)
+    if roomy:
+        print('%d other Lua chunk(s): %d+ slots free' % (roomy, probe_max))
 
 
 def check_hosted_chapters_declared(fail):
@@ -1744,7 +1875,7 @@ def main():
                   check_personal_line_injection_routes,
                   check_injection_order, check_cached_steps_are_config_invariant,
                   check_playtest_matrix, check_gate_chapter_window,
-                  check_declared_cases,
+                  check_declared_cases, check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,
                   check_tool_refs_exist, check_no_dead_concepts,
