@@ -225,31 +225,160 @@ def check_lua_chunks_load(fail):
             fail.append('%s does not compile: %s' % (rel, err))
 
 
+class LuaChunkError(Exception):
+    """A chunk does not compile at all, so its headroom is not a number."""
+
+
+# `return` must be the LAST statement in a Lua block, so a probe appended after one is a
+# syntax error no matter how many slots are free. Every module here ends in a module
+# return, and `ch05.lua`'s spans forty lines -- so the insertion point is found by the
+# LAST top-level `return`, never by matching the shape of the expression after it.
+_TOP_LEVEL_RETURN = re.compile(r'^return\b', re.M)
+
+
+def _probe_sites(body):
+    """Every position `n` probe locals could legally go, best candidate first.
+
+    Two, and which one is right is DECIDED BY THE COMPILER rather than by a pattern: insert
+    before the last top-level `return` (every module), or append (harness.lua, which ends
+    in a callback registration). `lua_local_headroom` takes the first that compiles with
+    zero probes, so a chunk shaped like neither raises instead of reporting a wrong number.
+    """
+    sites = []
+    matches = list(_TOP_LEVEL_RETURN.finditer(body))
+    if matches:
+        sites.append(matches[-1].start())
+    sites.append(len(body))
+    return sites
+
+
+def _with_probes(body, n, at):
+    """`body` with `n` probe locals spliced in at `at`, on a line of their own.
+
+    The leading newline is not cosmetic: `test_controller.lua` ends without one, so a bare
+    splice produced `endlocal __headroom_probe0` and the chunk reported 0 free against 74
+    locals -- a file with plenty of room reported as full, which is a build failure.
+    """
+    probes = ''.join('local __headroom_probe%d = %d\n' % (i, i) for i in range(n))
+    if n and at > 0 and body[at - 1] != '\n':
+        probes = '\n' + probes
+    return body[:at] + probes + body[at:]
+
+
 def lua_local_headroom(path, probe_max=8):
     """How many more top-level `local`s `path` can take before it stops compiling.
 
-    Measured by appending them, because there is no way to ask Lua: the limit counts
-    what the compiler allocates, not what a regex can see (upvalues, `for` control
-    variables, locals inside the chunk's own blocks).
+    Measured by inserting them, because there is no way to ask Lua: the limit counts what
+    the compiler allocates, not what a regex can see (upvalues, `for` control variables,
+    locals inside the chunk's own blocks).
+
+    Raises LuaChunkError if the chunk does not compile as it stands. Reporting that as 0
+    would name the wrong problem -- and 0 is the number that fails the build.
     """
     with open(path, encoding='utf-8') as f:
         body = f.read()
-    for extra in range(probe_max + 1):
-        probe = body + '\n' + ''.join(
-            'local __headroom_probe%d = %d\n' % (i, i) for i in range(extra + 1))
+
+    def compiles(text):
         fd, tmp = tempfile.mkstemp(suffix='.lua')
         try:
             with os.fdopen(fd, 'w') as f:
-                f.write(probe)
-            if lua_compile_error(tmp) is not None:
-                return extra
+                f.write(text)
+            return lua_compile_error(tmp)
         finally:
             os.unlink(tmp)
+
+    err = compiles(body)
+    if err is not None:
+        raise LuaChunkError('%s does not compile, so it has no headroom to measure: %s'
+                            % (os.path.relpath(path, REPO), err))
+    # Choose the site with a REAL probe, never with zero of them: inserting an empty string
+    # compiles anywhere, so a zero-probe check accepts the first candidate unconditionally --
+    # including a `return` that sits at column 0 INSIDE a function, where a probe would
+    # measure that function's budget rather than the chunk's. test_controller.lua has one,
+    # and it reported 0 free against 74 locals until this was fixed.
+    at = None
+    for site in _probe_sites(body):
+        if compiles(_with_probes(body, 1, site)) is None:
+            at = site
+            break
+    if at is None:
+        return 0                     # compiles as it stands, but has no room for one more
+    for extra in range(probe_max + 1):
+        if compiles(_with_probes(body, extra + 1, at)) is not None:
+            return extra
     return probe_max
 
 
+# harness.lua's top-level local count, RATCHETED. It may only go DOWN.
+#
+# This is not a fact about the code that could be computed instead (decisions.md -> "If a
+# number about our own code can be computed, compute it"). It is a POLICY threshold, like a
+# coverage floor: the computed number is checked against it on every run, so it cannot
+# silently drift -- the guard fails in BOTH directions, and a reduction is only accepted
+# once this constant comes down with it.
+#
+# Why a ratchet rather than more headroom: growth was 73 infrastructure locals in one
+# quarter against 2 free slots (#327). Freezing the count redirects the next helper into a
+# module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
+# scale; thinning the tail only makes it comfortable.
+HARNESS_TOP_LEVEL_LOCALS = 198
+
+# `[ \t]`, never `\s`: `\s` matches a NEWLINE, so `local controllerFault` followed by
+# `local function log` merged into one match and the count came out one short. A counter
+# that is quietly off by one is worse than none here -- it is the ratchet's whole input.
+_LUA_TOP_LEVEL_LOCAL = re.compile(
+    r'^local[ \t]+(function[ \t]+)?([A-Za-z0-9_,][A-Za-z0-9_, \t]*)', re.M)
+
+
+def lua_top_level_locals(path):
+    """How many top-level local NAMES a chunk declares.
+
+    Names, not lines: `local a, b, c = 1, 2, 3` spends three slots, and six declarations in
+    harness.lua are multi-name. Counting lines reports 190 where the compiler allocates 198,
+    and the gap is exactly the kind of quiet 8-slot error this file exists to prevent.
+    """
+    with open(path, encoding='utf-8') as fh:
+        body = fh.read()
+    total = 0
+    for m in _LUA_TOP_LEVEL_LOCAL.finditer(body):
+        if m.group(1):                       # `local function foo(` -- one name
+            total += 1
+            continue
+        total += len([n for n in m.group(2).split(',') if n.strip()])
+    return total
+
+
+def check_harness_local_ratchet(fail):
+    """`harness.lua`'s top-level local count may not grow (#327).
+
+    The ceiling kills every scenario at once and there are 2 slots left, so the question is
+    not "is there room today" but "where does the next helper go". Frozen here, it goes into
+    a module -- the pattern harness.lua already uses for ten of them -- and module count has
+    no limit. Without the freeze, the measured rate (73 infrastructure locals per quarter)
+    spends the remaining slack in about a week of tooling work.
+
+    Fails BOTH ways on purpose. Growth is the regression. A reduction is good news that must
+    still land here, or the ratchet quietly loosens to whatever the file happened to reach.
+    """
+    path = os.path.join(REPO, 'tools/playtest/harness.lua')
+    actual = lua_top_level_locals(path)
+    if actual > HARNESS_TOP_LEVEL_LOCALS:
+        fail.append(
+            'harness.lua declares %d top-level locals, up from the ratcheted %d. Lua caps a '
+            'chunk at 200 and breaching it stops every scenario at once, so a new helper '
+            'goes in a MODULE (the file already dofiles ten) or hangs off an existing table '
+            '(INSPECT, TUNE) -- not here (#327).'
+            % (actual, HARNESS_TOP_LEVEL_LOCALS))
+    elif actual < HARNESS_TOP_LEVEL_LOCALS:
+        fail.append(
+            'harness.lua is down to %d top-level locals from %d -- good. Lower '
+            'HARNESS_TOP_LEVEL_LOCALS in tools/check.py to %d in the same commit, or the '
+            'ratchet loosens to whatever the file last happened to reach (#327).'
+            % (actual, HARNESS_TOP_LEVEL_LOCALS, actual))
+
+
 def check_lua_local_headroom(fail, paths=None):
-    """Report the REMAINING local slots in the playtest chunks, and fail at zero.
+    """Report the REMAINING local slots in EVERY playtest chunk, and fail at zero.
 
     The margin used to be prose -- "two free slots", repeated in harness.lua, in this
     file and in HANDOFF.md -- and it was wrong in all three places within one PR of being
@@ -263,16 +392,33 @@ def check_lua_local_headroom(fail, paths=None):
     if shutil.which('lua') is None:
         print('check_lua_local_headroom: skipping (no lua on PATH; brew install lua)')
         return
-    for path in (paths or (os.path.join(REPO, 'tools/playtest/harness.lua'),)):
-        free = lua_local_headroom(path)
+    probe_max, roomy = 8, 0
+    chunks = paths or [os.path.join(REPO, rel) for rel in LUA_CHUNKS]
+    for path in chunks:
         rel = os.path.relpath(path, REPO)
-        print('%s: %d top-level local slot(s) free of Lua\'s 200-local ceiling' % (rel, free))
+        try:
+            free = lua_local_headroom(path, probe_max=probe_max)
+        except LuaChunkError as exc:
+            # check_lua_chunks_load reports the syntax error itself; refusing to print a
+            # number here is the point -- 0 would name the wrong problem and demand the
+            # wrong fix.
+            fail.append('%s: headroom not measurable (%s)' % (rel, exc))
+            continue
+        # Only the tight ones are printed. Twenty lines of "8+" buried the one number that
+        # matters, and a report nobody reads is the same as no report.
+        if free < probe_max:
+            print('%s: %d top-level local slot(s) free of Lua\'s 200-local ceiling'
+                  % (rel, free))
+        else:
+            roomy += 1
         if free == 0:
             fail.append(
                 '%s has NO room under the 200-local ceiling -- the next top-level local '
                 'stops the whole chunk loading and every scenario dies at once. Hang the '
                 'new helper off an existing table (INSPECT, TUNE) or move it to '
                 'controller.lua.' % rel)
+    if roomy:
+        print('%d other Lua chunk(s): %d+ slots free' % (roomy, probe_max))
 
 
 def check_hosted_chapters_declared(fail):
@@ -1744,7 +1890,7 @@ def main():
                   check_personal_line_injection_routes,
                   check_injection_order, check_cached_steps_are_config_invariant,
                   check_playtest_matrix, check_gate_chapter_window,
-                  check_declared_cases,
+                  check_declared_cases, check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,
                   check_tool_refs_exist, check_no_dead_concepts,
