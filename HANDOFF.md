@@ -13,51 +13,62 @@ a thing has a home before cutting it.
 
 ## In flight
 
-**Nothing.** `main` is at **#325** (`d4aeafc`), CI green, no open PRs.
+**Nothing.** `main` is at **#328** (`c5d326b`), CI green, no open PRs.
 
 ## Next task
 
-**The #302 epic — read its body first.** It carries the measurement that reordered it, and the
-board is at `https://claude.ai/code/artifact/269a5399-0385-49a8-af7a-ed069310c335`. Eight children
-(#308-#315); **#308 through #313 are done.** #309's phase 2 (ELF patching) is decided and NOT
-built — `decisions.md` records the two events that would reopen it.
+**#135's ch01 finding — read the triage comment on the issue first.** A v0.1.0 playtester
+reported ch01's enemy healing as *"confusing... or it was a glitch"*. It is neither a glitch nor
+our invention: the 12 fort tiles came with the `Ch13EirikaMap` base layout at identical
+coordinates, and the castle gate at (21,7) is ours, for Seize. Two healing terrains, two vanilla
+rates (20% / 10%).
 
-**#314 is next** — declarative scenario cases + chapter-declared `matrix.yaml` rows. Then #315,
-then ch06 through the model.
+What the triage actually turned up is bigger than the report: **our Guide is effectively empty.**
+We null vanilla's tutorial lists on every hosted slot (`build_campaign.py:3216`, `:7939`), so no
+vanilla `ENUT` ever runs, and `IsGuideLocked()` hides the Guide map-menu command entirely unless
+some entry's `displayFlag` is set. Of the 56 flags the Guide uses, our game sets exactly **one** —
+234 ("Arena"), in ch05's arena beat. So ch01–ch04 appear to have **no Guide command at all**, and
+from ch05 it lists one topic.
 
-**`make scene SCENE=ch05/1` now shows a scene without building anything** (#311, ~0.3s). Use it
-while authoring; `docs/scenes/ch05.md` is the committed book and `make check` diffs it. It
-replaces the AUTHORING loop and **not the proof** — a scene still gets one real run before it
-ships. ch05 only: ch01–ch04 render their scenes inline inside their injectors, and ch06 is a
-`CHAPTER_YAML` row plus its registry rows.
+⚠️ **That last claim is a STATIC CHAIN, not an observed run — disprove it before building on it.**
+The Guide command is menu id `0x74` (`menu_def.c`) and the controller already dumps `menu.items`
+with `override_id` in every action record, so a headless ch01 verdict scenario settles it for free.
+The fix, if it holds, is our own existing pattern: ch05's arena beat is already a verbatim
+vanilla-shaped tutorial (`CAMERA → CURSOR_FLASHING → TUTORIALTEXTBOXSTART → TEXTSHOW → ENUT`,
+`build_campaign.py:10520`); ch01's is the same shape with `ENUT(206)`.
 
-**The gate is now 6m48s, 21/21 PASS** (2026-08-23, against the old headed/serial 24m51s — 3.7x),
-and **bounded**: `check_gate_chapter_window` holds it to the spine plus the two most recently
-hosted chapters, so hosting ch06 ages ch04's six scenarios out into `SUITE=ch04`. Nothing moves
-today. Three tiers now, in `CLAUDE.md`: chapter suite while working, `SUITE=gate` before a merge,
-**`SUITE=all` before any playtest build we send the group** — that last tier is the only one that
-catches a chapter which left the gate breaking three chapters later, and it is also what keeps
-#309's phase 2 unnecessary.
+**Nicolas's bar here is VANILLA PARITY and nothing more** (2026-08-24): *"we don't need to explain
+it any more than vanilla does. as long as we have that guide players can reference we're good."*
+Vanilla does explain it — a forced Ch1 tutorial box that flashes the tiles and names Breguet on his
+gate — so parity is that beat plus the Guide entry, not a new system.
+
+The art-consistency and prologue-difficulty halves of #135 are still untriaged.
+
+**Then ch06 (#26), which is the #302 epic's own Definition of Done** — "ch06 costs materially fewer
+evenings than ch05 did". `make chapter CH=ch06` is the orientation: not hosted, no difficulty
+declared, 4 of 4 events unscripted, Messie has no portrait/map sprite/battle anim. Everything else
+on #302 is model built against a guess until a real chapter runs through it, which is the "golden
+cage" failure the epic names.
+
+**Deferred on purpose, both with reasons on their issues:** #327's tail thinning (comfort, not
+safety — the ceiling is measured in every chunk and frozen now) and #315's test ELF (assertion cost
+was never the bottleneck; watched-run cost was, and #308–#311 fixed that).
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
 with procs that never change — which looks exactly like broken input and is not. Restore the ROM,
 the ELF **and** `.build-config.json` from the same cache entry, then re-run `gen_symbols.py`.
 
-**Tree state: the ROM in the tree is `ch05lupinboot`** (`600f8241`, CH05BOOT+CH05LUPIN) — the last
-build of the 2026-08-23 gate run, not canonical. `tools/playtest/states/` holds valid **`prep`**
-and **`ch02start`** (105,705 and 128,940 bytes, 99.4–99.5% non-zero) stamped for the CANONICAL ROM
-`a44afcc2ac09:normal`, so anything wanting them needs canonical back in the tree first. A dead
-state is exactly **397,312 bytes of zeros** — that size is the tell.
+**Tree state: the ROM in the tree is `ch05boot`** (CH05BOOT=1) — the last build of the 2026-08-24
+verification runs, not canonical. `tools/playtest/states/` still holds valid **`prep`** and
+**`ch02start`** stamped for the CANONICAL ROM, so anything wanting them needs canonical back in the
+tree first. A dead state is exactly **397,312 bytes of zeros** — that size is the tell.
 
-⚠️ **The ROM cache is COLD as of #311–#313.** Those three touched `Makefile`,
-`tools/build_campaign.py` and `tools/inject/event_group.py`, and all three are `ROM_INPUT_PATHS`
-entries (`campaigns`, `engine`, `tools/inject`, `tools/build_campaign.py`,
-`tools/portrait_tool.py`, `tools/feditor_to_banim.py`, `Makefile`) — `rom_input_hash` folds the
-whole set, so every configuration misses. **The next `SUITE=gate` BUILDS five ROMs rather than
-restoring them; budget for it and do not read the first run's duration as a regression.** The
-per-step injection cache underneath is still warm (it keys on its own inputs, and no art
-changed), so each of those builds is the ~25s cached-injection kind rather than the ~50s one.
+**The ROM cache is WARM** for `canonical`, `testch`, `ch03boot`, `ch04boot`, `ch05boot`,
+`ch05lupinboot`, `ch05mooseboot` and the three ch05 ending arms (2026-08-24). #314 touched
+`Makefile`, `tools/build_campaign.py` and `tools/inject/` — all `ROM_INPUT_PATHS` entries, so
+`rom_input_hash` folded and every configuration missed once; the eight builds that followed
+re-warmed it. #327 touched only `tools/check.py`, which is not an input, so the cache survived it.
 
 ## Recently landed — do not redo
 
