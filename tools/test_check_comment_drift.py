@@ -76,6 +76,19 @@ class HandwrittenSourceScan(unittest.TestCase):
         self.assertIn('tools/playtest/harness.lua', sources)
         self.assertNotIn('tools/check.py', sources)   # hosts the registry; exempt
 
+    def test_the_doc_globs_cover_the_docs_people_FOLLOW(self):
+        """DOC_GLOBS silently re-narrowing is how both 2026-08-26 incidents happened:
+        `.github/ISSUE_TEMPLATE/custom_unit.md` taught the retired `clone_into` binding and
+        the dialogue-pass skill taught the retired 29/42-CHARACTER wrap, for as long as the
+        scan could not see either directory. Nothing asserted over `_docs()` before this."""
+        docs = [os.path.relpath(p, check.REPO) for p in check._docs()]
+        self.assertIn('.github/ISSUE_TEMPLATE/custom_unit.md', docs)
+        self.assertIn('.claude/skills/dialogue-pass/SKILL.md', docs)
+        self.assertIn('CLAUDE.md', docs)
+        self.assertIn('.claude/skills/dialogue-pass/references/fe8-register.md', docs)
+        # decisions.md IS globbed; its exemption is applied inside check_no_dead_concepts,
+        # not by narrowing the scan -- so do not assert its absence here.
+
     def test_the_live_repo_is_clean(self):
         fail = []
         check.check_no_dead_concepts(fail)

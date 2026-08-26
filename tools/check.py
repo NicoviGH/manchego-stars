@@ -30,7 +30,13 @@ import tempfile
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Docs that carry prose facts (decisions.md is handled specially per-check).
-DOC_GLOBS = ['docs/**/*.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md']
+# Every doc a HUMAN OR AGENT FOLLOWS, not just the ones under docs/. `.github/` and
+# `.claude/skills/` were unscanned until 2026-08-26 and both had already drifted:
+# `custom_unit.md` still said `clone_into` (dead since #65) and the dialogue-pass skill
+# still taught the 29/42-CHARACTER wrap that #298 replaced with pixel budgets. A doc that
+# instructs is exactly the kind this guard exists for.
+DOC_GLOBS = ['docs/**/*.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md',
+             '.github/**/*.md', '.claude/skills/**/*.md']
 
 # Terms that are NEVER legitimate in vision/ops docs OR hand-written code comments:
 # abandoned tools, dead code symbols, retired implementation phrases. decisions.md

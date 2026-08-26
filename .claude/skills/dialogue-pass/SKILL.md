@@ -29,8 +29,8 @@ beats → lines, human curates every level). Decided 2026-06-09 (docs/decisions.
    **A chapter's messages live in TWO places and TWO channels — check both, or you will
    conclude vanilla lacks a beat it has:**
    - `*-eventscript.h` carries the scenes, in **two channels**: `TEXTSHOW` (on-map, units
-     staged by `LOAD1`, bubbles wrap at **29** chars) and `Text_BG(BG_*, id)` (a still
-     backdrop, wraps **~42**). The channel sets the width you hand-box to, and vanilla uses
+     staged by `LOAD1`, the bubble's budget is **203px**) and `Text_BG(BG_*, id)` (a still
+     backdrop, auto-centred helpbox, **192px**). The channel sets the width you hand-box to, and vanilla uses
      the backdrop for scenes that happen ELSEWHERE (Ch5's Grado command scenes) — so it also
      tells you where a scene is set. `vanilla_scene.py` prints id + channel per message
      (regression-guarded by `tools/test_vanilla_scene.py`; it once matched `TEXTSHOW` only
@@ -83,8 +83,9 @@ silently strip it. So, before locking beats:
    (e.g. "menace vs. brevity"). Nicolas picks or mixes; he owns voice.
 2. **Draft BOXED, never as prose** (2026-07-23 learning — prose-length lines read as
    wordy and hide the real A-press pacing). Write every line as GBA boxes from the first
-   pass: **2 lines per box, ~29–30 chars/line** (on-map bubbles wrap at 29; cutscene
-   Text_BG ~42), `...` holds, `--` interrupts, one A-press per box — and show it *boxed*
+   pass: **2 lines per box**, measured in PIXELS not characters (#298 — 203px talk bubble,
+   192px helpbox, 143px battle bubble; `tools/fe8_talk_font.py` owns the three budgets and
+   `make scene` renders the real wrap), `...` holds, `--` interrupts — and show it *boxed*
    to Nicolas, not as paragraphs. Stay inside the budget: boss taunt ≤ 4 lines / 1 screen;
    opening exchange ≤ ~8 boxes; ending beat ≤ ~10 lines; narration card 2–5 lines ≤ ~25
    words; quote msgs 1–2 lines. Cut before adding.
@@ -157,8 +158,8 @@ alternative lines, Nicolas decides whether the lock reopens.
   mislead -- they catch the typewriter mid-stroke. Once the feature is accepted,
   remove the review artifact before merge unless a live document links to it.
 - Message-encoding gotchas (the hard-won ones, full trace in
-  `tools/build_campaign.py` `_script_to_message`): on-map bubble lines wrap at
-  29 chars, NOT Text_BG's ~42; every non-terminal [A] must be [LF]-followed
+  `tools/build_campaign.py` `_script_to_message`): a line's budget is PIXELS —
+  203px on-map, NOT the helpbox's 192px — so character counts are not the measure; every non-terminal [A] must be [LF]-followed
   (the width measure doesn't stop at [A], and right-side bubbles have no
   position clamp -- merged turns = offscreen bubble); a boss "steps out" via a
   message SPLIT + LOAD1 between, never a lazy right-face load mid-message.

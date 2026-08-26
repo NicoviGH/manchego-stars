@@ -7,12 +7,12 @@ labels: ["art"]
 
 End-to-end checklist for giving a unit its custom look. **The "how" lives in code + decisions, not a
 prose doc** — each step links its source of truth:
-- Anim/clone-class how → the `inject_battle_anims` docstring (`tools/build_campaign.py`)
+- Anim how (PC + enemy paths both) → the `inject_battle_anims` docstring (`tools/build_campaign.py`)
 - Platform how → the `inject_battle_platforms` docstring (`tools/build_campaign.py`)
-- Decisions/rationale (additive clone class, platform picks, scale) → `docs/decisions.md` (Art & Audio)
+- Decisions/rationale (additive binding, platform picks, scale) → `docs/decisions.md` (Art & Audio)
 - Fast iteration → `make TESTCH=1` (boots into the Ch1 sandbox) + `inject_test_chapter` docstring;
   capture via `tools/playtest/run.sh recordrbg` (fresh checkpoint)
-- **Principle that governs all of it: ADDITIVE, never global** — clone into free slots; never edit a
+- **Principle that governs all of it: ADDITIVE, never global** — bind into free slots; never edit a
   shared vanilla class/anim/terrain in place.
 
 ## Checklist
@@ -20,7 +20,7 @@ prose doc** — each step links its source of truth:
       `tools/ref_to_bust.py` / `tools/portrait_tool.py`; reskin a credited FE-Repo body via
       `tools/map_sprite_editor.py`. Add `fe_name` (≤12) if the name overflows the buffer.
 - [ ] **Battle anim** — 3 hi-res poses → BOX-descale to `campaigns/.../battle_anims/<unit>/{ready,
-      windup,peak}.png`; add the `battle_anim:` YAML block with a **free** `clone_into` class slot.
+      windup,peak}.png`; add the `battle_anim:` YAML block naming its `clone_from` donor class.
       (An FE-native community anim goes through `import:` instead — the `.txt` owns the cadence,
       so do NOT hand it one of ours.)
       ⚠️ confirm `AnimConf .index == anim_id + 1` (else purple dragon).
@@ -33,8 +33,12 @@ prose doc** — each step links its source of truth:
       set the chapter's `battleTileSet` (0 = Snowdrift / 0x15 = Uneven).
 - [ ] **Build + verify** — `make TESTCH=1`, then capture all THREE parts of the art in-engine:
       `PT_CHAR=<id> run.sh recordcast` (bust + map sprite, off the status screen) and
-      `PT_CHAR=<id> run.sh recordanim` (the battle anim). Confirm the unit deploys as its clone
-      class number and fires on the right ground (unforced).
+      `PT_CHAR=<id> run.sh recordanim` (the battle anim; `recordenemy` for a generic).
+      ⚠️ **The two halves of this template bind DIFFERENTLY.** A named PC/boss keeps its PLAIN
+      vanilla class and the anim rides a **private per-character AnimConf** (`_u25`). A generic
+      enemy has no unique character id, so an `enemy_class_reskins` entry binds at the **CLASS**
+      instead — a free `slot:` (`CLASS_BLST_*_EMPTY`, …) whose `.pBattleAnimDef` is repointed
+      (`decisions.md` #90). Confirm the unit fires on the right ground (unforced).
       ⚠️ **Film several rounds — `PT_ROUNDS=4` — not one.** FE8 resolves damage in DATA whatever the
       animation does, so a broken script still kills the foe, still shows correct frames and still
       reports PASS; a one-round capture never asks for the next input that reveals a soft-lock.
