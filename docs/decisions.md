@@ -7273,7 +7273,7 @@ _Decided: 2026-08-23 (Nicolas ruled on the rosters). Proof: 15 unit tests; the g
 every build; it found ch02's `miscBasedEvents` unruled on first run._
 
 
-### A base-map LABEL is prose — the donor is DERIVED (2026-08-24, #26)
+### A base-map LABEL is prose — the donor is DERIVED (2026-08-26, #26)
 
 `fe8_base_map` in a chapter YAML is documentation. Nothing reads it, so nothing has ever checked
 it, and ch01's said **"FE8 Ch13a — Fluorspar's Oath"** for months. It is wrong twice over:
@@ -7327,7 +7327,7 @@ parity bar is being corrected to FE8 Ch6 in its own pass), and **ch08's seed cla
 which ch01 has already used. Neither is a bug today; both are choices somebody should make on
 purpose.
 
-_Decided: 2026-08-24. Found during ch06's donor evaluation; ch01's label corrected and the tool
+_Decided: 2026-08-26. Found during ch06's donor evaluation; ch01's label corrected and the tool
 committed in the same PR. The first cut of this ADR published a hand-transcribed table with no
 tool behind it — code review caught that the numbers did not reproduce, that ch05's tie was
 suppressed, and that our own layouts were in the candidate pool._
