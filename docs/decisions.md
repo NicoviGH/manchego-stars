@@ -7272,6 +7272,66 @@ two would be two answers.
 _Decided: 2026-08-23 (Nicolas ruled on the rosters). Proof: 15 unit tests; the guard runs in
 every build; it found ch02's `miscBasedEvents` unruled on first run._
 
+
+### A base-map LABEL is prose — the donor is DERIVED (2026-08-26, #26)
+
+`fe8_base_map` in a chapter YAML is documentation. Nothing reads it, so nothing has ever checked
+it, and ch01's said **"FE8 Ch13a — Fluorspar's Oath"** for months. It is wrong twice over:
+`chapters.h` has `CHAPTER_E_13 // Hamill Canyon` against `CHAPTER_I_13 // Fluorspar's Oath`, so
+13a is the EIRIKA route and Fluorspar's Oath is 13b; and our ch01 map is 25x16, which matches
+`Ch13EirikaMap` and cannot be `Ch13EphraimMap` (22x22) at all.
+
+**Cost when it bit:** during ch06's donor search the label read as *"ch01 already spent the
+Ephraim layout"*, and `Ch13EphraimMap` was nearly struck off the candidate list on the strength of
+a sentence. A retile is the one decision in this repo where the source of truth is a binary we
+own, and we were reading a caption instead.
+
+**Derive it instead, with `tools/map_donor.py`.** A retile preserves geometry, so the donor is
+recoverable from the artifact: compare our `.mar`'s blocked-cell pattern against every vanilla
+layout of the SAME DIMENSIONS, each read through its own tile config. What it reports today:
+
+| ours | dims | vanilla candidates | donor | agreement |
+|---|---|---|---|---|
+| ch00 | 15x10 | 14 | `PrologueMap` | 100% |
+| ch01 | 25x16 | **1** | `Ch13EirikaMap` — Hamill Canyon | 97.8% |
+| ch02 | 15x15 | 2 | `Ch2Map` | 100% |
+| ch03 | 17x16 | **1** | `Ch3Map` — Borgo | 84.9% |
+| ch04 | 15x15 | 2 | `Ch4Map` | 100% |
+| ch05 | 15x21 | 2 | `Ch5Map` **tied with `Ch5TownMapPast`** | 100% |
+
+**Read the candidate COUNT before the percentage.** For ch01 and ch03 exactly one vanilla layout
+has those dimensions, so the geometry never identified anything — the size did, and the score is
+measuring how far we DIVERGED from the donor. ch03's 84.9% is that: ch03 edited the geometry. A
+low score is a fact about our repaint, never evidence of the wrong donor.
+
+**Three ways the naive version of this lies, all handled in the tool and all worth knowing:**
+
+- **A tie can be unbreakable.** `Ch5Map.mar` and `Ch5TownMapPast.mar` are **byte-identical** (same
+  md5), so ch05 scores 100% against both and no amount of geometry will ever separate them. The
+  tool SAYS so. A version that printed the first hit would have invented a certainty it did not
+  have — at exactly the 15x21-and-similar scale ch06 will be working in.
+- **Our own maps live in the candidate directory.** The build copies each of ours into the decomp's
+  `graphics/map/layout/`, so an unfiltered scan returns `Ch01IronTrailMap` as ch01's own donor at
+  ~98%. Worse, `_vanilla_tileconfig_path` cannot resolve a tile config for them: it WARNs and falls
+  back to `TileConfiguration1`, scoring against the wrong terrain table rather than failing. The
+  exclusion is read from build_campaign's `CHNN_LAYOUT` constants, so registering a chapter map
+  excludes it automatically.
+- **The impassable set IS the result.** The percentages mean nothing without it and it is a
+  judgement call, so it is declared in one place in the tool. Water and rivers are deliberately
+  NOT counted: they stop foot units, but they are precisely what a retile repaints — ch06 turns
+  sea into walkable ice — and counting them as walls scores a coast map against its own future.
+
+⚠️ **Ask the tool before claiming a layout is spent, and never a label.** Two collisions it makes
+visible: **ch05 and ch06 both declare `FE8 Ch5 — The Empire's Reach`** (the live one — ch06's
+parity bar is being corrected to FE8 Ch6 in its own pass), and **ch08's seed claims Hamill Canyon**,
+which ch01 has already used. Neither is a bug today; both are choices somebody should make on
+purpose.
+
+_Decided: 2026-08-26. Found during ch06's donor evaluation; ch01's label corrected and the tool
+committed in the same PR. The first cut of this ADR published a hand-transcribed table with no
+tool behind it — code review caught that the numbers did not reproduce, that ch05's tie was
+suppressed, and that our own layouts were in the candidate pool._
+
 ---
 
 ## Open Questions (not yet decided)

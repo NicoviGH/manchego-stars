@@ -56,7 +56,7 @@ if __name__ == '__main__':
     outdir = os.path.join('/tmp', 'manchego-stars-review', '21-iron-trail')
     os.makedirs(outdir, exist_ok=True)
     for name, slug in [('Ch1Map', 'a-vanilla-ch1-escape'),
-                       ('Ch13EirikaMap', 'b-ch13-fluorspar-wide-trail'),
+                       ('Ch13EirikaMap', 'b-ch13-hamill-wide-trail'),
                        ('Ch2Map', 'c-ch2-the-protected')]:
         render(name, os.path.join(outdir, f'{slug}.png'))
 
