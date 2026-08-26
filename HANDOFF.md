@@ -6,76 +6,101 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-24 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-08-26 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
-restated. Five gotchas that lived ONLY here were migrated into `decisions.md` first — check that
-a thing has a home before cutting it.
+restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**ch06 design pass (#26) — brainstorm, nothing built.** `main` is at **#328** (`c5d326b`), CI green,
-no open PRs, no ROM built this session.
+**ch06 design pass (#26) — brainstorm + art scouting. No ROM built, no chapter code written.**
+`main` is at **#330** (`7cc20bb`), CI green, no open PRs. One UNCOMMITTED edit: `ch06`'s YAML (see
+below). Tree is otherwise clean bar the usual dirty submodule and Nicolas's untracked `.agents/`.
 
-**The design board is the store for it:**
+**The design board is the store for the chapter design:**
 `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10` — canon vs seed, vanilla Ch6
-examined, the donor evaluation, the art sourcing, and seven numbered decisions with recommendations.
-Read it before reopening any of them; the reasoning is there and is NOT restated here.
+examined, donor evaluation, art sourcing, and the numbered decisions. ⚠️ **It is one revision behind
+on two points** (Messie's pronoun and the sprite-size ceiling); both are now written into
+`chapters/ch06-the-maer-monster.yaml` instead, which is the better home anyway. The scratchpad that
+held the board's source template was cleared by a session restart, so updating it means re-reading
+250KB of embedded images — not worth the context. Rebuild it from the YAML when ch06 is next picked up.
 
-**Owed, and the reason it is owed:**
-
-- **PR #329 is open and unreviewed** — `fix/ch01-base-map-name`. ch01's `fe8_base_map` said
-  *"FE8 Ch13a — Fluorspar's Oath"*; 13a is the EIRIKA route (`chapters.h`:
-  `CHAPTER_E_13 // Hamill Canyon`, `CHAPTER_I_13 // Fluorspar's Oath`) and our 25x16 map matches
-  `Ch13EirikaMap`, not the 22x22 `Ch13EphraimMap`. Carries the ADR for the method that replaces the
-  label — `decisions.md` → "A base-map LABEL is prose — the donor is DERIVED". Review + squash-merge.
-- **The ch06 decisions are on the BOARD, not in the repo yet.** Locked so far: Messie is **green**
-  (Loch Ness, not ice-blue, 2026-08-24); the Dorrie sheet's 32x32 icon is a **chibi, not a map
-  sprite** (Nicolas's correction — it is a portrait icon, so it feeds `portrait_tool`'s `chibi_png`
-  slot, and the full-body overworld sprite is still unmade). Phase A writes these into the chapter
-  YAML and #26.
-- **#135's ch01 Guide finding is still untouched** — it was the standing next task and this session
-  went to ch06 instead. Read the triage comment on the issue first. ⚠️ Its central claim (the Guide
-  command is absent ch01–ch04) is a STATIC CHAIN, not an observed run: a headless ch01 verdict
-  scenario settles it for free, because the controller already dumps `menu.items` with `override_id`.
-  Nicolas's bar there is **vanilla parity and nothing more** (2026-08-24).
+**Uncommitted: `chapters/ch06-the-maer-monster.yaml`.** Records two things settled today — Messie is
+**he/him** (Nicolas, 2026-08-26; the DM notes and the book both say "it" and the seed said "she"),
+and the map-sprite ceiling finding below. Also rewrites the Talk description to name the ch05 payoff:
+the book (p.31) names **Ravisin** as the druid who awakened him, and he keeps attacking only because
+he fears she will take the gift back — she is already dead, and an awaken spell is permanent. That is
+the argument Marty makes, and it is the spine of the chapter. Land it on a branch.
 
 ## Next task
 
-**PixelLab MCP — it needs a session restart, and that is the whole fix.** Nicolas registered
-`pixellab` (http, `https://api.pixellab.ai/mcp`, static bearer) under the `/Users/Yonick` project
-scope mid-session, so no `mcp__pixellab__*` tools exist in a session that started before it. There
-is no OAuth step. ⚠️ **Do not try to reach it over `curl` — the auto-mode classifier blocks the
-authenticated request**, and that block is correct; restart instead.
+**Art first, at Nicolas's call — the PixelLab probe.** The MCP is connected now (it needed the
+session restart; there is no OAuth step). ⚠️ **Do not reach it over `curl` — the auto-mode classifier
+blocks the authenticated request, and that block is correct.**
 
-What it is FOR, once connected (the two slots nothing else fills):
+⚠️ **BUDGET: it is a TRIAL — 38 of 40 generations left, $0.00 credits, paid to PixelLab (not
+Anthropic; Claude tokens do not cover images).** `create_character` standard = **1** generation;
+**`pro` = 20-40 per call and would eat the trial in one shot — do not use it.**
+`animate_character` template = 1 per direction.
 
-- **Map sprite** — a full-body overworld Messie: idle sheet plus a `32x480` walk sheet, background
-  keyed on **GREEN**, not index 0.
-- **Battle anim** — three frames, *ready / windup / peak*, on a COMMON feet anchor, at `88x64` or an
-  INTEGER multiple. The Dorrie body is 82x72 against that frame — it **overhangs by 8px**, so this
-  wants a re-POSE, not a re-shrink (`inject_battle_anims`: never re-shrink already-small art).
-
-Portrait and chibi do not need it: `ref_to_bust.py` takes a 4x reference (its docstring names the
-style — *flat cel-shaded, bold black outlines, ~16 colours, no gradients*) and `portrait_tool.generate`
-emits the chibi.
-
-**Then the rest of ch06's Phase A**, which needs no ROM at all: re-ground the seed YAML against the
-board's decisions, write the six beats as scene builders, `make scene` them, declare the `playtest:`
-block. `make chapter CH=ch06` is the orientation.
+What ch06 actually needs from it, given the ceiling below: **a 32x32 side-on idle**, and — as the
+real experiment — **whether it can produce a WALK CYCLE for art that is ours**. See "the gap" below.
+Nicolas also wants **Akueria** (an unreleased Pokémon, a rounder front-3/4 plesiosaur with a pearl)
+tested as a second base alongside the recoloured Dorrie. ⚠️ It was pasted into chat and there is no
+file for it — ask him to save it (e.g. `map-review/akueria.png`) before trying; PixelLab needs a URL
+or a file, and `reference_image_url` is preferred because MCP clients truncate large base64.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
 with procs that never change — which looks exactly like broken input and is not. Restore the ROM,
 the ELF **and** `.build-config.json` from the same cache entry, then re-run `gen_symbols.py`.
 
-**Tree state: the ROM in the tree is still `ch05boot`** (CH05BOOT=1) — nothing was built this
+**Tree state: the ROM in the tree is still `ch05boot`** (CH05BOOT=1). Nothing was built in this
 session. `tools/playtest/states/` still holds valid **`prep`** and **`ch02start`** stamped for the
 CANONICAL ROM, so anything wanting them needs canonical back in the tree first. A dead state is
 exactly **397,312 bytes of zeros** — that size is the tell.
 
 **The ROM cache is WARM** for `canonical`, `testch`, `ch03boot`, `ch04boot`, `ch05boot`,
-`ch05lupinboot`, `ch05mooseboot` and the three ch05 ending arms (2026-08-24). Untouched since:
-this session built nothing and edited no `ROM_INPUT_PATHS` entry.
+`ch05lupinboot`, `ch05mooseboot` and the three ch05 ending arms (2026-08-24). Untouched since.
+
+## Map sprites — what this session established
+
+Written here because it is live orientation for the next art session; the durable half is in
+`ch06-the-maer-monster.yaml` and `docs/decisions.md`.
+
+- **32x32 is a HARD ENGINE CEILING.** `UNIT_ICON_SIZE_*` has exactly three values (16x16, 16x32,
+  32x32) and `bmudisp.c` switches on them in five places. Bigger = an engine change plus SMS VRAM
+  we do not have spare. Our own Braulo, Meesmickle, Wolfram, Baxby, Lupin and the moose ALREADY sit
+  in that top tier, alongside Manakete 2 and the Demon King — there is no rung above them.
+- **Size reads as FILL, not as cell size.** The Demon King touches all four edges and reads huge;
+  Baxby is the same 32x32 and reads tiny because he sits centred with air around him. The moose
+  earns its size with antlers. This is the whole trick, and it is the spec for Messie.
+- **Geometry is DERIVED from the donor, never from sheet pixels.** A 16x96 sheet is ambiguous —
+  6x 16x16 vs 3x 16x32 — and only the wait table says which (`map_sprite_tool.donor_sms_geometry`,
+  whose docstring says so outright). I inferred from pixel dimensions and got Draco Zombie, Cyclops
+  and Basil wrong in one pass.
+- **A map sprite carries NO palette of its own** — it picks a resident faction bank, so the palette
+  stored in a decomp PNG is a meaningless leftover (the Demon King's is player-blue). Render vanilla
+  sprites through `graphics/unit_icon/palette/unit_icon_pal_enemy.agbpal`; ours are authored directly
+  in `map_sprites/cast_palette.png`.
+- ⚠️ **`footprint:` in a unit YAML is NOT the size class.** It is an art-direction note meaning how
+  big the creature READS ("PC-sized", "cat-sized"), explicitly contrasted with the frame in four
+  files: *"sprite frame is 32x32 but the unit reads party-scale"*. I mistook it for drift and nearly
+  opened a PR to delete working documentation. It does carry two meanings across files (Basil and
+  Lupin use it as the engine size class) — worth one disambiguating line someday, nothing more.
+
+**The gap PixelLab would actually close.** Our units split cleanly:
+- **WALK (15)** — basil, fire-imp, hlin-trollbane, lizard-wildling, lizardzerker, lupin,
+  lycanroc-pack, ravisin, sahnar, skel-{axe,bow,lance,sword}, trex, white-moose. Every one is a
+  VENDORED community sprite that arrived as a complete sheet, 9-15 unique frames.
+- **GLIDE (9)** — baxby, braulo, marty, meesmickle, pinky, prof-rbg, rootis, sclorbo, wolfram. The
+  original PCs, whose art we generated ourselves. `synth_mu_sheet` tiles ONE idle pose into all 15
+  MU blocks, so they slide across the map without moving their legs.
+
+So the gap is not "we cannot do walk cycles" — it is that **we can only get one by vendoring someone
+else's sprite.** If PixelLab can produce a usable walk for art that is ours, it pays for Messie AND
+retro-fits nine PCs. The MU layout is documented on the moose's sheet in ch04's YAML:
+**`side[0-4] / down[5-9] / up[10-14]`**, 32x480, fourth facing by H-flip. Success test is the one
+already used this session: generate, then diff the frames for uniqueness.
 
 ## Recently landed — do not redo
 
