@@ -58,6 +58,12 @@ DEAD_CONCEPTS = [
     r'gen-chapter-index\.rb', r'gen-class-index\.rb',  # ported to Python 2026-06-09
     # retired by the 2026-07-02 comment sweep:
     r'clone_into',                     # #65 clone-class approach -> per-character _u25
+    # retired by #311 (2026-08-23): the wrapper DOES page a turn at two lines and each page is
+    # its own [A], so a press count is a fact about the WRAP, read off the rendered body. The
+    # false claim had been written down THREE times -- #311's own scope, a decisions.md
+    # postscript, and HANDOFF's #298 entry, which survived the correction because nothing
+    # scanned for it. Registering it is what the ADR log calls registry discipline.
+    r'presses? ==\s*authored boxes', r'wrapper never invents a page break',
     r'tileset_stem\s*=',               # _register_chapter_map reads the layout's stamp
     r'BATTLE_FOLLOWUP_THRESHOLD',      # misnomer; real: BATTLE_FOLLOWUP_SPEED_THRESHOLD
     # Marty's "spore covenant" (2026-07-29): a ch05 villain-foil thread we drifted away
