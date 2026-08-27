@@ -70,140 +70,40 @@ WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not re
 
 ## Recently landed — do not redo
 
-Each of these is DONE, merged, and documented where it belongs. Listed only so a fresh session
-does not reopen one; the detail is on the issue and in `docs/decisions.md`.
+DONE and merged. One line each, so a fresh session does not reopen one. **The detail is in the
+named `docs/decisions.md` ADR or on the issue — deliberately not restated here.** Where no ADR is
+named, the issue is the record.
 
-- **Every ChapterEventGroup field is WRITTEN or DECLARED-INHERITED** (#313, PR #325) — the
-  build fails on anything nobody has ruled on. ⚠️ `decisions.md` → "Every ChapterEventGroup
-  field is WRITTEN or DECLARED-INHERITED": the census compares the field's **TARGET**, not the
-  initializer token, because our injectors keep the donor's symbol and rewrite what it points
-  at — a token census calls ~20 fields per chapter inherited when almost none are. It is also
-  meaningful **only on an injected tree** (`injected()` gates it; CI runs `make test` before
-  the build). **Nicolas ruled the six skirmish rosters KEPT** — vanilla has optional
-  skirmishes so we do too, wired with the world map (#29), and deliberately not nulled. The
-  guard found a sixth instance of the failure class on its first run: ch02 alone inherits
-  `miscBasedEvents`, correct by coincidence of design rather than intent.
-- **A chapter's status is DERIVED** (#312, PR #324) — `make chapter CH=chNN`, above. ⚠️ Two
-  things in `decisions.md` → "A chapter's status is DERIVED": a message BLOCK range must be
-  DECLARED and never inferred from the ids a chapter claims (a range computed from its own
-  contents can only report itself as full, which is the one question it exists to answer), and
-  a degraded mode must say *cannot tell* rather than report a wrong number — six of the nine
-  review findings on this were fallbacks that lied. The chapter YAML now has ONE reader,
-  `tools/campaign_chapters.py`, shared with the `docs/CHAPTERS.md` generator.
-- **A scene is readable without a ROM** (#311, PR #323) — `make scene`, and `docs/scenes/ch05.md`
-  as the golden. It renders nothing itself: each ch05 scene is already a pure
-  `chap -> [(msg_id, body)]` builder, so the preview calls the SHIPPING builder and reads its
-  output back. ⚠️ **`decisions.md` → "A scene is readable without a ROM"** carries the correction
-  that came out of it: *presses == authored boxes* was written down twice (in #311's own scope
-  and in a `decisions.md` postscript) and is **false** — a turn pages at two lines and each page
-  is its own `[A]`, so ch05 scene 1 is 19 authored boxes and costs 23. A press count is a fact
-  about the WRAP, readable only off the body. Same ADR has the three reader traps, each of which
-  renders a plausible wrong scene.
+**The #302 epic — playtest cost and chapter tooling. All merged:**
 
-- **The merge gate is bounded** (#302, PR #322) — it was 21 scenarios and 5 builds five chapters
-  into an 18-20 chapter game, and an accumulating gate is ~130 scenarios / ~18 builds by ch18: not
-  a slow gate, an unrun one. The window (spine + last two hosted chapters) is DERIVED from
-  `inject/hosts.py`, so hosting a chapter ages the oldest out; depth moves to that chapter's suite
-  and still runs in `--all`. ⚠️ `decisions.md` → "The gate is the spine plus the last two
-  chapters" records what was deliberately NOT added: one smoke per chapter in the gate, because
-  each drags its own ROM build — which is now the stated trigger for #309 phase 2.
-- **A new scenario no longer kills its running siblings** (#310, PR #321) — `run.sh` opened every
-  run with `pkill -9 -i mgba`, so with four scenarios in flight each new dispatch SIGKILLed the
-  ones already going; the first full gate lost `ch01`, `ch04moose` and `ch04packmath` to it, all
-  reporting `mGBA exited early` as though the ROM were broken. The kill is scoped to the
-  scenario's own `/tmp/playtest-<name>/` now, and `gen_symbols.py` writes its three shared tables
-  through a rename. ⚠️ `decisions.md` → "A blanket `pkill` is a serial-world habit": **the
-  4-scenario measurement that justified the parallel default could not have caught this**, because
-  the first wave of four always survives — measure a fan-out change ABOVE its own concurrency.
-- **A config switch stopped costing a whole build** (#302/#309 phase 1, PR #320) — the two
-  battle-anim injection steps were 26 of the injector's ~35 seconds and no boot flag reaches
-  either, so every one of the twelve `rom_configs` paid them for byte-identical data. They now
-  restore 639 files instead of recomputing them: a config switch is **49.0s → 25.2s**, a
-  same-config rebuild 59.7s → 25.5s. ⚠️ Traps in `decisions.md` → "A build is 50 seconds": the
-  cache key is the argument and the `pre`/`post` digest map is the CHECK on it (a `pre`-only rule
-  looked right and would have hit exactly never — nothing wipes the decomp between builds); and a
-  step wrapped in `_x.run(...)` DROPS OUT of `check_injection_order` unless its parser is told,
-  which has now bitten twice. `NO_INJECT_CACHE=1` turns the cache off.
-- **Headless runs made parallel dispatch pay** (#302/#310, PRs #318 + #319) — the parallel lane is
-  gated on `headless` per SCENARIO (a mixed group parallelises its headless half and runs the headed
-  ones after, alone), and `--jobs` now defaults to `cpus // 2` capped at 4 instead of 1. 3.2x on the
-  re-measurement; the 2026-08-09 "does not pay" note is retired in `decisions.md` and in `matrix.py`.
-  Scenarios also report on COMPLETION now, because dispatch lines stopped being progress once four
-  of them started at once.
-- **Verdict scenarios run HEADLESS** (#302/#308, PRs #316 + #317) — a `kind: verdict` scenario
-  asserts on memory and needs no pixels, so it runs with no window and stops costing a watched
-  run; `record`/`diagnostic` stay headed because their output IS the picture. `headless` is a
-  DECLARED `matrix.yaml` field (`auto` derives it from `kind`), and `tools/build_mgba_headless.sh`
-  builds the binary — nobody ships a macOS mGBA with headless AND Lua. ⚠️ **Nine traps in
-  `decisions.md`** → "A verdict scenario needs no pixels", and three are the kind that bite
-  silently: `emu:saveStateFile()` is broken headless (returns false, writes **397,312 bytes of
-  zeros**, and every call site ignored the return, so a checkpoint builder run headless would have
-  stamped a dead state VALID forever); **a verdict glob on the bare word matched a FAIL** whose
-  reason text contained it, which is how the stamp got written anyway — classification is now one
-  `verdict_passed()` helper, because four copies is why it was wrong in four places at once; and a
-  failed rebuild must not delete a checkpoint it did not write. **Reading the code proved the guard
-  fired; it did not prove what the caller did with the verdict.** Both directions are now proved by
-  running them.
-- **Traps are DECLARED, not inherited** (#302/#306) — `.traps` is a ChapterEventGroup field our
-  injectors filled but never wrote, so ch06 (on `Ch7EventData`) would have shipped vanilla Ch7's
-  two ballistae at its coordinates. ⚠️ Three traps in `decisions.md`: the placeable-type list is
-  what `LoadTrapData` PLACES, not what `bmtrick.h` names (four enum values either do nothing or
-  fall through — `TRAP_LIGHTARROW` hatches a gorgon egg); a file the build PATCHES must be in
-  `PATCHED_DECOMP_FILES` or the previous build's rows survive; and **still owed on #302: the
-  encounter-choice fields** (`playerUnits/enemyUnitsChoice{1,2,3}InEncounter`) are inherited on
-  ch03 and ch05 — six vanilla skirmish rosters each, dormant only while we expose no world map.
-- **All three difficulty modes, declared and proved in-engine** (#303/#304) — every chapter
-  YAML declares its triple, `difficulty.py --mode` grades a named mode on both sides, and the
-  `difficulty` scenario reads the red force off the map. ⚠️ Four traps recorded in
-  `decisions.md`: a raw-pid unit inherits a `CharacterData` GAP and `baseLevel` is the field
-  that decides whether the engine keeps its stat line or throws it away; **Def is a CLIFF on a
-  boss, not a dial** (+1 moved Ravisin 13.4→20.1 rounds, +2 overshot to 40.2); a bar measured
-  against vanilla is a MEASUREMENT, not a constant (Ravisin held "Saar's bar" for months after
-  Saar moved); and **confirm the model reproduces the ROM before tuning content against a model
-  number** — three level redistributions moved clear-load by 0.01, which was the clue.
+| | ADR in `docs/decisions.md` |
+|---|---|
+| #308 verdict scenarios run headless | *A verdict scenario needs no pixels, so it runs HEADLESS* |
+| #309 a config switch is 25s, not 50s | *A build is 50 seconds, and 26 of them were the same battle anims every time* |
+| #310 parallel dispatch + the `pkill` that sabotaged it | *A blanket `pkill` is a serial-world habit, and parallel dispatch turned it into a saboteur* |
+| #311 `make scene` — a scene without a ROM | *A scene is readable without a ROM, and a press count is read off the BODY* |
+| #312 `make chapter` — status is derived | *A chapter's status is DERIVED, and HANDOFF stops carrying it* |
+| #313 the ChapterEventGroup census guard | *Every ChapterEventGroup field is WRITTEN or DECLARED-INHERITED* |
+| #314 a chapter declares its own scenarios | *A scenario is DECLARED by the chapter it tests* |
+| #327 the Lua local-slot ceiling, measured then frozen | *The headroom guard measured one file correctly BY ACCIDENT* + *A CHAPTER is not what was filling harness.lua* |
+| #302 the merge gate is bounded | *The gate is the spine plus the last two chapters; depth lives in the chapter suite* |
 
-- **Structural tooling, because grep kept answering questions it could not** (#300/#301) —
-  `tools/callsites.py` (every call site with arguments BOUND to parameter names, which is what
-  text search cannot do), two `check.py` guards, and a `.clangd` in the PARENT repo that makes
-  the decomp indexable without touching the submodule. ⚠️ **Use `callsites.py` before changing
-  any signature, and especially before changing what a parameter MEANS** — that second kind
-  breaks no caller loudly and shipped three bugs the whole suite passed through.
-- **All three ch05 ending arms filmed** (#299) — `docs/demo/ch05-ending-{no-sahnar,basil-died}.gif`.
-  ⚠️ Two traps recorded in `decisions.md`: a ROM-config guard that compares only which flags are
-  ON cannot tell three arms apart when they differ by a flag's VALUE, and the ending gate's box
-  count is a FLOOR (it had been passing a wrong number for months) — the arm is asserted by
-  message id, not by length.
-- **Dialogue wraps by PIXELS now, not characters** (#298) — three budgets in
-  `tools/fe8_talk_font.py`, each measured on the window it belongs to: 203px talk bubble,
-  192px auto-centered helpbox (narration + the lord-select explainer), 143px battle bubble
-  (every taunt and death quote — `PutTalkBubble` FORCES that one to 20 tiles and ignores the
-  text width). 60 fewer A-presses campaign-wide, no word moved. ⚠️ **A wrap change is gated by
-  rendering every message under both versions and DIFFING them, not by the test suite** — three
-  breakages sailed through all 546 tests and only the diff caught them; `decisions.md` has the
-  method. And a press count is now a fact about the SCRIPT: the wrapper never invents a page
-  break, so presses == authored boxes.
-- **The Talk recruit's no-Lupin arm** (#297) — the last fallback, in `ch14a-eventscript.h`'s
-  shape (a whole message per arm, converging on a shared LABEL, one CUSA). With it, **all four
-  `CHECK_ALIVE` states are RUN, not read**: benched and recruited-then-killed closed by
-  `ch05lupinbenched` / `ch05lupinkilled`. ⚠️ Two traps paid for and recorded in `decisions.md`:
-  **box count is no longer a "which id played" witness** (this scene's two arms are both 21
-  A-presses — use `INSPECT.activeMsg()`, which reads `sActiveMsg` while a box is up), and a
-  harness poke that benches or kills a unit **must set `US_HIDDEN` too**, or the next phase
-  transition writes it back onto the tile grid.
-- **ch05's dialogue, all 17 scenes** (#295) — both endings included, filmed at
-  `docs/demo/ch05-ending.gif`. Four things that stretch settled are ADRs: the endings' BACKDROP
-  channel and the `vanilla_scene.py` bug behind it, why a conditional block is a whole copy rather
-  than a spliced beat, `CHECK_ALIVE` answering for ANY faction, and an ENCOUNTER not being a RECRUIT.
-- **ch05's enemy reskins** (#296) — all four line classes on skeleton map sprites and skeleton
-  battle anims, filmed. Board:
-  `https://claude.ai/code/artifact/6a05e1ff-8938-49ed-8927-631d0e4dc6bd`.
-- **Ravisin, complete** (#259, #261, #263, #286, #290, #291, #292) — portrait, stats, warning,
-  death quote, battle anim, hand-edited anim palette, map sprite. ⚠️ Two traps already paid for
-  and recorded in `decisions.md`: her palette is a BY-EYE call (do not reinstate the author's
-  index-aligned enemy palette — it turns her hair teal), and her map sprite is HOODLESS on purpose.
-- **ch05's Arena** (#265/#268), **the village-raid race and save-all payout** (#254), **the
-  opening's seven scenes** (#25), **per-chapter battle grounds** (#289), **the ch01/ch07 winter
-  CGs** (#256).
+**ch05 is complete** (#25 and children): dialogue all 17 scenes (#295), enemy reskins (#296), the
+no-Lupin Talk arm (#297), all three ending arms filmed (#299), the Arena (#265/#268), the
+village-raid race and save-all payout (#254), Ravisin end-to-end (#259, #261, #263, #286, #290-292),
+per-chapter battle grounds (#289), the ch01/ch07 winter CGs (#256). Reskin board:
+`https://claude.ai/code/artifact/6a05e1ff-8938-49ed-8927-631d0e4dc6bd`
+
+**Also landed:** #298 dialogue wraps by PIXELS (ADR *We wrapped on-map talk at 29 CHARACTERS; the
+engine measures PIXELS*) · #300/#301 `tools/callsites.py` — **use it before changing any signature,
+and especially before changing what a parameter MEANS** · #303/#304 all three difficulty modes
+(ADR *Vanilla ships three difficulty modes, so we ship three*) · #306 traps are declared, not
+inherited · #329 a donor is derived, not labelled (ADR *A base-map LABEL is prose — the donor is
+DERIVED*) · #330 the drift lint now scans `.github/` and `.claude/skills/`.
+
+⚠️ **Not landed, and it was buried in this list as though it were:** the **encounter-choice fields**
+(`playerUnits/enemyUnitsChoice{1,2,3}InEncounter`) are still inherited on ch03 and ch05 — six vanilla
+skirmish rosters each, dormant only while we expose no world map. Owed on #302.
 
 ## Current state
 
