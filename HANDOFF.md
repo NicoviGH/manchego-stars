@@ -24,12 +24,11 @@ on two points** (Messie's pronoun and the sprite-size ceiling); both are now wri
 held the board's source template was cleared by a session restart, so updating it means re-reading
 250KB of embedded images — not worth the context. Rebuild it from the YAML when ch06 is next picked up.
 
-**Uncommitted: `chapters/ch06-the-maer-monster.yaml`.** Records two things settled today — Messie is
-**he/him** (Nicolas, 2026-08-26; the DM notes and the book both say "it" and the seed said "she"),
-and the map-sprite ceiling finding below. Also rewrites the Talk description to name the ch05 payoff:
-the book (p.31) names **Ravisin** as the druid who awakened him, and he keeps attacking only because
-he fears she will take the gift back — she is already dead, and an awaken spell is permanent. That is
-the argument Marty makes, and it is the spine of the chapter. Land it on a branch.
+**The ch06 slice has a branch now: `feat/26-ch06-the-maer-monster`, PR #331** (unreviewed). It
+carries the design pass's settled content — Messie is **he/him**, and the Talk beat now names the
+ch05 payoff: the book (p.31) names **Ravisin** as the druid who awakened him, and he keeps attacking
+only because he fears she will take the gift back. She is dead; the awakening is permanent. That is
+Marty's argument and the spine of the chapter. Everything further on ch06 goes on that branch.
 
 ## Next task
 
@@ -62,45 +61,12 @@ exactly **397,312 bytes of zeros** — that size is the tell.
 **The ROM cache is WARM** for `canonical`, `testch`, `ch03boot`, `ch04boot`, `ch05boot`,
 `ch05lupinboot`, `ch05mooseboot` and the three ch05 ending arms (2026-08-24). Untouched since.
 
-## Map sprites — what this session established
+## Map sprites — read before any art session
 
-Written here because it is live orientation for the next art session; the durable half is in
-`ch06-the-maer-monster.yaml` and `docs/decisions.md`.
-
-- **32x32 is a HARD ENGINE CEILING.** `UNIT_ICON_SIZE_*` has exactly three values (16x16, 16x32,
-  32x32) and `bmudisp.c` switches on them in five places. Bigger = an engine change plus SMS VRAM
-  we do not have spare. Our own Braulo, Meesmickle, Wolfram, Baxby, Lupin and the moose ALREADY sit
-  in that top tier, alongside Manakete 2 and the Demon King — there is no rung above them.
-- **Size reads as FILL, not as cell size.** The Demon King touches all four edges and reads huge;
-  Baxby is the same 32x32 and reads tiny because he sits centred with air around him. The moose
-  earns its size with antlers. This is the whole trick, and it is the spec for Messie.
-- **Geometry is DERIVED from the donor, never from sheet pixels.** A 16x96 sheet is ambiguous —
-  6x 16x16 vs 3x 16x32 — and only the wait table says which (`map_sprite_tool.donor_sms_geometry`,
-  whose docstring says so outright). I inferred from pixel dimensions and got Draco Zombie, Cyclops
-  and Basil wrong in one pass.
-- **A map sprite carries NO palette of its own** — it picks a resident faction bank, so the palette
-  stored in a decomp PNG is a meaningless leftover (the Demon King's is player-blue). Render vanilla
-  sprites through `graphics/unit_icon/palette/unit_icon_pal_enemy.agbpal`; ours are authored directly
-  in `map_sprites/cast_palette.png`.
-- ⚠️ **`footprint:` in a unit YAML is NOT the size class.** It is an art-direction note meaning how
-  big the creature READS ("PC-sized", "cat-sized"), explicitly contrasted with the frame in four
-  files: *"sprite frame is 32x32 but the unit reads party-scale"*. I mistook it for drift and nearly
-  opened a PR to delete working documentation. It does carry two meanings across files (Basil and
-  Lupin use it as the engine size class) — worth one disambiguating line someday, nothing more.
-
-**The gap PixelLab would actually close.** Our units split cleanly:
-- **WALK (15)** — basil, fire-imp, hlin-trollbane, lizard-wildling, lizardzerker, lupin,
-  lycanroc-pack, ravisin, sahnar, skel-{axe,bow,lance,sword}, trex, white-moose. Every one is a
-  VENDORED community sprite that arrived as a complete sheet, 9-15 unique frames.
-- **GLIDE (9)** — baxby, braulo, marty, meesmickle, pinky, prof-rbg, rootis, sclorbo, wolfram. The
-  original PCs, whose art we generated ourselves. `synth_mu_sheet` tiles ONE idle pose into all 15
-  MU blocks, so they slide across the map without moving their legs.
-
-So the gap is not "we cannot do walk cycles" — it is that **we can only get one by vendoring someone
-else's sprite.** If PixelLab can produce a usable walk for art that is ours, it pays for Messie AND
-retro-fits nine PCs. The MU layout is documented on the moose's sheet in ch04's YAML:
-**`side[0-4] / down[5-9] / up[10-14]`**, 32x480, fourth facing by H-flip. Success test is the one
-already used this session: generate, then diff the frames for uniqueness.
+All of it is in `docs/decisions.md` → **"A map sprite is 32x32 or it is nothing"** (lands with PR #331): the hard engine
+ceiling, why size reads as FILL, why geometry is derived from the donor and never from sheet pixels,
+why a decomp sheet's palette is a meaningless leftover, what `footprint:` actually means, and the
+WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
 
