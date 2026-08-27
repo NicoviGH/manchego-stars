@@ -90,6 +90,21 @@ enemy_units:
     ai_pattern: boss_roam
     recruitable_via_talk: marty  # not a playable recruit — becomes a Bremen NPC
     death_quote: "*a mournful, fading cry beneath the ice*"
+    pronouns: he/him            # SETTLED 2026-08-26 (Nicolas). The DM notes and the book
+                                # both say "it"; an earlier draft of this file said "she".
+                                # He/him holds through ch07's Speaker installation.
+    art_note: >
+      32x32 is the ENGINE CEILING for a map sprite -- UNIT_ICON_SIZE_* has exactly three
+      values (16x16, 16x32, 32x32) and bmudisp.c switches on them in five places, so
+      anything larger is an engine change plus SMS VRAM we do not have spare. Braulo,
+      Meesmickle, Wolfram, the moose, Manakete 2 and the Demon King already sit in that
+      top tier: there is no rung above them, and size therefore has to come from FILLING
+      the cell corner to corner (what the Demon King does and Baxby does not).
+      He never moves and never joins, so he needs NO 32x480 walk sheet -- only the
+      3-frame idle. Design intent (2026-08-26): give the unit a breaching head-and-neck
+      and paint the REST of him into the tilemap, which has no size limit and costs no
+      engine work. "A large mass glides through the dark water below you" is the book's
+      own line (p.30).
   - id: harrier-fish
     name: "Knucklehead Swarm"
     count: 8                     # boss-chapter pacing bump (6 -> 9 enemies; decisions 2026-06-06)
@@ -114,9 +129,12 @@ events:
     type: command_unlock
     ea_file: events/ch06-messie-talk.ea
     description: >
-      The Talk command appears. If used: marty_messie_talk — Messie's story, her
-      fear, the peaceful resolution (the campaign-defining beat). Suggest she run
-      for Speaker of Bremen.
+      The Talk command appears. If used: marty_messie_talk — Messie's story, his
+      fear, the peaceful resolution (the campaign-defining beat). Suggest he run
+      for Speaker of Bremen. The ARGUMENT is the ch05 payoff: the book names Ravisin
+      (p.31) as the druid who awakened him, and he keeps attacking only because he
+      fears she will take the gift back. She is already dead -- the party killed her
+      at the tomb -- and an awaken spell is permanent.
   - trigger: chapter_end_talk
     type: cutscene
     ea_file: events/ch06-ending-peace.ea
