@@ -5703,6 +5703,65 @@ ramp entries into a single colour destroys form either way. Ship the intent with
 (`docs/demo/ch05-ravisin-palette.png`). Judge it offline first — this whole loop cost seconds and no
 ROM build, the same reason `rom_bg_preview.py` exists.
 
+### ch06 departs from its donor's terrain in 21 declared cells, and replaces forest composition wholesale (2026-08-28, #26)
+
+ch06 paints FE8 Ch13 (Ephraim) as a frozen lake. The departures from the donor's terrain are
+deliberate, and all of them are DECLARED rather than tolerated.
+
+**21 cells diverge, listed in the chapter YAML under `terrain_divergence`**, and
+`validate_terrain_matches_vanilla` rejects any drift not on that list. The breakdown:
+
+| cells | change | why |
+|---|---|---|
+| 16 | `TILE_2E` -> `FOREST` | the two village footprints, repainted as ice outcrops that are WALKABLE underneath (cliff art, forest terrain) |
+| 2 | `VILLAGE_REGULAR` -> `FOREST` | the door tiles inside those footprints; there is no village terrain left on the map |
+| 1 | `SEA` -> `CLIFF` | seals the dead south-west corner |
+| 1 | `SNAG` -> `PLAINS` | the map-change pair, after the crossing opens |
+| 1 | `RIVER` -> `BRIDGE_SNAG` | the other half of that pair |
+
+The allowlist is per-coordinate on purpose. A blanket per-chapter opt-out would have re-opened
+the ch05 fence->wall accident, where eleven cells changed role while looking right and would
+have walled out our only flier.
+
+**The south-west beach is NOT diverged, and that was the fix.** Vanilla has walkable SAND along
+that coast; painting it as cliff had quietly closed the left-hand approach. Restoring the SAND
+terrain byte (under the cliff art) re-opened it and brought the west boat from turn 10 to turn
+6, matching the east -- the symmetric two-route split the donor's own layout creates. It cost
+two entries off the allowlist rather than adding any.
+
+**Forest composition is replaced, not retiled.** A frozen lake has no trees, so all 23 FOREST
+cells become snow drifts drawn with snowy-bern's rough/rock art. The winter-retile invariant
+(#193) preserves the vanilla artists' forest SEQUENCES; that guard assumes we are translating a
+forest, and here the concept is gone from the chapter. This is the "deliberate
+forest-composition departure is a new map-design decision" case that invariant names, taken
+explicitly: `validate_vanilla_retile` now exempts exactly the declared cells, so a chapter that
+merely retiles a forest is still held to the sequence.
+
+**The drifts keep FOREST terrain, and that is load-bearing.** The snow piles are painted with
+MOUNTAIN art but stamped `TERRAIN_FOREST` (+20 avoid, +1 def, cost 2) rather than left as
+MOUNTAIN (+30 avoid, but IMPASSABLE to armour and horse). Measured on the painted map: as
+Mountain, cavalry and Braulo reach 194 of 265 passable cells -- the drifts wedge into the spiral
+and cut 71 cells off; as Forest, both reach all of them. The terrain byte is what keeps the map
+playable for mounted and armoured units, not merely what grants cover.
+
+**The outcrops are opened because vanilla's hostages are exposed.** Two of vanilla Ch6's three
+civilians can be attacked from 4/4 sides on foot; only one sits in a 2/4 pocket. So boats that
+can be reached and killed from every side is parity, not cruelty -- and it is what gives the
+`CHECK_ALIVE` bonus its stakes.
+
+**All of it lands in `snowy-bern-ice` alone.** That variant is snowy-bern with **4 palette
+entries** changed and **21 metatiles** added in slots snowy-bern declares unused (19 stamped
+FOREST, 2 stamped SAND); its `.4bpp` is byte-identical, so the copies cost no new tile ids.
+`snowy-bern` itself and every map already shipped on it are untouched -- ch04 rides it, and
+25.6% of ch04's pixels use the four recoloured entries, so an in-place edit would have restyled
+a finished chapter. `tilesets_are_compatible_variants` derives that relation from the files
+(identical `.4bpp`; `.bin` differing only at slots the BASE declares unused) so the learned
+reskin, the protected-terrain targets and a seed `.mar` all carry across -- and an edit that
+ever touches a live slot fails loudly instead of quietly
+(`test_map_tileset.TestVariantCompatibility`).
+_Decided: 2026-08-28 (Nicolas: "it's an artistic choice I made for this chapter, so don't do
+anything to impact the core tileset or past maps")._
+
 ### A LOCK has a DATE, and facts settled after it still apply (2026-08-19, #25, #293)
 
 ch05's scene 17 called Basil **"he"** twice. Her text was locked 2026-07-30; her `gender: female`
@@ -7332,7 +7391,86 @@ committed in the same PR. The first cut of this ADR published a hand-transcribed
 tool behind it — code review caught that the numbers did not reproduce, that ch05's tie was
 suppressed, and that our own layouts were in the candidate pool._
 
+
+### A map sprite is 32x32 or it is nothing (2026-08-26, #26)
+
+Established while sizing Messie for ch06, and every line of it applies to the next custom unit too.
+
+- **32x32 is a HARD ENGINE CEILING.** `UNIT_ICON_SIZE_*` has exactly three values (16x16, 16x32,
+  32x32) and `bmudisp.c` switches on them in five places. Bigger means new enum cases plus SMS VRAM
+  we do not have spare — the same VRAM that already bounds the TESTCH bench. Braulo, Meesmickle,
+  Wolfram, Baxby, Lupin and the white moose ALREADY sit in that top tier next to Manakete 2 and the
+  Demon King. **There is no rung above them**, so "make it bigger" is never the answer.
+- **Size reads as FILL, not as cell size.** The Demon King touches all four edges and reads huge.
+  Baxby is the same 32x32 and reads tiny, because he sits centred with air around him. The moose
+  earns its size with antlers — pure silhouette width. When a unit must read BIG, the spec is
+  corner-to-corner, not a larger class.
+- **Geometry is DERIVED from the donor, never from sheet pixels.** A 16x96 sheet is ambiguous —
+  6x 16x16 vs 3x 16x32 — and only the wait table resolves it, which is what
+  `map_sprite_tool.donor_sms_geometry` is for and what its docstring says outright. Inferring from
+  pixel dimensions got Draco Zombie, Cyclops and Basil wrong in a single pass.
+- **A map sprite carries NO palette of its own.** It picks a resident faction bank, so the palette
+  stored in a decomp PNG is a leftover from whoever ripped it — the Demon King's is player-blue,
+  and rendering him with it makes the final boss look like a frost golem. Render vanilla sprites
+  through `graphics/unit_icon/palette/unit_icon_pal_enemy.agbpal`; ours are authored directly in
+  `map_sprites/cast_palette.png` (a cast sheet's embedded palette IS that file, byte for byte).
+- ⚠️ **`footprint:` in a unit YAML is NOT the size class.** It is an art-direction note for how big
+  the creature READS in the world — "PC-sized", "cat-sized" — written explicitly AGAINST the frame
+  in four files: *"sprite frame is 32x32 but the unit reads party-scale"*. It disagrees with the
+  donor on eight of twelve units BY DESIGN. A session mistook that for drift and came within a
+  review of deleting all twelve as stale. It does carry two meanings across files (Basil and Lupin
+  use it as the engine size class) — worth one disambiguating line, never a delete.
+
+**WALK vs GLIDE, and what it means for buying art tooling.** Our units split cleanly, and the line
+is not the one you would guess:
+
+- **WALK (15)** — basil, fire-imp, hlin-trollbane, lizard-wildling, lizardzerker, lupin,
+  lycanroc-pack, ravisin, sahnar, skel-{axe,bow,lance,sword}, trex, white-moose. Every one is a
+  **vendored community sprite** that arrived as a complete sheet, 9-15 unique frames of 15.
+- **GLIDE (9)** — baxby, braulo, marty, meesmickle, pinky, prof-rbg, rootis, sclorbo, wolfram. The
+  **original PCs, whose art we generated ourselves.** With no committed `_mu.png`, `synth_mu_sheet`
+  tiles ONE idle pose into all 15 MU blocks, so they slide across the map without moving their legs.
+
+So the gap is not "we cannot do walk cycles" — it is that **we can only get one by vendoring someone
+else's sprite.** Any art tool is worth paying for exactly insofar as it closes THAT. The target is
+documented on the moose's sheet in ch04's YAML: `side[0-4] / down[5-9] / up[10-14]`, 32x480, fourth
+facing by H-flip. The success test is cheap and does not need a ROM: generate, then diff the frames
+for uniqueness — a glide is 1 unique frame, a walk is 9+.
+
+_Established: 2026-08-26, sizing Messie. Moved here from HANDOFF the next day: every bullet was
+still true three sessions later, which is the test for belonging in this file rather than that one._
+
 ---
+
+### The DONOR and the BAR are different chapters, and ch06 makes that explicit (2026-08-28, #26)
+
+ch06 paints **Ch13EphraimMap** and measures against **FE8 Ch6**. Approved by Nicolas.
+
+- **Why that layout.** Three candidates sit inside the learned-reskin family (all `TileConfiguration1`,
+  so all inherit the 50 hand-taught winter mappings). `Ch6Map` 29x20 has **zero** water. `MelkaenCoastMap`
+  20x30 has 128 `TERRAIN_SEA` along two edges -- a coastline. `Ch13EphraimMap` 22x22 has **137
+  `TERRAIN_RIVER` in concentric channels**: the only one whose water is a *route* rather than a border,
+  which is the whole chapter (navigating ice floes inward to the monster).
+- **Why the roster does not come with it.** Ch13Eph fields 58 enemies at avg L11.5 (20 Cavaliers,
+  10 Pegasus Knights); Ch6 fields 24 at avg L6.2. Levels live in the roster we author, not in the tiles.
+  ch01 already ships this split -- Hamill Canyon geometry, `parity_reference: "FE8 Ch1"`.
+- ⚠️ **The seed had it wrong twice over**: it claimed `FE8 Ch5` for BOTH fields, which is ch05's own bar.
+- **Movement is what makes the maze real** (`src/data_terrains.s`): `TERRAIN_RIVER` is impassable to foot,
+  armour AND horse; cost 2 to Pirate, 1 to flier. So on our roster the maze elevates **Braulo** (Pirate)
+  and **Pinky** (Pegasus) -- not the cavalry Ch13Eph was authored around. Copying its class bones would
+  import a solution to *Ephraim's* roster problem.
+- **`TERRAIN_GLACIER` shapes nothing** -- cost 1 for every class including armour. Permanent ridges are
+  `TERRAIN_PEAK`; the destructible floes are `TERRAIN_SNAG` (impassable to all, fliers included). The seed
+  said glacier; corrected in the same commit.
+- **Tileset is `snowy-fields`** -- vendored, previously used by nothing, and its 48 RIVER metatiles are
+  drawn as cracked ice channels (plus LAKE 18 / SEA 26 / SNAG 2). The seed named `water-boats`, which was
+  never vendored at all.
+- **Mode is a level shift, not a different force.** `chapter_settings` carries `easyMalus 4 / normalMalus 2
+  / difficultBonus 3` for both chapters, and `difficulty.vanilla_chapter_shifts` reads it. Vanilla Ch6's
+  own hard-mode delta is **+3 Cavaliers on turn 4** and nothing else -- a model worth copying for ch06's
+  `difficulty:` block.
+
+_Board: `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`. Checklist: issue #26._
 
 ## Open Questions (not yet decided)
 

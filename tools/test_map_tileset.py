@@ -889,5 +889,125 @@ class TestMapEditorOutputs(unittest.TestCase):
                 d, 'ch4-snowy-fields-start.png')))
 
 
+class TestVariantCompatibility(unittest.TestCase):
+    """A chapter-local tileset variant may ADD into unused slots -- never touch a live one.
+
+    That is the rule protecting every map that already shipped on the base tileset: ch04
+    rides snowy-bern, so a ch06 edit that reached a slot ch04 draws would silently
+    restyle or re-terrain a finished chapter.
+    """
+
+    MAPS = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+
+    def _variant(self, mutate):
+        """Copy snowy-bern into a temp dir under a variant name, mutate it, and test."""
+        base = os.path.join(self.MAPS, 'tilesets', 'snowy-bern')
+        with tempfile.TemporaryDirectory() as tmp:
+            tilesets = os.path.join(tmp, 'tilesets')
+            os.makedirs(os.path.join(tilesets, 'snowy-bern'))
+            os.makedirs(os.path.join(tilesets, 'variant'))
+            for ext in ('4bpp', 'bin', 'gbapal'):
+                blob = open(os.path.join(base, 'snowy-bern.%s' % ext), 'rb').read()
+                open(os.path.join(tilesets, 'snowy-bern',
+                                  'snowy-bern.%s' % ext), 'wb').write(blob)
+                if ext == 'bin':
+                    blob = mutate(bytearray(blob))
+                open(os.path.join(tilesets, 'variant',
+                                  'variant.%s' % ext), 'wb').write(bytes(blob))
+            return mt.tilesets_are_compatible_variants(tmp, 'snowy-bern', 'variant')
+
+    def _first_slot(self, terrain_is_zero):
+        ts = mt._tileset_from_dir(os.path.join(self.MAPS, 'tilesets', 'snowy-bern'))
+        for m in range(1, 1024):
+            if (ts.terrain(m) == 0) == terrain_is_zero:
+                return m
+        self.fail('no such slot')
+
+    def test_adding_into_an_unused_slot_is_compatible(self):
+        free = self._first_slot(True)
+        live = self._first_slot(False)
+
+        def mutate(cfg):
+            cfg[free * 8:free * 8 + 8] = cfg[live * 8:live * 8 + 8]
+            cfg[8192 + free] = 0x0C
+            return cfg
+
+        self.assertTrue(self._variant(mutate))
+
+    def test_reterraining_a_live_slot_is_rejected(self):
+        live = self._first_slot(False)
+
+        def mutate(cfg):
+            cfg[8192 + live] = 0x0C
+            return cfg
+
+        self.assertFalse(self._variant(mutate))
+
+    def test_repointing_a_live_slots_art_is_rejected(self):
+        live = self._first_slot(False)
+
+        def mutate(cfg):
+            cfg[live * 8] ^= 0x01
+            return cfg
+
+        self.assertFalse(self._variant(mutate))
+
+    def test_shipped_ice_variant_obeys_the_rule(self):
+        self.assertTrue(mt.tilesets_are_compatible_variants(
+            self.MAPS, 'snowy-bern', 'snowy-bern-ice'))
+
+    def test_a_different_tileset_is_not_a_variant(self):
+        self.assertFalse(mt.tilesets_are_compatible_variants(
+            self.MAPS, 'snowy-bern', 'snowy-fields'))
+
+
+class TestDeclaredDivergenceLookup(unittest.TestCase):
+    """The escape hatch must actually find its chapter.
+
+    It shipped dead: it compared the chapter `id` (ch06-the-maer-monster) against the map
+    stem (ch06-maer-monster) and prefix-matched `map.file`, which is always
+    'maps/<stem>.<ext>' and so never starts with the stem. Both tests failed for every
+    chapter, so the guard silently saw "nothing declared" and rejected every deliberate
+    cell. A green suite proved nothing because nothing exercised the lookup.
+    """
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        import import_map_layout
+        self.iml = import_map_layout
+
+    def test_ch06_resolves_by_map_stem(self):
+        rows = self.iml._declared_divergence('ch06-maer-monster')
+        self.assertTrue(rows, 'ch06 declares divergences; the lookup returned none')
+        self.assertIn((17, 13), rows)
+
+    def test_unknown_stem_declares_nothing(self):
+        self.assertEqual(self.iml._declared_divergence('ch99-nope'), {})
+
+    def test_terrain_byte_accepts_every_spelling(self):
+        forest = self.iml.TERRAIN_BY_NAME['TERRAIN_FOREST']
+        for spelling in ('0x0C', '0x0c', 12, 'TERRAIN_FOREST'):
+            self.assertEqual(self.iml._terrain_byte(spelling), forest)
+
+    def test_every_declared_from_matches_vanilla(self):
+        """A `from:` that lies makes the whole allowlist untrustworthy."""
+        import yaml
+        chapter = os.path.join(
+            REPO, 'campaigns/rime-of-the-frostmaiden/chapters/ch06-the-maer-monster.yaml')
+        with open(chapter, encoding='utf-8') as handle:
+            data = yaml.safe_load(handle)
+        _, _, cells, terrain = mt.vanilla_layout_data(
+            os.path.join(REPO, 'fireemblem8u'), 'Ch13EphraimMap')
+        width = data['map']['size'].split('\u00d7')[0]
+        width = int(width) if width.isdigit() else 22
+        names = {v: k for k, v in self.iml.TERRAIN_BY_NAME.items()}
+        for row in data['terrain_divergence']:
+            x, y = row['tile']
+            got = names[terrain[cells[y * width + x]]]
+            self.assertEqual(got, 'TERRAIN_' + row['from'],
+                             'cell (%d, %d) declares from: %s but vanilla is %s'
+                             % (x, y, row['from'], got))
+
+
 if __name__ == '__main__':
     unittest.main()

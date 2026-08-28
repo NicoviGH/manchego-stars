@@ -18,7 +18,8 @@ DEC=os.path.join(ROOT,'fireemblem8u')
 sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import (_tileset_from_dir, preserved_terrain_targets,
                               render_grid, Tileset, vanilla_layout_data,
-                              vanilla_layout_tileset_assets)
+                              vanilla_layout_tileset_assets,
+                              tilesets_are_compatible_variants)
 from PIL import Image
 
 KNOWN_FLAGS={'--tileset','--blank','--fill','--ref','--vanilla'}
@@ -117,7 +118,8 @@ def _render_vanilla_layout(dec, layout):
     return img,w,h
 
 
-win=_tileset_from_dir(os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps/tilesets',TILESET))
+MAPS_ROOT=os.path.join(ROOT,'campaigns/rime-of-the-frostmaiden/maps')
+win=_tileset_from_dir(os.path.join(MAPS_ROOT,'tilesets',TILESET))
 RETILE_MODE='custom' if BLANK else 'vanilla'
 EXPORT_META={'retile_mode':RETILE_MODE}
 if not BLANK:
@@ -172,15 +174,23 @@ else:
     _learned_json=json.load(open(_learned_path)) if os.path.exists(_learned_path) else {}
     _src_cfg=vanilla_layout_tileset_assets(DEC,LAYOUT)[2]
     _src_ok=_learned_json.get('source_tileset','TileConfiguration1')==_src_cfg
-    _learned=(_learned_json.get('map',{})
-              if _learned_json.get('tileset','snowy-bern')==TILESET and _src_ok else {})
+    # The learned targets are metatile INDICES, so they carry to any tileset that is the
+    # base plus edits confined to unused slots -- snowy-bern-ice (a palette change plus
+    # ch06's snow piles in empty slots) inherits Nicolas's conventions instead of
+    # silently falling back to the smeared auto-reskin.
+    _learned_ts=_learned_json.get('tileset','snowy-bern')
+    _ts_ok=tilesets_are_compatible_variants(MAPS_ROOT,_learned_ts,TILESET)
+    _learned=(_learned_json.get('map',{}) if _ts_ok and _src_ok else {})
+    if TILESET!=_learned_ts and _ts_ok:
+        print('NOTE: %s is a compatible variant of %s; the learned reskin applies.'
+              %(TILESET,_learned_ts))
     if not _src_ok:
         print('NOTE: %s rides %s; the learned reskin was authored against %s -- not applied.'
               % (LAYOUT,_src_cfg,_learned_json.get('source_tileset','TileConfiguration1')))
     for i in range(W*H):
         w=_learned.get(str(cells[i]))
         if w is not None: resolved[i]=w
-    if TILESET=='snowy-bern':
+    if _ts_ok:
         try:
             PROTECTED_TARGETS=preserved_terrain_targets(
                 cells,source_terrain,win,_learned_json,W)
@@ -210,7 +220,7 @@ if SEED_MAR:
     if (sj['width'],sj['height'])!=(W,H):
         sys.exit('ERROR: seed .mar is %dx%d but layout %s is %dx%d'
                  %(sj['width'],sj['height'],LAYOUT,W,H))
-    if sj.get('tileset','snowy-bern')!=TILESET:
+    if not tilesets_are_compatible_variants(MAPS_ROOT,sj.get('tileset','snowy-bern'),TILESET):
         sys.exit('ERROR: seed .mar was painted on tileset %r but this canvas is %r '
                  '-- its metatile indices would reinterpret as the wrong art/terrain'
                  %(sj.get('tileset','snowy-bern'),TILESET))

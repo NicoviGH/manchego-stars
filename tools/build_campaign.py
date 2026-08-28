@@ -6647,7 +6647,12 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
 # resolves it; the _register_tileset call that actually writes the asset entries lands with
 # inject_ch05, the same way 'Cave' rides inject_ch03.
 TILESET_STEMS = {'snowy-bern': 'Snow', 'cave-interior': 'Cave',
-                 'port-or-town-winter': 'PortTown'}
+                 'port-or-town-winter': 'PortTown',
+                 # ch06's chapter-local variant: snowy-bern's geometry with a colder palette
+                 # and ch06's own metatiles in slots snowy-bern leaves unused. It needs its OWN
+                 # asset-table entry rather than riding 'Snow' -- same tiles, different palette,
+                 # so sharing Snow's slot would draw ch06 in ch04's colours (and vice versa).
+                 'snowy-bern-ice': 'SnowIce'}
 
 
 def _register_chapter_map(maps_dir, layout, comment):
@@ -9829,7 +9834,10 @@ CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCL
                  'booster-def': 'ITEM_BOOSTER_DEF', 'booster-skl': 'ITEM_BOOSTER_SKL',
                  'armorslayer': 'ITEM_SWORD_ARMORSLAYER', 'torch': 'ITEM_TORCH',
                  # the save-all-four bonus -- vanilla Ch5's own, handed over at the ending
-                 'guiding-ring': 'ITEM_GUIDINGRING'}
+                 'guiding-ring': 'ITEM_GUIDINGRING',
+                 # ch06's boats -- vanilla Ch6's own pair: the village gift, and the
+                 # save-them-all prize its ENDING scene grants on CHECK_ALIVE
+                 'antitoxin': 'ITEM_ANTITOXIN', 'orions-bolt': 'ITEM_ORIONSBOLT'}
 
 
 # ── Message-id ownership across hosted chapters (#198 review, issue #24) ────────
