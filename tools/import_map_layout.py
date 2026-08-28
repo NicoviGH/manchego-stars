@@ -19,7 +19,7 @@ from map_tileset_tool import (_tileset_from_dir, compile_layout,
                               vanilla_layout_data)
 
 
-def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root):
+def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root, declared=None):
     """A retile inherits vanilla's terrain, whatever tileset it is painted on.
 
     Runs for EVERY tileset, unlike validate_vanilla_retile below, which only ever covered
@@ -31,6 +31,13 @@ def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root):
 
     The fix for a violation is to author the TERRAIN BYTE of the offending metatile in our
     vendored copy of the tileset -- never to swap the painted tile.
+
+    `declared` is the ONE escape hatch: a chapter that deliberately departs from vanilla's
+    terrain (ch06 seals a corner with cliff, and turns a snag into a lowered bridge) lists
+    those cells in its YAML under `terrain_divergence`. It is a cell-by-cell allowlist on
+    purpose -- naming the exact coordinate and the exact before/after keeps the guard live
+    everywhere else, so the ch05 fence->wall class of accident still fails loudly. An
+    undeclared drift is a bug; a declared one is a decision with an ADR behind it.
     """
     layout = export_data.get('vanilla_layout')
     if not layout:
@@ -45,6 +52,13 @@ def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root):
     for cell, (painted, vanilla_metatile) in enumerate(zip(grid, source_cells)):
         want = source_terrain[vanilla_metatile]
         got = tileset.terrain(painted)
+        if (cell % width, cell // width) in (declared or {}):
+            expected = (declared or {})[(cell % width, cell // width)]
+            if got == expected:
+                continue
+            errors.append('(%d, %d) declares a divergence to 0x%02x but is painted 0x%02x'
+                          % (cell % width, cell // width, expected, got))
+            continue
         if got != want:
             errors.append('(%d, %d) is terrain 0x%02x; vanilla %s has 0x%02x '
                           '(metatile %d)' % (cell % width, cell // width, got,
@@ -103,6 +117,30 @@ def validate_vanilla_retile(export_data, decomp_root, maps_root):
         raise ValueError('; '.join(errors))
 
 
+def _declared_divergence(stem):
+    """Read a chapter's `terrain_divergence:` allowlist -> {(x, y): terrain_byte}.
+
+    Lives in the chapter YAML because that is where the campaign's facts live and where the
+    ADR can point; absent block or absent file means "no divergence declared", which is the
+    right default for every chapter that simply inherits vanilla terrain.
+    """
+    path = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/chapters')
+    if not os.path.isdir(path):
+        return {}
+    for name in sorted(os.listdir(path)):
+        if not name.endswith(('.yaml', '.yml')) or not name.startswith(stem[:4]):
+            continue
+        import yaml
+        with open(os.path.join(path, name), encoding='utf-8') as handle:
+            data = yaml.safe_load(handle) or {}
+        if (data.get('map') or {}).get('file', '').startswith(stem) or data.get('id') == stem:
+            out = {}
+            for row in data.get('terrain_divergence') or []:
+                out[(row['tile'][0], row['tile'][1])] = int(row['to'], 0)
+            return out
+    return {}
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if not argv:
@@ -129,7 +167,8 @@ def main(argv=None):
     decomp = os.path.join(ROOT, 'fireemblem8u')
     maps_root = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/maps')
     try:
-        validate_terrain_matches_vanilla(export_data, decomp, maps_root)
+        validate_terrain_matches_vanilla(export_data, decomp, maps_root,
+                                         declared=_declared_divergence(stem))
         validate_vanilla_retile(export_data, decomp, maps_root)
     except ValueError as error:
         sys.exit('ERROR: %s' % error)
