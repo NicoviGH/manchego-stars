@@ -13,14 +13,17 @@ restated. Check that a thing has a home before writing it here.
 ## In flight
 
 **ch06 (#26) — D1 is SETTLED; the map has not been painted.** Refreshed 2026-08-28.
-`main` is at #332. **Two open PRs**, neither reviewed:
+`main` is at #332. **One open PR:**
 
 - **#331 `feat/26-ch06-the-maer-monster`** — Messie is he/him, the Ravisin argument, the 32x32 ADR,
   and now **the donor decision**: paint **Ch13EphraimMap**, measure against **FE8 Ch6**. Nicolas
   approved it 2026-08-28. Rationale is the ADR *"The DONOR and the BAR are different chapters"*.
-- **#333 `feat/fe8-wiki-miner`** — a generated FE8 chapter guide (all 28 vanilla chapters mined
-  from fireemblemwiki.org: objective, deploy cap, per-difficulty enemy tables, donor-selection
-  index). The doc and its tool land WITH that PR; neither is on `main` yet.
+**#333 MERGED** — `docs/fe8-guide.md` is on `main`: all 28 vanilla chapters from
+fireemblemwiki.org, with a **donor-selection index** (objective / enemy count / shape / pressure).
+That is the *how is it won* half of parity, which the decomp cannot answer. Regenerate with
+`tools/fe8_guide_mine.py`; three chapters are digested (1, 6, 7) and the rest carry a pointer to
+`--strategy <slug>`. ⚠️ Tier labels are NOT a fixed set (plain `Normal`, combined `Easy/Normal`,
+route-split `Eirika Normal`) — that cost a review round; do not reintroduce a hardcoded triple.
 
 **The design board is current** (rebuilt 2026-08-28 around the chapter YAML schema — every open
 decision names the field it writes): `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`
