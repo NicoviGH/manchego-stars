@@ -14,7 +14,9 @@ cadence: marquee_setpiece       # see docs/CHAPTERS.md — 🎬 (the Navarre/Jos
 # The layout is Ephraim's Ch13; the enemy-pressure bar stays vanilla Ch6. Same split ch01
 # already ships (Hamill Canyon geometry, "FE8 Ch1" pressure) -- see decisions.md.
 fe8_base_map: "FE8 Ch13 Ephraim — Fluorspar's Oath (layout only)"
-parity_reference: "FE8 Ch6"   # #48 enemy-pressure parity bar — Victims of War (24 enemies, avg L6.2, deploy 10)
+parity_reference: "FE8 Ch6"   # #48 enemy-pressure parity bar — Victims of War (24 enemies, avg L6.2, deploy 10).
+                              # Also sets the REWARD TIER: the economy block below is legal only
+                              # because this is >= FE8 Ch5 (decisions.md, reward ladder).
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
@@ -73,6 +75,23 @@ objective:
 win_condition: messie_defeated_OR_messie_talked
 lose_condition: all_player_units_defeated
 
+# ── Difficulty (D3) ─────────────────────────────────────────────────────────────
+# Vanilla FE8 Ch6's OWN mode offsets, copied verbatim from chapter_settings
+# (easyModeLevelMalus 4 / normalModeLevelMalus 2 / difficultModeLevelBonus 3).
+# FE8 expresses difficulty as level offsets + extra traps + a Hard-only reinforcement
+# wave; we use that mechanism and invent no dial of our own.
+difficulty:
+  tutorial: 4
+  normal: 2
+  difficult: 3
+
+# NO FOG. Vanilla Ch6 runs initialFogLevel 3 because its map is an open field where
+# fog is the only difficulty. Our donor puts 40% of the map in concentric water with
+# only 8 crossings, so the route IS the puzzle and it is one the player can see and
+# solve. Measured: foot reaches all 288 passable cells; the split-party runs land the
+# right village turn 6 and the left turn 10, which is the race fog was buying.
+fog: none
+
 difficulty_note: >
   A REAL boss fight (≈FE8 Ch5 difficulty) — Messie is tough but beatable in 8–12
   turns through combat. The Talk option is discoverable, never forced: pre-chapter
@@ -82,6 +101,8 @@ difficulty_note: >
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
+  deploy_limit: 10              # D4 -- FE8 Ch6 parity (deploy 1-10); the donor map ships 11 slots
+  start_area: "x4-10, y0-2 (the donor's own deploy block, top-centre) -- forces the spiral"
   note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit (TBD), split across the two boats — small units (Basil/Trex/Sahnar/casters) on the Burly Ram, Braulo/Wolfram on the Pronged Goat. Marty MUST be deployable (his Talk is the hidden resolution). The beast-cavalry (Baxby/Lupin) may bench on the boat map by terrain — authoring call. Only the pack direwolves stay non-combat dressing. Positions set in Tiled."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
@@ -162,6 +183,168 @@ post_chapter:
 signature_moments:
   - pc: marty
     trigger: marty_messie_talk     # PRIMARY — see pcs/marty.yaml
+
+# ── Declared terrain divergences ────────────────────────────────────────────────
+# Every cell here departs from the donor's vanilla terrain ON PURPOSE. The import guard
+# (validate_terrain_matches_vanilla) rejects any drift NOT listed, so this block is the
+# whole allowlist -- cell by cell, so the ch05 fence->wall class of accident still fails.
+# The two village footprints are repainted as ice outcrops and made WALKABLE underneath
+# (cliff art, FOREST terrain -- the snow-mound trick). That is deliberate: vanilla Ch6's
+# hostages sit in a pocket attackable from 4/4 sides for two of the three, so boats that
+# can be reached and killed from every side is parity, not cruelty. The SW beach keeps
+# vanilla's SAND and is therefore NOT listed -- restoring it is what opens the left
+# coast route and brings the west boat to turn 6, matching the east.
+# Rationale: docs/decisions.md -> "ch06 departs from its donor's terrain in ... declared
+# cells, and replaces forest composition wholesale".
+terrain_divergence:
+- tile: [16, 11]                 # Q12
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [17, 11]                 # R12
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [18, 11]                 # S12
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [16, 12]                 # Q13
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [17, 12]                 # R13
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [18, 12]                 # S13
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [16, 13]                 # Q14
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [17, 13]                 # R14
+  from: VILLAGE_REGULAR
+  to: '0x0C'
+  why: the door tile the player stands on to board
+- tile: [18, 13]                 # S14
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [3, 16]                 # D17
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [4, 16]                 # E17
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [5, 16]                 # F17
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [3, 17]                 # D18
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [4, 17]                 # E18
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [5, 17]                 # F18
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [10, 17]                 # K18
+  from: SNAG
+  to: '0x01'
+  why: map-change pair; SNAG is impassable to EVERY class, fliers included
+- tile: [3, 18]                 # D19
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [4, 18]                 # E19
+  from: VILLAGE_REGULAR
+  to: '0x0C'
+  why: the door tile the player stands on to board
+- tile: [5, 18]                 # F19
+  from: TILE_2E
+  to: '0x0C'
+  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+- tile: [10, 18]                 # K19
+  from: RIVER
+  to: '0x34'
+  why: map-change pair; the crossing the player opens
+- tile: [3, 21]                 # D22
+  from: SEA
+  to: '0x26'
+  why: seals the dead south-west corner
+
+# ── The rescue boats (D6) ───────────────────────────────────────────────────────
+# Two stranded vessels, dropped as green NPC UNITS rather than painted into the map.
+# A unit is the whole point: it can be KILLED, and vanilla Ch6 gates its Orion's Bolt
+# on CHECK_ALIVE over three green civilians. A dead NPC stops offering Talk exactly as
+# a burned village stops offering Visit, so one mechanism covers both halves -- there
+# is no separate visit prompt and no village terrain anywhere on this map.
+#
+# Two, not three: we adapt the donor's two sites rather than invent a third, and Ch6's
+# reward SHAPE (one gift + one save-them-all prize) carries over intact at two.
+#
+# ENGINE NOTE for the injector: FE8's Talk is a NAMED PAIR --
+# `EvtListTalk(flag, script, pid_a, pid_b)`, and `EventInfoCheckTalk` compares both pids
+# for exact equality, with no wildcard. So "any unit may board" is emitted as one Talk
+# entry per (deployable PC x boat), every entry for a boat sharing that boat's ONE flag:
+# the first boarding sets it and `SearchAvailableEvent` then skips the rest. Generated
+# from the roster, never hand-listed, or it silently rots when the roster changes.
+rescue_boats:
+- id: boat-east
+  fe_name: "Fishing Boat"       # <=12 chars (see decisions.md: long names garble the buffer)
+  class: fleet                  # CLASS_FLEET -- vanilla's own ship map sprite, SMSId 0x41
+  size: 32x32                   # unit_icon_wait_table[0x41] = UNIT_ICON_SIZE_32x32
+  faction: green                # -> unit_icon_pal_npc; the ally green IS vanilla's civilian faction
+  tile: [17, 12]                # R13, the outcrop cell north of the door
+  ai_pattern: hold              # never moves; Fleet has mov 3 and must not wander
+  attackable_sides: 4           # parity: 2 of vanilla Ch6's 3 civilians are open on 4/4 sides
+  reached_on: {foot: 6, cavalry: 5, flier: 3}
+  talk:
+    background: bg_Boat         # vendored from FE-Repo; the boarding CG
+    ea_file: events/ch06-boat-east.ea
+    reward:
+    - id: antitoxin             # vanilla Ch6's own village gift, same tier
+      amount: 1
+    text: []                    # TODO: boarding scene. Seed the snow-pile line here
+                                # ("get in the drifts") so the cover mechanic is taught.
+- id: boat-west
+  fe_name: "Fishing Boat"
+  class: fleet
+  size: 32x32
+  faction: green
+  tile: [4, 17]                 # E18
+  ai_pattern: hold
+  attackable_sides: 4
+  reached_on: {foot: 6, cavalry: 5, flier: 3}
+  talk:
+    background: bg_Boat
+    ea_file: events/ch06-boat-west.ea
+    reward: []                  # the line is the reward; the prize is keeping both alive
+    text: []                    # TODO
+
+economy:
+  reward_sites:
+  - gift: antitoxin
+  # Vanilla Ch6 grants the Bolt in its ENDING scene, gated on CHECK_ALIVE for every
+  # civilian -- keep them alive; boarding is NOT required for the bonus. prof-rbg is
+  # our Archer, so this is a literal-parity reward that lands on a real unit.
+  save_all_bonus: orions-bolt
+  save_all_gate: "CHECK_ALIVE on both rescue_boats, in the ending scene"
+
+# ── Events declared but unwritten ───────────────────────────────────────────────
+# Registered here so `make chapter CH=ch06` counts them as owed rather than missing.
+# Both boarding scenes need a voice pass before a line is drafted (decisions.md: read
+# every speaker's bible first) -- the boat crews have no bible yet, so the text is TODO
+# on purpose rather than placeholder prose.
 
 design_notes: >
   The emotional centerpiece of the MVP and Marty's primary signature beat. Keep

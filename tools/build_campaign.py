@@ -9829,7 +9829,10 @@ CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCL
                  'booster-def': 'ITEM_BOOSTER_DEF', 'booster-skl': 'ITEM_BOOSTER_SKL',
                  'armorslayer': 'ITEM_SWORD_ARMORSLAYER', 'torch': 'ITEM_TORCH',
                  # the save-all-four bonus -- vanilla Ch5's own, handed over at the ending
-                 'guiding-ring': 'ITEM_GUIDINGRING'}
+                 'guiding-ring': 'ITEM_GUIDINGRING',
+                 # ch06's boats -- vanilla Ch6's own pair: the village gift, and the
+                 # save-them-all prize its ENDING scene grants on CHECK_ALIVE
+                 'antitoxin': 'ITEM_ANTITOXIN', 'orions-bolt': 'ITEM_ORIONSBOLT'}
 
 
 # ── Message-id ownership across hosted chapters (#198 review, issue #24) ────────
