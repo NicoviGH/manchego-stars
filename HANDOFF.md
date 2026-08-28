@@ -6,58 +6,68 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-26 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-08-28 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**ch06 (#26) — D1 is SETTLED; the map has not been painted.** Refreshed 2026-08-28.
-`main` is at #332. **One open PR:**
+**Nothing.** `main` is at **#331** (squash-merged 2026-08-28), the branch is deleted and the tree is
+clean. **#26 stays open**: the map is done, the chapter is not.
 
-- **#331 `feat/26-ch06-the-maer-monster`** — Messie is he/him, the Ravisin argument, the 32x32 ADR,
-  and now **the donor decision**: paint **Ch13EphraimMap**, measure against **FE8 Ch6**. Nicolas
-  approved it 2026-08-28. Rationale is the ADR *"The DONOR and the BAR are different chapters"*.
-**#333 MERGED** — `docs/fe8-guide.md` is on `main`: all 28 vanilla chapters from
-fireemblemwiki.org, with a **donor-selection index** (objective / enemy count / shape / pressure).
-That is the *how is it won* half of parity, which the decomp cannot answer. Regenerate with
-`tools/fe8_guide_mine.py`; three chapters are digested (1, 6, 7) and the rest carry a pointer to
-`--strategy <slug>`. ⚠️ Tier labels are NOT a fixed set (plain `Normal`, combined `Easy/Normal`,
-route-split `Eirika Normal`) — that cost a review round; do not reintroduce a hardcoded triple.
-
-**The design board is current** (rebuilt 2026-08-28 around the chapter YAML schema — every open
-decision names the field it writes): `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`
+**The design board** (rebuilt 2026-08-28 around the chapter YAML schema — every open decision names
+the field it writes): `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`
 **Issue #26 carries the same list as a checklist.** Read the issue for scope, the board for reasoning.
 
 ## Next task
 
-**Nicolas set the order (2026-08-28): the map, then units, then the beats, then Messie/mermaids.**
+**The ch06 enemy roster (D5) — Nicolas asked to do this one together.** Everything the decision
+needs is now on disk:
 
-1. **Paint the ch06 map.** `Ch13EphraimMap` (22x22, TileConfiguration1) on the **`snowy-fields`**
-   tileset — vendored, previously used by nothing, and its 48 `TERRAIN_RIVER` metatiles are drawn as
-   cracked ice channels. Flow is `gen_map_editor` → browser paint → `import_map_layout`; Nicolas
-   corrects by hand. Water metatiles rendered with ids at `map-review/tilesets/snowy-fields-water.png`.
-2. **Units.** Open debate on the issue (D5): Ch13Eph is authored around 20 Cavaliers + 10 Pegasus
-   Knights, but on our roster `TERRAIN_RIVER` is impassable to foot, armour AND horse — cost 2 to
-   Pirate, 1 to flier. So the maze elevates **Braulo** and **Pinky**, not cavalry. Copying Ch13's
-   class bones imports a solution to *Ephraim's* roster problem.
-3. **The beats** — mine vanilla Ch6's cutscenes for narrative flow, then map our story onto it.
-4. **Messie + the mermaids.** ⚠️ Verify a Mermaid **map sprite** exists; `fe-repo-scouting.md` only
-   proves a battle ANIM. `Fleet` is a vanilla 32x32 **ship** sprite, so damaged hulls need no new art.
+- **The bar is FE8 Ch6**: 24 enemies (27 Difficult), avg L6.2 — 6 Soldier, 3 Fighter, 3 Knight,
+  3 Cavalier, 2 Mercenary, 2 Shaman (`docs/fe8-guide.md`).
+- **The donor is not the bar.** Ch13 Ephraim ships 58 enemies, 19 of them Cavaliers, on "defeat
+  all" — an attrition brawl, and cavalry is exactly what our river punishes. Do not import it.
+- **Density already works out.** Ch6's map is 580 cells and ours is 484, so 24 enemies is slightly
+  DENSER than vanilla Ch6. No scaling argument needed.
+- ⚠️ **The seed is wrong and will mislead you.** `enemy_units:` still declares 9 (Messie + 8
+  "Knucklehead Swarm"), and that swarm is class `gargoyle` — a **flier**. Fliers ignore the
+  concentric water the whole map exists to enforce, so the seed defeats the map's own premise.
+- **Water-bound mermaids** is the open proposal, not a decision: the rings become their highway,
+  the 8 crossings become the player's chokepoints, and Pinky covers the deep boat — turning the
+  map's flier bias into a division of labour rather than a monopoly.
+- **Placement facts** (measured, from the donor's own deploy block x4-10/y0-2): a flier reaches all
+  484 cells by turn 5; foot reaches every one of the 306 passable cells; both boats are turn 6 on
+  foot, 5 on cavalry, 3 by air. `TERRAIN_RIVER` is impassable to foot/armour/horse, cost 2 to
+  Pirate, 1 to flier; `CLIFF` and `PEAK` are impassable to everything but fliers.
+
+Then, in Nicolas's order: **the beats** (mine vanilla Ch6's cutscenes, then map our story onto it),
+then **Messie's art**.
 
 **Messie's map sprite is NICOLAS'S, not ours** — he took it back mid-session ("I'll handle it").
 Do not re-open it unprompted. The PixelLab verdict, if it comes up: it produces genuine
-native-resolution pixel art that passes `map_sprite_tool` (32x32, ≤16 colours, forced onto a bank),
+native-resolution pixel art that passes `map_sprite_tool` (32x32, <=16 colours, forced onto a bank),
 but its text model does not know what a plesiosaur is. **34 of 40 trial generations left.**
+
+## What ch06 still owes
+
+`make chapter CH=ch06` derives most of it — do not restate that here. Two things it cannot see:
+
+- **`inject_ch06` must call `_register_tileset(campaign, 'snowy-bern-ice', 'SnowIce', ...)`.**
+  `TILESET_STEMS` knows the name, but `_register_chapter_map` then looks up `ObjectTypeSnowIce` /
+  `MapPaletteSnowIce` / `TileConfigurationSnowIce` in the asset table and the first build
+  `sys.exit`s without them. Sharing `Snow` would draw ch06 in ch04's palette.
+- **Both boarding scenes are declared with empty `text:` on purpose.** The boat crews have no voice
+  bible, and drafting before that pass is how dialogue drifts.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
 with procs that never change — which looks exactly like broken input and is not. Restore the ROM,
 the ELF **and** `.build-config.json` from the same cache entry, then re-run `gen_symbols.py`.
 
-**Tree state: the ROM in the tree is still `ch05boot`** (CH05BOOT=1). Nothing was built in this
-session. `tools/playtest/states/` still holds valid **`prep`** and **`ch02start`** stamped for the
-CANONICAL ROM, so anything wanting them needs canonical back in the tree first. A dead state is
+**Tree state: the ROM in the tree is still `ch05boot`** (CH05BOOT=1). Nothing was built on
+2026-08-28. `tools/playtest/states/` still holds valid **`prep`** and **`ch02start`** stamped for
+the CANONICAL ROM, so anything wanting them needs canonical back in the tree first. A dead state is
 exactly **397,312 bytes of zeros** — that size is the tell.
 
 **The ROM cache is WARM** for `canonical`, `testch`, `ch03boot`, `ch04boot`, `ch05boot`,
@@ -65,12 +75,34 @@ exactly **397,312 bytes of zeros** — that size is the tell.
 
 ## Map sprites — read before any art session
 
-All of it is in `docs/decisions.md` → **"A map sprite is 32x32 or it is nothing"** (lands with PR #331): the hard engine
+All of it is in `docs/decisions.md` → **"A map sprite is 32x32 or it is nothing"**: the hard engine
 ceiling, why size reads as FILL, why geometry is derived from the donor and never from sheet pixels,
 why a decomp sheet's palette is a meaningless leftover, what `footprint:` actually means, and the
 WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
+
+**#331 (2026-08-28) — ch06's map is painted, compiled and committed.** Detail lives in
+`docs/decisions.md` → *"ch06 departs from its donor's terrain in 21 declared cells"* and
+*"The DONOR and the BAR are different chapters"*; the one-line version:
+
+| | |
+|---|---|
+| `campaigns/.../maps/ch06-maer-monster.mar` | 22x22 on `snowy-bern-ice`, round-trips byte-exact |
+| `snowy-bern-ice` | snowy-bern + 4 palette entries + 21 metatiles in slots snowy-bern declares unused; `.4bpp` byte-identical, `snowy-bern` and ch04 untouched |
+| `terrain_divergence:` | 21 declared cells, 0 undeclared; the import guard rejects anything not listed |
+| `forest_composition: replaced` | ch06 has no trees, so #193's sequence guard is exempted for FOREST only — the "deliberate departure" clause, taken explicitly |
+| boats | two green `CLASS_FLEET` units, not tiles and not villages; a dead NPC stops offering Talk exactly as a burned village stops offering Visit |
+
+⚠️ **Three guards shipped DEAD earlier that day and were fixed in the same PR** — the lesson
+generalises: `_declared_divergence` matched the chapter `id` against the map stem and loaded zero
+rows; `validate_vanilla_retile` compared the tileset by NAME and skipped 25 protected cells for any
+variant. Both had a green suite because nothing exercised them. If you add an escape hatch to a
+guard, add the test that proves the hatch opens **and** that the guard still shuts.
+
+### Earlier
+
+
 
 DONE and merged. One line each, so a fresh session does not reopen one. **The detail is in the
 named `docs/decisions.md` ADR or on the issue — deliberately not restated here.** Where no ADR is
@@ -126,6 +158,11 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
   from ch04 on — nothing reads it, so it misleads rather than breaks). #30 is now cheap: since
   #312 there is one reader for the chapter YAML (`tools/campaign_chapters.py`), so that block
   can be derived from it rather than hand-kept.
+- ⚠️ **Branch BEFORE editing, and check whether a file's "stale" content is already fixed on an
+  unmerged branch.** 2026-08-28 cost a rework round: ch06's `parity_reference` read `FE8 Ch5` on
+  `main`, so it got "fixed" there — while PR #331 had already corrected it on its branch. A whole
+  session's work then had to be rebased off `main` and reconciled. `git branch --all --contains`
+  and a look at open PRs answer this in seconds.
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
 - **Checkout: `/Users/Yonick/Projects/manchego-stars`, the ONE tree** (#267). It is clean except
   for the intentionally dirty `fireemblem8u` submodule and Nicolas's untracked `.agents/` +
