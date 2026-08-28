@@ -6647,7 +6647,12 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
 # resolves it; the _register_tileset call that actually writes the asset entries lands with
 # inject_ch05, the same way 'Cave' rides inject_ch03.
 TILESET_STEMS = {'snowy-bern': 'Snow', 'cave-interior': 'Cave',
-                 'port-or-town-winter': 'PortTown'}
+                 'port-or-town-winter': 'PortTown',
+                 # ch06's chapter-local variant: snowy-bern's geometry with a colder palette
+                 # and ch06's own metatiles in slots snowy-bern leaves unused. It needs its OWN
+                 # asset-table entry rather than riding 'Snow' -- same tiles, different palette,
+                 # so sharing Snow's slot would draw ch06 in ch04's colours (and vice versa).
+                 'snowy-bern-ice': 'SnowIce'}
 
 
 def _register_chapter_map(maps_dir, layout, comment):

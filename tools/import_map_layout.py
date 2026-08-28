@@ -9,6 +9,7 @@ e.g.   import_map_layout.py ch01-the-iron-trail ~/Downloads/ch01-layout.json
         any other stem has no second fallback)"""
 import json
 import os
+import re
 import sys
 
 
@@ -16,7 +17,15 @@ ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (w
 sys.path.insert(0, os.path.join(ROOT,'tools'))
 from map_tileset_tool import (_tileset_from_dir, compile_layout,
                               preserved_terrain_targets, render_grid,
+                              tilesets_are_compatible_variants,
                               vanilla_layout_data)
+
+
+TERRAIN_BY_NAME = {}
+for _line in open(os.path.join(ROOT, 'fireemblem8u/include/constants/terrains.h')):
+    _m = re.match(r'\s*(TERRAIN_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', _line)
+    if _m:
+        TERRAIN_BY_NAME[_m.group(1)] = int(_m.group(2), 0)
 
 
 def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root, declared=None):
@@ -71,9 +80,23 @@ def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root, declar
                + (' ...' if len(errors) > 8 else '')))
 
 
-def validate_vanilla_retile(export_data, decomp_root, maps_root):
-    """Reject Snowy Bern exports that alter protected vanilla terrain sequences."""
-    if export_data.get('tileset', 'snowy-bern') != 'snowy-bern':
+def validate_vanilla_retile(export_data, decomp_root, maps_root, declared=None, stem=None):
+    """Reject Snowy Bern exports that alter protected vanilla terrain sequences.
+
+    Runs for snowy-bern AND for any compatible variant of it (identical .4bpp, .bin differing
+    only at slots the base declares unused). An exact name compare used to skip the whole
+    invariant for `snowy-bern-ice`, which is how ch06 could violate all 25 protected cells and
+    still import clean -- the generator was taught about variants in the same change and the
+    importer was not.
+
+    `declared` exempts cells the chapter lists under `terrain_divergence:`. That is the
+    sanctioned form of the #193 escape clause ("a deliberate forest-composition departure is a
+    new map-design decision, not a quiet override"): ch06 is a frozen lake with no trees, so
+    its 23 forest cells become snow drifts. The exemption is per-coordinate, so a chapter that
+    merely retiles a forest is still held to the sequence, cell for cell.
+    """
+    tileset = export_data.get('tileset', 'snowy-bern')
+    if not tilesets_are_compatible_variants(maps_root, 'snowy-bern', tileset):
         return
 
     mode = export_data.get('retile_mode')
@@ -102,13 +125,17 @@ def validate_vanilla_retile(export_data, decomp_root, maps_root):
     with open(os.path.join(maps_root, 'reskin-learned.json'),
               encoding='utf-8') as source:
         rules = json.load(source)
-    target_tileset = _tileset_from_dir(
-        os.path.join(maps_root, 'tilesets/snowy-bern'))
+    target_tileset = _tileset_from_dir(os.path.join(maps_root, 'tilesets', tileset))
     expected_targets = preserved_terrain_targets(
         source_cells, source_terrain, target_tileset, rules, width)
 
+    replaced = (_chapter_for_map(stem) or {}).get('forest_composition') == 'replaced'
     errors = []
     for cell, expected in expected_targets.items():
+        if (cell % width, cell // width) in (declared or {}):
+            continue                      # a declared terrain divergence, with an ADR behind it
+        if replaced and source_terrain[source_cells[cell]] == TERRAIN_BY_NAME['TERRAIN_FOREST']:
+            continue                      # the chapter declared it has no forest to translate
         actual = grid[cell]
         if actual != expected:
             errors.append('forest sequence at (%d, %d) is tile %d; expected tile %d' %
@@ -117,28 +144,57 @@ def validate_vanilla_retile(export_data, decomp_root, maps_root):
         raise ValueError('; '.join(errors))
 
 
-def _declared_divergence(stem):
-    """Read a chapter's `terrain_divergence:` allowlist -> {(x, y): terrain_byte}.
+def _terrain_byte(value):
+    """A `to:` entry -> terrain byte. Accepts '0x0C', '0x0c', 12 and 'TERRAIN_FOREST'.
 
-    Lives in the chapter YAML because that is where the campaign's facts live and where the
-    ADR can point; absent block or absent file means "no divergence declared", which is the
-    right default for every chapter that simply inherits vanilla terrain.
+    Quoting hex in YAML is easy to forget, and `yaml.safe_load` turns an unquoted 0x0C into
+    the int 12 -- which used to reach int(value, 0) and raise a bare TypeError naming neither
+    the chapter nor the cell.
+    """
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if text.upper().startswith('TERRAIN_'):
+        return TERRAIN_BY_NAME[text.upper()]
+    return int(text, 0)
+
+
+def _chapter_for_map(stem):
+    """The chapter YAML whose `map.file` names `stem`, or None.
+
+    Matched on the map file's BASENAME. An earlier version compared the chapter `id`
+    (ch06-the-maer-monster) against the map stem (ch06-maer-monster) and prefix-matched
+    `map.file` -- which is always 'maps/<stem>.<ext>' and so never starts with the stem.
+    Both tests failed for every chapter, silently returning "nothing declared" and taking
+    the guard's escape hatch with it.
     """
     path = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/chapters')
     if not os.path.isdir(path):
-        return {}
+        return None
+    import yaml
     for name in sorted(os.listdir(path)):
-        if not name.endswith(('.yaml', '.yml')) or not name.startswith(stem[:4]):
+        if not name.endswith(('.yaml', '.yml')):
             continue
-        import yaml
         with open(os.path.join(path, name), encoding='utf-8') as handle:
             data = yaml.safe_load(handle) or {}
-        if (data.get('map') or {}).get('file', '').startswith(stem) or data.get('id') == stem:
-            out = {}
-            for row in data.get('terrain_divergence') or []:
-                out[(row['tile'][0], row['tile'][1])] = int(row['to'], 0)
-            return out
-    return {}
+        declared = (data.get('map') or {}).get('file') or ''
+        if os.path.splitext(os.path.basename(declared))[0] == stem:
+            return data
+    return None
+
+
+def _declared_divergence(stem):
+    """A chapter's `terrain_divergence:` allowlist -> {(x, y): terrain_byte}.
+
+    Lives in the chapter YAML because that is where the campaign's facts live and where the
+    ADR can point; no chapter, or no block, means "nothing declared", which is the right
+    default for every chapter that simply inherits vanilla terrain.
+    """
+    data = _chapter_for_map(stem)
+    if not data:
+        return {}
+    return {(row['tile'][0], row['tile'][1]): _terrain_byte(row['to'])
+            for row in data.get('terrain_divergence') or []}
 
 
 def main(argv=None):
@@ -169,7 +225,8 @@ def main(argv=None):
     try:
         validate_terrain_matches_vanilla(export_data, decomp, maps_root,
                                          declared=_declared_divergence(stem))
-        validate_vanilla_retile(export_data, decomp, maps_root)
+        validate_vanilla_retile(export_data, decomp, maps_root,
+                                declared=_declared_divergence(stem), stem=stem)
     except ValueError as error:
         sys.exit('ERROR: %s' % error)
 

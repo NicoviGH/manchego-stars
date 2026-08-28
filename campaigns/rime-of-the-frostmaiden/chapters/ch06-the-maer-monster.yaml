@@ -34,10 +34,12 @@ narrative: >
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch06-maer-monster.tmx
-  tileset: snowy-fields         # VENDORED and previously unused. 48 RIVER metatiles drawn as
-                              # cracked ice channels + LAKE 18 / SEA 26 / SNAG 2 -- the frozen-lake
-                              # art. Replaces the seed's `water-boats`, which was never vendored.
+  file: maps/ch06-maer-monster.mar     # compiled by import_map_layout; .tmx is never produced
+  tileset: snowy-bern-ice       # snowy-bern + Nicolas's ice palette + ch06's own metatiles, all
+                                # in slots snowy-bern declares unused. The core tileset and every
+                                # map already shipped on it stay byte-identical (ch04 rides it).
+                                # NOT snowy-fields: that was the seed's guess, decided against
+                                # once snowy-bern won the look (decisions.md, the ice ADR).
   size: "22×22"                 # Ch13EphraimMap; 137 TERRAIN_RIVER in concentric channels
   description: >
     Tight water map over the frozen mouth of Maer Dualdon. Two boat-deck platforms —
@@ -183,6 +185,20 @@ post_chapter:
 signature_moments:
   - pc: marty
     trigger: marty_messie_talk     # PRIMARY — see pcs/marty.yaml
+
+# ── Forest composition (declared departure from #193) ───────────────────────────
+# A frozen lake has no trees, so ch06 replaces the concept: all 23 of the donor's FOREST
+# cells become snow drifts (rough/rock art stamped TERRAIN_FOREST, so they still grant
+# cover and still cost 2). The terrain byte is PRESERVED cell for cell -- what changes is
+# the ART, which is exactly what the winter-retile invariant protects.
+#
+# #193 preserves the vanilla artists' forest SEQUENCES on the assumption that a retile is
+# TRANSLATING a forest. Here there is no forest to translate, and the ADR names this case:
+# "a deliberate forest-composition departure is a new map-design decision, not a quiet
+# override of this guard". This line IS that decision, scoped to this chapter -- every
+# other protected terrain (village, house, ruins, inn) stays guarded, and every other
+# chapter keeps the full sequence check.
+forest_composition: replaced
 
 # ── Declared terrain divergences ────────────────────────────────────────────────
 # Every cell here departs from the donor's vanilla terrain ON PURPOSE. The import guard

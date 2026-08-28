@@ -961,5 +961,53 @@ class TestVariantCompatibility(unittest.TestCase):
             self.MAPS, 'snowy-bern', 'snowy-fields'))
 
 
+class TestDeclaredDivergenceLookup(unittest.TestCase):
+    """The escape hatch must actually find its chapter.
+
+    It shipped dead: it compared the chapter `id` (ch06-the-maer-monster) against the map
+    stem (ch06-maer-monster) and prefix-matched `map.file`, which is always
+    'maps/<stem>.<ext>' and so never starts with the stem. Both tests failed for every
+    chapter, so the guard silently saw "nothing declared" and rejected every deliberate
+    cell. A green suite proved nothing because nothing exercised the lookup.
+    """
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        import import_map_layout
+        self.iml = import_map_layout
+
+    def test_ch06_resolves_by_map_stem(self):
+        rows = self.iml._declared_divergence('ch06-maer-monster')
+        self.assertTrue(rows, 'ch06 declares divergences; the lookup returned none')
+        self.assertIn((17, 13), rows)
+
+    def test_unknown_stem_declares_nothing(self):
+        self.assertEqual(self.iml._declared_divergence('ch99-nope'), {})
+
+    def test_terrain_byte_accepts_every_spelling(self):
+        forest = self.iml.TERRAIN_BY_NAME['TERRAIN_FOREST']
+        for spelling in ('0x0C', '0x0c', 12, 'TERRAIN_FOREST'):
+            self.assertEqual(self.iml._terrain_byte(spelling), forest)
+
+    def test_every_declared_from_matches_vanilla(self):
+        """A `from:` that lies makes the whole allowlist untrustworthy."""
+        import yaml
+        chapter = os.path.join(
+            REPO, 'campaigns/rime-of-the-frostmaiden/chapters/ch06-the-maer-monster.yaml')
+        with open(chapter, encoding='utf-8') as handle:
+            data = yaml.safe_load(handle)
+        _, _, cells, terrain = mt.vanilla_layout_data(
+            os.path.join(REPO, 'fireemblem8u'), 'Ch13EphraimMap')
+        width = data['map']['size'].split('\u00d7')[0]
+        width = int(width) if width.isdigit() else 22
+        names = {v: k for k, v in self.iml.TERRAIN_BY_NAME.items()}
+        for row in data['terrain_divergence']:
+            x, y = row['tile']
+            got = names[terrain[cells[y * width + x]]]
+            self.assertEqual(got, 'TERRAIN_' + row['from'],
+                             'cell (%d, %d) declares from: %s but vanilla is %s'
+                             % (x, y, row['from'], got))
+
+
 if __name__ == '__main__':
     unittest.main()
