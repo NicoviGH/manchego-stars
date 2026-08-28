@@ -102,10 +102,18 @@ def fetch(slug, title, delay=4.0):
     if os.path.exists(dest) and os.path.getsize(dest) > 20000:
         return "cached"
     url = BASE + title.replace(" ", "_").replace("'", "%27")
-    p = subprocess.run(["curl", "-sS", "--compressed", "-A", UA,
-                        "-w", "%{http_code}", "-o", dest, url],
-                       capture_output=True, text=True, timeout=60)
-    code = (p.stdout or "").strip()[-3:]
+    try:
+        p = subprocess.run(["curl", "-sS", "--compressed", "-A", UA,
+                            "-w", "%{http_code}", "-o", dest, url],
+                           capture_output=True, text=True, timeout=60)
+        code = (p.stdout or "").strip()[-3:]
+    except subprocess.TimeoutExpired:
+        # a partial body left behind can be big enough to pass the size check and
+        # then be trusted forever, so drop it here rather than let the loop die
+        if os.path.exists(dest):
+            os.remove(dest)
+        time.sleep(delay)
+        return "TIMEOUT"
     size = os.path.getsize(dest) if os.path.exists(dest) else 0
     ok = code == "200" and size > 20000
     if not ok and os.path.exists(dest):
@@ -119,7 +127,7 @@ def fetch_all(delay=4.0):
     bad = 0
     for slug, title, _ in CHAPTERS:
         r = fetch(slug, title, delay)
-        failed = r.startswith("HTTP")
+        failed = r.startswith(("HTTP", "TIMEOUT"))
         bad += failed
         print(f"  {'FAIL' if failed else 'ok  '} {slug:12s} {title:24s} {r}", flush=True)
     print(f"\n{len(CHAPTERS)-bad} cached, {bad} failed. Re-run to retry only the failures.")
@@ -137,6 +145,16 @@ def _section(page, sect, nxt):
     i = page.find(f'id="{sect}"')
     j = page.find(f'id="{nxt}"')
     return page[i:j if j > i else len(page)] if i >= 0 else ""
+
+
+def _section_until(page, sect, followers):
+    """Slice from `sect` to whichever of `followers` appears first after it."""
+    i = page.find(f'id="{sect}"')
+    if i < 0:
+        return ""
+    ends = [page.find(f'id="{f}"', i) for f in followers]
+    ends = [e for e in ends if e > i]
+    return page[i:min(ends)] if ends else page[i:]
 
 
 def _tab_panes(chunk):
@@ -198,15 +216,36 @@ def parse(path):
         if rows:
             d["tiers"][label] = rows
 
-    boss = _text(_section(page, "Boss_data", "Strategy"))
-    d["boss"] = boss[:400]
+    # `_section` runs to end-of-page when the named next-section is absent, so an
+    # `or` chain never reaches its fallback -- it just dumps the page tail. Cut at
+    # whichever known follower appears FIRST instead.
+    d["strategy"] = _text(_section_until(page, "Strategy",
+                                         ("Trivia", "Etymology", "Gallery",
+                                          "Navigation", "References")))
 
-    strat = _section(page, "Strategy", "Trivia") or _section(page, "Strategy", "Etymology")
-    d["strategy"] = _text(strat).replace("Strategy ", "", 1)
-
-    items = _text(_section(page, "Item_data", "Enemy_data"))
-    d["items"] = items[:400]
     return d
+
+
+def playable_tiers(tiers):
+    """Every scraped tier except the Japanese columns, in page order.
+
+    Tier labels are NOT a fixed set. Observed on the wiki: plain `Normal`, a
+    COMBINED `Easy/Normal` (prologue, Ch1, Ch4), and ROUTE-SPLIT `Eirika Normal` /
+    `Ephraim Normal` (Ch15, Ch16, which are route-shared chapters). Hardcoding
+    ("Easy","Normal","Difficult") silently rendered NOTHING for the route-split
+    chapters while the index still counted them -- so match by substring, and
+    never drop a tier just because its label is unfamiliar.
+    """
+    return [(k, v) for k, v in tiers.items() if "(Japan)" not in k]
+
+
+def tier_like(tiers, want):
+    """The tier whose label mentions `want` (so `Easy/Normal` answers to both).
+    Returns (label, rows) or (None, None)."""
+    for k, v in playable_tiers(tiers):
+        if want.lower() in k.lower():
+            return k, v
+    return None, None
 
 
 def summarize(tier_rows):
@@ -240,10 +279,16 @@ def render(records, glosses):
         g = glosses.get(slug) or {}
         if isinstance(g, str):
             g = {"playstyle": g}
-        normal = d["tiers"].get("Normal") or next(iter(d["tiers"].values()), [])
-        tot, avg, _ = summarize(normal) if normal else (0, 0, {})
+        lab, rows = tier_like(d["tiers"], "Normal")
+        if rows:
+            tot = summarize(rows)[0]
+            # say WHICH tier when it is not a plain "Normal" -- a route-split or
+            # combined label under a column headed Normal is a silent lie.
+            cell = f"{tot}" if lab == "Normal" else f"{tot} <sub>({lab})</sub>"
+        else:
+            cell = "—"
         anchor = re.sub(r"[^a-z0-9 -]", "", label.lower()).replace(" ", "-")
-        L.append(f"| [{label}](#{anchor}) | {d['objective'] or '—'} | {tot or '—'} "
+        L.append(f"| [{label}](#{anchor}) | {d['objective'] or '—'} | {cell} "
                  f"| {g.get('shape','—')} | {g.get('pressure','—')} |")
     L.append("\n---\n")
 
@@ -256,21 +301,20 @@ def render(records, glosses):
                  + (f"  ·  **Lose**: {d['lose']}" if d.get("lose") else ""))
         if d.get("deploy"):
             L.append(f"- **Deploy**: {d['deploy']}")
-        for tier in ("Easy", "Normal", "Difficult"):
-            rows = d["tiers"].get(tier)
-            if not rows:
-                continue
+        for tier, rows in playable_tiers(d["tiers"]):
             tot, avg, by = summarize(rows)
             mix = ", ".join(f"{v}× {k}" for k, v in by.most_common(6))
             L.append(f"- **{tier}**: {tot} enemies · avg L{avg:.1f} — {mix}")
-        n = d["tiers"].get("Normal")
-        h = d["tiers"].get("Difficult")
-        if n and h:
-            a = summarize(n)[2]
-            b = summarize(h)[2]
-            delta = {k: b[k] - a.get(k, 0) for k in b if b[k] != a.get(k, 0)}
+        nl, n = tier_like(d["tiers"], "Normal")
+        hl, h = tier_like(d["tiers"], "Difficult")
+        if n and h and nl != hl:
+            a, b = summarize(n)[2], summarize(h)[2]
+            # union of BOTH key sets: a class REMOVED on Difficult is a delta too,
+            # and iterating only the Difficult counter would never show it.
+            delta = {k: b.get(k, 0) - a.get(k, 0) for k in set(a) | set(b)
+                     if b.get(k, 0) != a.get(k, 0)}
             if delta:
-                L.append(f"- **Hard-mode delta**: {delta} — a UNIT change, not just a level shift")
+                L.append(f"- **Delta {nl} → {hl}**: {delta} — a UNIT change, not a level shift")
         for key, name in (("shape", "Shape"), ("pressure", "Pressure"), ("teaches", "Teaches")):
             if g.get(key):
                 L.append(f"- **{name}**: {g[key]}")
@@ -287,6 +331,8 @@ def main():
     ap.add_argument("--render", action="store_true")
     ap.add_argument("--strategy", metavar="SLUG")
     ap.add_argument("--delay", type=float, default=4.0)
+    ap.add_argument("--render-anyway", action="store_true",
+                    help="render even if the fetch had failures (writes a partial digest)")
     ap.add_argument("--cache", default=CACHE)
     a = ap.parse_args()
     globals()["CACHE"] = a.cache
@@ -300,8 +346,13 @@ def main():
 
     if not (a.fetch or a.render):
         a.fetch = a.render = True
+    failures = 0
     if a.fetch:
-        fetch_all(a.delay)
+        failures = fetch_all(a.delay)
+    if a.render and failures and not a.render_anyway:
+        sys.exit(f"ERROR: {failures} page(s) failed to fetch — refusing to overwrite the "
+                 f"committed digest from a partial cache. Re-run --fetch (it resumes), "
+                 f"or pass --render-anyway if a partial digest is what you want.")
     if a.render:
         records, missing = [], []
         for slug, title, label in CHAPTERS:

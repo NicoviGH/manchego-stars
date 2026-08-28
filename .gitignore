@@ -67,5 +67,5 @@ campaigns/*/battle_anims/*/.paint/
 # matrix build-scope manifest (what each injection step wrote; describes the build, not the source)
 .build-scopes.json
 
-# fireemblemwod HTML cache (third-party pages; only the derived digest is committed)
+# fireemblemwiki HTML cache (third-party pages; only the derived digest is committed)
 .fe8-guide-cache/
