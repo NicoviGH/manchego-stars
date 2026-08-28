@@ -12,41 +12,40 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**ch06 design pass (#26) — brainstorm + art scouting. No ROM built, no chapter code written.**
-`main` is at **#330** (`7cc20bb`), CI green, no open PRs. One UNCOMMITTED edit: `ch06`'s YAML (see
-below). Tree is otherwise clean bar the usual dirty submodule and Nicolas's untracked `.agents/`.
+**ch06 (#26) — D1 is SETTLED; the map has not been painted.** Refreshed 2026-08-28.
+`main` is at #332. **Two open PRs**, neither reviewed:
 
-**The design board is the store for the chapter design:**
-`https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10` — canon vs seed, vanilla Ch6
-examined, donor evaluation, art sourcing, and the numbered decisions. ⚠️ **It is one revision behind
-on two points** (Messie's pronoun and the sprite-size ceiling); both are now written into
-`chapters/ch06-the-maer-monster.yaml` instead, which is the better home anyway. The scratchpad that
-held the board's source template was cleared by a session restart, so updating it means re-reading
-250KB of embedded images — not worth the context. Rebuild it from the YAML when ch06 is next picked up.
+- **#331 `feat/26-ch06-the-maer-monster`** — Messie is he/him, the Ravisin argument, the 32x32 ADR,
+  and now **the donor decision**: paint **Ch13EphraimMap**, measure against **FE8 Ch6**. Nicolas
+  approved it 2026-08-28. Rationale is the ADR *"The DONOR and the BAR are different chapters"*.
+- **#333 `feat/fe8-wiki-miner`** — a generated FE8 chapter guide (all 28 vanilla chapters mined
+  from fireemblemwiki.org: objective, deploy cap, per-difficulty enemy tables, donor-selection
+  index). The doc and its tool land WITH that PR; neither is on `main` yet.
 
-**The ch06 slice has a branch now: `feat/26-ch06-the-maer-monster`, PR #331** (unreviewed). It
-carries the design pass's settled content — Messie is **he/him**, and the Talk beat now names the
-ch05 payoff: the book (p.31) names **Ravisin** as the druid who awakened him, and he keeps attacking
-only because he fears she will take the gift back. She is dead; the awakening is permanent. That is
-Marty's argument and the spine of the chapter. Everything further on ch06 goes on that branch.
+**The design board is current** (rebuilt 2026-08-28 around the chapter YAML schema — every open
+decision names the field it writes): `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`
+**Issue #26 carries the same list as a checklist.** Read the issue for scope, the board for reasoning.
 
 ## Next task
 
-**Art first, at Nicolas's call — the PixelLab probe.** The MCP is connected now (it needed the
-session restart; there is no OAuth step). ⚠️ **Do not reach it over `curl` — the auto-mode classifier
-blocks the authenticated request, and that block is correct.**
+**Nicolas set the order (2026-08-28): the map, then units, then the beats, then Messie/mermaids.**
 
-⚠️ **BUDGET: it is a TRIAL — 38 of 40 generations left, $0.00 credits, paid to PixelLab (not
-Anthropic; Claude tokens do not cover images).** `create_character` standard = **1** generation;
-**`pro` = 20-40 per call and would eat the trial in one shot — do not use it.**
-`animate_character` template = 1 per direction.
+1. **Paint the ch06 map.** `Ch13EphraimMap` (22x22, TileConfiguration1) on the **`snowy-fields`**
+   tileset — vendored, previously used by nothing, and its 48 `TERRAIN_RIVER` metatiles are drawn as
+   cracked ice channels. Flow is `gen_map_editor` → browser paint → `import_map_layout`; Nicolas
+   corrects by hand. Water metatiles rendered with ids at `map-review/tilesets/snowy-fields-water.png`.
+2. **Units.** Open debate on the issue (D5): Ch13Eph is authored around 20 Cavaliers + 10 Pegasus
+   Knights, but on our roster `TERRAIN_RIVER` is impassable to foot, armour AND horse — cost 2 to
+   Pirate, 1 to flier. So the maze elevates **Braulo** and **Pinky**, not cavalry. Copying Ch13's
+   class bones imports a solution to *Ephraim's* roster problem.
+3. **The beats** — mine vanilla Ch6's cutscenes for narrative flow, then map our story onto it.
+4. **Messie + the mermaids.** ⚠️ Verify a Mermaid **map sprite** exists; `fe-repo-scouting.md` only
+   proves a battle ANIM. `Fleet` is a vanilla 32x32 **ship** sprite, so damaged hulls need no new art.
 
-What ch06 actually needs from it, given the ceiling below: **a 32x32 side-on idle**, and — as the
-real experiment — **whether it can produce a WALK CYCLE for art that is ours**. See "the gap" below.
-Nicolas also wants **Akueria** (an unreleased Pokémon, a rounder front-3/4 plesiosaur with a pearl)
-tested as a second base alongside the recoloured Dorrie. ⚠️ It was pasted into chat and there is no
-file for it — ask him to save it (e.g. `map-review/akueria.png`) before trying; PixelLab needs a URL
-or a file, and `reference_image_url` is preferred because MCP clients truncate large base64.
+**Messie's map sprite is NICOLAS'S, not ours** — he took it back mid-session ("I'll handle it").
+Do not re-open it unprompted. The PixelLab verdict, if it comes up: it produces genuine
+native-resolution pixel art that passes `map_sprite_tool` (32x32, ≤16 colours, forced onto a bank),
+but its text model does not know what a plesiosaur is. **34 of 40 trial generations left.**
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
