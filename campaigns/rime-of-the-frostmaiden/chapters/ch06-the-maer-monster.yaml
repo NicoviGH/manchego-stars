@@ -10,8 +10,11 @@ status: planned                # brainstorm SEED, NOT authoritative: enemy roste
                                # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: marquee_setpiece       # see docs/CHAPTERS.md — 🎬 (the Navarre/Joshua moment)
-fe8_base_map: "FE8 Ch5 — The Empire's Reach"        # DefeatBoss set-piece base
-parity_reference: "FE8 Ch5"   # #48 enemy-pressure parity bar — The Empire's Reach — DefeatBoss set-piece
+# DONOR and BAR are SEPARATE, and deliberately different chapters (Nicolas, 2026-08-28).
+# The layout is Ephraim's Ch13; the enemy-pressure bar stays vanilla Ch6. Same split ch01
+# already ships (Hamill Canyon geometry, "FE8 Ch1" pressure) -- see decisions.md.
+fe8_base_map: "FE8 Ch13 Ephraim — Fluorspar's Oath (layout only)"
+parity_reference: "FE8 Ch6"   # #48 enemy-pressure parity bar — Victims of War (24 enemies, avg L6.2, deploy 10)
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
@@ -30,8 +33,10 @@ narrative: >
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
   file: maps/ch06-maer-monster.tmx
-  tileset: water-boats          # water map, 2 boat platforms; custom/community tileset
-  size: "22×16"
+  tileset: snowy-fields         # VENDORED and previously unused. 48 RIVER metatiles drawn as
+                              # cracked ice channels + LAKE 18 / SEA 26 / SNAG 2 -- the frozen-lake
+                              # art. Replaces the seed's `water-boats`, which was never vendored.
+  size: "22×22"                 # Ch13EphraimMap; 137 TERRAIN_RIVER in concentric channels
   description: >
     Tight water map over the frozen mouth of Maer Dualdon. Two boat-deck platforms —
     the Burly Ram (small creatures) and the Pronged Goat (Braulo/Wolfram) — drift
@@ -47,7 +52,8 @@ map:
     ice_floes: TERRAIN_SNAG       # 0x33 — DESTRUCTIBLE drifting floes blocking the lanes between
                                   #        the decks. Attack to break one open (vanilla snag rule),
                                   #        creating stepping-stones to cross boats or reach Messie.
-    ice_walls: TERRAIN_GLACIER    # 0x2F — a few permanent ice ridges that just shape the lanes.
+    ice_walls: TERRAIN_PEAK       # 0x12 — permanent ridges. NOT glacier: TERRAIN_GLACIER costs 1 for
+                              #        EVERY class (incl. armour), so it shapes nothing at all.
   terrain_note: >
     The two boats start separated by an impassable channel webbed with snag-floes.
     Clearing floes (or waiting for Messie to smash them) is how foot units bridge the
