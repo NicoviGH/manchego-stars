@@ -112,6 +112,15 @@ whose `RearUp`/`Attack`/`Charge` supply the three poses `inject_battle_anims` ne
 ## Campaign source material (Wizards of the Coast)
 - ***Icewind Dale: Rime of the Frostmaiden*** © Wizards of the Coast — the campaign this hack adapts (privately, for its own players). Book art reused in-ROM: the ch1 opener aurora-township painting (lore-crawl mural), the regional Icewind Dale map (basis/reference for the world-tour backdrops), and the **axe-beak illustration** (the reference for Baxby's portrait — see AI-generated art below).
 
+## Reference material (documentation, not shipped assets)
+- **Fire Emblem Wiki** (<https://fireemblemwiki.org>), the independent community wiki. Mined by
+  `tools/fe8_guide_mine.py` into the generated digest `docs/fe8-guide.md`, which is the *how a chapter
+  is meant to be won* half of our parity work &mdash; the decomp only answers what a chapter contains.
+  **Only game FACTS are committed** (objectives, deploy caps, per-difficulty enemy tables); the wiki's
+  Strategy prose is its own authorship and is deliberately not reproduced in-repo &mdash; the
+  `Shape`/`Pressure`/`Teaches`/`Playstyle` lines are ours, written from it. Fetched HTML lives in the
+  gitignored `.fe8-guide-cache/` and is never redistributed.
+
 ## AI-generated art (disclose)
 - **PC/cast portraits** are AI-generated (Google **Gemini / "Nano Banana"**) from reference art, then hand-fitted and indexed into FE8 portraits via our bust pipeline (`tools/ref_to_bust.py`, `tools/portrait_tool.py`). To be disclosed as AI-assisted per community norms.
 - **Baxby the axe-beak portrait** — the reference is the **axe-beak illustration from *Rime of the Frostmaiden*** (© Wizards of the Coast), modified with Google **Gemini** (prompt-run by Nicolas), then fitted/indexed via the bust pipeline (`tools/ref_to_bust.py --crop 780,18,1920,940 --flip-h --zoom 0.88`). Disclose as both AI-assisted and WotC-derived.

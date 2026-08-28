@@ -1,0 +1,24 @@
+{
+  "_README": "The guide's strategy section digested into OUR design vocabulary, keyed by the slug in tools/fe8_guide_mine.py CHAPTERS. Written by hand -- a machine translation would give a paraphrase of tactics when what donor selection needs is the SHAPE of the level. 'shape' and 'pressure' feed the donor-selection index at the top of docs/fe8-guide.md; keep them to one scannable line each. An absent key means 'not digested yet', not an error.",
+
+  "ch1": {
+    "shape": "Tutorial seize with a rearward ambush",
+    "pressure": "A midline tripwire — crossing it drops 2 Fighters and a Soldier on your own start tile",
+    "teaches": "Trading weapons between units; allied reinforcements arriving on green tiles; effective weapons (the rapier against an armoured boss)",
+    "playstyle": "Barely harder than the prologue. Hand Seth's sword to Eirika first so the rapier is not wasted on ordinary infantry. Franz and Gilliam arrive turn 2 on the green tiles. Feed Eirika the Fighters and Franz or Gilliam the Soldiers if you intend to keep using them. The one trap: crossing the map's midline spawns two Fighters and a Soldier back where Seth and Eirika started, so do not leave your rear empty. Breguet is a Knight with Def 9 and Res 0 — the rapier cuts him, or lances do it the slow way. 5,000 gold on completion."
+  },
+
+  "ch6": {
+    "shape": "Rescue on a clock, run blind under fog",
+    "pressure": "Fog — the guide says it is the ONLY thing making the map hard — plus a 7-turn hostage timer, and Hard-only turn-4 cavalry spawning behind you",
+    "teaches": "Fog of war; enemies that heal; magic and poison at scale; effective weapons aimed at the player",
+    "playstyle": "The fog is the entire difficulty; strip it out and this is a walkover. Vision is a purchase, not a stat — buy torches from the PREVIOUS chapter's shop and lead with the thief for his sight radius. Then it is a race: Novala is holding hostages, reach them in under 7 turns with a flier, and the guide advises sending her from turn 1 to be safe. Saving all of them pays an Orion's Bolt, the biggest reward on the map. Only then go for the boss, who is a Shaman with Def 5 — 'a very easy boss, throw physical units at him'. Tank with your one overpowered unit, park in the forests on the right to evade, and watch your rear for the Hard-mode cavalry."
+  },
+
+  "ch7": {
+    "shape": "Seize across open ground, past fixed ranged emplacements",
+    "pressure": "Ballistae covering the approach — a positional hazard you route around rather than fight, and lethal to fliers",
+    "teaches": "Ballistae; stealing",
+    "playstyle": "A simple map by the guide's own account: beat the boss, take the castle. The single real hazard is the ballistae — keep fliers entirely outside their range, or walk an armour knight into it deliberately to break the machine. Bring the thief; there is an Energy Ring to steal. Push south behind a defensive front line. Murray is another pushover and can be safely chipped from range."
+  }
+}
