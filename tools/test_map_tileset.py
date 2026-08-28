@@ -889,5 +889,77 @@ class TestMapEditorOutputs(unittest.TestCase):
                 d, 'ch4-snowy-fields-start.png')))
 
 
+class TestVariantCompatibility(unittest.TestCase):
+    """A chapter-local tileset variant may ADD into unused slots -- never touch a live one.
+
+    That is the rule protecting every map that already shipped on the base tileset: ch04
+    rides snowy-bern, so a ch06 edit that reached a slot ch04 draws would silently
+    restyle or re-terrain a finished chapter.
+    """
+
+    MAPS = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+
+    def _variant(self, mutate):
+        """Copy snowy-bern into a temp dir under a variant name, mutate it, and test."""
+        base = os.path.join(self.MAPS, 'tilesets', 'snowy-bern')
+        with tempfile.TemporaryDirectory() as tmp:
+            tilesets = os.path.join(tmp, 'tilesets')
+            os.makedirs(os.path.join(tilesets, 'snowy-bern'))
+            os.makedirs(os.path.join(tilesets, 'variant'))
+            for ext in ('4bpp', 'bin', 'gbapal'):
+                blob = open(os.path.join(base, 'snowy-bern.%s' % ext), 'rb').read()
+                open(os.path.join(tilesets, 'snowy-bern',
+                                  'snowy-bern.%s' % ext), 'wb').write(blob)
+                if ext == 'bin':
+                    blob = mutate(bytearray(blob))
+                open(os.path.join(tilesets, 'variant',
+                                  'variant.%s' % ext), 'wb').write(bytes(blob))
+            return mt.tilesets_are_compatible_variants(tmp, 'snowy-bern', 'variant')
+
+    def _first_slot(self, terrain_is_zero):
+        ts = mt._tileset_from_dir(os.path.join(self.MAPS, 'tilesets', 'snowy-bern'))
+        for m in range(1, 1024):
+            if (ts.terrain(m) == 0) == terrain_is_zero:
+                return m
+        self.fail('no such slot')
+
+    def test_adding_into_an_unused_slot_is_compatible(self):
+        free = self._first_slot(True)
+        live = self._first_slot(False)
+
+        def mutate(cfg):
+            cfg[free * 8:free * 8 + 8] = cfg[live * 8:live * 8 + 8]
+            cfg[8192 + free] = 0x0C
+            return cfg
+
+        self.assertTrue(self._variant(mutate))
+
+    def test_reterraining_a_live_slot_is_rejected(self):
+        live = self._first_slot(False)
+
+        def mutate(cfg):
+            cfg[8192 + live] = 0x0C
+            return cfg
+
+        self.assertFalse(self._variant(mutate))
+
+    def test_repointing_a_live_slots_art_is_rejected(self):
+        live = self._first_slot(False)
+
+        def mutate(cfg):
+            cfg[live * 8] ^= 0x01
+            return cfg
+
+        self.assertFalse(self._variant(mutate))
+
+    def test_shipped_ice_variant_obeys_the_rule(self):
+        self.assertTrue(mt.tilesets_are_compatible_variants(
+            self.MAPS, 'snowy-bern', 'snowy-bern-ice'))
+
+    def test_a_different_tileset_is_not_a_variant(self):
+        self.assertFalse(mt.tilesets_are_compatible_variants(
+            self.MAPS, 'snowy-bern', 'snowy-fields'))
+
+
 if __name__ == '__main__':
     unittest.main()

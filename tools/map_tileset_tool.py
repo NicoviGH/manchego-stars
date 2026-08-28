@@ -144,6 +144,57 @@ def compile_layout(grid, out_bin, map_id, tileset='snowy-bern'):
     return out_bin
 
 
+def tilesets_are_compatible_variants(maps_root, base, variant):
+    """True when ``variant`` is ``base`` plus edits confined to unused slots.
+
+    A metatile index and a terrain byte both live in the `.bin`, and the art lives in the
+    `.4bpp`. A variant is safe to inherit a learned reskin, a protected-terrain target or a
+    seed `.mar` from its base when, and only when:
+
+      * the `.4bpp` is byte-identical -- so no metatile's ART has moved, and a copied
+        metatile costs no new tile ids; and
+      * the `.bin` differs ONLY at metatiles the BASE declares unused (`TERRAIN_NONE`).
+
+    That second clause is the campaign rule made mechanical: a variant may ADD into empty
+    slots (ch06's snow piles, stamped FOREST, live in `snowy-bern-ice` alone) but may never
+    alter a slot the base actually uses -- which is what would silently restyle or re-terrain
+    a chapter that already shipped on the base tileset. Palettes are free to differ; that is
+    the whole point of a variant.
+
+    Derived rather than declared (`decisions.md` -> "A base-map LABEL is prose -- the donor
+    is DERIVED"): compatibility is recomputed from the files every time, so there is no list
+    to keep in sync and a future edit that breaks the rule fails loudly instead of quietly.
+    """
+    if base == variant:
+        return True
+
+    def read(name, ext):
+        path = os.path.join(maps_root, 'tilesets', name, '%s.%s' % (name, ext))
+        if not os.path.exists(path):
+            return None
+        with open(path, 'rb') as handle:
+            return handle.read()
+
+    base_gfx, var_gfx = read(base, '4bpp'), read(variant, '4bpp')
+    if base_gfx is None or var_gfx is None or base_gfx != var_gfx:
+        return False
+    base_cfg, var_cfg = read(base, 'bin'), read(variant, 'bin')
+    if base_cfg is None or var_cfg is None or len(base_cfg) != len(var_cfg):
+        return False
+    if base_cfg == var_cfg:
+        return True
+
+    touched = set()
+    for offset in range(min(8192, len(base_cfg))):
+        if base_cfg[offset] != var_cfg[offset]:
+            touched.add(offset // 8)
+    for offset in range(8192, len(base_cfg)):
+        if base_cfg[offset] != var_cfg[offset]:
+            touched.add(offset - 8192)
+    # every touched slot must be one the BASE declared unused
+    return all(base_cfg[8192 + m] == 0 for m in touched if 8192 + m < len(base_cfg))
+
+
 def _tileset_from_dir(d):
     name = os.path.basename(d.rstrip('/'))
     return Tileset(os.path.join(d, name + '.4bpp'),
