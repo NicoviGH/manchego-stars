@@ -9,6 +9,12 @@ Rationale for the whole approach — **"divorce skin from class"**: `docs/decisi
 skin-divorce refinement (put our skins on the vanilla FE8 twin's classes → parity by construction;
 the ch01 goblin-skinned Soldiers/Fighters are the precedent).
 
+⚠️ **HOW to search this repo is a decided thing:** `docs/decisions.md` -> *"The FE-Repo is READ,
+not grepped"*. Pull the git trees per top-level directory (the root recursive call truncates and
+silently drops categories) and READ the category listings -- the assets that matter are named
+`Squidsmith`, `IronShell-Tiny General` and `[Spider-Variant] Cavalier Rider`, and no keyword
+sweep will ever find them.
+
 Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (the public GBAFE graphics
 repo; FEUniverse mirror). Scanned 2026-07-23.
 

@@ -757,16 +757,11 @@ design_notes: >
   Keep the merfolk honest (they are vanilla Ch6's own 24) and keep the two marooned boats
   killable -- that clock, not the boss, is where this chapter's difficulty lives.
 
-# ── Cutscene actor availability (classic permadeath) ─────────────────────────────
-# `permadeath.default_mode: classic` means Marty or Braulo can be DEAD when the boss falls.
-# The retired Talk design degraded on its own (no Marty, no Talk, fight it out); a cutscene
-# does not. events/ch06-messie.ea must therefore branch on CHECK_ALIVE for both speakers:
-# Marty is the one who can talk to animals and Braulo is lake fauna himself, so each can
-# carry the scene alone, and if BOTH are dead the scene plays with Messie unanswered --
-# he surfaces, waits, and submerges. Vanilla precedent for loading a scene actor regardless
-# of deployment is ch04's moose sighting; vanilla precedent for gating on the living is
-# Ch6's own Orion's Bolt (CHECK_ALIVE on its civilians).
-cutscene_actors:
-  required: []                  # nothing is force-deployed; the scene adapts instead
-  speakers: [marty, braulo]     # each sufficient alone
-  if_all_dead: "Messie surfaces, is not answered, and submerges -- the chapter still ends"
+# ── Cutscene actors ──────────────────────────────────────────────────────────────
+# The eight PCs appear in cutscenes whether or not they are alive -- permadeath is a COMBAT
+# rule here, not a narrative one (decisions.md, "Permadeath is a combat rule"). So this scene
+# does NOT gate on Marty or Braulo: they speak, always. The invariant that makes that safe is
+# that events/ch06-messie.ea must LOAD its actors rather than assume they are standing on the
+# map (`LoadUnit` has no death check; `GetUnitFromCharId` returns NULL for an absent unit, and
+# a CUMO/MOVE on NULL is the never-returns soft-lock assert_scripted_move_reachable exists for).
+cutscene_actors: [marty, braulo]
