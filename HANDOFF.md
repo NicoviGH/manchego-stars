@@ -6,59 +6,61 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-28 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-08-29 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing.** `main` is at **#331** (squash-merged 2026-08-28), the branch is deleted and the tree is
-clean. **#26 stays open**: the map is done, the chapter is not.
+**Nothing.** `main` is at **#334** (squash-merged 2026-08-29), the branch is deleted and the tree is
+clean. **#26 stays open**: the map and the roster are done, the chapter is not.
 
-**The design board** (rebuilt 2026-08-28 around the chapter YAML schema — every open decision names
-the field it writes): `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`
-**Issue #26 carries the same list as a checklist.** Read the issue for scope, the board for reasoning.
+**The design board:** `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`
+**Asset board** (every aquatic asset in the FE-Repo, animated per weapon):
+`https://claude.ai/code/artifact/d783c124-429c-4955-a575-0ae93b3cacd3`
+**Issue #26 carries the checklist**, including a comment holding the two boarding scenes' decided
+content. Read the issue for scope, the boards for reasoning.
 
 ## Next task
 
-**The ch06 enemy roster (D5) — Nicolas asked to do this one together.** Everything the decision
-needs is now on disk:
+**ch06 enemy POSITIONS — bring Nicolas a render first.** The roster is authored and measures
+x1.00; where the 27 units stand is the one design item left, and it is NOT derivable:
 
-- **The bar is FE8 Ch6**: 24 enemies (27 Difficult), avg L6.2 — 6 Soldier, 3 Fighter, 3 Knight,
-  3 Cavalier, 2 Mercenary, 2 Shaman (`docs/fe8-guide.md`).
-- **The donor is not the bar.** Ch13 Ephraim ships 58 enemies, 19 of them Cavaliers, on "defeat
-  all" — an attrition brawl, and cavalry is exactly what our river punishes. Do not import it.
-- **Density already works out.** Ch6's map is 580 cells and ours is 484, so 24 enemies is slightly
-  DENSER than vanilla Ch6. No scaling argument needed.
-- ⚠️ **The seed is wrong and will mislead you.** `enemy_units:` still declares 9 (Messie + 8
-  "Knucklehead Swarm"), and that swarm is class `gargoyle` — a **flier**. Fliers ignore the
-  concentric water the whole map exists to enforce, so the seed defeats the map's own premise.
-- **Water-bound mermaids** is the open proposal, not a decision: the rings become their highway,
-  the 8 crossings become the player's chokepoints, and Pinky covers the deep boat — turning the
-  map's flier bias into a division of labour rather than a monopoly.
-- **Placement facts** (measured, from the donor's own deploy block x4-10/y0-2): a flier reaches all
-  484 cells by turn 5; foot reaches every one of the 306 passable cells; both boats are turn 6 on
-  foot, 5 on cavalry, 3 by air. `TERRAIN_RIVER` is impassable to foot/armour/horse, cost 2 to
-  Pirate, 1 to flier; `CLIFF` and `PEAK` are impassable to everything but fliers.
-
-Then, in Nicolas's order: **the beats** (mine vanilla Ch6's cutscenes, then map our story onto it),
-then **Messie's art**.
-
-**Messie's map sprite is NICOLAS'S, not ours** — he took it back mid-session ("I'll handle it").
-Do not re-open it unprompted. The PixelLab verdict, if it comes up: it produces genuine
-native-resolution pixel art that passes `map_sprite_tool` (32x32, <=16 colours, forced onto a bank),
-but its text model does not know what a plesiosaur is. **34 of 40 trial generations left.**
+- **Neither vanilla source transfers.** ch05 lifted its coordinates from its twin because its map
+  IS that twin's retile. ch06 splits donor from bar (layout Ch13Ephraim, pressure Ch6), so Ch6's
+  coordinates describe a different map and Ch13Ephraim's describe a 58-unit force on ours.
+- **Three jobs to place against** (from the chapter's own design): boat squads in reach of both
+  marooned boats from turn 1 (the clock that replaces vanilla's hostage timer), lane holders on
+  the crossings, and a guard on the centre shelf.
+- **Measured geometry** (off the painted `.mar`, re-verified in review): 306 foot-passable cells in
+  ONE connected component; 8 crossings; a 6-cell centre shelf at (9-11, 11-13) whose only foot
+  doors are the bridges at **(8,11)** and **(10,14)**; a 3x3 drift pocket (+20 avoid, +1 Def) around
+  each boat; deploy block x4-10/y0-2. Foot reaches the west boat T6 and the east T7, Braulo T5/T4,
+  Pinky T3 — vanilla Ch6's own "send a flier" math, arrived at independently.
+- **Nicolas drives what/where/why** (2-3 concept options on a render), Claude drives how it is built.
 
 ## What ch06 still owes
 
-`make chapter CH=ch06` derives most of it — do not restate that here. Two things it cannot see:
+`make chapter CH=ch06` derives most of it — do not restate that here. What it cannot see:
 
 - **`inject_ch06` must call `_register_tileset(campaign, 'snowy-bern-ice', 'SnowIce', ...)`.**
   `TILESET_STEMS` knows the name, but `_register_chapter_map` then looks up `ObjectTypeSnowIce` /
   `MapPaletteSnowIce` / `TileConfigurationSnowIce` in the asset table and the first build
   `sys.exit`s without them. Sharing `Snow` would draw ch06 in ch04's palette.
-- **Both boarding scenes are declared with empty `text:` on purpose.** The boat crews have no voice
-  bible, and drafting before that pass is how dialogue drifts.
+- **The injector owes a `CH06_AI` table.** The exact byte tuples are recorded in the chapter YAML
+  above `enemy_units:`, including two labels no other chapter has (`charge_after_one_turn`
+  {0x0,0x12,0,0} and `pursue` {0,0,0,0}), and ch06's `hold_position` is Ch6's own
+  {0x3,0x3,0x0,0x0} — NOT ch05's {0x3,0x3,0x9,0x20}. `hard_mode_only: true` on the three extra
+  crab-riders wants vanilla's `CALL(EventScr_LoadReinforceHardMode)`.
+- **Five enemy reskins to vendor and wire** in `campaign.yaml` → `enemy_class_reskins` (Mermaid,
+  Shark Rider, spider-rider-as-crab, IronShell General, Lamia) with their `frame:` overrides. The
+  asset board above names every file and folder. NB the IronShell animation preview keys on BLUE,
+  not the usual green.
+- **Both boarding scenes are declared with empty `text:` on purpose.** Their content is DECIDED —
+  see the #26 comment (east/Grynsk teaches the snow mounds, west/Tali teases the intelligence) —
+  but Grynsk and Tali still need voice rows in `lore/frostmaiden-voices.md` before a line is drafted.
+- **`events/ch06-messie.ea` must branch on CHECK_ALIVE** for Marty and Braulo; `cutscene_actors:`
+  in the chapter YAML states the fallback. Classic permadeath can kill a cutscene speaker.
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
@@ -82,23 +84,21 @@ WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not re
 
 ## Recently landed — do not redo
 
-**#331 (2026-08-28) — ch06's map is painted, compiled and committed.** Detail lives in
-`docs/decisions.md` → *"ch06 departs from its donor's terrain in 21 declared cells"* and
-*"The DONOR and the BAR are different chapters"*; the one-line version:
+**#334 (2026-08-29) — ch06's roster, and Messie stops being a fight.** Two ADRs in
+`docs/decisions.md` carry the whole reasoning: *"Messie is a cutscene, not a boss"* and *"The AI is
+in the UnitDefs, so it is DERIVED"*. The one-line version: the merfolk are the enemy, Messie
+arrives in the boss-death cutscene, the objective is plain `defeat_boss`, and the boss rides
+`CHARACTER_NOVALA` via `ENEMY_BASE_SLOT` so she inherits his real line. Parity is **x1.00 threat /
+x1.00 clear-load** against FE8 Ch6, role check clean.
 
-| | |
-|---|---|
-| `campaigns/.../maps/ch06-maer-monster.mar` | 22x22 on `snowy-bern-ice`, round-trips byte-exact |
-| `snowy-bern-ice` | snowy-bern + 4 palette entries + 21 metatiles in slots snowy-bern declares unused; `.4bpp` byte-identical, `snowy-bern` and ch04 untouched |
-| `terrain_divergence:` | 21 declared cells, 0 undeclared; the import guard rejects anything not listed |
-| `forest_composition: replaced` | ch06 has no trees, so #193's sequence guard is exempted for FOREST only — the "deliberate departure" clause, taken explicitly |
-| boats | two green `CLASS_FLEET` units, not tiles and not villages; a dead NPC stops offering Talk exactly as a burned village stops offering Visit |
+⚠️ **The lesson that outlives ch06: #48 measures STATS, so behavioural drift is invisible to every
+gate.** ch06's first draft measured x1.00 while fielding 13 pursuers against a twin that fields
+two. An audit found ch00-ch05 have the same gap, biased toward aggression — **issue #335**, which
+also proposes the guard (an `ai_divergence:` allowlist, modelled on `terrain_divergence`).
 
-⚠️ **Three guards shipped DEAD earlier that day and were fixed in the same PR** — the lesson
-generalises: `_declared_divergence` matched the chapter `id` against the map stem and loaded zero
-rows; `validate_vanilla_retile` compared the tileset by NAME and skipped 25 protected cells for any
-variant. Both had a green suite because nothing exercised them. If you add an escape hatch to a
-guard, add the test that proves the hatch opens **and** that the guard still shuts.
+**#331 (2026-08-28) — ch06's map is painted, compiled and committed.** Detail in `docs/decisions.md`
+→ *"ch06 departs from its donor's terrain in 21 declared cells"* and *"The DONOR and the BAR are
+different chapters"*.
 
 ### Earlier
 
@@ -153,7 +153,7 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
   an unchecked box records what someone intended, not what the repo contains: #23 read as "7 open
   items" while git history and the live YAML showed the work shipped long ago. Cross-reference the
   artifact. Closed in the sweep: #303, #23, #133, #244. Still open and each carrying its own fresh
-  evidence: **#135** (real v0.1.0 playtester feedback on art consistency and difficulty, never
+  evidence: **#335** (the AI audit, opened 2026-08-29), **#135** (real v0.1.0 playtester feedback on art consistency and difficulty, never
   triaged) and **#30** (`campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one
   from ch04 on — nothing reads it, so it misleads rather than breaks). #30 is now cheap: since
   #312 there is one reader for the chapter YAML (`tools/campaign_chapters.py`), so that block
