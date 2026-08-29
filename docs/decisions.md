@@ -7561,6 +7561,48 @@ standing on the map is the never-returns soft-lock `assert_scripted_move_reachab
 for. Vanilla's own scenes `LOAD1`/`LOAD2` their actors before staging them; ch04's moose does the
 same. Every scene of ours must.
 
+### The FE-Repo is READ, not grepped (2026-08-29)
+
+Scouting the FE-Repo by keyword misses the assets that matter. ch06's search found nothing useful
+until the method changed; then it found five, and every one of them **contains no word describing
+what it is**:
+
+| the asset | what it actually is | the word that would have found it |
+|---|---|---|
+| `[Berserker-Hawkeye] Squidsmith` | the only aquatic AXE anim | none |
+| `[General-Variant] IronShell-Tiny General` | the only armour anim carrying a LANCE | none |
+| `[Spider-Variant] Cavalier Rider` | mounted **sword + lance**, one palette from a crab | none |
+| `[Monster-Custom] Lamia` | a mounted-footprint staff healer | none |
+| `Shark Rider (M/F)` | mounted merfolk, map sprite only | "shark", by luck |
+
+A broad aquatic keyword sweep over the same tree returned **2,966 name hits**, almost all noise --
+it matches artist handles (`SeaLion`, `WAve`, `Squidaccus`, `Shark3134`) and words like "sea" and
+"ice" inside unrelated filenames -- and still surfaced none of the five. Keyword search answers
+"who is named like a fish", which is not the question. The question is "what can wield an axe
+underwater", and only a human reading the category can answer it.
+
+**The method that works:**
+
+1. **Pull the git trees, per top-level directory.** The root `git/trees/HEAD?recursive=1` call
+   TRUNCATES (40,326 entries, `truncated: true`) and silently drops whole categories -- its
+   top-level listing stops at "Battle Animations", so `Map Sprites` never appears. Fetch the root
+   tree non-recursively for the directory SHAs, then recurse each one:
+   `Map Sprites` returns complete at 3,074 files, `Portrait Repository` at 17,341; `Battle
+   Animations` truncates at 44,200, so fetch its 23 category subtrees individually.
+2. **Read the category listing by eye.** The monster and mounted categories are short enough
+   (~100-210 names each) to scan, and scanning is what surfaced every asset above.
+3. **Open the mode folders before believing anything about weapons.** `docs/fe-repo-scouting.md`
+   already warns that its table says where an anim LIVES, not what it does. Do not `head` the
+   listing either: the Mermaid's modes were first reported off a truncated list, and the full one
+   (`2. Lance`, `4. Bow`, `4. Staff`, `5/6. Magic`, `7. Staff`, `8. Refresh/Unarmed`, and NO sword
+   or axe) is what actually decided the roster.
+4. **Check the map-sprite half separately.** An anim without a map sprite is half an asset, and the
+   reverse (Kraken, Shark, Shark Rider) is common -- they look right walking and produce a vanilla
+   monster's animation the moment combat starts.
+
+Cost is a few API calls and one pass of reading. The alternative cost ch06 an afternoon of
+believing the axe block had to be redesigned around an asset gap that did not exist.
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:
