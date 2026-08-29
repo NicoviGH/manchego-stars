@@ -806,6 +806,12 @@ ENEMY_BASE_SLOT = {
     'goblin-chief':  'CHARACTER_%s' % CH01_BOSS_SLOT,
     'raider-captain': 'CHARACTER_%s' % CH02_BOSS_SLOT,
     'raider-bruiser': 'CHARACTER_%s' % CH02_MINIBOSS_SLOT,
+    # ch06's merfolk elder RIDES NOVALA (2026-08-29). Her chapter's parity_reference IS
+    # FE8 Ch6, so the boss the bar measures against and the slot she deploys on are the
+    # same character -- she inherits his real line (HP 28 / Mag 10 / Def 5) instead of
+    # needing an invented `personal:` block and a RAW_PID_PERSONAL_SOURCES route. Both
+    # sides of the comparison then read the same article.
+    'nerra': 'CHARACTER_NOVALA',
 }
 
 

@@ -105,7 +105,9 @@ events:
     description: >
       Dorbulgruf refuses payment — paranoid, half-remembering, accusing the party of
       swindling him. Tensions rise. Braulo swings first (braulo_first_swing) — combat
-      begins. Branches on the ch06 messie_spared flag.
+      begins. SINGLE outcome as of 2026-08-29: ch06 no longer branches (Messie is a
+      cutscene, not a boss), so there is no messie_spared flag to read -- he is always alive
+      and always the Speaker candidate.
   - trigger: unit_engages_boss
     unit: wolfram
     target: dorbulgruf
@@ -119,7 +121,8 @@ events:
     type: cutscene
     ea_file: events/ch07-ending.ea
     description: >
-      If messie_spared: Messie installed as Speaker; uneasy but hopeful town.
+      Messie installed as Speaker; uneasy but hopeful town. (No longer conditional --
+      ch06 has one ending.)
       If Messie was slain in ch06: a colder installation scene / different
       Speaker outcome. Either way the party leaves in a trail of blood, mixed
       reception. Foreshadow: a town crier mentions Easthaven heard of Bremen.
@@ -141,5 +144,5 @@ design_notes: >
   genuinely greedy old miser AND a sick old man whose dementia has sharpened the
   bitterness — the party isn't wrong that he's stiffing them, but they still cut down
   a confused, dying elder. Don't resolve which he is. Civilian no-kill constraint is
-  the design hook. Ending branches on messie_spared. The town crier's Easthaven line
+  the design hook. ONE ending (ch06 no longer branches). The town crier's Easthaven line
   seeds the ch08 ambush (word of Bremen traveled).
