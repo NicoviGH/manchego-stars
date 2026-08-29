@@ -1,5 +1,6 @@
 # chapters/ch06-the-maer-monster.yaml
-# Chapter index: docs/CHAPTERS.md (generated from this file). Rationale: docs/decisions.md (esp. the Ch6 Talk-resolution beat).
+# Chapter index: docs/CHAPTERS.md (generated from this file).
+# Rationale: docs/decisions.md -> "Messie is a cutscene, not a boss" (2026-08-29).
 # Combat is vanilla FE (see docs/decisions.md §Combat). damage_type labels are cosmetic.
 
 id: ch06-the-maer-monster
@@ -116,7 +117,7 @@ difficulty_note: >
 deployment:
   deploy_limit: 10              # D4 -- FE8 Ch6 parity (deploy 1-10); the donor map ships 11 slots
   start_area: "x4-10, y0-2 (the donor's own deploy block, top-centre) -- forces the spiral"
-  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene, so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages cutscene characters exactly this way -- ch04's moose sighting is ours). Braulo is a Pirate and the only PC who can cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
+  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene, so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages cutscene characters exactly this way -- ch04's moose sighting is ours). Braulo (Pirate, river cost 2) and Trex (Thief, cost 5 -- one channel cell per turn at mov 6) are the only PCs who cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 # DERIVED, not invented: every row below is one of vanilla Ch6's own 24 units -- same class,
 # same level, same inventory -- re-dressed as merfolk. Source is the Fire Emblem Wiki enemy
@@ -241,10 +242,10 @@ enemy_units:
     inventory:
       - id: iron-axe
       - id: halberd
-    item_drop: halberd          # vanilla drops the UNEQUIPPED item off a Fighter (item table).
-                                # The same table also lists an Iron Axe as a Fighter drop; only
-                                # this row carries two items, so the second drop is unresolved
-                                # from the wiki alone -- confirm against the ROM when ch06 is hosted.
+    item_drop: halberd          # SETTLED from events_udefs.c, not the wiki: this L5 Fighter is the
+                                # only Ch6 unit with `.itemDrop = 1` on an axe, carrying
+                                # {AXE_IRON, AXE_HALBERD}. FE8 drops the LAST item, so the Halberd
+                                # is the drop and the Iron Axe is what it swings.
     damage_type: slashing
     ai_pattern: cautious               # vanilla AttackInRangeAI
     skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
@@ -432,6 +433,11 @@ enemy_units:
     level: 6
     autolevel: true
     arrives_turn: 4             # vanilla's own turn-4 player-phase load
+    hard_mode_only: true        # vanilla loads this array with CALL(EventScr_LoadReinforceHardMode)
+                                # (ch6-eventscript.h, EventScr_089F2B74) -- DIFFICULT ONLY. Without
+                                # this flag Normal would field 27 where vanilla fields 24, and the
+                                # static bar cannot see it: #48 folds vanilla's Hard array into the
+                                # comparison on BOTH sides, so the x1.00 stays x1.00 either way.
     inventory:
       - id: javelin
       - id: iron-lance
@@ -445,6 +451,7 @@ enemy_units:
     level: 7
     autolevel: true
     arrives_turn: 4
+    hard_mode_only: true        # as above -- EventScr_LoadReinforceHardMode
     inventory:
       - id: iron-lance
     damage_type: piercing
@@ -457,6 +464,7 @@ enemy_units:
     level: 6
     autolevel: true
     arrives_turn: 4
+    hard_mode_only: true        # as above -- EventScr_LoadReinforceHardMode
     inventory:
       - id: iron-sword
       - id: javelin
@@ -702,7 +710,7 @@ rescue_boats:
   tile: [17, 12]                # R13, the outcrop cell north of the door
   ai_pattern: hold              # never moves; Fleet has mov 3 and must not wander
   attackable_sides: 4           # parity: 2 of vanilla Ch6's 3 civilians are open on 4/4 sides
-  reached_on: {foot: 6, cavalry: 5, flier: 3}
+  reached_on: {foot: 7, cavalry: 5, flier: 3, braulo: 4}   # re-measured off the painted .mar
   talk:
     background: bg_Boat         # vendored from FE-Repo; the boarding CG
     ea_file: events/ch06-boat-east.ea
@@ -719,7 +727,7 @@ rescue_boats:
   tile: [4, 17]                 # E18
   ai_pattern: hold
   attackable_sides: 4
-  reached_on: {foot: 6, cavalry: 5, flier: 3}
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5}   # re-measured off the painted .mar
   talk:
     background: bg_Boat
     ea_file: events/ch06-boat-west.ea
@@ -742,6 +750,23 @@ economy:
 # on purpose rather than placeholder prose.
 
 design_notes: >
-  The emotional centerpiece of the MVP and Marty's primary signature beat. Keep
-  the fight genuinely hard so the Talk feels earned, not handed out. Track the
-  messie_spared flag — ch07's Speaker-installation scene branches on it.
+  The emotional centerpiece of the MVP and Marty's primary signature beat -- and as of
+  2026-08-29 it is a CUTSCENE, not a hidden Talk. The fight is the merfolk; Messie hauls
+  himself onto the ice once Nerra falls. There is no messie_spared flag and no second
+  ending: every player sees the beat, and nobody has to guess a command exists on a boss.
+  Keep the merfolk honest (they are vanilla Ch6's own 24) and keep the two marooned boats
+  killable -- that clock, not the boss, is where this chapter's difficulty lives.
+
+# ── Cutscene actor availability (classic permadeath) ─────────────────────────────
+# `permadeath.default_mode: classic` means Marty or Braulo can be DEAD when the boss falls.
+# The retired Talk design degraded on its own (no Marty, no Talk, fight it out); a cutscene
+# does not. events/ch06-messie.ea must therefore branch on CHECK_ALIVE for both speakers:
+# Marty is the one who can talk to animals and Braulo is lake fauna himself, so each can
+# carry the scene alone, and if BOTH are dead the scene plays with Messie unanswered --
+# he surfaces, waits, and submerges. Vanilla precedent for loading a scene actor regardless
+# of deployment is ch04's moose sighting; vanilla precedent for gating on the living is
+# Ch6's own Orion's Bolt (CHECK_ALIVE on its civilians).
+cutscene_actors:
+  required: []                  # nothing is force-deployed; the scene adapts instead
+  speakers: [marty, braulo]     # each sufficient alone
+  if_all_dead: "Messie surfaces, is not answered, and submerges -- the chapter still ends"

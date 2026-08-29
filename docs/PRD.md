@@ -66,7 +66,7 @@ Nicolas ran a multi-year D&D 5e campaign (*Rime of the Frostmaiden*) with 6 frie
 - **Recruit NPC allies** (Trex, Basil, the Mummy, …) as the story progresses so the roster grows like a real FE game.
 - **Casual or Classic mode** (FE8's toggle) so permadeath is my choice.
 - **Campaign-specific dialogue and story beats** (the kobold execution, Messie becoming Speaker, Braulo smashing shackles) so it feels like *our* campaign.
-- **Discover Marty can Talk to Messie in Ch 6** — rewarded for paying attention to the story, not a tutorial prompt.
+- **Watch Marty talk the Maer monster down in Ch 6** — the fight is the merfolk; Messie climbs onto the ice afterwards and answers him in Common.
 - **Ch 8 ends in a scripted defeat** so the Revel's End cliffhanger lands hard.
 
 ---
@@ -177,7 +177,7 @@ The MVP is **done** when:
 5. Combat plays as vanilla FE, reskinned with D&D-flavored names/art + a cosmetic d20 crit flourish (no damage-type mechanic).
 6. Vanilla FE weapon effectiveness works for iconic matchups (armorslayer vs knights, monster-effective vs skeletons/ice trolls).
 7. Spell-tome charges deplete and restock correctly.
-8. Ch 6 (Messie) is resolvable via Talk.
+8. Ch 6 ends on the Messie cutscene: the merfolk elder falls, Messie surfaces, Marty and Braulo speak with him.
 9. Ch 8 ends in a scripted defeat with the Revel's End cliffhanger text.
 10. Casual/Classic toggle works.
 11. Playtested end-to-end at least twice (bugs, then balance).
