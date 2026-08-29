@@ -19,18 +19,24 @@ parity_reference: "FE8 Ch6"   # #48 enemy-pressure parity bar — Victims of War
                               # because this is >= FE8 Ch5 (decisions.md, reward ladder).
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
+# REFRAMED 2026-08-29 (Nicolas). Messie is NOT the antagonist and is NOT a fight: the
+# merfolk are. He sank Bremen's boats to keep their crews off water the merfolk control --
+# clumsy protection, which the town read as a monster. Canon supports this rather than
+# bending it (Rime pp. 28-31): the plesiosaurus "recognizes boats from Bremen but does not
+# attack indiscriminately", "prefers to dine on fish, not people", was told by Ravisin only
+# to SPREAD FEAR among the fishers, and its whole behaviour table is boat damage. Tali's own
+# deduction is that ONLY Bremen boats were attacked. The Pronged Goat "was found by fishers
+# the next day, drifting crewless" -- a marooned Bremen boat is the book's own image.
 narrative: >
-  In Bremen, on the frozen west bank of Maer Dualdon, a rude shield-dwarf named
-  Grynsk Berylbore drafts the party onto his two fishing boats — the Burly Ram
-  and the Pronged Goat (the latter still bearing a huge bite-mark). They meet
-  Tali, a half-elf wildlife researcher (they/them) who warns that something has
-  been sinking the boats and hands the party a notebook, asking them to record
-  whatever they find. They haul in knucklehead trout for stingy pay, then see a
-  vast shadow beneath the ice: Messie, an awakened plesiosaur, capsizing boats.
-  Messie separates the party's two boats and attacks. Marty's Talk with Animals
-  reveals she was "awakened" by a frost druid, fears losing her new intelligence,
-  and was ordered to terrorize the town. The party can fight her down — or talk
-  her down.
+  Bremen sends the party onto the frozen mouth of Maer Dualdon to bring back two boats
+  that went out and never came home. The lake around the docks is frozen solid -- the
+  fishers pull their rowboats up onto the ice -- so the party walks out across it, into
+  water the merfolk consider theirs. The merfolk are what has been sinking Bremen's
+  crews. Messie, the awakened plesiosaur the town blames for it, has been ramming those
+  same boats to turn them back before they reached deep water. When the merfolk are
+  broken, he hauls himself up onto the ice, and Marty and Braulo find out what he is:
+  a creature Ravisin woke, ordered to frighten the fishers, and who has been quietly
+  disobeying her by protecting them instead.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -42,39 +48,43 @@ map:
                                 # once snowy-bern won the look (decisions.md, the ice ADR).
   size: "22×22"                 # Ch13EphraimMap; 137 TERRAIN_RIVER in concentric channels
   description: >
-    Tight water map over the frozen mouth of Maer Dualdon. Two boat-deck platforms —
-    the Burly Ram (small creatures) and the Pronged Goat (Braulo/Wolfram) — drift
-    apart across open water; Messie roams the deeps; the knucklehead swarm flanks the
-    boats. Drifting ice floes choke the lanes between the two decks.
-  # FE-native terrain mapping of the book's ice-floe hazard (grounded in
-  # fireemblem8u/include/constants/terrains.h — vanilla, no engine work):
+    The frozen mouth of Maer Dualdon, 22x22. Concentric channels of cracked-open water ring
+    the map, crossed at eight points; everything else is walkable lake ice. Two marooned
+    fishing boats sit in ice outcrops at opposite corners -- the Burly Ram east (17,12),
+    the Pronged Goat west (4,17) -- and a six-cell ice shelf holds the map's centre,
+    reachable on foot only over the bridges at (8,11) and (10,14).
+  # FE-native terrain, grounded in fireemblem8u/include/constants/terrains.h. The lake is
+  # FROZEN: every combatant walks. Only the ring channels are open water.
   terrain_mechanic:
-    open_water: TERRAIN_SEA       # 0x15 — impassable to foot/mounted units; this is WHY the
-                                  #        knucklehead swarm is a flier class (gargoyle) and the
-                                  #        PCs are confined to the two boat decks.
-    boat_decks: TERRAIN_SHIP_FLAT # 0x2A — the walkable Burly Ram / Pronged Goat platforms.
-    ice_floes: TERRAIN_SNAG       # 0x33 — DESTRUCTIBLE drifting floes blocking the lanes between
-                                  #        the decks. Attack to break one open (vanilla snag rule),
-                                  #        creating stepping-stones to cross boats or reach Messie.
-    ice_walls: TERRAIN_PEAK       # 0x12 — permanent ridges. NOT glacier: TERRAIN_GLACIER costs 1 for
-                              #        EVERY class (incl. armour), so it shapes nothing at all.
+    lake_ice: TERRAIN_PLAINS      # 0x01 -- 255 cells; the frozen surface everyone fights on
+    channels: TERRAIN_RIVER       # 0x10 -- 136 cells; impassable to our foot/armour/horse
+                                  #         classes, cost 2 to Braulo (Pirate) and 5 to Trex
+                                  #         (Thief), 1 to Pinky. The party's three answers.
+    crossings: TERRAIN_BRIDGE_REGULAR  # 0x13 -- 7 bridges + one BRIDGE_SNAG = 8 crossings
+    snow_drifts: TERRAIN_FOREST   # 0x0C -- 41 cells, +20 avoid / +1 Def, cost 2. Nine ring
+                                  #         each boat (the repainted village footprints);
+                                  #         (7,11) covers the west door onto the centre shelf.
+    ice_walls: TERRAIN_PEAK       # 0x12 -- permanent ridges. NOT glacier: TERRAIN_GLACIER
+                                  #         costs 1 for EVERY class, so it shapes nothing.
   terrain_note: >
-    The two boats start separated by an impassable channel webbed with snag-floes.
-    Clearing floes (or waiting for Messie to smash them) is how foot units bridge the
-    gap — turning the book's "steer around the ice floes" into a vanilla movement puzzle.
+    Measured off the painted .mar: foot reaches 306 of 484 cells and they form ONE connected
+    component -- the eight crossings wire the whole lake together, so the channels shape the
+    route without ever stranding anyone. Foot reaches the west boat turn 6 and the east turn 7;
+    Braulo swims to them turn 5 and 4; Pinky flies to both turn 3. That is vanilla Ch6's own
+    math, where the guide tells you to send a flier at the hostages.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
+# PLAIN DefeatBoss, as vanilla Ch6 (2026-08-29). The old `defeat_boss_or_talk` + hidden
+# Talk resolution is GONE: Messie is not an enemy unit, so there is nothing to talk down
+# mid-battle. He arrives in the boss-death cutscene instead, which means every player sees
+# the chapter's signature beat instead of the few who would have tried Talk on a boss.
+# This also puts ch06 on the wiring ch03 and ch05 already ship (a borrowed vanilla
+# defeat_boss goal template) rather than an invented dual win condition.
 objective:
-  type: defeat_boss_or_talk              # mirrors FE8 Ch5 = DefeatBoss; Talk is our hidden alt-resolution
-  description: "Defeat Messie OR have Marty Talk to her while adjacent"
-  hidden_resolution:
-    unit: marty
-    target: messie
-    condition: adjacent
-    command: talk
-    result: peaceful_resolution
+  type: defeat_boss
+  description: "Defeat Nerra, the merfolk elder"
 
-win_condition: messie_defeated_OR_messie_talked
+win_condition: nerra_defeated
 lose_condition: all_player_units_defeated
 
 # ── Difficulty (D3) ─────────────────────────────────────────────────────────────
@@ -95,96 +105,439 @@ difficulty:
 fog: none
 
 difficulty_note: >
-  A REAL boss fight (≈FE8 Ch5 difficulty) — Messie is tough but beatable in 8–12
-  turns through combat. The Talk option is discoverable, never forced: pre-chapter
-  dialogue hints Marty can speak with beasts; the Talk command appears only when
-  Marty is adjacent. The long combat window gives players time to notice Talk
-  organically. Two outcomes (see events).
+  The difficulty is the merfolk and the two marooned boats, never the boss -- which is
+  vanilla Ch6's own shape, where Novala is a Def 5 shaman the guide says to throw physical
+  units at and the real pressure is a hostage clock under fog. We drop the fog (the route
+  is legible and the channels do that work) and keep the clock: merfolk stand in reach of
+  both boats from turn 1, and the boats can die. Nerra inherits Novala's softness on
+  purpose. Messie is a cutscene, not an encounter, so no route skips XP.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   deploy_limit: 10              # D4 -- FE8 Ch6 parity (deploy 1-10); the donor map ships 11 slots
   start_area: "x4-10, y0-2 (the donor's own deploy block, top-centre) -- forces the spiral"
-  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit (TBD), split across the two boats — small units (Basil/Trex/Sahnar/casters) on the Burly Ram, Braulo/Wolfram on the Pronged Goat. Marty MUST be deployable (his Talk is the hidden resolution). The beast-cavalry (Baxby/Lupin) may bench on the boat map by terrain — authoring call. Only the pack direwolves stay non-combat dressing. Positions set in Tiled."
-
+  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene, so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages cutscene characters exactly this way -- ch04's moose sighting is ours). Braulo is a Pirate and the only PC who can cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+# DERIVED, not invented: every row below is one of vanilla Ch6's own 24 units -- same class,
+# same level, same inventory -- re-dressed as merfolk. Source is the Fire Emblem Wiki enemy
+# table for Victims of War (Normal), the same page `tools/fe8_guide_mine.py` mines; the
+# guide's digest prints only the top six classes, so the per-unit levels here come from the
+# cached page directly. Totals check: 24 units, levels summing to 148, average 6.17 --
+# vanilla's own 6.17 to the decimal.
+#
+# ART (decided 2026-08-29, Nicolas): the merfolk carry lance/bow/staff/magic on Stephano's
+# Mermaid anim, which ships no sword and no axe -- so the axe block rides the Shark Rider
+# map sprite with a regular axe anim, the mounted and sword blocks ride a spider-rider
+# repainted as a crab, the Knights are the IronShell General (the one armour anim that
+# carries a LANCE), and vanilla's Troubadour stays a Troubadour on the Lamia, whose serpent
+# body IS the mount. Sprite size is a declared field, not a constraint -- `frame:` in
+# `campaign.yaml` -> `enemy_class_reskins` sets the wait-row size flag, as ch01's 16x32 Fire
+# Imp on a Soldier and ch03's Lizard Wildling on a Brigand already do. The `skin:` notes
+# below are INTENT; the wiring lands in campaign.yaml when the slice is built.
+#
+# MESSIE IS NOT HERE. He is not an encounter -- he arrives in the boss-death cutscene.
 enemy_units:
-  - id: messie
-    name: "Messie"
+  # ── The trident line (vanilla's 6 Soldiers) → merfolk, Mermaid `2. Lance` ─────
+  - id: merfolk-trident
+    name: "Mermaid"
+    count: 4
+    class: soldier              # vanilla: 4x Lv7 Soldier, Iron Lance
+    level: 7
+    autolevel: true
+    inventory:
+      - id: iron-lance
+    damage_type: piercing       # flavor label only
+    ai_pattern: aggressive      # the boat squads -- see `roster_roles` below
+    skin:
+      look: "merfolk spear-guard; the anim's lance IS a trident"
+      source: "FE-Repo: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [F] Mermaid by Stephano -> 2. Lance; map sprite Mermaid (F) {N426} or {ZoramineFae}, 16x16"
+  - id: merfolk-thrower
+    name: "Mermaid"
+    count: 1
+    class: soldier              # vanilla: 1x Lv7 Soldier, Javelin + Iron Lance
+    level: 7
+    autolevel: true
+    inventory:
+      - id: javelin
+      - id: iron-lance
+    damage_type: piercing
+    ai_pattern: aggressive
+    skin: {look: "merfolk spear-guard, thrown trident", source: "as merfolk-trident"}
+  - id: merfolk-trident-young
+    name: "Mermaid"
+    count: 1
+    class: soldier              # vanilla: 1x Lv6 Soldier, Iron Lance
+    level: 6
+    autolevel: true
+    inventory:
+      - id: iron-lance
+    damage_type: piercing
+    ai_pattern: defensive
+    skin: {look: "merfolk spear-guard", source: "as merfolk-trident"}
+
+  # ── The axe block (vanilla's 3 Fighters) → shark riders ──────────────────────
+  # No aquatic AXE anim exists that reads as one of these people (the FE-Repo's only
+  # candidate, Stephano's Squidsmith, is a Shantae-styled figure swinging a squid), so
+  # these ride the SHARK RIDER map sprite over a regular axe animation -- Nicolas's call,
+  # and the same trade ch03 makes where the archer and thief stay vanilla so the player
+  # can still read the class.
+  - id: shark-rider-poison
+    name: "Shark Rider"
+    count: 1
+    class: fighter              # vanilla: 1x Lv6 Fighter, Poison Axe
+    level: 6
+    autolevel: true
+    inventory:
+      - id: poison-axe
+        fe_base: venin-axe        # FE8's ITEM_AXE_VENIN, which the wiki prints as "Poison Axe"
+    damage_type: slashing
+    ai_pattern: aggressive
+    skin:
+      look: "merfolk on a shark, boarding axe"
+      source: "FE-Repo: Map Sprites/Mounted - Dismounted, Monsters, Misc/Shark Rider (M) {N426}, 16x16 (stand+walk); NO battle anim exists -- vanilla Fighter frames, repalletted"
+  - id: shark-rider-steel
+    name: "Shark Rider"
+    count: 1
+    class: fighter              # vanilla: 1x Lv6 Fighter, Steel Axe
+    level: 6
+    autolevel: true
+    inventory:
+      - id: steel-axe
+    damage_type: slashing
+    ai_pattern: aggressive
+    skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
+  - id: shark-rider-halberd
+    name: "Shark Rider"
+    count: 1
+    class: fighter              # vanilla: 1x Lv5 Fighter, Iron Axe + Halberd
+    level: 5
+    autolevel: true
+    inventory:
+      - id: iron-axe
+      - id: halberd
+    item_drop: halberd          # vanilla drops the UNEQUIPPED item off a Fighter (item table).
+                                # The same table also lists an Iron Axe as a Fighter drop; only
+                                # this row carries two items, so the second drop is unresolved
+                                # from the wiki alone -- confirm against the ROM when ch06 is hosted.
+    damage_type: slashing
+    ai_pattern: defensive
+    skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
+
+  # ── The mounted block (vanilla's 3 Cavaliers) → crab-riders ──────────────────
+  - id: crab-rider-blade
+    name: "Crab Rider"
+    count: 1
+    class: cavalier             # vanilla: 1x Lv7 Cavalier, Iron Blade
+    level: 7
+    autolevel: true
+    inventory:
+      - id: iron-blade
+    damage_type: slashing
+    ai_pattern: aggressive
+    skin:
+      look: "merfolk astride a lake crab; the mount repainted from an arachnid to ice-blue shell"
+      source: "FE-Repo: Battle Animations/Mounted - Dismounted, Monsters, Misc/[Spider-Variant] [M] Cavalier Rider by DATonDemand -> 1. Sword + 2. Lance; map sprite Cavalier (M) Spider Rider Sword {Zoramine} or Elder Bael Sword {Metalocif}, 16x32"
+  - id: crab-rider-sword
+    name: "Crab Rider"
+    count: 1
+    class: cavalier             # vanilla: 1x Lv6 Cavalier, Iron Sword
+    level: 6
+    autolevel: true
+    inventory:
+      - id: iron-sword
+    damage_type: slashing
+    ai_pattern: aggressive
+    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
+  - id: crab-rider-lance
+    name: "Crab Rider"
+    count: 1
+    class: cavalier             # vanilla: 1x Lv6 Cavalier, Iron Lance
+    level: 6
+    autolevel: true
+    inventory:
+      - id: iron-lance
+    damage_type: piercing
+    ai_pattern: aggressive
+    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 2. Lance"}
+
+  # ── The sword block (vanilla's 2 Mercenaries) → crab-riders on foot-speed ────
+  - id: merfolk-blade
+    name: "Crab Rider"
+    count: 1
+    class: mercenary            # vanilla: 1x Lv6 Mercenary, Iron Sword
+    level: 6
+    autolevel: true
+    inventory:
+      - id: iron-sword
+    damage_type: slashing
+    ai_pattern: aggressive
+    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 1. Sword"}
+  - id: merfolk-blade-drop
+    name: "Crab Rider"
+    count: 1
+    class: mercenary            # vanilla: 1x Lv6 Mercenary, Iron Blade
+    level: 6
+    autolevel: true
+    inventory:
+      - id: iron-blade
+    item_drop: iron-blade       # vanilla: "Iron Blade -- dropped by enemy Mercenary"
+    damage_type: slashing
+    ai_pattern: aggressive
+    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 1. Sword"}
+
+  # ── The armour block (vanilla's 3 Knights) → IronShell ───────────────────────
+  # The Bael is NOT reused here: it is already the one Bael vanilla fields, and it is
+  # already the crab-riders' mount. IronShell is the only armour anim in the repo that
+  # carries a LANCE, so the Knights keep vanilla's weapon as well as its class.
+  - id: ironshell-guard
+    name: "Ironshell"
+    count: 2
+    class: armor-knight         # vanilla: 2x Lv6 Knight, Iron Lance (FE8 CLASS_ARMOR_KNIGHT)
+    level: 6
+    autolevel: true
+    inventory:
+      - id: iron-lance
+    damage_type: piercing
+    ai_pattern: hold_position   # the crossings -- a 1-tile bridge is what armour is for
+    skin:
+      look: "a shelled thing plated like a knight, holding a bridge"
+      source: "FE-Repo: Battle Animations/Infantry - Knights, Generals, Armors/[General-Variant] IronShell-Tiny General [U] by Alexsplode -> 2. Lance; map sprite General (U) IronShell_Tiny {Alexsplode}, 16x32. NB its anim preview keys on BLUE, not the usual green."
+  - id: ironshell-horseslayer
+    name: "Ironshell"
+    count: 1
+    class: armor-knight         # vanilla: 1x Lv6 Knight, Horseslayer + Javelin
+    level: 6
+    autolevel: true
+    inventory:
+      - id: horseslayer
+      - id: javelin
+    damage_type: piercing
+    ai_pattern: hold_position
+    skin: {look: "as ironshell-guard", source: "as ironshell-guard"}
+
+  # ── Casters and healers (vanilla's Shaman, Mage, Priest, Troubadour) ─────────
+  - id: merfolk-tidecaller
+    name: "Mermaid"
+    count: 1
+    class: shaman               # vanilla: 1x Lv6 Shaman, Flux
+    level: 6
+    autolevel: true
+    inventory:
+      - id: flux
+    damage_type: necrotic
+    ai_pattern: cautious
+    skin: {look: "merfolk caster", source: "Mermaid by Stephano -> 6. Magic"}
+  - id: merfolk-singer
+    name: "Mermaid"
+    count: 1
+    class: mage                 # vanilla: 1x Lv6 Mage, Thunder
+    level: 6
+    autolevel: true
+    inventory:
+      - id: thunder
+    damage_type: lightning
+    ai_pattern: cautious
+    skin: {look: "merfolk caster", source: "Mermaid by Stephano -> 5. Magic"}
+  - id: merfolk-mender
+    name: "Mermaid"
+    count: 1
+    class: priest               # vanilla: 1x Lv6 Priest, Mend
+    level: 6
+    autolevel: true
+    inventory:
+      - id: mend
+    ai_pattern: defensive       # vanilla Ch6 TEACHES enemies that heal; both healers stay
+    skin: {look: "merfolk healer", source: "Mermaid by Stephano -> 4./7. Staff"}
+  - id: lamia-mender
+    name: "Lamia"
+    count: 1
+    class: troubadour           # vanilla: 1x Lv6 Troubadour, Mend + Elixir. KEPT MOUNTED --
+                                # a lamia's serpent body is the mount, so vanilla's mounted
+                                # healer stays a Troubadour (mov 6) instead of dismounting
+                                # to a Cleric. Nicolas, 2026-08-29.
+    level: 6
+    autolevel: true
+    inventory:
+      - id: mend
+      - id: elixir
+    item_drop: elixir           # vanilla: "Elixir -- dropped by enemy Troubadour"
+    ai_pattern: defensive
+    skin:
+      look: "serpent-bodied merfolk healer"
+      source: "FE-Repo: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [U] Lamia by L95 -> 7. Staff (also 6. Magic); map sprite Lamia (F) {Dutch Introvert}, 16x32 -- a native fit for the Troubadour's own 16x32 row"
+
+  # ── Bow and beast (vanilla's Archer and its one Bael) ────────────────────────
+  - id: merfolk-bow
+    name: "Mermaid"
+    count: 1
+    class: archer               # vanilla: 1x Lv6 Archer, Iron Bow
+    level: 6
+    autolevel: true
+    inventory:
+      - id: iron-bow
+    damage_type: piercing
+    ai_pattern: defensive       # punishes the crossings from across a channel
+    skin: {look: "merfolk with a harpoon-bow", source: "Mermaid by Stephano -> 4. Bow"}
+  - id: ice-crab
+    name: "Ice Crab"
+    count: 1
+    class: bael                 # vanilla: 1x Lv1 Bael, Poison Claw -- kept as itself
+    level: 1
+    autolevel: true
+    inventory:
+      - id: poison-claw
+        fe_base: venin-claw       # ITEM_MONSTER_VENINCLW -- vanilla Ch6's own Bael weapon
+    damage_type: poison
+    ai_pattern: aggressive
+    skin: {look: "a lake crab the size of a boat", source: "vanilla Bael art, 32x32 -- no reskin"}
+
+  # ── The Hard wave (vanilla's Difficult-only Cavaliers) ───────────────────────
+  # Vanilla Ch6 keeps three extra Cavaliers in a SEPARATE UnitDefinition array, loaded by a
+  # turn-4 player-phase event and present only on Difficult -- the guide's "Hard-mode cavalry
+  # spawning behind you", and the whole of its Normal->Difficult delta (24 -> 27; the wiki
+  # calls it "a UNIT change, not a level shift"). We field the same three, as crab-riders,
+  # with vanilla's own levels and inventories. #48's static bar folds that array in on the
+  # vanilla side unconditionally, so declaring ours is what makes the two sides count the
+  # same force: with them, the comparison reads x1.00 on both metrics instead of x0.88/x0.82.
+  - id: crab-rider-hard-javelin
+    name: "Crab Rider"
+    count: 1
+    class: cavalier             # vanilla (Difficult array): 1x Lv6 Cavalier, Javelin + Iron Lance
+    level: 6
+    autolevel: true
+    arrives_turn: 4             # vanilla's own turn-4 player-phase load
+    inventory:
+      - id: javelin
+      - id: iron-lance
+    damage_type: piercing
+    ai_pattern: aggressive
+    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
+  - id: crab-rider-hard-lance
+    name: "Crab Rider"
+    count: 1
+    class: cavalier             # vanilla (Difficult array): 1x Lv7 Cavalier, Iron Lance
+    level: 7
+    autolevel: true
+    arrives_turn: 4
+    inventory:
+      - id: iron-lance
+    damage_type: piercing
+    ai_pattern: aggressive
+    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
+  - id: crab-rider-hard-sword
+    name: "Crab Rider"
+    count: 1
+    class: cavalier             # vanilla (Difficult array): 1x Lv6 Cavalier, Iron Sword + Javelin
+    level: 6
+    autolevel: true
+    arrives_turn: 4
+    inventory:
+      - id: iron-sword
+      - id: javelin
+    damage_type: slashing
+    ai_pattern: aggressive
+    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
+
+  # ── The boss (vanilla's Novala) ──────────────────────────────────────────────
+  # Novala's own line, from the wiki's boss table: Shaman Lv10, HP 28, Mag 10, Skl 8,
+  # Spd 6, Lck 7, DEF 5, Res 9, Con 7, Mov 5, carrying Flux, dropping nothing. Def 5 is
+  # why the guide says to throw physical units at him, and that softness is the point:
+  # vanilla Ch6 puts its difficulty in the hostage clock, not the boss. No personal: block
+  # -- ch06 has no injector yet, and #284 requires every declared line to have a route.
+  - id: nerra
+    name: "Nerra"
+    fe_name: "Nerra"
     is_boss: true
     count: 1
-    class: draco-zombie         # FE8 monster boss class (dragon-tier); reskinned as Messie the plesiosaur
-    level: 9
-    damage_type: bludgeoning    # flavor label only
-    ai_pattern: boss_roam
-    recruitable_via_talk: marty  # not a playable recruit — becomes a Bremen NPC
-    death_quote: "*a mournful, fading cry beneath the ice*"
-    pronouns: he/him            # SETTLED 2026-08-26 (Nicolas). The DM notes and the book
-                                # both say "it"; an earlier draft of this file said "she".
-                                # He/him holds through ch07's Speaker installation.
-    art_note: >
-      32x32 is the ENGINE CEILING for a map sprite -- UNIT_ICON_SIZE_* has exactly three
-      values (16x16, 16x32, 32x32) and bmudisp.c switches on them in five places, so
-      anything larger is an engine change plus SMS VRAM we do not have spare. Braulo,
-      Meesmickle, Wolfram, the moose, Manakete 2 and the Demon King already sit in that
-      top tier: there is no rung above them, and size therefore has to come from FILLING
-      the cell corner to corner (what the Demon King does and Baxby does not).
-      He never moves and never joins, so he needs NO 32x480 walk sheet -- only the
-      3-frame idle. Design intent (2026-08-26): give the unit a breaching head-and-neck
-      and paint the REST of him into the tilemap, which has no size limit and costs no
-      engine work. "A large mass glides through the dark water below you" is the book's
-      own line (p.30).
-  - id: harrier-fish
-    name: "Knucklehead Swarm"
-    count: 8                     # boss-chapter pacing bump (6 -> 9 enemies; decisions 2026-06-06)
-    class: gargoyle             # FE8 monster class (agile flier); reskinned as a leaping fish swarm
-    level: 5
-    damage_type: piercing
-    ai_pattern: harass          # flank the boats, split player attention
+    class: shaman
+    level: 10
+    inventory:
+      - id: flux
+    damage_type: necrotic
+    ai_pattern: hold_position   # as Novala, who teleports to his corner and waits
+    skin: {look: "the largest of the merfolk", source: "Mermaid by Stephano -> 6. Magic; no portrait -- see below"}
+    # NO death quote and NO portrait, deliberately (Nicolas, 2026-08-29): the merfolk do not
+    # speak. Messie does, and that contrast is the chapter. The FE-Repo has no merfolk
+    # portrait at all -- 17,341 files searched; the nearest is a HUMAN knight in a fin-crested
+    # helm ("Shark Knight" {Sphealnuke}) -- so a speaking boss would have cost authored art
+    # for nothing. The name is arbitrary and touches one string.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
+# THREE scenes, down from four (2026-08-29). The `unit_adjacent` Talk unlock is gone with
+# the boss fight: Messie is not on the field, so there is nothing to walk up to. The two
+# ending arms collapse to one, because "kill the creature that was protecting the town" is
+# not a choice this version offers.
 events:
   - trigger: chapter_start
     type: cutscene
     ea_file: events/ch06-opening.ea
     description: >
-      Bremen docks; Grynsk Berylbore drafts the crew onto the Burly Ram and Pronged
-      Goat; Tali (half-elf researcher, they/them) warns of the boat-sinkings and hands
-      over a notebook; Marty's pre-chapter beast-speech hint ('I can talk to animals,
-      remember?'). Boats set out.
-  - trigger: unit_adjacent
-    unit: marty
-    target: messie
-    type: command_unlock
-    ea_file: events/ch06-messie-talk.ea
+      Bremen docks. Two boats went out and neither came back, and the town wants them
+      brought in before the ice closes. Grynsk Berylbore -- who sent those crews -- and
+      Tali, the half-elf researcher (they/them), are both out there. The party walks onto
+      the frozen lake. NOTE: the merfolk are not introduced here; the player meets them by
+      being attacked, and learns what they are from the two rescued crews.
+  - trigger: boss_defeated
+    unit: nerra
+    type: cutscene
+    ea_file: events/ch06-messie.ea
     description: >
-      The Talk command appears. If used: marty_messie_talk — Messie's story, his
-      fear, the peaceful resolution (the campaign-defining beat). Suggest he run
-      for Speaker of Bremen. The ARGUMENT is the ch05 payoff: the book names Ravisin
-      (p.31) as the druid who awakened him, and he keeps attacking only because he
-      fears she will take the gift back. She is already dead -- the party killed her
-      at the tomb -- and an awaken spell is permanent.
-  - trigger: chapter_end_talk
+      THE CHAPTER. With the merfolk broken, the ice cracks and Messie hauls himself up onto
+      it -- the mass the whole town has been calling a monster, lying on the ice in front of
+      the people who came to kill it. Marty speaks to him (his beast-speech), and the answer
+      comes back in Common, because Ravisin's awaken spell gave him language along with a
+      mind (book p.28: Intelligence 10 and speech in Common; his own line on p.31 is
+      "I'm listening"). Braulo is the second voice -- lake fauna talking to lake fauna.
+      What comes out: Ravisin woke him and told him to spread fear among Bremen's fishers;
+      he has been ramming their boats instead, to turn them back before they reached
+      merfolk water. He fears losing the mind he was given. She is already dead -- the party
+      killed her at the tomb -- and an awaken spell is permanent. He is free and does not
+      know it yet.
+  - trigger: chapter_end
     type: cutscene
-    ea_file: events/ch06-ending-peace.ea
-    description: "Peaceful payoff: Messie spared, joins Bremen, set up to become Speaker (pays off in ch07)."
-  - trigger: chapter_end_kill
-    type: cutscene
-    ea_file: events/ch06-ending-kill.ea
-    description: "Brute-force ending: Messie slain; a sadder, quieter scene. Bremen Speaker plot in ch07 differs."
+    ea_file: events/ch06-ending.ea
+    description: >
+      Back at Bremen with the rescued crews. Messie is not a monster and the town has to
+      swallow it; the Speaker seed for ch07 is planted here. If both boats survived, the
+      Orion's Bolt is handed over in this scene, exactly as vanilla Ch6 pays its own
+      save-them-all reward (CHECK_ALIVE on both).
+
+# ── Messie (cutscene actor, NOT an enemy unit) ───────────────────────────────────
+# He has no class, no level and no AI: he is loaded by `events/ch06-messie.ea`, speaks, and
+# leaves. That deletes the campaign's single hardest art dependency -- `docs/fe-repo-scouting.md`
+# records that NO plesiosaur/sea-monster battle animation exists anywhere in the FE-Repo, and a
+# unit that never fights needs none. What he still needs is a map sprite, which is NICOLAS'S
+# (taken back 2026-08-26); do not re-open it.
+messie:
+  name: "Messie"
+  pronouns: he/him              # SETTLED 2026-08-26 (Nicolas). The DM notes and the book both
+                                # say "it"; an earlier draft of this file said "she" throughout.
+  role: cutscene_actor
+  appears_in: events/ch06-messie.ea
+  art_note: >
+    32x32 is the ENGINE CEILING for a map sprite -- UNIT_ICON_SIZE_* has exactly three values
+    and bmudisp.c switches on them in five places -- so size has to come from FILLING the cell
+    corner to corner. He never moves and never fights, so he needs no walk sheet and NO battle
+    animation: a 3-frame idle is the whole ask. Design intent (2026-08-26): a breaching
+    head-and-neck as the sprite, with the REST of him painted into the tilemap, which has no
+    size limit and costs no engine work. "A large mass glides through the dark water below
+    you" is the book's own line (p.30).
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
   gold_reward: 400
   available_shops: [bremen]
   units_available_to_recruit: []   # Messie is an NPC, not a playable unit
-  branch_flag: messie_spared       # consumed by ch07 dialogue
   unlocks_chapter: ch07-blood-in-bremen
+  # NO branch_flag. There is one outcome now (2026-08-29): the fight is against the merfolk,
+  # and Messie's scene plays for every player. ch07 is unwritten, so nothing was orphaned.
 
 # ── Signature Moment anchored here ───────────────────────────────────────────────
 signature_moments:
   - pc: marty
-    trigger: marty_messie_talk     # PRIMARY — see pcs/marty.yaml
+    trigger: ch06_messie_scene     # PRIMARY — see pcs/marty.yaml. Now a guaranteed
+                                   # cutscene rather than a hidden Talk: every player
+                                   # sees it, nobody has to guess the command exists.
 
 # ── Forest composition (declared departure from #193) ───────────────────────────
 # A frozen lake has no trees, so ch06 replaces the concept: all 23 of the donor's FOREST
