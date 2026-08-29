@@ -59,8 +59,9 @@ x1.00; where the 27 units stand is the one design item left, and it is NOT deriv
 - **Both boarding scenes are declared with empty `text:` on purpose.** Their content is DECIDED —
   see the #26 comment (east/Grynsk teaches the snow mounds, west/Tali teases the intelligence) —
   but Grynsk and Tali still need voice rows in `lore/frostmaiden-voices.md` before a line is drafted.
-- **`events/ch06-messie.ea` must branch on CHECK_ALIVE** for Marty and Braulo; `cutscene_actors:`
-  in the chapter YAML states the fallback. Classic permadeath can kill a cutscene speaker.
+- **`events/ch06-messie.ea` must LOAD Marty and Braulo**, not assume them. They speak whether or
+  not they are alive (`decisions.md` -> *"Permadeath is a combat rule, not a narrative one"*); what
+  is NOT optional is loading them, because staging an absent unit is a soft-lock (issue #337).
 
 ⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
 `.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
@@ -95,6 +96,15 @@ x1.00 clear-load** against FE8 Ch6, role check clean.
 gate.** ch06's first draft measured x1.00 while fielding 13 pursuers against a twin that fields
 two. An audit found ch00-ch05 have the same gap, biased toward aggression — **issue #335**, which
 also proposes the guard (an `ai_divergence:` allowlist, modelled on `terrain_divergence`).
+
+**#336 (2026-08-29) — two campaign-wide rules, both ADRs in `docs/decisions.md`.** *"Permadeath is
+a combat rule, not a narrative one"*: the eight PCs appear in every cutscene alive or dead, because
+the player picks their own lord and there is no always-present character to hand a dead PC's lines
+to the way vanilla hands Artur's to Eirika — and these scenes record a campaign that happened. The
+invariant is **a cutscene LOADs its actors** (guard proposed in **#337**). And *"The FE-Repo is
+READ, not grepped"*: pull the git trees per directory and read the categories, because every asset
+ch06 needed is named `Squidsmith` / `IronShell-Tiny General` / `[Spider-Variant] Cavalier Rider`
+and no keyword sweep finds those.
 
 **#331 (2026-08-28) — ch06's map is painted, compiled and committed.** Detail in `docs/decisions.md`
 → *"ch06 departs from its donor's terrain in 21 declared cells"* and *"The DONOR and the BAR are
@@ -153,7 +163,8 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
   an unchecked box records what someone intended, not what the repo contains: #23 read as "7 open
   items" while git history and the live YAML showed the work shipped long ago. Cross-reference the
   artifact. Closed in the sweep: #303, #23, #133, #244. Still open and each carrying its own fresh
-  evidence: **#335** (the AI audit, opened 2026-08-29), **#135** (real v0.1.0 playtester feedback on art consistency and difficulty, never
+  evidence: **#335** (the AI audit) and **#337** (the cutscene-actor guard), both opened
+  2026-08-29, **#135** (real v0.1.0 playtester feedback on art consistency and difficulty, never
   triaged) and **#30** (`campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one
   from ch04 on — nothing reads it, so it misleads rather than breaks). #30 is now cheap: since
   #312 there is one reader for the chapter YAML (`tools/campaign_chapters.py`), so that block
