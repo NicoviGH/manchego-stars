@@ -164,7 +164,7 @@ enemy_units:
       - id: evil-eye
         fe_base: evil-eye
     damage_type: dark           # flavor label only
-    ai_pattern: defensive
+    donor: [[11, 6], [13, 7], [12, 8], [13, 11]]   # vanilla's four mogalls, tile for tile -- and they run THREE AIs, not one
   # ── Revenants ×2 (melee zombies) — vanilla Ch4's core fodder; the tough end of the line ──
   - id: revenant
     name: "Revenant"
@@ -178,7 +178,7 @@ enemy_units:
       - id: rotten-claw
         fe_base: rotten-claw    # ITEM_MONSTER_ROTTENCLW — vanilla Revenant claw
     damage_type: bludgeoning    # flavor label only
-    ai_pattern: aggressive
+    donor: [[7, 9], [5, 13]]   # two of vanilla's main-force L2 revenants (AttackInRange)
   # ── Bonewalkers ×3 (MELEE, iron sword) — vanilla Ch4 Bonewalkers are melee, not bows ──
   - id: bonewalker
     name: "Bonewalker"
@@ -192,7 +192,7 @@ enemy_units:
       - id: iron-sword
         fe_base: iron-sword     # ITEM_SWORD_IRON — vanilla Ch4 line Bonewalker weapon
     damage_type: slashing       # flavor label only
-    ai_pattern: aggressive
+    donor: [[2, 7], [3, 10], [1, 14]]   # vanilla's three main-force bonewalkers -- (2,7) pursues, the other two hold
   # ── Entombed ×1 (tanky melee brute) — vanilla Ch4 DOES field one Entombed (L1) ──
   - id: entoumbed
     name: "Entombed"
@@ -206,7 +206,7 @@ enemy_units:
       - id: fetid-claw
         fe_base: fetid-claw     # ITEM_MONSTER_FETIDCLW — vanilla Entombed claw
     damage_type: bludgeoning    # flavor label only
-    ai_pattern: defensive
+    donor: [13, 13]   # vanilla's Entombed, on the same tile
   # ══ TURN-2 REVEAL: the convertible wolf pack (6) ═════════════════════════════
   # Flow (Nicolas 2026-07-21): ch04 OPENS monsters-only (above); on turn 2 the pack bursts from the
   # NW fog beside the party — Lupin commands them (intelligence shown by ACTION), Marty reads it
@@ -237,7 +237,13 @@ enemy_units:
       - id: beast-bite
         fe_base: rotten-claw    # modeled beast bite (same claw class as the Revenants they replace)
     damage_type: piercing       # flavor label only
-    ai_pattern: aggressive
+    ai_override:
+      ai: '{DefaultAI, 0xC, 0x0}'
+      why: >
+        vanilla's matching wave is four L2 revenants stacked on (0,0)
+        (UnitDef_088B4C24); ours is a six-wolf pack on its own spawn tiles because Marty's
+        parley needs each wolf individually addressable (#203). Their AI is those
+        revenants' own -- pursue -- minus the stray GuardTile bit one of the four carries.
     convertible: true           # #171 — the pack parley (Marty). Convertible REINFORCEMENT: arrives
                                 # turn 2 then recruited rather than ground down (the clear-load discount).
     parley:
@@ -262,7 +268,10 @@ enemy_units:
         fe_base: rotten-claw
     item_drop: vulnerary        # the twin's dropping Revenant (ITEM_VULNERARY, last-slot drop)
     damage_type: bludgeoning
-    ai_pattern: aggressive
+    donor: [{at: [5, 8], class: CLASS_REVENANT}, {at: [8, 14], class: CLASS_REVENANT},
+              [10, 12], [11, 14]]
+    # four of vanilla's revenants, one apiece -- two hold, two pursue. The middle pair stand
+    # on their counterparts' own tiles; the outer two take the revenants our wave displaces.
   # ── Bonewalker pack ×3 (MELEE, iron lance) — vanilla Ch4's turn-2 Bonewalker pack ──
   - id: bonewalker-reinf
     name: "Bonewalker"
@@ -277,7 +286,7 @@ enemy_units:
       - id: iron-lance
         fe_base: iron-lance     # ITEM_LANCE_IRON — vanilla Ch4 pack Bonewalker weapon
     damage_type: piercing
-    ai_pattern: aggressive
+    donor: [[14, 9], [14, 8], [14, 6]]   # vanilla's east bonewalker wave (UnitDef_088B4C88), tile for tile
 
 # ── Scripted neutral (the quarry) ────────────────────────────────────────────────
 neutral_units:

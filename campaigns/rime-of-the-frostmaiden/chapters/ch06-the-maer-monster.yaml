@@ -174,7 +174,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing       # flavor label only
-    ai_pattern: cautious               # vanilla: 3 of these 4 Soldiers are AttackInRangeAI; the 4th pursues (see note)
+    donor: [[14, 9], [15, 7], [20, 7], [19, 13]] # vanilla's four HOLDING L7 soldiers
     skin:
       look: "merfolk spear-guard; the anim's lance IS a trident"
       source: "FE-Repo: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [F] Mermaid by Stephano -> 2. Lance; map sprite Mermaid (F) {N426} or {ZoramineFae}, 16x16"
@@ -188,7 +188,7 @@ enemy_units:
       - id: javelin
       - id: iron-lance
     damage_type: piercing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [14, 16]                 # vanilla's fifth L7 soldier -- the one it lets PURSUE
     skin: {look: "merfolk spear-guard, thrown trident", source: "as merfolk-trident"}
   - id: merfolk-trident-young
     name: "Mermaid"
@@ -199,7 +199,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [14, 11]                 # vanilla's L6 soldier
     skin: {look: "merfolk spear-guard", source: "as merfolk-trident"}
 
   # ── The axe block (vanilla's 3 Fighters) → shark riders ──────────────────────
@@ -218,7 +218,7 @@ enemy_units:
       - id: poison-axe
         fe_base: venin-axe        # FE8's ITEM_AXE_VENIN, which the wiki prints as "Poison Axe"
     damage_type: slashing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [16, 9]                  # vanilla L6 fighter
     skin:
       look: "merfolk on a shark, boarding axe"
       source: "FE-Repo: Map Sprites/Mounted - Dismounted, Monsters, Misc/Shark Rider (M) {N426}, 16x16 (stand+walk); NO battle anim exists -- vanilla Fighter frames, repalletted"
@@ -231,7 +231,7 @@ enemy_units:
     inventory:
       - id: steel-axe
     damage_type: slashing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [15, 15]                 # vanilla L6 fighter
     skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
   - id: shark-rider-halberd
     name: "Shark Rider"
@@ -247,7 +247,7 @@ enemy_units:
                                 # {AXE_IRON, AXE_HALBERD}. FE8 drops the LAST item, so the Halberd
                                 # is the drop and the Iron Axe is what it swings.
     damage_type: slashing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [13, 6]                  # vanilla L5 fighter
     skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
 
   # ── The mounted block (vanilla's 3 Cavaliers) → crab-riders ──────────────────
@@ -260,7 +260,7 @@ enemy_units:
     inventory:
       - id: iron-blade
     damage_type: slashing
-    ai_pattern: charge_after_one_turn  # vanilla {0x0, 0x12, 0x0, 0x0}
+    donor: [8, 1]                   # vanilla L7 cavalier -- charge-after-one-turn
     skin:
       look: "merfolk astride a lake crab; the mount repainted from an arachnid to ice-blue shell"
       source: "FE-Repo: Battle Animations/Mounted - Dismounted, Monsters, Misc/[Spider-Variant] [M] Cavalier Rider by DATonDemand -> 1. Sword + 2. Lance; map sprite Cavalier (M) Spider Rider Sword {Zoramine} or Elder Bael Sword {Metalocif}, 16x32"
@@ -273,7 +273,7 @@ enemy_units:
     inventory:
       - id: iron-sword
     damage_type: slashing
-    ai_pattern: charge_after_one_turn  # vanilla {0x0, 0x12, 0x0, 0x0}
+    donor: [7, 1]                   # vanilla L6 cavalier
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
   - id: crab-rider-lance
     name: "Crab Rider"
@@ -284,7 +284,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
-    ai_pattern: charge_after_one_turn  # vanilla {0x0, 0x12, 0x0, 0x0}
+    donor: [11, 0]                  # vanilla L6 cavalier
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 2. Lance"}
 
   # ── The sword block (vanilla's 2 Mercenaries) → crab-riders on foot-speed ────
@@ -297,7 +297,7 @@ enemy_units:
     inventory:
       - id: iron-sword
     damage_type: slashing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [14, 14]                 # vanilla L6 mercenary
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 1. Sword"}
   - id: merfolk-blade-drop
     name: "Crab Rider"
@@ -309,7 +309,7 @@ enemy_units:
       - id: iron-blade
     item_drop: iron-blade       # vanilla: "Iron Blade -- dropped by enemy Mercenary"
     damage_type: slashing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [15, 10]                 # vanilla L6 mercenary (the dropper)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 1. Sword"}
 
   # ── The armour block (vanilla's 3 Knights) → IronShell ───────────────────────
@@ -325,7 +325,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
-    ai_pattern: cautious               # vanilla AttackInRangeAI -- armour that never moves
+    donor: [[16, 12], [16, 13]]     # vanilla's paired L6 knights
     skin:
       look: "a shelled thing plated like a knight, holding a bridge"
       source: "FE-Repo: Battle Animations/Infantry - Knights, Generals, Armors/[General-Variant] IronShell-Tiny General [U] by Alexsplode -> 2. Lance; map sprite General (U) IronShell_Tiny {Alexsplode}, 16x32. NB its anim preview keys on BLUE, not the usual green."
@@ -339,7 +339,7 @@ enemy_units:
       - id: horseslayer
       - id: javelin
     damage_type: piercing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [21, 13]                 # vanilla's third L6 knight
     skin: {look: "as ironshell-guard", source: "as ironshell-guard"}
 
   # ── Casters and healers (vanilla's Shaman, Mage, Priest, Troubadour) ─────────
@@ -352,7 +352,7 @@ enemy_units:
     inventory:
       - id: flux
     damage_type: necrotic
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [18, 14]                 # vanilla L6 shaman
     skin: {look: "merfolk caster", source: "Mermaid by Stephano -> 6. Magic"}
   - id: merfolk-singer
     name: "Mermaid"
@@ -363,7 +363,7 @@ enemy_units:
     inventory:
       - id: thunder
     damage_type: lightning
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [18, 5]                  # vanilla L6 mage
     skin: {look: "merfolk caster", source: "Mermaid by Stephano -> 5. Magic"}
   - id: merfolk-mender
     name: "Mermaid"
@@ -373,7 +373,7 @@ enemy_units:
     autolevel: true
     inventory:
       - id: mend
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [18, 9]                  # vanilla L6 priest
     skin: {look: "merfolk healer", source: "Mermaid by Stephano -> 4./7. Staff"}
   - id: lamia-mender
     name: "Lamia"
@@ -388,7 +388,7 @@ enemy_units:
       - id: mend
       - id: elixir
     item_drop: elixir           # vanilla: "Elixir -- dropped by enemy Troubadour"
-    ai_pattern: charge_after_one_turn  # vanilla {0x0, 0x12, ...} -- the healer RIDES WITH the mounted squad
+    donor: [10, 0]                  # vanilla's troubadour -- she travels with the cavalry, so she charges with them
     skin:
       look: "serpent-bodied merfolk healer"
       source: "FE-Repo: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [U] Lamia by L95 -> 7. Staff (also 6. Magic); map sprite Lamia (F) {Dutch Introvert}, 16x32 -- a native fit for the Troubadour's own 16x32 row"
@@ -403,7 +403,7 @@ enemy_units:
     inventory:
       - id: iron-bow
     damage_type: piercing
-    ai_pattern: cautious               # vanilla AttackInRangeAI
+    donor: [12, 4]                  # vanilla L6 archer
     skin: {look: "merfolk with a harpoon-bow", source: "Mermaid by Stephano -> 4. Bow"}
   - id: ice-crab
     name: "Ice Crab"
@@ -415,7 +415,7 @@ enemy_units:
       - id: poison-claw
         fe_base: venin-claw       # ITEM_MONSTER_VENINCLW -- vanilla Ch6's own Bael weapon
     damage_type: poison
-    ai_pattern: pursue                 # vanilla ships NO .ai block = all zeros = MoveToEnemy
+    donor: [27, 4]                  # vanilla's lone Bael -- the one wandering pursuer
     skin: {look: "a lake crab the size of a boat", source: "vanilla Bael art, 32x32 -- no reskin"}
 
   # ── The Hard wave (vanilla's Difficult-only Cavaliers) ───────────────────────
@@ -442,7 +442,7 @@ enemy_units:
       - id: javelin
       - id: iron-lance
     damage_type: piercing
-    ai_pattern: aggressive             # vanilla {DefaultAI, 0x1, 0x0}
+    donor: [0, 11]                  # vanilla's HARD-mode cavalry (UnitDef_088B64F0)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
   - id: crab-rider-hard-lance
     name: "Crab Rider"
@@ -455,7 +455,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
-    ai_pattern: aggressive             # vanilla {DefaultAI, 0x1, 0x0}
+    donor: [0, 9]                   # vanilla's HARD-mode cavalry
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
   - id: crab-rider-hard-sword
     name: "Crab Rider"
@@ -469,7 +469,7 @@ enemy_units:
       - id: iron-sword
       - id: javelin
     damage_type: slashing
-    ai_pattern: aggressive             # vanilla {DefaultAI, 0x1, 0x0}
+    donor: [0, 13]                  # vanilla's HARD-mode cavalry
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
 
   # ── The boss (vanilla's Novala) ──────────────────────────────────────────────
@@ -488,7 +488,7 @@ enemy_units:
     inventory:
       - id: flux
     damage_type: necrotic
-    ai_pattern: hold_position          # vanilla GuardTileAI {0x3, 0x3, 0x0, 0x0} -- Novala stands on his tile
+    donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
     skin: {look: "the largest of the merfolk", source: "Mermaid by Stephano -> 6. Magic; no portrait -- see below"}
     # NO death quote and NO portrait, deliberately (Nicolas, 2026-08-29): the merfolk do not
     # speak. Messie does, and that contrast is the chapter. The FE-Repo has no merfolk
@@ -708,7 +708,7 @@ rescue_boats:
   size: 32x32                   # unit_icon_wait_table[0x41] = UNIT_ICON_SIZE_32x32
   faction: green                # -> unit_icon_pal_npc; the ally green IS vanilla's civilian faction
   tile: [17, 12]                # R13, the outcrop cell north of the door
-  ai_pattern: hold              # never moves; Fleet has mov 3 and must not wander
+  donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
   attackable_sides: 4           # parity: 2 of vanilla Ch6's 3 civilians are open on 4/4 sides
   reached_on: {foot: 7, cavalry: 5, flier: 3, braulo: 4}   # re-measured off the painted .mar
   talk:
@@ -725,7 +725,7 @@ rescue_boats:
   size: 32x32
   faction: green
   tile: [4, 17]                 # E18
-  ai_pattern: hold
+  donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
   attackable_sides: 4
   reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5}   # re-measured off the painted .mar
   talk:

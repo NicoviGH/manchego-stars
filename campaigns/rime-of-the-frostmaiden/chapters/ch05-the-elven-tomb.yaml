@@ -266,7 +266,7 @@ enemy_units:
       - id: killing-frost
         fe_base: flux           # FE8 Flux — dark magic (FE MAG vs RES) at 1-2 range
     damage_type: cold           # flavor label only
-    ai_pattern: hold_position   # = vanilla Saar's GuardTileAI posture (decomp: .ai {GuardTileAI,0x9,0x20})
+    donor: {at: [13, 0], class: CLASS_ARMOR_KNIGHT}   # Saar, vanilla Ch5's boss -- GuardTileAI + the GuardTile bit
     boss_tile: moon_dial        # she holds the moon dial at the centre — retiled as a dais
                                 # (flavour + AI anchor; NO terrain bonus, see below)
     personal:                   # FE8's OWN boss mechanism — a named boss is class base + a
@@ -422,7 +422,11 @@ enemy_units:
       - id: fire-fang
         fe_base: fire-fang
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
-    ai_pattern: aggressive
+    ai_override:
+      ai: '{DefaultAI, 0x9, 0x0}'
+      why: >
+        the moose is ours -- vanilla Ch5 fields no beast to borrow from. It hunts, so it
+        takes vanilla Ch5's own pursue vector rather than a static one.
     convertible: false          # #171 — a difficulty-model flag. `difficulty.py` reads it to
                                 # exempt a unit from the role-inversion check and to apply
                                 # CONVERT_CLEAR_DISCOUNT (0.5) to clear-load, and BOTH would be
@@ -499,7 +503,12 @@ enemy_units:
       - id: elven-spear
         fe_base: iron-lance
     damage_type: piercing       # flavor label only
-    ai_pattern: defensive       # hold the approaches to the depression
+    donor: [{at: [0, 0], class: CLASS_SOLDIER},
+              {at: [10, 0], class: CLASS_SOLDIER, level: 5, nth: 0},
+              {at: [12, 0], class: CLASS_SOLDIER, level: 5},
+              {at: [10, 0], class: CLASS_SOLDIER, level: 5, nth: 1}]
+    # vanilla's four L5 soldiers, one apiece -- it splits them 2 holding / 2 pursuing,
+    # and the (10,0) pair is identical in every field but AI, hence `nth`
     skin:
       look: "skeletal elven spear-guard"
       source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
@@ -525,7 +534,16 @@ enemy_units:
       - id: rusted-greataxe
         fe_base: iron-axe
     damage_type: slashing       # flavor label only
-    ai_pattern: aggressive
+    donor: [{at: [10, 0], class: CLASS_FIGHTER, level: 5},
+              {at: [10, 0], class: CLASS_FIGHTER, level: 5},
+              {at: [10, 0], class: CLASS_FIGHTER, level: 5},
+              {at: [12, 0], class: CLASS_SOLDIER, level: 6},
+              {at: [0, 0], class: CLASS_FIGHTER},
+              {at: [11, 0], class: CLASS_ARCHER},
+              {at: [10, 0], class: CLASS_FIGHTER, level: 4},
+              {at: [10, 0], class: CLASS_ARCHER, level: 4}]
+    # eight of vanilla's line, one apiece: 4 hold, 2 pursue, 2 charge on turn 2.
+    # Giving all eight ONE donor flattened that to eight holders (the shortcut #335 exists to kill)
     skin:
       look: "risen elven axe-reaver, frost-pale"
       source: palette_swap      # vanilla Fighter frame, frost/pale palette
@@ -545,7 +563,7 @@ enemy_units:
       - id: bone-sword
         fe_base: iron-sword
     damage_type: slashing       # flavor label only
-    ai_pattern: aggressive
+    donor: {at: [0, 0], class: CLASS_MERCENARY}   # vanilla's L6 mercenary
     skin:
       look: "skeletal elven blade"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Base] [U] Bonewalker (one arm, sword) by Alexsplode"
@@ -562,7 +580,7 @@ enemy_units:
       - id: elven-longbow
         fe_base: iron-bow
     damage_type: piercing       # flavor label only
-    ai_pattern: defensive
+    donor: {at: [0, 0], class: CLASS_ARCHER}   # vanilla's holding L5 archer (the (11,0) one pursues; this is the static half)
     skin:
       look: "skeletal elven archer"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
@@ -589,7 +607,7 @@ enemy_units:
       - id: elven-spear
         fe_base: iron-lance
     damage_type: piercing       # flavor label only
-    ai_pattern: raider          # AI_B_04, vanilla's own — they make for reliquary-south first
+    donor: [[14, 16], [14, 15]]   # vanilla's turn-2 raider pair (UnitDef_088B5860), tile for tile
     skin:
       look: "skeletal elven spear-guard"
       source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
@@ -606,7 +624,7 @@ enemy_units:
       - id: rusted-greataxe
         fe_base: iron-axe
     damage_type: slashing       # flavor label only
-    ai_pattern: raider          # AI_B_04 — reliquary-east (12,10) and west (5,6) are theirs
+    donor: [[14, 8], [14, 6]]   # vanilla's turn-3 raider pair (UnitDef_088B589C)
     skin:
       look: "risen elven axe-reaver, frost-pale"
       source: palette_swap
@@ -624,7 +642,7 @@ enemy_units:
       - id: elven-longbow
         fe_base: iron-bow
     damage_type: piercing       # flavor label only
-    ai_pattern: raider          # AI_B_04 — vanilla's turn-8 pair spawns here and races (5,1) too
+    donor: [{at: [13, 0], class: CLASS_BRIGAND}, [14, 1]]   # vanilla's turn-5 raider pair (UnitDef_088B58D8) -- (13,0) is SHARED with Saar's tile, so the class is named
     skin:
       look: "skeletal elven archer"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
@@ -666,7 +684,7 @@ enemy_units:
       - id: killing-edge
         fe_base: killing-edge   # Joshua's killing-edge (30 crit) — the fragile-escort tension
     damage_type: slashing       # flavor label only
-    ai_pattern: duelist_hold    # vanilla Joshua's own {0x7, 0x3, 0x9, 0x0} — strike anything that
+    donor: [12, 6]   # vanilla Joshua -- AI_A_07, the do-not-attack-the-escort duelist
                                 # comes in range, NEVER move, and DO NOT TOUCH THE ESCORT. She
                                 # stands guard at the arena. A turn-1 crit-Myrmidon on
                                 # `aggressive` (pursue/charge) would hunt the squishies, which is

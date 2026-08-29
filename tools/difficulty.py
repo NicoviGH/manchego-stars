@@ -411,6 +411,48 @@ PARITY_REFERENCE_ALLY_UDEFS = {
 }
 
 
+# The decomp's own AI vector macros, read from the header the decomp COMPILES
+# (include/EA_Standard_Library/AI_Helpers.h, pulled in by events_udefs.c through EAstdlib.h
+# -- which is why vanilla's unit data reads `.ai = {AttackInRangeAI, 0x0, 0x0}`). Parsed
+# rather than copied: a local table would be a second source of truth for the exact bytes
+# #335 exists to keep faithful, and the copy that drifts is always the one nobody reads.
+AI_HELPERS_H = 'include/EA_Standard_Library/AI_Helpers.h'
+
+
+def _ai_macros():
+    """`{macro name: (byte, ...)}` from the decomp's AI helper header.
+
+    Only the multi-byte AI-vector macros and the single-byte field constants matter here;
+    both are plain `#define NAME 0x..[,0x..]` lines, so one regex covers them."""
+    out = {}
+    for line in bc.vanilla_decomp_text(AI_HELPERS_H).splitlines():
+        m = re.match(r'\s*#define\s+(\w+)\s+((?:0x[0-9A-Fa-f]+)(?:\s*,\s*0x[0-9A-Fa-f]+)*)\s*$',
+                     line)
+        if m:
+            out[m.group(1)] = tuple(int(t, 16) for t in m.group(2).split(','))
+    return out
+
+
+AI_MACROS = _ai_macros()
+
+
+def ai_bytes(spec):
+    """An AI vector as vanilla writes it -> its 4 engine bytes.
+
+    `spec` is the text between the braces (with or without them), or None. A UnitDefinition
+    with NO `.ai` block is {0,0,0,0} -- ActionInRange + MoveToEnemy, i.e. a PURSUER, not an
+    inert default; two of vanilla Ch6's red force are exactly that, and reading them as
+    static would invert a chapter's shape. Short vectors zero-fill as the C initialiser does."""
+    if not spec:
+        return (0x00, 0x00, 0x00, 0x00)
+    out = []
+    for token in (t.strip() for t in spec.strip().strip('{}').split(',')):
+        if not token:
+            continue
+        out.extend(AI_MACROS[token] if token in AI_MACROS else (int(token, 0),))
+    return tuple((out + [0, 0, 0, 0])[:4])
+
+
 def _brace_entries(body):
     """Yield each top-level `{...}` group's inner text from an array body, tracking brace
     depth so a unit's nested `.items = {...}` / `.ai = {...}` don't split it early."""
@@ -444,7 +486,13 @@ def vanilla_unit_defs(text, array_name):
         lvl = re.search(r'\.level\s*=\s*(\d+)', block)
         alg = re.search(r'\.allegiance\s*=\s*(\w+)', block)
         items = re.search(r'\.items\s*=\s*\{(.*?)\}', block, re.S)
+        ai = re.search(r'\.ai\s*=\s*\{(.*?)\}', block, re.S)
+        xpos = re.search(r'\.xPosition\s*=\s*(\d+)', block)
+        ypos = re.search(r'\.yPosition\s*=\s*(\d+)', block)
         out.append({
+            'ai': ai_bytes(ai.group(1) if ai else None),
+            'xPosition': int(xpos.group(1)) if xpos else None,
+            'yPosition': int(ypos.group(1)) if ypos else None,
             'charIndex': chi.group(1) if chi else None,
             'classIndex': cls.group(1),
             'level': int(lvl.group(1)) if lvl else 1,
@@ -454,6 +502,84 @@ def vanilla_unit_defs(text, array_name):
                      if items else [],
         })
     return out
+
+
+def vanilla_red_units(parity_ref):
+    """Every RED UnitDefinition in the twin, parsed. None if the reference isn't curated.
+
+    Unlike vanilla_enemies(), nothing is dropped for carrying no modeled weapon: a
+    staff-only healer contributes nothing to the threat math and everything to the map's
+    shape -- vanilla Ch6 gives its Troubadour the same delayed charge as the cavalry she
+    rides with, and a chapter borrowing her AI needs to find her."""
+    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
+    if spec is None:
+        return None
+    relpath, arrays = spec
+    text = bc.vanilla_decomp_text(relpath)
+    return [d for array_name in arrays
+            for d in vanilla_unit_defs(text, array_name)
+            if d['allegiance'] == 'FACTION_ID_RED']
+
+
+def resolve_donor(parity_ref, spec):
+    """One of our enemies' `donor:` reference -> the vanilla unit(s) it stands in for.
+
+    `spec` is a match over the twin's red force: a bare `[x, y]` coordinate, or a mapping of
+    any of `at` / `class` / `level`. It resolves when everything it matches SHARES one AI --
+    vanilla's three L2 soldiers behave identically, so "the L2 soldiers" is a well-formed
+    donor for our group of three. Returns the representative unit.
+
+    A coordinate is NOT sufficient on its own as a convention, which is why the spec is a
+    `nth:` (0-based, array order) is the last resort, for units vanilla stacks that are
+    identical in every readable field and still behave differently -- Ch1 puts two L2
+    fighters on (2,9), one pursuing from turn 1 and one charging on turn 2. It is opt-in
+    precisely because silently taking the first match is the bug this function exists to
+    prevent.
+
+    Two reasons a coordinate alone is not enough, both from real data: ch01 and ch06 sit on a
+    different MAP donor from their parity twin, so not one of their tiles lines up with it;
+    and where the map IS the twin's, a tile can still collide by accident -- ch05's
+    bone-archer reinforcements stand on (13,0), where vanilla Ch5 parks an ARMOR_KNIGHT
+    boss. Borrowing that boss's throne AI would have looked entirely reasonable.
+
+    Disagreement RAISES rather than taking the first match. Vanilla Ch2 puts an archer and a
+    brigand both on (14,7) with different AI, and a silent first-match would borrow the wrong
+    behaviour while looking perfectly correct -- the exact failure #335 exists to end."""
+    units = vanilla_red_units(parity_ref)
+    if units is None:
+        raise ValueError('parity_reference %r has no curated UnitDefinition arrays, so a '
+                         'donor cannot be resolved against it' % parity_ref)
+    if isinstance(spec, dict):
+        at, nth = spec.get('at'), spec.get('nth')
+        want = {'classIndex': spec.get('class'), 'level': spec.get('level')}
+    elif isinstance(spec, (list, tuple)) and len(spec) == 2:
+        at, nth, want = spec, None, {'classIndex': None, 'level': None}
+    else:
+        raise ValueError('donor %r is not a coordinate [x, y] nor a {at/class/level/nth} '
+                         'reference' % (spec,))
+    if at is not None and not (isinstance(at, (list, tuple)) and len(at) == 2):
+        raise ValueError('donor %r: `at` must be a coordinate [x, y]' % (spec,))
+    found = [u for u in units
+             if (at is None or (u['xPosition'], u['yPosition']) == tuple(at))
+             and all(v is None or u[k] == v for k, v in want.items())]
+    if not found:
+        raise ValueError('donor %r matches no red unit of %s' % (spec, parity_ref))
+    if nth is not None:
+        if nth >= len(found):
+            raise ValueError('donor %r: nth=%d but only %d red unit(s) of %s match'
+                             % (spec, nth, len(found), parity_ref))
+        return found[nth]
+    behaviours = {u['ai'] for u in found}
+    if len(behaviours) > 1:
+        raise ValueError(
+            'donor %r matches %d red units of %s whose AI DISAGREE (%s) -- narrow it with '
+            '`at`, `class` or `level`, or declare an `ai_override:`'
+            % (spec, len(found), parity_ref,
+               '; '.join('%s L%d @(%s,%s) %s'
+                         % (u['classIndex'], u['level'], u['xPosition'], u['yPosition'],
+                            '{%s}' % ','.join('0x%02X' % b for b in u['ai']))
+                         for u in found)))
+    return found[0]
 
 
 def _weapon_from_item_enums(item_enums):
@@ -1303,6 +1429,88 @@ def solo_contributors(chap, parity_ref, deploy_cap, floor=1.0, share=0.10):
             % (uid, 100 * t / total, without, full)]
 
 
+# Where a chapter's red force is authored. ch02 puts two of its nine under
+# `reinforcements:`, and a guard reading only `enemy_units:` would grade a chapter that
+# does not ship.
+AI_ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
+
+
+def _donor_specs(enemy):
+    """An entry's `donor:` -> one spec per position it places.
+
+    A bare `[x, y]` is ONE coordinate covering every position; a list whose ELEMENTS are
+    themselves specs is one donor per position, in order. The distinction is by element
+    type, because `donor: [11, 6]` and `donor: [[11, 6], [13, 7]]` must not be confused --
+    reading the first as two donors would make every single-donor entry per-position."""
+    donor = enemy.get('donor')
+    if isinstance(donor, list) and donor and all(isinstance(d, (list, dict)) for d in donor):
+        return donor
+    return None
+
+
+def enemy_ai_bytes(chap, enemy, index=0):
+    """The 4 AI bytes one of our enemies emits: its vanilla donor's, or a declared override.
+
+    This is the whole of #335. Our chapters pick a vanilla twin so their difficulty is
+    grounded rather than guessed, and we derive that twin's classes, levels, inventories and
+    drops from its `UnitDefinition` structs -- but the `.ai` field of those same structs was
+    never read, and got authored by feel instead. It measured fine, because #48 computes
+    threat from stats and weapons and AI is behavioural. Borrowing the donor's bytes closes
+    that by construction: there is no vocabulary in the middle to mistranslate.
+
+    `donor:` may be a single spec covering the whole entry, or one spec per position where
+    vanilla varies within a group -- ch04's four mogalls stand on vanilla's four mogall tiles
+    and those run three different AIs.
+
+    An `ai_override:` is how a chapter says it means to differ -- our map changed the
+    dynamics, or we field a unit vanilla does not. It carries the vector and a `why`, and it
+    may stand alone where no single donor applies. Neither donor nor override RAISES: a
+    default is exactly how ch00 shipped an `ai_pattern` its injector never read."""
+    override = enemy.get('ai_override')
+    if override:
+        return ai_bytes(override.get('ai'))
+    per_position = _donor_specs(enemy)
+    if per_position is not None:
+        if index >= len(per_position):
+            raise ValueError('enemy %r places %d unit(s) but lists %d donor(s), so position '
+                             '%d is not grounded in anything'
+                             % (enemy.get('id'), len(enemy.get('positions') or []),
+                                len(per_position), index))
+        return resolve_donor(chap.get('parity_reference'), per_position[index])['ai']
+    if enemy.get('donor') is not None:
+        return resolve_donor(chap.get('parity_reference'), enemy['donor'])['ai']
+    raise ValueError('enemy %r declares neither a `donor:` nor an `ai_override:`, so its AI '
+                     'is not grounded in anything' % enemy.get('id'))
+
+
+def ai_donor_findings(chap):
+    """#335's guard: every enemy's AI is borrowed from a vanilla donor or declared as a
+    deliberate departure. Returns a list of strings (empty == clean), the same contract
+    role_findings() uses so the parity gate can read both.
+
+    Silent on an uncurated twin -- there is nothing to borrow from, and that is a
+    `parity_reference` gap rather than an AI one."""
+    ref = chap.get('parity_reference')
+    if PARITY_REFERENCE_UDEFS.get(ref) is None:
+        return []
+    findings = []
+    for key in AI_ROSTER_KEYS:
+        for enemy in chap.get(key) or []:
+            if not isinstance(enemy, dict):
+                continue
+            override = enemy.get('ai_override')
+            if override and not override.get('why'):
+                findings.append('%s: ai_override has no `why` -- an undeclared reason is a '
+                                'silenced guard, not a decision' % enemy.get('id'))
+            for index in range(max(1, len(enemy.get('positions') or []))):
+                try:
+                    enemy_ai_bytes(chap, enemy, index)
+                except ValueError as error:
+                    findings.append('%s: %s' % (enemy.get('id'), error))
+                    break
+    return findings
+
+
 def role_findings(chap, parity_ref):
     """Per-unit role warnings: outlier threat vs the twin's ceiling, and a boss that is not
     the chapter's real centre of gravity. Returns a list of strings (empty == clean)."""
@@ -1769,6 +1977,12 @@ def curve_gate_failures(rows):
     informational and never gate; with zero locks the gate passes, so --check can ship before
     any chapter is locked.
 
+    The `ai` arm is #335's, and it rides the same opt-in because AI IS part of parity: a
+    chapter picks a vanilla twin so its difficulty is grounded rather than guessed, and the
+    twin's `UnitDefinition.ai` is as much of that grounding as its class and level. #48
+    computes threat from stats and weapons, so behaviour was invisible to it -- five chapters
+    measured at parity while fielding a force that played nothing like its twin.
+
     The `role` arm is #284's lesson. ch02 and ch03 shipped bosses that folded in a third of
     their twin's time, for months, while this gate read OK -- the aggregate sums the whole force
     and divides by the deploy cap, so one paper boss dissolves into a 23-unit average. The
@@ -1777,7 +1991,7 @@ def curve_gate_failures(rows):
     so locking one now means clearing them first."""
     return [r['label'] for r in rows
             if r['locked'] and (not r['has_ref'] or r['verdict'] != 'OK' or r['boss_drop']
-                                or r.get('role'))]
+                                or r.get('role') or r.get('ai'))]
 
 
 def curve_report(campaign, band=0.25, mode=None):
@@ -1848,8 +2062,13 @@ def curve_report(campaign, band=0.25, mode=None):
         role = role_findings(chap, p['reference']) if has_ref else []
         if role:
             flag += '  !!role'
+        # ... and whether every enemy's AI is grounded in a vanilla donor (#335). Invisible
+        # to everything above, which is computed from stats and weapons.
+        ai = ai_donor_findings(chap) if has_ref else []
+        if ai:
+            flag += '  !!ai'
         rows.append({'label': label[:22].strip(), 'locked': locked, 'has_ref': has_ref,
-                     'verdict': verdict, 'boss_drop': boss_drop, 'role': role})
+                     'verdict': verdict, 'boss_drop': boss_drop, 'role': role, 'ai': ai})
         if not has_ref:
             print('  %-22s %-13s %5.1f           %5.1f             (no ref)%s'
                   % (label[:22], (p['reference'] or '?')[:13], ot, ol, flag))
@@ -1862,6 +2081,15 @@ def curve_report(campaign, band=0.25, mode=None):
     if any_dropped_boss:
         print('\n  !! a dropped boss means that row\'s verdict is unreliable -- its scariest '
               'unit\n     carries an unmodeled weapon. Add fe_base to its YAML inventory (#51/#52).')
+    ungrounded = [r for r in rows if r.get('ai')]
+    if ungrounded:
+        print('\n  !! AI not grounded in the vanilla twin (#335) -- every enemy borrows its')
+        print('     donor\'s `UnitDefinition.ai` unless the chapter declares an `ai_override:`')
+        print('     with a reason:')
+        for r in ungrounded:
+            for f in r['ai']:
+                print('     %-6s %s%s' % (r['label'].split()[0], f,
+                                          '' if r['locked'] else '   [not locked -- advisory]'))
     flagged = [r for r in rows if r.get('role')]
     if flagged:
         print('\n  !! per-unit findings the per-slot averages above cannot show (#284):')

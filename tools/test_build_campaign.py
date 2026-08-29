@@ -117,9 +117,15 @@ class PrologueRosterFromYaml(unittest.TestCase):
             'hlin-trollbane': {'level': 3, 'position': [8, 5]},
             'scramsax': {'level': 1, 'position': [13, 9]},
             'sephek-kaltro': {'level': 5, 'position': [14, 8],
+                              # #335: the boss holds his tile by declared override, because
+                              # O'Neill's own DoNothing depends on a tutorial event-script
+                              # we do not run.
+                              'ai_override': {'ai': '{GuardTileAI, 0x9, 0x20}',
+                                              'why': 'see the ch00 YAML'},
                               'inventory': [{'id': 'ice-longsword',
                                              'fe_base': 'steel-sword'}]},
             'caravan-guard': {'level': 2, 'count': 2, 'positions': [[14, 7], [13, 7]],
+                              'donor': {'at': [14, 7], 'level': 2},
                               'inventory': [{'id': 'iron-axe'}]},
         }
         for uid, fields in over.items():                 # kwarg ids use _ for -
@@ -127,7 +133,10 @@ class PrologueRosterFromYaml(unittest.TestCase):
         return units
 
     def blocks(self, **over):
-        return bc._prologue_roster_blocks(self.by_id(**over), self.SLOTS, self.CLASSES,
+        units = self.by_id(**over)
+        chap = {'parity_reference': 'FE8 Prologue',
+                'enemy_units': [units['sephek-kaltro'], units['caravan-guard']]}
+        return bc._prologue_roster_blocks(chap, units, self.SLOTS, self.CLASSES,
                                           self.GUEST_ITEMS)
 
     def test_boss_level_tracks_the_yaml(self):
@@ -3814,9 +3823,15 @@ class Ch05SahnarIsJoshuaAndBasilIsNatasha(unittest.TestCase):
         chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH05_CHAPTER_YAML)
         return next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')
 
+    def _chap(self):
+        return bc._yaml_load(open(os.path.join(
+            bc.REPO, 'campaigns/rime-of-the-frostmaiden/chapters',
+            bc.CH05_CHAPTER_YAML), encoding='utf-8'))
+
     def test_she_carries_joshuas_exact_ai_bytes(self):
-        self.assertEqual('duelist_hold', self._sahnar()['ai_pattern'])
-        self.assertEqual('{0x7, 0x3, 0x9, 0x0}', bc.CH05_AI['duelist_hold'])
+        # #335: borrowed from vanilla Joshua's own UnitDefinition, not authored.
+        self.assertEqual('{0x7, 0x3, 0x9, 0x0}',
+                         bc.enemy_ai_initialiser(self._chap(), self._sahnar()))
 
     def test_the_list_has_exactly_one_client_which_is_what_makes_it_safe(self):
         """`.ai = {0x7,` appears ONCE in all of FE8 -- `UnitDef_088B5914`, vanilla Ch5's
@@ -3825,20 +3840,22 @@ class Ch05SahnarIsJoshuaAndBasilIsNatasha(unittest.TestCase):
         self.assertEqual(1, udefs.count('.ai = {0x7,'))
         bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
 
-    def test_a_second_client_is_refused(self):
-        with mock.patch.dict(bc.CH05_AI, {'someone_else': '{0x7, 0x0, 0x0, 0x0}'}):
+    def test_a_second_client_in_ANY_chapter_is_refused(self):
+        """The list is global, so the hazard is another chapter's unit reaching for `{0x7,`
+        on its own account. Since #335 the sweep reads the AI every enemy actually EMITS
+        rather than a table of labels -- which also catches a unit that inherits AI_A_07
+        from its vanilla DONOR, a case the old table scan could not see at all."""
+        planted = {'id': 'interloper', 'ai_override': {'ai': '{0x7, 0x3, 0x9, 0x0}',
+                                                       'why': 'test'}}
+        real = bc.escort_safe_ai_clients
+        with mock.patch.object(bc, 'escort_safe_ai_clients',
+                               lambda: real() + ['ch04.interloper']):
             with self.assertRaises(SystemExit):
                 bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
+        self.assertIsNotNone(planted)
 
-    def test_the_sweep_covers_EVERY_chapter_not_just_ch05(self):
-        """The list is global, so the hazard is a FUTURE chapter reaching for `{0x7,` on its
-        own account -- exactly the case a ch05-only scan cannot see. Scoping it to CH05_AI was
-        the first cut and it defeated the guard's own purpose."""
-        with mock.patch.dict(bc.CH04_AI, {'borrowed': '{0x7, 0x3, 0x9, 0x0}'}):
-            with self.assertRaises(SystemExit):
-                bc.assert_escort_safe_ai_has_one_client('{0x7, 0x3, 0x9, 0x0}')
-        # and the sweep really is finding more than one table
-        self.assertGreater(len([n for n in dir(bc) if re.fullmatch(r'CH\d\d_AI', n)]), 1)
+    def test_the_sweep_reads_every_chapter_and_finds_exactly_our_duelist(self):
+        self.assertEqual(bc.escort_safe_ai_clients(), ['ch05.sahnar'])
 
     def test_the_repoint_swaps_natasha_for_our_escort_and_keeps_the_shape(self):
         """`AiIsInShortList` takes `const u16*` and stops on a zero entry, so the u8 array
@@ -4945,6 +4962,40 @@ class MessageBlockPool(unittest.TestCase):
         self.assertEqual([], bc.live_ids_in_declared_blocks(
             {'bogus': ((0x969, 0x96C),)},
             claims={'bogus': (0x969, 0x96A, 0x96B, 0x96C)}))
+class PerPositionAiReachesTheEmittedRows(unittest.TestCase):
+    """#335: an entry with one donor PER POSITION must emit those distinct AIs.
+
+    This is a regression test for a real bug, caught by the output diff and not by any unit
+    test: every injector called `enemy_ai_initialiser(chap, enemy)` without the position
+    index, so all eight of ch05's tomb-reavers shipped their FIRST donor's AI. The YAML was
+    right, the resolver was right, the tests were green, and the ROM got eight identical
+    holders -- exactly the flattening the per-position donors exist to prevent."""
+
+    def _chap(self, stem):
+        import glob
+        path = glob.glob(os.path.join(
+            bc.REPO, 'campaigns/rime-of-the-frostmaiden/chapters', stem + '*.yaml'))[0]
+        with open(path, encoding='utf-8') as source:
+            return bc._yaml_load(source)
+
+    def test_ch05_tomb_reavers_emit_three_distinct_behaviours(self):
+        chap = self._chap('ch05')
+        rows = '\n'.join(bc.ch05_enemy_rows(chap, exclude=('sahnar',)))
+        reaver_ais = re.findall(r'tomb-reaver -- .*?\n(?:.*?\n)*?\s*\.ai = (\{[^}]*\})',
+                                rows)
+        self.assertEqual(8, len(reaver_ais), 'expected eight tomb-reavers')
+        self.assertEqual({'{0x0, 0x3, 0x9, 0x0}', '{0x0, 0x0, 0x9, 0x0}',
+                          '{0x0, 0x12, 0x9, 0x0}'}, set(reaver_ais))
+
+    def test_ch01_spears_and_axes_each_ship_one_delayed_charger(self):
+        chap = self._chap('ch01')
+        spear = next(e for e in chap['enemy_units'] if e['id'] == 'goblin-spear')
+        axe = next(e for e in chap['enemy_units'] if e['id'] == 'goblin-axe')
+        import difficulty
+        self.assertEqual(1, sum(1 for i in range(3)
+                                if difficulty.enemy_ai_bytes(chap, spear, i)[1] == 0x12))
+        self.assertEqual(1, sum(1 for i in range(3)
+                                if difficulty.enemy_ai_bytes(chap, axe, i)[1] == 0x12))
 
 
 class Ch05VillageRaidRace(unittest.TestCase):
@@ -5043,12 +5094,13 @@ class Ch05VillageRaidRace(unittest.TestCase):
         waves = [e for e in self._chap()['enemy_units'] if e.get('arrives_turn')
                  and e['id'] != 'sahnar']
         self.assertEqual(3, len(waves), 'ch05 has three eruption waves')
+        chap = self._chap()
         for wave in waves:
-            self.assertEqual('raider', wave.get('ai_pattern'),
-                             '%s does not race the reliquaries' % wave['id'])
-        self.assertEqual('{0x0, 0x4, 0x9, 0x0}', bc.CH05_AI['raider'],
-                         "vanilla Ch5's own raider AI, byte for byte (AI_B_04 = "
-                         'AiScr_AiB_PillageThenPursue)')
+            self.assertEqual('{0x0, 0x4, 0x9, 0x0}',
+                             bc.enemy_ai_initialiser(chap, wave),
+                             "%s does not race the reliquaries -- vanilla Ch5's own raider "
+                             'AI, byte for byte (AI_B_04 = AiScr_AiB_PillageThenPursue), is '
+                             'what its donor carries' % wave['id'])
 
     def test_a_raider_row_carries_the_pillage_ai_into_the_table(self):
         rows = '\n'.join(bc.ch05_enemy_rows(self._chap(), arrives_turn=2, exclude=('sahnar',)))

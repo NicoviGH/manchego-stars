@@ -177,7 +177,14 @@ enemy_units:
       - "Cold regeneration, fire vulnerability — the Frostmaiden's chill knits his wounds; flame unmakes them (echoed later by the Ch8 ice trolls)"
       - "True nature (book p.23): a drowned mariner possessed by a frost-druid spirit of Auril; kill the body and the winter spirit dies with it — but a single defeat only scatters him"
       - "Misty step: vanishes in a breath of frost — the diegetic reason he escapes the prologue despite being 'defeated'"
-    ai_pattern: hold_position
+    donor: [14, 8]              # O'Neill, the tutorial boss, on this very tile
+    ai_override:
+      ai: '{GuardTileAI, 0x9, 0x20}'
+      why: >
+        O'Neill's own AI is DoNothing ({0x6,0x3,0,0}) and it only works because vanilla's
+        prologue event-scripts his attack -- prologue-eventscript.h CHAIs him to {0,0} once
+        CHECK_TUTORIAL fails. We run no such script, so borrowing his bytes would field a
+        boss that never acts. He holds his tile instead.
     # Defeated on the field, but he does NOT die here — see the chapter_end cutscene (escape).
     death_quote: "Her work… does not end with me…"   # LOCKED 2026-06-10 (dialogue pass)
     art:
@@ -196,7 +203,9 @@ enemy_units:
     inventory:
       - id: iron-axe
         damage_type: slashing
-    ai_pattern: aggressive
+    donor: [{at: [14, 7], level: 1}, {at: [14, 7], level: 2}]
+    # one guard apiece: vanilla's L1 fighter runs the scripted AI_B_0A approach, its L2
+    # charges on turn 2. Giving both the same donor lost one of the two behaviours.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:

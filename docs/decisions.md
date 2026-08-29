@@ -7628,6 +7628,59 @@ blurbs now, and a block drawn over them would build clean, ship, and garble a sc
 looking at. `live_ids_in_declared_blocks` reads the module's own `*_MSG`/`*_MSGS` constants, so
 registering a new one is enough and there is no second list to maintain.
 _Decided and implemented: 2026-08-30._
+**Enemy AI is BORROWED from a vanilla donor, not authored (#335)**
+A chapter picks a vanilla twin so its difficulty is grounded rather than guessed, and we already
+derive that twin's classes, levels, inventories and drops from its `UnitDefinition` structs. The
+`.ai` field of those same structs was the one we never read. It got authored by feel through six
+per-chapter `CHnn_AI` label tables, and because #48 computes threat from stats and weapons, the
+drift was invisible to every gate: five chapters measured x1.00 and played nothing like their twin.
+
+**Each enemy now names a `donor:` and the build reads that unit's four AI bytes.** There is no
+label vocabulary in between, because the labels WERE the translation layer the drift lived in --
+`aggressive` meant one thing in the YAML and another in five injectors, `defensive` and
+`hold_position` were byte-identical under two names, and ch00's `ai_pattern:` was wired to nothing
+at all (its injector emitted literals). Every chapter YAML had already named its counterpart in a
+comment (`vanilla brigand @ (7,2) L3 iron-axe`) -- all 63 entries -- so `donor:` promotes prose
+that was already there to data the build can read. `ai_override:` with a `why` is how a chapter
+declares it means to differ.
+
+**Three engine facts the model rests on**, all from the decomp:
+- The vector is 2 script indices plus a 16-bit `ai_config` (`cp_utility.c` `LoadUnitAi`). `ai[2..3]`
+  are its halves, not two bytes: bits 0-2 heal threshold, **bits 3-7 the combat weight table**
+  (`cp_decide.c` -- *which enemy the unit picks*), bits 8-12 a guard-position index, bit 13
+  `FLAG_STAY`. Our `aggressive` ran weight table 0 where Ch1/2/3/5 all run table 1.
+- **AI scripts rewrite their own AI** (`AI_CMD_SET_AI`). `charge-after-one-turn` sets AI2 to pursue
+  on turn 2; `pillage` sets it once the loot is gone. Only `AI_B_03 NeverMove` is terminal, so
+  vanilla's lever is WHEN a unit activates, not whether.
+- `AI_ACTION` vs `AI_ACTION_IN_PLACE` differ by one flag: the latter sets `AI_FLAG_STAY`, which
+  collapses the movement map to the unit's own tile. Vanilla's static line (`{0x0,0x3,..}`) steps
+  out to strike; our `defensive` (`{0x3,0x3,0x9,0x20}`) was welded twice over -- the A-script AND
+  the config bit -- so we had put the throne-boss posture on every line unit in ch03/ch04/ch05.
+
+**A donor is a MATCH SPEC, not a coordinate lookup**, and it may be one PER POSITION. Coordinates
+alone fail twice over: ch01 and ch06 sit on a different map donor from their parity twin, so not
+one tile lines up; and where the map IS the twin's, tiles collide by accident (ch05's bone-archer
+wave stands on (13,0), where vanilla parks an ARMOR_KNIGHT boss). A spec resolves only when
+everything it matches shares one AI; `nth:` is the last resort for units vanilla stacks that are
+identical in every readable field and still behave differently (Ch1's two L2 fighters on (2,9)).
+Per-position donors matter because a single donor per entry FLATTENS a group -- ch04's four mogalls
+run three different AIs, and ch05's eight tomb-reavers stand in for a line vanilla splits 4/2/2.
+
+**The AI_A_07 escort guard now sweeps EMITTED AI, not the label tables.** Strictly wider: it also
+catches a unit that inherits `AI_A_07` from its donor, which no scan of our own vocabulary could
+see. Still exactly one client, `ch05.sahnar`.
+
+**Verification is an OUTPUT DIFF, and it earned its keep.** Every injector was re-run and
+`events_udefs.c` diffed: 102 changed lines, all of them `.ai`, zero collateral. It caught a bug the
+whole green test suite missed -- every injector called `enemy_ai_initialiser(chap, enemy)` without
+the position index, so all eight of ch05's tomb-reavers shipped their FIRST donor's AI. YAML right,
+resolver right, tests green, ROM wrong. `PerPositionAiReachesTheEmittedRows` now pins it.
+
+ch01, ch03 and ch06 come out matching their twins exactly; ch01 emits byte-identical output through
+the whole refactor, and ch06 -- the one chapter derived by hand -- reproduces byte for byte, which
+is the model's proof. Remaining differences are declared overrides: ch00's Sephek (O'Neill's
+DoNothing depends on a tutorial `CHAI` we do not run), ch04's six-wolf pack (#203), ch05's moose.
+_Decided and implemented: 2026-08-29 (#335)._
 
 ## Open Questions (not yet decided)
 

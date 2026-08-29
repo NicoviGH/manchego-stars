@@ -127,7 +127,10 @@ enemy_units:
     inventory:
       - id: iron-lance
         damage_type: piercing   # cosmetic flavor label
-    ai_pattern: hold_then_attack  # vanilla gate-guard posture: attack in range, don't chase
+    donor: [{at: [1, 9], class: CLASS_SOLDIER},
+              {at: [2, 9], class: CLASS_SOLDIER, level: 2},
+              {at: [2, 9], class: CLASS_SOLDIER, level: 3}]
+    # vanilla's three soldiers one apiece: two hold the road, the third charges on turn 2
 
   - id: goblin-axe
     name: "Goblin Raider"
@@ -139,7 +142,11 @@ enemy_units:
     inventory:
       - id: iron-axe
         damage_type: slashing   # cosmetic flavor label
-    ai_pattern: aggressive      # vanilla pursue AI {0x0,0x0A,0x0,0x0}
+    donor: [{at: [1, 9], class: CLASS_FIGHTER},
+              {at: [2, 9], class: CLASS_FIGHTER, level: 2, nth: 0},
+              {at: [2, 9], class: CLASS_FIGHTER, level: 2, nth: 1}]
+    # vanilla's three fighters one apiece: two pursue from turn 1, the third charges on
+    # turn 2. The (2,9) pair is identical in every readable field but AI, hence `nth`
 
   - id: goblin-chief
     name: "Izobai"               # the Foaming Mugs goblin boss (book canon); a female
@@ -157,7 +164,7 @@ enemy_units:
         damage_type: piercing   # cosmetic flavor label
       - id: iron-ingots         # drops on death → the job's MacGuffin
         is_key_item: true
-    ai_pattern: hold_position   # Breguet AI {0x3,0x3,0x9,0x20}: attack in place, never move
+    donor: {at: [2, 9], class: CLASS_ARMOR_KNIGHT} # Breguet, the chapter boss -- GuardTileAI + the GuardTile bit
     # Voice: cunning, mocking, mercenary bandit-warlord (lore/izobai.md). LOCKED 2026-06-17.
     taunt: "The iron's right here, under my boots. Come and take it."
     death_quote: "Should've taken the gold... and run..."
@@ -174,7 +181,7 @@ enemy_units:
     inventory_by_class:
       fighter: [iron-axe]
       soldier: [iron-lance]
-    ai_pattern: aggressive
+    donor: {at: [14, 9], class: CLASS_FIGHTER}  # vanilla Ch1's east reinforcement wave (both fighters share one AI)
 
 # ── Events ────────────────────────────────────────────────────────────────────
 events:
