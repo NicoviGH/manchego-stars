@@ -311,7 +311,9 @@ def render(records, glosses):
             a, b = summarize(n)[2], summarize(h)[2]
             # union of BOTH key sets: a class REMOVED on Difficult is a delta too,
             # and iterating only the Difficult counter would never show it.
-            delta = {k: b.get(k, 0) - a.get(k, 0) for k in set(a) | set(b)
+            # sorted(): a set union iterates in hash order, so an unsorted dict here
+            # renders differently run to run and every --render produced a spurious diff.
+            delta = {k: b.get(k, 0) - a.get(k, 0) for k in sorted(set(a) | set(b))
                      if b.get(k, 0) != a.get(k, 0)}
             if delta:
                 L.append(f"- **Delta {nl} → {hl}**: {delta} — a UNIT change, not a level shift")
