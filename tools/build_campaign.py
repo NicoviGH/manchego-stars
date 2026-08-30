@@ -388,18 +388,18 @@ CH02_FISHER_FID = '[FID_VillagerOldMan]'   # the brittle Targos fisher -- generi
 CH02_OPENING_BG = 'BG_NORMAL_VILLAGE'      # Bryn Shander west gate (vanilla village BG)
 CH02_ENDING_BG = 'BG_MS_TARGOS_WINTER'     # Targos at nightfall -- vendored snow-town (inject_backgrounds)
 # Enemy AI byte vectors + class/item maps (FE8-valid, mirrored from ch01's proven set).
-CH02_AI = {
-    'aggressive':    '{0x0, 0x0, 0x1, 0x0}',    # pursue/charge
-    'hold_position': '{0x3, 0x3, 0x9, 0x20}',   # boss/miniboss: attack in place, never move
-    'reinforce':     '{0x0, 0x0, 0x9, 0x0}',    # reinforcement wave
-    'cautious':      '{0x0, 0x3, 0x0, 0x0}',    # green chwinga: AttackInRangeAI -- defend, don't pursue (vanilla Garcia)
-}
 CH02_CLASS_IDS = {'brigand': 'CLASS_BRIGAND', 'archer': 'CLASS_ARCHER',
-                  'pegasus_knight': 'CLASS_PEGASUS_KNIGHT'}   # chwinga chassis (balance match to Ross+Garcia)
+                  'pegasus_knight': 'CLASS_PEGASUS_KNIGHT',
+                  # the chwinga chassis: Mov 5 like Garcia, staff at D so they heal EACH
+                  # OTHER (a staff cannot target its own carrier -- cp_staff.c), and it
+                  # wears Sclorbo's greenified anim. They were Mov-7 fliers, which gave
+                  # the units that need rescuing the best escape in the chapter.
+                  'priest': 'CLASS_PRIEST'}
 CH02_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
                  'iron-bow': 'ITEM_BOW_IRON', 'vulnerary': 'ITEM_VULNERARY',
                  'slim-lance': 'ITEM_LANCE_SLIM', 'hand-axe': 'ITEM_AXE_HANDAXE',
-                 'red-gem': 'ITEM_REDGEM', 'elixir': 'ITEM_ELIXIR', 'pure-water': 'ITEM_PUREWATER'}
+                 'red-gem': 'ITEM_REDGEM', 'elixir': 'ITEM_ELIXIR', 'pure-water': 'ITEM_PUREWATER',
+                 'heal-staff': 'ITEM_STAFF_HEAL'}
 CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
 # The three GREEN chwinga (protect layer): each rides a distinct minor vanilla NPC slot so
 # its survival is individually trackable via CHECK_ALIVE at the ending scene. Slots are
@@ -408,11 +408,85 @@ CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autoleve
 # (yaml_id, vanilla character slot). The charm-gift each survivor delivers is NOT stored here --
 # it is read from the chapter YAML's green_allies[].gift (single source of truth; the ch02<->ch03
 # reward swap lives in the YAML, so a hardcoded copy here silently drifted once -- #23).
+# All three keep an identity (face + name): Glimmerfrost is the inhabitant of the (1,12)
+# village rather than a unit on the field, so she needs a bust and a name for her visit
+# scene but never enters the green table. Who DEPLOYS is read from the chapter YAML's
+# green_allies, so moving a chwinga between the field and a village is a YAML edit.
 CH02_CHWINGA = (
     ('chwinga-mote',    'DARA'),
     ('chwinga-rime',    'KLIMT'),
     ('chwinga-glimmer', 'MANSEL'),
 )
+CH02_VILLAGE_CHWINGA = 'chwinga-glimmer'
+
+# ch02's two Targos huts (2026-08-30). Vanilla Ch2 wires THREE Village() and our retile kept
+# two of its four village-terrain tiles, so the map drew huts backing nothing. They are the
+# raid's DECOY: pillage targets terrain, so villages are what pull six pillaging bandits off
+# the protected greens while the player crosses to reach them.
+#   id                  event script          msg     mug                       backdrop
+CH02_VILLAGE_SLOTS = {
+    # Glimmerfrost speaks with the green chwinga bust -- CH02_CHWINGA_PORTRAIT_SLOT dresses
+    # MANSEL's slot with it, so this is her own face, not a villager stand-in.
+    'targos-hut-south': ('EventScr_089F15A0', 0xAC0, '[FID_Mansel]', CH02_OPENING_BG),
+    'targos-hut-east':  ('EventScr_089F1658', 0xAC1, CH02_FISHER_FID,  CH02_OPENING_BG),
+}
+# Dead vanilla Ch3 scripts (slot 3 is ch02's host and inject_ch02 blanks its event lists).
+# 0xAC0/0xAC1 are the first two ids of ch02's block -- it had none until the pool widened.
+
+# One event id per hut. It records the visit, disarms that hut's raider hook (Village() puts
+# the same eid on the destruction LOCA), and -- for the south hut -- answers whether
+# Glimmerfrost was reached in time to hand over her charm. ch02 sets no other event flag, so
+# 9 and 10 are free (checked: no ENUT/CHECK_EVENTID anywhere in its host).
+CH02_VILLAGE_FLAGS = {
+    'targos-hut-south': 'EVFLAG_TMP(9)',
+    'targos-hut-east':  'EVFLAG_TMP(10)',
+}
+# The 3x2 ruins block in snowy-bern: metatiles 929-931 over 961-963 (one row apart), the
+# picture the tileset artist drew to fit together. VERIFIED by _drawn_block on every build,
+# so a renumbered tileset fails loudly instead of tiling one corner across the footprint.
+CH02_RUIN_ORIGIN = 929
+
+
+def ch02_map_changes(chap, maps_dir):
+    """ch02's tile flips: a Targos hut SACKED, and a hut visited.
+
+    Same anatomy as ch05's reliquaries, and the same two correctness arguments.
+
+    ORDER: ruins (3x2) first, then the 1x1 doors. GetMapChangeIdAt keeps the LAST region
+    covering a tile (bmtrick.c), and the 3x2 overlaps its own door -- doors-first would make
+    VISITING a hut collapse it.
+
+    FOOTPRINT: AiPillageAction looks the change up at (x, y - 1), the tile above the door where
+    Village()'s destruction LOCA sits, so a change on the door alone is never found and a
+    sacked hut would keep standing and keep its gift.
+
+    RUINS_REGULAR is the lost state, not RUINS_VILLAGE: FE8 reads both "can a unit Visit here"
+    (CanUnitVisit) and "is this worth pillaging" (gTerrainList_LootableVillages) off the
+    TERRAIN, and RUINS_VILLAGE sits in BOTH lists -- a hut ruined into it would be lootable
+    again next turn.
+    """
+    import map_tileset_tool as mt
+    tileset = mt._tileset_from_dir(os.path.join(maps_dir, 'tilesets', WINTER_TILESET))
+    villages = chap.get('villages', [])
+    changes = [(x - 1, y - 1, 3, 2,
+                _drawn_block(tileset, CH02_RUIN_ORIGIN, (3, 2), 'TERRAIN_RUINS_REGULAR',
+                             '%s sacked' % v['id']),
+                '%s sacked -- raided before the party reached it' % v['id'])
+               for v in villages for x, y in [v['tile']]]
+    changes += [(v['tile'][0], v['tile'][1], 1, 1,
+                 [_snowy_metatile_for(tileset, 'TERRAIN_VILLAGE_CLOSED')],
+                 '%s visited' % v['id'])
+                for v in villages]
+    return changes
+
+
+def ch02_location_events(chap):
+    """ch02's Location list: the two Targos huts. Empty until 2026-08-30, which is why the
+    map drew huts that backed nothing and why six pillaging raiders had nowhere to go but
+    the protected chwinga."""
+    return location_events(chap.get('villages', []),
+                           {vid: slot[0] for vid, slot in CH02_VILLAGE_SLOTS.items()},
+                           flags=CH02_VILLAGE_FLAGS)
 # The chwinga wear Sclorbo's chwinga map sprite (he is one), recoloured by the green NPC
 # faction palette -- identical green triplets (Nicolas 2026-06-24). Build-time derived from
 # this cast sprite; see _inject_ch02_chwinga_sprites.
@@ -4405,6 +4479,21 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
               % (sms, ', '.join(slots)))
 
 
+def ch02_chwinga_identities(chap):
+    """{id: {name, fe_name, ...}} for every chwinga the chapter names, wherever it stands.
+
+    Two are green units and one is a village inhabitant, and BOTH need a face and a name --
+    Glimmerfrost speaks in her hut. Merging here rather than reading green_allies means
+    moving a chwinga between the field and a village stays a YAML edit.
+    """
+    out = {g['id']: g for g in chap.get('deployment', {}).get('green_allies', [])}
+    for village in chap.get('villages', []):
+        who = village.get('inhabitant')
+        if isinstance(who, dict):
+            out.setdefault(who['id'], who)
+    return out
+
+
 def inject_ch02_chwinga_faces(campaign, verbose=True):
     """Dress the 3 green chwinga (CH02_CHWINGA) with Sclorbo's bust recoloured green + their
     fe_names. The bust is build-derived from sclorbo.png -- the blue glow ramp hue-shifted to
@@ -4438,7 +4527,7 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
 
     # 3. name each chwinga slot from the ch02 YAML fe_name (Mote / Rime / Glimmer).
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
-    by_id = {g['id']: g for g in chap['deployment']['green_allies']}
+    by_id = ch02_chwinga_identities(chap)
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     for uid, slot in CH02_CHWINGA:
@@ -8607,6 +8696,8 @@ def inject_ch02(campaign, verbose=True):
 
     # 1. Map: register the painted layout, point slot 3 at it + the winter tileset, and
     #    swap the host goal to vanilla slot-4's defeat_all template (cf. inject_ch01 step 1).
+    _inject_tile_changes('MS_Ch02MapChanges', ch02_map_changes(chap, maps_dir),
+                         CH02_HOST_INDEX)
     indices = _register_chapter_map(maps_dir, CH02_LAYOUT,
                                     'Manchego Stars ch02 layout (#22)')
     obj_idx, pal_idx, cfg_idx, layout_idx = indices
@@ -8668,34 +8759,36 @@ def inject_ch02(campaign, verbose=True):
 
     # 2a. RED raider band (088B463C) -- vanilla Ch2 parity, reflavored chardalyn berserkers.
     enemies = []
-    for x, y in raider['positions']:
+    for index, (x, y) in enumerate(raider['positions']):
         enemies.append(_enemy_unit_entry(
             CH02_GENERIC_PID, brig, raider['level'], True, x, y,
-            axe, CH02_AI['aggressive'], ' /* chardalyn berserker */'))
-    for x, y in scavenger['positions']:
+            axe, enemy_ai_initialiser(chap, raider, index),
+            ' /* chardalyn berserker */'))
+    for index, (x, y) in enumerate(scavenger['positions']):
         enemies.append(_enemy_unit_entry(
             CH02_GENERIC_PID, brig, scavenger['level'], True, x, y,
-            '%s, %s' % (axe, vuln), CH02_AI['aggressive'],
+            '%s, %s' % (axe, vuln), enemy_ai_initialiser(chap, scavenger, index),
             ' /* chardalyn scavenger -- drops the vulnerary */',
             itemdrop=True))
-    for x, y in skirmisher['positions']:
+    for index, (x, y) in enumerate(skirmisher['positions']):
         enemies.append(_enemy_unit_entry(
             CH02_GENERIC_PID, brig, skirmisher['level'], True, x, y,
-            axe, CH02_AI['aggressive'], ' /* chardalyn skirmisher (L2) */'))
-    for x, y in archer['positions']:
+            axe, enemy_ai_initialiser(chap, skirmisher, index),
+            ' /* chardalyn skirmisher (L2) */'))
+    for index, (x, y) in enumerate(archer['positions']):
         enemies.append(_enemy_unit_entry(
             CH02_GENERIC_PID, arch, archer['level'], True, x, y,
-            bow, CH02_AI['aggressive'],
-            ' /* chardalyn hunter (archer) -- hard-counters the pegasi */'))
+            bow, enemy_ai_initialiser(chap, archer, index),
+            ' /* chardalyn hunter -- vanilla\'s lone archer, charges on turn 2 */'))
     gx, gy = grukk['position']
     enemies.append(_enemy_unit_entry(
         'CHARACTER_%s' % CH02_MINIBOSS_SLOT, brig, grukk['level'],
-        False, gx, gy, axe, CH02_AI['hold_position'],
+        False, gx, gy, axe, enemy_ai_initialiser(chap, grukk),
         ' /* Grukk the Bruiser -- miniboss, fixed bases (Bone slot) */'))
     hx, hy = halvar['position']
     enemies.append(_enemy_unit_entry(
         'CHARACTER_%s' % CH02_BOSS_SLOT, brig, halvar['level'],
-        True, hx, hy, steel, CH02_AI['hold_position'],
+        True, hx, hy, steel, enemy_ai_initialiser(chap, halvar),
         ' /* Halvar the Raider Captain -- boss, steel axe (Bazba slot) */'))
 
     # 2b. GREEN chwinga (088B4718) -- the protect layer; class + level + positions +
@@ -8706,27 +8799,43 @@ def inject_ch02(campaign, verbose=True):
     # The charm-gift is authored in the YAML (green_allies[].gift) -- the single source of truth
     # for the ch02<->ch03 reward swap. Validate every gift resolves + the id sets agree, so a YAML
     # edit that adds/renames a gift fails loudly here instead of silently shipping the wrong item.
+    slot_by_uid = dict(CH02_CHWINGA)
+    village_chwinga = {v['inhabitant']['id'] for v in chap.get('villages', [])
+                       if isinstance(v.get('inhabitant'), dict)}
     for uid, _slot in CH02_CHWINGA:
         g = chwinga_by_id.get(uid)
-        if not g or 'gift' not in g:
-            sys.exit('ERROR: ch02 chwinga %s missing from deployment.green_allies or has no gift' % uid)
+        if g is None:
+            # Not on the field is fine -- but only if a village claims her, or a chwinga can
+            # vanish from the chapter entirely and still be credited a charm at the ending.
+            if uid in village_chwinga:
+                continue
+            sys.exit('ERROR: ch02 chwinga %s is neither in deployment.green_allies nor named '
+                     'as a village inhabitant -- it would exist only as a charm nobody can '
+                     'earn' % uid)
+        if 'gift' not in g:
+            sys.exit('ERROR: ch02 chwinga %s has no gift' % uid)
         if g['gift'] not in CH02_ITEM_IDS:
             sys.exit('ERROR: ch02 chwinga %s gift %r not in CH02_ITEM_IDS' % (uid, g['gift']))
-    chwinga = [_ally_unit_entry(None, slot,
-                                CH02_CLASS_IDS[chwinga_by_id[uid]['class']],
-                                chwinga_by_id[uid]['level'],
-                                chwinga_by_id[uid]['position'][0],
-                                chwinga_by_id[uid]['position'][1],
-                                lance, ' /* chwinga %s (gift: %s) */' % (uid, chwinga_by_id[uid]['gift']),
+    # The green table is what DEPLOYS, read from the YAML rather than from CH02_CHWINGA:
+    # Glimmerfrost is a village inhabitant, not a unit. Inventory is per-chwinga now (the
+    # frail one carries Ross's Vulnerary alongside its Heal staff), and the AI comes from
+    # the same donor machinery as everything else (#335).
+    chwinga = [_ally_unit_entry(None, slot_by_uid[g['id']],
+                                CH02_CLASS_IDS[g['class']], g['level'],
+                                g['position'][0], g['position'][1],
+                                ', '.join(CH02_ITEM_IDS[i] for i in g['inventory']),
+                                ' /* chwinga %s (gift: %s) */' % (g['id'], g['gift']),
                                 allegiance='GREEN', autolevel=True,
-                                ai=CH02_AI['cautious'])
-               for uid, slot in CH02_CHWINGA]
+                                ai=enemy_ai_initialiser(chap, g))
+               for g in chap['deployment']['green_allies']]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
     reinforce = [_enemy_unit_entry(CH02_GENERIC_PID, brig, lv, True, x, y, axe,
-                                   CH02_AI['reinforce'], ' /* rear raider L%d, turn %d */'
+                                   enemy_ai_initialiser(chap, reinf, index),
+                                   ' /* rear raider L%d, turn %d */'
                                    % (lv, reinf['trigger_turn']))
-                 for (x, y), lv in zip(reinf['positions'], reinf['levels'])]
+                 for index, ((x, y), lv)
+                 in enumerate(zip(reinf['positions'], reinf['levels']))]
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
@@ -8758,7 +8867,7 @@ def inject_ch02(campaign, verbose=True):
     info = _replace_brace_block(
         info, 'EventListScr_Ch3_Character[] =', '{\n    END_MAIN\n}', CH3_EVENTINFO_H)
     info = _replace_brace_block(
-        info, 'EventListScr_Ch3_Location[] =', '{\n    END_MAIN\n}', CH3_EVENTINFO_H)
+        info, 'EventListScr_Ch3_Location[] =', ch02_location_events(chap), CH3_EVENTINFO_H)
     with open(CH3_EVENTINFO_H, 'w', encoding='utf-8') as f:
         f.write(info)
 
@@ -8829,18 +8938,35 @@ def inject_ch02(campaign, verbose=True):
         '{\n' + tut_text_calls +
         '    REMA\n'
         '    EVBIT_T(7)\n    ENDA\n}', CH3_EVENTSCRIPT_H)
+
+    # The two Targos huts (2026-08-30). Vanilla's own village shape (village_script, shared
+    # with ch04/ch05): one box over the village BG, then the reward into the visitor's hands.
+    # The south hut IS Glimmerfrost -- she hands her charm over when the party reaches her, so
+    # her Pure Water is delivered here rather than at the ending like the two on the field.
+    for village in chap.get('villages', []):
+        symbol, msg, _fid, bg = CH02_VILLAGE_SLOTS[village['id']]
+        script = _replace_brace_block(
+            script, symbol + '[] =',
+            village_script(msg, village_reward_item(village, CH02_ITEM_IDS), bg),
+            CH3_EVENTSCRIPT_H)
     # Per-chwinga charm-gift: read each chwinga's survival (CHECK_ALIVE writes EVT_SLOT_C)
     # while the battle units are still loaded, BEQ past the give if it fell, else drop the
     # charm into the leader's inventory (overflow -> convoy). This is the chapter's
     # per-unit soft-fail signature beat (cf. vanilla survival idiom, ch10b ending).
+    # Per-survivor charms, for the chwinga ON THE FIELD. Glimmerfrost's is not here: she
+    # lives in the south hut and hands hers over when the party reaches her, the way a
+    # vanilla village pays on visit. Losing her to a raider and losing a chwinga on the
+    # field are the same soft-fail; they are simply collected in different places.
+    slot_by_uid = dict(CH02_CHWINGA)
     chwinga_gifts = ''.join(
         '    SVAL(EVT_SLOT_3, %s) /* %s charm */\n'
         '    CHECK_ALIVE(CHARACTER_%s)\n'
         '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* fell -> forfeit its own charm */\n'
         '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)\n'
         'LABEL(0x%X)\n'
-        % (CH02_ITEM_IDS[chwinga_by_id[uid]['gift']], uid, slot.upper(), 0x30 + i, 0x30 + i)
-        for i, (uid, slot) in enumerate(CH02_CHWINGA))
+        % (CH02_ITEM_IDS[g['gift']], g['id'], slot_by_uid[g['id']].upper(),
+           0x30 + i, 0x30 + i)
+        for i, g in enumerate(chap['deployment']['green_allies']))
     script = _replace_brace_block(
         script, 'EventScr_Ch3_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
@@ -8872,6 +8998,14 @@ def inject_ch02(campaign, verbose=True):
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
+    # The two Targos hut visits. One `visit_text` entry per BOX (ch04's lesson: a flowed
+    # scalar reflows at 42 columns and buttons mid-sentence), each over BG_NORMAL_VILLAGE.
+    # Glimmerfrost speaks with the green chwinga bust; the east hut takes a villager mug.
+    for village in chap.get('villages', []):
+        _symbol, msg, fid, _bg = CH02_VILLAGE_SLOTS[village['id']]
+        set_message_body(lines, msg, _script_to_message(
+            [{'villager': box} for box in village_boxes(village)],
+            {'villager': ('[OpenMidLeft]', fid)}))
     # Boss/miniboss ride vanilla slots (Bazba/Bone) -- rename their name plates to ours,
     # or the vanilla "Bazba"/"Bone" leaks on the unit window + death quote (cf. inject_ch01,
     # which renames its Breguet boss slot). display_name uses the YAML fe_name (<=12).
@@ -9893,7 +10027,10 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
     # still have to be unique against every other hosted chapter (#207).
     'ch01': (CH01_GOAL_WINDOW_MSG, CH01_GOAL_STATUS_MSG),
-    'ch02': (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG),
+    # The goal window/status predate the block registry and sit outside it; the two Targos
+    # hut visits are ch02's first claims from the block it gained when the pool widened.
+    'ch02': (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG,
+             *(msg for _sym, msg, _fid, _bg in CH02_VILLAGE_SLOTS.values())),
 }
 
 # The DEAD VANILLA BLOCK each hosted chapter draws its ids from, inclusive. A hosted chapter

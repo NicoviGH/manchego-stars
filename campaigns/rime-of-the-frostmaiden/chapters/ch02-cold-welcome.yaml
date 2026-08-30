@@ -123,45 +123,54 @@ deployment:
     - [1, 5]
     - [2, 4]
   note: "Pick Units fields 5 of {7 PCs + Baxby} (vanilla Ch2 fields 5). The party rolls in NW; 3 green chwinga sit just ahead, in the raid's path."
-  # ── Protected: 3 GREEN chwinga (replaces the dropped sled) ──────────────────────
-  # Harmless gift-spirits (book: "Starting Quest: Nature Spirits", p25–26) on the
-  # Pegasus chassis (CLASS_PEGASUS_KNIGHT 0x48) — the verified balance match to vanilla's
-  # green Ross+Garcia (3 pegs ≈ 9–11 output vs 12; Mage over-shoots Res≈0 brigands,
-  # Myrmidon wildly over). Armed light (Slim Lance) so they defend themselves like the
-  # vanilla greens, who aren't defenseless. Cautious green AI (defend, don't suicide).
-  # They sit just ahead of the NW deploy ring, in the raid's converging path → the party
-  # must shield them. Repurposes vanilla Ch3's Colm GREEN table (UnitDef_088B4718).
+  # ── Protected: 2 GREEN chwinga, on vanilla's own green posts ───────────────────
+  # Harmless gift-spirits (book: "Starting Quest: Nature Spirits", p25-26). REWORKED
+  # 2026-08-30 to vanilla Ch2's actual shape, which we had inverted: vanilla strands Ross
+  # (Journeyman, Mov 4, 5 HP, on a FORT, carrying a Vulnerary) and Garcia (Fighter, Mov 5,
+  # in FOREST) deep EAST at (10,5)/(10,4) and puts its villages on the PLAYER's side, so
+  # six pillaging bandits walk away from the greens while the player races to reach them.
+  # Ours had three Mov-7 FLIERS parked one tile in front of the deploy ring -- the most
+  # mobile chassis in the chapter, given to the units that are supposed to need rescuing,
+  # with nothing pulling the raid off them.
+  #
+  # They are PRIESTS now, not Pegasus Knights: Mov 5 (Garcia's), ground-bound, staff at
+  # D rank so they HEAL EACH OTHER -- adjacent at (10,4)/(10,5), and `cautious` runs
+  # AI_A_00 ActionInRange, which tries AiTryDoStaff before any attack. A staff cannot
+  # target its own carrier (cp_staff.c AiStaffHealMendRecover skips gActiveUnitId), which
+  # is why vanilla hands Ross a VULNERARY and why Rime carries one too.
+  # Art: Sclorbo's portrait, map sprite AND battle anim, greenified at build time -- they
+  # are his kin, and a chwinga swinging a lance never read right anyway.
+  # The retile PRESERVED vanilla's terrain here: (10,4) is FOREST and (10,5) is FORT.
   green_allies:
     - id: chwinga-mote
       name: "Snow Mote"
-      fe_name: "Mote"             # ≤12 — name buffer safety
-      class: pegasus_knight
+      fe_name: "Mote"             # <=12 -- name buffer safety
+      class: priest
       level: 1
-      position: [3, 4]
-      inventory: [slim-lance]
-      ai_pattern: cautious        # defend, don't charge into the raid
-      gift: hand-axe              # DEVIATION (ch02↔ch03 swap, ADR in decisions.md): vanilla Ch2's Red Gem
+      position: [10, 4]           # vanilla Garcia's post -- FOREST, avoid
+      inventory: [heal-staff, vulnerary]   # vanilla arms BOTH greens with a Vulnerary
+      donor: {at: [10, 4], allegiance: GREEN}   # Garcia: {AttackInRangeAI, 0, 0} -- hold the
+                                # tile, strike what reaches you. `cautious` was already these
+                                # bytes; now it is grounded rather than matching by luck.
+      gift: hand-axe              # DEVIATION (ch02<->ch03 swap, ADR in decisions.md): vanilla Ch2's Red Gem
                                   # moves to ch03's gem-mine chest; this slot takes ch03's Hand Axe instead.
-                                  # Net wealth + item set across ch02+ch03 = vanilla. (Useful to Braulo; a
-                                  # chwinga scavenging a discarded hatchet in Icewind Dale reads fine.)
+                                  # Net wealth + item set across ch02+ch03 = vanilla.
     - id: chwinga-rime
       name: "Rime Spark"
       fe_name: "Rime"
-      class: pegasus_knight
+      class: priest
       level: 1
-      position: [3, 5]
-      inventory: [slim-lance]
-      ai_pattern: cautious
+      position: [10, 5]           # vanilla Ross's post -- FORT: avoid AND HP regen each turn
+      inventory: [heal-staff, vulnerary]   # Ross's own kit: a staff cannot heal its carrier
+      donor: {at: [10, 4], allegiance: GREEN}   # Garcia's posture, not Ross's: Ross runs the
+                                # scripted-approach AI_B_0A that walks him to this fort, and
+                                # ours starts on it. Holding is what we want from both.
       gift: elixir                # ITEM_ELIXIR 0x6D
-    - id: chwinga-glimmer
-      name: "Glimmerfrost"
-      fe_name: "Glimmer"
-      class: pegasus_knight
-      level: 1
-      position: [2, 6]
-      inventory: [slim-lance]
-      ai_pattern: cautious
-      gift: pure-water            # ITEM_PUREWATER 0x6E
+  # Glimmerfrost is NOT a map unit: she is the inhabitant of the village at (1,12) and
+  # hands over the Pure Water when reached -- vanilla's own item on vanilla's own tile
+  # (EventScr_Ch2_Village3 gives 0x6E there). Losing her to a raider and losing a chwinga
+  # to a raider become the SAME soft-fail, which is what the third charm now measures.
+
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 # EXACT vanilla FE8 Ch2 "The Protected" roster (count + level + mix), reskinned as
@@ -185,7 +194,7 @@ enemy_units:
     inventory:
       - id: iron-axe
         damage_type: slashing   # cosmetic label only
-    ai_pattern: aggressive
+    donor: [[10, 12], [7, 14]]  # vanilla's L3 pair: one raids after a turn, one pursues
   - id: chardalyn-scavenger
     name: "Chardalyn Berserker"
     count: 1                          # vanilla 088B4344 #4 — the L3 dropper
@@ -198,7 +207,7 @@ enemy_units:
     inventory:
       - id: iron-axe
         damage_type: slashing
-    ai_pattern: aggressive
+    donor: [6, 11]              # vanilla's L3 that charges on turn 2
     item_drop: vulnerary        # the one dropper, mirrors vanilla Ch2's vulnerary drop
   - id: chardalyn-skirmisher
     name: "Chardalyn Berserker"
@@ -212,7 +221,7 @@ enemy_units:
     inventory:
       - id: iron-axe
         damage_type: slashing
-    ai_pattern: aggressive
+    donor: [12, 5]              # vanilla's L2 -- raids after a turn
   - id: frost-archer
     name: "Chardalyn Hunter"
     count: 1                          # vanilla 088B4344 #2 — the single L1 archer
@@ -225,7 +234,7 @@ enemy_units:
     inventory:
       - id: iron-bow
         damage_type: piercing
-    ai_pattern: aggressive
+    donor: [14, 9]              # vanilla's lone archer -- charges on turn 2
   - id: raider-bruiser
     name: "Grukk the Bruiser"
     fe_name: "Grukk"            # ≤12 — overrides the vanilla "Bone" slot name plate
@@ -240,7 +249,7 @@ enemy_units:
     inventory:
       - id: iron-axe
         damage_type: slashing
-    ai_pattern: hold_position
+    donor: [13, 7]              # vanilla's L4 raider
   - id: raider-captain
     name: "Halvar the Raider Captain"
     fe_name: "Halvar"          # ≤12 — overrides the vanilla "Bazba" slot name plate
@@ -262,7 +271,7 @@ enemy_units:
     inventory:
       - id: steel-axe
         damage_type: slashing
-    ai_pattern: hold_position        # stationary guard, not a fleeing caster
+    donor: [11, 7]              # Bazba -- and vanilla's boss RAIDS; he is not a throne-sitter
     death_quote: "Should've… paid the toll…"
 
 reinforcements:
@@ -279,7 +288,7 @@ reinforcements:
     trigger_turn: 3
     spawn_edge: opposite_boss        # flanks a party pushed toward the boss (FE8 pattern)
     positions: [[0,6],[0,7]]         # west edge (boss anchors east) — emerge behind a pushed party
-    ai_pattern: aggressive
+    donor: [[0, 9], [1, 9]]     # vanilla's southwest raider pair, beside the southern village
 
 # ── Rewards (no chest — vanilla Ch2 has none) ─────────────────────────────────────
 # Vanilla Ch2's loot = three VILLAGE GIFTS (Red Gem / Elixir / Pure Water) + one enemy
@@ -290,6 +299,50 @@ reinforcements:
 # Water. The enemy drop is the chardalyn-scavenger's vulnerary. No on-map chest (vanilla has none).
 # The gift item lives in ONE place — green_allies[].gift above — which the build reads directly.
 chests: []
+
+# ── Villages ─────────────────────────────────────────────────────────────────────
+# RESTORED 2026-08-30. Vanilla Ch2 wires THREE `Village()` -- (4,2), (7,2), (1,12) -- and
+# our retile kept two of its four village-terrain tiles while the events were dropped, so
+# the map drew huts that backed nothing. They are not decoration: six of vanilla's nine
+# bandits carry pillage-family AI, and pillage targets TERRAIN, so the villages are what
+# pull the raid AWAY from the greens while the player crosses to reach them. Remove them
+# and the raid has nowhere to go but the protectees -- which is the chapter we had.
+#
+# (1,12) is vanilla's own southern village tile, and it takes vanilla's own item and beat.
+# (12,3) is vanilla's fourth village-TERRAIN cell, which vanilla itself leaves unbacked;
+# ours gives it a line so the hut stops promising a reward that is not there.
+villages:
+  - id: targos-hut-south
+    tile: [1, 12]              # vanilla's southern village, same tile: `Village(EVFLAG_TMP(11),
+                               # EventScr_Ch2_Village3, 1, 12)` giving 0x6E Pure Water.
+    inhabitant:                # the third chwinga -- her charm IS this village's reward,
+      id: chwinga-glimmer      # handed over on the visit the way a vanilla village pays
+      name: "Glimmerfrost"
+      fe_name: "Glimmer"       # <=12 -- name buffer safety
+    visit_reward:
+      - id: pure-water         # ITEM_PUREWATER 0x6E -- vanilla's item, unmoved
+        amount: 1
+    # PLACEHOLDER -- pending /dialogue-pass, co-written with Nicolas like every other ch02
+    # scene. The beat to write is vanilla's 0x96C: "B-bandits?! Spread the word, everyone!
+    # Close the village gates!" This is the CONTESTED tile (the rear raiders spawn at
+    # (0,6)/(0,7)), so the alarm sits exactly where it does its teaching.
+    visit_text:
+      - "(placeholder) Bandits on the road! Get inside and bar the door!"
+      - "(placeholder) Here -- take this. You'll need it more than I will." 
+    note: >
+      The contested one. Reaching Glimmerfrost before the raiders do is the third charm --
+      the same soft-fail as losing a chwinga on the field, measured a different way.
+  - id: targos-hut-east
+    tile: [12, 3]              # vanilla's unbacked fourth village-terrain cell
+    visit_reward: []           # no item: ch02's wealth is fixed at three and all three are spoken for
+    # PLACEHOLDER -- pending /dialogue-pass. One Targos voice; the precedent for a
+    # reward-free village is ch04's forest-cottage ("the line is the reward").
+    visit_text:
+      - "(placeholder) You'd best not linger. Nothing out here but cold and worse." 
+    note: >
+      A decoy with a line. It sits on the eastern route, so it pulls pillaging raiders off
+      the crossing without paying a second time.
+
 charm_gifts:
   note: "Each SURVIVING chwinga gifts its charm at chapter end (gated on the per-unit survival flag); the item is authored per-unit in green_allies[].gift."
 
