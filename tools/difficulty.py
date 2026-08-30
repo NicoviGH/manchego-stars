@@ -468,6 +468,19 @@ def _brace_entries(body):
                 yield body[start:i]
 
 
+def vanilla_redas(text):
+    """`{REDA symbol: [(x, y), ...]}` for every REDA array in a decomp source.
+
+    REDA is the scripted movement a unit walks when it loads. It matters here because a
+    UnitDefinition's `xPosition`/`yPosition` is frequently a SPAWN tile rather than a battle
+    post: vanilla Ch1's entire force enters on (1,9)/(2,9) and Ch5's on (0,0)/(10,0)/(12,0).
+    The last point is where the unit actually ends up."""
+    return {m.group(1): [(int(x), int(y)) for x, y in
+                         re.findall(r'\.x = (\d+),\s*\.y = (\d+)', m.group(2))]
+            for m in re.finditer(
+                r'CONST_DATA struct REDA (REDA_\w+)\[\] = \{(.*?)\n\};', text, re.S)}
+
+
 def vanilla_unit_defs(text, array_name):
     """Parse `CONST_DATA struct UnitDefinition <array_name>[] = { ... };` from decomp text
     into a list of per-entry dicts (charIndex, classIndex, level, allegiance, itemDrop, items).
@@ -477,6 +490,7 @@ def vanilla_unit_defs(text, array_name):
     statscreen.c:726), the enemy-drop channel the economy reads (#176)."""
     s, e = bc._find_brace_block(text, array_name + '[]', '<udef:%s>' % array_name)
     body = text[s + 1:e - 1]
+    redas = vanilla_redas(text)
     out = []
     for block in _brace_entries(body):           # top-level { ... } per unit (handles
         cls = re.search(r'\.classIndex\s*=\s*(\w+)', block)   # nested .items/.ai braces
@@ -489,10 +503,18 @@ def vanilla_unit_defs(text, array_name):
         ai = re.search(r'\.ai\s*=\s*\{(.*?)\}', block, re.S)
         xpos = re.search(r'\.xPosition\s*=\s*(\d+)', block)
         ypos = re.search(r'\.yPosition\s*=\s*(\d+)', block)
+        reda = re.search(r'\.redas\s*=\s*(REDA_\w+)', block)
+        placed = (int(xpos.group(1)) if xpos else None,
+                  int(ypos.group(1)) if ypos else None)
+        walked = redas.get(reda.group(1)) if (reda and redas) else None
         out.append({
             'ai': ai_bytes(ai.group(1) if ai else None),
-            'xPosition': int(xpos.group(1)) if xpos else None,
-            'yPosition': int(ypos.group(1)) if ypos else None,
+            'redas': reda.group(1) if reda else None,
+            # Where the unit FIGHTS: the end of its REDA walk, or its placed tile when it
+            # does not walk. Donors match on this, never on the spawn tile (#335).
+            'position': walked[-1] if walked else placed,
+            'xPosition': placed[0],
+            'yPosition': placed[1],
             'charIndex': chi.group(1) if chi else None,
             'classIndex': cls.group(1),
             'level': int(lvl.group(1)) if lvl else 1,
@@ -550,25 +572,21 @@ def resolve_donor(parity_ref, spec):
         raise ValueError('parity_reference %r has no curated UnitDefinition arrays, so a '
                          'donor cannot be resolved against it' % parity_ref)
     if isinstance(spec, dict):
-        at, nth = spec.get('at'), spec.get('nth')
-        want = {'classIndex': spec.get('class'), 'level': spec.get('level')}
+        at = spec.get('at')
+        want = {'classIndex': spec.get('class'), 'level': spec.get('level'),
+                'redas': spec.get('redas')}
     elif isinstance(spec, (list, tuple)) and len(spec) == 2:
-        at, nth, want = spec, None, {'classIndex': None, 'level': None}
+        at, want = spec, {'classIndex': None, 'level': None, 'redas': None}
     else:
         raise ValueError('donor %r is not a coordinate [x, y] nor a {at/class/level/nth} '
                          'reference' % (spec,))
     if at is not None and not (isinstance(at, (list, tuple)) and len(at) == 2):
         raise ValueError('donor %r: `at` must be a coordinate [x, y]' % (spec,))
     found = [u for u in units
-             if (at is None or (u['xPosition'], u['yPosition']) == tuple(at))
+             if (at is None or u['position'] == tuple(at))
              and all(v is None or u[k] == v for k, v in want.items())]
     if not found:
         raise ValueError('donor %r matches no red unit of %s' % (spec, parity_ref))
-    if nth is not None:
-        if nth >= len(found):
-            raise ValueError('donor %r: nth=%d but only %d red unit(s) of %s match'
-                             % (spec, nth, len(found), parity_ref))
-        return found[nth]
     behaviours = {u['ai'] for u in found}
     if len(behaviours) > 1:
         raise ValueError(

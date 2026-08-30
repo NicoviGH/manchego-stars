@@ -7657,14 +7657,24 @@ declares it means to differ.
   out to strike; our `defensive` (`{0x3,0x3,0x9,0x20}`) was welded twice over -- the A-script AND
   the config bit -- so we had put the throne-boss posture on every line unit in ch03/ch04/ch05.
 
-**A donor is a MATCH SPEC, not a coordinate lookup**, and it may be one PER POSITION. Coordinates
-alone fail twice over: ch01 and ch06 sit on a different map donor from their parity twin, so not
-one tile lines up; and where the map IS the twin's, tiles collide by accident (ch05's bone-archer
-wave stands on (13,0), where vanilla parks an ARMOR_KNIGHT boss). A spec resolves only when
-everything it matches shares one AI; `nth:` is the last resort for units vanilla stacks that are
-identical in every readable field and still behave differently (Ch1's two L2 fighters on (2,9)).
-Per-position donors matter because a single donor per entry FLATTENS a group -- ch04's four mogalls
-run three different AIs, and ch05's eight tomb-reavers stand in for a line vanilla splits 4/2/2.
+**A donor matches where a vanilla unit FIGHTS, which is usually not where it is placed.** A
+`UnitDefinition`'s `xPosition`/`yPosition` is frequently a SPAWN tile: `redas` is scripted movement
+that walks the unit from there to its post, and the last REDA point is the destination. Vanilla
+Ch1's entire force enters on (1,9)/(2,9) and Ch5's on (0,0)/(10,0)/(12,0), so matching a donor on
+those tiles matches on "entered from the north", which is no identity at all.
+
+This is not a detail. Matched on spawn tiles, 9 of ch05's 23 units appeared to line up with the
+twin and the nine were coincidences -- one of them paired our bone-archer wave with an ARMOR_KNIGHT
+boss, whose throne AI it would have inherited. Matched on POSTS it is **23 of 23**, class for class:
+our mercenary stands on vanilla's mercenary's tile, our archer on its archer's. ch05's pairing is
+therefore DERIVED, not assigned by hand, and it comes out matching the twin exactly.
+
+Posts are also unique where placements are not, which retired an earlier `nth:` ordinal: Ch1's two
+L2 fighters share spawn (2,9) and differ only in `redas`, but they post to (3,8) and (2,9). The
+spec is still a MATCH (`at` / `class` / `level`) that resolves only when everything it matches
+shares one AI, and it may be one donor PER POSITION -- a single donor per entry FLATTENS a group,
+and ch04's four mogalls run three different AIs while ch05's eight tomb-reavers stand in for a
+line vanilla splits 4/2/2.
 
 **The AI_A_07 escort guard now sweeps EMITTED AI, not the label tables.** Strictly wider: it also
 catches a unit that inherits `AI_A_07` from its donor, which no scan of our own vocabulary could
@@ -7676,10 +7686,11 @@ whole green test suite missed -- every injector called `enemy_ai_initialiser(cha
 the position index, so all eight of ch05's tomb-reavers shipped their FIRST donor's AI. YAML right,
 resolver right, tests green, ROM wrong. `PerPositionAiReachesTheEmittedRows` now pins it.
 
-ch01, ch03 and ch06 come out matching their twins exactly; ch01 emits byte-identical output through
-the whole refactor, and ch06 -- the one chapter derived by hand -- reproduces byte for byte, which
-is the model's proof. Remaining differences are declared overrides: ch00's Sephek (O'Neill's
-DoNothing depends on a tutorial `CHAI` we do not run), ch04's six-wolf pack (#203), ch05's moose.
+ch01, ch03, ch05 and ch06 come out matching their twins exactly; ch01 emits byte-identical output
+through the whole refactor, and ch06 -- the one chapter derived by hand -- reproduces byte for
+byte, which is the model's proof. The only remaining differences are declared overrides: ch00's
+Sephek (O'Neill's DoNothing depends on a tutorial `CHAI` we do not run) and ch04's six-wolf pack,
+which is six units where vanilla loads four because #203 needs each wolf addressable by pid.
 _Decided and implemented: 2026-08-29 (#335)._
 
 ## Open Questions (not yet decided)

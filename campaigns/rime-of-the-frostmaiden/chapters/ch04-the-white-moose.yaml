@@ -178,8 +178,8 @@ enemy_units:
       - id: rotten-claw
         fe_base: rotten-claw    # ITEM_MONSTER_ROTTENCLW — vanilla Revenant claw
     damage_type: bludgeoning    # flavor label only
-    donor: [[7, 9], [5, 13]]   # two of vanilla's main-force L2 revenants (AttackInRange)
-  # ── Bonewalkers ×3 (MELEE, iron sword) — vanilla Ch4 Bonewalkers are melee, not bows ──
+    donor: [[7, 9], [5, 8]]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
   - id: bonewalker
     name: "Bonewalker"
     fe_name: "Bonewalker"
@@ -286,7 +286,8 @@ enemy_units:
       - id: iron-lance
         fe_base: iron-lance     # ITEM_LANCE_IRON — vanilla Ch4 pack Bonewalker weapon
     damage_type: piercing
-    donor: [[14, 9], [14, 8], [14, 6]]   # vanilla's east bonewalker wave (UnitDef_088B4C88), tile for tile
+    donor: [[14, 6], [2, 7], [3, 10]]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
 
 # ── Scripted neutral (the quarry) ────────────────────────────────────────────────
 neutral_units:

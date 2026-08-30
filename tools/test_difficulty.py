@@ -236,22 +236,21 @@ class DonorResolution(unittest.TestCase):
         self.assertEqual(donor['ai'], (0x03, 0x03, 0x09, 0x20))
         self.assertEqual(donor['classIndex'], 'CLASS_BRIGAND')
 
-    def test_a_tile_vanilla_stacks_is_ambiguous_and_raises(self):
-        # vanilla Ch2 puts an ARCHER and a BRIGAND both on (14,7), and they do NOT share an
-        # AI ({0,0x12,..} vs {0,0x11,..}). First-match would silently pick one.
+    def test_a_post_two_units_share_is_ambiguous_and_raises(self):
+        # The prologue stands its two caravan guards on (14,7) with different AI
+        # ({0,0xA,..} scripted approach vs {0,0x12,..} charge-on-turn-2). First-match would
+        # silently pick one. Posts are otherwise unique in every twin we use.
         with self.assertRaises(ValueError) as caught:
-            df.resolve_donor('FE8 Ch2', [14, 7])
+            df.resolve_donor('FE8 Prologue', [14, 7])
         self.assertIn('disagree', str(caught.exception).lower())
 
-    def test_class_disambiguates_a_stacked_tile(self):
+    def test_level_disambiguates_a_shared_post(self):
         self.assertEqual(
-            df.resolve_donor('FE8 Ch2', {'at': [14, 7], 'class': 'CLASS_ARCHER'})['ai'],
-            (0x00, 0x12, 0x09, 0x00))
-
-    def test_level_disambiguates_a_stacked_tile(self):
-        # (14,8) carries a L4 and a L6 brigand.
+            df.resolve_donor('FE8 Prologue', {'at': [14, 7], 'level': 1})['ai'],
+            (0x00, 0x0A, 0x00, 0x00))
         self.assertEqual(
-            df.resolve_donor('FE8 Ch2', {'at': [14, 8], 'level': 6})['level'], 6)
+            df.resolve_donor('FE8 Prologue', {'at': [14, 7], 'level': 2})['ai'],
+            (0x00, 0x12, 0x02, 0x00))
 
     def test_a_coordinate_no_red_unit_occupies_raises(self):
         with self.assertRaises(ValueError) as caught:
@@ -320,7 +319,7 @@ class AiDonorFindings(unittest.TestCase):
 
     def test_an_unresolvable_donor_is_reported_with_the_reason_it_failed(self):
         findings = df.ai_donor_findings(self._chap([{'id': 'a', 'donor': [14, 7]}],
-                                                   ref='FE8 Ch2'))
+                                                   ref='FE8 Prologue'))
         self.assertTrue(any('disagree' in f.lower() for f in findings), findings)
 
     def test_reinforcement_waves_are_checked_too(self):
@@ -367,7 +366,7 @@ class DonorGroupResolution(unittest.TestCase):
 
     def test_coordinate_and_class_combine(self):
         self.assertEqual(
-            df.resolve_donor('FE8 Ch2', {'at': [14, 7], 'class': 'CLASS_ARCHER'})['ai'],
+            df.resolve_donor('FE8 Ch2', {'at': [14, 9], 'class': 'CLASS_ARCHER'})['ai'],
             (0x00, 0x12, 0x09, 0x00))
 
     def test_a_spec_matching_nothing_raises(self):
@@ -452,30 +451,53 @@ class AiFindingsInTheCurveReport(unittest.TestCase):
         self.assertTrue(all('ai' in r for r in self._rows().values()))
 
 
-class DonorNthDiscriminator(unittest.TestCase):
-    """Vanilla sometimes stacks units that are identical in every readable field and still
-    behave differently: Ch1 puts TWO L2 fighters on (2,9), one pursuing from turn 1 and one
-    charging on turn 2. Coordinate, class and level cannot separate them, so the spec takes
-    an `nth:` -- 0-based, in array order. It is the last resort, not the first: everything
-    else names a property, and `nth` names a slot."""
+class VanillaUnitDestinations(unittest.TestCase):
+    """#335: a vanilla unit's `xPosition`/`yPosition` is often a SPAWN tile, not where it
+    fights. `redas` is scripted movement data that walks it from there to its post, and the
+    last REDA point is the destination.
 
-    def test_nth_picks_between_units_identical_in_every_other_field(self):
-        base = {'at': [2, 9], 'class': 'CLASS_FIGHTER', 'level': 2}
-        self.assertEqual(df.resolve_donor('FE8 Ch1', dict(base, nth=0))['ai'],
-                         (0x00, 0x00, 0x01, 0x00))
-        self.assertEqual(df.resolve_donor('FE8 Ch1', dict(base, nth=1))['ai'],
-                         (0x00, 0x12, 0x01, 0x00))
+    This is load-bearing for donors. Vanilla Ch1's whole force enters on (1,9)/(2,9) and
+    Ch5's on (0,0)/(10,0)/(12,0) -- matching a donor on those tiles is matching on "entered
+    from the north", which is no identity at all. Matched on DESTINATION, every one of our
+    23 ch05 units lands exactly on a vanilla unit's post, and Ch1's two seemingly identical
+    L2 fighters separate cleanly (they walk to (3,8) and (2,9))."""
 
-    def test_nth_past_the_end_raises(self):
-        with self.assertRaises(ValueError) as caught:
-            df.resolve_donor('FE8 Ch1', {'at': [2, 9], 'class': 'CLASS_FIGHTER',
-                                         'level': 2, 'nth': 5})
-        self.assertIn('nth', str(caught.exception).lower())
+    def test_a_unit_with_redas_reports_its_destination_not_its_spawn(self):
+        units = df.vanilla_red_units('FE8 Ch1')
+        knight = next(u for u in units if u['classIndex'] == 'CLASS_ARMOR_KNIGHT')
+        self.assertEqual((2, 9), (knight['xPosition'], knight['yPosition']))
+        self.assertEqual((2, 5), knight['position'])
 
-    def test_without_nth_that_pair_still_raises(self):
-        # nth must be opt-in: silently taking the first match is the bug it exists to avoid.
-        with self.assertRaises(ValueError):
-            df.resolve_donor('FE8 Ch1', {'at': [2, 9], 'class': 'CLASS_FIGHTER', 'level': 2})
+    def test_a_unit_with_no_redas_falls_back_to_its_placed_tile(self):
+        # ch03's force is placed statically -- no REDA, so position IS xPosition/yPosition.
+        for unit in df.vanilla_red_units('FE8 Ch3'):
+            self.assertEqual((unit['xPosition'], unit['yPosition']), unit['position'])
+
+    def test_destinations_separate_units_identical_in_every_other_field(self):
+        # The pair that made me reach for `nth`: same class, level and spawn tile, different
+        # AI. Their destinations differ, so no ordinal is needed.
+        pair = [u for u in df.vanilla_red_units('FE8 Ch1')
+                if u['classIndex'] == 'CLASS_FIGHTER' and u['level'] == 2
+                and (u['xPosition'], u['yPosition']) == (2, 9)]
+        self.assertEqual(2, len(pair))
+        self.assertEqual({(3, 8), (2, 9)}, {u['position'] for u in pair})
+        self.assertNotEqual(pair[0]['ai'], pair[1]['ai'])
+
+    def test_a_donor_at_matches_the_destination(self):
+        self.assertEqual(df.resolve_donor('FE8 Ch1', [3, 8])['ai'], (0x00, 0x00, 0x01, 0x00))
+        self.assertEqual(df.resolve_donor('FE8 Ch1', [2, 9])['ai'], (0x00, 0x12, 0x01, 0x00))
+
+    def test_every_ch05_unit_of_ours_stands_on_a_vanilla_destination(self):
+        # 23/23 -- the ch05 pairing is DERIVED, not assigned by hand. Matched on spawn tiles
+        # it was 9/23, and the nine were coincidences.
+        posts = {u['position'] for u in df.vanilla_red_units('FE8 Ch5')}
+        with open(df.chapter_path('rime-of-the-frostmaiden', 'ch05'),
+                  encoding='utf-8') as source:
+            chap = bc.yaml.safe_load(source)
+        ours = [tuple(p) for key in df.AI_ROSTER_KEYS
+                for e in (chap.get(key) or []) if isinstance(e, dict)
+                for p in (e.get('positions') or [])]
+        self.assertEqual([], [p for p in ours if p not in posts])
 
 
 class ChapterEnemyForce(unittest.TestCase):
@@ -621,6 +643,7 @@ class VanillaUnitDefParser(unittest.TestCase):
         self.assertEqual(len(defs), 3)           # the { 0 } terminator is skipped
         self.assertEqual(defs[0], {'charIndex': 'CHARACTER_BREGUET',
                                    'ai': (0x03, 0x03, 0x09, 0x20),
+                                   'redas': None, 'position': (11, 3),
                                    'xPosition': 11, 'yPosition': 3,
                                    'classIndex': 'CLASS_ARMOR_KNIGHT', 'level': 4,
                                    'allegiance': 'FACTION_ID_RED', 'itemDrop': False,

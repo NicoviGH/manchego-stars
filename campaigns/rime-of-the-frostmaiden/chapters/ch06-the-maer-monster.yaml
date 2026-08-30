@@ -442,7 +442,8 @@ enemy_units:
       - id: javelin
       - id: iron-lance
     damage_type: piercing
-    donor: [0, 11]                  # vanilla's HARD-mode cavalry (UnitDef_088B64F0)
+    donor: [3, 11]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
   - id: crab-rider-hard-lance
     name: "Crab Rider"
@@ -455,7 +456,8 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
-    donor: [0, 9]                   # vanilla's HARD-mode cavalry
+    donor: [2, 9]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
   - id: crab-rider-hard-sword
     name: "Crab Rider"
@@ -469,7 +471,8 @@ enemy_units:
       - id: iron-sword
       - id: javelin
     damage_type: slashing
-    donor: [0, 13]                  # vanilla's HARD-mode cavalry
+    donor: [2, 13]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
 
   # ── The boss (vanilla's Novala) ──────────────────────────────────────────────
