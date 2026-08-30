@@ -4893,6 +4893,60 @@ def _ch05_ending(chap):
     return bc.ch05_ending_script(chap, 'CHARACTER_ARTUR', 'CHARACTER_MARISA')
 
 
+class MessageBlockPool(unittest.TestCase):
+    """A hosted chapter may declare MORE THAN ONE id range, and every range it declares must
+    be genuinely dead.
+
+    The original rule -- "take the dead block of the slot you displace" -- was safe without
+    analysis, because blanking slot N's events kills slot N's text references. It also caps
+    every chapter at whatever that one vanilla chapter happened to spend: ch05 hit 0 free at
+    18 ids while 528 ids belonging to chapters we never ship sat unclaimed in runs up to 48.
+    Widening is only safe if "this range is dead" is CHECKED, which is what these do.
+    """
+
+    def test_a_chapter_may_declare_several_ranges(self):
+        ranges = bc.message_block_ranges('ch05')
+        self.assertGreater(len(ranges), 1)
+        self.assertIn((0x9E4, 0x9F5), ranges)      # its original block, ids unmoved
+
+    def test_capacity_sums_every_range(self):
+        self.assertEqual(sum(hi - lo + 1 for lo, hi in bc.message_block_ranges('ch05')),
+                         bc.message_block_capacity('ch05'))
+
+    def test_overlap_is_refused_across_ranges_not_just_blocks(self):
+        with self.assertRaises(SystemExit):
+            bc.assert_message_blocks_disjoint(
+                {'a': ((0x100, 0x110), (0x300, 0x310)),
+                 'b': ((0x200, 0x210), (0x305, 0x320))})
+
+    def test_a_chapter_overlapping_ITSELF_is_refused(self):
+        # Two ranges on one chapter double-count its own headroom, which reads as free space
+        # that is not there.
+        with self.assertRaises(SystemExit):
+            bc.assert_message_blocks_disjoint({'a': ((0x100, 0x110), (0x108, 0x120))})
+
+    def test_no_declared_block_is_drawn_over_an_id_the_build_already_spends(self):
+        """The guard that makes widening safe. Vanilla's references to a slot we host die
+        when we blank that slot's events -- but ids we REPURPOSED are alive and no longer
+        look like what they were."""
+        self.assertEqual([], bc.live_ids_in_declared_blocks())
+
+    def test_the_guard_catches_a_range_drawn_over_a_repurposed_id(self):
+        """0x969 was vanilla Ch2's first village text and is now a lord-select blurb. A
+        block over it would build clean and garble a scene in play."""
+        self.assertIn(0x969, bc.injector_message_ids())
+        offenders = bc.live_ids_in_declared_blocks({'bogus': ((0x969, 0x96C),)})
+        self.assertTrue(any('0x969' in o for o in offenders), offenders)
+
+    def test_a_chapter_s_OWN_claims_inside_its_block_are_not_offenders(self):
+        """Same range as the test above -- the only difference is that the chapter claims
+        those ids, which is what a block is FOR. Without this carve-out every chapter would
+        report its own scenes as collisions."""
+        self.assertEqual([], bc.live_ids_in_declared_blocks(
+            {'bogus': ((0x969, 0x96C),)},
+            claims={'bogus': (0x969, 0x96A, 0x96B, 0x96C)}))
+
+
 class Ch05VillageRaidRace(unittest.TestCase):
     """ch05's declared structure: the eruption's dead race the party for the four reliquaries,
     and saving all four pays out (#25). Vanilla Ch5 is the reference for both halves -- it wires

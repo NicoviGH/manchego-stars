@@ -9916,11 +9916,81 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
 #
 # A block's free ids are the ones NOBODY claims, not the ones its owner has not taken: ch05's
 # ending borrowed 0x9C9/0x9CA out of ch04's block, with the reason recorded at CH05_ENDING_MSGS.
+# Message id ranges a hosted chapter may spend, as a TUPLE OF RANGES per chapter.
+#
+# The first rule was "take the dead block of the slot you displace" -- safe with no analysis,
+# since blanking slot N's events kills slot N's text references. It also caps a chapter at
+# whatever that one vanilla chapter happened to spend, and ch05 hit 0 free at 18 ids while
+# 528 ids belonging to chapters we never ship sat unclaimed in contiguous runs up to 48 wide.
+# Extra ranges come from that pool; `live_ids_in_declared_blocks` is what makes taking them
+# safe, by CHECKING deadness rather than assuming it. Existing ranges are never renumbered --
+# a shipped message id moving is a text regression nobody would see until the ROM ran.
 HOSTED_CHAPTER_MESSAGE_BLOCKS = {
-    'ch03': (0x9A3, 0x9B9),   # the dead vanilla Ch4 block (slot 4)
-    'ch04': (0x9BA, 0x9CC),   # the dead vanilla Ch5 block (slot 5)
-    'ch05': (0x9E4, 0x9F5),   # the dead vanilla Ch6 block (slot 6)
+    'ch02': ((0xAC0, 0xAEF),),                    # from the never-shipped pool (48 ids)
+    'ch03': ((0x9A3, 0x9B9),),                    # the dead vanilla Ch4 block (slot 4)
+    'ch04': ((0x9BA, 0x9CC),),                    # the dead vanilla Ch5 block (slot 5)
+    'ch05': ((0x9E4, 0x9F5), (0xBC5, 0xBF2)),     # its slot-6 block, plus 46 from the pool
 }
+
+# The size of vanilla's message table (gMsgTable). Ids at or above this are not messages.
+VANILLA_MESSAGE_COUNT = 0xD4C
+
+# Vanilla chapter slots we HOST in. A message id referenced only by the event scripts of
+# chapters outside this set is unreachable in our ROM, which is what makes it claimable.
+HOSTED_VANILLA_SLOTS = ('prologue', 'ch1', 'ch2', 'ch3', 'ch4', 'ch5', 'ch6')
+
+
+def message_block_ranges(chapter, blocks=None):
+    """The (lo, hi) ranges a hosted chapter may spend. Empty when it declares none."""
+    return tuple((blocks if blocks is not None
+                  else HOSTED_CHAPTER_MESSAGE_BLOCKS).get(chapter, ()))
+
+
+def message_block_capacity(chapter, blocks=None):
+    """How many ids a chapter's declared ranges hold in total."""
+    return sum(hi - lo + 1 for lo, hi in message_block_ranges(chapter, blocks))
+
+
+def injector_message_ids():
+    """{message id: constant name} for every id THIS module hardcodes.
+
+    The hazard a widened block actually faces. Vanilla's own references to a slot we host
+    die when our injector blanks that slot's event lists -- but ids we have REPURPOSED are
+    very much alive, and they no longer look like what they were. Vanilla Ch2's three
+    village texts (0x969-0x96C) are ch01's lord-select candidate blurbs now; a block drawn
+    over them would compile, ship, and garble a scene nobody was looking at.
+
+    Read off the module's own `*_MSG` / `*_MSGS` constants, so registering a new one is
+    enough -- there is no second list to remember.
+    """
+    out = {}
+    for name, value in sorted(globals().items()):
+        if not re.search(r'_MSGS?$', name):
+            continue
+        values = value if isinstance(value, (tuple, list, set)) else (value,)
+        for mid in values:
+            if isinstance(mid, int) and 0x300 <= mid < VANILLA_MESSAGE_COUNT:
+                out.setdefault(mid, name)
+    return out
+
+
+def live_ids_in_declared_blocks(blocks=None, claims=None):
+    """Ids inside a declared block that something else already spends. Empty == safe.
+
+    A chapter's own claims are fine -- that is what a block is FOR. What is refused is a
+    range drawn over an id another part of the build hardcodes, because nothing downstream
+    would notice: the build succeeds, the ROM ships, and one scene reads another's text.
+    """
+    spent = injector_message_ids()
+    owned = (claims if claims is not None else HOSTED_CHAPTER_MESSAGE_IDS)
+    bad = []
+    for chapter, ranges in sorted((blocks if blocks is not None
+                                   else HOSTED_CHAPTER_MESSAGE_BLOCKS).items()):
+        mine = set(owned.get(chapter, ()))
+        for lo, hi in ranges:
+            bad += ['%s 0x%X (%s)' % (chapter, m, spent[m])
+                    for m in range(lo, hi + 1) if m in spent and m not in mine]
+    return bad
 
 
 def assert_message_blocks_disjoint(blocks=None):
@@ -9930,13 +10000,18 @@ def assert_message_blocks_disjoint(blocks=None):
     setup that makes that inevitable -- two chapters told to help themselves to the same
     range -- before either has spent it.
     """
-    ordered = sorted((blocks if blocks is not None
-                      else HOSTED_CHAPTER_MESSAGE_BLOCKS).items(), key=lambda kv: kv[1])
+    flat = sorted(((lo, hi), name)
+                  for name, ranges in (blocks if blocks is not None
+                                       else HOSTED_CHAPTER_MESSAGE_BLOCKS).items()
+                  for lo, hi in ranges)
+    ordered = [(name, span) for span, name in flat]
     for (a, (a_lo, a_hi)), (b, (b_lo, b_hi)) in zip(ordered, ordered[1:]):
         if b_lo <= a_hi:
             sys.exit('ERROR: %s (0x%X-0x%X) and %s (0x%X-0x%X) declare OVERLAPPING message '
-                     'blocks -- two chapters cannot both be free to spend the same ids'
-                     % (a, a_lo, a_hi, b, b_lo, b_hi))
+                     'ranges -- two ranges cannot both be free to spend the same ids%s'
+                     % (a, a_lo, a_hi, b, b_lo, b_hi,
+                        ' (and they are the SAME chapter, which would double-count its own '
+                        'headroom)' if a == b else ''))
     return True
 
 

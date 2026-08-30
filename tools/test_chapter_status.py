@@ -67,10 +67,18 @@ class MessageIds(unittest.TestCase):
         reliquary lines, the moose's appended name), and those are claims but not headroom:
         counting them as block usage would report the block as overfull."""
         room = cs.message_ids('ch05')
-        lo, hi = room.block
-        self.assertTrue(all(lo <= m <= hi for m in room.used_in_block))
-        self.assertTrue(any(m < lo or m > hi for m in room.claimed))
-        self.assertEqual(hi - lo + 1 - len(room.used_in_block), room.free)
+        inside = lambda m: any(lo <= m <= hi for lo, hi in room.block)
+        self.assertTrue(all(inside(m) for m in room.used_in_block))
+        self.assertTrue(any(not inside(m) for m in room.claimed))
+        capacity = sum(hi - lo + 1 for lo, hi in room.block)
+        self.assertEqual(capacity - len(room.used_in_block), room.free)
+
+    def test_headroom_sums_across_every_declared_range(self):
+        """ch05 spends its slot-6 block down to zero and draws the rest from the pool, so a
+        reader that looked at only the first range would still call it FULL."""
+        room = cs.message_ids('ch05')
+        self.assertGreater(len(room.block), 1)
+        self.assertGreater(room.free, 0)
 
     def test_two_chapters_may_not_declare_overlapping_blocks(self):
         """`assert_message_ids_unique` catches two chapters writing the same id. This catches
@@ -78,10 +86,11 @@ class MessageIds(unittest.TestCase):
         import build_campaign as bc
         self.assertTrue(bc.assert_message_blocks_disjoint())
         with self.assertRaises(SystemExit):
-            bc.assert_message_blocks_disjoint({'a': (0x100, 0x110), 'b': (0x105, 0x120)})
+            bc.assert_message_blocks_disjoint({'a': ((0x100, 0x110),),
+                                               'b': ((0x105, 0x120),)})
 
     def test_a_chapter_with_no_declared_block_says_so_rather_than_guessing(self):
-        """ch01/ch02 predate the per-chapter block registry. Reporting 0 free would read as
+        """ch01 predates the per-chapter block registry. Reporting 0 free would read as
         'full' when the truth is 'nobody wrote it down'."""
         self.assertIsNone(cs.message_ids('ch01').block)
 
@@ -124,11 +133,12 @@ class Scenarios(unittest.TestCase):
 
 
 class LooseEnds(unittest.TestCase):
-    def test_ch05_s_message_block_is_reported_as_full(self):
-        """It is: 0x9E4-0x9F5, all eighteen spent. That is the number that decides whether
-        ch05's next scene costs an id or a redesign, and nothing computed it before."""
-        self.assertEqual(0, cs.message_ids('ch05').free)
-        self.assertTrue(any('block is full' in e for e in cs.loose_ends('ch05')))
+    def test_ch05_is_no_longer_out_of_message_ids(self):
+        """It WAS full -- 0x9E4-0x9F5, all eighteen spent -- because the first allocation
+        rule capped every chapter at whatever its host slot happened to spend. A second
+        range from the never-shipped pool is what unblocks its next scene."""
+        self.assertGreater(cs.message_ids('ch05').free, 0)
+        self.assertFalse(any('block is full' in e for e in cs.loose_ends('ch05')))
 
     def test_a_planned_chapter_reports_its_unwritten_scenes_and_missing_art(self):
         ends = cs.loose_ends('ch06')
