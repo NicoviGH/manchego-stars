@@ -5971,7 +5971,7 @@ class PreRecruitVariant(unittest.TestCase):
         self.assertIn('if (prv == 0) {', src)
 
     def test_the_lookup_is_c89_declarations_first(self):
-        # agbcc (GCC 2.95.1) rejects mid-block declarations; CLAUDE.md coding conventions.
+        # agbcc (GCC 2.95.1) rejects mid-block declarations; AGENTS.md coding conventions.
         body = [ln.strip() for ln in bc._pre_recruit_lookup('unit').splitlines() if ln.strip()]
         self.assertTrue(body[0].startswith('struct PreRecruitVariant * prv'))
         self.assertNotIn('//', bc._pre_recruit_lookup('unit'))

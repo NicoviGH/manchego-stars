@@ -35,7 +35,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # `custom_unit.md` still said `clone_into` (dead since #65) and the dialogue-pass skill
 # still taught the 29/42-CHARACTER wrap that #298 replaced with pixel budgets. A doc that
 # instructs is exactly the kind this guard exists for.
-DOC_GLOBS = ['docs/**/*.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md',
+DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md',
              '.github/**/*.md', '.claude/skills/**/*.md']
 
 # Terms that are NEVER legitimate in vision/ops docs OR hand-written code comments:
@@ -104,7 +104,7 @@ DEAD_CONCEPTS = [
     # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
     # But `build_campaign.py` already documents it as dead in the docstring a reader would hit
     # first, and DEAD_CONCEPTS would flag that warning too -- a guard that rejects its own warning
-    # is worse than none. The durable fix is a pointer in CLAUDE.md's Source-of-Truth table.
+    # is worse than none. The durable fix is a pointer in AGENTS.md's Source-of-Truth table.
     #
     # retired by #298 (2026-08-21), and #311 found THREE docstrings still asserting it: a
     # scene's wrap is a PIXEL budget, so no channel is "42" or "29" wide any more. The first
@@ -1358,7 +1358,7 @@ def check_engine_guards_present(fail):
 # Hand-written engine code must never name a campaign character: build_campaign INJECTS
 # names into the fireemblem8u working tree at build time, so the committed engine sources
 # stay reusable for any campaign ("braulo" belongs in YAML, not a .c). This was a
-# code-review rule (CLAUDE.md Engine/Content Boundary Rule); now a gate. Scope = what WE
+# code-review rule (AGENTS.md Engine/Content Boundary Rule); now a gate. Scope = what WE
 # author -- engine/** + the engine-hook injectors; the fireemblem8u submodule is vanilla +
 # build-injected and never committed by us, so it's deliberately excluded. Decision:
 # docs/decisions.md -> Coordination model (mechanize the name-in-C check).
@@ -1462,7 +1462,7 @@ def check_engine_campaign_agnostic(fail):
             rel = os.path.relpath(path, REPO)
             for tok, n in _engine_name_hits(ids, open(path, encoding='utf-8').read()):
                 fail.append('engine: %s:%d names campaign character %r -- engine code must be '
-                            'campaign-agnostic; inject it from YAML (CLAUDE.md Engine/Content '
+                            'campaign-agnostic; inject it from YAML (AGENTS.md Engine/Content '
                             'Boundary Rule)' % (rel, n, tok))
 
 

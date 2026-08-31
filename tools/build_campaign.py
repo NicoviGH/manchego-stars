@@ -6,7 +6,7 @@ files into the fireemblem8u submodule working tree, so a plain `make` compiles a
 ROM carrying our content. The generated files are reproducible build artifacts --
 restore vanilla with `git -C fireemblem8u checkout <path>`.
 
-Engine/Content boundary (CLAUDE.md): the GENERATOR knows character/chapter names;
+Engine/Content boundary (AGENTS.md): the GENERATOR knows character/chapter names;
 the C/asm it EMITS is just data. No campaign name is ever hardcoded in engine C.
 
 --- Milestone A (landed first; the file has since grown far past it): PORTRAITS --
@@ -3161,7 +3161,7 @@ def _lord_select_event_seq(bg_const, explainer_msg):
     up to and INCLUDING the BNE; callers append their own tail after it -- the real ch1
     BeginningScene does EVBIT_MODIFY(0x0)+FADI+map build, the lord-fast debug boot just
     FADI+ENDA. Single home so the debug boot can't drift from the flow it claims to verify
-    (CLAUDE.md design-placement rule -- one decision, one desk)."""
+    (AGENTS.md design-placement rule -- one decision, one desk)."""
     return (
         '    REMOVEPORTRAITS\n'
         '    BACG(%s)\n'
