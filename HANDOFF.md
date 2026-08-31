@@ -12,8 +12,29 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing.** `main` is at **#334** (squash-merged 2026-08-29), the branch is deleted and the tree is
-clean. **#26 stays open**: the map and the roster are done, the chapter is not.
+**A five-PR stack, open and unreviewed.** All `make check` green, `SUITE=all` 50/50, and the stack
+tip was diffed against the branch it replaces byte-for-byte. **Merge strictly in order**, with
+`--merge` (not `--squash`), retargeting each child to `main` BEFORE deleting its parent branch
+(`decisions.md` -> stacked PRs: deleting a base closes the PRs on it, and a closed PR cannot be
+retargeted).
+
+| order | PR | base |
+|---|---|---|
+| 1 | #339 ai: borrow every enemy's AI from its vanilla donor | `main` |
+| 2 | #340 ch02: restore vanilla's decoy | #339 |
+| 3 | #341 ch02: point slot 3 at its own map-change layer | #340 |
+| 4 | #342 playtest: a scene is not a stall | #341 |
+| 5 | #343 docs + tooling; **closes #335** | #342 |
+
+Each PR body carries its own reasoning; it is not restated here.
+
+**None has been code-reviewed.** All five were authored by one instance in one long session, so the
+author is the wrong reviewer: #338 shipped unreviewed and a fresh reviewer then found two real
+defects the author had read past twice. Give each PR the `superpowers:requesting-code-review`
+subagent before merging it, working DOWN the stack -- a fix to an earlier PR means rebasing every
+PR above it, so review 1 before merging 1, and so on.
+
+**#26 stays open**: the map and the roster are done, the chapter is not.
 
 **The design board:** `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`
 **Asset board** (every aquatic asset in the FE-Repo, animated per weapon):
@@ -21,10 +42,21 @@ clean. **#26 stays open**: the map and the roster are done, the chapter is not.
 **Issue #26 carries the checklist**, including a comment holding the two boarding scenes' decided
 content. Read the issue for scope, the boards for reasoning.
 
+## Owed, filed, not started
+
+- **#344** -- factor AI behaviour into the difficulty metric (#335's stretch, split out). This is the
+  metric that would have caught the drift #335 fixed: ch04 fielded 78% pursuers against a
+  half-static twin and still measured x1.00.
+- **#345** -- `SUITE=all` reports FALSE failures. Four long scenarios run concurrently and starve
+  each other past their wall-clock deadlines (~15fps against a 240fps target). The verdict
+  *conflation* is fixed in #342; the contention is not. Until it is, **re-run any `SUITE=all`
+  failure with `--jobs 1` before believing it.**
+
 ## Next task
 
-**ch06 enemy POSITIONS — bring Nicolas a render first.** The roster is authored and measures
-x1.00; where the 27 units stand is the one design item left, and it is NOT derivable:
+**Review and land the stack above, in order.** Once #343 merges, **#335 closes itself** and the next
+task is **ch06 enemy POSITIONS -- bring Nicolas a render first.** The roster is authored and
+measures x1.00; where the 27 units stand is the one design item left, and it is NOT derivable:
 
 - **Neither vanilla source transfers.** ch05 lifted its coordinates from its twin because its map
   IS that twin's retile. ch06 splits donor from bar (layout Ch13Ephraim, pressure Ch6), so Ch6's
@@ -36,7 +68,7 @@ x1.00; where the 27 units stand is the one design item left, and it is NOT deriv
   ONE connected component; 8 crossings; a 6-cell centre shelf at (9-11, 11-13) whose only foot
   doors are the bridges at **(8,11)** and **(10,14)**; a 3x3 drift pocket (+20 avoid, +1 Def) around
   each boat; deploy block x4-10/y0-2. Foot reaches the west boat T6 and the east T7, Braulo T5/T4,
-  Pinky T3 — vanilla Ch6's own "send a flier" math, arrived at independently.
+  Pinky T3 -- vanilla Ch6's own "send a flier" math, arrived at independently.
 - **Nicolas drives what/where/why** (2-3 concept options on a render), Claude drives how it is built.
 
 ## What ch06 still owes
@@ -47,11 +79,11 @@ x1.00; where the 27 units stand is the one design item left, and it is NOT deriv
   `TILESET_STEMS` knows the name, but `_register_chapter_map` then looks up `ObjectTypeSnowIce` /
   `MapPaletteSnowIce` / `TileConfigurationSnowIce` in the asset table and the first build
   `sys.exit`s without them. Sharing `Snow` would draw ch06 in ch04's palette.
-- **The injector owes a `CH06_AI` table.** The exact byte tuples are recorded in the chapter YAML
-  above `enemy_units:`, including two labels no other chapter has (`charge_after_one_turn`
-  {0x0,0x12,0,0} and `pursue` {0,0,0,0}), and ch06's `hold_position` is Ch6's own
-  {0x3,0x3,0x0,0x0} — NOT ch05's {0x3,0x3,0x9,0x20}. `hard_mode_only: true` on the three extra
-  crab-riders wants vanilla's `CALL(EventScr_LoadReinforceHardMode)`.
+- **ch06's enemies owe a `donor:` each**, not an AI table. #335 deleted every `CHnn_AI` table:
+  each enemy now names the vanilla unit it is modelled on and the build reads that unit's four
+  `.ai` bytes. A donor matches where the vanilla unit FIGHTS (the last REDA point), not where it
+  is placed. `make chapter CH=ch06` prints what each enemy resolved to, and an unresolvable donor
+  fails the parity gate.
 - **Five enemy reskins to vendor and wire** in `campaign.yaml` → `enemy_class_reskins` (Mermaid,
   Shark Rider, spider-rider-as-crab, IronShell General, Lamia) with their `frame:` overrides. The
   asset board above names every file and folder. NB the IronShell animation preview keys on BLUE,
@@ -68,10 +100,7 @@ x1.00; where the 27 units stand is the one design item left, and it is NOT deriv
 with procs that never change — which looks exactly like broken input and is not. Restore the ROM,
 the ELF **and** `.build-config.json` from the same cache entry, then re-run `gen_symbols.py`.
 
-**Tree state: the ROM in the tree is still `ch05boot`** (CH05BOOT=1). Nothing was built on
-2026-08-28. `tools/playtest/states/` still holds valid **`prep`** and **`ch02start`** stamped for
-the CANONICAL ROM, so anything wanting them needs canonical back in the tree first. A dead state is
-exactly **397,312 bytes of zeros** — that size is the tell.
+**Tree state: the ROM in the tree is `canonical`.** Rebuild for any other configuration; `make matrix` does it for you and caches per configuration.
 
 **The ROM cache is WARM** for `canonical`, `testch`, `ch03boot`, `ch04boot`, `ch05boot`,
 `ch05lupinboot`, `ch05mooseboot` and the three ch05 ending arms (2026-08-24). Untouched since.
