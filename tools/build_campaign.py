@@ -10090,8 +10090,13 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
 HOSTED_CHAPTER_MESSAGE_BLOCKS = {
     'ch02': ((0xAC0, 0xAEF),),                    # from the never-shipped pool (48 ids)
     'ch03': ((0x9A3, 0x9B9),),                    # the dead vanilla Ch4 block (slot 4)
-    'ch04': ((0x9BA, 0x9CC),),                    # the dead vanilla Ch5 block (slot 5)
-    'ch05': ((0x9E4, 0x9F5), (0xBC5, 0xBF2)),     # its slot-6 block, plus 46 from the pool
+    # 0x9C9-0x9CC withheld: ch05 spends 0x9C9/0x9CA (below), and a block may not cover
+    # an id another chapter already writes. ch04 spends through 0x9C6.
+    'ch04': ((0x9BA, 0x9C8),),                    # the dead vanilla Ch5 block (slot 5)
+    # (0x9C9,0x9D2) is not new territory -- ch05 was ALREADY writing these ids while no
+    # block declared them, so its headroom read wrong and ch04's block sat over two of
+    # them. Declaring them changes no text; it makes the declaration true.
+    'ch05': ((0x9C9, 0x9D2), (0x9E4, 0x9F5), (0xBC5, 0xBF2)),
 }
 
 # The size of vanilla's message table (gMsgTable). Ids at or above this are not messages.
@@ -10143,8 +10148,18 @@ def live_ids_in_declared_blocks(blocks=None, claims=None):
     range drawn over an id another part of the build hardcodes, because nothing downstream
     would notice: the build succeeds, the ROM ships, and one scene reads another's text.
     """
-    spent = injector_message_ids()
     owned = (claims if claims is not None else HOSTED_CHAPTER_MESSAGE_IDS)
+    # BOTH sources, because neither is complete on its own. `injector_message_ids` finds ids by
+    # NAME (`*_MSG` / `*_MSGS`), which misses any held in a constant called something else --
+    # ch02's two hut visits live in `CH02_VILLAGE_SLOTS`, so 0xAC0/0xAC1 were invisible to it and
+    # a future block drawn over them would have built clean and garbled a scene, which is the one
+    # thing this guard exists to stop. The per-chapter claims below are the authoritative list of
+    # what we spend and depend on no naming convention, so they are read too.
+    spent = injector_message_ids()
+    for chapter, ids in sorted(owned.items()):
+        for mid in ids:
+            if isinstance(mid, int) and 0x300 <= mid < VANILLA_MESSAGE_COUNT:
+                spent.setdefault(mid, '%s claim' % chapter)
     bad = []
     for chapter, ranges in sorted((blocks if blocks is not None
                                    else HOSTED_CHAPTER_MESSAGE_BLOCKS).items()):

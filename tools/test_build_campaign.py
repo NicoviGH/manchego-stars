@@ -5011,6 +5011,34 @@ class VillageBoxSpeakers(unittest.TestCase):
             bc.village_boxes({'id': 'v', 'visit_text': 'one long flowed line'})
 
 
+class MessageBlockGuardSeesEveryClaimedId(unittest.TestCase):
+    """The deadness guard must not depend on a constant's NAME (review finding on #338).
+
+    `injector_message_ids` finds ids by scanning globals whose name ends in `_MSG`/`_MSGS`,
+    and its docstring promises "registering a new one is enough -- there is no second list to
+    remember". That is false for an id held in a constant named anything else: ch02's two hut
+    visits live in `CH02_VILLAGE_SLOTS`, so 0xAC0/0xAC1 were invisible to it. They are
+    registered in HOSTED_CHAPTER_MESSAGE_IDS, which IS the authoritative list of what we
+    spend -- so the guard should read that too, and stop depending on a naming convention
+    nothing enforces.
+    """
+
+    def test_an_id_claimed_only_through_a_non_msg_constant_is_still_protected(self):
+        # ch02's hut-visit ids come from CH02_VILLAGE_SLOTS, not a *_MSG constant.
+        hut_ids = [slot[1] for slot in bc.CH02_VILLAGE_SLOTS.values()]
+        self.assertTrue(hut_ids)
+        # A DIFFERENT chapter drawing a block over them must be refused.
+        blocks = {'ch09': ((min(hut_ids), max(hut_ids)),)}
+        bad = bc.live_ids_in_declared_blocks(blocks=blocks)
+        self.assertTrue(bad, 'a block over ch02\'s claimed hut ids must be refused, but the '
+                             'guard only saw *_MSG constants')
+
+    def test_a_chapter_may_still_declare_a_block_over_its_own_claims(self):
+        # The whole point of a block is to hold the ids that chapter spends.
+        self.assertEqual(bc.live_ids_in_declared_blocks(
+            blocks={'ch02': bc.message_block_ranges('ch02')}), [])
+
+
 class MessageBlockPool(unittest.TestCase):
     """A hosted chapter may declare MORE THAN ONE id range, and every range it declares must
     be genuinely dead.
