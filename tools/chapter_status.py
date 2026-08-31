@@ -125,7 +125,7 @@ def message_ids(name, campaign=campaign_chapters.CAMPAIGN):
     one out of this block (ch05's ending borrowed two of ch04's), and reporting those as free
     would invite exactly the collision `assert_message_ids_unique` exists to refuse.
 
-    A chapter with no declared block reports `block=None` -- ch01 and ch02 predate the
+    A chapter with no declared block reports `block=None` -- ch01 predates the
     registry, and "0 free" would read as full when the truth is that nobody wrote it down.
     That is a different answer from `block=UNKNOWN`, which means the registry could not be
     read at all: ch05's block is FULL, and rendering it as "not declared" would make the

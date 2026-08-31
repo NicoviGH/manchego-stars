@@ -7638,31 +7638,6 @@ underwater", and only a human reading the category can answer it.
 Cost is a few API calls and one pass of reading. The alternative cost ch06 an afternoon of
 believing the axe block had to be redesigned around an asset gap that did not exist.
 
-**Message ids were rationed by a placeholder rule, and the pool is 528**
-Every hosted chapter took "the dead block of the vanilla slot it displaces" -- ch03 got Ch4's
-23 ids, ch04 got Ch5's 19, ch05 got Ch6's 18. That rule is safe with no analysis at all, since
-blanking slot N's event lists kills slot N's text references, and it was the right first move.
-It also caps a chapter at whatever one vanilla chapter happened to spend: **ch05 reached 0 free
-and its next scene "cost a redesign, not an id"** while the id space sat 85% unspoken-for.
-
-Measured: the table is **3404 ids**; 752 are referenced by any event script; 224 belong to the
-seven slots we host in; **528 belong exclusively to chapters we never ship** -- Ch7-Ch21, the
-route splits, the tower, the ruins -- in **14 contiguous runs of 16+, the largest 48 wide**, and
-*none* of them referenced anywhere outside `src/events/`.
-
-So a chapter now declares a TUPLE OF RANGES. ch02 takes `0xAC0-0xAEF` (it had no block at all,
-which is why `make chapter` could not report its headroom); ch05 keeps `0x9E4-0x9F5` and gains
-`0xBC5-0xBF2`. **Existing ranges are never renumbered** -- moving a shipped message id is a text
-regression that surfaces only when the ROM runs.
-
-**The guard is about OUR ids, not vanilla's.** The first version of it checked whether a range
-was referenced by a chapter we host, and it flagged all three existing blocks -- correctly, and
-uselessly, because those references die when we blank the slot. The real hazard is an id we have
-**repurposed**: vanilla Ch2's three village texts (`0x969-0x96C`) are ch01's lord-select candidate
-blurbs now, and a block drawn over them would build clean, ship, and garble a scene nobody was
-looking at. `live_ids_in_declared_blocks` reads the module's own `*_MSG`/`*_MSGS` constants, so
-registering a new one is enough and there is no second list to maintain.
-_Decided and implemented: 2026-08-30._
 **Enemy AI is BORROWED from a vanilla donor, not authored (#335)**
 A chapter picks a vanilla twin so its difficulty is grounded rather than guessed, and we already
 derive that twin's classes, levels, inventories and drops from its `UnitDefinition` structs. The
@@ -7727,6 +7702,38 @@ byte, which is the model's proof. The only remaining differences are declared ov
 Sephek (O'Neill's DoNothing depends on a tutorial `CHAI` we do not run) and ch04's six-wolf pack,
 which is six units where vanilla loads four because #203 needs each wolf addressable by pid.
 _Decided and implemented: 2026-08-29 (#335)._
+**Message ids were rationed by a placeholder rule, and the pool is 528**
+Every hosted chapter took "the dead block of the vanilla slot it displaces" -- ch03 got Ch4's
+23 ids, ch04 got Ch5's 19, ch05 got Ch6's 18. That rule is safe with no analysis at all, since
+blanking slot N's event lists kills slot N's text references, and it was the right first move.
+It also caps a chapter at whatever one vanilla chapter happened to spend: **ch05 reached 0 free
+and its next scene "cost a redesign, not an id"** while the id space sat 85% unspoken-for.
+
+Measured: the table is **3404 ids**; 752 are referenced by any event script; 224 belong to the
+seven slots we host in; **528 belong exclusively to chapters we never ship** -- Ch7-Ch21, the
+route splits, the tower, the ruins -- in **14 contiguous runs of 16+, the largest 48 wide**, and
+*none* of them referenced anywhere outside `src/events/`.
+
+So a chapter now declares a TUPLE OF RANGES. ch02 takes `0xAC0-0xAEF` (it had no block at all,
+which is why `make chapter` could not report its headroom); ch05 keeps `0x9E4-0x9F5` and gains
+`0xBC5-0xBF2`. **Existing ranges are never renumbered** -- moving a shipped message id is a text
+regression that surfaces only when the ROM runs.
+
+**The guard is about OUR ids, not vanilla's.** The first version of it checked whether a range
+was referenced by a chapter we host, and it flagged all three existing blocks -- correctly, and
+uselessly, because those references die when we blank the slot. The real hazard is an id we have
+**repurposed**: vanilla Ch2's three village texts (`0x969-0x96C`) are ch01's lord-select candidate
+blurbs now, and a block drawn over them would build clean, ship, and garble a scene nobody was
+looking at. `live_ids_in_declared_blocks` reads TWO sources, because neither is complete alone: the
+module's `*_MSG`/`*_MSGS` constants (found by name, and a dict of them counts), and
+`HOSTED_CHAPTER_MESSAGE_IDS`, which is the authoritative record of what each chapter
+spends and depends on no naming convention. The name-only version shipped first and had
+three blind spots, each of which would have built clean and garbled live text: ch02's hut
+visits (held in `CH02_VILLAGE_SLOTS`), all 13 PC death quotes (a dict, whose name DID end
+in `_MSGS`), and every chapter's objective window/status string (below an undocumented
+0x300 floor). What the guard still cannot see is an id computed at inject time, and saying
+so in the docstring is the point -- a guard may not rest on a convention nothing enforces.
+_Decided and implemented: 2026-08-30._
 
 ## Open Questions (not yet decided)
 

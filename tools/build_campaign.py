@@ -10016,7 +10016,16 @@ CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCL
 # a few lines away (`"vanilla 0x9C6" # data_battlequotes.c, pid CHARACTER_NATASHA`), and ch04
 # writes real text into 0x9BB/0x9BC right now. ch05's text insertion is still owed (#25), so
 # this guard lands FIRST, deliberately.
+# Ids the PROLOGUE and ch01 write as bare literals inside their injectors. They have no
+# `*_MSG` constant to be found by name, and neither chapter declares a block -- so until they
+# were registered here, both guard sources were blind to them. 0xC25 is the sharp one: it sits
+# 0x33 above ch05's 0xBC5-0xBF2, so the obvious next move (extend ch05's pool upward) would
+# have been accepted and would have overwritten Scramsax's defeat quote.
+PROLOGUE_LITERAL_MSGS = (0x664, 0x90D, 0x90E, 0x914, 0x917, 0x918, 0x936, 0xC25)
+CH01_LITERAL_MSGS = (0x93B, 0x93C, 0x955, 0x961)
+
 HOSTED_CHAPTER_MESSAGE_IDS = {
+    'ch00': PROLOGUE_LITERAL_MSGS,
     'ch03': (CH03_BOSS_DEATH_MSG,        # reserved: the grell's quote was CUT (msg=0) but the
                                          # slot stays ch03's, so nothing else may take it
              CH03_TREX_TALK_MSG, CH03_OPENING_CARD_MSG, *CH03_OPENING_MSGS,
@@ -10057,7 +10066,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
     # still have to be unique against every other hosted chapter (#207).
-    'ch01': (CH01_GOAL_WINDOW_MSG, CH01_GOAL_STATUS_MSG),
+    'ch01': (*CH01_LITERAL_MSGS, CH01_GOAL_WINDOW_MSG, CH01_GOAL_STATUS_MSG),
     # The goal window/status predate the block registry and sit outside it; the two Targos
     # hut visits are ch02's first claims from the block it gained when the pool widened.
     'ch02': (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG,
@@ -10102,15 +10111,21 @@ HOSTED_CHAPTER_MESSAGE_BLOCKS = {
 # The size of vanilla's message table (gMsgTable). Ids at or above this are not messages.
 VANILLA_MESSAGE_COUNT = 0xD4C
 
-# Vanilla chapter slots we HOST in. A message id referenced only by the event scripts of
-# chapters outside this set is unreachable in our ROM, which is what makes it claimable.
-HOSTED_VANILLA_SLOTS = ('prologue', 'ch1', 'ch2', 'ch3', 'ch4', 'ch5', 'ch6')
-
-
 def message_block_ranges(chapter, blocks=None):
-    """The (lo, hi) ranges a hosted chapter may spend. Empty when it declares none."""
-    return tuple((blocks if blocks is not None
-                  else HOSTED_CHAPTER_MESSAGE_BLOCKS).get(chapter, ()))
+    """The (lo, hi) ranges a hosted chapter may spend. Empty when it declares none.
+
+    Ranges validate themselves: an inverted pair yields NEGATIVE capacity and a negative
+    `free` in `make chapter`, and a typo'd bound (0xBF20 for 0xBF2) reports enormous headroom
+    -- neither of which any other guard would call wrong.
+    """
+    ranges = tuple((blocks if blocks is not None
+                    else HOSTED_CHAPTER_MESSAGE_BLOCKS).get(chapter, ()))
+    for lo, hi in ranges:
+        if not 0 < lo <= hi < VANILLA_MESSAGE_COUNT:
+            raise ValueError('%s declares message range (0x%X, 0x%X), which is not an '
+                             'ascending pair inside the 0x%X-id table'
+                             % (chapter, lo, hi, VANILLA_MESSAGE_COUNT))
+    return ranges
 
 
 def message_block_capacity(chapter, blocks=None):
@@ -10119,7 +10134,7 @@ def message_block_capacity(chapter, blocks=None):
 
 
 def injector_message_ids():
-    """{message id: constant name} for every id THIS module hardcodes.
+    """{vanilla message id: constant name} for the ids this module NAMES as `*_MSG`/`*_MSGS`.
 
     The hazard a widened block actually faces. Vanilla's own references to a slot we host
     die when our injector blanks that slot's event lists -- but ids we have REPURPOSED are
@@ -10127,16 +10142,29 @@ def injector_message_ids():
     village texts (0x969-0x96C) are ch01's lord-select candidate blurbs now; a block drawn
     over them would compile, ship, and garble a scene nobody was looking at.
 
-    Read off the module's own `*_MSG` / `*_MSGS` constants, so registering a new one is
-    enough -- there is no second list to remember.
+    NOT a complete list of what the build spends, and it cannot be: an id computed at inject
+    time (`vanilla_name_text_id(slot)`, a host's `chapTitleTextId`) has no constant to find.
+    `live_ids_in_declared_blocks` folds `HOSTED_CHAPTER_MESSAGE_IDS` on top for that reason --
+    naming this limit is what keeps the guard from resting on a convention nothing enforces.
+
+    A constant may hold its ids in a dict as readily as a tuple -- `PC_DEATH_QUOTE_MSGS` maps
+    unit -> id -- and reading only the tuple shape hid all 13 of its death quotes while its
+    NAME followed the convention perfectly.
     """
     out = {}
     for name, value in sorted(globals().items()):
         if not re.search(r'_MSGS?$', name):
             continue
-        values = value if isinstance(value, (tuple, list, set)) else (value,)
+        if isinstance(value, dict):
+            values = list(value.values())
+        elif isinstance(value, (tuple, list, set)):
+            values = value
+        else:
+            values = (value,)
+        # No lower bound: every chapter's objective window/status string lives below 0x300,
+        # and an undocumented floor there silently exempted all ten of them.
         for mid in values:
-            if isinstance(mid, int) and 0x300 <= mid < VANILLA_MESSAGE_COUNT:
+            if isinstance(mid, int) and 0 < mid < VANILLA_MESSAGE_COUNT:
                 out.setdefault(mid, name)
     return out
 
@@ -10158,7 +10186,7 @@ def live_ids_in_declared_blocks(blocks=None, claims=None):
     spent = injector_message_ids()
     for chapter, ids in sorted(owned.items()):
         for mid in ids:
-            if isinstance(mid, int) and 0x300 <= mid < VANILLA_MESSAGE_COUNT:
+            if isinstance(mid, int) and 0 < mid < VANILLA_MESSAGE_COUNT:
                 spent.setdefault(mid, '%s claim' % chapter)
     bad = []
     for chapter, ranges in sorted((blocks if blocks is not None
@@ -14177,6 +14205,13 @@ def main():
         # verify_text checks runaway text, not who owns a slot.
         assert_message_ids_unique()
         assert_message_blocks_disjoint()   # the setup that would make a collision inevitable
+        # And the third of the same family. It ran only from the tests, so `make check` caught
+        # it but a plain `make` with an edited block table still produced a ROM -- and the whole
+        # point of these is to fail the BUILD rather than let a collision ship.
+        drawn_over = live_ids_in_declared_blocks()
+        if drawn_over:
+            sys.exit('ERROR: declared message block(s) drawn over ids the build already '
+                     'spends: %s' % ', '.join(drawn_over))
         print('chapter 1 (#21):')
         _scopes.run(inject_ch01, args.campaign)  # MUST precede inject_prologue (vanilla goal read)
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
