@@ -136,17 +136,21 @@ def message_ids(name, campaign=campaign_chapters.CAMPAIGN):
     if bc is None:
         return Room(None, UNKNOWN, (), (), None)
     claimed = tuple(sorted(set(bc.HOSTED_CHAPTER_MESSAGE_IDS.get(chapter, ()))))
-    block = bc.HOSTED_CHAPTER_MESSAGE_BLOCKS.get(chapter)
-    if block is None:
+    ranges = bc.message_block_ranges(chapter)
+    if not ranges:
         return Room(claimed, None, (), (), None)
-    lo, hi = block
     owner = {}
     for other, ids in bc.HOSTED_CHAPTER_MESSAGE_IDS.items():
         for mid in ids:
             owner[mid] = other
-    used = tuple(sorted(m for m in owner if lo <= m <= hi))
+    # A chapter may hold SEVERAL ranges (#335 follow-up): ch05 spent its slot-6 block to
+    # zero and draws the rest from the never-shipped pool, so headroom sums across all of
+    # them -- reading only the first would still report it FULL.
+    inside = lambda m: any(lo <= m <= hi for lo, hi in ranges)
+    used = tuple(sorted(m for m in owner if inside(m)))
     borrowed = tuple(sorted(m for m in used if owner[m] != chapter))
-    return Room(claimed, (lo, hi), used, borrowed, (hi - lo + 1) - len(used))
+    capacity = bc.message_block_capacity(chapter)
+    return Room(claimed, ranges, used, borrowed, capacity - len(used))
 
 
 ArtRow = collections.namedtuple('ArtRow', 'unit role portrait map_sprite battle_anim missing')
@@ -394,9 +398,11 @@ def loose_ends(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
         out.append('claims %d message id(s) but declares no host block, so headroom is '
                    'unknown (see HOSTED_CHAPTER_MESSAGE_BLOCKS)' % len(room.claimed))
     elif room.block is not None and room.free == 0:
-        out.append('the host block is full: 0x%03X-0x%03X, all %d spent -- the next scene '
-                   'costs a redesign, not an id' % (room.block[0], room.block[1],
-                                                    len(room.used_in_block)))
+        out.append('the host block is full: %s, all %d spent -- the next scene costs a '
+                   'redesign, not an id (extend it from the never-shipped pool; see '
+                   'HOSTED_CHAPTER_MESSAGE_BLOCKS)'
+                   % (' + '.join('0x%03X-0x%03X' % r for r in room.block),
+                      len(room.used_in_block)))
     if room.borrowed:
         out.append('%d id(s) inside this block are held by another chapter: %s'
                    % (len(room.borrowed), ', '.join('0x%03X' % m for m in room.borrowed)))
@@ -480,8 +486,9 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
         out.append('  message ids  %d claimed; no host block declared, headroom unknown'
                    % len(room.claimed))
     else:
-        out.append('  message ids  %d claimed; block 0x%03X-0x%03X, %d spent, %s FREE'
-                   % (len(room.claimed), room.block[0], room.block[1],
+        out.append('  message ids  %d claimed; block %s, %d spent, %s FREE'
+                   % (len(room.claimed),
+                      ' + '.join('0x%03X-0x%03X' % r for r in room.block),
                       len(room.used_in_block), room.free))
         if room.borrowed:
             out.append('               held by another chapter: %s'

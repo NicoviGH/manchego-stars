@@ -7603,6 +7603,32 @@ underwater", and only a human reading the category can answer it.
 Cost is a few API calls and one pass of reading. The alternative cost ch06 an afternoon of
 believing the axe block had to be redesigned around an asset gap that did not exist.
 
+**Message ids were rationed by a placeholder rule, and the pool is 528**
+Every hosted chapter took "the dead block of the vanilla slot it displaces" -- ch03 got Ch4's
+23 ids, ch04 got Ch5's 19, ch05 got Ch6's 18. That rule is safe with no analysis at all, since
+blanking slot N's event lists kills slot N's text references, and it was the right first move.
+It also caps a chapter at whatever one vanilla chapter happened to spend: **ch05 reached 0 free
+and its next scene "cost a redesign, not an id"** while the id space sat 85% unspoken-for.
+
+Measured: the table is **3404 ids**; 752 are referenced by any event script; 224 belong to the
+seven slots we host in; **528 belong exclusively to chapters we never ship** -- Ch7-Ch21, the
+route splits, the tower, the ruins -- in **14 contiguous runs of 16+, the largest 48 wide**, and
+*none* of them referenced anywhere outside `src/events/`.
+
+So a chapter now declares a TUPLE OF RANGES. ch02 takes `0xAC0-0xAEF` (it had no block at all,
+which is why `make chapter` could not report its headroom); ch05 keeps `0x9E4-0x9F5` and gains
+`0xBC5-0xBF2`. **Existing ranges are never renumbered** -- moving a shipped message id is a text
+regression that surfaces only when the ROM runs.
+
+**The guard is about OUR ids, not vanilla's.** The first version of it checked whether a range
+was referenced by a chapter we host, and it flagged all three existing blocks -- correctly, and
+uselessly, because those references die when we blank the slot. The real hazard is an id we have
+**repurposed**: vanilla Ch2's three village texts (`0x969-0x96C`) are ch01's lord-select candidate
+blurbs now, and a block drawn over them would build clean, ship, and garble a scene nobody was
+looking at. `live_ids_in_declared_blocks` reads the module's own `*_MSG`/`*_MSGS` constants, so
+registering a new one is enough and there is no second list to maintain.
+_Decided and implemented: 2026-08-30._
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

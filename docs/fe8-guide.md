@@ -147,7 +147,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 38 enemies · avg L8.1 — 10× Mercenary, 8× Soldier, 5× Archer, 4× Fighter, 3× Pirate, 3× Mage
 - **Normal**: 38 enemies · avg L8.1 — 10× Mercenary, 8× Soldier, 5× Archer, 4× Fighter, 3× Pirate, 3× Mage
 - **Difficult**: 46 enemies · avg L8.3 — 10× Mercenary, 8× Soldier, 7× Archer, 7× Pirate, 6× Fighter, 3× Mage
-- **Delta Normal → Difficult**: {'Fighter': 2, 'Pirate': 4, 'Archer': 2} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Archer': 2, 'Fighter': 2, 'Pirate': 4} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy eirika9`*
 
 ## Chapter 10 (Eirika)
@@ -157,7 +157,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 51 enemies · avg L9.5 — 11× Brigand, 8× Myrmidon, 7× Soldier, 5× Mercenary, 4× Archer, 4× Pegasus Knight
 - **Normal**: 51 enemies · avg L9.5 — 11× Brigand, 8× Myrmidon, 7× Soldier, 5× Mercenary, 4× Archer, 4× Pegasus Knight
 - **Difficult**: 60 enemies · avg L9.6 — 11× Brigand, 8× Soldier, 8× Myrmidon, 7× Mercenary, 7× Pegasus Knight, 6× Archer
-- **Delta Normal → Difficult**: {'Fighter': 1, 'Pegasus Knight': 3, 'Mercenary': 2, 'Archer': 2, 'Soldier': 1} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Archer': 2, 'Fighter': 1, 'Mercenary': 2, 'Pegasus Knight': 3, 'Soldier': 1} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy eirika10`*
 
 ## Chapter 11 (Eirika)
@@ -166,7 +166,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 42 enemies · avg L8.6 — 24× Bonewalker, 4× Revenant, 4× Mogall, 4× Gargoyle, 3× Mauthe Doog, 1× Entombed
 - **Normal**: 42 enemies · avg L8.6 — 24× Bonewalker, 4× Revenant, 4× Mogall, 4× Gargoyle, 3× Mauthe Doog, 1× Entombed
 - **Difficult**: 54 enemies · avg L8.9 — 30× Bonewalker, 10× Revenant, 4× Mogall, 4× Gargoyle, 3× Mauthe Doog, 1× Entombed
-- **Delta Normal → Difficult**: {'Revenant': 6, 'Bonewalker': 6} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Bonewalker': 6, 'Revenant': 6} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy eirika11`*
 
 ## Chapter 12 (Eirika)
@@ -175,7 +175,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 44 enemies · avg L9.1 — 15× Gargoyle, 8× Bael, 8× Mauthe Doog, 4× Mogall, 3× Revenant, 2× Bonewalker
 - **Normal**: 44 enemies · avg L9.1 — 15× Gargoyle, 8× Bael, 8× Mauthe Doog, 4× Mogall, 3× Revenant, 2× Bonewalker
 - **Difficult**: 53 enemies · avg L9.1 — 19× Gargoyle, 9× Mauthe Doog, 8× Bael, 5× Mogall, 5× Revenant, 3× Bonewalker
-- **Delta Normal → Difficult**: {'Gargoyle': 4, 'Revenant': 2, 'Mogall': 1, 'Bonewalker': 1, 'Mauthe Doog': 1} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Bonewalker': 1, 'Gargoyle': 4, 'Mauthe Doog': 1, 'Mogall': 1, 'Revenant': 2} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy eirika12`*
 
 ## Chapter 13 (Eirika)
@@ -185,7 +185,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 58 enemies · avg L10.8 — 19× Cavalier, 6× Mercenary, 4× Archer, 4× Knight, 4× Fighter, 4× Brigand
 - **Normal**: 58 enemies · avg L10.8 — 19× Cavalier, 6× Mercenary, 4× Archer, 4× Knight, 4× Fighter, 4× Brigand
 - **Difficult**: 66 enemies · avg L10.9 — 21× Cavalier, 7× Mercenary, 6× Archer, 6× Soldier, 4× Knight, 4× Fighter
-- **Delta Normal → Difficult**: {'Mercenary': 1, 'Archer': 2, 'Cavalier': 2, 'Soldier': 3} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Archer': 2, 'Cavalier': 2, 'Mercenary': 1, 'Soldier': 3} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy eirika13`*
 
 ## Chapter 14 (Eirika)
@@ -213,7 +213,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 43 enemies · avg L9.6 — 16× Mercenary, 7× Cavalier, 3× Pirate, 3× Fighter, 3× Wyvern Rider, 2× Soldier
 - **Normal**: 43 enemies · avg L9.6 — 16× Mercenary, 7× Cavalier, 3× Pirate, 3× Fighter, 3× Wyvern Rider, 2× Soldier
 - **Difficult**: 49 enemies · avg L9.6 — 16× Mercenary, 9× Cavalier, 6× Pirate, 4× Fighter, 3× Wyvern Rider, 2× Soldier
-- **Delta Normal → Difficult**: {'Fighter': 1, 'Pirate': 3, 'Cavalier': 2} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Cavalier': 2, 'Fighter': 1, 'Pirate': 3} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy ephraim10`*
 
 ## Chapter 11 (Ephraim)
@@ -233,7 +233,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 51 enemies · avg L10.4 — 10× Shaman, 7× Cavalier, 5× Mage, 5× Bonewalker, 4× Fighter, 4× Archer
 - **Normal**: 51 enemies · avg L10.4 — 10× Shaman, 7× Cavalier, 5× Mage, 5× Bonewalker, 4× Fighter, 4× Archer
 - **Difficult**: 67 enemies · avg L10.3 — 11× Bonewalker, 10× Shaman, 8× Bael, 7× Cavalier, 6× Archer, 5× Mage
-- **Delta Normal → Difficult**: {'Bael': 6, 'Bonewalker': 6, 'Mercenary': 2, 'Archer': 2} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Archer': 2, 'Bael': 6, 'Bonewalker': 6, 'Mercenary': 2} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy ephraim12`*
 
 ## Chapter 13 (Ephraim)
@@ -251,7 +251,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 71 enemies · avg L12.2 — 15× Knight, 14× Shaman, 8× Fighter, 7× Mage, 6× Myrmidon, 6× Soldier
 - **Normal**: 71 enemies · avg L12.2 — 15× Knight, 14× Shaman, 8× Fighter, 7× Mage, 6× Myrmidon, 6× Soldier
 - **Difficult**: 81 enemies · avg L12.3 — 20× Shaman, 15× Knight, 9× Mage, 8× Fighter, 6× Myrmidon, 6× Soldier
-- **Delta Normal → Difficult**: {'Mage': 2, 'Shaman': 6, 'Priest': 2} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Mage': 2, 'Priest': 2, 'Shaman': 6} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy ephraim14`*
 
 ## Chapter 15
@@ -274,7 +274,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Ephraim Easy**: 52 enemies · avg L11.7 — 6× Druid, 6× Cavalier, 5× Knight, 4× Mercenary, 4× Monk, 4× Fighter
 - **Ephraim Normal**: 52 enemies · avg L11.7 — 6× Druid, 6× Cavalier, 5× Knight, 4× Mercenary, 4× Monk, 4× Fighter
 - **Ephraim Difficult**: 57 enemies · avg L11.4 — 7× Knight, 6× Druid, 6× Cavalier, 4× Mercenary, 4× Shaman, 4× Monk
-- **Delta Eirika Normal → Eirika Difficult**: {'Swordmaster': 1, 'Druid': 3, 'Knight': 5} — a UNIT change, not a level shift
+- **Delta Eirika Normal → Eirika Difficult**: {'Druid': 3, 'Knight': 5, 'Swordmaster': 1} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy ch16`*
 
 ## Chapter 17
@@ -292,7 +292,7 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 46 enemies · avg L6.1 — 21× Gorgon, 18× Gorgon Egg, 4× Mogall, 3× Gargoyle
 - **Normal**: 46 enemies · avg L6.1 — 21× Gorgon, 18× Gorgon Egg, 4× Mogall, 3× Gargoyle
 - **Difficult**: 69 enemies · avg L7.4 — 27× Gorgon, 24× Gorgon Egg, 9× Bael, 5× Gargoyle, 4× Mogall
-- **Delta Normal → Difficult**: {'Gargoyle': 2, 'Bael': 9, 'Gorgon': 6, 'Gorgon Egg': 6} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Bael': 9, 'Gargoyle': 2, 'Gorgon': 6, 'Gorgon Egg': 6} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy ch18`*
 
 ## Chapter 19
@@ -311,6 +311,6 @@ Enemy counts are **Normal** unless noted. In FE8 the difficulty dial is a *level
 - **Easy**: 122 enemies · avg L6.3 — 30× Deathgoyle, 22× Wight, 20× Mogall, 16× Maelduin, 15× Elder Bael, 9× Cyclops
 - **Normal**: 122 enemies · avg L6.3 — 30× Deathgoyle, 22× Wight, 20× Mogall, 16× Maelduin, 15× Elder Bael, 9× Cyclops
 - **Difficult**: 157 enemies · avg L6.3 — 33× Deathgoyle, 22× Wight, 20× Mogall, 20× Elder Bael, 19× Maelduin, 15× Gwyllgi
-- **Delta Normal → Difficult**: {'Deathgoyle': 3, 'Gwyllgi': 15, 'Arch Mogall': 3, 'Gargoyle': 6, 'Elder Bael': 5, 'Maelduin': 3} — a UNIT change, not a level shift
+- **Delta Normal → Difficult**: {'Arch Mogall': 3, 'Deathgoyle': 3, 'Elder Bael': 5, 'Gargoyle': 6, 'Gwyllgi': 15, 'Maelduin': 3} — a UNIT change, not a level shift
 - **Playstyle**: *not yet digested — `tools/fe8_guide_mine.py --strategy ch20`*
 
