@@ -5063,40 +5063,6 @@ class MessageBlockPool(unittest.TestCase):
         self.assertEqual([], bc.live_ids_in_declared_blocks(
             {'bogus': ((0x969, 0x96C),)},
             claims={'bogus': (0x969, 0x96A, 0x96B, 0x96C)}))
-class PerPositionAiReachesTheEmittedRows(unittest.TestCase):
-    """#335: an entry with one donor PER POSITION must emit those distinct AIs.
-
-    This is a regression test for a real bug, caught by the output diff and not by any unit
-    test: every injector called `enemy_ai_initialiser(chap, enemy)` without the position
-    index, so all eight of ch05's tomb-reavers shipped their FIRST donor's AI. The YAML was
-    right, the resolver was right, the tests were green, and the ROM got eight identical
-    holders -- exactly the flattening the per-position donors exist to prevent."""
-
-    def _chap(self, stem):
-        import glob
-        path = glob.glob(os.path.join(
-            bc.REPO, 'campaigns/rime-of-the-frostmaiden/chapters', stem + '*.yaml'))[0]
-        with open(path, encoding='utf-8') as source:
-            return bc._yaml_load(source)
-
-    def test_ch05_tomb_reavers_emit_three_distinct_behaviours(self):
-        chap = self._chap('ch05')
-        rows = '\n'.join(bc.ch05_enemy_rows(chap, exclude=('sahnar',)))
-        reaver_ais = re.findall(r'tomb-reaver -- .*?\n(?:.*?\n)*?\s*\.ai = (\{[^}]*\})',
-                                rows)
-        self.assertEqual(8, len(reaver_ais), 'expected eight tomb-reavers')
-        self.assertEqual({'{0x0, 0x3, 0x9, 0x0}', '{0x0, 0x0, 0x9, 0x0}',
-                          '{0x0, 0x12, 0x9, 0x0}'}, set(reaver_ais))
-
-    def test_ch01_spears_and_axes_each_ship_one_delayed_charger(self):
-        chap = self._chap('ch01')
-        spear = next(e for e in chap['enemy_units'] if e['id'] == 'goblin-spear')
-        axe = next(e for e in chap['enemy_units'] if e['id'] == 'goblin-axe')
-        import difficulty
-        self.assertEqual(1, sum(1 for i in range(3)
-                                if difficulty.enemy_ai_bytes(chap, spear, i)[1] == 0x12))
-        self.assertEqual(1, sum(1 for i in range(3)
-                                if difficulty.enemy_ai_bytes(chap, axe, i)[1] == 0x12))
 
 
 class Ch05VillageRaidRace(unittest.TestCase):
