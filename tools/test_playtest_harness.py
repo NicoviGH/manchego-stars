@@ -184,6 +184,49 @@ class TestAwaitControllerState(unittest.TestCase):
         self.assertGreater(int(m.group(1)), 9800,
                            'it must outlive the longest scene-bearing phase measured')
 
+    def test_a_unit_off_the_map_is_not_a_tile_at_x_255(self):
+        # #335. struct Unit's xPos/yPos are s8 (bmunit.h), and FE8 parks a unit that is not on
+        # the map at xPos -1. unitAt read them with ru8, so such a unit reported x=255: the
+        # clear-bot took it for a real position, drove the cursor at (255,8) on a 25-wide map,
+        # and failed clear_ch01 with an illegal input it could never satisfy. ch02 showed the
+        # same number in "teleportToFiringTile: (255,9)", which only survived because that one
+        # site happened to bail. Read the field the width the struct declares, and keep an
+        # off-map unit out of the lists that drive the cursor.
+        harness = _read_harness()
+        body = _block(harness, 'local function unitAt(', '\nlocal function findUnit')
+        self.assertIn('rs8(a + 0x10)', body, 'xPos is s8')
+        self.assertIn('rs8(a + 0x11)', body, 'yPos is s8')
+        self.assertNotIn('ru8(a + 0x10)', body, 'the unsigned read is the bug')
+        live = _block(harness, 'local function liveEnemies(', '\n\n')
+        self.assertIn('onMap', live, 'a target list must not offer an off-map unit')
+
+    def test_an_off_map_destination_is_refused_by_name(self):
+        # #335. The #220/#238 controller contract governs INPUTS -- it enumerates legal actions
+        # and verifies postconditions -- but it cannot vet the DESTINATION a caller asks for.
+        # Handed (-1,8), cursorTo walked the cursor to the wall at x=0 and then reported
+        # "cursor_left is not legal", which is true and useless: the defect is the target, and
+        # the bot read it off a unit that was not on the map. A target outside the map is
+        # refused up front, named, so the trace points at the caller instead of a wall.
+        harness = _read_harness()
+        body = _block(harness, 'local function cursorTo(', '\nlocal function waitFor')
+        self.assertIn('mapSize()', body, 'the target must be checked against the real map')
+        self.assertIn('off-map', body, 'and refused by name')
+        self.assertIn('traceFailure', body, 'failing closed, in the trace')
+
+    def test_a_destination_the_unit_cannot_reach_is_not_a_controller_fault(self):
+        # #335. Once ch01's boss dies, the clear loop offers the seize tile to every remaining
+        # unit in turn. The ones that cannot reach it drove the cursor there anyway and pressed
+        # A, and FE8 -- correctly -- offers no confirm on an unreachable tile, so each attempt
+        # logged `confirm_move: fail:not-legal`. That sticky fault failed a run that went on to
+        # WIN by turn 9. "This unit cannot get there" is an answer, not a defect: check the
+        # movement map after selecting and back out cleanly, leaving no fault behind.
+        harness = _read_harness()
+        body = _block(harness, 'local function moveUnit(', '\nlocal function chooseWait')
+        self.assertIn('reachCost(tx, ty)', body,
+                      'the destination must be checked against the live movement map')
+        self.assertIn('cancel_selection', body, 'and the selection backed out cleanly')
+        self.assertNotIn('traceFailure', body, 'an out-of-range destination is not a fault')
+
     def test_engine_is_working_recognises_the_phases_that_are_not_stalls(self):
         # The predicate is unit-tested in tools/playtest/test_controller.lua; this pins that
         # it keeps covering the two cases that produced real controller faults, so deleting

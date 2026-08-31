@@ -230,7 +230,12 @@ local function unitAt(base, i)
     return {
         addr = a,
         charId = ru8(chptr + 4),
-        x = ru8(a + 0x10), y = ru8(a + 0x11),
+        -- xPos/yPos are s8 (bmunit.h), and FE8 parks a unit that is NOT on the map at -1.
+        -- Read unsigned, that unit reported x=255: the clear-bot took it for a real tile and
+        -- drove the cursor at (255,8) on a 25-wide map, an input no press could ever satisfy
+        -- (#335). `onMap` is the question every caller that drives the cursor actually means.
+        x = rs8(a + 0x10), y = rs8(a + 0x11),
+        onMap = rs8(a + 0x10) >= 0 and rs8(a + 0x11) >= 0,
         hp = ru8(a + 0x13),
         -- struct Unit (bmunit.h): +08 level, +12 maxHP, +14 pow, +17 def. The difficulty
         -- shift re-projects these off class growths, so they are what a mode probe reads
@@ -875,7 +880,19 @@ local function selectSemantic(intention, expected, predicate, frames)
 end
 
 -- ---------------------------------------------------------------- UI driving
+-- The #220/#238 contract vets the INPUT -- is this press legal in this state -- but it cannot
+-- vet the DESTINATION a caller asks for. Handed an off-map tile, this walked the cursor to the
+-- wall and then reported "cursor_left is not legal", which is true and points at nothing: the
+-- defect is upstream, in whatever chose the target. A clear-bot read one off a unit that was not
+-- on the map and drove at (-1,8) on a 25-wide map (#335). Refuse it here, by name, so the trace
+-- names the caller's mistake instead of the wall it ended up against.
 local function cursorTo(tx, ty)
+    local w, h = mapSize()
+    if w > 0 and h > 0 and (tx < 0 or ty < 0 or tx >= w or ty >= h) then
+        traceFailure("cursor_to", string.format("destination (%d,%d) is on the %dx%d map",
+            tx, ty, w, h), "fail:off-map-destination", nil, "controller-off-map-destination")
+        return false
+    end
     for _ = 1, 120 do
         local cx, cy = cursor()
         if cx == tx and cy == ty then return true end
@@ -976,13 +993,33 @@ local function awaitControllerState(want, frames)
     return false
 end
 
+-- The live movement map's cost for a tile; >= 120 means the selected unit cannot stand there.
+local function reachCost(x, y)
+    local row = ru32(ru32(SYM.gBmMapMovement) + y * 4)
+    return ru8(row + x)
+end
+
 -- Select unit at (fx,fy), move to (tx,ty). True when the action menu opened.
+--
+-- False also means the plain, legal answer "this unit cannot reach that tile", and that is NOT a
+-- controller fault. ch01's clear loop offers the seize tile to every unit in turn once the boss
+-- dies; the ones out of range used to drive the cursor there and press A anyway, and FE8 --
+-- correctly -- offers no confirm on an unreachable tile, so each attempt logged
+-- `confirm_move: fail:not-legal` and the sticky fault failed a run that went on to WIN (#335).
+-- The movement map is already on screen once the unit is selected, so ask it before pressing.
 local function moveUnit(fx, fy, tx, ty)
     if not awaitControllerState("player_map_idle", 300) then return false end
     if not cursorTo(fx, fy) then return false end
     if not guardedInput("select_unit", "A", "PlayerPhase enters movement-range input", function(after)
         return controllerState(after) == "unit_selected"
     end, 120) then return false end
+    if reachCost(tx, ty) >= 120 then
+        -- Back out through the enumerated cancel, so the next unit starts from a clean map.
+        guardedInput("cancel_selection", "B", "selection returns to the live map", function(after)
+            return controllerState(after) == "player_map_idle"
+        end, 120)
+        return false
+    end
     if not cursorTo(tx, ty) then return false end
     return guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
         return controllerState(after) == "unit_command_menu"
@@ -1050,10 +1087,6 @@ end
 -- March a unit toward (tx,ty) using the game's own pathing: selecting the
 -- unit fills gBmMapMovement (include/bmmap.h; cost < 120 = reachable this
 -- turn), so we read it and pick the reachable free tile closest to the target.
-local function reachCost(x, y)
-    local row = ru32(ru32(SYM.gBmMapMovement) + y * 4)
-    return ru8(row + x)
-end
 local function marchToward(u, tx, ty, maxx, maxy)
     maxx, maxy = maxx or 14, maxy or 9 -- default = ch00 map; ch01 is 25x16
     if not awaitControllerState("player_map_idle", 300) then return false end
@@ -1765,7 +1798,8 @@ local function liveEnemies()
     local out = {}
     for i = 0, 23 do
         local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) then
+        -- onMap, not just alive: a live enemy still off the map is not a place to walk to.
+        if u and not isDead(u) and u.onMap then
             out[#out + 1] = { x = u.x, y = u.y, hp = u.hp, is_boss = unitIsBoss(u) }
         end
     end
@@ -2371,7 +2405,8 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
             if won() then return "won", t end
             if lost() then return "gameover", t end
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then   -- live, not yet acted
+            -- onMap too: an undeployed unit is alive and unacted but has no tile to select.
+            if u and not isDead(u) and u.onMap and (u.state & 0x2) == 0 then   -- live, not yet acted
                 b = findBoss()
                 if b then
                     seizeTile = { x = b.x, y = b.y }
