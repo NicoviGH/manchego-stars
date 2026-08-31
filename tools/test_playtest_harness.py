@@ -118,16 +118,80 @@ class TestAwaitControllerState(unittest.TestCase):
                       'a screen that outlives the allowance must still fail closed')
 
     def test_the_budget_counts_stall_not_wall_clock(self):
-        # #232. A wait for the map to become playable spans whole cutscenes, and no fixed
-        # budget fits every one -- the ch01 opening outran 300 frames and logged a fault
-        # on a chapter the scenario went on to clear. So the event engine running must not
-        # burn the budget, while a genuinely wedged engine still fails closed here rather
-        # than at run.sh's wall-clock deadline.
+        # #232/#335. A wait for the map to become playable spans whole cutscenes AND whole
+        # enemy phases, and no fixed budget fits every one -- the ch01 opening outran 300
+        # frames, and so did clear_ch02's ~2100-frame turn 1 -- each logging a fault on a
+        # chapter the scenario went on to clear. What counts as the engine working is
+        # Controller.engineIsWorking's to decide, because there it is tested against
+        # observations instead of asserted as a substring here; the budget must consult it
+        # rather than re-deciding inline. A genuinely wedged engine still fails closed here
+        # rather than at run.sh's wall-clock deadline.
         body = _block(_read_harness(), 'local function awaitControllerState(',
                       '\n-- Select unit at')
-        self.assertIn('std_event', body, 'event-engine progress must be recognised')
+        self.assertIn('Controller.engineIsWorking(last)', body,
+                      'the stall budget must consult the tested predicate')
+        self.assertIn('idle = idle + 1', body, 'and only count frames it rejects')
         self.assertIn('STALL_CEILING', body, 'the wait must still terminate on its own')
         self.assertIn('fail:state-timeout', body)
+
+    def test_the_win_fired_by_the_last_kill_leaves_no_turn_to_end(self):
+        # #335. A clear-bot that kills the final enemy can fire the DefeatAll win right there,
+        # and the ending then plays INSIDE the old chapter slot -- so `chapter() ~= start` is
+        # still false while the map is already gone. Ending the turn at that point makes
+        # endTurn wait for a player_map_idle this chapter will never show again, and it walks
+        # into the post-chapter save prompt and the next chapter's title card and fails the run
+        # on them. The precondition endTurn actually needs is the one that must be checked.
+        harness = _read_harness()
+        body = _block(harness, 'local function endTurn(', '\n-- End turn, then ride out')
+        self.assertIn('alreadyWon', body, 'callers firing a win must be able to say so')
+        self.assertIn('waitFor', body,
+                      'and it must settle -- FE8 is mid-transition right after the last kill')
+        self.assertIn('~= "player_map_idle"', body,
+                      'the decision must rest on the player actually having the map back')
+        # Both clear-and-chain scenarios must go through it; a second hand-rolled copy is how
+        # one of them silently keeps the bug.
+        self.assertNotIn('if routed and not advanced() then endTurn()', harness,
+                         'no scenario may end the turn on the chapter-number guard alone')
+        self.assertEqual(harness.count('endTurn(nil, advanced)'), 2,
+                         'clear_ch02 and recordchain must both pass the win predicate')
+
+    def test_a_chapter_ending_mid_phase_is_an_exit_not_a_wedge(self):
+        # #335. A DefeatAll win fires the ending from INSIDE the enemy phase, and from there
+        # FE8 goes to the post-chapter save prompt and the next chapter -- no player phase is
+        # ever coming back. runEnemyPhase waited for one anyway, spent its whole budget and
+        # reported a phase timeout on a chapter clear_ch04_parley had cleared and chained out
+        # of. Raising the cap only made it fail slower; the loop has to recognise the exit.
+        body = _block(_read_harness(), 'local function runEnemyPhase(', '\n-- Detecting an on-screen')
+        self.assertIn('startedIn', body, 'the phase must remember which chapter it began in')
+        self.assertIn('"ended"', body, 'and report a chapter that finished under it')
+        self.assertIn('fail:phase-timeout', body, 'a genuinely wedged phase must still fail')
+        # The fault is what a verdict trips over, so the normal exit must come FIRST.
+        self.assertLess(body.index('"ended"'), body.index('fail:phase-timeout'),
+                        'the chapter-ended exit must precede the timeout trace')
+
+    def test_the_enemy_phase_cap_outlives_a_phase_that_contains_a_scene(self):
+        # #335, the other half of the same failure. ch04's parley phase plays a cutscene and
+        # then the chapter ending inside the enemy phase: it was still running, chapter
+        # unchanged, 3,768 frames in, and the chapter did not flip until past 9,800. So the
+        # chapter-ended exit above can only fire if the cap outlives the scene -- with a flat
+        # 3,600 the loop died first and the exit never got the chance. Both are needed.
+        harness = _read_harness()
+        body = _block(harness, 'local function runEnemyPhase(', '\n-- Detecting an on-screen')
+        self.assertIn('TUNE.enemyPhaseFrames', body,
+                      'the cap must be a named tunable, not a literal in the loop head')
+        m = re.search(r'enemyPhaseFrames = (\d+)', harness)
+        self.assertIsNotNone(m, 'TUNE.enemyPhaseFrames must be defined')
+        self.assertGreater(int(m.group(1)), 9800,
+                           'it must outlive the longest scene-bearing phase measured')
+
+    def test_engine_is_working_recognises_the_phases_that_are_not_stalls(self):
+        # The predicate is unit-tested in tools/playtest/test_controller.lua; this pins that
+        # it keeps covering the two cases that produced real controller faults, so deleting
+        # either arm cannot pass by moving the constant somewhere else.
+        src = open(os.path.join(REPO, 'tools/playtest/controller.lua'), encoding='utf-8').read()
+        body = _block(src, 'function M.engineIsWorking(', '\nfunction M.formatTrace')
+        self.assertIn('std_event', body, 'event-engine progress must be recognised (#232)')
+        self.assertIn('FACTION_PLAYER', body, 'a phase the player does not control (#335)')
 
 
 class TestPlaytestHarness(unittest.TestCase):

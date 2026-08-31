@@ -54,6 +54,20 @@ local TUNE = {
     -- UNSKIPPED ch00 boss animation is 1238 frames, and vanilla's worst cases (crit, a
     -- double, a level-up, a promotion) run well past that -- see chooseAttack.
     combatFrames = 3600,
+    -- How long an ENEMY PHASE may run before it is called wedged. A phase is not only units
+    -- stepping: ch04's parley phase plays a full CUTSCENE and then the chapter's own ending
+    -- inside it, and it was still running -- chapter unchanged, faction still red -- 3,768
+    -- frames in, with the chapter not flipping until past 9,800. The old flat 3,600 therefore
+    -- gave up mid-scene and reported a phase timeout on a chapter clear_ch04_parley cleared
+    -- and chained out of (#335). Sibling of the budget bug awaitControllerState had: both
+    -- assumed a fixed cadence for something that legitimately contains a scene.
+    --
+    -- This is a WEDGE-CATCHER, not an estimate of a phase's length. In a healthy run it is
+    -- never reached -- the loop returns the moment control comes back, or the moment the
+    -- chapter ends under it -- so a generous value costs a passing run nothing and only bounds
+    -- how long a genuinely stuck phase takes to report itself. Staying inside run.sh's
+    -- deadline is what keeps that report a NAMED trace rather than a killed run.
+    enemyPhaseFrames = 20000,
     -- How many times a wait may back out of an unwanted screen before failing closed.
     stuckRecoveries = 2,
     -- A save slot takes TWO confirms; the prompt must be gone within this allowance.
@@ -897,11 +911,13 @@ end
 
 -- Wait until FE8 reaches `want`. `frames` bounds how long we tolerate NOTHING HAPPENING;
 -- it is not a wall-clock cap, because waiting for the map to become playable routinely
--- spans a scene -- a chapter opening, a turn event -- and no fixed budget fits every
--- cutscene (#232: the ch01 opening outran 300 frames, so ch01win/lordfloor logged a
--- controller fault on a chapter they went on to clear). The event engine running is
--- productive work, so it does not burn the budget; STALL_CEILING keeps a genuinely
--- wedged engine failing closed here rather than at run.sh's wall-clock deadline.
+-- spans a scene -- a chapter opening, a turn event, an enemy phase -- and no fixed budget
+-- fits every one (#232: the ch01 opening outran 300 frames, so ch01win/lordfloor logged a
+-- controller fault on a chapter they went on to clear; #335: clear_ch02's turn 1 did the
+-- same on a ~2100-frame enemy phase of seven raiders). Controller.engineIsWorking owns what
+-- counts as the engine working -- it is tested there, against observations, rather than
+-- asserted here -- and STALL_CEILING keeps a genuinely wedged engine failing closed here
+-- rather than at run.sh's wall-clock deadline.
 local STALL_CEILING = 40
 local function awaitControllerState(want, frames)
     local budget = frames or 300
@@ -912,7 +928,7 @@ local function awaitControllerState(want, frames)
         last = observeController()
         local state = controllerState(last)
         if state == want then return true end
-        if not (last.procs and last.procs.std_event) then idle = idle + 1 end
+        if not Controller.engineIsWorking(last) then idle = idle + 1 end
         -- Dialogue is never what a caller waits AT -- the targets are player_map_idle,
         -- unit_selected or a menu -- and FE8 interleaves text with play constantly: a
         -- turn event, a village line, a post-combat quote. Advancing it is a CLASSIFIED
@@ -1077,7 +1093,26 @@ local function emptyTile()
     return nil
 end
 
-local function endTurn(tile)
+-- `alreadyWon` is an optional predicate for callers that end a turn in order to FIRE a win
+-- condition. A clear-bot that kills the final enemy can fire DefeatAll with that kill, and the
+-- ending then plays INSIDE the old chapter slot -- so the caller's `chapter() ~= start` guard
+-- is still false while the map is already gone. Ending the turn there makes the wait below
+-- chase a player_map_idle this chapter will never show again: it meets the post-chapter save
+-- prompt and the next chapter's title card and fails the run on those, on a chapter it just
+-- cleared (#335). The precondition this function actually needs is that the PLAYER HAS THE
+-- MAP, so ask that rather than the chapter number -- after settling, because right after the
+-- last kill FE8 is mid-transition either way and an instant reading would skip a turn that
+-- genuinely still needs ending.
+local function endTurn(tile, alreadyWon)
+    if alreadyWon then
+        waitFor(function()
+            return alreadyWon() or controllerState(observeController()) == "player_map_idle"
+        end, 600)
+        if alreadyWon() or controllerState(observeController()) ~= "player_map_idle" then
+            log("the rout fired the win directly -- no turn left to end")
+            return true
+        end
+    end
     if not awaitControllerState("player_map_idle", 300) then return false end
     tile = tile or emptyTile()
     if not tile then
@@ -1094,12 +1129,22 @@ local function endTurn(tile)
     end, 900)
 end
 
--- End turn, then ride out the enemy phase. Returns "gameover" the moment the
--- game-over screen proc appears, "player" when control comes back, or nil.
+-- End turn, then ride out the enemy phase. Returns "gameover" the moment the game-over
+-- screen proc appears, "player" when control comes back, "ended" if the chapter itself
+-- finished during the phase, or nil if the phase wedged (which leaves a controller fault).
 local function runEnemyPhase(tile)
     if not endTurn(tile) then return nil end
-    for _ = 1, 3600 do
+    local startedIn = chapter()
+    for _ = 1, TUNE.enemyPhaseFrames do
         if gameOverActive() then return "gameover" end
+        -- The chapter can END during the enemy phase: a DefeatAll win fires the ending right
+        -- there, and from it FE8 goes to the post-chapter save prompt and then the next
+        -- chapter. No player phase is ever coming back, so waiting for one spends the whole
+        -- budget and then reports a PHASE TIMEOUT on a chapter that was cleared -- which is
+        -- what failed clear_ch04_parley, a run that went on to reach chapter 6 (#335).
+        -- A chapter ending under us is a normal exit, not a wedge, so it returns its own
+        -- value and leaves no controller fault behind for the verdict to trip over.
+        if chapter() ~= startedIn then return "ended" end
         if faction() == 0 and not menuOpen() and controllerState() == "player_map_idle" then
             return "player"
         end
@@ -2371,6 +2416,9 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         if lost() then return "gameover", t end
         local phase = runEnemyPhase(park)
         if phase == "gameover" then return "gameover", t end
+        -- "ended" = the phase carried the chapter out (a DefeatAll win fires the ending from
+        -- inside it). Ask won() rather than calling it stuck: the bot did its job (#335).
+        if phase == "ended" then return won() and "won" or "ended", t end
         if phase ~= "player" then return "stuck", t end
         -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
         -- instead of grinding the full budget on a wedged bot.
@@ -6014,7 +6062,7 @@ scenarios.clear_ch02 = function()
     -- ch03 (slot 4) and PREP re-picks the convoy/inventory. (Coarse polling skipped the charm window.)
     -- The ch02->ch03 chain (#23) replaced the old dev-placeholder->title landing: the ending now
     -- MNC2s straight into ch03, so we A-mash through it until chapter() == 4 (ch03), not the title.
-    if routed and not advanced() then endTurn() end
+    if routed then endTurn(nil, advanced) end
     local reachedCh03 = false
     local watchEnding = INSPECT.watch("clear_ch02_ending")
     for _ = 1, TUNE.bootSteps do
@@ -6119,7 +6167,7 @@ scenarios.recordchain = function()
             return result("FAIL", string.format("game over on turn %d -- party lost before the chain", t)) end
     end
     if not (routed or advanced()) then return result("FAIL", "could not rout ch02 -- no chain to record") end
-    if routed and not advanced() then endTurn() end   -- fire the DefeatAll win -> the ending auto-plays
+    if routed then endTurn(nil, advanced) end   -- fire the DefeatAll win -> the ending auto-plays
     -- Record the ending -> MNC2(0x4) -> ch03 opening -> PREP from HERE (no state reload). Normal speed
     -- so the text/fades animate for the GIF; A-mash to advance beats; stop when ch03 Preparations opens.
     return recordCutscene{ tag = "chain", until_ = "prep", speed = "normal",
