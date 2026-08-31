@@ -1123,8 +1123,17 @@ end
 -- during ALL normal map/turn event processing, so it must NOT be used to gate "a quote is up".
 
 -- ---------------------------------------------------------------- boot
-local function inChapter()
-    return chapter() == HOST_CHAPTER and faction() == 0 and turn() >= 1
+-- `want` is the chapter slot this boot is trying to REACH; it defaults to HOST_CHAPTER, the
+-- slot the scenario is ultimately about. They are the same thing for a scenario that boots
+-- straight onto its own map, and DIFFERENT for every chain that walks through chapters to get
+-- there -- winCh00 plays the prologue on the way to ch02, and must wait for the prologue.
+--
+-- Conflating them cost a run: ch02's cases carry host_chapter 3 (declared.py injects the
+-- chapter's own slot), so ckpt_ch02start -- which replays ch00 -> ch01 -> ch02 from New Game --
+-- booted the PROLOGUE and then waited for chapter 3 there until the deadline. It had only ever
+-- worked because ch02's older matrix.yaml rows named no host_chapter and defaulted to 1.
+local function inChapter(want)
+    return chapter() == (want or HOST_CHAPTER) and faction() == 0 and turn() >= 1
         and unitAt(SYM.gUnitArrayBlue, 0) ~= nil
 end
 
@@ -1263,7 +1272,35 @@ INSPECT.difficultyMismatch = function()
         actual, want, tostring(hard), controller)
 end
 
-local function bootToMap(stopAtPrep)
+-- `want`: the chapter slot to stop on, for a chain leg that is not the scenario's own (see
+-- inChapter). Omit it and the boot waits for HOST_CHAPTER, which is what every direct-boot
+-- scenario means.
+local function bootToMap(stopAtPrep, want)
+    -- A declared CHECKPOINT is the correct route to this chapter's map, not a shortcut past
+    -- it. Chapters with a debug boot (ch03-ch05) land on their map from New Game, so driving
+    -- the boot IS the route; ch02 has no such boot and reaches its map only down the
+    -- ch00 -> ch01 -> ch02 chain, which is exactly what its checkpoint holds. Without this,
+    -- "boot to the map" quietly means "boot to the map IF this chapter has a debug boot", and
+    -- every ch02 case that did not hand-roll a loadState sat on the prologue until it timed
+    -- out -- which is how `given: [on_map]` failed for ch02visit while passing everywhere else.
+    --
+    -- A ckpt_* builder is excluded: it is the thing that MINTS the state, so loading it would
+    -- either restore a stale one over the run that was meant to replace it, or load nothing.
+    local ckpt = PLAYTEST_CHECKPOINT
+    if ckpt and ckpt ~= "" and not string.match(PLAYTEST_SCENARIO or "", "^ckpt_") then
+        if loadState(ckpt) then
+            wait(90)
+            if inChapter(want) then
+                log(string.format("checkpoint %s -> chapter %d turn %d", ckpt, chapter(), turn()))
+                shot("map-loaded")
+                return true
+            end
+            -- Loaded, but not where it claims to be: fall through and boot honestly rather
+            -- than assert against whatever map the stale state happens to hold.
+            log(string.format("checkpoint %s loaded but chapter=%d (want %d) -- booting instead",
+                ckpt, chapter(), want or HOST_CHAPTER))
+        end
+    end
     log("booting to map with observed FE8 states")
     local stalled = INSPECT.watch("boot")
     -- TUNE.bootSteps, never a literal: a cap that expires mid-scene reports a timeout that
@@ -1277,7 +1314,7 @@ local function bootToMap(stopAtPrep)
             return false
         end
         if state == "player_map_idle" then
-            if inChapter() then
+            if inChapter(want) then
                 -- Assert the MODE on every boot, not only in the difficulty probe. A
                 -- checkpoint reload or a silent revert to the menu default would otherwise
                 -- run the whole gate in a mode nobody asked for and nothing would say so.
@@ -1815,11 +1852,21 @@ scenarios.smoke = function()
     return smokeDrive(chapter())
 end
 
--- Play ch00 to the boss kill and wait out the ending scene. Returns true once
--- the chapter has advanced past the host slot, nil/false (with its own FAIL
--- result already logged) otherwise. Shared by the win and ch01 scenarios.
+-- Play ch00 to the boss kill and wait out the ending scene. Returns true once the chapter
+-- has advanced past THE PROLOGUE'S slot, nil/false (with its own FAIL result already logged)
+-- otherwise. Shared by the win and ch01 scenarios, and by every checkpoint that replays the
+-- chain.
+--
+-- Every chapter test here is explicitly the PROLOGUE's slot, never HOST_CHAPTER. This
+-- function is a chain LEG: callers reach it on the way somewhere else, and a caller aiming at
+-- ch02 carries host_chapter 3, which would make "the chapter advanced" read false forever and
+-- the boot wait for a slot the prologue can never be. `reachCh01` already names ch01's slot
+-- as a literal (chapter() == 2) for the same reason; this is the other half of that.
 local function winCh00()
-    if not bootToMap() then result("FAIL", "never reached the map") return false end
+    local PROLOGUE = 1        -- ch00 hosts on chapter slot 1 (inject/hosts.py)
+    if not bootToMap(nil, PROLOGUE) then
+        result("FAIL", "never reached the map") return false
+    end
     local sephek = red(CHAR_SEPHEK)
     if not sephek then result("FAIL", "Sephek not found in red array") return false end
     pokeFrail(sephek)
@@ -1840,7 +1887,7 @@ local function winCh00()
         -- US_UNSELECTABLE -- the win succeeds and the combat wait times out anyway
         -- (#232). chooseAttack takes stopWhen for exactly this case.
         if not chooseAttack(scram.addr, function()
-            return isDead(red(CHAR_SEPHEK)) or chapter() ~= HOST_CHAPTER
+            return isDead(red(CHAR_SEPHEK)) or chapter() ~= PROLOGUE
         end) then
             result("FAIL", "combat did not reach its verified postcondition")
             return false
@@ -1860,7 +1907,7 @@ local function winCh00()
         if isDead(red(CHAR_SEPHEK)) then
             log("Sephek dead; waiting for the chapter to end")
             shot("sephek-dead")
-            local ended = waitFor(function() return chapter() ~= HOST_CHAPTER end, 3600, true)
+            local ended = waitFor(function() return chapter() ~= PROLOGUE end, 3600, true)
             shot("after-boss-kill")
             if ended then return true end
             traceFailure("win_ch00", "boss death advances beyond the hosted chapter",
@@ -1877,8 +1924,11 @@ end
 -- WIN: kill Sephek -> DefeatBoss -> ending scene -> chapter advances.
 scenarios.win = function()
     if winCh00() then
+        -- The prologue's own slot, not HOST_CHAPTER: `win` runs with host_chapter 1 today, but
+        -- the number being reported is "the chapter we just left", which is ch00's regardless
+        -- of who asked. (PROLOGUE is winCh00's local; naming it here would read a nil global.)
         result("PASS", string.format(
-            "DefeatBoss fired; chapter advanced %d -> %d", HOST_CHAPTER, chapter()))
+            "DefeatBoss fired; chapter advanced %d -> %d", 1, chapter()))
     end
 end
 
@@ -7294,18 +7344,26 @@ end
 scenarios.ch02raid = function()
     -- targos-hut-south: the contested one. The rear raiders spawn at (0,6)/(0,7) on turn 3
     -- with pillage AI and it is the nearest lootable terrain to them.
-    local SITE_X, SITE_Y = 1, 12
+    -- BOTH huts. The first pass watched only the south one on the reasoning that the turn-3
+    -- rear raiders spawn beside it -- and the run showed the band takes the EAST hut first,
+    -- because six of the nine start east and (12,3) is on their doorstep. Which hut falls is
+    -- a real design answer, so the test reports it rather than presuming it.
+    local HUTS = {
+        { name = "targos-hut-south", x = 1,  y = 12, flag = 9,  item = 0x6E },
+        { name = "targos-hut-east",  x = 12, y = 3,  flag = 10, item = nil  },
+    }
     local VILLAGE_REGULAR, RUINS, PUREWATER = 0x03, 0x25, 0x6E
-    local SITE_FLAG = 9                       -- EVFLAG_TMP(9); the macro is the identity
     if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
     pokeFastConfig()
     waitFor(function() return faction() == 0 and not menuOpen()
         and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
-    if terrainAt(SITE_X, SITE_Y) ~= VILLAGE_REGULAR then
-        return result("FAIL", string.format(
-            "targos-hut-south (%d,%d) is terrain 0x%02X at turn 1, not a village -- nothing "
-            .. "can raid it and nothing can visit it", SITE_X, SITE_Y,
-            terrainAt(SITE_X, SITE_Y)))
+    for _, hut in ipairs(HUTS) do
+        if terrainAt(hut.x, hut.y) ~= VILLAGE_REGULAR then
+            return result("FAIL", string.format(
+                "%s (%d,%d) is terrain 0x%02X at turn 1, not a village -- nothing can raid it "
+                .. "and nothing can visit it", hut.name, hut.x, hut.y,
+                terrainAt(hut.x, hut.y)))
+        end
     end
     -- Count the gift BEFORE: an absolute "the party holds no Pure Water" would fail the
     -- moment the chapter ships one anywhere else (ch05raid's lesson, kept).
@@ -7315,10 +7373,19 @@ scenarios.ch02raid = function()
         return n
     end
     local before = waters()
-    -- Hand the hut to the raiders: never visit it, just give the turns back. The party
-    -- deploys at (0,3)-(2,4) and the hut is seven tiles south of that, so idling genuinely
-    -- concedes the race rather than merely standing still next to it.
+    -- Hand the huts to the raiders: never visit one, just give the turns back.
+    --
+    -- The party is KEPT ALIVE while we wait, the way protectChwinga keeps the greens up for
+    -- the gift path. ch05raid can simply idle because its party spawns west of a south-east
+    -- site; ours deploys in the middle of the map the raid crosses, so an honest idle is a
+    -- rout -- the first run died on turn 11 with the question still unanswered. What is under
+    -- test is whether a RAIDER REACHES A HUT, and the party's survival is a balance question
+    -- for the human pass, not a precondition of this one.
     for t = 1, 12 do
+        for i = 0, 61 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) then emu:write8(u.addr + 0x13, 60) end
+        end
         local phase = runEnemyPhase()
         if phase == nil then
             return result("FAIL", string.format("the enemy phase never returned on turn %d", t))
@@ -7326,34 +7393,40 @@ scenarios.ch02raid = function()
         if phase == "gameover" then
             shot("ch02raid-gameover")
             return result("FAIL", string.format(
-                "the party died on turn %d before any raider reached a hut", t))
+                "the party died on turn %d even while being kept alive", t))
         end
-        if terrainAt(SITE_X, SITE_Y) == RUINS then
+        local fell
+        for _, hut in ipairs(HUTS) do
+            if terrainAt(hut.x, hut.y) == RUINS then fell = hut break end
+        end
+        if fell then
+            local SITE_X, SITE_Y, SITE_FLAG = fell.x, fell.y, fell.flag
             -- Camera on the hut before the shot: the verdict is a terrain byte, and a terrain
             -- byte has been right while the tiles it names drew wrong (ch05raid's note).
             cursorTo(SITE_X, SITE_Y)
             wait(90)
             shot("ch02raid")
-            log(string.format("ch02raid: targos-hut-south fell on turn %d", turn()))
-            if waters() > before then
+            log(string.format("ch02raid: %s fell on turn %d", fell.name, turn()))
+            if fell.item and waters() > before then
                 return result("FAIL", string.format(
-                    "the hut was sacked but its Pure Water reached the party anyway (%d -> %d)"
-                    .. " -- a lost hut must cost Glimmerfrost's charm", before, waters()))
+                    "%s was sacked but its Pure Water reached the party anyway (%d -> %d) -- "
+                    .. "a lost hut must cost Glimmerfrost's charm", fell.name, before, waters()))
             end
             if eventFlag(SITE_FLAG) then
                 return result("FAIL", string.format(
-                    "targos-hut-south was RAIDED but its event id %d is set -- a sacked hut "
-                    .. "would still pay out its charm", SITE_FLAG))
+                    "%s was RAIDED but its event id %d is set -- a sacked hut would still pay "
+                    .. "out", fell.name, SITE_FLAG))
             end
             return result("PASS", string.format(
-                "targos-hut-south was sacked on turn %d: terrain 0x%02X -> 0x%02X, no Pure "
-                .. "Water, flag %d unset", turn(), VILLAGE_REGULAR, RUINS, SITE_FLAG))
+                "%s was sacked on turn %d: terrain 0x%02X -> 0x%02X, no gift, flag %d unset",
+                fell.name, turn(), VILLAGE_REGULAR, RUINS, SITE_FLAG))
         end
     end
     shot("ch02raid-unraided")
     return result("FAIL", string.format(
-        "twelve turns and targos-hut-south still stands (terrain 0x%02X) -- no raider reached "
-        .. "it, so the decoy the chapter is built on does not exist", terrainAt(SITE_X, SITE_Y)))
+        "twelve turns and BOTH huts still stand (south 0x%02X, east 0x%02X) -- no raider "
+        .. "reached either, so the decoy the chapter is built on does not exist",
+        terrainAt(HUTS[1].x, HUTS[1].y), terrainAt(HUTS[2].x, HUTS[2].y)))
 end
 
 -- ch05raid (#25): can the party LOSE a reliquary? The chapter has declared a village-raid race
