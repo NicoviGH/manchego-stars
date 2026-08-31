@@ -55,55 +55,14 @@ content. Read the issue for scope, the boards for reasoning.
 ## Next task
 
 **Review and land the stack above, in order.** Once #343 merges, **#335 closes itself** and the next
-task is **ch06 enemy POSITIONS -- bring Nicolas a render first.** The roster is authored and
-measures x1.00; where the 27 units stand is the one design item left, and it is NOT derivable:
+task is **ch06 enemy POSITIONS -- bring Nicolas a render first** (2-3 concept options, not a
+finished map).
 
-- **Neither vanilla source transfers.** ch05 lifted its coordinates from its twin because its map
-  IS that twin's retile. ch06 splits donor from bar (layout Ch13Ephraim, pressure Ch6), so Ch6's
-  coordinates describe a different map and Ch13Ephraim's describe a 58-unit force on ours.
-- **Three jobs to place against** (from the chapter's own design): boat squads in reach of both
-  marooned boats from turn 1 (the clock that replaces vanilla's hostage timer), lane holders on
-  the crossings, and a guard on the centre shelf.
-- **Measured geometry** (off the painted `.mar`, re-verified in review): 306 foot-passable cells in
-  ONE connected component; 8 crossings; a 6-cell centre shelf at (9-11, 11-13) whose only foot
-  doors are the bridges at **(8,11)** and **(10,14)**; a 3x3 drift pocket (+20 avoid, +1 Def) around
-  each boat; deploy block x4-10/y0-2. Foot reaches the west boat T6 and the east T7, Braulo T5/T4,
-  Pinky T3 -- vanilla Ch6's own "send a flier" math, arrived at independently.
-- **Nicolas drives what/where/why** (2-3 concept options on a render), Claude drives how it is built.
-
-## What ch06 still owes
-
-`make chapter CH=ch06` derives most of it — do not restate that here. What it cannot see:
-
-- **`inject_ch06` must call `_register_tileset(campaign, 'snowy-bern-ice', 'SnowIce', ...)`.**
-  `TILESET_STEMS` knows the name, but `_register_chapter_map` then looks up `ObjectTypeSnowIce` /
-  `MapPaletteSnowIce` / `TileConfigurationSnowIce` in the asset table and the first build
-  `sys.exit`s without them. Sharing `Snow` would draw ch06 in ch04's palette.
-- **ch06's enemies owe a `donor:` each**, not an AI table. #335 deleted every `CHnn_AI` table:
-  each enemy now names the vanilla unit it is modelled on and the build reads that unit's four
-  `.ai` bytes. A donor matches where the vanilla unit FIGHTS (the last REDA point), not where it
-  is placed. `make chapter CH=ch06` prints what each enemy resolved to, and an unresolvable donor
-  fails the parity gate.
-- **Five enemy reskins to vendor and wire** in `campaign.yaml` → `enemy_class_reskins` (Mermaid,
-  Shark Rider, spider-rider-as-crab, IronShell General, Lamia) with their `frame:` overrides. The
-  asset board above names every file and folder. NB the IronShell animation preview keys on BLUE,
-  not the usual green.
-- **Both boarding scenes are declared with empty `text:` on purpose.** Their content is DECIDED —
-  see the #26 comment (east/Grynsk teaches the snow mounds, west/Tali teases the intelligence) —
-  but Grynsk and Tali still need voice rows in `lore/frostmaiden-voices.md` before a line is drafted.
-- **`events/ch06-messie.ea` must LOAD Marty and Braulo**, not assume them. They speak whether or
-  not they are alive (`decisions.md` -> *"Permadeath is a combat rule, not a narrative one"*); what
-  is NOT optional is loading them, because staging an absent unit is a soft-lock (issue #337).
-
-⚠️ **`gen_symbols.py` hardcodes `fireemblem8u/fireemblem8.elf`.** Pointing the harness at a
-`.matrix-romcache` ROM from a different build reads shifted addresses and hangs at `boot stuck`
-with procs that never change — which looks exactly like broken input and is not. Restore the ROM,
-the ELF **and** `.build-config.json` from the same cache entry, then re-run `gen_symbols.py`.
-
-**Tree state: the ROM in the tree is `canonical`.** Rebuild for any other configuration; `make matrix` does it for you and caches per configuration.
-
-**The ROM cache is WARM** for `canonical`, `testch`, `ch03boot`, `ch04boot`, `ch05boot`,
-`ch05lupinboot`, `ch05mooseboot` and the three ch05 ending arms (2026-08-24). Untouched since.
+Everything that decision answers to -- the measured map geometry, why neither vanilla source
+transfers, the three jobs placement must serve, the donor rule that replaced `CH06_AI`, and the
+build obligations `make chapter CH=ch06` cannot see -- is on **#26**, in two comments dated
+2026-08-31. All of it lived HERE until then and should not have: it is true until it is done,
+not live state, so it belongs on the issue.
 
 ## Map sprites — read before any art session
 
