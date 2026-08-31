@@ -300,6 +300,55 @@ reinforcements:
 # The gift item lives in ONE place — green_allies[].gift above — which the build reads directly.
 chests: []
 
+# ── Playtest ─────────────────────────────────────────────────────────────────────
+# ch02's OWN scenarios (#314). Its four older cases (ch02, ch02baxby, clear_ch02,
+# smoke_ch02) still live in matrix.yaml and stay there -- a name in both RAISES.
+# All of these ride the canonical ROM from the ch02start checkpoint, like the rest.
+playtest:
+  boot: canonical          # ch02 needs no debug boot: its four older cases already reach the
+                           # map from the ch02start checkpoint on the shipping ROM.
+  cases:
+    # Migrated from matrix.yaml 2026-08-30: the suite is DERIVED from here now (#314), so a
+    # copy over there could only fall behind. Bodies stay hand-written Lua; the declarations
+    # move.
+    - {name: ch02,       proves: "the map is entered: both chwinga green, the deploy cap is 5, archer and boss present, and both huts still standing", lua: ch02,       checkpoint: ch02start}
+    - {name: smoke_ch02, proves: "stability net -- idle-drive to a clean terminal, catching a crash or soft-lock on load or during the cutscenes", lua: smoke_ch02, checkpoint: ch02start}
+    - {name: ch02baxby,  proves: "Baxby joins the persistent party and fights on the map",     lua: ch02baxby,  checkpoint: ch02start}
+    - {name: clear_ch02, proves: "completability + the chain + both SURVIVOR charms delivered (the hut's Pure Water is ch02visit's)", lua: clear_ch02, checkpoint: ch02start}
+
+    # The south hut PAYS. Declared rather than hand-written: `visit` is the DSL ch05's four
+    # reliquaries use, and this is the same fact -- walk a unit to the door, take the gift.
+    - name: ch02visit
+      proves: >
+        the south hut hands over Glimmerfrost's Pure Water. ch02 shipped two village-terrain
+        cells backing no events at all until 2026-08-30, so nothing on the map could be
+        visited and the charm had no way to arrive.
+      checkpoint: ch02start
+      given: [on_map]
+      when:
+        - visit: {x: 1, y: 12, gains: 0x6E}    # targos-hut-south -> ITEM_PUREWATER
+      then:
+        - spoke: true
+
+    - name: ch02raid
+      proves: >
+        a raider can SACK a Targos hut -- terrain flips to ruins, the Pure Water never
+        arrives and the event id stays unset. Nothing tested this because ch02 had no
+        villages at all until 2026-08-30; the huts are the decoy that pulls the raid off
+        the chwinga, and if one cannot fall the decoy is scenery.
+      lua: ch02raid
+      checkpoint: ch02start
+    - name: recordch02turn1
+      proves: the turn-1 scene in motion -- RBG, Pinky, then Halvar's raid bark
+      lua: recordch02turn1
+      kind: record
+      checkpoint: ch02start
+    - name: recordch02huts
+      proves: the south hut's two-speaker hand-off, resident to Glimmerfrost
+      lua: recordch02huts
+      kind: record
+      checkpoint: ch02start
+
 # ── Villages ─────────────────────────────────────────────────────────────────────
 # RESTORED 2026-08-30. Vanilla Ch2 wires THREE `Village()` -- (4,2), (7,2), (1,12) -- and
 # our retile kept two of its four village-terrain tiles while the events were dropped, so

@@ -4947,8 +4947,12 @@ end
 -- Built on a "ch02start" save-state checkpoint (ckpt_ch02start plays the whole chain ONCE at
 -- top speed); ch02 / smoke_ch02 / clear_ch02 LOAD it so each is fast. Char/class/item ids from
 -- the decomp + the ch02 build (CH02_CHWINGA / CH02_ITEM_IDS in tools/build_campaign.py).
-local CH02_CHWINGA_PIDS = { 0xCA, 0xC9, 0xC8 }   -- DARA/KLIMT/MANSEL = Mote/Rime/Glimmer (green)
-local CH02_CHARMS = { 0x28, 0x6D, 0x6E }         -- Hand Axe / Elixir / Pure Water (Mote's Red Gem moved to ch03's chest, #23)
+-- The chwinga ON THE FIELD. Glimmerfrost (MANSEL, 0xC8) is not among them since 2026-08-30:
+-- she inhabits the (1,12) hut and hands her charm over on the visit, so she is never a unit.
+local CH02_CHWINGA_PIDS = { 0xCA, 0xC9 }         -- DARA/KLIMT = Mote/Rime (green)
+local CH02_CHARMS = { 0x28, 0x6D }               -- Hand Axe / Elixir, the two SURVIVOR charms.
+                                                 -- Pure Water (0x6E) is the hut's, proven by
+                                                 -- ch02visit (paid) and ch02raid (lost).
 local CLASS_ARCHER = 0x19                          -- the fliers-vs-bows debut enemy (CH02_CLASS_IDS)
 local CH02_CHAPTER = 3                             -- ch02 hosts on chapter slot 3 (ch01 -> MNC2(0x3))
 local CH03_CHAPTER = 4                             -- ch03 hosts on chapter slot 4 (ch02 ending -> MNC2(0x4))
@@ -5752,11 +5756,23 @@ scenarios.ch02 = function()
     log(string.format("ch02 entry: chwinga=%d deployed=%d archer=%s boss=%s",
         chwinga, deployed, tostring(archer), tostring(boss)))
     shot("ch02-entry")
-    if chwinga ~= 3 then return result("FAIL", string.format("want 3 green chwinga, found %d", chwinga)) end
+    if chwinga ~= 2 then return result("FAIL", string.format("want 2 green chwinga, found %d", chwinga)) end
+    -- The two Targos huts must be VILLAGE terrain at entry. They are the decoy the raid walks
+    -- toward, and pillage reads terrain: a hut painted as anything else is a hut no raider
+    -- targets, which puts the whole force back on the chwinga (#26).
+    for _, hut in ipairs({ {1, 12}, {12, 3} }) do
+        if terrainAt(hut[1], hut[2]) ~= 0x03 then
+            return result("FAIL", string.format(
+                "hut (%d,%d) is terrain 0x%02X at entry, not a village -- nothing raids it and "
+                .. "nothing visits it", hut[1], hut[2], terrainAt(hut[1], hut[2])))
+        end
+    end
     if deployed ~= 5 then return result("FAIL", string.format("deploy cap broken: %d on field (want 5)", deployed)) end
     if not archer then return result("FAIL", "no enemy archer (fliers-vs-bows debut) on the field") end
     if not boss then return result("FAIL", "no boss on the field") end
-    result("PASS", string.format("ch02 entered: 3 chwinga green, %d deployed, archer + boss present", deployed))
+    result("PASS", string.format(
+        "ch02 entered: 2 chwinga green, %d deployed, archer + boss present, both huts standing",
+        deployed))
 end
 
 -- smoke_ch02: stability net on the ch02 map -- idle-drive to a clean terminal, catching a
@@ -5884,8 +5900,13 @@ scenarios.ch02baxby = function()
 end
 
 -- clear_ch02: the completability + chain + charm-delivery proof. Rout the raider band (DefeatAll)
--- while keeping the chwinga alive, then watch the ending scene gift all 3 charms to the leader /
--- convoy. PASS = routed, chained, and all 3 chwinga charms delivered.
+-- while keeping the chwinga alive, then watch the ending scene gift their charms to the leader /
+-- convoy. PASS = routed, chained, and both SURVIVOR charms delivered.
+--
+-- TWO, not three, since 2026-08-30: Glimmerfrost moved into the (1,12) hut and pays on the
+-- visit rather than at the ending, so her Pure Water is ch02visit's to prove (and ch02raid's
+-- to prove LOST). This bot never detours to a door -- it routs -- so counting three here would
+-- fail a chapter that is working exactly as designed.
 scenarios.clear_ch02 = function()
     wait(30)
     if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
@@ -7216,6 +7237,123 @@ scenarios.ch05arena = function()
     return result("PASS", string.format(
         "arena (12,6) taught once, blocked replay, loaded winter palette + skeleton, accepted %dG, generated its opponent, and entered combat",
         wager))
+end
+
+-- recordch02turn1 (#26): the turn-1 scene in motion -- RBG warns flier Pinky off the archer,
+-- Pinky answers, then HALVAR sends the band at the huts. The third beat is new (2026-08-30):
+-- vanilla Ch2 pairs its bow warning and its raid announcement in one scene and we had only
+-- ever shipped the first, which left the huts unreadable as targets. The camera is the point
+-- here -- three speakers, three faces, and whether Halvar's bark reads as an ORDER.
+scenarios.recordch02turn1 = function()
+    pokeFastConfig()
+    if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
+    return recordCutscene({
+        tag = "ch02turn1", maxFrames = 3600, pressEvery = 90,
+        until_ = function()
+            return turn() >= 1 and faction() == 0 and not menuOpen()
+                and not procActive(SYM.ProcScr_StdEventEngine)
+        end,
+    })
+end
+
+-- recordch02huts (#26): both Targos hut visits in motion. The south hut is the one worth
+-- watching -- it hands off between TWO speakers, the resident carrying vanilla's own alarm and
+-- Glimmerfrost answering from the opposite podium with the green chwinga bust. A chwinga never
+-- speaks (lore/sclorbo.md), so her box is a parenthetical and the only way to know it reads is
+-- to look at it. The east hut is the information house.
+scenarios.recordch02huts = function()
+    pokeFastConfig()
+    if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    -- Teleport-and-visit, the ch04/ch05 village idiom: the WALK is not what the camera wants
+    -- and pathing across seven tiles of snow is not what this is proving.
+    local ok, why = openVillageVisit(1, 12)          -- targos-hut-south (Glimmerfrost)
+    if not ok then return result("FAIL", "south hut: " .. tostring(why)) end
+    return recordCutscene({
+        tag = "ch02huts", maxFrames = 3600, pressEvery = 90,
+        until_ = function()
+            return faction() == 0 and not menuOpen()
+                and not procActive(SYM.ProcScr_StdEventEngine)
+        end,
+    })
+end
+
+-- ch02raid (#26): can the party LOSE a Targos hut? ch02 spent its whole life unable to --
+-- it declared no villages at all, so the two village-terrain cells its retile kept from
+-- vanilla Ch2 backed nothing, and six raiders that vanilla points AT the huts had nowhere to
+-- go but the protected chwinga. The huts are the decoy that buys the player time to cross;
+-- if one cannot actually fall, the decoy is scenery and the pillage AI is decoration.
+--
+-- Same verdict shape as ch05raid, and for the same reason: the TERRAIN is what FE8 reads.
+-- CanUnitVisit (bmmenu.c) and gTerrainList_LootableVillages (cp_utility.c) both decide from
+-- it, so a hut that has become RUINS_REGULAR is one the player cannot enter and a second
+-- raider will not revisit. Its event id staying UNSET is the other half -- TILE_COMMAND_20
+-- changes the tile and sets nothing -- and here that is what costs Glimmerfrost her charm.
+-- Run: PT_HOST_CHAPTER=3 tools/playtest/run.sh ch02raid (needs a CH02BOOT=1 ROM).
+scenarios.ch02raid = function()
+    -- targos-hut-south: the contested one. The rear raiders spawn at (0,6)/(0,7) on turn 3
+    -- with pillage AI and it is the nearest lootable terrain to them.
+    local SITE_X, SITE_Y = 1, 12
+    local VILLAGE_REGULAR, RUINS, PUREWATER = 0x03, 0x25, 0x6E
+    local SITE_FLAG = 9                       -- EVFLAG_TMP(9); the macro is the identity
+    if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    if terrainAt(SITE_X, SITE_Y) ~= VILLAGE_REGULAR then
+        return result("FAIL", string.format(
+            "targos-hut-south (%d,%d) is terrain 0x%02X at turn 1, not a village -- nothing "
+            .. "can raid it and nothing can visit it", SITE_X, SITE_Y,
+            terrainAt(SITE_X, SITE_Y)))
+    end
+    -- Count the gift BEFORE: an absolute "the party holds no Pure Water" would fail the
+    -- moment the chapter ships one anywhere else (ch05raid's lesson, kept).
+    local function waters()
+        local n = 0
+        for _, got in ipairs(collectedItems()) do if got == PUREWATER then n = n + 1 end end
+        return n
+    end
+    local before = waters()
+    -- Hand the hut to the raiders: never visit it, just give the turns back. The party
+    -- deploys at (0,3)-(2,4) and the hut is seven tiles south of that, so idling genuinely
+    -- concedes the race rather than merely standing still next to it.
+    for t = 1, 12 do
+        local phase = runEnemyPhase()
+        if phase == nil then
+            return result("FAIL", string.format("the enemy phase never returned on turn %d", t))
+        end
+        if phase == "gameover" then
+            shot("ch02raid-gameover")
+            return result("FAIL", string.format(
+                "the party died on turn %d before any raider reached a hut", t))
+        end
+        if terrainAt(SITE_X, SITE_Y) == RUINS then
+            -- Camera on the hut before the shot: the verdict is a terrain byte, and a terrain
+            -- byte has been right while the tiles it names drew wrong (ch05raid's note).
+            cursorTo(SITE_X, SITE_Y)
+            wait(90)
+            shot("ch02raid")
+            log(string.format("ch02raid: targos-hut-south fell on turn %d", turn()))
+            if waters() > before then
+                return result("FAIL", string.format(
+                    "the hut was sacked but its Pure Water reached the party anyway (%d -> %d)"
+                    .. " -- a lost hut must cost Glimmerfrost's charm", before, waters()))
+            end
+            if eventFlag(SITE_FLAG) then
+                return result("FAIL", string.format(
+                    "targos-hut-south was RAIDED but its event id %d is set -- a sacked hut "
+                    .. "would still pay out its charm", SITE_FLAG))
+            end
+            return result("PASS", string.format(
+                "targos-hut-south was sacked on turn %d: terrain 0x%02X -> 0x%02X, no Pure "
+                .. "Water, flag %d unset", turn(), VILLAGE_REGULAR, RUINS, SITE_FLAG))
+        end
+    end
+    shot("ch02raid-unraided")
+    return result("FAIL", string.format(
+        "twelve turns and targos-hut-south still stands (terrain 0x%02X) -- no raider reached "
+        .. "it, so the decoy the chapter is built on does not exist", terrainAt(SITE_X, SITE_Y)))
 end
 
 -- ch05raid (#25): can the party LOSE a reliquary? The chapter has declared a village-raid race
