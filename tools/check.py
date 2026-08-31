@@ -764,6 +764,44 @@ def check_cached_steps_are_config_invariant(fail):
     fail.extend(_cached_step_violations(open(path, encoding='utf-8').read()))
 
 
+def _tile_change_order_violations(text):
+    """Within one chapter injector, _inject_tile_changes must follow _retarget_host_chapter.
+
+    _retarget_host_chapter ZEROES the host slot's map.changeLayerId when it repurposes the
+    slot; _inject_tile_changes is what points that field at the chapter's own map-change
+    table. Call them the other way round and the zero wins: the table is emitted and
+    registered in gChapterDataAssetTable, the slot points at entry 0, and every tile change
+    in the chapter silently never happens -- no build error, no missing symbol.
+
+    ch02 shipped exactly that (#335). Its two Targos huts could not be sacked OR closed on a
+    visit, because AiPillageAction -> StartAvailableTileEvent -> CallTileChangeEvent looks the
+    change up through GetMapChangeIdAt, which reads the layer the slot points at. A raider
+    stood on a village for twelve turns doing nothing, which reads as broken AI rather than a
+    misordered pair of injector calls.
+    """
+    msgs = []
+    for m in re.finditer(r'^def (inject_ch\w+)\(.*?(?=^def |\Z)', text, re.M | re.S):
+        name, body = m.group(1), m.group(0)
+        tile = body.find('_inject_tile_changes')
+        retarget = body.find('_retarget_host_chapter')
+        if tile == -1 or retarget == -1:
+            continue
+        if tile < retarget:
+            msgs.append(
+                '%s(): _inject_tile_changes runs BEFORE _retarget_host_chapter, which zeroes '
+                'map.changeLayerId -- the chapter\'s map-change table is emitted but the host '
+                'slot points at gChapterDataAssetTable[0], so no tile change in the chapter '
+                'ever fires (villages cannot be sacked or closed). Move the tile-change call '
+                'after the retarget.' % name)
+    return msgs
+
+
+def check_tile_changes_outlive_the_retarget(fail):
+    """A chapter's tile-change layer must survive its host retarget (#335)."""
+    path = os.path.join(REPO, 'tools', 'build_campaign.py')
+    fail.extend(_tile_change_order_violations(open(path, encoding='utf-8').read()))
+
+
 def check_injection_order(fail):
     """Injection steps run in a dependency order that used to live only in main()'s
     comments (audit 2.6): pin the documented MUST-precede pairs."""

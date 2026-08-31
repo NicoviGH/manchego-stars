@@ -140,5 +140,55 @@ class TestCachedStepsAreConfigInvariant(unittest.TestCase):
         check.check_cached_steps_are_config_invariant(fail)
         self.assertEqual(fail, [])
 
+
+# A chapter's map-change table is registered by _inject_tile_changes, which points the host
+# slot's map.changeLayerId at it -- and _retarget_host_chapter ZEROES that field when it
+# repurposes the slot. So the two calls have an order, and getting it wrong is silent: the
+# table ships, the slot points at gChapterDataAssetTable[0] instead, and every tile change in
+# the chapter simply never happens. ch02 shipped that way (#335) -- its villages could not be
+# sacked or closed because AiPillageAction's CallTileChangeEvent(GetMapChangeIdAt(...)) had no
+# layer to find. Nothing failed loudly; a village just stood through twelve turns of raiders.
+TILE_CHANGE_GOOD = """
+def inject_ch05(campaign, boot=False):
+    host = _retarget_host_chapter(CH05_HOST_INDEX, 6, 'defeat_all')
+    _inject_tile_changes('MS_Ch05MapChanges', ch05_map_changes(chap), CH05_HOST_INDEX)
+
+
+def inject_ch04(campaign):
+    _retarget_host_chapter(CH04_HOST_INDEX, 5, 'defeat_all')
+    _inject_tile_changes('MS_Ch04MapChanges', ch04_map_changes(chap), CH04_HOST_INDEX)
+"""
+
+TILE_CHANGE_BAD = """
+def inject_ch02(campaign):
+    _inject_tile_changes('MS_Ch02MapChanges', ch02_map_changes(chap, maps_dir),
+                         CH02_HOST_INDEX)
+    host = _retarget_host_chapter(CH02_HOST_INDEX, 4, 'defeat_all')
+"""
+
+
+class TestTileChangesOutliveTheRetarget(unittest.TestCase):
+    """_retarget_host_chapter zeroes map.changeLayerId, so _inject_tile_changes has to run
+    after it or the chapter's whole tile-change layer is orphaned (#335)."""
+
+    def test_tile_changes_after_the_retarget_pass(self):
+        self.assertEqual(check._tile_change_order_violations(TILE_CHANGE_GOOD), [])
+
+    def test_tile_changes_before_the_retarget_are_a_violation(self):
+        msgs = check._tile_change_order_violations(TILE_CHANGE_BAD)
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn('inject_ch02', msgs[0])
+        self.assertIn('changeLayerId', msgs[0])
+
+    def test_a_chapter_with_no_tile_changes_is_not_a_violation(self):
+        self.assertEqual(check._tile_change_order_violations(
+            "def inject_ch01(campaign):\n    _retarget_host_chapter(2, 3, 'rout')\n"), [])
+
+    def test_the_real_build_campaign_satisfies_it(self):
+        fail = []
+        check.check_tile_changes_outlive_the_retarget(fail)
+        self.assertEqual(fail, [])
+
+
 if __name__ == '__main__':
     unittest.main()

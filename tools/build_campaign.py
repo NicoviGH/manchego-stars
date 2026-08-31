@@ -8711,8 +8711,6 @@ def inject_ch02(campaign, verbose=True):
 
     # 1. Map: register the painted layout, point slot 3 at it + the winter tileset, and
     #    swap the host goal to vanilla slot-4's defeat_all template (cf. inject_ch01 step 1).
-    _inject_tile_changes('MS_Ch02MapChanges', ch02_map_changes(chap, maps_dir),
-                         CH02_HOST_INDEX)
     indices = _register_chapter_map(maps_dir, CH02_LAYOUT,
                                     'Manchego Stars ch02 layout (#22)')
     obj_idx, pal_idx, cfg_idx, layout_idx = indices
@@ -8722,6 +8720,12 @@ def inject_ch02(campaign, verbose=True):
         '(needed as the ch02 DefeatAll donor)',
         indices, chap['chapter_number'], CH02_EVENT_GROUP,
         (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG))
+    # AFTER the retarget, which zeroes map.changeLayerId (as ch03/ch04/ch05 do). Ordering this
+    # the other way emitted MS_Ch02MapChanges, registered it, and then left slot 3 pointing at
+    # gChapterDataAssetTable[0] -- so no hut could be sacked or closed, and a raider stood on a
+    # village for twelve turns doing nothing (#335). check.py pins the order for every chapter.
+    _inject_tile_changes('MS_Ch02MapChanges', ch02_map_changes(chap, maps_dir),
+                         CH02_HOST_INDEX)
 
     # 2. Rosters (events_udefs.c). Four tables, reusing vanilla Ch3 symbols (already
     #    declared in eventcall.h, so no extern surgery):

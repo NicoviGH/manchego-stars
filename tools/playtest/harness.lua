@@ -6060,14 +6060,19 @@ scenarios.clear_ch02 = function()
         end
     end
     shot("clear-ch02-ending")
-    log(string.format("charms delivered: %d/3; reached ch03=%s (chapter=%d)",
-        #best, tostring(reachedCh03), chapter()))
-    if #best < 3 then
+    -- TWO, matching CH02_CHARMS: Glimmerfrost moved into the (1,12) hut on 2026-08-30 and pays
+    -- on the visit, so only Mote's and Rime's charms arrive at the ending. The count stayed at
+    -- three through that rework, which no longer HAD a third to find -- an assertion no working
+    -- build could satisfy.
+    log(string.format("charms delivered: %d/%d; reached ch03=%s (chapter=%d)",
+        #best, #CH02_CHARMS, tostring(reachedCh03), chapter()))
+    if #best < #CH02_CHARMS then
         return result("FAIL", string.format(
-            "ch02 charm-gift broken: only %d/3 chwinga charms reached the leader/convoy", #best)) end
+            "ch02 charm-gift broken: only %d/%d chwinga charms reached the leader/convoy",
+            #best, #CH02_CHARMS)) end
     if not reachedCh03 then
         return result("FAIL", "ch02->ch03 chain broken: ending did not MNC2 into ch03 (slot 4)") end
-    result("PASS", "ch02 routed + chained into ch03; all 3 chwinga charms delivered (CHECK_ALIVE -> GIVEITEMTO)")
+    result("PASS", "ch02 routed + chained into ch03; both SURVIVOR chwinga charms delivered (CHECK_ALIVE -> GIVEITEMTO)")
 end
 
 -- recordchain: a REVIEW GIF of the ch02 -> ch03 chain in motion (#23 chaining pass). Loads the
@@ -7341,6 +7346,96 @@ end
 -- raider will not revisit. Its event id staying UNSET is the other half -- TILE_COMMAND_20
 -- changes the tile and sets nothing -- and here that is what costs Glimmerfrost her charm.
 -- Run: PT_HOST_CHAPTER=3 tools/playtest/run.sh ch02raid (needs a CH02BOOT=1 ROM).
+-- ch02aidiag -- DIAGNOSTIC (no verdict). ch02raid reported that twelve turns pass with both
+-- Targos huts standing, which puts the chapter's decoy premise in question. The engine reading
+-- (cp_decide.c sDecideFuncList) is that AI1 runs BEFORE AI2 and short-circuits it whenever it
+-- performs an action, so a raider with anything in reach never reaches the pillage script --
+-- but that is a HYPOTHESIS, and ch02raid keeps the party alive on purpose, which would pin the
+-- band by construction. This dumps the evidence instead of guessing: every red unit's LIVE
+-- ai1/ai2 (AI_CMD_SET_AI rewrites them mid-chapter, so the unit def is not the answer), its
+-- position, and how far it stands from each hut and from the nearest thing it could attack.
+--
+-- The turn-3 rear raiders are the CONTROL. They enter at (0,6)/(0,7) on the west edge with
+-- vanilla's pure pillage AI (AI_B_04), six tiles from the south hut and far from the eastern
+-- brawl. If even they never close on (1,12), then AI1 preemption does not explain the failure
+-- and the cause is structural.
+scenarios.ch02aidiag = function()
+    local HUTS = { { name = "south", x = 1, y = 12 }, { name = "east", x = 12, y = 3 } }
+    local VILLAGE_REGULAR, RUINS = 0x03, 0x25
+    if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+
+    local function dist(ax, ay, bx, by) return math.abs(ax - bx) + math.abs(ay - by) end
+
+    -- Nearest living unit the red could act on. Reds are hostile to BOTH blue and green here,
+    -- and the two chwinga stand at (10,4)/(10,5) in the middle of the raider spawn cluster --
+    -- so "nearest target" has to count them or the reading is wrong from the start.
+    local function nearestTarget(r)
+        local best, who = 99, "none"
+        for _, side in ipairs({ { "blue", SYM.gUnitArrayBlue, 62 },
+                                { "green", SYM.gUnitArrayGreen, 20 } }) do
+            for i = 0, side[3] - 1 do
+                local u = unitAt(side[2], i)
+                if u and not isDead(u) then
+                    local d = dist(r.x, r.y, u.x, u.y)
+                    if d < best then best, who = d, side[1] end
+                end
+            end
+        end
+        return best, who
+    end
+
+    local function dumpReds(label)
+        for i = 0, 49 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then
+                local ai1 = ru8(r.addr + 0x42)
+                local ai2 = ru8(r.addr + 0x44)
+                local cfg = ru16(r.addr + 0x40)
+                local ctr = ru8(r.addr + 0x46)
+                local flg = ru8(r.addr + 0x0A)
+                local td, who = nearestTarget(r)
+                log(string.format(
+                    "%s red[%02d] char=0x%02X (%2d,%2d) hp=%2d ai1=0x%02X ai2=0x%02X cfg=0x%04X "
+                    .. "ctr=%d flags=0x%02X | south=%2d east=%2d | nearest %s=%d",
+                    label, i, r.charId, r.x, r.y, r.hp, ai1, ai2, cfg, ctr, flg,
+                    dist(r.x, r.y, HUTS[1].x, HUTS[1].y),
+                    dist(r.x, r.y, HUTS[2].x, HUTS[2].y), who, td))
+            end
+        end
+    end
+
+    log("ch02aidiag: ai2 legend -- 0x00 MoveToEnemy, 0x03 NeverMove, 0x04 PillageThenPursue,")
+    log("ch02aidiag:              0x11 PillageThenPursueAfterOneTurn, 0x12 MoveToEnemyAfterOneTurn")
+    for _, h in ipairs(HUTS) do
+        log(string.format("ch02aidiag: hut %s (%d,%d) terrain 0x%02X at turn 1",
+            h.name, h.x, h.y, terrainAt(h.x, h.y)))
+    end
+
+    -- Same conditions ch02raid ran under -- the party is kept alive -- so this explains THAT
+    -- run rather than a different one. The control is the reinforcement pair, not the party.
+    for t = 1, 12 do
+        for i = 0, 61 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) then emu:write8(u.addr + 0x13, 60) end
+        end
+        log(string.format("---- turn %d (before enemy phase) ----", turn()))
+        dumpReds("PRE ")
+        local phase = runEnemyPhase()
+        if phase == nil then log("ch02aidiag: the enemy phase never returned") break end
+        if phase == "gameover" then log("ch02aidiag: gameover despite the party being kept alive") break end
+        dumpReds("POST")
+        for _, h in ipairs(HUTS) do
+            local tr = terrainAt(h.x, h.y)
+            log(string.format("ch02aidiag: hut %s terrain 0x%02X%s", h.name, tr,
+                tr == RUINS and "  <-- SACKED" or ""))
+        end
+    end
+    return result("PASS", "diagnostic: see the per-turn red AI dump above")
+end
+
 scenarios.ch02raid = function()
     -- targos-hut-south: the contested one. The rear raiders spawn at (0,6)/(0,7) on turn 3
     -- with pillage AI and it is the nearest lootable terrain to them.
