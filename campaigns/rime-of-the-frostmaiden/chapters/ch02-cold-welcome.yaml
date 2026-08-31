@@ -322,23 +322,36 @@ villages:
     visit_reward:
       - id: pure-water         # ITEM_PUREWATER 0x6E -- vanilla's item, unmoved
         amount: 1
-    # PLACEHOLDER -- pending /dialogue-pass, co-written with Nicolas like every other ch02
-    # scene. The beat to write is vanilla's 0x96C: "B-bandits?! Spread the word, everyone!
-    # Close the village gates!" This is the CONTESTED tile (the rear raiders spawn at
-    # (0,6)/(0,7)), so the alarm sits exactly where it does its teaching.
+    # LOCKED 2026-08-30 (dialogue-pass with Nicolas). Boxes 1-3 are vanilla's own MSG_96C,
+    # WORD FOR WORD -- this is the contested tile and vanilla already wrote the alarm that
+    # belongs on it. Box 4's first line is vanilla's too; only its second line moves, because
+    # the token is Glimmerfrost's to give. Her box is the one piece of new writing, and it is
+    # wordless: chwinga never speak (lore/sclorbo.md -- "NO quoted speech, ever") and have no
+    # face to emote with, so she acts and the text reports it.
     visit_text:
-      - "(placeholder) Bandits on the road! Get inside and bar the door!"
-      - "(placeholder) Here -- take this. You'll need it more than I will." 
+      - resident: "Hm? What is it? What's all the ruckus?"
+      - resident: "What? B-bandits?!"
+      - resident: "Spread the word, everyone! Close the village gates!"
+      - resident: "Thank you for your warning. The little one has a token for you."
+      - chwinga-glimmer: "(A snow-spirit unfolds from under the table and presses meltwater on you.)" 
     note: >
       The contested one. Reaching Glimmerfrost before the raiders do is the third charm --
       the same soft-fail as losing a chwinga on the field, measured a different way.
   - id: targos-hut-east
     tile: [12, 3]              # vanilla's unbacked fourth village-terrain cell
     visit_reward: []           # no item: ch02's wealth is fixed at three and all three are spoken for
-    # PLACEHOLDER -- pending /dialogue-pass. One Targos voice; the precedent for a
-    # reward-free village is ch04's forest-cottage ("the line is the reward").
+    # LOCKED 2026-08-30 (dialogue-pass with Nicolas). An INFORMATION house, in vanilla's own
+    # reward-free shape (MSG_93B: situation -> how it works -> what to do). A village that
+    # gives nothing is a let-down, and ch02's wealth is fixed at three items with all three
+    # spoken for -- so this pays in the one fact the chapter never states anywhere else:
+    # THE CHWINGA REPAY YOU. Vanilla tells the player Ross and Garcia can be recruited, which
+    # is why defending them is worth doing; nothing told ours that the spirits give charms.
+    # Not duplicated: ch01's houses teach fort terrain and the boss counter, RBG's turn-1 line
+    # teaches fliers-vs-bows, and Halvar's turn-1 bark announces the raid's target.
     visit_text:
-      - "(placeholder) You'd best not linger. Nothing out here but cold and worse." 
+      - resident: "Those little masked ones out on the road --"
+      - resident: "Show them a kindness and they don't forget it."
+      - resident: "They pay in charms. Small things, but good ones." 
     note: >
       A decoy with a line. It sits on the eastern route, so it pulls pillaging raiders off
       the crossing without paying a second time.
@@ -412,6 +425,16 @@ events:
       #  then glances to Pinky on the wing.)
       - prof-rbg: "Um, actually, Pinky — mind that bowman. Wings and arrows don't mix; he'll make Swiss cheese of you. Keep well clear."
       - pinky: "...Okay, Father. I'll be careful."
+      # ADDED 2026-08-30 (dialogue-pass). Vanilla Ch2 pairs its bow warning and its raid
+      # announcement in the SAME opening scene -- "Keep an eye out for enemy bowmen though,
+      # Vanessa" and Bone's MSG_957. We kept the first and dropped the second, which left the
+      # huts unreadable: nothing told the player they were the raid's target, so losing one
+      # read as a bug rather than a consequence. This is Bone's bark VERBATIM. It belongs
+      # here and not in a hut, because a warning you must walk into arrives too late to act
+      # on (Nicolas, 2026-08-30).
+      - halvar: "Let's start with that village there! Go to it, boys! It's all yours."
+      - halvar: "Cut down anyone fool enough to get in your way."
+      - halvar: "I'm heading west around the mountains to the other villages."
   - trigger: turn_start
     turn: 3
     type: reinforcement

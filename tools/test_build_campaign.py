@@ -1910,7 +1910,8 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_the_village_line_is_vanillas_own_snag_tutorial(self):
         """Nicolas 2026-08-02: copy vanilla 1:1. The line exists to teach the snag gimmick and
         hand over the tool -- a flavour line throws the function away."""
-        text = ' '.join(bc.village_boxes(self._chap()['villages'][0]))
+        text = ' '.join(line for _who, line in
+                        bc.village_boxes(self._chap()['villages'][0]))
         self.assertIn('snag', text)
         self.assertIn('bridge', text)
         self.assertNotIn('husband', text)   # the placeholder draft this replaces
@@ -1967,7 +1968,7 @@ class Ch04RuntimeHost(unittest.TestCase):
         """A village line is dialogue: its A-press breaks are authored, not a side effect of
         where a 42-column wrap happens to land. One YAML entry == one GBA box."""
         for village in self._chap()['villages']:
-            for box in bc.village_boxes(village):
+            for _who, box in bc.village_boxes(village):
                 lines = bc._wrap_fe_lines(bc._fe_dialogue_text(box))
                 self.assertLessEqual(len(lines), 2,
                                      'box overflows its A-press in %r (%dpx): %r'
@@ -1978,7 +1979,8 @@ class Ch04RuntimeHost(unittest.TestCase):
         """Vanilla's MSG_9B5 is FOUR boxes, each broken on a sentence. Flowed as one scalar
         ours reflowed to THREE and buttoned mid-sentence ("a handy bridge if / you could knock
         it over") -- 1:1 in words but not on screen, which is not what 1:1 was asked for."""
-        boxes = bc.village_boxes(self._chap()['villages'][0])
+        boxes = [line for _who, line in
+                 bc.village_boxes(self._chap()['villages'][0])]
         self.assertEqual(4, len(boxes))
         self.assertTrue(boxes[0].rstrip().endswith('south of here?'), boxes[0])
         self.assertTrue(boxes[1].rstrip().endswith('knock it over.'), boxes[1])
@@ -1988,7 +1990,8 @@ class Ch04RuntimeHost(unittest.TestCase):
         the DM notes -- "the frost druids did visit, but were largely ignored by villagefolk"
         -- and the book's Ravisin, who "won't rest until the forest is free of loggers". She
         is never NAMED here: the ending owns the chapter's one Ravisin seed (2026-07-03 cut)."""
-        text = ' '.join(bc.village_boxes(self._chap()['villages'][1]))
+        text = ' '.join(line for _who, line in
+                        bc.village_boxes(self._chap()['villages'][1]))
         self.assertIn('White furs', text)
         self.assertIn('southeast', text)
         self.assertNotIn('Ravisin', text)
@@ -2126,7 +2129,7 @@ class Ch05ReliquaryVisits(unittest.TestCase):
         chap = self._chap()
         total = 0
         for village in chap['villages']:
-            boxes = bc.village_boxes(village)
+            boxes = [line for _who, line in bc.village_boxes(village)]
             self.assertEqual(len(boxes), len(village['visit_text']))
             for box in boxes:
                 self.assertLessEqual(len(textwrap.wrap(box, 42)), 2,
@@ -4908,6 +4911,104 @@ def _ch05_ending(chap):
     match if the unit happened to still be wearing it.
     """
     return bc.ch05_ending_script(chap, 'CHARACTER_ARTUR', 'CHARACTER_MARISA')
+
+
+class PerPositionAiReachesTheEmittedRows(unittest.TestCase):
+    """#335: an entry with one donor PER POSITION must emit those distinct AIs.
+
+    This is a regression test for a real bug, caught by the output diff and not by any unit
+    test: every injector called `enemy_ai_initialiser(chap, enemy)` without the position
+    index, so all eight of ch05's tomb-reavers shipped their FIRST donor's AI. The YAML was
+    right, the resolver was right, the tests were green, and the ROM got eight identical
+    holders -- exactly the flattening the per-position donors exist to prevent."""
+
+    def _chap(self, stem):
+        import glob
+        path = glob.glob(os.path.join(
+            bc.REPO, 'campaigns/rime-of-the-frostmaiden/chapters', stem + '*.yaml'))[0]
+        with open(path, encoding='utf-8') as source:
+            return bc._yaml_load(source)
+
+    def test_ch05_tomb_reavers_emit_three_distinct_behaviours(self):
+        chap = self._chap('ch05')
+        rows = '\n'.join(bc.ch05_enemy_rows(chap, exclude=('sahnar',)))
+        reaver_ais = re.findall(r'tomb-reaver -- .*?\n(?:.*?\n)*?\s*\.ai = (\{[^}]*\})',
+                                rows)
+        self.assertEqual(8, len(reaver_ais), 'expected eight tomb-reavers')
+        self.assertEqual({'{0x0, 0x3, 0x9, 0x0}', '{0x0, 0x0, 0x9, 0x0}',
+                          '{0x0, 0x12, 0x9, 0x0}'}, set(reaver_ais))
+
+    def test_ch01_spears_and_axes_each_ship_one_delayed_charger(self):
+        chap = self._chap('ch01')
+        spear = next(e for e in chap['enemy_units'] if e['id'] == 'goblin-spear')
+        axe = next(e for e in chap['enemy_units'] if e['id'] == 'goblin-axe')
+        import difficulty
+        self.assertEqual(1, sum(1 for i in range(3)
+                                if difficulty.enemy_ai_bytes(chap, spear, i)[1] == 0x12))
+        self.assertEqual(1, sum(1 for i in range(3)
+                                if difficulty.enemy_ai_bytes(chap, axe, i)[1] == 0x12))
+class SetMessageBodyReplacesTheWholeBody(unittest.TestCase):
+    """A message body runs to the NEXT header, not to the first blank line.
+
+    74 vanilla messages contain a mid-body blank line -- a scene with a [BreakTalk] between
+    stanzas. Stopping at the first blank replaced only the opening stanza and left the rest
+    of vanilla's scene sitting inside our message: ch02's Halvar bark took MSG_AC2 and kept
+    Ephraim and Duessel discussing the Dark Stone underneath it. The ROM decoder stops at our
+    [X] so verify_text saw nothing, which is exactly what makes it worth a test.
+    """
+
+    def _doc(self):
+        return ['## MSG_001', 'first line', '', 'second stanza', 'third line', '',
+                '## MSG_002', 'untouched', '']
+
+    def test_a_body_with_a_blank_line_is_fully_replaced(self):
+        lines = self._doc()
+        bc.set_message_body(lines, 0x001, 'NEW[X]')
+        self.assertEqual(['## MSG_001', 'NEW[X]', '', '## MSG_002', 'untouched', ''], lines)
+
+    def test_the_next_message_is_untouched(self):
+        lines = self._doc()
+        bc.set_message_body(lines, 0x001, 'NEW[X]')
+        self.assertEqual('untouched', lines[lines.index('## MSG_002') + 1])
+
+    def test_a_simple_body_still_round_trips(self):
+        lines = ['## MSG_001', 'old', '', '## MSG_002', 'keep', '']
+        bc.set_message_body(lines, 0x001, 'new')
+        self.assertEqual(['## MSG_001', 'new', '', '## MSG_002', 'keep', ''], lines)
+
+    def test_replacing_the_last_message_does_not_run_off_the_end(self):
+        lines = ['## MSG_001', 'old', '', 'more', '']
+        bc.set_message_body(lines, 0x001, 'new')
+        self.assertEqual(['## MSG_001', 'new', ''], lines)
+
+
+class VillageBoxSpeakers(unittest.TestCase):
+    """`visit_text` may name a speaker per box, the same `- who: "line"` form the chapter
+    scene scripts already use. ch02's south hut needs it: the resident carries vanilla's
+    alarm and Glimmerfrost hands over the token, and she cannot be given the resident's
+    face -- chwinga have their own bust and never speak."""
+
+    def test_a_plain_string_belongs_to_the_default_speaker(self):
+        # ch04/ch05 author flat strings and must keep working untouched.
+        self.assertEqual([('resident', 'Line one.'), ('resident', 'Line two.')],
+                         bc.village_boxes({'id': 'v', 'visit_text': ['Line one.',
+                                                                     'Line two.']}))
+
+    def test_a_mapping_names_its_speaker(self):
+        boxes = bc.village_boxes({'id': 'v', 'visit_text': [
+            {'resident': 'What? B-bandits?!'},
+            {'chwinga-glimmer': '(It presses meltwater on you.)'}]})
+        self.assertEqual([('resident', 'What? B-bandits?!'),
+                          ('chwinga-glimmer', '(It presses meltwater on you.)')], boxes)
+
+    def test_a_box_naming_two_speakers_is_refused(self):
+        # One box is one A-press by one person; two keys would silently drop a line.
+        with self.assertRaises(SystemExit):
+            bc.village_boxes({'id': 'v', 'visit_text': [{'a': 'x', 'b': 'y'}]})
+
+    def test_a_flowed_scalar_is_still_refused(self):
+        with self.assertRaises(SystemExit):
+            bc.village_boxes({'id': 'v', 'visit_text': 'one long flowed line'})
 
 
 class MessageBlockPool(unittest.TestCase):

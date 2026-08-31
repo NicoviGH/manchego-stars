@@ -425,10 +425,8 @@ CH02_VILLAGE_CHWINGA = 'chwinga-glimmer'
 # the protected greens while the player crosses to reach them.
 #   id                  event script          msg     mug                       backdrop
 CH02_VILLAGE_SLOTS = {
-    # Glimmerfrost speaks with the green chwinga bust -- CH02_CHWINGA_PORTRAIT_SLOT dresses
-    # MANSEL's slot with it, so this is her own face, not a villager stand-in.
-    'targos-hut-south': ('EventScr_089F15A0', 0xAC0, '[FID_Mansel]', CH02_OPENING_BG),
-    'targos-hut-east':  ('EventScr_089F1658', 0xAC1, CH02_FISHER_FID,  CH02_OPENING_BG),
+    'targos-hut-south': ('EventScr_089F15A0', 0xAC0, '[FID_VillagerWoman]', CH02_OPENING_BG),
+    'targos-hut-east':  ('EventScr_089F1658', 0xAC1, '[FID_VillagerMan3]', CH02_OPENING_BG),
 }
 # Dead vanilla Ch3 scripts (slot 3 is ch02's host and inject_ch02 blanks its event lists).
 # 0xAC0/0xAC1 are the first two ids of ch02's block -- it had none until the pool widened.
@@ -437,6 +435,10 @@ CH02_VILLAGE_SLOTS = {
 # the same eid on the destruction LOCA), and -- for the south hut -- answers whether
 # Glimmerfrost was reached in time to hand over her charm. ch02 sets no other event flag, so
 # 9 and 10 are free (checked: no ENUT/CHECK_EVENTID anywhere in its host).
+# The mug each hut's RESIDENT wears. A chwinga inhabitant brings her own -- see
+# CH02_CHWINGA_PORTRAIT_SLOT, which dresses MANSEL's slot with the green bust, so
+# Glimmerfrost speaks (wordlessly) with her own face rather than a villager stand-in.
+# Three distinct villager mugs across the chapter: these two plus the ending's fisher.
 CH02_VILLAGE_FLAGS = {
     'targos-hut-south': 'EVFLAG_TMP(9)',
     'targos-hut-east':  'EVFLAG_TMP(10)',
@@ -510,7 +512,11 @@ CH02_CHWINGA_GLOW_RECOLOR = {
 # 1. Ending (Targos): card + 4 beats. Boss death quote: 1.
 CH02_OPENING_CARD_MSG = 0x98b
 CH02_OPENING_MSGS = (0x98c, 0x98e, 0x98d)     # A (Vellynne/RBG), B (Meesmickle/Braulo), C (chwinga: Sclorbo's kin + Marty)
-CH02_TUTORIAL_MSGS = (0x98f, 0x991)           # turn-1 fliers-vs-bows debut: RBG warns flier Pinky / Pinky
+# The turn-1 scene's messages, one per beat. The first two are the fliers-vs-bows debut
+# (RBG warns flier Pinky, Pinky answers); the last three are Halvar's raid bark -- vanilla
+# Ch2's own MSG_957, verbatim, pairing the warning with the announcement exactly as vanilla's
+# opening does. 0xAC2-0xAC4 come from ch02's block.
+CH02_TURN1_MSGS = (0x98f, 0x991, 0xAC2, 0xAC3, 0xAC4)
 CH02_BARK_MSG = 0x990                         # Wolfram's turn-3 rear-ambush bark (over map)
 CH02_ENDING_CARD_MSG = 0x995
 CH02_ENDING_MSGS = (0x996, 0x997, 0x998, 0x999)  # A fisher, B Rootis, C narration(#58), D RBG
@@ -1252,7 +1258,15 @@ def name_message_body(name):
 
 def set_message_body(lines, msg_id, body, create=False):
     """Replace the content lines of `## MSG_<id>` with `body` (in place). Idempotent:
-    matches the header and rewrites whatever non-blank lines follow it.
+    matches the header and rewrites everything up to the NEXT header.
+
+    Up to the next HEADER, not to the first blank line. 74 vanilla messages carry a mid-body
+    blank -- a scene with a [BreakTalk] between stanzas -- and stopping at it replaced only
+    the opening stanza, leaving the rest of vanilla's scene inside our message. ch02's Halvar
+    bark took MSG_AC2 and kept Ephraim and Duessel discussing the Dark Stone underneath it.
+    Nothing caught it: our body ends in [X], so the ROM decoder stops there and `verify_text`
+    reported no runaway. It was dead text in the table and a trap for the next id claimed out
+    of the 74.
 
     `create` APPENDS the header when it does not exist, for an id past the last vanilla message
     (MSG_D4B). gMsgTable[] is generated from this file and self-sizes, so a new trailing header
@@ -1263,10 +1277,10 @@ def set_message_body(lines, msg_id, body, create=False):
     for i, line in enumerate(lines):
         if line.strip() == header:
             j = i + 1
-            while j < len(lines) and lines[j].strip() != '' \
-                    and not lines[j].lstrip().startswith('#'):
+            while j < len(lines) and not lines[j].lstrip().startswith('## MSG_'):
                 j += 1
-            lines[i + 1:j] = [body]
+            # Keep one blank line before the next header, as the file is formatted.
+            lines[i + 1:j] = [body, '']
             return True
     if not create:
         sys.exit('ERROR: message header %r not found in %s' % (header, TEXTS_TXT))
@@ -8677,12 +8691,13 @@ def inject_ch02(campaign, verbose=True):
                 if e.get('trigger') == 'turn_start' and e.get('turn') == 3)['script']
     tutorial = next(e for e in chap['events']
                     if e.get('trigger') == 'turn_start' and e.get('turn') == 1)['script']
-    if len(tutorial) != len(CH02_TUTORIAL_MSGS):
+    if len(tutorial) != len(CH02_TURN1_MSGS):
         sys.exit('ERROR: ch02 turn-1 tutorial has %d lines; expected %d '
-                 '(zip would silently drop the extra)' % (len(tutorial), len(CH02_TUTORIAL_MSGS)))
+                 '(zip would silently drop the extra)' % (len(tutorial), len(CH02_TURN1_MSGS)))
 
     cut_special = {
         'narration': None,                         # faceless stage-business box (#58)
+        'halvar': _fid_tag(CH02_BOSS_SLOT),        # the raider captain, on the Bazba slot
         'vellynne': _fid_tag(CH02_VELLYNNE_SLOT),  # recurring NPC: placeholder face (#19)
         'targos-fisher': CH02_FISHER_FID,          # generic villager mug
     }
@@ -8882,9 +8897,12 @@ def inject_ch02(campaign, verbose=True):
          'B -- Meesmickle & Braulo react to the corpse-sled',
          'C -- Sclorbo meets his chwinga kin; Marty offers a Chagaccino'])
     tut_text_calls = _scenic_beat_calls(
-        CH02_TUTORIAL_MSGS, [[ln] for ln in tutorial],
+        CH02_TURN1_MSGS, [[ln] for ln in tutorial],
         ['RBG warns flier Pinky off the archer (fliers-vs-bows debut)',
-         'Pinky takes it to heart'])
+         'Pinky takes it to heart',
+         "Halvar sends the band at the huts (vanilla MSG_957 verbatim)",
+         'Halvar: cut down anyone in the way',
+         'Halvar takes the far hut himself'])
     end_text_calls = _scenic_beat_calls(
         CH02_ENDING_MSGS, end_beats,
         ['A -- the Targos fisher warns them off the frozen body',
@@ -9003,9 +9021,18 @@ def inject_ch02(campaign, verbose=True):
     # Glimmerfrost speaks with the green chwinga bust; the east hut takes a villager mug.
     for village in chap.get('villages', []):
         _symbol, msg, fid, _bg = CH02_VILLAGE_SLOTS[village['id']]
+        # Two voices in the south hut: the resident carries vanilla's alarm, and the chwinga
+        # sheltering under his table hands the token over. She takes the OPPOSITE side of the
+        # screen so the hand-off reads as two people, which is what vanilla's own multi-speaker
+        # village (MSG_969: villager, Eirika, Selena) does.
+        speakers = {DEFAULT_VILLAGE_SPEAKER: ('[OpenMidLeft]', fid)}
+        guest = village.get('inhabitant')
+        if isinstance(guest, dict):
+            speakers[guest['id']] = (
+                '[OpenMidRight]',
+                '[FID_%s]' % CH02_CHWINGA_PORTRAIT_SLOT[dict(CH02_CHWINGA)[guest['id']]])
         set_message_body(lines, msg, _script_to_message(
-            [{'villager': box} for box in village_boxes(village)],
-            {'villager': ('[OpenMidLeft]', fid)}))
+            [{who: line} for who, line in village_boxes(village)], speakers))
     # Boss/miniboss ride vanilla slots (Bazba/Bone) -- rename their name plates to ours,
     # or the vanilla "Bazba"/"Bone" leaks on the unit window + death quote (cf. inject_ch01,
     # which renames its Breguet boss slot). display_name uses the YAML fe_name (<=12).
@@ -9025,8 +9052,8 @@ def inject_ch02(campaign, verbose=True):
                      goal_window_body('Defeat enemy'))
     set_message_body(lines, CH02_OPENING_CARD_MSG, name_message_body(op_card))
     _emit_scene_beats(lines, CH02_OPENING_MSGS, op_beats, cut_fid, op_home)
-    # Turn-1 fliers-vs-bows tutorial: one portrait box per line (RBG, then Pinky), Text_BG 42-wrap.
-    for msg_id, ln in zip(CH02_TUTORIAL_MSGS, tutorial):
+    # The turn-1 scene: one portrait box per line -- RBG, Pinky, then Halvar's three-box bark.
+    for msg_id, ln in zip(CH02_TURN1_MSGS, tutorial):
         set_message_body(lines, msg_id, _script_to_message(
             [ln], _stage_beat([ln], cut_fid, op_home)))
     # Wolfram's rear-ambush bark, shown over the map (29-tile bubble wrap via
@@ -10030,6 +10057,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # The goal window/status predate the block registry and sit outside it; the two Targos
     # hut visits are ch02's first claims from the block it gained when the pool widened.
     'ch02': (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG,
+             *CH02_TURN1_MSGS,
              *(msg for _sym, msg, _fid, _bg in CH02_VILLAGE_SLOTS.values())),
 }
 
@@ -10396,6 +10424,11 @@ def village_reward_item(village, item_ids):
     return item_ids[reward] if reward else None
 
 
+# Whom a bare `visit_text` string belongs to. ch04/ch05 author flat lists with one voice;
+# ch02's south hut needs two, so a box may instead be `- who: "line"`.
+DEFAULT_VILLAGE_SPEAKER = 'resident'
+
+
 def village_boxes(village):
     """A village's line, as the GBA boxes it was AUTHORED in -- one `visit_text` entry per
     A-press.
@@ -10412,7 +10445,19 @@ def village_boxes(village):
         sys.exit('ERROR: village %r must author `visit_text` as a LIST -- one entry per GBA '
                  'box. A flowed scalar reflows at the wrap width and puts the A-press breaks '
                  'mid-sentence.' % village['id'])
-    return [' '.join(box.split()) for box in text]
+    boxes = []
+    for box in text:
+        if isinstance(box, dict):
+            # `- who: "line"` -- the same form the chapter scene scripts use. Two keys in one
+            # box would be two speakers sharing an A-press, which drops a line on the floor.
+            if len(box) != 1:
+                sys.exit('ERROR: village %r has a visit_text box naming %d speakers; one box '
+                         'is one A-press by one person' % (village['id'], len(box)))
+            who, line = next(iter(box.items()))
+        else:
+            who, line = DEFAULT_VILLAGE_SPEAKER, box
+        boxes.append((who, ' '.join(line.split())))
+    return boxes
 
 
 def location_events(villages, village_slots, shops=(), flags=None):
@@ -12152,8 +12197,8 @@ def inject_ch04(campaign, boot=False, verbose=True):
     for village in chap['villages']:
         _symbol, msg, fid, _bg = CH04_VILLAGE_SLOTS[village['id']]
         set_message_body(lines, msg, _script_to_message(
-            [{'villager': box} for box in village_boxes(village)],
-            {'villager': ('[OpenMidLeft]', fid)}))
+            [{who: line} for who, line in village_boxes(village)],
+            {DEFAULT_VILLAGE_SPEAKER: ('[OpenMidLeft]', fid)}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.4: ' + chap['title'])
@@ -13494,8 +13539,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     for village in chap['villages']:
         _symbol, msg, fid = CH05_VILLAGE_SLOTS[village['id']]
         set_message_body(lines, msg, _script_to_message(
-            [{'resident': box} for box in village_boxes(village)],
-            {'resident': ('[OpenMidLeft]', fid)}))
+            [{who: line} for who, line in village_boxes(village)],
+            {DEFAULT_VILLAGE_SPEAKER: ('[OpenMidLeft]', fid)}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.5: ' + chap['title'])
