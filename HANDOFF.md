@@ -29,9 +29,11 @@ which is what every other chapter always did; the retired identifier is in `DEAD
 Reasoning: `docs/decisions.md` -> *"A reskin is resolved by its SLOT, never by the class it
 clones"*. **ch06's five reskins can now be wired without stealing a base from ch05.**
 
-⚠️ **Nobody has LOOKED at a goblin yet.** The emitted data is right and pinned by tests, but
-this bug's defining trait is that no data-level check could see it -- twelve days of green
-suites while ch01 fought as skeletons. The proof is a human eye on ch01, not a matrix run.
+**Confirmed by eye, in canonical ch01** (2026-09-02): a red horned Fire Imp on the snow, and
+class 0x6A filmed on the `recordenemy` bench swings an Iron Lance as a Fire Imp. Both halves
+of the look, since `SMSId` and `pBattleAnimDef` hang off the same class entry. Getting that
+look cost a canonical build plus a prologue playthrough, because **ch01 has no debug
+boot** -- filed as **#353**.
 
 **Two conventions landed 2026-09-02**, both ADRs in `docs/decisions.md`: *"`/code-review` is
 the review step, and the author never reviews their own PR"* (#349) and *"A guard that stops
@@ -58,8 +60,20 @@ content. Read the issue for scope, the boards for reasoning.
 
 ## Next task
 
-**ch06 enemy POSITIONS -- bring Nicolas a render first** (2-3 concept options, not a finished
-map). #347 is done, so the reskin convention no longer blocks ch06's roster art.
+**Messie's map sprite is IN PROGRESS and it is NICOLAS'S** (taken back 2026-08-26). Claude
+drew a starting concept 2026-09-02 -- full body, four flippers, neck arcing over, 3-frame
+idle, 32x96 indexed on the cast palette -- and Nicolas is painting from there in
+`tools/map_sprite_editor.py --campaign rime-of-the-frostmaiden --extra messie=Gargoyle`.
+`map_sprites/messie.png` is UNTRACKED on purpose; do not commit it without him.
+
+⚠️ **His reference is the WHOLE animal, which contradicts ch06's `art_note`** (head-and-neck
+only, the rest painted into the tilemap, recorded 2026-08-26). One of the two has to win.
+**Do not rewrite that note until Nicolas settles the art** -- it is his decision, not a
+drafting error. He is also not yet wired in: Messie needs an `art.map_sprite` block and an
+SMS id before he appears in game.
+
+Then **ch06 enemy POSITIONS -- bring Nicolas a render first** (2-3 concept options, not a
+finished map). #347 is done, so the reskin convention no longer blocks ch06's roster art.
 
 Everything that decision answers to -- the measured map geometry, why neither vanilla source
 transfers, the three jobs placement must serve, the donor rule that replaced `CH06_AI`, and the
