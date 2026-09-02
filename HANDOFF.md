@@ -22,12 +22,21 @@ Landed green on a full `SUITE=all --jobs 1` run at the stack tip: **50/50 PASS, 
 (`harness.lua` changed, so nothing was served from the verdict cache and every scenario really
 ran), 6 builds, 27m25s.
 
-**#347 landed 2026-09-02 (#348, squashed).** ch01's goblins were shipping as ch05's
-skeletons -- and, because `SMSId` and `pBattleAnimDef` are fields of the same class entry,
-with the skeleton battle anim too. A skin is now resolved by its SLOT, which is what every
-other chapter always did; the retired identifier is in `DEAD_CONCEPTS`. Reasoning:
-`docs/decisions.md` -> *"A reskin is resolved by its SLOT, never by the class it clones"*.
-**ch06's five reskins can now be wired without stealing a base from ch05.**
+**#347 landed 2026-09-02 (#348), with #350 cleaning up after it.** ch01's goblins were
+shipping as ch05's skeletons -- and, because `SMSId` and `pBattleAnimDef` are fields of the
+same class entry, with the skeleton battle anim too. A skin is now resolved by its SLOT,
+which is what every other chapter always did; the retired identifier is in `DEAD_CONCEPTS`.
+Reasoning: `docs/decisions.md` -> *"A reskin is resolved by its SLOT, never by the class it
+clones"*. **ch06's five reskins can now be wired without stealing a base from ch05.**
+
+⚠️ **Nobody has LOOKED at a goblin yet.** The emitted data is right and pinned by tests, but
+this bug's defining trait is that no data-level check could see it -- twelve days of green
+suites while ch01 fought as skeletons. The proof is a human eye on ch01, not a matrix run.
+
+**Two conventions landed 2026-09-02**, both ADRs in `docs/decisions.md`: *"`/code-review` is
+the review step, and the author never reviews their own PR"* (#349) and *"A guard that stops
+guarding fails silently, and green is what that looks like"* (#351, the durable lesson from
+the stack's two Criticals).
 
 **#26 stays open**: the map and the roster are done, the chapter is not.
 
