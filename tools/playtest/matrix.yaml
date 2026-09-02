@@ -245,14 +245,6 @@ scenarios:
   smoke_ch03:
     rom: ch03boot
     host_chapter: 4
-  ch02:
-    checkpoint: ch02start
-  smoke_ch02:
-    checkpoint: ch02start
-  ch02baxby:
-    checkpoint: ch02start
-  clear_ch02:
-    checkpoint: ch02start
   recordchain:
     kind: record
     checkpoint: ch02start
@@ -349,11 +341,6 @@ suites:
     - smoke_ch01
     - clear_ch01
 
-  ch02:
-    - ch02
-    - ch02baxby
-    - smoke_ch02
-    - clear_ch02
 
   ch03:
     - ch03

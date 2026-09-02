@@ -516,6 +516,30 @@ class VanillaUnitDestinations(unittest.TestCase):
         self.assertEqual([], [p for p in ours if p not in posts])
 
 
+class GreenDonors(unittest.TestCase):
+    """A donor may name a unit of any allegiance, defaulting to RED.
+
+    Our protected greens have vanilla counterparts too -- ch02's chwinga stand in for Ross
+    and Garcia -- and their AI is as much a design decision as an enemy's. Garcia runs
+    {AttackInRangeAI, 0, 0}: strike anything that reaches him, never leave his tile. Reading
+    only the red force would leave the units the chapter is ABOUT ungrounded."""
+
+    def test_a_green_donor_resolves(self):
+        garcia = df.resolve_donor('FE8 Ch2', {'at': [10, 4], 'allegiance': 'GREEN'})
+        self.assertEqual(garcia['charIndex'], 'CHARACTER_GARCIA')
+        self.assertEqual(garcia['ai'], (0x00, 0x03, 0x00, 0x00))
+
+    def test_red_is_still_the_default(self):
+        # (10,4) holds Garcia (green) and nothing red, so an unqualified spec must miss.
+        with self.assertRaises(ValueError):
+            df.resolve_donor('FE8 Ch2', [10, 4])
+
+    def test_the_two_greens_are_distinguishable_by_post(self):
+        ross = df.resolve_donor('FE8 Ch2', {'at': [10, 5], 'allegiance': 'GREEN'})
+        self.assertEqual(ross['charIndex'], 'CHARACTER_ROSS')
+        self.assertNotEqual(ross['ai'], (0x00, 0x03, 0x00, 0x00))
+
+
 class ChapterEnemyForce(unittest.TestCase):
     def test_expands_count_and_composition_into_per_unit_force(self):
         chap = {'enemy_units': [

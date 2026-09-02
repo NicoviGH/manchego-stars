@@ -453,6 +453,22 @@ def ai_bytes(spec):
     return tuple((out + [0, 0, 0, 0])[:4])
 
 
+# parity_reference -> (decomp relpath, [UnitDefinition arrays]) for its vanilla GREEN units
+# (#335). Greens are the units a "protect" chapter is ABOUT, and their AI is a design decision
+# as much as an enemy's -- vanilla Ch2 gives Garcia {AttackInRangeAI, 0, 0} (hold the tile and
+# strike what reaches him) and Ross the scripted-approach AI_B_0A. Curated as references need
+# them, like the red and ally registries above.
+PARITY_REFERENCE_GREEN_UDEFS = {
+    'FE8 Ch2': ('src/events_udefs.c', ['UnitDef_088B4434']),   # Ross + Garcia
+}
+
+
+def _udef_registry(allegiance):
+    return {'RED': PARITY_REFERENCE_UDEFS,
+            'BLUE': PARITY_REFERENCE_ALLY_UDEFS,
+            'GREEN': PARITY_REFERENCE_GREEN_UDEFS}[allegiance]
+
+
 def _brace_entries(body):
     """Yield each top-level `{...}` group's inner text from an array body, tracking brace
     depth so a unit's nested `.items = {...}` / `.ai = {...}` don't split it early."""
@@ -526,6 +542,23 @@ def vanilla_unit_defs(text, array_name):
     return out
 
 
+def vanilla_units(parity_ref, allegiance='RED'):
+    """Every UnitDefinition of one allegiance in the twin, parsed. None if uncurated.
+
+    RED by default because that is the force the difficulty math grades. GREEN matters for
+    donors: our protected units have vanilla counterparts too (ch02's chwinga stand in for
+    Ross and Garcia), and their AI is as much a design decision as an enemy's."""
+    spec = _udef_registry(allegiance).get(parity_ref)
+    if spec is None:
+        return None
+    relpath, arrays = spec
+    text = bc.vanilla_decomp_text(relpath)
+    want = 'FACTION_ID_%s' % allegiance
+    return [d for array_name in arrays
+            for d in vanilla_unit_defs(text, array_name)
+            if d['allegiance'] == want]
+
+
 def vanilla_red_units(parity_ref):
     """Every RED UnitDefinition in the twin, parsed. None if the reference isn't curated.
 
@@ -560,16 +593,16 @@ def resolve_donor(parity_ref, spec):
     Disagreement RAISES rather than taking the first match. Vanilla Ch2 puts an archer and a
     brigand both on (14,7) with different AI, and a silent first-match would borrow the wrong
     behaviour while looking perfectly correct -- the exact failure #335 exists to end."""
-    units = vanilla_red_units(parity_ref)
+    allegiance = spec.get('allegiance', 'RED') if isinstance(spec, dict) else 'RED'
+    units = vanilla_units(parity_ref, allegiance)
     if units is None:
         raise ValueError('parity_reference %r has no curated UnitDefinition arrays, so a '
                          'donor cannot be resolved against it' % parity_ref)
     if isinstance(spec, dict):
         at = spec.get('at')
-        want = {'classIndex': spec.get('class'), 'level': spec.get('level'),
-                'redas': spec.get('redas')}
+        want = {'classIndex': spec.get('class'), 'level': spec.get('level')}
     elif isinstance(spec, (list, tuple)) and len(spec) == 2:
-        at, want = spec, {'classIndex': None, 'level': None, 'redas': None}
+        at, want = spec, {'classIndex': None, 'level': None}
     else:
         raise ValueError('donor %r is not a coordinate [x, y] nor a {at/class/level} '
                          'reference' % (spec,))
@@ -579,7 +612,8 @@ def resolve_donor(parity_ref, spec):
              if (at is None or u['position'] == tuple(at))
              and all(v is None or u[k] == v for k, v in want.items())]
     if not found:
-        raise ValueError('donor %r matches no red unit of %s' % (spec, parity_ref))
+        raise ValueError('donor %r matches no %s unit of %s'
+                         % (spec, allegiance.lower(), parity_ref))
     behaviours = {u['ai'] for u in found}
     if len(behaviours) > 1:
         raise ValueError(
