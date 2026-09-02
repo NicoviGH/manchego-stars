@@ -200,6 +200,21 @@ class TestAwaitControllerState(unittest.TestCase):
         live = _block(harness, 'local function liveEnemies(', '\n\n')
         self.assertIn('onMap', live, 'a target list must not offer an off-map unit')
 
+    def test_no_guard_still_compares_a_units_x_against_255(self):
+        # The other half of the same change, and the one that was missed. Switching unitAt to
+        # rs8 silently RETIRED every `u.x ~= 0xFF` guard in the file: rs8 cannot return 255,
+        # so each one became vacuously true (and the two `== 0xFF` forms vacuously false).
+        # That is worse than the crash it replaced -- deployment counters counted units that
+        # were not on the map, partyDeployed() returned true on a unit that had not been
+        # placed (the exact false positive its own comment says it exists to prevent), and
+        # the off-map lord and Baxby checks could never fire again. A guard that stops
+        # guarding fails silently, so pin the encoding rather than the call sites.
+        harness = _read_harness()
+        self.assertNotIn('.x == 0xFF', harness,
+                         'an off-map test must read .onMap; rs8 never returns 255')
+        self.assertNotIn('.x ~= 0xFF', harness,
+                         'an off-map test must read .onMap; rs8 never returns 255')
+
     def test_an_off_map_destination_is_refused_by_name(self):
         # #335. The #220/#238 controller contract governs INPUTS -- it enumerates legal actions
         # and verifies postconditions -- but it cannot vet the DESTINATION a caller asks for.

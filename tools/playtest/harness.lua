@@ -1553,7 +1553,7 @@ local function battleSide(base)
     if chptr == 0 then return "(none)" end
     return string.format("pid=0x%02X class=0x%02X hp=%d at(%d,%d) terrain=0x%02X weapon=0x%02X",
         ru8(chptr + 4), ru8(ru32(base + 4) + 4), ru8(base + 0x13),
-        ru8(base + 0x10), ru8(base + 0x11), ru8(base + 0x55), ru16(base + 0x48) & 0xFF)
+        rs8(base + 0x10), rs8(base + 0x11), ru8(base + 0x55), ru16(base + 0x48) & 0xFF)
 end
 
 -- Dump everything that localizes a freeze. Sampled twice, `gap` frames apart.
@@ -1705,7 +1705,7 @@ scenarios.controller_turn = function()
     for i = 0, 61 do
         local candidate = unitAt(SYM.gUnitArrayBlue, i)
         if candidate and not isDead(candidate) and (candidate.state & 0xB) == 0
-            and candidate.x ~= 0xFF then
+            and candidate.onMap then
             actor = candidate
             break
         end
@@ -2219,7 +2219,7 @@ scenarios.ch01 = function()
         if u then
             party = party + 1
             -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3)
-            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
         end
     end
     log(string.format("party=%d deployed=%d turn=%d", party, deployed, turn()))
@@ -3228,13 +3228,13 @@ scenarios.recordsupply = function()
     wait(120); shot("supply")                             -- the deployed field
     -- Map-side assertions: Braulo benched (not on field), Pinky deployed, exactly 4 out.
     local braulo = blue(CHAR_BRAULO)
-    local braOnField = braulo and (braulo.state & 0x9) == 0 and braulo.x ~= 0xFF
+    local braOnField = braulo and (braulo.state & 0x9) == 0 and braulo.onMap
     local pinky = blue(CHAR_PINKY_LORD)
-    local pinkyOnField = pinky and (pinky.state & 0x9) == 0 and pinky.x ~= 0xFF
+    local pinkyOnField = pinky and (pinky.state & 0x9) == 0 and pinky.onMap
     local onField = 0
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then onField = onField + 1 end
+        if u and (u.state & 0x9) == 0 and u.onMap then onField = onField + 1 end
     end
     log(string.format("map: braulo=%s pinky=%s field=%d",
         tostring(braOnField), tostring(pinkyOnField), onField))
@@ -3286,7 +3286,7 @@ scenarios.recordsupply = function()
         local u = unitAt(SYM.gUnitArrayBlue, i)
         local beside = pinky and u and math.abs(u.x - pinky.x) + math.abs(u.y - pinky.y) == 1
         if u and u.charId ~= CHAR_PINKY_LORD and not beside
-            and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+            and (u.state & 0x9) == 0 and u.onMap then
             if moveUnit(u.x, u.y, u.x, u.y) then
                 wait(40); shot("supply")
                 -- The CONTRAST is the point of this half, so assert it rather than leaving
@@ -3359,7 +3359,7 @@ scenarios.recordrescue = function()
         local target
         for i = 0, 50 do
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and u.charId ~= rescuer.charId and (u.state & 0x9) == 0 and u.x ~= 0xFF
+            if u and u.charId ~= rescuer.charId and (u.state & 0x9) == 0 and u.onMap
                and math.abs(u.x - rescuer.x) + math.abs(u.y - rescuer.y) == 1 then target = u break end
         end
         if not target then return nil end
@@ -3381,7 +3381,7 @@ scenarios.recordrescue = function()
     local rescued, rescuerId
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+        if u and (u.state & 0x9) == 0 and u.onMap then
             rescued = tryRescue(u)
             if rescued then rescuerId = u.charId; break end
         end
@@ -3420,7 +3420,7 @@ scenarios.recordtrade = function()
         local target
         for i = 0, 50 do
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and u.charId ~= actor.charId and (u.state & 0x9) == 0 and u.x ~= 0xFF
+            if u and u.charId ~= actor.charId and (u.state & 0x9) == 0 and u.onMap
                and math.abs(u.x - actor.x) + math.abs(u.y - actor.y) == 1 then target = u break end
         end
         if not target then return nil end
@@ -3438,7 +3438,7 @@ scenarios.recordtrade = function()
     local partner
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+        if u and (u.state & 0x9) == 0 and u.onMap then
             partner = tryTrade(u)
             if partner then break end
         end
@@ -3486,7 +3486,7 @@ scenarios.recordfix = function()
     local scoutId
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and u.charId ~= 0x01 and (u.state & 0x9) == 0 and u.x ~= 0xFF then scoutId = u.charId break end
+        if u and u.charId ~= 0x01 and (u.state & 0x9) == 0 and u.onMap then scoutId = u.charId break end
     end
     if not scoutId then return result("FAIL", "no non-lord PC deployed") end
     -- Map combat (battle anims OFF) + NORMAL speed: the per-PC death quote is a battle-quote
@@ -3502,7 +3502,7 @@ scenarios.recordfix = function()
         local g, gd = nil, 999
         for i = 0, 23 do
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and r.x ~= 0xFF then
+            if r and not isDead(r) and r.onMap then
                 local d = math.abs(r.x - s.x) + math.abs(r.y - s.y)
                 if d < gd then g, gd = r, d end
             end
@@ -3515,7 +3515,7 @@ scenarios.recordfix = function()
         if not s or isDead(s) then sawDeath = isDead(blue(scoutId)); break end
         local g, gd = nearestGoblin(s)
         local ng = 0
-        for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r and not isDead(r) and r.x ~= 0xFF then ng = ng + 1 end end
+        for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r and not isDead(r) and r.onMap then ng = ng + 1 end end
         log(string.format("#6 turn %d: scout 0x%02X at (%d,%d) HP=%d gobl=%d nearestGd=%s",
             t, scoutId, s.x, s.y, s.curHP or -1, ng, tostring(gd)))
         if not g then break end
@@ -3765,13 +3765,13 @@ scenarios.ch01lord = function()
             LORDSEL_FLAG_BASE + route.picked, route.picked))
     end
     local lord = blue(CHAR_PINKY)
-    if not lord or (lord.state & 0x9) ~= 0 or lord.x == 0xFF then
+    if not lord or (lord.state & 0x9) ~= 0 or not lord.onMap then
         return result("FAIL", "chosen lord (char 0x08) is not force-deployed")
     end
     local deployed = 0
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+        if u and (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
     end
     if deployed ~= 4 then
         return result("FAIL", string.format(
@@ -5168,7 +5168,7 @@ local function reachCh02Map()
     -- earlier "faction 0 + turn 1" fired during the opening cutscene, before any of them existed.
     local function partyDeployed()
         for j = 0, 7 do local u = unitAt(SYM.gUnitArrayBlue, j)
-            if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then return true end end
+            if u and (u.state & 0x9) == 0 and u.onMap then return true end end
         return false
     end
     for _ = 1, 16000 do
@@ -5421,7 +5421,7 @@ scenarios.ch03prep = function()
         if u then
             party = party + 1
             -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3), real tile
-            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
             log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
                 i, u.charId, u.x, u.y, u.state))
         end
@@ -5475,7 +5475,7 @@ scenarios.ch03door = function()
     local u
     for i = 0, 23 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
+        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed blue unit to open the door") end
     -- Door Key in slot 0 (0x6A, 1 use), zero the rest -> no weapon -> no Attack row.
@@ -5547,7 +5547,7 @@ scenarios.ch03chest = function()
     local u
     for i = 0, 23 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
+        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed blue unit to open the chest") end
     -- Chest Key in slot 0 (0x69, 1 use), zero the rest -> no weapon (no Attack) + free slots for the loot.
@@ -5617,7 +5617,7 @@ scenarios.ch03tourmaline = function()
     local u
     for i = 0, 23 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
+        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed unit to hold the Tourmaline") end
     -- items[0..2] = Tourmaline (0x76, custom pal), Blue Gem (0x75, pal 0), Goodberry/Vulnerary (0x6C, pal 0).
@@ -5816,7 +5816,7 @@ scenarios.ch03 = function()
         if u then
             log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
                 i, u.charId, u.x, u.y, u.state))
-            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
             if u.charId == BAXBY and not isDead(u) then baxby = true end
         end
     end
@@ -5876,7 +5876,7 @@ scenarios.ch02 = function()
     local deployed = 0
     for i = 0, 7 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+        if u and (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
     end
     local archer, boss = false, false
     for i = 0, 23 do
@@ -5950,7 +5950,7 @@ scenarios.ch02baxby = function()
     --    0x8 set, or x==0xFF) -- clear the bench bits, drop him on a free NW tile, register him in
     --    the map-unit grid so the engine can select him. (The cap is 5 and he joins last, so the
     --    auto-pick usually benches him -- exactly the case we must be able to deploy.)
-    if (baxby.state & 0x9) ~= 0 or baxby.x == 0xFF then
+    if (baxby.state & 0x9) ~= 0 or not baxby.onMap then
         local idx = ru8(baxby.addr + 0x0B)                    -- unit->index = its map-grid id
         emu:write32(baxby.addr + 0x0C, baxby.state & ~0x9)    -- clear US_HIDDEN | US_NOT_DEPLOYED
         local placed = false
