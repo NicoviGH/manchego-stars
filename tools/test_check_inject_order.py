@@ -166,6 +166,23 @@ def inject_ch02(campaign):
     host = _retarget_host_chapter(CH02_HOST_INDEX, 4, 'defeat_all')
 """
 
+# ch03 does not call _inject_tile_changes itself -- it calls a per-chapter wrapper that
+# does. A guard matching the literal name therefore never sees ch03 at all, so the chapter
+# would be ordered correctly only by discipline. check.py already learned this lesson once,
+# in _injection_call_sequence: "otherwise every wrapped injector silently drops out of this
+# gate, taking its ordering constraints with it."
+TILE_CHANGE_WRAPPED_GOOD = """
+def inject_ch03(campaign):
+    host = _retarget_host_chapter(CH03_HOST_INDEX, 4, 'defeat_all')
+    _inject_ch03_tile_changes(campaign, chap, maps_dir)
+"""
+
+TILE_CHANGE_WRAPPED_BAD = """
+def inject_ch03(campaign):
+    _inject_ch03_tile_changes(campaign, chap, maps_dir)
+    host = _retarget_host_chapter(CH03_HOST_INDEX, 4, 'defeat_all')
+"""
+
 
 class TestTileChangesOutliveTheRetarget(unittest.TestCase):
     """_retarget_host_chapter zeroes map.changeLayerId, so _inject_tile_changes has to run
@@ -183,6 +200,32 @@ class TestTileChangesOutliveTheRetarget(unittest.TestCase):
     def test_a_chapter_with_no_tile_changes_is_not_a_violation(self):
         self.assertEqual(check._tile_change_order_violations(
             "def inject_ch01(campaign):\n    _retarget_host_chapter(2, 3, 'rout')\n"), [])
+
+    def test_a_wrapped_tile_change_call_is_still_seen(self):
+        # A per-chapter wrapper is the same step in the same place.
+        self.assertEqual(check._tile_change_order_violations(TILE_CHANGE_WRAPPED_GOOD), [])
+
+    def test_a_wrapped_tile_change_before_the_retarget_is_a_violation(self):
+        msgs = check._tile_change_order_violations(TILE_CHANGE_WRAPPED_BAD)
+        self.assertEqual(len(msgs), 1, msgs)
+        self.assertIn('inject_ch03', msgs[0])
+
+    def test_every_hosted_injector_is_actually_covered(self):
+        # The guard silently skips any injector where it finds no tile-change call. That is
+        # correct for a chapter with no map changes and a BLIND SPOT for one whose call it
+        # cannot recognise, and the two look identical from outside.
+        import build_campaign  # noqa: F401
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'build_campaign.py')
+        text = open(path, encoding='utf-8').read()
+        self.assertIn('inject_ch03', check._tile_change_injectors_seen(text))
+
+    def test_the_check_is_registered_in_the_drift_gate(self):
+        # Defined-but-unregistered is how this guard shipped: it ran only via the test
+        # subprocess, which check_tests_pass skips whenever fireemblem8u/src is absent --
+        # exactly the lightweight CI job it was meant to protect.
+        import inspect
+        src = inspect.getsource(check.main)
+        self.assertIn('check_tile_changes_outlive_the_retarget', src)
 
     def test_the_real_build_campaign_satisfies_it(self):
         fail = []

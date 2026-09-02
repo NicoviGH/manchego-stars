@@ -764,6 +764,33 @@ def check_cached_steps_are_config_invariant(fail):
     fail.extend(_cached_step_violations(open(path, encoding='utf-8').read()))
 
 
+# ch03 registers its map changes through _inject_ch03_tile_changes, a per-chapter wrapper
+# around _inject_tile_changes. A guard matching only the bare name never sees it, so the
+# chapter drops out of the gate entirely and looks identical to one with no tile changes at
+# all. _injection_call_sequence learned this same lesson for _scopes.run/_anims.run.
+TILE_CHANGE_CALL = re.compile(r'_inject_(?:ch\w+_)?tile_changes')
+
+
+def _tile_change_call_offset(body):
+    """Offset of the first tile-change registration in an injector body, wrapper or not."""
+    m = TILE_CHANGE_CALL.search(body)
+    return m.start() if m else -1
+
+
+def _tile_change_injectors_seen(text):
+    """Which chapter injectors this guard actually inspects.
+
+    The guard skips an injector where it finds no tile-change call. That is right for a
+    chapter with no map changes and a blind spot for one whose call it cannot recognise --
+    and from outside the two are the same silence. This makes the covered set assertable.
+    """
+    seen = []
+    for m in re.finditer(r'^def (inject_ch\w+)\(.*?(?=^def |\Z)', text, re.M | re.S):
+        if _tile_change_call_offset(m.group(0)) != -1:
+            seen.append(m.group(1))
+    return seen
+
+
 def _tile_change_order_violations(text):
     """Within one chapter injector, _inject_tile_changes must follow _retarget_host_chapter.
 
@@ -782,7 +809,7 @@ def _tile_change_order_violations(text):
     msgs = []
     for m in re.finditer(r'^def (inject_ch\w+)\(.*?(?=^def |\Z)', text, re.M | re.S):
         name, body = m.group(1), m.group(0)
-        tile = body.find('_inject_tile_changes')
+        tile = _tile_change_call_offset(body)
         retarget = body.find('_retarget_host_chapter')
         if tile == -1 or retarget == -1:
             continue
@@ -1924,6 +1951,7 @@ def main():
                   check_chapter_status, check_chapter_deployment_schema,
                   check_personal_line_injection_routes,
                   check_injection_order, check_cached_steps_are_config_invariant,
+                  check_tile_changes_outlive_the_retarget,
                   check_playtest_matrix, check_gate_chapter_window,
                   check_declared_cases, check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
