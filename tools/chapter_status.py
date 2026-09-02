@@ -125,7 +125,7 @@ def message_ids(name, campaign=campaign_chapters.CAMPAIGN):
     one out of this block (ch05's ending borrowed two of ch04's), and reporting those as free
     would invite exactly the collision `assert_message_ids_unique` exists to refuse.
 
-    A chapter with no declared block reports `block=None` -- ch01 and ch02 predate the
+    A chapter with no declared block reports `block=None` -- ch01 predates the
     registry, and "0 free" would read as full when the truth is that nobody wrote it down.
     That is a different answer from `block=UNKNOWN`, which means the registry could not be
     read at all: ch05's block is FULL, and rendering it as "not declared" would make the
@@ -202,6 +202,97 @@ def art(name, campaign=campaign_chapters.CAMPAIGN):
         rows.append(ArtRow(unit, role, have['portrait'], have['map_sprite'],
                            have['battle_anim'],
                            sorted(p for p, ok in have.items() if not ok)))
+    return rows
+
+
+def _donor_label(row):
+    """`(x, y)` for a coordinate donor, the richer spec's own text otherwise, `override`
+    where the unit declares one. The donor is the ANSWER to "where did this AI come from",
+    so it has to stay readable at a glance rather than truncate into noise."""
+    if row.override:
+        return 'override'
+    donor = row.donor
+    if isinstance(donor, (list, tuple)) and len(donor) == 2 and all(
+            isinstance(v, int) for v in donor):
+        return '(%d,%d)' % (donor[0], donor[1])
+    if isinstance(donor, dict):
+        at = donor.get('at')
+        if isinstance(at, (list, tuple)) and len(at) == 2:
+            return '(%d,%d)' % (at[0], at[1])
+        return ','.join('%s=%s' % kv for kv in sorted(donor.items()))[:14]
+    return '--' if donor is None else str(donor)[:14]
+
+
+AI_BEHAVIOUR = {
+    0x00: 'pursue',
+    0x03: 'never-move',
+    0x04: 'pillage',
+    0x05: 'pillage-escape',
+    0x06: 'pursue-twice',
+    0x10: 'guard-tile',
+    0x11: 'pillage-after-1',
+    0x12: 'charge-after-1',
+}
+
+# `override` is a FLAG, not the vector: both _donor_label and the report's override list
+# test it for truth, and an ai_override whose vector ever stringified to something falsy
+# would silently drop out of both while still being an override.
+AiRow = collections.namedtuple('AiRow', 'unit donor override why ai')
+
+
+def _difficulty_module():
+    """`difficulty`, which owns donor resolution. Imported lazily for the same reason
+    `_preview_module` is: this report must still run where its heavier deps are absent."""
+    try:
+        import difficulty
+        return difficulty
+    except ImportError:
+        return None
+
+
+def ai(name, campaign=campaign_chapters.CAMPAIGN, missing_ok=False):
+    """Where each enemy's AI comes from: the vanilla donor it is borrowed from, or the
+    declared override and its reason (#335 scope item 3).
+
+    AI used to be authored per-unit by feel, and nothing showed it -- #48's threat and
+    clear-load are computed from stats and weapons, so a chapter could measure x1.00 and
+    still play like a different map. It is derived now, and this is where that is legible
+    without remembering to go looking.
+
+    Empty for a chapter with no curated twin: there is nothing to borrow from, which is a
+    `parity_reference` gap rather than an AI one -- the same rule ai_donor_findings uses.
+    """
+    try:
+        chapter = load(name, campaign)
+    except Exception:
+        if missing_ok:
+            return []
+        raise
+    difficulty = _difficulty_module()
+    if difficulty is None:
+        return []
+    ref = chapter.get('parity_reference')
+    if difficulty.PARITY_REFERENCE_UDEFS.get(ref) is None:
+        return []
+    rows = []
+    for key in difficulty.AI_ROSTER_KEYS:
+        for enemy in chapter.get(key) or []:
+            if not isinstance(enemy, dict):
+                continue
+            override = enemy.get('ai_override') or {}
+            positions = enemy.get('positions') or []
+            for index in range(max(1, len(positions))):
+                try:
+                    emitted = difficulty.enemy_ai_bytes(chapter, enemy, index)
+                except ValueError as error:
+                    # A donor that cannot be resolved is exactly what the parity gate fails
+                    # on. Say so here rather than dropping the unit off the report.
+                    rows.append(AiRow(enemy.get('id'), None, None, str(error), None))
+                    break
+                specs = difficulty._donor_specs(enemy)
+                donor = specs[index] if specs and index < len(specs) else enemy.get('donor')
+                rows.append(AiRow(enemy.get('id'), None if override else donor,
+                                  bool(override), override.get('why'), emitted))
     return rows
 
 
@@ -503,6 +594,28 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
                       _yes(row.battle_anim), row.unit))
     if not art_rows:
         out.append('    (no named units declared)')
+
+    out.append('')
+    ai_rows = ai(name, campaign)
+    if ai_rows:
+        out.append('  ai        behaviour        borrowed from  unit')
+        for row in ai_rows:
+            if row.ai is None:
+                out.append('    %-16s %-14s %s' % ('UNGROUNDED', '--', row.unit))
+                continue
+            out.append('    %-16s %-14s %s'
+                       % (AI_BEHAVIOUR.get(row.ai[1], '0x%02X' % row.ai[1]),
+                          _donor_label(row), row.unit))
+        overrides = [r for r in ai_rows if r.override]
+        for row in overrides:
+            # First sentence only: the reason is authored in full in the chapter YAML, and this
+            # report is a glance, not a second copy of it.
+            why = ' '.join((row.why or '').split())
+            if len(why) > 96:
+                why = why[:95].rsplit(' ', 1)[0] + '...'
+            out.append('    override  %s: %s' % (row.unit, why))
+        out.append('    AI is BORROWED from each unit\'s vanilla donor, never authored --')
+        out.append('    an override states its reason or the parity gate fails (#335).')
 
     out.append('')
     covering = scenarios(name, campaign, cache_dir)

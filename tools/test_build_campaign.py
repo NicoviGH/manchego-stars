@@ -5011,6 +5011,81 @@ class VillageBoxSpeakers(unittest.TestCase):
             bc.village_boxes({'id': 'v', 'visit_text': 'one long flowed line'})
 
 
+class MessageBlockGuardSeesEveryClaimedId(unittest.TestCase):
+    """The deadness guard must not depend on a constant's NAME (review finding on #338).
+
+    `injector_message_ids` finds ids by scanning globals whose name ends in `_MSG`/`_MSGS`,
+    and its docstring promises "registering a new one is enough -- there is no second list to
+    remember". That is false for an id held in a constant named anything else: ch02's two hut
+    visits live in `CH02_VILLAGE_SLOTS`, so 0xAC0/0xAC1 were invisible to it. They are
+    registered in HOSTED_CHAPTER_MESSAGE_IDS, which IS the authoritative list of what we
+    spend -- so the guard should read that too, and stop depending on a naming convention
+    nothing enforces.
+    """
+
+    def test_an_id_claimed_only_through_a_non_msg_constant_is_still_protected(self):
+        # ch02's hut-visit ids come from CH02_VILLAGE_SLOTS, not a *_MSG constant.
+        hut_ids = [slot[1] for slot in bc.CH02_VILLAGE_SLOTS.values()]
+        self.assertTrue(hut_ids)
+        # A DIFFERENT chapter drawing a block over them must be refused.
+        blocks = {'ch09': ((min(hut_ids), max(hut_ids)),)}
+        bad = bc.live_ids_in_declared_blocks(blocks=blocks)
+        self.assertTrue(bad, 'a block over ch02\'s claimed hut ids must be refused, but the '
+                             'guard only saw *_MSG constants')
+
+    def test_a_chapter_may_still_declare_a_block_over_its_own_claims(self):
+        # The whole point of a block is to hold the ids that chapter spends.
+        self.assertEqual(bc.live_ids_in_declared_blocks(
+            blocks={'ch02': bc.message_block_ranges('ch02')}), [])
+
+
+class MessageBlockGuardHasNoBlindSpots(unittest.TestCase):
+    """Code-review findings on #338: two more classes of id the guard could not see.
+
+    Both are the SAME failure as the one 17c266a fixed -- a block drawn over them builds
+    clean, ships, and replaces live text -- and both slipped through because the scan was
+    shaped by how a constant is written rather than by what the build writes.
+    """
+
+    def _spent(self):
+        return bc.injector_message_ids()
+
+    def test_ids_held_in_a_dict_are_seen(self):
+        # PC_DEATH_QUOTE_MSGS is a DICT whose name does end in _MSGS, so its author followed
+        # the convention exactly -- and the flattener wrapped it as `(the_dict,)`, dropping
+        # all 13 ids. A block over them would have swapped a PC's death quote for other prose.
+        ids = sorted(v for v in bc.PC_DEATH_QUOTE_MSGS.values() if isinstance(v, int))
+        self.assertTrue(ids)
+        spent = self._spent()
+        missing = [hex(i) for i in ids if i not in spent]
+        self.assertEqual([], missing, 'death-quote ids invisible to the guard')
+
+    def test_a_block_over_the_death_quotes_is_refused(self):
+        lo = min(v for v in bc.PC_DEATH_QUOTE_MSGS.values() if isinstance(v, int))
+        self.assertTrue(bc.live_ids_in_declared_blocks(blocks={'zz': ((lo, lo),)}))
+
+    def test_goal_ids_below_the_old_floor_are_seen(self):
+        # Every chapter's objective window/status string lives below 0x300, which an
+        # undocumented lower bound silently excluded -- from the claims fold too, so
+        # registering them did not help. A block there garbles the objective on every chapter.
+        goals = [v for n, v in vars(bc).items()
+                 if n.endswith(('GOAL_WINDOW_MSG', 'GOAL_STATUS_MSG')) and isinstance(v, int)]
+        self.assertTrue(goals)
+        spent = self._spent()
+        self.assertEqual([], [hex(i) for i in goals if i not in spent])
+
+    def test_a_block_over_the_goal_strings_is_refused(self):
+        self.assertTrue(bc.live_ids_in_declared_blocks(blocks={'zz': ((0x19D, 0x1A7),)}))
+
+    def test_the_build_refuses_a_block_over_a_spent_id(self):
+        # The guard's two siblings run in main() before any injector; this one ran only from
+        # the tests, so a plain `make` with an edited block table still produced a ROM.
+        src = open(os.path.join(bc.REPO, 'tools/build_campaign.py'), encoding='utf-8').read()
+        main = src[src.index('\ndef main():'):]
+        self.assertIn('live_ids_in_declared_blocks()', main,
+                      'the deadness guard must run in the build, like its siblings')
+
+
 class MessageBlockPool(unittest.TestCase):
     """A hosted chapter may declare MORE THAN ONE id range, and every range it declares must
     be genuinely dead.
@@ -5971,7 +6046,7 @@ class PreRecruitVariant(unittest.TestCase):
         self.assertIn('if (prv == 0) {', src)
 
     def test_the_lookup_is_c89_declarations_first(self):
-        # agbcc (GCC 2.95.1) rejects mid-block declarations; CLAUDE.md coding conventions.
+        # agbcc (GCC 2.95.1) rejects mid-block declarations; AGENTS.md coding conventions.
         body = [ln.strip() for ln in bc._pre_recruit_lookup('unit').splitlines() if ln.strip()]
         self.assertTrue(body[0].startswith('struct PreRecruitVariant * prv'))
         self.assertNotIn('//', bc._pre_recruit_lookup('unit'))

@@ -256,5 +256,39 @@ class CoverageComesFromTheMatrix(unittest.TestCase):
         self.assertEqual('Ch1Events', cs.event_group('ch00'))
 
 
+
+class TestAiFidelity(unittest.TestCase):
+    """#335 scope item 3: a chapter's AI fidelity is visible in `make chapter CH=chNN`,
+    beside scenes and art, so nobody has to remember to look for it."""
+
+    def test_every_enemy_reports_the_donor_it_borrows_its_ai_from(self):
+        rows = cs.ai('ch02')
+        self.assertTrue(rows, 'ch02 fields enemies, so it has AI to report')
+        for row in rows:
+            self.assertTrue(row.unit, 'every row names its unit')
+            # The donor IS the answer to "where did this AI come from". A row without one
+            # would be an authored pattern, which is what #335 removed.
+            self.assertTrue(row.donor or row.override,
+                            '%s reports neither a donor nor an override' % row.unit)
+
+    def test_an_override_is_reported_with_its_reason(self):
+        # ch00's O'Neill overrides his donor's DoNothing, because vanilla event-scripts his
+        # attack and we run no such script. An override without its `why` is a silenced guard.
+        rows = [r for r in cs.ai('ch00') if r.override]
+        self.assertTrue(rows, 'ch00 has an ai_override')
+        for row in rows:
+            self.assertTrue(row.why, '%s overrides its donor without a stated reason' % row.unit)
+
+    def test_a_chapter_with_no_curated_twin_reports_nothing_rather_than_guessing(self):
+        # Silence is the honest answer where there is no twin to borrow from -- that is a
+        # parity_reference gap, not an AI one (difficulty.ai_donor_findings' own rule).
+        self.assertEqual(cs.ai('ch99-not-a-chapter', missing_ok=True), [])
+
+    def test_the_report_shows_the_ai_section(self):
+        text = cs.report('ch02')
+        self.assertIn('  ai ', text, 'the section is rendered')
+        self.assertIn('donor', text)
+
+
 if __name__ == '__main__':
     unittest.main()

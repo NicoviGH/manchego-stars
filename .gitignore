@@ -69,3 +69,13 @@ campaigns/*/battle_anims/*/.paint/
 
 # fireemblemwiki HTML cache (third-party pages; only the derived digest is committed)
 .fe8-guide-cache/
+
+# Local scratch for showing work in progress: rendered maps, portraits and review crops that
+# get `open`ed for Nicolas. Deliverables he needs to SEE from a phone go in docs/demo/ and are
+# committed (decisions.md -> remote file delivery); everything here is throwaway.
+map-review/
+review/
+
+# Per-tool agent config written by other coding agents, not this project's own guidance.
+# Shared guidance lives in AGENTS.md, which CLAUDE.md imports.
+.agents/
