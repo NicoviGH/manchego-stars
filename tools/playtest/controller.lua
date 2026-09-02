@@ -758,6 +758,33 @@ end
 -- the same wire format, so they share one encoder -- two would drift.
 M.encode = jsonEncode
 
+-- gPlaySt's faction byte: 0 player, 0x40 green, 0x80 red (FACTION_ID_*, bmunit.h).
+local FACTION_PLAYER = 0
+
+--- Is FE8 doing work a waiting driver can only sit through?
+---
+--- awaitControllerState's budget measures NOTHING HAPPENING, not wall clock, so whatever
+--- counts as the engine working must be exempt from it. Three things do:
+---
+---   * the event engine -- a wait for the map to become playable spans whole cutscenes,
+---     and the ch01 opening outran a 300-frame budget (#232);
+---   * a phase the player does not control -- the driver cannot act during it and the
+---     engine is stepping units through it. clear_ch02's turn 1 spends ~2100 frames on
+---     seven raiders with map-animation battles, and counting that as a stall logged a
+---     controller fault on a chapter the scenario went on to rout (#335);
+---   * a live battle, which outlives its phase byte at the boundary.
+---
+--- This is not a licence to hang: awaitControllerState's STALL_CEILING still bounds the
+--- total, so an engine genuinely wedged in any of these states fails closed with a trace.
+function M.engineIsWorking(observation)
+    if not observation then return false end
+    local procs = observation.procs
+    if procs and (procs.std_event or procs.battle) then return true end
+    local world = observation.world
+    if world and world.faction and world.faction ~= FACTION_PLAYER then return true end
+    return false
+end
+
 function M.formatTrace(record)
     return jsonEncode({
         event = "transition",

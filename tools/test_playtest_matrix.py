@@ -310,6 +310,25 @@ class VerdictParsing(unittest.TestCase):
     def test_a_pass_line_with_a_nonzero_exit_is_not_trusted(self):
         self.assertEqual(mx.parse_verdict(self.REAL_PASS, 1), 'FAIL')
 
+    def test_a_timeout_is_an_error_not_a_failure(self):
+        # run.sh writes `RESULT: ERROR -- timed out after Ns` when it kills a run on its
+        # WALL-CLOCK deadline. Reading every non-PASS RESULT line as FAIL downgraded that to
+        # a scenario failure, so a contended machine reported eight broken chapters: in one
+        # SUITE=all sweep the long canonical scenarios ran at ~15fps instead of 240, timed
+        # out, and were tabled as FAIL. All eight passed when re-run serially. "The run never
+        # finished" and "the scenario proved something false" are different facts and the
+        # table has to keep them apart -- a wrong one costs hours chasing a phantom.
+        text = '[f042115] RESULT: ERROR -- timed out after 300s\n'
+        self.assertEqual(mx.parse_verdict(text, 1), 'ERROR')
+
+    def test_an_error_verdict_of_any_kind_is_not_a_failure(self):
+        text = '[f001] RESULT: ERROR -- mGBA exited early\n'
+        self.assertEqual(mx.parse_verdict(text, 1), 'ERROR')
+
+    def test_a_real_failure_is_still_a_failure(self):
+        # The distinction must not swallow genuine FAILs.
+        self.assertEqual(mx.parse_verdict(self.REAL_FAIL, 1), 'FAIL')
+
 
 class StaleResults(unittest.TestCase):
     """Regression: a run takes minutes and results.json is what everything downstream

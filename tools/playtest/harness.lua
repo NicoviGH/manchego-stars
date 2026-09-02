@@ -54,6 +54,20 @@ local TUNE = {
     -- UNSKIPPED ch00 boss animation is 1238 frames, and vanilla's worst cases (crit, a
     -- double, a level-up, a promotion) run well past that -- see chooseAttack.
     combatFrames = 3600,
+    -- How long an ENEMY PHASE may run before it is called wedged. A phase is not only units
+    -- stepping: ch04's parley phase plays a full CUTSCENE and then the chapter's own ending
+    -- inside it, and it was still running -- chapter unchanged, faction still red -- 3,768
+    -- frames in, with the chapter not flipping until past 9,800. The old flat 3,600 therefore
+    -- gave up mid-scene and reported a phase timeout on a chapter clear_ch04_parley cleared
+    -- and chained out of (#335). Sibling of the budget bug awaitControllerState had: both
+    -- assumed a fixed cadence for something that legitimately contains a scene.
+    --
+    -- This is a WEDGE-CATCHER, not an estimate of a phase's length. In a healthy run it is
+    -- never reached -- the loop returns the moment control comes back, or the moment the
+    -- chapter ends under it -- so a generous value costs a passing run nothing and only bounds
+    -- how long a genuinely stuck phase takes to report itself. Staying inside run.sh's
+    -- deadline is what keeps that report a NAMED trace rather than a killed run.
+    enemyPhaseFrames = 20000,
     -- How many times a wait may back out of an unwanted screen before failing closed.
     stuckRecoveries = 2,
     -- A save slot takes TWO confirms; the prompt must be gone within this allowance.
@@ -216,7 +230,12 @@ local function unitAt(base, i)
     return {
         addr = a,
         charId = ru8(chptr + 4),
-        x = ru8(a + 0x10), y = ru8(a + 0x11),
+        -- xPos/yPos are s8 (bmunit.h), and FE8 parks a unit that is NOT on the map at -1.
+        -- Read unsigned, that unit reported x=255: the clear-bot took it for a real tile and
+        -- drove the cursor at (255,8) on a 25-wide map, an input no press could ever satisfy
+        -- (#335). `onMap` is the question every caller that drives the cursor actually means.
+        x = rs8(a + 0x10), y = rs8(a + 0x11),
+        onMap = rs8(a + 0x10) >= 0 and rs8(a + 0x11) >= 0,
         hp = ru8(a + 0x13),
         -- struct Unit (bmunit.h): +08 level, +12 maxHP, +14 pow, +17 def. The difficulty
         -- shift re-projects these off class growths, so they are what a mode probe reads
@@ -861,7 +880,19 @@ local function selectSemantic(intention, expected, predicate, frames)
 end
 
 -- ---------------------------------------------------------------- UI driving
+-- The #220/#238 contract vets the INPUT -- is this press legal in this state -- but it cannot
+-- vet the DESTINATION a caller asks for. Handed an off-map tile, this walked the cursor to the
+-- wall and then reported "cursor_left is not legal", which is true and points at nothing: the
+-- defect is upstream, in whatever chose the target. A clear-bot read one off a unit that was not
+-- on the map and drove at (-1,8) on a 25-wide map (#335). Refuse it here, by name, so the trace
+-- names the caller's mistake instead of the wall it ended up against.
 local function cursorTo(tx, ty)
+    local w, h = mapSize()
+    if w > 0 and h > 0 and (tx < 0 or ty < 0 or tx >= w or ty >= h) then
+        traceFailure("cursor_to", string.format("destination (%d,%d) is on the %dx%d map",
+            tx, ty, w, h), "fail:off-map-destination", nil, "controller-off-map-destination")
+        return false
+    end
     for _ = 1, 120 do
         local cx, cy = cursor()
         if cx == tx and cy == ty then return true end
@@ -897,11 +928,13 @@ end
 
 -- Wait until FE8 reaches `want`. `frames` bounds how long we tolerate NOTHING HAPPENING;
 -- it is not a wall-clock cap, because waiting for the map to become playable routinely
--- spans a scene -- a chapter opening, a turn event -- and no fixed budget fits every
--- cutscene (#232: the ch01 opening outran 300 frames, so ch01win/lordfloor logged a
--- controller fault on a chapter they went on to clear). The event engine running is
--- productive work, so it does not burn the budget; STALL_CEILING keeps a genuinely
--- wedged engine failing closed here rather than at run.sh's wall-clock deadline.
+-- spans a scene -- a chapter opening, a turn event, an enemy phase -- and no fixed budget
+-- fits every one (#232: the ch01 opening outran 300 frames, so ch01win/lordfloor logged a
+-- controller fault on a chapter they went on to clear; #335: clear_ch02's turn 1 did the
+-- same on a ~2100-frame enemy phase of seven raiders). Controller.engineIsWorking owns what
+-- counts as the engine working -- it is tested there, against observations, rather than
+-- asserted here -- and STALL_CEILING keeps a genuinely wedged engine failing closed here
+-- rather than at run.sh's wall-clock deadline.
 local STALL_CEILING = 40
 local function awaitControllerState(want, frames)
     local budget = frames or 300
@@ -912,7 +945,7 @@ local function awaitControllerState(want, frames)
         last = observeController()
         local state = controllerState(last)
         if state == want then return true end
-        if not (last.procs and last.procs.std_event) then idle = idle + 1 end
+        if not Controller.engineIsWorking(last) then idle = idle + 1 end
         -- Dialogue is never what a caller waits AT -- the targets are player_map_idle,
         -- unit_selected or a menu -- and FE8 interleaves text with play constantly: a
         -- turn event, a village line, a post-combat quote. Advancing it is a CLASSIFIED
@@ -960,13 +993,33 @@ local function awaitControllerState(want, frames)
     return false
 end
 
+-- The live movement map's cost for a tile; >= 120 means the selected unit cannot stand there.
+local function reachCost(x, y)
+    local row = ru32(ru32(SYM.gBmMapMovement) + y * 4)
+    return ru8(row + x)
+end
+
 -- Select unit at (fx,fy), move to (tx,ty). True when the action menu opened.
+--
+-- False also means the plain, legal answer "this unit cannot reach that tile", and that is NOT a
+-- controller fault. ch01's clear loop offers the seize tile to every unit in turn once the boss
+-- dies; the ones out of range used to drive the cursor there and press A anyway, and FE8 --
+-- correctly -- offers no confirm on an unreachable tile, so each attempt logged
+-- `confirm_move: fail:not-legal` and the sticky fault failed a run that went on to WIN (#335).
+-- The movement map is already on screen once the unit is selected, so ask it before pressing.
 local function moveUnit(fx, fy, tx, ty)
     if not awaitControllerState("player_map_idle", 300) then return false end
     if not cursorTo(fx, fy) then return false end
     if not guardedInput("select_unit", "A", "PlayerPhase enters movement-range input", function(after)
         return controllerState(after) == "unit_selected"
     end, 120) then return false end
+    if reachCost(tx, ty) >= 120 then
+        -- Back out through the enumerated cancel, so the next unit starts from a clean map.
+        guardedInput("cancel_selection", "B", "selection returns to the live map", function(after)
+            return controllerState(after) == "player_map_idle"
+        end, 120)
+        return false
+    end
     if not cursorTo(tx, ty) then return false end
     return guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
         return controllerState(after) == "unit_command_menu"
@@ -1034,10 +1087,6 @@ end
 -- March a unit toward (tx,ty) using the game's own pathing: selecting the
 -- unit fills gBmMapMovement (include/bmmap.h; cost < 120 = reachable this
 -- turn), so we read it and pick the reachable free tile closest to the target.
-local function reachCost(x, y)
-    local row = ru32(ru32(SYM.gBmMapMovement) + y * 4)
-    return ru8(row + x)
-end
 local function marchToward(u, tx, ty, maxx, maxy)
     maxx, maxy = maxx or 14, maxy or 9 -- default = ch00 map; ch01 is 25x16
     if not awaitControllerState("player_map_idle", 300) then return false end
@@ -1077,7 +1126,26 @@ local function emptyTile()
     return nil
 end
 
-local function endTurn(tile)
+-- `alreadyWon` is an optional predicate for callers that end a turn in order to FIRE a win
+-- condition. A clear-bot that kills the final enemy can fire DefeatAll with that kill, and the
+-- ending then plays INSIDE the old chapter slot -- so the caller's `chapter() ~= start` guard
+-- is still false while the map is already gone. Ending the turn there makes the wait below
+-- chase a player_map_idle this chapter will never show again: it meets the post-chapter save
+-- prompt and the next chapter's title card and fails the run on those, on a chapter it just
+-- cleared (#335). The precondition this function actually needs is that the PLAYER HAS THE
+-- MAP, so ask that rather than the chapter number -- after settling, because right after the
+-- last kill FE8 is mid-transition either way and an instant reading would skip a turn that
+-- genuinely still needs ending.
+local function endTurn(tile, alreadyWon)
+    if alreadyWon then
+        waitFor(function()
+            return alreadyWon() or controllerState(observeController()) == "player_map_idle"
+        end, 600)
+        if alreadyWon() or controllerState(observeController()) ~= "player_map_idle" then
+            log("the rout fired the win directly -- no turn left to end")
+            return true
+        end
+    end
     if not awaitControllerState("player_map_idle", 300) then return false end
     tile = tile or emptyTile()
     if not tile then
@@ -1094,12 +1162,22 @@ local function endTurn(tile)
     end, 900)
 end
 
--- End turn, then ride out the enemy phase. Returns "gameover" the moment the
--- game-over screen proc appears, "player" when control comes back, or nil.
+-- End turn, then ride out the enemy phase. Returns "gameover" the moment the game-over
+-- screen proc appears, "player" when control comes back, "ended" if the chapter itself
+-- finished during the phase, or nil if the phase wedged (which leaves a controller fault).
 local function runEnemyPhase(tile)
     if not endTurn(tile) then return nil end
-    for _ = 1, 3600 do
+    local startedIn = chapter()
+    for _ = 1, TUNE.enemyPhaseFrames do
         if gameOverActive() then return "gameover" end
+        -- The chapter can END during the enemy phase: a DefeatAll win fires the ending right
+        -- there, and from it FE8 goes to the post-chapter save prompt and then the next
+        -- chapter. No player phase is ever coming back, so waiting for one spends the whole
+        -- budget and then reports a PHASE TIMEOUT on a chapter that was cleared -- which is
+        -- what failed clear_ch04_parley, a run that went on to reach chapter 6 (#335).
+        -- A chapter ending under us is a normal exit, not a wedge, so it returns its own
+        -- value and leaves no controller fault behind for the verdict to trip over.
+        if chapter() ~= startedIn then return "ended" end
         if faction() == 0 and not menuOpen() and controllerState() == "player_map_idle" then
             return "player"
         end
@@ -1475,7 +1553,7 @@ local function battleSide(base)
     if chptr == 0 then return "(none)" end
     return string.format("pid=0x%02X class=0x%02X hp=%d at(%d,%d) terrain=0x%02X weapon=0x%02X",
         ru8(chptr + 4), ru8(ru32(base + 4) + 4), ru8(base + 0x13),
-        ru8(base + 0x10), ru8(base + 0x11), ru8(base + 0x55), ru16(base + 0x48) & 0xFF)
+        rs8(base + 0x10), rs8(base + 0x11), ru8(base + 0x55), ru16(base + 0x48) & 0xFF)
 end
 
 -- Dump everything that localizes a freeze. Sampled twice, `gap` frames apart.
@@ -1627,7 +1705,7 @@ scenarios.controller_turn = function()
     for i = 0, 61 do
         local candidate = unitAt(SYM.gUnitArrayBlue, i)
         if candidate and not isDead(candidate) and (candidate.state & 0xB) == 0
-            and candidate.x ~= 0xFF then
+            and candidate.onMap then
             actor = candidate
             break
         end
@@ -1720,7 +1798,8 @@ local function liveEnemies()
     local out = {}
     for i = 0, 23 do
         local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) then
+        -- onMap, not just alive: a live enemy still off the map is not a place to walk to.
+        if u and not isDead(u) and u.onMap then
             out[#out + 1] = { x = u.x, y = u.y, hp = u.hp, is_boss = unitIsBoss(u) }
         end
     end
@@ -2140,7 +2219,7 @@ scenarios.ch01 = function()
         if u then
             party = party + 1
             -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3)
-            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
         end
     end
     log(string.format("party=%d deployed=%d turn=%d", party, deployed, turn()))
@@ -2326,7 +2405,8 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
             if won() then return "won", t end
             if lost() then return "gameover", t end
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then   -- live, not yet acted
+            -- onMap too: an undeployed unit is alive and unacted but has no tile to select.
+            if u and not isDead(u) and u.onMap and (u.state & 0x2) == 0 then   -- live, not yet acted
                 b = findBoss()
                 if b then
                     seizeTile = { x = b.x, y = b.y }
@@ -2371,6 +2451,9 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         if lost() then return "gameover", t end
         local phase = runEnemyPhase(park)
         if phase == "gameover" then return "gameover", t end
+        -- "ended" = the phase carried the chapter out (a DefeatAll win fires the ending from
+        -- inside it). Ask won() rather than calling it stuck: the bot did its job (#335).
+        if phase == "ended" then return won() and "won" or "ended", t end
         if phase ~= "player" then return "stuck", t end
         -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
         -- instead of grinding the full budget on a wedged bot.
@@ -3145,13 +3228,13 @@ scenarios.recordsupply = function()
     wait(120); shot("supply")                             -- the deployed field
     -- Map-side assertions: Braulo benched (not on field), Pinky deployed, exactly 4 out.
     local braulo = blue(CHAR_BRAULO)
-    local braOnField = braulo and (braulo.state & 0x9) == 0 and braulo.x ~= 0xFF
+    local braOnField = braulo and (braulo.state & 0x9) == 0 and braulo.onMap
     local pinky = blue(CHAR_PINKY_LORD)
-    local pinkyOnField = pinky and (pinky.state & 0x9) == 0 and pinky.x ~= 0xFF
+    local pinkyOnField = pinky and (pinky.state & 0x9) == 0 and pinky.onMap
     local onField = 0
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then onField = onField + 1 end
+        if u and (u.state & 0x9) == 0 and u.onMap then onField = onField + 1 end
     end
     log(string.format("map: braulo=%s pinky=%s field=%d",
         tostring(braOnField), tostring(pinkyOnField), onField))
@@ -3203,7 +3286,7 @@ scenarios.recordsupply = function()
         local u = unitAt(SYM.gUnitArrayBlue, i)
         local beside = pinky and u and math.abs(u.x - pinky.x) + math.abs(u.y - pinky.y) == 1
         if u and u.charId ~= CHAR_PINKY_LORD and not beside
-            and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+            and (u.state & 0x9) == 0 and u.onMap then
             if moveUnit(u.x, u.y, u.x, u.y) then
                 wait(40); shot("supply")
                 -- The CONTRAST is the point of this half, so assert it rather than leaving
@@ -3276,7 +3359,7 @@ scenarios.recordrescue = function()
         local target
         for i = 0, 50 do
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and u.charId ~= rescuer.charId and (u.state & 0x9) == 0 and u.x ~= 0xFF
+            if u and u.charId ~= rescuer.charId and (u.state & 0x9) == 0 and u.onMap
                and math.abs(u.x - rescuer.x) + math.abs(u.y - rescuer.y) == 1 then target = u break end
         end
         if not target then return nil end
@@ -3298,7 +3381,7 @@ scenarios.recordrescue = function()
     local rescued, rescuerId
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+        if u and (u.state & 0x9) == 0 and u.onMap then
             rescued = tryRescue(u)
             if rescued then rescuerId = u.charId; break end
         end
@@ -3337,7 +3420,7 @@ scenarios.recordtrade = function()
         local target
         for i = 0, 50 do
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and u.charId ~= actor.charId and (u.state & 0x9) == 0 and u.x ~= 0xFF
+            if u and u.charId ~= actor.charId and (u.state & 0x9) == 0 and u.onMap
                and math.abs(u.x - actor.x) + math.abs(u.y - actor.y) == 1 then target = u break end
         end
         if not target then return nil end
@@ -3355,7 +3438,7 @@ scenarios.recordtrade = function()
     local partner
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then
+        if u and (u.state & 0x9) == 0 and u.onMap then
             partner = tryTrade(u)
             if partner then break end
         end
@@ -3403,7 +3486,7 @@ scenarios.recordfix = function()
     local scoutId
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and u.charId ~= 0x01 and (u.state & 0x9) == 0 and u.x ~= 0xFF then scoutId = u.charId break end
+        if u and u.charId ~= 0x01 and (u.state & 0x9) == 0 and u.onMap then scoutId = u.charId break end
     end
     if not scoutId then return result("FAIL", "no non-lord PC deployed") end
     -- Map combat (battle anims OFF) + NORMAL speed: the per-PC death quote is a battle-quote
@@ -3419,7 +3502,7 @@ scenarios.recordfix = function()
         local g, gd = nil, 999
         for i = 0, 23 do
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and r.x ~= 0xFF then
+            if r and not isDead(r) and r.onMap then
                 local d = math.abs(r.x - s.x) + math.abs(r.y - s.y)
                 if d < gd then g, gd = r, d end
             end
@@ -3432,7 +3515,7 @@ scenarios.recordfix = function()
         if not s or isDead(s) then sawDeath = isDead(blue(scoutId)); break end
         local g, gd = nearestGoblin(s)
         local ng = 0
-        for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r and not isDead(r) and r.x ~= 0xFF then ng = ng + 1 end end
+        for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r and not isDead(r) and r.onMap then ng = ng + 1 end end
         log(string.format("#6 turn %d: scout 0x%02X at (%d,%d) HP=%d gobl=%d nearestGd=%s",
             t, scoutId, s.x, s.y, s.curHP or -1, ng, tostring(gd)))
         if not g then break end
@@ -3682,13 +3765,13 @@ scenarios.ch01lord = function()
             LORDSEL_FLAG_BASE + route.picked, route.picked))
     end
     local lord = blue(CHAR_PINKY)
-    if not lord or (lord.state & 0x9) ~= 0 or lord.x == 0xFF then
+    if not lord or (lord.state & 0x9) ~= 0 or not lord.onMap then
         return result("FAIL", "chosen lord (char 0x08) is not force-deployed")
     end
     local deployed = 0
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+        if u and (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
     end
     if deployed ~= 4 then
         return result("FAIL", string.format(
@@ -5085,7 +5168,7 @@ local function reachCh02Map()
     -- earlier "faction 0 + turn 1" fired during the opening cutscene, before any of them existed.
     local function partyDeployed()
         for j = 0, 7 do local u = unitAt(SYM.gUnitArrayBlue, j)
-            if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then return true end end
+            if u and (u.state & 0x9) == 0 and u.onMap then return true end end
         return false
     end
     for _ = 1, 16000 do
@@ -5338,7 +5421,7 @@ scenarios.ch03prep = function()
         if u then
             party = party + 1
             -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3), real tile
-            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
             log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
                 i, u.charId, u.x, u.y, u.state))
         end
@@ -5392,7 +5475,7 @@ scenarios.ch03door = function()
     local u
     for i = 0, 23 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
+        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed blue unit to open the door") end
     -- Door Key in slot 0 (0x6A, 1 use), zero the rest -> no weapon -> no Attack row.
@@ -5464,7 +5547,7 @@ scenarios.ch03chest = function()
     local u
     for i = 0, 23 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
+        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed blue unit to open the chest") end
     -- Chest Key in slot 0 (0x69, 1 use), zero the rest -> no weapon (no Attack) + free slots for the loot.
@@ -5534,7 +5617,7 @@ scenarios.ch03tourmaline = function()
     local u
     for i = 0, 23 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.x ~= 0xFF then u = c break end
+        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed unit to hold the Tourmaline") end
     -- items[0..2] = Tourmaline (0x76, custom pal), Blue Gem (0x75, pal 0), Goodberry/Vulnerary (0x6C, pal 0).
@@ -5733,7 +5816,7 @@ scenarios.ch03 = function()
         if u then
             log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
                 i, u.charId, u.x, u.y, u.state))
-            if (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
             if u.charId == BAXBY and not isDead(u) then baxby = true end
         end
     end
@@ -5793,7 +5876,7 @@ scenarios.ch02 = function()
     local deployed = 0
     for i = 0, 7 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.x ~= 0xFF then deployed = deployed + 1 end
+        if u and (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
     end
     local archer, boss = false, false
     for i = 0, 23 do
@@ -5867,7 +5950,7 @@ scenarios.ch02baxby = function()
     --    0x8 set, or x==0xFF) -- clear the bench bits, drop him on a free NW tile, register him in
     --    the map-unit grid so the engine can select him. (The cap is 5 and he joins last, so the
     --    auto-pick usually benches him -- exactly the case we must be able to deploy.)
-    if (baxby.state & 0x9) ~= 0 or baxby.x == 0xFF then
+    if (baxby.state & 0x9) ~= 0 or not baxby.onMap then
         local idx = ru8(baxby.addr + 0x0B)                    -- unit->index = its map-grid id
         emu:write32(baxby.addr + 0x0C, baxby.state & ~0x9)    -- clear US_HIDDEN | US_NOT_DEPLOYED
         local placed = false
@@ -6014,7 +6097,7 @@ scenarios.clear_ch02 = function()
     -- ch03 (slot 4) and PREP re-picks the convoy/inventory. (Coarse polling skipped the charm window.)
     -- The ch02->ch03 chain (#23) replaced the old dev-placeholder->title landing: the ending now
     -- MNC2s straight into ch03, so we A-mash through it until chapter() == 4 (ch03), not the title.
-    if routed and not advanced() then endTurn() end
+    if routed then endTurn(nil, advanced) end
     local reachedCh03 = false
     local watchEnding = INSPECT.watch("clear_ch02_ending")
     for _ = 1, TUNE.bootSteps do
@@ -6119,7 +6202,7 @@ scenarios.recordchain = function()
             return result("FAIL", string.format("game over on turn %d -- party lost before the chain", t)) end
     end
     if not (routed or advanced()) then return result("FAIL", "could not rout ch02 -- no chain to record") end
-    if routed and not advanced() then endTurn() end   -- fire the DefeatAll win -> the ending auto-plays
+    if routed then endTurn(nil, advanced) end   -- fire the DefeatAll win -> the ending auto-plays
     -- Record the ending -> MNC2(0x4) -> ch03 opening -> PREP from HERE (no state reload). Normal speed
     -- so the text/fades animate for the GIF; A-mash to advance beats; stop when ch03 Preparations opens.
     return recordCutscene{ tag = "chain", until_ = "prep", speed = "normal",

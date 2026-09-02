@@ -1304,13 +1304,28 @@ def parse_verdict(text, returncode):
     The harness stamps every line with the frame it was logged on -- the verdict
     line reads `[f007234] RESULT: PASS -- ...`, never starts with RESULT: -- so this
     matches anywhere in the line. run.sh's exit status is the corroborating signal
-    (0 only on PASS); if the two disagree, the run did not end cleanly, so fail."""
+    (0 only on PASS); if the two disagree, the run did not end cleanly, so fail.
+
+    ERROR and FAIL are DIFFERENT FACTS and the table has to keep them apart. "The scenario
+    proved something false" is a finding about the game; "the run never finished" is a finding
+    about the machine, and run.sh says which by writing `RESULT: ERROR -- timed out after Ns`
+    when it kills a run on its wall-clock deadline. Reading every non-PASS RESULT line as FAIL
+    downgraded those: one SUITE=all sweep ran its long canonical scenarios at ~15fps instead of
+    240 under contention, timed out, and tabled eight chapters as broken. Every one passed when
+    re-run serially -- but not before the FAILs had been chased as real."""
     verdict = None
     for line in text.splitlines():
         if 'RESULT:' in line:
-            verdict = 'PASS' if 'RESULT: PASS' in line else 'FAIL'
+            if 'RESULT: PASS' in line:
+                verdict = 'PASS'
+            elif 'RESULT: ERROR' in line:
+                verdict = 'ERROR'
+            else:
+                verdict = 'FAIL'
     if verdict is None:
-        return 'ERROR'          # no verdict at all: crash, timeout, or a refused run
+        return 'ERROR'          # no verdict at all: crash, or a refused run
+    if verdict == 'ERROR':
+        return 'ERROR'          # a run that did not finish is not evidence about the game
     if verdict == 'PASS' and returncode != 0:
         return 'FAIL'
     return verdict

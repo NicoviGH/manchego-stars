@@ -825,6 +825,34 @@ check(action(diffObs(1, 0), "select_difficulty_down").key, "DOWN",
     "the menu wraps, so DOWN reaches a lower index too")
 
 
+-- engineIsWorking -- what the stall budget must NOT count (#335).
+--
+-- awaitControllerState bounds how long it tolerates NOTHING HAPPENING. It only ever
+-- exempted the event engine, so a legitimate ENEMY PHASE burned the budget: clear_ch02's
+-- turn 1 ran seven raiders with map-animation battles for ~2100 frames and the wait gave
+-- up at 300, logging a controller fault on a phase that finished fine and a chapter the
+-- scenario went on to rout. A phase the player does not control is the engine working,
+-- exactly like a cutscene is.
+local function busy(observation, want, msg)
+    check(C.engineIsWorking(observation), want, msg)
+end
+
+busy({ world = { faction = 0 } }, false,
+    "an idle player phase with nothing running is a real stall")
+busy({ world = { faction = 0 }, procs = proc("std_event", "event_engine") }, true,
+    "the event engine running is productive work (#232)")
+busy({ world = { faction = 128 } }, true,
+    "the ENEMY phase is productive work -- the driver cannot act and must wait it out")
+busy({ world = { faction = 64 } }, true,
+    "so is the green phase")
+busy({ world = { faction = 0 }, procs = proc("battle", "battle_event") }, true,
+    "a live battle is productive work even once the phase reads as the player's")
+busy({}, false,
+    "an observation with no world block cannot claim to be busy")
+busy({ world = {} }, false,
+    "nor can one whose faction was not observed")
+
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests))
     os.exit(1)

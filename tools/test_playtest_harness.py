@@ -118,16 +118,138 @@ class TestAwaitControllerState(unittest.TestCase):
                       'a screen that outlives the allowance must still fail closed')
 
     def test_the_budget_counts_stall_not_wall_clock(self):
-        # #232. A wait for the map to become playable spans whole cutscenes, and no fixed
-        # budget fits every one -- the ch01 opening outran 300 frames and logged a fault
-        # on a chapter the scenario went on to clear. So the event engine running must not
-        # burn the budget, while a genuinely wedged engine still fails closed here rather
-        # than at run.sh's wall-clock deadline.
+        # #232/#335. A wait for the map to become playable spans whole cutscenes AND whole
+        # enemy phases, and no fixed budget fits every one -- the ch01 opening outran 300
+        # frames, and so did clear_ch02's ~2100-frame turn 1 -- each logging a fault on a
+        # chapter the scenario went on to clear. What counts as the engine working is
+        # Controller.engineIsWorking's to decide, because there it is tested against
+        # observations instead of asserted as a substring here; the budget must consult it
+        # rather than re-deciding inline. A genuinely wedged engine still fails closed here
+        # rather than at run.sh's wall-clock deadline.
         body = _block(_read_harness(), 'local function awaitControllerState(',
                       '\n-- Select unit at')
-        self.assertIn('std_event', body, 'event-engine progress must be recognised')
+        self.assertIn('Controller.engineIsWorking(last)', body,
+                      'the stall budget must consult the tested predicate')
+        self.assertIn('idle = idle + 1', body, 'and only count frames it rejects')
         self.assertIn('STALL_CEILING', body, 'the wait must still terminate on its own')
         self.assertIn('fail:state-timeout', body)
+
+    def test_the_win_fired_by_the_last_kill_leaves_no_turn_to_end(self):
+        # #335. A clear-bot that kills the final enemy can fire the DefeatAll win right there,
+        # and the ending then plays INSIDE the old chapter slot -- so `chapter() ~= start` is
+        # still false while the map is already gone. Ending the turn at that point makes
+        # endTurn wait for a player_map_idle this chapter will never show again, and it walks
+        # into the post-chapter save prompt and the next chapter's title card and fails the run
+        # on them. The precondition endTurn actually needs is the one that must be checked.
+        harness = _read_harness()
+        body = _block(harness, 'local function endTurn(', '\n-- End turn, then ride out')
+        self.assertIn('alreadyWon', body, 'callers firing a win must be able to say so')
+        self.assertIn('waitFor', body,
+                      'and it must settle -- FE8 is mid-transition right after the last kill')
+        self.assertIn('~= "player_map_idle"', body,
+                      'the decision must rest on the player actually having the map back')
+        # Both clear-and-chain scenarios must go through it; a second hand-rolled copy is how
+        # one of them silently keeps the bug.
+        self.assertNotIn('if routed and not advanced() then endTurn()', harness,
+                         'no scenario may end the turn on the chapter-number guard alone')
+        self.assertEqual(harness.count('endTurn(nil, advanced)'), 2,
+                         'clear_ch02 and recordchain must both pass the win predicate')
+
+    def test_a_chapter_ending_mid_phase_is_an_exit_not_a_wedge(self):
+        # #335. A DefeatAll win fires the ending from INSIDE the enemy phase, and from there
+        # FE8 goes to the post-chapter save prompt and the next chapter -- no player phase is
+        # ever coming back. runEnemyPhase waited for one anyway, spent its whole budget and
+        # reported a phase timeout on a chapter clear_ch04_parley had cleared and chained out
+        # of. Raising the cap only made it fail slower; the loop has to recognise the exit.
+        body = _block(_read_harness(), 'local function runEnemyPhase(', '\n-- Detecting an on-screen')
+        self.assertIn('startedIn', body, 'the phase must remember which chapter it began in')
+        self.assertIn('"ended"', body, 'and report a chapter that finished under it')
+        self.assertIn('fail:phase-timeout', body, 'a genuinely wedged phase must still fail')
+        # The fault is what a verdict trips over, so the normal exit must come FIRST.
+        self.assertLess(body.index('"ended"'), body.index('fail:phase-timeout'),
+                        'the chapter-ended exit must precede the timeout trace')
+
+    def test_the_enemy_phase_cap_outlives_a_phase_that_contains_a_scene(self):
+        # #335, the other half of the same failure. ch04's parley phase plays a cutscene and
+        # then the chapter ending inside the enemy phase: it was still running, chapter
+        # unchanged, 3,768 frames in, and the chapter did not flip until past 9,800. So the
+        # chapter-ended exit above can only fire if the cap outlives the scene -- with a flat
+        # 3,600 the loop died first and the exit never got the chance. Both are needed.
+        harness = _read_harness()
+        body = _block(harness, 'local function runEnemyPhase(', '\n-- Detecting an on-screen')
+        self.assertIn('TUNE.enemyPhaseFrames', body,
+                      'the cap must be a named tunable, not a literal in the loop head')
+        m = re.search(r'enemyPhaseFrames = (\d+)', harness)
+        self.assertIsNotNone(m, 'TUNE.enemyPhaseFrames must be defined')
+        self.assertGreater(int(m.group(1)), 9800,
+                           'it must outlive the longest scene-bearing phase measured')
+
+    def test_a_unit_off_the_map_is_not_a_tile_at_x_255(self):
+        # #335. struct Unit's xPos/yPos are s8 (bmunit.h), and FE8 parks a unit that is not on
+        # the map at xPos -1. unitAt read them with ru8, so such a unit reported x=255: the
+        # clear-bot took it for a real position, drove the cursor at (255,8) on a 25-wide map,
+        # and failed clear_ch01 with an illegal input it could never satisfy. ch02 showed the
+        # same number in "teleportToFiringTile: (255,9)", which only survived because that one
+        # site happened to bail. Read the field the width the struct declares, and keep an
+        # off-map unit out of the lists that drive the cursor.
+        harness = _read_harness()
+        body = _block(harness, 'local function unitAt(', '\nlocal function findUnit')
+        self.assertIn('rs8(a + 0x10)', body, 'xPos is s8')
+        self.assertIn('rs8(a + 0x11)', body, 'yPos is s8')
+        self.assertNotIn('ru8(a + 0x10)', body, 'the unsigned read is the bug')
+        live = _block(harness, 'local function liveEnemies(', '\n\n')
+        self.assertIn('onMap', live, 'a target list must not offer an off-map unit')
+
+    def test_no_guard_still_compares_a_units_x_against_255(self):
+        # The other half of the same change, and the one that was missed. Switching unitAt to
+        # rs8 silently RETIRED every `u.x ~= 0xFF` guard in the file: rs8 cannot return 255,
+        # so each one became vacuously true (and the two `== 0xFF` forms vacuously false).
+        # That is worse than the crash it replaced -- deployment counters counted units that
+        # were not on the map, partyDeployed() returned true on a unit that had not been
+        # placed (the exact false positive its own comment says it exists to prevent), and
+        # the off-map lord and Baxby checks could never fire again. A guard that stops
+        # guarding fails silently, so pin the encoding rather than the call sites.
+        harness = _read_harness()
+        self.assertNotIn('.x == 0xFF', harness,
+                         'an off-map test must read .onMap; rs8 never returns 255')
+        self.assertNotIn('.x ~= 0xFF', harness,
+                         'an off-map test must read .onMap; rs8 never returns 255')
+
+    def test_an_off_map_destination_is_refused_by_name(self):
+        # #335. The #220/#238 controller contract governs INPUTS -- it enumerates legal actions
+        # and verifies postconditions -- but it cannot vet the DESTINATION a caller asks for.
+        # Handed (-1,8), cursorTo walked the cursor to the wall at x=0 and then reported
+        # "cursor_left is not legal", which is true and useless: the defect is the target, and
+        # the bot read it off a unit that was not on the map. A target outside the map is
+        # refused up front, named, so the trace points at the caller instead of a wall.
+        harness = _read_harness()
+        body = _block(harness, 'local function cursorTo(', '\nlocal function waitFor')
+        self.assertIn('mapSize()', body, 'the target must be checked against the real map')
+        self.assertIn('off-map', body, 'and refused by name')
+        self.assertIn('traceFailure', body, 'failing closed, in the trace')
+
+    def test_a_destination_the_unit_cannot_reach_is_not_a_controller_fault(self):
+        # #335. Once ch01's boss dies, the clear loop offers the seize tile to every remaining
+        # unit in turn. The ones that cannot reach it drove the cursor there anyway and pressed
+        # A, and FE8 -- correctly -- offers no confirm on an unreachable tile, so each attempt
+        # logged `confirm_move: fail:not-legal`. That sticky fault failed a run that went on to
+        # WIN by turn 9. "This unit cannot get there" is an answer, not a defect: check the
+        # movement map after selecting and back out cleanly, leaving no fault behind.
+        harness = _read_harness()
+        body = _block(harness, 'local function moveUnit(', '\nlocal function chooseWait')
+        self.assertIn('reachCost(tx, ty)', body,
+                      'the destination must be checked against the live movement map')
+        self.assertIn('cancel_selection', body, 'and the selection backed out cleanly')
+        self.assertNotIn('traceFailure', body, 'an out-of-range destination is not a fault')
+
+    def test_engine_is_working_recognises_the_phases_that_are_not_stalls(self):
+        # The predicate is unit-tested in tools/playtest/test_controller.lua; this pins that
+        # it keeps covering the two cases that produced real controller faults, so deleting
+        # either arm cannot pass by moving the constant somewhere else.
+        src = open(os.path.join(REPO, 'tools/playtest/controller.lua'), encoding='utf-8').read()
+        body = _block(src, 'function M.engineIsWorking(', '\nfunction M.formatTrace')
+        self.assertIn('std_event', body, 'event-engine progress must be recognised (#232)')
+        self.assertIn('FACTION_PLAYER', body, 'a phase the player does not control (#335)')
 
 
 class TestPlaytestHarness(unittest.TestCase):
