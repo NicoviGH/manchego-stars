@@ -234,6 +234,9 @@ AI_BEHAVIOUR = {
     0x12: 'charge-after-1',
 }
 
+# `override` is a FLAG, not the vector: both _donor_label and the report's override list
+# test it for truth, and an ai_override whose vector ever stringified to something falsy
+# would silently drop out of both while still being an override.
 AiRow = collections.namedtuple('AiRow', 'unit donor override why ai')
 
 
@@ -289,7 +292,7 @@ def ai(name, campaign=campaign_chapters.CAMPAIGN, missing_ok=False):
                 specs = difficulty._donor_specs(enemy)
                 donor = specs[index] if specs and index < len(specs) else enemy.get('donor')
                 rows.append(AiRow(enemy.get('id'), None if override else donor,
-                                  override.get('ai'), override.get('why'), emitted))
+                                  bool(override), override.get('why'), emitted))
     return rows
 
 
