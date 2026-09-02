@@ -12,27 +12,36 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**A five-PR stack, open and unreviewed.** All `make check` green, `SUITE=all` 50/50, and the stack
-tip was diffed against the branch it replaces byte-for-byte. **Merge strictly in order**, with
-`--merge` (not `--squash`), retargeting each child to `main` BEFORE deleting its parent branch
+**A five-PR stack, reviewed and fixed, waiting on ONE matrix run.** **Merge strictly in order**,
+with `--merge` (not `--squash`), retargeting each child to `main` BEFORE deleting its parent branch
 (`decisions.md` -> stacked PRs: deleting a base closes the PRs on it, and a closed PR cannot be
 retargeted).
 
-| order | PR | base |
-|---|---|---|
-| 1 | #339 ai: borrow every enemy's AI from its vanilla donor | `main` |
-| 2 | #340 ch02: restore vanilla's decoy | #339 |
-| 3 | #341 ch02: point slot 3 at its own map-change layer | #340 |
-| 4 | #342 playtest: a scene is not a stall | #341 |
-| 5 | #343 docs + tooling; **closes #335** | #342 |
+| order | PR | base | review |
+|---|---|---|---|
+| 1 | #339 ai: borrow every enemy's AI from its vanilla donor | `main` | fixed (7798a06) |
+| 2 | #340 ch02: restore vanilla's decoy | #339 | clean |
+| 3 | #341 ch02: point slot 3 at its own map-change layer | #340 | fixed (7cf289b) |
+| 4 | #342 playtest: a scene is not a stall | #341 | fixed (dbbead6) |
+| 5 | #343 docs + tooling; **closes #335** | #342 | fixed (6639431) |
 
-Each PR body carries its own reasoning; it is not restated here.
+All five were reviewed 2026-09-02 by a fresh reviewer per PR. **What each review found and what
+was done about it is a comment on the PR itself** -- not restated here. Two were Critical: #341's
+ordering guard was never registered in `check.py`'s gate and could not see ch03's wrapper, and
+#342's s8 change had silently made 23 off-map guards vacuous. The stack was rebased in order and
+force-pushed; every base is intact and MERGEABLE.
 
-**None has been code-reviewed.** All five were authored by one instance in one long session, so the
-author is the wrong reviewer: #338 shipped unreviewed and a fresh reviewer then found two real
-defects the author had read past twice. Give each PR the `superpowers:requesting-code-review`
-subagent before merging it, working DOWN the stack -- a fix to an earlier PR means rebasing every
-PR above it, so review 1 before merging 1, and so on.
+**#339 and #340 are ATOMIC with respect to CI.** #339 adds a gate arm that `balance_locked` ch02
+cannot satisfy until #340 migrates it: `make difficulty-gate` exits 1 at #339 and 0 at #340.
+Merging #339 alone leaves `main` red. Merge them back to back.
+
+**What is owed before merging: one `SUITE=all` matrix run at the stack tip, `--jobs 1`.**
+`make matrix SUITE=all` runs `matrix.py run --all`; per #345 a parallel run starves its own
+scenarios and reports false failures, so serial or do not believe it. Dry-run says **50 scenarios
+across 6 ROM configurations**, and `harness.lua` changed, so the verdict cache will not spare
+much. It is the honest tier because #342's fix is in shared clear-bot helpers that every scenario
+inherits -- no single chapter suite covers it. Everything else is verified static: full suite
+green by the repo's own runner, `difficulty-gate` 0 at the tip, drift clean on every commit.
 
 **#26 stays open**: the map and the roster are done, the chapter is not.
 
@@ -54,9 +63,10 @@ content. Read the issue for scope, the boards for reasoning.
 
 ## Next task
 
-**Review and land the stack above, in order.** Once #343 merges, **#335 closes itself** and the next
-task is **ch06 enemy POSITIONS -- bring Nicolas a render first** (2-3 concept options, not a
-finished map).
+**Run the `SUITE=all` matrix at the stack tip (`--jobs 1`), then land the stack in order.** The
+review and the fixes are done; that run is the only thing between the stack and `main`. Once #343
+merges, **#335 closes itself** and the next task is **ch06 enemy POSITIONS -- bring Nicolas a
+render first** (2-3 concept options, not a finished map).
 
 Everything that decision answers to -- the measured map geometry, why neither vanilla source
 transfers, the three jobs placement must serve, the donor rule that replaced `CH06_AI`, and the
@@ -164,8 +174,9 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
   and a look at open PRs answer this in seconds.
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
 - **Checkout: `/Users/Yonick/Projects/manchego-stars`, the ONE tree** (#267). It is clean except
-  for the intentionally dirty `fireemblem8u` submodule and Nicolas's untracked `.agents/` +
-  `AGENTS.md` — preserve those and **stage paths explicitly**.
+  for the intentionally dirty `fireemblem8u` submodule and the untracked `.agents/`,
+  `map-review/` and `review/` — preserve those and **stage paths explicitly**. (`AGENTS.md` was
+  untracked here until #343 commits it; it is no longer in the tree on `main`.)
 - **Two sandbox false negatives on this Mac, neither a real failure.** `gh auth status` reports
   the saved token invalid because a restricted process cannot read the macOS Keychain — run `gh`
   with escalation rather than asking Nicolas to log in again. And an mGBA GUI crash with an AppKit
