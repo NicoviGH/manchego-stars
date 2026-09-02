@@ -127,7 +127,8 @@ enemy_units:
     inventory:
       - id: iron-lance
         damage_type: piercing   # cosmetic flavor label
-    ai_pattern: hold_then_attack  # vanilla gate-guard posture: attack in range, don't chase
+    donor: [[1, 6], [3, 6], [2, 7]]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
 
   - id: goblin-axe
     name: "Goblin Raider"
@@ -139,7 +140,8 @@ enemy_units:
     inventory:
       - id: iron-axe
         damage_type: slashing   # cosmetic flavor label
-    ai_pattern: aggressive      # vanilla pursue AI {0x0,0x0A,0x0,0x0}
+    donor: [[1, 8], [3, 8], [2, 9]]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
 
   - id: goblin-chief
     name: "Izobai"               # the Foaming Mugs goblin boss (book canon); a female
@@ -157,8 +159,8 @@ enemy_units:
         damage_type: piercing   # cosmetic flavor label
       - id: iron-ingots         # drops on death → the job's MacGuffin
         is_key_item: true
-    ai_pattern: hold_position   # Breguet AI {0x3,0x3,0x9,0x20}: attack in place, never move
-    # Voice: cunning, mocking, mercenary bandit-warlord (lore/izobai.md). LOCKED 2026-06-17.
+    donor: [2, 5]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     taunt: "The iron's right here, under my boots. Come and take it."
     death_quote: "Should've taken the gold... and run..."
 
@@ -174,7 +176,8 @@ enemy_units:
     inventory_by_class:
       fighter: [iron-axe]
       soldier: [iron-lance]
-    ai_pattern: aggressive
+    donor: [[13, 8], [13, 9], [12, 9]]
+    # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
 
 # ── Events ────────────────────────────────────────────────────────────────────
 events:

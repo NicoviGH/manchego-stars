@@ -227,12 +227,24 @@ CH01_BOSS_SLOT = 'BREGUET'   # vanilla Ch1's boss slot: CA_BOSS + hand-authored
 CH01_JOIN_POSITIONS = [(c, r) for r in (8, 9) for c in range(1, 6)]
 # Enemy AI byte vectors, mirrored from vanilla Ch1's own unit definitions
 # (git HEAD src/events/ch1-eventudefs.h) per the YAML's ai_pattern labels.
-CH01_AI = {
-    'hold_then_attack': '{0x0, 0x3, 0x9, 0x0}',   # vanilla Ch1 soldier line
-    'aggressive':       '{0x0, 0x0, 0x1, 0x0}',   # vanilla Ch1 fighter pursuit
-    'hold_position':    '{0x3, 0x3, 0x9, 0x20}',  # Breguet: attack in place, never move
-    'reinforce':        '{0x0, 0x0, 0x9, 0x0}',   # vanilla Ch1 reinforcement wave
-}
+def enemy_ai_initialiser(chap, enemy, index=0):
+    """The `.ai = {...}` initialiser for one of our enemies -- its vanilla DONOR's bytes.
+
+    #335. A chapter picks a vanilla twin so its difficulty is grounded rather than guessed,
+    and we already derive that twin's classes, levels, inventories and drops from its
+    `UnitDefinition` structs. The `.ai` field of those same structs was the one we never
+    read: it got authored by feel through per-chapter label tables, and because #48 computes
+    threat from stats and weapons, five chapters shipped a force that measured at parity and
+    behaved nothing like its twin. There is no label vocabulary here on purpose -- the labels
+    WERE the translation layer the drift lived in.
+
+    `difficulty` is imported locally because it imports us; the decomp-reading layer is the
+    lower one, and inverting that at module scope would cycle."""
+    import difficulty
+    return '{%s}' % ', '.join('0x%X' % b
+                             for b in difficulty.enemy_ai_bytes(chap, enemy, index))
+
+
 CH01_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON'}
 CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
                   'armor-knight': 'CLASS_ARMOR_KNIGHT'}
@@ -6051,16 +6063,15 @@ def _load_prologue_chapter(campaign):
         return _yaml_load(f)
 
 
-def _prologue_roster_blocks(by_id, slots, classes, guest_items):
+def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
     """The prologue's two `UnitDefinition` initialisers, driven by the ch00 YAML.
 
     redaCount=0 places units statically at xPosition/yPosition (like inject_test_chapter);
     the boss rides the ONEILL slot (CA_BOSS marks it a boss for autolevel/UI -- the
-    DefeatBoss EVENT flag comes from the flagged defeat quote, not from CA_BOSS). AI: boss
-    = Breguet's stationary-aggressive bytes {AI_A_03 ActionStanding, AI_B_03 NeverMove,
-    config} (cp_data.c gAi1/2ScriptTable) -- NOT O'Neill's {0x6,0x3} "DoNothing", which
-    only works because the vanilla tutorial event-scripts his attack. Guards attack in
-    range (AI_A_00).
+    DefeatBoss EVENT flag comes from the flagged defeat quote, not from CA_BOSS). AI is
+    BORROWED from each unit's vanilla donor and no longer written here (#335); Sephek
+    carries an `ai_override:` in the YAML because O'Neill's DoNothing depends on a tutorial
+    event-script we do not run.
 
     Levels, positions (0-indexed x,y), the guard head-count and the enemy weapons are read
     from the YAML. They used to be literals here under a comment that claimed otherwise,
@@ -6136,10 +6147,11 @@ def _prologue_roster_blocks(by_id, slots, classes, guest_items):
         '        .yPosition = %d,\n'
         '        .redaCount = 0,\n'
         '        .items = { %s },\n'
-        '        .ai = {0x0, 0xa, 0x0, 0x0},\n'
+        '        .ai = %s,\n'
         '    },\n' % (slot, guard['level'], pos[0], pos[1],
-                      fe_item_enum(guard['inventory'][0]))
-        for slot, pos in zip(guard_slots, guard['positions']))
+                      fe_item_enum(guard['inventory'][0]),
+                      enemy_ai_initialiser(chap, guard, index))
+        for index, (slot, pos) in enumerate(zip(guard_slots, guard['positions'])))
 
     enemy = (
         '{\n'
@@ -6152,12 +6164,13 @@ def _prologue_roster_blocks(by_id, slots, classes, guest_items):
         '        .yPosition = %d,\n'
         '        .redaCount = 0,\n'
         '        .items = { %s },\n'
-        '        .ai = {0x3, 0x3, 0x9, 0x20}, /* attack in place, never move (Breguet) */\n'
+        '        .ai = %s,\n'
         '    },\n'
         '%s'
         '    { 0 },\n'
         '}' % (sephek_slot, sephek['level'], sephek['position'][0], sephek['position'][1],
-               fe_item_enum(sephek['inventory'][0]), guards))
+               fe_item_enum(sephek['inventory'][0]),
+               enemy_ai_initialiser(chap, sephek), guards))
     return ally, enemy
 
 
@@ -6214,7 +6227,7 @@ def inject_prologue(campaign, verbose=True, montage=False):
 
     # 2. Rewrite the two prologue rosters from the ch00 YAML (_prologue_roster_blocks).
     ally, enemy = _prologue_roster_blocks(
-        by_id, (hlin_slot, scram_slot, sephek_slot), (hlin_class, scram_class),
+        chap, by_id, (hlin_slot, scram_slot, sephek_slot), (hlin_class, scram_class),
         (hlin_items, scram_items))
     with open(CH1_UDEFS_H, encoding='utf-8') as f:
         udefs = f.read()
@@ -7842,31 +7855,33 @@ def inject_ch01(campaign, verbose=True):
         return reskin_by_base.get(base, base)
 
     enemies = []
-    for x, y in spear['positions']:
+    for index, (x, y) in enumerate(spear['positions']):
         enemies.append(_enemy_unit_entry(
             '0x80', grunt_class(spear['class']), spear['level'], True, x, y,
-            CH01_ITEM_IDS[spear['inventory'][0]['id']], CH01_AI[spear['ai_pattern']],
+            CH01_ITEM_IDS[spear['inventory'][0]['id']],
+            enemy_ai_initialiser(chap, spear, index),
             ' /* goblin spear -- camp approach */'))
-    for x, y in axe['positions']:
+    for index, (x, y) in enumerate(axe['positions']):
         enemies.append(_enemy_unit_entry(
             '0x80', grunt_class(axe['class']), axe['level'], True, x, y,
-            CH01_ITEM_IDS[axe['inventory'][0]['id']], CH01_AI[axe['ai_pattern']],
+            CH01_ITEM_IDS[axe['inventory'][0]['id']],
+            enemy_ai_initialiser(chap, axe, index),
             ' /* goblin raider -- mid-trail pursuer */'))
     cx, cy = chief['position']
     # The iron-ingots MacGuffin stays narrative (no FE8 item exists for it yet);
     # recovery is told in the ending scene. The chief mirrors Breguet 1:1: his slot's
-    # vanilla boss bases, no autolevel, lv4, attack-in-place AI, ON the seize tile.
+    # vanilla boss bases, no autolevel, lv4, his own borrowed AI, ON the seize tile.
     enemies.append(_enemy_unit_entry(
         'CHARACTER_%s' % CH01_BOSS_SLOT, CH01_CLASS_IDS[chief['class']],
         chief['level'], False, cx, cy,
-        CH01_ITEM_IDS[chief['inventory'][0]['id']], CH01_AI[chief['ai_pattern']],
+        CH01_ITEM_IDS[chief['inventory'][0]['id']], enemy_ai_initialiser(chap, chief),
         ' /* goblin chief -- boss, holds the seize tile */'))
     reinforce = []
-    for cls, (x, y) in zip(reinf['composition'], reinf['positions']):
+    for index, (cls, (x, y)) in enumerate(zip(reinf['composition'], reinf['positions'])):
         reinforce.append(_enemy_unit_entry(
             '0x80', grunt_class(cls), reinf['level'], True, x, y,
             CH01_ITEM_IDS[reinf['inventory_by_class'][cls][0]],
-            CH01_AI['reinforce'], ' /* west reinforcement, turn %d */'
+            enemy_ai_initialiser(chap, reinf, index), ' /* west reinforcement, turn %d */'
             % reinf['spawn_turn']))
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
@@ -8931,8 +8946,6 @@ CH03_BOSS_DEATH_MSG = 0x9A3
 # DefeatBoss ending script: repurpose the vanilla Ch4 ending EventScr_089F19F8 (defined in ch4-eventscript.h,
 # already extern-referenced by the vanilla Ch4 Misc's DefeatAll -> visible to ch4-eventinfo.h's Misc list).
 CH03_ENDING_SCRIPT = 'EventScr_089F19F8'
-CH03_AI = {'aggressive': '{0x0, 0x0, 0x1, 0x0}',   # pursue/charge
-           'defensive':  '{0x3, 0x3, 0x9, 0x20}'}  # attack in place, never move (hold the galleries)
 # Brigand kobolds ride the Lizard-Wildling reskin slot (inject_enemy_class_reskins clones
 # CLASS_BRIGAND -> CLASS_BRG_LIZARD_WILDLING, an appended class id, with the lizard SMS;
 # combat stays brigand). Grell = vanilla Mogall; blade = Mercenary (Lizardzerker slot lands
@@ -9071,10 +9084,6 @@ CH04_MONSTER_PIDS = {
     'bonewalker-bow': '0xad',
     'mogall': '0xb7',
     'entoumbed': '0xab',
-}
-CH04_AI = {
-    'aggressive': '{0x0, 0x0, 0x1, 0x0}',
-    'defensive': '{0x3, 0x3, 0x9, 0x20}',
 }
 # Stage 2b -- the turn-2 wolf-pack reveal + Marty->Lupin parley (issue #24). Lupin rides the
 # collision-free Duessel identity slot (Stage 2a); placed RED as the pack leader, Marty's Talk
@@ -9795,22 +9804,6 @@ def unregistered_raw_pid_bosses(campaign):
 RAW_PID_BATTLE_ANIMS = {
     'white-moose': (CH05_CHAPTER_YAML, CH05_MOOSE_PID),
     'ravisin': (CH05_CHAPTER_YAML, CH05_BOSS_PID),
-}
-CH05_AI = {
-    'aggressive': '{0x0, 0x0, 0x1, 0x0}',        # pursue/charge
-    'defensive': '{0x3, 0x3, 0x9, 0x20}',        # hold and strike in range
-    'hold_position': '{GuardTileAI, 0x9, 0x20}', # vanilla Saar's boss posture
-    # Vanilla Joshua's own bytes (UnitDef_088B5914): AI_A_07 + AI_B_03 = strike anything that
-    # comes in range, NEVER move, and DO NOT TOUCH THE ESCORT. Sahnar stands guard at the arena
-    # from turn 1 (#25's scene-3 summon), and a turn-1 crit-Myrmidon that PURSUED would be a
-    # different chapter -- one that hunts the squishies instead of posing the escort puzzle ch05
-    # is built on. The escort carve-out is real for us too; see repoint_escort_safe_ai_list.
-    'duelist_hold': '{0x7, 0x3, 0x9, 0x0}',
-    # AI_B_04 = AiScr_AiB_PillageThenPursue (cp_data.c): head for the nearest lootable tile,
-    # sack it, then fight normally. Vanilla Ch5 puts this on all six of its reinforcements and
-    # nothing else, which is the whole village-raid race -- the AI is terrain-driven
-    # (gTerrainList_LootableVillages), so it needs no target list and no class of its own.
-    'raider': '{0x0, 0x4, 0x9, 0x0}',
 }
 # ch05's four INFANTRY classes deploy on their skeleton reskins (#25, campaign.yaml
 # `enemy_class_reskins`): every ch05 unit wearing one of them is a risen tomb-guardian, and
@@ -10894,8 +10887,8 @@ def ch04_enemy_rows(chap, arrives_turn=None):
             key = item.get('fe_base') or item['id']
             inventory.append(CH04_ITEM_IDS[key])
         drop = enemy.get('item_drop')
-        ai = CH04_AI[enemy.get('ai_pattern', 'defensive')]
         for index, (x, y) in enumerate(enemy['positions']):
+            ai = enemy_ai_initialiser(chap, enemy, index)
             items = list(inventory)
             is_dropper = bool(drop) and index == 0
             if is_dropper:
@@ -10919,14 +10912,14 @@ def _ch04_reveal_wave(chap):
     return wave
 
 
-def _ch04_wave_pack_kit(wave):
+def _ch04_wave_pack_kit(chap, wave):
     """(class_enum, ai, items) for a ch04 enemy wave, read from its authored YAML (no drift).
 
     The pack keeps this kit through the parley: CUSN changes a unit's FACTION, nothing else,
-    so the converted wolves fight on with the same class, items and (aggressive) AI -- which
-    is the point, since "the wolves turn the tide" is what the parley buys."""
+    so the converted wolves fight on with the same class, items and AI -- which is the point,
+    since "the wolves turn the tide" is what the parley buys."""
     cls = CH04_CLASS_IDS[wave['class']]
-    ai = CH04_AI[wave.get('ai_pattern', 'defensive')]
+    ai = enemy_ai_initialiser(chap, wave)
     items = [CH04_ITEM_IDS[i.get('fe_base') or i['id']] for i in wave.get('inventory', [])]
     return cls, ai, ', '.join(items) or '0'
 
@@ -10943,7 +10936,7 @@ def ch04_turn2_reveal_rows(chap, lupin):
     Each generic takes its OWN pid (CH04_PACK_PIDS, in tile order) -- the parley addresses them
     one at a time, and a shared pid can only ever be found once (#203)."""
     wave = _ch04_reveal_wave(chap)
-    cls, ai, items = _ch04_wave_pack_kit(wave)
+    cls, ai, items = _ch04_wave_pack_kit(chap, wave)
     leader_pos, generic_pos = wave['positions'][0], wave['positions'][1:]
     if len(generic_pos) != len(CH04_PACK_PIDS):
         sys.exit('ERROR: ch04 pack is %d generics but CH04_PACK_PIDS has %d pids -- the '
@@ -10953,7 +10946,8 @@ def ch04_turn2_reveal_rows(chap, lupin):
     lupin_row = _enemy_unit_entry(
         char_symbol(slot), deploy_class, level, False,
         leader_pos[0], leader_pos[1], ', '.join(CLASS_LOADOUT[class_enum]),
-        CH04_AI['aggressive'], ' /* lupin -- hostile pack leader (red; Marty parleys him blue) */')
+        ai,
+        ' /* lupin -- hostile pack leader (red; Marty parleys him blue) */')
     generics = [_enemy_unit_entry(
         pid, cls, int(wave['level']), bool(wave.get('autolevel')), x, y, items, ai,
         ' /* %s %d/%d -- %s (generic pack; own pid so the parley can convert it) */'
@@ -11362,16 +11356,16 @@ def inject_ch03(campaign, boot=False, verbose=True):
         drop = e.get('item_drop')
         if drop:
             items = '%s, %s' % (items, CH03_ITEM_IDS[drop]) if items else CH03_ITEM_IDS[drop]
-        ai = CH03_AI.get(e.get('ai_pattern', 'defensive'), CH03_AI['defensive'])
         # The boss (grell) + the mid-map miniboss (Brute) each ride a UNIQUE raw pid so their
         # flagged gDefeatTalkList entries key their death events (WIN / midmap AFEV) to them
         # alone; every other enemy shares the generic autolevelled-trash pid.
         char = (CH03_BOSS_PID if e.get('is_boss')
                 else CH03_BRUTE_MINIBOSS_PID if e.get('is_miniboss')
                 else CH03_GENERIC_PID)
-        for x, y in e['positions']:
+        for index, (x, y) in enumerate(e['positions']):
             enemies.append(_enemy_unit_entry(
-                char, cls, e['level'], bool(e.get('autolevel')), x, y, items, ai,
+                char, cls, e['level'], bool(e.get('autolevel')), x, y, items,
+                enemy_ai_initialiser(chap, e, index),
                 ' /* %s */' % e['id'], itemdrop=bool(drop)))
     enemy = '{\n' + '\n'.join(enemies) + '\n    { 0 },\n}'
 
@@ -12086,6 +12080,35 @@ def repoint_escort_safe_ai_list(escort_char, why):
         f.write(source)
 
 
+def escort_safe_ai_clients(campaign='rime-of-the-frostmaiden'):
+    """`['chNN.enemy-id', ...]` for every enemy whose EMITTED AI1 is AI_A_07.
+
+    Reads what each chapter actually ships -- donor bytes or a declared override -- rather
+    than a table of labels (#335). That is strictly wider than the label scan it replaced:
+    it also catches a unit that inherits AI_A_07 from its vanilla DONOR, which no scan of
+    our own vocabulary could ever see."""
+    import difficulty
+    out = []
+    for path in sorted(glob.glob(os.path.join(
+            REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml'))):
+        with open(path, encoding='utf-8') as source:
+            chap = _yaml_load(source)
+        stem = os.path.basename(path)[:4]
+        for key in difficulty.AI_ROSTER_KEYS:
+            for enemy in chap.get(key) or []:
+                if not isinstance(enemy, dict):
+                    continue
+                for index in range(max(1, len(enemy.get('positions') or []))):
+                    try:
+                        ai = difficulty.enemy_ai_bytes(chap, enemy, index)
+                    except ValueError:
+                        continue        # ungrounded: ai_donor_findings reports it, not us
+                    if ai[0] == ESCORT_SAFE_AI_INDEX:
+                        out.append('%s.%s' % (stem, enemy.get('id')))
+                        break
+    return sorted(out)
+
+
 def assert_escort_safe_ai_has_one_client(ai_bytes):
     """Refuse the repoint if anything but our duelist has picked up AI_A_07.
 
@@ -12093,21 +12116,14 @@ def assert_escort_safe_ai_has_one_client(ai_bytes):
     user; if ANY chapter gives a second unit `AI_A_07`, that unit silently inherits "will not
     attack Basil" and this stops being a faithful copy of Joshua's refusal.
 
-    Swept over EVERY chapter's AI vocabulary, not just ch05's. Scoping it to ch05 was the first
-    cut and it defeated the guard's own purpose: the hazard is a FUTURE chapter reaching for
+    Swept over EVERY chapter, not just ch05: the hazard is a FUTURE chapter reaching for
     `{0x7,` for its own reasons, which is precisely the case a ch05-only scan cannot see.
     """
-    tables = {name: value for name, value in globals().items()
-              if re.fullmatch(r'CH\d\d_AI', name) and isinstance(value, dict)}
-    users = sorted('%s.%s' % (table, pattern)
-                   for table, ai_map in tables.items()
-                   for pattern, ai in ai_map.items()
-                   if ai.startswith('{0x%X,' % ESCORT_SAFE_AI_INDEX))
-    if users != ['CH05_AI.duelist_hold'] or CH05_AI['duelist_hold'] != ai_bytes:
-        sys.exit('ERROR: AI_A_07 (%s) must have exactly one client across ALL chapters -- ch05 '
-                 'Sahnar\'s duelist_hold. Got %s (swept %d AI table(s)). The do-not-attack list '
-                 'is global; a second client inherits our escort\'s immunity by accident.'
-                 % (ESCORT_SAFE_AI_LIST, users, len(tables)))
+    users = escort_safe_ai_clients()
+    if users != ['ch05.sahnar'] or ai_bytes != '{0x7, 0x3, 0x9, 0x0}':
+        sys.exit('ERROR: AI_A_07 (%s) must have exactly one client across ALL chapters -- '
+                 'ch05 Sahnar. Got %s. The do-not-attack list is global; a second client '
+                 'inherits our escort\'s immunity by accident.' % (ESCORT_SAFE_AI_LIST, users))
 
 
 def ch05_enemy_rows(chap, arrives_turn=None, exclude=()):
@@ -12126,11 +12142,11 @@ def ch05_enemy_rows(chap, arrives_turn=None, exclude=()):
         items = [CH05_ITEM_IDS[item.get('fe_base') or item['id']]
                  for item in enemy.get('inventory', [])]
         drop = enemy.get('item_drop')
-        ai = CH05_AI[enemy.get('ai_pattern', 'defensive')]
         pid = (CH05_BOSS_PID if enemy.get('is_boss')
                else CH05_MOOSE_PID if enemy.get('is_miniboss')
                else CH05_GENERIC_PID)
         for index, (x, y) in enumerate(enemy['positions']):
+            ai = enemy_ai_initialiser(chap, enemy, index)
             carried = list(items)
             dropper = bool(drop) and index == 0
             if dropper:
@@ -13198,8 +13214,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # the arena tile at all. That refusal rides a character id in a global list, not in the .ai
     # bytes, so copying his bytes alone leaves Basil a legal target. Repointed here, at the one
     # place that knows who our escort is.
-    assert_escort_safe_ai_has_one_client(CH05_AI[
-        next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')['ai_pattern']])
+    assert_escort_safe_ai_has_one_client(enemy_ai_initialiser(
+        chap, next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')))
     repoint_escort_safe_ai_list(basil_char, 'Basil (ch05 escort)')
 
     # 3. Strip the host slot's event lists and wire ours. The list SYMBOLS are the only

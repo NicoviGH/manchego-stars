@@ -183,6 +183,339 @@ class CurveGate(unittest.TestCase):
         self.assertEqual(df.curve_gate_failures(rows), [])
 
 
+class VanillaAiBytes(unittest.TestCase):
+    """#335: an AI vector as vanilla writes it -> the 4 bytes the engine loads.
+
+    Vanilla writes its own UnitDefinition AI in the decomp's compiled EA macros
+    (include/EA_Standard_Library/AI_Helpers.h, reached from events_udefs.c via EAstdlib.h),
+    falling back to raw literals for the combinations that have no macro. We read BOTH,
+    from the header itself -- a hand-copied macro table here would be a second source of
+    truth for the exact bytes this whole feature exists to keep faithful."""
+
+    def test_literal_bytes_pass_through(self):
+        self.assertEqual(df.ai_bytes('{0x0, 0x3, 0x9, 0x0}'), (0x00, 0x03, 0x09, 0x00))
+
+    def test_a_two_byte_macro_expands_in_place(self):
+        # AI_Helpers.h: #define GuardTileAI 0x03,0x03
+        self.assertEqual(df.ai_bytes('{GuardTileAI, 0x9, 0x20}'), (0x03, 0x03, 0x09, 0x20))
+
+    def test_a_four_byte_macro_fills_the_whole_vector(self):
+        # #define NeverMoveAI 0x03,0x03,0x04,0x20
+        self.assertEqual(df.ai_bytes('{NeverMoveAI}'), (0x03, 0x03, 0x04, 0x20))
+
+    def test_a_missing_ai_block_is_all_zeros(self):
+        # No .ai in a UnitDefinition means {0,0,0,0} = ActionInRange + MoveToEnemy, which is
+        # a PURSUER. Two of vanilla Ch6's red units are exactly that.
+        self.assertEqual(df.ai_bytes(None), (0x00, 0x00, 0x00, 0x00))
+
+    def test_macros_are_read_from_the_decomp_header_not_a_local_copy(self):
+        # The guard against the mistake this feature is fixing one level up: every macro the
+        # header defines must resolve, so adding one there needs no edit here.
+        self.assertIn('AttackInRangeAI', df.AI_MACROS)
+        self.assertEqual(df.AI_MACROS['AttackInRangeAI'], (0x00, 0x03))
+        self.assertEqual(df.AI_MACROS['DoNothing'], (0x06, 0x03))
+
+
+class DonorResolution(unittest.TestCase):
+    """#335: each of our enemies stands in for a unit in its chapter's vanilla twin, and the
+    twin's UnitDefinition already carries that unit's AI. The chapter YAMLs have named their
+    counterpart in a comment since they were written ("vanilla brigand @ (7,2) L3 iron-axe");
+    `donor:` promotes that prose to a field so the build can read it.
+
+    Keyed on the twin's map COORDINATE, the way the comments already write it. Vanilla stacks
+    several units on one tile in places, so the reference may add `class`/`level` to pick one
+    -- and an ambiguous reference is an ERROR, never a silent first-match."""
+
+    def test_a_coordinate_resolves_to_that_units_ai(self):
+        # vanilla Ch3's brigand at (7,2): AttackInRangeAI, the static line.
+        self.assertEqual(df.resolve_donor('FE8 Ch3', [7, 2])['ai'], (0x00, 0x03, 0x09, 0x00))
+
+    def test_the_boss_tile_resolves_to_the_boss(self):
+        # Bazba at (14,1) -- GuardTileAI + the GuardTile config bit.
+        donor = df.resolve_donor('FE8 Ch3', [14, 1])
+        self.assertEqual(donor['ai'], (0x03, 0x03, 0x09, 0x20))
+        self.assertEqual(donor['classIndex'], 'CLASS_BRIGAND')
+
+    def test_a_post_two_units_share_is_ambiguous_and_raises(self):
+        # The prologue stands its two caravan guards on (14,7) with different AI
+        # ({0,0xA,..} scripted approach vs {0,0x12,..} charge-on-turn-2). First-match would
+        # silently pick one. Posts are otherwise unique in every twin we use.
+        with self.assertRaises(ValueError) as caught:
+            df.resolve_donor('FE8 Prologue', [14, 7])
+        self.assertIn('disagree', str(caught.exception).lower())
+
+    def test_level_disambiguates_a_shared_post(self):
+        self.assertEqual(
+            df.resolve_donor('FE8 Prologue', {'at': [14, 7], 'level': 1})['ai'],
+            (0x00, 0x0A, 0x00, 0x00))
+        self.assertEqual(
+            df.resolve_donor('FE8 Prologue', {'at': [14, 7], 'level': 2})['ai'],
+            (0x00, 0x12, 0x02, 0x00))
+
+    def test_a_coordinate_no_red_unit_occupies_raises(self):
+        with self.assertRaises(ValueError) as caught:
+            df.resolve_donor('FE8 Ch3', [0, 0])
+        self.assertIn('matches no red unit', str(caught.exception).lower())
+
+    def test_an_uncurated_twin_raises_rather_than_returning_nothing(self):
+        with self.assertRaises(ValueError):
+            df.resolve_donor('FE8 Ch99', [1, 1])
+
+
+class EnemyAiBytes(unittest.TestCase):
+    """#335: an enemy's AI is BORROWED from its vanilla donor unless the chapter says
+    otherwise in writing. No label vocabulary in between -- the labels were the translation
+    layer every one of these bugs lived in (`aggressive` meaning one thing in the YAML and
+    another in five injectors; `defensive` and `hold_position` being the same bytes under
+    two names; ch00's label wired to nothing at all)."""
+
+    def _enemy(self, **kw):
+        return dict({'id': 'e', 'class': 'brigand', 'level': 3}, **kw)
+
+    def test_an_enemy_borrows_its_donors_ai(self):
+        chap = {'parity_reference': 'FE8 Ch3'}
+        self.assertEqual(df.enemy_ai_bytes(chap, self._enemy(donor=[7, 2])),
+                         (0x00, 0x03, 0x09, 0x00))
+
+    def test_an_override_replaces_the_donors_ai(self):
+        chap = {'parity_reference': 'FE8 Ch3'}
+        enemy = self._enemy(donor=[7, 2], ai_override={
+            'ai': '{DefaultAI, 0x9, 0x0}', 'why': 'our map moves the fight to the entrance'})
+        self.assertEqual(df.enemy_ai_bytes(chap, enemy), (0x00, 0x00, 0x09, 0x00))
+
+    def test_an_override_may_stand_alone_where_we_field_a_unit_vanilla_does_not(self):
+        # ch04's wolf pack is six units where vanilla loads four revenants on one corner
+        # tile; there is no single donor to point at, so the override IS the declaration.
+        chap = {'parity_reference': 'FE8 Ch4'}
+        enemy = self._enemy(ai_override={'ai': '{AttackInRangeAI, 0xC, 0x0}',
+                                         'why': 'the pack is ours, not a vanilla unit'})
+        self.assertEqual(df.enemy_ai_bytes(chap, enemy), (0x00, 0x03, 0x0C, 0x00))
+
+    def test_an_enemy_with_neither_is_an_error_not_a_default(self):
+        # A default here is how ch00 shipped an ai_pattern nobody read. Refuse instead.
+        chap = {'parity_reference': 'FE8 Ch3'}
+        with self.assertRaises(ValueError):
+            df.enemy_ai_bytes(chap, self._enemy())
+
+    def test_an_override_without_a_why_is_refused_at_build_time(self):
+        # The `why` is the whole difference between a declared divergence and a silenced
+        # guard. Reporting it only in the curve gate left it optional for every chapter
+        # that is not balance_locked -- which is where new AI actually gets authored.
+        chap = {'parity_reference': 'FE8 Ch3'}
+        enemy = self._enemy(donor=[7, 2], ai_override={'ai': '{DefaultAI, 0x9, 0x0}'})
+        with self.assertRaises(ValueError):
+            df.enemy_ai_bytes(chap, enemy)
+
+    def test_an_override_with_a_blank_why_is_refused_too(self):
+        chap = {'parity_reference': 'FE8 Ch3'}
+        enemy = self._enemy(donor=[7, 2],
+                            ai_override={'ai': '{DefaultAI, 0x9, 0x0}', 'why': '   '})
+        with self.assertRaises(ValueError):
+            df.enemy_ai_bytes(chap, enemy)
+
+
+class AiDonorFindings(unittest.TestCase):
+    """The guard. Same contract as role_findings(): a list of strings, empty == clean."""
+
+    def _chap(self, enemies, ref='FE8 Ch3'):
+        return {'parity_reference': ref, 'enemy_units': enemies}
+
+    def test_a_fully_donored_chapter_is_clean(self):
+        self.assertEqual(df.ai_donor_findings(
+            self._chap([{'id': 'a', 'donor': [7, 2]}, {'id': 'b', 'donor': [14, 1]}])), [])
+
+    def test_an_enemy_with_no_donor_is_reported(self):
+        findings = df.ai_donor_findings(self._chap([{'id': 'stray'}]))
+        self.assertTrue(any('stray' in f for f in findings), findings)
+
+    def test_an_override_without_a_reason_is_reported(self):
+        findings = df.ai_donor_findings(self._chap(
+            [{'id': 'a', 'donor': [7, 2], 'ai_override': {'ai': '{DefaultAI, 0x9, 0x0}'}}]))
+        self.assertTrue(any('why' in f for f in findings), findings)
+
+    def test_an_unresolvable_donor_is_reported_with_the_reason_it_failed(self):
+        findings = df.ai_donor_findings(self._chap([{'id': 'a', 'donor': [14, 7]}],
+                                                   ref='FE8 Prologue'))
+        self.assertTrue(any('disagree' in f.lower() for f in findings), findings)
+
+    def test_reinforcement_waves_are_checked_too(self):
+        # ch02 declares two of its nine reds under `reinforcements:`.
+        chap = self._chap([{'id': 'a', 'donor': [7, 2]}])
+        chap['reinforcements'] = [{'id': 'late'}]
+        findings = df.ai_donor_findings(chap)
+        self.assertTrue(any('late' in f for f in findings), findings)
+
+    def test_an_uncurated_twin_yields_no_findings(self):
+        self.assertEqual(
+            df.ai_donor_findings(self._chap([{'id': 'a'}], ref='FE8 Ch99')), [])
+
+
+class DonorGroupResolution(unittest.TestCase):
+    """A donor reference need not be a coordinate. ch01 and ch06 sit on a DIFFERENT map
+    donor from their parity twin (Ch13Eirika and Ch13Ephraim), so no tile of theirs lines up
+    with the twin at all -- but their forces pair by role, 1:1. And coordinates are actively
+    treacherous as a lone key: ch05's bone-archer reinforcement wave sits on (13,0), where
+    vanilla Ch5 happens to park an ARMOR_KNIGHT boss.
+
+    So the reference is a MATCH SPEC over the twin's red force -- coordinate, class, level,
+    any combination -- and it resolves when every unit it matches SHARES an AI. Vanilla's
+    three L2 soldiers behave identically, so 'the L2 soldiers' is a well-formed donor for our
+    group of three; where the matches disagree, it raises and asks for a narrower spec."""
+
+    def test_a_class_spec_resolves_a_whole_group_that_shares_one_ai(self):
+        # vanilla Ch3's five L3 brigands are all AttackInRangeAI -- one behaviour, so "the
+        # L3 brigands" is a well-formed donor for a group of ours.
+        self.assertEqual(
+            df.resolve_donor('FE8 Ch3', {'class': 'CLASS_BRIGAND', 'level': 3})['ai'],
+            (0x00, 0x03, 0x09, 0x00))
+
+    def test_a_class_spec_spanning_line_and_reinforcements_raises(self):
+        # Ch1's three L2 SOLDIERs look interchangeable and are not: the two on the line are
+        # AttackInRange, the one in the reinforcement wave PURSUES. Same class, same level,
+        # different chapter role -- exactly the collapse that authoring by feel produces.
+        with self.assertRaises(ValueError) as caught:
+            df.resolve_donor('FE8 Ch1', {'class': 'CLASS_SOLDIER', 'level': 2})
+        self.assertIn('disagree', str(caught.exception).lower())
+
+    def test_a_coordinate_still_works_where_the_map_is_the_twins(self):
+        self.assertEqual(df.resolve_donor('FE8 Ch3', [7, 2])['ai'], (0x00, 0x03, 0x09, 0x00))
+
+    def test_coordinate_and_class_combine(self):
+        self.assertEqual(
+            df.resolve_donor('FE8 Ch2', {'at': [14, 9], 'class': 'CLASS_ARCHER'})['ai'],
+            (0x00, 0x12, 0x09, 0x00))
+
+    def test_a_spec_matching_nothing_raises(self):
+        with self.assertRaises(ValueError) as caught:
+            df.resolve_donor('FE8 Ch3', {'class': 'CLASS_PEGASUS_KNIGHT'})
+        self.assertIn('matches no red unit', str(caught.exception).lower())
+
+
+class PerPositionDonors(unittest.TestCase):
+    """An entry may carry ONE donor per position. ch04's `mogall` entry places four units on
+    vanilla Ch4's four mogall tiles, and those four vanilla mogalls run THREE different AIs
+    (AttackInRange x2, pursue, charge-after-one-turn). A single donor per entry would flatten
+    that into one behaviour and quietly lose the map's texture -- the same collapse that
+    authoring by label produced in the first place."""
+
+    CHAP = {'parity_reference': 'FE8 Ch4'}
+
+    def test_a_list_of_donors_gives_each_position_its_own_ai(self):
+        enemy = {'id': 'mogall', 'count': 4,
+                 'positions': [[11, 6], [13, 7], [12, 8], [13, 11]],
+                 'donor': [[11, 6], [13, 7], [12, 8], [13, 11]]}
+        self.assertEqual([df.enemy_ai_bytes(self.CHAP, enemy, i) for i in range(4)],
+                         [(0x00, 0x03, 0x0C, 0x00), (0x00, 0x00, 0x0C, 0x00),
+                          (0x00, 0x12, 0x0C, 0x00), (0x00, 0x03, 0x0C, 0x00)])
+
+    def test_a_single_donor_still_covers_every_position(self):
+        enemy = {'id': 'pack', 'count': 3, 'positions': [[1, 1], [2, 2], [3, 3]],
+                 'donor': [11, 6]}
+        self.assertEqual([df.enemy_ai_bytes(self.CHAP, enemy, i) for i in range(3)],
+                         [(0x00, 0x03, 0x0C, 0x00)] * 3)
+
+    def test_a_donor_list_that_does_not_cover_every_position_raises(self):
+        # Silently reusing the last donor would ship a unit nobody grounded.
+        enemy = {'id': 'short', 'count': 3, 'positions': [[1, 1], [2, 2], [3, 3]],
+                 'donor': [[11, 6], [13, 7]]}
+        with self.assertRaises(ValueError) as caught:
+            df.enemy_ai_bytes(self.CHAP, enemy, 2)
+        self.assertIn('2 donor', str(caught.exception))
+
+    def test_a_bare_coordinate_is_not_read_as_a_list_of_two_donors(self):
+        # `donor: [11, 6]` is ONE coordinate, not two donors. Getting this backwards would
+        # make every single-donor entry silently per-position.
+        enemy = {'id': 'one', 'positions': [[1, 1]], 'donor': [11, 6]}
+        self.assertEqual(df.enemy_ai_bytes(self.CHAP, enemy, 0), (0x00, 0x03, 0x0C, 0x00))
+
+
+class AiGateArm(unittest.TestCase):
+    """#335 joins #284's `role` arm on the SAME opt-in. AI is part of parity -- a chapter
+    marked balance-final whose force is not grounded in its twin is the same contradiction as
+    one carrying an open per-unit finding."""
+
+    def _row(self, label, locked=False, ai=()):
+        return {'label': label, 'locked': locked, 'has_ref': True, 'verdict': 'OK',
+                'boss_drop': False, 'role': [], 'ai': list(ai)}
+
+    def test_a_locked_chapter_with_an_ungrounded_enemy_fails(self):
+        rows = [self._row('CH2', locked=True, ai=['raider-captain: no donor'])]
+        self.assertEqual(df.curve_gate_failures(rows), ['CH2'])
+
+    def test_an_unlocked_chapter_stays_advisory(self):
+        rows = [self._row('CH6', locked=False, ai=['nerra: no donor'])]
+        self.assertEqual(df.curve_gate_failures(rows), [])
+
+    def test_a_locked_chapter_with_every_enemy_grounded_passes(self):
+        self.assertEqual(df.curve_gate_failures([self._row('CH3', locked=True)]), [])
+
+
+class AiFindingsInTheCurveReport(unittest.TestCase):
+    """The report must read EACH chapter's own donors. Runs against the real campaign data:
+    the wiring is the thing under test, and a report that silently graded the wrong chapter
+    would look exactly like a clean one."""
+
+    def _rows(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return {r['label'].split()[0]: r
+                    for r in df.curve_report('rime-of-the-frostmaiden')}
+
+    def test_a_fully_donored_chapter_reports_clean(self):
+        self.assertEqual(self._rows()['CH3']['ai'], [])
+
+    def test_every_row_carries_the_ai_key_so_the_gate_can_read_it(self):
+        self.assertTrue(all('ai' in r for r in self._rows().values()))
+
+
+class VanillaUnitDestinations(unittest.TestCase):
+    """#335: a vanilla unit's `xPosition`/`yPosition` is often a SPAWN tile, not where it
+    fights. `redas` is scripted movement data that walks it from there to its post, and the
+    last REDA point is the destination.
+
+    This is load-bearing for donors. Vanilla Ch1's whole force enters on (1,9)/(2,9) and
+    Ch5's on (0,0)/(10,0)/(12,0) -- matching a donor on those tiles is matching on "entered
+    from the north", which is no identity at all. Matched on DESTINATION, every one of our
+    23 ch05 units lands exactly on a vanilla unit's post, and Ch1's two seemingly identical
+    L2 fighters separate cleanly (they walk to (3,8) and (2,9))."""
+
+    def test_a_unit_with_redas_reports_its_destination_not_its_spawn(self):
+        units = df.vanilla_red_units('FE8 Ch1')
+        knight = next(u for u in units if u['classIndex'] == 'CLASS_ARMOR_KNIGHT')
+        self.assertEqual((2, 9), (knight['xPosition'], knight['yPosition']))
+        self.assertEqual((2, 5), knight['position'])
+
+    def test_a_unit_with_no_redas_falls_back_to_its_placed_tile(self):
+        # ch03's force is placed statically -- no REDA, so position IS xPosition/yPosition.
+        for unit in df.vanilla_red_units('FE8 Ch3'):
+            self.assertEqual((unit['xPosition'], unit['yPosition']), unit['position'])
+
+    def test_destinations_separate_units_identical_in_every_other_field(self):
+        # The pair that made me reach for `nth`: same class, level and spawn tile, different
+        # AI. Their destinations differ, so no ordinal is needed.
+        pair = [u for u in df.vanilla_red_units('FE8 Ch1')
+                if u['classIndex'] == 'CLASS_FIGHTER' and u['level'] == 2
+                and (u['xPosition'], u['yPosition']) == (2, 9)]
+        self.assertEqual(2, len(pair))
+        self.assertEqual({(3, 8), (2, 9)}, {u['position'] for u in pair})
+        self.assertNotEqual(pair[0]['ai'], pair[1]['ai'])
+
+    def test_a_donor_at_matches_the_destination(self):
+        self.assertEqual(df.resolve_donor('FE8 Ch1', [3, 8])['ai'], (0x00, 0x00, 0x01, 0x00))
+        self.assertEqual(df.resolve_donor('FE8 Ch1', [2, 9])['ai'], (0x00, 0x12, 0x01, 0x00))
+
+    def test_every_ch05_unit_of_ours_stands_on_a_vanilla_destination(self):
+        # 23/23 -- the ch05 pairing is DERIVED, not assigned by hand. Matched on spawn tiles
+        # it was 9/23, and the nine were coincidences.
+        posts = {u['position'] for u in df.vanilla_red_units('FE8 Ch5')}
+        with open(df.chapter_path('rime-of-the-frostmaiden', 'ch05'),
+                  encoding='utf-8') as source:
+            chap = bc.yaml.safe_load(source)
+        ours = [tuple(p) for key in df.AI_ROSTER_KEYS
+                for e in (chap.get(key) or []) if isinstance(e, dict)
+                for p in (e.get('positions') or [])]
+        self.assertEqual([], [p for p in ours if p not in posts])
+
+
 class ChapterEnemyForce(unittest.TestCase):
     def test_expands_count_and_composition_into_per_unit_force(self):
         chap = {'enemy_units': [
@@ -260,6 +593,9 @@ CONST_DATA struct UnitDefinition UnitDef_Test[] = {
         .charIndex = CHARACTER_BREGUET,
         .classIndex = CLASS_ARMOR_KNIGHT,
         .allegiance = FACTION_ID_RED,
+        .ai = {GuardTileAI, 0x9, 0x20},
+        .xPosition = 11,
+        .yPosition = 3,
         .level = 4,
         .items = {
             ITEM_LANCE_IRON,
@@ -322,6 +658,9 @@ class VanillaUnitDefParser(unittest.TestCase):
         defs = df.vanilla_unit_defs(_UDEF_SNIPPET, 'UnitDef_Test')
         self.assertEqual(len(defs), 3)           # the { 0 } terminator is skipped
         self.assertEqual(defs[0], {'charIndex': 'CHARACTER_BREGUET',
+                                   'ai': (0x03, 0x03, 0x09, 0x20),
+                                   'redas': None, 'position': (11, 3),
+                                   'xPosition': 11, 'yPosition': 3,
                                    'classIndex': 'CLASS_ARMOR_KNIGHT', 'level': 4,
                                    'allegiance': 'FACTION_ID_RED', 'itemDrop': False,
                                    'items': ['ITEM_LANCE_IRON']})
@@ -334,6 +673,13 @@ class VanillaUnitDefParser(unittest.TestCase):
         defs = df.vanilla_unit_defs(_UDEF_SNIPPET, 'UnitDef_Test')
         self.assertEqual(defs[0]['charIndex'], 'CHARACTER_BREGUET')
         self.assertEqual(defs[2]['charIndex'], 'CHARACTER_EIRIKA')
+
+    def test_captures_the_ai_vector_and_defaults_it_to_all_zeros(self):
+        # #335. A nested .ai must not split the entry (that is what _brace_entries guards),
+        # and an entry WITHOUT one is {0,0,0,0} -- a pursuer, not an inert default.
+        defs = df.vanilla_unit_defs(_UDEF_SNIPPET, 'UnitDef_Test')
+        self.assertEqual(defs[0]['ai'], (0x03, 0x03, 0x09, 0x20))
+        self.assertEqual(defs[1]['ai'], (0x00, 0x00, 0x00, 0x00))
 
     def test_captures_item_drop_bit(self):
         # #176: a unit flagged .itemDrop = 1 drops its LAST item (US_DROP_ITEM, the final

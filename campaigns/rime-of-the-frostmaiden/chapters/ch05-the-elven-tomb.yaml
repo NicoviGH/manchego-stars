@@ -266,7 +266,9 @@ enemy_units:
       - id: killing-frost
         fe_base: flux           # FE8 Flux — dark magic (FE MAG vs RES) at 1-2 range
     damage_type: cold           # flavor label only
-    ai_pattern: hold_position   # = vanilla Saar's GuardTileAI posture (decomp: .ai {GuardTileAI,0x9,0x20})
+    donor: [[13, 1]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     boss_tile: moon_dial        # she holds the moon dial at the centre — retiled as a dais
                                 # (flavour + AI anchor; NO terrain bonus, see below)
     personal:                   # FE8's OWN boss mechanism — a named boss is class base + a
@@ -422,7 +424,11 @@ enemy_units:
       - id: fire-fang
         fe_base: fire-fang
     damage_type: bludgeoning    # flavor label only ("antlers/hooves")
-    ai_pattern: aggressive
+    ai_override:
+      ai: '{DefaultAI, 0x9, 0x0}'
+      why: >
+        the moose is ours -- vanilla Ch5 fields no beast to borrow from. It hunts, so it
+        takes vanilla Ch5's own pursue vector rather than a static one.
     convertible: false          # #171 — a difficulty-model flag. `difficulty.py` reads it to
                                 # exempt a unit from the role-inversion check and to apply
                                 # CONVERT_CLEAR_DISCOUNT (0.5) to clear-load, and BOTH would be
@@ -499,7 +505,9 @@ enemy_units:
       - id: elven-spear
         fe_base: iron-lance
     damage_type: piercing       # flavor label only
-    ai_pattern: defensive       # hold the approaches to the depression
+    donor: [[11, 2], [13, 3], [9, 4], [9, 9]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     skin:
       look: "skeletal elven spear-guard"
       source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
@@ -525,7 +533,9 @@ enemy_units:
       - id: rusted-greataxe
         fe_base: iron-axe
     damage_type: slashing       # flavor label only
-    ai_pattern: aggressive
+    donor: [[10, 8], [8, 8], [7, 2], [0, 0], [4, 10], [0, 10], [3, 7], [5, 7]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     skin:
       look: "risen elven axe-reaver, frost-pale"
       source: palette_swap      # vanilla Fighter frame, frost/pale palette
@@ -545,7 +555,9 @@ enemy_units:
       - id: bone-sword
         fe_base: iron-sword
     damage_type: slashing       # flavor label only
-    ai_pattern: aggressive
+    donor: [[3, 3]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     skin:
       look: "skeletal elven blade"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Base] [U] Bonewalker (one arm, sword) by Alexsplode"
@@ -562,7 +574,9 @@ enemy_units:
       - id: elven-longbow
         fe_base: iron-bow
     damage_type: piercing       # flavor label only
-    ai_pattern: defensive
+    donor: [[1, 7]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     skin:
       look: "skeletal elven archer"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
@@ -589,7 +603,9 @@ enemy_units:
       - id: elven-spear
         fe_base: iron-lance
     damage_type: piercing       # flavor label only
-    ai_pattern: raider          # AI_B_04, vanilla's own — they make for reliquary-south first
+    donor: [[14, 16], [14, 15]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     skin:
       look: "skeletal elven spear-guard"
       source: "FE-Repo: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] [U] Skeleberdier (skeleton lance; frost-repal)"
@@ -606,7 +622,9 @@ enemy_units:
       - id: rusted-greataxe
         fe_base: iron-axe
     damage_type: slashing       # flavor label only
-    ai_pattern: raider          # AI_B_04 — reliquary-east (12,10) and west (5,6) are theirs
+    donor: [[14, 8], [14, 6]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     skin:
       look: "risen elven axe-reaver, frost-pale"
       source: palette_swap
@@ -624,7 +642,9 @@ enemy_units:
       - id: elven-longbow
         fe_base: iron-bow
     damage_type: piercing       # flavor label only
-    ai_pattern: raider          # AI_B_04 — vanilla's turn-8 pair spawns here and races (5,1) too
+    donor: [[13, 0], [14, 1]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     skin:
       look: "skeletal elven archer"
       source: "FE-Repo: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand"
@@ -666,18 +686,9 @@ enemy_units:
       - id: killing-edge
         fe_base: killing-edge   # Joshua's killing-edge (30 crit) — the fragile-escort tension
     damage_type: slashing       # flavor label only
-    ai_pattern: duelist_hold    # vanilla Joshua's own {0x7, 0x3, 0x9, 0x0} — strike anything that
-                                # comes in range, NEVER move, and DO NOT TOUCH THE ESCORT. She
-                                # stands guard at the arena. A turn-1 crit-Myrmidon on
-                                # `aggressive` (pursue/charge) would hunt the squishies, which is
-                                # a different chapter; one standing guard is the escort puzzle
-                                # this chapter is built on.
-                                # Sahnar is Joshua and Basil is Natasha, all the way down: AI_A_07
-                                # is `ActionInRange_ExceptNatasha`, and the refusal that makes a
-                                # fragile Cleric able to walk up to a Killing Edge lives in a
-                                # character-id list, not in these bytes. `repoint_escort_safe_ai_list`
-                                # points it at Basil at build time — the list has exactly one
-                                # client in all of FE8 (this unit's donor), so nothing else moves.
+    donor: [[12, 6]]
+    # every ch05 unit stands on a vanilla unit's POST (its REDA
+    # destination), so the pairing is derived: 23 of 23, tile for tile
     convertible: true           # #171 — the Joshua flip. Hostile crit-Myrmidon until fragile BASIL
                                 # chaperones across to Talk her; then a +~0.9 kills/round back-half ally.
     parley:

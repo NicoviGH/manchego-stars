@@ -168,7 +168,7 @@ enemy_units:
                                 # chapters later, so the boss curve stays monotonic.
     inventory:
       - id: evil-eye            # the mogall's innate ranged magic gaze (hits RES); flavor = lightning tentacle
-    ai_pattern: aggressive      # guards the lair; VISIBLE from turn 1 like vanilla Bazba — Pinky's shaft-scout moved into the opening cutscene (player sees the mogall up top), so no in-battle reveal
+    donor: [14, 1]     # vanilla Bazba, the seize-tile boss -- GuardTileAI + the GuardTile bit
     death_quote: "*a wet, clicking shriek*"
   # ── 6 Brigand kobolds (vanilla L3-L4 brigands; 2 are key-droppers below) → Icewind kobolds ──
   - id: kobold-axe
@@ -180,7 +180,7 @@ enemy_units:
     autolevel: true
     inventory:
       - id: iron-axe            # pick/hatchet
-    ai_pattern: defensive       # territorial; hold the galleries
+    donor: [7, 2]      # vanilla L3 iron-axe brigand
   - id: kobold-thrower-l3
     name: "Icewind Kobold"
     count: 1                    # vanilla brigand @ (9,8) L3 hand-axe
@@ -190,7 +190,7 @@ enemy_units:
     autolevel: true
     inventory:
       - id: hand-axe            # throwing pick (1-2 range)
-    ai_pattern: defensive
+    donor: [9, 8]      # vanilla L3 hand-axe brigand
   - id: kobold-thrower-l4
     name: "Icewind Kobold"
     count: 1                    # vanilla brigand @ (14,11) L4 hand-axe
@@ -200,7 +200,7 @@ enemy_units:
     autolevel: true
     inventory:
       - id: hand-axe
-    ai_pattern: defensive
+    donor: [14, 11]    # vanilla L4 hand-axe brigand
   - id: kobold-steel
     name: "Icewind Brute"
     count: 1                    # vanilla brigand @ (14,6) L3 steel-axe (the grell's nearest enforcer)
@@ -218,7 +218,7 @@ enemy_units:
     inventory:
       - id: steel-axe           # heavy mining maul
       - id: pure-water          # vanilla (14,6) brigand carried Pure Water
-    ai_pattern: defensive
+    donor: [14, 6]     # vanilla L3 steel-axe brigand -- the boss's nearest enforcer
   # ── 1 Mercenary (vanilla L2 merc @ (15,2)) → a blade-kobold ──
   - id: kobold-blade
     name: "Kobold Skirmisher"
@@ -230,7 +230,7 @@ enemy_units:
     inventory:
       - id: iron-sword
       - id: antitoxin           # vanilla merc carried Antitoxin
-    ai_pattern: defensive
+    donor: [15, 2]     # vanilla L2 mercenary
   # ── 1 Archer (vanilla L4 archer @ (12,9)) → a kobold slinger ──
   - id: kobold-slinger
     name: "Kobold Slinger"
@@ -241,7 +241,7 @@ enemy_units:
     autolevel: true
     inventory:
       - id: iron-bow            # dart/sling — the chapter's single ranged kobold
-    ai_pattern: defensive
+    donor: [12, 9]     # vanilla L4 archer
   # ── 1 Thief (vanilla enemy thief @ (9,11)) → a svirfneblin gem-skulk (deep-gnome looter; not a rat — RBG & Pinky are the party's rats) ──
   - id: svirfneblin-skulk
     name: "Svirfneblin Skulk"
@@ -253,7 +253,7 @@ enemy_units:
     autolevel: true
     inventory:
       - id: iron-sword          # a fine knife (modeled as the vanilla thief's blade)
-    ai_pattern: aggressive      # slipped up from the Underdark for the tourmaline — ties to the grell's origin; loots like the vanilla thief
+    donor: [9, 11]     # vanilla enemy thief
   # ── 2 key-droppers (vanilla Door Key / Chest Key brigands) → kobolds that drop the keys ──
   - id: kobold-keykeep-door
     name: "Icewind Kobold"
@@ -265,7 +265,7 @@ enemy_units:
     inventory:
       - id: iron-axe
     item_drop: door-key         # so a player who hasn't recruited Trex yet can still open doors
-    ai_pattern: defensive
+    donor: [5, 9]      # vanilla L3 brigand (door-key carrier)
   - id: kobold-keykeep-chest
     name: "Icewind Kobold"
     count: 1
@@ -276,7 +276,7 @@ enemy_units:
     inventory:
       - id: iron-axe
     item_drop: chest-key        # backup chest access (Trex is the intended opener)
-    ai_pattern: defensive
+    donor: [7, 11]     # vanilla L3 brigand (chest-key carrier)
 
 # ── Chests / Mine Loot ───────────────────────────────────────────────────────────
 # Reward footprint mirrors vanilla FE8 Ch3 (decisions.md §Reward budget; fe8-pacing-reference
