@@ -4809,8 +4809,14 @@ scenarios.recordenemy = function()
                     [sel]
     local want = (not wantPid) and (RESKIN_ENEMY_CLASS[sel] or tonumber(sel)) or nil
     if not want and not wantPid then
+        local names = {}
+        for k in pairs(RESKIN_ENEMY_CLASS) do names[#names + 1] = k end
+        table.sort(names)
+        -- Derived, not retyped: the hand-written list had gone stale and omitted the two
+        -- goblin classes, which sent a reader looking for a raw class id for a foe the
+        -- table already names (#347's confirmation run).
         return result("FAIL", "unknown enemy '" .. sel .. "' -- one of: "
-            .. "kobold-grunt kobold-blade kobold-brute white-moose ravisin, or a raw class id "
+            .. table.concat(names, " ") .. " white-moose ravisin, or a raw class id "
             .. "(e.g. 0x82)") end
     local function classOf(u) return ru8(ru32(u.addr + 0x04) + 0x04) end
     -- the chosen foe: by CHARACTER for a raw-pid creature, by CLASS for a class-level reskin
