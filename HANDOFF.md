@@ -12,36 +12,26 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**A five-PR stack, reviewed and fixed, waiting on ONE matrix run.** **Merge strictly in order**,
-with `--merge` (not `--squash`), retargeting each child to `main` BEFORE deleting its parent branch
-(`decisions.md` -> stacked PRs: deleting a base closes the PRs on it, and a closed PR cannot be
-retargeted).
+**Nothing.** The #335 stack (#339-#343) landed 2026-09-02, merged in order with `--merge`, every
+branch deleted. **#335 closed itself.** All five were reviewed first by a fresh reviewer per PR;
+what each review found is a comment on the PR. Two Criticals were fixed before merge: #341's
+ordering guard was never registered in `check.py`'s gate and could not see ch03's wrapper call,
+and #342's s8 change had silently made 23 off-map guards vacuous.
 
-| order | PR | base | review |
-|---|---|---|---|
-| 1 | #339 ai: borrow every enemy's AI from its vanilla donor | `main` | fixed (7798a06) |
-| 2 | #340 ch02: restore vanilla's decoy | #339 | clean |
-| 3 | #341 ch02: point slot 3 at its own map-change layer | #340 | fixed (7cf289b) |
-| 4 | #342 playtest: a scene is not a stall | #341 | fixed (dbbead6) |
-| 5 | #343 docs + tooling; **closes #335** | #342 | fixed (6639431) |
+Landed green on a full `SUITE=all --jobs 1` run at the stack tip: **50/50 PASS, 0 cached**
+(`harness.lua` changed, so nothing was served from the verdict cache and every scenario really
+ran), 6 builds, 27m25s.
 
-All five were reviewed 2026-09-02 by a fresh reviewer per PR. **What each review found and what
-was done about it is a comment on the PR itself** -- not restated here. Two were Critical: #341's
-ordering guard was never registered in `check.py`'s gate and could not see ch03's wrapper, and
-#342's s8 change had silently made 23 off-map guards vacuous. The stack was rebased in order and
-force-pushed; every base is intact and MERGEABLE.
-
-**#339 and #340 are ATOMIC with respect to CI.** #339 adds a gate arm that `balance_locked` ch02
-cannot satisfy until #340 migrates it: `make difficulty-gate` exits 1 at #339 and 0 at #340.
-Merging #339 alone leaves `main` red. Merge them back to back.
-
-**What is owed before merging: one `SUITE=all` matrix run at the stack tip, `--jobs 1`.**
-`make matrix SUITE=all` runs `matrix.py run --all`; per #345 a parallel run starves its own
-scenarios and reports false failures, so serial or do not believe it. Dry-run says **50 scenarios
-across 6 ROM configurations**, and `harness.lua` changed, so the verdict cache will not spare
-much. It is the honest tier because #342's fix is in shared clear-bot helpers that every scenario
-inherits -- no single chapter suite covers it. Everything else is verified static: full suite
-green by the repo's own runner, `difficulty-gate` 0 at the tip, drift clean on every commit.
+⚠️ **#347 -- ch01's goblins ship as ch05's skeletons, and it blocks ch06.** Found by Nicolas
+playing, confirmed in the emitted `events_udefs.c`. `inject_ch01` resolves a reskin through
+`reskin_by_base`, a dict keyed on the BASE class -- and base is many-to-one by design, since
+several creatures rightly clone one chassis. Four bases are claimed twice, so ch05's undead
+overwrite ch01's Fire Imps. ch01 is the only chapter that does this; ch03/ch04/ch05 name their
+slots explicitly and are correct by construction. **This must land before ch06's five reskins**,
+whose mermaids/shark-riders/crab-blades/merfolk-bow sit on four already-contested bases and would
+steal them from ch05 exactly as ch05 stole ch01's. The issue carries the full fix. **No matrix run
+will prove it** -- nothing asserts which sprite a unit wears, which is how it went 12 days
+unnoticed; the proof is the emitted class ids plus a regression pin.
 
 **#26 stays open**: the map and the roster are done, the chapter is not.
 
@@ -63,10 +53,9 @@ content. Read the issue for scope, the boards for reasoning.
 
 ## Next task
 
-**Run the `SUITE=all` matrix at the stack tip (`--jobs 1`), then land the stack in order.** The
-review and the fixes are done; that run is the only thing between the stack and `main`. Once #343
-merges, **#335 closes itself** and the next task is **ch06 enemy POSITIONS -- bring Nicolas a
-render first** (2-3 concept options, not a finished map).
+**#347 -- ch01's goblins are shipping as skeletons.** Nicolas's call: fix it before anything else,
+because ch06 inherits the same collision. Then **ch06 enemy POSITIONS -- bring Nicolas a render
+first** (2-3 concept options, not a finished map).
 
 Everything that decision answers to -- the measured map geometry, why neither vanilla source
 transfers, the three jobs placement must serve, the donor rule that replaced `CH06_AI`, and the
