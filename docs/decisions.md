@@ -376,6 +376,17 @@ and got welded onto the same `inst/<track>` worktree, forcing work to partition 
 - **Feature-flow.** A task = issue → short-lived `feat/<n>-slug` branch off `main` → an **ephemeral**
   worktree (isolation only) → a **PR** → CI + `/code-review` → squash-merge → drop the branch + worktree.
   Concurrency = N feature worktrees, not two fixed slots. A PR may span the old seam; that is the point.
+**`/code-review` is the review step, and the author never reviews their own PR (2026-09-02)**
+The flow above names `/code-review`, and it is mandatory rather than a suggestion. Two things
+kept going wrong. An author re-reading their own diff finds nothing: #338 shipped unreviewed
+and a fresh reviewer then found two real defects the author had read past twice, and the #335
+stack repeated it at scale — four of five PRs needed fixes and two were Critical, including a
+guard that was defined, unit-tested, and never registered in the gate it was written for. And
+a reviewer prompt improvised in the moment is not the skill: skills change, so reconstructing
+one from memory quietly runs an older process. `superpowers:requesting-code-review` is the
+variant for a STACK, or where a PR needs context the diff cannot carry — one fresh reviewer
+per PR, working DOWN the stack, because a fix to an earlier PR rebases every PR above it.
+
 - **The "not my job" propagation test runs at PR review** — push the change through the desks and watch
   the reactions (my job / I can help / no impact / no need to know). Review is where ownership is decided,
   replacing the pre-commit glob block.

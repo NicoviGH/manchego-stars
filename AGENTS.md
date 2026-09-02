@@ -107,6 +107,12 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
 - A task = a GitHub issue → short-lived `feat/<n>-slug` branch off `main` → PR → CI + `/code-review`
   → squash-merge → delete the branch. A feature may span engine + content — ownership lives on the
   PR + issue, not a file glob.
+- **Review is `/code-review`, and the author is never the reviewer.** It is the default on every
+  PR, not an optional extra, and a hand-rolled reviewer prompt is not a substitute — a skill
+  reconstructed from memory runs last month's process. Use
+  `superpowers:requesting-code-review` instead only for a STACK or where the PR needs context
+  the diff cannot carry: one fresh reviewer per PR, reviewed DOWN the stack, since a fix to an
+  earlier PR rebases every PR above it.
 - **A stack of PRs lands with `--merge`, not `--squash`, and every child is retargeted to `main`
   (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted** — deleting a base branch
   closes the PRs on it, and a closed PR can't be retargeted (`decisions.md` → stacked PRs).
