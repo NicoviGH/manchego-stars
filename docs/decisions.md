@@ -4186,6 +4186,41 @@ _Decided: 2026-07-30 (CLAUDE; ch05 `0x9C9` Sahnar block)._
 _Moved here from `HANDOFF.md` 2026-07-02 (audit): these are durable engineering constraints, not
 session state. `HANDOFF.md` points here._
 
+**A guard that stops guarding fails silently, and green is what that looks like (2026-09-02)**
+Both Criticals found in the #335 stack review were guards that had quietly stopped holding.
+Neither failed a test; a guard's whole job is to say nothing when things are fine, so a broken
+one is indistinguishable from a working one until you go and check. Two distinct mechanisms,
+both worth recognising on sight:
+
+**A check that is defined and unit-tested is still not RUNNING.** `check_tile_changes_outlive_
+the_retarget` was written, tested, and never added to `check.py`'s tuple in `main()`. It
+executed only as a side effect of `check_tests_pass` re-invoking its test file as a
+subprocess — and that no-ops when `fireemblem8u/src` is absent, i.e. exactly the lightweight
+CI job it existed to protect. **Adding a check means registering it; the test proving the
+check works does not prove the check runs.** A test asserting the function appears in
+`main()`'s source is the cheap pin.
+
+**A guard matching source text by NAME skips whatever is wrapped.** The same check searched
+for the literal `_inject_tile_changes`, while ch03 calls `_inject_ch03_tile_changes`. A
+skipped injector and a chapter with no map changes look identical from outside — silence
+either way — so ch03 was correct by discipline, not construction. `_injection_call_sequence`
+had already learned this for `_scopes.run`/`_anims.run` and says so. **Make the covered set
+assertable** (`_tile_change_injectors_seen`) so "who is being checked" is a fact, not a hope.
+
+**Changing how a field is DECODED retires every comparison written against the old
+encoding.** `unitAt` moved `xPos`/`yPos` from `ru8` to `rs8` — correct, since they are `s8`
+and FE8 parks an off-map unit at −1. But 23 guards in the harness tested `u.x ~= 0xFF`, the
+unsigned sentinel. `rs8` cannot return 255, so 21 became vacuously TRUE and 2 vacuously
+false. Deployment counters counted off-map units, `partyDeployed()` returned true for a unit
+that had not been placed, and the off-map lord and Baxby checks could never fire. **When you
+change an encoding, the call sites that read the old one do not error — they lie.** Grep for
+the old sentinel before changing the reader, and pin the ENCODING in a test (no `.x == 0xFF`
+anywhere) rather than the call sites, which the next author would have to remember to extend.
+
+The unifying test: after any change to a check, an encoding, or a sentinel, ask *what would
+now be different if this were broken?* If the answer is "nothing observable", that is the
+bug, not the reassurance.
+
 - **Dressing a portrait slot and NORMALIZING its mouth/eye window are two steps, and missing the
   second is silent** (2026-08-09, #25). `patch_portrait_geometry` only knew about `PORTRAIT_MAP`
   and the guests, so any other dressed slot kept the VANILLA character's mouth coordinates and the
