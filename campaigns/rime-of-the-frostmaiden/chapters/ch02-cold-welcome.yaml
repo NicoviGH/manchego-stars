@@ -338,6 +338,18 @@ playtest:
         the chwinga, and if one cannot fall the decoy is scenery.
       lua: ch02raid
       checkpoint: ch02start
+    # DIAGNOSTIC (2026-08-31, #335): ch02raid reports both huts standing after twelve turns,
+    # which questions the decoy the chapter is built on. Rather than guess between "AI1
+    # preempts the pillage script" and something structural, this dumps every red unit's LIVE
+    # ai1/ai2 and position per turn. Headless: its output is a log, not a picture.
+    - name: ch02aidiag
+      proves: >
+        evidence only -- why no raider reaches a Targos hut. Asserts nothing.
+      lua: ch02aidiag
+      kind: diagnostic
+      headless: true
+      checkpoint: ch02start
+
     - name: recordch02turn1
       proves: the turn-1 scene in motion -- RBG, Pinky, then Halvar's raid bark
       lua: recordch02turn1
