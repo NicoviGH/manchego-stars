@@ -246,7 +246,13 @@ def enemy_ai_initialiser(chap, enemy, index=0):
 
 
 CH01_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON'}
-CH01_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
+# ch01's grunts are goblins: they ride the CLONED goblin classes, whose own class entries
+# carry the Fire Imp map sprite (SMSId) and the goblin AnimConf. Name the SLOT here, the way
+# every other chapter does (ch05: 'soldier' -> CLASS_SOL_SKELEBERDIER) -- resolving a skin
+# from the vanilla base at build time is what shipped ch01 as ch05's skeletons (#347).
+# armor-knight is reskinned by nobody, so the chief stays a vanilla Knight.
+CH01_CLASS_IDS = {'soldier': 'CLASS_BLST_REGULAR_EMPTY',
+                  'fighter': 'CLASS_BLST_LONG_EMPTY',
                   'armor-knight': 'CLASS_ARMOR_KNIGHT'}
 
 # Lord select (#42): in ch01's beginning scene (after the Northlook muster, before
@@ -7947,15 +7953,10 @@ def inject_ch01(campaign, verbose=True):
     spear, axe = by_eid['goblin-spear'], by_eid['goblin-axe']
     chief, reinf = by_eid['goblin-chief'], by_eid['goblin-reinforcements']
 
-    # Ch1's grunts are goblins on the map: swap their vanilla class for the cloned goblin
-    # class (same stats/anim, goblin map sprite -- inject_enemy_class_reskins). Keyed by
-    # the base class enum so only declared reskins apply; the chief (armor-knight) has no
-    # reskin and stays the vanilla Knight sprite.
-    reskin_by_base = {rk['base']: rk['slot'] for rk in enemy_class_reskins(campaign)}
-
+    # A reskin's identity is its SLOT, and CH01_CLASS_IDS names it directly -- see #347 for
+    # why deriving it from the base class here could not work.
     def grunt_class(cls_label):
-        base = CH01_CLASS_IDS[cls_label]
-        return reskin_by_base.get(base, base)
+        return CH01_CLASS_IDS[cls_label]
 
     enemies = []
     for index, (x, y) in enumerate(spear['positions']):
