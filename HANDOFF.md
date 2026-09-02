@@ -6,21 +6,48 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-08-29 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-02 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing.** The #335 stack (#339-#343) landed 2026-09-02, merged in order with `--merge`, every
-branch deleted. **#335 closed itself.** All five were reviewed first by a fresh reviewer per PR;
-what each review found is a comment on the PR. Two Criticals were fixed before merge: #341's
-ordering guard was never registered in `check.py`'s gate and could not see ch03's wrapper call,
-and #342's s8 change had silently made 23 off-map guards vacuous.
+**PR #356 (#346) is OPEN, verified, and NOT REVIEWED.** The bare-literal message-id guard:
+discovery (`inject.hosts.literal_message_ids` AST-scans `build_campaign.py` via `callsites.py`)
+plus ownership (`check_message_literals_are_registered`). 12 literals on main, all already
+claimed, so it ships strict with no allowlist. Measured 17 errors + 1 failure before the patch,
+18/18 after; `tools/check.py` clean. No ROM build or playtest needed -- it is a lint.
+**It was drafted by a subagent; I verified the before/after myself, which is not a review.**
+Per the *"`/code-review` is the review step"* ADR it needs a fresh reviewer before merge.
 
-Landed green on a full `SUITE=all --jobs 1` run at the stack tip: **50/50 PASS, 0 cached**
-(`harness.lua` changed, so nothing was served from the verdict cache and every scenario really
-ran), 6 builds, 27m25s.
+⚠️ **#344, #345 and #353 are NOT started, and the partial work from 2026-09-02 is NOT
+trustworthy.** Four subagents were fanned out at them; three died mid-write on the session limit
+and their scratch files hold half-finished analysis in a temp dir that will not survive. **Redo
+them from the issues, do not resume from those fragments.** Lesson, the hard way: fanning out
+four Opus agents at once costs a whole session budget -- cap at two, prefer Sonnet, stage them.
+
+**#135 is triaged and CLOSED, but closing it did not DO any of the work** -- it routed one intake
+ticket into two new issues, a reopened slice, and two notes on #33. Net open work went UP by two.
+What it actually produced:
+
+- **#21 REOPENED, and it holds the one real deliverable.** ch01's terrain-heal concept ships in
+  **no channel at all**: we null vanilla's tutorial lists on every slot we host, so the Guide
+  command is absent from the map menu in ch01-ch04 (of the 56 flags the Guide uses we set exactly
+  one -- 234/Arena, in ch05), flag 206 "Fortresses & Castle Gates" is never set, and the
+  townsperson healing line the reporter half-remembered was a **designer note never authored into
+  dialogue**. The fix is ch05's own arena shape with `ENUT(206)` (`build_campaign.py:10520`) --
+  a copy, not a design. Cheaper to confirm once #353 lands. **This is the next piece of real work
+  to come out of the playtest.**
+- **#354** (new, M3) -- cross-context art consistency, carrying the style anchors the reporter
+  named: Meesmickle / Marty / Prof. RBG read as FE, and the ice enemy (reads as Sephek) should
+  stay off-model on purpose. **The anchor mapping is inferred and needs Nicolas to confirm it.**
+- **#355** (new, M4, `stretch`) -- promoted-tier looks. Needs a whether-not-how decision from
+  Nicolas; gated behind #354 so we do not author twice the art with the same drift.
+- **#33** -- the prologue Jeigan note (phrased as the question the reporter asked: does it recur
+  after ch00?) and "hard but doable for a non-FE player" as the calibration band.
+- #20 was deliberately NOT reopened: the reporter resolved that finding themselves as "it's fine"
+  and the slice is genuinely complete. #57/#58 on #21 had shipped in June and were never ticked --
+  same stale-checkbox trap as #23; fixed.
 
 **#347 landed 2026-09-02 (#348), with #350 cleaning up after it.** ch01's goblins were
 shipping as ch05's skeletons -- and, because `SMSId` and `pBattleAnimDef` are fields of the
