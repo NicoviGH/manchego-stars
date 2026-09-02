@@ -7953,21 +7953,16 @@ def inject_ch01(campaign, verbose=True):
     spear, axe = by_eid['goblin-spear'], by_eid['goblin-axe']
     chief, reinf = by_eid['goblin-chief'], by_eid['goblin-reinforcements']
 
-    # A reskin's identity is its SLOT, and CH01_CLASS_IDS names it directly -- see #347 for
-    # why deriving it from the base class here could not work.
-    def grunt_class(cls_label):
-        return CH01_CLASS_IDS[cls_label]
-
     enemies = []
     for index, (x, y) in enumerate(spear['positions']):
         enemies.append(_enemy_unit_entry(
-            '0x80', grunt_class(spear['class']), spear['level'], True, x, y,
+            '0x80', CH01_CLASS_IDS[spear['class']], spear['level'], True, x, y,
             CH01_ITEM_IDS[spear['inventory'][0]['id']],
             enemy_ai_initialiser(chap, spear, index),
             ' /* goblin spear -- camp approach */'))
     for index, (x, y) in enumerate(axe['positions']):
         enemies.append(_enemy_unit_entry(
-            '0x80', grunt_class(axe['class']), axe['level'], True, x, y,
+            '0x80', CH01_CLASS_IDS[axe['class']], axe['level'], True, x, y,
             CH01_ITEM_IDS[axe['inventory'][0]['id']],
             enemy_ai_initialiser(chap, axe, index),
             ' /* goblin raider -- mid-trail pursuer */'))
@@ -7983,7 +7978,7 @@ def inject_ch01(campaign, verbose=True):
     reinforce = []
     for index, (cls, (x, y)) in enumerate(zip(reinf['composition'], reinf['positions'])):
         reinforce.append(_enemy_unit_entry(
-            '0x80', grunt_class(cls), reinf['level'], True, x, y,
+            '0x80', CH01_CLASS_IDS[cls], reinf['level'], True, x, y,
             CH01_ITEM_IDS[reinf['inventory_by_class'][cls][0]],
             enemy_ai_initialiser(chap, reinf, index), ' /* west reinforcement, turn %d */'
             % reinf['spawn_turn']))
