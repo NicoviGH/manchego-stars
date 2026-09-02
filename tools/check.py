@@ -1868,6 +1868,163 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
     return fail
 
 
+# The registry a bare literal has to reach to be OWNED. Read out of build_campaign.py's
+# SOURCE rather than imported, for the reason check_vanilla_reads_come_from_head states: the
+# module pulls in portrait_tool -> PIL, the lean `checks` CI job installs neither, and a guard
+# that skips in CI is half a guard.
+MESSAGE_CLAIMS_REGISTRY = 'HOSTED_CHAPTER_MESSAGE_IDS'
+
+
+def _module_int_table(tree):
+    """{name: {int, ...}} for every module-level assignment, as much as a static read can say.
+
+    Ints are collected from the whole value subtree, so a tuple, a nested tuple and a dict all
+    work -- a dict contributes its VALUES only, because `PC_DEATH_QUOTE_MSGS` is keyed by unit
+    id and those are not message ids. Two shapes are deliberately out of reach and both only
+    ever make this set SMALLER: a tuple-unpacking target (`A, B = SLOTS['x'][:2]`, which is how
+    CH04_VILLAGE_MSG is written) and a value built by a call. A missing name can only ever ask
+    for a literal to be registered that already is, which is harmless advice; it can never let
+    an unregistered one through.
+    """
+    table = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+        if not names:
+            continue
+        subtrees = node.value.values if isinstance(node.value, ast.Dict) else [node.value]
+        ints = {n.value for sub in subtrees for n in ast.walk(sub)
+                if isinstance(n, ast.Constant) and isinstance(n.value, int)
+                and not isinstance(n.value, bool)}
+        for name in names:
+            table.setdefault(name, set()).update(ints)
+    return table
+
+
+def _chapter_message_claims(tree, table):
+    """{chapter: {message id, ...}} as HOSTED_CHAPTER_MESSAGE_IDS declares it, read statically.
+
+    The dict is written as names and splats (`*CH03_OPENING_MSGS`, `*CH05_ENDING_MSGS.values()`),
+    so it is not a literal and `literal_eval` refuses it outright -- the same shape
+    check_vanilla_reads_come_from_head meets in PATCHED_DECOMP_FILES. Every Name in a chapter's
+    subtree is resolved through `table` and every inline int is taken as itself.
+    """
+    claims = {}
+    for node in tree.body:
+        if not (isinstance(node, ast.Assign)
+                and any(getattr(t, 'id', None) == MESSAGE_CLAIMS_REGISTRY
+                        for t in node.targets)):
+            continue
+        if not isinstance(node.value, ast.Dict):
+            continue
+        for key, value in zip(node.value.keys, node.value.values):
+            if not (isinstance(key, ast.Constant) and isinstance(key.value, str)):
+                continue
+            ids = set()
+            for sub in ast.walk(value):
+                if isinstance(sub, ast.Name):
+                    ids |= table.get(sub.id, set())
+                elif (isinstance(sub, ast.Constant) and isinstance(sub.value, int)
+                      and not isinstance(sub.value, bool)):
+                    ids.add(sub.value)
+            claims[key.value] = ids
+    return claims
+
+
+def _literal_msgs_tuple(chapter):
+    """The constant a chapter registers its bare literals in. The prologue's is not CH00_."""
+    return ('PROLOGUE_LITERAL_MSGS' if chapter == 'ch00'
+            else '%s_LITERAL_MSGS' % chapter.upper())
+
+
+def check_message_literals_are_registered(fail, source=None):
+    """Guard: a message id written as a BARE LITERAL must still be CLAIMED by its chapter.
+
+    `injector_message_ids` finds ids by the NAME of the constant holding them, and #346's
+    complaint is that a hex id at the `set_message_body` call site has no name to be found by.
+    Twelve exist -- the prologue's eight and ch01's four -- and they reached the guards only
+    because someone grepped for them once and hand-transcribed them into `PROLOGUE_LITERAL_MSGS`
+    / `CH01_LITERAL_MSGS`. `literal_message_ids` now discovers them from source, which closes
+    the DEADNESS half automatically: a block drawn over a bare literal is refused whether or not
+    anyone wrote the id down.
+
+    What discovery cannot do is give the id an OWNER. `HOSTED_CHAPTER_MESSAGE_IDS` is what
+    `assert_message_ids_unique` collides on and what `make chapter CH=chNN` reads for headroom,
+    and a chapter that spends an id it does not claim reads as having room it has already
+    spent. So the transcription still has to happen -- it just stops being something a human
+    has to notice. 0xC25 is the case that pays for this: it sits 0x33 above ch05's pool, so
+    extending that range upward would have silently overwritten Scramsax's defeat quote.
+
+    Reads build_campaign.py's SOURCE and never imports it (no Pillow in the lean `checks`
+    job), through the stdlib-only `inject.hosts` -- the same route check_hosted_chapters_declared
+    takes for the host-slot registry.
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    try:
+        from inject import hosts
+    except Exception as exc:                      # pragma: no cover - import guard
+        fail.append('check_message_literals_are_registered: inject.hosts does not import: %s'
+                    % exc)
+        return fail
+    finally:
+        sys.path.remove(os.path.join(REPO, 'tools'))
+
+    live = source is None
+    if live:
+        with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
+            source = fh.read()
+    try:
+        literals = hosts.literal_message_ids(source=source)
+        tree = ast.parse(source, 'build_campaign.py')
+    except (ValueError, SyntaxError) as exc:
+        fail.append('check_message_literals_are_registered: cannot scan build_campaign.py: %s'
+                    % exc)
+        return fail
+
+    # A scan that finds nothing and a tree with nothing to find look identical from outside --
+    # the shape decisions.md 2026-09-02 names. There are twelve on main; zero means the scan
+    # broke, not that the campaign stopped writing literals.
+    if live and not literals:
+        fail.append('check_message_literals_are_registered: found NO bare message-id literal '
+                    'in build_campaign.py. There are twelve, so the scan is broken and the '
+                    'guard would pass vacuously.')
+        return fail
+
+    table = _module_int_table(tree)
+    claims = _chapter_message_claims(tree, table)
+    if live and not claims:
+        fail.append('check_message_literals_are_registered: could not read %s out of '
+                    'build_campaign.py -- the guard has nothing to check against.'
+                    % MESSAGE_CLAIMS_REGISTRY)
+        return fail
+    named = set()
+    for name, ids in table.items():
+        if re.search(r'_MSGS?$', name):
+            named |= ids
+
+    for lit in literals:
+        if lit.chapter is None:
+            # No injector encloses it, so nothing can say whose id it is. A name is then the
+            # only handle it has.
+            if lit.msg_id not in named:
+                fail.append(
+                    'build_campaign.py:%d writes message 0x%X as a BARE LITERAL outside every '
+                    'injector, and no `*_MSG`/`*_MSGS` constant holds it -- so no guard, no '
+                    'deadness check and no headroom read can see it. Hold the id in a named '
+                    'constant.' % (lit.lineno, lit.msg_id))
+            continue
+        if lit.msg_id not in claims.get(lit.chapter, set()):
+            fail.append(
+                'build_campaign.py:%d writes message 0x%X as a BARE LITERAL in %s, but %s does '
+                'not claim it in %s -- so the id has no owner, `assert_message_ids_unique` '
+                'cannot collide on it and `make chapter CH=%s` counts it as free headroom it '
+                'has already spent. Add 0x%X to %s.'
+                % (lit.lineno, lit.msg_id, lit.chapter, lit.chapter, MESSAGE_CLAIMS_REGISTRY,
+                   lit.chapter, lit.msg_id, _literal_msgs_tuple(lit.chapter)))
+    return fail
+
+
 def check_handoff_only_on_main(fail):
     """HANDOFF.md is live state and live state is global -- author it on main, never on a
     feature branch. See the block comment above for the incident this encodes."""
@@ -1968,6 +2125,7 @@ def main():
                   check_recordenemy_knows_every_raw_pid,
                   check_wrap_widths_are_pixels,
                   check_vanilla_reads_come_from_head,
+                  check_message_literals_are_registered,
                   check_handoff_only_on_main,
                   check_lane_ownership):
         check(fail)

@@ -77,7 +77,8 @@ from inject.hosts import (  # noqa: E402,F401
     CH01_HOST_INDEX, CH01_EVENT_GROUP, CH02_HOST_INDEX, CH02_EVENT_GROUP,
     CH03_HOST_INDEX, CH03_EVENT_GROUP, CH04_HOST_INDEX, CH04_EVENT_GROUP,
     CH05_HOST_INDEX, CH05_EVENT_GROUP,
-    HostedChapter, hosted_chapters, injector_chapters, undeclared_injectors)
+    HostedChapter, hosted_chapters, injector_chapters, undeclared_injectors,
+    MessageLiteral, literal_message_ids)
 
 PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 # Palette index 0 of an FE8 bust is the transparent key, and our authored busts all carry
@@ -10143,6 +10144,12 @@ def injector_message_ids():
     `live_ids_in_declared_blocks` folds `HOSTED_CHAPTER_MESSAGE_IDS` on top for that reason --
     naming this limit is what keeps the guard from resting on a convention nothing enforces.
 
+    A BARE LITERAL at the call site has no constant either, and that hole is now closed from
+    the other side: `literal_message_ids` (inject/hosts.py) reads them out of this module's
+    SOURCE and they are folded in below, so a literal no longer waits on a human to notice it
+    (#346). `check_message_literals_are_registered` is the half that still asks for a NAME --
+    only a named id lands in HOSTED_CHAPTER_MESSAGE_IDS, and only that gives it an owner.
+
     A constant may hold its ids in a dict as readily as a tuple -- `PC_DEATH_QUOTE_MSGS` maps
     unit -> id -- and reading only the tuple shape hid all 13 of its death quotes while its
     NAME followed the convention perfectly.
@@ -10162,6 +10169,18 @@ def injector_message_ids():
         for mid in values:
             if isinstance(mid, int) and 0 < mid < VANILLA_MESSAGE_COUNT:
                 out.setdefault(mid, name)
+    # And the ids with no constant to be found by: a BARE LITERAL at the `set_message_body`
+    # call site (#346). The prologue and ch01 write twelve, and they were visible here only
+    # because someone grepped for them and hand-transcribed them into PROLOGUE_LITERAL_MSGS /
+    # CH01_LITERAL_MSGS -- so for that class the promise above ("registering a new one is
+    # enough") held only for whoever remembered to do the transcribing. `literal_message_ids`
+    # reads them out of this module's own SOURCE, so the next one registers itself the moment
+    # it is written. 0xC25 is why it matters: it sits 0x33 above ch05's pool, and extending
+    # that range upward -- the obvious next move -- would have overwritten a defeat quote.
+    for lit in literal_message_ids():
+        if 0 < lit.msg_id < VANILLA_MESSAGE_COUNT:
+            out.setdefault(lit.msg_id, 'literal in %s (build_campaign.py:%d)'
+                           % (lit.chapter or 'a module-level helper', lit.lineno))
     return out
 
 

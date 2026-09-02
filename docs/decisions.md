@@ -4221,6 +4221,32 @@ The unifying test: after any change to a check, an encoding, or a sentinel, ask 
 now be different if this were broken?* If the answer is "nothing observable", that is the
 bug, not the reassurance.
 
+**A message id written as a bare literal now registers itself (2026-09-02, #346)**
+`injector_message_ids` finds an id by the NAME of the constant holding it, and promised that
+"registering a new one is enough -- there is no second list to remember". That was false for an id
+passed as hex at the `set_message_body` call site: the prologue and ch01 write twelve, and they
+reached the deadness guard only because someone grepped for them once and hand-transcribed them
+into `PROLOGUE_LITERAL_MSGS` / `CH01_LITERAL_MSGS`. The next one was invisible until a human
+noticed it. `0xC25` is the sharp case -- it sits `0x33` above ch05's `0xBC5-0xBF2` pool, so
+extending that range upward, the obvious next move, would have been accepted by every guard and
+would have overwritten Scramsax's defeat quote.
+
+**The mechanism, not the discipline, was missing.** `inject.hosts.literal_message_ids` reads the
+literals out of `build_campaign.py`'s own source through `tools/callsites.py` -- argument
+BINDINGS, not text, because `msg_id` is positional at all 71 call sites and `grep msg_id=` finds
+none of them -- and attributes each to the injector that writes it. `injector_message_ids` folds
+them in, so deadness is checked with no human step.
+
+**Discovery cannot invent an OWNER, so the registry stays, and it stays a gate.**
+`HOSTED_CHAPTER_MESSAGE_IDS` is what `assert_message_ids_unique` collides on and what
+`make chapter` reads for headroom; an id spent but unclaimed reads as free room already spent.
+`check_message_literals_are_registered` requires the claim and names the tuple to add it to. The
+two halves split cleanly: **discovery makes the id safe, registration makes it accountable.**
+
+The guard is registered in `check.py`'s `main()` tuple and pinned by a test that reads that
+function's source, and it fails when the live scan finds zero literals -- both because of the
+lesson directly above.
+
 - **Dressing a portrait slot and NORMALIZING its mouth/eye window are two steps, and missing the
   second is silent** (2026-08-09, #25). `patch_portrait_geometry` only knew about `PORTRAIT_MAP`
   and the guests, so any other dressed slot kept the VANILLA character's mouth coordinates and the
