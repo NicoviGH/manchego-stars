@@ -22,16 +22,12 @@ Landed green on a full `SUITE=all --jobs 1` run at the stack tip: **50/50 PASS, 
 (`harness.lua` changed, so nothing was served from the verdict cache and every scenario really
 ran), 6 builds, 27m25s.
 
-⚠️ **#347 -- ch01's goblins ship as ch05's skeletons, and it blocks ch06.** Found by Nicolas
-playing, confirmed in the emitted `events_udefs.c`. `inject_ch01` resolves a reskin through
-a dict keyed on the BASE class -- and base is many-to-one by design, since
-several creatures rightly clone one chassis. Four bases are claimed twice, so ch05's undead
-overwrite ch01's Fire Imps. ch01 is the only chapter that does this; ch03/ch04/ch05 name their
-slots explicitly and are correct by construction. **This must land before ch06's five reskins**,
-whose mermaids/shark-riders/crab-blades/merfolk-bow sit on four already-contested bases and would
-steal them from ch05 exactly as ch05 stole ch01's. The issue carries the full fix. **No matrix run
-will prove it** -- nothing asserts which sprite a unit wears, which is how it went 12 days
-unnoticed; the proof is the emitted class ids plus a regression pin.
+**#347 landed 2026-09-02 (#348, squashed).** ch01's goblins were shipping as ch05's
+skeletons -- and, because `SMSId` and `pBattleAnimDef` are fields of the same class entry,
+with the skeleton battle anim too. A skin is now resolved by its SLOT, which is what every
+other chapter always did; the retired identifier is in `DEAD_CONCEPTS`. Reasoning:
+`docs/decisions.md` -> *"A reskin is resolved by its SLOT, never by the class it clones"*.
+**ch06's five reskins can now be wired without stealing a base from ch05.**
 
 **#26 stays open**: the map and the roster are done, the chapter is not.
 
@@ -53,9 +49,8 @@ content. Read the issue for scope, the boards for reasoning.
 
 ## Next task
 
-**#347 -- ch01's goblins are shipping as skeletons.** Nicolas's call: fix it before anything else,
-because ch06 inherits the same collision. Then **ch06 enemy POSITIONS -- bring Nicolas a render
-first** (2-3 concept options, not a finished map).
+**ch06 enemy POSITIONS -- bring Nicolas a render first** (2-3 concept options, not a finished
+map). #347 is done, so the reskin convention no longer blocks ch06's roster art.
 
 Everything that decision answers to -- the measured map geometry, why neither vanilla source
 transfers, the three jobs placement must serve, the donor rule that replaced `CH06_AI`, and the
