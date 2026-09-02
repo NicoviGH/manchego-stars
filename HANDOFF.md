@@ -24,7 +24,7 @@ ran), 6 builds, 27m25s.
 
 ⚠️ **#347 -- ch01's goblins ship as ch05's skeletons, and it blocks ch06.** Found by Nicolas
 playing, confirmed in the emitted `events_udefs.c`. `inject_ch01` resolves a reskin through
-`reskin_by_base`, a dict keyed on the BASE class -- and base is many-to-one by design, since
+a dict keyed on the BASE class -- and base is many-to-one by design, since
 several creatures rightly clone one chassis. Four bases are claimed twice, so ch05's undead
 overwrite ch01's Fire Imps. ch01 is the only chapter that does this; ch03/ch04/ch05 name their
 slots explicitly and are correct by construction. **This must land before ch06's five reskins**,
