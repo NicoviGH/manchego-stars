@@ -297,6 +297,22 @@ class EnemyAiBytes(unittest.TestCase):
         with self.assertRaises(ValueError):
             df.enemy_ai_bytes(chap, self._enemy())
 
+    def test_an_override_without_a_why_is_refused_at_build_time(self):
+        # The `why` is the whole difference between a declared divergence and a silenced
+        # guard. Reporting it only in the curve gate left it optional for every chapter
+        # that is not balance_locked -- which is where new AI actually gets authored.
+        chap = {'parity_reference': 'FE8 Ch3'}
+        enemy = self._enemy(donor=[7, 2], ai_override={'ai': '{DefaultAI, 0x9, 0x0}'})
+        with self.assertRaises(ValueError):
+            df.enemy_ai_bytes(chap, enemy)
+
+    def test_an_override_with_a_blank_why_is_refused_too(self):
+        chap = {'parity_reference': 'FE8 Ch3'}
+        enemy = self._enemy(donor=[7, 2],
+                            ai_override={'ai': '{DefaultAI, 0x9, 0x0}', 'why': '   '})
+        with self.assertRaises(ValueError):
+            df.enemy_ai_bytes(chap, enemy)
+
 
 class AiDonorFindings(unittest.TestCase):
     """The guard. Same contract as role_findings(): a list of strings, empty == clean."""

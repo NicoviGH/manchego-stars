@@ -551,13 +551,6 @@ def resolve_donor(parity_ref, spec):
     vanilla's three L2 soldiers behave identically, so "the L2 soldiers" is a well-formed
     donor for our group of three. Returns the representative unit.
 
-    A coordinate is NOT sufficient on its own as a convention, which is why the spec is a
-    `nth:` (0-based, array order) is the last resort, for units vanilla stacks that are
-    identical in every readable field and still behave differently -- Ch1 puts two L2
-    fighters on (2,9), one pursuing from turn 1 and one charging on turn 2. It is opt-in
-    precisely because silently taking the first match is the bug this function exists to
-    prevent.
-
     Two reasons a coordinate alone is not enough, both from real data: ch01 and ch06 sit on a
     different MAP donor from their parity twin, so not one of their tiles lines up with it;
     and where the map IS the twin's, a tile can still collide by accident -- ch05's
@@ -578,7 +571,7 @@ def resolve_donor(parity_ref, spec):
     elif isinstance(spec, (list, tuple)) and len(spec) == 2:
         at, want = spec, {'classIndex': None, 'level': None, 'redas': None}
     else:
-        raise ValueError('donor %r is not a coordinate [x, y] nor a {at/class/level/nth} '
+        raise ValueError('donor %r is not a coordinate [x, y] nor a {at/class/level} '
                          'reference' % (spec,))
     if at is not None and not (isinstance(at, (list, tuple)) and len(at) == 2):
         raise ValueError('donor %r: `at` must be a coordinate [x, y]' % (spec,))
@@ -1482,10 +1475,16 @@ def enemy_ai_bytes(chap, enemy, index=0):
 
     An `ai_override:` is how a chapter says it means to differ -- our map changed the
     dynamics, or we field a unit vanilla does not. It carries the vector and a `why`, and it
-    may stand alone where no single donor applies. Neither donor nor override RAISES: a
+    may stand alone where no single donor applies. The `why` is REQUIRED here, not merely
+    reported by the curve gate: that gate only reaches balance_locked chapters, so an
+    override authored in a chapter still being written could skip its reason entirely. Neither donor nor override RAISES: a
     default is exactly how ch00 shipped an `ai_pattern` its injector never read."""
     override = enemy.get('ai_override')
     if override:
+        if not str(override.get('why') or '').strip():
+            raise ValueError('enemy %r declares an `ai_override:` with no `why` -- an '
+                             'undeclared reason is a silenced guard, not a decision'
+                             % enemy.get('id'))
         return ai_bytes(override.get('ai'))
     per_position = _donor_specs(enemy)
     if per_position is not None:
