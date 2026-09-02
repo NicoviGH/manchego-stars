@@ -64,6 +64,10 @@ DEAD_CONCEPTS = [
     # postscript, and HANDOFF's #298 entry, which survived the correction because nothing
     # scanned for it. Registering it is what the ADR log calls registry discipline.
     r'presses? ==\s*authored boxes', r'wrapper never invents a page break',
+    # retired by #347: a reskin CLONES a vanilla class into its own slot, so `base` is
+    # many-to-one -- four bases are claimed twice, and a base-keyed dict silently handed
+    # ch01's Fire Imps to ch05's skeletons for twelve days. A skin is resolved by its SLOT.
+    r'reskin_by_base',
     r'tileset_stem\s*=',               # _register_chapter_map reads the layout's stamp
     r'BATTLE_FOLLOWUP_THRESHOLD',      # misnomer; real: BATTLE_FOLLOWUP_SPEED_THRESHOLD
     # Marty's "spore covenant" (2026-07-29): a ch05 villain-foil thread we drifted away

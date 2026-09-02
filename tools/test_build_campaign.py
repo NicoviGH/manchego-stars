@@ -4947,6 +4947,57 @@ class PerPositionAiReachesTheEmittedRows(unittest.TestCase):
                                 if difficulty.enemy_ai_bytes(chap, spear, i)[1] == 0x12))
         self.assertEqual(1, sum(1 for i in range(3)
                                 if difficulty.enemy_ai_bytes(chap, axe, i)[1] == 0x12))
+class AReskinIsResolvedByItsOwnSlot(unittest.TestCase):
+    """A reskin CLONES a vanilla class into its OWN class slot, so `base` is many-to-one.
+
+    ch01 resolved its goblins through a dict keyed on the base class
+    (`{rk['base']: rk['slot'] ...}`), and four bases are claimed twice -- goblin-soldier and
+    ch05's risen-spear both clone CLASS_SOLDIER, goblin-fighter and tomb-reaver both clone
+    CLASS_FIGHTER. Last-wins, so ch01's Fire Imps shipped as ch05's skeletons for twelve
+    days (#347). Nothing failed: #48 measures stats, the playtest scenarios assert memory
+    state, and neither reads which sprite a unit wears.
+
+    Every other chapter names its slot outright (ch05: 'soldier' -> CLASS_SOL_SKELEBERDIER),
+    which is correct by construction. ch01 now does the same.
+    """
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _slot_of(self, reskin_id):
+        rk = next(r for r in bc.enemy_class_reskins(self.CAMPAIGN)
+                  if r['id'] == reskin_id)
+        return rk['slot']
+
+    def test_ch01_names_the_goblin_slots_not_the_vanilla_chassis(self):
+        # Read the slot from campaign.yaml rather than repeating it here: the bug was the
+        # code and the data disagreeing, so a test that hardcodes both cannot see it.
+        self.assertEqual(self._slot_of('goblin-soldier'), bc.CH01_CLASS_IDS['soldier'])
+        self.assertEqual(self._slot_of('goblin-fighter'), bc.CH01_CLASS_IDS['fighter'])
+
+    def test_the_chief_has_no_reskin_and_stays_a_vanilla_knight(self):
+        # armor-knight is claimed by no reskin, so naming the vanilla class is right here.
+        self.assertEqual('CLASS_ARMOR_KNIGHT', bc.CH01_CLASS_IDS['armor-knight'])
+        bases = {r['base'] for r in bc.enemy_class_reskins(self.CAMPAIGN)}
+        self.assertNotIn('CLASS_ARMOR_KNIGHT', bases)
+
+    def test_no_two_reskins_claim_the_same_slot(self):
+        # THIS is the invariant, not "no two share a base" -- sharing a base is legitimate
+        # and four pairs do it. A slot is the identity; two creatures in one slot is the
+        # collision that would actually lose art.
+        slots = [r['slot'] for r in bc.enemy_class_reskins(self.CAMPAIGN)]
+        self.assertEqual(len(slots), len(set(slots)),
+                         'a reskin slot is claimed twice: %s' % sorted(
+                             s for s in slots if slots.count(s) > 1))
+
+    def test_a_contested_base_is_still_allowed(self):
+        # Guard the guard: several creatures rightly clone one chassis, and a check that
+        # rejected duplicate bases would forbid ch05's skeletons and ch06's merfolk.
+        bases = [r['base'] for r in bc.enemy_class_reskins(self.CAMPAIGN)]
+        self.assertGreater(len(bases), len(set(bases)),
+                           'bases are expected to be reused; if this ever stops being true '
+                           'the many-to-one hazard is gone and this suite can relax')
+
+
 class SetMessageBodyReplacesTheWholeBody(unittest.TestCase):
     """A message body runs to the NEXT header, not to the first blank line.
 
