@@ -4237,15 +4237,26 @@ BINDINGS, not text, because `msg_id` is positional at all 71 call sites and `gre
 none of them -- and attributes each to the injector that writes it. `injector_message_ids` folds
 them in, so deadness is checked with no human step.
 
-**Discovery cannot invent an OWNER, so the registry stays, and it stays a gate.**
-`HOSTED_CHAPTER_MESSAGE_IDS` is what `assert_message_ids_unique` collides on and what
-`make chapter` reads for headroom; an id spent but unclaimed reads as free room already spent.
-`check_message_literals_are_registered` requires the claim and names the tuple to add it to. The
-two halves split cleanly: **discovery makes the id safe, registration makes it accountable.**
+**Discovery cannot invent an OWNER, so the registry stays -- but the ownership check belongs
+where the registry is REAL.** `HOSTED_CHAPTER_MESSAGE_IDS` is what `assert_message_ids_unique`
+collides on and what `make chapter` reads for headroom; an id spent but unclaimed reads as free
+room already spent. The first cut asserted that in `check.py` by reading the registry with an AST
+evaluator, and #356's review killed it: the registry is written as generators, subscripts and
+tuple-unpacked constants (`*(msg for (_slot, msg, _boxes, _what) in CH05_OPENING_SLOTS)`,
+`CH05_ARRIVAL_SLOT[1]`, `CH04_VILLAGE_MSG`), so the static read was wrong in **both** directions
+-- it missed ch04's `0x9C3`/`0x9C6` and would have demanded a registration that makes
+`assert_message_ids_unique` exit, and it swept up ch05's box counts so an unclaimed `0x13` passed.
+**A hand-rolled evaluator of a data structure is a second, worse implementation of it.** Ownership
+now lives in `build_campaign.assert_literals_are_claimed`, called from `main()` beside
+`assert_message_ids_unique`, where the dict is a real Python object and the answer is exact.
 
-The guard is registered in `check.py`'s `main()` tuple and pinned by a test that reads that
-function's source, and it fails when the live scan finds zero literals -- both because of the
-lesson directly above.
+The split that survives: **`check.py` owns DISCOVERY** -- stdlib-only, so the lean CI `checks` job
+runs it for real -- and **the BUILD owns OWNERSHIP.** Discovery makes the id safe (it folds into
+`injector_message_ids`, so deadness is checked with no human step); ownership makes it accountable.
+
+The discovery guard is registered in `check.py`'s `main()` tuple and pinned by a test that reads
+that function's source, and it fails when the live scan finds zero literals -- both because of the
+lesson directly above. The build-time half is pinned the same way, by a test reading `main`.
 
 - **Dressing a portrait slot and NORMALIZING its mouth/eye window are two steps, and missing the
   second is silent** (2026-08-09, #25). `patch_portrait_geometry` only knew about `PORTRAIT_MAP`

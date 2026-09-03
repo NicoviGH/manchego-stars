@@ -127,12 +127,15 @@ class LiteralMessageIdScan(unittest.TestCase):
             hosts.literal_message_ids(source='def inject_ch07(c):\n    '
                                              'set_message_body(lines, 0xBF4, body)\n')
 
-    def test_the_live_tree_has_exactly_the_twelve_the_issue_names(self):
+    def test_the_live_tree_s_literals_are_all_attributed(self):
+        """Count-free on purpose: a hardcoded 12 fails the moment someone adds a THIRTEENTH
+        and registers it correctly, which is the behaviour this guard exists to permit."""
         found = hosts.literal_message_ids()
-        self.assertEqual(12, len(found), found)
-        self.assertEqual({'ch00': 8, 'ch01': 4},
-                         {c: len([l for l in found if l.chapter == c]) for c in ('ch00', 'ch01')})
-        self.assertIn(0xC25, [lit.msg_id for lit in found])
+        self.assertTrue(found, 'the live tree writes bare literals; finding none means a broken scan')
+        self.assertTrue(all(lit.chapter for lit in found),
+                        [l for l in found if not l.chapter])
+        self.assertIn(0xC25, [lit.msg_id for lit in found],
+                      "0xC25 is the id whose invisibility motivated #346")
 
     def test_injector_message_ids_folds_the_literals_in(self):
         """The deadness half. With this, a block drawn over 0xC25 is refused whether or not
@@ -148,38 +151,22 @@ class LiteralMessageIdScan(unittest.TestCase):
                         'a block over the prologue\'s 0xC25 literal must be refused')
 
 
-class MessageLiteralsAreRegistered(unittest.TestCase):
-    """The ownership half: discovery finds the id, but only the registry can OWN it."""
+class MessageLiteralDiscoveryGuard(unittest.TestCase):
+    """check.py owns DISCOVERY: the scan runs, and every hit can name an owner."""
 
     def _fail(self, source):
         fail = []
         check.check_message_literals_are_registered(fail, source=source)
         return fail
 
-    def test_a_registered_literal_passes(self):
-        self.assertEqual([], self._fail(REGISTERED))
-
-    def test_an_unregistered_bare_literal_is_caught(self):
-        bad = self._fail(UNREGISTERED)
-        self.assertEqual(1, len(bad), bad)
-        self.assertIn('0xBF4', bad[0])
-        self.assertIn('ch07', bad[0])
-
-    def test_the_complaint_names_the_tuple_to_add_it_to(self):
-        self.assertIn('CH07_LITERAL_MSGS', self._fail(UNREGISTERED)[0])
-
-    def test_the_prologue_complaint_names_PROLOGUE_LITERAL_MSGS(self):
-        """ch00's tuple is not CH00_-shaped, and a guard that told the author to create
-        CH00_LITERAL_MSGS would be inventing a second registry beside the one that works."""
-        bad = self._fail(PROLOGUE)
-        self.assertEqual(1, len(bad), bad)
-        self.assertIn('0xC25', bad[0])
-        self.assertIn('PROLOGUE_LITERAL_MSGS', bad[0])
+    def test_a_literal_inside_an_injector_is_not_this_guard_s_business(self):
+        """Ownership moved to build time (#356 review). Here, an attributed literal is fine."""
+        self.assertEqual([], self._fail(UNREGISTERED))
 
     def test_a_named_id_is_none_of_this_guards_business(self):
         self.assertEqual([], self._fail(NAMED_ONLY))
 
-    def test_a_literal_with_no_injector_must_at_least_have_a_NAME(self):
+    def test_a_literal_with_no_injector_is_caught(self):
         bad = self._fail(HOMELESS)
         self.assertEqual(1, len(bad), bad)
         self.assertIn('outside every injector', bad[0])
@@ -197,6 +184,14 @@ class MessageLiteralsAreRegistered(unittest.TestCase):
         self.assertTrue(fail)
         self.assertIn('vacuously', fail[0])
 
+    def test_a_malformed_source_is_REPORTED_not_raised(self):
+        """callsites.signature turns SyntaxError into callsites.ParseError, which is not a
+        SyntaxError -- so an `except (ValueError, SyntaxError)` let it escape and killed the
+        whole drift gate with a traceback, skipping every check after it (#356 review)."""
+        fail = self._fail('def inject_ch07(c):\n    set_message_body(lines, 0x1,\n')
+        self.assertEqual(1, len(fail), fail)
+        self.assertIn('cannot scan', fail[0])
+
     def test_the_check_is_registered_in_the_drift_gate(self):
         """Defined-but-unregistered is how check_tile_changes_outlive_the_retarget shipped:
         it ran only via the test subprocess, which check_tests_pass skips whenever
@@ -206,20 +201,60 @@ class MessageLiteralsAreRegistered(unittest.TestCase):
         self.assertIn('check_message_literals_are_registered',
                       inspect.getsource(check.main))
 
-    def test_the_static_registry_read_is_not_empty(self):
-        """The claims dict is names and splats, so `literal_eval` refuses it outright. If the
-        static read came back empty the guard would police nothing and say so."""
-        import ast
-        with open(os.path.join(check.REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
-            tree = ast.parse(fh.read(), 'build_campaign.py')
-        claims = check._chapter_message_claims(tree, check._module_int_table(tree))
-        self.assertIn('ch00', claims)
-        self.assertIn(0xC25, claims['ch00'])
-
     def test_the_live_tree_is_clean(self):
         fail = []
         check.check_message_literals_are_registered(fail)
         self.assertEqual([], fail)
+
+
+class LiteralOwnershipAtBuildTime(unittest.TestCase):
+    """build_campaign owns OWNERSHIP, because there the registry is a real dict.
+
+    The static version died in #356's review: HOSTED_CHAPTER_MESSAGE_IDS is written as
+    generators, subscripts and tuple-unpacked constants, so an AST evaluator of it was wrong
+    in both directions -- it missed ch04's 0x9C3/0x9C6 and demanded a registration that makes
+    assert_message_ids_unique exit, and it over-collected ch05's box counts and passed an
+    unclaimed 0x13.
+    """
+
+    def setUp(self):
+        try:
+            import build_campaign as bc
+        except ImportError as exc:                # pragma: no cover - lean environment
+            self.skipTest('build_campaign does not import here: %s' % exc)
+        self.bc = bc
+        self.lit = hosts.MessageLiteral
+
+    def test_a_claimed_literal_passes(self):
+        self.bc.assert_literals_are_claimed(
+            literals=[self.lit(0xBF4, 'ch07', 10)], claims={'ch07': (0xBF4,)})
+
+    def test_an_unclaimed_literal_exits_the_BUILD(self):
+        with self.assertRaises(SystemExit) as caught:
+            self.bc.assert_literals_are_claimed(
+                literals=[self.lit(0xBF4, 'ch07', 10)], claims={'ch07': (0x1,)})
+        self.assertIn('0xBF4', str(caught.exception))
+        self.assertIn('CH07_LITERAL_MSGS', str(caught.exception))
+
+    def test_the_prologue_complaint_names_PROLOGUE_LITERAL_MSGS(self):
+        """ch00's tuple is not CH00_-shaped, and telling the author to create CH00_LITERAL_MSGS
+        would invent a second registry beside the one that works."""
+        with self.assertRaises(SystemExit) as caught:
+            self.bc.assert_literals_are_claimed(
+                literals=[self.lit(0xC25, 'ch00', 10)], claims={'ch00': ()})
+        self.assertIn('PROLOGUE_LITERAL_MSGS', str(caught.exception))
+
+    def test_an_unattributed_literal_is_left_to_the_discovery_guard(self):
+        self.bc.assert_literals_are_claimed(
+            literals=[self.lit(0xBF4, None, 10)], claims={})
+
+    def test_the_LIVE_tree_passes_against_the_REAL_registry(self):
+        """The whole point of moving here: ch04's tuple-unpacked claims resolve exactly."""
+        self.bc.assert_literals_are_claimed()
+
+    def test_it_runs_in_the_build(self):
+        import inspect
+        self.assertIn('assert_literals_are_claimed', inspect.getsource(self.bc.main))
 
 
 if __name__ == '__main__':

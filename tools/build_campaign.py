@@ -10256,6 +10256,43 @@ def assert_message_ids_unique(claims=None):
     return owner
 
 
+def assert_literals_are_claimed(literals=None, claims=None):
+    """Guard: a message id written as a BARE LITERAL must still be CLAIMED by its chapter.
+
+    Discovery (`inject.hosts.literal_message_ids`) makes a bare literal SAFE -- it folds into
+    `injector_message_ids`, so the deadness check sees it whether or not anyone wrote it down.
+    What discovery cannot do is give the id an OWNER. `HOSTED_CHAPTER_MESSAGE_IDS` is what
+    `assert_message_ids_unique` collides on and what `make chapter CH=chNN` reads for headroom,
+    and a chapter that spends an id it does not claim reads as having room it has already
+    spent. 0xC25 is the case that pays for this: it sits 0x33 above ch05's pool, so extending
+    that range upward would have silently overwritten Scramsax's defeat quote.
+
+    This lives HERE, at build time, and not in `check.py`, because here the registry is a real
+    dict. #356's review killed the static version: the registry is written as generators,
+    subscripts and splats, so reading it with an AST evaluator was wrong in both directions --
+    it missed ch04's 0x9C3/0x9C6 (tuple-unpacked constants) and demanded a registration that
+    makes `assert_message_ids_unique` exit, and it over-collected ch05's box counts and let an
+    unclaimed 0x13 through. Import the registry where it is real; never re-derive it.
+    """
+    from inject import hosts
+    literals = hosts.literal_message_ids() if literals is None else literals
+    claims = HOSTED_CHAPTER_MESSAGE_IDS if claims is None else claims
+    for lit in literals:
+        if lit.chapter is None:
+            continue                              # check.py's discovery guard owns this shape
+        if lit.msg_id not in set(claims.get(lit.chapter, ())):
+            holder = ('PROLOGUE_LITERAL_MSGS' if lit.chapter == 'ch00'
+                      else '%s_LITERAL_MSGS' % lit.chapter.upper())
+            sys.exit(
+                'ERROR: build_campaign.py:%d writes message 0x%X as a BARE LITERAL in %s, but '
+                '%s does not claim it in HOSTED_CHAPTER_MESSAGE_IDS -- so the id has no owner, '
+                'assert_message_ids_unique cannot collide on it, and `make chapter CH=%s` '
+                'counts it as free headroom it has already spent. Add 0x%X to %s.'
+                % (lit.lineno, lit.msg_id, lit.chapter, lit.chapter, lit.chapter,
+                   lit.msg_id, holder))
+    return literals
+
+
 def assert_message_id_unclaimed(msg_id, chapter, what):
     """A chapter may DISPLAY a vanilla message id it does not own -- that is the placeholder
     pattern (decisions.md "Vanilla prose is a legitimate PLACEHOLDER"), and ch05's reliquary
@@ -14219,6 +14256,7 @@ def main():
         # hosted chapters claim one message id -- a double-claim is otherwise silent, since
         # verify_text checks runaway text, not who owns a slot.
         assert_message_ids_unique()
+        assert_literals_are_claimed()
         assert_message_blocks_disjoint()   # the setup that would make a collision inevitable
         # And the third of the same family. It ran only from the tests, so `make check` caught
         # it but a plain `make` with an edited block table still produced a ROM -- and the whole
