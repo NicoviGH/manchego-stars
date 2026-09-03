@@ -1105,6 +1105,30 @@ class ItemEconomy(unittest.TestCase):
         self.assertEqual(ours['drops'], ['chest-key'])
         self.assertEqual(ours['shops'], ['termalaine'])
 
+    def test_chapter_economy_counts_non_village_delivery_vehicles(self):
+        """A gift is a gift whatever carries it (#26).
+
+        ch06 hands out vanilla Ch6's own two rewards -- the Antitoxin its village gives and the
+        Orion's Bolt its ending gates on CHECK_ALIVE -- but through vehicles this chapter
+        invented: a Talk on a rescue boat, and a save-them-all clear bonus. The reader only knew
+        villages, chests, drops and post_chapter gold, so it scored ch06 at 400g against the
+        twin's ~15,240g and made a faithful chapter look impoverished. The build already emits
+        both (ch05 ships save_all_bonus), so this was the REPORT lying, not the chapter."""
+        chap = {
+            'rescue_boats': [
+                {'id': 'boat-east', 'talk': {'reward': [{'id': 'antitoxin', 'amount': 1},
+                                                        {'id': 'gold', 'amount': 500}]}},
+                {'id': 'boat-west', 'talk': {'reward': []}},
+            ],
+            'economy': {'save_all_bonus': 'orions-bolt'},
+        }
+        ours = df.chapter_economy(chap)
+        self.assertEqual(ours['gold'], 500)
+        self.assertEqual(ours['gifts'], ['antitoxin', 'orions-bolt'])
+
+    def test_chapter_economy_survives_a_chapter_with_no_boats(self):
+        self.assertEqual(df.chapter_economy({})['gifts'], [])
+
 
 class BattlefieldDynamics(unittest.TestCase):
     """Recruit-flips + reinforcement timing (#171), auto-detected from HEAD for the twin and

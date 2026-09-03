@@ -1773,15 +1773,34 @@ def vanilla_economy(parity_ref):
 def chapter_economy(chap):
     """Our chapter's declared economy from its YAML: explicit gold + item ids by vehicle.
     Campaign item ids aren't valued here (they aren't vanilla enums) -- the vanilla bar is the
-    gold target; ours is listed alongside for a same-glance compare."""
+    gold target; ours is listed alongside for a same-glance compare.
+
+    Every DELIVERY VEHICLE we ship has to be listed here, not just the vanilla-shaped ones. ch06
+    hands out FE8 Ch6's own two rewards -- an Antitoxin and the Orion's Bolt gated on keeping
+    everyone alive -- through a Talk on a rescue boat and a save-them-all clear bonus, because it
+    has no villages at all. Counting only villages/chests/drops/post-chapter gold scored it at
+    400g against the twin's ~15,240g and reported a faithful chapter as an impoverished one
+    (#26). A vehicle the reader does not know reads as a reward we never gave.
+    """
     gold = 0
     gifts, chests, drops = [], [], []
-    for v in chap.get('villages') or []:
-        for r in v.get('visit_reward') or []:
+
+    def take(rewards):
+        """Fold one reward list into gold + gifts. Same shape wherever it is carried."""
+        nonlocal gold
+        for r in rewards or []:
             if r.get('id') == 'gold':
                 gold += int(r.get('amount') or 0)
             elif r.get('id'):
                 gifts.append(r['id'])
+
+    for v in chap.get('villages') or []:
+        take(v.get('visit_reward'))
+    for boat in chap.get('rescue_boats') or []:
+        take((boat.get('talk') or {}).get('reward'))
+    bonus = (chap.get('economy') or {}).get('save_all_bonus')
+    if bonus:
+        gifts.append(bonus)
     for c in chap.get('chests') or []:
         for it in c.get('contents') or []:
             if it.get('id'):
