@@ -228,10 +228,11 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the branch/PR and commit state, verification
   actually run, and the exact next step. Short-lived feature branches in this checkout, one at a
-  time. **Feature work goes in its OWN ephemeral worktree** (`tools/worktree-setup.sh <path>
-  <branch>`), per `docs/decisions.md` → feature-flow: branch → worktree → PR → `/code-review` →
-  squash-merge → drop both. The older "one tree, no worktrees" line here was stale and cost a
-  correction on 2026-09-02.
+  time. **One task at a time = a plain BRANCH in this tree.** Flow: branch → PR →
+  `/code-review` → squash-merge → delete the branch. A worktree buys build isolation between
+  CONCURRENT workers (two ROM builds in one tree corrupt each other) — working serially it buys
+  nothing and costs setup, so don't (Nicolas, 2026-09-02). `tools/worktree-setup.sh` is there for
+  when work really is parallel.
 
 ## Before you touch anything
 
