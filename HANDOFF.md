@@ -12,42 +12,51 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**PR #356 (#346) is OPEN, verified, and NOT REVIEWED.** The bare-literal message-id guard:
-discovery (`inject.hosts.literal_message_ids` AST-scans `build_campaign.py` via `callsites.py`)
-plus ownership (`check_message_literals_are_registered`). 12 literals on main, all already
-claimed, so it ships strict with no allowlist. Measured 17 errors + 1 failure before the patch,
-18/18 after; `tools/check.py` clean. No ROM build or playtest needed -- it is a lint.
-**It was drafted by a subagent; I verified the before/after myself, which is not a review.**
-Per the *"`/code-review` is the review step"* ADR it needs a fresh reviewer before merge.
+**Nothing.** #346 (PR #356) and #353 (PR #357) both landed 2026-09-02, reviewed by
+`/code-review` first, squash-merged, branches and the ms-353 worktree dropped.
 
-⚠️ **#344, #345 and #353 are NOT started, and the partial work from 2026-09-02 is NOT
-trustworthy.** Four subagents were fanned out at them; three died mid-write on the session limit
-and their scratch files hold half-finished analysis in a temp dir that will not survive. **Redo
-them from the issues, do not resume from those fragments.** Lesson, the hard way: fanning out
-four Opus agents at once costs a whole session budget -- cap at two, prefer Sonnet, stage them.
+**#346 -- a bare-literal message id registers itself.** Discovery AST-scans
+`build_campaign.py` for `set_message_body` literals; OWNERSHIP is asserted at BUILD time by
+`assert_literals_are_claimed`. The review killed the first design, which read
+`HOSTED_CHAPTER_MESSAGE_IDS` with a hand-rolled AST evaluator and was wrong in BOTH directions.
+ADR: *"A message id written as a bare literal now registers itself"*.
 
-**#135 is triaged and CLOSED, but closing it did not DO any of the work** -- it routed one intake
-ticket into two new issues, a reopened slice, and two notes on #33. Net open work went UP by two.
-What it actually produced:
+**#353 -- ch01 has a debug boot** (`CH01BOOT=1`, `--ch01-boot`). New Game -> the Iron Trail at
+**frame 2,856** against ~24,000 for a prologue playthrough. ADRs: *"ch01 is the only hosted
+chapter whose opening runs a MENU"*, *"One fact, four registries"*, *"A duplicate top-level
+`def` disables the earlier one"*.
 
-- **#21 REOPENED, and it holds the one real deliverable.** ch01's terrain-heal concept ships in
-  **no channel at all**: we null vanilla's tutorial lists on every slot we host, so the Guide
-  command is absent from the map menu in ch01-ch04 (of the 56 flags the Guide uses we set exactly
-  one -- 234/Arena, in ch05), flag 206 "Fortresses & Castle Gates" is never set, and the
-  townsperson healing line the reporter half-remembered was a **designer note never authored into
-  dialogue**. The fix is ch05's own arena shape with `ENUT(206)` (`build_campaign.py:10520`) --
-  a copy, not a design. Cheaper to confirm once #353 lands. **This is the next piece of real work
-  to come out of the playtest.**
-- **#354** (new, M3) -- cross-context art consistency, carrying the style anchors the reporter
-  named: Meesmickle / Marty / Prof. RBG read as FE, and the ice enemy (reads as Sephek) should
-  stay off-model on purpose. **The anchor mapping is inferred and needs Nicolas to confirm it.**
-- **#355** (new, M4, `stretch`) -- promoted-tier looks. Needs a whether-not-how decision from
-  Nicolas; gated behind #354 so we do not author twice the art with the same drift.
-- **#33** -- the prologue Jeigan note (phrased as the question the reporter asked: does it recur
-  after ch00?) and "hard but doable for a non-FE player" as the calibration band.
-- #20 was deliberately NOT reopened: the reporter resolved that finding themselves as "it's fine"
-  and the slice is genuinely complete. #57/#58 on #21 had shipped in June and were never ticked --
-  same stale-checkbox trap as #23; fixed.
+⚠️ **`PT_HOST_CHAPTER=2 tools/playtest/run.sh mapshot` is the invocation** -- through
+`matrix.py` it FAILS, because `mapshot` is chapter-generic (`host_chapter: null`) and resolves
+to host 1 while the ROM boots chapter 2. Scenario wiring, not a boot fault. A dedicated fast
+ch01 scenario would cost one of `harness.lua`'s **2 remaining** local slots; noted on #353.
+
+**The pre-commit hook could not pass from a worktree at all, before any of this.** `git commit`
+exports `GIT_DIR`, which BEATS `git -C`, so every decomp read resolved against the superproject
+and exited 128 -- surfacing as 12 test errors that appear ONLY under `git commit`. Five inline
+copies of the env strip existed and the one that mattered had none. Now `inject.decomp.git_env()`
+at all 8 call sites, pinned by `check_decomp_git_calls_strip_the_env`.
+
+**Three new guards, all registered in `check.py`'s gate:**
+`check_rom_configs_reach_the_build` (a rom_config must reach the Makefile, `_requested_flags`,
+`FLAG_ARGS` and `_boots` -- three of four were missed on the first cut),
+`check_decomp_git_calls_strip_the_env`, `check_no_shadowed_definitions`.
+
+**#135 is triaged and CLOSED -- and closing it did not DO the work.** It routed one ticket into
+**#354**, **#355**, a reopened **#21** and two notes on #33; net open work went UP by two.
+
+⚠️ **#354 was RE-SCOPED 2026-09-02 and is much smaller than filed.** `v0.1.0` was tagged
+2026-06-19 and the report is from 2026-07-06, but nearly the whole custom-art programme landed
+AFTER it (portraits from 06-24, map sprites from 07-07). The "mismatched sprites" complaint
+described a build where a few custom busts sat beside vanilla donors -- the gap the last ten
+weeks closed. What survives: re-check on a CURRENT build, and keep the style anchors
+(Meesmickle / Marty / Prof. RBG read as FE; the ice enemy stays off-model) as a forward standard.
+
+**#21's real deliverable: ch01's terrain-heal beat.** We ship that concept in no channel at all
+-- the Guide command is absent in ch01-ch04 (only flag 234/Arena is ever set) and the townsperson
+healing line was a designer note never authored into dialogue. The fix is ch05's arena `ENUT`
+shape with `ENUT(206)` (`build_campaign.py:10520`) -- a copy, not a design, and cheap to confirm
+now that #353 exists.
 
 **#347 landed 2026-09-02 (#348), with #350 cleaning up after it.** ch01's goblins were
 shipping as ch05's skeletons -- and, because `SMSId` and `pBattleAnimDef` are fields of the
@@ -80,7 +89,7 @@ content. Read the issue for scope, the boards for reasoning.
 - **#344** -- factor AI behaviour into the difficulty metric (#335's stretch, split out). This is the
   metric that would have caught the drift #335 fixed: ch04 fielded 78% pursuers against a
   half-static twin and still measured x1.00.
-- **#345** -- `SUITE=all` reports FALSE failures. Four long scenarios run concurrently and starve
+- **#345** -- `SUITE=all` reports FALSE failures. **NEXT.** Four long scenarios run concurrently and starve
   each other past their wall-clock deadlines (~15fps against a 240fps target). The verdict
   *conflation* is fixed in #342; the contention is not. Until it is, **re-run any `SUITE=all`
   failure with `--jobs 1` before believing it.**
@@ -207,7 +216,7 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
   session's work then had to be rebased off `main` and reconciled. `git branch --all --contains`
   and a look at open PRs answer this in seconds.
 - **Environment: Nicolas is on his Mac. ROM builds, `verify_text` and mGBA playtests are LIVE.**
-- **Checkout: `/Users/Yonick/Projects/manchego-stars`, the ONE tree** (#267). It is clean except
+- **Primary checkout: `/Users/Yonick/Projects/manchego-stars`** (#267), which holds `main`. It is clean except
   for the intentionally dirty `fireemblem8u` submodule and the untracked `.agents/`,
   `map-review/` and `review/` — preserve those and **stage paths explicitly**. (`AGENTS.md` was
   untracked here until #343 commits it; it is no longer in the tree on `main`.)
@@ -219,7 +228,10 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions. Codex must leave an
   explicit HANDOFF entry naming what it changed, the branch/PR and commit state, verification
   actually run, and the exact next step. Short-lived feature branches in this checkout, one at a
-  time — **no worktrees unless Nicolas says otherwise**.
+  time. **Feature work goes in its OWN ephemeral worktree** (`tools/worktree-setup.sh <path>
+  <branch>`), per `docs/decisions.md` → feature-flow: branch → worktree → PR → `/code-review` →
+  squash-merge → drop both. The older "one tree, no worktrees" line here was stale and cost a
+  correction on 2026-09-02.
 
 ## Before you touch anything
 
