@@ -4242,6 +4242,51 @@ different guards in `check.py`, both times from a sloppy source-slicing edit tha
 instead of replacing it. `check_no_shadowed_definitions` now rejects it across `tools/`. Same family
 as *"A guard that stops guarding fails silently"*: the failure is indistinguishable from working.
 
+**A deadline that measures the MACHINE is not a deadline (2026-09-02, #345)**
+A `SUITE=all` sweep tabled **eight chapters as FAIL**. Nothing had failed. `SUITE=all` puts nearly
+every long scenario in the repo in one `canonical` block, so four multi-minute mGBA processes ran
+concurrently against `-j8` ROM builds at roughly **15fps against a 240fps target** -- 16x slower
+than solo. Every deadline in `matrix.yaml` was WALL-CLOCK, so scenarios that pass alone in 25-70s
+blew 300-600s walls, and the tier meant to be the pre-playtest safety net was the one that broke.
+All eight passed under `--jobs 1`.
+
+**The work is frame-bound, so the budget is frames.** `deadline` is now read as what it always
+meant -- how much WORK a scenario may do -- in frames rather than seconds. Under contention a run
+takes longer in wall time and its verdict does not change.
+
+**The rate is FLOORED at the declared target, not fixed to it.** The emulator outruns its own
+target: `titlecard` measures 877fps against a 240 target, so a flat `deadline * target` would have
+been ~3.6x stingier than the wall deadline it replaces -- and `llm`, whose own comment says *"at
+240fps a frame budget would be 4x too impatient"*, would have started failing. The budget therefore
+uses the best rate the run has actually achieved, floored at the declared one: that reproduces the
+old allowance on an idle machine, while contention can only make the budget LARGER. **The bad
+direction is the one that cannot happen.** It is sized on the DECLARED rate too, never on a `PT_FPS`
+override -- watching a run at 60fps must not quarter its work allowance.
+
+**A frame budget alone would hang forever**, because a wedged emulator emits no frames and so never
+reaches any budget. Two kill paths, and both name a real fault rather than a busy laptop:
+**OVERRUN** (more frames than budgeted -- genuinely not finishing) and **STALL** (the frame counter
+stopped -- mGBA is wedged). `PT_MAX_WALL_S` stays as a last-resort net for neither.
+
+**STALL is the one piece that is still a wall clock, and the first cut set it wrong.** Progress is
+read from stamped log lines, but the harness goes deliberately silent inside long waits -- the
+largest is 9000 frames, which at the ~15fps contention floor is **600 SECONDS**. A 180s default
+would have killed healthy contended runs as "wedged", recreating the exact bug this entry is about,
+one layer down. The default is 1800s, and a test pins it against the largest `waitFor` in
+`harness.lua` so the two cannot drift apart.
+
+Every run now prints `throughput: N frames in Ns = Nfps (target Nfps)`. The harness already stamped
+every line with its frame, so measured fps was free the whole time; printing it is what makes a
+contended run legible instead of a mystery. **The fix and the diagnosis are the same number.**
+
+Two bugs found while proving it, both worth naming. **`set -euo pipefail` turns an empty `grep`
+into a dead script:** before the first stamped line exists the frame scan found nothing, grep exited
+1, and run.sh died silently right after its "running" banner -- while the scenario itself went on to
+PASS in its own log. And **bash reads a leading-zero number as OCTAL in `$(( ))`**: the stamps are
+zero-padded, so frame 3425 evaluated as 3425 octal = 1813 and the throughput line under-reported by
+a third. `10#` forces base ten. A number that is confidently wrong is worse than no number, which is
+the whole point of the feature.
+
 **ch01 is the only hosted chapter whose opening runs a MENU, and that is what a debug boot has
 to strip (2026-09-02, #353)**
 Every hosted chapter but ch01 had a fast boot; confirming #347 by eye therefore cost a canonical

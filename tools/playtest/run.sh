@@ -252,11 +252,11 @@ ROMHASH=$(shasum "$ROM" | cut -c1-12)
 # FAIL classify as a pass (#308).
 verdict_passed() { case "$VERDICT" in *"RESULT: PASS"*) return 0 ;; *) return 1 ;; esac; }
 
-# run_mgba <scenario> <fps> <vsync> <deadline_s> [headless|headed]
+# run_mgba <scenario> <fps> <vsync> <deadline_s> [headless|headed] [budget_fps]
 #   -> echoes log, sets global VERDICT. The engine is an ARGUMENT because a checkpoint
 #      builder must stay headed even when the scenario that needs it is headless.
 run_mgba() {
-    local scen=$1 fps=$2 vsync=$3 deadline=$4 mode=${5:-headed}
+    local scen=$1 fps=$2 vsync=$3 deadline=$4 mode=${5:-headed} budget_fps=${6:-$2}
     local app hl=0
     if [ "$mode" = "headless" ]; then app="$HEADLESS_APP"; hl=1; else app="$HEADED_APP"; ensure_headed_app; fi
     # Say which engine ran, every time. Which binary served an invocation decides whether
@@ -317,14 +317,81 @@ EOF
         "$ROM" >"$out/mgba-stdout.log" 2>&1 &
     local pid=$!
     echo "running '$scen' (pid $pid, ${fps}fps); polling $log"
-    local end=$((SECONDS + deadline))
+    # The work is FRAME-bound; the deadline used to be WALL-clock, and that mismatch is what
+    # made SUITE=all report false failures (#345). Four long scenarios sharing the machine ran
+    # at ~15fps against a 240fps target -- 16x slower -- so scenarios that pass solo in 25-70s
+    # blew 300-600s wall deadlines and were tabled as FAIL. Nothing had failed; the clock was
+    # measuring the MACHINE'S LOAD, not the scenario.
+    #
+    # So the declared `deadline` is read as what it always meant -- how much WORK a scenario may
+    # do -- expressed in frames at its own target rate. Contention then makes a run take longer
+    # in wall time and changes nothing about its verdict. Two things still kill a run, and both
+    # are real faults rather than symptoms of a busy laptop:
+    #
+    #   OVERRUN  the scenario did more frames than its budget: it is genuinely not finishing.
+    #   STALL    the frame counter stopped moving: mGBA is wedged, so no budget would ever be
+    #            reached and waiting for one is waiting forever.
+    #
+    # PT_MAX_WALL_S remains as a last-resort net for a pathology neither of those describes.
+    # The budget is sized on the DECLARED rate, never on PT_FPS. PT_FPS=60 to watch a run at
+    # real speed must not quarter its work allowance and OVERRUN a scenario that passes by
+    # default (#358 review).
+    #
+    # ...and it floors at that rate rather than fixing it there, because the emulator OUTRUNS
+    # its target: titlecard measures 877fps against a 240 target. A flat deadline*target would
+    # be ~3.6x STINGIER than the wall deadline it replaces, and `llm` -- whose own comment says
+    # "at 240fps a frame budget would be 4x too impatient" -- would start failing. Taking the
+    # best rate the run has actually achieved reproduces the old allowance on an idle machine,
+    # while contention can only make the budget LARGER, never smaller. The bad direction is
+    # the one that cannot happen.
+    local stall=${PT_STALL_S:-1800}
+    local max_wall=${PT_MAX_WALL_S:-7200}
+    local started=$SECONDS
+    local last_frame=0 last_progress=$SECONDS frame=0
     VERDICT=""
-    while [ $SECONDS -lt $end ]; do
+    while :; do
         if [ -f "$log" ] && grep -q "RESULT:" "$log"; then VERDICT=$(grep "RESULT:" "$log" | tail -1); break; fi
         if ! kill -0 "$pid" 2>/dev/null; then VERDICT="RESULT: ERROR -- mGBA exited early"; break; fi
+        # Every harness line is stamped [fNNNNN], so progress is free to read. Only the tail is
+        # scanned: these logs reach hundreds of MB and re-reading one every 3s is its own load.
+        # `|| true`: before the first stamped line exists grep exits 1, and under
+        # `set -euo pipefail` that killed run.sh outright -- silently, after the "running"
+        # banner, with the scenario still passing in its own log. No frames yet is a NORMAL
+        # early state, not an error.
+        frame=$(tail -c 200000 "$log" 2>/dev/null | grep -oE '\[f[0-9]+\]' | tail -1 | tr -dc '0-9' || true)
+        # 10# forces base 10: the stamps are zero-padded ([f005267]) and bash reads a
+        # leading-zero number in $(( )) as OCTAL, which silently mis-scaled the throughput
+        # line (3425 read as 3425o = 1813, reported as 302fps instead of 570).
+        frame=$((10#${frame:-0}))
+        if [ "$frame" -gt "$last_frame" ]; then last_frame=$frame; last_progress=$SECONDS; fi
+        local ran=$((SECONDS - started)); [ "$ran" -gt 0 ] || ran=1
+        local rate=$((last_frame / ran))
+        [ "$rate" -gt "$budget_fps" ] || rate=$budget_fps
+        local budget=$((deadline * rate))
+        if [ "$frame" -gt "$budget" ]; then
+            VERDICT="RESULT: ERROR -- OVERRAN its frame budget (${frame} > ${budget} frames, i.e. ${deadline}s of work at ${rate}fps)"
+            break
+        fi
+        if [ $((SECONDS - last_progress)) -ge "$stall" ]; then
+            VERDICT="RESULT: ERROR -- STALLED: no frame progress for ${stall}s (stuck at frame ${last_frame})"
+            break
+        fi
+        if [ $((SECONDS - started)) -ge "$max_wall" ]; then
+            VERDICT="RESULT: ERROR -- exceeded PT_MAX_WALL_S=${max_wall}s at frame ${last_frame}"
+            break
+        fi
         sleep 3
     done
-    [ -n "$VERDICT" ] || VERDICT="RESULT: ERROR -- timed out after ${deadline}s"
+    # Throughput, always -- a contended run is now legible instead of a mystery (#345). A number
+    # far under the target is the signal that the machine, not the change, is what is slow.
+    # Re-read the final frame: the poll interval means the loop's last sample is up to 3s
+    # stale, and on a short scenario that is most of the run.
+    local final
+    final=$(tail -c 200000 "$log" 2>/dev/null | grep -oE '\[f[0-9]+\]' | tail -1 | tr -dc '0-9' || true)
+    final=$((10#${final:-0}))
+    [ "$final" -gt "$last_frame" ] && last_frame=$final
+    local elapsed=$((SECONDS - started)); [ "$elapsed" -gt 0 ] || elapsed=1
+    echo "throughput: ${last_frame} frames in ${elapsed}s = $((last_frame / elapsed))fps (target ${fps}fps)"
     if [ "$KEEP_OPEN" != "--keep-open" ]; then kill "$pid" 2>/dev/null || true; fi
     echo "----------------------------------------"
     cat "$log" 2>/dev/null || echo "(no log produced)"
@@ -366,7 +433,7 @@ if [ -n "$BUILDER" ]; then
         # (PT_DIFFICULTY=difficult, say) would otherwise delete the perfectly good state
         # belonging to the previous stamp and force a full re-mint when you switch back.
         _ss_before=$(stat -f%m "$STATE_DIR/$CKPT.ss" 2>/dev/null || echo none)
-        run_mgba "$BUILDER" 240 0 "$MX_CHECKPOINT_DEADLINE" headed  # HEADED always: saveStateFile is
+        run_mgba "$BUILDER" 240 0 "$MX_CHECKPOINT_DEADLINE" headed 240  # HEADED always: saveStateFile is
         # broken under mgba-headless (see the engine-selection note above). ch02start
         # replays the whole ch00->ch01->ch02 chain.
         if verdict_passed; then
@@ -402,7 +469,7 @@ FPS="$MX_FPS"; VSYNC="$MX_VSYNC"; DEADLINE_S="$MX_DEADLINE"
 # speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
 if [ -n "${PT_FPS:-}" ]; then FPS="$PT_FPS"; [ "$PT_FPS" -ge 240 ] && VSYNC=0; fi
 run_mgba "$SCENARIO" "$FPS" "$VSYNC" "$DEADLINE_S" \
-    "$([ "$SCENARIO_HEADLESS" = "1" ] && echo headless || echo headed)"
+    "$([ "$SCENARIO_HEADLESS" = "1" ] && echo headless || echo headed)" "$MX_FPS"
 # Tell the sidecar the run is over: serve() drains any pending request, saves its
 # transcript (record mode), and exits -- without this it polls forever and a recorded
 # transcript would only be saved by a clean Ctrl-C.

@@ -1681,5 +1681,129 @@ class ValuedBuildFlagsCarryTheirValue(unittest.TestCase):
         self.assertEqual(set(), pi.VALUED_FLAGS - set(pi.FLAG_ARGS))
 
 
+class DeadlineIsAFrameBudget(unittest.TestCase):
+    """#345: SUITE=all tabled eight chapters as FAIL. Nothing had failed -- four long
+    scenarios sharing the machine ran at ~15fps against a 240fps target, so wall-clock
+    deadlines expired. The clock was measuring the machine's load, not the scenario."""
+
+    def _run_sh(self):
+        import check, os
+        with open(os.path.join(check.REPO, 'tools', 'playtest', 'run.sh'),
+                  encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_run_sh_no_longer_kills_on_elapsed_wall_time(self):
+        """The old shape was `local end=$((SECONDS + deadline))` with the poll loop bounded
+        by it. Contention alone could then fail a passing scenario."""
+        self.assertNotIn('local end=$((SECONDS + deadline))', self._run_sh())
+
+    def test_the_budget_is_frames_not_wall_seconds(self):
+        """Sized on the rate the run actually achieves, floored at its declared target --
+        see BudgetRateIsFlooredNotFixed for why a flat deadline*target was too stingy."""
+        self.assertIn('local budget=$((deadline * rate))', self._run_sh())
+
+    def test_both_kill_paths_survive(self):
+        """A frame budget alone would wait forever on a wedged emulator: no frames means the
+        budget is never reached. The stall detector is what makes the budget safe."""
+        src = self._run_sh()
+        self.assertIn('OVERRAN its frame budget', src)
+        self.assertIn('STALLED: no frame progress', src)
+
+    def test_frames_are_parsed_base_ten(self):
+        """Stamps are zero-padded ([f005267]) and bash reads a leading-zero number in $(( ))
+        as OCTAL -- 3425 became 1813 and the throughput line lied."""
+        self.assertIn('10#', self._run_sh())
+
+    def test_throughput_is_always_reported(self):
+        self.assertIn('throughput:', self._run_sh())
+
+
+class VerdictKeepsErrorApartFromFail(unittest.TestCase):
+    """"The scenario proved something false" and "the run never finished" are different
+    facts, and #345's false failures came from conflating them."""
+
+    def _verdict(self, line, rc=1):
+        import matrix as mx
+        return mx.parse_verdict('[f000123] %s\n' % line, rc)
+
+    def test_an_overrun_is_an_ERROR_not_a_FAIL(self):
+        self.assertEqual('ERROR', self._verdict(
+            'RESULT: ERROR -- OVERRAN its frame budget (3803 > 240 frames)'))
+
+    def test_a_stall_is_an_ERROR_not_a_FAIL(self):
+        self.assertEqual('ERROR', self._verdict(
+            'RESULT: ERROR -- STALLED: no frame progress for 180s (stuck at frame 40)'))
+
+    def test_a_real_failure_is_still_a_FAIL(self):
+        self.assertEqual('FAIL', self._verdict('RESULT: FAIL -- never reached the map'))
+
+    def test_a_pass_is_a_PASS(self):
+        self.assertEqual('PASS', self._verdict('RESULT: PASS -- map deployed', rc=0))
+
+
+class RunShDefaultsMatchTheCacheKey(unittest.TestCase):
+    """#358 review: unset and the explicit default are the SAME run, so they must hash the
+    same. That only holds while the two files agree about what the default IS."""
+
+    def test_every_declared_default_matches_run_sh(self):
+        import check, matrix as mx, os, re
+        with open(os.path.join(check.REPO, 'tools', 'playtest', 'run.sh'),
+                  encoding='utf-8') as fh:
+            src = fh.read()
+        for key, value in mx.RUN_SH_DEFAULTS.items():
+            if key == 'PT_DIFFICULTY':
+                continue            # defaulted elsewhere in run.sh, not via ${X:-N}
+            found = re.search(r'\$\{%s:-([^}]+)\}' % re.escape(key), src)
+            self.assertIsNotNone(found, '%s is not defaulted in run.sh' % key)
+            self.assertEqual(value, found.group(1),
+                             '%s: matrix says %r, run.sh says %r'
+                             % (key, value, found.group(1)))
+
+    def test_the_defaults_are_all_real_cache_keys(self):
+        import matrix as mx
+        self.assertEqual(set(), set(mx.RUN_SH_DEFAULTS) - set(mx.PLAYTEST_ENV_KEYS))
+
+    def test_unset_and_explicit_default_hash_the_same(self):
+        """The whole point: otherwise the cache pays for the identical run twice."""
+        import matrix as mx
+        key = [k for k in mx.RUN_SH_DEFAULTS if k != 'PT_DIFFICULTY'][0]
+        self.assertIn(key, mx.PLAYTEST_ENV_KEYS)
+
+
+class BudgetRateIsFlooredNotFixed(unittest.TestCase):
+    """#358 review: the emulator OUTRUNS its target (877fps measured against 240), so a flat
+    deadline*target would be ~3.6x stingier than the wall deadline it replaces."""
+
+    def _run_sh(self):
+        import check, os
+        with open(os.path.join(check.REPO, 'tools', 'playtest', 'run.sh'),
+                  encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_the_rate_floors_at_the_declared_target(self):
+        self.assertIn('[ "$rate" -gt "$budget_fps" ] || rate=$budget_fps', self._run_sh())
+
+    def test_the_budget_is_sized_on_the_DECLARED_rate_not_PT_FPS(self):
+        """PT_FPS=60 to watch a run at real speed must not quarter its work allowance."""
+        src = self._run_sh()
+        self.assertIn('budget_fps=${6:-$2}', src)
+        self.assertIn('"$MX_FPS"', src)
+
+    def test_the_stall_default_clears_the_longest_silent_wait(self):
+        """The largest waitFor in harness.lua is 9000 frames; at the ~15fps contention floor
+        that is 600s of silence in a HEALTHY run."""
+        import check, os, re
+        src = self._run_sh()
+        found = re.search(r'\$\{PT_STALL_S:-([0-9]+)\}', src)
+        self.assertIsNotNone(found)
+        with open(os.path.join(check.REPO, 'tools', 'playtest', 'harness.lua'),
+                  encoding='utf-8') as fh:
+            waits = [int(m) for m in re.findall(r'waitFor\([^)]*?,\s*([0-9]{3,})', fh.read())]
+        self.assertTrue(waits, 'no waitFor budgets found -- the scan is broken')
+        self.assertGreater(int(found.group(1)), max(waits) / 15.0,
+                           'PT_STALL_S must clear %d frames at the 15fps contention floor'
+                           % max(waits))
+
+
 if __name__ == '__main__':
     unittest.main()
