@@ -384,6 +384,9 @@ async function switchTo(uid, mode){
   await loadChar(uid, mode);
 }
 let undo=[], redo=[], playT=0, playStart=0;
+/* The preview repaints on a frame boundary, or when an edit/background change
+   invalidates what is on screen (previewDirty). */
+let lastPreviewFrame=-1, previewDirty=true;
 const BGS=[['grass',[104,152,56]],['snow',[224,232,240]],['grey',[96,96,96]],['black',[20,20,20]]];
 let bgIdx=0;
 const $=id=>document.getElementById(id);
@@ -534,15 +537,23 @@ function drawRef(){if(!REF){return;} const c=$('refCv');const cell=Math.max(2,(1
   const ref=REF[frame];for(let y=0;y<S.fh;y++)for(let x=0;x<S.fw;x++){const p=ref[y*S.fw+x];if(!p[3])continue;
     ctx.fillStyle=`rgb(${p[0]},${p[1]},${p[2]})`;ctx.fillRect(x*cell,y*cell,cell,cell);}}
 
-/* ---- live preview (decomp idle timing) ---- */
+/* ---- live preview (decomp idle timing) ----
+   The cadence is bmudisp.c's own ladder (see IDLE_SEQ) and must not be smoothed: the
+   engine SNAPS between held poses. What must not happen is repainting a pose that has
+   not changed -- 1024 fillRects and a canvas realloc on every one of 60 frames a second
+   made the preview stutter on a busy machine, which reads as a jumpy sprite and is not
+   one. Redraw on the frame BOUNDARIES only, which is exactly when the engine redraws. */
 function loop(ts){
   if(playing){const cycle=S.idleSeq.reduce((a,s)=>a+s[1],0)*S.tickMs;
     const t=((ts-playStart)%cycle)/S.tickMs; let acc=0,pf=S.idleSeq[0][0];
     for(const [fi,dur] of S.idleSeq){if(t<acc+dur){pf=fi;break;}acc+=dur;}
-    drawPreview(pf);}
+    if(pf!==lastPreviewFrame||previewDirty){lastPreviewFrame=pf;previewDirty=false;drawPreview(pf);}}
   requestAnimationFrame(loop);
 }
-function drawPreview(pf){const c=$('prevCv');const cell=6;c.width=S.fw*cell;c.height=S.fh*cell;
+function drawPreview(pf){const c=$('prevCv');const cell=6;
+  /* Assigning width/height RESETS the surface, so only do it when the geometry
+     actually changed (a different sheet), never once per animation frame. */
+  if(c.width!==S.fw*cell||c.height!==S.fh*cell){c.width=S.fw*cell;c.height=S.fh*cell;}
   const ctx=c.getContext('2d');const bg=BGS[bgIdx][1];
   ctx.fillStyle=`rgb(${bg[0]},${bg[1]},${bg[2]})`;ctx.fillRect(0,0,c.width,c.height);
   const fr=S.frames[Math.min(pf,S.n-1)];for(let y=0;y<S.fh;y++)for(let x=0;x<S.fw;x++){
@@ -617,7 +628,7 @@ window.addEventListener('load',()=>{
   $('followTgl').onclick=e=>{if(!MOTION)return;followMotion=!followMotion;if(followMotion)allFrames=false;syncModeBtns();};
   $('undoBtn').onclick=doUndo; $('redoBtn').onclick=doRedo;
   $('play').onclick=e=>{playing=!playing;e.target.textContent=playing?'⏸':'▶';if(playing)playStart=performance.now();};
-  $('bgCycle').onclick=e=>{bgIdx=(bgIdx+1)%BGS.length;e.target.textContent=BGS[bgIdx][0]+' ▸';};
+  $('bgCycle').onclick=e=>{bgIdx=(bgIdx+1)%BGS.length;previewDirty=true;e.target.textContent=BGS[bgIdx][0]+' ▸';};
   $('save').onclick=save;
   $('finishBtn').onclick=async()=>{
     const url = S.done ? 'unfinish' : 'finish';
@@ -637,7 +648,7 @@ window.addEventListener('load',()=>{
     if(map[k]){tool=map[k];[...document.querySelectorAll('.tool')].forEach(x=>x.classList.toggle('on',x.dataset.tool===tool));}});
   window.addEventListener('resize',()=>drawStage());
   window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
-  playStart=performance.now();
+  playStart=performance.now(); previewDirty=true;
 });
 function rebuildThumbs(){const cells=$('frames').children;
   for(let f=0;f<S.n;f++)if(cells[f])drawFrameInto(cells[f].querySelector('canvas').getContext('2d'),f,3,null);}
@@ -645,7 +656,8 @@ function syncModeBtns(){$('allTgl').classList.toggle('on',allFrames);
   $('followTgl').classList.toggle('on',followMotion);}
 function syncUndoBtns(){const u=$('undoBtn'),r=$('redoBtn');
   if(u)u.disabled=!undo.length; if(r)r.disabled=!redo.length;}
-function markDirty(){dirty=true; const b=$('save'); if(b&&!b.textContent.startsWith('● '))b.textContent='● '+b.textContent.replace(/^● /,'');}
+function markDirty(){dirty=true; previewDirty=true;   // every pixel edit lands here
+  const b=$('save'); if(b&&!b.textContent.startsWith('● '))b.textContent='● '+b.textContent.replace(/^● /,'');}
 function doUndo(){if(!undo.length)return;redo.push(snap());S.frames=undo.pop();drawStage();rebuildThumbs();syncUndoBtns();markDirty();}
 function doRedo(){if(!redo.length)return;undo.push(snap());S.frames=redo.pop();drawStage();rebuildThumbs();syncUndoBtns();markDirty();}
 async function save(){$('saveStat').querySelector('button')&&($('save').textContent='saving…');
