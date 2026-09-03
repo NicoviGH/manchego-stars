@@ -55,6 +55,7 @@ from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitive
     REPO, DECOMP, _find_brace_block, _replace_brace_block,
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE,
     WEAPON_ITEM_ENUM, fe_item_enum)  # shared weapon<->ITEM map (used by inject_prologue)
+from inject.decomp import git_env  # noqa: E402  strip inherited GIT_* so `git -C DECOMP` works in a hook
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
 from inject import event_group  # noqa: E402  the ChapterEventGroup census guard (#313)
 from inject import step_cache  # noqa: E402  restore a config-invariant step (#309)
@@ -693,7 +694,7 @@ def _decomp_footprint():
     yields an empty snapshot, which preserves correctness and only skips the speed-up."""
     try:
         out = subprocess.run(
-            ['git', '-C', DECOMP, 'status', '--porcelain', '-z', '-uall'],
+            ['git', '-C', DECOMP, 'status', '--porcelain', '-z', '-uall'], env=git_env(),
             check=True, capture_output=True).stdout
     except (subprocess.SubprocessError, OSError):
         return []
@@ -769,7 +770,7 @@ def _anim_step_cache(campaign, verbose=True):
     h = hashlib.sha256()
     h.update(('campaign:' + campaign + '\n').encode())
     try:
-        head = subprocess.check_output(['git', '-C', DECOMP, 'rev-parse', 'HEAD'],
+        head = subprocess.check_output(['git', '-C', DECOMP, 'rev-parse', 'HEAD'], env=git_env(),
                                        stderr=subprocess.DEVNULL)
     except (subprocess.CalledProcessError, OSError):
         return step_cache.disabled()   # cannot pin the decomp -> recompute rather than guess
@@ -808,7 +809,7 @@ def restore_vanilla_sources():
     # the staging area, so a previously-staged patched file would survive and corrupt the
     # build (e.g. the non-montage monologue-skip leaking into a --montage build). `HEAD --`
     # always resets to the committed vanilla source.
-    subprocess.run(['git', '-C', DECOMP, 'checkout', 'HEAD', '--'] + PATCHED_DECOMP_FILES,
+    subprocess.run(['git', '-C', DECOMP, 'checkout', 'HEAD', '--'] + PATCHED_DECOMP_FILES, env=git_env(),
                    check=True)
 
 # Our cast wear stock vanilla FE8 classes (docs/decisions.md Class Mapping). Map
@@ -2412,10 +2413,7 @@ def vanilla_decomp_text(relpath):
     # GIT_DIR overrides the -C discovery -- so `show HEAD:...` resolves against the
     # superproject and fails (128). Bit us committing from a content/pipeline worktree,
     # whose submodule gitdir is separate from the superproject's.
-    env = {k: v for k, v in os.environ.items()
-           if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX',
-                        'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE',
-                        'GIT_ALTERNATE_OBJECT_DIRECTORIES')}
+    env = git_env()
     return subprocess.check_output(['git', '-C', DECOMP, 'show', 'HEAD:' + relpath],
                                    encoding='utf-8', env=env)
 
@@ -7692,7 +7690,7 @@ def _vanilla_decomp_text_at_head(relative_path):
     """A decomp file as HEAD has it -- our injections are build artifacts, so the working
     tree is the wrong source for any question about what VANILLA says."""
     return subprocess.check_output(
-        ['git', '-C', DECOMP, 'show', 'HEAD:' + relative_path], text=True)
+        ['git', '-C', DECOMP, 'show', 'HEAD:' + relative_path], text=True, env=git_env())
 
 
 def _assert_ms_symbol(symbol):
@@ -7806,7 +7804,7 @@ def _write_chapter_title_card(host, title):
         os.remove(chap_title_o)
 
 
-def inject_ch01(campaign, verbose=True):
+def inject_ch01(campaign, verbose=True, boot=False):
     """Wire Ch1 "The Iron Trail" (#21) onto chapter slot 2 (ch00's MNC2(0x2) target).
 
     Field parity (decisions.md 2026-06-10): the deploy cap IS the ally UnitDefinition
@@ -8273,7 +8271,34 @@ def inject_ch01(campaign, verbose=True):
         % CH01_BEAT1_CARD_MSG
         + beat1_text_calls +
         '    FADI(16) /* fade the Northlook out */\n')
-    script = _replace_brace_block(
+    if boot:
+        # --ch01-boot (#353): the fast boot is a MAP load-test, so it drops everything that
+        # stands between New Game and the trail -- the Northlook beats, lord select (#42) and
+        # Preparations. Same shape as --ch03/04/05-boot ("cutscenes stripped"), and the reason
+        # this branch has to exist at all: ch01 is the only hosted chapter whose opening runs a
+        # MENU, and a controller that meets an unrecognised menu cannot reach the map (measured
+        # 2026-09-02 -- mapshot on the first cut died on the 8-item lord-select with
+        # "fail:nil ... never reached the map"). The company LOAD is ch01's own, so the boot
+        # still founds the party exactly as the canonical chapter does -- no seed table.
+        boot_scene = (
+            '{\n'
+            '    EVBIT_MODIFY(0x0)\n'
+            '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
+            '    LOMA(0x%X) /* RestartBattleMap -- build the trail map fresh */\n'
+            '    DISA(CHARACTER_NATASHA) /* Hlin stays in Bryn Shander (ch00 guest) */\n'
+            '    DISA(CHARACTER_KYLE)    /* Scramsax departs (ch00 guest) */\n'
+            '    LOAD1(0x1, UnitDef_088B4344) /* goblins */\n'
+            '    ENUN\n'
+            '    LOAD1(0x1, UnitDef_088B440C) /* the company signs on at the Northlook */\n'
+            '    ENUN\n'
+            '    FADU(16) /* chapter loads come up black; reveal the trail */\n'
+            '    ENUT(8)\n'
+            '    EVBIT_T(7)\n'
+            '    ENDA\n}' % (CH01_HOST_INDEX,))
+        script = _replace_brace_block(script, 'EventScr_Ch2_BeginningScene[] =', boot_scene,
+                                      CH2_EVENTSCRIPT_H)
+    else:
+        script = _replace_brace_block(
         script, 'EventScr_Ch2_BeginningScene[] =',
         '{\n'
         + beat1_scene +
@@ -13700,7 +13725,7 @@ def inject_northlook_bitey(verbose=True):
     blue-purple tones read as a frozen-lake trophy and survive the tile conversion."""
     from PIL import ImageDraw
     bg = os.path.join(DECOMP, 'graphics', 'bg', 'bg_Fireplace.png')
-    subprocess.run(['git', '-C', DECOMP, 'checkout', '--', 'graphics/bg/bg_Fireplace.png'],
+    subprocess.run(['git', '-C', DECOMP, 'checkout', '--', 'graphics/bg/bg_Fireplace.png'], env=git_env(),
                    check=True)
     im = Image.open(bg)
     pal = im.getpalette()
@@ -14095,6 +14120,13 @@ def main():
                          'opens straight into the lord-select prep screen on New Game, so '
                          'iterating on that screen is compile-time only -- no playthrough '
                          'grind (see decisions.md / the debug-fast-boot convention).')
+    ap.add_argument('--ch01-boot', action='store_true',
+                    help='PLAYTEST build (#353): New Game boots straight into Ch1 "The Iron '
+                         'Trail" on slot 2. ch01 is the chapter that FOUNDS the party -- its '
+                         'opening LOADs the company at the Northlook and then runs PREP -- so '
+                         'this boot needs no armed seed table, unlike --ch03/04/05-boot. '
+                         'Mutually exclusive with the prologue: confirming anything in ch01 '
+                         'otherwise costs a full prologue playthrough (~24,000 frames).')
     ap.add_argument('--ch03-boot', action='store_true',
                     help='PLAYTEST build (#23): New Game boots straight into the Ch3 '
                          '"Termalaine Mine" on slot 4 -- the party deployed at the left '
@@ -14266,7 +14298,7 @@ def main():
             sys.exit('ERROR: declared message block(s) drawn over ids the build already '
                      'spends: %s' % ', '.join(drawn_over))
         print('chapter 1 (#21):')
-        _scopes.run(inject_ch01, args.campaign)  # MUST precede inject_prologue (vanilla goal read)
+        _scopes.run(inject_ch01, args.campaign, boot=args.ch01_boot)  # MUST precede inject_prologue (vanilla goal read)
         inject_northlook_bitey()    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing)
         print('chapter 2 (#22):')
         _scopes.run(inject_ch02, args.campaign)  # hosts slot 3; ch01's ending MNC2(0x3) lands here
@@ -14291,6 +14323,11 @@ def main():
         elif args.ch03_boot:
             print('CH03 BOOT (playtest: New Game -> Termalaine Mine, party + foes deployed):')
             _configure_boot(CH03_HOST_INDEX)
+        elif args.ch01_boot:
+            # No seed table here on purpose: ch01's own opening LOADs the company and runs
+            # PREP, so a cold start founds its party exactly as the canonical chapter does.
+            print('CH01 BOOT (playtest: New Game -> the Iron Trail, party founded by ch01):')
+            _configure_boot(CH01_HOST_INDEX)
         else:
             if args.test_chapter:
                 print('TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast deployed):')

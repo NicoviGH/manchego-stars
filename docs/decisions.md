@@ -4221,6 +4221,35 @@ The unifying test: after any change to a check, an encoding, or a sentinel, ask 
 now be different if this were broken?* If the answer is "nothing observable", that is the
 bug, not the reassurance.
 
+**ch01 is the only hosted chapter whose opening runs a MENU, and that is what a debug boot has
+to strip (2026-09-02, #353)**
+Every hosted chapter but ch01 had a fast boot; confirming #347 by eye therefore cost a canonical
+build plus a full prologue playthrough (~24,000 frames) to look at a map ch03 would have shown in
+twenty seconds. The boot itself was the easy half -- `_configure_boot(CH01_HOST_INDEX)`, the same
+call ch03/ch04/ch05 make.
+
+**Two things made ch01 different, and only one was predictable.** ch01 needs **no armed seed
+table**: it is the chapter that FOUNDS the party, so its own opening LOADs the company at the
+Northlook and runs PREP, where ch03/ch04/ch05 boot into a party that must be conjured from nothing
+(`CH03_BOOT_SEED_SYMBOL` and friends). The unpredictable half was **lord select (#42)**. The first
+cut kept ch01's opening intact and the run died with `fail:nil ... never reached the map` on an
+8-item `generic_menu` -- the lord-select menu, which no other boot has ever met because no other
+chapter opens with one. **A debug boot is a MAP load-test: it must strip every screen between New
+Game and the map, and a MENU is such a screen even though it is not a cutscene.** The boot branch
+drops the Northlook beats, lord select and Preparations, and LOMAs straight to the trail.
+
+Measured: New Game -> `player_map_idle` on chapter 2, player faction, turn 1, at **frame 2,856**
+against ~24,000 for the honest route. `PT_HOST_CHAPTER=2 tools/playtest/run.sh mapshot` PASSes;
+going through `matrix.py` instead does not, because `mapshot` is chapter-generic
+(`host_chapter: null`) and resolves to host 1 while the ROM boots chapter 2 -- the run then waits
+for a map that never matches and reports `boot-timeout`. That is scenario wiring, not a boot fault,
+and it is why the invocation is documented rather than left to be rediscovered.
+
+Also from this change: **a rom_config env var the Makefile does not translate builds CANONICAL**,
+so the scenario's verdict is about a different ROM than the one it names -- silence in both
+directions. `check_rom_configs_reach_the_build` now pins every `rom_configs` var to a `$(VAR)` arm
+in the Makefile.
+
 **A message id written as a bare literal now registers itself (2026-09-02, #346)**
 `injector_message_ids` finds an id by the NAME of the constant holding it, and promised that
 "registering a new one is enough -- there is no second list to remember". That was false for an id

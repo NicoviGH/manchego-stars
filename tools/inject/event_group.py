@@ -17,6 +17,8 @@ import subprocess
 
 _TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(_TOOLS)
+from .decomp import git_env  # noqa: E402  strip inherited GIT_* (hook safety)
+
 DECOMP = os.path.join(REPO, 'fireemblem8u')
 
 CHAPTERDATA_H = os.path.join(DECOMP, 'include', 'chapterdata.h')
@@ -209,10 +211,7 @@ def vanilla_header(relpath):
     inherited GIT_DIR (set inside a commit hook) overrides `-C` discovery and resolves against
     the superproject instead of the submodule.
     """
-    env = dict((k, v) for k, v in os.environ.items()
-               if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX',
-                            'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE',
-                            'GIT_ALTERNATE_OBJECT_DIRECTORIES'))
+    env = git_env()
     out = subprocess.run(['git', '-C', DECOMP, 'show', 'HEAD:%s' % relpath],
                          capture_output=True, text=True, env=env)
     if out.returncode != 0:

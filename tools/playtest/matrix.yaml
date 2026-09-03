@@ -46,6 +46,11 @@ rom_configs:
     LORDBOOT: 1
   montage:
     MONTAGE: 1
+  # ch01 is the FIRST chapter that founds a party -- its opening LOADs the company at the
+  # Northlook and then runs PREP -- so unlike ch03/ch04/ch05 this boot needs no armed seed
+  # table. New Game lands on the Iron Trail; the prologue is not injected (#353).
+  ch01boot:
+    CH01BOOT: 1
   ch03boot:
     CH03BOOT: 1
   ch04boot:

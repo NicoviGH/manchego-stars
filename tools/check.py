@@ -923,6 +923,94 @@ def check_gate_chapter_window(fail):
     fail.extend(_gate_window_violations(boots, hosts.hosted_chapters()))
 
 
+def check_decomp_git_calls_strip_the_env(fail, sources=None):
+    """Guard: every `git -C DECOMP ...` subprocess must pass env=, to drop inherited GIT_*.
+
+    Git EXPORTS GIT_DIR/GIT_INDEX_FILE to a hook, and an explicit GIT_DIR BEATS `-C`. So inside
+    the pre-commit hook a `git -C fireemblem8u show HEAD:...` resolves against the superproject
+    and exits 128. `vanilla_decomp_text` learned that once and stripped the env inline; the
+    lesson did not propagate. Three separate inline copies of the same dict existed, and the one
+    site that lacked it -- `chapter_label_constants`, the same `show HEAD:` call -- made the hook
+    UNPASSABLE from a worktree: 12 test errors that appear only under `git commit`, never when
+    you run the tests yourself (#353). A lesson living in three copies is a lesson waiting to be
+    missed in a fourth place; `inject.decomp.git_env()` is now the single one, and this pins it.
+    """
+    targets = sources or ('tools/build_campaign.py', 'tools/inject/event_group.py',
+                          'tools/inject/decomp.py')
+    seen = 0
+    for rel in targets:
+        path = os.path.join(REPO, rel)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding='utf-8') as fh:
+            tree = ast.parse(fh.read(), rel)
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            first = node.args[0]
+            parts = first.elts if isinstance(first, (ast.List, ast.Tuple)) else []
+            if isinstance(first, ast.BinOp) and isinstance(first.left, (ast.List, ast.Tuple)):
+                parts = first.left.elts
+            lits = [p.value for p in parts[:3]
+                    if isinstance(p, ast.Constant) and isinstance(p.value, str)]
+            names = [p.id for p in parts[:3] if isinstance(p, ast.Name)]
+            if lits[:2] != ['git', '-C'] or 'DECOMP' not in names:
+                continue
+            seen += 1
+            if not any(kw.arg == 'env' for kw in node.keywords):
+                fail.append(
+                    '%s:%d runs `git -C DECOMP` without env= -- inside a commit hook the '
+                    'inherited GIT_DIR overrides -C, so it resolves against the SUPERPROJECT '
+                    'and exits 128. Pass env=git_env() (inject.decomp).' % (rel, node.lineno))
+    if not seen:
+        fail.append('check_decomp_git_calls_strip_the_env: found NO `git -C DECOMP` call, so '
+                    'the scan is broken -- there are several.')
+    return fail
+
+
+def check_rom_configs_reach_the_build(fail, matrix_text=None, makefile_text=None):
+    """Guard: every env var a rom_config sets must be TRANSLATED by the Makefile.
+
+    `matrix.yaml`'s rom_configs render straight onto the make line (`CH05BOOT=1 make ...`),
+    and the Makefile turns each into a `--flag` for build_campaign. A config whose var has no
+    Makefile arm still builds -- it just builds CANONICAL, and the scenario then passes or
+    fails against a ROM that is not the one it names. Silence in both directions, which is the
+    shape decisions.md 2026-09-02 names ("A guard that stops guarding fails silently").
+    """
+    import re as _re
+    matrix = os.path.join(REPO, 'tools', 'playtest', 'matrix.yaml')
+    makefile = os.path.join(REPO, 'Makefile')
+    if matrix_text is None and makefile_text is None and not (
+            os.path.exists(matrix) and os.path.exists(makefile)):
+        fail.append('check_rom_configs_reach_the_build: matrix.yaml or Makefile is missing')
+        return fail
+    if matrix_text is None:
+        with open(matrix, encoding='utf-8') as fh:
+            matrix_text = fh.read()
+    text = matrix_text
+    block = _re.search(r'^rom_configs:\n(.*?)(?=^\w)', text, _re.S | _re.M)
+    if not block:
+        fail.append('check_rom_configs_reach_the_build: no rom_configs block in matrix.yaml')
+        return fail
+    envs = set(_re.findall(r'^\s+([A-Z][A-Z0-9_]*):\s', block.group(1), _re.M))
+    if not envs:
+        fail.append('check_rom_configs_reach_the_build: rom_configs sets NO env var, so the '
+                    'scan is broken -- there are several on main.')
+        return fail
+    if makefile_text is None:
+        with open(makefile, encoding='utf-8') as fh:
+            makefile_text = fh.read()
+    mk = makefile_text
+    for env in sorted(envs):
+        if '$(%s)' % env not in mk:
+            fail.append(
+                'matrix.yaml rom_configs sets %s, but the Makefile never reads $(%s) -- so a '
+                'scenario asking for that configuration silently builds CANONICAL and its '
+                'verdict is about the wrong ROM. Add `$(if $(%s),--<flag>)` to the '
+                'build_campaign line.' % (env, env, env))
+    return fail
+
+
 def check_playtest_matrix(fail):
     """tools/playtest/matrix.yaml is the single source of "what does this scenario
     need" (ROM configuration, host chapter, checkpoint, timing) -- so it has to keep
@@ -2026,7 +2114,8 @@ def main():
                   check_personal_line_injection_routes,
                   check_injection_order, check_cached_steps_are_config_invariant,
                   check_tile_changes_outlive_the_retarget,
-                  check_playtest_matrix, check_gate_chapter_window,
+                  check_playtest_matrix, check_rom_configs_reach_the_build,
+                  check_decomp_git_calls_strip_the_env, check_gate_chapter_window,
                   check_declared_cases, check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,

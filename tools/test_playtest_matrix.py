@@ -1472,5 +1472,42 @@ class CachedRowsReadDistinctly(unittest.TestCase):
                          [True, False])
 
 
+
+
+class RomConfigsReachTheBuild(unittest.TestCase):
+    """#353's guard: a rom_config env var the Makefile does not translate builds CANONICAL,
+    so the scenario's verdict is about a different ROM than the one it names."""
+
+    MATRIX = 'rom_configs:\n  canonical: {}\n  ch01boot:\n    CH01BOOT: 1\n\nscenarios:\n  x: {}\n'
+
+    def _fail(self, matrix_text, makefile_text):
+        import check
+        fail = []
+        check.check_rom_configs_reach_the_build(fail, matrix_text=matrix_text,
+                                                makefile_text=makefile_text)
+        return fail
+
+    def test_a_translated_env_var_passes(self):
+        self.assertEqual([], self._fail(self.MATRIX, 'x: $(if $(CH01BOOT),--ch01-boot)\n'))
+
+    def test_an_untranslated_env_var_is_caught(self):
+        bad = self._fail(self.MATRIX, 'x: $(if $(CH03BOOT),--ch03-boot)\n')
+        self.assertEqual(1, len(bad), bad)
+        self.assertIn('CH01BOOT', bad[0])
+        self.assertIn('CANONICAL', bad[0])
+
+    def test_finding_no_env_var_at_all_fails_instead_of_passing_vacuously(self):
+        bad = self._fail('rom_configs:\n  canonical: {}\n\nscenarios:\n  x: {}\n', 'x:\n')
+        self.assertTrue(bad)
+        self.assertIn('scan is broken', bad[0])
+
+    def test_the_live_tree_is_clean(self):
+        self.assertEqual([], self._fail(None, None))
+
+    def test_the_check_is_registered_in_the_drift_gate(self):
+        import check, inspect
+        self.assertIn('check_rom_configs_reach_the_build', inspect.getsource(check.main))
+
+
 if __name__ == '__main__':
     unittest.main()
