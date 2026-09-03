@@ -1868,6 +1868,76 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
     return fail
 
 
+def check_message_literals_are_registered(fail, source=None):
+    """Guard: every bare-literal message id must be DISCOVERABLE and ATTRIBUTABLE.
+
+    `injector_message_ids` finds an id by the NAME of the constant holding it, and #346's
+    complaint is that a hex id at the `set_message_body` call site has no name to be found by.
+    Twelve exist -- the prologue's eight and ch01's four -- and they reached the guards only
+    because someone grepped for them once and hand-transcribed them into `PROLOGUE_LITERAL_MSGS`
+    / `CH01_LITERAL_MSGS`. `hosts.literal_message_ids` now discovers them from source, which
+    closes the DEADNESS half automatically: a block drawn over a bare literal is refused whether
+    or not anyone wrote the id down.
+
+    This check owns the DISCOVERY half only -- that the scan runs, finds what is there, and can
+    name an owner for each hit. **OWNERSHIP is asserted at BUILD time**, by
+    `build_campaign.assert_literals_are_claimed`, and deliberately not here. It was tried here
+    first and the review of #356 killed it: `HOSTED_CHAPTER_MESSAGE_IDS` is written as
+    generators, subscripts and splats (`*(msg for (_slot, msg, _boxes, _what) in
+    CH05_OPENING_SLOTS)`, `CH05_ARRIVAL_SLOT[1]`, `CH04_VILLAGE_MSG` from a tuple-unpacked
+    assignment), so a hand-rolled static evaluator of it was wrong in BOTH directions --
+    it missed ch04's 0x9C3/0x9C6 and so would have demanded a registration that makes
+    `assert_message_ids_unique` exit, and it over-collected ch05's box counts and so passed a
+    literal 0x13 that nothing claimed. At build time the dict is a real Python object and the
+    answer is exact. **Do not re-implement the registry statically; import it where it is real.**
+
+    Reads build_campaign.py's SOURCE and never imports it (no Pillow in the lean `checks` job),
+    through the stdlib-only `inject.hosts` -- the same route check_hosted_chapters_declared
+    takes for the host-slot registry.
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    try:
+        from inject import hosts
+        import callsites
+    except Exception as exc:                      # pragma: no cover - import guard
+        fail.append('check_message_literals_are_registered: inject.hosts does not import: %s'
+                    % exc)
+        return fail
+    finally:
+        sys.path.remove(os.path.join(REPO, 'tools'))
+
+    live = source is None
+    if live:
+        with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
+            source = fh.read()
+    try:
+        literals = hosts.literal_message_ids(source=source)
+    except (ValueError, SyntaxError, callsites.ParseError) as exc:
+        fail.append('check_message_literals_are_registered: cannot scan build_campaign.py: %s'
+                    % exc)
+        return fail
+
+    # A scan that finds nothing and a tree with nothing to find look identical from outside --
+    # the shape decisions.md 2026-09-02 names. There are bare literals on main today; zero means
+    # the scan broke, not that the campaign stopped writing them.
+    if live and not literals:
+        fail.append('check_message_literals_are_registered: found NO bare message-id literal '
+                    'in build_campaign.py. There are some, so the scan is broken and the '
+                    'guard would pass vacuously.')
+        return fail
+
+    for lit in literals:
+        if lit.chapter is None:
+            # No injector encloses it, so nothing can say whose id it is -- and the build-time
+            # ownership assertion has no chapter to check it against either.
+            fail.append(
+                'build_campaign.py:%d writes message 0x%X as a BARE LITERAL outside every '
+                'injector, so no chapter can claim it and `assert_literals_are_claimed` cannot '
+                'see it. Move it inside its injector, or hold the id in a named constant.'
+                % (lit.lineno, lit.msg_id))
+    return fail
+
+
 def check_handoff_only_on_main(fail):
     """HANDOFF.md is live state and live state is global -- author it on main, never on a
     feature branch. See the block comment above for the incident this encodes."""
@@ -1968,6 +2038,7 @@ def main():
                   check_recordenemy_knows_every_raw_pid,
                   check_wrap_widths_are_pixels,
                   check_vanilla_reads_come_from_head,
+                  check_message_literals_are_registered,
                   check_handoff_only_on_main,
                   check_lane_ownership):
         check(fail)
