@@ -52,8 +52,10 @@ map:
     The frozen mouth of Maer Dualdon, 22x22. Concentric channels of cracked-open water ring
     the map, crossed at eight points; everything else is walkable lake ice. Two marooned
     fishing boats sit in ice outcrops at opposite corners -- the Burly Ram east (17,12),
-    the Pronged Goat west (4,17) -- and a six-cell ice shelf holds the map's centre,
-    reachable on foot only over the bridges at (8,11) and (10,14).
+    the Pronged Goat west (4,17). Each outcrop is a POCKET: the eight cells around the hull
+    keep the donor's impassable TILE_2E, so the only ground entrance is the door directly
+    south -- (17,13) and (4,18). A six-cell ice shelf holds the map's centre, reachable on
+    foot only over the bridges at (8,11) and (10,14).
   # FE-native terrain, grounded in fireemblem8u/include/constants/terrains.h. The lake is
   # FROZEN: every combatant walks. Only the ring channels are open water.
   terrain_mechanic:
@@ -62,17 +64,29 @@ map:
                                   #         classes, cost 2 to Braulo (Pirate) and 5 to Trex
                                   #         (Thief), 1 to Pinky. The party's three answers.
     crossings: TERRAIN_BRIDGE_REGULAR  # 0x13 -- 7 bridges + one BRIDGE_SNAG = 8 crossings
-    snow_drifts: TERRAIN_FOREST   # 0x0C -- 41 cells, +20 avoid / +1 Def, cost 2. Nine ring
-                                  #         each boat (the repainted village footprints);
-                                  #         (7,11) covers the west door onto the centre shelf.
+    snow_drifts: TERRAIN_FOREST   # 0x0C -- 27 cells, +20 avoid / +1 Def, cost 2. Two of them
+                                  #         are each boat's own cell and its door; (7,11)
+                                  #         covers the west door onto the centre shelf.
+    boat_pockets: TERRAIN_TILE_2E # 0x2E -- 14 cells, the donor's own village bodies, kept.
+                                  #         Impassable to every ground class, cost 1 to a
+                                  #         FLIER -- so Pinky may work a hull from four cells
+                                  #         where everyone else has one. That asymmetry is
+                                  #         vanilla's, not ours.
     ice_walls: TERRAIN_PEAK       # 0x12 -- permanent ridges. NOT glacier: TERRAIN_GLACIER
                                   #         costs 1 for EVERY class, so it shapes nothing.
   terrain_note: >
-    Measured off the painted .mar: foot reaches 306 of 484 cells and they form ONE connected
-    component -- the eight crossings wire the whole lake together, so the channels shape the
-    route without ever stranding anyone. Foot reaches the west boat turn 6 and the east turn 7;
-    Braulo swims to them turn 5 and 4; Pinky flies to both turn 3. That is vanilla Ch6's own
-    math, where the guide tells you to send a flier at the hostages.
+    Measured off the painted .mar, after the pockets: foot reaches 292 of 484 cells and they
+    form ONE connected component -- the eight crossings wire the whole lake together, so the
+    channels shape the route without ever stranding anyone. The pockets SYMMETRISE the two
+    rescues, which the open outcrops did not: every class now reaches both doors on the same
+    turn -- Pinky 3, Braulo 4, Baxby/Lupin/Trex 5, foot 6.
+
+    That is vanilla Ch6's budget, measured rather than guessed (2026-09-03): its villagers
+    sit in a mountain-ringed pocket a Paladin or a flier reaches on turn 4 and foot on turn 6,
+    while an unpromoted Cavalier and an Armour cannot reach them AT ALL -- which is why the
+    guide says to send Seth. Its lone pursuing Bael is beside them on turn 7, and a villager
+    is 7 HP at Def 0, so contact IS death. Ours reproduces the outcome, not the mechanism:
+    a boat is tougher than a child, so the clock is a fuse instead of one bite.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 # PLAIN DefeatBoss, as vanilla Ch6 (2026-08-29). The old `defeat_boss_or_talk` + hidden
@@ -109,9 +123,24 @@ difficulty_note: >
   The difficulty is the merfolk and the two marooned boats, never the boss -- which is
   vanilla Ch6's own shape, where Novala is a Def 5 shaman the guide says to throw physical
   units at and the real pressure is a hostage clock under fog. We drop the fog (the route
-  is legible and the channels do that work) and keep the clock: merfolk stand in reach of
-  both boats from turn 1, and the boats can die. Nerra inherits Novala's softness on
-  purpose. Messie is a cutscene, not an encounter, so no route skips XP.
+  is legible and the channels do that work) and keep the clock.
+
+  NOTHING is in range of a hull on turn 1 -- vanilla's own placement, where not one unit
+  can hit a villager before the Bael walks over. The clock is the two PURSUERS, and they
+  are deliberately different problems:
+
+    east / Burly Ram   merfolk-thrower from (15,17), at the door on turn 2. Its JAVELIN is
+                       range 1-2, so holding the door does NOT stop it -- it has to be
+                       killed. Sinks the hull on turn 7.
+    west / Pronged Goat ice-crab from (7,20), at the door on turn 2. Venin claw is range 1,
+                       so the single door cell blocks it outright -- race it, block it, or
+                       kill it. Sinks the hull on turn 8.
+
+  The west boat is therefore both the slower clock and the one a body-block answers, which
+  is what puts the plot-critical hint (Tali) on the boat a player is likeliest to save.
+  Against foot on turn 6 that is vanilla's own slack of one turn. Nerra inherits Novala's
+  softness on purpose -- but note her Flux does 22 to a 19 HP hull, so she is kept on the
+  centre shelf, far from both. Messie is a cutscene, not an encounter, so no route skips XP.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -174,6 +203,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing       # flavor label only
+    positions: [[18, 14], [2, 14], [13, 11], [7, 15]]
     donor: [[14, 9], [15, 7], [20, 7], [19, 13]] # vanilla's four HOLDING L7 soldiers
     skin:
       look: "merfolk spear-guard; the anim's lance IS a trident"
@@ -188,6 +218,7 @@ enemy_units:
       - id: javelin
       - id: iron-lance
     damage_type: piercing
+    positions: [[15, 17]]
     donor: [14, 16]                 # vanilla's fifth L7 soldier -- the one it lets PURSUE
     skin: {look: "merfolk spear-guard, thrown trident", source: "as merfolk-trident"}
   - id: merfolk-trident-young
@@ -199,6 +230,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
+    positions: [[3, 13]]
     donor: [14, 11]                 # vanilla's L6 soldier
     skin: {look: "merfolk spear-guard", source: "as merfolk-trident"}
 
@@ -218,6 +250,7 @@ enemy_units:
       - id: poison-axe
         fe_base: venin-axe        # FE8's ITEM_AXE_VENIN, which the wiki prints as "Poison Axe"
     damage_type: slashing
+    positions: [[7, 16]]
     donor: [16, 9]                  # vanilla L6 fighter
     skin:
       look: "merfolk on a shark, boarding axe"
@@ -231,6 +264,7 @@ enemy_units:
     inventory:
       - id: steel-axe
     damage_type: slashing
+    positions: [[16, 15]]
     donor: [15, 15]                 # vanilla L6 fighter
     skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
   - id: shark-rider-halberd
@@ -247,6 +281,7 @@ enemy_units:
                                 # {AXE_IRON, AXE_HALBERD}. FE8 drops the LAST item, so the Halberd
                                 # is the drop and the Iron Axe is what it swings.
     damage_type: slashing
+    positions: [[15, 16]]
     donor: [13, 6]                  # vanilla L5 fighter
     skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
 
@@ -260,6 +295,7 @@ enemy_units:
     inventory:
       - id: iron-blade
     damage_type: slashing
+    positions: [[19, 4]]
     donor: [8, 1]                   # vanilla L7 cavalier -- charge-after-one-turn
     skin:
       look: "merfolk astride a lake crab; the mount repainted from an arachnid to ice-blue shell"
@@ -273,6 +309,7 @@ enemy_units:
     inventory:
       - id: iron-sword
     damage_type: slashing
+    positions: [[18, 4]]
     donor: [7, 1]                   # vanilla L6 cavalier
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
   - id: crab-rider-lance
@@ -284,6 +321,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
+    positions: [[19, 5]]
     donor: [11, 0]                  # vanilla L6 cavalier
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 2. Lance"}
 
@@ -297,6 +335,7 @@ enemy_units:
     inventory:
       - id: iron-sword
     damage_type: slashing
+    positions: [[6, 12]]
     donor: [14, 14]                 # vanilla L6 mercenary
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 1. Sword"}
   - id: merfolk-blade-drop
@@ -309,6 +348,7 @@ enemy_units:
       - id: iron-blade
     item_drop: iron-blade       # vanilla: "Iron Blade -- dropped by enemy Mercenary"
     damage_type: slashing
+    positions: [[9, 15]]
     donor: [15, 10]                 # vanilla L6 mercenary (the dropper)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 1. Sword"}
 
@@ -325,6 +365,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
+    positions: [[10, 13], [8, 11]]
     donor: [[16, 12], [16, 13]]     # vanilla's paired L6 knights
     skin:
       look: "a shelled thing plated like a knight, holding a bridge"
@@ -339,6 +380,7 @@ enemy_units:
       - id: horseslayer
       - id: javelin
     damage_type: piercing
+    positions: [[14, 12]]
     donor: [21, 13]                 # vanilla's third L6 knight
     skin: {look: "as ironshell-guard", source: "as ironshell-guard"}
 
@@ -352,6 +394,7 @@ enemy_units:
     inventory:
       - id: flux
     damage_type: necrotic
+    positions: [[11, 11]]
     donor: [18, 14]                 # vanilla L6 shaman
     skin: {look: "merfolk caster", source: "Mermaid by Stephano -> 6. Magic"}
   - id: merfolk-singer
@@ -363,6 +406,7 @@ enemy_units:
     inventory:
       - id: thunder
     damage_type: lightning
+    positions: [[12, 15]]
     donor: [18, 5]                  # vanilla L6 mage
     skin: {look: "merfolk caster", source: "Mermaid by Stephano -> 5. Magic"}
   - id: merfolk-mender
@@ -373,6 +417,7 @@ enemy_units:
     autolevel: true
     inventory:
       - id: mend
+    positions: [[17, 10]]
     donor: [18, 9]                  # vanilla L6 priest
     skin: {look: "merfolk healer", source: "Mermaid by Stephano -> 4./7. Staff"}
   - id: lamia-mender
@@ -388,6 +433,7 @@ enemy_units:
       - id: mend
       - id: elixir
     item_drop: elixir           # vanilla: "Elixir -- dropped by enemy Troubadour"
+    positions: [[20, 5]]
     donor: [10, 0]                  # vanilla's troubadour -- she travels with the cavalry, so she charges with them
     skin:
       look: "serpent-bodied merfolk healer"
@@ -403,6 +449,7 @@ enemy_units:
     inventory:
       - id: iron-bow
     damage_type: piercing
+    positions: [[20, 12]]
     donor: [12, 4]                  # vanilla L6 archer
     skin: {look: "merfolk with a harpoon-bow", source: "Mermaid by Stephano -> 4. Bow"}
   - id: ice-crab
@@ -415,6 +462,7 @@ enemy_units:
       - id: poison-claw
         fe_base: venin-claw       # ITEM_MONSTER_VENINCLW -- vanilla Ch6's own Bael weapon
     damage_type: poison
+    positions: [[7, 20]]
     donor: [27, 4]                  # vanilla's lone Bael -- the one wandering pursuer
     skin: {look: "a lake crab the size of a boat", source: "vanilla Bael art, 32x32 -- no reskin"}
 
@@ -442,6 +490,7 @@ enemy_units:
       - id: javelin
       - id: iron-lance
     damage_type: piercing
+    positions: [[0, 11]]
     donor: [3, 11]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
@@ -456,6 +505,7 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing
+    positions: [[0, 9]]
     donor: [2, 9]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
@@ -471,6 +521,7 @@ enemy_units:
       - id: iron-sword
       - id: javelin
     damage_type: slashing
+    positions: [[0, 13]]
     donor: [2, 13]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
@@ -491,6 +542,7 @@ enemy_units:
     inventory:
       - id: flux
     damage_type: necrotic
+    positions: [[10, 12]]
     donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
     skin: {look: "the largest of the merfolk", source: "Mermaid by Stephano -> 6. Magic; no portrait -- see below"}
     # NO death quote and NO portrait, deliberately (Nicolas, 2026-08-29): the merfolk do not
@@ -594,96 +646,51 @@ forest_composition: replaced
 # Every cell here departs from the donor's vanilla terrain ON PURPOSE. The import guard
 # (validate_terrain_matches_vanilla) rejects any drift NOT listed, so this block is the
 # whole allowlist -- cell by cell, so the ch05 fence->wall class of accident still fails.
-# The two village footprints are repainted as ice outcrops and made WALKABLE underneath
-# (cliff art, FOREST terrain -- the snow-mound trick). That is deliberate: vanilla Ch6's
-# hostages sit in a pocket attackable from 4/4 sides for two of the three, so boats that
-# can be reached and killed from every side is parity, not cruelty. The SW beach keeps
-# vanilla's SAND and is therefore NOT listed -- restoring it is what opens the left
-# coast route and brings the west boat to turn 6, matching the east.
-# Rationale: docs/decisions.md -> "ch06 departs from its donor's terrain in ... declared
-# cells, and replaces forest composition wholesale".
+#
+# SEVEN cells, down from twenty-one (2026-09-03). The two village footprints are no longer
+# repainted walkable: they keep the donor's own impassable TILE_2E, so each boat sits in a
+# POCKET whose only ground entrance is the door tile directly south of it. That is what a
+# village IS in FE8 -- a body you cannot walk into and a door you visit it from -- and
+# honouring it costs nothing, because a metatile's terrain byte is separate from its art
+# (`map_tileset_tool.py set-terrain`). Twelve metatiles moved 0x0C -> 0x2E; the .4bpp and
+# .gbapal are byte-identical, so the painted ice-outcrop art is untouched and snowy-bern
+# (and therefore ch04) never sees the change.
+#
+# TILE_2E costs 1 to a FLIER and is impassable to every ground class, which is vanilla's
+# own rule and the reason Pinky keeps a privilege the rest of the party does not: she can
+# work the boat from four cells where everyone else has one. Blocking her would have been
+# STRICTER than FE8, not more faithful to it.
+#
+# The boat's OWN tile stays FOREST on purpose: +1 Def and +20 avoid are what stretch a
+# single attacker's fuse to the length the chapter's clock is tuned around.
+# Rationale: docs/decisions.md -> "ch06's boats sit in POCKETS, because a village is a
+# body you cannot walk into and a door you visit it from".
 terrain_divergence:
-- tile: [16, 11]                 # Q12
+- tile: [17, 12]                 # R13 -- the east boat's own cell
   from: TILE_2E
   to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [17, 11]                 # R12
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [18, 11]                 # S12
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [16, 12]                 # Q13
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [17, 12]                 # R13
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [18, 12]                 # S13
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [16, 13]                 # Q14
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+  why: the hull sits in cover -- FOREST's +1 Def / +20 avoid is what makes the sinking clock take turns rather than one bite
 - tile: [17, 13]                 # R14
   from: VILLAGE_REGULAR
   to: '0x0C'
-  why: the door tile the player stands on to board
-- tile: [18, 13]                 # S14
+  why: the east door -- the one ground cell from which the boat can be boarded or attacked; FOREST so the defender holding it is in the drifts Grynsk's scene teaches
+- tile: [4, 17]                  # E18 -- the west boat's own cell
   from: TILE_2E
   to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [3, 16]                 # D17
-  from: TILE_2E
+  why: as (17,12)
+- tile: [4, 18]                  # E19
+  from: VILLAGE_REGULAR
   to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [4, 16]                 # E17
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [5, 16]                 # F17
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [3, 17]                 # D18
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [4, 17]                 # E18
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [5, 17]                 # F18
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
+  why: the west door -- as (17,13). Not left as VILLAGE_REGULAR, because there is no village event on this map and a dead Visit prompt is worse than none
 - tile: [10, 17]                 # K18
   from: SNAG
   to: '0x01'
   why: map-change pair; SNAG is impassable to EVERY class, fliers included
-- tile: [3, 18]                 # D19
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
-- tile: [4, 18]                 # E19
-  from: VILLAGE_REGULAR
-  to: '0x0C'
-  why: the door tile the player stands on to board
-- tile: [5, 18]                 # F19
-  from: TILE_2E
-  to: '0x0C'
-  why: ice outcrop, walkable with cover -- the boat sits in it and can be attacked from every side, as vanilla Ch6 allows for two of its three civilians
 - tile: [10, 18]                 # K19
   from: RIVER
   to: '0x34'
   why: map-change pair; the crossing the player opens
-- tile: [3, 21]                 # D22
+- tile: [3, 21]                  # D22
   from: SEA
   to: '0x26'
   why: seals the dead south-west corner
@@ -710,16 +717,23 @@ rescue_boats:
   class: fleet                  # CLASS_FLEET -- vanilla's own ship map sprite, SMSId 0x41
   size: 32x32                   # unit_icon_wait_table[0x41] = UNIT_ICON_SIZE_32x32
   faction: green                # -> unit_icon_pal_npc; the ally green IS vanilla's civilian faction
-  tile: [17, 12]                # R13, the outcrop cell north of the door
+  tile: [17, 12]                # R13, inside the pocket; the door is (17,13) directly south
+  door: [17, 13]                # the ONE ground cell adjacent to the hull -- board from here,
+                                # and everything that swings at the hull has to stand here too
   donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
-  attackable_sides: 4           # parity: 2 of vanilla Ch6's 3 civilians are open on 4/4 sides
-  reached_on: {foot: 7, cavalry: 5, flier: 3, braulo: 4}   # re-measured off the painted .mar
+  attackable_sides: 1           # ground. A FLIER may also take any of the 3 pocket cells, and
+                                # a range-2 weapon reaches the hull over the wall from 3 tiles
+                                # -- FE8 has no line of sight, so a wall never stops a javelin,
+                                # a bow or a tome. Placement is the only lever for those.
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 4, trex: 5}   # to the DOOR, re-measured
   talk:
     background: bg_Boat         # vendored from FE-Repo; the boarding CG
     ea_file: events/ch06-boat-east.ea
     reward:
-    - id: antitoxin             # vanilla Ch6's own village gift, same tier
-      amount: 1
+    - id: antitoxin             # vanilla Ch6's own village gift, same tier -- confirmed
+      amount: 1                 # against the decomp: Ch6's village at (11,18) gives
+                                # ITEM_ANTITOXIN (0x6F), and its ending gives
+                                # ITEM_ORIONSBOLT (0x66) gated on three CHECK_ALIVEs
     text: []                    # TODO: boarding scene. Seed the snow-pile line here
                                 # ("get in the drifts") so the cover mechanic is taught.
 - id: boat-west
@@ -727,10 +741,11 @@ rescue_boats:
   class: fleet
   size: 32x32
   faction: green
-  tile: [4, 17]                 # E18
+  tile: [4, 17]                 # E18, inside the pocket; the door is (4,18) directly south
+  door: [4, 18]
   donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
-  attackable_sides: 4
-  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5}   # re-measured off the painted .mar
+  attackable_sides: 1           # as boat-east; a flier adds 3 cells, range-2 reaches from 2
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 4, trex: 5}   # to the DOOR, re-measured
   talk:
     background: bg_Boat
     ea_file: events/ch06-boat-west.ea

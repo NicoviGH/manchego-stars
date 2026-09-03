@@ -17,6 +17,7 @@ The layout .bin is: byte width, byte height, then width*height little-endian u16
 each = metatile_index * 4 (verified across vanilla Prologue/Ch1/Ch5X maps).
 """
 
+import glob
 import json
 import os
 import re
@@ -407,6 +408,70 @@ def import_febuilder_tileset(config_path, object_png, out_dir):
     return out_dir
 
 
+def set_metatile_terrain(tileset_dir, metatiles, terrain):
+    """Change only the TERRAIN byte of one or more metatiles, leaving the art untouched.
+
+    A metatile carries two independent things: what it looks like (the TSA entries) and
+    what it MEANS to movement (the terrain byte after the TSA). Retiling a map to change
+    a cell's role therefore repaints art that was already right. ch06's boat outcrops are
+    the case that forced this: the donor has impassable village bodies there, we painted
+    them walkable, and the fix is one byte per metatile -- no repaint, no .mar edit, and
+    the art stays pixel-identical.
+
+    Terrain lives in the SHARED tileset, so this changes the meaning of those metatiles for
+    every map riding this tileset. `terrain_impact` reports exactly which cells those are;
+    call it before writing, and read what it prints.
+
+    Returns [(metatile, before, after)] for the metatiles that actually changed.
+    """
+    if not 0 <= terrain <= 0xFF:
+        raise ValueError('terrain must be in 0..255')
+    name = os.path.basename(tileset_dir.rstrip('/'))
+    cfg_path = os.path.join(tileset_dir, name + '.bin')
+    with open(cfg_path, 'rb') as source:
+        cfg = bytearray(source.read())
+    changed = []
+    for metatile in metatiles:
+        if not 0 <= metatile < NUM_METATILES:
+            raise ValueError('metatile must be in 0..%d' % (NUM_METATILES - 1))
+        before = cfg[8192 + metatile]
+        if before == terrain:
+            continue
+        cfg[8192 + metatile] = terrain
+        changed.append((metatile, before, terrain))
+    with open(cfg_path, 'wb') as output:
+        output.write(cfg)
+    return changed
+
+
+def terrain_impact(maps_root, tileset, metatiles):
+    """Which compiled maps ride `tileset`, and which of their cells use `metatiles`.
+
+    The audit that has to happen BEFORE a terrain byte moves: the byte is shared, so the
+    blast radius is every map on the tileset, not the one you had in mind.
+
+    Returns {map_stem: {metatile: [(x, y), ...]}}, maps with no hit omitted.
+    """
+    out = {}
+    for path in sorted(glob.glob(os.path.join(maps_root, '*.json'))):
+        stem = os.path.splitext(os.path.basename(path))[0]
+        with open(path) as source:
+            meta = json.load(source)
+        if meta.get('tileset') != tileset or 'width' not in meta:
+            continue
+        with open(os.path.join(maps_root, stem + '.mar'), 'rb') as source:
+            raw = source.read()
+        width, height = meta['width'], meta['height']
+        hits = {}
+        for index in range(width * height):
+            cell = struct.unpack_from('<H', raw, index * 2)[0] >> 5
+            if cell in metatiles:
+                hits.setdefault(cell, []).append((index % width, index // width))
+        if hits:
+            out[stem] = hits
+    return out
+
+
 def paint_metatile(tileset_dir, metatile, png_path, bank, terrain=None,
                    write_bank=False):
     """Paint one 16x16 PNG into a vendored tileset without touching shared tiles.
@@ -582,12 +647,38 @@ if __name__ == '__main__':
     p.add_argument('--bank', type=int, required=True)
     p.add_argument('--terrain', type=lambda value: int(value, 0))
     p.add_argument('--write-bank', action='store_true')
+    t = sub.add_parser('set-terrain', help='change only the TERRAIN byte of metatiles '
+                       '(art untouched); prints the blast radius first')
+    t.add_argument('tileset_dir')
+    t.add_argument('metatiles', help='comma-separated metatile indices')
+    t.add_argument('terrain', type=lambda value: int(value, 0), help='terrain id, e.g. 0x2E')
+    t.add_argument('--apply', action='store_true', help='write it (default: report only)')
     args = ap.parse_args()
     if args.cmd == 'import':
         print(import_febuilder_tileset(args.config, args.object_png, args.out_dir))
     elif args.cmd == 'render-tmx':
         ts = _tileset_from_dir(args.tileset_dir)
         print(render_grid(ts, tmx_grid(args.tmx), args.out, zoom=args.zoom))
+    elif args.cmd == 'set-terrain':
+        wanted = [int(v) for v in args.metatiles.split(',') if v.strip()]
+        maps_root = os.path.dirname(os.path.dirname(os.path.abspath(args.tileset_dir)))
+        tileset = os.path.basename(args.tileset_dir.rstrip('/'))
+        impact = terrain_impact(maps_root, tileset, set(wanted))
+        ts_before = _tileset_from_dir(args.tileset_dir)
+        for metatile in wanted:
+            print('  metatile %4d  terrain 0x%02X -> 0x%02X'
+                  % (metatile, ts_before.terrain(metatile), args.terrain))
+        for stem, hits in impact.items():
+            cells = sum(len(v) for v in hits.values())
+            print('  %s: %d cell(s) change meaning' % (stem, cells))
+        if not impact:
+            print('  no compiled map on this tileset uses them')
+        if args.apply:
+            for metatile, before, after in set_metatile_terrain(
+                    args.tileset_dir, wanted, args.terrain):
+                print('  WROTE %4d: 0x%02X -> 0x%02X' % (metatile, before, after))
+        else:
+            print('  (report only -- pass --apply to write)')
     elif args.cmd == 'paint-metatile':
         print(paint_metatile(args.tileset_dir, args.metatile, args.png,
                              bank=args.bank, terrain=args.terrain,

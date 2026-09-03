@@ -1008,6 +1008,65 @@ class TestDeclaredDivergenceLookup(unittest.TestCase):
                              'cell (%d, %d) declares from: %s but vanilla is %s'
                              % (x, y, row['from'], got))
 
+class SetMetatileTerrain(unittest.TestCase):
+    """Terrain is separate from art, and shared across every map on the tileset (#26).
+
+    ch06's boat pockets are made by moving twelve terrain bytes and repainting nothing.
+    The two things that must hold: the art really is untouched, and the blast radius is
+    reported before it is taken -- a terrain byte belongs to the TILESET, so it changes the
+    meaning of those metatiles for every map riding it, not just the one in mind.
+    """
+
+    def _tileset(self, tmp, terrain_bytes):
+        d = os.path.join(tmp, 'probe')
+        os.makedirs(d)
+        with open(os.path.join(d, 'probe.bin'), 'wb') as fh:
+            fh.write(bytes(8192) + bytes(terrain_bytes) + bytes(1024 - len(terrain_bytes)))
+        with open(os.path.join(d, 'probe.4bpp'), 'wb') as fh:
+            fh.write(bytes(32 * 1024))
+        with open(os.path.join(d, 'probe.gbapal'), 'wb') as fh:
+            fh.write(bytes(2 * 16 * 16))
+        return d
+
+    def test_it_moves_only_the_terrain_byte_and_leaves_the_art_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._tileset(tmp, [0x01, 0x0C, 0x0C, 0x10])
+            before = open(os.path.join(d, 'probe.4bpp'), 'rb').read()
+            changed = mt.set_metatile_terrain(d, [1, 2], 0x2E)
+            self.assertEqual(changed, [(1, 0x0C, 0x2E), (2, 0x0C, 0x2E)])
+            cfg = open(os.path.join(d, 'probe.bin'), 'rb').read()
+            self.assertEqual(cfg[8192:8196], bytes([0x01, 0x2E, 0x2E, 0x10]))
+            self.assertEqual(open(os.path.join(d, 'probe.4bpp'), 'rb').read(), before)
+
+    def test_a_metatile_already_at_the_target_is_not_reported_as_changed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._tileset(tmp, [0x2E, 0x0C])
+            self.assertEqual(mt.set_metatile_terrain(d, [0], 0x2E), [])
+
+    def test_an_out_of_range_terrain_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            d = self._tileset(tmp, [0x01])
+            with self.assertRaises(ValueError):
+                mt.set_metatile_terrain(d, [0], 0x100)
+
+    def test_terrain_impact_names_the_cells_that_change_meaning(self):
+        """The audit that has to happen first. ch06 is the live case: twelve metatiles,
+        fourteen cells, one map."""
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            'campaigns/rime-of-the-frostmaiden/maps')
+        pocket = {10, 12, 17, 18, 30, 31, 40, 41, 48, 49, 50, 51}
+        impact = mt.terrain_impact(root, 'snowy-bern-ice', pocket)
+        self.assertEqual(list(impact), ['ch06-maer-monster'])
+        self.assertEqual(sum(len(v) for v in impact['ch06-maer-monster'].values()), 14)
+
+    def test_ch04s_tileset_is_untouched_by_ch06s_pocket_metatiles(self):
+        """snowy-bern and snowy-bern-ice are separate .bin files, and ch04 rides the former.
+        This is the claim the whole 'it costs no repainting' argument rests on."""
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            'campaigns/rime-of-the-frostmaiden/maps')
+        pocket = {10, 12, 17, 18, 30, 31, 40, 41, 48, 49, 50, 51}
+        self.assertEqual(mt.terrain_impact(root, 'snowy-bern', pocket), {})
+
 
 if __name__ == '__main__':
     unittest.main()
