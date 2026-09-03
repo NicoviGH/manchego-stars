@@ -223,16 +223,79 @@ def _donor_label(row):
     return '--' if donor is None else str(donor)[:14]
 
 
+# The AI2 index selects a script from the decomp's own `gAi2ScriptTable`
+# (`cp_data.c:1548`, 19 entries), which `cp_script.c:90` reads as
+# `gpAi2Table[0][gActiveUnit->ai2]`. This mapping is that table, and the tests pin it so the
+# two cannot drift. Cite the tracked `.c`: `cp_data.s` is a BUILD ARTIFACT and is not at HEAD.
+#
+# The first eight names were all this map had, so the other ELEVEN indices reported as bare
+# `0x0A`-style numbers -- including one vanilla's own PROLOGUE fields (#344). Thirteen are now
+# named. The remaining SIX (0x08, 0x09, 0x0A, 0x0B, 0x0D, 0x0F) are named after bare addresses
+# in the decomp too, so they stay UNNAMED here rather than being guessed at: an invented name
+# would be indistinguishable from a known one at the call site.
 AI_BEHAVIOUR = {
     0x00: 'pursue',
+    0x01: 'pursue-ignore-char',        # MoveToEnemy_IgnoreChar_Unused1
+    0x02: 'pursue-ignore-char',        # MoveToEnemy_IgnoreChar_Unused2
     0x03: 'never-move',
     0x04: 'pillage',
     0x05: 'pillage-escape',
     0x06: 'pursue-twice',
+    0x07: 'pursue-twice-ignore-char',  # MoveTwiceToEnemy_IgnoreChar_Unused1
+    0x0C: 'escape',                    # gAiScript_Escape
+    0x0E: 'attack-walls-snags',        # gAiScript_AttackWallsSnags
     0x10: 'guard-tile',
     0x11: 'pillage-after-1',
     0x12: 'charge-after-1',
 }
+
+# Which families are "threat that comes to you" and which are "threat you walk into" -- ch05's
+# YAML coined the distinction and #344 measured it. A unit that never moves contributes nothing
+# until the player enters its range, so the two are not interchangeable.
+#
+# Only families whose DECOMP SYMBOL states the behaviour are classified. The six table entries
+# named after bare addresses, and any index outside the table, are UNCLASSIFIED on purpose:
+# bucketing an unknown script as "static" because it is unnamed would be a guess wearing a
+# measurement's clothes, and it would land silently on the side that lowers the number.
+AI_COMES_TO_YOU = frozenset({'pursue', 'pursue-ignore-char', 'pursue-twice',
+                             'pursue-twice-ignore-char', 'charge-after-1',
+                             'pillage', 'pillage-after-1'})
+AI_WALK_INTO = frozenset({'never-move', 'guard-tile'})
+# Known behaviours that are NEITHER: the unit moves, but not at the player. A thief that loots
+# and leaves, a script that flees, one that chews on walls. Folding these into "unclassified"
+# said "we do not know" about three scripts the decomp names outright -- and ai2=0x05 alone
+# occurs 120x in the reference files the parity twins already read (#359 review). "Known but
+# neither" and "unknown" are different facts and the report keeps them apart.
+AI_OWN_ERRAND = frozenset({'pillage-escape', 'escape', 'attack-walls-snags'})
+
+
+def ai_family(ai2):
+    """The behaviour family for an AI2 index, or None where the decomp does not name one."""
+    return AI_BEHAVIOUR.get(ai2)
+
+
+def behaviour_split(ai2s):
+    """{comes_to_you, walk_into, unclassified, n} over a sequence of AI2 indices.
+
+    Reported rather than folded into threat. #344 set out to WEIGHT threat by behaviour and the
+    measurement said not to: since #335 derives every unit's AI from its vanilla donor, our
+    behavioural shape IS the twin's shape (measured: 0 points of difference on all six active
+    chapters), so a weighting would scale both sides of the ratio identically and always report
+    x1.00. What is worth having is the split in the open, where a future divergence shows.
+    """
+    out = {'comes_to_you': 0, 'walk_into': 0, 'own_errand': 0, 'unclassified': 0, 'n': 0}
+    for ai2 in ai2s:
+        out['n'] += 1
+        family = ai_family(ai2)
+        if family in AI_COMES_TO_YOU:
+            out['comes_to_you'] += 1
+        elif family in AI_WALK_INTO:
+            out['walk_into'] += 1
+        elif family in AI_OWN_ERRAND:
+            out['own_errand'] += 1
+        else:
+            out['unclassified'] += 1
+    return out
 
 # `override` is a FLAG, not the vector: both _donor_label and the report's override list
 # test it for truth, and an ai_override whose vector ever stringified to something falsy
@@ -614,6 +677,23 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
             if len(why) > 96:
                 why = why[:95].rsplit(' ', 1)[0] + '...'
             out.append('    override  %s: %s' % (row.unit, why))
+        # The behavioural split, beside the roster it describes (#344). Reported, never folded
+        # into threat: AI is DERIVED from the donor, so our shape IS the twin's -- measured at
+        # 0 points of difference on all six active chapters -- and a weighting would scale both
+        # sides of the ratio and always say x1.00. What this catches is the day that stops
+        # being true, which can only happen through an ai_override or a donor-less unit.
+        split = behaviour_split([r.ai[1] for r in ai_rows if r.ai is not None])
+        if split['n']:
+            line = ('    shape     %d come to you / %d you walk into'
+                    % (split['comes_to_you'], split['walk_into']))
+            if split['own_errand']:
+                # Moves, but not at the player -- loots and leaves, flees, chews on walls.
+                line += ' / %d on its own errand' % split['own_errand']
+            if split['unclassified']:
+                # Named separately rather than folded into any of them: the decomp leaves six
+                # AI2 scripts as bare addresses, and one is live in vanilla's own Prologue.
+                line += ' / %d unclassified' % split['unclassified']
+            out.append(line)
         out.append('    AI is BORROWED from each unit\'s vanilla donor, never authored --')
         out.append('    an override states its reason or the parity gate fails (#335).')
 
