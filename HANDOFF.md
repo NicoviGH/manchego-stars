@@ -41,12 +41,18 @@ not re-derive it from the diffs.
 **#135 is triaged and CLOSED -- and closing it did not DO the work.** It routed one ticket into
 **#354**, **#355**, a reopened **#21** and two notes on #33.
 
-⚠️ **#354 was RE-SCOPED and is much smaller than filed.** `v0.1.0` was tagged 2026-06-19 and the
-report is 2026-07-06, but nearly the whole custom-art programme landed AFTER it (portraits from
-06-24, map sprites from 07-07). The "mismatched sprites" complaint described a gap the following
-ten weeks closed. What survives: re-check on a CURRENT build, and keep the style anchors
-(Meesmickle / Marty / Prof. RBG read as FE; the ice enemy stays off-model) as a forward standard.
-**The anchor mapping is inferred and Nicolas has not confirmed it** -- Sephek especially.
+**#354 is CLOSED, and the reason generalises.** `v0.1.0` was tagged 2026-06-19; the report is
+2026-07-06. Every PC already had a custom portrait (06-01..06-03) and map sprite (06-06) by then --
+but **not one custom battle animation existed**: the first is `prof-rbg` on 06-23, four days after
+the tag, and the last is `ravisin` on 08-16. So the reporter played a build with bespoke art in TWO
+contexts and a vanilla donor's animation in the THIRD, which is exactly the "mismatched sprites in
+different contexts" they described. The "these three read closest to FE" observation is part of the
+same artifact, not a style standard to hold future art to -- **do not resurrect it as one.** All 13
+battle anims shipped June-August. If cross-context consistency is worth re-checking, it is a fresh
+playtest against a CURRENT build, not a backlog item.
+
+**#355** (promoted-tier looks) stays open on its own merits and needs a whether-or-not call from
+Nicolas -- not a how.
 
 **#21's real deliverable: ch01's terrain-heal beat.** We ship that concept in no channel at all --
 the Guide command is absent in ch01-ch04 (only flag 234/Arena is ever set) and the townsperson
