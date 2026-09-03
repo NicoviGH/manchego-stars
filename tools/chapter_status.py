@@ -224,15 +224,15 @@ def _donor_label(row):
 
 
 # The AI2 index selects a script from the decomp's own `gAi2ScriptTable`
-# (`cp_data.s:3245`, .size 76 = 19 entries), which `cp_script.c:90` reads as
-# `gpAi2Table[0][gActiveUnit->ai2]`. This mapping is that table, and
-# `test_ai_behaviour_matches_the_decomp_table` pins it so the two cannot drift.
+# (`cp_data.c:1548`, 19 entries), which `cp_script.c:90` reads as
+# `gpAi2Table[0][gActiveUnit->ai2]`. This mapping is that table, and the tests pin it so the
+# two cannot drift. Cite the tracked `.c`: `cp_data.s` is a BUILD ARTIFACT and is not at HEAD.
 #
-# The first eight names were all this map had, and every one of the other eleven was reported
-# as a bare `0x0A`-style number -- including one that vanilla's own PROLOGUE fields (#344).
-# Where the decomp's symbol states the behaviour, the name says it; where the symbol is a bare
-# address, the entry stays UNNAMED rather than being guessed at. An invented name would be
-# indistinguishable from a known one at the call site.
+# The first eight names were all this map had, so the other ELEVEN indices reported as bare
+# `0x0A`-style numbers -- including one vanilla's own PROLOGUE fields (#344). Thirteen are now
+# named. The remaining SIX (0x08, 0x09, 0x0A, 0x0B, 0x0D, 0x0F) are named after bare addresses
+# in the decomp too, so they stay UNNAMED here rather than being guessed at: an invented name
+# would be indistinguishable from a known one at the call site.
 AI_BEHAVIOUR = {
     0x00: 'pursue',
     0x01: 'pursue-ignore-char',        # MoveToEnemy_IgnoreChar_Unused1
@@ -253,15 +253,20 @@ AI_BEHAVIOUR = {
 # YAML coined the distinction and #344 measured it. A unit that never moves contributes nothing
 # until the player enters its range, so the two are not interchangeable.
 #
-# Only families whose DECOMP SYMBOL states the behaviour are classified. The eleven table
-# entries named after bare addresses, and any index outside the table, are UNCLASSIFIED on
-# purpose: bucketing an unknown script as "static" because it is unnamed would be a guess
-# wearing a measurement's clothes, and it would land silently on the side that lowers the
-# number.
+# Only families whose DECOMP SYMBOL states the behaviour are classified. The six table entries
+# named after bare addresses, and any index outside the table, are UNCLASSIFIED on purpose:
+# bucketing an unknown script as "static" because it is unnamed would be a guess wearing a
+# measurement's clothes, and it would land silently on the side that lowers the number.
 AI_COMES_TO_YOU = frozenset({'pursue', 'pursue-ignore-char', 'pursue-twice',
                              'pursue-twice-ignore-char', 'charge-after-1',
                              'pillage', 'pillage-after-1'})
 AI_WALK_INTO = frozenset({'never-move', 'guard-tile'})
+# Known behaviours that are NEITHER: the unit moves, but not at the player. A thief that loots
+# and leaves, a script that flees, one that chews on walls. Folding these into "unclassified"
+# said "we do not know" about three scripts the decomp names outright -- and ai2=0x05 alone
+# occurs 120x in the reference files the parity twins already read (#359 review). "Known but
+# neither" and "unknown" are different facts and the report keeps them apart.
+AI_OWN_ERRAND = frozenset({'pillage-escape', 'escape', 'attack-walls-snags'})
 
 
 def ai_family(ai2):
@@ -278,7 +283,7 @@ def behaviour_split(ai2s):
     chapters), so a weighting would scale both sides of the ratio identically and always report
     x1.00. What is worth having is the split in the open, where a future divergence shows.
     """
-    out = {'comes_to_you': 0, 'walk_into': 0, 'unclassified': 0, 'n': 0}
+    out = {'comes_to_you': 0, 'walk_into': 0, 'own_errand': 0, 'unclassified': 0, 'n': 0}
     for ai2 in ai2s:
         out['n'] += 1
         family = ai_family(ai2)
@@ -286,6 +291,8 @@ def behaviour_split(ai2s):
             out['comes_to_you'] += 1
         elif family in AI_WALK_INTO:
             out['walk_into'] += 1
+        elif family in AI_OWN_ERRAND:
+            out['own_errand'] += 1
         else:
             out['unclassified'] += 1
     return out
@@ -679,10 +686,12 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
         if split['n']:
             line = ('    shape     %d come to you / %d you walk into'
                     % (split['comes_to_you'], split['walk_into']))
+            if split['own_errand']:
+                # Moves, but not at the player -- loots and leaves, flees, chews on walls.
+                line += ' / %d on its own errand' % split['own_errand']
             if split['unclassified']:
-                # Named separately rather than folded into either side: the decomp leaves
-                # eleven AI2 scripts as bare addresses, and one of them is live in vanilla's
-                # own Prologue.
+                # Named separately rather than folded into any of them: the decomp leaves six
+                # AI2 scripts as bare addresses, and one is live in vanilla's own Prologue.
                 line += ' / %d unclassified' % split['unclassified']
             out.append(line)
         out.append('    AI is BORROWED from each unit\'s vanilla donor, never authored --')

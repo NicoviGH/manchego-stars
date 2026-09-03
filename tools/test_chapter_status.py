@@ -292,15 +292,22 @@ class TestAiFidelity(unittest.TestCase):
 
 
 class AiBehaviourTable(unittest.TestCase):
-    """#344: the map named 8 of the decomp's 19 AI2 scripts, so eleven reported as bare
-    numbers -- one of which (0x0A) vanilla's own Prologue fields."""
+    """#344: the map named 8 of the decomp's 19 AI2 scripts, so eleven indices reported as
+    bare numbers -- one of which (0x0A) vanilla's own Prologue fields. Thirteen are named now;
+    the six the decomp itself only gives an ADDRESS stay unnamed.
+
+    Every name here is pinned, including 0x01/0x02/0x07 -- the #359 review caught those three
+    unpinned, which meant a decomp rename could mis-bucket units past a green suite."""
 
     SYMBOLS = {                      # index -> the decomp symbol whose name states behaviour
         0x00: 'AiScr_AiB_MoveToEnemy',
+        0x01: 'AiScr_AiB_MoveToEnemy_IgnoreChar_Unused1',
+        0x02: 'AiScr_AiB_MoveToEnemy_IgnoreChar_Unused2',
         0x03: 'AiScr_AiB_NeverMove',
         0x04: 'AiScr_AiB_PillageThenPursue',
         0x05: 'AiScr_AiB_PillageThenEscape',
         0x06: 'AiScr_AiB_MoveTwiceToEnemy',
+        0x07: 'AiScr_AiB_MoveTwiceToEnemy_IgnoreChar_Unused1',
         0x0C: 'gAiScript_Escape',
         0x0E: 'gAiScript_AttackWallsSnags',
         0x10: 'AiScr_AiB_GuardSpecificLocation',
@@ -338,7 +345,7 @@ class AiBehaviourTable(unittest.TestCase):
             self.assertIn(index, cs.AI_BEHAVIOUR)
 
     def test_indices_the_decomp_does_not_NAME_are_left_unnamed(self):
-        """The eleven bare-address entries stay out of the map. Inventing a name for one would
+        """The six bare-address entries stay out of the map. Inventing a name for one would
         make a guess indistinguishable from a fact at the call site."""
         import chapter_status as cs
         table = self._table()
@@ -365,6 +372,26 @@ class BehaviourSplit(unittest.TestCase):
         self.assertEqual(2, got['walk_into'])
         self.assertEqual(0, got['unclassified'])
 
+    def test_a_known_but_non_player_behaviour_is_its_OWN_bucket(self):
+        """A thief that loots and leaves, a script that flees, one that chews on walls: the
+        decomp NAMES all three, so calling them "unclassified" would say we do not know when
+        we do. ai2=0x05 alone occurs 120x in the reference files (#359 review)."""
+        import chapter_status as cs
+        got = cs.behaviour_split([0x05, 0x0C, 0x0E])
+        self.assertEqual(3, got['own_errand'])
+        self.assertEqual(0, got['unclassified'])
+        self.assertEqual(0, got['comes_to_you'])
+
+    def test_every_named_family_lands_in_exactly_one_bucket(self):
+        """The rule the review found broken: a NAMED family must never fall through to
+        unclassified, which is reserved for scripts the decomp does not name."""
+        import chapter_status as cs
+        for index in cs.AI_BEHAVIOUR:
+            got = cs.behaviour_split([index])
+            self.assertEqual(0, got['unclassified'],
+                             '0x%02X is named %r but falls through to unclassified'
+                             % (index, cs.AI_BEHAVIOUR[index]))
+
     def test_an_unnamed_script_is_UNCLASSIFIED_not_bucketed(self):
         """0x0A is live in vanilla's Prologue. Calling it static because it is unnamed would
         be a guess that silently lowers the number."""
@@ -379,9 +406,9 @@ class BehaviourSplit(unittest.TestCase):
 
     def test_the_three_buckets_account_for_every_unit(self):
         import chapter_status as cs
-        got = cs.behaviour_split([0x00, 0x03, 0x0A, 0xFF, 0x11])
-        self.assertEqual(got['n'],
-                         got['comes_to_you'] + got['walk_into'] + got['unclassified'])
+        got = cs.behaviour_split([0x00, 0x03, 0x0A, 0xFF, 0x11, 0x05])
+        self.assertEqual(got['n'], got['comes_to_you'] + got['walk_into']
+                         + got['own_errand'] + got['unclassified'])
 
 
 if __name__ == '__main__':

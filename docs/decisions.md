@@ -4270,13 +4270,21 @@ latent -- and the metric stays about stats, which is what it can actually measur
 
 **A corollary, and the one real gap the measurement found.** `AI_BEHAVIOUR` named 8 of the decomp's
 19 AI2 scripts (`gAi2ScriptTable`, `cp_data.c:1548`, read via `cp_script.c:90` as
-`gpAi2Table[0][ai2]`), so eleven reported as bare numbers -- including `0x0A`, which **vanilla's own
-Prologue fields**. The map is now complete for every index whose decomp SYMBOL states its behaviour,
-and the eleven named after bare addresses are left **unnamed and UNCLASSIFIED** rather than guessed
-at: bucketing an unknown script as static because it is unnamed would be a guess wearing a
-measurement's clothes, and it would land on the side that lowers the number. A test pins the map
-against `cp_data.c` -- the tracked `.c`, never the generated `.s`, which is a build artifact and not
-at HEAD at all.
+`gpAi2Table[0][ai2]`), so eleven indices reported as bare numbers -- including `0x0A`, which
+**vanilla's own Prologue fields**. Thirteen are named now: every index whose decomp SYMBOL states
+its behaviour. The **six** the decomp itself gives only an address (0x08, 0x09, 0x0A, 0x0B, 0x0D,
+0x0F) stay **unnamed and UNCLASSIFIED** rather than guessed at -- bucketing an unknown script as
+static because it is unnamed would be a guess wearing a measurement's clothes, and it would land on
+the side that lowers the number. A test pins the map against `cp_data.c` -- the tracked `.c`, never
+the generated `.s`, which is a build artifact and not at HEAD at all.
+
+**"Known but neither" is not the same fact as "unknown", and the first cut collapsed them.** Three
+NAMED families -- `pillage-escape`, `escape`, `attack-walls-snags` -- are neither threat that comes
+to you nor threat you walk into: the unit moves, but not at the player. Leaving them to fall through
+to `unclassified` said *we do not know* about scripts the decomp names outright, and `ai2 = 0x05`
+alone appears 120 times in the reference files the parity twins already read. They get their own
+bucket, **on its own errand**, and a test asserts that no named family can ever fall through to
+unclassified again.
 
 **A deadline that measures the MACHINE is not a deadline (2026-09-02, #345)**
 A `SUITE=all` sweep tabled **eight chapters as FAIL**. Nothing had failed. `SUITE=all` puts nearly
