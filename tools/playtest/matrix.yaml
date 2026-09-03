@@ -25,7 +25,8 @@ defaults:
   host_chapter: 1       # PT_HOST_CHAPTER; run.sh's historical default
   fps: 240              # top speed
   vsync: 0
-  deadline: 420         # seconds before run.sh calls the run timed-out
+  deadline: 420         # WORK budget: run.sh allows deadline*fps FRAMES, not wall seconds
+                        # (#345 -- a wall clock measures the machine's load, not the scenario)
   kind: verdict         # verdict | record | checkpoint | diagnostic
   headless: auto        # auto = derive from kind (verdict -> headless). `false` pins it
                         # HEADED: mgba-headless attaches no video renderer, so a scenario

@@ -1681,5 +1681,63 @@ class ValuedBuildFlagsCarryTheirValue(unittest.TestCase):
         self.assertEqual(set(), pi.VALUED_FLAGS - set(pi.FLAG_ARGS))
 
 
+class DeadlineIsAFrameBudget(unittest.TestCase):
+    """#345: SUITE=all tabled eight chapters as FAIL. Nothing had failed -- four long
+    scenarios sharing the machine ran at ~15fps against a 240fps target, so wall-clock
+    deadlines expired. The clock was measuring the machine's load, not the scenario."""
+
+    def _run_sh(self):
+        import check, os
+        with open(os.path.join(check.REPO, 'tools', 'playtest', 'run.sh'),
+                  encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_run_sh_no_longer_kills_on_elapsed_wall_time(self):
+        """The old shape was `local end=$((SECONDS + deadline))` with the poll loop bounded
+        by it. Contention alone could then fail a passing scenario."""
+        self.assertNotIn('local end=$((SECONDS + deadline))', self._run_sh())
+
+    def test_the_budget_is_frames_at_the_target_rate(self):
+        self.assertIn('local budget=$((deadline * fps))', self._run_sh())
+
+    def test_both_kill_paths_survive(self):
+        """A frame budget alone would wait forever on a wedged emulator: no frames means the
+        budget is never reached. The stall detector is what makes the budget safe."""
+        src = self._run_sh()
+        self.assertIn('OVERRAN its frame budget', src)
+        self.assertIn('STALLED: no frame progress', src)
+
+    def test_frames_are_parsed_base_ten(self):
+        """Stamps are zero-padded ([f005267]) and bash reads a leading-zero number in $(( ))
+        as OCTAL -- 3425 became 1813 and the throughput line lied."""
+        self.assertIn('10#', self._run_sh())
+
+    def test_throughput_is_always_reported(self):
+        self.assertIn('throughput:', self._run_sh())
+
+
+class VerdictKeepsErrorApartFromFail(unittest.TestCase):
+    """"The scenario proved something false" and "the run never finished" are different
+    facts, and #345's false failures came from conflating them."""
+
+    def _verdict(self, line, rc=1):
+        import matrix as mx
+        return mx.parse_verdict('[f000123] %s\n' % line, rc)
+
+    def test_an_overrun_is_an_ERROR_not_a_FAIL(self):
+        self.assertEqual('ERROR', self._verdict(
+            'RESULT: ERROR -- OVERRAN its frame budget (3803 > 240 frames)'))
+
+    def test_a_stall_is_an_ERROR_not_a_FAIL(self):
+        self.assertEqual('ERROR', self._verdict(
+            'RESULT: ERROR -- STALLED: no frame progress for 180s (stuck at frame 40)'))
+
+    def test_a_real_failure_is_still_a_FAIL(self):
+        self.assertEqual('FAIL', self._verdict('RESULT: FAIL -- never reached the map'))
+
+    def test_a_pass_is_a_PASS(self):
+        self.assertEqual('PASS', self._verdict('RESULT: PASS -- map deployed', rc=0))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -932,6 +932,11 @@ def scenario_driver_text(scenario_name, files=None, harness_source=None):
 PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
                      'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
                      'PT_DIFFICULTY',
+                     # The #345 watchdog knobs. Neither should change a verdict -- they bound
+                     # how patient run.sh is, not what the scenario proves -- but the guard
+                     # that keeps this list honest cannot tell, and a run killed early by a
+                     # tightened PT_STALL_S must not be served later as a cached PASS.
+                     'PT_STALL_S', 'PT_MAX_WALL_S',
                      'PT_PROVIDER', 'PT_MODEL', 'PT_BASE_URL', 'PT_LLM_DIR',
                      # PT_SOUND cannot change a VERDICT -- it unmutes the emulator and nothing
                      # else -- but it is in the key anyway, because the guard that keeps this
@@ -1308,11 +1313,16 @@ def parse_verdict(text, returncode):
 
     ERROR and FAIL are DIFFERENT FACTS and the table has to keep them apart. "The scenario
     proved something false" is a finding about the game; "the run never finished" is a finding
-    about the machine, and run.sh says which by writing `RESULT: ERROR -- timed out after Ns`
-    when it kills a run on its wall-clock deadline. Reading every non-PASS RESULT line as FAIL
-    downgraded those: one SUITE=all sweep ran its long canonical scenarios at ~15fps instead of
-    240 under contention, timed out, and tabled eight chapters as broken. Every one passed when
-    re-run serially -- but not before the FAILs had been chased as real."""
+    about the machine, and run.sh says which by writing `RESULT: ERROR -- ...`. Reading every
+    non-PASS RESULT line as FAIL downgraded those: one SUITE=all sweep ran its long canonical
+    scenarios at ~15fps instead of 240 under contention, timed out, and tabled eight chapters as
+    broken. Every one passed when re-run serially -- but not before the FAILs had been chased as
+    real.
+
+    Since #345 run.sh no longer kills on WALL time at all: the deadline is a FRAME budget, so
+    contention changes how long a run takes and not whether it passes. The ERROR arm still
+    matters -- `OVERRAN its frame budget` and `STALLED: no frame progress` are both real, and
+    both are findings about the run rather than about the game."""
     verdict = None
     for line in text.splitlines():
         if 'RESULT:' in line:

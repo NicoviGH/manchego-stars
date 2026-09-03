@@ -317,14 +317,67 @@ EOF
         "$ROM" >"$out/mgba-stdout.log" 2>&1 &
     local pid=$!
     echo "running '$scen' (pid $pid, ${fps}fps); polling $log"
-    local end=$((SECONDS + deadline))
+    # The work is FRAME-bound; the deadline used to be WALL-clock, and that mismatch is what
+    # made SUITE=all report false failures (#345). Four long scenarios sharing the machine ran
+    # at ~15fps against a 240fps target -- 16x slower -- so scenarios that pass solo in 25-70s
+    # blew 300-600s wall deadlines and were tabled as FAIL. Nothing had failed; the clock was
+    # measuring the MACHINE'S LOAD, not the scenario.
+    #
+    # So the declared `deadline` is read as what it always meant -- how much WORK a scenario may
+    # do -- expressed in frames at its own target rate. Contention then makes a run take longer
+    # in wall time and changes nothing about its verdict. Two things still kill a run, and both
+    # are real faults rather than symptoms of a busy laptop:
+    #
+    #   OVERRUN  the scenario did more frames than its budget: it is genuinely not finishing.
+    #   STALL    the frame counter stopped moving: mGBA is wedged, so no budget would ever be
+    #            reached and waiting for one is waiting forever.
+    #
+    # PT_MAX_WALL_S remains as a last-resort net for a pathology neither of those describes.
+    local budget=$((deadline * fps))
+    local stall=${PT_STALL_S:-180}
+    local max_wall=${PT_MAX_WALL_S:-7200}
+    local started=$SECONDS
+    local last_frame=0 last_progress=$SECONDS frame=0
     VERDICT=""
-    while [ $SECONDS -lt $end ]; do
+    while :; do
         if [ -f "$log" ] && grep -q "RESULT:" "$log"; then VERDICT=$(grep "RESULT:" "$log" | tail -1); break; fi
         if ! kill -0 "$pid" 2>/dev/null; then VERDICT="RESULT: ERROR -- mGBA exited early"; break; fi
+        # Every harness line is stamped [fNNNNN], so progress is free to read. Only the tail is
+        # scanned: these logs reach hundreds of MB and re-reading one every 3s is its own load.
+        # `|| true`: before the first stamped line exists grep exits 1, and under
+        # `set -euo pipefail` that killed run.sh outright -- silently, after the "running"
+        # banner, with the scenario still passing in its own log. No frames yet is a NORMAL
+        # early state, not an error.
+        frame=$(tail -c 200000 "$log" 2>/dev/null | grep -oE '\[f[0-9]+\]' | tail -1 | tr -dc '0-9' || true)
+        # 10# forces base 10: the stamps are zero-padded ([f005267]) and bash reads a
+        # leading-zero number in $(( )) as OCTAL, which silently mis-scaled the throughput
+        # line (3425 read as 3425o = 1813, reported as 302fps instead of 570).
+        frame=$((10#${frame:-0}))
+        if [ "$frame" -gt "$last_frame" ]; then last_frame=$frame; last_progress=$SECONDS; fi
+        if [ "$frame" -gt "$budget" ]; then
+            VERDICT="RESULT: ERROR -- OVERRAN its frame budget (${frame} > ${budget} frames, i.e. ${deadline}s of work at ${fps}fps)"
+            break
+        fi
+        if [ $((SECONDS - last_progress)) -ge "$stall" ]; then
+            VERDICT="RESULT: ERROR -- STALLED: no frame progress for ${stall}s (stuck at frame ${last_frame})"
+            break
+        fi
+        if [ $((SECONDS - started)) -ge "$max_wall" ]; then
+            VERDICT="RESULT: ERROR -- exceeded PT_MAX_WALL_S=${max_wall}s at frame ${last_frame}"
+            break
+        fi
         sleep 3
     done
-    [ -n "$VERDICT" ] || VERDICT="RESULT: ERROR -- timed out after ${deadline}s"
+    # Throughput, always -- a contended run is now legible instead of a mystery (#345). A number
+    # far under the target is the signal that the machine, not the change, is what is slow.
+    # Re-read the final frame: the poll interval means the loop's last sample is up to 3s
+    # stale, and on a short scenario that is most of the run.
+    local final
+    final=$(tail -c 200000 "$log" 2>/dev/null | grep -oE '\[f[0-9]+\]' | tail -1 | tr -dc '0-9' || true)
+    final=$((10#${final:-0}))
+    [ "$final" -gt "$last_frame" ] && last_frame=$final
+    local elapsed=$((SECONDS - started)); [ "$elapsed" -gt 0 ] || elapsed=1
+    echo "throughput: ${last_frame} frames in ${elapsed}s = $((last_frame / elapsed))fps (target ${fps}fps)"
     if [ "$KEEP_OPEN" != "--keep-open" ]; then kill "$pid" 2>/dev/null || true; fi
     echo "----------------------------------------"
     cat "$log" 2>/dev/null || echo "(no log produced)"
