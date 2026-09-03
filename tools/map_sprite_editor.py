@@ -217,6 +217,12 @@ class Doc:
         if not self.done_path:
             return
         if value:
+            # The marker lives beside the clean-recolour snapshot, and an --extra sheet has
+            # no snapshot -- so for a scratch character (Messie) the .base/ directory may not
+            # exist at all and Finish died on a missing parent. The flag is about THIS sheet,
+            # not about having a donor to reset to, so create the directory rather than
+            # refuse (Nicolas, 2026-09-03: "not sure if the finish button is broken").
+            os.makedirs(os.path.dirname(self.done_path), exist_ok=True)
             open(self.done_path, 'w').close()
         elif os.path.exists(self.done_path):
             os.remove(self.done_path)

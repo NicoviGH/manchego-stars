@@ -12,79 +12,43 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing.** Four tooling issues landed 2026-09-02/03 -- **#346** (PR #356), **#353** (#357),
-**#345** (#358), **#344** (#359). Each was reviewed by `/code-review` first, every finding fixed,
-all squash-merged, all branches deleted. Reasoning for each is an ADR in `docs/decisions.md`; do
-not re-derive it from the diffs.
+**Three PRs, all open, all awaiting `/code-review` — Nicolas runs it, the author never reviews
+their own (#349).** Each is off `main` and independent of the others; none is stacked.
 
-**What a fresh session most needs to know from them:**
+| PR | branch | what |
+|---|---|---|
+| **#360** | `ch06-enemy-positions` | ch06's 24 enemy positions + the boat POCKETS |
+| **#361** | `fix/economy-delivery-vehicles` | the item-economy reader learns two vehicles |
+| **#362** | `fix/sprite-editor-preview-repaint` | the idle preview repaints on frame boundaries |
 
-- **ch01 has a debug boot.** `CH01BOOT=1` / `--ch01-boot`: New Game -> the Iron Trail at frame
-  **2,856** against ~24,000 for a prologue playthrough. ⚠️ The invocation is
-  `PT_HOST_CHAPTER=2 tools/playtest/run.sh mapshot` -- through `matrix.py` it FAILS, because
-  `mapshot` is chapter-generic (`host_chapter: null`) and resolves to host 1 while the ROM boots
-  chapter 2. Scenario wiring, not a boot fault.
-- **A playtest deadline is now a FRAME budget, not wall time.** Contention no longer fails a
-  passing scenario, so **the `--jobs 1` re-run ritual for `SUITE=all` is retired.** Every run
-  prints `throughput: N frames in Ns = Nfps (target Nfps)`; a number far under target means the
-  machine is busy, not that the change is broken.
-- **`make chapter` prints the behavioural shape** (`shape N come to you / N you walk into`).
-- **The pre-commit hook could not pass from a worktree at all** before this -- `git commit`
-  exports `GIT_DIR`, which BEATS `git -C`, so every decomp read hit the superproject and exited
-  128, surfacing as 12 test errors that appear ONLY under `git commit`. Fixed; one
-  `inject.decomp.git_env()` at all 8 call sites.
+`make check` clean and `make test` green (1,829 cases) as of the last commit on each.
 
-**Five new guards, all registered in `check.py`'s gate:** `check_message_literals_are_registered`,
-`check_rom_configs_reach_the_build`, `check_decomp_git_calls_strip_the_env`,
-`check_no_shadowed_definitions`, plus build-time `assert_literals_are_claimed`.
+**#360 is the ch06 slice's placement step, and it is DONE pending review.** The reasoning is two
+ADRs in `docs/decisions.md` — *"ch06's boats sit in POCKETS…"* and *"Vanilla Ch6's urgency is
+TRAVEL TIME, not a fuse"* — plus the PR body. Do not re-derive it from the diff. The one-line
+version: vanilla Ch6's villager is 7 HP at Def 0 so contact is death, nothing can reach it before
+turn 7, and its mountain pocket locks out unpromoted cavalry entirely; ours reproduces that
+BUDGET (foot turn 6 either door, hulls sink turn 7 and 8) rather than the mechanism.
 
-**#135 is triaged and CLOSED -- and closing it did not DO the work.** It routed one ticket into
-**#354**, **#355**, a reopened **#21** and two notes on #33.
+⚠️ **Two things #360 does NOT prove, deliberately.** ch06 has no debug boot, so nobody has watched
+(a) an enemy AI path to a single melee tile and queue rather than stall, or (b) Talk fire from the
+door. Both are cheap the moment ch06 is hosted and get a `ch06boot`; neither should be assumed
+before then.
 
-**#354 is CLOSED, and the reason generalises.** `v0.1.0` was tagged 2026-06-19; the report is
-2026-07-06. Every PC already had a custom portrait (06-01..06-03) and map sprite (06-06) by then --
-but **not one custom battle animation existed**: the first is `prof-rbg` on 06-23, four days after
-the tag, and the last is `ravisin` on 08-16. So the reporter played a build with bespoke art in TWO
-contexts and a vanilla donor's animation in the THIRD, which is exactly the "mismatched sprites in
-different contexts" they described. The "these three read closest to FE" observation is part of the
-same artifact, not a style standard to hold future art to -- **do not resurrect it as one.** All 13
-battle anims shipped June-August. If cross-context consistency is worth re-checking, it is a fresh
-playtest against a CURRENT build, not a backlog item.
+**#360 brings a reusable placement-preview tool** (arrives with that branch, so it is not on `main`
+yet): it renders a placement on the real metatile art and reads positions from the chapter YAML
+once authored, or a concept JSON while they are being chosen. ch07 and ch08 get their placement
+conversations on it for free. Concept files for the four ch06 options are in the untracked
+`map-review/ch06-placement/`.
 
-**#355** (promoted-tier looks) stays open on its own merits and needs a whether-or-not call from
-Nicolas -- not a how.
+**Messie's map sprite is FINISHED (Nicolas, 2026-09-03) and committed** — see the art PR. Painted
+in the sprite editor: 32x96 indexed on the cast palette, a plesiosaur whose two held idle frames
+differ only in the front flippers. He is NOT wired in yet: he still needs an `art.map_sprite`
+block and an SMS id before he appears in game.
 
-**#21's real deliverable: ch01's terrain-heal beat.** We ship that concept in no channel at all --
-the Guide command is absent in ch01-ch04 (only flag 234/Arena is ever set) and the townsperson
-healing line was a designer note never authored into dialogue. The fix is ch05's arena `ENUT`
-shape with `ENUT(206)` (`build_campaign.py:10520`) -- a copy, not a design, and cheap to confirm
-now that #353 exists.
-
-**#347 landed 2026-09-02 (#348), with #350 cleaning up after it.** ch01's goblins were
-shipping as ch05's skeletons -- and, because `SMSId` and `pBattleAnimDef` are fields of the
-same class entry, with the skeleton battle anim too. A skin is now resolved by its SLOT,
-which is what every other chapter always did; the retired identifier is in `DEAD_CONCEPTS`.
-Reasoning: `docs/decisions.md` -> *"A reskin is resolved by its SLOT, never by the class it
-clones"*. **ch06's five reskins can now be wired without stealing a base from ch05.**
-
-**Confirmed by eye, in canonical ch01** (2026-09-02): a red horned Fire Imp on the snow, and
-class 0x6A filmed on the `recordenemy` bench swings an Iron Lance as a Fire Imp. Both halves
-of the look, since `SMSId` and `pBattleAnimDef` hang off the same class entry. Getting that
-look cost a canonical build plus a prologue playthrough, because **ch01 has no debug
-boot** -- filed as **#353**.
-
-**Two conventions landed 2026-09-02**, both ADRs in `docs/decisions.md`: *"`/code-review` is
-the review step, and the author never reviews their own PR"* (#349) and *"A guard that stops
-guarding fails silently, and green is what that looks like"* (#351, the durable lesson from
-the stack's two Criticals).
-
-**#26 stays open**: the map and the roster are done, the chapter is not.
-
-**The design board:** `https://claude.ai/code/artifact/6952f53d-0fde-4a0f-b07c-b8fc846d6f10`
-**Asset board** (every aquatic asset in the FE-Repo, animated per weapon):
-`https://claude.ai/code/artifact/d783c124-429c-4955-a575-0ae93b3cacd3`
-**Issue #26 carries the checklist**, including a comment holding the two boarding scenes' decided
-content. Read the issue for scope, the boards for reasoning.
+⚠️ **His reference is the WHOLE animal, which contradicts ch06's `art_note`** (head-and-neck only,
+2026-08-26) — and the finished sprite settles it in favour of the whole animal, so **that note is
+now the stale one**. Update it when Messie is wired, not before.
 
 ## Owed, filed, not started
 
@@ -96,31 +60,13 @@ content. Read the issue for scope, the boards for reasoning.
 
 ## Next task
 
-**The tooling debt is CLEARED.** #344/#345/#346/#353 all landed 2026-09-02/03, which is what
-2026-09-02's session was spent on: Nicolas's call was to drain the backlog first, because
-"if we go back to ch6 now I am not going to want to go back". Nothing tooling-shaped is
-blocking chapter work any more.
+**ch06 placement is done and in review (#360).** What the ch06 slice still owes, in the order the
+issue lists it: host slot + `inject_ch06` (which owes `_register_tileset` for `SnowIce` or the
+first build exits), the five enemy reskins, all four scripts, Messie's art, and a `ch06boot`
+scenario. **#26 carries the checklist** — read the issue for scope, not this file.
 
-**Messie's map sprite is IN PROGRESS and it is NICOLAS'S** (taken back 2026-08-26). Claude
-drew a starting concept 2026-09-02 -- full body, four flippers, neck arcing over, 3-frame
-idle, 32x96 indexed on the cast palette -- and Nicolas is painting from there in
-`tools/map_sprite_editor.py --campaign rime-of-the-frostmaiden --extra messie=Gargoyle`.
-`map_sprites/messie.png` is UNTRACKED on purpose; do not commit it without him.
-
-⚠️ **His reference is the WHOLE animal, which contradicts ch06's `art_note`** (head-and-neck
-only, the rest painted into the tilemap, recorded 2026-08-26). One of the two has to win.
-**Do not rewrite that note until Nicolas settles the art** -- it is his decision, not a
-drafting error. He is also not yet wired in: Messie needs an `art.map_sprite` block and an
-SMS id before he appears in game.
-
-Then **ch06 enemy POSITIONS -- bring Nicolas a render first** (2-3 concept options, not a
-finished map). #347 is done, so the reskin convention no longer blocks ch06's roster art.
-
-Everything that decision answers to -- the measured map geometry, why neither vanilla source
-transfers, the three jobs placement must serve, the donor rule that replaced `CH06_AI`, and the
-build obligations `make chapter CH=ch06` cannot see -- is on **#26**, in two comments dated
-2026-08-31. All of it lived HERE until then and should not have: it is true until it is done,
-not live state, so it belongs on the issue.
+The build obligations and the map geometry live in two comments on **#26** dated 2026-08-31, and
+the placement reasoning is in `docs/decisions.md`. Nothing about ch06 belongs here.
 
 ## Map sprites — read before any art session
 
