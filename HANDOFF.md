@@ -6,54 +6,50 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-02 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-03 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing.** #346 (PR #356) and #353 (PR #357) both landed 2026-09-02, reviewed by
-`/code-review` first, squash-merged, branches and the ms-353 worktree dropped.
+**Nothing.** Four tooling issues landed 2026-09-02/03 -- **#346** (PR #356), **#353** (#357),
+**#345** (#358), **#344** (#359). Each was reviewed by `/code-review` first, every finding fixed,
+all squash-merged, all branches deleted. Reasoning for each is an ADR in `docs/decisions.md`; do
+not re-derive it from the diffs.
 
-**#346 -- a bare-literal message id registers itself.** Discovery AST-scans
-`build_campaign.py` for `set_message_body` literals; OWNERSHIP is asserted at BUILD time by
-`assert_literals_are_claimed`. The review killed the first design, which read
-`HOSTED_CHAPTER_MESSAGE_IDS` with a hand-rolled AST evaluator and was wrong in BOTH directions.
-ADR: *"A message id written as a bare literal now registers itself"*.
+**What a fresh session most needs to know from them:**
 
-**#353 -- ch01 has a debug boot** (`CH01BOOT=1`, `--ch01-boot`). New Game -> the Iron Trail at
-**frame 2,856** against ~24,000 for a prologue playthrough. ADRs: *"ch01 is the only hosted
-chapter whose opening runs a MENU"*, *"One fact, four registries"*, *"A duplicate top-level
-`def` disables the earlier one"*.
+- **ch01 has a debug boot.** `CH01BOOT=1` / `--ch01-boot`: New Game -> the Iron Trail at frame
+  **2,856** against ~24,000 for a prologue playthrough. ⚠️ The invocation is
+  `PT_HOST_CHAPTER=2 tools/playtest/run.sh mapshot` -- through `matrix.py` it FAILS, because
+  `mapshot` is chapter-generic (`host_chapter: null`) and resolves to host 1 while the ROM boots
+  chapter 2. Scenario wiring, not a boot fault.
+- **A playtest deadline is now a FRAME budget, not wall time.** Contention no longer fails a
+  passing scenario, so **the `--jobs 1` re-run ritual for `SUITE=all` is retired.** Every run
+  prints `throughput: N frames in Ns = Nfps (target Nfps)`; a number far under target means the
+  machine is busy, not that the change is broken.
+- **`make chapter` prints the behavioural shape** (`shape N come to you / N you walk into`).
+- **The pre-commit hook could not pass from a worktree at all** before this -- `git commit`
+  exports `GIT_DIR`, which BEATS `git -C`, so every decomp read hit the superproject and exited
+  128, surfacing as 12 test errors that appear ONLY under `git commit`. Fixed; one
+  `inject.decomp.git_env()` at all 8 call sites.
 
-⚠️ **`PT_HOST_CHAPTER=2 tools/playtest/run.sh mapshot` is the invocation** -- through
-`matrix.py` it FAILS, because `mapshot` is chapter-generic (`host_chapter: null`) and resolves
-to host 1 while the ROM boots chapter 2. Scenario wiring, not a boot fault. A dedicated fast
-ch01 scenario would cost one of `harness.lua`'s **2 remaining** local slots; noted on #353.
-
-**The pre-commit hook could not pass from a worktree at all, before any of this.** `git commit`
-exports `GIT_DIR`, which BEATS `git -C`, so every decomp read resolved against the superproject
-and exited 128 -- surfacing as 12 test errors that appear ONLY under `git commit`. Five inline
-copies of the env strip existed and the one that mattered had none. Now `inject.decomp.git_env()`
-at all 8 call sites, pinned by `check_decomp_git_calls_strip_the_env`.
-
-**Three new guards, all registered in `check.py`'s gate:**
-`check_rom_configs_reach_the_build` (a rom_config must reach the Makefile, `_requested_flags`,
-`FLAG_ARGS` and `_boots` -- three of four were missed on the first cut),
-`check_decomp_git_calls_strip_the_env`, `check_no_shadowed_definitions`.
+**Five new guards, all registered in `check.py`'s gate:** `check_message_literals_are_registered`,
+`check_rom_configs_reach_the_build`, `check_decomp_git_calls_strip_the_env`,
+`check_no_shadowed_definitions`, plus build-time `assert_literals_are_claimed`.
 
 **#135 is triaged and CLOSED -- and closing it did not DO the work.** It routed one ticket into
-**#354**, **#355**, a reopened **#21** and two notes on #33; net open work went UP by two.
+**#354**, **#355**, a reopened **#21** and two notes on #33.
 
-⚠️ **#354 was RE-SCOPED 2026-09-02 and is much smaller than filed.** `v0.1.0` was tagged
-2026-06-19 and the report is from 2026-07-06, but nearly the whole custom-art programme landed
-AFTER it (portraits from 06-24, map sprites from 07-07). The "mismatched sprites" complaint
-described a build where a few custom busts sat beside vanilla donors -- the gap the last ten
-weeks closed. What survives: re-check on a CURRENT build, and keep the style anchors
+⚠️ **#354 was RE-SCOPED and is much smaller than filed.** `v0.1.0` was tagged 2026-06-19 and the
+report is 2026-07-06, but nearly the whole custom-art programme landed AFTER it (portraits from
+06-24, map sprites from 07-07). The "mismatched sprites" complaint described a gap the following
+ten weeks closed. What survives: re-check on a CURRENT build, and keep the style anchors
 (Meesmickle / Marty / Prof. RBG read as FE; the ice enemy stays off-model) as a forward standard.
+**The anchor mapping is inferred and Nicolas has not confirmed it** -- Sephek especially.
 
-**#21's real deliverable: ch01's terrain-heal beat.** We ship that concept in no channel at all
--- the Guide command is absent in ch01-ch04 (only flag 234/Arena is ever set) and the townsperson
+**#21's real deliverable: ch01's terrain-heal beat.** We ship that concept in no channel at all --
+the Guide command is absent in ch01-ch04 (only flag 234/Arena is ever set) and the townsperson
 healing line was a designer note never authored into dialogue. The fix is ch05's arena `ENUT`
 shape with `ENUT(206)` (`build_campaign.py:10520`) -- a copy, not a design, and cheap to confirm
 now that #353 exists.
@@ -86,15 +82,18 @@ content. Read the issue for scope, the boards for reasoning.
 
 ## Owed, filed, not started
 
-- **#344** -- factor AI behaviour into the difficulty metric (#335's stretch, split out). This is the
-  metric that would have caught the drift #335 fixed: ch04 fielded 78% pursuers against a
-  half-static twin and still measured x1.00.
-- **#345** -- `SUITE=all` reports FALSE failures. **NEXT.** Four long scenarios run concurrently and starve
-  each other past their wall-clock deadlines (~15fps against a 240fps target). The verdict
-  *conflation* is fixed in #342; the contention is not. Until it is, **re-run any `SUITE=all`
-  failure with `--jobs 1` before believing it.**
+- **#337** -- guard: a cutscene must LOAD every character it stages (the permadeath invariant).
+  Opened 2026-08-29, still not started.
+- **#30** -- `campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one from ch04 on.
+  Nothing reads it, so it misleads rather than breaks. Cheap since #312: one reader
+  (`tools/campaign_chapters.py`) means the block can be DERIVED rather than hand-kept.
 
 ## Next task
+
+**The tooling debt is CLEARED.** #344/#345/#346/#353 all landed 2026-09-02/03, which is what
+2026-09-02's session was spent on: Nicolas's call was to drain the backlog first, because
+"if we go back to ch6 now I am not going to want to go back". Nothing tooling-shaped is
+blocking chapter work any more.
 
 **Messie's map sprite is IN PROGRESS and it is NICOLAS'S** (taken back 2026-08-26). Claude
 drew a starting concept 2026-09-02 -- full body, four flippers, neck arcing over, 3-frame
