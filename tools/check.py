@@ -923,6 +923,236 @@ def check_gate_chapter_window(fail):
     fail.extend(_gate_window_violations(boots, hosts.hosted_chapters()))
 
 
+def _re_local_git_env(text, name):
+    """True if `name` is bound to git_env() in this file -- `env = git_env()` then `env=env`."""
+    import re as _re
+    return _re.search(r'^\s*%s\s*=\s*git_env\(\)' % _re.escape(name), text, _re.M)
+
+
+def check_decomp_git_calls_strip_the_env(fail, sources=None):
+    """Guard: every `git -C DECOMP ...` subprocess must pass env=, to drop inherited GIT_*.
+
+    Git EXPORTS GIT_DIR/GIT_INDEX_FILE to a hook, and an explicit GIT_DIR BEATS `-C`. So inside
+    the pre-commit hook a `git -C fireemblem8u show HEAD:...` resolves against the superproject
+    and exits 128. `vanilla_decomp_text` learned that once and stripped the env inline; the
+    lesson did not propagate. Three separate inline copies of the same dict existed, and the one
+    site that lacked it -- `chapter_label_constants`, the same `show HEAD:` call -- made the hook
+    UNPASSABLE from a worktree: 12 test errors that appear only under `git commit`, never when
+    you run the tests yourself (#353). A lesson living in three copies is a lesson waiting to be
+    missed in a fourth place; `inject.decomp.git_env()` is now the single one, and this pins it.
+    """
+    # EVERY python file under tools/, not a hand-kept list: the whole failure mode here is a
+    # call site nobody remembered. gen_chapter_title.py and test_winter_forest_backfill.py were
+    # both invisible to the first cut, which is exactly the drift this is supposed to stop.
+    if sources is None:
+        targets = []
+        for base, _dirs, files in os.walk(os.path.join(REPO, 'tools')):
+            for name in sorted(files):
+                if name.endswith('.py'):
+                    targets.append(os.path.relpath(os.path.join(base, name), REPO))
+        targets.sort()
+    else:
+        targets = sources
+    seen = 0
+    for rel in targets:
+        path = os.path.join(REPO, rel)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+        try:
+            tree = ast.parse(text, rel)
+        except SyntaxError as exc:
+            # Report; do NOT traceback. This runs in the pre-commit hook, where a traceback
+            # kills the gate and skips every check after it.
+            fail.append('%s does not parse, so it cannot be checked: %s' % (rel, exc))
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            first = node.args[0]
+            parts = first.elts if isinstance(first, (ast.List, ast.Tuple)) else []
+            if isinstance(first, ast.BinOp) and isinstance(first.left, (ast.List, ast.Tuple)):
+                parts = first.left.elts
+            lits = [p.value for p in parts[:3]
+                    if isinstance(p, ast.Constant) and isinstance(p.value, str)]
+            names = [p.id for p in parts[:3] if isinstance(p, ast.Name)]
+            if lits[:2] != ['git', '-C'] or 'DECOMP' not in names:
+                continue
+            seen += 1
+            env_kw = next((kw for kw in node.keywords if kw.arg == 'env'), None)
+            # Demand the env expression BE git_env() -- either the call itself, or a local
+            # bound to it. Anything else passes: env=os.environ.copy() (a Call, so an
+            # `is this an Attribute` test misses it), or a file's own inline dict, which is how
+            # gen_chapter_title.py shipped a strip missing GIT_COMMON_DIR / GIT_NAMESPACE /
+            # GIT_ALTERNATE_OBJECT_DIRECTORIES and half-worked. A file-scoped `'git_env' in
+            # text` was the first attempt and let every new call in build_campaign.py through
+            # (#357 review, second round).
+            def _is_git_env(expr):
+                if isinstance(expr, ast.Call):
+                    fn = expr.func
+                    return (getattr(fn, 'id', None) == 'git_env'
+                            or getattr(fn, 'attr', None) == 'git_env')
+                if isinstance(expr, ast.Name):      # local bound to git_env() nearby
+                    return bool(_re_local_git_env(text, expr.id))
+                return False
+
+            if env_kw is None or not _is_git_env(env_kw.value):
+                fail.append(
+                    '%s:%d runs `git -C DECOMP` without env=git_env() -- inside a commit hook '
+                    'the inherited GIT_DIR overrides -C, so it resolves against the '
+                    'SUPERPROJECT and exits 128. env=os.environ (or a .copy(), or a private '
+                    'inline strip) is not a fix. Pass env=git_env() (inject.decomp).'
+                    % (rel, node.lineno))
+    if not seen:
+        fail.append('check_decomp_git_calls_strip_the_env: found NO `git -C DECOMP` call, so '
+                    'the scan is broken -- there are several.')
+    return fail
+
+
+def check_no_shadowed_definitions(fail, sources=None):
+    """Guard: no module may define the same top-level name twice.
+
+    Python takes the LAST definition and says nothing, so a duplicate is invisible: the file
+    reads correctly, the tests import the survivor, and edits to the other copy do nothing at
+    all. That is how two guards in this very file were quietly disabled on 2026-09-02 -- an
+    edit landed on the first copy while the second, stale one was what actually ran, and the
+    only symptom was a test asserting on `inspect.getsource` that "impossibly" failed.
+
+    Same family as the ADR above: a thing that stops working while everything stays green.
+    """
+    targets = sources
+    if targets is None:
+        targets = []
+        for base, _dirs, files in os.walk(os.path.join(REPO, 'tools')):
+            for name in sorted(files):
+                if name.endswith('.py'):
+                    targets.append(os.path.relpath(os.path.join(base, name), REPO))
+        targets.sort()
+    for rel in targets:
+        path = os.path.join(REPO, rel)
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding='utf-8') as fh:
+            try:
+                tree = ast.parse(fh.read(), rel)
+            except SyntaxError as exc:
+                fail.append('%s does not parse: %s' % (rel, exc))
+                continue
+        seen = {}
+        for node in tree.body:
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            if node.name in seen:
+                fail.append(
+                    '%s defines %s twice (lines %d and %d) -- Python keeps the LAST one and '
+                    'says nothing, so the earlier copy is dead code and any edit to it is '
+                    'silently discarded. Delete the stale one.'
+                    % (rel, node.name, seen[node.name], node.lineno))
+            seen[node.name] = node.lineno
+    return fail
+
+
+def check_rom_configs_reach_the_build(fail, matrix_text=None, makefile_text=None,
+                                      sources=None):
+    """Guard: a rom_config env var must reach EVERY registry that decides what got built.
+
+    `matrix.yaml`'s rom_configs render onto the make line (`CH05BOOT=1 make ...`), and four
+    separate places have to agree about that var. Miss one and the failure is silent:
+
+      * the **Makefile** turns it into a `--flag`. Missing -> the config builds CANONICAL, and
+        the scenario's verdict is about a ROM it never asked for.
+      * **`_requested_flags`** stamps the built ROM. Missing -> a `--ch01-boot` build stamps
+        itself `canonical`, so a canonical scenario is not refused against it (and burns the
+        whole mGBA deadline), while a `rom: ch01boot` scenario is refused forever as "tree holds
+        canonical" even right after the correct build. Found by review on #357.
+      * **`probe_invalidation.FLAG_ARGS`** maps it back to the switch. Missing -> `KeyError` the
+        moment a scenario uses the config.
+      * **`_boots`**, for a `CH..BOOT` var: the mutual-exclusion list. Missing -> `CH01BOOT=1
+        CH03BOOT=1` builds happily, boots ch03, and ships a ch01 whose opening was stripped.
+
+    Four registries for one fact is the shape that keeps costing us; until they are one thing,
+    this check is what keeps them equal.
+    """
+    import re as _re
+    matrix = os.path.join(REPO, 'tools', 'playtest', 'matrix.yaml')
+    if matrix_text is None:
+        if not os.path.exists(matrix):
+            fail.append('check_rom_configs_reach_the_build: matrix.yaml is missing')
+            return fail
+        with open(matrix, encoding='utf-8') as fh:
+            matrix_text = fh.read()
+    block = _re.search(r'^rom_configs:\n(.*?)(?=^\S|\Z)', matrix_text, _re.S | _re.M)
+    if not block:
+        fail.append('check_rom_configs_reach_the_build: no rom_configs block in matrix.yaml')
+        return fail
+    envs = set(_re.findall(r'^\s+([A-Z][A-Z0-9_]*):\s', block.group(1), _re.M))
+    if not envs:
+        fail.append('check_rom_configs_reach_the_build: rom_configs sets NO env var, so the '
+                    'scan is broken -- there are several on main.')
+        return fail
+
+    def _read(rel, injected):
+        if injected is not None:
+            return injected
+        path = os.path.join(REPO, rel)
+        if not os.path.exists(path):
+            return ''
+        with open(path, encoding='utf-8') as fh:
+            return fh.read()
+
+    sources = sources or {}
+    mk = _read('Makefile', makefile_text if makefile_text is not None else sources.get('Makefile'))
+    bc = _read('tools/build_campaign.py', sources.get('build_campaign'))
+    probe = _read('tools/probe_invalidation.py', sources.get('probe'))
+    # A regex that stops matching must FAIL, not quietly skip its arm: three of the four
+    # registry checks would then be disabled while the gate still prints "clean" -- the exact
+    # silent-guard shape this function exists to stop (#357 review, second round).
+    def _region(pattern, text, what, where):
+        found = _re.search(pattern, text, _re.S)
+        if not found:
+            fail.append(
+                'check_rom_configs_reach_the_build: cannot find %s in %s, so that registry is '
+                'NOT being checked. It was renamed or reformatted -- fix this scan rather than '
+                'letting it pass vacuously.' % (what, where))
+            return None
+        return found.group(1)
+
+    stamp_text = _region(r'_requested_flags = \{(.*?)\}', bc, '_requested_flags',
+                         'build_campaign.py')
+    boots_text = _region(r'_boots = \[(.*?)\]', bc, '_boots', 'build_campaign.py')
+    flag_text = _region(r'FLAG_ARGS = \{(.*?)\}', probe, 'FLAG_ARGS',
+                        'probe_invalidation.py')
+    if stamp_text is None or boots_text is None or flag_text is None:
+        return fail
+
+    for env in sorted(envs):
+        if '$(%s)' % env not in mk:
+            fail.append(
+                'matrix.yaml rom_configs sets %s, but the Makefile never reads $(%s) -- so a '
+                'scenario asking for that configuration silently builds CANONICAL and its '
+                'verdict is about the wrong ROM. Add `$(if $(%s),--<flag>)` to the '
+                'build_campaign line.' % (env, env, env))
+        if "'%s'" % env not in stamp_text:
+            fail.append(
+                'matrix.yaml rom_configs sets %s, but build_campaign\'s _requested_flags does '
+                'not stamp it -- so that build calls itself `canonical`, a canonical scenario '
+                'is not refused against it, and a `rom:` scenario naming the config is refused '
+                'forever. Add %s to _requested_flags.' % (env, env))
+        if "'%s'" % env not in flag_text:
+            fail.append(
+                'matrix.yaml rom_configs sets %s, but probe_invalidation.FLAG_ARGS has no entry '
+                '-- build_manifests KeyErrors as soon as a scenario uses that config.'
+                % env)
+        if _re.match(r'^CH\d\dBOOT$', env) and env.lower().replace(
+                'boot', '-boot').replace('ch', '--ch') not in boots_text:
+            fail.append(
+                '%s is a fast boot but is not in build_campaign\'s _boots mutual-exclusion list '
+                '-- two boots then build together, the later one wins New Game, and the other '
+                'chapter ships with its opening stripped.' % env)
+    return fail
+
+
 def check_playtest_matrix(fail):
     """tools/playtest/matrix.yaml is the single source of "what does this scenario
     need" (ROM configuration, host chapter, checkpoint, timing) -- so it has to keep
@@ -2026,7 +2256,9 @@ def main():
                   check_personal_line_injection_routes,
                   check_injection_order, check_cached_steps_are_config_invariant,
                   check_tile_changes_outlive_the_retarget,
-                  check_playtest_matrix, check_gate_chapter_window,
+                  check_playtest_matrix, check_rom_configs_reach_the_build,
+                  check_decomp_git_calls_strip_the_env,
+                  check_no_shadowed_definitions, check_gate_chapter_window,
                   check_declared_cases, check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,

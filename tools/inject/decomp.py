@@ -63,3 +63,19 @@ def _replace_brace_block(text, marker, new_body, path):
     """Replace the `{...}` after `marker` with `new_body` (a `{...}` string)."""
     s, e = _find_brace_block(text, marker, path)
     return text[:s] + new_body + text[e:]
+
+
+def git_env():
+    """os.environ minus every inherited GIT_* that would override `git -C DECOMP` discovery.
+
+    Git EXPORTS GIT_DIR/GIT_INDEX_FILE/... to a hook, and an explicit GIT_DIR beats `-C`. So
+    inside a pre-commit hook every `git -C fireemblem8u show HEAD:...` resolves against the
+    SUPERPROJECT and exits 128. `vanilla_decomp_text` learned this once and stripped the env
+    inline; the lesson did not propagate, and `chapter_label_constants` -- the same call,
+    without the strip -- made the hook unpassable from a worktree (12 test errors, #353).
+    One helper, so the next `git -C DECOMP` cannot get it wrong; check.py pins every call site.
+    """
+    return {k: v for k, v in os.environ.items()
+            if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX',
+                         'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE',
+                         'GIT_ALTERNATE_OBJECT_DIRECTORIES')}

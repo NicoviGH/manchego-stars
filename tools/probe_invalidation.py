@@ -138,8 +138,14 @@ CASES = [
 
 # make-flag -> the build_campaign.py switch that sets it (Makefile line 39).
 FLAG_ARGS = {'TESTCH': '--test-chapter', 'LORDBOOT': '--lord-boot', 'MONTAGE': '--montage',
+             'CH01BOOT': '--ch01-boot',
              'CH03BOOT': '--ch03-boot', 'CH04BOOT': '--ch04-boot', 'CH05BOOT': '--ch05-boot',
-             'CH05LUPIN': '--ch05-lupin'}
+             'CH05LUPIN': '--ch05-lupin', 'CH05MOOSE': '--ch05-moose',
+             'CH05ENDING': '--ch05-ending'}
+
+# Switches that take a VALUE rather than being a bare on/off flag. `--ch05-ending` without its
+# arm is an argparse error 2, surfacing as an opaque CalledProcessError three frames away.
+VALUED_FLAGS = frozenset({'CH05ENDING'})
 
 
 def keys_for(names, manifests):
@@ -166,7 +172,13 @@ def build_manifests(roms):
         flags = mx.Manifest.load().resolve_rom(rom)
         cmd = [sys.executable, os.path.join(HERE, 'build_campaign.py'),
                '--campaign', 'rime-of-the-frostmaiden']
-        cmd += [FLAG_ARGS[flag.split('=')[0]] for flag in flags]
+        # A VALUED switch has to carry its value: `--ch05-ending` bare exits argparse 2, and
+        # the caller only sees an opaque CalledProcessError (#357 review). resolve_rom yields
+        # "CH05ENDING=full" for those, so keep the arm.
+        for flag in flags:
+            name, _, value = flag.partition('=')
+            switch = FLAG_ARGS[name]
+            cmd.append('%s=%s' % (switch, value) if name in VALUED_FLAGS else switch)
         subprocess.run(cmd, cwd=REPO, check=True, capture_output=True)
         out[rom] = build_scopes.load_manifest(
             os.path.join(REPO, '.build-scopes.json'))
