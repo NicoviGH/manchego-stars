@@ -14179,7 +14179,8 @@ def main():
     # Snapshot the flags AS PASSED, before --lord-boot implies --test-chapter below:
     # the build stamp has to describe the `make` invocation, not the derived state.
     _requested_flags = {'TESTCH': args.test_chapter, 'LORDBOOT': args.lord_boot,
-                        'MONTAGE': args.montage, 'CH03BOOT': args.ch03_boot,
+                        'MONTAGE': args.montage, 'CH01BOOT': args.ch01_boot,
+                        'CH03BOOT': args.ch03_boot,
                         'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot,
                         'CH05LUPIN': args.ch05_lupin, 'CH05MOOSE': args.ch05_moose,
                         'CH05ENDING': args.ch05_ending}
@@ -14187,7 +14188,8 @@ def main():
         args.test_chapter = True  # the fast-boot rides the sandbox
     # Each fast-boot repoints New Game at its own slot, so at most one may win. Named
     # explicitly rather than counted, so the error says which flags actually clash.
-    _boots = [name for name, on in (('--ch03-boot', args.ch03_boot),
+    _boots = [name for name, on in (('--ch01-boot', args.ch01_boot),
+                                    ('--ch03-boot', args.ch03_boot),
                                     ('--ch04-boot', args.ch04_boot),
                                     ('--ch05-boot', args.ch05_boot)) if on]
     if len(_boots) > 1:

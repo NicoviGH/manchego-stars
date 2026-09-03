@@ -8,6 +8,8 @@ import struct
 import subprocess
 import unittest
 
+from inject.decomp import git_env
+
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DECOMP = os.path.join(REPO, 'fireemblem8u')
@@ -43,8 +45,7 @@ def _metatiles(path):
 
 def _vanilla_decomp_text(relative_path):
     """Read committed vanilla input, not campaign-injected build output."""
-    env = {key: value for key, value in os.environ.items()
-           if not key.startswith('GIT_')}
+    env = git_env()
     return subprocess.check_output(
         ['git', '-C', DECOMP, 'show', 'HEAD:' + relative_path],
         encoding='utf-8', env=env)

@@ -19,6 +19,8 @@ import os
 import subprocess
 import sys
 
+from inject.decomp import git_env   # one env strip, not a fifth inline copy
+
 import numpy as np
 from PIL import Image
 
@@ -96,9 +98,7 @@ def _vanilla_card(idx):
     from the wrong (already-injected) card. Mirror build_campaign.vanilla_decomp_text's
     env handling (a commit hook sets GIT_DIR, which would override -C discovery). Falls
     back to the working tree if git/HEAD is unavailable (ad-hoc standalone use)."""
-    env = {k: v for k, v in os.environ.items()
-           if k not in ('GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_PREFIX',
-                        'GIT_OBJECT_DIRECTORY')}
+    env = git_env()
     try:
         raw = subprocess.check_output(
             ['git', '-C', DECOMP, 'show', 'HEAD:' + CARD_REL % idx], env=env)

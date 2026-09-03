@@ -4221,6 +4221,27 @@ The unifying test: after any change to a check, an encoding, or a sentinel, ask 
 now be different if this were broken?* If the answer is "nothing observable", that is the
 bug, not the reassurance.
 
+**One fact, four registries: a rom_config has to reach all of them or the wrongness is silent
+(2026-09-02, #353/#357 review)**
+Adding `ch01boot` meant adding `CH01BOOT` in four unrelated places, and missing any one of them
+fails quietly in a different way: the **Makefile** (missing -> the config builds CANONICAL and the
+scenario's verdict is about a ROM it never asked for), **`_requested_flags`** (missing -> the build
+stamps itself `canonical`, so a canonical scenario is not refused against it and burns the whole
+mGBA deadline, while a `rom: ch01boot` scenario is refused forever as "tree holds canonical" even
+right after the correct build), **`probe_invalidation.FLAG_ARGS`** (missing -> `KeyError` the moment
+a scenario uses it) and **`_boots`** (missing -> `CH01BOOT=1 CH03BOOT=1` builds happily, boots ch03,
+and ships a ch01 whose opening was stripped). Three of the four were missed on the first cut and
+found by review. Until they are one thing, `check_rom_configs_reach_the_build` is what keeps them
+equal -- it is cheaper than the four ways of being silently wrong.
+
+**A duplicate top-level `def` disables the earlier one and says nothing (2026-09-02)**
+Python keeps the LAST definition. So a file can hold an edited function and a stale copy of it, the
+module imports cleanly, the tests pass, and the edits do nothing -- the only symptom is a test
+asserting on `inspect.getsource` that "impossibly" fails. It happened TWICE in one session to two
+different guards in `check.py`, both times from a sloppy source-slicing edit that copied a region
+instead of replacing it. `check_no_shadowed_definitions` now rejects it across `tools/`. Same family
+as *"A guard that stops guarding fails silently"*: the failure is indistinguishable from working.
+
 **ch01 is the only hosted chapter whose opening runs a MENU, and that is what a debug boot has
 to strip (2026-09-02, #353)**
 Every hosted chapter but ch01 had a fast boot; confirming #347 by eye therefore cost a canonical

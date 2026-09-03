@@ -138,8 +138,10 @@ CASES = [
 
 # make-flag -> the build_campaign.py switch that sets it (Makefile line 39).
 FLAG_ARGS = {'TESTCH': '--test-chapter', 'LORDBOOT': '--lord-boot', 'MONTAGE': '--montage',
+             'CH01BOOT': '--ch01-boot',
              'CH03BOOT': '--ch03-boot', 'CH04BOOT': '--ch04-boot', 'CH05BOOT': '--ch05-boot',
-             'CH05LUPIN': '--ch05-lupin'}
+             'CH05LUPIN': '--ch05-lupin', 'CH05MOOSE': '--ch05-moose',
+             'CH05ENDING': '--ch05-ending'}
 
 
 def keys_for(names, manifests):

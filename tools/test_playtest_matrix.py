@@ -1509,5 +1509,100 @@ class RomConfigsReachTheBuild(unittest.TestCase):
         self.assertIn('check_rom_configs_reach_the_build', inspect.getsource(check.main))
 
 
+class RomConfigReachesEveryRegistry(unittest.TestCase):
+    """#357 review: a rom_config env var must reach the Makefile, _requested_flags,
+    FLAG_ARGS and (for a boot) _boots. Missing any one of them fails SILENTLY."""
+
+    MATRIX = 'rom_configs:\n  ch01boot:\n    CH01BOOT: 1\n\nscenarios:\n  x: {}\n'
+    BC = "_requested_flags = {'CH01BOOT': a}\n_boots = [(('--ch01-boot', a))]\n"
+    PROBE = "FLAG_ARGS = {'CH01BOOT': '--ch01-boot'}\n"
+
+    def _fail(self, makefile='$(CH01BOOT)', bc=None, probe=None):
+        import check
+        fail = []
+        check.check_rom_configs_reach_the_build(
+            fail, matrix_text=self.MATRIX,
+            sources={'Makefile': makefile, 'build_campaign': bc or self.BC,
+                     'probe': probe or self.PROBE})
+        return fail
+
+    def test_all_four_registries_present_passes(self):
+        self.assertEqual([], self._fail())
+
+    def test_a_missing_makefile_arm_builds_canonical(self):
+        bad = self._fail(makefile='nothing')
+        self.assertTrue(any('CANONICAL' in f for f in bad), bad)
+
+    def test_a_missing_build_stamp_mislabels_the_rom(self):
+        bad = self._fail(bc="_requested_flags = {'TESTCH': a}\n_boots = [(('--ch01-boot', a))]\n")
+        self.assertTrue(any('_requested_flags' in f for f in bad), bad)
+
+    def test_a_missing_FLAG_ARGS_entry_is_caught(self):
+        bad = self._fail(probe="FLAG_ARGS = {'TESTCH': '--test-chapter'}\n")
+        self.assertTrue(any('FLAG_ARGS' in f for f in bad), bad)
+
+    def test_a_boot_missing_from_the_exclusion_list_is_caught(self):
+        bad = self._fail(bc="_requested_flags = {'CH01BOOT': a}\n_boots = [(('--ch03-boot', a))]\n")
+        self.assertTrue(any('_boots' in f for f in bad), bad)
+
+    def test_the_live_tree_is_clean(self):
+        import check
+        fail = []
+        check.check_rom_configs_reach_the_build(fail)
+        self.assertEqual([], fail)
+
+
+class DecompGitCallsStripTheEnv(unittest.TestCase):
+    """#353: GIT_DIR beats `git -C`, so inside a commit hook every decomp read resolves
+    against the superproject and exits 128."""
+
+    def test_the_live_tree_is_clean(self):
+        import check
+        fail = []
+        check.check_decomp_git_calls_strip_the_env(fail)
+        self.assertEqual([], fail)
+
+    def test_a_file_with_no_such_call_fails_instead_of_passing_vacuously(self):
+        import check
+        fail = []
+        check.check_decomp_git_calls_strip_the_env(fail, sources=['tools/callsites.py'])
+        self.assertTrue(fail)
+        self.assertIn('scan is broken', fail[0])
+
+    def test_it_scans_every_python_file_under_tools(self):
+        """The first cut listed three files by hand and its docstring claimed to pin every
+        call site; two real ones were invisible to it."""
+        import check, inspect
+        self.assertIn('os.walk', inspect.getsource(check.check_decomp_git_calls_strip_the_env))
+
+
+class NoShadowedDefinitions(unittest.TestCase):
+    """A duplicate top-level def silently shadows the first -- Python keeps the last and
+    says nothing. It disabled two guards in check.py on 2026-09-02."""
+
+    def test_the_live_tree_is_clean(self):
+        import check
+        fail = []
+        check.check_no_shadowed_definitions(fail)
+        self.assertEqual([], fail)
+
+    def test_a_duplicate_is_caught(self):
+        import check, os, tempfile
+        probe = os.path.join(check.REPO, 'tools', '_shadowprobe_test.py')
+        with open(probe, 'w', encoding='utf-8') as fh:
+            fh.write('def a():\n    pass\n\n\ndef a():\n    pass\n')
+        try:
+            fail = []
+            check.check_no_shadowed_definitions(fail, sources=['tools/_shadowprobe_test.py'])
+        finally:
+            os.remove(probe)
+        self.assertEqual(1, len(fail), fail)
+        self.assertIn('defines a twice', fail[0])
+
+    def test_the_check_is_registered_in_the_drift_gate(self):
+        import check, inspect
+        self.assertIn('check_no_shadowed_definitions', inspect.getsource(check.main))
+
+
 if __name__ == '__main__':
     unittest.main()
