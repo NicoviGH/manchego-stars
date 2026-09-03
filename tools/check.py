@@ -923,6 +923,12 @@ def check_gate_chapter_window(fail):
     fail.extend(_gate_window_violations(boots, hosts.hosted_chapters()))
 
 
+def _re_local_git_env(text, name):
+    """True if `name` is bound to git_env() in this file -- `env = git_env()` then `env=env`."""
+    import re as _re
+    return _re.search(r'^\s*%s\s*=\s*git_env\(\)' % _re.escape(name), text, _re.M)
+
+
 def check_decomp_git_calls_strip_the_env(fail, sources=None):
     """Guard: every `git -C DECOMP ...` subprocess must pass env=, to drop inherited GIT_*.
 
@@ -954,7 +960,13 @@ def check_decomp_git_calls_strip_the_env(fail, sources=None):
             continue
         with open(path, encoding='utf-8') as fh:
             text = fh.read()
-        tree = ast.parse(text, rel)
+        try:
+            tree = ast.parse(text, rel)
+        except SyntaxError as exc:
+            # Report; do NOT traceback. This runs in the pre-commit hook, where a traceback
+            # kills the gate and skips every check after it.
+            fail.append('%s does not parse, so it cannot be checked: %s' % (rel, exc))
+            continue
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call) or not node.args:
                 continue
@@ -969,22 +981,29 @@ def check_decomp_git_calls_strip_the_env(fail, sources=None):
                 continue
             seen += 1
             env_kw = next((kw for kw in node.keywords if kw.arg == 'env'), None)
-            # `env=os.environ` passes the inherited GIT_* straight back in -- it looks like the
-            # fix and is the bug.
-            passthrough = (isinstance(env_kw.value, ast.Attribute)
-                           and env_kw.value.attr == 'environ') if env_kw else False
-            # A file that rolls its OWN strip is a copy of the lesson, and a copy drifts: the
-            # gen_chapter_title.py copy was missing GIT_COMMON_DIR / GIT_NAMESPACE /
-            # GIT_ALTERNATE_OBJECT_DIRECTORIES, so it half-worked. Demand the shared helper.
-            rolls_own = 'git_env' not in text
-            if env_kw is None or passthrough or rolls_own:
+            # Demand the env expression BE git_env() -- either the call itself, or a local
+            # bound to it. Anything else passes: env=os.environ.copy() (a Call, so an
+            # `is this an Attribute` test misses it), or a file's own inline dict, which is how
+            # gen_chapter_title.py shipped a strip missing GIT_COMMON_DIR / GIT_NAMESPACE /
+            # GIT_ALTERNATE_OBJECT_DIRECTORIES and half-worked. A file-scoped `'git_env' in
+            # text` was the first attempt and let every new call in build_campaign.py through
+            # (#357 review, second round).
+            def _is_git_env(expr):
+                if isinstance(expr, ast.Call):
+                    fn = expr.func
+                    return (getattr(fn, 'id', None) == 'git_env'
+                            or getattr(fn, 'attr', None) == 'git_env')
+                if isinstance(expr, ast.Name):      # local bound to git_env() nearby
+                    return bool(_re_local_git_env(text, expr.id))
+                return False
+
+            if env_kw is None or not _is_git_env(env_kw.value):
                 fail.append(
-                    '%s:%d runs `git -C DECOMP` with %s -- inside a commit hook the inherited '
-                    'GIT_DIR overrides -C, so it resolves against the SUPERPROJECT and exits '
-                    '128. Pass env=git_env() (inject.decomp).'
-                    % (rel, node.lineno,
-                       'env=os.environ' if passthrough
-                       else ('its own inline env strip' if env_kw is not None else 'no env=')))
+                    '%s:%d runs `git -C DECOMP` without env=git_env() -- inside a commit hook '
+                    'the inherited GIT_DIR overrides -C, so it resolves against the '
+                    'SUPERPROJECT and exits 128. env=os.environ (or a .copy(), or a private '
+                    'inline strip) is not a fix. Pass env=git_env() (inject.decomp).'
+                    % (rel, node.lineno))
     if not seen:
         fail.append('check_decomp_git_calls_strip_the_env: found NO `git -C DECOMP` call, so '
                     'the scan is broken -- there are several.')
@@ -1086,12 +1105,26 @@ def check_rom_configs_reach_the_build(fail, matrix_text=None, makefile_text=None
     mk = _read('Makefile', makefile_text if makefile_text is not None else sources.get('Makefile'))
     bc = _read('tools/build_campaign.py', sources.get('build_campaign'))
     probe = _read('tools/probe_invalidation.py', sources.get('probe'))
-    stamp = _re.search(r'_requested_flags = \{(.*?)\}', bc, _re.S)
-    stamp_text = stamp.group(1) if stamp else ''
-    boots = _re.search(r'_boots = \[(.*?)\]', bc, _re.S)
-    boots_text = boots.group(1) if boots else ''
-    flag_args = _re.search(r'FLAG_ARGS = \{(.*?)\}', probe, _re.S)
-    flag_text = flag_args.group(1) if flag_args else ''
+    # A regex that stops matching must FAIL, not quietly skip its arm: three of the four
+    # registry checks would then be disabled while the gate still prints "clean" -- the exact
+    # silent-guard shape this function exists to stop (#357 review, second round).
+    def _region(pattern, text, what, where):
+        found = _re.search(pattern, text, _re.S)
+        if not found:
+            fail.append(
+                'check_rom_configs_reach_the_build: cannot find %s in %s, so that registry is '
+                'NOT being checked. It was renamed or reformatted -- fix this scan rather than '
+                'letting it pass vacuously.' % (what, where))
+            return None
+        return found.group(1)
+
+    stamp_text = _region(r'_requested_flags = \{(.*?)\}', bc, '_requested_flags',
+                         'build_campaign.py')
+    boots_text = _region(r'_boots = \[(.*?)\]', bc, '_boots', 'build_campaign.py')
+    flag_text = _region(r'FLAG_ARGS = \{(.*?)\}', probe, 'FLAG_ARGS',
+                        'probe_invalidation.py')
+    if stamp_text is None or boots_text is None or flag_text is None:
+        return fail
 
     for env in sorted(envs):
         if '$(%s)' % env not in mk:
@@ -1100,18 +1133,18 @@ def check_rom_configs_reach_the_build(fail, matrix_text=None, makefile_text=None
                 'scenario asking for that configuration silently builds CANONICAL and its '
                 'verdict is about the wrong ROM. Add `$(if $(%s),--<flag>)` to the '
                 'build_campaign line.' % (env, env, env))
-        if stamp_text and "'%s'" % env not in stamp_text:
+        if "'%s'" % env not in stamp_text:
             fail.append(
                 'matrix.yaml rom_configs sets %s, but build_campaign\'s _requested_flags does '
                 'not stamp it -- so that build calls itself `canonical`, a canonical scenario '
                 'is not refused against it, and a `rom:` scenario naming the config is refused '
                 'forever. Add %s to _requested_flags.' % (env, env))
-        if flag_text and "'%s'" % env not in flag_text:
+        if "'%s'" % env not in flag_text:
             fail.append(
                 'matrix.yaml rom_configs sets %s, but probe_invalidation.FLAG_ARGS has no entry '
                 '-- build_manifests KeyErrors as soon as a scenario uses that config.'
                 % env)
-        if _re.match(r'^CH\d\dBOOT$', env) and boots_text and env.lower().replace(
+        if _re.match(r'^CH\d\dBOOT$', env) and env.lower().replace(
                 'boot', '-boot').replace('ch', '--ch') not in boots_text:
             fail.append(
                 '%s is a fast boot but is not in build_campaign\'s _boots mutual-exclusion list '

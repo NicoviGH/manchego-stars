@@ -1604,5 +1604,82 @@ class NoShadowedDefinitions(unittest.TestCase):
         self.assertIn('check_no_shadowed_definitions', inspect.getsource(check.main))
 
 
+class GitEnvGuardRejectsEvasions(unittest.TestCase):
+    """#357 review round 2: the first cut accepted any env=, then any file MENTIONING
+    git_env. Both let the exact #353 failure back in."""
+
+    PROBE = 'tools/_envprobe_test.py'
+
+    def _fail(self, source):
+        import check, os
+        path = os.path.join(check.REPO, self.PROBE)
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write(source)
+        try:
+            fail = []
+            check.check_decomp_git_calls_strip_the_env(fail, sources=[self.PROBE])
+        finally:
+            os.remove(path)
+        return fail
+
+    HEAD = 'from inject.decomp import git_env\nimport subprocess, os\nDECOMP = "x"\n'
+
+    def test_git_env_call_passes(self):
+        self.assertEqual([], self._fail(
+            self.HEAD + 'subprocess.run(["git","-C",DECOMP,"show","HEAD:a"], env=git_env())\n'))
+
+    def test_a_local_bound_to_git_env_passes(self):
+        self.assertEqual([], self._fail(
+            self.HEAD + 'env = git_env()\n'
+            'subprocess.run(["git","-C",DECOMP,"show","HEAD:a"], env=env)\n'))
+
+    def test_os_environ_copy_is_rejected(self):
+        """A Call, not an Attribute -- an `is it os.environ` test misses it entirely."""
+        bad = self._fail(
+            self.HEAD + 'subprocess.run(["git","-C",DECOMP,"show","HEAD:a"], env=os.environ.copy())\n')
+        self.assertEqual(1, len(bad), bad)
+
+    def test_a_private_inline_strip_is_rejected(self):
+        """gen_chapter_title.py shipped one missing three GIT_ vars, so it half-worked."""
+        bad = self._fail(
+            self.HEAD + 'e = {k: v for k, v in os.environ.items() if k != "GIT_DIR"}\n'
+            'subprocess.run(["git","-C",DECOMP,"show","HEAD:a"], env=e)\n')
+        self.assertEqual(1, len(bad), bad)
+
+    def test_a_syntax_error_is_reported_not_raised(self):
+        """This runs in the pre-commit hook: a traceback kills the gate and skips the
+        checks after it."""
+        bad = self._fail('subprocess.run(["git","-C",DECOMP,\n')
+        self.assertTrue(bad)
+        self.assertIn('does not parse', bad[0])
+
+
+class RegistryScanFailsLoudly(unittest.TestCase):
+    """A regex that stops matching must FAIL, not skip its arm while the gate says clean."""
+
+    def test_a_renamed_registry_is_reported(self):
+        import check
+        fail = []
+        check.check_rom_configs_reach_the_build(
+            fail, matrix_text='rom_configs:\n  ch01boot:\n    CH01BOOT: 1\n\nscenarios:\n  x: {}\n',
+            sources={'Makefile': '$(CH01BOOT)', 'build_campaign': 'renamed away',
+                     'probe': "FLAG_ARGS = {'CH01BOOT': '--ch01-boot'}\n"})
+        self.assertTrue(fail)
+        self.assertIn('NOT being checked', fail[0])
+
+
+class ValuedBuildFlagsCarryTheirValue(unittest.TestCase):
+    """--ch05-ending bare is argparse error 2, surfacing as an opaque CalledProcessError."""
+
+    def test_ch05ending_is_declared_valued(self):
+        import probe_invalidation as pi
+        self.assertIn('CH05ENDING', pi.VALUED_FLAGS)
+        self.assertIn('CH05ENDING', pi.FLAG_ARGS)
+
+    def test_every_valued_flag_is_in_FLAG_ARGS(self):
+        import probe_invalidation as pi
+        self.assertEqual(set(), pi.VALUED_FLAGS - set(pi.FLAG_ARGS))
+
+
 if __name__ == '__main__':
     unittest.main()
