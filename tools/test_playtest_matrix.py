@@ -1697,8 +1697,10 @@ class DeadlineIsAFrameBudget(unittest.TestCase):
         by it. Contention alone could then fail a passing scenario."""
         self.assertNotIn('local end=$((SECONDS + deadline))', self._run_sh())
 
-    def test_the_budget_is_frames_at_the_target_rate(self):
-        self.assertIn('local budget=$((deadline * fps))', self._run_sh())
+    def test_the_budget_is_frames_not_wall_seconds(self):
+        """Sized on the rate the run actually achieves, floored at its declared target --
+        see BudgetRateIsFlooredNotFixed for why a flat deadline*target was too stingy."""
+        self.assertIn('local budget=$((deadline * rate))', self._run_sh())
 
     def test_both_kill_paths_survive(self):
         """A frame budget alone would wait forever on a wedged emulator: no frames means the
@@ -1737,6 +1739,70 @@ class VerdictKeepsErrorApartFromFail(unittest.TestCase):
 
     def test_a_pass_is_a_PASS(self):
         self.assertEqual('PASS', self._verdict('RESULT: PASS -- map deployed', rc=0))
+
+
+class RunShDefaultsMatchTheCacheKey(unittest.TestCase):
+    """#358 review: unset and the explicit default are the SAME run, so they must hash the
+    same. That only holds while the two files agree about what the default IS."""
+
+    def test_every_declared_default_matches_run_sh(self):
+        import check, matrix as mx, os, re
+        with open(os.path.join(check.REPO, 'tools', 'playtest', 'run.sh'),
+                  encoding='utf-8') as fh:
+            src = fh.read()
+        for key, value in mx.RUN_SH_DEFAULTS.items():
+            if key == 'PT_DIFFICULTY':
+                continue            # defaulted elsewhere in run.sh, not via ${X:-N}
+            found = re.search(r'\$\{%s:-([^}]+)\}' % re.escape(key), src)
+            self.assertIsNotNone(found, '%s is not defaulted in run.sh' % key)
+            self.assertEqual(value, found.group(1),
+                             '%s: matrix says %r, run.sh says %r'
+                             % (key, value, found.group(1)))
+
+    def test_the_defaults_are_all_real_cache_keys(self):
+        import matrix as mx
+        self.assertEqual(set(), set(mx.RUN_SH_DEFAULTS) - set(mx.PLAYTEST_ENV_KEYS))
+
+    def test_unset_and_explicit_default_hash_the_same(self):
+        """The whole point: otherwise the cache pays for the identical run twice."""
+        import matrix as mx
+        key = [k for k in mx.RUN_SH_DEFAULTS if k != 'PT_DIFFICULTY'][0]
+        self.assertIn(key, mx.PLAYTEST_ENV_KEYS)
+
+
+class BudgetRateIsFlooredNotFixed(unittest.TestCase):
+    """#358 review: the emulator OUTRUNS its target (877fps measured against 240), so a flat
+    deadline*target would be ~3.6x stingier than the wall deadline it replaces."""
+
+    def _run_sh(self):
+        import check, os
+        with open(os.path.join(check.REPO, 'tools', 'playtest', 'run.sh'),
+                  encoding='utf-8') as fh:
+            return fh.read()
+
+    def test_the_rate_floors_at_the_declared_target(self):
+        self.assertIn('[ "$rate" -gt "$budget_fps" ] || rate=$budget_fps', self._run_sh())
+
+    def test_the_budget_is_sized_on_the_DECLARED_rate_not_PT_FPS(self):
+        """PT_FPS=60 to watch a run at real speed must not quarter its work allowance."""
+        src = self._run_sh()
+        self.assertIn('budget_fps=${6:-$2}', src)
+        self.assertIn('"$MX_FPS"', src)
+
+    def test_the_stall_default_clears_the_longest_silent_wait(self):
+        """The largest waitFor in harness.lua is 9000 frames; at the ~15fps contention floor
+        that is 600s of silence in a HEALTHY run."""
+        import check, os, re
+        src = self._run_sh()
+        found = re.search(r'\$\{PT_STALL_S:-([0-9]+)\}', src)
+        self.assertIsNotNone(found)
+        with open(os.path.join(check.REPO, 'tools', 'playtest', 'harness.lua'),
+                  encoding='utf-8') as fh:
+            waits = [int(m) for m in re.findall(r'waitFor\([^)]*?,\s*([0-9]{3,})', fh.read())]
+        self.assertTrue(waits, 'no waitFor budgets found -- the scan is broken')
+        self.assertGreater(int(found.group(1)), max(waits) / 15.0,
+                           'PT_STALL_S must clear %d frames at the 15fps contention floor'
+                           % max(waits))
 
 
 if __name__ == '__main__':

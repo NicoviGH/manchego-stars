@@ -4251,14 +4251,29 @@ blew 300-600s walls, and the tier meant to be the pre-playtest safety net was th
 All eight passed under `--jobs 1`.
 
 **The work is frame-bound, so the budget is frames.** `deadline` is now read as what it always
-meant -- how much WORK a scenario may do -- expressed as `deadline * fps` frames at its own target
-rate. Under contention a run takes longer in wall time and its verdict does not change. The
-identical arithmetic applies on an idle machine, so nothing about the healthy case moved.
+meant -- how much WORK a scenario may do -- in frames rather than seconds. Under contention a run
+takes longer in wall time and its verdict does not change.
+
+**The rate is FLOORED at the declared target, not fixed to it.** The emulator outruns its own
+target: `titlecard` measures 877fps against a 240 target, so a flat `deadline * target` would have
+been ~3.6x stingier than the wall deadline it replaces -- and `llm`, whose own comment says *"at
+240fps a frame budget would be 4x too impatient"*, would have started failing. The budget therefore
+uses the best rate the run has actually achieved, floored at the declared one: that reproduces the
+old allowance on an idle machine, while contention can only make the budget LARGER. **The bad
+direction is the one that cannot happen.** It is sized on the DECLARED rate too, never on a `PT_FPS`
+override -- watching a run at 60fps must not quarter its work allowance.
 
 **A frame budget alone would hang forever**, because a wedged emulator emits no frames and so never
 reaches any budget. Two kill paths, and both name a real fault rather than a busy laptop:
 **OVERRUN** (more frames than budgeted -- genuinely not finishing) and **STALL** (the frame counter
 stopped -- mGBA is wedged). `PT_MAX_WALL_S` stays as a last-resort net for neither.
+
+**STALL is the one piece that is still a wall clock, and the first cut set it wrong.** Progress is
+read from stamped log lines, but the harness goes deliberately silent inside long waits -- the
+largest is 9000 frames, which at the ~15fps contention floor is **600 SECONDS**. A 180s default
+would have killed healthy contended runs as "wedged", recreating the exact bug this entry is about,
+one layer down. The default is 1800s, and a test pins it against the largest `waitFor` in
+`harness.lua` so the two cannot drift apart.
 
 Every run now prints `throughput: N frames in Ns = Nfps (target Nfps)`. The harness already stamped
 every line with its frame, so measured fps was free the whole time; printing it is what makes a

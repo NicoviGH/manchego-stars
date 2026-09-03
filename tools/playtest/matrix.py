@@ -929,6 +929,10 @@ def scenario_driver_text(scenario_name, files=None, harness_source=None):
 # served a cached PASS it never earned. Kept in sync with run.sh by
 # `test_every_PT_var_run_sh_reads_is_in_the_key`. PT_HOST_CHAPTER is deliberately absent:
 # matrix.py sets it FROM the manifest entry, which `export_env` already covers.
+# What run.sh falls back to when a knob is unset. Unset and the explicit default describe the
+# SAME run, so they must hash the same or the cache pays for it twice (#358 review).
+RUN_SH_DEFAULTS = {'PT_DIFFICULTY': 'normal', 'PT_STALL_S': '1800', 'PT_MAX_WALL_S': '7200'}
+
 PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
                      'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
                      'PT_DIFFICULTY',
@@ -1099,11 +1103,12 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None,
     h.update(('matrix-verdict-v1\n%s\nentry:%s\n' % (rom_part, export_env(scenario))).encode())
     for key in PLAYTEST_ENV_KEYS:
         value = env.get(key)
-        # run.sh DEFAULTS PT_DIFFICULTY, so unset and an explicit "normal" are the same run.
+        # run.sh DEFAULTS some knobs, so unset and an explicit default are the SAME run.
         # Normalising here keeps them on one cache key instead of paying for the same watched
-        # run twice (the other keys have no default -- absent really is a different run).
-        if key == 'PT_DIFFICULTY' and not value:
-            value = 'normal'
+        # run twice. Keys absent from this table have no default -- absent really is a
+        # different run there.
+        if not value and key in RUN_SH_DEFAULTS:
+            value = RUN_SH_DEFAULTS[key]
         if value:
             h.update(('env:%s=%s\n' % (key, value)).encode())
     h.update(b'driver:\n')
