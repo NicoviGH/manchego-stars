@@ -7658,6 +7658,13 @@ Established while sizing Messie for ch06, and every line of it applies to the ne
   nudged one pixel down with only the head or neck retouched. Measured counter-example, caught
   mid-authoring: a Messie draft with 141 of 415 inked cells differing between the two held frames
   read as jumpy, and **no timing change can fix that** — the engine snaps by design.
+- **What must not move is the SILHOUETTE, not every pixel** (refined 2026-09-03, the same day, by
+  the next draft). Messie's finished sheet differs by 77 of 321 inked cells between the held frames
+  and reads correctly, because every one of them is in the front FLIPPERS: body, neck and head are
+  pixel-identical, so the eye sees a plesiosaur paddling rather than a pose swapping. The test is
+  therefore *where* the cells differ, not how many — a localized moving part held against a fixed
+  body is the two-pose bob doing its job, and a whole-silhouette redraw is the failure. Diff the
+  two held frames and look at the map before judging the count.
 
 - **32x32 is a HARD ENGINE CEILING.** `UNIT_ICON_SIZE_*` has exactly three values (16x16, 16x32,
   32x32) and `bmudisp.c` switches on them in five places. Bigger means new enum cases plus SMS VRAM
