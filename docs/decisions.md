@@ -7648,6 +7648,17 @@ suppressed, and that our own layouts were in the candidate pool._
 
 Established while sizing Messie for ch06, and every line of it applies to the next custom unit too.
 
+- **The idle is a TWO-POSE BOB, not three drawings** (added 2026-09-03). FE8 holds frame 0 for 32
+  ticks, frame 1 for 4, frame 2 for 32, frame 1 for 4 (`bmudisp.c`, the `GetGameClock() % 72`
+  ladder). Both long holds are 32 ticks, so if frames 0 and 2 are different drawings the sprite
+  SNAPS between two poses half a second apart and reads as jumpy. The cast's 32x32 beasts do not
+  do this: white-moose's frame 2 is within 12 cells of frame 0 and its frame 1 is the whole
+  silhouette shifted (0,+1) at **0.0% residual**; lupin and lycanroc-pack have frame 2 **byte-
+  identical** to frame 0. So the shape to paint is: frame 0, frame 2 = frame 0, frame 1 = frame 0
+  nudged one pixel down with only the head or neck retouched. Measured counter-example, caught
+  mid-authoring: a Messie draft with 141 of 415 inked cells differing between the two held frames
+  read as jumpy, and **no timing change can fix that** — the engine snaps by design.
+
 - **32x32 is a HARD ENGINE CEILING.** `UNIT_ICON_SIZE_*` has exactly three values (16x16, 16x32,
   32x32) and `bmudisp.c` switches on them in five places. Bigger means new enum cases plus SMS VRAM
   we do not have spare — the same VRAM that already bounds the TESTCH bench. Braulo, Meesmickle,
