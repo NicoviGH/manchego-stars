@@ -927,6 +927,92 @@ def check_gate_chapter_window(fail):
     fail.extend(_gate_window_violations(boots, hosts.hosted_chapters()))
 
 
+# A row in a chapter Lua chunk: `{ id = "boat-east", x = 17, y = 12, doorX = 17, ... }`.
+# Only rows keyed by `id` are in scope -- ch05.lua's reliquaries are keyed by `name` against
+# YAML ids of a different shape (`north` vs `reliquary-north`), and matching those would mean
+# renaming a shipped chapter's constants rather than catching a bug.
+_LUA_ROW = re.compile(r'\{[^{}]*\bid\s*=\s*"([^"]+)"[^{}]*\}')
+_LUA_FIELD = re.compile(r'\b(\w+)\s*=\s*(-?\d+|0x[0-9A-Fa-f]+)')
+
+
+def _chapter_lua_coords(doc):
+    """{id: {'xy': (x, y), 'door': (x, y) or None}} for everything a chapter YAML places."""
+    out = {}
+    for boat in (doc.get('rescue_boats') or ()):
+        if boat.get('id') and _int_pair(boat.get('tile')):
+            door = boat.get('door')
+            out[boat['id']] = {'xy': tuple(boat['tile']),
+                               'door': tuple(door) if _int_pair(door) else None}
+    for enemy in (doc.get('enemy_units') or ()):
+        spots = enemy.get('positions') or ()
+        if enemy.get('id') and spots and _int_pair(spots[0]):
+            out[enemy['id']] = {'xy': tuple(spots[0]), 'door': None}
+    for village in (doc.get('villages') or ()):
+        if village.get('id') and _int_pair(village.get('tile')):
+            out[village['id']] = {'xy': tuple(village['tile']), 'door': None}
+    return out
+
+
+def _chapter_lua_fact_violations(rel, text, chapter_rel, doc):
+    """A chapter Lua chunk's coordinates must be the chapter YAML's own.
+
+    A chunk restates what the YAML declares -- ch06.lua carries both hulls' pocket cells and
+    both pocket DOORS, and ch06clock's verdict is that a melee attacker stands on one of those
+    doors. A stale coordinate there does not crash: it produces a scenario that runs, reads
+    the wrong cell, and FAILs blaming the engine for a constant nobody updated. Same failure
+    `check_declared_cases` stops for a `visit` step's tile, one file over.
+    """
+    placed = _chapter_lua_coords(doc)
+    problems = []
+    for row in _LUA_ROW.finditer(text):
+        body = row.group(0)
+        uid = row.group(1)
+        fields = dict((k, int(v, 0)) for k, v in _LUA_FIELD.findall(body))
+        if 'x' not in fields or 'y' not in fields:
+            continue
+        want = placed.get(uid)
+        if want is None:
+            problems.append(
+                '%s places %r at (%d,%d), and %s declares nothing by that id -- a chapter '
+                'chunk that names a unit the chapter does not field cannot be found at run '
+                'time, so the scenario fails at its precondition'
+                % (rel, uid, fields['x'], fields['y'], chapter_rel))
+            continue
+        if (fields['x'], fields['y']) != want['xy']:
+            problems.append(
+                '%s puts %r at (%d,%d); %s declares (%d,%d). The Lua is not the authority'
+                % (rel, uid, fields['x'], fields['y'], chapter_rel, want['xy'][0],
+                   want['xy'][1]))
+        if 'doorX' in fields and 'doorY' in fields:
+            got = (fields['doorX'], fields['doorY'])
+            if want['door'] is None:
+                problems.append('%s gives %r a door at (%d,%d); %s declares none'
+                                % (rel, uid, got[0], got[1], chapter_rel))
+            elif got != want['door']:
+                problems.append(
+                    '%s puts %r\'s door at (%d,%d); %s declares (%d,%d). The door is the one '
+                    'ground cell the pocket can be attacked from, and it IS the verdict'
+                    % (rel, uid, got[0], got[1], chapter_rel, want['door'][0],
+                       want['door'][1]))
+    return problems
+
+
+def check_chapter_lua_facts(fail):
+    """Every `tools/playtest/chNN.lua` agrees with the chapter YAML it speaks for (#26)."""
+    docs = {}
+    for rel, d in _chapters():
+        docs[os.path.basename(rel).split('-')[0]] = (rel, d)
+    for path in sorted(glob.glob(os.path.join(REPO, 'tools/playtest/ch*.lua'))):
+        rel = os.path.relpath(path, REPO)
+        short = os.path.basename(path).split('.')[0]
+        if short not in docs:
+            continue                        # ch02check.lua and friends speak for no chapter
+        with open(path, encoding='utf-8') as fh:
+            text = fh.read()
+        chapter_rel, doc = docs[short]
+        fail.extend(_chapter_lua_fact_violations(rel, text, chapter_rel, doc))
+
+
 def _re_local_git_env(text, name):
     """True if `name` is bound to git_env() in this file -- `env = git_env()` then `env=env`."""
     import re as _re
@@ -2263,7 +2349,8 @@ def main():
                   check_playtest_matrix, check_rom_configs_reach_the_build,
                   check_decomp_git_calls_strip_the_env,
                   check_no_shadowed_definitions, check_gate_chapter_window,
-                  check_declared_cases, check_harness_local_ratchet,
+                  check_declared_cases, check_chapter_lua_facts,
+                  check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,
                   check_tool_refs_exist, check_no_dead_concepts,

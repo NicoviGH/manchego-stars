@@ -816,3 +816,27 @@ design_notes: >
 # map (`LoadUnit` has no death check; `GetUnitFromCharId` returns NULL for an absent unit, and
 # a CUMO/MOVE on NULL is the never-returns soft-lock assert_scripted_move_reachable exists for).
 cutscene_actors: [marty, braulo]
+
+# ── What proves it (D8) ─────────────────────────────────────────────────────────
+# A chapter DECLARES its own scenarios and `tools/playtest/declared.py` derives their matrix
+# rows from this block (#314) -- the ROM from `boot:`, PT_HOST_CHAPTER from the host-slot
+# registry. Nothing about them is written a second time in `matrix.yaml`.
+#
+# There is one case, and it is the one #360 could not run because ch06 had no debug boot when
+# it landed: the pockets are a claim about the ENGINE'S pathing, and `mapshot` photographs
+# turn 1 while the question needs several enemy phases. Everything else ch06 owes is a
+# DIALOGUE or ART dependency (the three cutscenes, the boarding pass, Messie's bust, the
+# merfolk reskins) and there is nothing to assert about a scene that has no text yet.
+playtest:
+  boot: ch06boot                  # CH06BOOT=1; host slot 7 comes from inject/hosts.py
+  cases:
+    # Hand-written Lua, and it names why rather than defaulting to it: the declared
+    # vocabulary is boot -> settle -> visit -> read items, and this case drives ENEMY PHASES
+    # and reads the red and green unit arrays. `deadline` is raised because twelve phases of
+    # twenty-four enemies is several times the work a village case does.
+    - name: ch06clock
+      proves: >
+        both pursuers path to their hull without stalling, and the range-1 crab attacks the
+        west boat only from its pocket door -- the single melee cell the pocket promises
+      lua: ch06clock
+      deadline: 900
