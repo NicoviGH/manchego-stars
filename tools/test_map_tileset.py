@@ -1059,13 +1059,29 @@ class SetMetatileTerrain(unittest.TestCase):
         self.assertEqual(list(impact), ['ch06-maer-monster'])
         self.assertEqual(sum(len(v) for v in impact['ch06-maer-monster'].values()), 14)
 
-    def test_ch04s_tileset_is_untouched_by_ch06s_pocket_metatiles(self):
-        """snowy-bern and snowy-bern-ice are separate .bin files, and ch04 rides the former.
-        This is the claim the whole 'it costs no repainting' argument rests on."""
+    def test_snowy_bern_is_untouched_by_ch06s_pocket_metatiles(self):
+        """snowy-bern and snowy-bern-ice are separate .bin files, and ch00/ch01/ch02/ch04
+        ride the former. This is the claim the whole 'it costs no repainting' argument
+        rests on, and it must cover every map on that tileset -- not just the one that
+        names it."""
         root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                             'campaigns/rime-of-the-frostmaiden/maps')
         pocket = {10, 12, 17, 18, 30, 31, 40, 41, 48, 49, 50, 51}
         self.assertEqual(mt.terrain_impact(root, 'snowy-bern', pocket), {})
+
+    def test_a_map_that_omits_its_tileset_key_still_counts_as_snowy_bern(self):
+        """Four of our eight maps omit `tileset`, and every other reader in the repo spells
+        the default `get('tileset', 'snowy-bern')`. Comparing a bare .get() made those four
+        INVISIBLE here -- so a snowy-bern flip would have printed a clean blast radius while
+        silently re-terraining ch00, ch01 and ch02. This is the regression guard: an audit
+        nobody can trust is worse than no audit (#360 review)."""
+        root = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            'campaigns/rime-of-the-frostmaiden/maps')
+        seen = mt.terrain_impact(root, 'snowy-bern', {6, 43, 44})
+        for stem in ('ch01-the-iron-trail', 'ch00-prologue', 'ch02-cold-welcome'):
+            with open(os.path.join(root, stem + '.json')) as fh:
+                self.assertNotIn('tileset', json.load(fh), stem)   # the premise
+        self.assertIn('ch01-the-iron-trail', seen)
 
 
 if __name__ == '__main__':

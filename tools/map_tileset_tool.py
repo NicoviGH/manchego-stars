@@ -24,6 +24,7 @@ import re
 import struct
 import sys
 
+DEFAULT_TILESET = 'snowy-bern'   # what an absent `tileset` key means (see terrain_impact)
 NUM_METATILES = 1024
 
 
@@ -457,7 +458,13 @@ def terrain_impact(maps_root, tileset, metatiles):
         stem = os.path.splitext(os.path.basename(path))[0]
         with open(path) as source:
             meta = json.load(source)
-        if meta.get('tileset') != tileset or 'width' not in meta:
+        # An ABSENT `tileset` key means snowy-bern -- the repo-wide default (map_donor,
+        # import_map_layout, gen_map_editor all spell it `get('tileset', 'snowy-bern')`),
+        # and four of our eight maps omit it. Comparing a bare .get() against the name
+        # made those four invisible, so a snowy-bern terrain flip would have printed a
+        # clean blast radius while silently re-terraining ch00, ch01 and ch02. The whole
+        # point of this function is to be believed before a destructive write.
+        if meta.get('tileset', DEFAULT_TILESET) != tileset or 'width' not in meta:
             continue
         with open(os.path.join(maps_root, stem + '.mar'), 'rb') as source:
             raw = source.read()

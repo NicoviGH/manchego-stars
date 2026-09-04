@@ -79,7 +79,8 @@ map:
     form ONE connected component -- the eight crossings wire the whole lake together, so the
     channels shape the route without ever stranding anyone. The pockets SYMMETRISE the two
     rescues, which the open outcrops did not: every class now reaches both doors on the same
-    turn -- Pinky 3, Braulo 4, Baxby/Lupin/Trex 5, foot 6.
+    turn -- Pinky 3, Braulo/Baxby/Lupin/Trex 5, foot 6. (Braulo is a PIRATE, CLASS_PIRATE
+    baseMov 5 -- not the 6 an earlier draft assumed; both doors are 24 move points away.)
 
     That is vanilla Ch6's budget, measured rather than guessed (2026-09-03): its villagers
     sit in a mountain-ringed pocket a Paladin or a flier reaches on turn 4 and foot on turn 6,
@@ -129,16 +130,24 @@ difficulty_note: >
   can hit a villager before the Bael walks over. The clock is the two PURSUERS, and they
   are deliberately different problems:
 
-    east / Burly Ram   merfolk-thrower from (15,17), at the door on turn 2. Its JAVELIN is
-                       range 1-2, so holding the door does NOT stop it -- it has to be
-                       killed. Sinks the hull on turn 7.
-    west / Pronged Goat ice-crab from (7,20), at the door on turn 2. Venin claw is range 1,
-                       so the single door cell blocks it outright -- race it, block it, or
-                       kill it. Sinks the hull on turn 8.
+    east / Burly Ram   merfolk-thrower from (14,9). Its JAVELIN is range 1-2, so the door
+                       does not stop it -- only four cells on the map are inside that range
+                       ((15,12), (17,10), (17,13), (17,14)) and it starts SIX move points
+                       from the nearest, so its first throw lands on enemy phase 2 and not
+                       before. It has to be killed. Sinks the hull on turn 7.
+    west / Pronged Goat ice-crab from (7,20), on the door from enemy phase 2. Venin claw is
+                       range 1, so it must occupy that one cell -- which also means the
+                       player cannot BOARD until it is dead. Sinks the hull on turn 8.
 
-  The west boat is therefore both the slower clock and the one a body-block answers, which
-  is what puts the plot-critical hint (Tali) on the boat a player is likeliest to save.
-  Against foot on turn 6 that is vanilla's own slack of one turn. Nerra inherits Novala's
+  Neither boat is answered by a body-block, and the #360 review is why that is written down:
+  the crab reaches the door on turn 2 and the player's earliest arrival anywhere near it is
+  Pinky on turn 3, so "race it to the door" was a lever that did not exist. What the west
+  boat actually offers is a SOFTER kill -- a Level 1 Bael, the weakest unit on the map,
+  against five turns of slack -- while the east is a Level 7 soldier that throws from
+  outside melee. That asymmetry is what puts the plot-critical hint (Tali) on the boat a
+  player is likeliest to save.
+
+  Against foot on turn 6 the east clock is vanilla's own slack of one turn. Nerra inherits Novala's
   softness on purpose -- but note her Flux does 22 to a 19 HP hull, so she is kept on the
   centre shelf, far from both. Messie is a cutscene, not an encounter, so no route skips XP.
 
@@ -218,7 +227,7 @@ enemy_units:
       - id: javelin
       - id: iron-lance
     damage_type: piercing
-    positions: [[15, 17]]
+    positions: [[14, 9]]
     donor: [14, 16]                 # vanilla's fifth L7 soldier -- the one it lets PURSUE
     skin: {look: "merfolk spear-guard, thrown trident", source: "as merfolk-trident"}
   - id: merfolk-trident-young
@@ -647,9 +656,10 @@ forest_composition: replaced
 # (validate_terrain_matches_vanilla) rejects any drift NOT listed, so this block is the
 # whole allowlist -- cell by cell, so the ch05 fence->wall class of accident still fails.
 #
-# SEVEN cells, down from twenty-one (2026-09-03). The two village footprints are no longer
-# repainted walkable: they keep the donor's own impassable TILE_2E, so each boat sits in a
-# POCKET whose only ground entrance is the door tile directly south of it. That is what a
+# SEVEN divergences, down from twenty-one (2026-09-03). The two village footprints are no
+# longer repainted walkable: SEVEN cells of each keep the donor's own impassable TILE_2E
+# (fourteen in all -- the eighth cell of each footprint is the DOOR, which stays walkable),
+# so each boat sits in a POCKET whose only ground entrance is that door, directly south. That is what a
 # village IS in FE8 -- a body you cannot walk into and a door you visit it from -- and
 # honouring it costs nothing, because a metatile's terrain byte is separate from its art
 # (`map_tileset_tool.py set-terrain`). Twelve metatiles moved 0x0C -> 0x2E; the .4bpp and
@@ -725,7 +735,7 @@ rescue_boats:
                                 # a range-2 weapon reaches the hull over the wall from 3 tiles
                                 # -- FE8 has no line of sight, so a wall never stops a javelin,
                                 # a bow or a tome. Placement is the only lever for those.
-  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 4, trex: 5}   # to the DOOR, re-measured
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, re-measured
   talk:
     background: bg_Boat         # vendored from FE-Repo; the boarding CG
     ea_file: events/ch06-boat-east.ea
@@ -745,7 +755,7 @@ rescue_boats:
   door: [4, 18]
   donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
   attackable_sides: 1           # as boat-east; a flier adds 3 cells, range-2 reaches from 2
-  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 4, trex: 5}   # to the DOOR, re-measured
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, re-measured
   talk:
     background: bg_Boat
     ea_file: events/ch06-boat-west.ea
