@@ -2264,20 +2264,36 @@ class RavisinPortrait(unittest.TestCase):
         .number = 0xb9,
         .defaultClass = CLASS_GORGON,
         .miniPortrait = 0x4,
+    },
+    [0xbb - 1] = {
+        .baseLevel = 1,
+        .nameTextId = 0x255,
+        .number = 0xbb,
+        .defaultClass = CLASS_GARGOYLE,
+        .miniPortrait = 0x4,
+    },
+    [0xbc - 1] = {
+        .baseLevel = 1,
+        .nameTextId = 0x255,
+        .number = 0xbc,
+        .defaultClass = CLASS_DEATHGOYLE,
+        .miniPortrait = 0x4,
     },'''
         patched = bc.raw_pid_portrait_data(source, self.CAMPAIGN)
         self.assertIn('.nameTextId = 0x246,', patched)
         self.assertIn('.portraitId = 0x48,', patched)
-        # Ravisin is the only DRESSED raw pid; the moose is named without a bust, and the grell
-        # takes neither -- so exactly one name plate stays generic.
+        # Ravisin is the only DRESSED raw pid; the moose and ch06's two boats are named without
+        # a bust, and the grell takes neither -- so exactly one name plate stays generic.
         self.assertEqual(1, patched.count('.portraitId'))
         self.assertIn('.nameTextId = 0xD4C,', patched)
+        self.assertIn('.nameTextId = 0xD4D,', patched)   # the Burly Ram
+        self.assertIn('.nameTextId = 0xD4E,', patched)   # the Pronged Goat
         self.assertEqual(1, patched.count('.nameTextId = 0x255,'))
         # ...and every raw-pid boss leaves with a baseLevel matching its deploy level, so the
         # difficulty malus cannot reset its line (#303, RAW_PID_LEVEL_SOURCES).
         self.assertIn('.baseLevel = 7,', patched)      # Ravisin, level 7
         self.assertIn('.baseLevel = 3,', patched)      # the kobold brute, level 3
-        self.assertEqual(3, patched.count('.miniPortrait = 0x4,'))
+        self.assertEqual(5, patched.count('.miniPortrait = 0x4,'))
 
         for chapter_yaml, uid in ((bc.CH05_CHAPTER_YAML, 'ravisin'),
                                   (bc.CH03_CHAPTER_YAML, 'grell')):
@@ -5536,7 +5552,7 @@ class HostedChapterEnumeration(unittest.TestCase):
         self.assertEqual(got, {'prologue': bc.PROLOGUE_HOST_INDEX,
                                'ch01': bc.CH01_HOST_INDEX, 'ch02': bc.CH02_HOST_INDEX,
                                'ch03': bc.CH03_HOST_INDEX, 'ch04': bc.CH04_HOST_INDEX,
-                               'ch05': bc.CH05_HOST_INDEX})
+                               'ch05': bc.CH05_HOST_INDEX, 'ch06': bc.CH06_HOST_INDEX})
 
     def test_each_entry_carries_the_event_group_its_injector_fills(self):
         groups = {c.name: c.event_group for c in bc.hosted_chapters()}
@@ -5548,7 +5564,7 @@ class HostedChapterEnumeration(unittest.TestCase):
         """Not by name -- 'ch01' sorts before 'prologue', and a name sort against a
         sorted() scan is a test that cannot fail."""
         self.assertEqual([c.name for c in bc.hosted_chapters()],
-                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'])
+                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06'])
 
     def test_every_injector_in_this_module_is_enrolled(self):
         """Discovery only covers a chapter that spells its constants right. An
@@ -7244,6 +7260,194 @@ class ChapterTraps(unittest.TestCase):
         for symbol, body in written.items():
             self.assertTrue(symbol.startswith('TrapData_Event_'), symbol)
             self.assertIn('TRAP_NONE', body)
+
+
+class NamedRawPidsAreExclusive(unittest.TestCase):
+    """A raw pid carrying a NAME PLATE may be claimed by one chapter only.
+
+    `RAW_PID_PORTRAITS` writes nameTextId into gCharacterData[pid - 1], one row per pid with no
+    chapter dimension -- unlike gDefeatTalkList, where ch03's grell and ch04's mogall share 0xb7
+    legally because each entry is keyed by chapter too. ch06's boats took 0xb4/0xb5, already
+    CH04_PACK_PIDS', and two of ch04's five Mauthe Doogs would have read "Fishing Boat".
+    """
+
+    def test_the_live_registry_is_clean(self):
+        bc.assert_named_raw_pids_are_exclusive()
+
+    def test_a_generic_pid_may_still_be_shared(self):
+        """ch05 and ch06 both spend 0x80 on autolevelled trash, and that is fine -- a generic pid
+        is never named, so nothing global is written for it. The guard must not over-reach."""
+        claims = bc.raw_pid_claims()
+        self.assertEqual(claims.get('0x80'), {'CH05', 'CH06'})
+        self.assertNotIn('0x80', bc.RAW_PID_PORTRAITS)
+
+    def test_discovery_reads_strings_tuples_and_dicts(self):
+        claims = bc.raw_pid_claims()
+        self.assertEqual(claims.get('0xb8'), {'CH05'})            # CH05_BOSS_PID, a bare string
+        for pid in bc.CH04_PACK_PIDS:                             # a tuple
+            self.assertIn('CH04', claims.get(pid, set()), pid)
+        for pid in bc.CH06_BOAT_PIDS.values():                    # a dict
+            self.assertEqual(claims.get(pid), {'CH06'}, pid)
+
+    def test_the_original_collision_is_caught(self):
+        portraits = dict(bc.RAW_PID_PORTRAITS)
+        for pid in bc.CH06_BOAT_PIDS.values():
+            portraits.pop(pid, None)
+        portraits['0xb4'] = ('boat-east', 0xD4D, None, 'Fishing Boat')
+        scope = dict(vars(bc), CH06_BOAT_PIDS={'boat-east': '0xb4', 'boat-west': '0xb5'})
+        with self.assertRaises(SystemExit) as caught:
+            bc.assert_named_raw_pids_are_exclusive(portraits, scope)
+        self.assertIn('0xb4', str(caught.exception))
+        self.assertIn('CH04', str(caught.exception))
+
+
+class ItemDropIsCarriedOnce(unittest.TestCase):
+    """FE8 drops the LAST item, and a chapter YAML may name the drop in `inventory:` too.
+
+    ch06 is the first chapter whose data spells it both ways; appending unconditionally emitted a
+    second copy on three units while `make difficulty` still read PARITY, because the parity model
+    prices the YAML rather than the rows the injector emits.
+    """
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_a_drop_already_in_inventory_is_not_duplicated(self):
+        self.assertEqual(bc._items_with_drop_last(['A', 'B'], 'B'), ['A', 'B'])
+
+    def test_a_drop_absent_from_inventory_is_appended(self):
+        self.assertEqual(bc._items_with_drop_last(['A'], 'B'), ['A', 'B'])
+
+    def test_a_drop_listed_first_is_moved_LAST(self):
+        # De-duplicating alone would leave the engine dropping the wrong item.
+        self.assertEqual(bc._items_with_drop_last(['B', 'A'], 'B'), ['A', 'B'])
+
+    def test_no_ch06_enemy_carries_a_duplicate(self):
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH06_CHAPTER_YAML)
+        rows = bc.ch06_enemy_rows(chap) + bc.ch06_enemy_rows(
+            chap, arrives_turn=bc.CH06_HARD_WAVE_TURN)
+        for row in rows:
+            items = re.search(r'\.items = \{ (.*?) \}', row).group(1).split(', ')
+            items = [i for i in items if i != '0']
+            self.assertEqual(len(items), len(set(items)), row)
+
+    def test_every_dropper_matches_its_vanilla_donors_item_count(self):
+        """The check that would have caught it: our row against the donor unit it is derived
+        from. Vanilla's three ch06 droppers carry 2 / 1 / 2 items."""
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH06_CHAPTER_YAML)
+        expected = {'shark-rider-halberd': 2, 'merfolk-blade-drop': 1, 'lamia-mender': 2}
+        rows = bc.ch06_enemy_rows(chap)
+        for enemy_id, count in expected.items():
+            row = next(r for r in rows if '/* %s --' % enemy_id in r)
+            items = re.search(r'\.items = \{ (.*?) \}', row).group(1).split(', ')
+            self.assertEqual(len(items), count, '%s: %s' % (enemy_id, row))
+            self.assertIn('.itemDrop = 1', row, enemy_id)
+
+
+class AssetTableCeiling(unittest.TestCase):
+    """gChapterDataAssetTable is addressed by NINE u8 fields of struct ROMChapterData, so 255 is
+    the last index the engine can reach (decisions.md -> "The asset table is addressed by a u8").
+
+    ch06 is the chapter that hit it: vanilla's 236 entries plus ch00-ch05's 19 appends is 255
+    exactly, and ch06 registers four more. The ONLY thing that caught it was agbcc's `-Werror`
+    on an implicit truncation in generated code -- so these are the gates that catch the next
+    one before the compiler has to.
+    """
+
+    TABLE = 'gChapterDataAssetTable'
+    # Every u8 field of a vanilla chapter entry that indexes the table. Spelled out here rather
+    # than imported, so a silent edit to the module's own tuple fails this test instead of
+    # travelling through it -- a PARTIAL list is the specific mistake that made the first read
+    # of this problem report 60 free slots that were all ChapterEventGroups.
+    INDEX_FIELDS = ('obj1Id', 'obj2Id', 'paletteId', 'tileConfigId', 'mainLayerId',
+                    'objAnimId', 'paletteAnimId', 'changeLayerId')
+
+    def _vanilla_table(self):
+        return bc.vanilla_decomp_text('data/data_8B363C.s')
+
+    def test_every_index_field_the_engine_reads_is_counted(self):
+        self.assertEqual(set(bc._ASSET_ID_FIELDS), set(self.INDEX_FIELDS))
+
+    def test_vanilla_has_no_unreferenced_entry_at_all(self):
+        """The reason reclaiming from never-loaded chapters is the only answer: there is no
+        free list to find. Counting only `map.*` says otherwise, and says it convincingly."""
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        used = set()
+        for chapter in vanilla['chapters']:
+            used |= bc._chapter_asset_ids(chapter)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'asset_table.s')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(self._vanilla_table())
+            with open(path, encoding='utf-8') as f:
+                lines = f.read().splitlines(keepends=True)
+            _start, rows = bc._asm_table_words(lines, self.TABLE, path)
+        self.assertEqual([i for i in range(len(rows)) if i not in used], [])
+
+    def test_the_reclaim_pool_never_offers_a_reserved_slot(self):
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        reserved = set()
+        for chapter in vanilla['chapters'][:bc.ASSET_TABLE_RESERVED_SLOTS]:
+            reserved |= bc._chapter_asset_ids(chapter)
+        pool = set(bc.reclaimable_asset_slots())
+        self.assertTrue(pool, 'the pool is empty -- every new chapter asset would fail')
+        self.assertEqual(pool & reserved, set())
+
+    def test_our_own_host_slots_are_inside_the_reserve(self):
+        """The reserve is stated as a slot COUNT, so it has to actually cover where we host."""
+        from inject import hosts
+        for chapter in hosts.hosted_chapters():
+            self.assertLess(chapter.host_index, bc.ASSET_TABLE_RESERVED_SLOTS, chapter.name)
+
+    def _claim(self, count, table=None):
+        vanilla = self._vanilla_table()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'data_8B363C.s')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(table if table is not None else vanilla)
+            got = bc._claim_asm_table_words(
+                path, self.TABLE, ['MS_TestAsset%d' % i for i in range(count)],
+                vanilla_source=vanilla)
+            with open(path, encoding='utf-8') as f:
+                return got, f.read()
+
+    def test_it_appends_while_the_index_is_still_addressable(self):
+        got, written = self._claim(3)
+        self.assertEqual(got, [236, 237, 238])
+        self.assertNotIn('reclaimed', written)
+
+    def test_it_reclaims_once_the_ceiling_is_reached_and_never_exceeds_it(self):
+        # 20 more than vanilla's 236: the first 20 fit (236..255), the rest must be reclaimed.
+        got, written = self._claim(24)
+        self.assertEqual(got[:20], list(range(236, 256)))
+        self.assertTrue(all(i < bc.ASSET_TABLE_CEILING for i in got), got)
+        self.assertEqual(len(set(got)), len(got), 'a slot was handed out twice')
+        self.assertEqual(written.count('/* reclaimed:'), 4)
+        # ...and the reclaimed ones are pool slots, not arbitrary ones.
+        for index in got[20:]:
+            self.assertIn(index, bc.reclaimable_asset_slots())
+
+    def test_a_full_table_fails_loudly_rather_than_truncating(self):
+        real = bc.reclaimable_asset_slots
+        bc.reclaimable_asset_slots = lambda: []
+        try:
+            with self.assertRaises(SystemExit) as caught:
+                self._claim(21)
+        finally:
+            bc.reclaimable_asset_slots = real
+        self.assertIn('is full', str(caught.exception))
+
+    def test_a_reclaimed_slot_is_still_findable_by_name(self):
+        """_asm_table_word_index is how a later injector finds a tileset piece, and a reclaimed
+        entry carries a trailing comment. Matching the raw line would find every APPENDED asset
+        and miss exactly the reclaimed ones."""
+        vanilla = self._vanilla_table()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'data_8B363C.s')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(vanilla)
+            got = bc._claim_asm_table_words(
+                path, self.TABLE, ['MS_A%d' % i for i in range(22)], vanilla_source=vanilla)
+            self.assertEqual(bc._asm_table_word_index(path, self.TABLE, 'MS_A21'), got[21])
 
 
 if __name__ == '__main__':

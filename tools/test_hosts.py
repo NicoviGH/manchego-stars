@@ -58,7 +58,8 @@ class Discovery(unittest.TestCase):
                                'ch02': hosts.CH02_HOST_INDEX,
                                'ch03': hosts.CH03_HOST_INDEX,
                                'ch04': hosts.CH04_HOST_INDEX,
-                               'ch05': hosts.CH05_HOST_INDEX})
+                               'ch05': hosts.CH05_HOST_INDEX,
+                               'ch06': hosts.CH06_HOST_INDEX})
 
     def test_the_prologue_is_enrolled_like_any_other_chapter(self):
         """It was invisible to discovery because PROLOGUE_HOST_INDEX does not match
@@ -82,7 +83,7 @@ class Discovery(unittest.TestCase):
         scope = dict(vars(hosts), CH10_HOST_INDEX=11, CH10_EVENT_GROUP='Ch11Events')
         names = [c.name for c in hosts.hosted_chapters(scope)]
         self.assertEqual(names,
-                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch10'])
+                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06', 'ch10'])
 
     def test_a_new_chapter_enrolls_itself(self):
         scope = dict(vars(hosts), CH05_HOST_INDEX=6, CH05_EVENT_GROUP='Ch6EventData')
@@ -90,13 +91,15 @@ class Discovery(unittest.TestCase):
         self.assertEqual((entry.host_index, entry.event_group), (6, 'Ch6EventData'))
 
     def test_a_host_slot_without_an_event_group_fails_loudly(self):
-        # ch06 is the next UNHOSTED chapter, so the scope override is the only source of
-        # CH06_HOST_INDEX. Using a hosted chapter here would inherit its real event group
-        # from vars(hosts) and the guard would have nothing to catch.
-        scope = dict(vars(hosts), CH06_HOST_INDEX=7)
+        # The example has to be a chapter that is NOT hosted, because a hosted one
+        # inherits its real event group from vars(hosts) and the guard would have nothing
+        # to catch. ch06 played this part until ch06 was hosted (2026-09-03), which is the
+        # second time this test has had to walk forward -- so it walks to ch07 rather than
+        # being rewritten to stop caring.
+        scope = dict(vars(hosts), CH07_HOST_INDEX=8)
         with self.assertRaises(ValueError) as caught:
             hosts.hosted_chapters(scope)
-        self.assertIn('CH06_EVENT_GROUP', str(caught.exception))
+        self.assertIn('CH07_EVENT_GROUP', str(caught.exception))
 
     def test_two_chapters_may_not_share_a_host_slot(self):
         scope = dict(vars(hosts), CH05_HOST_INDEX=hosts.CH04_HOST_INDEX,
@@ -112,7 +115,8 @@ class EnrolmentIsAGate(unittest.TestCase):
 
     def test_it_finds_the_injectors_in_the_source(self):
         found = hosts.injector_chapters()
-        self.assertEqual(found, ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'])
+        self.assertEqual(found,
+                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06'])
 
     def test_it_reads_source_rather_than_importing(self):
         blocker = _BlockImports('PIL', 'yaml', 'numpy')
@@ -123,14 +127,16 @@ class EnrolmentIsAGate(unittest.TestCase):
             sys.meta_path.remove(blocker)
 
     def test_an_injector_with_no_declaration_is_reported(self):
-        # ch06: the next chapter to be hosted, and the one this gate exists to catch when
-        # someone writes its injector and forgets to enrol it.
-        src = 'def inject_ch06(campaign):\n    pass\n'
-        self.assertEqual(hosts.undeclared_injectors(source=src), ['ch06'])
+        # The example must be a chapter NOT in the real registry, or the default scope finds
+        # it declared and the gate has nothing to report. ch06 played this part until it was
+        # hosted (2026-09-03); ch07 is the next one to be hosted, and the one this gate exists
+        # to catch when someone writes its injector and forgets to enrol it.
+        src = 'def inject_ch07(campaign):\n    pass\n'
+        self.assertEqual(hosts.undeclared_injectors(source=src), ['ch07'])
 
     def test_a_declared_injector_is_not_reported(self):
-        src = 'def inject_ch06(campaign):\n    pass\n'
-        scope = dict(vars(hosts), CH06_HOST_INDEX=7, CH06_EVENT_GROUP='Ch7EventData')
+        src = 'def inject_ch07(campaign):\n    pass\n'
+        scope = dict(vars(hosts), CH07_HOST_INDEX=8, CH07_EVENT_GROUP='Ch8EventData')
         self.assertEqual(hosts.undeclared_injectors(source=src, scope=scope), [])
 
     def test_the_live_build_has_no_undeclared_injectors(self):

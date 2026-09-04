@@ -3968,6 +3968,20 @@ end
 -- frames for a clean capture. Reusable smoke-look for every new chapter host.
 scenarios.mapshot = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
+    -- SETTLE BEFORE READING THE ROSTER. bootToMap returns on player_map_idle, which can be
+    -- true while the chapter's beginning script is still running -- and on a chapter whose
+    -- opening is a bare LOMA/LOAD/prep spine there is almost nothing between the Fight press
+    -- and that state. INSPECT.units walks gUnitArrayBlue directly, so reading it there
+    -- reports the party PREP has not finished redeploying yet: ch06 dumped 2 of 10 while its
+    -- own screenshots, 120 frames later, showed the lord standing on the map. That is a
+    -- diagnostic that lies, and the runbook tells people to trust this dump over a screenshot
+    -- ("verify placement from INSPECT.units, never from a screenshot"), so it has to be true.
+    -- Same predicate mapfull already waits on, for the same reason.
+    waitFor(function()
+        return faction() == 0 and not menuOpen()
+           and not procActive(SYM.ProcScr_StdEventEngine)
+           and not procActive(SYM.ProcScr_BattleEventEngine)
+    end, 900, true)
     INSPECT.units("mapshot")
     for i = 1, 6 do
         wait(20)

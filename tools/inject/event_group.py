@@ -312,6 +312,17 @@ DECLARED_INHERITED_BY_CHAPTER = {
     'ch02': {'miscBasedEvents': "vanilla Ch3's misc list is CauseGameOverIfLordDies alone, "
                                 "which is ch02's declared lose_condition; its defeat_all "
                                 "objective needs no misc entry"},
+    # ch06 is the first hosted chapter with NOTHING in its Character list, and vanilla Ch7's is
+    # already `{ END_MAIN }` -- so the injector writes the same bytes the donor ships and the
+    # census correctly reads INHERITED. Nothing leaks, because there is nothing there.
+    #
+    # This one is TEMPORARY by construction and says so: ch06 owes two boarding Talks (one CHAR
+    # entry per deployable PC x boat, sharing that boat's flag -- the chapter YAML's
+    # `rescue_boats` engine note). The moment they are wired the field becomes WRITTEN, and this
+    # guard then fails on the STALE DECLARATION rather than letting it sit here forever.
+    'ch06': {'characterBasedEvents': "vanilla Ch7 ships this list empty (END_MAIN): nothing to "
+                                     "leak. ch06's only character events are the boat-boarding "
+                                     'Talks, which land with the boarding pass (#26)'},
     # The prologue is the one chapter that does NOT retarget its host slot (inject/hosts.py):
     # it keeps Ch1Events and writes its scenes into the slot's own scripts, so almost the whole
     # group reads inherited by construction rather than by oversight.

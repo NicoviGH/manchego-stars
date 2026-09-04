@@ -60,6 +60,15 @@ CH05_HOST_INDEX = 6
 # retarget is mandatory for every chapter after this one too.
 CH05_EVENT_GROUP = 'Ch6Events'
 
+CH06_HOST_INDEX = 7
+# Slot 7 SHIPS pointing at Ch6Events -- the group ch05 fills on slot 6. Same trap as ch05's,
+# one slot along: leaving it would put ch05 and ch06 on ONE event group, and the second to
+# load would run the first's roster and scripts under its own map. Derived, not guessed:
+# gChapterDataAssetTable[36] is Ch6Events and [39] is Ch7EventData, and slot 8 is the slot
+# that ships the latter. So our chapter N takes the group named for chapter N, and the slot
+# it sits on keeps shipping chapter N-1's -- the pattern every chapter from ch04 follows.
+CH06_EVENT_GROUP = 'Ch7EventData'
+
 # --- discovery -------------------------------------------------------------------------
 
 HostedChapter = collections.namedtuple(

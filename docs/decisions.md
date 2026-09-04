@@ -2467,6 +2467,123 @@ move it into the merge gate, for ~50s of a 408-second gate. Two events would reo
 sweep growing slow enough that we stop running it before playtest builds, or a chapter regression
 reaching the players that a gate-tier smoke would have caught.
 
+### A load-test that reads the roster before PREP settles is a diagnostic that LIES (2026-09-04, #26)
+
+`mapshot` is the chapter-generic load test every new host runs, and `docs/adding-a-chapter.md`
+tells you in bold to **verify placement from `INSPECT.units`, never from a screenshot** -- because
+FE8 draws a map sprite offset upward, so a unit reads a row high. That instruction is right. What
+was wrong is that the dump could be read too early.
+
+`INSPECT.units` walks `gUnitArrayBlue` directly. `bootToMap` returns on `player_map_idle`, which
+can be true while the chapter's beginning script is still running -- and on a chapter whose
+opening is a bare `LOMA` / `LOAD1` / `CALL(prep)` spine there is almost nothing between the Fight
+press and that state. ch06 dumped **2 blue of a cap of 10**, while its own screenshots 120 frames
+later showed the lord standing on the map with full HP.
+
+**Every chapter before ch06 hid this**, and hid it in the way that makes a latent bug expensive:
+ch05's opening plays four backdrop scenes, a join and a monologue AFTER prep, so its dump lands
+~15,000 frames in, long settled. The bug was therefore invisible on exactly the chapters that had
+scenes, and would have fired on exactly the chapters that do not -- new hosts, which is what this
+scenario is FOR. ch07 and ch08 would have inherited it.
+
+Cost when it bit: a full A/B against ch05 to decide whether ch06 or the harness was at fault, and
+a confident, wrong report that ch06 shipped a broken deploy. The screenshot is what disproved the
+dump -- which inverts the runbook's advice in the one case the runbook does not cover, and is why
+the fix is to make the dump trustworthy rather than to soften the advice.
+
+`mapshot` now waits on the same predicate `mapfull` already waited on (player phase, no menu, no
+std/battle event engine) before reading. **The general rule: a probe that reads engine state must
+wait for the state to settle, and "the controller handed back input" is not that.** A diagnostic
+that reports a partial truth is worse than one that fails, because it gets believed.
+
+_Decided: 2026-09-04 (Claude, hosting ch06)._
+
+
+### The asset table is addressed by a u8, so ch06 RECLAIMS a slot rather than appending (2026-09-03, #26)
+
+`gChapterDataAssetTable` is reached through **nine `u8` fields** of `struct ROMChapterData` — the
+eight `map.*Id`s plus `mapEventDataId` (chapterdata.h; `chapterdata.c`, `bmmap.c` and `bmio.c` are
+the only readers and all nine go through those fields). **Index 255 is the last one the engine can
+address.** An entry appended past it is written, assembled, linked and shipped, and unreachable.
+
+Vanilla ships 236 entries and ch00-ch05 had appended 19 — **255 exactly.** The campaign had been
+sitting on the last addressable slot for a chapter without anyone knowing. ch06 registers four
+more (its own tileset's three pieces plus its layout), the prologue's layout follows, and the
+table ran to 260.
+
+**Only `-Werror` caught it**, as `chapter_settings.h:993: warning: large integer implicitly
+truncated to unsigned type`. Nothing in our own gates would have: every id is DERIVED per build
+and written into `chapter_settings.json` by the injector that registered it, so the numbers are
+self-consistent right up to the truncation. The ROM would have built clean and ch06 would have
+drawn whatever asset lived at `258 & 0xFF`.
+
+**There is no slack in vanilla's own table, and the obvious read says there is.** A first pass
+looked at the eight `map.*` fields, found 60 entries no chapter referenced, and concluded the
+problem was easy. Every one of those 60 is a **ChapterEventGroup**, reached through
+`mapEventDataId` — the ninth field. Counting all nine, vanilla's 236 entries are referenced
+**without exception**. A partial read of which fields index a table is worse than no read: it
+produces a free list that is entirely wrong and looks authoritative.
+
+So a campaign asset now **claims a slot belonging to a vanilla chapter our ROM can never load.**
+Our chapter chain runs ch00 -> ch08 on host slots 1..9 and there is no world map, so a vanilla
+chapter at slot 26 or beyond is unreachable and the assets only IT names are dead weight. That is
+the same argument that already lets us strip a host slot's event lists, squat its dead message
+block, repurpose its unreferenced scripts, and take unnamed `gCharacterData` gaps — this is that
+rule reaching the one table where APPENDING was never an option.
+
+The mechanism, in `_claim_asm_table_words`:
+
+* **append while the next index is still below 256**, and only reclaim past it. That is what keeps
+  the blast radius to the assets that could not fit at all. Every chapter map registered before
+  the ceiling keeps its id exactly; the ONE thing that moves is the prologue's layout, because
+  `inject_prologue` runs after `inject_ch06` in `main()` and so is the last to register. Harmless
+  -- every id is derived per build and written into `chapter_settings.json` by the injector that
+  claimed it -- but "nothing before ch06 moves" would be a slightly false invariant to state;
+* the pool is derived from **vanilla's chapter table at HEAD**, never the built tree, so the
+  answer does not depend on how far through a build you are;
+* everything vanilla slots **0..25** touch is reserved. We host on 1..9, so 26 is a wide margin
+  rather than a fitted bound, and it still leaves **118** reclaimable entries — more than ch07,
+  ch08 and any tileset they bring can spend several times over;
+* a pooled slot counts as free iff its word still equals HEAD's. The decomp is restored from HEAD
+  every build, so "already claimed this build" needs no bookkeeping of its own and cannot go stale;
+* running out is a **hard error that names the ceiling**, not a silent truncation.
+
+`_register_tileset` stopped returning `base, base+1, base+2` in the same change: past the ceiling
+its three pieces land wherever the pool has room, so contiguity was an assumption with no owner.
+`_asm_table_word_index` learned to ignore a reclaimed slot's `/* reclaimed: ... */` note, or it
+would find every appended asset and miss exactly the reclaimed ones.
+
+**What it picked is the entry's own footnote.** ch06's palette, tile configuration and layout took
+indices 118-120 — vanilla's `Ch13EphraimMap`, `Ch13EphraimMapChanges` and `Ch13EphraimEventData`.
+ch06's geometry is a retile of Ch13 Ephraim and its deploy tiles are lifted from that group's own
+unit table, so the chapter now occupies its donor's runtime slots as well as its shape. The
+build-time derivation is untouched: those SYMBOLS still exist in the decomp source, and only the
+table's pointers to them moved.
+
+_Decided: 2026-09-03 (Claude, hosting ch06) — flagged to Nicolas as a campaign-wide call._
+
+
+### A hosted chapter inherits its host slot's FOG, and nothing guards that (2026-09-03, #26)
+
+ch06 declares `fog: none` and means it: 40% of its map is concentric water with eight crossings,
+so the route IS the puzzle and it is one the player has to be able to see. **Slot 7 ships
+`initialFogLevel: 3`** — vanilla Ch7 is a fogged chapter — so hosting ch06 there without writing
+the field would have handed the chapter three-tile vision and hidden its entire design.
+
+This is the same shape as the goal text ids (#207), the battle grounds, the difficulty numbers
+(#303) and `.traps` (#302), with one difference worth writing down: **those four now have passes
+that write every hosted chapter's declaration, and fog does not.** ch04 writes `initialFogLevel`
+inline because it WANTS fog; ch06 writes it inline because it does not. Two chapters, two inline
+writes, no registry — which is precisely the state `.traps` was in the day before it nearly
+shipped ch06 a pair of ballistae.
+
+`inject_ch06` reads the YAML's `fog:` and refuses a value it does not know how to write, so the
+declaration decides rather than the injector remembering. **The general pass is owed**, and it
+should cover every `chapter_settings` field a chapter can silently inherit, not just this one.
+
+_Decided: 2026-09-03 (Claude, hosting ch06)._
+
+
 ### A chapter declares its traps; `.traps` is the fourth inherited field (2026-08-22, #302)
 
 `.traps` is a **ChapterEventGroup** field (chapterdata.h:32), not a `chapter_settings` one. Our

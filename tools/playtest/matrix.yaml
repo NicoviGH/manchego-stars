@@ -87,6 +87,8 @@ rom_configs:
   ch05endingbasildied:
     CH05BOOT: 1
     CH05ENDING: basil-died
+  ch06boot:
+    CH06BOOT: 1
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:
@@ -315,12 +317,10 @@ suites:
     - ch01win
     - lordfloor
     - recordunitlist
-    - ch04moose
-    - ch04packmath
-    - ch04village
-    - ch04cottage
-    - ch04snag
-    - clear_ch04_parley
+    # ch04's six aged OUT of the window when ch06 was hosted (check_gate_chapter_window
+    # derives it from the host registry: the spine plus the last two hosted chapters, now
+    # ch05 + ch06). Nothing is lost -- the derived `ch04` suite still carries all six, and
+    # the --all sweep still runs them.
     - ch05village
     - ch05reliquaries
     - ch05arena

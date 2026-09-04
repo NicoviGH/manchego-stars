@@ -6,10 +6,16 @@
 id: ch06-the-maer-monster
 title: "The Maer Monster"
 chapter_number: 6
-status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
-                               # re-grounded against vanilla + party data when the slice is reached
-                               # (brainstorming skill digests this). Exempt from the parity gate until then.
+status: active                 # the slice is reached: roster/levels/AI re-grounded against vanilla
+                               # Ch6 unit by unit (#334), the map is painted and compiled (#331),
+                               # the placement is authored (#360), and the chapter is HOSTED on
+                               # slot 7 (#26). In the parity gate from here.
 milestone: M3
+traps: []                      # DECLARED empty (#302/#306). ch06 fills `Ch7EventData`, and vanilla
+                               # Ch7 ships TWO BALLISTAE in `TrapData_Event_Ch7` -- at Ch7's
+                               # coordinates, on Ch7's map. Inheriting them would put siege engines
+                               # on a frozen lake wherever those tiles happen to land. A lake has no
+                               # ballista emplacement, so the field is cleared rather than re-sited.
 cadence: marquee_setpiece       # see docs/CHAPTERS.md — 🎬 (the Navarre/Joshua moment)
 # DONOR and BAR are SEPARATE, and deliberately different chapters (Nicolas, 2026-08-28).
 # The layout is Ephraim's Ch13; the enemy-pressure bar stays vanilla Ch6. Same split ch01
@@ -155,6 +161,23 @@ difficulty_note: >
 deployment:
   deploy_limit: 10              # D4 -- FE8 Ch6 parity (deploy 1-10); the donor map ships 11 slots
   start_area: "x4-10, y0-2 (the donor's own deploy block, top-centre) -- forces the spiral"
+  deploy_slots:                 # Ch13Ephraim's OWN eleven start tiles (UnitDef_088C4EB4, the
+                                # table its ChapterEventGroup names), lifted 1:1 the way ch05
+                                # lifts its twin's -- their bounding box IS the x4-10/y0-2 block
+                                # `start_area` claims, verified against the decomp rather than
+                                # taken on trust. The donor ships ELEVEN and our cap is TEN, so
+                                # we take the donor's own order and drop its last entry; the
+                                # first is its lord tile, which stays ours.
+    - [7, 1]                    # lord tile (vanilla Ephraim's)
+    - [6, 0]
+    - [5, 1]
+    - [9, 1]
+    - [4, 0]
+    - [8, 0]
+    - [6, 2]
+    - [4, 2]
+    - [6, 1]
+    - [10, 0]
   note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene, so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages cutscene characters exactly this way -- ch04's moose sighting is ours). Braulo (Pirate, river cost 2) and Trex (Thief, cost 5 -- one channel cell per turn at mov 6) are the only PCs who cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 # DERIVED, not invented: every row below is one of vanilla Ch6's own 24 units -- same class,
