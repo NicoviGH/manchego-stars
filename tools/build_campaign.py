@@ -7574,6 +7574,21 @@ def _deploy_cap_entries(chap, cast, leader, label):
             in enumerate(zip(cast[:limit], slots))]
 
 
+def _items_with_drop_last(items, drop_enum):
+    """`items` with `drop_enum` present exactly ONCE and LAST -- FE8 drops the last item.
+
+    A chapter YAML may name the dropped item in `inventory:` as well as in `item_drop:`, and both
+    readings are right: the unit really is carrying it. Appending unconditionally then emits a
+    SECOND copy. ch06 is the first chapter whose data spells it both ways and it shipped three
+    such units -- {AXE_IRON, AXE_HALBERD, AXE_HALBERD} against a donor carrying two items -- while
+    `make difficulty` read PARITY, because the parity model prices the YAML rather than the rows
+    the injector emits. Re-ordering rather than merely de-duplicating, because "last" is the part
+    the engine actually reads: an inventory that lists the drop first would otherwise drop the
+    wrong item.
+    """
+    return [item for item in items if item != drop_enum] + [drop_enum]
+
+
 def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comment,
                       itemdrop=False):
     """One enemy UnitDefinition row; autolevel/itemdrop toggle their optional fields."""
@@ -10085,11 +10100,21 @@ CH06_BOSS_PID = ENEMY_BASE_SLOT['nerra']
 CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla Ch7's own generic,
                                                  # and vanilla Ch6's (both spend 0x80)
 # The two marooned boats are UNITS, not painted scenery, so they can be KILLED -- which is the
-# whole clock (#360). Each takes its OWN raw pid out of the unnamed 0xB0..0xB9 gCharacterData
-# gaps, for the same reason ch04's wolf pack needed one (#203): a shared pid is unaddressable,
-# and each hull has to be independently CHECK_ALIVE-able for the save-them-both payout and
-# independently Talk-able when the boarding pass lands. 0xB6..0xB9 are ch03's and ch05's.
-CH06_BOAT_PIDS = {'boat-east': '0xb4', 'boat-west': '0xb5'}
+# whole clock (#360). Each takes its OWN raw pid, for the same reason ch04's wolf pack needed one
+# (#203): a shared pid is unaddressable, and each hull has to be independently CHECK_ALIVE-able
+# for the save-them-both payout and independently Talk-able when the boarding pass lands.
+#
+# 0xB0..0xBA IS FULL, and a first draft of this line took 0xB4/0xB5 believing otherwise. The
+# range's real occupancy is 0xb0/b1/b2/b4/b5 CH04_PACK_PIDS, 0xb3 ch04's Mauthe Doog, 0xb6 ch03's
+# Brute, 0xb7 ch03's grell (which ch04's mogall shares -- legal, because a defeat quote is keyed
+# by CHAPTER too), 0xb8 Ravisin, 0xb9 the moose, 0xba Sahnar's. Taking 0xB4/0xB5 would have
+# renamed two of ch04's five wolves to "Fishing Boat": a name plate is written into
+# `gCharacterData`, which is ONE GLOBAL TABLE with no chapter dimension, so a NAMED pid must be
+# exclusive even though a generic one need not be (ch05 and ch06 both spend 0x80 for trash).
+# 0xbb and 0xbc are the next unnamed gaps -- nameTextId 0x255, the generic monster plate, the
+# same shape as every pid above. `assert_named_raw_pids_are_exclusive` now makes the mistake
+# impossible rather than leaving the next chapter to re-read this comment.
+CH06_BOAT_PIDS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
 # Their NAMES, appended past the last vanilla message (ch05's moose took 0xD4C). A raw pid's
 # stock nameTextId is the generic monster plate shared by every 0xB0-range gap, so a boat reads
 # "Monster" without this -- the #90 rule in the message-id space: append your own rather than
@@ -10537,6 +10562,64 @@ def assert_message_blocks_disjoint(blocks=None):
                         ' (and they are the SAME chapter, which would double-count its own '
                         'headroom)' if a == b else ''))
     return True
+
+
+_RAW_PID_RE = re.compile(r'^0x[0-9a-f]{2}$')
+_RAW_PID_CONST_RE = re.compile(r'^(CH\d+|PROLOGUE)_[A-Z0-9_]*PIDS?$')
+
+
+def raw_pid_claims(scope=None):
+    """{raw pid: the set of chapter prefixes whose constants claim it}.
+
+    DISCOVERED from this module's own `CHNN_*PID`/`*PIDS` constants -- string, tuple or dict --
+    rather than a hand-kept list, for the reason the list would exist: the constant that got this
+    wrong carried a comment enumerating which pids were taken, and the comment simply did not know
+    about ch04's five (#26).
+    """
+    scope = globals() if scope is None else scope
+    claims = collections.defaultdict(set)
+    for name, value in sorted(scope.items()):
+        match = _RAW_PID_CONST_RE.match(name)
+        if not match:
+            continue
+        if isinstance(value, dict):
+            values = list(value.values())
+        elif isinstance(value, (tuple, list, set, frozenset)):
+            values = list(value)
+        else:
+            values = [value]
+        for pid in values:
+            if isinstance(pid, str) and _RAW_PID_RE.match(pid):
+                claims[pid].add(match.group(1))
+    return dict(claims)
+
+
+def assert_named_raw_pids_are_exclusive(portraits=None, scope=None):
+    """Guard: a raw pid that gets a NAME PLATE may be claimed by only one chapter.
+
+    `RAW_PID_PORTRAITS` writes `nameTextId` into `gCharacterData[pid - 1]`, and that table has ONE
+    row per pid with **no chapter dimension** -- unlike `gDefeatTalkList`, where ch03's grell and
+    ch04's mogall share 0xb7 quite legally because each entry is keyed by chapter too. So a shared
+    GENERIC pid is fine (ch05 and ch06 both spend 0x80 on autolevelled trash) while a shared NAMED
+    one silently retitles somebody else's units.
+
+    ch06's two boats took 0xb4/0xb5, which `CH04_PACK_PIDS` already owned, and two of ch04's five
+    Mauthe Doogs would have read "Fishing Boat" on the unit window. Nothing caught it:
+    `assert_pack_pids_addressable` checks that ch04's pack is addressable within ch04, and the
+    0xB0-range occupancy lived in prose in three separate comments, none of which was complete.
+    """
+    portraits = RAW_PID_PORTRAITS if portraits is None else portraits
+    claims = raw_pid_claims(scope)
+    for pid, (_unit_id, _slot, _portrait_id, name) in sorted(portraits.items()):
+        owners = claims.get(pid, set())
+        if len(owners) > 1:
+            sys.exit(
+                'ERROR: raw pid %s is NAMED %r but claimed by %s. A name plate is written into '
+                'gCharacterData[%s - 1], which has one row per pid and no chapter dimension, so '
+                'every unit on that pid in EVERY chapter takes the name. Give the named unit a '
+                'pid of its own (an unnamed 0x255 gap).'
+                % (pid, name, ' and '.join(sorted(owners)), pid))
+    return claims
 
 
 def assert_message_ids_unique(claims=None):
@@ -12740,7 +12823,7 @@ def ch06_enemy_rows(chap, arrives_turn=None):
             # group (vanilla gives exactly one Fighter the axe drop, not all three).
             dropper = bool(drop) and index == 0
             if dropper:
-                carried.append(CH06_ITEM_IDS[drop])
+                carried = _items_with_drop_last(carried, CH06_ITEM_IDS[drop])
             rows.append(_enemy_unit_entry(
                 pid, cls, int(enemy['level']), bool(enemy.get('autolevel')), x, y,
                 ', '.join(carried) or '0', enemy_ai_initialiser(chap, enemy, index),
@@ -12801,7 +12884,7 @@ def ch05_enemy_rows(chap, arrives_turn=None, exclude=()):
             carried = list(items)
             dropper = bool(drop) and index == 0
             if dropper:
-                carried.append(CH05_ITEM_IDS[drop])
+                carried = _items_with_drop_last(carried, CH05_ITEM_IDS[drop])
             rows.append(_enemy_unit_entry(
                 pid, cls, int(enemy['level']), bool(enemy.get('autolevel')), x, y,
                 ', '.join(carried) or '0', ai,
@@ -14880,6 +14963,7 @@ def main():
         # hosted chapters claim one message id -- a double-claim is otherwise silent, since
         # verify_text checks runaway text, not who owns a slot.
         assert_message_ids_unique()
+        assert_named_raw_pids_are_exclusive()
         assert_literals_are_claimed()
         assert_message_blocks_disjoint()   # the setup that would make a collision inevitable
         # And the third of the same family. It ran only from the tests, so `make check` caught

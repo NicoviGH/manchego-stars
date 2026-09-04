@@ -2502,8 +2502,11 @@ rule reaching the one table where APPENDING was never an option.
 The mechanism, in `_claim_asm_table_words`:
 
 * **append while the next index is still below 256**, and only reclaim past it. That is what keeps
-  every id ch00-ch05 already built with byte-identical; the blast radius is exactly the assets
-  that could not fit at all;
+  the blast radius to the assets that could not fit at all. Every chapter map registered before
+  the ceiling keeps its id exactly; the ONE thing that moves is the prologue's layout, because
+  `inject_prologue` runs after `inject_ch06` in `main()` and so is the last to register. Harmless
+  -- every id is derived per build and written into `chapter_settings.json` by the injector that
+  claimed it -- but "nothing before ch06 moves" would be a slightly false invariant to state;
 * the pool is derived from **vanilla's chapter table at HEAD**, never the built tree, so the
   answer does not depend on how far through a build you are;
 * everything vanilla slots **0..25** touch is reserved. We host on 1..9, so 26 is a wide margin

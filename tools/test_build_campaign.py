@@ -2265,18 +2265,18 @@ class RavisinPortrait(unittest.TestCase):
         .defaultClass = CLASS_GORGON,
         .miniPortrait = 0x4,
     },
-    [0xb4 - 1] = {
+    [0xbb - 1] = {
         .baseLevel = 1,
         .nameTextId = 0x255,
-        .number = 0xb4,
-        .defaultClass = CLASS_BAEL,
+        .number = 0xbb,
+        .defaultClass = CLASS_GARGOYLE,
         .miniPortrait = 0x4,
     },
-    [0xb5 - 1] = {
+    [0xbc - 1] = {
         .baseLevel = 1,
         .nameTextId = 0x255,
-        .number = 0xb5,
-        .defaultClass = CLASS_BAEL,
+        .number = 0xbc,
+        .defaultClass = CLASS_DEATHGOYLE,
         .miniPortrait = 0x4,
     },'''
         patched = bc.raw_pid_portrait_data(source, self.CAMPAIGN)
@@ -7260,6 +7260,87 @@ class ChapterTraps(unittest.TestCase):
         for symbol, body in written.items():
             self.assertTrue(symbol.startswith('TrapData_Event_'), symbol)
             self.assertIn('TRAP_NONE', body)
+
+
+class NamedRawPidsAreExclusive(unittest.TestCase):
+    """A raw pid carrying a NAME PLATE may be claimed by one chapter only.
+
+    `RAW_PID_PORTRAITS` writes nameTextId into gCharacterData[pid - 1], one row per pid with no
+    chapter dimension -- unlike gDefeatTalkList, where ch03's grell and ch04's mogall share 0xb7
+    legally because each entry is keyed by chapter too. ch06's boats took 0xb4/0xb5, already
+    CH04_PACK_PIDS', and two of ch04's five Mauthe Doogs would have read "Fishing Boat".
+    """
+
+    def test_the_live_registry_is_clean(self):
+        bc.assert_named_raw_pids_are_exclusive()
+
+    def test_a_generic_pid_may_still_be_shared(self):
+        """ch05 and ch06 both spend 0x80 on autolevelled trash, and that is fine -- a generic pid
+        is never named, so nothing global is written for it. The guard must not over-reach."""
+        claims = bc.raw_pid_claims()
+        self.assertEqual(claims.get('0x80'), {'CH05', 'CH06'})
+        self.assertNotIn('0x80', bc.RAW_PID_PORTRAITS)
+
+    def test_discovery_reads_strings_tuples_and_dicts(self):
+        claims = bc.raw_pid_claims()
+        self.assertEqual(claims.get('0xb8'), {'CH05'})            # CH05_BOSS_PID, a bare string
+        for pid in bc.CH04_PACK_PIDS:                             # a tuple
+            self.assertIn('CH04', claims.get(pid, set()), pid)
+        for pid in bc.CH06_BOAT_PIDS.values():                    # a dict
+            self.assertEqual(claims.get(pid), {'CH06'}, pid)
+
+    def test_the_original_collision_is_caught(self):
+        portraits = dict(bc.RAW_PID_PORTRAITS)
+        for pid in bc.CH06_BOAT_PIDS.values():
+            portraits.pop(pid, None)
+        portraits['0xb4'] = ('boat-east', 0xD4D, None, 'Fishing Boat')
+        scope = dict(vars(bc), CH06_BOAT_PIDS={'boat-east': '0xb4', 'boat-west': '0xb5'})
+        with self.assertRaises(SystemExit) as caught:
+            bc.assert_named_raw_pids_are_exclusive(portraits, scope)
+        self.assertIn('0xb4', str(caught.exception))
+        self.assertIn('CH04', str(caught.exception))
+
+
+class ItemDropIsCarriedOnce(unittest.TestCase):
+    """FE8 drops the LAST item, and a chapter YAML may name the drop in `inventory:` too.
+
+    ch06 is the first chapter whose data spells it both ways; appending unconditionally emitted a
+    second copy on three units while `make difficulty` still read PARITY, because the parity model
+    prices the YAML rather than the rows the injector emits.
+    """
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_a_drop_already_in_inventory_is_not_duplicated(self):
+        self.assertEqual(bc._items_with_drop_last(['A', 'B'], 'B'), ['A', 'B'])
+
+    def test_a_drop_absent_from_inventory_is_appended(self):
+        self.assertEqual(bc._items_with_drop_last(['A'], 'B'), ['A', 'B'])
+
+    def test_a_drop_listed_first_is_moved_LAST(self):
+        # De-duplicating alone would leave the engine dropping the wrong item.
+        self.assertEqual(bc._items_with_drop_last(['B', 'A'], 'B'), ['A', 'B'])
+
+    def test_no_ch06_enemy_carries_a_duplicate(self):
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH06_CHAPTER_YAML)
+        rows = bc.ch06_enemy_rows(chap) + bc.ch06_enemy_rows(
+            chap, arrives_turn=bc.CH06_HARD_WAVE_TURN)
+        for row in rows:
+            items = re.search(r'\.items = \{ (.*?) \}', row).group(1).split(', ')
+            items = [i for i in items if i != '0']
+            self.assertEqual(len(items), len(set(items)), row)
+
+    def test_every_dropper_matches_its_vanilla_donors_item_count(self):
+        """The check that would have caught it: our row against the donor unit it is derived
+        from. Vanilla's three ch06 droppers carry 2 / 1 / 2 items."""
+        chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.CH06_CHAPTER_YAML)
+        expected = {'shark-rider-halberd': 2, 'merfolk-blade-drop': 1, 'lamia-mender': 2}
+        rows = bc.ch06_enemy_rows(chap)
+        for enemy_id, count in expected.items():
+            row = next(r for r in rows if '/* %s --' % enemy_id in r)
+            items = re.search(r'\.items = \{ (.*?) \}', row).group(1).split(', ')
+            self.assertEqual(len(items), count, '%s: %s' % (enemy_id, row))
+            self.assertIn('.itemDrop = 1', row, enemy_id)
 
 
 class AssetTableCeiling(unittest.TestCase):
