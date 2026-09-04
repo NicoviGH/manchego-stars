@@ -8005,6 +8005,63 @@ in `_MSGS`), and every chapter's objective window/status string (below an undocu
 so in the docstring is the point -- a guard may not rest on a convention nothing enforces.
 _Decided and implemented: 2026-08-30._
 
+### ch06's boats sit in POCKETS, because a village is a body you cannot walk into and a door you visit it from (2026-09-03, #26)
+
+The donor puts two **villages** where our two marooned boats sit. ch06's first pass repainted all
+eighteen footprint cells walkable FOREST, so each hull was open on four sides, and declared the
+sixteen extra cells as terrain divergences. That was backwards. A village in FE8 *is* a pocket: an
+impassable body (`TILE_2E`) plus one door you interact with it from. Honouring the donor gives us
+the shape for free — and, measured against the real Ch6, it is the shape the chapter needs.
+
+**It cost no repainting.** A metatile carries its art (the TSA entries) and its meaning (the
+terrain byte) independently, and the twelve metatiles involved are used *nowhere else*: all twelve
+are `TERRAIN_NONE` in snowy-bern, i.e. our own slots in the range the ice tileset was built to
+occupy. ch04, the only other map on snowy-bern, uses none of them; ch03 uses four of the indices
+but on `cave-interior`, where the index means a different metatile. So the change is twelve bytes
+in `snowy-bern-ice.bin` — `.4bpp` and `.gbapal` byte-identical, `.mar` untouched, the painted
+ice-outcrop art pixel-for-pixel the same. `map_tileset_tool.py set-terrain` does it and prints the
+blast radius first, because a terrain byte is SHARED and the map you had in mind is not the only
+one riding the tileset.
+
+`terrain_divergence` fell from **21 declared cells to 7** — the map moved closer to its donor by
+doing less to it, which is the direction that block should always travel.
+
+**The flier keeps her privilege, and that is vanilla's rule, not ours.** `TILE_2E` costs 1 to
+`FlyNormal` and is impassable to every ground class. So Pinky can work a hull from four cells
+where everyone else has one. Sealing her out would have needed `SNAG`/`WALL`/`VALLEY` — and would
+have been *stricter than FE8*, in the one chapter whose whole lesson is "send a flier".
+
+**What terrain cannot do is stop a ranged weapon.** FE8 has no line of sight: a javelin, bow or
+tome reaches any tile in range through any wall. A pocket therefore shapes *melee* only, and
+keeping range-2 units off a hull is a placement decision, permanently. This is why ch06's two
+pursuers are deliberately different problems — the range-1 ice-crab is answered by standing in the
+door, the range-1-2 javelin thrower has to be killed.
+
+### Vanilla Ch6's urgency is TRAVEL TIME, not a fuse (2026-09-03, #26)
+
+Measured off `Ch6Map` and `events_udefs.c` rather than remembered, because the design was being
+tuned against a model of vanilla that turned out to be wrong in both halves:
+
+- A `CLASS_CIVILIAN_F1` is **7 HP at Def 0**. The Bael's venin claw does 12. **Contact is death** —
+  there is no grind, and no fuse to tune.
+- **Not one Ch6 unit can hit a villager on turn 1.** The nearest static is an Armour four tiles
+  away that never moves. The entire clock is one pursuing Bael walking 32 move points — **turn 7**.
+  It targets the villagers rather than the party because they are 32 MP away and the party is 50.
+- The villagers sit in a mountain-ringed pocket. Reading the engine's own cost tables, MOUNTAIN is
+  `--` for Cavalier and Armour, 6 for Paladin, 4 for foot, 3 for the Bael, 1 for a flier. **Franz
+  and Gilliam cannot reach them at all.** That table *is* the guide's "send Seth".
+- So vanilla's budget is: **death turn 7, fast answer turn 4, foot turn 6** — slack of 3 and 1.
+
+ch06 reproduces the *outcome*, not the mechanism. A boat is tougher than a child, so the clock is a
+fuse rather than one bite; and our map cannot host vanilla's long walk, because vanilla's villagers
+have a dead corner behind them and ours are already in the two far corners — searching every tile,
+a turn-7 contact leaves the pursuer nearer the party than the boat, so it simply retargets. What
+transfers is the budget: **our foot reaches either door on turn 6, exactly as vanilla's does, and
+both hulls sink on turn 7 and 8.** Same slack, arrived at from the other direction.
+
+The lesson that outlives ch06: a parity claim about a vanilla chapter's *feel* is a measurement,
+not a memory. Both halves of this one had been asserted in a chapter YAML for weeks.
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:
