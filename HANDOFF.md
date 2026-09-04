@@ -6,65 +6,58 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-03 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-04 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**`ch06-host` — hosting groundwork, COMMITTED RED ON PURPOSE and pushed.** Declaring a host slot
-is what enrols a chapter in the guards, so it is also what makes them demand the rest. Two suites
-are red and only on `inject_ch06`: `test_event_group_census` and `test_build_campaign`. No PR yet.
-**Everything settled about it — the derived host slot (7), event group (`Ch7EventData`), message
-block (0x9F6-0x9FF), goal donor (17), tileset stem (`SnowIce`), deploy tiles, and the remaining
-checklist — is a comment on #26 dated 2026-09-03. Read that, not this file, and do not re-derive
-any of it.**
+**Nothing. The tree is clean on `main` and no branch is open.** #364 squash-merged 2026-09-04 and
+`ch06-host` is deleted.
 
-⚠️ **Two things ch06's placement does NOT prove**, and cannot until the chapter is hosted: that
-enemy AI paths to a single melee tile and QUEUES rather than stalling, and that Talk fires from
-the door. Both are one instrumented run once `ch06boot` exists. Do not assume either.
-
-**Merged 2026-09-03 — four PRs.** #360 (ch06's enemy positions + the boat pockets; reasoning is
-two ADRs in `docs/decisions.md`, *"ch06's boats sit in POCKETS…"* and *"Vanilla Ch6's urgency is
-TRAVEL TIME, not a fuse"* — do not re-derive it from the diff), #361 (the item-economy reader
-learns two delivery vehicles), #362 (sprite editor: Finish works for scratch characters, the
-preview repaints on frame boundaries, and the two-pose idle rule is bounded), #363 (Messie's map
-sprite plus a top-hat variant for ch07's mayor beat, both painted by Nicolas).
-
-**#360's review caught six findings and all six are fixed** — including one that mattered beyond
-ch06: `terrain_impact` compared a bare `meta.get('tileset')` against the name, but four of our
-eight maps OMIT that key and default to snowy-bern everywhere else, so the audit was blind to
-ch00/ch01/ch02 and would have blessed a snowy-bern flip that silently re-terrained them. Fixed
-with a regression test. **The lesson generalises: `get('tileset', 'snowy-bern')` is the repo-wide
-spelling — a bare `.get()` on that key is a bug.**
-
-**Messie's sprites are DONE and committed; neither is WIRED.** Both need an `art.map_sprite` block
-and an SMS id, and the top-hat sheet additionally needs whatever swaps a unit's sprite at the ch07
-beat. ⚠️ The finished art is the WHOLE animal, which settles the conflict with ch06's `art_note`
-(head-and-neck only, 2026-08-26) in favour of the sprite — **that note is now the stale half.**
-Rewrite it when Messie is wired, not before.
-
-**`tools/map_placement_preview.py` is on `main` now** — it renders a placement on the real
-metatile art and reads positions from the chapter YAML, or a concept JSON while they are being
-chosen. ch07 and ch08 get their placement conversations on it. ch06's concept files are in the
-untracked `map-review/ch06-placement/`.
+⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
+its full cap and can be won — with no dialogue, no cutscenes, and merfolk that render as vanilla
+FE8 humans. `make chapter CH=ch06` is the state; **#26's body is the remaining slice work** and was
+rewritten 2026-09-04 against the repo, because it had rotted in both directions: its premise still
+described a boat boss with a hidden Marty→Messie Talk and two endings (reversed 2026-08-29), while
+D1–D8 read as open although they had all shipped. Do not trust its old shape from memory.
 
 ## Owed, filed, not started
 
+- **#365** -- guard: a hosted chapter DECLARES its fog. `initialFogLevel` is the LAST
+  `chapter_settings` field with no pass writing every chapter's declaration, so it is the last one
+  that can be inherited silently; the other four in that class each got a pass only after
+  something went wrong. Opened 2026-09-04 while hosting ch06. Also proposes a census over the
+  whole `ROMChapterData` struct, so the question is answered once instead of five more times.
 - **#337** -- guard: a cutscene must LOAD every character it stages (the permadeath invariant).
-  Opened 2026-08-29, still not started.
+  Opened 2026-08-29, still not started. **ch06 raises the stakes:** its Messie scene stages Marty
+  and Braulo unconditionally (`cutscene_actors`), which is only safe if the scene LOADs them.
 - **#30** -- `campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one from ch04 on.
   Nothing reads it, so it misleads rather than breaks. Cheap since #312: one reader
   (`tools/campaign_chapters.py`) means the block can be DERIVED rather than hand-kept.
 
 ## Next task
 
-**Write `inject_ch06`** (~350 lines against `inject_ch05`; `docs/adding-a-chapter.md` is the
-recipe). The full checklist and every settled constant is the #26 comment dated 2026-09-03.
-Then one build and ONE instrumented run to close #360's two open questions above.
+**Finish ch06 — the list is #26's body, not this file.** In the order that unblocks the most:
 
-Dialogue stays deferred: ch06's scenes are declared with empty text on purpose, and the boat
-crews still need voice rows before a line is drafted.
+1. **ch06's `playtest:` block + one instrumented run.** ch06 is the only hosted chapter with no
+   scenario covering it, and it is the last thing #360 could not prove: that enemy AI paths to a
+   single melee tile and **QUEUES rather than stalling**. `mapshot` structurally cannot answer
+   that — it needs a scenario watching several enemy phases. *"Talk fires from the door" is NOT
+   answerable until the boarding pass exists*, so do not plan a run around it.
+2. **The boarding pass.** One Talk entry per (deployable PC × boat) sharing that boat's flag,
+   generated from the roster — the engine note in the ch06 YAML's `rescue_boats` spells the shape
+   out. Plus the east hull's Antitoxin and the `CHECK_ALIVE` save-them-both Orion's Bolt. Blocked
+   on voice bibles for the two crews. When it lands, `event_group.DECLARED_INHERITED_BY_CHAPTER`
+   ch06 → `characterBasedEvents` becomes a STALE declaration and the census will say so — that is
+   deliberate, not a bug to route around.
+3. **Messie's portrait**, settled 2026-09-04 (Nicolas): he speaks over a bust. Authored art, and
+   the chapter's one remaining hard art dependency now that making him a cutscene deleted the
+   battle anim. Nothing merfolk or plesiosaur exists in the FE-Repo, so it is generated.
+4. **The three cutscenes**, then the merfolk reskins.
+
+Dialogue stays deferred until the voice bibles exist — ch06's scenes are declared with empty text
+on purpose, not as a stub.
 
 ## Map sprites — read before any art session
 
@@ -74,6 +67,28 @@ why a decomp sheet's palette is a meaningless leftover, what `footprint:` actual
 WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
+
+**#364 (2026-09-04) — ch06 is hosted on slot 7, and the asset table hit its CEILING.** Three ADRs
+in `docs/decisions.md` carry the whole reasoning and are not restated here: *"The asset table is
+addressed by a u8, so ch06 RECLAIMS a slot rather than appending"*, *"A hosted chapter inherits
+its host slot's FOG, and nothing guards that"* (now #365), and *"A load-test that reads the roster
+before PREP settles is a diagnostic that LIES"*.
+
+⚠️ **Three lessons that outlive ch06:**
+
+- **A partial read of which fields index a table is worse than no read.** The asset table looked
+  like it had 60 free entries when only `map.*` was counted; every one of them was a
+  `ChapterEventGroup` reached through the ninth field, `mapEventDataId`. Vanilla's 236 entries are
+  referenced without exception.
+- **A NAMED raw pid must be exclusive; a generic one need not be.** A name plate is one global
+  `gCharacterData` row with no chapter dimension, while `gDefeatTalkList` is keyed by chapter too
+  — which is why ch03's grell and ch04's mogall share 0xb7 legally, and why ch06's boats taking
+  0xb4/0xb5 would have renamed two of ch04's wolves. `assert_named_raw_pids_are_exclusive` now
+  discovers every claim rather than trusting a comment. **0xB0..0xBA is FULL.**
+- **`make difficulty` prices the YAML, not the rows the injector emits.** `item_drop` was appended
+  even when the YAML already listed it in `inventory:`, so three ch06 enemies carried a duplicate
+  while parity read x1.00 throughout. Verify a mechanical change with an OUTPUT DIFF against the
+  emitted decomp, never with the tests.
 
 **#334 (2026-08-29) — ch06's roster, and Messie stops being a fight.** Two ADRs in
 `docs/decisions.md` carry the whole reasoning: *"Messie is a cutscene, not a boss"* and *"The AI is
@@ -98,7 +113,8 @@ and no keyword sweep finds those.
 
 **#331 (2026-08-28) — ch06's map is painted, compiled and committed.** Detail in `docs/decisions.md`
 → *"ch06 departs from its donor's terrain in 21 declared cells"* and *"The DONOR and the BAR are
-different chapters"*.
+different chapters"*. ⚠️ That ADR title is its 2026-08-28 state: #360 cut the divergences from 21
+to **7** when the boats became pockets, and the later entry records it. The YAML is the count.
 
 ### Earlier
 
