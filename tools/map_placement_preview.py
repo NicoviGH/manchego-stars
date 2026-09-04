@@ -109,10 +109,37 @@ def load_map(stem):
     return grid, terrain, ts
 
 
-def foot_reach(terrain, sources):
-    """Movement-point distance from any source cell, for a walking class."""
+# The movement profiles `reached_on:` is declared in. Each is (decomp cost table, baseMov) --
+# the table names are the decomp's own, and the two named entries are the PCs whose class makes
+# the crossing question different for them than for the rest of the party.
+REACH_ROLES = {
+    'foot':    ('TerrainTable_MovCost_CommonT1Normal', 5),
+    'cavalry': ('TerrainTable_MovCost_HorseT1Normal', 7),
+    'flier':   ('TerrainTable_MovCost_FlyNormal', 7),
+    'braulo':  ('TerrainTable_MovCost_PirateNormal', 5),
+    'trex':    ('TerrainTable_MovCost_CommonT1Normal', 6),
+}
+
+
+def foot_reach(terrain, sources, blocked=(), cost=None):
+    """Movement-point distance from any source cell.
+
+    `blocked` is cells a unit may not enter or pass through -- in FE that is every ENEMY body,
+    with no phasing and no swapping. Leaving it empty measures an EMPTY MAP, which is how
+    ch06's `reached_on:` came to claim "foot reaches either door on turn 6" for a boat sitting
+    behind a merfolk line: true of the terrain, untrue of the chapter. A source cell is never
+    blocked -- the walker is standing there.
+
+    `cost` is a terrain-id -> points table (see REACH_ROLES); it defaults to the foot row.
+
+    LIMIT, stated rather than implied: this is a turn-1 SNAPSHOT. Strikers step into the route
+    on later phases, so the contested number is still a floor -- a tighter one than the empty
+    map, not the truth. What it cannot model is the cost of fighting, which depends on play.
+    """
     import heapq
+    cost = FOOT_COST if cost is None else cost
     h, w = len(terrain), len(terrain[0])
+    blocked = set(blocked) - set(sources)
     dist, pq = {}, []
     for s in sources:
         dist[s] = 0
@@ -123,15 +150,65 @@ def foot_reach(terrain, sources):
             continue
         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             nx, ny = x + dx, y + dy
-            if not (0 <= nx < w and 0 <= ny < h):
+            if not (0 <= nx < w and 0 <= ny < h) or (nx, ny) in blocked:
                 continue
-            step = FOOT_COST.get(terrain[ny][nx])
+            step = cost.get(terrain[ny][nx])
             if step is None:
                 continue
             if c + step < dist.get((nx, ny), 1 << 30):
                 dist[(nx, ny)] = c + step
                 heapq.heappush(pq, (c + step, (nx, ny)))
     return dist
+
+
+def arrival_turn(points, mov):
+    """Movement points -> the turn a unit spending `mov` a turn first stands there."""
+    if points is None:
+        return None
+    return max(1, -(-points // mov))
+
+
+def enemy_bodies(chapter):
+    """Every turn-1 enemy tile. Reinforcements are excluded: they are not on the board yet."""
+    out = set()
+    for enemy in chapter.get('enemy_units') or ():
+        if enemy.get('arrives_turn'):
+            continue
+        for tile in enemy.get('positions') or ():
+            out.add(tuple(tile))
+    return out
+
+
+def load_chapter(prefix):
+    """The chapter doc whose id starts with `prefix`. One resolver, so `main` and every caller
+    that needs a chapter agree about what "ch06" means."""
+    match = [c for c in campaign_chapters.load_all()
+             if str(c.get('id', '')).startswith(prefix)]
+    if not match:
+        sys.exit('ERROR: no chapter id starts with %r' % prefix)
+    return match[0]
+
+
+def terrain_grid(chapter):
+    """The chapter's compiled terrain, by the map its YAML names."""
+    stem = os.path.splitext(os.path.basename(chapter['map']['file']))[0]
+    return load_map(stem)[1]
+
+
+def reached_on(chapter, terrain, target, contested=True):
+    """{role: turn} for reaching `target` from the deploy block, per movement profile.
+
+    `contested=True` walks the map with the enemy line standing on it, which is the reading
+    a chapter's clock actually needs. `contested=False` reproduces the empty-map number the
+    hand-written `reached_on:` blocks were measured with, so the two can be compared.
+    """
+    blocked = enemy_bodies(chapter) if contested else ()
+    out = {}
+    for role, (table, mov) in REACH_ROLES.items():
+        dist = foot_reach(terrain, deploy_cells(chapter, terrain), blocked=blocked,
+                          cost=mov_cost_row(table))
+        out[role] = arrival_turn(dist.get(tuple(target)), mov)
+    return out
 
 
 def deploy_cells(chapter, terrain):

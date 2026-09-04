@@ -758,7 +758,13 @@ rescue_boats:
                                 # a range-2 weapon reaches the hull over the wall from 3 tiles
                                 # -- FE8 has no line of sight, so a wall never stops a javelin,
                                 # a bow or a tome. Placement is the only lever for those.
-  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, re-measured
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, EMPTY MAP
+  # ...and the same walk with the enemy LINE standing on it (turn-1 snapshot; derived by
+  # `map_placement_preview.reached_on`, never hand-kept). A unit cannot pass through an enemy
+  # body, and this map's channels are narrow enough that ONE body corks a route: removing
+  # shark-rider-halberd at (15,16) alone turns `null` into turn 12. The empty-map row above is
+  # what the chapter's clock was designed against, and it is not what a player walks.
+  reached_on_contested: {foot: null, cavalry: null, flier: 3, braulo: 6, trex: null}
   talk:
     background: bg_Boat         # vendored from FE-Repo; the boarding CG
     ea_file: events/ch06-boat-east.ea
@@ -778,7 +784,10 @@ rescue_boats:
   door: [4, 18]
   donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
   attackable_sides: 1           # as boat-east; a flier adds 3 cells, range-2 reaches from 2
-  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, re-measured
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, EMPTY MAP
+  # Contested, as boat-east. The cork here is merfolk-trident at (2,14): removing that one
+  # body takes foot from turn 11 back to the declared 6.
+  reached_on_contested: {foot: 11, cavalry: 8, flier: 3, braulo: 6, trex: 9}
   talk:
     background: bg_Boat
     ea_file: events/ch06-boat-west.ea
