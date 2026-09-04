@@ -12,8 +12,10 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing. The tree is clean on `main` and no branch is open.** #364 squash-merged 2026-09-04 and
-`ch06-host` is deleted.
+**PR #366 on branch `ch06-playtest`** — ch06's `playtest:` block, its chapter Lua chunk, the
+`check_chapter_lua_facts` guard, and the first `ch06clock` run. Awaiting `/code-review`.
+`make check` clean, `make test` 1,856 cases exit 0, one playtest run (FAIL, on purpose — see
+below).
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
@@ -32,15 +34,21 @@ against the repo 2026-09-04, so do not trust its shape from memory).
 
 ## Next task
 
-**ch06's `playtest:` block + one instrumented run.** ch06 is the only hosted chapter no scenario
-covers, and the run settles the last thing #360 could not prove: that enemy AI paths to a single
-melee tile and **QUEUES rather than stalling**. `mapshot` cannot answer it — it needs several
-enemy phases. ⚠️ *"Talk fires from the door" is NOT answerable until the boarding pass exists*, so
-do not plan a run around it.
+**`/code-review` on #366, then Nicolas's call on ch06's clock.** The run landed and split cleanly
+in two:
 
-Everything else ch06 owes — the boarding pass, Messie's portrait and wiring, the three cutscenes,
-the merfolk reskins — is ordered on **#26**. Dialogue stays deferred until the boat crews have
-voice bibles.
+- **The pockets HOLD.** The range-1 crab pathed to the west hull's single door cell on enemy phase
+  2 and attacked from there and nowhere else for five phases, never stalling. That is what #360
+  shipped unverified, and `ch06clock` guards it from here.
+- **The clock does not.** Three findings, all on **#26** as checklist items with the evidence in
+  its 2026-09-04 comment: something reaches the east hull on enemy phase 1, both fuses run
+  shorter than declared, and the east pursuer walks away instead of pursuing. ⚠️ *Which of those
+  is fixed by retuning the placement and which by restating the budget is a DESIGN call and is
+  not decided.* Do not pick one on your own.
+
+⚠️ **`ch06clock` is red on `main` until that call is made**, and it is red for the right reason —
+it is the chapter that is wrong, not the scenario. It is deliberately **not** in the gate suite
+yet; adding it before the clock is settled would make every merge red.
 
 ## Map sprites — read before any art session
 
