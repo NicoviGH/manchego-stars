@@ -12,18 +12,32 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**PR #366 on branch `ch06-playtest`** — ch06's `playtest:` block, its chapter Lua chunk, the
-`check_chapter_lua_facts` guard, and the first `ch06clock` run. Awaiting `/code-review`.
-`make check` clean, `make test` 1,856 cases exit 0, one playtest run (FAIL, on purpose — see
-below).
+**PR #366 on branch `ch06-playtest`, five commits, ready for `/code-review`.** ch06's playtest
+block, the run it enabled, and the campaign-wide defect that run found. `make check` clean,
+`make test` green, `ch06clock` **PASS**. Nothing is half-done on the branch.
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
-humans. **`make chapter CH=ch06` is the state; #26's body is the remaining work** (rewritten
-against the repo 2026-09-04, so do not trust its shape from memory).
+humans. **`make chapter CH=ch06` is the state; #26's body is the remaining work.**
+
+## PARKED, by Nicolas, 2026-09-04
+
+**ch06's fuse tuning, and anything that leans on the difficulty model, until #367 is answered.**
+The measured fuses are wrong in both directions — east still afloat at turn 12 against a declared
+7, west sank turn 5 against 8 — and the levers (HP on the boat pids, a second east pursuer) are
+exactly what #367 affects. **Do not tune the clock.** Evidence is on #26.
+
+⚠️ **#366 itself does NOT depend on that review** and can merge independently: its fix is grounded
+in measured vanilla behaviour (zero of vanilla Ch6's seventeen strikers can reach a villager in one
+turn), not in `difficulty.py`.
 
 ## Owed, filed, not started
 
+- **#367** -- does the difficulty model have a SPATIAL element we designed and never wired?
+  Opened 2026-09-04, carrying two findings from #26: the player side is modelled at BASE LEVEL
+  while enemies are autolevelled (so the parity ratio cancels only to FIRST order, and the error
+  grows with every chapter), and nothing states an expected party level per chapter.
+  **ch06's tuning is parked behind this.**
 - **#365** -- guard: a hosted chapter DECLARES its fog, and a census over the rest of
   `ROMChapterData`. Opened 2026-09-04 while hosting ch06.
 - **#337** -- guard: a cutscene must LOAD every character it stages (the permadeath invariant).
@@ -34,21 +48,11 @@ against the repo 2026-09-04, so do not trust its shape from memory).
 
 ## Next task
 
-**`/code-review` on #366, then Nicolas's call on ch06's clock.** The run landed and split cleanly
-in two:
+**`/code-review` on #366, then merge it.** It is self-contained and does not wait on #367.
 
-- **The pockets HOLD.** The range-1 crab pathed to the west hull's single door cell on enemy phase
-  2 and attacked from there and nowhere else for five phases, never stalling. That is what #360
-  shipped unverified, and `ch06clock` guards it from here.
-- **The clock does not.** Three findings, all on **#26** as checklist items with the evidence in
-  its 2026-09-04 comment: something reaches the east hull on enemy phase 1, both fuses run
-  shorter than declared, and the east pursuer walks away instead of pursuing. ⚠️ *Which of those
-  is fixed by retuning the placement and which by restating the budget is a DESIGN call and is
-  not decided.* Do not pick one on your own.
-
-⚠️ **`ch06clock` is red on `main` until that call is made**, and it is red for the right reason —
-it is the chapter that is wrong, not the scenario. It is deliberately **not** in the gate suite
-yet; adding it before the clock is settled would make every merge red.
+After that, ch06's remaining work is ordered on **#26** and none of it is blocked: the three
+cutscenes, the boarding pass, Messie's portrait and wiring, the merfolk reskins. Dialogue still
+waits on voice bibles for the boat crews. **Do not tune the clock** -- see PARKED above.
 
 ## Map sprites — read before any art session
 
@@ -58,6 +62,16 @@ why a decomp sheet's palette is a meaningless leftover, what `footprint:` actual
 WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
+
+**#366 (2026-09-04, IN REVIEW not merged) — the AI vector has two halves, and we were reading
+one.** Three ADRs in `docs/decisions.md` carry it: *"AI_B is the APPROACH and AI_A is the ACTION"*,
+*"A reach number measured on an EMPTY MAP is a claim about terrain, not about the chapter"*, and
+*"A rescue clock is a HIT RATE, so a scenario MEASURES it and never asserts it"*. The one-line
+version: `never-move` names only the approach byte, so 48 of the 51 units our reports called static
+will step out and strike — which is how four merfolk mobbed a boat the chapter had nowhere near
+them. `make chapter` now prints both halves and a three-way shape, reach is measured with the
+enemy line standing on it, and two new guards (`check_rescue_targets`, `check_chapter_lua_facts`)
+hold both.
 
 **#364 (2026-09-04) — ch06 is hosted on slot 7, and the asset table hit its 8-bit CEILING.** Five
 ADRs in `docs/decisions.md` carry all of it and are deliberately not restated here: *"The asset
