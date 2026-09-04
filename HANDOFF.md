@@ -16,48 +16,31 @@ restated. Check that a thing has a home before writing it here.
 `ch06-host` is deleted.
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
-its full cap and can be won — with no dialogue, no cutscenes, and merfolk that render as vanilla
-FE8 humans. `make chapter CH=ch06` is the state; **#26's body is the remaining slice work** and was
-rewritten 2026-09-04 against the repo, because it had rotted in both directions: its premise still
-described a boat boss with a hidden Marty→Messie Talk and two endings (reversed 2026-08-29), while
-D1–D8 read as open although they had all shipped. Do not trust its old shape from memory.
+its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
+humans. **`make chapter CH=ch06` is the state; #26's body is the remaining work** (rewritten
+against the repo 2026-09-04, so do not trust its shape from memory).
 
 ## Owed, filed, not started
 
-- **#365** -- guard: a hosted chapter DECLARES its fog. `initialFogLevel` is the LAST
-  `chapter_settings` field with no pass writing every chapter's declaration, so it is the last one
-  that can be inherited silently; the other four in that class each got a pass only after
-  something went wrong. Opened 2026-09-04 while hosting ch06. Also proposes a census over the
-  whole `ROMChapterData` struct, so the question is answered once instead of five more times.
+- **#365** -- guard: a hosted chapter DECLARES its fog, and a census over the rest of
+  `ROMChapterData`. Opened 2026-09-04 while hosting ch06.
 - **#337** -- guard: a cutscene must LOAD every character it stages (the permadeath invariant).
-  Opened 2026-08-29, still not started. **ch06 raises the stakes:** its Messie scene stages Marty
-  and Braulo unconditionally (`cutscene_actors`), which is only safe if the scene LOADs them.
+  Wanted BEFORE ch06's dialogue pass writes the Messie scene; the why is on the issue.
 - **#30** -- `campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one from ch04 on.
   Nothing reads it, so it misleads rather than breaks. Cheap since #312: one reader
   (`tools/campaign_chapters.py`) means the block can be DERIVED rather than hand-kept.
 
 ## Next task
 
-**Finish ch06 — the list is #26's body, not this file.** In the order that unblocks the most:
+**ch06's `playtest:` block + one instrumented run.** ch06 is the only hosted chapter no scenario
+covers, and the run settles the last thing #360 could not prove: that enemy AI paths to a single
+melee tile and **QUEUES rather than stalling**. `mapshot` cannot answer it — it needs several
+enemy phases. ⚠️ *"Talk fires from the door" is NOT answerable until the boarding pass exists*, so
+do not plan a run around it.
 
-1. **ch06's `playtest:` block + one instrumented run.** ch06 is the only hosted chapter with no
-   scenario covering it, and it is the last thing #360 could not prove: that enemy AI paths to a
-   single melee tile and **QUEUES rather than stalling**. `mapshot` structurally cannot answer
-   that — it needs a scenario watching several enemy phases. *"Talk fires from the door" is NOT
-   answerable until the boarding pass exists*, so do not plan a run around it.
-2. **The boarding pass.** One Talk entry per (deployable PC × boat) sharing that boat's flag,
-   generated from the roster — the engine note in the ch06 YAML's `rescue_boats` spells the shape
-   out. Plus the east hull's Antitoxin and the `CHECK_ALIVE` save-them-both Orion's Bolt. Blocked
-   on voice bibles for the two crews. When it lands, `event_group.DECLARED_INHERITED_BY_CHAPTER`
-   ch06 → `characterBasedEvents` becomes a STALE declaration and the census will say so — that is
-   deliberate, not a bug to route around.
-3. **Messie's portrait**, settled 2026-09-04 (Nicolas): he speaks over a bust. Authored art, and
-   the chapter's one remaining hard art dependency now that making him a cutscene deleted the
-   battle anim. Nothing merfolk or plesiosaur exists in the FE-Repo, so it is generated.
-4. **The three cutscenes**, then the merfolk reskins.
-
-Dialogue stays deferred until the voice bibles exist — ch06's scenes are declared with empty text
-on purpose, not as a stub.
+Everything else ch06 owes — the boarding pass, Messie's portrait and wiring, the three cutscenes,
+the merfolk reskins — is ordered on **#26**. Dialogue stays deferred until the boat crews have
+voice bibles.
 
 ## Map sprites — read before any art session
 
@@ -68,27 +51,12 @@ WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not re
 
 ## Recently landed — do not redo
 
-**#364 (2026-09-04) — ch06 is hosted on slot 7, and the asset table hit its CEILING.** Three ADRs
-in `docs/decisions.md` carry the whole reasoning and are not restated here: *"The asset table is
-addressed by a u8, so ch06 RECLAIMS a slot rather than appending"*, *"A hosted chapter inherits
-its host slot's FOG, and nothing guards that"* (now #365), and *"A load-test that reads the roster
-before PREP settles is a diagnostic that LIES"*.
-
-⚠️ **Three lessons that outlive ch06:**
-
-- **A partial read of which fields index a table is worse than no read.** The asset table looked
-  like it had 60 free entries when only `map.*` was counted; every one of them was a
-  `ChapterEventGroup` reached through the ninth field, `mapEventDataId`. Vanilla's 236 entries are
-  referenced without exception.
-- **A NAMED raw pid must be exclusive; a generic one need not be.** A name plate is one global
-  `gCharacterData` row with no chapter dimension, while `gDefeatTalkList` is keyed by chapter too
-  — which is why ch03's grell and ch04's mogall share 0xb7 legally, and why ch06's boats taking
-  0xb4/0xb5 would have renamed two of ch04's wolves. `assert_named_raw_pids_are_exclusive` now
-  discovers every claim rather than trusting a comment. **0xB0..0xBA is FULL.**
-- **`make difficulty` prices the YAML, not the rows the injector emits.** `item_drop` was appended
-  even when the YAML already listed it in `inventory:`, so three ch06 enemies carried a duplicate
-  while parity read x1.00 throughout. Verify a mechanical change with an OUTPUT DIFF against the
-  emitted decomp, never with the tests.
+**#364 (2026-09-04) — ch06 is hosted on slot 7, and the asset table hit its 8-bit CEILING.** Five
+ADRs in `docs/decisions.md` carry all of it and are deliberately not restated here: *"The asset
+table is addressed by a u8…"*, *"A hosted chapter inherits its host slot's FOG…"* (now #365), *"A
+load-test that reads the roster before PREP settles is a diagnostic that LIES"*, *"A NAMED raw pid
+must be exclusive; a GENERIC one need not be"*, and *"The parity model prices the YAML; only the
+EMITTED ROWS are the ROM"*.
 
 **#334 (2026-08-29) — ch06's roster, and Messie stops being a fight.** Two ADRs in
 `docs/decisions.md` carry the whole reasoning: *"Messie is a cutscene, not a boss"* and *"The AI is
@@ -113,8 +81,7 @@ and no keyword sweep finds those.
 
 **#331 (2026-08-28) — ch06's map is painted, compiled and committed.** Detail in `docs/decisions.md`
 → *"ch06 departs from its donor's terrain in 21 declared cells"* and *"The DONOR and the BAR are
-different chapters"*. ⚠️ That ADR title is its 2026-08-28 state: #360 cut the divergences from 21
-to **7** when the boats became pockets, and the later entry records it. The YAML is the count.
+different chapters"*.
 
 ### Earlier
 
