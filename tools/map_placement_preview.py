@@ -179,6 +179,78 @@ def enemy_bodies(chapter):
     return out
 
 
+def class_movement(class_token):
+    """('cost table symbol', baseMov) for one of our chapter YAML class tokens.
+
+    Read off the ENGINE's class row, never a hand-kept table: a chapter whose whole shape is
+    who-can-cross-what cannot afford a second opinion about a class's movement.
+    """
+    import difficulty
+    enum = difficulty._enemy_class_enum(class_token)
+    src = _classes_text()
+    block = re.search(r'\[%s - 1\] = \{(.*?)\n    \},' % enum, src, re.S)
+    if not block:
+        raise KeyError('no class row for %r' % enum)
+    table = re.search(r'\.pMovCostTable\s*=\s*(\w+)', block.group(1))
+    mov = re.search(r'\.baseMov\s*=\s*(\d+)', block.group(1))
+    return (table.group(1) if table else 'TerrainTable_MovCost_CommonT1Normal',
+            int(mov.group(1)))
+
+
+def _classes_text():
+    import build_campaign as bc
+    return bc.vanilla_decomp_text('src/data_classes.c')
+
+
+def units_reaching(chapter, terrain, targets):
+    """[(enemy id, ai bytes)] for every turn-1 unit that can ATTACK one of `targets`.
+
+    The two shapes reach differently, and conflating them is what made the first cut of this
+    analysis wrong by three units:
+
+      * a STRIKER acts only on what it can reach THIS turn -- `AI_A` moves within the unit's
+        own movement to a firing cell or the unit does nothing at all. Vanilla Ch6's Soldier
+        nine points from a villager therefore never moves, which is why its line never mobs
+        them.
+      * a PURSUER accumulates movement across turns, so ANY path to a firing cell counts.
+
+    Weapon range comes from `difficulty._weapon_for`, so a staff-only unit is correctly no
+    threat and a javelin correctly reaches two.
+    """
+    import difficulty
+    import chapter_status as cs
+    out = []
+    for enemy in chapter.get('enemy_units') or ():
+        if enemy.get('arrives_turn'):
+            continue                      # not on the board when the clock starts
+        # MAX range over the whole inventory, not the first weapon. FE8's AI equips whatever
+        # lets it attack, and ch06's ironshell-horseslayer proved it in-engine: its items[0] is
+        # a range-1 Horseslayer, and it threw its JAVELIN at the hull from two tiles away.
+        ranges = [w.rng[1] for w in
+                  (difficulty._weapon_for([item]) for item in (enemy.get('inventory') or ()))
+                  if w is not None]
+        if not ranges:
+            continue                      # a staff is not a threat to a hull
+        reach = max(ranges)
+        table, mov = class_movement(enemy.get('deploy_class') or enemy['class'])
+        cost = mov_cost_row(table)
+        for index, (x, y) in enumerate(enemy.get('positions') or ()):
+            ai = difficulty.enemy_ai_bytes(chapter, enemy, index)
+            dist = foot_reach(terrain, [(x, y)], cost=cost)
+            # A STATUE cannot move at all, even to attack -- its reach is its weapon and
+            # nothing more. Giving it a pursuer's unlimited budget reported ch06's Nerra as a
+            # threat to a hull seven tiles away that she can never leave her tile to touch.
+            shape = cs.ai_shape(ai)
+            budget = 0 if shape == 'statue' else (mov if shape == 'striker' else None)
+            for cell, points in dist.items():
+                if budget is not None and points > budget:
+                    continue
+                if any(abs(cell[0] - t[0]) + abs(cell[1] - t[1]) <= reach for t in targets):
+                    out.append((enemy['id'], ai))
+                    break
+    return out
+
+
 def load_chapter(prefix):
     """The chapter doc whose id starts with `prefix`. One resolver, so `main` and every caller
     that needs a chapter agree about what "ch06" means."""

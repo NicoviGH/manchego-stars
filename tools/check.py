@@ -1013,6 +1013,63 @@ def check_chapter_lua_facts(fail):
         fail.extend(_chapter_lua_fact_violations(rel, text, chapter_rel, doc))
 
 
+# The ACTION bytes that cannot target a listed character. AI_A_08 is the one ch06 spends
+# (`repoint_boat_safe_ai_list`); AI_A_07 is ch05's escort. Both run the standard offensive
+# action through `AiIsUnitEnemyAndNotInScrList`, so a unit carrying either fights the player
+# normally and simply will not swing at whatever the repointed list names.
+RESCUE_SAFE_ACTIONS = (0x07, 0x08)
+
+
+def _rescue_target_violations(short, reachers, pursuers):
+    """Every unit that can reach a rescue target without being licensed to.
+
+    `reachers` is [(enemy id, its 4 AI bytes)] for units that can attack a hull; `pursuers` is
+    the ids the chapter DECLARES as its clock. A chapter with rescue targets has costed exactly
+    those, and anything else reaching one is a mob it did not plan for -- ch06 shipped four, and
+    a hull tuned as a one-pursuer fuse sank on turn 4 instead of 7 (#26).
+
+    Two ways to be legitimate, and the finding names both: be the declared clock, or carry an
+    ACTION byte that cannot target the hull at all.
+    """
+    out = []
+    for uid, ai in reachers:
+        if uid in pursuers or (ai and ai[0] in RESCUE_SAFE_ACTIONS):
+            continue
+        out.append(
+            '%s: %r can attack a rescue target but is neither a declared pursuer nor carries '
+            'a do-not-attack ACTION byte. Vanilla protects its rescue targets with TERRAIN no '
+            'striker can cross; where our map cannot, the unit needs an `ai_override` to '
+            'AI_A_08 (0x8) -- or the chapter must declare it a pursuer and cost its clock'
+            % (short, uid))
+    return out
+
+
+def check_rescue_targets(fail):
+    """A chapter's rescue targets are reachable only by units it declared (#26)."""
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    try:
+        import difficulty
+        import map_placement_preview as pp
+        import chapter_status as cs
+    except ImportError as exc:      # Pillow / submodule absent on the lightweight checks job
+        print('check_rescue_targets: skipping (%s; the build job\'s `make test` covers it)' % exc)
+        return
+    for rel, doc in _chapters():
+        boats = doc.get('rescue_boats') or []
+        if not boats:
+            continue
+        short = str(doc.get('id', '')).split('-')[0]
+        try:
+            terrain = pp.terrain_grid(doc)
+        except Exception as exc:    # noqa: BLE001 -- an unbuilt map is not this gate's business
+            print('check_rescue_targets: skipping %s (%s)' % (short, exc))
+            continue
+        hulls = [tuple(b['tile']) for b in boats]
+        pursuers = {p['id'] for p in (doc.get('rescue_pursuers') or [])}
+        fail.extend(_rescue_target_violations(
+            short, pp.units_reaching(doc, terrain, hulls), pursuers))
+
+
 def _re_local_git_env(text, name):
     """True if `name` is bound to git_env() in this file -- `env = git_env()` then `env=env`."""
     import re as _re
@@ -2350,6 +2407,7 @@ def main():
                   check_decomp_git_calls_strip_the_env,
                   check_no_shadowed_definitions, check_gate_chapter_window,
                   check_declared_cases, check_chapter_lua_facts,
+                  check_rescue_targets,
                   check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,
