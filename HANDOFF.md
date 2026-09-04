@@ -12,27 +12,31 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**#360 — ch06's enemy positions + the boat pockets.** Open, rebased on `main`, awaiting
-`/code-review` (Nicolas runs it; the author never reviews their own, #349). Reasoning is two
-ADRs in `docs/decisions.md` — *"ch06's boats sit in POCKETS…"* and *"Vanilla Ch6's urgency is
-TRAVEL TIME, not a fuse"* — plus the PR body. Do not re-derive it from the diff.
+**`ch06-host` — hosting groundwork, COMMITTED RED ON PURPOSE and pushed.** Declaring a host slot
+is what enrols a chapter in the guards, so it is also what makes them demand the rest. Two suites
+are red and only on `inject_ch06`: `test_event_group_census` and `test_build_campaign`. No PR yet.
+**Everything settled about it — the derived host slot (7), event group (`Ch7EventData`), message
+block (0x9F6-0x9FF), goal donor (17), tileset stem (`SnowIce`), deploy tiles, and the remaining
+checklist — is a comment on #26 dated 2026-09-03. Read that, not this file, and do not re-derive
+any of it.**
 
-⚠️ **Two things #360 does NOT prove**, and cannot until ch06 is hosted: that enemy AI paths to a
-single melee tile and QUEUES rather than stalling, and that Talk fires from the door. Both are one
-instrumented run once `ch06boot` exists.
+⚠️ **Two things ch06's placement does NOT prove**, and cannot until the chapter is hosted: that
+enemy AI paths to a single melee tile and QUEUES rather than stalling, and that Talk fires from
+the door. Both are one instrumented run once `ch06boot` exists. Do not assume either.
 
-**`ch06-host` — hosting groundwork, stacked on #360, COMMITTED RED ON PURPOSE.** Declaring a host
-slot is what enrols a chapter in the guards, so it is also what makes them demand the rest. Two
-suites are red and only on `inject_ch06`: `test_event_group_census` and `test_build_campaign`.
-**Everything settled about it — the derived host slot, event group, message block, goal donor,
-tileset stem, deploy tiles, and the remaining checklist — is a comment on #26 dated 2026-09-03.
-Read that, not this file, and do not re-derive any of it.**
+**Merged 2026-09-03 — four PRs.** #360 (ch06's enemy positions + the boat pockets; reasoning is
+two ADRs in `docs/decisions.md`, *"ch06's boats sit in POCKETS…"* and *"Vanilla Ch6's urgency is
+TRAVEL TIME, not a fuse"* — do not re-derive it from the diff), #361 (the item-economy reader
+learns two delivery vehicles), #362 (sprite editor: Finish works for scratch characters, the
+preview repaints on frame boundaries, and the two-pose idle rule is bounded), #363 (Messie's map
+sprite plus a top-hat variant for ch07's mayor beat, both painted by Nicolas).
 
-**Merged 2026-09-03:** #361 (the item-economy reader learns two delivery vehicles — a boat's Talk
-and `save_all_bonus`, so ch06 stops reading as impoverished and ch05's five gifts land 1:1 on
-vanilla's), #362 (sprite editor: Finish works for scratch characters, the preview repaints on
-frame boundaries, and the two-pose idle rule is bounded), #363 (Messie's map sprite and a top-hat
-variant for ch07's mayor beat, both painted by Nicolas).
+**#360's review caught six findings and all six are fixed** — including one that mattered beyond
+ch06: `terrain_impact` compared a bare `meta.get('tileset')` against the name, but four of our
+eight maps OMIT that key and default to snowy-bern everywhere else, so the audit was blind to
+ch00/ch01/ch02 and would have blessed a snowy-bern flip that silently re-terrained them. Fixed
+with a regression test. **The lesson generalises: `get('tileset', 'snowy-bern')` is the repo-wide
+spelling — a bare `.get()` on that key is a bug.**
 
 **Messie's sprites are DONE and committed; neither is WIRED.** Both need an `art.map_sprite` block
 and an SMS id, and the top-hat sheet additionally needs whatever swaps a unit's sprite at the ch07
@@ -40,10 +44,10 @@ beat. ⚠️ The finished art is the WHOLE animal, which settles the conflict wi
 (head-and-neck only, 2026-08-26) in favour of the sprite — **that note is now the stale half.**
 Rewrite it when Messie is wired, not before.
 
-**A reusable placement previewer landed with #360**: it renders a placement on the real metatile
-art and reads positions from the chapter YAML once authored, or a concept JSON while they are
-being chosen. ch07 and ch08 get their placement conversations on it. Concept files for ch06's four
-options are in the untracked `map-review/ch06-placement/`.
+**`tools/map_placement_preview.py` is on `main` now** — it renders a placement on the real
+metatile art and reads positions from the chapter YAML, or a concept JSON while they are being
+chosen. ch07 and ch08 get their placement conversations on it. ch06's concept files are in the
+untracked `map-review/ch06-placement/`.
 
 ## Owed, filed, not started
 
