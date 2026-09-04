@@ -2264,20 +2264,36 @@ class RavisinPortrait(unittest.TestCase):
         .number = 0xb9,
         .defaultClass = CLASS_GORGON,
         .miniPortrait = 0x4,
+    },
+    [0xb4 - 1] = {
+        .baseLevel = 1,
+        .nameTextId = 0x255,
+        .number = 0xb4,
+        .defaultClass = CLASS_BAEL,
+        .miniPortrait = 0x4,
+    },
+    [0xb5 - 1] = {
+        .baseLevel = 1,
+        .nameTextId = 0x255,
+        .number = 0xb5,
+        .defaultClass = CLASS_BAEL,
+        .miniPortrait = 0x4,
     },'''
         patched = bc.raw_pid_portrait_data(source, self.CAMPAIGN)
         self.assertIn('.nameTextId = 0x246,', patched)
         self.assertIn('.portraitId = 0x48,', patched)
-        # Ravisin is the only DRESSED raw pid; the moose is named without a bust, and the grell
-        # takes neither -- so exactly one name plate stays generic.
+        # Ravisin is the only DRESSED raw pid; the moose and ch06's two boats are named without
+        # a bust, and the grell takes neither -- so exactly one name plate stays generic.
         self.assertEqual(1, patched.count('.portraitId'))
         self.assertIn('.nameTextId = 0xD4C,', patched)
+        self.assertIn('.nameTextId = 0xD4D,', patched)   # the Burly Ram
+        self.assertIn('.nameTextId = 0xD4E,', patched)   # the Pronged Goat
         self.assertEqual(1, patched.count('.nameTextId = 0x255,'))
         # ...and every raw-pid boss leaves with a baseLevel matching its deploy level, so the
         # difficulty malus cannot reset its line (#303, RAW_PID_LEVEL_SOURCES).
         self.assertIn('.baseLevel = 7,', patched)      # Ravisin, level 7
         self.assertIn('.baseLevel = 3,', patched)      # the kobold brute, level 3
-        self.assertEqual(3, patched.count('.miniPortrait = 0x4,'))
+        self.assertEqual(5, patched.count('.miniPortrait = 0x4,'))
 
         for chapter_yaml, uid in ((bc.CH05_CHAPTER_YAML, 'ravisin'),
                                   (bc.CH03_CHAPTER_YAML, 'grell')):
@@ -5536,7 +5552,7 @@ class HostedChapterEnumeration(unittest.TestCase):
         self.assertEqual(got, {'prologue': bc.PROLOGUE_HOST_INDEX,
                                'ch01': bc.CH01_HOST_INDEX, 'ch02': bc.CH02_HOST_INDEX,
                                'ch03': bc.CH03_HOST_INDEX, 'ch04': bc.CH04_HOST_INDEX,
-                               'ch05': bc.CH05_HOST_INDEX})
+                               'ch05': bc.CH05_HOST_INDEX, 'ch06': bc.CH06_HOST_INDEX})
 
     def test_each_entry_carries_the_event_group_its_injector_fills(self):
         groups = {c.name: c.event_group for c in bc.hosted_chapters()}
@@ -5548,7 +5564,7 @@ class HostedChapterEnumeration(unittest.TestCase):
         """Not by name -- 'ch01' sorts before 'prologue', and a name sort against a
         sorted() scan is a test that cannot fail."""
         self.assertEqual([c.name for c in bc.hosted_chapters()],
-                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'])
+                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06'])
 
     def test_every_injector_in_this_module_is_enrolled(self):
         """Discovery only covers a chapter that spells its constants right. An
@@ -7244,6 +7260,113 @@ class ChapterTraps(unittest.TestCase):
         for symbol, body in written.items():
             self.assertTrue(symbol.startswith('TrapData_Event_'), symbol)
             self.assertIn('TRAP_NONE', body)
+
+
+class AssetTableCeiling(unittest.TestCase):
+    """gChapterDataAssetTable is addressed by NINE u8 fields of struct ROMChapterData, so 255 is
+    the last index the engine can reach (decisions.md -> "The asset table is addressed by a u8").
+
+    ch06 is the chapter that hit it: vanilla's 236 entries plus ch00-ch05's 19 appends is 255
+    exactly, and ch06 registers four more. The ONLY thing that caught it was agbcc's `-Werror`
+    on an implicit truncation in generated code -- so these are the gates that catch the next
+    one before the compiler has to.
+    """
+
+    TABLE = 'gChapterDataAssetTable'
+    # Every u8 field of a vanilla chapter entry that indexes the table. Spelled out here rather
+    # than imported, so a silent edit to the module's own tuple fails this test instead of
+    # travelling through it -- a PARTIAL list is the specific mistake that made the first read
+    # of this problem report 60 free slots that were all ChapterEventGroups.
+    INDEX_FIELDS = ('obj1Id', 'obj2Id', 'paletteId', 'tileConfigId', 'mainLayerId',
+                    'objAnimId', 'paletteAnimId', 'changeLayerId')
+
+    def _vanilla_table(self):
+        return bc.vanilla_decomp_text('data/data_8B363C.s')
+
+    def test_every_index_field_the_engine_reads_is_counted(self):
+        self.assertEqual(set(bc._ASSET_ID_FIELDS), set(self.INDEX_FIELDS))
+
+    def test_vanilla_has_no_unreferenced_entry_at_all(self):
+        """The reason reclaiming from never-loaded chapters is the only answer: there is no
+        free list to find. Counting only `map.*` says otherwise, and says it convincingly."""
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        used = set()
+        for chapter in vanilla['chapters']:
+            used |= bc._chapter_asset_ids(chapter)
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'asset_table.s')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(self._vanilla_table())
+            with open(path, encoding='utf-8') as f:
+                lines = f.read().splitlines(keepends=True)
+            _start, rows = bc._asm_table_words(lines, self.TABLE, path)
+        self.assertEqual([i for i in range(len(rows)) if i not in used], [])
+
+    def test_the_reclaim_pool_never_offers_a_reserved_slot(self):
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        reserved = set()
+        for chapter in vanilla['chapters'][:bc.ASSET_TABLE_RESERVED_SLOTS]:
+            reserved |= bc._chapter_asset_ids(chapter)
+        pool = set(bc.reclaimable_asset_slots())
+        self.assertTrue(pool, 'the pool is empty -- every new chapter asset would fail')
+        self.assertEqual(pool & reserved, set())
+
+    def test_our_own_host_slots_are_inside_the_reserve(self):
+        """The reserve is stated as a slot COUNT, so it has to actually cover where we host."""
+        from inject import hosts
+        for chapter in hosts.hosted_chapters():
+            self.assertLess(chapter.host_index, bc.ASSET_TABLE_RESERVED_SLOTS, chapter.name)
+
+    def _claim(self, count, table=None):
+        vanilla = self._vanilla_table()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'data_8B363C.s')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(table if table is not None else vanilla)
+            got = bc._claim_asm_table_words(
+                path, self.TABLE, ['MS_TestAsset%d' % i for i in range(count)],
+                vanilla_source=vanilla)
+            with open(path, encoding='utf-8') as f:
+                return got, f.read()
+
+    def test_it_appends_while_the_index_is_still_addressable(self):
+        got, written = self._claim(3)
+        self.assertEqual(got, [236, 237, 238])
+        self.assertNotIn('reclaimed', written)
+
+    def test_it_reclaims_once_the_ceiling_is_reached_and_never_exceeds_it(self):
+        # 20 more than vanilla's 236: the first 20 fit (236..255), the rest must be reclaimed.
+        got, written = self._claim(24)
+        self.assertEqual(got[:20], list(range(236, 256)))
+        self.assertTrue(all(i < bc.ASSET_TABLE_CEILING for i in got), got)
+        self.assertEqual(len(set(got)), len(got), 'a slot was handed out twice')
+        self.assertEqual(written.count('/* reclaimed:'), 4)
+        # ...and the reclaimed ones are pool slots, not arbitrary ones.
+        for index in got[20:]:
+            self.assertIn(index, bc.reclaimable_asset_slots())
+
+    def test_a_full_table_fails_loudly_rather_than_truncating(self):
+        real = bc.reclaimable_asset_slots
+        bc.reclaimable_asset_slots = lambda: []
+        try:
+            with self.assertRaises(SystemExit) as caught:
+                self._claim(21)
+        finally:
+            bc.reclaimable_asset_slots = real
+        self.assertIn('is full', str(caught.exception))
+
+    def test_a_reclaimed_slot_is_still_findable_by_name(self):
+        """_asm_table_word_index is how a later injector finds a tileset piece, and a reclaimed
+        entry carries a trailing comment. Matching the raw line would find every APPENDED asset
+        and miss exactly the reclaimed ones."""
+        vanilla = self._vanilla_table()
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'data_8B363C.s')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(vanilla)
+            got = bc._claim_asm_table_words(
+                path, self.TABLE, ['MS_A%d' % i for i in range(22)], vanilla_source=vanilla)
+            self.assertEqual(bc._asm_table_word_index(path, self.TABLE, 'MS_A21'), got[21])
 
 
 if __name__ == '__main__':

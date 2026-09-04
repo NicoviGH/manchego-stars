@@ -115,7 +115,8 @@ class EnrolmentIsAGate(unittest.TestCase):
 
     def test_it_finds_the_injectors_in_the_source(self):
         found = hosts.injector_chapters()
-        self.assertEqual(found, ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'])
+        self.assertEqual(found,
+                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06'])
 
     def test_it_reads_source_rather_than_importing(self):
         blocker = _BlockImports('PIL', 'yaml', 'numpy')

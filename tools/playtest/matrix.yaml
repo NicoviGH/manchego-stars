@@ -87,6 +87,8 @@ rom_configs:
   ch05endingbasildied:
     CH05BOOT: 1
     CH05ENDING: basil-died
+  ch06boot:
+    CH06BOOT: 1
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:

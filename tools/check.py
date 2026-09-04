@@ -684,6 +684,10 @@ INJECTION_ORDER = [
     ('inject_ch04', 'inject_ch05',
      "chapter hosts are injected in campaign order; chain_ch04_to_ch05 rewrites ch04's "
      'dev-placeholder landing, which inject_ch04 must have written first'),
+    ('inject_ch05', 'inject_ch06',
+     "chapter hosts are injected in campaign order; chain_ch05_to_ch06 rewrites ch05's "
+     'dev-placeholder landing, which inject_ch05 must have written first -- and ch06 appends '
+     "its boats' name plates past ch05's moose, which set_message_body requires be dense"),
 ]
 
 

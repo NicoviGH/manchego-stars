@@ -6,10 +6,16 @@
 id: ch06-the-maer-monster
 title: "The Maer Monster"
 chapter_number: 6
-status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
-                               # re-grounded against vanilla + party data when the slice is reached
-                               # (brainstorming skill digests this). Exempt from the parity gate until then.
+status: active                 # the slice is reached: roster/levels/AI re-grounded against vanilla
+                               # Ch6 unit by unit (#334), the map is painted and compiled (#331),
+                               # the placement is authored (#360), and the chapter is HOSTED on
+                               # slot 7 (#26). In the parity gate from here.
 milestone: M3
+traps: []                      # DECLARED empty (#302/#306). ch06 fills `Ch7EventData`, and vanilla
+                               # Ch7 ships TWO BALLISTAE in `TrapData_Event_Ch7` -- at Ch7's
+                               # coordinates, on Ch7's map. Inheriting them would put siege engines
+                               # on a frozen lake wherever those tiles happen to land. A lake has no
+                               # ballista emplacement, so the field is cleared rather than re-sited.
 cadence: marquee_setpiece       # see docs/CHAPTERS.md — 🎬 (the Navarre/Joshua moment)
 # DONOR and BAR are SEPARATE, and deliberately different chapters (Nicolas, 2026-08-28).
 # The layout is Ephraim's Ch13; the enemy-pressure bar stays vanilla Ch6. Same split ch01

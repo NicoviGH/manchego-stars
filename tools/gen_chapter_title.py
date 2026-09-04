@@ -41,6 +41,11 @@ WORDS = {
     # img6 is "Ch.5: The Empire's Reach" -- vanilla Ch5's card, which is the chapter ch05
     # is a 1:1 retile of AND the card our host slot (6) overwrites. Same source either way.
     'Ch.5:':     (6, 18, 52),   # "Ch.5: The Empire's Reach" -- vanilla's own chapter prefix
+    # img7 is "Ch.6: Victims of War" -- vanilla Ch6's card, which is BOTH the chapter ch06
+    # takes its enemy-pressure bar from and the card our host slot (7) overwrites. Same
+    # source either way, exactly as ch05's prefix is (the LETTERS atlas already cuts its
+    # 'm' and 'W' out of this card).
+    'Ch.6:':     (7, 31, 65),   # "Ch.6: Victims of War" -- vanilla's own chapter prefix
     'The':       (0, 74, 96),
 }
 

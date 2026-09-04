@@ -30,6 +30,7 @@ def main():
     inject_ch03(c)
     inject_ch04(c)
     inject_ch05(c)
+    inject_ch06(c)
     if test:
         inject_test_chapter(c)
     else:
