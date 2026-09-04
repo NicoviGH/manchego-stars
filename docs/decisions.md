@@ -8298,12 +8298,28 @@ ROM, which is the proof the pipeline is whole. #335's derivation is sound and no
 re-deriving; *"AI behaviour is MEASURED and REPORTED, not weighted into threat"* still holds, since
 copied-wholesale bytes match the twin on both halves.
 
-**What it does invalidate** is the read-back. `AI_BEHAVIOUR`, `ai_family`, `behaviour_split` and
-`make chapter`'s behaviour column all key on `ai[1]` alone; `ai[0]` is read in exactly one place in
-the repo (ch05's escort). So the split's premise — *"a unit that never moves contributes nothing
-until the player enters its range"* — is false for 48 of 51 units, and #344's kept deliverable is
-the part that misreports. Note the shape of it: #344's own corollary was a coverage gap in this same
-table along the AI_B axis. Same bug class, one dimension over.
+**What it invalidated** was the read-back, now fixed in the same change. `AI_BEHAVIOUR`,
+`ai_family`, `behaviour_split` and `make chapter`'s behaviour column all keyed on `ai[1]` alone, so
+the split's premise — *"a unit that never moves contributes nothing until the player enters its
+range"* — was false for 48 of 51 units, and #344's kept deliverable was the part that misreported.
+Note the shape of it: #344's own corollary was a coverage gap in this same table along the AI_B
+axis. Same bug class, one dimension over.
+
+The report now names both halves and derives a THREE-way shape from the pair, because two buckets
+could not express the case that actually shipped:
+
+- **pursuer** — the approach walks it across the map at you.
+- **striker** — it holds ground, but its ACTION steps out within its own move range. `{engage,
+  never-move}` is vanilla's commonest pairing and most of every roster; this is the bucket that did
+  not exist.
+- **statue** — it holds ground and does not move at all, even to attack. Four units campaign-wide.
+
+`AI_ACTION` is pinned against `gAi1ScriptTable` by a test on the same discipline `AI_BEHAVIOUR`
+follows: the twelve entries the decomp gives only an address (0x09–0x14) stay UNNAMED rather than
+guessed at. `ai_shape` takes the vector and **raises on a bare int**, because a stale
+`ai_shape(ai[1])` would classify a whole roster off half the information and look entirely correct
+— which is precisely how this defect survived. `map_placement_preview`'s `is_boss` special case is
+deleted: it was standing in for the AI_A half it could not see, and it was wrong in both directions.
 
 **Why it surfaced on ch06 and not earlier.** It needs a killable unit parked inside a static's
 reach. Vanilla Ch6's entire red force is `ActionInRange x26 / ActionStanding x1` — **no

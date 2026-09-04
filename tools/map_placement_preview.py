@@ -161,7 +161,10 @@ def placed_units(chapter, concept=None):
         tiles = override.get(eid, enemy.get('positions') or [])
         for i, tile in enumerate(tiles):
             ai = dif.enemy_ai_bytes(chapter, enemy, i)
-            behaviour = 'hold-position' if enemy.get('is_boss') else cs.ai_family(ai[1])
+            # Derived from the WHOLE vector, never patched by role: `is_boss` was standing in
+            # for the AI_A half this could not see, and it was wrong in both directions -- a
+            # non-boss statue read as mobile, and a boss with an engaging action read as static.
+            behaviour = cs.ai_shape(ai) or cs.ai_family(ai[1]) or '?'
             code = 'B' if enemy.get('is_boss') else ROLE_CODE.get(enemy.get('class'), '??')
             late = enemy.get('arrives_turn') or enemy.get('hard_mode_only')
             out.append((tuple(tile), code, behaviour, eid, late))

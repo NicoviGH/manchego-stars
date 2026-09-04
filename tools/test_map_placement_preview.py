@@ -76,10 +76,18 @@ class Board(unittest.TestCase):
         units = pp.placed_units(self.chap)
         self.assertEqual(len(units), sum(int(e.get('count', 1))
                                          for e in self.chap['enemy_units']))
+        # SHAPES, derived from the whole AI vector, not the approach byte alone. `striker` is
+        # the one the old two-label vocabulary could not say: holds ground, but steps out
+        # within its own move range to strike. It is most of this roster, and reading those
+        # units as `never-move` is what let ch06's clock be designed around a line that in
+        # fact walks to the boats (decisions.md -> "AI_B is the APPROACH and AI_A is the
+        # ACTION"). The boss is `statue` because his VECTOR says so -- GuardTileAI, inherited
+        # from Novala -- rather than because an `is_boss` flag patched the label.
         behaviours = {b for _, _, b, _, _ in units}
-        self.assertIn('never-move', behaviours)
-        self.assertIn('pursue', behaviours)
-        self.assertIn('hold-position', behaviours)          # the boss, flagged by is_boss
+        self.assertIn('striker', behaviours)
+        self.assertIn('pursuer', behaviours)
+        self.assertIn('statue', behaviours)
+        self.assertNotIn('hold-position', behaviours)
 
     def test_no_enemy_stands_where_its_class_cannot(self):
         """The failure this tool exists to make impossible: a coordinate that looks fine on
