@@ -9587,6 +9587,14 @@ scenarios.ch06clock = function()
             if hp < h.hp then
                 log(string.format("ch06clock: %s took %d on enemy phase %d -- reds within 3:",
                     b.id, h.hp - hp, t))
+                -- Put the CAMERA on the hull before the frame. Headless this is a no-op and
+                -- the roster dump below is the whole reading; headed (PT_HEADED=1 PT_FPS=60)
+                -- it photographs who is actually standing around the boat, which is the
+                -- question the emitted unit table could not answer.
+                cursorTo(b.x, b.y)
+                wait(90)                -- the map scrolls to the cursor; shooting before it
+                                        -- arrives photographs wherever the fight happened to be
+                shot(string.format("%s-hit-turn%d", b.id, t))
                 for i = 0, 49 do
                     local r = unitAt(SYM.gUnitArrayRed, i)
                     if r and not isDead(r) and r.onMap and dist(r.x, r.y, b.x, b.y) <= 3 then
