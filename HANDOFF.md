@@ -12,43 +12,38 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Three PRs, all open, all awaiting `/code-review` — Nicolas runs it, the author never reviews
-their own (#349).** Each is off `main` and independent of the others; none is stacked.
-
-| PR | branch | what |
-|---|---|---|
-| **#360** | `ch06-enemy-positions` | ch06's 24 enemy positions + the boat POCKETS |
-| **#361** | `fix/economy-delivery-vehicles` | the item-economy reader learns two vehicles |
-| **#362** | `fix/sprite-editor-preview-repaint` | the idle preview repaints on frame boundaries |
-
-`make check` clean and `make test` green (1,829 cases) as of the last commit on each.
-
-**#360 is the ch06 slice's placement step, and it is DONE pending review.** The reasoning is two
+**#360 — ch06's enemy positions + the boat pockets.** Open, rebased on `main`, awaiting
+`/code-review` (Nicolas runs it; the author never reviews their own, #349). Reasoning is two
 ADRs in `docs/decisions.md` — *"ch06's boats sit in POCKETS…"* and *"Vanilla Ch6's urgency is
-TRAVEL TIME, not a fuse"* — plus the PR body. Do not re-derive it from the diff. The one-line
-version: vanilla Ch6's villager is 7 HP at Def 0 so contact is death, nothing can reach it before
-turn 7, and its mountain pocket locks out unpromoted cavalry entirely; ours reproduces that
-BUDGET (foot turn 6 either door, hulls sink turn 7 and 8) rather than the mechanism.
+TRAVEL TIME, not a fuse"* — plus the PR body. Do not re-derive it from the diff.
 
-⚠️ **Two things #360 does NOT prove, deliberately.** ch06 has no debug boot, so nobody has watched
-(a) an enemy AI path to a single melee tile and queue rather than stall, or (b) Talk fire from the
-door. Both are cheap the moment ch06 is hosted and get a `ch06boot`; neither should be assumed
-before then.
+⚠️ **Two things #360 does NOT prove**, and cannot until ch06 is hosted: that enemy AI paths to a
+single melee tile and QUEUES rather than stalling, and that Talk fires from the door. Both are one
+instrumented run once `ch06boot` exists.
 
-**#360 brings a reusable placement-preview tool** (arrives with that branch, so it is not on `main`
-yet): it renders a placement on the real metatile art and reads positions from the chapter YAML
-once authored, or a concept JSON while they are being chosen. ch07 and ch08 get their placement
-conversations on it for free. Concept files for the four ch06 options are in the untracked
-`map-review/ch06-placement/`.
+**`ch06-host` — hosting groundwork, stacked on #360, COMMITTED RED ON PURPOSE.** Declaring a host
+slot is what enrols a chapter in the guards, so it is also what makes them demand the rest. Two
+suites are red and only on `inject_ch06`: `test_event_group_census` and `test_build_campaign`.
+**Everything settled about it — the derived host slot, event group, message block, goal donor,
+tileset stem, deploy tiles, and the remaining checklist — is a comment on #26 dated 2026-09-03.
+Read that, not this file, and do not re-derive any of it.**
 
-**Messie's map sprite is FINISHED (Nicolas, 2026-09-03) and committed** — see the art PR. Painted
-in the sprite editor: 32x96 indexed on the cast palette, a plesiosaur whose two held idle frames
-differ only in the front flippers. He is NOT wired in yet: he still needs an `art.map_sprite`
-block and an SMS id before he appears in game.
+**Merged 2026-09-03:** #361 (the item-economy reader learns two delivery vehicles — a boat's Talk
+and `save_all_bonus`, so ch06 stops reading as impoverished and ch05's five gifts land 1:1 on
+vanilla's), #362 (sprite editor: Finish works for scratch characters, the preview repaints on
+frame boundaries, and the two-pose idle rule is bounded), #363 (Messie's map sprite and a top-hat
+variant for ch07's mayor beat, both painted by Nicolas).
 
-⚠️ **His reference is the WHOLE animal, which contradicts ch06's `art_note`** (head-and-neck only,
-2026-08-26) — and the finished sprite settles it in favour of the whole animal, so **that note is
-now the stale one**. Update it when Messie is wired, not before.
+**Messie's sprites are DONE and committed; neither is WIRED.** Both need an `art.map_sprite` block
+and an SMS id, and the top-hat sheet additionally needs whatever swaps a unit's sprite at the ch07
+beat. ⚠️ The finished art is the WHOLE animal, which settles the conflict with ch06's `art_note`
+(head-and-neck only, 2026-08-26) in favour of the sprite — **that note is now the stale half.**
+Rewrite it when Messie is wired, not before.
+
+**A reusable placement previewer landed with #360**: it renders a placement on the real metatile
+art and reads positions from the chapter YAML once authored, or a concept JSON while they are
+being chosen. ch07 and ch08 get their placement conversations on it. Concept files for ch06's four
+options are in the untracked `map-review/ch06-placement/`.
 
 ## Owed, filed, not started
 
@@ -60,13 +55,12 @@ now the stale one**. Update it when Messie is wired, not before.
 
 ## Next task
 
-**ch06 placement is done and in review (#360).** What the ch06 slice still owes, in the order the
-issue lists it: host slot + `inject_ch06` (which owes `_register_tileset` for `SnowIce` or the
-first build exits), the five enemy reskins, all four scripts, Messie's art, and a `ch06boot`
-scenario. **#26 carries the checklist** — read the issue for scope, not this file.
+**Write `inject_ch06`** (~350 lines against `inject_ch05`; `docs/adding-a-chapter.md` is the
+recipe). The full checklist and every settled constant is the #26 comment dated 2026-09-03.
+Then one build and ONE instrumented run to close #360's two open questions above.
 
-The build obligations and the map geometry live in two comments on **#26** dated 2026-08-31, and
-the placement reasoning is in `docs/decisions.md`. Nothing about ch06 belongs here.
+Dialogue stays deferred: ch06's scenes are declared with empty text on purpose, and the boat
+crews still need voice rows before a line is drafted.
 
 ## Map sprites — read before any art session
 
