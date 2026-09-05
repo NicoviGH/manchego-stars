@@ -699,6 +699,77 @@ class DeclaredLevelsEverywhere(unittest.TestCase):
         self.assertEqual(df._entry_body_count({'composition': ['a', 'b', 'c']}), 3)
 
 
+class RoleFindingsGradeTypesNotBodies(unittest.TestCase):
+    """`role_findings` asks a per-UNIT question -- is this unit's threat an outlier, is this
+    boss too soft -- and the answer is a property of the unit type, not of how many copies
+    stand on the map. Expanding it per body repeated every warning `count` times and made
+    the boss census count copies: ch08's `count: 4` ice-troll read as "4 units flagged
+    is_boss (ice-troll, ice-troll, ice-troll, ice-troll)". `role` is a `--check` gate arm,
+    so that reds CI on the first locked chapter with a multi-copy boss entry."""
+
+    def _ch08(self):
+        # ch08 is `status: planned`, so it has no host slot and no CH08_CHAPTER_YAML --
+        # read the file directly. It is the live case: a `count: 4` boss entry.
+        with open(df.chapter_path('rime-of-the-frostmaiden', 'ch08'), encoding='utf-8') as f:
+            return bc.yaml.safe_load(f)
+
+    def test_a_multi_copy_boss_entry_is_ONE_boss(self):
+        findings = df.role_findings(self._ch08(), self._ch08().get('parity_reference'))
+        census = [f for f in findings if 'flagged is_boss' in f]
+        self.assertEqual(census, [], census)
+
+    def test_a_warning_is_stated_once_per_unit_type(self):
+        findings = df.role_findings(self._ch08(), self._ch08().get('parity_reference'))
+        self.assertEqual(len(findings), len(set(findings)), findings)
+
+    def test_bodies_at_DIFFERENT_levels_are_different_types(self):
+        # `levels: [2, 3]` is two distinct units and both get graded; `count: 2` is one.
+        ed = {'id': 'w', 'class': 'general', 'levels': [19, 20], 'is_boss': True,
+              'inventory': [{'id': 'silver-lance'}]}
+        self.assertEqual(len(df._entry_combatants(ed, distinct=True)), 2)
+        self.assertEqual(len(df._entry_combatants(dict(ed, levels=None, level=20, count=2),
+                                                  distinct=True)), 1)
+
+
+class GuardsSeeTheWholeRoster(unittest.TestCase):
+    def test_the_boss_malus_guard_reads_every_roster_key_and_declared_level(self):
+        # `_our_base_level` treats every boss as malus-immune; this guard is what makes that
+        # true. A boss declared under `reinforcements:`, or one whose level comes from
+        # `levels:`, was invisible to it while still riding the assumption.
+        donor = sorted(bc.ENEMY_BASE_SLOT.items())[0]
+        uid, slot = donor
+        over = df._character_base_level(slot) + 5
+        chap = {'reinforcements': [{'id': uid, 'is_boss': True, 'levels': [over],
+                                    'class': 'general'}]}
+        self.assertEqual(df._boss_entries_over_donor_base_level(chap), [uid])
+
+    def test_a_drop_on_a_reinforcement_wave_is_part_of_the_economy(self):
+        chap = {'reinforcements': [{'id': 'w', 'item_drop': 'elixir'}]}
+        self.assertEqual(df.chapter_economy(chap)['drops'], ['elixir'])
+
+    def test_a_bag_entry_is_graded_on_its_real_article(self):
+        # a `composition` entry carrying a personal line was graded at naked class base
+        # once the expander stopped applying it -- the #284 failure mode.
+        ed = {'id': 'bag', 'composition': ['general'], 'level': 10,
+              'personal': {'hp': 20}, 'inventory_by_class': {'general': ['silver-lance']}}
+        plain = df._entry_combatants(ed)[0]
+        real = df._entry_combatants(ed, real_article=True)[0]
+        self.assertEqual(real.hp, plain.hp + 20)
+
+
+class DeclaredCountsMustAgree(unittest.TestCase):
+    def test_positions_and_count_are_cross_checked_even_without_levels(self):
+        # `positions` is what build_campaign zips against; a mismatch models a force the
+        # ROM never emits, and mirror% now compares body-for-body against the twin on it.
+        with self.assertRaises(ValueError):
+            df._body_levels({'id': 'w', 'count': 3, 'level': 2,
+                             'positions': [[0, 6], [0, 7]]})
+
+    def test_agreeing_declarations_pass(self):
+        self.assertEqual(df._body_levels({'count': 2, 'level': 2,
+                                          'positions': [[0, 6], [0, 7]]}), [2, 2])
+
+
 class MirrorShareOnRealChapters(unittest.TestCase):
     """Against the real campaign, because the wiring is the thing under test."""
 

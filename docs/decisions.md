@@ -8519,8 +8519,20 @@ past. That is the `drop_staff` flag, and the output diff is what caught it: ch06
 moved 7.54 → 7.41 and three lords' worst matchups changed, because the menders had silently left
 the field.
 
-Verified by an output diff of every per-chapter report, every `--lord-floor` table and both curve
-reports before and after: **only ch02's numbers move.**
+**A per-unit question is answered per unit TYPE, not per body.** The shared expander yields one
+body per copy, and `role_findings` took it as-is — so ch08's `count: 4` ice-troll read as *"4 units
+flagged is_boss (ice-troll, ice-troll, ice-troll, ice-troll)"* and repeated every warning four
+times. Whether a unit's threat is an outlier does not depend on how many of it stand on the map,
+and `role` is a `--check` gate arm, so that would have redded CI on the first locked chapter with
+a multi-copy boss entry. Hence `distinct`: bodies of one entry collapse unless `levels:` actually
+makes them different units.
+
+**And the output diff has to cover every chapter the tool reads, not the ones the change was
+about.** The first diff ran ch00–ch06 and reported "only ch02 moves" — which was true of those
+seven and false of ch08, a `status: planned` chapter the curve still grades. A planned chapter is
+brainstorm seed, but the tool reads it, so it is part of the tool's output. Verified now over all
+nine chapters, every `--lord-floor` table and all four curve reports (authored + three modes):
+**only ch02's numbers move.**
 
 ## Open Questions (not yet decided)
 

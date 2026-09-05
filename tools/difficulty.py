@@ -309,19 +309,25 @@ def _body_levels(enemy_def):
     levels = enemy_def.get('levels')
     bag = (enemy_def.get('composition') or []) if 'class' not in enemy_def else None
     count = len(bag) if bag else int(enemy_def.get('count', 1))
+    # Every field that states the body count states the SAME fact, so they must agree.
+    # `positions` is the one build_campaign actually zips against, so a mismatch models a
+    # body the ROM never emits -- and mirror% now compares body-for-body against the twin.
+    stated = [(f, n) for f, n in
+              (('composition', len(bag) if bag else None),
+               ('count', int(enemy_def['count']) if 'count' in enemy_def and not bag
+                else None),
+               ('positions', len(enemy_def['positions'])
+                if enemy_def.get('positions') else None),
+               ('levels', len(levels) if levels is not None else None))
+              if n is not None]
+    for field, n in stated:
+        if n != stated[0][1]:
+            raise ValueError('%r declares %s %d but %s %d -- they are the same fact and '
+                             'they disagree'
+                             % (enemy_def.get('id', enemy_def.get('name', 'enemy')),
+                                stated[0][0], stated[0][1], field, n))
     if levels is None:
         return [int(enemy_def.get('level', 1))] * count
-    for field, n in (('composition', len(bag) if bag else None),
-                     ('count', count if 'count' in enemy_def and not bag else None),
-                     ('positions', len(enemy_def['positions'])
-                      if enemy_def.get('positions') else None)):
-        # `positions` is what build_campaign actually zips `levels` against, so a mismatch
-        # there models a body the ROM never emits. Both are the same fact stated twice.
-        if n is not None and n != len(levels):
-            raise ValueError('%r declares %s %d but %d levels (%r) -- they are the same '
-                             'fact and they disagree'
-                             % (enemy_def.get('id', enemy_def.get('name', 'enemy')),
-                                field, n, len(levels), levels))
     return [int(lv) for lv in levels]
 
 
@@ -878,18 +884,25 @@ def bosses_over_their_donor_base_level(campaign):
     CHARACTER_ slots it is merely true today, and at ZERO margin -- Breguet 4/4, Bone 4/4,
     Bazba 6/6. One level bump and the ROM starts applying the malus while the model still
     assumes it does not, which is the silent model/ROM divergence in miniature."""
+    return sorted(uid for chapter in bc.hosted_chapters()
+                  for uid in _boss_entries_over_donor_base_level(
+                      bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))))
+
+
+def _boss_entries_over_donor_base_level(chap):
+    """The same question for ONE loaded chapter, over every roster key and every declared
+    body level. `_entry_combatants` applies the malus-immunity assumption to a boss wherever
+    it is declared, so the guard has to look wherever it is declared."""
     out = []
-    for chapter in bc.hosted_chapters():
-        chap = bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))
-        for enemy in chap.get('enemy_units', []):
-            if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
-                continue
-            donor = bc.ENEMY_BASE_SLOT.get(enemy.get('id'))
-            if not donor:
-                continue
-            if int(enemy.get('level', 1)) > _character_base_level(donor):
-                out.append(enemy.get('id'))
-    return sorted(out)
+    for enemy in chapter_roster_entries(chap):
+        if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
+            continue
+        donor = bc.ENEMY_BASE_SLOT.get(enemy.get('id'))
+        if not donor:
+            continue
+        if max(_body_levels(enemy)) > _character_base_level(donor):
+            out.append(enemy.get('id'))
+    return out
 
 
 def _our_takes_difficulty_shift(enemy_def):
@@ -934,13 +947,19 @@ def chapter_roster_entries(chap):
             if isinstance(ed, dict)]
 
 
-def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff=True):
+def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff=True,
+                      distinct=False):
     """Every BODY one enemy entry places.
 
     `drop_staff` drops a unit carrying no modeled weapon, which is what every PARITY metric
     wants (it can contribute no damage, and `unmodeled_enemies` warns about it separately).
     The cast tables want the opposite: a chapter's healer is a body our units can kill and
     walk past, so `load_field` keeps it.
+
+    `distinct` collapses identical bodies to one, for readers asking a per-unit-TYPE
+    question: whether a unit's threat is an outlier is a property of the unit, not of how
+    many copies of it stand on the map. Two bodies of one entry differ only when `levels:`
+    gives them different levels.
 
     THE entry expander. It was three near-copies -- one in `chapter_units`, one in
     `_entry_combatants`, one in `role_findings` -- which is how `levels:` came to be honored
@@ -953,10 +972,15 @@ def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff
     if 'composition' in ed and 'class' not in ed:
         name = ed.get('id', ed.get('name', 'enemy'))
         by_class = ed.get('inventory_by_class', {})
+        bodies = list(zip(ed.get('composition', []), _body_levels(ed)))
         units = [_one_enemy('%s-%s' % (name, cls), cls, lv,
                             _weapon_for([{'id': w} for w in by_class.get(cls, [])]),
                             mode=mode, shifts=shifts)
-                 for cls, lv in zip(ed.get('composition', []), _body_levels(ed))]
+                 for cls, lv in (dict.fromkeys(bodies) if distinct else bodies)]
+        if real_article:
+            # a bag is generics, so no per-member line -- but an entry-level `personal:` or
+            # donor id describes the GROUP and must still be applied (#284).
+            units = [unit_real_article(ed, c) for c in units]
     else:
         # One body per DECLARED level, not `count` copies of one: a wave authored as
         # `levels: [2, 3]` is an L2 and an L3, which is what the ROM emits. `base_level` is
@@ -964,7 +988,8 @@ def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff
         # against -- reading it off `level:` while the body comes from `levels:` invents a
         # malus the engine never applies.
         units = []
-        for lv in _body_levels(ed):
+        levels = _body_levels(ed)
+        for lv in (dict.fromkeys(levels) if distinct else levels):
             units.extend(enemy_combatants(
                 dict(ed, level=lv), mode=mode, shifts=shifts,
                 base_level=_our_base_level(dict(ed, level=lv)),
@@ -1713,7 +1738,10 @@ def role_findings(chap, parity_ref):
         # THREAT comparisons run on the real article (class base + personal line), the same
         # footing the durability check below has always used. The AGGREGATE metric stays
         # class-base on both sides -- that is a different question and a fair one.
-        for c in _entry_combatants(ed, real_article=True, drop_staff=False):
+        # per-unit questions, so one row per unit TYPE: whether a unit's threat is an
+        # outlier does not depend on how many copies of it the map holds, and counting
+        # copies made a `count: 4` boss entry read as four bosses.
+        for c in _entry_combatants(ed, real_article=True, drop_staff=False, distinct=True):
             ours.append((ed.get('id') or c.name, bool(ed.get('is_boss')), c,
                          bool(ed.get('convertible')), ed.get('tile_terrain')))
     if not ours:
@@ -1942,7 +1970,7 @@ def chapter_economy(chap):
         for it in c.get('contents') or []:
             if it.get('id'):
                 chests.append(it['id'])
-    for ed in chap.get('enemy_units') or []:
+    for ed in chapter_roster_entries(chap):
         if ed.get('item_drop'):
             drops.append(ed['item_drop'])
     pc = chap.get('post_chapter') or {}
