@@ -598,12 +598,105 @@ class ReinforcementsAreOurForce(unittest.TestCase):
         self.assertEqual(p['n_ours'], p['n_vanilla'])
 
     def test_the_wave_is_modeled_at_its_declared_levels(self):
-        levels = sorted(u.name for ed, u in df.chapter_units(self._ch02())
-                        if ed.get('id') == 'rear-raiders')
-        self.assertEqual(len(levels), 2)
+        # `levels: [2, 3]`, so the two bodies must differ -- an L1/L1 pair (the old default)
+        # and an L2/L2 pair (count-expansion of one level) both fail here.
+        bodies = [u for ed, u in df.chapter_units(self._ch02())
+                  if ed.get('id') == 'rear-raiders']
+        self.assertEqual(len(bodies), 2)
+        brig = df._class_base('CLASS_BRIGAND')
+        growths = df._class_growths('CLASS_BRIGAND')
+        self.assertEqual(sorted(b.hp for b in bodies),
+                         sorted(df.autolevel(brig, growths, lv)['baseHP'] for lv in (2, 3)))
 
     def test_ch02_transcribes_its_twin_once_its_wave_is_counted(self):
         self.assertEqual(df.mirror_share(self._ch02())['pct'], 100.0)
+
+
+class OneForceEveryReader(unittest.TestCase):
+    """Widening "what is this chapter's force" for the verdict and leaving the readers around
+    it on `enemy_units` produces a report that contradicts itself on one page: ch02 printed
+    "ours (9 enemies)" two lines above "ours line 7 · reinf 0". Every reader of the force
+    reads the same roster."""
+
+    def _ch02(self):
+        return bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for('ch02'))
+
+    def test_the_dynamics_split_buckets_the_wave_the_verdict_counted(self):
+        g = df.chapter_enemy_groups(self._ch02())
+        self.assertEqual(len(g['reinforcements']), 2)
+        self.assertEqual(sum(len(v) for v in g.values()),
+                         df._chapter_pressure(self._ch02())['n_ours'])
+
+    def test_an_entry_under_a_reinforcement_key_is_a_reinforcement_by_the_KEY(self):
+        # ch02's wave carries `trigger_turn`, not `arrives_turn`: the key it is declared
+        # under is what makes it a reinforcement, and an arrives_turn test alone read it
+        # as turn-1 line.
+        chap = {'reinforcements': [{'id': 'w', 'class': 'brigand', 'level': 2,
+                                    'inventory': [{'id': 'iron-axe'}]}]}
+        g = df.chapter_enemy_groups(chap)
+        self.assertEqual(len(g['reinforcements']), 1)
+        self.assertEqual(g['line'], [])
+
+    def test_a_staff_only_wave_is_reported_as_unmodeled(self):
+        chap = {'reinforcements': [{'id': 'healer', 'class': 'priest', 'level': 3,
+                                    'is_boss': True, 'inventory': [{'id': 'heal'}]}]}
+        self.assertEqual([d['id'] for d in df.unmodeled_enemies(chap)], ['healer'])
+
+    def test_the_cast_tables_grade_the_same_force_as_the_verdict(self):
+        chap, roster, line, bosses, cap, labels = df.load_field(
+            'rime-of-the-frostmaiden', 'ch02')
+        self.assertEqual(len(line) + len(bosses),
+                         df._chapter_pressure(chap)['n_ours'])
+
+    def test_role_findings_grade_a_unit_declared_under_a_reinforcement_key(self):
+        # a monstrous boss hidden under `reinforcements:` was invisible to the per-unit
+        # gate arm while contributing its threat to the aggregate.
+        chap = {'parity_reference': 'FE8 Prologue',
+                'reinforcements': [{'id': 'sleeper', 'class': 'general', 'level': 20,
+                                    'is_boss': True,
+                                    'inventory': [{'id': 'silver-lance'}]}]}
+        self.assertTrue(any('sleeper' in f for f in df.role_findings(chap, 'FE8 Prologue')))
+
+
+class DeclaredLevelsEverywhere(unittest.TestCase):
+    def test_a_composition_wave_honors_its_per_body_levels(self):
+        chap = {'parity_reference': 'FE8 Prologue',
+                'enemy_units': [{'id': 'a', 'composition': ['fighter', 'fighter'],
+                                 'levels': [1, 2]}]}
+        self.assertEqual(df.mirror_share(chap)['shared'], 2)
+
+    def test_levels_must_agree_with_the_positions_the_rom_zips_them_against(self):
+        with self.assertRaises(ValueError):
+            df._body_levels({'levels': [2, 3], 'positions': [[0, 6]]})
+
+    def test_a_composition_declares_its_body_count_too(self):
+        # the bag's length is the body count, so `levels:` must match it -- indexing past
+        # the list would raise IndexError deep in the expander instead of naming the entry.
+        with self.assertRaises(ValueError):
+            df._body_levels({'id': 'bag', 'composition': ['fighter', 'fighter'],
+                             'levels': [1]})
+
+    def test_a_composition_without_levels_is_one_body_per_member(self):
+        self.assertEqual(df._body_levels({'composition': ['a', 'b'], 'level': 4}), [4, 4])
+
+    def test_a_boss_carries_ITS_bodys_level_as_its_malus_floor(self):
+        # `base_level` is the >= baseLevel gate a difficulty malus floors against. Reading
+        # it off `level:` while the body comes from `levels:` gives a boss base_level 1 and
+        # a malus the ROM never applies.
+        chap = {'enemy_units': [{'id': 'b', 'class': 'general', 'is_boss': True,
+                                 'levels': [10],
+                                 'inventory': [{'id': 'silver-lance'}]}]}
+        shifts = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+        plain = df.chapter_units(chap)[0][1]
+        shifted = df.chapter_units(chap, mode='tutorial', shifts=shifts)[0][1]
+        self.assertEqual(plain.hp, shifted.hp)   # boss is at its baseLevel: no malus
+
+    def test_solo_contributors_counts_BODIES_not_the_count_field(self):
+        # a `levels:`-only entry has no `count:`; reading count as 1 made every body of it
+        # eligible for the single-unit NOTE.
+        self.assertEqual(df._entry_body_count({'levels': [2, 3, 4]}), 3)
+        self.assertEqual(df._entry_body_count({'count': 2, 'level': 3}), 2)
+        self.assertEqual(df._entry_body_count({'composition': ['a', 'b', 'c']}), 3)
 
 
 class MirrorShareOnRealChapters(unittest.TestCase):

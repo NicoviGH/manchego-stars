@@ -8495,11 +8495,32 @@ So there are **two** copy-x1.00 chapters, not one, and #367's "mirror% climbs as
 pipeline improves" reads differently: ch02 was already a transcription in 2026-08, and the
 instrument was hiding it.
 
-The fix is one function, `chapter_roster_entries`, which answers *"what is this chapter's force"*
-once, over `AI_ROSTER_KEYS` — the same three keys the AI guard already iterates. The parity metric
-and the AI guard can no longer disagree about which units a chapter fields. Verified by an output
-diff of every per-chapter report and both curve reports before and after: **only ch02's numbers
-move.**
+The fix is two functions and it is the general form, not a patch on ch02:
+
+- `chapter_roster_entries` answers *"what is this chapter's force"* once, over `AI_ROSTER_KEYS` —
+  the same three keys the AI guard already iterates, `enemy_reinforcements` included. The parity
+  metric and the AI guard can no longer disagree about which units a chapter fields.
+- `_entry_combatants` is the single entry expander. It was three near-copies — one in
+  `chapter_units`, one of its own, one inside `role_findings` — which is precisely how `levels:`
+  came to be honored in one reader and defaulted to L1 in the others. Body count, per-body level
+  and the `levels:`↔`count`/`positions`/`composition` guard all live in `_body_levels` now.
+
+**A widened definition has to reach every reader or it makes the report contradict itself.** The
+first attempt adopted the new roster in the verdict alone, and `--chapter ch02` then printed *"ours
+(9 enemies)"* two lines above *"ours line 7 · reinf 0"*. Five readers were still on
+`chap['enemy_units']`: the dynamics split, the unmodeled-boss warning (a gate hole — a staff-only
+boss under `reinforcements:` raised no BOSS DROPPED), `load_field`'s cast tables, `role_findings`
+(an arm of the parity gate, so a boss parked under `reinforcements:` could never be graded
+per-unit), and `solo_contributors`.
+
+One thing the shared expander must NOT unify: the parity metrics drop a unit with no modeled
+weapon, and the cast tables must not — a chapter's healer is a body our units can kill and walk
+past. That is the `drop_staff` flag, and the output diff is what caught it: ch06's throughput
+moved 7.54 → 7.41 and three lords' worst matchups changed, because the menders had silently left
+the field.
+
+Verified by an output diff of every per-chapter report, every `--lord-floor` table and both curve
+reports before and after: **only ch02's numbers move.**
 
 ## Open Questions (not yet decided)
 

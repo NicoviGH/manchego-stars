@@ -307,15 +307,28 @@ def _body_levels(enemy_def):
     declarations of the same fact contradicting each other, so it raises rather than
     truncating the way a bare zip() would."""
     levels = enemy_def.get('levels')
-    count = int(enemy_def.get('count', 1))
+    bag = (enemy_def.get('composition') or []) if 'class' not in enemy_def else None
+    count = len(bag) if bag else int(enemy_def.get('count', 1))
     if levels is None:
         return [int(enemy_def.get('level', 1))] * count
-    if 'count' in enemy_def and len(levels) != count:
-        raise ValueError('%r declares count %d but %d levels (%r) -- they are the same '
-                         'fact and they disagree'
-                         % (enemy_def.get('id', enemy_def.get('name', 'enemy')),
-                            count, len(levels), levels))
+    for field, n in (('composition', len(bag) if bag else None),
+                     ('count', count if 'count' in enemy_def and not bag else None),
+                     ('positions', len(enemy_def['positions'])
+                      if enemy_def.get('positions') else None)):
+        # `positions` is what build_campaign actually zips `levels` against, so a mismatch
+        # there models a body the ROM never emits. Both are the same fact stated twice.
+        if n is not None and n != len(levels):
+            raise ValueError('%r declares %s %d but %d levels (%r) -- they are the same '
+                             'fact and they disagree'
+                             % (enemy_def.get('id', enemy_def.get('name', 'enemy')),
+                                field, n, len(levels), levels))
     return [int(lv) for lv in levels]
+
+
+def _entry_body_count(enemy_def):
+    """How many BODIES one entry places -- one per declared level, and `composition` is a
+    bag of generics whose length IS that count."""
+    return len(_body_levels(enemy_def))
 
 
 def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=True):
@@ -921,6 +934,46 @@ def chapter_roster_entries(chap):
             if isinstance(ed, dict)]
 
 
+def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff=True):
+    """Every BODY one enemy entry places.
+
+    `drop_staff` drops a unit carrying no modeled weapon, which is what every PARITY metric
+    wants (it can contribute no damage, and `unmodeled_enemies` warns about it separately).
+    The cast tables want the opposite: a chapter's healer is a body our units can kill and
+    walk past, so `load_field` keeps it.
+
+    THE entry expander. It was three near-copies -- one in `chapter_units`, one in
+    `_entry_combatants`, one in `role_findings` -- which is how `levels:` came to be honored
+    in one reader and defaulted to L1 in the others.
+
+    `real_article` folds in the entry's personal line (#285); the aggregate metrics want
+    class base on both sides and pass it False. A `composition` entry is a bag of GENERICS,
+    so it never takes one.
+    """
+    if 'composition' in ed and 'class' not in ed:
+        name = ed.get('id', ed.get('name', 'enemy'))
+        by_class = ed.get('inventory_by_class', {})
+        units = [_one_enemy('%s-%s' % (name, cls), cls, lv,
+                            _weapon_for([{'id': w} for w in by_class.get(cls, [])]),
+                            mode=mode, shifts=shifts)
+                 for cls, lv in zip(ed.get('composition', []), _body_levels(ed))]
+    else:
+        # One body per DECLARED level, not `count` copies of one: a wave authored as
+        # `levels: [2, 3]` is an L2 and an L3, which is what the ROM emits. `base_level` is
+        # THIS body's level for a boss, since that is the floor the difficulty malus tests
+        # against -- reading it off `level:` while the body comes from `levels:` invents a
+        # malus the engine never applies.
+        units = []
+        for lv in _body_levels(ed):
+            units.extend(enemy_combatants(
+                dict(ed, level=lv), mode=mode, shifts=shifts,
+                base_level=_our_base_level(dict(ed, level=lv)),
+                shiftable=_our_takes_difficulty_shift(ed)))
+        if real_article:
+            units = [unit_real_article(ed, c) for c in units]
+    return [u for u in units if u.weapon is not None or not drop_staff]
+
+
 def chapter_units(chap, mode=None, shifts=None):
     """(enemy_def, real-article Combatant) for every BODY our chapter fields, weapons modeled.
 
@@ -929,27 +982,8 @@ def chapter_units(chap, mode=None, shifts=None):
     `composition` to its DISTINCT classes -- so on ch01 it counted 6 bodies where this counts 3
     and printed a share that contradicted the verdict directly above it (#285).
     """
-    out = []
-    for ed in chapter_roster_entries(chap):
-        if 'composition' in ed and 'class' not in ed:
-            level = ed.get('level', 1)
-            name = ed.get('id', ed.get('name', 'enemy'))
-            by_class = ed.get('inventory_by_class', {})
-            for cls in ed.get('composition', []):
-                weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
-                # generics: no personal line, deliberately (see chapter_enemy_force)
-                out.append((ed, _one_enemy('%s-%s' % (name, cls), cls, level, weapon,
-                                           mode=mode, shifts=shifts)))
-        else:
-            # one body per DECLARED level, not `count` copies of one: a wave authored as
-            # `levels: [2, 3]` is an L2 and an L3, which is what the ROM emits.
-            for lv in _body_levels(ed):
-                out.extend((ed, unit_real_article(ed, c))
-                           for c in enemy_combatants(dict(ed, level=lv), mode=mode,
-                                                     shifts=shifts,
-                                                     base_level=_our_base_level(ed),
-                                                     shiftable=_our_takes_difficulty_shift(ed)))
-    return [(ed, u) for ed, u in out if u.weapon is not None]  # drop staff-only enemies
+    return [(ed, u) for ed in chapter_roster_entries(chap)
+            for u in _entry_combatants(ed, mode=mode, shifts=shifts, real_article=True)]
 
 
 def unmodeled_enemies(chap):
@@ -957,7 +991,7 @@ def unmodeled_enemies(chap):
     them) -- returned as {id, is_boss} so the report can warn instead of silently skewing the
     verdict (#51). A boss here means the parity read for that chapter is untrustworthy."""
     out = []
-    for ed in chap.get('enemy_units', []):
+    for ed in chapter_roster_entries(chap):
         if 'composition' in ed and 'class' not in ed:
             by_class = ed.get('inventory_by_class', {})
             modeled = any(_weapon_for([{'id': w} for w in by_class.get(cls, [])])
@@ -999,9 +1033,8 @@ def _force_signature(chap):
             for lv in _body_levels(ed):
                 out[(_enemy_class_enum(ed['class']), lv)] += 1
         else:
-            level = int(ed.get('level', 1))
-            for cls in ed.get('composition', []):
-                out[(_enemy_class_enum(cls), level)] += 1
+            for cls, lv in zip(ed.get('composition', []), _body_levels(ed)):
+                out[(_enemy_class_enum(cls), lv)] += 1
     return out
 
 
@@ -1235,12 +1268,12 @@ def load_field(campaign, ch):
         chap = bc.yaml.safe_load(f)
     roster = [player_combatant(campaign, uid) for uid in ROSTER]
     line, bosses, labels = [], [], []
-    for ed in chap.get('enemy_units', []):
-        units = enemy_combatants(ed)
-        count = int(ed.get('count', 1))
+    for ed in chapter_roster_entries(chap):
+        units = _entry_combatants(ed, drop_staff=False)
         kind = ed.get('class') or '+'.join(dict.fromkeys(ed.get('composition', ['?'])))
-        labels.append('%dx %s (%s l%s)' % (count, ed.get('name', ed.get('id', '?')),
-                                           kind, ed.get('level', 1)))
+        labels.append('%dx %s (%s l%s)'
+                      % (_entry_body_count(ed), ed.get('name', ed.get('id', '?')), kind,
+                         ed.get('level') or ','.join(str(lv) for lv in _body_levels(ed))))
         (bosses if ed.get('is_boss') else line).extend(units)
     return chap, roster, line, bosses, chapter_deploy_limit(chap, len(roster)), labels
 
@@ -1562,7 +1595,7 @@ def solo_contributors(chap, parity_ref, deploy_cap, floor=1.0, share=0.10):
         return []
     # Built from the SAME force builder as the verdict this note is printed under (#285) -- a
     # note computed on a different footing than the number it explains is worse than none.
-    rows = [(ed.get('id') or u.name, int(ed.get('count', 1)),
+    rows = [(ed.get('id') or u.name, _entry_body_count(ed),
              fc.damage_per_round(u, YARDSTICK)) for ed, u in chapter_units(chap)]
     total = sum(t for _u, _n, t in rows)
     full = (total / cap) / vt
@@ -1674,15 +1707,14 @@ def role_findings(chap, parity_ref):
     if not van:
         return []
     ours, personal_by_id = [], {}
-    for ed in chap.get('enemy_units', []):
+    for ed in chapter_roster_entries(chap):
         if ed.get('personal'):
             personal_by_id[ed.get('id')] = ed['personal']
-        for c in enemy_combatants(ed):
-            # THREAT comparisons run on the real article (class base + personal line), the same
-            # footing the durability check below has always used. The AGGREGATE metric stays
-            # class-base on both sides -- that is a different question and a fair one.
-            ours.append((ed.get('id') or c.name, bool(ed.get('is_boss')),
-                         unit_real_article(ed, c),
+        # THREAT comparisons run on the real article (class base + personal line), the same
+        # footing the durability check below has always used. The AGGREGATE metric stays
+        # class-base on both sides -- that is a different question and a fair one.
+        for c in _entry_combatants(ed, real_article=True, drop_staff=False):
+            ours.append((ed.get('id') or c.name, bool(ed.get('is_boss')), c,
                          bool(ed.get('convertible')), ed.get('tile_terrain')))
     if not ours:
         return []
@@ -2031,32 +2063,24 @@ def _vanilla_reinforcement_turns(stem):
     return out
 
 
-def _entry_combatants(ed):
-    """The Combatants for one enemy_units entry (count/composition expanded, weapon-filtered)."""
-    if 'composition' in ed and 'class' not in ed:
-        level = ed.get('level', 1)
-        name = ed.get('id', ed.get('name', 'enemy'))
-        by_class = ed.get('inventory_by_class', {})
-        units = [_one_enemy('%s-%s' % (name, cls), cls, level,
-                            _weapon_for([{'id': w} for w in by_class.get(cls, [])]))
-                 for cls in ed.get('composition', [])]
-    else:
-        units = enemy_combatants(ed) * int(ed.get('count', 1))
-    return [u for u in units if u.weapon is not None]
-
-
 def chapter_enemy_groups(chap):
     """Our force split by battlefield role (#171): line (turn-1 must-kill), reinforcements
     (arrives_turn > 1), convertibles (recruitable). Each a Combatant list."""
     g = {'line': [], 'reinforcements': [], 'convertibles': []}
-    for ed in chap.get('enemy_units', []):
-        units = _entry_combatants(ed)
-        if ed.get('convertible'):
-            g['convertibles'].extend(units)
-        elif int(ed.get('arrives_turn', 1) or 1) > 1:
-            g['reinforcements'].extend(units)
-        else:
-            g['line'].extend(units)
+    for key in AI_ROSTER_KEYS:
+        for ed in (chap.get(key) or []):
+            if not isinstance(ed, dict):
+                continue
+            units = _entry_combatants(ed)
+            if ed.get('convertible'):
+                g['convertibles'].extend(units)
+            elif key != 'enemy_units' or int(ed.get('arrives_turn', 1) or 1) > 1:
+                # the KEY is what makes ch02's wave a reinforcement: it carries
+                # `trigger_turn`, not `arrives_turn`, so an arrives_turn test alone read it
+                # as turn-1 line.
+                g['reinforcements'].extend(units)
+            else:
+                g['line'].extend(units)
     return g
 
 
