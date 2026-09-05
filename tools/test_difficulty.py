@@ -467,6 +467,114 @@ class AiFindingsInTheCurveReport(unittest.TestCase):
         self.assertTrue(all('ai' in r for r in self._rows().values()))
 
 
+class MirrorShare(unittest.TestCase):
+    """mirror% -- the share of the TWIN's force a chapter reproduces exactly (class + level).
+
+    It is what separates a copy-x1.00 from a composed-x1.00: the parity ratio is an
+    aggregate over stats, so a chapter that transcribes its twin unit for unit and a
+    chapter that arrives at the same per-slot pressure from a different force read
+    identically. #367's finding was that ch06 is the first, and its x1.00 was a checksum
+    on the donor pipeline rather than a measurement.
+
+    vanilla Prologue's red force is 3 fighters: L4, L1, L2.
+    """
+
+    def _chap(self, enemies, ref='FE8 Prologue'):
+        return {'parity_reference': ref, 'enemy_units': enemies}
+
+    def test_a_force_transcribed_unit_for_unit_is_a_full_mirror(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 4},
+                                        {'id': 'b', 'class': 'fighter', 'level': 1},
+                                        {'id': 'c', 'class': 'fighter', 'level': 2}]))
+        self.assertEqual((m['shared'], m['twin']), (3, 3))
+        self.assertEqual(m['pct'], 100.0)
+
+    def test_a_force_sharing_nothing_with_its_twin_mirrors_zero(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'mage', 'level': 4}]))
+        self.assertEqual((m['shared'], m['pct']), (0, 0.0))
+
+    def test_the_same_class_at_a_different_level_is_not_a_mirror(self):
+        # class alone is not the unit: an L9 fighter is not the twin's L1 one.
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 9}]))
+        self.assertEqual(m['shared'], 0)
+
+    def test_a_partial_match_is_a_share_of_the_TWINS_force(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 4}]))
+        self.assertEqual((m['shared'], m['twin']), (1, 3))
+        self.assertAlmostEqual(m['pct'], 100.0 / 3)
+
+    def test_count_expands_into_that_many_bodies(self):
+        # our two L2 fighters can only mirror the twin's ONE: the intersection is a
+        # multiset, so a doubled body does not score twice.
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 2,
+                                         'count': 2}]))
+        self.assertEqual(m['shared'], 1)
+
+    def test_a_composition_entry_expands_per_member(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'level': 2,
+                                         'composition': ['fighter', 'fighter']}]))
+        self.assertEqual(m['shared'], 1)
+
+    def test_fielding_more_than_the_twin_never_reads_above_100(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 4},
+                                        {'id': 'b', 'class': 'fighter', 'level': 1},
+                                        {'id': 'c', 'class': 'fighter', 'level': 2},
+                                        {'id': 'd', 'class': 'fighter', 'level': 2}]))
+        self.assertEqual(m['pct'], 100.0)
+
+    def test_reinforcement_waves_count_as_part_of_our_force(self):
+        chap = self._chap([{'id': 'a', 'class': 'fighter', 'level': 4}])
+        chap['reinforcements'] = [{'id': 'late', 'class': 'fighter', 'level': 1}]
+        self.assertEqual(df.mirror_share(chap)['shared'], 2)
+
+    def test_a_staff_only_unit_still_counts_as_a_body(self):
+        # the parity metric DROPS a unit with no modeled weapon; mirror% is about the
+        # force's SHAPE, so a healer the twin fields is a unit the chapter did or did not
+        # reproduce.
+        m = df.mirror_share(self._chap([{'id': 'h', 'class': 'troubadour', 'level': 6}],
+                                       ref='FE8 Ch6'))
+        self.assertEqual(m['shared'], 1)
+
+    def test_an_uncurated_twin_has_no_mirror_to_measure(self):
+        self.assertIsNone(df.mirror_share(self._chap([{'id': 'a'}], ref='FE8 Ch99')))
+
+
+class MirrorShareOnRealChapters(unittest.TestCase):
+    """Against the real campaign, because the wiring is the thing under test."""
+
+    def _mirror(self, ch):
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for(ch))
+        return df.mirror_share(chap)
+
+    def test_ch06_reproduces_its_twin_exactly(self):
+        # ch06 IS vanilla Ch6's 27-unit force, re-sited. This is the number that makes its
+        # x1.00 legible as a copy (#367).
+        self.assertEqual(self._mirror('ch06')['pct'], 100.0)
+
+    def test_a_composed_chapter_reads_well_under_a_copy(self):
+        # ch01 fields ten units against a ten-unit twin and mirrors three of them.
+        self.assertEqual(self._mirror('ch01')['shared'], 3)
+
+
+class MirrorInTheCurveReport(unittest.TestCase):
+    def _rows(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return {r['label'].split()[0]: r
+                    for r in df.curve_report('rime-of-the-frostmaiden')}
+
+    def test_every_row_carries_its_mirror_share(self):
+        self.assertEqual(self._rows()['CH6']['mirror']['pct'], 100.0)
+
+    def test_the_curve_prints_mirror_beside_the_parity_ratio(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            df.curve_report('rime-of-the-frostmaiden')
+        text = out.getvalue()
+        self.assertIn('mirror', text)
+        ch06_row = [l for l in text.splitlines() if 'ch06' in l][0]
+        self.assertIn('100%', ch06_row)
+
+
 class VanillaUnitDestinations(unittest.TestCase):
     """#335: a vanilla unit's `xPosition`/`yPosition` is often a SPAWN tile, not where it
     fights. `redas` is scripted movement data that walks it from there to its post, and the

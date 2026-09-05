@@ -18,6 +18,7 @@ All combat math is fe_combat.py (the decomp's own formulas, tested). Stat resolu
 shares build_campaign.py's primitives so there is one source of truth for "what is this
 unit's stat line".
 """
+import collections
 import dataclasses
 import os
 import re
@@ -928,6 +929,54 @@ def unmodeled_enemies(chap):
     return out
 
 
+# ── mirror% -- how much of the twin a chapter TRANSCRIBES (#367) ─────────────────
+# The parity ratio is an aggregate over stats, so it cannot tell a chapter that copies its
+# twin unit for unit from one that composes a different force arriving at the same per-slot
+# pressure. Both read x1.00, and only one of them is a measurement. ch06 is the live case:
+# it reproduces 100% of vanilla Ch6's force, so its perfect score is a checksum on the donor
+# pipeline rather than evidence about the chapter. mirror% prints beside every ratio so the
+# difference is visible without re-deriving it.
+#
+# A body is (class, level) -- the unit, not just its class: an L9 fighter is not the twin's
+# L1 one. The intersection is a MULTISET, so doubling a body cannot score it twice, and the
+# denominator is the TWIN's body count, so fielding more than the twin never reads above
+# 100%. Both sides count every body: ours line + reinforcements, the twin every red
+# UnitDefinition in its curated arrays (reinforcement waves included). Nothing is dropped
+# for carrying no modeled weapon the way the pressure metric drops a staff-only healer --
+# this measures the force's SHAPE, and a healer the twin fields is a unit we did or did not
+# reproduce.
+
+
+def _force_signature(chap):
+    """Every enemy BODY the chapter fields, as a Counter of (class enum, level).
+
+    Line and reinforcements both, `count`/`composition` expanded -- the multiplicity the
+    metrics layer collapses is exactly what a shape comparison needs."""
+    out = collections.Counter()
+    for ed in list(chap.get('enemy_units') or []) + list(chap.get('reinforcements') or []):
+        level = int(ed.get('level', 1))
+        if 'class' in ed:
+            out[(_enemy_class_enum(ed['class']), level)] += int(ed.get('count', 1))
+        else:
+            for cls in ed.get('composition', []):
+                out[(_enemy_class_enum(cls), level)] += 1
+    return out
+
+
+def mirror_share(chap):
+    """Share of the twin's force this chapter reproduces exactly, as
+    {shared, ours, twin, pct}. None when the reference isn't curated (#48 registry)."""
+    van = vanilla_red_units(chap.get('parity_reference'))
+    if van is None:
+        return None
+    twin = collections.Counter((u['classIndex'], u['level']) for u in van)
+    ours = _force_signature(chap)
+    shared = sum((twin & ours).values())
+    n = sum(twin.values())
+    return {'shared': shared, 'ours': sum(ours.values()), 'twin': n,
+            'pct': 100.0 * shared / n if n else 0.0}
+
+
 # ── Pure metrics layer (no I/O; operates on fe_combat.Combatant) ──────────────────
 # The three FE survival questions, each a single number so a chapter can be compared
 # to vanilla at a glance.
@@ -1271,7 +1320,7 @@ def _chapter_pressure(chap, band=0.25, mode=None):
     ref = chap.get('parity_reference')
     van = vanilla_enemies(ref, mode=mode)
     out = {'reference': ref, 'deploy_cap': deploy_cap, 'ours': ours, 'mode': mode,
-           'n_ours': len(ours_force), 'vanilla': None,
+           'n_ours': len(ours_force), 'vanilla': None, 'mirror': mirror_share(chap),
            'dropped': unmodeled_enemies(chap)}
     if van is not None:
         out['vanilla'] = enemy_pressure(van, deploy_cap)
@@ -1308,6 +1357,15 @@ def _print_pressure(p):
           'clear-load/slot %4.1f (x%.2f %s)'
           % ('', p['n_ours'], ot, v['threat_ratio'], v['threat'],
              ol, v['load_ratio'], v['load']))
+    m = p.get('mirror')
+    if m:
+        # WHAT THE RATIOS ABOVE CANNOT SAY (#367): a ratio is an aggregate over stats, so a
+        # transcribed force and a composed one that lands on the same pressure read alike.
+        print('  mirror: %.0f%% of %s\'s force reproduced exactly (%d of %d bodies, class '
+              '+ level)' % (m['pct'], p['reference'], m['shared'], m['twin']))
+        if m['pct'] >= 90:
+            print('          -- at this share the verdict is largely a CHECKSUM on the donor '
+                  'pipeline,\n             not evidence about the chapter.')
     print('  verdict: %s' % ('PARITY (within band)' if v['verdict'] == 'OK'
                              else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
     for line in p.get('solo') or []:
@@ -2086,8 +2144,8 @@ def curve_report(campaign, band=0.25, mode=None):
               '\n     AUTHORED table, not on %s -- only the parity rows are mode-shifted.'
               % mode.upper())
     print(bar)
-    print('  %-22s %-13s %-15s %-17s %s'
-          % ('chapter', 'reference', 'threat/slot', 'clear-load/slot', 'verdict'))
+    print('  %-22s %-13s %-15s %-17s %-7s %s'
+          % ('chapter', 'reference', 'threat/slot', 'clear-load/slot', 'mirror', 'verdict'))
     chaps = []
     for path in paths:
         with open(path, encoding='utf-8') as f:
@@ -2114,8 +2172,8 @@ def curve_report(campaign, band=0.25, mode=None):
             else:
                 note = (' (%d yardstick-proof units, clear-load floored)'
                         % proj['proof']) if proj['proof'] else ''
-                print('  %-22s %-13s %4.1f (target)    %4.1f (target)      planned%s'
-                      % (label[:22], ref[:13], proj['threat'], proj['clearload'], note))
+                print('  %-22s %-13s %4.1f (target)    %4.1f (target)      %-7s planned%s'
+                      % (label[:22], ref[:13], proj['threat'], proj['clearload'], '--', note))
             continue
         p = _chapter_pressure(chap, band, mode=mode)
         ot, ol = p['ours']
@@ -2138,16 +2196,18 @@ def curve_report(campaign, band=0.25, mode=None):
         if ai:
             flag += '  !!ai'
         rows.append({'label': label[:22].strip(), 'locked': locked, 'has_ref': has_ref,
-                     'verdict': verdict, 'boss_drop': boss_drop, 'role': role, 'ai': ai})
+                     'verdict': verdict, 'boss_drop': boss_drop, 'role': role, 'ai': ai,
+                     'mirror': p['mirror']})
         if not has_ref:
-            print('  %-22s %-13s %5.1f           %5.1f             (no ref)%s'
-                  % (label[:22], (p['reference'] or '?')[:13], ot, ol, flag))
+            print('  %-22s %-13s %5.1f           %5.1f             %-7s (no ref)%s'
+                  % (label[:22], (p['reference'] or '?')[:13], ot, ol, '--', flag))
             continue
         vt, vl = p['vanilla']
         v = p['verdict']
-        print('  %-22s %-13s %4.1f (x%.2f)     %4.1f (x%.2f)       %s%s'
+        print('  %-22s %-13s %4.1f (x%.2f)     %4.1f (x%.2f)       %-7s %s%s'
               % (label[:22], (p['reference'] or '?')[:13], ot, v['threat_ratio'],
-                 ol, v['load_ratio'], v['verdict'], flag))
+                 ol, v['load_ratio'], '%.0f%%' % p['mirror']['pct'] if p['mirror'] else '--',
+                 v['verdict'], flag))
     if any_dropped_boss:
         print('\n  !! a dropped boss means that row\'s verdict is unreliable -- its scariest '
               'unit\n     carries an unmodeled weapon. Add fe_base to its YAML inventory (#51/#52).')
