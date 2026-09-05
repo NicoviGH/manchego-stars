@@ -12,8 +12,8 @@ for its confirmation preview -- and overlays:
 
   * a coordinate ruler, because every placement conversation is in map coordinates
   * the deploy block, the crossings and the boats, read from the chapter YAML
-  * one marker per placed unit, coloured by AI behaviour (the thing placement decides:
-    a never-move unit is furniture, a pursuer is a clock)
+  * one marker per placed unit, coloured by AI SHAPE (the thing placement decides:
+    a statue is furniture, a striker holds but strikes, a pursuer is a clock)
   * optional per-cell shading -- turn-reach bands, or the cells a placement threatens
 
 Placements come from the chapter YAML's own `positions:` once they are authored, or from
@@ -76,14 +76,25 @@ def mov_cost_row(table='TerrainTable_MovCost_CommonT1Normal'):
 
 FOOT_COST = mov_cost_row()
 
-# Marker colours by AI behaviour, because behaviour is what a placement decides: a
-# never-move unit is furniture the player walks into, a pursuer is a clock.
+# Marker colours by AI SHAPE (`chapter_status.ai_shape`), because shape is what a placement
+# decides: a statue is furniture, a striker holds its ground but steps out to hit whatever
+# comes close, a pursuer is a clock.
+#
+# Keyed on the SHAPE and never on the approach family. `never-move` names only the approach
+# byte, and a unit carrying it still steps out to strike -- which is exactly how four merfolk
+# mobbed a hull the chapter had nowhere near them (`decisions.md` -> "AI_B is the APPROACH and
+# AI_A is the ACTION"). These keys must stay in step with `ai_shape`'s return values;
+# `test_map_placement_preview` pins that.
 BEHAVIOUR_COLOUR = {
-    'never-move':     (206, 74, 74),      # red
-    'charge-after-1': (232, 138, 46),     # orange
-    'pursue':         (240, 208, 62),     # yellow
-    'hold-position':  (150, 46, 140),     # purple -- the boss on its tile
+    'pursuer':    (240, 208, 62),      # yellow -- the approach walks it at you
+    'striker':    (232, 138, 46),      # orange -- holds, but its ACTION steps out to strike
+    'statue':     (206, 74, 74),       # red    -- does not move at all, even to attack
+    'own-errand': (150, 46, 140),      # purple -- moves, but not at you (loots, flees)
 }
+# `ai_shape` returns None when either half of the vector is unnamed in the decomp. Draw that
+# as its own colour rather than guessing a shape: an unclassified unit is a fact, and the
+# marker should say so instead of borrowing a neighbour's meaning.
+UNCLASSIFIED_COLOUR = (140, 148, 170)
 BOAT_COLOUR = (86, 196, 120)
 DEPLOY_COLOUR = (74, 138, 226)
 
@@ -109,10 +120,37 @@ def load_map(stem):
     return grid, terrain, ts
 
 
-def foot_reach(terrain, sources):
-    """Movement-point distance from any source cell, for a walking class."""
+# The movement profiles `reached_on:` is declared in. Each is (decomp cost table, baseMov) --
+# the table names are the decomp's own, and the two named entries are the PCs whose class makes
+# the crossing question different for them than for the rest of the party.
+REACH_ROLES = {
+    'foot':    ('TerrainTable_MovCost_CommonT1Normal', 5),
+    'cavalry': ('TerrainTable_MovCost_HorseT1Normal', 7),
+    'flier':   ('TerrainTable_MovCost_FlyNormal', 7),
+    'braulo':  ('TerrainTable_MovCost_PirateNormal', 5),
+    'trex':    ('TerrainTable_MovCost_CommonT1Normal', 6),
+}
+
+
+def foot_reach(terrain, sources, blocked=(), cost=None):
+    """Movement-point distance from any source cell.
+
+    `blocked` is cells a unit may not enter or pass through -- in FE that is every ENEMY body,
+    with no phasing and no swapping. Leaving it empty measures an EMPTY MAP, which is how
+    ch06's `reached_on:` came to claim "foot reaches either door on turn 6" for a boat sitting
+    behind a merfolk line: true of the terrain, untrue of the chapter. A source cell is never
+    blocked -- the walker is standing there.
+
+    `cost` is a terrain-id -> points table (see REACH_ROLES); it defaults to the foot row.
+
+    LIMIT, stated rather than implied: this is a turn-1 SNAPSHOT. Strikers step into the route
+    on later phases, so the contested number is still a floor -- a tighter one than the empty
+    map, not the truth. What it cannot model is the cost of fighting, which depends on play.
+    """
     import heapq
+    cost = FOOT_COST if cost is None else cost
     h, w = len(terrain), len(terrain[0])
+    blocked = set(blocked) - set(sources)
     dist, pq = {}, []
     for s in sources:
         dist[s] = 0
@@ -123,15 +161,141 @@ def foot_reach(terrain, sources):
             continue
         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             nx, ny = x + dx, y + dy
-            if not (0 <= nx < w and 0 <= ny < h):
+            if not (0 <= nx < w and 0 <= ny < h) or (nx, ny) in blocked:
                 continue
-            step = FOOT_COST.get(terrain[ny][nx])
+            step = cost.get(terrain[ny][nx])
             if step is None:
                 continue
             if c + step < dist.get((nx, ny), 1 << 30):
                 dist[(nx, ny)] = c + step
                 heapq.heappush(pq, (c + step, (nx, ny)))
     return dist
+
+
+def arrival_turn(points, mov):
+    """Movement points -> the turn a unit spending `mov` a turn first stands there."""
+    if points is None:
+        return None
+    return max(1, -(-points // mov))
+
+
+def enemy_bodies(chapter):
+    """Every turn-1 enemy tile. Reinforcements are excluded: they are not on the board yet."""
+    out = set()
+    for enemy in chapter.get('enemy_units') or ():
+        if enemy.get('arrives_turn'):
+            continue
+        for tile in enemy.get('positions') or ():
+            out.add(tuple(tile))
+    return out
+
+
+def class_movement(class_token):
+    """('cost table symbol', baseMov) for one of our chapter YAML class tokens.
+
+    Read off the ENGINE's class row, never a hand-kept table: a chapter whose whole shape is
+    who-can-cross-what cannot afford a second opinion about a class's movement.
+    """
+    import difficulty
+    enum = difficulty._enemy_class_enum(class_token)
+    src = _classes_text()
+    block = re.search(r'\[%s - 1\] = \{(.*?)\n    \},' % enum, src, re.S)
+    if not block:
+        raise KeyError('no class row for %r' % enum)
+    table = re.search(r'\.pMovCostTable\s*=\s*(\w+)', block.group(1))
+    mov = re.search(r'\.baseMov\s*=\s*(\d+)', block.group(1))
+    return (table.group(1) if table else 'TerrainTable_MovCost_CommonT1Normal',
+            int(mov.group(1)))
+
+
+def _classes_text():
+    import build_campaign as bc
+    return bc.vanilla_decomp_text('src/data_classes.c')
+
+
+def units_reaching(chapter, terrain, targets):
+    """[(enemy id, ai bytes)] for every unit that can ATTACK one of `targets`.
+
+    REINFORCEMENTS ARE INCLUDED. They are not on the opening board, but a hull's fuse is costed
+    against the units a chapter DECLARES as its clock, and an undeclared unit that reaches a
+    hull on turn 5 sinks it exactly as surely as one that reaches it on turn 1 -- it just does
+    it out of sight of a gate that only ever looked at turn 1. Skipping them hid ch06's three
+    Difficult-only turn-4 crab riders, which spawn on the west edge and do reach the west hull.
+
+    The two shapes reach differently, and conflating them is what made the first cut of this
+    analysis wrong by three units:
+
+      * a STRIKER acts only on what it can reach THIS turn -- `AI_A` moves within the unit's
+        own movement to a firing cell or the unit does nothing at all. Vanilla Ch6's Soldier
+        nine points from a villager therefore never moves, which is why its line never mobs
+        them.
+      * a PURSUER accumulates movement across turns, so ANY path to a firing cell counts.
+
+    Weapon range comes from `difficulty._weapon_for`, so a staff-only unit is correctly no
+    threat and a javelin correctly reaches two.
+    """
+    import difficulty
+    import chapter_status as cs
+    out = []
+    for enemy in chapter.get('enemy_units') or ():
+        # MAX range over the whole inventory, not the first weapon. FE8's AI equips whatever
+        # lets it attack, and ch06's ironshell-horseslayer proved it in-engine: its items[0] is
+        # a range-1 Horseslayer, and it threw its JAVELIN at the hull from two tiles away.
+        ranges = [w.rng[1] for w in
+                  (difficulty._weapon_for([item]) for item in (enemy.get('inventory') or ()))
+                  if w is not None]
+        if not ranges:
+            continue                      # a staff is not a threat to a hull
+        reach = max(ranges)
+        table, mov = class_movement(enemy.get('deploy_class') or enemy['class'])
+        cost = mov_cost_row(table)
+        for index, (x, y) in enumerate(enemy.get('positions') or ()):
+            ai = difficulty.enemy_ai_bytes(chapter, enemy, index)
+            dist = foot_reach(terrain, [(x, y)], cost=cost)
+            # A STATUE cannot move at all, even to attack -- its reach is its weapon and
+            # nothing more. Giving it a pursuer's unlimited budget reported ch06's Nerra as a
+            # threat to a hull seven tiles away that she can never leave her tile to touch.
+            shape = cs.ai_shape(ai)
+            budget = 0 if shape == 'statue' else (mov if shape == 'striker' else None)
+            for cell, points in dist.items():
+                if budget is not None and points > budget:
+                    continue
+                if any(abs(cell[0] - t[0]) + abs(cell[1] - t[1]) <= reach for t in targets):
+                    out.append((enemy['id'], ai))
+                    break
+    return out
+
+
+def load_chapter(prefix):
+    """The chapter doc whose id starts with `prefix`. One resolver, so `main` and every caller
+    that needs a chapter agree about what "ch06" means."""
+    match = [c for c in campaign_chapters.load_all()
+             if str(c.get('id', '')).startswith(prefix)]
+    if not match:
+        sys.exit('ERROR: no chapter id starts with %r' % prefix)
+    return match[0]
+
+
+def terrain_grid(chapter):
+    """The chapter's compiled terrain, by the map its YAML names."""
+    stem = os.path.splitext(os.path.basename(chapter['map']['file']))[0]
+    return load_map(stem)[1]
+
+
+def reached_on(chapter, terrain, target, contested=True):
+    """{role: turn} for reaching `target` from the deploy block, per movement profile.
+
+    `contested=True` walks the map with the enemy line standing on it, which is the reading
+    a chapter's clock actually needs. `contested=False` reproduces the empty-map number the
+    hand-written `reached_on:` blocks were measured with, so the two can be compared.
+    """
+    blocked = enemy_bodies(chapter) if contested else ()
+    out = {}
+    for role, (table, mov) in REACH_ROLES.items():
+        dist = foot_reach(terrain, deploy_cells(chapter, terrain), blocked=blocked,
+                          cost=mov_cost_row(table))
+        out[role] = arrival_turn(dist.get(tuple(target)), mov)
+    return out
 
 
 def deploy_cells(chapter, terrain):
@@ -161,7 +325,10 @@ def placed_units(chapter, concept=None):
         tiles = override.get(eid, enemy.get('positions') or [])
         for i, tile in enumerate(tiles):
             ai = dif.enemy_ai_bytes(chapter, enemy, i)
-            behaviour = 'hold-position' if enemy.get('is_boss') else cs.ai_family(ai[1])
+            # Derived from the WHOLE vector, never patched by role: `is_boss` was standing in
+            # for the AI_A half this could not see, and it was wrong in both directions -- a
+            # non-boss statue read as mobile, and a boss with an engaging action read as static.
+            behaviour = cs.ai_shape(ai) or cs.ai_family(ai[1]) or '?'
             code = 'B' if enemy.get('is_boss') else ROLE_CODE.get(enemy.get('class'), '??')
             late = enemy.get('arrives_turn') or enemy.get('hard_mode_only')
             out.append((tuple(tile), code, behaviour, eid, late))
@@ -285,7 +452,7 @@ def render(chapter, stem, out_png, concept=None, shade=None, zoom=3):
 
     for tile, code, behaviour, eid, late in units:
         x, y = tile
-        colour = BEHAVIOUR_COLOUR.get(behaviour, (200, 200, 200))
+        colour = BEHAVIOUR_COLOUR.get(behaviour, UNCLASSIFIED_COLOUR)
         cx, cy = pad + x * cell + cell // 2, head + y * cell + cell // 2
         r = cell // 2 - 2
         if late:
@@ -304,10 +471,11 @@ def render(chapter, stem, out_png, concept=None, shade=None, zoom=3):
     d.text((pad, ly), 'behaviour, borrowed from each unit\'s vanilla donor (#335):',
            fill=(210, 210, 216), font=f_small)
     lx = pad + 390
-    for name, colour in (('never-move -- you walk into it', BEHAVIOUR_COLOUR['never-move']),
-                         ('charge after turn 1', BEHAVIOUR_COLOUR['charge-after-1']),
-                         ('pursue from turn 1', BEHAVIOUR_COLOUR['pursue']),
-                         ('B = boss, guards its tile', BEHAVIOUR_COLOUR['hold-position']),
+    for name, colour in (('pursuer -- comes to you', BEHAVIOUR_COLOUR['pursuer']),
+                         ('striker -- holds, steps out to strike', BEHAVIOUR_COLOUR['striker']),
+                         ('statue -- never moves, even to attack', BEHAVIOUR_COLOUR['statue']),
+                         ('own errand -- moves, not at you', BEHAVIOUR_COLOUR['own-errand']),
+                         ('AI not classified', UNCLASSIFIED_COLOUR),
                          ('hollow = arrives turn 4, Hard only', (150, 150, 158))):
         d.ellipse([lx, ly, lx + 15, ly + 15], fill=colour, outline=(16, 16, 18))
         d.text((lx + 22, ly), name, fill=(210, 210, 216), font=f_small)

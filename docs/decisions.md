@@ -8239,6 +8239,183 @@ both hulls sink on turn 7 and 8.** Same slack, arrived at from the other directi
 The lesson that outlives ch06: a parity claim about a vanilla chapter's *feel* is a measurement,
 not a memory. Both halves of this one had been asserted in a chapter YAML for weeks.
 
+### A rescue clock is a HIT RATE, so a scenario MEASURES it and never asserts it (2026-09-04, #26)
+
+ch06's chapter YAML declares its two hulls sinking on **turn 7 and turn 8**, and `ch06clock` was
+about to assert exactly that. It does not, and the reason generalises past this chapter.
+
+The west fuse is one Level 1 Bael swinging a venin claw at a 19 HP, 5 Def hull sitting in FOREST.
+Read off the decomp's own tables: 6 damage a connection, four connections to sink it, and a **47
+displayed hit** into the hull's +1 Def / +20 avoid cover — 45% true on 2RN. Seven phases of that
+sink the hull about **38%** of the time. "Turn 8" is not a turn number; it is the middle of a
+distribution, and one playtest is one sample of it. A scenario that asserted the declared turn
+would be a coin-flip verdict: green or red on the same unchanged ROM, which is worse than no
+coverage because it teaches the next session to re-run until it passes.
+
+So the case splits what it does by what is actually deterministic:
+
+- **Asserted** — the pathing. Neither pursuer stalls short of its hull; the range-1 attacker, once
+  in range, is standing on the pocket's single door cell and nowhere else; nothing reaches a hull
+  on enemy phase 1. Those are properties of the map and the AI, and they are the same every run.
+- **Measured and logged** — the sink turn, printed against the declared one. A run that disagrees
+  is a finding about the chapter's balance, not a broken scenario.
+
+The corollary for the instrument: **the first run of `ch06clock` watched two units and could not
+name a third.** An 11-damage hit landed on the east hull during enemy phase 1 while the only mover
+near it was three tiles out and nothing in the emitted `MS_Ch06Line` was in weapon range at all.
+That gap is not a bad guess, it is a scenario too narrow to distinguish "the AI did something
+surprising" from "what LOADED is not the table we emitted" — so it now dumps the whole red roster
+at turn 1 and every red within three tiles of a hull the moment the hull loses HP. A run costs the
+same either way; the reading is what varies (see *"Playtest runs are the most expensive thing in
+this repo"*).
+
+What that first run actually returned is on **#26**, and the response — retune the placement, or
+restate the budget the chapter claims — is not settled here.
+
+### AI_B is the APPROACH and AI_A is the ACTION, and the moving half is AI_A (2026-09-04, #26)
+
+`ch06clock`'s first headed run found three enemies our tooling labels **never-move** standing around
+a boat they had walked to. They are not mislabelled data — they are a label that reports half a
+vector.
+
+From `cp_data.c`, a unit's AI is two scripts, not one:
+
+- `gAi2ScriptTable[AI_B_03] = AiScr_AiB_NeverMove` is `AI_NOP_0E`. It is the **approach** script and
+  it does nothing: all it suppresses is walking across the map at you.
+- `gAi1ScriptTable[AI_A_00] = gAiScript_ActionInRange` is `AI_ACTION(100)`. It is the **action**
+  script, and acting includes moving within the unit's own range to reach a target. The statue is
+  `AI_A_03 ActionStanding`.
+
+So `{0x00, 0x03}` — vanilla's most common pairing — means *"hold the line, but step out and hit
+anything you can reach."* Measured across the campaign: **94 of 99 enemies are `ActionInRange`,
+and 48 of the 51 units reported as "threat you walk into" will move.** Four units in the whole
+campaign are genuine statues.
+
+**What this does NOT invalidate.** `enemy_ai_bytes` emits all four donor bytes and `ai_bytes`
+resolves vanilla's symbolic macros (`GuardTileAI` -> `(0x3, 0x3)`, `DoNothing` -> `(0x6, 0x3)`),
+raising rather than defaulting on an unknown token. ch06's boats carry a live non-zero AI_A into the
+ROM, which is the proof the pipeline is whole. #335's derivation is sound and nothing needs
+re-deriving; *"AI behaviour is MEASURED and REPORTED, not weighted into threat"* still holds, since
+copied-wholesale bytes match the twin on both halves.
+
+**What it invalidated** was the read-back, now fixed in the same change. `AI_BEHAVIOUR`,
+`ai_family`, `behaviour_split` and `make chapter`'s behaviour column all keyed on `ai[1]` alone, so
+the split's premise — *"a unit that never moves contributes nothing until the player enters its
+range"* — was false for 48 of 51 units, and #344's kept deliverable was the part that misreported.
+Note the shape of it: #344's own corollary was a coverage gap in this same table along the AI_B
+axis. Same bug class, one dimension over.
+
+The report now names both halves and derives a THREE-way shape from the pair, because two buckets
+could not express the case that actually shipped:
+
+- **pursuer** — the approach walks it across the map at you.
+- **striker** — it holds ground, but its ACTION steps out within its own move range. `{engage,
+  never-move}` is vanilla's commonest pairing and most of every roster; this is the bucket that did
+  not exist.
+- **statue** — it holds ground and does not move at all, even to attack. Four units campaign-wide.
+
+`AI_ACTION` is pinned against `gAi1ScriptTable` by a test on the same discipline `AI_BEHAVIOUR`
+follows: the twelve entries the decomp gives only an address (0x09–0x14) stay UNNAMED rather than
+guessed at. `ai_shape` takes the vector and **raises on a bare int**, because a stale
+`ai_shape(ai[1])` would classify a whole roster off half the information and look entirely correct
+— which is precisely how this defect survived. `map_placement_preview`'s `is_boss` special case is
+deleted: it was standing in for the AI_A half it could not see, and it was wrong in both directions.
+
+**Why it surfaced on ch06 and not earlier.** It needs a killable unit parked inside a static's
+reach. Vanilla Ch6's entire red force is `ActionInRange x26 / ActionStanding x1` — **no
+`AI_A_08 ActionInRange_ExceptCivilian` anywhere** — so vanilla protects its villagers by PLACEMENT
+alone, which is what *"Vanilla Ch6's urgency is TRAVEL TIME"* measured independently. Our pockets
+moved a 19 HP hull into range of four statics. The bytes are faithful; the map is what changed.
+
+The ch06 response is not settled here — it is on #26.
+
+### A reach number measured on an EMPTY MAP is a claim about terrain, not about the chapter (2026-09-04, #26)
+
+ch06's `reached_on:` block — *"foot reaches either door on turn 6, exactly as vanilla's does"* — is
+the number its entire rescue clock is tuned against. Nothing read it, nothing checked it, and it
+was measured by a Dijkstra (`map_placement_preview.foot_reach`) that did not know units exist.
+
+In FE a unit cannot move through an enemy body. Walking the same map with the line standing on it:
+
+| | foot | cavalry | flier | braulo | trex |
+|---|---|---|---|---|---|
+| **east door**, empty map | 6 | 5 | 3 | 5 | 5 |
+| **east door**, contested | **--** | **--** | 3 | 6 | **--** |
+| **west door**, empty map | 6 | 5 | 3 | 5 | 5 |
+| **west door**, contested | **11** | 8 | 3 | 6 | 9 |
+
+**Only the flier and Braulo can honour any clock.** Foot, cavalry and Trex cannot reach the east
+boat at all while the line stands, and reach the west one on turn 11 against a turn-8 fuse.
+
+**The channels are narrow enough that ONE body corks a route.** Removing `shark-rider-halberd` at
+(15,16) alone turns the east door from unreachable into turn 12; removing `merfolk-trident` at
+(2,14) takes the west door from turn 11 back to the declared 6. That is not a placement anyone
+would have predicted by eye, and it is why this is derived rather than reasoned about.
+
+`reached_on_contested:` now carries it, derived and pinned by a test, beside the empty-map row that
+is kept because it is what the clock was designed against — the two disagreeing IS the finding.
+
+**Stated limit.** The contested walk is a turn-1 SNAPSHOT: strikers step into the route on later
+phases, and the player kills bodies out of it. So it is a floor, a tighter one than the empty map,
+not the truth. What it cannot model is the cost of fighting, which depends on play — that stays a
+human playtest question, and a scenario that pretended to answer it would be measuring its own
+bot.
+
+**The vanilla parallel, and where it breaks.** Vanilla Ch6 also has classes that simply cannot make
+the rescue — MOUNTAIN is `--` for Cavalier and Armour, which is the guide's "send Seth"
+(*"Vanilla Ch6's urgency is TRAVEL TIME"*). So a rescue only some of the party can attempt is
+faithful. The difference is legibility: vanilla's restriction is TERRAIN, which the player reads
+off the map before committing, and ours is ENEMY BODIES, which are dynamic, invisible as a
+constraint, and dissolve as you kill them.
+
+### Two do-not-attack lists are not one mechanism, and they have different invariants (2026-09-04, #26)
+
+`AI_A_07` and `AI_A_08` look interchangeable. Both run the standard offensive action through
+`AiIsUnitEnemyAndNotInScrList`, so a unit carrying either fights the player normally and simply
+will not swing at whatever its list names. `check_rescue_targets` accepted **either** as proof
+that a unit could not sink a hull.
+
+It is not proof, because the **lists are different and each names one thing**. AI_A_07's is
+repointed at ch05's escort (`repoint_escort_safe_ai_list`) and never at a boat pid, so a ch06
+unit carrying `{0x7, ...}` politely refuses to attack Basil — who is not in the chapter — and
+sinks the hull on schedule. The gate would have called it licensed. Only `AI_A_08` is repointed
+at the hulls, so only `AI_A_08` licenses anything here.
+
+**The invariants also differ, and the difference is not an oversight.** AI_A_07's is one **UNIT**:
+vanilla ships exactly one client (Ch5's Joshua), so a second silently inherits our escort's
+immunity — `assert_escort_safe_ai_has_one_client` sweeps every chapter for it. AI_A_08's is one
+**CHAPTER**: vanilla ships *no* clients at all, so the chapter that claims the list may spend it
+on as many of its own units as it likes (ch06 spends it on ten), and the hazard is a *different*
+chapter picking the byte up for its own reasons — inheriting immunity to pids it has never heard
+of, and standing in the way of the next chapter that wants the list for its own rescue targets.
+`assert_boat_safe_ai_is_single_chapter` is that sweep, and both now run through one
+`safe_ai_clients(ai_index)` implementation. Having only one of the two lists swept is exactly how
+the second came to be spent with no sweep at all.
+
+_Found by `/code-review` on #366 (2026-09-04)._
+
+### A reachability gate that skips reinforcements is grading the opening board, not the chapter (2026-09-04, #26)
+
+`units_reaching` dropped every enemy with an `arrives_turn`, reasoning that it is "not on the
+board when the clock starts". True, and irrelevant: a hull's fuse is costed against the units the
+chapter **declares** as its clock, and an undeclared unit that reaches a hull on turn 5 sinks it
+exactly as surely as one that reaches it on turn 1 — it just does it out of sight of a gate that
+only ever looked at turn 1.
+
+ch06's three Difficult-only turn-4 crab riders spawn on the WEST EDGE, a short ride from the west
+hull's pocket, and their donor's pursuing approach walks them onto it. They were invisible, so
+they carried no `ai_override` while their six turn-1 siblings all did — *"the hulls' clock is its
+declared pursuers and nothing else"* had been applied to the opening board and nowhere else. They
+now carry the same override, changing only the ACTION byte and leaving the donor's approach
+(`0x0`, pursue) untouched.
+
+The general form: **a guard scoped to turn 1 states a turn-1 fact, and difficulty is not a turn-1
+property.** The three shipped difficulty modes are all shipped (*"Vanilla ships three difficulty
+modes, so we ship three"*), so a hull that survives on Normal and sinks early on Difficult is a
+defect the gate has to be able to see.
+
+_Found by `/code-review` on #366 (2026-09-04)._
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

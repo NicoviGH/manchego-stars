@@ -145,6 +145,17 @@ difficulty_note: >
                        range 1, so it must occupy that one cell -- which also means the
                        player cannot BOARD until it is dead. Sinks the hull on turn 8.
 
+  THOSE TWO AND NOTHING ELSE, and enforcing it took a licence. Measured in-engine (#26): four of
+  the line's STRIKERS reached the east hull on enemy phase 1 and sank it on turn 4, because
+  `never-move` names only the APPROACH byte while the ACTION half steps out within a unit's own
+  movement to hit whatever it can reach. Vanilla Ch6 never has this problem -- ZERO of its
+  seventeen strikers can reach a villager in one turn, its rescue targets sit in a mountain ring,
+  and its clock is pursuers only. Our frozen lake has no mountain ring, so the protection is
+  bought with vanilla's own AI_A_08 instead: every unit that can reach a hull and is not declared
+  in `rescue_pursuers` carries a do-not-attack ACTION byte, and fights the player identically.
+  `check_rescue_targets` is the guard; decisions.md -> "AI_B is the APPROACH and AI_A is the
+  ACTION".
+
   Neither boat is answered by a body-block, and the #360 review is why that is written down:
   the crab reaches the door on turn 2 and the player's earliest arrival anywhere near it is
   Pinky on turn 3, so "race it to the door" was a lever that did not exist. What the west
@@ -153,7 +164,16 @@ difficulty_note: >
   outside melee. That asymmetry is what puts the plot-critical hint (Tali) on the boat a
   player is likeliest to save.
 
-  Against foot on turn 6 the east clock is vanilla's own slack of one turn. Nerra inherits Novala's
+  WHO CAN ACTUALLY GET THERE is `reached_on_contested:`, not `reached_on:` -- the latter is an
+  EMPTY-MAP walk, and a unit cannot move through an enemy body. With the line standing, the WEST
+  door is turn 6 for foot (vanilla Ch6's own foot number) after moving one corking body off the
+  channel, and the EAST door is a FLIER-and-Braulo objective: foot, cavalry and Trex cannot reach
+  it at all. That is deliberate and it is OURS, not parity -- vanilla's rescue is reachable by
+  everything except Cavalier and Armour. ch06 makes the east hull Pinky's beat the way vanilla
+  builds whole chapters around a flier or a thief; the west hull is the one the party saves
+  together.
+
+  Against foot on turn 6 the west clock is vanilla's own slack of one turn. Nerra inherits Novala's
   softness on purpose -- but note her Flux does 22 to a 19 HP hull, so she is kept on the
   centre shelf, far from both. Messie is a cutscene, not an encounter, so no route skips XP.
 
@@ -227,6 +247,19 @@ deployment:
 enemy_units:
   # ── The trident line (vanilla's 6 Soldiers) → merfolk, Mermaid `2. Lance` ─────
   - id: merfolk-trident
+    ai_override:
+      ai: '{0x8, 0x3, 0x0, 0x0}'   # AI_A_08 ActionInRange_ExceptCivilian + AI_B_03 NeverMove
+      why: >
+        Vanilla Ch6's line CANNOT touch a rescue target. Measured over Ch6Map with each class's
+        own movement-cost table: ZERO of its seventeen strikers can reach a villager in one
+        turn, and the clock is eight PURSUERS arriving turns 4-6. Ours can, because our map put
+        a hull inside the line instead of in a mountain-ringed corner -- its (18,14) body is two steps from the east hull, so it steps out and swings.
+        Only the ACTION half changes, to vanilla's own AI_A_08, whose do-not-attack list is
+        repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's AI_A_07
+        precedent). The donor's approach byte is kept, so this unit fights the player exactly
+        as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
+        from terrain and our map cannot. decisions.md -> "AI_B is the APPROACH and AI_A is the
+        ACTION".
     name: "Mermaid"
     count: 4
     class: soldier              # vanilla: 4x Lv7 Soldier, Iron Lance
@@ -235,7 +268,11 @@ enemy_units:
     inventory:
       - id: iron-lance
     damage_type: piercing       # flavor label only
-    positions: [[18, 14], [2, 14], [13, 11], [7, 15]]
+    # (2,14) -> (3,14): ONE tile, and it is the whole west clock. That body corked the
+    # only foot channel to the west door -- contested foot arrival was turn 11 against a
+    # turn-8 fuse, i.e. unsaveable. At (3,14) it is turn 6, which is vanilla Ch6's own
+    # foot number. Derived, not eyeballed: `map_placement_preview.reached_on`.
+    positions: [[18, 14], [3, 14], [13, 11], [7, 15]]
     donor: [[14, 9], [15, 7], [20, 7], [19, 13]] # vanilla's four HOLDING L7 soldiers
     skin:
       look: "merfolk spear-guard; the anim's lance IS a trident"
@@ -288,6 +325,19 @@ enemy_units:
       look: "merfolk on a shark, boarding axe"
       source: "FE-Repo: Map Sprites/Mounted - Dismounted, Monsters, Misc/Shark Rider (M) {N426}, 16x16 (stand+walk); NO battle anim exists -- vanilla Fighter frames, repalletted"
   - id: shark-rider-steel
+    ai_override:
+      ai: '{0x8, 0x3, 0x0, 0x0}'   # AI_A_08 ActionInRange_ExceptCivilian + AI_B_03 NeverMove
+      why: >
+        Vanilla Ch6's line CANNOT touch a rescue target. Measured over Ch6Map with each class's
+        own movement-cost table: ZERO of its seventeen strikers can reach a villager in one
+        turn, and the clock is eight PURSUERS arriving turns 4-6. Ours can, because our map put
+        a hull inside the line instead of in a mountain-ringed corner -- (16,15) reaches the east door in one move.
+        Only the ACTION half changes, to vanilla's own AI_A_08, whose do-not-attack list is
+        repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's AI_A_07
+        precedent). The donor's approach byte is kept, so this unit fights the player exactly
+        as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
+        from terrain and our map cannot. decisions.md -> "AI_B is the APPROACH and AI_A is the
+        ACTION".
     name: "Shark Rider"
     count: 1
     class: fighter              # vanilla: 1x Lv6 Fighter, Steel Axe
@@ -319,6 +369,14 @@ enemy_units:
 
   # ── The mounted block (vanilla's 3 Cavaliers) → crab-riders ──────────────────
   - id: crab-rider-blade
+    ai_override:
+      ai: '{0x8, 0x12, 0x0, 0x0}'  # AI_A_08 ExceptCivilian + the donor's charge-after-1
+      why: >
+        Its CHARGE is the donor's and is untouched -- only the ACTION half changes, so it comes
+        at the player exactly as vanilla's does. But it can path to the east hull, and this
+        chapter's clock is its two DECLARED pursuers (`rescue_pursuers`), not whatever else can
+        reach a boat. Vanilla Ch6 keeps its rescue targets out of reach with terrain; our map
+        cannot, so the licence is spent explicitly instead. `check_rescue_targets` is the guard.
     name: "Crab Rider"
     count: 1
     class: cavalier             # vanilla: 1x Lv7 Cavalier, Iron Blade
@@ -333,6 +391,14 @@ enemy_units:
       look: "merfolk astride a lake crab; the mount repainted from an arachnid to ice-blue shell"
       source: "FE-Repo: Battle Animations/Mounted - Dismounted, Monsters, Misc/[Spider-Variant] [M] Cavalier Rider by DATonDemand -> 1. Sword + 2. Lance; map sprite Cavalier (M) Spider Rider Sword {Zoramine} or Elder Bael Sword {Metalocif}, 16x32"
   - id: crab-rider-sword
+    ai_override:
+      ai: '{0x8, 0x12, 0x0, 0x0}'  # AI_A_08 ExceptCivilian + the donor's charge-after-1
+      why: >
+        Its CHARGE is the donor's and is untouched -- only the ACTION half changes, so it comes
+        at the player exactly as vanilla's does. But it can path to the east hull, and this
+        chapter's clock is its two DECLARED pursuers (`rescue_pursuers`), not whatever else can
+        reach a boat. Vanilla Ch6 keeps its rescue targets out of reach with terrain; our map
+        cannot, so the licence is spent explicitly instead. `check_rescue_targets` is the guard.
     name: "Crab Rider"
     count: 1
     class: cavalier             # vanilla: 1x Lv6 Cavalier, Iron Sword
@@ -345,6 +411,14 @@ enemy_units:
     donor: [7, 1]                   # vanilla L6 cavalier
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
   - id: crab-rider-lance
+    ai_override:
+      ai: '{0x8, 0x12, 0x0, 0x0}'  # AI_A_08 ExceptCivilian + the donor's charge-after-1
+      why: >
+        Its CHARGE is the donor's and is untouched -- only the ACTION half changes, so it comes
+        at the player exactly as vanilla's does. But it can path to the east hull, and this
+        chapter's clock is its two DECLARED pursuers (`rescue_pursuers`), not whatever else can
+        reach a boat. Vanilla Ch6 keeps its rescue targets out of reach with terrain; our map
+        cannot, so the licence is spent explicitly instead. `check_rescue_targets` is the guard.
     name: "Crab Rider"
     count: 1
     class: cavalier             # vanilla: 1x Lv6 Cavalier, Iron Lance
@@ -403,6 +477,19 @@ enemy_units:
       look: "a shelled thing plated like a knight, holding a bridge"
       source: "FE-Repo: Battle Animations/Infantry - Knights, Generals, Armors/[General-Variant] IronShell-Tiny General [U] by Alexsplode -> 2. Lance; map sprite General (U) IronShell_Tiny {Alexsplode}, 16x32. NB its anim preview keys on BLUE, not the usual green."
   - id: ironshell-horseslayer
+    ai_override:
+      ai: '{0x8, 0x3, 0x0, 0x0}'   # AI_A_08 ActionInRange_ExceptCivilian + AI_B_03 NeverMove
+      why: >
+        Vanilla Ch6's line CANNOT touch a rescue target. Measured over Ch6Map with each class's
+        own movement-cost table: ZERO of its seventeen strikers can reach a villager in one
+        turn, and the clock is eight PURSUERS arriving turns 4-6. Ours can, because our map put
+        a hull inside the line instead of in a mountain-ringed corner -- its JAVELIN reaches the east hull from (15,12), one step away.
+        Only the ACTION half changes, to vanilla's own AI_A_08, whose do-not-attack list is
+        repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's AI_A_07
+        precedent). The donor's approach byte is kept, so this unit fights the player exactly
+        as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
+        from terrain and our map cannot. decisions.md -> "AI_B is the APPROACH and AI_A is the
+        ACTION".
     name: "Ironshell"
     count: 1
     class: armor-knight         # vanilla: 1x Lv6 Knight, Horseslayer + Javelin
@@ -473,6 +560,19 @@ enemy_units:
 
   # ── Bow and beast (vanilla's Archer and its one Bael) ────────────────────────
   - id: merfolk-bow
+    ai_override:
+      ai: '{0x8, 0x3, 0x0, 0x0}'   # AI_A_08 ActionInRange_ExceptCivilian + AI_B_03 NeverMove
+      why: >
+        Vanilla Ch6's line CANNOT touch a rescue target. Measured over Ch6Map with each class's
+        own movement-cost table: ZERO of its seventeen strikers can reach a villager in one
+        turn, and the clock is eight PURSUERS arriving turns 4-6. Ours can, because our map put
+        a hull inside the line instead of in a mountain-ringed corner -- an iron bow reaches the hull from (17,14), three steps from its post.
+        Only the ACTION half changes, to vanilla's own AI_A_08, whose do-not-attack list is
+        repointed at the two boat pids (repoint_boat_safe_ai_list, on ch05's AI_A_07
+        precedent). The donor's approach byte is kept, so this unit fights the player exactly
+        as its donor does and simply will not swing at a hull -- the behaviour vanilla gets
+        from terrain and our map cannot. decisions.md -> "AI_B is the APPROACH and AI_A is the
+        ACTION".
     name: "Mermaid"
     count: 1
     class: archer               # vanilla: 1x Lv6 Archer, Iron Bow
@@ -523,6 +623,17 @@ enemy_units:
       - id: iron-lance
     damage_type: piercing
     positions: [[0, 11]]
+    ai_override:
+      ai: '{0x8, 0x0, 0x1, 0x0}'   # AI_A_08 ExceptCivilian + the donor's own pursue approach
+      why: >
+        The same override the turn-1 line carries, for the same reason and with the same
+        discipline: only the ACTION byte changes, and the approach (0x0, pursue) is the donor's
+        own, untouched. These three spawn on the WEST EDGE, a short ride from the west hull's
+        pocket, and a pursuing approach walks them onto it -- so without this they are
+        undeclared pressure on a hull whose fuse is costed against one declared pursuer.
+        "The hulls' clock is its DECLARED pursuers and nothing else" is not a turn-1 rule, and
+        a Difficult-only wave is no less bound by it than the opening board. They were invisible
+        to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [3, 11]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
@@ -538,6 +649,17 @@ enemy_units:
       - id: iron-lance
     damage_type: piercing
     positions: [[0, 9]]
+    ai_override:
+      ai: '{0x8, 0x0, 0x1, 0x0}'   # AI_A_08 ExceptCivilian + the donor's own pursue approach
+      why: >
+        The same override the turn-1 line carries, for the same reason and with the same
+        discipline: only the ACTION byte changes, and the approach (0x0, pursue) is the donor's
+        own, untouched. These three spawn on the WEST EDGE, a short ride from the west hull's
+        pocket, and a pursuing approach walks them onto it -- so without this they are
+        undeclared pressure on a hull whose fuse is costed against one declared pursuer.
+        "The hulls' clock is its DECLARED pursuers and nothing else" is not a turn-1 rule, and
+        a Difficult-only wave is no less bound by it than the opening board. They were invisible
+        to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [2, 9]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
@@ -554,6 +676,17 @@ enemy_units:
       - id: javelin
     damage_type: slashing
     positions: [[0, 13]]
+    ai_override:
+      ai: '{0x8, 0x0, 0x1, 0x0}'   # AI_A_08 ExceptCivilian + the donor's own pursue approach
+      why: >
+        The same override the turn-1 line carries, for the same reason and with the same
+        discipline: only the ACTION byte changes, and the approach (0x0, pursue) is the donor's
+        own, untouched. These three spawn on the WEST EDGE, a short ride from the west hull's
+        pocket, and a pursuing approach walks them onto it -- so without this they are
+        undeclared pressure on a hull whose fuse is costed against one declared pursuer.
+        "The hulls' clock is its DECLARED pursuers and nothing else" is not a turn-1 rule, and
+        a Difficult-only wave is no less bound by it than the opening board. They were invisible
+        to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [2, 13]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
@@ -744,6 +877,14 @@ terrain_divergence:
 # entry per (deployable PC x boat), every entry for a boat sharing that boat's ONE flag:
 # the first boarding sets it and `SearchAvailableEvent` then skips the rest. Generated
 # from the roster, never hand-listed, or it silently rots when the roster changes.
+# The chapter's CLOCK, declared. `check_rescue_targets` proves nothing else on the board can
+# attack a hull: every other unit that can reach one carries an ACTION byte that cannot target
+# it. Vanilla Ch6 gets this from terrain -- zero of its seventeen strikers can reach a villager
+# in one turn, and its clock is pursuers only. Ours is the same shape, bought with the AI byte.
+rescue_pursuers:
+- id: merfolk-thrower           # east: JAVELIN, range 1-2, so the pocket door never stops it
+- id: ice-crab                  # west: range 1, so it must OCCUPY the door -- and it does
+
 rescue_boats:
 - id: boat-east
   fe_name: "Fishing Boat"       # <=12 chars (see decisions.md: long names garble the buffer)
@@ -758,7 +899,13 @@ rescue_boats:
                                 # a range-2 weapon reaches the hull over the wall from 3 tiles
                                 # -- FE8 has no line of sight, so a wall never stops a javelin,
                                 # a bow or a tome. Placement is the only lever for those.
-  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, re-measured
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, EMPTY MAP
+  # ...and the same walk with the enemy LINE standing on it (turn-1 snapshot; derived by
+  # `map_placement_preview.reached_on`, never hand-kept). A unit cannot pass through an enemy
+  # body, and this map's channels are narrow enough that ONE body corks a route: removing
+  # shark-rider-halberd at (15,16) alone turns `null` into turn 12. The empty-map row above is
+  # what the chapter's clock was designed against, and it is not what a player walks.
+  reached_on_contested: {foot: null, cavalry: null, flier: 3, braulo: 6, trex: null}
   talk:
     background: bg_Boat         # vendored from FE-Repo; the boarding CG
     ea_file: events/ch06-boat-east.ea
@@ -778,7 +925,10 @@ rescue_boats:
   door: [4, 18]
   donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
   attackable_sides: 1           # as boat-east; a flier adds 3 cells, range-2 reaches from 2
-  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, re-measured
+  reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, EMPTY MAP
+  # Contested, as boat-east. The cork here is merfolk-trident at (2,14): removing that one
+  # body takes foot from turn 11 back to the declared 6.
+  reached_on_contested: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}
   talk:
     background: bg_Boat
     ea_file: events/ch06-boat-west.ea
@@ -816,3 +966,27 @@ design_notes: >
 # map (`LoadUnit` has no death check; `GetUnitFromCharId` returns NULL for an absent unit, and
 # a CUMO/MOVE on NULL is the never-returns soft-lock assert_scripted_move_reachable exists for).
 cutscene_actors: [marty, braulo]
+
+# ── What proves it (D8) ─────────────────────────────────────────────────────────
+# A chapter DECLARES its own scenarios and `tools/playtest/declared.py` derives their matrix
+# rows from this block (#314) -- the ROM from `boot:`, PT_HOST_CHAPTER from the host-slot
+# registry. Nothing about them is written a second time in `matrix.yaml`.
+#
+# There is one case, and it is the one #360 could not run because ch06 had no debug boot when
+# it landed: the pockets are a claim about the ENGINE'S pathing, and `mapshot` photographs
+# turn 1 while the question needs several enemy phases. Everything else ch06 owes is a
+# DIALOGUE or ART dependency (the three cutscenes, the boarding pass, Messie's bust, the
+# merfolk reskins) and there is nothing to assert about a scene that has no text yet.
+playtest:
+  boot: ch06boot                  # CH06BOOT=1; host slot 7 comes from inject/hosts.py
+  cases:
+    # Hand-written Lua, and it names why rather than defaulting to it: the declared
+    # vocabulary is boot -> settle -> visit -> read items, and this case drives ENEMY PHASES
+    # and reads the red and green unit arrays. `deadline` is raised because twelve phases of
+    # twenty-four enemies is several times the work a village case does.
+    - name: ch06clock
+      proves: >
+        both pursuers path to their hull without stalling, and the range-1 crab attacks the
+        west boat only from its pocket door -- the single melee cell the pocket promises
+      lua: ch06clock
+      deadline: 900

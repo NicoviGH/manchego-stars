@@ -9448,6 +9448,241 @@ scenarios.recordch02ending = function()
     result("PASS", atTitle and "ch02 ending recorded (reached title)" or "ch02 ending recorded")
 end
 
+-- ch06clock (#26): the run #360 could not do, because ch06 had no debug boot when it landed.
+--
+-- WHAT IT SETTLES. ch06's two hulls sit in POCKETS: an impassable TILE_2E body plus ONE
+-- ground cell you can stand on to swing at them (decisions.md -> "ch06's boats sit in
+-- POCKETS"). That is a claim about the ENGINE'S pathing, not about our map data, and no
+-- static tool can answer it -- `mapshot` photographs turn 1 and the question needs several
+-- enemy phases. So this drives the enemy phases and reads memory:
+--
+--   * neither pursuer STALLS -- it closes on its hull every phase until it is in range,
+--     rather than parking because the approach is one tile wide;
+--   * the range-1 crab, once in range of the west hull, is standing on the DOOR and nowhere
+--     else. That is the pocket's whole promise: exactly one melee tile;
+--   * the range-2 thrower reaches the east hull ANYWAY -- FE8 has no line of sight, so the
+--     wall never stops a javelin. Its throwing tile is logged, because that is placement
+--     evidence rather than a pass/fail;
+--   * nothing touches a hull on turn 1, which is vanilla Ch6's own placement claim.
+--
+-- WHAT IT DELIBERATELY DOES NOT ASSERT: the sink TURN. The chapter YAML declares turns 7 and
+-- 8, but a fuse made of attacks is a hit RATE, not a turn number -- the crab shows a 47
+-- displayed hit into the hull's forest cover and needs four connections, so "turn 8" is a
+-- distribution and one run is one sample of it. Asserting it would make this a coin-flip
+-- verdict. It is measured and LOGGED against the declared turn instead, and a run that
+-- disagrees is a finding for the chapter's balance, not a broken scenario.
+--
+-- The party is held at full HP every turn. That is isolation, not a cheat: a dead PC ends
+-- the run in a game over long before the clock resolves, and the subject here is the two
+-- pursuers rather than whether the fight is winnable. Same control ch02aidiag used.
+--
+-- CONTENTION for the door -- two units wanting the same single tile -- does NOT exist on
+-- normal, where the only pursuers are these two and they want different hulls. It exists on
+-- DIFFICULT, whose turn-4 crab-rider trio also pursues from the west edge. Declared cases
+-- run on normal, so that arm is not covered here and is not claimed to be.
+scenarios.ch06clock = function()
+    local CH06 = dofile(PLAYTEST_DIR .. "/ch06.lua")     -- ch06's shared facts (#314)
+    local TURNS = 12                                     -- past both declared fuses, with slack
+    if not bootToMap() then return result("FAIL", "never reached the ch06 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+
+    local function dist(ax, ay, bx, by) return math.abs(ax - bx) + math.abs(ay - by) end
+    local function indexOf(base, count, match)
+        for i = 0, count - 1 do
+            local u = unitAt(base, i)
+            if u and not isDead(u) and match(u) then return i, u end
+        end
+        return nil
+    end
+
+    -- The hulls, by the raw pid each boat owns (CH06_BOAT_PIDS). Tracked by INDEX and
+    -- re-read every phase: a unit snapshot is a copy, and the whole subject is what changes.
+    local hulls = {}
+    for _, b in ipairs(CH06.BOATS) do
+        local i, u = indexOf(SYM.gUnitArrayGreen, 20, function(g) return g.charId == b.pid end)
+        if not i then
+            return result("FAIL", string.format(
+                "%s (pid 0x%02X) is not on the map -- the chapter's clock is two GREEN units "
+                .. "and one of them never loaded", b.id, b.pid))
+        end
+        if u.x ~= b.x or u.y ~= b.y then
+            return result("FAIL", string.format(
+                "%s loaded at (%d,%d), not the pocket cell (%d,%d) its chapter YAML declares",
+                b.id, u.x, u.y, b.x, b.y))
+        end
+        hulls[b.id] = { boat = b, index = i, hp = u.hp, maxhp = u.maxhp, sank = nil }
+        log(string.format("ch06clock: %s hull at (%d,%d) %d/%d HP, door (%d,%d), declared "
+            .. "fuse turn %d", b.id, u.x, u.y, u.hp, u.maxhp, b.doorX, b.doorY, b.sinks_on))
+    end
+
+    -- The pursuers. Every ch06 enemy shares one generic pid, so a pursuer is identified by
+    -- the tile it STARTS on and then tracked by its stable index in gUnitArrayRed.
+    local chase = {}
+    for _, p in ipairs(CH06.PURSUERS) do
+        local i, u = indexOf(SYM.gUnitArrayRed, 50,
+            function(r) return r.x == p.x and r.y == p.y end)
+        if not i then
+            return result("FAIL", string.format(
+                "no living enemy on (%d,%d) at turn 1 -- %s is the pursuer that makes the %s "
+                .. "clock exist, and the placement this scenario reads is gone",
+                p.x, p.y, p.id, p.boat))
+        end
+        local lo, hi = unitAttackRange(u)
+        chase[#chase + 1] = { spec = p, index = i, x = u.x, y = u.y, arrived = nil }
+        log(string.format("ch06clock: %s at (%d,%d), weapon range %s-%s (declared max %d), "
+            .. "chasing %s -- %d tiles from its door",
+            p.id, u.x, u.y, tostring(lo), tostring(hi), p.range, p.boat,
+            dist(u.x, u.y, hulls[p.boat].boat.doorX, hulls[p.boat].boat.doorY)))
+    end
+
+    -- The turn-1 red roster, once. The first run of this scenario measured an 11-damage hit
+    -- on a hull during enemy phase 1 and could not name what threw it: nothing in the EMITTED
+    -- unit table (`MS_Ch06Line`) is within weapon range of that hull at load, and the only
+    -- mover near it was still three tiles out. A scenario that watches two units cannot tell
+    -- "the AI did something surprising" from "the loaded map is not the table we emitted", so
+    -- it dumps what actually LOADED -- which is the reading the next run needs and the one
+    -- this scenario was too narrow to take (decisions.md -> one INSTRUMENTED run, not one run
+    -- per guess).
+    for i = 0, 49 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and not isDead(u) and u.onMap then
+            local lo, hi = unitAttackRange(u)
+            log(string.format("ch06clock: roster red[%02d] (%2d,%2d) lvl %2d hp %2d range %s-%s",
+                i, u.x, u.y, u.level, u.hp, tostring(lo), tostring(hi)))
+        end
+    end
+
+    -- Findings are COLLECTED, not returned on sight. This is the one run ch06 gets for the
+    -- question (decisions.md -> "Playtest runs are the most expensive thing in this repo"), so
+    -- a turn-1 contact must not abandon the pathing evidence the same run was going to
+    -- produce. Only a wedged phase or a game over ends it early, because neither leaves
+    -- anything left to read.
+    local stalls, offdoor, early = {}, {}, {}
+    for t = 1, TURNS do
+        -- Isolation: the party is not the subject, and a game over ends the run before the
+        -- clock resolves. Never visits, never fights -- it only gives the turns back.
+        for i = 0, 61 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and not isDead(u) then emu:write8(u.addr + 0x13, u.maxhp) end
+        end
+        local phase = runEnemyPhase()
+        if phase == nil then
+            return result("FAIL", string.format("the enemy phase never returned on turn %d", t))
+        end
+        if phase == "gameover" then
+            return result("FAIL", string.format(
+                "game over on turn %d despite the party being held at full HP", t))
+        end
+
+        for _, b in ipairs(CH06.BOATS) do
+            local h = hulls[b.id]
+            local u = unitAt(SYM.gUnitArrayGreen, h.index)
+            local hp = (u and not isDead(u)) and u.hp or 0
+            if hp == 0 and not h.sank then h.sank = t end
+            -- Name the attacker. A hull losing HP with no pursuer in range is the reading the
+            -- first run could not explain, so every red that could plausibly have reached it
+            -- is dumped at the moment the damage lands rather than reconstructed afterwards.
+            if hp < h.hp then
+                log(string.format("ch06clock: %s took %d on enemy phase %d -- reds within 3:",
+                    b.id, h.hp - hp, t))
+                -- Put the CAMERA on the hull before the frame. Headless this is a no-op and
+                -- the roster dump below is the whole reading; headed (PT_HEADED=1 PT_FPS=60)
+                -- it photographs who is actually standing around the boat, which is the
+                -- question the emitted unit table could not answer.
+                cursorTo(b.x, b.y)
+                wait(90)                -- the map scrolls to the cursor; shooting before it
+                                        -- arrives photographs wherever the fight happened to be
+                shot(string.format("%s-hit-turn%d", b.id, t))
+                for i = 0, 49 do
+                    local r = unitAt(SYM.gUnitArrayRed, i)
+                    if r and not isDead(r) and r.onMap and dist(r.x, r.y, b.x, b.y) <= 3 then
+                        local lo, hi = unitAttackRange(r)
+                        log(string.format("ch06clock:   red[%02d] (%2d,%2d) d=%d range %s-%s",
+                            i, r.x, r.y, dist(r.x, r.y, b.x, b.y), tostring(lo), tostring(hi)))
+                    end
+                end
+            end
+            if t == 1 and hp < h.maxhp then
+                early[#early + 1] = string.format("%s took %d on enemy phase 1", b.id,
+                                                  h.maxhp - hp)
+            end
+            h.hp = hp
+        end
+
+        for _, c in ipairs(chase) do
+            local h = hulls[c.spec.boat]
+            local u = unitAt(SYM.gUnitArrayRed, c.index)
+            local x, y = (u and not isDead(u)) and u.x or -1, (u and not isDead(u)) and u.y or -1
+            local d = (x >= 0) and dist(x, y, h.boat.x, h.boat.y) or -1
+            local inRange = d >= 0 and d <= c.spec.range
+            log(string.format(
+                "ch06clock: turn %2d (engine %2d)  %-16s (%2d,%2d) d=%2d %-9s | %-9s %2d/%2d HP",
+                t, turn(), c.spec.id, x, y, d, inRange and "IN RANGE" or "closing",
+                c.spec.boat, h.hp, h.maxhp))
+            if h.hp > 0 and x >= 0 then
+                if inRange then
+                    if not c.arrived then c.arrived = t end
+                    -- The pocket's whole promise. A range-1 attacker in range of the hull is
+                    -- standing on the door or the pocket does not shape melee at all.
+                    if c.spec.range == 1 and not (x == h.boat.doorX and y == h.boat.doorY) then
+                        offdoor[#offdoor + 1] = string.format(
+                            "%s reached %s from (%d,%d) on turn %d, not the door (%d,%d)",
+                            c.spec.id, c.spec.boat, x, y, t, h.boat.doorX, h.boat.doorY)
+                    end
+                elseif x == c.x and y == c.y then
+                    stalls[#stalls + 1] = string.format(
+                        "%s did not move on turn %d -- still (%d,%d), %d tiles from %s",
+                        c.spec.id, t, x, y, d, c.spec.boat)
+                end
+            end
+            c.x, c.y = x, y
+        end
+    end
+
+    if #early > 0 then
+        return result("FAIL", "something reached a hull on enemy phase 1. ch06's whole "
+            .. "travel-time budget is measured from vanilla Ch6's claim that nothing can: "
+            .. table.concat(early, "; "))
+    end
+    if #stalls > 0 then
+        return result("FAIL", "a pursuer STALLED short of its hull, so the one-tile approach "
+            .. "is not pathable for it: " .. table.concat(stalls, "; "))
+    end
+    if #offdoor > 0 then
+        return result("FAIL", "a melee pursuer attacked a hull from outside its pocket door, "
+            .. "so the pocket is not one tile wide: " .. table.concat(offdoor, "; "))
+    end
+    for _, c in ipairs(chase) do
+        if not c.arrived then
+            return result("FAIL", string.format(
+                "%s never came within %d of %s in %d turns -- it retargeted or the pocket has "
+                .. "no path, and that boat has no clock",
+                c.spec.id, c.spec.range, c.spec.boat, TURNS))
+        end
+    end
+
+    -- The fuse: measured, reported, not asserted. See the header.
+    local told = {}
+    for _, b in ipairs(CH06.BOATS) do
+        local h = hulls[b.id]
+        local got = h.sank and string.format("turn %d", h.sank)
+            or string.format("still afloat at turn %d on %d HP", TURNS, h.hp)
+        told[#told + 1] = string.format("%s declared turn %d, measured %s", b.id, b.sinks_on, got)
+        if h.sank ~= b.sinks_on then
+            log(string.format("ch06clock: FUSE DIFFERS -- %s", told[#told]))
+        end
+    end
+    log("ch06clock: " .. table.concat(told, " | "))
+    return result("PASS", string.format(
+        "both pursuers pathed to their hull and neither stalled (%s); the melee pursuer "
+        .. "attacked only from its pocket door. Fuse measured, not asserted: %s",
+        table.concat({ chase[1].spec.id .. " in range turn " .. chase[1].arrived,
+                       chase[2].spec.id .. " in range turn " .. chase[2].arrived }, ", "),
+        table.concat(told, " | ")))
+end
+
 -- ---------------------------------------------------------------- runner
 -- A DECLARED case (#314) has no function here: its chapter YAML declares what it proves,
 -- `declared.py` emits it as a Lua table into the run directory, and cases.lua runs it. The

@@ -76,10 +76,18 @@ class Board(unittest.TestCase):
         units = pp.placed_units(self.chap)
         self.assertEqual(len(units), sum(int(e.get('count', 1))
                                          for e in self.chap['enemy_units']))
+        # SHAPES, derived from the whole AI vector, not the approach byte alone. `striker` is
+        # the one the old two-label vocabulary could not say: holds ground, but steps out
+        # within its own move range to strike. It is most of this roster, and reading those
+        # units as `never-move` is what let ch06's clock be designed around a line that in
+        # fact walks to the boats (decisions.md -> "AI_B is the APPROACH and AI_A is the
+        # ACTION"). The boss is `statue` because his VECTOR says so -- GuardTileAI, inherited
+        # from Novala -- rather than because an `is_boss` flag patched the label.
         behaviours = {b for _, _, b, _, _ in units}
-        self.assertIn('never-move', behaviours)
-        self.assertIn('pursue', behaviours)
-        self.assertIn('hold-position', behaviours)          # the boss, flagged by is_boss
+        self.assertIn('striker', behaviours)
+        self.assertIn('pursuer', behaviours)
+        self.assertIn('statue', behaviours)
+        self.assertNotIn('hold-position', behaviours)
 
     def test_no_enemy_stands_where_its_class_cannot(self):
         """The failure this tool exists to make impossible: a coordinate that looks fine on
@@ -123,6 +131,127 @@ class Board(unittest.TestCase):
             placed = dict((eid, tile) for tile, _, _, eid, _
                           in pp.placed_units(self.chap, concept))
             self.assertEqual(placed['nerra'], (9, 12))
+
+
+class ContestedReach(unittest.TestCase):
+    """`reached_on:` is the number ch06's whole clock rests on, and until now nothing read it.
+
+    It was also measured on an EMPTY MAP: `foot_reach` was a Dijkstra over terrain that did not
+    know units exist. In FE a unit cannot move through an enemy body, so a line standing across
+    a channel is a wall -- and ch06's east boat sits behind exactly such a line. An uncontested
+    number flatters our map more than it flatters vanilla's, whose rescue route peels away from
+    the fight entirely (decisions.md -> "Vanilla Ch6's urgency is TRAVEL TIME").
+    """
+
+    def _grid(self):
+        # 5x1 corridor of plain, cost 1 per step.
+        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
+        return [[plain] * 5]
+
+    def test_an_open_corridor_costs_one_point_per_step(self):
+        dist = pp.foot_reach(self._grid(), [(0, 0)])
+        self.assertEqual(4, dist[(4, 0)])
+
+    def test_a_body_in_the_corridor_makes_the_far_side_UNREACHABLE(self):
+        """The whole point: FE has no phasing through an enemy."""
+        dist = pp.foot_reach(self._grid(), [(0, 0)], blocked={(2, 0)})
+        self.assertNotIn((4, 0), dist)
+        self.assertEqual(1, dist[(1, 0)])
+
+    def test_a_body_ON_the_source_does_not_break_the_walk(self):
+        dist = pp.foot_reach(self._grid(), [(0, 0)], blocked={(0, 0)})
+        self.assertEqual(4, dist[(4, 0)])
+
+    def test_blocked_defaults_to_empty_so_the_old_reading_is_still_available(self):
+        self.assertEqual(pp.foot_reach(self._grid(), [(0, 0)]),
+                         pp.foot_reach(self._grid(), [(0, 0)], blocked=set()))
+
+    def test_turns_is_ceiling_of_points_over_move(self):
+        """A unit spends up to `mov` points a turn, so 6 points at mov 5 is two turns."""
+        self.assertEqual(1, pp.arrival_turn(5, 5))
+        self.assertEqual(2, pp.arrival_turn(6, 5))
+        self.assertEqual(2, pp.arrival_turn(10, 5))
+        self.assertIsNone(pp.arrival_turn(None, 5))
+
+
+class ReachedOnIsDerived(unittest.TestCase):
+    """ch06 declares `reached_on:` per class. It is now derived and compared, because a hand-kept
+    number that nothing reads is how "foot reaches either door on turn 6" survived as the
+    chapter's load-bearing claim without ever being true under fire."""
+
+    def test_every_declared_class_is_one_the_deriver_knows(self):
+        chap = pp.load_chapter('ch06')
+        for boat in chap['rescue_boats']:
+            for role in (boat.get('reached_on') or {}):
+                self.assertIn(role, pp.REACH_ROLES,
+                              '%r is declared but has no movement profile' % role)
+
+    def test_the_contested_walk_reproduces_the_declared_numbers(self):
+        """`reached_on_contested:` is the row that describes what a player actually walks, so
+        it is derived and pinned. Nothing may hand-edit it away from the map."""
+        chap = pp.load_chapter('ch06')
+        terrain = pp.terrain_grid(chap)
+        for boat in chap['rescue_boats']:
+            got = pp.reached_on(chap, terrain, tuple(boat['door']), contested=True)
+            for role, declared in (boat.get('reached_on_contested') or {}).items():
+                self.assertEqual(declared, got[role],
+                                 '%s %s: declared %s, derived %s'
+                                 % (boat['id'], role, declared, got[role]))
+
+    def test_a_contested_row_is_declared_for_every_boat(self):
+        """The empty-map row alone is what let "foot reaches either door on turn 6" stand as
+        the chapter's load-bearing claim while being false for every ground class."""
+        for boat in pp.load_chapter('ch06')['rescue_boats']:
+            self.assertIn('reached_on_contested', boat, boat['id'])
+
+    def test_the_uncontested_walk_reproduces_the_declared_numbers(self):
+        """The declared block was measured this way, so deriving it the same way must agree --
+        that is what makes the CONTESTED number a finding rather than a tooling difference."""
+        chap = pp.load_chapter('ch06')
+        terrain = pp.terrain_grid(chap)
+        for boat in chap['rescue_boats']:
+            got = pp.reached_on(chap, terrain, tuple(boat['door']), contested=False)
+            for role, declared in (boat.get('reached_on') or {}).items():
+                self.assertEqual(declared, got[role],
+                                 '%s %s: declared turn %s, derived %s'
+                                 % (boat['id'], role, declared, got[role]))
+
+
+class BehaviourColour(unittest.TestCase):
+    """The legend must not promise a colour the render never draws.
+
+    `ai_shape` replaced the approach-family vocabulary and `BEHAVIOUR_COLOUR` kept the old
+    keys, so every one of ch06's 27 markers fell through to the default grey while the legend
+    still advertised red/orange/yellow/purple. Nothing caught it because nothing tested the
+    key set -- and a placement picture that mis-states behaviour is exactly the picture ch06's
+    clock was designed against.
+    """
+
+    def test_every_shape_has_a_colour(self):
+        import chapter_status as cs
+        shapes = set()
+        for action in cs.AI_ACTION:
+            for approach in cs.AI_BEHAVIOUR:
+                shape = cs.ai_shape((action, approach, 0, 0))
+                if shape is not None:
+                    shapes.add(shape)
+        self.assertTrue(shapes, 'ai_shape named nothing -- the sweep is not reaching it')
+        self.assertEqual(shapes - set(pp.BEHAVIOUR_COLOUR), set(),
+                         'ai_shape returns a shape the render has no colour for')
+
+    def test_no_colour_for_a_shape_that_does_not_exist(self):
+        """The other direction: a stale key is a legend entry nothing can ever draw."""
+        import chapter_status as cs
+        shapes = {cs.ai_shape((a, b, 0, 0))
+                  for a in cs.AI_ACTION for b in cs.AI_BEHAVIOUR}
+        self.assertEqual(set(pp.BEHAVIOUR_COLOUR) - shapes, set(),
+                         'BEHAVIOUR_COLOUR names a behaviour `ai_shape` never returns')
+
+    def test_ch06_markers_all_resolve(self):
+        """The regression itself: no ch06 unit renders as unclassified."""
+        grey = sorted(u[3] for u in pp.placed_units(ch06())
+                      if u[2] not in pp.BEHAVIOUR_COLOUR)
+        self.assertEqual(grey, [], 'ch06 units with no derived shape: %r' % (grey,))
 
 
 if __name__ == '__main__':

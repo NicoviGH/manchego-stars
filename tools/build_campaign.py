@@ -12748,13 +12748,67 @@ def repoint_escort_safe_ai_list(escort_char, why):
         f.write(source)
 
 
-def escort_safe_ai_clients(campaign='rime-of-the-frostmaiden'):
-    """`['chNN.enemy-id', ...]` for every enemy whose EMITTED AI1 is AI_A_07.
+#  AI_A_08's do-not-attack list, and the ch06 hulls it is repointed at. Vanilla declares it
+#  `u8 gUnknown_085A8B3C[] = { CHARACTER_CITIZEN, 0, 0, 0 }` and NOTHING in FE8 uses AI_A_08 --
+#  swept over events_udefs.c at decomp HEAD, `.ai = {0x8,` appears zero times -- so the index and
+#  its list are both free for us to spend.
+BOAT_SAFE_AI_INDEX = 0x8            # gAi1ScriptTable[AI_A_08] = gAiScript_ActionInRange_ExceptCivilian
+BOAT_SAFE_AI_LIST = 'gUnknown_085A8B3C'
+
+
+def repoint_boat_safe_ai_list(char_ids, why, owner):
+    """Point AI_A_08's do-not-attack list at OUR rescue targets instead of vanilla's Citizen.
+
+    ch06's map puts a killable hull inside the merfolk line, which vanilla Ch6 never does: over
+    Ch6Map, with each class's own cost table, ZERO of its seventeen strikers can reach a
+    villager in one turn. Ours reach a boat on enemy phase 1, four of them, and a hull tuned as
+    a one-pursuer fuse sinks on turn 4 instead of 7. Vanilla buys that protection with TERRAIN
+    -- a mountain ring no Armour or Cavalier can cross -- and our frozen lake has no analogue,
+    so we buy it with the AI byte vanilla itself provides for exactly this job.
+
+    `AI_A_08` is `gAiScript_ActionInRange_ExceptCivilian`: the standard offensive action run
+    through `AiIsUnitEnemyAndNotInScrList`, which calls `AiIsInShortList(script->unk_08, ...)`
+    against each candidate's `pCharacterData->number`. `unk_08` is the list below. Copying the
+    byte alone does NOT protect our hulls, because the list holds a literal character id and
+    ours are raw pids of our own -- the same trap `repoint_escort_safe_ai_list` documents for
+    AI_A_07, and this is that function's twin.
+
+    THE LIST IS WIDENED, and that is not cosmetic. `AiIsInShortList` takes a `const u16*` and
+    stops on a zero entry, so vanilla's four BYTES are the two-entry u16 short list
+    `{ CHARACTER_CITIZEN, TERMINATOR }` -- it holds ONE id, not four. Writing both hull pids
+    into the byte slots would produce the single garbage id 0xBCBB and protect neither. Two ids
+    need six bytes: `{ id, 0, id, 0, 0, 0 }` reads as `{ id, id, TERMINATOR }`.
+
+    SAFE BECAUSE THE LIST HAS NO CLIENTS AT ALL. Unlike AI_A_07 (vanilla Ch5's Joshua), AI_A_08
+    is referenced by no vanilla UnitDefinition in the ROM, so repointing its list changes the
+    behaviour of nothing that vanilla ships.
+    """
+    assert_boat_safe_ai_is_single_chapter(owner)
+    with open(CP_DATA_C, encoding='utf-8') as f:
+        source = f.read()
+    body = ', '.join('%s, 0' % c for c in char_ids) + ', 0, 0'
+    pattern = (r'(u8 CONST_DATA %s\[\] = \{ )CHARACTER_CITIZEN, 0, 0, 0( \};)'
+               % BOAT_SAFE_AI_LIST)
+    source, count = re.subn(pattern, r'\g<1>%s\g<2>' % body, source, count=1)
+    if count != 1:
+        sys.exit('ERROR: %s is not vanilla\'s { CHARACTER_CITIZEN, 0, 0, 0 } in %s -- AI_A_08\'s '
+                 'do-not-attack list moved or was already patched, so %s would go unprotected'
+                 % (BOAT_SAFE_AI_LIST, CP_DATA_C, why))
+    with open(CP_DATA_C, 'w', encoding='utf-8') as f:
+        f.write(source)
+
+
+def safe_ai_clients(ai_index, campaign='rime-of-the-frostmaiden'):
+    """`['chNN.enemy-id', ...]` for every enemy whose EMITTED AI1 is `ai_index`.
 
     Reads what each chapter actually ships -- donor bytes or a declared override -- rather
     than a table of labels (#335). That is strictly wider than the label scan it replaced:
-    it also catches a unit that inherits AI_A_07 from its vanilla DONOR, which no scan of
-    our own vocabulary could ever see."""
+    it also catches a unit that inherits the byte from its vanilla DONOR, which no scan of
+    our own vocabulary could ever see.
+
+    One implementation for BOTH repointed do-not-attack lists. They have the same hazard --
+    a global list whose safety rests on knowing every client -- and having only AI_A_07's
+    swept is what let AI_A_08 be spent with no sweep at all."""
     import difficulty
     out = []
     for path in sorted(glob.glob(os.path.join(
@@ -12771,10 +12825,41 @@ def escort_safe_ai_clients(campaign='rime-of-the-frostmaiden'):
                         ai = difficulty.enemy_ai_bytes(chap, enemy, index)
                     except ValueError:
                         continue        # ungrounded: ai_donor_findings reports it, not us
-                    if ai[0] == ESCORT_SAFE_AI_INDEX:
+                    if ai[0] == ai_index:
                         out.append('%s.%s' % (stem, enemy.get('id')))
                         break
     return sorted(out)
+
+
+def escort_safe_ai_clients(campaign='rime-of-the-frostmaiden'):
+    """Every enemy carrying AI_A_07 -- ch05's escort byte."""
+    return safe_ai_clients(ESCORT_SAFE_AI_INDEX, campaign)
+
+
+def assert_boat_safe_ai_is_single_chapter(owner):
+    """Refuse the repoint if any chapter but `owner` has picked up AI_A_08.
+
+    `assert_escort_safe_ai_has_one_client`'s twin, and it exists because AI_A_08's list is
+    exactly as GLOBAL as AI_A_07's. Once repointed it names ch06's two hull pids, so ANY unit
+    anywhere carrying `{0x8, ...}` inherits "will not attack those pids".
+
+    The invariants differ, and the difference is the point. AI_A_07's is one UNIT, because
+    vanilla ships one client and a second would inherit our escort's immunity by accident.
+    AI_A_08's is one CHAPTER, because vanilla ships NO clients -- so the chapter that claims
+    the list may spend it on as many of its own units as it likes (ch06 spends it on ten), and
+    the hazard is a DIFFERENT chapter picking the byte up for its own reasons. That unit would
+    silently refuse to attack pids its chapter has never heard of, and the next chapter to want
+    this byte for its own rescue targets would repoint the list out from under ch06 with
+    nothing anywhere to say so.
+    """
+    strays = [c for c in safe_ai_clients(BOAT_SAFE_AI_INDEX)
+              if not c.startswith(owner + '.')]
+    if strays:
+        sys.exit('ERROR: AI_A_08 (%s) is claimed by %s, but %s also carry it. The '
+                 'do-not-attack list is GLOBAL and now names %s\'s rescue targets, so those '
+                 'units silently inherit an immunity to pids their own chapter never declared. '
+                 'Give them a different ACTION byte, or move the list to a second index.'
+                 % (BOAT_SAFE_AI_LIST, owner, ', '.join(strays), owner))
 
 
 def assert_escort_safe_ai_has_one_client(ai_bytes):
@@ -14218,6 +14303,12 @@ def inject_ch06(campaign, boot=False, verbose=True):
     declare_unit_table(CH06_BOAT_TABLE, boat_rows,
                        'ch06 the Burly Ram and the Pronged Goat: green hulls in their pockets, '
                        'and the chapter\'s real difficulty (#26)')
+    # ...and take the hulls off the MENU for every unit that is not their declared pursuer.
+    # Four of the line's strikers reach a hull on enemy phase 1 -- vanilla Ch6's line reaches
+    # its villagers NEVER -- so the chapter's overridden units carry AI_A_08 and this points
+    # its do-not-attack list at the two boat pids. See repoint_boat_safe_ai_list.
+    repoint_boat_safe_ai_list([CH06_BOAT_PIDS['boat-east'], CH06_BOAT_PIDS['boat-west']],
+                              'ch06 the two marooned hulls', owner='ch06')
 
     # 3. Strip the host slot's event lists and wire ours. The list SYMBOLS are the only vanilla
     #    names left in this function, and they come from CH06_EVENT_LISTS.

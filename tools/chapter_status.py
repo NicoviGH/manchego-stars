@@ -249,18 +249,38 @@ AI_BEHAVIOUR = {
     0x12: 'charge-after-1',
 }
 
-# Which families are "threat that comes to you" and which are "threat you walk into" -- ch05's
-# YAML coined the distinction and #344 measured it. A unit that never moves contributes nothing
-# until the player enters its range, so the two are not interchangeable.
-#
-# Only families whose DECOMP SYMBOL states the behaviour are classified. The six table entries
-# named after bare addresses, and any index outside the table, are UNCLASSIFIED on purpose:
-# bucketing an unknown script as "static" because it is unnamed would be a guess wearing a
-# measurement's clothes, and it would land silently on the side that lowers the number.
+# The ACTION half, `gAi1ScriptTable` (cp_data.c). This is the half that MOVES, and reading only
+# AI_B is what let a chapter be designed against the word "never-move": `AI_B_03 NeverMove` is
+# `AI_NOP_0E` -- it only suppresses crossing the map -- while `AI_A_00 ActionInRange` is
+# `AI_ACTION(100)`, and acting includes stepping within the unit's own range to reach a target.
+# Measured when this landed: 94 of 99 campaign enemies are ActionInRange, and 48 of the 51 units
+# reported as "threat you walk into" will move (decisions.md -> "AI_B is the APPROACH and AI_A is
+# the ACTION"). Same naming discipline as AI_BEHAVIOUR: the twelve entries the decomp gives only
+# an address (0x09..0x14) stay UNNAMED rather than guessed at.
+AI_ACTION = {
+    0x00: 'engage',                   # ActionInRange
+    0x01: 'engage-80',                # ActionInRange_80Perc
+    0x02: 'engage-50',                # ActionInRange_50Perc
+    0x03: 'hold',                     # ActionStanding -- vanilla Ch6's Novala, and a true statue
+    0x04: 'hold-80',                  # ActionStanding_80Perc
+    0x05: 'hold-50',                  # ActionStanding_50Perc
+    0x06: 'inert',                    # DoNothing -- vanilla Ch6's three green villagers
+    0x07: 'engage-except-char',       # ActionInRange_ExceptNatasha (ch05's escort rides this)
+    0x08: 'engage-except-civilian',   # ActionInRange_ExceptCivilian
+}
+# Whether the ACTION reaches for a target. `engage*` walks within its own move range to attack;
+# `hold*` strikes only what is already adjacent; `inert` does nothing at all.
+AI_ACTION_MOVES = frozenset({'engage', 'engage-80', 'engage-50',
+                             'engage-except-char', 'engage-except-civilian'})
+AI_ACTION_HOLDS = frozenset({'hold', 'hold-80', 'hold-50', 'inert'})
+
+# Which APPROACH families cross the map at you, and which hold ground. Note this is no longer the
+# whole story on its own -- a holding APPROACH still moves if its ACTION engages, which is what
+# `ai_shape` exists to express.
 AI_COMES_TO_YOU = frozenset({'pursue', 'pursue-ignore-char', 'pursue-twice',
                              'pursue-twice-ignore-char', 'charge-after-1',
                              'pillage', 'pillage-after-1'})
-AI_WALK_INTO = frozenset({'never-move', 'guard-tile'})
+AI_HOLDS_GROUND = frozenset({'never-move', 'guard-tile'})
 # Known behaviours that are NEITHER: the unit moves, but not at the player. A thief that loots
 # and leaves, a script that flees, one that chews on walls. Folding these into "unclassified"
 # said "we do not know" about three scripts the decomp names outright -- and ai2=0x05 alone
@@ -270,31 +290,62 @@ AI_OWN_ERRAND = frozenset({'pillage-escape', 'escape', 'attack-walls-snags'})
 
 
 def ai_family(ai2):
-    """The behaviour family for an AI2 index, or None where the decomp does not name one."""
+    """The APPROACH family for an AI2 index, or None where the decomp does not name one."""
     return AI_BEHAVIOUR.get(ai2)
 
 
-def behaviour_split(ai2s):
-    """{comes_to_you, walk_into, unclassified, n} over a sequence of AI2 indices.
+def ai_action(ai1):
+    """The ACTION family for an AI1 index, or None where the decomp does not name one."""
+    return AI_ACTION.get(ai1)
+
+
+def ai_shape(ai):
+    """The three-way shape a FULL 4-byte vector describes, or None if either half is unnamed.
+
+        pursuer     -- the approach walks it across the map at you
+        striker     -- it holds ground, but its ACTION steps out within its own move range
+        statue      -- it holds ground and does not move at all, even to attack
+        own-errand  -- it moves, but not at the player (loots, flees, chews on walls)
+
+    Two buckets could not express the middle one, and the middle one is most of the campaign:
+    `{engage, never-move}` is vanilla's commonest pairing. ch06's clock was designed as though
+    it meant `statue`, and four merfolk walked to a boat the design had them nowhere near.
+
+    Takes the vector, never a single byte: a stale `ai_shape(ai[1])` would classify a whole
+    roster off half the information and look entirely correct, so an int RAISES.
+    """
+    if isinstance(ai, int) or not hasattr(ai, '__len__') or len(ai) < 2:
+        raise TypeError('ai_shape takes the 4-byte AI vector, not one byte -- the ACTION half '
+                        '(ai[0]) is what decides whether the unit moves (got %r)' % (ai,))
+    action, approach = ai_action(ai[0]), ai_family(ai[1])
+    if action is None or approach is None:
+        return None
+    if approach in AI_OWN_ERRAND:
+        return 'own-errand'
+    if approach in AI_COMES_TO_YOU:
+        return 'pursuer'
+    if approach in AI_HOLDS_GROUND:
+        return 'striker' if action in AI_ACTION_MOVES else 'statue'
+    return None
+
+
+def behaviour_split(ais):
+    """{pursuer, striker, statue, own_errand, unclassified, n} over a sequence of AI VECTORS.
 
     Reported rather than folded into threat. #344 set out to WEIGHT threat by behaviour and the
     measurement said not to: since #335 derives every unit's AI from its vanilla donor, our
-    behavioural shape IS the twin's shape (measured: 0 points of difference on all six active
-    chapters), so a weighting would scale both sides of the ratio identically and always report
-    x1.00. What is worth having is the split in the open, where a future divergence shows.
+    behavioural shape IS the twin's, so a weighting would scale both sides of the ratio
+    identically and always report x1.00. What is worth having is the split in the open, where a
+    future divergence shows -- which only works if the split describes the whole vector.
     """
-    out = {'comes_to_you': 0, 'walk_into': 0, 'own_errand': 0, 'unclassified': 0, 'n': 0}
-    for ai2 in ai2s:
+    out = {'pursuer': 0, 'striker': 0, 'statue': 0, 'own_errand': 0, 'unclassified': 0, 'n': 0}
+    for ai in ais:
         out['n'] += 1
-        family = ai_family(ai2)
-        if family in AI_COMES_TO_YOU:
-            out['comes_to_you'] += 1
-        elif family in AI_WALK_INTO:
-            out['walk_into'] += 1
-        elif family in AI_OWN_ERRAND:
-            out['own_errand'] += 1
-        else:
+        shape = ai_shape(ai)
+        if shape is None:
             out['unclassified'] += 1
+        else:
+            out[shape.replace('-', '_')] += 1
     return out
 
 # `override` is a FLAG, not the vector: both _donor_label and the report's override list
@@ -661,14 +712,19 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     out.append('')
     ai_rows = ai(name, campaign)
     if ai_rows:
-        out.append('  ai        behaviour        borrowed from  unit')
+        out.append('  ai        action/approach          shape      borrowed from  unit')
         for row in ai_rows:
             if row.ai is None:
-                out.append('    %-16s %-14s %s' % ('UNGROUNDED', '--', row.unit))
+                out.append('    %-24s %-10s %-14s %s'
+                           % ('UNGROUNDED', '--', '--', row.unit))
                 continue
-            out.append('    %-16s %-14s %s'
-                       % (AI_BEHAVIOUR.get(row.ai[1], '0x%02X' % row.ai[1]),
-                          _donor_label(row), row.unit))
+            # BOTH halves. The approach alone reads "never-move" for a unit that steps out to
+            # strike, which is what ch06's clock was designed against (decisions.md -> "AI_B is
+            # the APPROACH and AI_A is the ACTION").
+            pair = '%s/%s' % (AI_ACTION.get(row.ai[0], '0x%02X' % row.ai[0]),
+                              AI_BEHAVIOUR.get(row.ai[1], '0x%02X' % row.ai[1]))
+            out.append('    %-24s %-10s %-14s %s'
+                       % (pair, ai_shape(row.ai) or '?', _donor_label(row), row.unit))
         overrides = [r for r in ai_rows if r.override]
         for row in overrides:
             # First sentence only: the reason is authored in full in the chapter YAML, and this
@@ -682,10 +738,13 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
         # 0 points of difference on all six active chapters -- and a weighting would scale both
         # sides of the ratio and always say x1.00. What this catches is the day that stops
         # being true, which can only happen through an ai_override or a donor-less unit.
-        split = behaviour_split([r.ai[1] for r in ai_rows if r.ai is not None])
+        split = behaviour_split([r.ai for r in ai_rows if r.ai is not None])
         if split['n']:
-            line = ('    shape     %d come to you / %d you walk into'
-                    % (split['comes_to_you'], split['walk_into']))
+            # THREE, not two. A `striker` holds ground but steps out within its own move range,
+            # and it is most of every roster -- collapsing it into "you walk into" is what let a
+            # chapter be planned as though the line would stand still.
+            line = ('    shape     %d come to you / %d hold and STRIKE / %d never move'
+                    % (split['pursuer'], split['striker'], split['statue']))
             if split['own_errand']:
                 # Moves, but not at the player -- loots and leaves, flees, chews on walls.
                 line += ' / %d on its own errand' % split['own_errand']

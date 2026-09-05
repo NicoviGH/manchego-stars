@@ -360,54 +360,158 @@ class AiBehaviourTable(unittest.TestCase):
         self.assertEqual([], [i for i in cs.AI_BEHAVIOUR if i not in table])
 
 
-class BehaviourSplit(unittest.TestCase):
-    """"Threat that comes to you" vs "threat you walk into" -- ch05's YAML coined it, #344
-    measured it. Reported, never folded into threat: since #335 derives AI from the donor,
-    our shape IS the twin's, so a weighting would scale both sides and always say x1.00."""
+class Ai1Table(unittest.TestCase):
+    """`AI_ACTION` is a claim about `gAi1ScriptTable`, so it is checked against it.
 
-    def test_it_counts_each_side(self):
+    The AI_A half is the one that MOVES: `AI_A_00 ActionInRange` is `AI_ACTION(100)` and acting
+    includes stepping within the unit's own range to reach a target, while `AI_B_03 NeverMove`
+    is `AI_NOP_0E` and only suppresses crossing the map. Reading AI_B alone reported 48 of 51
+    units as static when they step out (decisions.md -> "AI_B is the APPROACH and AI_A is the
+    ACTION"), which is the same coverage gap #344 fixed one axis over."""
+
+    SYMBOLS = {0x00: 'gAiScript_ActionInRange',
+               0x01: 'gAiScript_ActionInRange_80Perc',
+               0x02: 'gAiScript_ActionInRange_50Perc',
+               0x03: 'gAiScript_ActionStanding',
+               0x04: 'gAiScript_ActionStanding_80Perc',
+               0x05: 'gAiScript_ActionStanding_50Perc',
+               0x06: 'gAiScript_DoNothing',
+               0x07: 'gAiScript_ActionInRange_ExceptNatasha',
+               0x08: 'gAiScript_ActionInRange_ExceptCivilian'}
+
+    def _table(self):
+        import build_campaign as bc
+        body = re.search(r'gAi1ScriptTable\[\] = \{(.*?)\n\};',
+                         bc.vanilla_decomp_text('src/cp_data.c'), re.S).group(1)
+        return {int(i, 16): sym
+                for i, sym in re.findall(r'\[AI_A_([0-9A-Fa-f]{2})\]\s*=\s*(\w+)', body)}
+
+    def test_the_decomp_table_is_the_length_the_map_assumes(self):
+        table = self._table()
+        self.assertEqual(21, len(table))
+        self.assertEqual(set(range(21)), set(table), 'the table is dense 0x00..0x14')
+
+    def test_every_named_index_matches_its_decomp_symbol(self):
         import chapter_status as cs
-        got = cs.behaviour_split([0x00, 0x12, 0x03, 0x10])
-        self.assertEqual(2, got['comes_to_you'])
-        self.assertEqual(2, got['walk_into'])
+        table = self._table()
+        for index, symbol in self.SYMBOLS.items():
+            self.assertEqual(symbol, table[index],
+                             'index 0x%02X is %s in the decomp' % (index, table[index]))
+            self.assertIn(index, cs.AI_ACTION)
+
+    def test_indices_the_decomp_does_not_NAME_are_left_unnamed(self):
+        """Twelve bare-address entries (0x09..0x14) stay out, on the same rule AI_BEHAVIOUR
+        follows: a guess must not be indistinguishable from a fact at the call site."""
+        import chapter_status as cs
+        for index, symbol in sorted(self._table().items()):
+            if re.match(r'^gAiScript_[0-9A-Fa-f]{6,}$', symbol):
+                self.assertNotIn(index, cs.AI_ACTION,
+                                 'index 0x%02X is only an address (%s)' % (index, symbol))
+
+    def test_no_mapped_index_falls_outside_the_table(self):
+        import chapter_status as cs
+        table = self._table()
+        self.assertEqual([], [i for i in cs.AI_ACTION if i not in table])
+
+    def test_every_named_action_is_classified_as_moving_or_holding(self):
+        import chapter_status as cs
+        for index, name in cs.AI_ACTION.items():
+            self.assertTrue(name in cs.AI_ACTION_MOVES or name in cs.AI_ACTION_HOLDS,
+                            '0x%02X (%s) is named but neither moves nor holds' % (index, name))
+
+
+class AiShape(unittest.TestCase):
+    """The three-way shape a FULL vector describes. Two buckets could not express the case
+    that actually shipped: a unit that holds its ground but steps out to strike."""
+
+    def test_a_pursuer_crosses_the_map(self):
+        import chapter_status as cs
+        self.assertEqual('pursuer', cs.ai_shape((0x00, 0x00, 0, 0)))
+
+    def test_engage_plus_never_move_is_a_STRIKER_not_a_statue(self):
+        """The whole finding. ch06's merfolk are exactly this, and were read as statues."""
+        import chapter_status as cs
+        self.assertEqual('striker', cs.ai_shape((0x00, 0x03, 0, 0)))
+
+    def test_hold_plus_never_move_is_a_statue(self):
+        """vanilla Ch6's Novala -- GuardTileAI, the only non-ActionInRange unit in that force."""
+        import chapter_status as cs
+        self.assertEqual('statue', cs.ai_shape((0x03, 0x03, 0, 0)))
+
+    def test_inert_plus_never_move_is_a_statue_too(self):
+        """DoNothing -- vanilla Ch6's three green villagers."""
+        import chapter_status as cs
+        self.assertEqual('statue', cs.ai_shape((0x06, 0x03, 0, 0)))
+
+    def test_an_own_errand_is_neither(self):
+        import chapter_status as cs
+        self.assertEqual('own-errand', cs.ai_shape((0x00, 0x05, 0, 0)))
+
+    def test_an_unnamed_approach_is_unclassified(self):
+        import chapter_status as cs
+        self.assertIsNone(cs.ai_shape((0x00, 0x0A, 0, 0)))
+
+    def test_an_unnamed_ACTION_is_unclassified_even_when_the_approach_is_named(self):
+        """The half that decides movement is AI_A, so an unknown there is unknown overall --
+        bucketing it by AI_B alone is the exact error this change exists to end."""
+        import chapter_status as cs
+        self.assertIsNone(cs.ai_shape((0x09, 0x03, 0, 0)))
+
+    def test_a_bare_int_is_REFUSED_rather_than_misread(self):
+        """A stale `ai_shape(ai[1])` call would classify a whole roster off half a vector and
+        look perfectly correct. It raises instead."""
+        import chapter_status as cs
+        self.assertRaises(TypeError, cs.ai_shape, 0x03)
+
+
+class BehaviourSplit(unittest.TestCase):
+    """Reported, never folded into threat: since #335 derives AI from the donor, our shape IS
+    the twin's, so a weighting would scale both sides and always say x1.00 (#344)."""
+
+    def test_it_counts_each_shape(self):
+        import chapter_status as cs
+        got = cs.behaviour_split([(0x00, 0x00, 0, 0), (0x00, 0x12, 0, 0),
+                                  (0x00, 0x03, 0, 0), (0x03, 0x10, 0, 0)])
+        self.assertEqual(2, got['pursuer'])
+        self.assertEqual(1, got['striker'])
+        self.assertEqual(1, got['statue'])
         self.assertEqual(0, got['unclassified'])
 
     def test_a_known_but_non_player_behaviour_is_its_OWN_bucket(self):
-        """A thief that loots and leaves, a script that flees, one that chews on walls: the
-        decomp NAMES all three, so calling them "unclassified" would say we do not know when
-        we do. ai2=0x05 alone occurs 120x in the reference files (#359 review)."""
         import chapter_status as cs
-        got = cs.behaviour_split([0x05, 0x0C, 0x0E])
+        got = cs.behaviour_split([(0x00, 0x05, 0, 0), (0x00, 0x0C, 0, 0), (0x00, 0x0E, 0, 0)])
         self.assertEqual(3, got['own_errand'])
         self.assertEqual(0, got['unclassified'])
-        self.assertEqual(0, got['comes_to_you'])
+        self.assertEqual(0, got['pursuer'])
 
-    def test_every_named_family_lands_in_exactly_one_bucket(self):
-        """The rule the review found broken: a NAMED family must never fall through to
-        unclassified, which is reserved for scripts the decomp does not name."""
+    def test_every_named_pair_lands_in_exactly_one_bucket(self):
+        """A NAMED family must never fall through to unclassified -- the rule #344's review
+        found broken, now enforced across BOTH halves."""
         import chapter_status as cs
-        for index in cs.AI_BEHAVIOUR:
-            got = cs.behaviour_split([index])
-            self.assertEqual(0, got['unclassified'],
-                             '0x%02X is named %r but falls through to unclassified'
-                             % (index, cs.AI_BEHAVIOUR[index]))
+        for a in cs.AI_ACTION:
+            for b in cs.AI_BEHAVIOUR:
+                got = cs.behaviour_split([(a, b, 0, 0)])
+                self.assertEqual(0, got['unclassified'],
+                                 '(0x%02X, 0x%02X) is named on both halves but falls through'
+                                 % (a, b))
 
     def test_an_unnamed_script_is_UNCLASSIFIED_not_bucketed(self):
-        """0x0A is live in vanilla's Prologue. Calling it static because it is unnamed would
-        be a guess that silently lowers the number."""
         import chapter_status as cs
-        got = cs.behaviour_split([0x0A])
+        got = cs.behaviour_split([(0x00, 0x0A, 0, 0)])
         self.assertEqual(1, got['unclassified'])
-        self.assertEqual(0, got['walk_into'])
+        self.assertEqual(0, got['statue'])
 
     def test_an_index_off_the_end_is_unclassified_too(self):
         import chapter_status as cs
-        self.assertEqual(1, cs.behaviour_split([0xFF])['unclassified'])
+        self.assertEqual(1, cs.behaviour_split([(0xFF, 0xFF, 0, 0)])['unclassified'])
 
-    def test_the_three_buckets_account_for_every_unit(self):
+    def test_the_buckets_account_for_every_unit(self):
         import chapter_status as cs
-        got = cs.behaviour_split([0x00, 0x03, 0x0A, 0xFF, 0x11, 0x05])
-        self.assertEqual(got['n'], got['comes_to_you'] + got['walk_into']
+        vectors = [(0x00, 0x00, 0, 0), (0x00, 0x03, 0, 0), (0x03, 0x03, 0, 0),
+                   (0x00, 0x0A, 0, 0), (0xFF, 0xFF, 0, 0), (0x00, 0x11, 0, 0),
+                   (0x00, 0x05, 0, 0)]
+        got = cs.behaviour_split(vectors)
+        self.assertEqual(got['n'], got['pursuer'] + got['striker'] + got['statue']
                          + got['own_errand'] + got['unclassified'])
 
 

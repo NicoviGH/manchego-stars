@@ -195,6 +195,42 @@ post-MVP question — see `docs/roadmap.md`.)
 
 ---
 
+## Expected party level, by chapter — a stated PLANNING ASSUMPTION
+
+Not derived, and it cannot be: vanilla's ally `UnitDefinition` level is only read on a unit's
+FIRST load, so IS never declares what the party is by Ch6. It is a pacing fact, not a data fact.
+It is written down anyway, because every ABSOLUTE question needs it as a floor.
+
+| chapter | deployed-throughout unit, unpromoted |
+|---|---|
+| ch00–ch01 | 1–3 |
+| ch02–ch03 | 3–7 |
+| ch04–ch05 | 6–10 |
+| ch06–ch07 | **8–12** |
+| ch08 | 10–14 |
+
+**What this is for, and what it is NOT for.**
+
+`tools/difficulty.py` does not use it and should not. `player_combatant` resolves the cast *at
+base level* on purpose, and the parity ratio compares our chapter to its vanilla twin with the
+same understated party on both sides, so the bias cancels — the same argument
+`decisions.md` → *"AI behaviour is MEASURED and REPORTED"* makes for not weighting AI. Feeding a
+projected level into one side only would break that cancellation, not improve it.
+
+⚠️ The cancellation is first-order, not exact: `kills_per_round` and `durability` are threshold
+functions (doubling breakpoints, integer rounds-to-kill), so a party far below the enemies' level
+can saturate against both sides and flatten the ratio toward x1.00. The error is smallest at ch00
+and **grows with every chapter**. Tracked on #367.
+
+What the band IS for is sanity-checking any absolute claim before it becomes a design decision —
+*"can this unit survive that flight", "is this fuse long enough for a real party", "is this
+objective a coin flip"*. During #26 a ch06-era flier was assessed as fragile off her LEVEL 1 stat
+line and a chapter's design nearly turned on it. A number in a table would have stopped that.
+Absolute questions still end at tier 3 (`decisions.md` → *"Difficulty is checked in fidelity
+tiers"*): a chapter is not difficulty-verified until it has been played.
+
+---
+
 ## Open Items / deferred grounding
 
 - [x] **Pin exact promotion-item chapters** — done 2026-06-22: §3 is now a [decomp]-pinned
