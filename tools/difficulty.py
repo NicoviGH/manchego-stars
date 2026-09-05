@@ -297,6 +297,27 @@ def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shift
                             shiftable=shiftable)
 
 
+def _body_levels(enemy_def):
+    """The level of each BODY an entry places, in order.
+
+    `levels:` is a PER-BODY list and it is what the ROM contains -- build_campaign zips it
+    with `positions` to emit one UnitDefinition per pair, so an entry carrying it declares
+    two L2/L3 brigands and not two copies of one level. Everything else is `count` bodies at
+    the entry's `level` (default 1). A `levels:` that disagrees with `count` is two
+    declarations of the same fact contradicting each other, so it raises rather than
+    truncating the way a bare zip() would."""
+    levels = enemy_def.get('levels')
+    count = int(enemy_def.get('count', 1))
+    if levels is None:
+        return [int(enemy_def.get('level', 1))] * count
+    if 'count' in enemy_def and len(levels) != count:
+        raise ValueError('%r declares count %d but %d levels (%r) -- they are the same '
+                         'fact and they disagree'
+                         % (enemy_def.get('id', enemy_def.get('name', 'enemy')),
+                            count, len(levels), levels))
+    return [int(lv) for lv in levels]
+
+
 def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=True):
     """One representative Combatant per DISTINCT enemy type in a chapter enemy_units entry
     (its `count`/positions are tactical detail the metrics don't model). Class base
@@ -883,6 +904,23 @@ def _our_base_level(enemy_def):
     return 1
 
 
+def chapter_roster_entries(chap):
+    """Every enemy entry the chapter fields, across ALL of its roster keys.
+
+    A reinforcement wave is part of the force. The twin's curated UnitDefinition arrays fold
+    its own waves in unconditionally (vanilla Ch2's `UnitDef_088B4470`, vanilla Ch6's
+    Hard-mode array), so a builder that reads only our opening board compares seven bodies
+    against nine and scores the two missing ones as divergence. ch06 already ran into this
+    and worked around it by declaring its turn-4 wave inside `enemy_units` -- its own YAML
+    says declaring them "is what makes the two sides count the same force". ch02 used the
+    `reinforcements:` key instead and was simply never counted.
+
+    The keys are AI_ROSTER_KEYS, so there is one answer to "what is this chapter's force"
+    and the AI guard and the parity metric cannot drift apart on it."""
+    return [ed for key in AI_ROSTER_KEYS for ed in (chap.get(key) or [])
+            if isinstance(ed, dict)]
+
+
 def chapter_units(chap, mode=None, shifts=None):
     """(enemy_def, real-article Combatant) for every BODY our chapter fields, weapons modeled.
 
@@ -892,7 +930,7 @@ def chapter_units(chap, mode=None, shifts=None):
     and printed a share that contradicted the verdict directly above it (#285).
     """
     out = []
-    for ed in chap.get('enemy_units', []):
+    for ed in chapter_roster_entries(chap):
         if 'composition' in ed and 'class' not in ed:
             level = ed.get('level', 1)
             name = ed.get('id', ed.get('name', 'enemy'))
@@ -903,11 +941,14 @@ def chapter_units(chap, mode=None, shifts=None):
                 out.append((ed, _one_enemy('%s-%s' % (name, cls), cls, level, weapon,
                                            mode=mode, shifts=shifts)))
         else:
-            out.extend([(ed, unit_real_article(ed, c))
-                        for c in enemy_combatants(ed, mode=mode, shifts=shifts,
-                                                  base_level=_our_base_level(ed),
-                                                  shiftable=_our_takes_difficulty_shift(ed))]
-                       * int(ed.get('count', 1)))
+            # one body per DECLARED level, not `count` copies of one: a wave authored as
+            # `levels: [2, 3]` is an L2 and an L3, which is what the ROM emits.
+            for lv in _body_levels(ed):
+                out.extend((ed, unit_real_article(ed, c))
+                           for c in enemy_combatants(dict(ed, level=lv), mode=mode,
+                                                     shifts=shifts,
+                                                     base_level=_our_base_level(ed),
+                                                     shiftable=_our_takes_difficulty_shift(ed)))
     return [(ed, u) for ed, u in out if u.weapon is not None]  # drop staff-only enemies
 
 
@@ -953,11 +994,12 @@ def _force_signature(chap):
     Line and reinforcements both, `count`/`composition` expanded -- the multiplicity the
     metrics layer collapses is exactly what a shape comparison needs."""
     out = collections.Counter()
-    for ed in list(chap.get('enemy_units') or []) + list(chap.get('reinforcements') or []):
-        level = int(ed.get('level', 1))
+    for ed in chapter_roster_entries(chap):
         if 'class' in ed:
-            out[(_enemy_class_enum(ed['class']), level)] += int(ed.get('count', 1))
+            for lv in _body_levels(ed):
+                out[(_enemy_class_enum(ed['class']), lv)] += 1
         else:
+            level = int(ed.get('level', 1))
             for cls in ed.get('composition', []):
                 out[(_enemy_class_enum(cls), level)] += 1
     return out
@@ -965,7 +1007,12 @@ def _force_signature(chap):
 
 def mirror_share(chap):
     """Share of the twin's force this chapter reproduces exactly, as
-    {shared, ours, twin, pct}. None when the reference isn't curated (#48 registry)."""
+    {shared, ours, twin, pct}. None when the reference isn't curated (#48 registry).
+
+    Takes no `mode`, and that is not an omission: a difficulty mode re-projects the SAME
+    level through a chapter's malus/bonus (`mode_stats`), so it moves stats and never a
+    unit's class or level, and the Hard-only waves are folded into both sides
+    unconditionally. The force's shape is identical in all three modes."""
     van = vanilla_red_units(chap.get('parity_reference'))
     if van is None:
         return None
@@ -2142,6 +2189,8 @@ def curve_report(campaign, band=0.25, mode=None):
     if mode:
         print('  NB per-unit role findings and planned-chapter targets below are graded on the'
               '\n     AUTHORED table, not on %s -- only the parity rows are mode-shifted.'
+              '\n     mirror%% is INVARIANT: a mode shifts stats, never a unit\'s class or level,'
+              '\n     and the Hard-only waves are folded into both sides unconditionally.'
               % mode.upper())
     print(bar)
     print('  %-22s %-13s %-15s %-17s %-7s %s'

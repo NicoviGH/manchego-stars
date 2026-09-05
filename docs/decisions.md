@@ -8428,9 +8428,9 @@ the same number, and nothing in the report distinguished them.
 `mirror_share` prints, beside every ratio, the share of the **twin's** force the chapter
 reproduces exactly. Measured across the campaign:
 
-| ch00 | ch01 | ch02 | ch03 | ch04 | ch05 | **ch06** |
+| ch00 | ch01 | **ch02** | ch03 | ch04 | ch05 | **ch06** |
 |---|---|---|---|---|---|---|
-| 33% | 30% | 78% | 90% | 61% | 52% | **100%** |
+| 33% | 30% | **100%** | 90% | 61% | 52% | **100%** |
 
 **The trend is the finding, not the ch06 cell.** mirror% has climbed as the donor pipeline
 improved — every gain in derivation fidelity made the gate more tautological, and nobody was
@@ -8444,11 +8444,8 @@ What a body IS, and why each choice:
   one.
 - **The denominator is the TWIN's body count**, so fielding more than the twin never reads above
   100%. The question is how much of the twin we reproduced, not how much of ours is borrowed.
-- **Both sides count line AND reinforcements.** The twin's curated arrays already include its
-  waves, so counting only our opening board would compare nine vanilla units against seven of
-  ours and call the gap divergence. (Live case: ch02's two L1 brigands are reinforcements, and
-  its twin fields no L1 brigand — so the honest read is still 78%, arrived at with both waves on
-  the board.)
+- **Both sides count line AND reinforcements**, at each body's DECLARED level. This is the
+  choice that found a bug, and the bug is below.
 - **Nothing is dropped for carrying no modeled weapon.** The pressure metric drops a staff-only
   healer because it contributes no damage; this measures the force's SHAPE, and a healer the twin
   fields is a unit we did or did not reproduce. So the two numbers on the same line count
@@ -8457,6 +8454,52 @@ What a body IS, and why each choice:
 **It does not gate.** A high mirror is not a defect and a low one is not either — ch03 at 90% and
 ch01 at 30% are both fine chapters. It is a legibility number: it says how much a verdict is
 worth, and at ≥90% the report says so in words.
+
+**mirror% is mode-invariant, and that is not an omission.** A difficulty mode re-projects the same
+level through the chapter's malus/bonus (`mode_stats`), so it moves stats and never a unit's class
+or level; the Hard-only waves are folded into both sides unconditionally. The `--mode` banner says
+so, because mirror sits on a row whose other figures ARE shifted.
+
+### What asking "what is a body" found: ch02 was never counting its own wave
+
+Defining mirror% forced the question the ratio had never been asked, and the answer was that our
+side and the twin's side were counting different forces.
+
+`chapter_units` — THE our-side force builder — read only `enemy_units`. `vanilla_enemies` reads
+every red `UnitDefinition` in the twin's curated arrays, **reinforcement waves included**. ch02
+declares its rear-raider pair under the `reinforcements:` key, so its verdict compared **seven of
+our bodies against nine of vanilla's**, and the two missing ones scored as divergence. That entry
+also carries `levels: [2, 3]` and no `level:` — the per-body list `build_campaign` zips with
+`positions` to emit the ROM — so both bodies were additionally modeled as **L1**.
+
+ch06 had already hit this and worked around it privately: its Hard-only turn-4 wave is declared
+inside `enemy_units` rather than under `reinforcements:`, and its own YAML comment says why —
+*"#48's static bar folds that array in on the vanilla side unconditionally, so declaring ours is
+what makes the two sides count the same force."* That is the general rule, and it was being
+enforced one chapter at a time by hand.
+
+Corrected, ch02 is not the campaign's easiest chapter by a wide margin. It is an exact
+transcription:
+
+| | shipped | corrected |
+|---|---|---|
+| threat/slot | 5.3 (**x0.81**) | 6.5 (**x1.00**) |
+| clear-load/slot | 3.0 (**x0.79**) | 3.8 (**x1.00**) |
+| mirror | 78% | **100%** |
+| bodies ours vs twin | 7 vs 9 | 9 vs 9 |
+
+The verdict was OK before and is OK now — it never flipped a gate, which is exactly why it
+survived four chapters. `--mode difficult` moves identically (x0.81/x0.79 → x1.00/x1.00).
+
+So there are **two** copy-x1.00 chapters, not one, and #367's "mirror% climbs as the donor
+pipeline improves" reads differently: ch02 was already a transcription in 2026-08, and the
+instrument was hiding it.
+
+The fix is one function, `chapter_roster_entries`, which answers *"what is this chapter's force"*
+once, over `AI_ROSTER_KEYS` — the same three keys the AI guard already iterates. The parity metric
+and the AI guard can no longer disagree about which units a chapter fields. Verified by an output
+diff of every per-chapter report and both curve reports before and after: **only ch02's numbers
+move.**
 
 ## Open Questions (not yet decided)
 

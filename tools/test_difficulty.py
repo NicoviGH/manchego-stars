@@ -539,6 +539,73 @@ class MirrorShare(unittest.TestCase):
         self.assertIsNone(df.mirror_share(self._chap([{'id': 'a'}], ref='FE8 Ch99')))
 
 
+class PerBodyLevels(unittest.TestCase):
+    """`levels:` is a PER-BODY list, and it is what the ROM writes.
+
+    ch02's rear-raider wave declares `count: 2` with `levels: [2, 3]` and no `level:` --
+    build_campaign zips positions with levels to emit the two UnitDefinitions. A reader
+    that only knows `level:` falls through to the default and models the pair as two L1
+    brigands, which is neither what the chapter declares nor what the ROM contains.
+    """
+
+    def test_a_levels_list_gives_each_body_its_own_level(self):
+        self.assertEqual(df._body_levels({'count': 2, 'levels': [2, 3]}), [2, 3])
+
+    def test_without_levels_every_body_carries_the_entrys_level(self):
+        self.assertEqual(df._body_levels({'count': 3, 'level': 5}), [5, 5, 5])
+
+    def test_a_bare_entry_is_one_body_at_level_one(self):
+        self.assertEqual(df._body_levels({}), [1])
+
+    def test_levels_disagreeing_with_count_is_a_contradiction_not_a_truncation(self):
+        # zip() would silently drop the third body; two declarations of the same fact
+        # that disagree is a data error, and the ROM emitter zips them too.
+        with self.assertRaises(ValueError):
+            df._body_levels({'count': 3, 'levels': [2, 3]})
+
+    def test_a_wave_with_per_body_levels_mirrors_each_of_them(self):
+        chap = {'parity_reference': 'FE8 Prologue',
+                'enemy_units': [{'id': 'a', 'class': 'fighter', 'count': 2,
+                                 'levels': [1, 2]}]}
+        self.assertEqual(df.mirror_share(chap)['shared'], 2)
+
+
+class EveryRosterKeyIsAForce(unittest.TestCase):
+    """The module already names its three roster keys once, in AI_ROSTER_KEYS. A force
+    builder that hand-rolls two of them silently scores a wave under the third as pure
+    divergence."""
+
+    def test_a_wave_under_any_roster_key_counts_as_our_force(self):
+        for key in df.AI_ROSTER_KEYS:
+            chap = {'parity_reference': 'FE8 Prologue',
+                    key: [{'id': 'a', 'class': 'fighter', 'level': 4}]}
+            self.assertEqual(df.mirror_share(chap)['shared'], 1, key)
+
+
+class ReinforcementsAreOurForce(unittest.TestCase):
+    """The twin's curated arrays fold its reinforcement waves in unconditionally, so a
+    force builder that reads only our opening board compares 7 bodies against 9 and calls
+    the missing two divergence. ch06 already discovered this and worked around it by
+    declaring its turn-4 wave inside `enemy_units`; ch02 used the `reinforcements:` key
+    and was never counted.
+    """
+
+    def _ch02(self):
+        return bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for('ch02'))
+
+    def test_our_side_fields_as_many_bodies_as_the_twin(self):
+        p = df._chapter_pressure(self._ch02())
+        self.assertEqual(p['n_ours'], p['n_vanilla'])
+
+    def test_the_wave_is_modeled_at_its_declared_levels(self):
+        levels = sorted(u.name for ed, u in df.chapter_units(self._ch02())
+                        if ed.get('id') == 'rear-raiders')
+        self.assertEqual(len(levels), 2)
+
+    def test_ch02_transcribes_its_twin_once_its_wave_is_counted(self):
+        self.assertEqual(df.mirror_share(self._ch02())['pct'], 100.0)
+
+
 class MirrorShareOnRealChapters(unittest.TestCase):
     """Against the real campaign, because the wiring is the thing under test."""
 
@@ -573,6 +640,34 @@ class MirrorInTheCurveReport(unittest.TestCase):
         self.assertIn('mirror', text)
         ch06_row = [l for l in text.splitlines() if 'ch06' in l][0]
         self.assertIn('100%', ch06_row)
+
+
+class MirrorIsModeInvariant(unittest.TestCase):
+    """A difficulty mode shifts STATS, never a unit's class or level (`mode_stats` re-projects
+    the same level through the chapter's malus/bonus), and the mode-gated bodies -- ch06's
+    Hard-only turn-4 wave, vanilla's Hard reinforcement arrays -- are folded into BOTH sides
+    unconditionally. So the force's shape is the same in all three modes and mirror% is
+    invariant by construction. The report has to say so: it sits on a row whose banner
+    declares the other figures mode-shifted."""
+
+    def _text(self, mode=None):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            df.curve_report('rime-of-the-frostmaiden', mode=mode)
+        return out.getvalue()
+
+    def _mirror_column(self, text):
+        return [l.split()[-2] for l in text.splitlines()
+                if l.startswith('  CH') and '%' in l]
+
+    def test_the_mode_banner_names_mirror_among_the_unshifted_figures(self):
+        self.assertIn('mirror', self._text(mode='difficult').split('NB')[1].split('=====')[0])
+
+    def test_every_mirror_reads_the_same_in_every_mode(self):
+        base = self._mirror_column(self._text())
+        self.assertTrue(base)
+        for mode in ('tutorial', 'normal', 'difficult'):
+            self.assertEqual(self._mirror_column(self._text(mode=mode)), base, mode)
 
 
 class VanillaUnitDestinations(unittest.TestCase):
