@@ -297,37 +297,11 @@ def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shift
                             shiftable=shiftable)
 
 
-def _body_levels(enemy_def):
-    """The level of each BODY an entry places, in order.
-
-    `levels:` is a PER-BODY list and it is what the ROM contains -- build_campaign zips it
-    with `positions` to emit one UnitDefinition per pair, so an entry carrying it declares
-    two L2/L3 brigands and not two copies of one level. Everything else is `count` bodies at
-    the entry's `level` (default 1). A `levels:` that disagrees with `count` is two
-    declarations of the same fact contradicting each other, so it raises rather than
-    truncating the way a bare zip() would."""
-    levels = enemy_def.get('levels')
-    bag = (enemy_def.get('composition') or []) if 'class' not in enemy_def else None
-    count = len(bag) if bag else int(enemy_def.get('count', 1))
-    # Every field that states the body count states the SAME fact, so they must agree.
-    # `positions` is the one build_campaign actually zips against, so a mismatch models a
-    # body the ROM never emits -- and mirror% now compares body-for-body against the twin.
-    stated = [(f, n) for f, n in
-              (('composition', len(bag) if bag else None),
-               ('count', int(enemy_def['count']) if 'count' in enemy_def else None),
-               ('positions', len(enemy_def['positions'])
-                if enemy_def.get('positions') else None),
-               ('levels', len(levels) if levels is not None else None))
-              if n is not None]
-    for field, n in stated:
-        if n != stated[0][1]:
-            raise ValueError('%r declares %s %d but %s %d -- they are the same fact and '
-                             'they disagree'
-                             % (enemy_def.get('id', enemy_def.get('name', 'enemy')),
-                                stated[0][0], stated[0][1], field, n))
-    if levels is None:
-        return [int(enemy_def.get('level', 1))] * count
-    return [int(lv) for lv in levels]
+# "What bodies does this entry place" is chapter-SCHEMA knowledge, so it lives beside the
+# roster keys on build_campaign's desk -- the ROM emitters, the raw-pid registry and every
+# metric here have to agree on it, and they did not (decisions.md -> "A parity ratio does not
+# say how much of the twin it COPIED").
+_body_levels = bc.entry_body_levels
 
 
 def _entry_body_count(enemy_def):
@@ -1785,11 +1759,16 @@ def role_findings(chap, parity_ref):
         elif not bar and van_tank > 0 and bk < van_tank * 0.5:
             out.append("boss %s takes %.1f rounds to kill%s; %s's tankiest unit takes %.1f -- "
                        'the climax may fold too fast' % (uid, bk, where, parity_ref, van_tank))
-    if len(bosses) > 1:
+    # The census counts ENTRIES, not bodies: `distinct` splits one entry into a row per
+    # declared level, and every row carries that entry's id -- so a boss authored
+    # `levels: [19, 20]` would otherwise read as two bosses named the same thing. The
+    # per-unit warnings above are deduped for the same reason.
+    boss_ids = list(dict.fromkeys(n for n, _c, _t in bosses))
+    if len(boss_ids) > 1:
         out.append('%d units flagged is_boss (%s) -- only the objective target should be a boss; '
                    'use a miniboss/convertible role for the others'
-                   % (len(bosses), ', '.join(n for n, _c, _t in bosses)))
-    return out
+                   % (len(boss_ids), ', '.join(boss_ids)))
+    return list(dict.fromkeys(out))
 
 
 def print_role_findings(chap, parity_ref):

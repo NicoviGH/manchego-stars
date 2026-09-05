@@ -722,6 +722,17 @@ class RoleFindingsGradeTypesNotBodies(unittest.TestCase):
         findings = df.role_findings(self._ch08(), self._ch08().get('parity_reference'))
         self.assertEqual(len(findings), len(set(findings)), findings)
 
+    def test_one_ENTRY_is_one_boss_however_many_levels_it_declares(self):
+        # `distinct` splits an entry by level, and all its rows share the entry's id -- so a
+        # boss authored `levels: [19, 20]` re-created the census bug that `count: 4` had.
+        chap = {'parity_reference': 'FE8 Prologue',
+                'enemy_units': [{'id': 'w', 'class': 'general', 'levels': [19, 20],
+                                 'is_boss': True,
+                                 'inventory': [{'id': 'silver-lance'}]}]}
+        findings = df.role_findings(chap, 'FE8 Prologue')
+        self.assertEqual([f for f in findings if 'flagged is_boss' in f], [], findings)
+        self.assertEqual(len(findings), len(set(findings)), findings)
+
     def test_bodies_at_DIFFERENT_levels_are_different_types(self):
         # `levels: [2, 3]` is two distinct units and both get graded; `count: 2` is one.
         ed = {'id': 'w', 'class': 'general', 'levels': [19, 20], 'is_boss': True,
@@ -777,6 +788,18 @@ class DeclaredCountsMustAgree(unittest.TestCase):
         with self.assertRaises(ValueError):
             df._body_levels({'id': 'w', 'count': 3, 'level': 2,
                              'positions': [[0, 6], [0, 7]]})
+
+    def test_positions_alone_declares_the_body_count(self):
+        # build_campaign enumerates `positions` to emit units, so three positions are three
+        # bodies whether or not a `count:` says so -- defaulting to 1 under-counts the force
+        # everywhere, mirror% included.
+        self.assertEqual(df._body_levels({'level': 4, 'positions': [[1, 1], [2, 2], [3, 3]]}),
+                         [4, 4, 4])
+
+    def test_an_entry_that_places_no_body_is_named_in_the_error(self):
+        with self.assertRaises(ValueError) as cm:
+            df._body_levels({'id': 'ghost', 'count': 0})
+        self.assertIn('ghost', str(cm.exception))
 
     def test_a_stale_count_on_a_bag_entry_is_caught_too(self):
         # the bag's length is the body count, so a `count:` beside it is the same fact --
