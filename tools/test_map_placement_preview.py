@@ -217,5 +217,42 @@ class ReachedOnIsDerived(unittest.TestCase):
                                  % (boat['id'], role, declared, got[role]))
 
 
+class BehaviourColour(unittest.TestCase):
+    """The legend must not promise a colour the render never draws.
+
+    `ai_shape` replaced the approach-family vocabulary and `BEHAVIOUR_COLOUR` kept the old
+    keys, so every one of ch06's 27 markers fell through to the default grey while the legend
+    still advertised red/orange/yellow/purple. Nothing caught it because nothing tested the
+    key set -- and a placement picture that mis-states behaviour is exactly the picture ch06's
+    clock was designed against.
+    """
+
+    def test_every_shape_has_a_colour(self):
+        import chapter_status as cs
+        shapes = set()
+        for action in cs.AI_ACTION:
+            for approach in cs.AI_BEHAVIOUR:
+                shape = cs.ai_shape((action, approach, 0, 0))
+                if shape is not None:
+                    shapes.add(shape)
+        self.assertTrue(shapes, 'ai_shape named nothing -- the sweep is not reaching it')
+        self.assertEqual(shapes - set(pp.BEHAVIOUR_COLOUR), set(),
+                         'ai_shape returns a shape the render has no colour for')
+
+    def test_no_colour_for_a_shape_that_does_not_exist(self):
+        """The other direction: a stale key is a legend entry nothing can ever draw."""
+        import chapter_status as cs
+        shapes = {cs.ai_shape((a, b, 0, 0))
+                  for a in cs.AI_ACTION for b in cs.AI_BEHAVIOUR}
+        self.assertEqual(set(pp.BEHAVIOUR_COLOUR) - shapes, set(),
+                         'BEHAVIOUR_COLOUR names a behaviour `ai_shape` never returns')
+
+    def test_ch06_markers_all_resolve(self):
+        """The regression itself: no ch06 unit renders as unclassified."""
+        grey = sorted(u[3] for u in pp.placed_units(ch06())
+                      if u[2] not in pp.BEHAVIOUR_COLOUR)
+        self.assertEqual(grey, [], 'ch06 units with no derived shape: %r' % (grey,))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -8368,6 +8368,54 @@ faithful. The difference is legibility: vanilla's restriction is TERRAIN, which 
 off the map before committing, and ours is ENEMY BODIES, which are dynamic, invisible as a
 constraint, and dissolve as you kill them.
 
+### Two do-not-attack lists are not one mechanism, and they have different invariants (2026-09-04, #26)
+
+`AI_A_07` and `AI_A_08` look interchangeable. Both run the standard offensive action through
+`AiIsUnitEnemyAndNotInScrList`, so a unit carrying either fights the player normally and simply
+will not swing at whatever its list names. `check_rescue_targets` accepted **either** as proof
+that a unit could not sink a hull.
+
+It is not proof, because the **lists are different and each names one thing**. AI_A_07's is
+repointed at ch05's escort (`repoint_escort_safe_ai_list`) and never at a boat pid, so a ch06
+unit carrying `{0x7, ...}` politely refuses to attack Basil — who is not in the chapter — and
+sinks the hull on schedule. The gate would have called it licensed. Only `AI_A_08` is repointed
+at the hulls, so only `AI_A_08` licenses anything here.
+
+**The invariants also differ, and the difference is not an oversight.** AI_A_07's is one **UNIT**:
+vanilla ships exactly one client (Ch5's Joshua), so a second silently inherits our escort's
+immunity — `assert_escort_safe_ai_has_one_client` sweeps every chapter for it. AI_A_08's is one
+**CHAPTER**: vanilla ships *no* clients at all, so the chapter that claims the list may spend it
+on as many of its own units as it likes (ch06 spends it on ten), and the hazard is a *different*
+chapter picking the byte up for its own reasons — inheriting immunity to pids it has never heard
+of, and standing in the way of the next chapter that wants the list for its own rescue targets.
+`assert_boat_safe_ai_is_single_chapter` is that sweep, and both now run through one
+`safe_ai_clients(ai_index)` implementation. Having only one of the two lists swept is exactly how
+the second came to be spent with no sweep at all.
+
+_Found by `/code-review` on #366 (2026-09-04)._
+
+### A reachability gate that skips reinforcements is grading the opening board, not the chapter (2026-09-04, #26)
+
+`units_reaching` dropped every enemy with an `arrives_turn`, reasoning that it is "not on the
+board when the clock starts". True, and irrelevant: a hull's fuse is costed against the units the
+chapter **declares** as its clock, and an undeclared unit that reaches a hull on turn 5 sinks it
+exactly as surely as one that reaches it on turn 1 — it just does it out of sight of a gate that
+only ever looked at turn 1.
+
+ch06's three Difficult-only turn-4 crab riders spawn on the WEST EDGE, a short ride from the west
+hull's pocket, and their donor's pursuing approach walks them onto it. They were invisible, so
+they carried no `ai_override` while their six turn-1 siblings all did — *"the hulls' clock is its
+declared pursuers and nothing else"* had been applied to the opening board and nowhere else. They
+now carry the same override, changing only the ACTION byte and leaving the donor's approach
+(`0x0`, pursue) untouched.
+
+The general form: **a guard scoped to turn 1 states a turn-1 fact, and difficulty is not a turn-1
+property.** The three shipped difficulty modes are all shipped (*"Vanilla ships three difficulty
+modes, so we ship three"*), so a hull that survives on Normal and sinks early on Difficult is a
+defect the gate has to be able to see.
+
+_Found by `/code-review` on #366 (2026-09-04)._
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

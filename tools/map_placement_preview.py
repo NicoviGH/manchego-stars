@@ -12,8 +12,8 @@ for its confirmation preview -- and overlays:
 
   * a coordinate ruler, because every placement conversation is in map coordinates
   * the deploy block, the crossings and the boats, read from the chapter YAML
-  * one marker per placed unit, coloured by AI behaviour (the thing placement decides:
-    a never-move unit is furniture, a pursuer is a clock)
+  * one marker per placed unit, coloured by AI SHAPE (the thing placement decides:
+    a statue is furniture, a striker holds but strikes, a pursuer is a clock)
   * optional per-cell shading -- turn-reach bands, or the cells a placement threatens
 
 Placements come from the chapter YAML's own `positions:` once they are authored, or from
@@ -76,14 +76,25 @@ def mov_cost_row(table='TerrainTable_MovCost_CommonT1Normal'):
 
 FOOT_COST = mov_cost_row()
 
-# Marker colours by AI behaviour, because behaviour is what a placement decides: a
-# never-move unit is furniture the player walks into, a pursuer is a clock.
+# Marker colours by AI SHAPE (`chapter_status.ai_shape`), because shape is what a placement
+# decides: a statue is furniture, a striker holds its ground but steps out to hit whatever
+# comes close, a pursuer is a clock.
+#
+# Keyed on the SHAPE and never on the approach family. `never-move` names only the approach
+# byte, and a unit carrying it still steps out to strike -- which is exactly how four merfolk
+# mobbed a hull the chapter had nowhere near them (`decisions.md` -> "AI_B is the APPROACH and
+# AI_A is the ACTION"). These keys must stay in step with `ai_shape`'s return values;
+# `test_map_placement_preview` pins that.
 BEHAVIOUR_COLOUR = {
-    'never-move':     (206, 74, 74),      # red
-    'charge-after-1': (232, 138, 46),     # orange
-    'pursue':         (240, 208, 62),     # yellow
-    'hold-position':  (150, 46, 140),     # purple -- the boss on its tile
+    'pursuer':    (240, 208, 62),      # yellow -- the approach walks it at you
+    'striker':    (232, 138, 46),      # orange -- holds, but its ACTION steps out to strike
+    'statue':     (206, 74, 74),       # red    -- does not move at all, even to attack
+    'own-errand': (150, 46, 140),      # purple -- moves, but not at you (loots, flees)
 }
+# `ai_shape` returns None when either half of the vector is unnamed in the decomp. Draw that
+# as its own colour rather than guessing a shape: an unclassified unit is a fact, and the
+# marker should say so instead of borrowing a neighbour's meaning.
+UNCLASSIFIED_COLOUR = (140, 148, 170)
 BOAT_COLOUR = (86, 196, 120)
 DEPLOY_COLOUR = (74, 138, 226)
 
@@ -203,7 +214,13 @@ def _classes_text():
 
 
 def units_reaching(chapter, terrain, targets):
-    """[(enemy id, ai bytes)] for every turn-1 unit that can ATTACK one of `targets`.
+    """[(enemy id, ai bytes)] for every unit that can ATTACK one of `targets`.
+
+    REINFORCEMENTS ARE INCLUDED. They are not on the opening board, but a hull's fuse is costed
+    against the units a chapter DECLARES as its clock, and an undeclared unit that reaches a
+    hull on turn 5 sinks it exactly as surely as one that reaches it on turn 1 -- it just does
+    it out of sight of a gate that only ever looked at turn 1. Skipping them hid ch06's three
+    Difficult-only turn-4 crab riders, which spawn on the west edge and do reach the west hull.
 
     The two shapes reach differently, and conflating them is what made the first cut of this
     analysis wrong by three units:
@@ -221,8 +238,6 @@ def units_reaching(chapter, terrain, targets):
     import chapter_status as cs
     out = []
     for enemy in chapter.get('enemy_units') or ():
-        if enemy.get('arrives_turn'):
-            continue                      # not on the board when the clock starts
         # MAX range over the whole inventory, not the first weapon. FE8's AI equips whatever
         # lets it attack, and ch06's ironshell-horseslayer proved it in-engine: its items[0] is
         # a range-1 Horseslayer, and it threw its JAVELIN at the hull from two tiles away.
@@ -437,7 +452,7 @@ def render(chapter, stem, out_png, concept=None, shade=None, zoom=3):
 
     for tile, code, behaviour, eid, late in units:
         x, y = tile
-        colour = BEHAVIOUR_COLOUR.get(behaviour, (200, 200, 200))
+        colour = BEHAVIOUR_COLOUR.get(behaviour, UNCLASSIFIED_COLOUR)
         cx, cy = pad + x * cell + cell // 2, head + y * cell + cell // 2
         r = cell // 2 - 2
         if late:
@@ -456,10 +471,11 @@ def render(chapter, stem, out_png, concept=None, shade=None, zoom=3):
     d.text((pad, ly), 'behaviour, borrowed from each unit\'s vanilla donor (#335):',
            fill=(210, 210, 216), font=f_small)
     lx = pad + 390
-    for name, colour in (('never-move -- you walk into it', BEHAVIOUR_COLOUR['never-move']),
-                         ('charge after turn 1', BEHAVIOUR_COLOUR['charge-after-1']),
-                         ('pursue from turn 1', BEHAVIOUR_COLOUR['pursue']),
-                         ('B = boss, guards its tile', BEHAVIOUR_COLOUR['hold-position']),
+    for name, colour in (('pursuer -- comes to you', BEHAVIOUR_COLOUR['pursuer']),
+                         ('striker -- holds, steps out to strike', BEHAVIOUR_COLOUR['striker']),
+                         ('statue -- never moves, even to attack', BEHAVIOUR_COLOUR['statue']),
+                         ('own errand -- moves, not at you', BEHAVIOUR_COLOUR['own-errand']),
+                         ('AI not classified', UNCLASSIFIED_COLOUR),
                          ('hollow = arrives turn 4, Hard only', (150, 150, 158))):
         d.ellipse([lx, ly, lx + 15, ly + 15], fill=colour, outline=(16, 16, 18))
         d.text((lx + 22, ly), name, fill=(210, 210, 216), font=f_small)

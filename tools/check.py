@@ -932,7 +932,9 @@ def check_gate_chapter_window(fail):
 # YAML ids of a different shape (`north` vs `reliquary-north`), and matching those would mean
 # renaming a shipped chapter's constants rather than catching a bug.
 _LUA_ROW = re.compile(r'\{[^{}]*\bid\s*=\s*"([^"]+)"[^{}]*\}')
-_LUA_FIELD = re.compile(r'\b(\w+)\s*=\s*(-?\d+|0x[0-9A-Fa-f]+)')
+# NB the hex branch comes FIRST: Python's alternation is ordered, so `-?\d+` would match the
+# leading `0` of `0x11` and the field would silently read as 0.
+_LUA_FIELD = re.compile(r'\b(\w+)\s*=\s*(0x[0-9A-Fa-f]+|-?\d+)')
 
 
 def _chapter_lua_coords(doc):
@@ -1013,11 +1015,16 @@ def check_chapter_lua_facts(fail):
         fail.extend(_chapter_lua_fact_violations(rel, text, chapter_rel, doc))
 
 
-# The ACTION bytes that cannot target a listed character. AI_A_08 is the one ch06 spends
-# (`repoint_boat_safe_ai_list`); AI_A_07 is ch05's escort. Both run the standard offensive
-# action through `AiIsUnitEnemyAndNotInScrList`, so a unit carrying either fights the player
-# normally and simply will not swing at whatever the repointed list names.
-RESCUE_SAFE_ACTIONS = (0x07, 0x08)
+# The ACTION byte that cannot target a rescue target. AI_A_08 is the one ch06 spends
+# (`repoint_boat_safe_ai_list`), and it is the ONLY one that licenses a unit here.
+#
+# AI_A_07 deliberately is NOT in this tuple, though it has the same shape. Both run the
+# standard offensive action through `AiIsUnitEnemyAndNotInScrList`, so both refuse to swing at
+# whatever their list names -- but the LISTS are different and each names one thing. AI_A_07's
+# is repointed at ch05's escort (`repoint_escort_safe_ai_list`), never at a boat pid, so a
+# ch06 unit carrying `{0x7, ...}` refuses to attack Basil and sinks the hull happily. Treating
+# the two as interchangeable made this gate accept exactly that unit as proven safe.
+RESCUE_SAFE_ACTIONS = (0x08,)
 
 
 def _rescue_target_violations(short, reachers, pursuers):

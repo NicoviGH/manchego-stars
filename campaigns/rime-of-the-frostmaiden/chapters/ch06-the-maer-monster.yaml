@@ -623,6 +623,17 @@ enemy_units:
       - id: iron-lance
     damage_type: piercing
     positions: [[0, 11]]
+    ai_override:
+      ai: '{0x8, 0x0, 0x1, 0x0}'   # AI_A_08 ExceptCivilian + the donor's own pursue approach
+      why: >
+        The same override the turn-1 line carries, for the same reason and with the same
+        discipline: only the ACTION byte changes, and the approach (0x0, pursue) is the donor's
+        own, untouched. These three spawn on the WEST EDGE, a short ride from the west hull's
+        pocket, and a pursuing approach walks them onto it -- so without this they are
+        undeclared pressure on a hull whose fuse is costed against one declared pursuer.
+        "The hulls' clock is its DECLARED pursuers and nothing else" is not a turn-1 rule, and
+        a Difficult-only wave is no less bound by it than the opening board. They were invisible
+        to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [3, 11]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
@@ -638,6 +649,17 @@ enemy_units:
       - id: iron-lance
     damage_type: piercing
     positions: [[0, 9]]
+    ai_override:
+      ai: '{0x8, 0x0, 0x1, 0x0}'   # AI_A_08 ExceptCivilian + the donor's own pursue approach
+      why: >
+        The same override the turn-1 line carries, for the same reason and with the same
+        discipline: only the ACTION byte changes, and the approach (0x0, pursue) is the donor's
+        own, untouched. These three spawn on the WEST EDGE, a short ride from the west hull's
+        pocket, and a pursuing approach walks them onto it -- so without this they are
+        undeclared pressure on a hull whose fuse is costed against one declared pursuer.
+        "The hulls' clock is its DECLARED pursuers and nothing else" is not a turn-1 rule, and
+        a Difficult-only wave is no less bound by it than the opening board. They were invisible
+        to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [2, 9]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
@@ -654,6 +676,17 @@ enemy_units:
       - id: javelin
     damage_type: slashing
     positions: [[0, 13]]
+    ai_override:
+      ai: '{0x8, 0x0, 0x1, 0x0}'   # AI_A_08 ExceptCivilian + the donor's own pursue approach
+      why: >
+        The same override the turn-1 line carries, for the same reason and with the same
+        discipline: only the ACTION byte changes, and the approach (0x0, pursue) is the donor's
+        own, untouched. These three spawn on the WEST EDGE, a short ride from the west hull's
+        pocket, and a pursuing approach walks them onto it -- so without this they are
+        undeclared pressure on a hull whose fuse is costed against one declared pursuer.
+        "The hulls' clock is its DECLARED pursuers and nothing else" is not a turn-1 rule, and
+        a Difficult-only wave is no less bound by it than the opening board. They were invisible
+        to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [2, 13]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
     skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
