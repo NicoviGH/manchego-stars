@@ -7074,6 +7074,27 @@ class RawPidBossBaseLevel(unittest.TestCase):
         self.assertEqual(missing, [],
                          'raw-pid boss(es) with no RAW_PID_LEVEL_SOURCES row: %s' % missing)
 
+    def test_the_registry_READER_sees_every_roster_key_too(self):
+        # otherwise the guard has no reachable green state: a raw-pid boss under
+        # `reinforcements:` is flagged as unregistered, and adding the row that silences it
+        # makes the reader sys.exit("does not exist") and kills the build.
+        chap = {'reinforcements': [{'id': 'stowaway', 'is_boss': True, 'level': 9}]}
+        self.assertEqual(bc._entry_base_level_in(chap, 'stowaway'), 9)
+
+    def test_the_registry_reads_a_DECLARED_body_level(self):
+        # `levels:` is the per-body list the ROM is built from; reading `level:` past it
+        # writes baseLevel 1 (so the malus fires) while the model treats the boss as
+        # malus-immune at its real level.
+        chap = {'enemy_units': [{'id': 'b', 'is_boss': True, 'levels': [9]}]}
+        self.assertEqual(bc._entry_base_level_in(chap, 'b'), 9)
+
+    def test_a_raw_pid_boss_under_any_roster_key_is_caught(self):
+        # `_our_base_level` models every boss as malus-immune WHEREVER it is declared, and
+        # this registry is what makes that true -- so the guard has to look everywhere too.
+        for key in bc.ENEMY_ROSTER_KEYS:
+            chap = {key: [{'id': 'stowaway', 'is_boss': True, 'level': 9}]}
+            self.assertEqual(bc._unregistered_raw_pid_boss_entries(chap), ['stowaway'], key)
+
     def test_registry_resolves_each_boss_to_its_deploy_level(self):
         got = bc.raw_pid_base_levels('rime-of-the-frostmaiden')
         self.assertEqual({k: got.get(k) for k in self.RAW_BOSSES}, self.RAW_BOSSES)

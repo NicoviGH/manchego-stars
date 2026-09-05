@@ -467,6 +467,415 @@ class AiFindingsInTheCurveReport(unittest.TestCase):
         self.assertTrue(all('ai' in r for r in self._rows().values()))
 
 
+class MirrorShare(unittest.TestCase):
+    """mirror% -- the share of the TWIN's force a chapter reproduces exactly (class + level).
+
+    It is what separates a copy-x1.00 from a composed-x1.00: the parity ratio is an
+    aggregate over stats, so a chapter that transcribes its twin unit for unit and a
+    chapter that arrives at the same per-slot pressure from a different force read
+    identically. #367's finding was that ch06 is the first, and its x1.00 was a checksum
+    on the donor pipeline rather than a measurement.
+
+    vanilla Prologue's red force is 3 fighters: L4, L1, L2.
+    """
+
+    def _chap(self, enemies, ref='FE8 Prologue'):
+        return {'parity_reference': ref, 'enemy_units': enemies}
+
+    def test_a_force_transcribed_unit_for_unit_is_a_full_mirror(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 4},
+                                        {'id': 'b', 'class': 'fighter', 'level': 1},
+                                        {'id': 'c', 'class': 'fighter', 'level': 2}]))
+        self.assertEqual((m['shared'], m['twin']), (3, 3))
+        self.assertEqual(m['pct'], 100.0)
+
+    def test_a_force_sharing_nothing_with_its_twin_mirrors_zero(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'mage', 'level': 4}]))
+        self.assertEqual((m['shared'], m['pct']), (0, 0.0))
+
+    def test_the_same_class_at_a_different_level_is_not_a_mirror(self):
+        # class alone is not the unit: an L9 fighter is not the twin's L1 one.
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 9}]))
+        self.assertEqual(m['shared'], 0)
+
+    def test_a_partial_match_is_a_share_of_the_TWINS_force(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 4}]))
+        self.assertEqual((m['shared'], m['twin']), (1, 3))
+        self.assertAlmostEqual(m['pct'], 100.0 / 3)
+
+    def test_count_expands_into_that_many_bodies(self):
+        # our two L2 fighters can only mirror the twin's ONE: the intersection is a
+        # multiset, so a doubled body does not score twice.
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 2,
+                                         'count': 2}]))
+        self.assertEqual(m['shared'], 1)
+
+    def test_a_composition_entry_expands_per_member(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'level': 2,
+                                         'composition': ['fighter', 'fighter']}]))
+        self.assertEqual(m['shared'], 1)
+
+    def test_fielding_more_than_the_twin_never_reads_above_100(self):
+        m = df.mirror_share(self._chap([{'id': 'a', 'class': 'fighter', 'level': 4},
+                                        {'id': 'b', 'class': 'fighter', 'level': 1},
+                                        {'id': 'c', 'class': 'fighter', 'level': 2},
+                                        {'id': 'd', 'class': 'fighter', 'level': 2}]))
+        self.assertEqual(m['pct'], 100.0)
+
+    def test_reinforcement_waves_count_as_part_of_our_force(self):
+        chap = self._chap([{'id': 'a', 'class': 'fighter', 'level': 4}])
+        chap['reinforcements'] = [{'id': 'late', 'class': 'fighter', 'level': 1}]
+        self.assertEqual(df.mirror_share(chap)['shared'], 2)
+
+    def test_a_staff_only_unit_still_counts_as_a_body(self):
+        # the parity metric DROPS a unit with no modeled weapon; mirror% is about the
+        # force's SHAPE, so a healer the twin fields is a unit the chapter did or did not
+        # reproduce.
+        m = df.mirror_share(self._chap([{'id': 'h', 'class': 'troubadour', 'level': 6}],
+                                       ref='FE8 Ch6'))
+        self.assertEqual(m['shared'], 1)
+
+    def test_an_uncurated_twin_has_no_mirror_to_measure(self):
+        self.assertIsNone(df.mirror_share(self._chap([{'id': 'a'}], ref='FE8 Ch99')))
+
+
+class PerBodyLevels(unittest.TestCase):
+    """`levels:` is a PER-BODY list, and it is what the ROM writes.
+
+    ch02's rear-raider wave declares `count: 2` with `levels: [2, 3]` and no `level:` --
+    build_campaign zips positions with levels to emit the two UnitDefinitions. A reader
+    that only knows `level:` falls through to the default and models the pair as two L1
+    brigands, which is neither what the chapter declares nor what the ROM contains.
+    """
+
+    def test_a_levels_list_gives_each_body_its_own_level(self):
+        self.assertEqual(df._body_levels({'count': 2, 'levels': [2, 3]}), [2, 3])
+
+    def test_without_levels_every_body_carries_the_entrys_level(self):
+        self.assertEqual(df._body_levels({'count': 3, 'level': 5}), [5, 5, 5])
+
+    def test_a_bare_entry_is_one_body_at_level_one(self):
+        self.assertEqual(df._body_levels({}), [1])
+
+    def test_levels_disagreeing_with_count_is_a_contradiction_not_a_truncation(self):
+        # zip() would silently drop the third body; two declarations of the same fact
+        # that disagree is a data error, and the ROM emitter zips them too.
+        with self.assertRaises(ValueError):
+            df._body_levels({'count': 3, 'levels': [2, 3]})
+
+    def test_a_wave_with_per_body_levels_mirrors_each_of_them(self):
+        chap = {'parity_reference': 'FE8 Prologue',
+                'enemy_units': [{'id': 'a', 'class': 'fighter', 'count': 2,
+                                 'levels': [1, 2]}]}
+        self.assertEqual(df.mirror_share(chap)['shared'], 2)
+
+
+class EveryRosterKeyIsAForce(unittest.TestCase):
+    """The module already names its three roster keys once, in AI_ROSTER_KEYS. A force
+    builder that hand-rolls two of them silently scores a wave under the third as pure
+    divergence."""
+
+    def test_a_wave_under_any_roster_key_counts_as_our_force(self):
+        for key in df.AI_ROSTER_KEYS:
+            chap = {'parity_reference': 'FE8 Prologue',
+                    key: [{'id': 'a', 'class': 'fighter', 'level': 4}]}
+            self.assertEqual(df.mirror_share(chap)['shared'], 1, key)
+
+
+class ReinforcementsAreOurForce(unittest.TestCase):
+    """The twin's curated arrays fold its reinforcement waves in unconditionally, so a
+    force builder that reads only our opening board compares 7 bodies against 9 and calls
+    the missing two divergence. ch06 already discovered this and worked around it by
+    declaring its turn-4 wave inside `enemy_units`; ch02 used the `reinforcements:` key
+    and was never counted.
+    """
+
+    def _ch02(self):
+        return bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for('ch02'))
+
+    def test_our_side_fields_as_many_bodies_as_the_twin(self):
+        p = df._chapter_pressure(self._ch02())
+        self.assertEqual(p['n_ours'], p['n_vanilla'])
+
+    def test_the_wave_is_modeled_at_its_declared_levels(self):
+        # `levels: [2, 3]`, so the two bodies must differ -- an L1/L1 pair (the old default)
+        # and an L2/L2 pair (count-expansion of one level) both fail here.
+        bodies = [u for ed, u in df.chapter_units(self._ch02())
+                  if ed.get('id') == 'rear-raiders']
+        self.assertEqual(len(bodies), 2)
+        brig = df._class_base('CLASS_BRIGAND')
+        growths = df._class_growths('CLASS_BRIGAND')
+        self.assertEqual(sorted(b.hp for b in bodies),
+                         sorted(df.autolevel(brig, growths, lv)['baseHP'] for lv in (2, 3)))
+
+    def test_ch02_transcribes_its_twin_once_its_wave_is_counted(self):
+        self.assertEqual(df.mirror_share(self._ch02())['pct'], 100.0)
+
+
+class OneForceEveryReader(unittest.TestCase):
+    """Widening "what is this chapter's force" for the verdict and leaving the readers around
+    it on `enemy_units` produces a report that contradicts itself on one page: ch02 printed
+    "ours (9 enemies)" two lines above "ours line 7 · reinf 0". Every reader of the force
+    reads the same roster."""
+
+    def _ch02(self):
+        return bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for('ch02'))
+
+    def test_the_dynamics_split_buckets_the_wave_the_verdict_counted(self):
+        g = df.chapter_enemy_groups(self._ch02())
+        self.assertEqual(len(g['reinforcements']), 2)
+        self.assertEqual(sum(len(v) for v in g.values()),
+                         df._chapter_pressure(self._ch02())['n_ours'])
+
+    def test_an_entry_under_a_reinforcement_key_is_a_reinforcement_by_the_KEY(self):
+        # ch02's wave carries `trigger_turn`, not `arrives_turn`: the key it is declared
+        # under is what makes it a reinforcement, and an arrives_turn test alone read it
+        # as turn-1 line.
+        chap = {'reinforcements': [{'id': 'w', 'class': 'brigand', 'level': 2,
+                                    'inventory': [{'id': 'iron-axe'}]}]}
+        g = df.chapter_enemy_groups(chap)
+        self.assertEqual(len(g['reinforcements']), 1)
+        self.assertEqual(g['line'], [])
+
+    def test_a_staff_only_wave_is_reported_as_unmodeled(self):
+        chap = {'reinforcements': [{'id': 'healer', 'class': 'priest', 'level': 3,
+                                    'is_boss': True, 'inventory': [{'id': 'heal'}]}]}
+        self.assertEqual([d['id'] for d in df.unmodeled_enemies(chap)], ['healer'])
+
+    def test_the_cast_tables_grade_the_same_force_as_the_verdict(self):
+        chap, roster, line, bosses, cap, labels = df.load_field(
+            'rime-of-the-frostmaiden', 'ch02')
+        self.assertEqual(len(line) + len(bosses),
+                         df._chapter_pressure(chap)['n_ours'])
+
+    def test_role_findings_grade_a_unit_declared_under_a_reinforcement_key(self):
+        # a monstrous boss hidden under `reinforcements:` was invisible to the per-unit
+        # gate arm while contributing its threat to the aggregate.
+        chap = {'parity_reference': 'FE8 Prologue',
+                'reinforcements': [{'id': 'sleeper', 'class': 'general', 'level': 20,
+                                    'is_boss': True,
+                                    'inventory': [{'id': 'silver-lance'}]}]}
+        self.assertTrue(any('sleeper' in f for f in df.role_findings(chap, 'FE8 Prologue')))
+
+
+class DeclaredLevelsEverywhere(unittest.TestCase):
+    def test_a_composition_wave_honors_its_per_body_levels(self):
+        chap = {'parity_reference': 'FE8 Prologue',
+                'enemy_units': [{'id': 'a', 'composition': ['fighter', 'fighter'],
+                                 'levels': [1, 2]}]}
+        self.assertEqual(df.mirror_share(chap)['shared'], 2)
+
+    def test_levels_must_agree_with_the_positions_the_rom_zips_them_against(self):
+        with self.assertRaises(ValueError):
+            df._body_levels({'levels': [2, 3], 'positions': [[0, 6]]})
+
+    def test_a_composition_declares_its_body_count_too(self):
+        # the bag's length is the body count, so `levels:` must match it -- indexing past
+        # the list would raise IndexError deep in the expander instead of naming the entry.
+        with self.assertRaises(ValueError):
+            df._body_levels({'id': 'bag', 'composition': ['fighter', 'fighter'],
+                             'levels': [1]})
+
+    def test_a_composition_without_levels_is_one_body_per_member(self):
+        self.assertEqual(df._body_levels({'composition': ['a', 'b'], 'level': 4}), [4, 4])
+
+    def test_a_boss_carries_ITS_bodys_level_as_its_malus_floor(self):
+        # `base_level` is the >= baseLevel gate a difficulty malus floors against. Reading
+        # it off `level:` while the body comes from `levels:` gives a boss base_level 1 and
+        # a malus the ROM never applies.
+        chap = {'enemy_units': [{'id': 'b', 'class': 'general', 'is_boss': True,
+                                 'levels': [10],
+                                 'inventory': [{'id': 'silver-lance'}]}]}
+        shifts = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+        plain = df.chapter_units(chap)[0][1]
+        shifted = df.chapter_units(chap, mode='tutorial', shifts=shifts)[0][1]
+        self.assertEqual(plain.hp, shifted.hp)   # boss is at its baseLevel: no malus
+
+    def test_solo_contributors_counts_BODIES_not_the_count_field(self):
+        # a `levels:`-only entry has no `count:`; reading count as 1 made every body of it
+        # eligible for the single-unit NOTE.
+        self.assertEqual(df._entry_body_count({'levels': [2, 3, 4]}), 3)
+        self.assertEqual(df._entry_body_count({'count': 2, 'level': 3}), 2)
+        self.assertEqual(df._entry_body_count({'composition': ['a', 'b', 'c']}), 3)
+
+
+class RoleFindingsGradeTypesNotBodies(unittest.TestCase):
+    """`role_findings` asks a per-UNIT question -- is this unit's threat an outlier, is this
+    boss too soft -- and the answer is a property of the unit type, not of how many copies
+    stand on the map. Expanding it per body repeated every warning `count` times and made
+    the boss census count copies: ch08's `count: 4` ice-troll read as "4 units flagged
+    is_boss (ice-troll, ice-troll, ice-troll, ice-troll)". `role` is a `--check` gate arm,
+    so that reds CI on the first locked chapter with a multi-copy boss entry."""
+
+    def _ch08(self):
+        # ch08 is `status: planned`, so it has no host slot and no CH08_CHAPTER_YAML --
+        # read the file directly. It is the live case: a `count: 4` boss entry.
+        with open(df.chapter_path('rime-of-the-frostmaiden', 'ch08'), encoding='utf-8') as f:
+            return bc.yaml.safe_load(f)
+
+    def test_a_multi_copy_boss_entry_is_ONE_boss(self):
+        findings = df.role_findings(self._ch08(), self._ch08().get('parity_reference'))
+        census = [f for f in findings if 'flagged is_boss' in f]
+        self.assertEqual(census, [], census)
+
+    def test_a_warning_is_stated_once_per_unit_type(self):
+        findings = df.role_findings(self._ch08(), self._ch08().get('parity_reference'))
+        self.assertEqual(len(findings), len(set(findings)), findings)
+
+    def test_one_ENTRY_is_one_boss_however_many_levels_it_declares(self):
+        # `distinct` splits an entry by level, and all its rows share the entry's id -- so a
+        # boss authored `levels: [19, 20]` re-created the census bug that `count: 4` had.
+        chap = {'parity_reference': 'FE8 Prologue',
+                'enemy_units': [{'id': 'w', 'class': 'general', 'levels': [19, 20],
+                                 'is_boss': True,
+                                 'inventory': [{'id': 'silver-lance'}]}]}
+        findings = df.role_findings(chap, 'FE8 Prologue')
+        self.assertEqual([f for f in findings if 'flagged is_boss' in f], [], findings)
+        self.assertEqual(len(findings), len(set(findings)), findings)
+
+    def test_bodies_at_DIFFERENT_levels_are_different_types(self):
+        # `levels: [2, 3]` is two distinct units and both get graded; `count: 2` is one.
+        ed = {'id': 'w', 'class': 'general', 'levels': [19, 20], 'is_boss': True,
+              'inventory': [{'id': 'silver-lance'}]}
+        self.assertEqual(len(df._entry_combatants(ed, distinct=True)), 2)
+        self.assertEqual(len(df._entry_combatants(dict(ed, levels=None, level=20, count=2),
+                                                  distinct=True)), 1)
+
+
+class GuardsSeeTheWholeRoster(unittest.TestCase):
+    def test_the_boss_malus_guard_reads_every_roster_key_and_declared_level(self):
+        # `_our_base_level` treats every boss as malus-immune; this guard is what makes that
+        # true. A boss declared under `reinforcements:`, or one whose level comes from
+        # `levels:`, was invisible to it while still riding the assumption.
+        donor = sorted(bc.ENEMY_BASE_SLOT.items())[0]
+        uid, slot = donor
+        over = df._character_base_level(slot) + 5
+        chap = {'reinforcements': [{'id': uid, 'is_boss': True, 'levels': [over],
+                                    'class': 'general'}]}
+        self.assertEqual(df._boss_entries_over_donor_base_level(chap), [uid])
+
+    def test_a_drop_on_a_reinforcement_wave_is_part_of_the_economy(self):
+        chap = {'reinforcements': [{'id': 'w', 'item_drop': 'elixir'}]}
+        self.assertEqual(df.chapter_economy(chap)['drops'], ['elixir'])
+
+    def test_a_bag_NEVER_takes_a_personal_line(self):
+        # The documented rule (chapter_enemy_force): a `composition` entry is a mixed bag of
+        # GENERICS, and `RAW_PID_PERSONAL_SOURCES` routes one pid per unit id -- so at most
+        # one member could carry a line in the ROM while all N would be credited here. A
+        # `personal:` on such an entry describes the GROUP; applying it per member is a
+        # silent multiplier.
+        ed = {'id': 'bag', 'composition': ['general', 'general'], 'level': 10,
+              'personal': {'hp': 20},
+              'inventory_by_class': {'general': ['silver-lance']}}
+        plain = df._entry_combatants(ed)
+        real = df._entry_combatants(ed, real_article=True)
+        self.assertEqual([u.hp for u in real], [u.hp for u in plain])
+
+    def test_a_bag_body_is_shifted_the_way_the_ENGINE_would_shift_it(self):
+        # the bag branch passed base_level=1/shiftable=True by construction while the class
+        # branch resolved both, so a bag boss took a malus the ROM never applies.
+        ed = {'id': 'bag', 'composition': ['general'], 'level': 10, 'is_boss': True,
+              'inventory_by_class': {'general': ['silver-lance']}}
+        shifts = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+        self.assertEqual(df._entry_combatants(ed)[0].hp,
+                         df._entry_combatants(ed, mode='tutorial', shifts=shifts)[0].hp)
+
+
+class DeclaredCountsMustAgree(unittest.TestCase):
+    def test_positions_and_count_are_cross_checked_even_without_levels(self):
+        # `positions` is what build_campaign zips against; a mismatch models a force the
+        # ROM never emits, and mirror% now compares body-for-body against the twin on it.
+        with self.assertRaises(ValueError):
+            df._body_levels({'id': 'w', 'count': 3, 'level': 2,
+                             'positions': [[0, 6], [0, 7]]})
+
+    def test_positions_alone_declares_the_body_count(self):
+        # build_campaign enumerates `positions` to emit units, so three positions are three
+        # bodies whether or not a `count:` says so -- defaulting to 1 under-counts the force
+        # everywhere, mirror% included.
+        self.assertEqual(df._body_levels({'level': 4, 'positions': [[1, 1], [2, 2], [3, 3]]}),
+                         [4, 4, 4])
+
+    def test_an_entry_that_places_no_body_is_named_in_the_error(self):
+        with self.assertRaises(ValueError) as cm:
+            df._body_levels({'id': 'ghost', 'count': 0})
+        self.assertIn('ghost', str(cm.exception))
+
+    def test_a_stale_count_on_a_bag_entry_is_caught_too(self):
+        # the bag's length is the body count, so a `count:` beside it is the same fact --
+        # and a stale one silently models a force the ROM never emits.
+        with self.assertRaises(ValueError):
+            df._body_levels({'id': 'bag', 'composition': ['a', 'b'], 'count': 3})
+
+    def test_agreeing_declarations_pass(self):
+        self.assertEqual(df._body_levels({'count': 2, 'level': 2,
+                                          'positions': [[0, 6], [0, 7]]}), [2, 2])
+
+
+class MirrorShareOnRealChapters(unittest.TestCase):
+    """Against the real campaign, because the wiring is the thing under test."""
+
+    def _mirror(self, ch):
+        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for(ch))
+        return df.mirror_share(chap)
+
+    def test_ch06_reproduces_its_twin_exactly(self):
+        # ch06 IS vanilla Ch6's 27-unit force, re-sited. This is the number that makes its
+        # x1.00 legible as a copy (#367).
+        self.assertEqual(self._mirror('ch06')['pct'], 100.0)
+
+    def test_a_composed_chapter_reads_well_under_a_copy(self):
+        # ch01 fields ten units against a ten-unit twin and mirrors three of them.
+        self.assertEqual(self._mirror('ch01')['shared'], 3)
+
+
+class MirrorInTheCurveReport(unittest.TestCase):
+    def _rows(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            return {r['label'].split()[0]: r
+                    for r in df.curve_report('rime-of-the-frostmaiden')}
+
+    def test_every_row_carries_its_mirror_share(self):
+        self.assertEqual(self._rows()['CH6']['mirror']['pct'], 100.0)
+
+    def test_the_curve_prints_mirror_beside_the_parity_ratio(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            df.curve_report('rime-of-the-frostmaiden')
+        text = out.getvalue()
+        self.assertIn('mirror', text)
+        ch06_row = [l for l in text.splitlines() if 'ch06' in l][0]
+        self.assertIn('100%', ch06_row)
+
+
+class MirrorIsModeInvariant(unittest.TestCase):
+    """A difficulty mode shifts STATS, never a unit's class or level (`mode_stats` re-projects
+    the same level through the chapter's malus/bonus), and the mode-gated bodies -- ch06's
+    Hard-only turn-4 wave, vanilla's Hard reinforcement arrays -- are folded into BOTH sides
+    unconditionally. So the force's shape is the same in all three modes and mirror% is
+    invariant by construction. The report has to say so: it sits on a row whose banner
+    declares the other figures mode-shifted."""
+
+    def _text(self, mode=None):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            df.curve_report('rime-of-the-frostmaiden', mode=mode)
+        return out.getvalue()
+
+    def _mirror_column(self, text):
+        return [l.split()[-2] for l in text.splitlines()
+                if l.startswith('  CH') and '%' in l]
+
+    def test_the_mode_banner_names_mirror_among_the_unshifted_figures(self):
+        self.assertIn('mirror', self._text(mode='difficult').split('NB')[1].split('=====')[0])
+
+    def test_every_mirror_reads_the_same_in_every_mode(self):
+        base = self._mirror_column(self._text())
+        self.assertTrue(base)
+        for mode in ('tutorial', 'normal', 'difficult'):
+            self.assertEqual(self._mirror_column(self._text(mode=mode)), base, mode)
+
+
 class VanillaUnitDestinations(unittest.TestCase):
     """#335: a vanilla unit's `xPosition`/`yPosition` is often a SPAWN tile, not where it
     fights. `redas` is scripted movement data that walks it from there to its post, and the

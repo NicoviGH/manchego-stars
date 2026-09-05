@@ -10245,13 +10245,77 @@ def raw_pid_base_levels(campaign):
     """Raw pid -> the baseLevel it must carry, read from the level it deploys at."""
     out = {}
     for pid, (chapter_yaml, unit_id) in RAW_PID_LEVEL_SOURCES.items():
-        chapter = _load_chapter_yaml(campaign, chapter_yaml)
-        unit = next((e for e in chapter.get('enemy_units', []) if e.get('id') == unit_id), None)
-        if unit is None:
+        level = _entry_base_level_in(_load_chapter_yaml(campaign, chapter_yaml), unit_id)
+        if level is None:
             sys.exit('ERROR: RAW_PID_LEVEL_SOURCES names %s/%s, which does not exist'
                      % (chapter_yaml, unit_id))
-        out[pid] = int(unit.get('level', 1))
+        out[pid] = level
     return out
+
+
+# The keys a chapter YAML may hold enemy entries under. ONE definition, because every
+# reader of "what units does this chapter field" must agree: the parity metric, the AI-donor
+# guard, the personal-line routes and the raw-pid boss registry all key off it, and ch02
+# spent four chapters with its `reinforcements:` wave counted by some of them and not others
+# (decisions.md -> "A parity ratio does not say how much of the twin it COPIED").
+ENEMY_ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
+
+
+def chapter_roster_entries(chap):
+    """Every enemy entry a chapter fields, across ALL of its roster keys.
+
+    A reinforcement wave is part of the force. The vanilla twins' curated UnitDefinition
+    arrays fold their own waves in unconditionally (vanilla Ch2's `UnitDef_088B4470`,
+    vanilla Ch6's Hard-mode array), so a reader that takes only the opening board compares
+    seven bodies against nine and scores the two missing ones as divergence.
+    """
+    return [ed for key in ENEMY_ROSTER_KEYS for ed in (chap.get(key) or [])
+            if isinstance(ed, dict)]
+
+
+def entry_body_levels(enemy_def):
+    """The level of each BODY one enemy entry places, in order.
+
+    `levels:` is a PER-BODY list and it is what the ROM contains -- the emitters zip it with
+    `positions` to write one UnitDefinition per pair, so an entry carrying it declares an L2
+    and an L3 rather than two copies of one level. Everything else is `count` (or, failing
+    that, `positions`) bodies at the entry's `level`.
+
+    Every field that states the body count states the SAME fact, so they must agree: a stale
+    `count:` beside a `positions:` list models a force the ROM never emits, and since #367
+    the parity metric compares body-for-body against the vanilla twin on it.
+    """
+    uid = enemy_def.get('id', enemy_def.get('name', 'enemy'))
+    levels = enemy_def.get('levels')
+    bag = (enemy_def.get('composition') or []) if 'class' not in enemy_def else None
+    stated = [(f, n) for f, n in
+              (('composition', len(bag) if bag else None),
+               ('count', int(enemy_def['count']) if 'count' in enemy_def else None),
+               ('positions', len(enemy_def['positions'])
+                if enemy_def.get('positions') else None),
+               ('levels', len(levels) if levels is not None else None))
+              if n is not None]
+    for field, n in stated:
+        if n != stated[0][1]:
+            raise ValueError('%r declares %s %d but %s %d -- they are the same fact and '
+                             'they disagree' % (uid, stated[0][0], stated[0][1], field, n))
+    count = stated[0][1] if stated else 1
+    if count < 1:
+        raise ValueError('%r places no body (%s %d)'
+                         % (uid, stated[0][0] if stated else 'count', count))
+    if levels is None:
+        return [int(enemy_def.get('level', 1))] * count
+    return [int(lv) for lv in levels]
+
+
+def _entry_base_level_in(chap, unit_id):
+    """The baseLevel the named unit deploys at, found across every roster key.
+
+    Reads a DECLARED body level, so a boss authored `levels: [9]` writes baseLevel 9 rather
+    than falling through to 1 -- which would make the ROM apply a difficulty malus while
+    difficulty's `_our_base_level` models the same boss as immune to it."""
+    unit = next((e for e in chapter_roster_entries(chap) if e.get('id') == unit_id), None)
+    return None if unit is None else max(entry_body_levels(unit))
 
 
 def unregistered_raw_pid_bosses(campaign):
@@ -10262,19 +10326,24 @@ def unregistered_raw_pid_bosses(campaign):
     construction. The prologue's zeroed guests are excluded: they DO ride vanilla slots (only
     their base STATS are zeroed), so their baseLevel is the slot's and the penalty is already
     governed by vanilla's own number."""
+    return sorted(uid for chapter in hosted_chapters()
+                  for uid in _unregistered_raw_pid_boss_entries(
+                      _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))))
+
+
+def _unregistered_raw_pid_boss_entries(chap):
+    """The same question for ONE loaded chapter, over every roster key.
+
+    difficulty's `_our_base_level` models a boss as malus-immune WHEREVER it is declared,
+    and this registry is what makes that true, so the guard has to look wherever it is
+    declared too."""
     registered = {unit_id for _yaml, unit_id in RAW_PID_LEVEL_SOURCES.values()}
     prologue_guests = {'sephek-kaltro'}
-    missing = []
-    for chapter in hosted_chapters():
-        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
-        for enemy in chap.get('enemy_units', []):
-            if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
-                continue
-            uid = enemy.get('id')
-            if uid in ENEMY_BASE_SLOT or uid in registered or uid in prologue_guests:
-                continue
-            missing.append(uid)
-    return sorted(missing)
+    return [enemy.get('id') for enemy in chapter_roster_entries(chap)
+            if (enemy.get('is_boss') or enemy.get('is_miniboss'))
+            and enemy.get('id') not in ENEMY_BASE_SLOT
+            and enemy.get('id') not in registered
+            and enemy.get('id') not in prologue_guests]
 
 
 RAW_PID_BATTLE_ANIMS = {
