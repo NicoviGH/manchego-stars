@@ -6,38 +6,47 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-04 (Claude). Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-04 (Claude), after #366 merged and #367 was answered. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**PR #366 on branch `ch06-playtest`, five commits, ready for `/code-review`.** ch06's playtest
-block, the run it enabled, and the campaign-wide defect that run found. `make check` clean,
-`make test` green, `ch06clock` **PASS**. Nothing is half-done on the branch.
+**Nothing. The tree is clean on `main` and no branch is open.** #366 squash-merged 2026-09-04
+(`eaedac5`) with its five review findings fixed; `ch06-playtest` is deleted.
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
 humans. **`make chapter CH=ch06` is the state; #26's body is the remaining work.**
 
-## PARKED, by Nicolas, 2026-09-04
+## PARKED — and what unparks it
 
-**ch06's fuse tuning, and anything that leans on the difficulty model, until #367 is answered.**
-The measured fuses are wrong in both directions — east still afloat at turn 12 against a declared
-7, west sank turn 5 against 8 — and the levers (HP on the boat pids, a second east pursuer) are
-exactly what #367 affects. **Do not tune the clock.** Evidence is on #26.
+**ch06's fuse tuning is still parked.** The measured fuses are wrong in both directions — east
+still afloat at turn 12 against a declared 7, west sank turn 5 against 8 — and the levers (HP on
+the boat pids, a second east pursuer) are what #367 affects. Evidence is on #26.
 
-⚠️ **#366 itself does NOT depend on that review** and can merge independently: its fix is grounded
-in measured vanilla behaviour (zero of vanilla Ch6's seventeen strikers can reach a villager in one
-turn), not in `difficulty.py`.
+**#367 is now ANSWERED** (2026-09-04 investigation comment — read it before touching the clock).
+The short version: the rosters, the donor derivation and the exp curve through ch06 are sound;
+the parity *ratio* is not a statement about difficulty and at ch06 says nothing at all, because
+ch06 reproduces 100% of FE8 Ch6's force and so reads x1.00 by construction.
+
+**The unblock is the danger map** (Next task), not a decision. The fuse is arithmetic on one
+tile — which units reach a hull, on which turn, for how much, against how much hull HP — so the
+danger map answers it directly instead of tuning by re-running. ⚠️ **The pocket door is a
+throughput limit of about one attacker; a danger map that sums everyone in range will get both
+fuses wrong.** The 2026-09-04 instrumented run (one crab at the west door from enemy phase 2,
+five phases) is the calibration point: reproduce it before trusting anything the map says about
+the east hull.
 
 ## Owed, filed, not started
 
-- **#367** -- does the difficulty model have a SPATIAL element we designed and never wired?
-  Opened 2026-09-04, carrying two findings from #26: the player side is modelled at BASE LEVEL
-  while enemies are autolevelled (so the parity ratio cancels only to FIRST order, and the error
-  grows with every chapter), and nothing states an expected party level per chapter.
-  **ch06's tuning is parked behind this.**
+- **#367** -- ANSWERED, and now the work item. Findings + proposals are in its 2026-09-04
+  comment; **do not re-derive them, and do not restate them here.** Two of its four proposals are
+  the Next task. Still open on it and not started: locking ch03-ch06 (or accepting the gate is
+  decorative for them), and the party-level band into `docs/fe8-pacing-reference.md`.
+  ⚠️ **ch07 is the one to watch** -- it reuses FE8 Ch6 as its bar, so honest parity there hands
+  the party an extra chapter of exp the vanilla curve does not contain, and the per-chapter gate
+  cannot see it.
 - **#365** -- guard: a hosted chapter DECLARES its fog, and a census over the rest of
   `ROMChapterData`. Opened 2026-09-04 while hosting ch06.
 - **#337** -- guard: a cutscene must LOAD every character it stages (the permadeath invariant).
@@ -48,11 +57,20 @@ turn), not in `difficulty.py`.
 
 ## Next task
 
-**`/code-review` on #366, then merge it.** It is self-contained and does not wait on #367.
+**Two things off #367, in this order. Nicolas's direction, 2026-09-04.**
 
-After that, ch06's remaining work is ordered on **#26** and none of it is blocked: the three
-cutscenes, the boarding pass, Messie's portrait and wiring, the merfolk reskins. Dialogue still
-waits on voice bibles for the boat crews. **Do not tune the clock** -- see PARKED above.
+1. **mirror%** -- print, beside every parity ratio, the share of the twin's force a chapter
+   reproduces exactly (class + level). Small, no emulator, no ROM. It is what makes a
+   copy-x1.00 visibly different from a composed-x1.00. Measured today: ch00 33%, ch01 30%,
+   ch02 78%, ch03 90%, ch04 61%, ch05 52%, **ch06 100%**.
+2. **The danger map** -- forecast incoming damage per tile per turn, from `foot_reach` plus the
+   pursuer/striker/statue split #366 landed plus real `fe_combat` damage. This is the spatial
+   element #367 went looking for, and it is one step from code that already exists.
+   `map_placement_preview` computes real reach and **nothing imports it** -- it only shades a
+   PNG. Validate against the west hull before pointing it at the east one.
+
+Then ch06's fuse, then the rest of #26: the three cutscenes, the boarding pass, Messie's portrait
+and wiring, the merfolk reskins. Dialogue still waits on voice bibles for the boat crews.
 
 ## Map sprites — read before any art session
 
@@ -63,8 +81,8 @@ WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not re
 
 ## Recently landed — do not redo
 
-**#366 (2026-09-04, IN REVIEW not merged) — the AI vector has two halves, and we were reading
-one.** Three ADRs in `docs/decisions.md` carry it: *"AI_B is the APPROACH and AI_A is the ACTION"*,
+**#366 (2026-09-04, MERGED `eaedac5`) — the AI vector has two halves, and we were reading
+one.** Five ADRs in `docs/decisions.md` carry it. The first three: *"AI_B is the APPROACH and AI_A is the ACTION"*,
 *"A reach number measured on an EMPTY MAP is a claim about terrain, not about the chapter"*, and
 *"A rescue clock is a HIT RATE, so a scenario MEASURES it and never asserts it"*. The one-line
 version: `never-move` names only the approach byte, so 48 of the 51 units our reports called static
@@ -72,6 +90,16 @@ will step out and strike — which is how four merfolk mobbed a boat the chapter
 them. `make chapter` now prints both halves and a three-way shape, reach is measured with the
 enemy line standing on it, and two new guards (`check_rescue_targets`, `check_chapter_lua_facts`)
 hold both.
+
+The review added two more ADRs, both gates that had been passing for the wrong reason:
+*"Two do-not-attack lists are not one mechanism, and they have different invariants"* (AI_A_07's
+list names ch05's escort, so it never licensed anything at a ch06 hull -- and AI_A_08 had no
+client sweep at all) and *"A reachability gate that skips reinforcements is grading the opening
+board"* (ch06's three Difficult-only turn-4 crab riders reach the west hull and were invisible;
+they now carry their siblings' `ai_override`, ACTION byte only). Also fixed: `BEHAVIOUR_COLOUR`
+still keyed on the retired approach-family vocabulary, so every ch06 marker drew grey while the
+legend advertised four colours -- **the placement picture was mis-stating behaviour, which is the
+picture ch06's clock was designed on.**
 
 **#364 (2026-09-04) — ch06 is hosted on slot 7, and the asset table hit its 8-bit CEILING.** Five
 ADRs in `docs/decisions.md` carry all of it and are deliberately not restated here: *"The asset
