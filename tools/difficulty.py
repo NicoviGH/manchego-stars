@@ -314,8 +314,7 @@ def _body_levels(enemy_def):
     # body the ROM never emits -- and mirror% now compares body-for-body against the twin.
     stated = [(f, n) for f, n in
               (('composition', len(bag) if bag else None),
-               ('count', int(enemy_def['count']) if 'count' in enemy_def and not bag
-                else None),
+               ('count', int(enemy_def['count']) if 'count' in enemy_def else None),
                ('positions', len(enemy_def['positions'])
                 if enemy_def.get('positions') else None),
                ('levels', len(levels) if levels is not None else None))
@@ -930,21 +929,13 @@ def _our_base_level(enemy_def):
     return 1
 
 
-def chapter_roster_entries(chap):
-    """Every enemy entry the chapter fields, across ALL of its roster keys.
-
-    A reinforcement wave is part of the force. The twin's curated UnitDefinition arrays fold
-    its own waves in unconditionally (vanilla Ch2's `UnitDef_088B4470`, vanilla Ch6's
-    Hard-mode array), so a builder that reads only our opening board compares seven bodies
-    against nine and scores the two missing ones as divergence. ch06 already ran into this
-    and worked around it by declaring its turn-4 wave inside `enemy_units` -- its own YAML
-    says declaring them "is what makes the two sides count the same force". ch02 used the
-    `reinforcements:` key instead and was simply never counted.
-
-    The keys are AI_ROSTER_KEYS, so there is one answer to "what is this chapter's force"
-    and the AI guard and the parity metric cannot drift apart on it."""
-    return [ed for key in AI_ROSTER_KEYS for ed in (chap.get(key) or [])
-            if isinstance(ed, dict)]
+# ch06 ran into this first and worked around it privately, by declaring its turn-4 wave
+# inside `enemy_units` -- its own YAML says declaring them "is what makes the two sides count
+# the same force". ch02 used the `reinforcements:` key instead and was simply never counted.
+# The definition lives in build_campaign, which owns the chapter schema, so the parity
+# metric, the AI guard, the personal-line routes and the raw-pid registry cannot drift apart
+# on which units a chapter fields.
+chapter_roster_entries = bc.chapter_roster_entries
 
 
 def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff=True,
@@ -973,14 +964,18 @@ def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff
         name = ed.get('id', ed.get('name', 'enemy'))
         by_class = ed.get('inventory_by_class', {})
         bodies = list(zip(ed.get('composition', []), _body_levels(ed)))
+        # A bag NEVER takes a personal line, `real_article` or not: it is a mixed bag of
+        # GENERICS, and RAW_PID_PERSONAL_SOURCES routes one pid per unit id -- so at most
+        # one member could carry a line in the ROM while all N would be credited here. A
+        # `personal:` or donor-matching id on such an entry describes the GROUP.
+        # `base_level`/`shiftable` are resolved the same way the class branch resolves them,
+        # so a bag boss is not handed a malus the engine never applies.
         units = [_one_enemy('%s-%s' % (name, cls), cls, lv,
                             _weapon_for([{'id': w} for w in by_class.get(cls, [])]),
-                            mode=mode, shifts=shifts)
+                            mode=mode, shifts=shifts,
+                            base_level=_our_base_level(dict(ed, level=lv)),
+                            shiftable=_our_takes_difficulty_shift(ed))
                  for cls, lv in (dict.fromkeys(bodies) if distinct else bodies)]
-        if real_article:
-            # a bag is generics, so no per-member line -- but an entry-level `personal:` or
-            # donor id describes the GROUP and must still be applied (#284).
-            units = [unit_real_article(ed, c) for c in units]
     else:
         # One body per DECLARED level, not `count` copies of one: a wave authored as
         # `levels: [2, 3]` is an L2 and an L3, which is what the ROM emits. `base_level` is
@@ -1640,7 +1635,7 @@ def solo_contributors(chap, parity_ref, deploy_cap, floor=1.0, share=0.10):
 # Where a chapter's red force is authored. ch02 puts two of its nine under
 # `reinforcements:`, and a guard reading only `enemy_units:` would grade a chapter that
 # does not ship.
-AI_ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
+AI_ROSTER_KEYS = bc.ENEMY_ROSTER_KEYS   # the AI guard was this roster's first reader
 
 
 def _donor_specs(enemy):

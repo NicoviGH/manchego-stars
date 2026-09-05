@@ -170,8 +170,8 @@ class TestPersonalLineRoutes(unittest.TestCase):
         return check._personal_line_route_violations(
             'chNN.yaml', d, injected_ids=set(injected), slot_ids=set(slots))
 
-    def _chap(self, unit):
-        return {'status': 'active', 'enemy_units': [unit]}
+    def _chap(self, unit, key='enemy_units'):
+        return {'status': 'active', key: [unit]}
 
     def test_a_line_with_an_injection_route_is_fine(self):
         self.assertEqual(self.routes(self._chap(
@@ -185,12 +185,31 @@ class TestPersonalLineRoutes(unittest.TestCase):
         self.assertEqual(len(msgs), 1, msgs)
         self.assertIn('RAW_PID_PERSONAL_SOURCES', msgs[0])
 
+    def test_a_line_under_a_reinforcement_key_is_routed_too(self):
+        # the parity metric folds `personal:` from EVERY roster key into the verdict, so a
+        # boss parked under `reinforcements:` measures fixed and plays naked with no gate.
+        for key in ('reinforcements', 'enemy_reinforcements'):
+            msgs = self.routes(self._chap({'id': 'newboss', 'personal': {'baseHP': 9}},
+                                          key=key))
+            self.assertEqual(len(msgs), 1, (key, msgs))
+
     def test_a_line_on_a_slot_riding_unit_is_caught(self):
         # The dangerous direction: it never reaches the ROM *and* it displaces the slot's real
         # line in the measurement, understating the boss worse than the bug that started #284.
         msgs = self.routes(self._chap({'id': 'raider-captain', 'personal': {'baseHP': 1}}))
         self.assertEqual(len(msgs), 1, msgs)
         self.assertIn('already carries', msgs[0])
+
+
+class TestRosterKeysAgree(unittest.TestCase):
+    def test_checks_roster_keys_match_the_content_desks(self):
+        # check.py names them rather than importing, so the bare-interpreter `checks` job
+        # stays import-free -- which is only safe if a divergence fails here.
+        try:
+            import build_campaign as bc
+        except ImportError as e:
+            self.skipTest('build_campaign unavailable (%s)' % e)
+        self.assertEqual(check.ROSTER_KEYS, bc.ENEMY_ROSTER_KEYS)
 
 
 class TestRealChapters(unittest.TestCase):

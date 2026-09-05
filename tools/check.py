@@ -505,7 +505,7 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
         boss further than the bug that opened #284, with every gate green.
     """
     out = []
-    for unit in (d.get('enemy_units') or []):
+    for unit in _roster_entries(d):
         if not unit.get('personal'):
             continue
         uid = unit.get('id')
@@ -519,6 +519,17 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
                        'RAW_PID_PERSONAL_SOURCES in build_campaign.py, or the boss will measure '
                        'fixed and play as a naked class base' % (rel, uid))
     return out
+
+
+# Mirrors build_campaign.ENEMY_ROSTER_KEYS. Named here rather than imported because this
+# module's `checks` CI job runs on a bare interpreter with no Pillow and no submodule, so it
+# must stay import-free; the schema tests fail if the two ever diverge.
+ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
+
+
+def _roster_entries(d):
+    """Every enemy entry a chapter dict fields, across all of its roster keys."""
+    return [u for key in ROSTER_KEYS for u in (d.get(key) or []) if isinstance(u, dict)]
 
 
 def check_personal_line_injection_routes(fail):
@@ -545,7 +556,7 @@ def check_personal_line_injection_routes(fail):
     seen = set()
     for rel, d in _chapters():
         fail.extend(_personal_line_route_violations(rel, d, injected_ids, slot_ids))
-        seen.update(u.get('id') for u in (d.get('enemy_units') or []))
+        seen.update(u.get('id') for u in _roster_entries(d))
     for uid in sorted(slot_ids - seen):
         fail.append('ENEMY_BASE_SLOT maps %r, which no chapter fields -- a stale key silently '
                     'drops that boss back to a naked-class-base measurement (#284)' % uid)

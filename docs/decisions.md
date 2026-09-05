@@ -8497,9 +8497,15 @@ instrument was hiding it.
 
 The fix is two functions and it is the general form, not a patch on ch02:
 
-- `chapter_roster_entries` answers *"what is this chapter's force"* once, over `AI_ROSTER_KEYS` —
-  the same three keys the AI guard already iterates, `enemy_reinforcements` included. The parity
-  metric and the AI guard can no longer disagree about which units a chapter fields.
+- `build_campaign.chapter_roster_entries` answers *"what is this chapter's force"* once, over
+  `ENEMY_ROSTER_KEYS`. It lives on the desk that owns the chapter schema because four separate
+  gates key off that answer — the parity metric, the AI-donor guard, the `personal:` injection
+  routes (#284) and the raw-pid boss registry — and each had its own copy of the question. Two of
+  those copies were holes: a boss under `reinforcements:` could carry a `personal:` block with no
+  route into the ROM, and could ride a raw pid with no `RAW_PID_LEVEL_SOURCES` row, while
+  `_our_base_level` modelled it as malus-immune anyway. `check.py` names the keys rather than
+  importing them (its CI job runs on a bare interpreter), and a test fails if the two ever
+  diverge.
 - `_entry_combatants` is the single entry expander. It was three near-copies — one in
   `chapter_units`, one of its own, one inside `role_findings` — which is precisely how `levels:`
   came to be honored in one reader and defaulted to L1 in the others. Body count, per-body level

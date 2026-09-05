@@ -747,14 +747,27 @@ class GuardsSeeTheWholeRoster(unittest.TestCase):
         chap = {'reinforcements': [{'id': 'w', 'item_drop': 'elixir'}]}
         self.assertEqual(df.chapter_economy(chap)['drops'], ['elixir'])
 
-    def test_a_bag_entry_is_graded_on_its_real_article(self):
-        # a `composition` entry carrying a personal line was graded at naked class base
-        # once the expander stopped applying it -- the #284 failure mode.
-        ed = {'id': 'bag', 'composition': ['general'], 'level': 10,
-              'personal': {'hp': 20}, 'inventory_by_class': {'general': ['silver-lance']}}
-        plain = df._entry_combatants(ed)[0]
-        real = df._entry_combatants(ed, real_article=True)[0]
-        self.assertEqual(real.hp, plain.hp + 20)
+    def test_a_bag_NEVER_takes_a_personal_line(self):
+        # The documented rule (chapter_enemy_force): a `composition` entry is a mixed bag of
+        # GENERICS, and `RAW_PID_PERSONAL_SOURCES` routes one pid per unit id -- so at most
+        # one member could carry a line in the ROM while all N would be credited here. A
+        # `personal:` on such an entry describes the GROUP; applying it per member is a
+        # silent multiplier.
+        ed = {'id': 'bag', 'composition': ['general', 'general'], 'level': 10,
+              'personal': {'hp': 20},
+              'inventory_by_class': {'general': ['silver-lance']}}
+        plain = df._entry_combatants(ed)
+        real = df._entry_combatants(ed, real_article=True)
+        self.assertEqual([u.hp for u in real], [u.hp for u in plain])
+
+    def test_a_bag_body_is_shifted_the_way_the_ENGINE_would_shift_it(self):
+        # the bag branch passed base_level=1/shiftable=True by construction while the class
+        # branch resolved both, so a bag boss took a malus the ROM never applies.
+        ed = {'id': 'bag', 'composition': ['general'], 'level': 10, 'is_boss': True,
+              'inventory_by_class': {'general': ['silver-lance']}}
+        shifts = {'tutorial': 4, 'normal': 2, 'difficult': 3}
+        self.assertEqual(df._entry_combatants(ed)[0].hp,
+                         df._entry_combatants(ed, mode='tutorial', shifts=shifts)[0].hp)
 
 
 class DeclaredCountsMustAgree(unittest.TestCase):
@@ -764,6 +777,12 @@ class DeclaredCountsMustAgree(unittest.TestCase):
         with self.assertRaises(ValueError):
             df._body_levels({'id': 'w', 'count': 3, 'level': 2,
                              'positions': [[0, 6], [0, 7]]})
+
+    def test_a_stale_count_on_a_bag_entry_is_caught_too(self):
+        # the bag's length is the body count, so a `count:` beside it is the same fact --
+        # and a stale one silently models a force the ROM never emits.
+        with self.assertRaises(ValueError):
+            df._body_levels({'id': 'bag', 'composition': ['a', 'b'], 'count': 3})
 
     def test_agreeing_declarations_pass(self):
         self.assertEqual(df._body_levels({'count': 2, 'level': 2,

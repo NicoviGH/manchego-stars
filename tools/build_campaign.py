@@ -10254,6 +10254,26 @@ def raw_pid_base_levels(campaign):
     return out
 
 
+# The keys a chapter YAML may hold enemy entries under. ONE definition, because every
+# reader of "what units does this chapter field" must agree: the parity metric, the AI-donor
+# guard, the personal-line routes and the raw-pid boss registry all key off it, and ch02
+# spent four chapters with its `reinforcements:` wave counted by some of them and not others
+# (decisions.md -> "A parity ratio does not say how much of the twin it COPIED").
+ENEMY_ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
+
+
+def chapter_roster_entries(chap):
+    """Every enemy entry a chapter fields, across ALL of its roster keys.
+
+    A reinforcement wave is part of the force. The vanilla twins' curated UnitDefinition
+    arrays fold their own waves in unconditionally (vanilla Ch2's `UnitDef_088B4470`,
+    vanilla Ch6's Hard-mode array), so a reader that takes only the opening board compares
+    seven bodies against nine and scores the two missing ones as divergence.
+    """
+    return [ed for key in ENEMY_ROSTER_KEYS for ed in (chap.get(key) or [])
+            if isinstance(ed, dict)]
+
+
 def unregistered_raw_pid_bosses(campaign):
     """Boss/miniboss ids that ride a RAW pid but declare no baseLevel (sorted).
 
@@ -10262,19 +10282,24 @@ def unregistered_raw_pid_bosses(campaign):
     construction. The prologue's zeroed guests are excluded: they DO ride vanilla slots (only
     their base STATS are zeroed), so their baseLevel is the slot's and the penalty is already
     governed by vanilla's own number."""
+    return sorted(uid for chapter in hosted_chapters()
+                  for uid in _unregistered_raw_pid_boss_entries(
+                      _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))))
+
+
+def _unregistered_raw_pid_boss_entries(chap):
+    """The same question for ONE loaded chapter, over every roster key.
+
+    difficulty's `_our_base_level` models a boss as malus-immune WHEREVER it is declared,
+    and this registry is what makes that true, so the guard has to look wherever it is
+    declared too."""
     registered = {unit_id for _yaml, unit_id in RAW_PID_LEVEL_SOURCES.values()}
     prologue_guests = {'sephek-kaltro'}
-    missing = []
-    for chapter in hosted_chapters():
-        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
-        for enemy in chap.get('enemy_units', []):
-            if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
-                continue
-            uid = enemy.get('id')
-            if uid in ENEMY_BASE_SLOT or uid in registered or uid in prologue_guests:
-                continue
-            missing.append(uid)
-    return sorted(missing)
+    return [enemy.get('id') for enemy in chapter_roster_entries(chap)
+            if (enemy.get('is_boss') or enemy.get('is_miniboss'))
+            and enemy.get('id') not in ENEMY_BASE_SLOT
+            and enemy.get('id') not in registered
+            and enemy.get('id') not in prologue_guests]
 
 
 RAW_PID_BATTLE_ANIMS = {
