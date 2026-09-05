@@ -1088,6 +1088,82 @@ def check_rescue_targets(fail):
             short, pp.units_reaching(doc, terrain, hulls), pursuers))
 
 
+def _fuse_forecast_findings(chapter, rows=None):
+    """Advisory findings for one chapter's rescue clock (#367).
+
+    Two things the fuse-forecast model can say that `check_rescue_targets` cannot -- that
+    guard proves nothing UNDECLARED can attack a hull; this asks whether the DECLARED clock
+    actually gets there:
+
+      * every `rescue_pursuers:` id should reach a firing cell for AT LEAST ONE of the
+        chapter's `rescue_boats` (mirroring `check_rescue_targets`'s own "any hull"
+        reading -- a chapter does not wire which pursuer clocks which boat, only that each
+        declared pursuer is somebody's clock);
+      * a boat's optional `declared_fuse:` (no shipped chapter has adopted this field yet --
+        ch06's "sinks on turn 7/8" lives as PROSE in `difficulty_note:`) should fall inside
+        the forecast band of whatever pursuer reaches it.
+
+    `rows` is `rescue_forecast.chapter_forecast(chapter)`'s output, threaded in for
+    testability; the caller computes it once per chapter and passes it here.
+    """
+    findings = []
+    for pursuer in chapter.get('rescue_pursuers') or []:
+        pid = pursuer['id']
+        mine = [r for r in (rows or []) if r.enemy_id == pid]
+        if mine and not any(r.arrival_turn is not None for r in mine):
+            findings.append(
+                '%s: declared a rescue_pursuer but cannot reach a firing cell for any '
+                'rescue target on the contested snapshot -- its fuse describes a unit '
+                'that never arrives' % pid)
+    for boat in chapter.get('rescue_boats') or []:
+        declared = boat.get('declared_fuse')
+        if declared is None:
+            continue
+        reaching = [r for r in (rows or [])
+                   if r.boat_id == boat['id'] and r.arrival_turn is not None]
+        if not reaching:
+            continue                  # already reported above, once, by the pursuer loop
+        if not any(r.sink_low <= declared <= r.sink_high for r in reaching):
+            findings.append(
+                '%s: declared_fuse %s falls outside every reaching pursuer\'s forecast '
+                'band (%s)' % (boat['id'], declared,
+                              ', '.join('%s %s-%s' % (r.enemy_id, r.sink_low, r.sink_high)
+                                        for r in reaching)))
+    return findings
+
+
+def check_rescue_fuse_forecast(fail):
+    """ADVISORY, not a gate (#367): does a chapter's DECLARED rescue clock actually reach
+    its target, and does a declared fuse sit inside the forecast band.
+
+    Deliberately never appends to `fail`. ch06's east pursuer (`merfolk-thrower`) fails the
+    reachability half TODAY -- a real, already-confirmed bug (#26): its own line corks
+    every one of its four javelin firing cells on the contested snapshot, so the chapter's
+    declared "sinks on turn 7" describes a unit that never arrives. The fix is a design
+    call (move the pursuer, or re-declare which hull is the east clock) that belongs to
+    Nicolas, not to this PR, so this prints rather than reddens `main`. Flip the
+    `_fuse_forecast_findings` call below to `fail.extend(...)` once that pursuer is
+    settled -- see `docs/decisions.md` for the dated ADR."""
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    try:
+        import rescue_forecast as rf
+    except ImportError as exc:      # Pillow / submodule absent on the lightweight checks job
+        print('check_rescue_fuse_forecast: skipping (%s; the build job\'s `make test` '
+             'covers it)' % exc)
+        return
+    for rel, doc in _chapters():
+        if not (doc.get('rescue_boats') and doc.get('rescue_pursuers')):
+            continue
+        short = str(doc.get('id', '')).split('-')[0]
+        try:
+            rows = rf.chapter_forecast(doc)
+        except Exception as exc:    # noqa: BLE001 -- an unbuilt map is not this gate's business
+            print('check_rescue_fuse_forecast: skipping %s (%s)' % (short, exc))
+            continue
+        for finding in _fuse_forecast_findings(doc, rows):
+            print('check_rescue_fuse_forecast: %s: %s' % (short, finding))
+
+
 def _re_local_git_env(text, name):
     """True if `name` is bound to git_env() in this file -- `env = git_env()` then `env=env`."""
     import re as _re
@@ -2425,7 +2501,7 @@ def main():
                   check_decomp_git_calls_strip_the_env,
                   check_no_shadowed_definitions, check_gate_chapter_window,
                   check_declared_cases, check_chapter_lua_facts,
-                  check_rescue_targets,
+                  check_rescue_targets, check_rescue_fuse_forecast,
                   check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,

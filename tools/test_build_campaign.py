@@ -7117,6 +7117,34 @@ class RawPidBossBaseLevel(unittest.TestCase):
             self.assertGreaterEqual(base, self.RAW_BOSSES.get(pid, base), pid)
 
 
+class EntryIsTurn1(unittest.TestCase):
+    """`entry_is_turn1` is the one predicate `difficulty.chapter_enemy_groups` and
+    `map_placement_preview.enemy_bodies` must now share (#367): both readers ask "is this
+    body on the opening board", and both got it wrong by testing `arrives_turn` alone --
+    which is absent, and therefore falsy, on a `reinforcements:`/`enemy_reinforcements:`
+    entry that carries `trigger_turn` instead. The KEY is what makes an entry a
+    reinforcement; `arrives_turn` only refines `enemy_units` itself (ch06's Difficult-only
+    wave stays inside `enemy_units` for exactly this reason)."""
+
+    def test_an_enemy_units_entry_with_no_arrives_turn_is_turn1(self):
+        self.assertTrue(bc.entry_is_turn1('enemy_units', {'id': 'a'}))
+
+    def test_an_enemy_units_entry_with_arrives_turn_1_is_turn1(self):
+        self.assertTrue(bc.entry_is_turn1('enemy_units', {'id': 'a', 'arrives_turn': 1}))
+
+    def test_an_enemy_units_entry_with_arrives_turn_above_1_is_not(self):
+        self.assertFalse(bc.entry_is_turn1('enemy_units', {'id': 'a', 'arrives_turn': 4}))
+
+    def test_a_reinforcements_key_entry_is_never_turn1_even_with_no_arrives_turn(self):
+        # The exact shape of the bug: ch02's `rear-raiders` carries `trigger_turn`, not
+        # `arrives_turn`, so `entry.get('arrives_turn')` alone reads it as turn-1.
+        self.assertFalse(bc.entry_is_turn1('reinforcements',
+                                           {'id': 'rear-raiders', 'trigger_turn': 3}))
+
+    def test_an_enemy_reinforcements_key_entry_is_never_turn1_either(self):
+        self.assertFalse(bc.entry_is_turn1('enemy_reinforcements', {'id': 'w'}))
+
+
 class ArenaTutorialPlaysInEveryMode(unittest.TestCase):
     """ch05's arena tutorial is SAFETY text, so it is not gated on tutorial mode (#303).
 

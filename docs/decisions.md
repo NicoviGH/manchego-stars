@@ -8543,6 +8543,93 @@ brainstorm seed, but the tool reads it, so it is part of the tool's output. Veri
 nine chapters, every `--lord-floor` table and all four curve reports (authored + three modes):
 **only ch02's numbers move.**
 
+### A rescue-fuse FORECAST is the reusable question, and it is not a danger grid (2026-09-05, #367, #26)
+
+#367 asked whether the difficulty model has a spatial element that was designed and never
+wired. The answer for a full per-tile danger grid is: not built, and deliberately out of
+scope here -- that is a different, much larger tool. What chapters actually need, repeatedly,
+is narrower: *for a protected tile (a rescue boat, a defend objective, a fragile NPC), which
+enemies can get a firing position on it, on what turn, for how much damage per phase, and
+therefore when does it die?* `tools/rescue_forecast.py` answers exactly that, reusing (never
+reinventing) three things that already existed on three different desks:
+
+- `map_placement_preview.foot_reach` -- the contested (turn-1-body-blocked) Dijkstra
+  `reached_on_contested:` already uses.
+- `difficulty`'s stat resolution (`_entry_combatants`, `_class_base`, `on_terrain`) --
+  the SAME donor-derived numbers the parity gate grades a chapter's force on.
+- `fe_combat.damage_per_round` -- the decomp's own combat math, never a second model.
+
+**The five pieces.** (1) `firing_cells(terrain, target, weapon_range)`: every cell at
+Manhattan distance 1..range that a foot unit can stand on -- FE8 has no line of sight, so
+this is pure distance, not a walk (`decisions.md` -> "What terrain cannot do is stop a
+ranged weapon"). (2) `arrival_to_cells`: the turn an enemy first stands on ANY of those
+cells, walking the CONTESTED map -- `None` (never engages) is a first-class result, not an
+error. (3) damage/phase is `fe_combat.damage_per_round` with the target resolved on its
+real terrain. (4) `sink_band`: HP / damage-per-phase is a MEAN, not a fact (`decisions.md`
+-> "A rescue clock is a HIT RATE"), so the sink turn is reported as a band -- modeled as the
+first-passage time of a random walk with the phase's own mean and variance (the Wald /
+inverse-Gaussian approximation: `E[phases] = hp/mu`, `Var[phases] = hp*sigma2/mu**3`), a
+heuristic width stated as exactly that in the docstring, not a claimed percentile. (5)
+`concurrent_attacker_cap`: when several enemies can reach one target, how many can attack
+it in the SAME phase is a bipartite MATCHING between attackers and the firing cells each
+one's own range reaches, not a single number split between them.
+
+**Validated against ch06's own measured numbers, not synthetic stand-ins.** boat-east's
+javelin-range firing cells are exactly `(15,12) (17,10) (17,13) (17,14)`, one melee cell
+`(17,13)`; boat-west's are `(2,17) (4,18) (4,19)`, one melee cell `(4,18)` -- both match
+their declared `door`. `merfolk-thrower` (soldier L7, javelin) computes to 2.76 dmg/phase
+against the hull's real fighting stats (19 HP / 6 Def in FOREST cover / +20 avoid) and
+**cannot reach any east firing cell on the contested snapshot -- its own allies cork all
+four.** `ice-crab` (bael L1, venin claw) computes to 2.82 dmg/phase, reaches its door on
+turn 2, forecast sink band ~turn 6-12 (expected 9) against a declared 8 -- inside the band.
+
+**The finding this reproduces, in one number: ch06's declared "sinks the hull on turn 7"
+(east) describes a unit that never arrives.** That prose lives in `difficulty_note:`, not a
+schema field -- nothing was asserting it, so nothing broke when it stopped being true. This
+is the SAME shape as the already-confirmed #26 bug (`decisions.md` -> "AI_B is the APPROACH
+and AI_A is the ACTION"): the tooling that measures a chapter's clock did not exist, so the
+design note was never checked against the map it now sits on.
+
+**The guard is ADVISORY, not a gate, on purpose.** `check.check_rescue_fuse_forecast` prints
+(never appends to `fail`) when a declared `rescue_pursuers:` id cannot reach a firing cell
+for any of its chapter's `rescue_boats`, and would check a declared numeric fuse against the
+forecast band if a chapter ever adopts an (currently unused, forward-looking) `declared_fuse:`
+field. Flipping the reachability half to a hard gate is a follow-up left for Nicolas once
+ch06's east pursuer is resettled (move the pursuer, or re-declare which hull is its clock) --
+this PR does not touch ch06's YAML to make the guard pass, because the finding is real and
+the fix is a design call, not a bug in the tool. `chapter_status.loose_ends` surfaces the
+identical finding for `make chapter CH=ch06`, sharing `check._fuse_forecast_findings` so the
+two never drift into two different opinions about the same chapter.
+
+**Same code path, two latent bugs fixed alongside it (map_placement_preview.py, not
+rescue_forecast.py's own code).** `units_reaching` iterated `chapter['enemy_units']` only,
+though its docstring claimed reinforcements were included -- true only because ch06 happens
+to keep its Difficult-only wave inside `enemy_units`. It now reads
+`build_campaign.chapter_roster_entries`, every roster key. `enemy_bodies` never read past
+`enemy_units:` at all, so a `reinforcements:`/`enemy_reinforcements:` entry's body was
+invisible to the contested Dijkstra's blockers regardless of timing -- and a naive fix that
+widened the loop without ALSO fixing the timing test would have flipped the bug rather than
+closed it, since those keys carry `trigger_turn`, not `arrives_turn` (ch02's `rear-raiders`
+wave): testing `arrives_turn` alone reads an absent field as falsy, i.e. turn-1. The one
+correct predicate -- "is this entry's body on the board at turn 1" -- was already living
+correctly, but only, inside `difficulty.chapter_enemy_groups`; it is now
+`build_campaign.entry_is_turn1(key, enemy_def)`, and both readers share it.
+
+**Output diff, over all nine chapters (ch00..ch08), because a previous PR on this exact area
+got burned diffing only seven of them (`decisions.md` -> "only ch02's numbers move").**
+`enemy_bodies`, `units_reaching` (with each chapter's own `rescue_boats` as targets, `[]`
+where none are declared) and `difficulty.chapter_enemy_groups`'s counts/names: byte-identical
+before and after, on every chapter. This is a real, checked result, not an assumption --
+ch02 is the only chapter using a `reinforcements:` key today, and its wave was invisible to
+`enemy_bodies` both before (never read) and after (correctly excluded as not-turn-1); no
+chapter besides ch06 declares `rescue_boats`, so `units_reaching`'s target list is `[]`
+everywhere else and its output cannot move. The FIX has zero live-chapter impact today and
+is still worth shipping: it closes two latent traps for the day a chapter fields a
+reinforcement-key pursuer against a rescue target, which #367's own forecast model now makes
+newly possible to author correctly. `chapter_status.report()` moves on exactly one chapter
+(ch06) and by exactly one line -- the new advisory loose-end -- everywhere else
+byte-identical.
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

@@ -180,13 +180,24 @@ def arrival_turn(points, mov):
 
 
 def enemy_bodies(chapter):
-    """Every turn-1 enemy tile. Reinforcements are excluded: they are not on the board yet."""
+    """Every turn-1 enemy tile, across every roster key a body may be declared under.
+
+    Reinforcements are excluded -- they are not on the board yet -- but "reinforcement" is
+    not simply "an `enemy_units` entry with a truthy `arrives_turn`": a `reinforcements:` or
+    `enemy_reinforcements:` entry carries `trigger_turn` instead (ch02's `rear-raiders`), so
+    testing `arrives_turn` alone against a bare `chapter.get('enemy_units')` loop both missed
+    those entries' bodies AND, on a naive widen-the-loop fix, would have read them as turn-1
+    (`arrives_turn` absent reads as falsy) -- exactly backwards, since a reinforcement KEY is
+    the one shape definitely not on the opening board. `build_campaign.entry_is_turn1` is the
+    one place that now decides this, shared with `difficulty.chapter_enemy_groups` (#367)."""
+    import build_campaign as bc
     out = set()
-    for enemy in chapter.get('enemy_units') or ():
-        if enemy.get('arrives_turn'):
-            continue
-        for tile in enemy.get('positions') or ():
-            out.add(tuple(tile))
+    for key in bc.ENEMY_ROSTER_KEYS:
+        for enemy in chapter.get(key) or ():
+            if not isinstance(enemy, dict) or not bc.entry_is_turn1(key, enemy):
+                continue
+            for tile in enemy.get('positions') or ():
+                out.add(tuple(tile))
     return out
 
 
@@ -216,11 +227,15 @@ def _classes_text():
 def units_reaching(chapter, terrain, targets):
     """[(enemy id, ai bytes)] for every unit that can ATTACK one of `targets`.
 
-    REINFORCEMENTS ARE INCLUDED. They are not on the opening board, but a hull's fuse is costed
+    REINFORCEMENTS ARE INCLUDED, across every roster key (`build_campaign.chapter_roster_entries`)
+    -- not just `enemy_units`. They are not on the opening board, but a hull's fuse is costed
     against the units a chapter DECLARES as its clock, and an undeclared unit that reaches a
     hull on turn 5 sinks it exactly as surely as one that reaches it on turn 1 -- it just does
     it out of sight of a gate that only ever looked at turn 1. Skipping them hid ch06's three
-    Difficult-only turn-4 crab riders, which spawn on the west edge and do reach the west hull.
+    Difficult-only turn-4 crab riders, which spawn on the west edge and do reach the west hull;
+    this docstring's claim was only ever TRUE of ch06, because ch06 happens to keep that wave
+    inside `enemy_units` -- a chapter whose wave lives under `reinforcements:` or
+    `enemy_reinforcements:` (ch02's own `rear-raiders`) was invisible here until now (#367).
 
     The two shapes reach differently, and conflating them is what made the first cut of this
     analysis wrong by three units:
@@ -234,10 +249,11 @@ def units_reaching(chapter, terrain, targets):
     Weapon range comes from `difficulty._weapon_for`, so a staff-only unit is correctly no
     threat and a javelin correctly reaches two.
     """
+    import build_campaign as bc
     import difficulty
     import chapter_status as cs
     out = []
-    for enemy in chapter.get('enemy_units') or ():
+    for enemy in bc.chapter_roster_entries(chapter):
         # MAX range over the whole inventory, not the first weapon. FE8's AI equips whatever
         # lets it attack, and ch06's ironshell-horseslayer proved it in-engine: its items[0] is
         # a range-1 Horseslayer, and it threw its JAVELIN at the hull from two tiles away.

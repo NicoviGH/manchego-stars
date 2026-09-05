@@ -174,6 +174,45 @@ class ContestedReach(unittest.TestCase):
         self.assertIsNone(pp.arrival_turn(None, 5))
 
 
+class EnemyBodiesAndUnitsReachingReadEveryRosterKey(unittest.TestCase):
+    """`enemy_bodies` and `units_reaching` both docstring-claimed to cover reinforcements and
+    both did not: `enemy_bodies` never looked past `enemy_units:`, and a naive fix that just
+    widened the loop without the KEY test would have flipped the bug rather than fixed it,
+    since a `reinforcements:`/`enemy_reinforcements:` entry carries `trigger_turn`, not
+    `arrives_turn` -- ch02's real `rear-raiders` wave (#367).
+    """
+
+    def test_a_reinforcements_key_entry_is_not_a_turn1_blocking_body(self):
+        chap = {'reinforcements': [{'id': 'w', 'trigger_turn': 3, 'positions': [[2, 0]]}]}
+        self.assertEqual(pp.enemy_bodies(chap), set())
+
+    def test_an_enemy_reinforcements_key_entry_is_not_a_turn1_body_either(self):
+        chap = {'enemy_reinforcements': [{'id': 'w', 'trigger_turn': 3,
+                                          'positions': [[2, 0]]}]}
+        self.assertEqual(pp.enemy_bodies(chap), set())
+
+    def test_an_enemy_units_entry_is_still_a_turn1_blocking_body(self):
+        chap = {'enemy_units': [{'id': 'a', 'positions': [[1, 0]]}]}
+        self.assertEqual(pp.enemy_bodies(chap), {(1, 0)})
+
+    def test_an_enemy_units_wave_past_turn_1_is_still_excluded(self):
+        chap = {'enemy_units': [{'id': 'a', 'arrives_turn': 4, 'positions': [[1, 0]]}]}
+        self.assertEqual(pp.enemy_bodies(chap), set())
+
+    def test_units_reaching_finds_a_unit_declared_under_reinforcements(self):
+        """The docstring has always claimed this ("REINFORCEMENTS ARE INCLUDED"); it was
+        only ever true of ch06 because ch06 happens to keep its wave inside `enemy_units`."""
+        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
+        terrain = [[plain] * 5]
+        chap = {'reinforcements': [{
+            'id': 'w', 'class': 'soldier', 'level': 1, 'trigger_turn': 3,
+            'inventory': [{'id': 'iron-lance'}], 'positions': [[0, 0]],
+            'ai_override': {'ai': '{0x0, 0x0, 0x0, 0x0}', 'why': 'test pursuer'},
+        }]}
+        found = pp.units_reaching(chap, terrain, [(4, 0)])
+        self.assertEqual([f[0] for f in found], ['w'])
+
+
 class ReachedOnIsDerived(unittest.TestCase):
     """ch06 declares `reached_on:` per class. It is now derived and compared, because a hand-kept
     number that nothing reads is how "foot reaches either door on turn 6" survived as the
