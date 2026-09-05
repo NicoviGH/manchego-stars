@@ -6,14 +6,22 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-04 (Claude), after #366 merged and #367 was answered. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-05 (Claude), after #368 merged. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing. The tree is clean on `main` and no branch is open.** #366 squash-merged 2026-09-04
-(`eaedac5`) with its five review findings fixed; `ch06-playtest` is deleted.
+**Nothing. The tree is clean on `main` and no branch is open.** #368 squash-merged 2026-09-05
+(`7786bc5`); `mirror-percent` is deleted.
+
+**Waiting on Nicolas: two calls before the danger map is built** (asked 2026-09-05, evidence
+below and on #367).
+1. **The throughput model** -- occupancy-matched (units assigned to DISTINCT firing cells;
+   reproduces the recorded stall) vs cap-only (sum, clamped to the firing-cell count). My
+   recommendation is occupancy-matched.
+2. **Output shape** -- the full per-tile-per-turn grid, or a focused fuse forecast for named
+   target tiles first.
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
@@ -21,22 +29,24 @@ humans. **`make chapter CH=ch06` is the state; #26's body is the remaining work.
 
 ## PARKED — and what unparks it
 
-**ch06's fuse tuning is still parked.** The measured fuses are wrong in both directions — east
-still afloat at turn 12 against a declared 7, west sank turn 5 against 8 — and the levers (HP on
-the boat pids, a second east pursuer) are what #367 affects. Evidence is on #26.
+**ch06's fuse tuning is still parked**, but it is no longer a mystery. The measured fuses are
+wrong in both directions — east still afloat at turn 12 against a declared 7, west sank turn 5
+against 8 — and **the asymmetry is GEOMETRY, measured 2026-09-05 and posted to #367**: the east
+hull has **4 firing cells and 1 melee door**, the west **8 and 3**. Three times the melee
+throughput, which is the whole difference. The computed east cells are
+`(15,12) (17,10) (17,13) (17,14)` — exactly the four #26 records as blocked when the thrower
+stalled, so the model is validated against the instrumented run before it is written.
 
-**#367 is now ANSWERED** (2026-09-04 investigation comment — read it before touching the clock).
-The short version: the rosters, the donor derivation and the exp curve through ch06 are sound;
-the parity *ratio* is not a statement about difficulty and at ch06 says nothing at all, because
-ch06 reproduces 100% of FE8 Ch6's force and so reads x1.00 by construction.
+**#367 is now ANSWERED** (2026-09-04 investigation comment — read it before touching the clock;
+its ch02 numbers are superseded by the 2026-09-05 comment). The short version: the rosters, the
+donor derivation and the exp curve through ch06 are sound; the parity *ratio* is not a statement
+about difficulty, and at ch02 and ch06 says nothing at all, because both reproduce 100% of their
+twin's force and so read x1.00 by construction.
 
-**The unblock is the danger map** (Next task), not a decision. The fuse is arithmetic on one
-tile — which units reach a hull, on which turn, for how much, against how much hull HP — so the
-danger map answers it directly instead of tuning by re-running. ⚠️ **The pocket door is a
-throughput limit of about one attacker; a danger map that sums everyone in range will get both
-fuses wrong.** The 2026-09-04 instrumented run (one crab at the west door from enemy phase 2,
-five phases) is the calibration point: reproduce it before trusting anything the map says about
-the east hull.
+**The unblock is the danger map** (Next task), not a decision, and it is now two answers away
+rather than a research problem. ⚠️ **Throughput is bounded by DISTINCT firing cells and allies
+block each other** — the recorded stall is that bound being hit, and a map that sums everyone in
+range gets both fuses wrong.
 
 ## Owed, filed, not started
 
@@ -57,17 +67,20 @@ the east hull.
 
 ## Next task
 
-**Two things off #367, in this order. Nicolas's direction, 2026-09-04.**
+**The danger map** -- #367 proposal 2, the second of the two things Nicolas named 2026-09-04.
+mirror% (the first) landed as #368. Blocked only on the two calls under "In flight".
 
-1. **mirror%** -- print, beside every parity ratio, the share of the twin's force a chapter
-   reproduces exactly (class + level). Small, no emulator, no ROM. It is what makes a
-   copy-x1.00 visibly different from a composed-x1.00. Measured today: ch00 33%, ch01 30%,
-   ch02 78%, ch03 90%, ch04 61%, ch05 52%, **ch06 100%**.
-2. **The danger map** -- forecast incoming damage per tile per turn, from `foot_reach` plus the
-   pursuer/striker/statue split #366 landed plus real `fe_combat` damage. This is the spatial
-   element #367 went looking for, and it is one step from code that already exists.
-   `map_placement_preview` computes real reach and **nothing imports it** -- it only shades a
-   PNG. Validate against the west hull before pointing it at the east one.
+Forecast incoming damage per tile per turn, from `foot_reach` plus the pursuer/striker/statue
+split #366 landed plus real `fe_combat` damage. `map_placement_preview` already computes real
+reach with per-class cost tables and **nothing imports it** -- it only shades a PNG. Since it is
+a HIT RATE (`decisions.md`), the output should be expected damage and a turn DISTRIBUTION, never
+a single sink turn.
+
+⚠️ **`map_placement_preview` was not in #368's roster sweep and has the same split** (detail on
+#367, fix it with the danger map rather than separately): `units_reaching` reads `enemy_units`
+only, and `enemy_bodies` excludes waves by `arrives_turn` -- so an entry under the
+`reinforcements:` key, which carries `trigger_turn`, is counted as a turn-1 BLOCKING body, which
+is backwards.
 
 Then ch06's fuse, then the rest of #26: the three cutscenes, the boarding pass, Messie's portrait
 and wiring, the merfolk reskins. Dialogue still waits on voice bibles for the boat crews.
@@ -80,6 +93,17 @@ why a decomp sheet's palette is a meaningless leftover, what `footprint:` actual
 WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
+
+**#368 (2026-09-05, MERGED `7786bc5`) — mirror%, and ch02 was never counting its own wave.**
+One ADR in `docs/decisions.md` carries it: *"A parity ratio does not say how much of the twin it
+COPIED, so mirror% says it"*. Every ratio now prints the share of the twin's force the chapter
+reproduces exactly. ⚠️ **It found a shipped bug on a `balance_locked` chapter on day one**: our
+side read only `enemy_units` while the twin's curated arrays fold their reinforcement waves in,
+so ch02 compared 7 bodies against 9 (both at L1, its declared `levels: [2, 3]` unread).
+**ch02 is x1.00/x1.00 and 100% mirror, not x0.81/x0.79 and 78%** — a second copy chapter, so
+ch06 is not the first. Verdict never changed, which is how it survived four chapters.
+`ENEMY_ROSTER_KEYS` / `chapter_roster_entries` / `entry_body_levels` now live on
+`build_campaign`'s desk and nine readers use them; four were silent gate holes.
 
 **#366 (2026-09-04, MERGED `eaedac5`) — the AI vector has two halves, and we were reading
 one.** Five ADRs in `docs/decisions.md` carry it. The first three: *"AI_B is the APPROACH and AI_A is the ACTION"*,
