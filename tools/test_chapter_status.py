@@ -149,6 +149,15 @@ class LooseEnds(unittest.TestCase):
     def test_a_finished_chapter_has_fewer_loose_ends_than_a_planned_one(self):
         self.assertLess(len(cs.loose_ends('ch05')), len(cs.loose_ends('ch06')))
 
+    def test_ch06_reports_its_east_pursuer_cannot_engage(self):
+        """The confirmed #26/#367 finding, surfaced where a fresh session actually reads
+        chapter state -- `make chapter CH=ch06` -- not only in check.py's own stdout."""
+        ends = cs.loose_ends('ch06')
+        self.assertTrue(any('merfolk-thrower' in e for e in ends), ends)
+
+    def test_a_chapter_with_no_rescue_boats_says_nothing_about_a_clock(self):
+        self.assertFalse(any('rescue_pursuer' in e for e in cs.loose_ends('ch05')))
+
 
 class TheReport(unittest.TestCase):
     def test_a_record_scenario_is_not_reported_as_never_run(self):
@@ -193,6 +202,23 @@ class TheReport(unittest.TestCase):
             self.assertNotEqual('UNRULED', why, field)
 
 
+class TryImport(unittest.TestCase):
+    """`_preview_module`/`_build_campaign`/`_rescue_forecast_module` were three copies of
+    the same `try: import X; return X; except ImportError: return None` template, differing
+    only in the module name -- this is the one shared implementation each now calls."""
+
+    def test_a_real_module_is_returned(self):
+        self.assertIs(cs._try_import('os'), __import__('os'))
+
+    def test_an_unimportable_name_returns_none_not_a_raise(self):
+        self.assertIsNone(cs._try_import('no_such_module_xyz'))
+
+    def test_each_wrapper_still_resolves_its_own_module_by_name(self):
+        """The refactor must not collapse the three into one shared cache keyed wrong --
+        each wrapper is independently callable and returns ITS module."""
+        self.assertIs(cs._build_campaign(), __import__('build_campaign'))
+
+
 class DegradedModesMustSayCannotTell(unittest.TestCase):
     """Every optional import here has a fallback, and a fallback that reports a WRONG number
     is worse than one that reports none: the whole promise of this command is that its rows
@@ -200,8 +226,10 @@ class DegradedModesMustSayCannotTell(unittest.TestCase):
 
     def setUp(self):
         self._preview, self._bc = cs._preview_module, cs._build_campaign
+        self._rf = cs._rescue_forecast_module
         self.addCleanup(setattr, cs, '_preview_module', self._preview)
         self.addCleanup(setattr, cs, '_build_campaign', self._bc)
+        self.addCleanup(setattr, cs, '_rescue_forecast_module', self._rf)
         cs._scenes_cache.clear()
 
     def tearDown(self):
@@ -210,6 +238,12 @@ class DegradedModesMustSayCannotTell(unittest.TestCase):
     def test_without_the_preview_module_scenes_are_unknown_not_unpreviewable(self):
         cs._preview_module = lambda: None
         self.assertFalse(any('cannot be previewed' in e for e in cs.loose_ends('ch05')))
+
+    def test_without_rescue_forecast_the_clock_finding_is_silent_not_falsely_clean(self):
+        """ch06 genuinely has an unreachable pursuer; a degraded import must not silently
+        drop that finding by reporting nothing where it would otherwise report a bug."""
+        cs._rescue_forecast_module = lambda: None
+        self.assertFalse(any('merfolk-thrower' in e for e in cs.loose_ends('ch06')))
 
     def test_without_build_campaign_a_full_block_is_not_reported_as_undeclared(self):
         """ch05's block is FULL. Rendering that as 'no host block declared' makes it

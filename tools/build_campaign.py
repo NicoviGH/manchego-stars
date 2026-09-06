@@ -10273,6 +10273,23 @@ def chapter_roster_entries(chap):
             if isinstance(ed, dict)]
 
 
+def entry_is_turn1(key, enemy_def):
+    """Is this entry's body standing on the board at TURN 1, before the player's first move?
+
+    The KEY decides it, not `arrives_turn` alone: only `enemy_units` is the opening-board
+    array, and even then only unconditionally -- an entry there may still declare its OWN
+    `arrives_turn > 1` (ch06's Difficult-only crab-rider wave stays inside `enemy_units` for
+    exactly this reason, so its own field is what excludes it). A `reinforcements:` or
+    `enemy_reinforcements:` entry is never turn-1 regardless of what it carries, and that
+    matters because those entries use a DIFFERENT field for their own timing --
+    `trigger_turn`, not `arrives_turn` (ch02's `rear-raiders`). Two readers tested
+    `arrives_turn` alone against every key and both read a `trigger_turn` wave as turn-1,
+    which is backwards: a reinforcement key is the one shape definitely not on the opening
+    board (`difficulty.chapter_enemy_groups`'s dynamics split, and
+    `map_placement_preview.enemy_bodies`'s Dijkstra blockers, #367)."""
+    return key == 'enemy_units' and int(enemy_def.get('arrives_turn', 1) or 1) <= 1
+
+
 def entry_body_levels(enemy_def):
     """The level of each BODY one enemy entry places, in order.
 

@@ -26,6 +26,17 @@ SceneRow = collections.namedtuple('SceneRow', 'trigger slot declared boxes previ
 Room = collections.namedtuple('Room', 'claimed block used_in_block borrowed free')
 
 
+def _try_import(name):
+    """`name`, imported, or `None` where it cannot be -- the one implementation behind
+    `_preview_module`/`_build_campaign`/`_rescue_forecast_module`, which were three copies
+    of this exact template. Each stays its own module-level function (not a single
+    parameterized one) because callers monkeypatch them individually by name in tests."""
+    try:
+        return __import__(name)
+    except ImportError:
+        return None
+
+
 def _preview_module():
     """`scene_preview`, or None where it cannot be imported.
 
@@ -33,11 +44,7 @@ def _preview_module():
     CI job that installs pyyaml and nothing else this is absent, and a status report is still
     worth printing without its preview column. Everything else here is stdlib + pyyaml.
     """
-    try:
-        import scene_preview
-        return scene_preview
-    except ImportError:
-        return None
+    return _try_import('scene_preview')
 
 
 def _previews_by_event(chapter_short):
@@ -60,11 +67,33 @@ def _previews_by_event(chapter_short):
 
 def _build_campaign():
     """`build_campaign`, or None where Pillow is absent (see `_preview_module`)."""
+    return _try_import('build_campaign')
+
+
+def _rescue_forecast_module():
+    """`rescue_forecast`, or None where it cannot be imported (same Pillow dependency as
+    `_preview_module`, through `map_placement_preview`)."""
+    return _try_import('rescue_forecast')
+
+
+def _rescue_clock_findings(name, campaign=campaign_chapters.CAMPAIGN):
+    """Advisory findings for a chapter's rescue clock (#367), for `loose_ends` and the
+    report -- the same pure logic `check.py check_rescue_fuse_forecast` runs, read here so
+    a fresh session sees ch06's confirmed #26 finding (the east pursuer cannot engage)
+    without leaving the terminal. `[]` on a chapter with no rescue clock, or where the
+    forecast module could not be imported -- silence, never a false "clean"."""
+    rf = _rescue_forecast_module()
+    if rf is None:
+        return []
+    chapter = load(name, campaign)
+    if not (chapter.get('rescue_boats') and chapter.get('rescue_pursuers')):
+        return []
     try:
-        import build_campaign
-        return build_campaign
-    except ImportError:
-        return None
+        rows = rf.chapter_forecast(chapter)
+    except Exception:                # noqa: BLE001 -- an unbuilt map is not this report's business
+        return []
+    import check
+    return check._fuse_forecast_findings(chapter, rows)
 
 
 def _boxes(script):
@@ -615,6 +644,8 @@ def loose_ends(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     for row in art(name, campaign):
         if row.missing:
             out.append('%s (%s) has no %s' % (row.unit, row.role, ', '.join(row.missing)))
+
+    out.extend(_rescue_clock_findings(name, campaign))
 
     if host_slot(name, campaign) is None:
         out.append('not hosted: no slot declared in inject/hosts.py, so nothing loads it')

@@ -2076,10 +2076,11 @@ def chapter_enemy_groups(chap):
             units = _entry_combatants(ed)
             if ed.get('convertible'):
                 g['convertibles'].extend(units)
-            elif key != 'enemy_units' or int(ed.get('arrives_turn', 1) or 1) > 1:
+            elif not bc.entry_is_turn1(key, ed):
                 # the KEY is what makes ch02's wave a reinforcement: it carries
                 # `trigger_turn`, not `arrives_turn`, so an arrives_turn test alone read it
-                # as turn-1 line.
+                # as turn-1 line. `entry_is_turn1` is the one place that now knows it
+                # (#367) -- `map_placement_preview.enemy_bodies` shares it too.
                 g['reinforcements'].extend(units)
             else:
                 g['line'].extend(units)
