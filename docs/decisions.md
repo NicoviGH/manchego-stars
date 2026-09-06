@@ -8693,6 +8693,53 @@ is ch02's `placed_units` gaining its two `rear-raiders` bodies, correctly marked
 is simultaneously the proof that the four refactors are behaviour-preserving and that the
 fifth was a real bug.
 
+### A map's tileset has one home: the chapter YAML, not its sidecar JSON too (2026-09-06, #26)
+
+`map_placement_preview.load_map(stem)` read the tileset name from the map's compiled sidecar
+JSON (`<stem>.json`'s `meta['tileset']`) — a plain `dict['key']` lookup. Every chapter YAML
+already declares the identical fact under `map.tileset` (it's how `import_map_layout` and the
+build know which set to compile against in the first place), so the sidecar copy was never a
+second fact, only a second place the first one could go stale. It did: ch00–ch02's sidecars
+predate the `tileset` key entirely (ch03 onward all carry it, and every chapter where both
+exist agrees), so `load_map` — and therefore `terrain_grid` and `render`, its only two
+production callers — hard-crashed with a bare `KeyError: 'tileset'` on exactly the three
+oldest chapters. No *gate* lost coverage from this (`check_rescue_targets` and
+`check_rescue_fuse_forecast` both try/except-and-skip on `terrain_grid`, and none of ch00–02
+declare `rescue_boats`), but the tool this repo calls "the picture a placement decision gets
+made on" could not draw that picture for a third of the campaign.
+
+Backfilling `"tileset"` into the three old sidecars would have made the crash go away without
+touching the actual defect: two places still carrying the same fact, with nothing stopping the
+next hand-made map from shipping a sidecar that once again forgot the key. Instead
+`load_map(stem, tileset=None)` takes the tileset from its caller when given one, and both
+production callers (`terrain_grid`, `render`) now pass their chapter dict's own
+`chapter['map']['tileset']` — the chapter YAML is the single source of truth, and the sidecar
+copy is read only as a **fallback**, for the one caller with no chapter dict in hand
+(`test_map_placement_preview.py`'s own `load_map('ch06-maer-monster')`, which predates this
+change and is pinned to keep working exactly as before).
+
+**When both are given and they disagree, `load_map` raises rather than picking a winner.**
+This repo has been burned repeatedly by one fact living in two places where a copy silently
+diverged — a parity ratio that didn't say what it counted, ch02 never counting its own
+reinforcement wave (`decisions.md` → "A parity ratio does not say how much of the twin it
+COPIED", "What asking 'what is a body' found") — and letting YAML win unconditionally repeats
+that shape rather than closing it: the sidecar's tileset is the one the `.mar` was actually
+*compiled* against, so silently preferring the YAML could render a map under the wrong
+tileset while looking exactly as confident as a correct render. A raised, named contradiction
+(`ValueError` naming the stem, both values, and both places looked) is the only outcome that
+can't be mistaken for a working render; a stale copy either source is discovered and fixed at
+the point it's read, not laundered into a picture that quietly lies. Absence of BOTH (the
+ch00–ch02 shape) gets the same treatment: a `ValueError` naming the stem and both places
+looked, never the bare `KeyError` this ADR exists to retire.
+
+**Verified byte-identical**, not just "still passes": for the four chapters whose sidecars
+already carried a tileset (ch03–ch06), `terrain_grid`'s output and `render`'s full PNG output
+are hashed before and after this change and match exactly — this only moves *where* the name
+is read from, never *which* tileset is used for a chapter that already worked. ch00–ch02, which
+previously could not render at all, now do; ch07/ch08 (no compiled `.mar`/`.json` yet — planned
+chapters) still fail the same way they always did, a `FileNotFoundError` naming the missing
+sidecar, unchanged by this fix and already clear rather than confusing.
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

@@ -14,6 +14,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import campaign_chapters as cc                                       # noqa: E402
 import map_placement_preview as pp                                   # noqa: E402
+import map_tileset_tool as mt                                        # noqa: E402
 
 
 def ch06():
@@ -131,6 +132,56 @@ class Board(unittest.TestCase):
             placed = dict((eid, tile) for tile, _, _, eid, _
                           in pp.placed_units(self.chap, concept))
             self.assertEqual(placed['nerra'], (9, 12))
+
+
+class LoadMapTilesetSourceOfTruth(unittest.TestCase):
+    """The tileset name used to be read ONLY from a map's sidecar JSON (`meta['tileset']`),
+    which is a second copy of a fact the chapter YAML's own `map.tileset` already owns -- and
+    ch00-ch02's sidecars predate that key entirely, so `load_map` hard-crashed with a bare
+    `KeyError: 'tileset'` on exactly the three oldest maps. The chapter YAML is now the single
+    source of truth: `load_map(stem, tileset=...)` uses what it is given, and only falls back
+    to the sidecar for the one caller with no chapter dict in hand (this module's own ch06
+    fixture, which predates `terrain_grid` threading the chapter through)."""
+
+    def test_an_explicit_tileset_is_used_even_when_the_sidecar_predates_the_key(self):
+        """ch01's sidecar genuinely has no 'tileset' key -- this is the real crash, not a
+        synthetic fixture standing in for it."""
+        _grid, _terrain, ts = pp.load_map('ch01-the-iron-trail', tileset='snowy-bern')
+        want = mt._tileset_from_dir(os.path.join(pp.MAPS, 'tilesets', 'snowy-bern'))
+        self.assertEqual(ts.gfx, want.gfx)
+
+    def test_with_no_explicit_tileset_the_sidecar_is_still_a_valid_fallback(self):
+        """The one caller with no chapter dict at hand -- this test module's own `setUp` --
+        must keep working exactly as before."""
+        _grid, _terrain, ts = pp.load_map('ch06-maer-monster')
+        want = mt._tileset_from_dir(os.path.join(pp.MAPS, 'tilesets', 'snowy-bern-ice'))
+        self.assertEqual(ts.gfx, want.gfx)
+
+    def test_neither_source_having_a_tileset_names_the_stem_not_a_bare_keyerror(self):
+        with self.assertRaises(Exception) as ctx:
+            pp.load_map('ch01-the-iron-trail')
+        self.assertNotIsInstance(ctx.exception, KeyError)
+        self.assertIn('ch01-the-iron-trail', str(ctx.exception))
+
+    def test_disagreement_between_the_two_sources_raises_rather_than_silently_picking_one(self):
+        """ch06's sidecar says 'snowy-bern-ice'. Passing a DIFFERENT name -- as if the chapter
+        YAML had drifted from the map actually compiled -- must be caught, not resolved in
+        either source's favour: `decisions.md` has repeatedly been burned by one fact in two
+        places where a copy silently diverged (a parity ratio not saying what it counted; ch02
+        never counting its own wave)."""
+        with self.assertRaises(Exception) as ctx:
+            pp.load_map('ch06-maer-monster', tileset='snowy-bern')
+        msg = str(ctx.exception)
+        self.assertIn('ch06-maer-monster', msg)
+        self.assertIn('snowy-bern-ice', msg)
+        self.assertIn('snowy-bern', msg)
+
+    def test_terrain_grid_passes_the_chapters_own_tileset_so_ch01_no_longer_crashes(self):
+        """The regression itself: `terrain_grid` used to hand `load_map` nothing but the
+        stem, so ch01 (whose sidecar predates 'tileset') inherited the bare KeyError."""
+        chapter = pp.load_chapter('ch01')
+        terrain = pp.terrain_grid(chapter)
+        self.assertTrue(terrain)
 
 
 class ContestedReach(unittest.TestCase):
