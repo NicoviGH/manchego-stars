@@ -149,11 +149,16 @@ class LooseEnds(unittest.TestCase):
     def test_a_finished_chapter_has_fewer_loose_ends_than_a_planned_one(self):
         self.assertLess(len(cs.loose_ends('ch05')), len(cs.loose_ends('ch06')))
 
-    def test_ch06_reports_its_east_pursuer_cannot_engage(self):
-        """The confirmed #26/#367 finding, surfaced where a fresh session actually reads
-        chapter state -- `make chapter CH=ch06` -- not only in check.py's own stdout."""
+    def test_ch06s_rescue_clock_is_clean_after_the_east_pursuer_fix(self):
+        """Was the confirmed #26/#367 finding (the east pursuer corked by its own line,
+        `merfolk-thrower` at (14,9) unable to reach any of boat-east's firing cells) --
+        fixed on ch06-east-pursuer by moving the two corking bodies off the corridor. The
+        WIRING that would surface such a finding (`make chapter CH=chNN`, not just
+        check.py's stdout) is still exercised by the mocked-module test below plus the pure
+        `_fuse_forecast_findings` logic tests in test_check_rescue_fuse_forecast.py -- this
+        test only pins that ch06's real data no longer trips it."""
         ends = cs.loose_ends('ch06')
-        self.assertTrue(any('merfolk-thrower' in e for e in ends), ends)
+        self.assertFalse(any('merfolk-thrower' in e for e in ends), ends)
 
     def test_a_chapter_with_no_rescue_boats_says_nothing_about_a_clock(self):
         self.assertFalse(any('rescue_pursuer' in e for e in cs.loose_ends('ch05')))

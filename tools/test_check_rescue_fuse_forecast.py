@@ -103,23 +103,26 @@ class ADeclaredFuseMustFallInsideTheBand(unittest.TestCase):
 
 
 class TheGuardIsAdvisoryAndReproducesCh06(unittest.TestCase):
-    """`check_rescue_fuse_forecast` must NEVER append to `fail` -- ch06 fails the
-    reachability question today and CI on `main` must stay green."""
+    """`check_rescue_fuse_forecast` must NEVER append to `fail`, regardless of whether any
+    chapter's rescue clock is currently clean -- ch06's east pursuer was the confirmed #26
+    bug this guard was built to surface (`merfolk-thrower` corked by its own line), fixed on
+    ch06-east-pursuer by moving the two corking bodies off the corridor. The advisory
+    contract has to hold either way, so this class no longer needs a live finding to test it."""
 
     def test_the_check_never_fails_the_build(self):
         fail = []
         check.check_rescue_fuse_forecast(fail)
         self.assertEqual(fail, [])
 
-    def test_ch06s_real_finding_is_the_east_pursuer(self):
-        """Not a synthetic stand-in: the real chapter YAML, the real compiled map. This is
-        the confirmed #26 bug the guard exists to surface."""
+    def test_ch06s_pursuers_are_now_clean_so_it_prints_nothing_about_them(self):
+        """Not a synthetic stand-in: the real chapter YAML, the real compiled map. Confirms
+        the fix, not just the tool -- a regression here means the corridor corked again."""
         import io
         from contextlib import redirect_stdout
         buf = io.StringIO()
         with redirect_stdout(buf):
             check.check_rescue_fuse_forecast([])
-        self.assertIn('merfolk-thrower', buf.getvalue())
+        self.assertNotIn('merfolk-thrower', buf.getvalue())
 
     def test_ch06s_west_pursuer_is_clean_so_it_prints_nothing_about_it(self):
         import io

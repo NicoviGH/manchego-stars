@@ -272,7 +272,13 @@ enemy_units:
     # only foot channel to the west door -- contested foot arrival was turn 11 against a
     # turn-8 fuse, i.e. unsaveable. At (3,14) it is turn 6, which is vanilla Ch6's own
     # foot number. Derived, not eyeballed: `map_placement_preview.reached_on`.
-    positions: [[18, 14], [3, 14], [13, 11], [7, 15]]
+    # (13,11) -> (13,13): the EAST clock's mirror of the same bug. This body plus
+    # ironshell-horseslayer at (14,12) corked all four of merfolk-thrower's javelin firing
+    # cells, so the declared east pursuer never reached one on the contested snapshot --
+    # its "sinks turn 7" fuse described a unit that never arrived (#26, #367,
+    # `tools/rescue_forecast.py`). At (13,13) the corridor opens: the thrower reaches
+    # (15,12) on turn 2, same as the empty-map design always assumed.
+    positions: [[18, 14], [3, 14], [13, 13], [7, 15]]
     donor: [[14, 9], [15, 7], [20, 7], [19, 13]] # vanilla's four HOLDING L7 soldiers
     skin:
       look: "merfolk spear-guard; the anim's lance IS a trident"
@@ -499,7 +505,11 @@ enemy_units:
       - id: horseslayer
       - id: javelin
     damage_type: piercing
-    positions: [[14, 12]]
+    # (14,12) -> (15,13): its old tile plus merfolk-trident's (13,11) body corked all four
+    # of merfolk-thrower's east firing cells, so the declared pursuer never engaged (#26,
+    # #367). Moved off the corridor rather than off the map: it keeps its own do-not-attack
+    # AI_A_08 override and its javelin still threatens the same corridor, one tile south.
+    positions: [[15, 13]]
     donor: [21, 13]                 # vanilla's third L6 knight
     skin: {look: "as ironshell-guard", source: "as ironshell-guard"}
 
