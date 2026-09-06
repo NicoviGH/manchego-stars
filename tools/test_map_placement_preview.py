@@ -134,54 +134,63 @@ class Board(unittest.TestCase):
             self.assertEqual(placed['nerra'], (9, 12))
 
 
-class LoadMapTilesetSourceOfTruth(unittest.TestCase):
-    """The tileset name used to be read ONLY from a map's sidecar JSON (`meta['tileset']`),
-    which is a second copy of a fact the chapter YAML's own `map.tileset` already owns -- and
-    ch00-ch02's sidecars predate that key entirely, so `load_map` hard-crashed with a bare
-    `KeyError: 'tileset'` on exactly the three oldest maps. The chapter YAML is now the single
-    source of truth: `load_map(stem, tileset=...)` uses what it is given, and only falls back
-    to the sidecar for the one caller with no chapter dict in hand (this module's own ch06
-    fixture, which predates `terrain_grid` threading the chapter through)."""
+class LoadMapResolvesTheTilesetTheBuildWillUse(unittest.TestCase):
+    """`load_map` read the tileset with a bare `meta['tileset']`, so it hard-crashed with
+    `KeyError: 'tileset'` on ch00-ch02, whose sidecars predate that key.
 
-    def test_an_explicit_tileset_is_used_even_when_the_sidecar_predates_the_key(self):
-        """ch01's sidecar genuinely has no 'tileset' key -- this is the real crash, not a
-        synthetic fixture standing in for it."""
-        _grid, _terrain, ts = pp.load_map('ch01-the-iron-trail', tileset='snowy-bern')
-        want = mt._tileset_from_dir(os.path.join(pp.MAPS, 'tilesets', 'snowy-bern'))
-        self.assertEqual(ts.gfx, want.gfx)
+    The fix is NOT to read the chapter YAML's `map.tileset` instead. Nothing in the ROM
+    build reads that field -- `build_campaign._register_chapter_map` reads the SIDECAR,
+    defaulting to `WINTER_TILESET` when the key is absent, and that default is exactly why
+    ch00-ch02 build fine today. A preview that sourced its tileset from the YAML would be
+    rendering a fact the game never consults, and could draw a confident picture of a
+    tileset the ROM does not use.
 
-    def test_with_no_explicit_tileset_the_sidecar_is_still_a_valid_fallback(self):
-        """The one caller with no chapter dict at hand -- this test module's own `setUp` --
-        must keep working exactly as before."""
+    So the preview resolves the tileset the same way the build does, through the build's own
+    `map_tileset(meta)` -- one function, one rule, and the picture cannot disagree with the
+    cartridge by construction.
+    """
+
+    def _ts(self, name):
+        return mt._tileset_from_dir(os.path.join(pp.MAPS, 'tilesets', name))
+
+    def test_a_keyless_sidecar_resolves_to_the_builds_own_default(self):
+        """ch00-ch02's sidecars have no `tileset` key; the build gives them WINTER_TILESET,
+        so the preview must give them the same thing rather than raising."""
+        import build_campaign as bc
+        _grid, _terrain, ts = pp.load_map('ch01-the-iron-trail')
+        self.assertEqual(ts.palettes, self._ts(bc.WINTER_TILESET).palettes)
+
+    def test_a_sidecar_that_names_a_tileset_uses_that_one(self):
         _grid, _terrain, ts = pp.load_map('ch06-maer-monster')
-        want = mt._tileset_from_dir(os.path.join(pp.MAPS, 'tilesets', 'snowy-bern-ice'))
-        self.assertEqual(ts.gfx, want.gfx)
+        self.assertEqual(ts.palettes, self._ts('snowy-bern-ice').palettes)
 
-    def test_neither_source_having_a_tileset_names_the_stem_not_a_bare_keyerror(self):
-        with self.assertRaises(Exception) as ctx:
-            pp.load_map('ch01-the-iron-trail')
-        self.assertNotIsInstance(ctx.exception, KeyError)
-        self.assertIn('ch01-the-iron-trail', str(ctx.exception))
+    def test_the_two_snowy_tilesets_are_told_apart_by_PALETTE_not_gfx(self):
+        """Guards the two assertions above from passing vacuously: snowy-bern and
+        snowy-bern-ice ship byte-identical `.4bpp` gfx and differ only in palette, so a test
+        that compared `ts.gfx` would pass even when the wrong tileset was loaded."""
+        plain, ice = self._ts('snowy-bern'), self._ts('snowy-bern-ice')
+        self.assertEqual(plain.gfx, ice.gfx)
+        self.assertNotEqual(plain.palettes, ice.palettes)
 
-    def test_disagreement_between_the_two_sources_raises_rather_than_silently_picking_one(self):
-        """ch06's sidecar says 'snowy-bern-ice'. Passing a DIFFERENT name -- as if the chapter
-        YAML had drifted from the map actually compiled -- must be caught, not resolved in
-        either source's favour: `decisions.md` has repeatedly been burned by one fact in two
-        places where a copy silently diverged (a parity ratio not saying what it counted; ch02
-        never counting its own wave)."""
-        with self.assertRaises(Exception) as ctx:
-            pp.load_map('ch06-maer-monster', tileset='snowy-bern')
-        msg = str(ctx.exception)
-        self.assertIn('ch06-maer-monster', msg)
-        self.assertIn('snowy-bern-ice', msg)
-        self.assertIn('snowy-bern', msg)
+    def test_the_preview_agrees_with_the_build_for_every_compiled_map(self):
+        """The property that matters, asserted directly rather than chapter by chapter:
+        whatever the build would compile a map against is what the preview draws it with."""
+        import build_campaign as bc
+        import glob
+        import json
+        for path in sorted(glob.glob(os.path.join(pp.MAPS, '*.json'))):
+            stem = os.path.splitext(os.path.basename(path))[0]
+            if not os.path.exists(os.path.join(pp.MAPS, stem + '.mar')):
+                continue
+            with open(path, encoding='utf-8') as f:
+                meta = json.load(f)
+            _grid, _terrain, ts = pp.load_map(stem)
+            self.assertEqual(ts.palettes, self._ts(bc.map_tileset(meta)).palettes, stem)
 
-    def test_terrain_grid_passes_the_chapters_own_tileset_so_ch01_no_longer_crashes(self):
-        """The regression itself: `terrain_grid` used to hand `load_map` nothing but the
-        stem, so ch01 (whose sidecar predates 'tileset') inherited the bare KeyError."""
-        chapter = pp.load_chapter('ch01')
-        terrain = pp.terrain_grid(chapter)
-        self.assertTrue(terrain)
+    def test_terrain_grid_no_longer_crashes_on_the_oldest_chapters(self):
+        """The regression itself: ch00-ch02 could not be previewed at all."""
+        for short in ('ch00', 'ch01', 'ch02'):
+            self.assertTrue(pp.terrain_grid(pp.load_chapter(short)), short)
 
 
 class ContestedReach(unittest.TestCase):

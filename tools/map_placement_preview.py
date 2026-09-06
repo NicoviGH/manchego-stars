@@ -108,45 +108,28 @@ ROLE_LEGEND = [('Sp', 'spear'), ('Ax', 'axe'), ('Sw', 'sword'), ('Cv', 'cavalry'
                ('St', 'staff'), ('Bs', 'beast')]
 
 
-def load_map(stem, tileset=None):
+def load_map(stem):
     """(grid, terrain, tileset) for one of our compiled maps.
 
-    The tileset name has one true home: the chapter YAML's own `map.tileset` (every hosted
-    chapter declares it -- it's how `import_map_layout` and the build already know which set
-    to compile against). A map's sidecar JSON (`<stem>.json`) ALSO carries a `tileset` key,
-    but that's a second copy of the same fact, not a second fact, and three of the oldest
-    sidecars (ch00-ch02) predate the key entirely -- so reading it as the only source made
-    `load_map` a bare `KeyError: 'tileset'` on exactly those chapters.
+    The tileset comes from the map's sidecar `<stem>.json`, resolved through
+    `build_campaign.map_tileset` -- the SAME function the ROM build resolves it with. This
+    used to be a bare `meta['tileset']`, which hard-crashed with `KeyError: 'tileset'` on
+    ch00-ch02, whose sidecars predate that key; the build never had that problem because it
+    has always defaulted a keyless sidecar to `WINTER_TILESET`.
 
-    Pass `tileset` (the caller's chapter dict already has `chapter['map']['tileset']`) and
-    it wins. Omit it and the sidecar is used as a fallback, for the one caller that has no
-    chapter dict at hand (`test_map_placement_preview.py`'s own `load_map('ch06-...')` call,
-    which predates `terrain_grid`/`render` threading the chapter through).
-
-    If BOTH are given and they disagree, that is not "YAML wins" -- it's a contradiction
-    between two things that are supposed to be the same fact, and the map that got compiled
-    is the sidecar's, so a silent pick could render the WRONG tileset while claiming to be
-    faithful to the YAML. Raise, the same call this repo has made every other time one fact
-    lived in two places and a copy quietly diverged (decisions.md: a parity ratio not saying
-    what it counted; ch02 never counting its own wave). Neither present is the ch00-ch02
-    case this function exists to stop being a crash: name the stem and both places looked.
+    The chapter YAML also declares `map.tileset`, and it is tempting to treat that as the
+    source of truth since it reads like the authored one. It is not: nothing in the build
+    consults it, so a preview sourced from it would be drawing a fact the cartridge ignores,
+    and could render a confident picture of a tileset the game does not use. Sharing the
+    build's own resolver instead makes disagreement between the picture and the ROM
+    impossible by construction (`decisions.md` -> "A map's tileset has one home").
     """
+    import build_campaign as bc
     meta = json.load(open(os.path.join(MAPS, stem + '.json')))
     w, h = meta['width'], meta['height']
-    sidecar = meta.get('tileset')
-    if tileset is not None and sidecar is not None and tileset != sidecar:
-        raise ValueError(
-            "tileset mismatch for %r: caller says %r (chapter YAML's map.tileset) but "
-            "%s.json says %r -- one of these is stale; fix the wrong one rather than "
-            "picking a winner" % (stem, tileset, stem, sidecar))
-    name = tileset if tileset is not None else sidecar
-    if name is None:
-        raise ValueError(
-            "no tileset for %r: not passed by the caller (chapter YAML's map.tileset), "
-            "and %s.json has no 'tileset' key either" % (stem, stem))
     raw = open(os.path.join(MAPS, stem + '.mar'), 'rb').read()
     cells = [struct.unpack_from('<H', raw, i * 2)[0] >> 5 for i in range(w * h)]
-    ts = mt._tileset_from_dir(os.path.join(MAPS, 'tilesets', name))
+    ts = mt._tileset_from_dir(os.path.join(MAPS, 'tilesets', bc.map_tileset(meta)))
     grid = [[cells[y * w + x] for x in range(w)] for y in range(h)]
     terrain = [[ts.terrain(m) for m in row] for row in grid]
     return grid, terrain, ts
@@ -375,7 +358,7 @@ def load_chapter(prefix):
 def terrain_grid(chapter):
     """The chapter's compiled terrain, by the map its YAML names."""
     stem = os.path.splitext(os.path.basename(chapter['map']['file']))[0]
-    return load_map(stem, chapter['map']['tileset'])[1]
+    return load_map(stem)[1]
 
 
 def reached_on(chapter, terrain, target, contested=True):
@@ -457,7 +440,7 @@ def _font(size, bold=False):
 
 def render(chapter, stem, out_png, concept=None, shade=None, zoom=3):
     from PIL import Image, ImageDraw
-    grid, terrain, ts = load_map(stem, chapter['map']['tileset'])
+    grid, terrain, ts = load_map(stem)
     h, w = len(grid), len(grid[0])
     cell = 16 * zoom
     pad = cell                       # a cell of margin for the coordinate ruler

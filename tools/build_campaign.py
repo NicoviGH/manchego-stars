@@ -5826,6 +5826,20 @@ CHAPTER_SETTINGS_JSON = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.js
 # (e.g. cave-interior, #40/#23) register in the chapter injector that first
 # consumes them.
 WINTER_TILESET = 'snowy-bern'         # shared winter overworld (#41), stem Snow
+
+
+def map_tileset(meta):
+    """The tileset a compiled map is built against, from its sidecar `<stem>.json`.
+
+    THE resolution rule, in one place. A sidecar that names no tileset gets
+    `WINTER_TILESET`, which is not a guess: the three oldest maps (ch00-ch02) predate
+    the key entirely and have always been compiled as snowy-bern by exactly this
+    default. The chapter YAML's own `map.tileset` is DOCUMENTATION -- nothing in the
+    build reads it -- so anything needing to know which tileset a map really uses asks
+    HERE, and cannot end up drawing a picture of a tileset the cartridge does not use
+    (`decisions.md` -> "A map's tileset has one home").
+    """
+    return meta.get('tileset', WINTER_TILESET)
 WINTER_TEST_LAYOUT = ('ChTestSnowMap', 'ch-test-snowfield')  # (asset label, campaign source stem)
 
 
@@ -6934,7 +6948,7 @@ def _register_chapter_map(maps_dir, layout, comment):
         shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
                         os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
     with open(os.path.join(maps_dir, '%s.json' % stem), encoding='utf-8') as f:
-        tileset = json.load(f).get('tileset', WINTER_TILESET)
+        tileset = map_tileset(json.load(f))
     if tileset not in TILESET_STEMS:
         sys.exit('ERROR: %s.json names tileset %r -- add it to TILESET_STEMS and '
                  'register it (_register_tileset) first' % (stem, tileset))
@@ -11817,7 +11831,7 @@ def _map_terrain_grid(maps_dir, stem):
     ours is the committed source, the decomp's is the untracked artifact injection writes."""
     with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
         meta = json.load(f)
-    width, tileset = meta['width'], meta.get('tileset', WINTER_TILESET)
+    width, tileset = meta['width'], map_tileset(meta)
     with open(os.path.join(maps_dir, 'tilesets', tileset, tileset + '.bin'), 'rb') as f:
         terrain = f.read()[TERRAIN_TABLE_OFFSET:]
     with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
