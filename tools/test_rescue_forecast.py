@@ -58,9 +58,12 @@ class FiringCells(unittest.TestCase):
 class ArrivalToFiringCells(unittest.TestCase):
     """The clock's first half: does a pursuer even get a shot, and when.
 
-    Pinned against the exact ch06 finding (#26): the east pursuer's own allies cork every
-    one of its four firing cells on the contested (turn-1-blocked) snapshot, so its declared
-    fuse describes a unit that never arrives; the west pursuer reaches its one door on turn 2.
+    Pinned against the ch06 finding (#26, #367) and its fix (ch06-east-pursuer): the east
+    pursuer's own allies -- merfolk-trident's (13,11) body and ironshell-horseslayer at
+    (14,12) -- corked every one of its four firing cells on the contested snapshot, so its
+    declared fuse described a unit that never arrived. Moved off the corridor, it reaches
+    (15,12) on turn 2 -- the same empty-map arrival the chapter was designed around. The
+    west pursuer reaches its one door on turn 2 unchanged throughout.
     """
 
     def setUp(self):
@@ -68,11 +71,11 @@ class ArrivalToFiringCells(unittest.TestCase):
         self.terrain = pp.terrain_grid(self.chap)
         self.blocked = pp.enemy_bodies(self.chap)
 
-    def test_merfolk_thrower_cannot_reach_any_east_firing_cell(self):
+    def test_merfolk_thrower_reaches_an_east_firing_cell_on_turn_2(self):
         cells = rf.firing_cells(self.terrain, (17, 12), 2)
         table, mov = pp.class_movement('soldier')
         arrival = rf.arrival_to_cells(self.terrain, (14, 9), table, mov, cells, self.blocked)
-        self.assertIsNone(arrival)
+        self.assertEqual(arrival, 2)
 
     def test_ice_crab_reaches_its_door_on_turn_2(self):
         cells = rf.firing_cells(self.terrain, (4, 17), 1)
@@ -281,13 +284,17 @@ class PursuerForecast(unittest.TestCase):
     def _boat(self, bid):
         return next(b for b in self.chap['rescue_boats'] if b['id'] == bid)
 
-    def test_merfolk_thrower_never_engages_boat_east(self):
+    def test_merfolk_thrower_engages_boat_east_on_turn_2(self):
+        # Was `never_engages`: the thrower's own line -- merfolk-trident's (13,11) body and
+        # ironshell-horseslayer at (14,12) -- corked all four east firing cells (#26, #367).
+        # Fixed by moving those two bodies off the corridor (ch06-east-pursuer); this is the
+        # SAME empty-map arrival (turn 2 from (14,9)) the chapter was always designed around,
+        # now reachable on the contested snapshot too.
         row = rf.pursuer_forecast(self.chap, self.terrain, self._entry('merfolk-thrower'),
                                   0, self._boat('boat-east'))
-        self.assertIsNone(row.arrival_turn)
-        self.assertIsNone(row.sink_low)
-        self.assertIsNone(row.sink_expected)
-        self.assertIsNone(row.sink_high)
+        self.assertEqual(row.arrival_turn, 2)
+        self.assertAlmostEqual(row.damage_per_phase, 2.76, places=2)
+        self.assertEqual(row.sink_expected, 9)
 
     def test_ice_crab_engages_boat_west_on_turn_2_and_sinks_around_9(self):
         row = rf.pursuer_forecast(self.chap, self.terrain, self._entry('ice-crab'),
