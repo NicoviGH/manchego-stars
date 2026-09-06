@@ -58,5 +58,35 @@ class RescueTargetsHaveOnlyTheirDeclaredClock(unittest.TestCase):
         self.assertIn('pursuer', text)
 
 
+class TheGateSurvivesAnUngroundedRosterEntry(unittest.TestCase):
+    """`check_rescue_targets` now reaches `units_reaching`, which -- since #369 widened it to
+    every roster key -- calls `difficulty.enemy_ai_bytes` on `reinforcements:` and
+    `enemy_reinforcements:` entries too, and that call RAISES on an entry with neither
+    `donor:` nor `ai_override:` (a normal mid-draft state while a chapter is being
+    authored). No live chapter combines `rescue_boats` with such an entry today, but
+    `check.py`'s `main()` calls every check with zero per-check exception isolation, so this
+    is not a print-and-skip away from crashing the WHOLE gate for an unrelated future
+    chapter -- it is one YAML edit away."""
+
+    def _ch06_with_ungrounded_wave(self):
+        import copy
+        import check as chk
+        chap = copy.deepcopy(next(d for rel, d in chk._chapters()
+                                  if d.get('id', '').startswith('ch06')))
+        chap['reinforcements'] = [{'id': 'draft-stub', 'class': 'fighter', 'level': 1,
+                                   'positions': [[0, 0]], 'inventory': [{'id': 'iron-sword'}]}]
+        return chap
+
+    def test_an_ungrounded_reinforcement_does_not_crash_the_whole_gate(self):
+        chap = self._ch06_with_ungrounded_wave()
+        original = check._chapters
+        check._chapters = lambda: iter([('ch06-stub.yaml', chap)])
+        try:
+            fail = []
+            check.check_rescue_targets(fail)          # must not raise
+        finally:
+            check._chapters = original
+
+
 if __name__ == '__main__':
     unittest.main()

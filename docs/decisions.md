@@ -8630,6 +8630,36 @@ newly possible to author correctly. `chapter_status.report()` moves on exactly o
 (ch06) and by exactly one line -- the new advisory loose-end -- everywhere else
 byte-identical.
 
+**Review found two more crash paths the roster-widening opened, both fixed before merge.**
+`/code-review high`, four independent angles, three of which converged on the same defect
+from different directions: `_fuse_forecast_findings`'s declared-fuse loop compared
+`r.sink_low <= declared <= r.sink_high` over every row that reaches its target, but
+`pursuer_forecast` returns exactly `arrival_turn` set with every sink field `None` when the
+attacker reaches a firing cell yet deals zero true damage there (`sink_band`'s own `None`
+case) -- unreached today because no chapter has adopted `declared_fuse:` yet, but a raw
+`TypeError` the day one does, inside the function whose own docstring and dedicated test
+promise it never fails the build. Fixed by requiring `sink_low is not None` too. Second: the
+now-widened `units_reaching` calls `difficulty.enemy_ai_bytes` on every roster key, which
+RAISES on an entry with neither `donor:` nor `ai_override:` -- a normal mid-draft state --
+and `check_rescue_targets` called it with no guard, inside a `main()` that runs every check
+with zero exception isolation between them. One ungrounded `reinforcements:` entry on a
+future rescue chapter would have crashed the ENTIRE `check.py`, every other gate along with
+it. Fixed with the same try/except-and-skip idiom the function already used two lines above
+for an unbuilt map. Both reproduced with a failing test before the fix -- the second via a
+`check._chapters` monkeypatch, the first such precedent in that test file.
+
+Left as follow-up rather than fixed here (all latent, none affect a gate or a live chapter's
+numbers, and the change was already large): `target_combatant` bypasses
+`difficulty._one_enemy`'s autolevel/class-tag/personal-line handling (a no-op today, since
+ch06's boats are level-1 no-personal `CLASS_FLEET`, but silently wrong the day a boat entry
+adopts any of those); `firing_cells`/`arrival_to_cells`/`_boat_terrain_name` each re-glue
+primitives that already exist inlined elsewhere rather than sharing one implementation;
+`chapter_status.py` grew a third copy of the same `try: import X except ImportError: None`
+template; and `map_placement_preview.placed_units` (the tool's PNG *render* path, not any
+of its data-consumed-by-gates path) still reads `enemy_units` alone, so a
+`reinforcements:`-key wave renders invisibly on a concept PNG even though every gate now
+accounts for it correctly.
+
 ## Open Questions (not yet decided)
 
 See `docs/PRD.md §13` for the full list. Key unresolved items:

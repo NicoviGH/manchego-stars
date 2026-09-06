@@ -1084,8 +1084,15 @@ def check_rescue_targets(fail):
             continue
         hulls = [tuple(b['tile']) for b in boats]
         pursuers = {p['id'] for p in (doc.get('rescue_pursuers') or [])}
-        fail.extend(_rescue_target_violations(
-            short, pp.units_reaching(doc, terrain, hulls), pursuers))
+        try:
+            reachers = pp.units_reaching(doc, terrain, hulls)
+        except Exception as exc:    # noqa: BLE001 -- an ungrounded roster entry (no donor/
+            # ai_override, a normal mid-draft state -- #369 widened `units_reaching` to every
+            # roster key, so a `reinforcements:`/`enemy_reinforcements:` entry authored ahead
+            # of its AI can reach here) is #335's business, not this gate's.
+            print('check_rescue_targets: skipping %s (%s)' % (short, exc))
+            continue
+        fail.extend(_rescue_target_violations(short, reachers, pursuers))
 
 
 def _fuse_forecast_findings(chapter, rows=None):
@@ -1119,8 +1126,14 @@ def _fuse_forecast_findings(chapter, rows=None):
         declared = boat.get('declared_fuse')
         if declared is None:
             continue
+        # `sink_low is not None` too: `pursuer_forecast` returns a row with `arrival_turn`
+        # SET but every sink field None when the attacker reaches a firing cell yet deals
+        # no true damage there (`sink_band`'s own None case -- 0 hit chance or an
+        # effectiveness mismatch). Comparing `None <= declared` crashes the very guard whose
+        # whole contract is that it never fails the build.
         reaching = [r for r in (rows or [])
-                   if r.boat_id == boat['id'] and r.arrival_turn is not None]
+                   if r.boat_id == boat['id'] and r.arrival_turn is not None
+                   and r.sink_low is not None]
         if not reaching:
             continue                  # already reported above, once, by the pursuer loop
         if not any(r.sink_low <= declared <= r.sink_high for r in reaching):
