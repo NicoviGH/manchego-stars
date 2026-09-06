@@ -201,6 +201,35 @@ class TestPersonalLineRoutes(unittest.TestCase):
         self.assertIn('already carries', msgs[0])
 
 
+class TestDocumentedTileset(unittest.TestCase):
+    """`map.tileset` in a chapter YAML is DOCUMENTATION -- the build resolves the real
+    tileset from the map's sidecar JSON (`build_campaign.map_tileset`). Documentation
+    nothing reads is free to rot, and it nearly did: the first fix for ch00-ch02's
+    `KeyError: 'tileset'` promoted this field to the preview's source of truth, which would
+    have let an edit here draw a confident picture of a tileset the cartridge never loads."""
+
+    def test_agreement_is_clean(self):
+        self.assertEqual([], check._documented_tileset_violations(
+            'chNN.yaml', {'map': {'tileset': 'snowy-bern'}}, 'snowy-bern'))
+
+    def test_drift_between_the_doc_and_the_build_is_reported(self):
+        found = check._documented_tileset_violations(
+            'chNN.yaml', {'map': {'tileset': 'cave-interior'}}, 'snowy-bern')
+        self.assertEqual(len(found), 1, found)
+        self.assertIn('cave-interior', found[0])
+        self.assertIn('snowy-bern', found[0])
+
+    def test_a_chapter_documenting_nothing_is_not_a_violation(self):
+        """The field is optional; this gate exists to catch a WRONG one, not a missing one."""
+        self.assertEqual([], check._documented_tileset_violations(
+            'chNN.yaml', {'map': {'file': 'maps/x.mar'}}, 'snowy-bern'))
+
+    def test_every_shipped_chapter_agrees_with_its_build_tileset(self):
+        fail = []
+        check.check_documented_tileset(fail)
+        self.assertEqual([], fail)
+
+
 class TestRosterKeysAgree(unittest.TestCase):
     def test_checks_roster_keys_match_the_content_desks(self):
         # check.py names them rather than importing, so the bare-interpreter `checks` job

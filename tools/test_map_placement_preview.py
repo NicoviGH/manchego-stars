@@ -14,6 +14,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import campaign_chapters as cc                                       # noqa: E402
 import map_placement_preview as pp                                   # noqa: E402
+import map_tileset_tool as mt                                        # noqa: E402
 
 
 def ch06():
@@ -131,6 +132,65 @@ class Board(unittest.TestCase):
             placed = dict((eid, tile) for tile, _, _, eid, _
                           in pp.placed_units(self.chap, concept))
             self.assertEqual(placed['nerra'], (9, 12))
+
+
+class LoadMapResolvesTheTilesetTheBuildWillUse(unittest.TestCase):
+    """`load_map` read the tileset with a bare `meta['tileset']`, so it hard-crashed with
+    `KeyError: 'tileset'` on ch00-ch02, whose sidecars predate that key.
+
+    The fix is NOT to read the chapter YAML's `map.tileset` instead. Nothing in the ROM
+    build reads that field -- `build_campaign._register_chapter_map` reads the SIDECAR,
+    defaulting to `WINTER_TILESET` when the key is absent, and that default is exactly why
+    ch00-ch02 build fine today. A preview that sourced its tileset from the YAML would be
+    rendering a fact the game never consults, and could draw a confident picture of a
+    tileset the ROM does not use.
+
+    So the preview resolves the tileset the same way the build does, through the build's own
+    `map_tileset(meta)` -- one function, one rule, and the picture cannot disagree with the
+    cartridge by construction.
+    """
+
+    def _ts(self, name):
+        return mt._tileset_from_dir(os.path.join(pp.MAPS, 'tilesets', name))
+
+    def test_a_keyless_sidecar_resolves_to_the_builds_own_default(self):
+        """ch00-ch02's sidecars have no `tileset` key; the build gives them WINTER_TILESET,
+        so the preview must give them the same thing rather than raising."""
+        import build_campaign as bc
+        _grid, _terrain, ts = pp.load_map('ch01-the-iron-trail')
+        self.assertEqual(ts.palettes, self._ts(bc.WINTER_TILESET).palettes)
+
+    def test_a_sidecar_that_names_a_tileset_uses_that_one(self):
+        _grid, _terrain, ts = pp.load_map('ch06-maer-monster')
+        self.assertEqual(ts.palettes, self._ts('snowy-bern-ice').palettes)
+
+    def test_the_two_snowy_tilesets_are_told_apart_by_PALETTE_not_gfx(self):
+        """Guards the two assertions above from passing vacuously: snowy-bern and
+        snowy-bern-ice ship byte-identical `.4bpp` gfx and differ only in palette, so a test
+        that compared `ts.gfx` would pass even when the wrong tileset was loaded."""
+        plain, ice = self._ts('snowy-bern'), self._ts('snowy-bern-ice')
+        self.assertEqual(plain.gfx, ice.gfx)
+        self.assertNotEqual(plain.palettes, ice.palettes)
+
+    def test_the_preview_agrees_with_the_build_for_every_compiled_map(self):
+        """The property that matters, asserted directly rather than chapter by chapter:
+        whatever the build would compile a map against is what the preview draws it with."""
+        import build_campaign as bc
+        import glob
+        import json
+        for path in sorted(glob.glob(os.path.join(pp.MAPS, '*.json'))):
+            stem = os.path.splitext(os.path.basename(path))[0]
+            if not os.path.exists(os.path.join(pp.MAPS, stem + '.mar')):
+                continue
+            with open(path, encoding='utf-8') as f:
+                meta = json.load(f)
+            _grid, _terrain, ts = pp.load_map(stem)
+            self.assertEqual(ts.palettes, self._ts(bc.map_tileset(meta)).palettes, stem)
+
+    def test_terrain_grid_no_longer_crashes_on_the_oldest_chapters(self):
+        """The regression itself: ch00-ch02 could not be previewed at all."""
+        for short in ('ch00', 'ch01', 'ch02'):
+            self.assertTrue(pp.terrain_grid(pp.load_chapter(short)), short)
 
 
 class ContestedReach(unittest.TestCase):

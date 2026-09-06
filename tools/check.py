@@ -1062,6 +1062,47 @@ def _rescue_target_violations(short, reachers, pursuers):
     return out
 
 
+def _documented_tileset_violations(rel, d, effective):
+    """The chapter YAML's `map.tileset` must name the tileset the BUILD will actually use.
+
+    Nothing in the build reads this field -- `_register_chapter_map` resolves the tileset
+    from the map's sidecar JSON via `build_campaign.map_tileset` -- so it is documentation,
+    and documentation nothing reads is documentation free to rot. It very nearly did: the
+    first fix for ch00-ch02's `KeyError: 'tileset'` promoted this field to the preview's
+    source of truth, which would have let an edit here render a confident picture of a
+    tileset the cartridge never loads. The field stays, and stays honest, by being CHECKED
+    against the effective answer rather than trusted as one."""
+    documented = ((d.get('map') or {}).get('tileset'))
+    if documented is None or documented == effective:
+        return []
+    return ['%s: map.tileset documents %r but the build compiles this map as %r (its '
+            'sidecar JSON, via build_campaign.map_tileset) -- fix whichever is stale'
+            % (rel, documented, effective)]
+
+
+def check_documented_tileset(fail):
+    """#26: a chapter's documented `map.tileset` agrees with the one the build resolves."""
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    try:
+        import build_campaign as bc
+    except ImportError as exc:      # Pillow absent on the lightweight checks job
+        print('check_documented_tileset: skipping (%s; the build job\'s `make test` '
+              'covers it)' % exc)
+        return
+    import json
+    for rel, d in _chapters():
+        mapfile = ((d.get('map') or {}).get('file'))
+        if not mapfile:
+            continue
+        sidecar = os.path.join(REPO, 'campaigns', rel.split(os.sep)[1], 'maps',
+                               os.path.basename(mapfile).replace('.mar', '.json'))
+        if not os.path.exists(sidecar):
+            continue              # a planned chapter with no compiled map yet
+        with open(sidecar, encoding='utf-8') as f:
+            effective = bc.map_tileset(json.load(f))
+        fail.extend(_documented_tileset_violations(rel, d, effective))
+
+
 def check_rescue_targets(fail):
     """A chapter's rescue targets are reachable only by units it declared (#26)."""
     sys.path.insert(0, os.path.join(REPO, 'tools'))
@@ -1079,8 +1120,18 @@ def check_rescue_targets(fail):
         short = str(doc.get('id', '')).split('-')[0]
         try:
             terrain = pp.terrain_grid(doc)
-        except Exception as exc:    # noqa: BLE001 -- an unbuilt map is not this gate's business
+        except FileNotFoundError as exc:
+            # A chapter with no compiled map yet is not this gate's business.
             print('check_rescue_targets: skipping %s (%s)' % (short, exc))
+            continue
+        except Exception as exc:    # noqa: BLE001
+            # Anything else -- an unreadable tileset, a corrupt .mar -- is a REAL problem,
+            # and the two wrong ways to handle it are the two obvious ones: swallowing it
+            # skips a hard gate silently, and letting it propagate crashes every OTHER check
+            # too (`main` runs them with no isolation). Report it as drift: loud, attributed,
+            # and it fails the build without taking the rest of the run down.
+            fail.append('%s: rescue-target gate could not read the map (%s: %s) -- this gate '
+                        'did not run for this chapter' % (short, type(exc).__name__, exc))
             continue
         hulls = [tuple(b['tile']) for b in boats]
         pursuers = {p['id'] for p in (doc.get('rescue_pursuers') or [])}
@@ -2515,6 +2566,7 @@ def main():
                   check_no_shadowed_definitions, check_gate_chapter_window,
                   check_declared_cases, check_chapter_lua_facts,
                   check_rescue_targets, check_rescue_fuse_forecast,
+                  check_documented_tileset,
                   check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,

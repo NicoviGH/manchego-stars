@@ -109,12 +109,27 @@ ROLE_LEGEND = [('Sp', 'spear'), ('Ax', 'axe'), ('Sw', 'sword'), ('Cv', 'cavalry'
 
 
 def load_map(stem):
-    """(grid, terrain, tileset) for one of our compiled maps."""
+    """(grid, terrain, tileset) for one of our compiled maps.
+
+    The tileset comes from the map's sidecar `<stem>.json`, resolved through
+    `build_campaign.map_tileset` -- the SAME function the ROM build resolves it with. This
+    used to be a bare `meta['tileset']`, which hard-crashed with `KeyError: 'tileset'` on
+    ch00-ch02, whose sidecars predate that key; the build never had that problem because it
+    has always defaulted a keyless sidecar to `WINTER_TILESET`.
+
+    The chapter YAML also declares `map.tileset`, and it is tempting to treat that as the
+    source of truth since it reads like the authored one. It is not: nothing in the build
+    consults it, so a preview sourced from it would be drawing a fact the cartridge ignores,
+    and could render a confident picture of a tileset the game does not use. Sharing the
+    build's own resolver instead makes disagreement between the picture and the ROM
+    impossible by construction (`decisions.md` -> "A map's tileset has one home").
+    """
+    import build_campaign as bc
     meta = json.load(open(os.path.join(MAPS, stem + '.json')))
     w, h = meta['width'], meta['height']
     raw = open(os.path.join(MAPS, stem + '.mar'), 'rb').read()
     cells = [struct.unpack_from('<H', raw, i * 2)[0] >> 5 for i in range(w * h)]
-    ts = mt._tileset_from_dir(os.path.join(MAPS, 'tilesets', meta['tileset']))
+    ts = mt._tileset_from_dir(os.path.join(MAPS, 'tilesets', bc.map_tileset(meta)))
     grid = [[cells[y * w + x] for x in range(w)] for y in range(h)]
     terrain = [[ts.terrain(m) for m in row] for row in grid]
     return grid, terrain, ts
