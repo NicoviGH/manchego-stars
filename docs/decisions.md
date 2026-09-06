@@ -8648,17 +8648,50 @@ it. Fixed with the same try/except-and-skip idiom the function already used two 
 for an unbuilt map. Both reproduced with a failing test before the fix -- the second via a
 `check._chapters` monkeypatch, the first such precedent in that test file.
 
-Left as follow-up rather than fixed here (all latent, none affect a gate or a live chapter's
-numbers, and the change was already large): `target_combatant` bypasses
-`difficulty._one_enemy`'s autolevel/class-tag/personal-line handling (a no-op today, since
-ch06's boats are level-1 no-personal `CLASS_FLEET`, but silently wrong the day a boat entry
-adopts any of those); `firing_cells`/`arrival_to_cells`/`_boat_terrain_name` each re-glue
-primitives that already exist inlined elsewhere rather than sharing one implementation;
-`chapter_status.py` grew a third copy of the same `try: import X except ImportError: None`
-template; and `map_placement_preview.placed_units` (the tool's PNG *render* path, not any
-of its data-consumed-by-gates path) still reads `enemy_units` alone, so a
-`reinforcements:`-key wave renders invisibly on a concept PNG even though every gate now
-accounts for it correctly.
+**The review's other half was reuse, and "it's only latent" was the wrong bar.** The same
+pass flagged five places where this work had grown its own copy of something that already
+existed. The first instinct was to leave them — all latent, none touching a gate or a live
+chapter's numbers. That reasoning does not survive contact with where the code actually
+lives: these are not pre-existing debt the PR walked past, they are code the PR itself wrote,
+or the third instance of a bug in a file whose other two instances it already claims to have
+fixed. A change that says "same code path, two latent bugs fixed alongside it" and leaves the
+third copy of that same bug in that same file has not fixed the pattern, it has fixed two
+thirds of it.
+
+- **`placed_units` was that third copy.** `enemy_units` alone, plus a `late` flag testing
+  `arrives_turn` alone — which reads a `trigger_turn` wave as turn-1, exactly backwards. Now
+  iterates `ENEMY_ROSTER_KEYS` and asks `entry_is_turn1`, OR'd with `hard_mode_only` (a MODE
+  gate, a different axis `entry_is_turn1` deliberately does not model).
+- **`target_combatant` bypassed `difficulty._one_enemy`**, the path every other enemy
+  resolves through, so it skipped autolevel, `CLASS_TAGS` (which `fe_combat` reads to resolve
+  effective weapons) and any personal line. A no-op while ch06's boats are level-1
+  no-personal `CLASS_FLEET`; silently wrong the day a `rescue_boats:` entry declares
+  otherwise.
+- **`firing_cells` was a second copy of the Manhattan-range check `units_reaching` already
+  ran inline.** It is a terrain/range primitive, the same family as `foot_reach`, so it moved
+  to `map_placement_preview`; `units_reaching` calls it and `rescue_forecast` aliases it.
+- **`reached_on` and `arrival_to_cells` were mirror-image glue** over the same two
+  primitives — Dijkstra, then points-to-turn — differing only in which end was plural.
+  `arrival_turn_to` takes both ends as lists and serves either direction.
+- **`chapter_status` grew a third `try: import X except ImportError: None`.** Extracted
+  `_try_import`; the three wrappers stay separately named because tests monkeypatch them
+  individually.
+
+**One flagged "duplicate" was refused, and the reason is the general rule.**
+`_boat_terrain_name` was called a duplicate of `difficulty.vanilla_terrain_at`. It is not:
+`vanilla_terrain_at` resolves a tile on a VANILLA DONOR layout by name, `_boat_terrain_name`
+reads OUR OWN compiled grid already in hand. Those differ by construction — see *"ch06
+departs from its donor's terrain in 21 declared cells"* above, and both boat tiles are among
+those 21 (`TILE_2E`/`VILLAGE_REGULAR` → `FOREST` by `terrain_divergence`). Unifying them
+would swap the hull's cover for the donor's terrain and move every sink band. **A shared
+shape is not a shared question**, and a dedup that changes an answer is a regression wearing
+a cleanup's clothes.
+
+Verified by output diff across all nine chapters over `placed_units`, `reached_on` (contested
+and uncontested), `units_reaching` and the whole `chapter_forecast`: the only change anywhere
+is ch02's `placed_units` gaining its two `rear-raiders` bodies, correctly marked late — which
+is simultaneously the proof that the four refactors are behaviour-preserving and that the
+fifth was a real bug.
 
 ## Open Questions (not yet decided)
 
