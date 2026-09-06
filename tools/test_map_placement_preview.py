@@ -174,6 +174,45 @@ class ContestedReach(unittest.TestCase):
         self.assertIsNone(pp.arrival_turn(None, 5))
 
 
+class FiringCellsLivesHereNotInRescueForecast(unittest.TestCase):
+    """`firing_cells` (every foot-standable cell within weapon range of a target) is a
+    terrain/range primitive, the same family as `foot_reach`/`mov_cost_row` -- it belongs on
+    this module's desk, not `rescue_forecast`'s, which had grown its own copy of the exact
+    Manhattan-range check `units_reaching` already does inline. `rescue_forecast.firing_cells`
+    is now an alias, so a fix to the rule (the range bound, the passability gate) cannot land
+    in one consumer and not the other."""
+
+    def test_firing_cells_lives_on_map_placement_preview(self):
+        terrain = [[pp.TERRAIN['TERRAIN_PLAINS']] * 5] * 5
+        self.assertEqual(pp.firing_cells(terrain, (2, 2), 1),
+                         [(1, 2), (2, 1), (2, 3), (3, 2)])
+
+    def test_rescue_forecast_is_an_alias_not_a_second_copy(self):
+        import rescue_forecast as rf
+        self.assertIs(rf.firing_cells, pp.firing_cells)
+
+    def test_units_reaching_shares_the_same_range_rule_firing_cells_uses(self):
+        """A STATUE (budget 0 -- cannot move, even to attack) is a threat only from the tile
+        it already stands on, which isolates the pure RANGE check from any movement search:
+        a body on one of `firing_cells`'s own cells is found; the same tile one step outside
+        the range bound is not -- both directions, so a swap to a shared implementation
+        can't silently widen or narrow who counts as a threat."""
+        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
+        terrain = [[plain] * 6]
+        statue = {'ai': '{0x3, 0x3, 0x0, 0x0}', 'why': 't'}   # ActionStanding + NeverMove
+        chap = {'enemy_units': [
+            {'id': 'in-range', 'class': 'soldier', 'level': 1,
+             'inventory': [{'id': 'iron-lance'}], 'positions': [[1, 0]],
+             'ai_override': statue},
+            {'id': 'out-of-range', 'class': 'soldier', 'level': 1,
+             'inventory': [{'id': 'iron-lance'}], 'positions': [[5, 0]],
+             'ai_override': statue},
+        ]}
+        found = {eid for eid, _ai in pp.units_reaching(chap, terrain, [(2, 0)])}
+        self.assertIn('in-range', found)          # iron-lance range 2: |1-2| = 1
+        self.assertNotIn('out-of-range', found)   # |5-2| = 3, past range
+
+
 class EnemyBodiesAndUnitsReachingReadEveryRosterKey(unittest.TestCase):
     """`enemy_bodies` and `units_reaching` both docstring-claimed to cover reinforcements and
     both did not: `enemy_bodies` never looked past `enemy_units:`, and a naive fix that just
@@ -211,6 +250,84 @@ class EnemyBodiesAndUnitsReachingReadEveryRosterKey(unittest.TestCase):
         }]}
         found = pp.units_reaching(chap, terrain, [(4, 0)])
         self.assertEqual([f[0] for f in found], ['w'])
+
+    def _reinforcement_entry(self, eid='w'):
+        return {'id': eid, 'class': 'soldier', 'level': 1, 'trigger_turn': 3,
+                'inventory': [{'id': 'iron-lance'}], 'positions': [[0, 0]],
+                'ai_override': {'ai': '{0x0, 0x0, 0x0, 0x0}', 'why': 'test pursuer'}}
+
+    def test_placed_units_draws_a_reinforcements_key_wave_too(self):
+        """`placed_units` -- the tool's own PNG render, not a value any gate consumes --
+        was the THIRD copy of this exact bug: it still read `chapter.get('enemy_units')`
+        alone, so a `reinforcements:`/`enemy_reinforcements:` wave was simply absent from
+        the picture, even after `enemy_bodies` and `units_reaching` were fixed to see it."""
+        chap = {'reinforcements': [self._reinforcement_entry()]}
+        units = pp.placed_units(chap)
+        self.assertEqual([eid for _tile, _code, _beh, eid, _late in units], ['w'])
+
+    def test_placed_units_marks_a_reinforcements_key_wave_as_LATE(self):
+        """The render draws a late body as a hollow ring -- 'not here at turn 1'. A
+        reinforcement-key entry is never turn-1 regardless of its own fields, per
+        `build_campaign.entry_is_turn1`."""
+        chap = {'reinforcements': [self._reinforcement_entry()]}
+        _tile, _code, _beh, _eid, late = pp.placed_units(chap)[0]
+        self.assertTrue(late)
+
+    def test_placed_units_still_marks_a_hard_mode_only_enemy_units_entry_as_LATE(self):
+        """`hard_mode_only` is a MODE gate, not a turn-arrival one -- `entry_is_turn1` does
+        not know about it, so the two conditions have to stay OR'd, not replaced."""
+        chap = {'enemy_units': [{'id': 'h', 'class': 'soldier', 'level': 1,
+                                 'hard_mode_only': True,
+                                 'inventory': [{'id': 'iron-lance'}], 'positions': [[0, 0]],
+                                 'ai_override': {'ai': '{0x0, 0x0, 0x0, 0x0}', 'why': 't'}}]}
+        _tile, _code, _beh, _eid, late = pp.placed_units(chap)[0]
+        self.assertTrue(late)
+
+    def test_placed_units_still_marks_a_plain_enemy_units_body_as_not_late(self):
+        chap = {'enemy_units': [{'id': 'a', 'class': 'soldier', 'level': 1,
+                                 'inventory': [{'id': 'iron-lance'}], 'positions': [[0, 0]],
+                                 'ai_override': {'ai': '{0x0, 0x0, 0x0, 0x0}', 'why': 't'}}]}
+        _tile, _code, _beh, _eid, late = pp.placed_units(chap)[0]
+        self.assertFalse(late)
+
+
+class ArrivalTurnToIsSharedByBothDirections(unittest.TestCase):
+    """`reached_on` (MANY deploy cells -> ONE target) and `rescue_forecast.arrival_to_cells`
+    (ONE enemy -> MANY candidate firing cells) were mirror-image compositions of the exact
+    same two primitives, `foot_reach` then `arrival_turn`, glued together twice. One
+    function that takes both ends as lists covers either direction; `reached_on` and
+    `arrival_to_cells` are both thin callers of it now."""
+
+    def test_many_sources_to_one_target_matches_reached_on(self):
+        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
+        terrain = [[plain] * 6]
+        got = pp.arrival_turn_to(terrain, [(0, 0), (5, 0)], 'TerrainTable_MovCost_CommonT1Normal',
+                                 mov=3, targets=[(2, 0)])
+        self.assertEqual(got, 1)          # (0,0) is 2 points away, one turn at mov 3
+
+    def test_one_source_to_many_targets_matches_arrival_to_cells(self):
+        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
+        terrain = [[plain] * 6]
+        got = pp.arrival_turn_to(terrain, [(0, 0)], 'TerrainTable_MovCost_CommonT1Normal',
+                                 mov=3, targets=[(5, 0), (2, 0)])
+        self.assertEqual(got, 1)          # the NEARER target wins, whichever list position
+
+    def test_no_reachable_target_is_none_not_an_error(self):
+        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
+        terrain = [[plain] * 6]
+        got = pp.arrival_turn_to(terrain, [(0, 0)], 'TerrainTable_MovCost_CommonT1Normal',
+                                 mov=3, targets=[])
+        self.assertIsNone(got)
+
+    def test_rescue_forecasts_arrival_to_cells_delegates_to_the_shared_primitive(self):
+        import rescue_forecast as rf
+        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
+        terrain = [[plain] * 6]
+        via_wrapper = rf.arrival_to_cells(terrain, (0, 0),
+                                          'TerrainTable_MovCost_CommonT1Normal', 3, [(2, 0)])
+        via_shared = pp.arrival_turn_to(terrain, [(0, 0)],
+                                        'TerrainTable_MovCost_CommonT1Normal', 3, [(2, 0)])
+        self.assertEqual(via_wrapper, via_shared)
 
 
 class ReachedOnIsDerived(unittest.TestCase):

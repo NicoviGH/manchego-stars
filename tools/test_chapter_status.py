@@ -202,6 +202,23 @@ class TheReport(unittest.TestCase):
             self.assertNotEqual('UNRULED', why, field)
 
 
+class TryImport(unittest.TestCase):
+    """`_preview_module`/`_build_campaign`/`_rescue_forecast_module` were three copies of
+    the same `try: import X; return X; except ImportError: return None` template, differing
+    only in the module name -- this is the one shared implementation each now calls."""
+
+    def test_a_real_module_is_returned(self):
+        self.assertIs(cs._try_import('os'), __import__('os'))
+
+    def test_an_unimportable_name_returns_none_not_a_raise(self):
+        self.assertIsNone(cs._try_import('no_such_module_xyz'))
+
+    def test_each_wrapper_still_resolves_its_own_module_by_name(self):
+        """The refactor must not collapse the three into one shared cache keyed wrong --
+        each wrapper is independently callable and returns ITS module."""
+        self.assertIs(cs._build_campaign(), __import__('build_campaign'))
+
+
 class DegradedModesMustSayCannotTell(unittest.TestCase):
     """Every optional import here has a fallback, and a fallback that reports a WRONG number
     is worse than one that reports none: the whole promise of this command is that its rows

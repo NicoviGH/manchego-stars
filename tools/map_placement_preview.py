@@ -132,6 +132,31 @@ REACH_ROLES = {
 }
 
 
+def firing_cells(terrain, target, weapon_range):
+    """Every cell at Manhattan distance 1..`weapon_range` from `target` that a foot unit can
+    stand on -- the set of tiles an attacker could occupy to hit it. FE8 has no line of
+    sight (decisions.md -> "What terrain cannot do is stop a ranged weapon"), so this is
+    pure Manhattan distance, not a walk: a range-2 firing cell three tiles out through a
+    wall is exactly as live as the door directly beside the target.
+
+    Standability is FOOT passability (`FOOT_COST`), a generic ground proxy rather than any
+    one attacker's own class -- the cell has to exist for SOME ground unit to occupy it
+    before who specifically reaches it is asked. The target's own tile (distance 0) is
+    never a firing cell.
+
+    `units_reaching` uses this for the same range check it always ran inline; `rescue_forecast`
+    aliases it rather than keeping its own copy."""
+    tx, ty = target
+    h, w = len(terrain), len(terrain[0])
+    out = []
+    for y in range(h):
+        for x in range(w):
+            d = abs(x - tx) + abs(y - ty)
+            if 1 <= d <= weapon_range and FOOT_COST.get(terrain[y][x]) is not None:
+                out.append((x, y))
+    return sorted(out)
+
+
 def foot_reach(terrain, sources, blocked=(), cost=None):
     """Movement-point distance from any source cell.
 
@@ -177,6 +202,28 @@ def arrival_turn(points, mov):
     if points is None:
         return None
     return max(1, -(-points // mov))
+
+
+def arrival_turn_to(terrain, sources, cost_table, mov, targets, blocked=()):
+    """The turn a unit moving from ANY of `sources` (at `mov` points/turn on `cost_table`, a
+    `pMovCostTable` symbol per `class_movement`) first stands on ANY of `targets`, walking
+    the map with `blocked` cells excluded. `None` if no target is reachable at all -- a
+    first-class outcome, not an error (ch06's merfolk-thrower: its own line corks every one
+    of its four javelin cells).
+
+    ONE Dijkstra + arrival-turn conversion, shared by two call shapes that are otherwise
+    mirror images of each other: `reached_on` walks MANY sources (the deploy block) to ONE
+    target; `rescue_forecast.arrival_to_cells` walks ONE source (an enemy) to MANY candidate
+    firing cells. Passing both ends as lists covers either direction without the caller
+    having to know which side is plural."""
+    if not targets:
+        return None
+    cost = mov_cost_row(cost_table)
+    dist = foot_reach(terrain, [tuple(s) for s in sources], blocked=blocked, cost=cost)
+    reachable = [dist[c] for c in (tuple(t) for t in targets) if c in dist]
+    if not reachable:
+        return None
+    return arrival_turn(min(reachable), mov)
 
 
 def enemy_bodies(chapter):
@@ -265,6 +312,7 @@ def units_reaching(chapter, terrain, targets):
         reach = max(ranges)
         table, mov = class_movement(enemy.get('deploy_class') or enemy['class'])
         cost = mov_cost_row(table)
+        fire = {cell for t in targets for cell in firing_cells(terrain, t, reach)}
         for index, (x, y) in enumerate(enemy.get('positions') or ()):
             ai = difficulty.enemy_ai_bytes(chapter, enemy, index)
             dist = foot_reach(terrain, [(x, y)], cost=cost)
@@ -276,7 +324,7 @@ def units_reaching(chapter, terrain, targets):
             for cell, points in dist.items():
                 if budget is not None and points > budget:
                     continue
-                if any(abs(cell[0] - t[0]) + abs(cell[1] - t[1]) <= reach for t in targets):
+                if cell in fire:
                     out.append((enemy['id'], ai))
                     break
     return out
@@ -306,12 +354,9 @@ def reached_on(chapter, terrain, target, contested=True):
     hand-written `reached_on:` blocks were measured with, so the two can be compared.
     """
     blocked = enemy_bodies(chapter) if contested else ()
-    out = {}
-    for role, (table, mov) in REACH_ROLES.items():
-        dist = foot_reach(terrain, deploy_cells(chapter, terrain), blocked=blocked,
-                          cost=mov_cost_row(table))
-        out[role] = arrival_turn(dist.get(tuple(target)), mov)
-    return out
+    sources = deploy_cells(chapter, terrain)
+    return {role: arrival_turn_to(terrain, sources, table, mov, [target], blocked=blocked)
+            for role, (table, mov) in REACH_ROLES.items()}
 
 
 def deploy_cells(chapter, terrain):
@@ -326,28 +371,40 @@ def deploy_cells(chapter, terrain):
 
 
 def placed_units(chapter, concept=None):
-    """[(tile, label, behaviour)] for every unit a placement puts on the map.
+    """[(tile, label, behaviour, id, late)] for every unit a placement puts on the map.
 
     From a concept JSON when one is given -- `{"units": {"<enemy id>": [[x, y], ...]}}` --
     and otherwise from each enemy entry's own `positions:`. Behaviour comes from the
     chapter's own AI resolution either way, so a concept cannot drift from what the
-    build would emit."""
+    build would emit.
+
+    Reads every roster key (#367/#369) -- was `enemy_units` alone, the THIRD copy of the
+    same bug `enemy_bodies` and `units_reaching` were fixed for: a `reinforcements:`/
+    `enemy_reinforcements:` wave was simply absent from the picture. `late` (drawn as a
+    hollow ring) is `build_campaign.entry_is_turn1`'s KEY-aware answer OR'd with
+    `hard_mode_only` -- a separate, MODE-gated axis `entry_is_turn1` does not model, since
+    ch06's Difficult-only crab riders declare it while staying inside `enemy_units`."""
+    import build_campaign as bc
     import difficulty as dif
     import chapter_status as cs
     override = (json.load(open(concept))['units'] if concept else {})
     out = []
-    for enemy in chapter.get('enemy_units') or []:
-        eid = enemy.get('id')
-        tiles = override.get(eid, enemy.get('positions') or [])
-        for i, tile in enumerate(tiles):
-            ai = dif.enemy_ai_bytes(chapter, enemy, i)
-            # Derived from the WHOLE vector, never patched by role: `is_boss` was standing in
-            # for the AI_A half this could not see, and it was wrong in both directions -- a
-            # non-boss statue read as mobile, and a boss with an engaging action read as static.
-            behaviour = cs.ai_shape(ai) or cs.ai_family(ai[1]) or '?'
-            code = 'B' if enemy.get('is_boss') else ROLE_CODE.get(enemy.get('class'), '??')
-            late = enemy.get('arrives_turn') or enemy.get('hard_mode_only')
-            out.append((tuple(tile), code, behaviour, eid, late))
+    for key in bc.ENEMY_ROSTER_KEYS:
+        for enemy in chapter.get(key) or ():
+            if not isinstance(enemy, dict):
+                continue
+            eid = enemy.get('id')
+            tiles = override.get(eid, enemy.get('positions') or [])
+            for i, tile in enumerate(tiles):
+                ai = dif.enemy_ai_bytes(chapter, enemy, i)
+                # Derived from the WHOLE vector, never patched by role: `is_boss` was standing
+                # in for the AI_A half this could not see, and it was wrong in both directions
+                # -- a non-boss statue read as mobile, and a boss with an engaging action read
+                # as static.
+                behaviour = cs.ai_shape(ai) or cs.ai_family(ai[1]) or '?'
+                code = 'B' if enemy.get('is_boss') else ROLE_CODE.get(enemy.get('class'), '??')
+                late = not bc.entry_is_turn1(key, enemy) or bool(enemy.get('hard_mode_only'))
+                out.append((tuple(tile), code, behaviour, eid, late))
     return out
 
 

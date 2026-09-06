@@ -26,6 +26,17 @@ SceneRow = collections.namedtuple('SceneRow', 'trigger slot declared boxes previ
 Room = collections.namedtuple('Room', 'claimed block used_in_block borrowed free')
 
 
+def _try_import(name):
+    """`name`, imported, or `None` where it cannot be -- the one implementation behind
+    `_preview_module`/`_build_campaign`/`_rescue_forecast_module`, which were three copies
+    of this exact template. Each stays its own module-level function (not a single
+    parameterized one) because callers monkeypatch them individually by name in tests."""
+    try:
+        return __import__(name)
+    except ImportError:
+        return None
+
+
 def _preview_module():
     """`scene_preview`, or None where it cannot be imported.
 
@@ -33,11 +44,7 @@ def _preview_module():
     CI job that installs pyyaml and nothing else this is absent, and a status report is still
     worth printing without its preview column. Everything else here is stdlib + pyyaml.
     """
-    try:
-        import scene_preview
-        return scene_preview
-    except ImportError:
-        return None
+    return _try_import('scene_preview')
 
 
 def _previews_by_event(chapter_short):
@@ -60,21 +67,13 @@ def _previews_by_event(chapter_short):
 
 def _build_campaign():
     """`build_campaign`, or None where Pillow is absent (see `_preview_module`)."""
-    try:
-        import build_campaign
-        return build_campaign
-    except ImportError:
-        return None
+    return _try_import('build_campaign')
 
 
 def _rescue_forecast_module():
     """`rescue_forecast`, or None where it cannot be imported (same Pillow dependency as
     `_preview_module`, through `map_placement_preview`)."""
-    try:
-        import rescue_forecast
-        return rescue_forecast
-    except ImportError:
-        return None
+    return _try_import('rescue_forecast')
 
 
 def _rescue_clock_findings(name, campaign=campaign_chapters.CAMPAIGN):

@@ -53,26 +53,10 @@ import fe_combat as fc                                                # noqa: E4
 import map_placement_preview as pp                                   # noqa: E402
 
 
-def firing_cells(terrain, target, weapon_range):
-    """Every cell at Manhattan distance 1..`weapon_range` from `target` that a foot unit can
-    stand on -- the set of tiles an attacker could occupy to hit it. FE8 has no line of
-    sight (decisions.md -> "What terrain cannot do is stop a ranged weapon"), so this is
-    pure Manhattan distance, not a walk: a range-2 firing cell three tiles out through a
-    wall is exactly as live as the door directly beside the target.
-
-    Standability is FOOT passability (`map_placement_preview.FOOT_COST`), a generic ground
-    proxy rather than any one attacker's own class -- the cell has to exist for SOME ground
-    unit to occupy it before who specifically reaches it is asked. The target's own tile
-    (distance 0) is never a firing cell."""
-    tx, ty = target
-    h, w = len(terrain), len(terrain[0])
-    out = []
-    for y in range(h):
-        for x in range(w):
-            d = abs(x - tx) + abs(y - ty)
-            if 1 <= d <= weapon_range and pp.FOOT_COST.get(terrain[y][x]) is not None:
-                out.append((x, y))
-    return sorted(out)
+# `firing_cells` is a terrain/range primitive -- the same family as `foot_reach` -- and
+# `map_placement_preview.units_reaching` needs the identical rule for its own reachability
+# check, so it lives there and this is an alias, not a second copy (#369 review).
+firing_cells = pp.firing_cells
 
 
 def arrival_to_cells(terrain, source, cost_table, mov, cells, blocked=()):
@@ -81,15 +65,12 @@ def arrival_to_cells(terrain, source, cost_table, mov, cells, blocked=()):
     of `cells`, walking the CONTESTED map (`blocked` -- turn-1 enemy bodies, which a unit
     may not enter or pass through). `None` if none of `cells` is reachable at all -- the
     enemy never gets a firing position, which is a first-class outcome (ch06's
-    merfolk-thrower: its own line corks every one of its four javelin cells)."""
-    if not cells:
-        return None
-    cost = pp.mov_cost_row(cost_table)
-    dist = pp.foot_reach(terrain, [tuple(source)], blocked=blocked, cost=cost)
-    reachable = [dist[c] for c in cells if c in dist]
-    if not reachable:
-        return None
-    return pp.arrival_turn(min(reachable), mov)
+    merfolk-thrower: its own line corks every one of its four javelin cells).
+
+    A thin, single-source wrapper over `map_placement_preview.arrival_turn_to`, which
+    `reached_on` also calls (many-sources-to-one-target, the mirror image of this
+    one-source-to-many-targets shape) -- one Dijkstra-then-arrival-turn composition, not two."""
+    return pp.arrival_turn_to(terrain, [source], cost_table, mov, cells, blocked=blocked)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -206,11 +187,14 @@ class PursuerForecast:
 
 
 def target_combatant(boat):
-    """The Combatant a `rescue_boats:` entry fights as: its declared class's base stats,
-    unarmed (a rescue target never attacks back -- FE8's civilian hulls carry no weapon)."""
-    enum = dif._enemy_class_enum(boat['class'])
-    base = dif._class_base(enum)
-    return dif._stats_to_combatant(boat.get('id', 'target'), base, weapon=None)
+    """The Combatant a `rescue_boats:` entry fights as, resolved through `difficulty._one_enemy`
+    -- the SAME path every other enemy in this codebase resolves through, so a boat that ever
+    declares a `level:`, a class carrying an effectiveness tag, or a `personal:` line is not
+    silently understated the way a hand-rolled class-base read would leave it. Unarmed always
+    (a rescue target never attacks back -- FE8's civilian hulls carry no weapon), regardless
+    of what its class would otherwise wield."""
+    return dif._one_enemy(boat.get('id', 'target'), boat['class'], boat.get('level', 1),
+                          None, personal=boat.get('personal'))
 
 
 def _boat_terrain_name(terrain, boat):

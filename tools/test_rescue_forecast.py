@@ -16,6 +16,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import difficulty as dif                                              # noqa: E402
 import fe_combat as fc                                                # noqa: E402
 import map_placement_preview as pp                                    # noqa: E402
 import rescue_forecast as rf                                          # noqa: E402
@@ -97,6 +98,42 @@ def _hull_on_forest():
     hull = fc.Combatant('hull', hp=19, pow=1, skl=1, spd=2, df=5, res=0, lck=0, con=25,
                         weapon=None)
     return dif.on_terrain(hull, 'TERRAIN_FOREST')          # (combatant, terrain_avoid)
+
+
+class TargetCombatant(unittest.TestCase):
+    """A `rescue_boats:` entry's fighting stats resolve through `difficulty._one_enemy` --
+    the SAME path every other enemy in the codebase resolves through -- rather than a
+    hand-rolled `_class_base` + `_stats_to_combatant` that skips autolevel, class tags and
+    a personal line. ch06's boats are level-1, no-personal `CLASS_FLEET`, so the bypass was
+    a no-op there; these pin the three things it would get wrong the day a boat entry
+    declares any of them."""
+
+    def test_a_boats_stats_come_from_ONE_of_enemy(self):
+        boat = {'id': 'hull', 'class': 'fleet'}
+        got = rf.target_combatant(boat)
+        want = dif._one_enemy('hull', 'fleet', 1, None)
+        self.assertEqual((got.hp, got.pow, got.skl, got.spd, got.df, got.res, got.lck,
+                          got.con), (want.hp, want.pow, want.skl, want.spd, want.df,
+                                     want.res, want.lck, want.con))
+
+    def test_a_declared_level_is_autoleveled_not_ignored(self):
+        """The exact bug: a naive class-base read never grows past L1."""
+        l1 = rf.target_combatant({'id': 'hull', 'class': 'armor-knight'})
+        l10 = rf.target_combatant({'id': 'hull', 'class': 'armor-knight', 'level': 10})
+        self.assertGreater(l10.hp, l1.hp)
+
+    def test_a_class_carrying_an_effectiveness_tag_keeps_it(self):
+        """`fe_combat` reads `tags` to resolve effective weapons (a Rapier vs `armor`). A
+        hand-rolled Combatant that skips `CLASS_TAGS` is invisible to that -- silently
+        wrong, not merely incomplete."""
+        boat = rf.target_combatant({'id': 'hull', 'class': 'armor-knight'})
+        self.assertIn('armor', boat.tags)
+
+    def test_a_boat_never_carries_a_weapon(self):
+        """The one thing the bypass got right on purpose: a rescue target never attacks
+        back, so `_one_enemy` is called with `weapon=None` regardless of the boat's class."""
+        boat = rf.target_combatant({'id': 'hull', 'class': 'fleet'})
+        self.assertIsNone(boat.weapon)
 
 
 class DamagePerPhase(unittest.TestCase):
