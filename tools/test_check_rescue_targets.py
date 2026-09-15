@@ -77,10 +77,60 @@ class TheGateSurvivesAnUngroundedRosterEntry(unittest.TestCase):
                                    'positions': [[0, 0]], 'inventory': [{'id': 'iron-sword'}]}]
         return chap
 
+    def test_an_unreadable_TILESET_is_reported_not_silently_skipped(self):
+        """The failure this gate must not swallow, exercised the way it really happens.
+
+        An earlier version keyed the skip on `except FileNotFoundError`, reasoning that a
+        missing file meant an unbuilt map -- but a missing/misnamed tileset DIRECTORY raises
+        FileNotFoundError too (the tileset opens `<name>.4bpp`), so the very case its comment
+        named still skipped a hard gate in silence. The discriminator is whether the map
+        EXISTS, not which exception came back. Driven here by a bogus tileset name rather
+        than an injected exception, because the previous test injected a `ValueError` that no
+        real code path raises and so proved nothing."""
+        import build_campaign as bc
+        real = bc.map_tileset
+        bc.map_tileset = lambda meta: 'snowy-bern-NOPE'
+        try:
+            fail = []
+            check.check_rescue_targets(fail)          # must not raise
+            self.assertTrue(fail, 'an unreadable tileset must be reported, not skipped')
+            self.assertTrue(any('ch06' in f for f in fail), fail)
+        finally:
+            bc.map_tileset = real
+
+    def test_a_chapter_with_no_compiled_map_is_still_just_skipped(self):
+        chap = {'id': 'ch99-planned', 'rescue_boats': [{'id': 'b', 'tile': [1, 1]}],
+                'map': {'file': 'maps/ch99-does-not-exist.mar'}}
+        original = check._chapters
+        check._chapters = lambda: iter([('campaigns/rime-of-the-frostmaiden/chapters/ch99.yaml',
+                                         chap)])
+        try:
+            fail = []
+            check.check_rescue_targets(fail)
+            self.assertEqual([], fail)
+        finally:
+            check._chapters = original
+
+    def test_a_chapter_with_no_map_block_yet_is_skipped_not_failed(self):
+        """A chapter that declares its rescue targets before its `map:` block is a normal
+        mid-draft state -- the same class the unbuilt-map skip exists to preserve. Keying the
+        skip on the exception type turned it into a hard build failure (`KeyError: 'map'`)."""
+        chap = {'id': 'ch99-draft', 'rescue_boats': [{'id': 'b', 'tile': [1, 1]}]}
+        original = check._chapters
+        check._chapters = lambda: iter([('campaigns/rime-of-the-frostmaiden/chapters/ch99.yaml',
+                                         chap)])
+        try:
+            fail = []
+            check.check_rescue_targets(fail)
+            self.assertEqual([], fail)
+        finally:
+            check._chapters = original
+
     def test_an_ungrounded_reinforcement_does_not_crash_the_whole_gate(self):
         chap = self._ch06_with_ungrounded_wave()
         original = check._chapters
-        check._chapters = lambda: iter([('ch06-stub.yaml', chap)])
+        check._chapters = lambda: iter(
+            [('campaigns/rime-of-the-frostmaiden/chapters/ch06-stub.yaml', chap)])
         try:
             fail = []
             check.check_rescue_targets(fail)          # must not raise

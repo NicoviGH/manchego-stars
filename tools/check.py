@@ -1062,6 +1062,67 @@ def _rescue_target_violations(short, reachers, pursuers):
     return out
 
 
+def _documented_tileset_violations(rel, d, effective):
+    """The chapter YAML's `map.tileset` must name the tileset the BUILD will actually use.
+
+    Nothing in the build reads this field -- `_register_chapter_map` resolves the tileset
+    from the map's sidecar JSON via `build_campaign.map_tileset` -- so it is documentation,
+    and documentation nothing reads is documentation free to rot. It very nearly did: the
+    first fix for ch00-ch02's `KeyError: 'tileset'` promoted this field to the preview's
+    source of truth, which would have let an edit here render a confident picture of a
+    tileset the cartridge never loads. The field stays, and stays honest, by being CHECKED
+    against the effective answer rather than trusted as one."""
+    documented = ((d.get('map') or {}).get('tileset'))
+    if documented is None or documented == effective:
+        return []
+    return ['%s: map.tileset documents %r but the build compiles this map as %r (its '
+            'sidecar JSON, via build_campaign.map_tileset) -- fix whichever is stale'
+            % (rel, documented, effective)]
+
+
+def _chapter_sidecar(rel, d):
+    """Absolute path to the compiled map's sidecar JSON for one chapter, or None when the
+    chapter declares no map at all.
+
+    `splitext`, never `.replace('.mar', '.json')`: ch07/ch08 declare `.tmx` map files, which
+    that replace silently no-ops on, handing an unchanged `.tmx` path straight to
+    `json.load`. Nothing has one on disk today, so it was a latent crash -- and with no
+    per-check isolation in `main`, one would have taken down the whole drift guard and every
+    check after it. The whole declared `map.file` is joined too, rather than its basename, so
+    a path with a subdirectory in it resolves instead of quietly losing the directory."""
+    mapfile = ((d.get('map') or {}).get('file'))
+    if not mapfile:
+        return None
+    campaign = rel.split(os.sep)[1]
+    return os.path.join(REPO, 'campaigns', campaign, os.path.splitext(mapfile)[0] + '.json')
+
+
+def check_documented_tileset(fail):
+    """#26: a chapter's documented `map.tileset` agrees with the one the build resolves."""
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    try:
+        import build_campaign as bc
+    except ImportError as exc:      # Pillow absent on the lightweight checks job
+        print('check_documented_tileset: skipping (%s; the build job\'s `make test` '
+              'covers it)' % exc)
+        return
+    import json
+    for rel, d in _chapters():
+        sidecar = _chapter_sidecar(rel, d)
+        if not sidecar or not os.path.exists(sidecar):
+            continue              # a planned chapter with no compiled map yet
+        try:
+            with open(sidecar, encoding='utf-8') as f:
+                effective = bc.map_tileset(json.load(f))
+        except (ValueError, OSError) as exc:
+            # `main` runs every check with no isolation, so one malformed sidecar would take
+            # the whole drift guard down with a traceback -- and every check after it.
+            fail.append('%s: map sidecar %s is unreadable (%s: %s)'
+                        % (rel, os.path.relpath(sidecar, REPO), type(exc).__name__, exc))
+            continue
+        fail.extend(_documented_tileset_violations(rel, d, effective))
+
+
 def check_rescue_targets(fail):
     """A chapter's rescue targets are reachable only by units it declared (#26)."""
     sys.path.insert(0, os.path.join(REPO, 'tools'))
@@ -1079,8 +1140,19 @@ def check_rescue_targets(fail):
         short = str(doc.get('id', '')).split('-')[0]
         try:
             terrain = pp.terrain_grid(doc)
-        except Exception as exc:    # noqa: BLE001 -- an unbuilt map is not this gate's business
+        except pp.MapNotCompiled as exc:
+            # ASKED, not guessed. Two earlier versions of this guard re-derived the reader's
+            # preconditions here -- by exception type, then by testing for the sidecar -- and
+            # both drifted from what `load_map` actually opens. The reader owns the question.
             print('check_rescue_targets: skipping %s (%s)' % (short, exc))
+            continue
+        except Exception as exc:    # noqa: BLE001
+            # The map is compiled, so ANY failure reading it is a real problem. Both obvious
+            # handlings are wrong: swallowing it skips a hard gate silently, and letting it
+            # propagate crashes every OTHER check too (`main` runs them with no isolation).
+            # Report it as drift -- attributed, no traceback, rest of the run intact.
+            fail.append('%s: rescue-target gate could not read the map (%s: %s) -- this gate '
+                        'did not run for this chapter' % (short, type(exc).__name__, exc))
             continue
         hulls = [tuple(b['tile']) for b in boats]
         pursuers = {p['id'] for p in (doc.get('rescue_pursuers') or [])}
@@ -2515,6 +2587,7 @@ def main():
                   check_no_shadowed_definitions, check_gate_chapter_window,
                   check_declared_cases, check_chapter_lua_facts,
                   check_rescue_targets, check_rescue_fuse_forecast,
+                  check_documented_tileset,
                   check_harness_local_ratchet,
                   check_verdict_scenarios_are_guarded,
                   check_no_hardcoded_symbol_addresses,

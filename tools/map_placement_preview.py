@@ -109,12 +109,27 @@ ROLE_LEGEND = [('Sp', 'spear'), ('Ax', 'axe'), ('Sw', 'sword'), ('Cv', 'cavalry'
 
 
 def load_map(stem):
-    """(grid, terrain, tileset) for one of our compiled maps."""
+    """(grid, terrain, tileset) for one of our compiled maps.
+
+    The tileset comes from the map's sidecar `<stem>.json`, resolved through
+    `build_campaign.map_tileset` -- the SAME function the ROM build resolves it with. This
+    used to be a bare `meta['tileset']`, which hard-crashed with `KeyError: 'tileset'` on
+    ch00-ch02, whose sidecars predate that key; the build never had that problem because it
+    has always defaulted a keyless sidecar to `WINTER_TILESET`.
+
+    The chapter YAML also declares `map.tileset`, and it is tempting to treat that as the
+    source of truth since it reads like the authored one. It is not: nothing in the build
+    consults it, so a preview sourced from it would be drawing a fact the cartridge ignores,
+    and could render a confident picture of a tileset the game does not use. Sharing the
+    build's own resolver instead makes disagreement between the picture and the ROM
+    impossible by construction (`decisions.md` -> "A map's tileset has one home").
+    """
+    import build_campaign as bc
     meta = json.load(open(os.path.join(MAPS, stem + '.json')))
     w, h = meta['width'], meta['height']
     raw = open(os.path.join(MAPS, stem + '.mar'), 'rb').read()
     cells = [struct.unpack_from('<H', raw, i * 2)[0] >> 5 for i in range(w * h)]
-    ts = mt._tileset_from_dir(os.path.join(MAPS, 'tilesets', meta['tileset']))
+    ts = mt._tileset_from_dir(os.path.join(MAPS, 'tilesets', bc.map_tileset(meta)))
     grid = [[cells[y * w + x] for x in range(w)] for y in range(h)]
     terrain = [[ts.terrain(m) for m in row] for row in grid]
     return grid, terrain, ts
@@ -130,6 +145,20 @@ REACH_ROLES = {
     'braulo':  ('TerrainTable_MovCost_PirateNormal', 5),
     'trex':    ('TerrainTable_MovCost_CommonT1Normal', 6),
 }
+
+
+class MapNotCompiled(Exception):
+    """This chapter has no compiled map to read yet -- a normal state for a planned chapter,
+    and distinct from a map that exists and cannot be READ.
+
+    It lives here because the distinction is the READER's to draw: `load_map` is what knows
+    it needs BOTH `<stem>.json` and `<stem>.mar`, and knows it resolves them against this
+    module's own MAPS root rather than against whatever path arithmetic a caller did. Twice
+    `check.py` tried to answer "is there a map?" from outside -- once by catching
+    `FileNotFoundError` (which a missing TILESET directory also raises, so a real failure
+    skipped a hard gate in silence) and once by testing for the sidecar alone (so a missing
+    `.mar` became a hard build failure instead of a skip). Both were the same mistake:
+    re-deriving a precondition instead of asking the thing that has it."""
 
 
 def firing_cells(terrain, target, weapon_range):
@@ -341,8 +370,20 @@ def load_chapter(prefix):
 
 
 def terrain_grid(chapter):
-    """The chapter's compiled terrain, by the map its YAML names."""
-    stem = os.path.splitext(os.path.basename(chapter['map']['file']))[0]
+    """The chapter's compiled terrain, by the map its YAML names.
+
+    Raises `MapNotCompiled` when the chapter declares no map, or when either file
+    `load_map` needs is absent -- so a caller can tell "not built yet" (skip) from "built and
+    broken" (a real failure) without knowing which files that is or where they live."""
+    mapfile = ((chapter.get('map') or {}).get('file'))
+    if not mapfile:
+        raise MapNotCompiled('%s declares no map' % (chapter.get('id') or 'chapter'))
+    stem = os.path.splitext(os.path.basename(mapfile))[0]
+    for ext in ('.json', '.mar'):
+        path = os.path.join(MAPS, stem + ext)
+        if not os.path.exists(path):
+            raise MapNotCompiled('%s: no %s' % (chapter.get('id') or stem,
+                                                os.path.relpath(path, CAMPAIGN)))
     return load_map(stem)[1]
 
 

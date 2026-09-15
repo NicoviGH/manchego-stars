@@ -201,6 +201,101 @@ class TestPersonalLineRoutes(unittest.TestCase):
         self.assertIn('already carries', msgs[0])
 
 
+class TestDocumentedTileset(unittest.TestCase):
+    """`map.tileset` in a chapter YAML is DOCUMENTATION -- the build resolves the real
+    tileset from the map's sidecar JSON (`build_campaign.map_tileset`). Documentation
+    nothing reads is free to rot, and it nearly did: the first fix for ch00-ch02's
+    `KeyError: 'tileset'` promoted this field to the preview's source of truth, which would
+    have let an edit here draw a confident picture of a tileset the cartridge never loads."""
+
+    def test_agreement_is_clean(self):
+        self.assertEqual([], check._documented_tileset_violations(
+            'chNN.yaml', {'map': {'tileset': 'snowy-bern'}}, 'snowy-bern'))
+
+    def test_drift_between_the_doc_and_the_build_is_reported(self):
+        found = check._documented_tileset_violations(
+            'chNN.yaml', {'map': {'tileset': 'cave-interior'}}, 'snowy-bern')
+        self.assertEqual(len(found), 1, found)
+        self.assertIn('cave-interior', found[0])
+        self.assertIn('snowy-bern', found[0])
+
+    def test_a_chapter_documenting_nothing_is_not_a_violation(self):
+        """The field is optional; this gate exists to catch a WRONG one, not a missing one."""
+        self.assertEqual([], check._documented_tileset_violations(
+            'chNN.yaml', {'map': {'file': 'maps/x.mar'}}, 'snowy-bern'))
+
+    def test_a_tmx_map_file_resolves_to_a_json_sidecar_not_itself(self):
+        """ch07/ch08 declare `.tmx` map files. A `.replace('.mar', '.json')` no-ops on those,
+        so the unchanged `.tmx` path went straight into `json.load` -- and with no per-check
+        isolation in `main()`, one real `.tmx` on disk would take down the whole drift guard
+        and every check after it."""
+        got = check._chapter_sidecar('campaigns/rime-of-the-frostmaiden/chapters/ch07.yaml',
+                                     {'map': {'file': 'maps/ch07-blood-in-bremen.tmx'}})
+        self.assertTrue(got.endswith('maps/ch07-blood-in-bremen.json'), got)
+
+    def test_a_mar_map_file_resolves_the_same_way(self):
+        got = check._chapter_sidecar('campaigns/rime-of-the-frostmaiden/chapters/ch06.yaml',
+                                     {'map': {'file': 'maps/ch06-maer-monster.mar'}})
+        self.assertTrue(got.endswith('maps/ch06-maer-monster.json'), got)
+        self.assertTrue(os.path.exists(got), got)
+
+    def test_a_chapter_with_no_map_block_has_no_sidecar(self):
+        self.assertIsNone(check._chapter_sidecar('campaigns/c/chapters/ch99.yaml', {}))
+        self.assertIsNone(check._chapter_sidecar('campaigns/c/chapters/ch99.yaml',
+                                                 {'map': None}))
+
+    def test_a_sidecar_that_is_valid_json_but_not_an_object_is_also_reported(self):
+        """`null`, `[]` and a bare string are all valid JSON and none of them has `.get`, so
+        they raised AttributeError straight through the `(ValueError, OSError)` clause and out
+        of `main` -- the exact failure that clause exists to stop, one type away."""
+        import tempfile
+        for body in ('null', '[]', '"snowy-bern"'):
+            with tempfile.TemporaryDirectory() as tmp:
+                maps = os.path.join(tmp, 'campaigns', 'c', 'maps')
+                os.makedirs(maps)
+                with open(os.path.join(maps, 'odd.json'), 'w') as fh:
+                    fh.write(body)
+                chap = {'id': 'ch99', 'map': {'file': 'maps/odd.mar', 'tileset': 'snowy-bern'}}
+                original_repo, original_chapters = check.REPO, check._chapters
+                check.REPO = tmp
+                check._chapters = lambda: iter([(os.path.join('campaigns', 'c', 'chapters',
+                                                              'ch99.yaml'), chap)])
+                try:
+                    fail = []
+                    check.check_documented_tileset(fail)      # must not raise
+                    self.assertEqual(len(fail), 1, (body, fail))
+                finally:
+                    check.REPO, check._chapters = original_repo, original_chapters
+
+    def test_a_malformed_sidecar_is_reported_not_a_traceback_through_main(self):
+        """`main` runs every check with no isolation, so an unguarded `json.load` on a
+        corrupt sidecar would take the whole drift guard down -- and every check after it --
+        with a raw JSONDecodeError. It is drift, reported and attributed."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            maps = os.path.join(tmp, 'campaigns', 'c', 'maps')
+            os.makedirs(maps)
+            with open(os.path.join(maps, 'broken.json'), 'w') as fh:
+                fh.write('{not json')
+            chap = {'id': 'ch99', 'map': {'file': 'maps/broken.mar', 'tileset': 'snowy-bern'}}
+            original_repo, original_chapters = check.REPO, check._chapters
+            check.REPO = tmp
+            check._chapters = lambda: iter([(os.path.join('campaigns', 'c', 'chapters',
+                                                          'ch99.yaml'), chap)])
+            try:
+                fail = []
+                check.check_documented_tileset(fail)      # must not raise
+                self.assertEqual(len(fail), 1, fail)
+                self.assertIn('unreadable', fail[0])
+            finally:
+                check.REPO, check._chapters = original_repo, original_chapters
+
+    def test_every_shipped_chapter_agrees_with_its_build_tileset(self):
+        fail = []
+        check.check_documented_tileset(fail)
+        self.assertEqual([], fail)
+
+
 class TestRosterKeysAgree(unittest.TestCase):
     def test_checks_roster_keys_match_the_content_desks(self):
         # check.py names them rather than importing, so the bare-interpreter `checks` job
