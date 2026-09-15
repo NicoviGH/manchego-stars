@@ -244,6 +244,29 @@ class TestDocumentedTileset(unittest.TestCase):
         self.assertIsNone(check._chapter_sidecar('campaigns/c/chapters/ch99.yaml',
                                                  {'map': None}))
 
+    def test_a_malformed_sidecar_is_reported_not_a_traceback_through_main(self):
+        """`main` runs every check with no isolation, so an unguarded `json.load` on a
+        corrupt sidecar would take the whole drift guard down -- and every check after it --
+        with a raw JSONDecodeError. It is drift, reported and attributed."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            maps = os.path.join(tmp, 'campaigns', 'c', 'maps')
+            os.makedirs(maps)
+            with open(os.path.join(maps, 'broken.json'), 'w') as fh:
+                fh.write('{not json')
+            chap = {'id': 'ch99', 'map': {'file': 'maps/broken.mar', 'tileset': 'snowy-bern'}}
+            original_repo, original_chapters = check.REPO, check._chapters
+            check.REPO = tmp
+            check._chapters = lambda: iter([(os.path.join('campaigns', 'c', 'chapters',
+                                                          'ch99.yaml'), chap)])
+            try:
+                fail = []
+                check.check_documented_tileset(fail)      # must not raise
+                self.assertEqual(len(fail), 1, fail)
+                self.assertIn('unreadable', fail[0])
+            finally:
+                check.REPO, check._chapters = original_repo, original_chapters
+
     def test_every_shipped_chapter_agrees_with_its_build_tileset(self):
         fail = []
         check.check_documented_tileset(fail)

@@ -134,6 +134,47 @@ class Board(unittest.TestCase):
             self.assertEqual(placed['nerra'], (9, 12))
 
 
+class TerrainGridSaysWhenAMapIsNotCompiledYet(unittest.TestCase):
+    """"Has this chapter got a compiled map?" is the READER's question, and it belongs to the
+    reader. `check.py` twice tried to answer it from outside -- first by exception type, then
+    by testing for the sidecar -- and got it wrong both times, because the gate's idea of what
+    `load_map` needs kept drifting from what `load_map` actually opens (it needs the `.mar`
+    too, and resolves it against this module's own MAPS root rather than the caller's path
+    arithmetic). `MapNotCompiled` moves the question here, so a caller asks instead of
+    guessing and cannot drift again."""
+
+    def setUp(self):
+        self.chap = ch06()
+
+    def test_a_chapter_with_a_compiled_map_just_works(self):
+        self.assertTrue(pp.terrain_grid(self.chap))
+
+    def test_a_chapter_with_no_map_block_is_not_compiled(self):
+        with self.assertRaises(pp.MapNotCompiled):
+            pp.terrain_grid({'id': 'ch99-draft'})
+
+    def test_a_missing_mar_is_not_compiled_even_when_the_sidecar_is_there(self):
+        """The case the sidecar-only guard got wrong: `load_map` reads BOTH files."""
+        import copy
+        chap = copy.deepcopy(self.chap)
+        chap['map']['file'] = 'maps/ch06-maer-monster-NOPE.mar'
+        with self.assertRaises(pp.MapNotCompiled):
+            pp.terrain_grid(chap)
+
+    def test_a_map_that_exists_but_cannot_be_READ_is_not_MapNotCompiled(self):
+        """The distinction the whole exception exists to draw: absent is a skip, broken is a
+        real failure, and they must not collapse into each other."""
+        import build_campaign as bc
+        real = bc.map_tileset
+        bc.map_tileset = lambda meta: 'snowy-bern-NOPE'
+        try:
+            with self.assertRaises(Exception) as ctx:
+                pp.terrain_grid(self.chap)
+            self.assertNotIsInstance(ctx.exception, pp.MapNotCompiled)
+        finally:
+            bc.map_tileset = real
+
+
 class LoadMapResolvesTheTilesetTheBuildWillUse(unittest.TestCase):
     """`load_map` read the tileset with a bare `meta['tileset']`, so it hard-crashed with
     `KeyError: 'tileset'` on ch00-ch02, whose sidecars predate that key.

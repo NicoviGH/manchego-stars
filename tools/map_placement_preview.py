@@ -147,6 +147,20 @@ REACH_ROLES = {
 }
 
 
+class MapNotCompiled(Exception):
+    """This chapter has no compiled map to read yet -- a normal state for a planned chapter,
+    and distinct from a map that exists and cannot be READ.
+
+    It lives here because the distinction is the READER's to draw: `load_map` is what knows
+    it needs BOTH `<stem>.json` and `<stem>.mar`, and knows it resolves them against this
+    module's own MAPS root rather than against whatever path arithmetic a caller did. Twice
+    `check.py` tried to answer "is there a map?" from outside -- once by catching
+    `FileNotFoundError` (which a missing TILESET directory also raises, so a real failure
+    skipped a hard gate in silence) and once by testing for the sidecar alone (so a missing
+    `.mar` became a hard build failure instead of a skip). Both were the same mistake:
+    re-deriving a precondition instead of asking the thing that has it."""
+
+
 def firing_cells(terrain, target, weapon_range):
     """Every cell at Manhattan distance 1..`weapon_range` from `target` that a foot unit can
     stand on -- the set of tiles an attacker could occupy to hit it. FE8 has no line of
@@ -356,8 +370,20 @@ def load_chapter(prefix):
 
 
 def terrain_grid(chapter):
-    """The chapter's compiled terrain, by the map its YAML names."""
-    stem = os.path.splitext(os.path.basename(chapter['map']['file']))[0]
+    """The chapter's compiled terrain, by the map its YAML names.
+
+    Raises `MapNotCompiled` when the chapter declares no map, or when either file
+    `load_map` needs is absent -- so a caller can tell "not built yet" (skip) from "built and
+    broken" (a real failure) without knowing which files that is or where they live."""
+    mapfile = ((chapter.get('map') or {}).get('file'))
+    if not mapfile:
+        raise MapNotCompiled('%s declares no map' % (chapter.get('id') or 'chapter'))
+    stem = os.path.splitext(os.path.basename(mapfile))[0]
+    for ext in ('.json', '.mar'):
+        path = os.path.join(MAPS, stem + ext)
+        if not os.path.exists(path):
+            raise MapNotCompiled('%s: no %s' % (chapter.get('id') or stem,
+                                                os.path.relpath(path, CAMPAIGN)))
     return load_map(stem)[1]
 
 

@@ -1111,8 +1111,15 @@ def check_documented_tileset(fail):
         sidecar = _chapter_sidecar(rel, d)
         if not sidecar or not os.path.exists(sidecar):
             continue              # a planned chapter with no compiled map yet
-        with open(sidecar, encoding='utf-8') as f:
-            effective = bc.map_tileset(json.load(f))
+        try:
+            with open(sidecar, encoding='utf-8') as f:
+                effective = bc.map_tileset(json.load(f))
+        except (ValueError, OSError) as exc:
+            # `main` runs every check with no isolation, so one malformed sidecar would take
+            # the whole drift guard down with a traceback -- and every check after it.
+            fail.append('%s: map sidecar %s is unreadable (%s: %s)'
+                        % (rel, os.path.relpath(sidecar, REPO), type(exc).__name__, exc))
+            continue
         fail.extend(_documented_tileset_violations(rel, d, effective))
 
 
@@ -1131,24 +1138,19 @@ def check_rescue_targets(fail):
         if not boats:
             continue
         short = str(doc.get('id', '')).split('-')[0]
-        # Whether the compiled map EXISTS is the discriminator, not which exception came
-        # back. Keying the skip on `except FileNotFoundError` looked right and was not: a
-        # missing or misnamed tileset DIRECTORY raises FileNotFoundError too (the tileset
-        # opens `<name>.4bpp`), so the one case worth reporting still skipped a hard gate in
-        # silence -- and a chapter declaring its boats before its `map:` block became a hard
-        # build failure instead of the mid-draft skip it had always been.
-        sidecar = _chapter_sidecar(rel, doc)
-        if not sidecar or not os.path.exists(sidecar):
-            print('check_rescue_targets: skipping %s (no compiled map yet)' % short)
-            continue
         try:
             terrain = pp.terrain_grid(doc)
+        except pp.MapNotCompiled as exc:
+            # ASKED, not guessed. Two earlier versions of this guard re-derived the reader's
+            # preconditions here -- by exception type, then by testing for the sidecar -- and
+            # both drifted from what `load_map` actually opens. The reader owns the question.
+            print('check_rescue_targets: skipping %s (%s)' % (short, exc))
+            continue
         except Exception as exc:    # noqa: BLE001
-            # The map is on disk, so ANY failure reading it is a real problem. The two
-            # obvious handlings are both wrong: swallowing it skips a hard gate silently, and
-            # letting it propagate crashes every OTHER check too (`main` runs them with no
-            # isolation). Report it as drift -- attributed, no traceback, rest of the run
-            # intact.
+            # The map is compiled, so ANY failure reading it is a real problem. Both obvious
+            # handlings are wrong: swallowing it skips a hard gate silently, and letting it
+            # propagate crashes every OTHER check too (`main` runs them with no isolation).
+            # Report it as drift -- attributed, no traceback, rest of the run intact.
             fail.append('%s: rescue-target gate could not read the map (%s: %s) -- this gate '
                         'did not run for this chapter' % (short, type(exc).__name__, exc))
             continue
