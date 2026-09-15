@@ -224,6 +224,26 @@ class TestDocumentedTileset(unittest.TestCase):
         self.assertEqual([], check._documented_tileset_violations(
             'chNN.yaml', {'map': {'file': 'maps/x.mar'}}, 'snowy-bern'))
 
+    def test_a_tmx_map_file_resolves_to_a_json_sidecar_not_itself(self):
+        """ch07/ch08 declare `.tmx` map files. A `.replace('.mar', '.json')` no-ops on those,
+        so the unchanged `.tmx` path went straight into `json.load` -- and with no per-check
+        isolation in `main()`, one real `.tmx` on disk would take down the whole drift guard
+        and every check after it."""
+        got = check._chapter_sidecar('campaigns/rime-of-the-frostmaiden/chapters/ch07.yaml',
+                                     {'map': {'file': 'maps/ch07-blood-in-bremen.tmx'}})
+        self.assertTrue(got.endswith('maps/ch07-blood-in-bremen.json'), got)
+
+    def test_a_mar_map_file_resolves_the_same_way(self):
+        got = check._chapter_sidecar('campaigns/rime-of-the-frostmaiden/chapters/ch06.yaml',
+                                     {'map': {'file': 'maps/ch06-maer-monster.mar'}})
+        self.assertTrue(got.endswith('maps/ch06-maer-monster.json'), got)
+        self.assertTrue(os.path.exists(got), got)
+
+    def test_a_chapter_with_no_map_block_has_no_sidecar(self):
+        self.assertIsNone(check._chapter_sidecar('campaigns/c/chapters/ch99.yaml', {}))
+        self.assertIsNone(check._chapter_sidecar('campaigns/c/chapters/ch99.yaml',
+                                                 {'map': None}))
+
     def test_every_shipped_chapter_agrees_with_its_build_tileset(self):
         fail = []
         check.check_documented_tileset(fail)

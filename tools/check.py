@@ -1080,6 +1080,23 @@ def _documented_tileset_violations(rel, d, effective):
             % (rel, documented, effective)]
 
 
+def _chapter_sidecar(rel, d):
+    """Absolute path to the compiled map's sidecar JSON for one chapter, or None when the
+    chapter declares no map at all.
+
+    `splitext`, never `.replace('.mar', '.json')`: ch07/ch08 declare `.tmx` map files, which
+    that replace silently no-ops on, handing an unchanged `.tmx` path straight to
+    `json.load`. Nothing has one on disk today, so it was a latent crash -- and with no
+    per-check isolation in `main`, one would have taken down the whole drift guard and every
+    check after it. The whole declared `map.file` is joined too, rather than its basename, so
+    a path with a subdirectory in it resolves instead of quietly losing the directory."""
+    mapfile = ((d.get('map') or {}).get('file'))
+    if not mapfile:
+        return None
+    campaign = rel.split(os.sep)[1]
+    return os.path.join(REPO, 'campaigns', campaign, os.path.splitext(mapfile)[0] + '.json')
+
+
 def check_documented_tileset(fail):
     """#26: a chapter's documented `map.tileset` agrees with the one the build resolves."""
     sys.path.insert(0, os.path.join(REPO, 'tools'))
@@ -1091,12 +1108,8 @@ def check_documented_tileset(fail):
         return
     import json
     for rel, d in _chapters():
-        mapfile = ((d.get('map') or {}).get('file'))
-        if not mapfile:
-            continue
-        sidecar = os.path.join(REPO, 'campaigns', rel.split(os.sep)[1], 'maps',
-                               os.path.basename(mapfile).replace('.mar', '.json'))
-        if not os.path.exists(sidecar):
+        sidecar = _chapter_sidecar(rel, d)
+        if not sidecar or not os.path.exists(sidecar):
             continue              # a planned chapter with no compiled map yet
         with open(sidecar, encoding='utf-8') as f:
             effective = bc.map_tileset(json.load(f))
@@ -1118,18 +1131,24 @@ def check_rescue_targets(fail):
         if not boats:
             continue
         short = str(doc.get('id', '')).split('-')[0]
+        # Whether the compiled map EXISTS is the discriminator, not which exception came
+        # back. Keying the skip on `except FileNotFoundError` looked right and was not: a
+        # missing or misnamed tileset DIRECTORY raises FileNotFoundError too (the tileset
+        # opens `<name>.4bpp`), so the one case worth reporting still skipped a hard gate in
+        # silence -- and a chapter declaring its boats before its `map:` block became a hard
+        # build failure instead of the mid-draft skip it had always been.
+        sidecar = _chapter_sidecar(rel, doc)
+        if not sidecar or not os.path.exists(sidecar):
+            print('check_rescue_targets: skipping %s (no compiled map yet)' % short)
+            continue
         try:
             terrain = pp.terrain_grid(doc)
-        except FileNotFoundError as exc:
-            # A chapter with no compiled map yet is not this gate's business.
-            print('check_rescue_targets: skipping %s (%s)' % (short, exc))
-            continue
         except Exception as exc:    # noqa: BLE001
-            # Anything else -- an unreadable tileset, a corrupt .mar -- is a REAL problem,
-            # and the two wrong ways to handle it are the two obvious ones: swallowing it
-            # skips a hard gate silently, and letting it propagate crashes every OTHER check
-            # too (`main` runs them with no isolation). Report it as drift: loud, attributed,
-            # and it fails the build without taking the rest of the run down.
+            # The map is on disk, so ANY failure reading it is a real problem. The two
+            # obvious handlings are both wrong: swallowing it skips a hard gate silently, and
+            # letting it propagate crashes every OTHER check too (`main` runs them with no
+            # isolation). Report it as drift -- attributed, no traceback, rest of the run
+            # intact.
             fail.append('%s: rescue-target gate could not read the map (%s: %s) -- this gate '
                         'did not run for this chapter' % (short, type(exc).__name__, exc))
             continue
