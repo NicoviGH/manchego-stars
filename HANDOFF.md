@@ -6,47 +6,55 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-05 (Claude), after #368 merged. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-15 (Claude), after #369/#370/#371 merged. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing. The tree is clean on `main` and no branch is open.** #368 squash-merged 2026-09-05
-(`7786bc5`); `mirror-percent` is deleted.
+**Nothing. The tree is clean on `main` and no branch is open.** #371 squash-merged 2026-09-15
+(`e3ff529`); every feature branch is deleted and pruned.
 
-**Waiting on Nicolas: two calls before the danger map is built** (asked 2026-09-05, evidence
-below and on #367).
-1. **The throughput model** -- occupancy-matched (units assigned to DISTINCT firing cells;
-   reproduces the recorded stall) vs cap-only (sum, clamped to the firing-cell count). My
-   recommendation is occupancy-matched.
-2. **Output shape** -- the full per-tile-per-turn grid, or a focused fuse forecast for named
-   target tiles first.
+## Next task: three filed follow-ups off #371, in this order
+
+All three are SMALL and self-contained, and each carries its own Definition of Done on the
+issue -- read the issue, don't re-derive it here.
+
+1. **#372 -- `check.py`'s `main()` has no per-check isolation.** The highest-value of the
+   three and the reason the other two are only findings rather than outages. One raising
+   check kills the whole drift guard and the ~29 after it. ⚠️ **Make the design call FIRST**
+   (what an errored check does -- the issue lays out the options and a recommendation); the
+   loop itself is ~5 lines.
+2. **#374 -- two `map_changes` sites still hardcode `WINTER_TILESET`.** Mechanically simple.
+   ⚠️ Touches ROM-build metatile resolution, so it needs an OUTPUT DIFF of the emitted
+   change lists, not just green tests.
+3. **#373 -- the gate and the build locate a chapter's map sidecar by different routes.**
+   The subtlest of the three; prefer a guard that the two agree over making either
+   authoritative (the issue explains why -- #371's first attempt picked the wrong winner).
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
 humans. **`make chapter CH=ch06` is the state; #26's body is the remaining work.**
 
-## PARKED — and what unparks it
+## PARKED — nothing. ch06's fuse is answered and fixed
 
-**ch06's fuse tuning is still parked**, but it is no longer a mystery. The measured fuses are
-wrong in both directions — east still afloat at turn 12 against a declared 7, west sank turn 5
-against 8 — and **the asymmetry is GEOMETRY, measured 2026-09-05 and posted to #367**: the east
-hull has **4 firing cells and 1 melee door**, the west **8 and 3**. Three times the melee
-throughput, which is the whole difference. The computed east cells are
-`(15,12) (17,10) (17,13) (17,14)` — exactly the four #26 records as blocked when the thrower
-stalled, so the model is validated against the instrumented run before it is written.
+**ch06's east pursuer could not reach its hull at all**, which is why its declared fuse of 7
+described a unit that never arrived. `merfolk-thrower` at (14,9) was corked by two of its own
+allies; both were nudged off the corridor (#370, Nicolas's call: move the line, not the
+thrower) and it now reaches `(15,12)` on turn 2 for a forecast sink around turn 9. Both hulls
+have an engaging pursuer. `tools/rescue_forecast.py ch06` prints the current numbers -- read
+that rather than any figure written down here.
 
-**#367 is now ANSWERED** (2026-09-04 investigation comment — read it before touching the clock;
-its ch02 numbers are superseded by the 2026-09-05 comment). The short version: the rosters, the
-donor derivation and the exp curve through ch06 are sound; the parity *ratio* is not a statement
-about difficulty, and at ch02 and ch06 says nothing at all, because both reproduce 100% of their
-twin's force and so read x1.00 by construction.
+⚠️ **An earlier HANDOFF claimed the two hulls differ 3x in melee throughput (east 4 cells/1
+door, west 8/3). That was wrong** -- it came from measuring the west hull at a coordinate that
+is not its tile. Both hulls have exactly ONE melee door, as their YAML always declared. The
+real asymmetry was reachability, not geometry.
 
-**The unblock is the danger map** (Next task), not a decision, and it is now two answers away
-rather than a research problem. ⚠️ **Throughput is bounded by DISTINCT firing cells and allies
-block each other** — the recorded stall is that bound being hit, and a map that sums everyone in
-range gets both fuses wrong.
+**#367 is ANSWERED** (2026-09-04 investigation comment; its ch02 numbers are superseded by the
+2026-09-05 comment). The rosters, the donor derivation and the exp curve through ch06 are
+sound; the parity *ratio* is not a statement about difficulty, and at ch02 and ch06 says
+nothing at all, because both reproduce 100% of their twin's force and so read x1.00 by
+construction.
 
 ## Owed, filed, not started
 
@@ -65,25 +73,10 @@ range gets both fuses wrong.
   Nothing reads it, so it misleads rather than breaks. Cheap since #312: one reader
   (`tools/campaign_chapters.py`) means the block can be DERIVED rather than hand-kept.
 
-## Next task
+## After the follow-ups: the rest of ch06 (#26)
 
-**The danger map** -- #367 proposal 2, the second of the two things Nicolas named 2026-09-04.
-mirror% (the first) landed as #368. Blocked only on the two calls under "In flight".
-
-Forecast incoming damage per tile per turn, from `foot_reach` plus the pursuer/striker/statue
-split #366 landed plus real `fe_combat` damage. `map_placement_preview` already computes real
-reach with per-class cost tables and **nothing imports it** -- it only shades a PNG. Since it is
-a HIT RATE (`decisions.md`), the output should be expected damage and a turn DISTRIBUTION, never
-a single sink turn.
-
-⚠️ **`map_placement_preview` was not in #368's roster sweep and has the same split** (detail on
-#367, fix it with the danger map rather than separately): `units_reaching` reads `enemy_units`
-only, and `enemy_bodies` excludes waves by `arrives_turn` -- so an entry under the
-`reinforcements:` key, which carries `trigger_turn`, is counted as a turn-1 BLOCKING body, which
-is backwards.
-
-Then ch06's fuse, then the rest of #26: the three cutscenes, the boarding pass, Messie's portrait
-and wiring, the merfolk reskins. Dialogue still waits on voice bibles for the boat crews.
+The three cutscenes, the boarding pass, Messie's portrait and wiring, the merfolk reskins.
+Dialogue still waits on voice bibles for the boat crews. `make chapter CH=ch06` is the state.
 
 ## Map sprites — read before any art session
 
@@ -93,6 +86,23 @@ why a decomp sheet's palette is a meaningless leftover, what `footprint:` actual
 WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
+
+**#369 / #370 / #371 (2026-09-15) — the rescue-fuse forecast, ch06's east pursuer, and the
+tileset's one home.** Three ADRs in `docs/decisions.md` carry all of it and are deliberately
+not restated: *"A rescue-fuse FORECAST is the reusable question, and it is not a danger grid"*,
+*"A map's tileset has one home, and it is the one the BUILD reads"*, plus the ch06 placement
+fix on #370. One-line version: `tools/rescue_forecast.py` answers *which enemy can get a firing
+position on a protected tile, when, for how much, so when does it die* -- reusing `foot_reach`,
+`difficulty`'s stat resolution and `fe_combat`, never a second combat model. The full danger
+GRID was explicitly cut from scope (Nicolas, 2026-09-05); the narrow question is what chapters
+actually ask.
+
+⚠️ **The lesson that outlives these: a gate must ASK the reader, never re-derive its
+preconditions.** `check.py` guessed twice at what `load_map` needs -- by exception type, then by
+testing for the sidecar -- and both drifted from what it actually opens. `MapNotCompiled` now
+lives with the reader. Five review rounds on #371, and after the first, every finding was in
+code written to make a `check.py` guard defensive; **#372 (per-check isolation) is why that
+class was severe at all** and is the first follow-up for a reason.
 
 **#368 (2026-09-05, MERGED `7786bc5`) — mirror%, and ch02 was never counting its own wave.**
 One ADR in `docs/decisions.md` carries it: *"A parity ratio does not say how much of the twin it
@@ -267,3 +277,13 @@ Two live workflow facts that are not decisions and have nowhere better to sit:
   `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
 - **`HANDOFF.md` is authored on `main` ONLY**, gated by `check.py check_handoff_only_on_main`. If
   the guard fires on a branch: `git checkout main -- HANDOFF.md`.
+- **A commit takes 6-10 MINUTES here and is not hung.** The pre-commit hook runs the full
+  `tools/check.py`, which spawns every test file as its own process; CPU stays near zero while
+  it does. Run `git commit` with `run_in_background` and wait for the notification. Commit with
+  a message FILE (`git commit -F <file>`), never a heredoc -- a heredoc's stdin has hung the
+  hook. Killing a commit mid-hook is safe (nothing is written until it passes), but re-running
+  costs the full cycle again, so get the message right first.
+- **A SUBAGENT is not woken by its own background task.** One ended its turn waiting on a
+  backgrounded `make check`, stalled, and on resume raced a commit the main session had already
+  started -- two `git commit` processes on one repo. If you dispatch one, tell it to run long
+  commands in the FOREGROUND and absorb the wall-clock.
