@@ -8738,8 +8738,9 @@ and full PNG renders are identical before and after — and identical again betw
 YAML-sourced version and the shipped build-sourced one, because every chapter's documented
 tileset happens to match its effective one today. That agreement is exactly why the wrong premise
 produced right answers and could have shipped unnoticed; it is now a gate rather than a
-coincidence. ch00–ch02 render for the first time; ch07/ch08 still have no compiled `.mar` and
-still fail the same `FileNotFoundError` they always did.
+coincidence. ch00–ch02 render for the first time; ch07/ch08 still have no compiled `.mar`, and
+now say so precisely — `terrain_grid` raises `MapNotCompiled` for them, while the CLI render
+path still surfaces the underlying `FileNotFoundError`.
 
 ## Open Questions (not yet decided)
 

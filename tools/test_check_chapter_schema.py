@@ -244,6 +244,29 @@ class TestDocumentedTileset(unittest.TestCase):
         self.assertIsNone(check._chapter_sidecar('campaigns/c/chapters/ch99.yaml',
                                                  {'map': None}))
 
+    def test_a_sidecar_that_is_valid_json_but_not_an_object_is_also_reported(self):
+        """`null`, `[]` and a bare string are all valid JSON and none of them has `.get`, so
+        they raised AttributeError straight through the `(ValueError, OSError)` clause and out
+        of `main` -- the exact failure that clause exists to stop, one type away."""
+        import tempfile
+        for body in ('null', '[]', '"snowy-bern"'):
+            with tempfile.TemporaryDirectory() as tmp:
+                maps = os.path.join(tmp, 'campaigns', 'c', 'maps')
+                os.makedirs(maps)
+                with open(os.path.join(maps, 'odd.json'), 'w') as fh:
+                    fh.write(body)
+                chap = {'id': 'ch99', 'map': {'file': 'maps/odd.mar', 'tileset': 'snowy-bern'}}
+                original_repo, original_chapters = check.REPO, check._chapters
+                check.REPO = tmp
+                check._chapters = lambda: iter([(os.path.join('campaigns', 'c', 'chapters',
+                                                              'ch99.yaml'), chap)])
+                try:
+                    fail = []
+                    check.check_documented_tileset(fail)      # must not raise
+                    self.assertEqual(len(fail), 1, (body, fail))
+                finally:
+                    check.REPO, check._chapters = original_repo, original_chapters
+
     def test_a_malformed_sidecar_is_reported_not_a_traceback_through_main(self):
         """`main` runs every check with no isolation, so an unguarded `json.load` on a
         corrupt sidecar would take the whole drift guard down -- and every check after it --
