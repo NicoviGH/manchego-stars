@@ -1139,7 +1139,18 @@ def check_documented_tileset(fail):
 # routes: this gate derives it from the YAML's `map.file`; the BUILD gets its stem from the
 # `CHxx_LAYOUT` constants and never reads `map.file` at all; the PREVIEW takes
 # `basename(map.file)` against its own campaign root. They agree today, and nothing made them.
-_REGISTER_CHAPTER_MAP = re.compile(r'_register_chapter_map\(\s*maps_dir,\s*([A-Z][A-Z0-9_]*)')
+#
+# Everything below is read from SOURCE and pyyaml, deliberately. This runs on the CI `checks`
+# job, which installs pyyaml and nothing else and checks out NO submodule -- so `import
+# build_campaign` (Pillow at module scope) and `import map_placement_preview` (which opens the
+# decomp's terrains.h at module scope) both fail there. `check_hosted_chapters_declared` states
+# the same rule for the same reason. A guard that cannot run on the only job that runs
+# `check.py` is not a guard.
+_REGISTER_CHAPTER_MAP = re.compile(r'_register_chapter_map\(\s*\w+,\s*([A-Z][A-Z0-9_]*)')
+_LAYOUT_CONST = re.compile(r"^((?:CH\d+|PROLOGUE)_LAYOUT)\s*=\s*\(\s*'[^']*',\s*'([^']+)'",
+                           re.M)
+_PREVIEW_CAMPAIGN = re.compile(r"^CAMPAIGN\s*=\s*os\.path\.join\(ROOT,\s*'([^']+)'\)", re.M)
+_PREVIEW_MAPS = re.compile(r"^MAPS\s*=\s*os\.path\.join\(CAMPAIGN,\s*'([^']+)'\)", re.M)
 
 
 def _build_registered_layouts(text):
@@ -1148,7 +1159,9 @@ def _build_registered_layouts(text):
     Read from `build_campaign`'s SOURCE, like `_injection_call_sequence` above it, so a newly
     hosted chapter joins this gate the moment its injector registers a map -- a hand-kept table
     here would be a fourth place to disagree about the same fact. Matched per injector BODY
-    rather than across the file, so a call cannot be attributed to whatever `def` preceded it.
+    rather than across the file, so a call cannot be attributed to whatever `def` preceded it,
+    and on the LAYOUT argument rather than the caller's local variable name, because renaming
+    a local is a refactor and must not empty this gate.
     """
     out = {}
     for m in re.finditer(r'^def (inject_\w+)\(.*?(?=^def |\Z)', text, re.M | re.S):
@@ -1166,76 +1179,113 @@ def _chapter_of_injector(name):
     return m.group(1) if m else None
 
 
-def _sidecar_routes(text, chapters, preview_maps):
-    """One (short id, rel, {route: path}, note) row per chapter, plus rows for registrations
-    that cannot be attributed to a chapter at all.
+def _sidecar_routes(build_src, preview_src, chapters, hosted):
+    """One row per chapter, plus rows for anything that belongs to no chapter.
 
-    A route missing from the dict is a route that has nothing to say about this chapter -- a
-    chapter with no `map.file`, or one whose map is painted but not yet hosted. `note` says
-    which, so "this guard skipped it" and "there was nothing to check" stop looking alike.
+    A row is `{'short', 'rel', 'routes', 'problems', 'note'}`. `routes` maps a route name to
+    the sidecar path it resolves; a route missing from it has nothing to say about this chapter.
+    `problems` carries `(kind, text)` pairs -- structured, so the caller never has to sniff
+    prose to tell a violation from a note. `note` is the benign reason a route is absent.
+
+    `hosted` is the authoritative list of chapters this build hosts (`inject.hosts`), and it is
+    the floor that keeps this guard from going blind: a HOSTED chapter owes all three routes, so
+    a pattern that stops matching, or an id that stops lining up, becomes loud instead of
+    degrading every chapter to the legitimate "painted but not hosted yet" skip.
     """
-    sys.path.insert(0, os.path.join(REPO, 'tools'))
-    import build_campaign as bc
+    rows = []
+    want = {('ch00' if h == 'prologue' else h) for h in hosted}
+    layouts = _build_registered_layouts(build_src)
+    stems = dict(_LAYOUT_CONST.findall(build_src))
 
-    layouts = _build_registered_layouts(text)
-    rows, by_chapter, orphans = [], {}, []
+    if not layouts:
+        rows.append({'short': None, 'rel': None, 'routes': {}, 'note': '', 'problems': [
+            ('build-unreadable',
+             'no chapter map registration is recognisable in build_campaign.py -- '
+             '_REGISTER_CHAPTER_MAP no longer matches how the build registers a map, so this '
+             'gate would compare nothing and pass')]})
+
+    campaign_root = _PREVIEW_CAMPAIGN.search(preview_src)
+    maps_leaf = _PREVIEW_MAPS.search(preview_src)
+    preview_maps = (os.path.join(REPO, campaign_root.group(1), maps_leaf.group(1))
+                    if campaign_root and maps_leaf else None)
+    if preview_maps is None:
+        rows.append({'short': None, 'rel': None, 'routes': {}, 'note': '', 'problems': [
+            ('preview-unreadable',
+             'cannot read map_placement_preview\'s own maps root from its source, so the '
+             'preview route -- the one that exists to catch that hardcoded campaign root -- '
+             'cannot be compared')]})
+
+    by_chapter, claimed = {}, set()
     for injector, const in sorted(layouts.items()):
         short = _chapter_of_injector(injector)
         if short is None:
-            orphans.append((injector, const))
+            rows.append({'short': None, 'rel': None, 'routes': {}, 'note': '', 'problems': [
+                ('unattributable',
+                 '%s registers a chapter map through %s, and this guard cannot tell which '
+                 'chapter it belongs to -- teach _chapter_of_injector the new name'
+                 % (injector, const))]})
         else:
             by_chapter[short] = (injector, const)
 
     for rel, d in chapters:
         short = str(d.get('id', '')).split('-')[0]
         mapfile = ((d.get('map') or {}).get('file'))
-        routes, notes = {}, []
+        routes, problems, notes = {}, [], []
         gate = _chapter_sidecar(rel, d)
         if gate:
             routes['gate'] = gate
-            routes['preview'] = os.path.join(
-                preview_maps, os.path.splitext(os.path.basename(mapfile))[0] + '.json')
+            if preview_maps:
+                routes['preview'] = os.path.join(
+                    preview_maps, os.path.splitext(os.path.basename(mapfile))[0] + '.json')
         else:
             notes.append('declares no map')
+
         injector, const = by_chapter.get(short, (None, None))
         if injector is None:
             notes.append('no injector registers a map for it (painted but not hosted yet)')
         else:
-            layout = getattr(bc, const, None)
-            if layout is None:
-                notes.append('%s registers %s, which build_campaign does not define'
-                             % (injector, const))
+            claimed.add(short)
+            if const not in stems:
+                problems.append(('undefined-layout',
+                                 '%s registers %s, which build_campaign does not define'
+                                 % (injector, const)))
             else:
                 campaign = rel.split(os.sep)[1]
                 routes['build'] = os.path.join(REPO, 'campaigns', campaign, 'maps',
-                                               layout[1] + '.json')
-        rows.append((short, rel, routes, '; '.join(notes)))
+                                               stems[const] + '.json')
 
-    for injector, const in orphans:
-        rows.append((None, None, {},
-                     '%s registers a chapter map through %s, and this guard cannot tell which '
-                     'chapter it belongs to -- teach _chapter_of_injector the new name'
-                     % (injector, const)))
+        if short in want:
+            for name in ('gate', 'build', 'preview'):
+                if name not in routes:
+                    problems.append(('hosted-route-missing',
+                                     '%s is HOSTED but has no %s route (%s)'
+                                     % (short, name, '; '.join(notes) or 'route unresolved')))
+        if len(set(routes.values())) > 1:
+            named = ', '.join('%s -> %s' % (name, os.path.relpath(path, REPO))
+                              for name, path in sorted(routes.items()))
+            problems.append(('disagree',
+                             '%s: the routes to its map sidecar disagree (%s) -- the gate would '
+                             'grade a file the cartridge never loads' % (short, named)))
+        rows.append({'short': short, 'rel': rel, 'routes': routes,
+                     'note': '; '.join(notes), 'problems': problems})
+
+    for short in sorted(want - claimed):
+        rows.append({'short': short, 'rel': None, 'routes': {}, 'note': '', 'problems': [
+            ('hosted-unmatched',
+             '%s is HOSTED and its registered map belongs to no chapter YAML -- an id that '
+             'stopped lining up reads as "not hosted yet" and silently drops out' % short)]})
+
+    for short in sorted(set(by_chapter) - claimed):
+        rows.append({'short': None, 'rel': None, 'routes': {}, 'note': '', 'problems': [
+            ('orphan-registration',
+             '%s registers a map for %s, and no chapter YAML has that id'
+             % (by_chapter[short][0], short))]})
     return rows
 
 
 def _sidecar_route_violations(rows):
-    """Where two routes name different files for one chapter, or a registration is unnamed."""
-    out = []
-    for short, rel, routes, note in rows:
-        if short is None:
-            out.append(note)
-            continue
-        if 'does not define' in note:
-            out.append('%s: %s' % (rel, note))
-            continue
-        seen = sorted(set(routes.values()))
-        if len(seen) > 1:
-            named = ', '.join('%s -> %s' % (name, os.path.relpath(path, REPO))
-                              for name, path in sorted(routes.items()))
-            out.append('%s: the routes to its map sidecar disagree (%s) -- the gate would grade '
-                       'a file the cartridge never loads' % (short, named))
-    return out
+    """Every structured problem the rows carry, in the order they were found."""
+    return [text for row in rows for _, text in row['problems']]
 
 
 def check_map_sidecar_routes_agree(fail):
@@ -1248,16 +1298,20 @@ def check_map_sidecar_routes_agree(fail):
     """
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
-        import map_placement_preview as pp
-    except ImportError as exc:      # Pillow absent on the lightweight checks job
-        print('check_map_sidecar_routes_agree: skipping (%s; the build job\'s `make test` '
-              'covers it)' % exc)
+        from inject import hosts
+    except Exception as exc:                      # pragma: no cover - import guard
+        fail.append('inject.hosts does not import, so the hosted-chapter floor for the sidecar '
+                    'routes is unknown: %s' % exc)
         return
-    path = os.path.join(REPO, 'tools', 'build_campaign.py')
-    with open(path, encoding='utf-8') as f:
-        text = f.read()
-    fail.extend(_sidecar_route_violations(
-        _sidecar_routes(text, list(_chapters()), pp.MAPS)))
+    finally:
+        sys.path.remove(os.path.join(REPO, 'tools'))
+    sources = []
+    for rel in ('tools/build_campaign.py', 'tools/map_placement_preview.py'):
+        with open(os.path.join(REPO, rel), encoding='utf-8') as f:
+            sources.append(f.read())
+    fail.extend(_sidecar_route_violations(_sidecar_routes(
+        sources[0], sources[1], list(_chapters()),
+        [h.name for h in hosts.hosted_chapters()])))
 
 
 def check_rescue_targets(fail):
