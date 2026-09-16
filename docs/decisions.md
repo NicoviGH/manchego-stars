@@ -4370,8 +4370,10 @@ the_retarget` was written, tested, and never added to `check.py`'s tuple in `mai
 executed only as a side effect of `check_tests_pass` re-invoking its test file as a
 subprocess — and that no-ops when `fireemblem8u/src` is absent, i.e. exactly the lightweight
 CI job it existed to protect. **Adding a check means registering it; the test proving the
-check works does not prove the check runs.** A test asserting the function appears in
-`main()`'s source is the cheap pin.
+check works does not prove the check runs.** The pin was a test asserting the function's NAME
+appears in `main()`'s source, which a comment mentioning the check satisfies too; since #372 the
+gate list is a module-level `CHECKS` tuple, so `check_every_gate_is_registered` answers this for
+every check at once and a per-check pin asserts the function OBJECT is in it.
 
 **A guard matching source text by NAME skips whatever is wrapped.** The same check searched
 for the literal `_inject_tile_changes`, while ch03 calls `_inject_ch03_tile_changes`. A
@@ -4566,9 +4568,10 @@ The split that survives: **`check.py` owns DISCOVERY** -- stdlib-only, so the le
 runs it for real -- and **the BUILD owns OWNERSHIP.** Discovery makes the id safe (it folds into
 `injector_message_ids`, so deadness is checked with no human step); ownership makes it accountable.
 
-The discovery guard is registered in `check.py`'s `main()` tuple and pinned by a test that reads
-that function's source, and it fails when the live scan finds zero literals -- both because of the
-lesson directly above. The build-time half is pinned the same way, by a test reading `main`.
+The discovery guard is registered in `check.py`'s `CHECKS` tuple and pinned by a test asserting
+the function object is in it, and it fails when the live scan finds zero literals -- both because
+of the lesson directly above. The build-time half is pinned by a test reading
+`build_campaign.main`, which has no such tuple to assert against.
 
 - **Dressing a portrait slot and NORMALIZING its mouth/eye window are two steps, and missing the
   second is silent** (2026-08-09, #25). `patch_portrait_geometry` only knew about `PORTRAIT_MAP`
@@ -8774,10 +8777,13 @@ reading.** "check_documented_tileset could not run" names no file, and the guard
 opening the sidecar can. So the per-guard error handling #371 added stays exactly as it was, and
 its rationale is now the message quality rather than the survival of the run.
 
-**Six comments asserted the old behaviour as load-bearing rationale** — three in `check.py`, two
-test docstrings, one in `build_campaign.map_tileset` — so the retired claim is registered in
-`DEAD_CONCEPTS` in the same commit (registry discipline; the same shape as the 29-character wrap
-that was written down three times and survived its own correction).
+**The old behaviour was written down nine times as load-bearing rationale** — four comments in
+`check.py`, one in `build_campaign.map_tileset`, and four test docstrings, each explaining why a
+guard handles its own errors the way it does. All nine are rewritten, and the retired claim is
+registered in `DEAD_CONCEPTS` in the same commit (registry discipline; the same shape as the
+29-character wrap that was written down three times and survived its own correction). Review
+caught the ninth and a stale prescription in this log — *"a test asserting the function appears in
+`main()`'s source is the cheap pin"* — which #372 replaces with the tuple and its own gate.
 
 The list itself moved out of `main()` to a module-level `CHECKS`, so there is one authoritative
 gate list and one loop that runs it; `main()` is now `fail = run_checks(CHECKS)` plus the report.
@@ -8785,7 +8791,11 @@ That also fixed how "is this check registered?" is asked. Four tests answered it
 `inspect.getsource(check.main)` for the check's NAME — a substring of the source, which a comment
 mentioning the check would satisfy just as well. They now assert the function OBJECT is in
 `CHECKS`, which is the thing that actually runs. The question is worth asking at all because
-defined-but-unregistered is how `check_tile_changes_outlive_the_retarget` shipped.
+defined-but-unregistered is how `check_tile_changes_outlive_the_retarget` shipped — and it is now
+asked once for every check rather than four times by hand: `check_every_gate_is_registered` reds
+the build when a `check_*` defined in the file is missing from the tuple. Thirty-five of the
+thirty-nine had no pin at all, and writing thirty-five more of them would have been the wrong
+shape; a module-level list makes it one guard.
 
 ## Open Questions (not yet decided)
 

@@ -187,7 +187,8 @@ class MessageLiteralDiscoveryGuard(unittest.TestCase):
     def test_a_malformed_source_is_REPORTED_not_raised(self):
         """callsites.signature turns SyntaxError into callsites.ParseError, which is not a
         SyntaxError -- so an `except (ValueError, SyntaxError)` let it escape and killed the
-        whole drift gate with a traceback, skipping every check after it (#356 review)."""
+        whole drift gate with a traceback, skipping every check after it (#356 review). Since
+        #372 that escape costs this check rather than the gate, and it still costs the answer."""
         fail = self._fail('def inject_ch07(c):\n    set_message_body(lines, 0x1,\n')
         self.assertEqual(1, len(fail), fail)
         self.assertIn('cannot scan', fail[0])

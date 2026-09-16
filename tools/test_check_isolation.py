@@ -22,7 +22,7 @@ import io
 import os
 import sys
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -113,11 +113,77 @@ class PerCheckIsolation(unittest.TestCase):
             _quietly([check_interrupted, check_after])
         self.assertEqual(ran, [])
 
-    def test_main_runs_the_authoritative_list_through_the_isolating_loop(self):
-        """The list in CHECKS is what `make check` runs -- no second, bare loop."""
-        self.assertTrue(check.CHECKS)
-        for c in check.CHECKS:
-            self.assertTrue(c.__name__.startswith('check_'), c.__name__)
+    def test_main_runs_the_authoritative_list_through_run_checks(self):
+        """`CHECKS` is only authoritative if `main()` is what runs it.
+
+        Asserting the tuple's shape proves nothing about the gate: a bare loop reintroduced
+        in `main()` would pass every other test in this file. So this pins the call.
+        """
+        seen = []
+        real = check.run_checks
+        check.run_checks = lambda checks, fail=None: seen.append(checks) or []
+        try:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = check.main()
+        finally:
+            check.run_checks = real
+        self.assertEqual(seen, [check.CHECKS])
+        self.assertEqual(rc, 0)
+        self.assertIn('drift check: clean', buf.getvalue())
+
+    def test_main_reds_and_lists_every_finding_it_was_handed(self):
+        """The other half of `main()`'s contract, unchanged by isolation."""
+        real = check.run_checks
+        check.run_checks = lambda checks, fail=None: ['first drift', 'second drift']
+        try:
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                rc = check.main()
+        finally:
+            check.run_checks = real
+        self.assertEqual(rc, 1)
+        self.assertIn('DRIFT (2)', buf.getvalue())
+        self.assertIn('first drift', buf.getvalue())
+        self.assertIn('second drift', buf.getvalue())
+
+
+class EveryGateIsRegistered(unittest.TestCase):
+    """A check defined but left out of `CHECKS` never runs, and nothing says so.
+
+    That is how `check_tile_changes_outlive_the_retarget` shipped: it executed only as a side
+    effect of `check_tests_pass` re-invoking its test file, which no-ops when
+    `fireemblem8u/src` is absent -- exactly the lightweight CI job it existed to protect.
+    Four checks carry their own hand-written registration test; the other 35 carried nothing,
+    and hoisting the list to a module-level `CHECKS` is what makes the question answerable in
+    one place for all of them.
+    """
+
+    def test_the_live_gate_registers_every_check_it_defines(self):
+        fail = []
+        check.check_every_gate_is_registered(fail)
+        self.assertEqual(fail, [])
+
+    def test_the_guard_registers_itself(self):
+        self.assertIn(check.check_every_gate_is_registered, check.CHECKS)
+
+    def test_a_defined_but_unregistered_gate_is_reported(self):
+        def check_zzz_probe(fail):
+            pass
+
+        # `__module__` is what the guard reads to mean "defined in check.py" -- so an
+        # imported `check_*` from elsewhere is not demanded of the tuple. The probe has to
+        # carry check.py's attribution to stand in for a check defined there.
+        check_zzz_probe.__module__ = check.__name__
+        check.check_zzz_probe = check_zzz_probe
+        try:
+            fail = []
+            check.check_every_gate_is_registered(fail)
+        finally:
+            del check.check_zzz_probe
+        self.assertEqual(len(fail), 1, fail)
+        self.assertIn('check_zzz_probe', fail[0])
+        self.assertIn('CHECKS', fail[0])
 
 
 if __name__ == '__main__':

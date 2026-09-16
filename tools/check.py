@@ -1301,8 +1301,9 @@ def check_decomp_git_calls_strip_the_env(fail, sources=None):
         try:
             tree = ast.parse(text, rel)
         except SyntaxError as exc:
-            # Report; do NOT traceback. This runs in the pre-commit hook, where a traceback
-            # kills the gate and skips every check after it.
+            # Report; do NOT traceback. #372 would contain the crash to this check, but
+            # it would still cost every remaining file's scan, and the report has to name
+            # the file that will not parse.
             fail.append('%s does not parse, so it cannot be checked: %s' % (rel, exc))
             continue
         for node in ast.walk(tree):
@@ -2585,6 +2586,31 @@ def check_lane_ownership(fail):
               % (path, owner))
 
 
+def check_every_gate_is_registered(fail):
+    """Every `check_*` defined in this file is in `CHECKS` (#372).
+
+    A check defined but left out of the list never runs, and nothing says so -- it is
+    indistinguishable from a check that passes. That is how
+    `check_tile_changes_outlive_the_retarget` shipped: it executed only as a side effect of
+    `check_tests_pass` re-invoking its own test file, which no-ops when `fireemblem8u/src` is
+    absent, i.e. exactly the lightweight CI job it existed to protect.
+
+    Four checks answer this question with a hand-written registration test of their own. The
+    other 35 answered nothing, and writing 35 more would be the wrong shape; hoisting the
+    list to a module-level `CHECKS` is what makes it answerable once, here, for all of them.
+
+    `def check_*` in this file IS a gate -- the convention the module docstring states -- so a
+    helper that is not one belongs under a different name, and gets told so by this guard.
+    """
+    registered = {c.__name__ for c in CHECKS}
+    for name, obj in sorted(globals().items()):
+        if (name.startswith('check_') and callable(obj)
+                and getattr(obj, '__module__', None) == __name__
+                and name not in registered):
+            fail.append('%s is defined but not in CHECKS, so `make check` never runs it -- '
+                        'add it to the tuple (a check nothing runs cannot fail)' % name)
+
+
 # The authoritative gate list: one check_* per gate, run through run_checks() and never a
 # bare loop (#372).
 CHECKS = (
@@ -2603,6 +2629,7 @@ CHECKS = (
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
     check_wrap_widths_are_pixels, check_vanilla_reads_come_from_head,
     check_message_literals_are_registered, check_handoff_only_on_main, check_lane_ownership,
+    check_every_gate_is_registered,
 )
 
 
