@@ -5842,8 +5842,9 @@ def map_tileset(meta):
     if not isinstance(meta, dict):
         # `null`, `[]` and a bare string are all valid JSON and none of them has `.get`.
         # Raising here rather than AttributeError-ing from inside means every caller --
-        # including `check.py`, whose `main` runs ~30 checks with no isolation -- can catch
-        # a malformed sidecar as the data error it is instead of a traceback.
+        # including `check.py`'s guards, which would otherwise report a check that "could
+        # not run" instead of naming the file -- can catch a malformed sidecar as the data
+        # error it is instead of a traceback.
         raise ValueError('map sidecar is %s, not a JSON object' % type(meta).__name__)
     return meta.get('tileset', WINTER_TILESET)
 WINTER_TEST_LAYOUT = ('ChTestSnowMap', 'ch-test-snowfield')  # (asset label, campaign source stem)

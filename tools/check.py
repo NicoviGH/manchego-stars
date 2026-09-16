@@ -2,7 +2,7 @@
 """Repo drift guard. ONE source of check logic, run by CI, the git pre-commit hook,
 and `make check`. Keeps doc/plan drift from landing.
 
-Catches (main() is the authoritative list -- one check_* per gate): compile/parse
+Catches (CHECKS is the authoritative list -- one check_* per gate): compile/parse
 gates (Python tooling, unit tests, campaign YAML), doc/comment drift (dangling
 tools/docs references, resurrected "dead concepts" -- abandoned tool names, dead
 symbols, retired implementation phrases -- everywhere except decisions.md, the ADR
@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -103,6 +104,15 @@ DEAD_CONCEPTS = [
     r'Sahnar.{0,20}rises? (?:HOSTILE )?(?:at|with) the eruption',
     r'scene 6 (?:does not inherit|needs a backdrop)',
     r'the one place the twin fails us',
+    # retired by #372 (2026-09-15): `run_checks` isolates every check, so one raising no
+    # longer takes the gate down with it. The claim that it does was written down SIX times
+    # (three comments in this file, two test docstrings, one in build_campaign) and each was
+    # load-bearing rationale for how a guard handles its own errors -- exactly the shape the
+    # registry exists for. A guard still catches what it can name; what changed is the blast
+    # radius, not the duty.
+    r'`?main\(?\)?`? (?:runs|calls) (?:every|~?\d+|all) checks? with (?:no|zero)',
+    r'(?:no|zero) per-check (?:exception )?isolation in `?main',
+    r'runs them with no isolation',
     # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
     # false for every chapter, including ones that plainly have prep) and citing it as evidence is
     # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
@@ -1086,9 +1096,9 @@ def _chapter_sidecar(rel, d):
 
     `splitext`, never `.replace('.mar', '.json')`: ch07/ch08 declare `.tmx` map files, which
     that replace silently no-ops on, handing an unchanged `.tmx` path straight to
-    `json.load`. Nothing has one on disk today, so it was a latent crash -- and with no
-    per-check isolation in `main`, one would have taken down the whole drift guard and every
-    check after it. The whole declared `map.file` is joined too, rather than its basename, so
+    `json.load`. Nothing has one on disk today, so it was a latent crash -- and until #372
+    it would have taken the whole drift guard down with it. The whole declared `map.file` is
+    joined too, rather than its basename, so
     a path with a subdirectory in it resolves instead of quietly losing the directory."""
     mapfile = ((d.get('map') or {}).get('file'))
     if not mapfile:
@@ -1115,8 +1125,9 @@ def check_documented_tileset(fail):
             with open(sidecar, encoding='utf-8') as f:
                 effective = bc.map_tileset(json.load(f))
         except (ValueError, OSError) as exc:
-            # `main` runs every check with no isolation, so one malformed sidecar would take
-            # the whole drift guard down with a traceback -- and every check after it.
+            # `run_checks` would now contain a raised JSONDecodeError to this check
+            # (#372), but "check_documented_tileset could not run" does not say WHICH
+            # sidecar. Caught here, the drift names the file that has to be fixed.
             fail.append('%s: map sidecar %s is unreadable (%s: %s)'
                         % (rel, os.path.relpath(sidecar, REPO), type(exc).__name__, exc))
             continue
@@ -1149,7 +1160,8 @@ def check_rescue_targets(fail):
         except Exception as exc:    # noqa: BLE001
             # The map is compiled, so ANY failure reading it is a real problem. Both obvious
             # handlings are wrong: swallowing it skips a hard gate silently, and letting it
-            # propagate crashes every OTHER check too (`main` runs them with no isolation).
+            # propagate loses the chapter's name and the chapters behind it in the loop
+            # (#372 contains the crash to this check, but it reports the CHECK, not the map).
             # Report it as drift -- attributed, no traceback, rest of the run intact.
             fail.append('%s: rescue-target gate could not read the map (%s: %s) -- this gate '
                         'did not run for this chapter' % (short, type(exc).__name__, exc))
@@ -1289,8 +1301,9 @@ def check_decomp_git_calls_strip_the_env(fail, sources=None):
         try:
             tree = ast.parse(text, rel)
         except SyntaxError as exc:
-            # Report; do NOT traceback. This runs in the pre-commit hook, where a traceback
-            # kills the gate and skips every check after it.
+            # Report; do NOT traceback. #372 would contain the crash to this check, but
+            # it would still cost every remaining file's scan, and the report has to name
+            # the file that will not parse.
             fail.append('%s does not parse, so it cannot be checked: %s' % (rel, exc))
             continue
         for node in ast.walk(tree):
@@ -2573,36 +2586,85 @@ def check_lane_ownership(fail):
               % (path, owner))
 
 
+def check_every_gate_is_registered(fail):
+    """Every `check_*` defined in this file is in `CHECKS` (#372).
+
+    A check defined but left out of the list never runs, and nothing says so -- it is
+    indistinguishable from a check that passes. That is how
+    `check_tile_changes_outlive_the_retarget` shipped: it executed only as a side effect of
+    `check_tests_pass` re-invoking its own test file, which no-ops when `fireemblem8u/src` is
+    absent, i.e. exactly the lightweight CI job it existed to protect.
+
+    Four checks answer this question with a hand-written registration test of their own. The
+    other 35 answered nothing, and writing 35 more would be the wrong shape; hoisting the
+    list to a module-level `CHECKS` is what makes it answerable once, here, for all of them.
+
+    `def check_*` in this file IS a gate -- the convention the module docstring states -- so a
+    helper that is not one belongs under a different name, and gets told so by this guard.
+    """
+    registered = {c.__name__ for c in CHECKS}
+    for name, obj in sorted(globals().items()):
+        if (name.startswith('check_') and callable(obj)
+                and getattr(obj, '__module__', None) == __name__
+                and name not in registered):
+            fail.append('%s is defined but not in CHECKS, so `make check` never runs it -- '
+                        'add it to the tuple (a check nothing runs cannot fail)' % name)
+
+
+# The authoritative gate list: one check_* per gate, run through run_checks() and never a
+# bare loop (#372).
+CHECKS = (
+    check_python_compiles, check_lua_chunks_load, check_lua_local_headroom,
+    check_hosted_chapters_declared, check_tests_pass, check_yaml_parses, check_chapter_status,
+    check_chapter_deployment_schema, check_personal_line_injection_routes,
+    check_injection_order, check_cached_steps_are_config_invariant,
+    check_tile_changes_outlive_the_retarget, check_playtest_matrix,
+    check_rom_configs_reach_the_build, check_decomp_git_calls_strip_the_env,
+    check_no_shadowed_definitions, check_gate_chapter_window, check_declared_cases,
+    check_chapter_lua_facts, check_rescue_targets, check_rescue_fuse_forecast,
+    check_documented_tileset, check_harness_local_ratchet, check_verdict_scenarios_are_guarded,
+    check_no_hardcoded_symbol_addresses, check_tool_refs_exist, check_no_dead_concepts,
+    check_generated_indexes_fresh, check_engine_guards_present,
+    check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
+    check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
+    check_wrap_widths_are_pixels, check_vanilla_reads_come_from_head,
+    check_message_literals_are_registered, check_handoff_only_on_main, check_lane_ownership,
+    check_every_gate_is_registered,
+)
+
+
+def run_checks(checks, fail=None):
+    """Run every check, containing a crash to the check that crashed (#372).
+
+    Before this, main() ran the list in a bare loop: one check raising took down the whole
+    drift guard and every check behind it, with a raw traceback and an exit that named
+    nothing. That is what made a wrong assumption inside any one guard severe -- five review
+    rounds on #371 each found a defect in code written to make ONE check defensive, because
+    with no isolation every guard is load-bearing for the entire gate.
+
+    The call, made on #372 before the loop was written, because it sets `make check`'s exit
+    semantics: an errored check goes into `fail`. A check that could not run is not a check
+    that passed, and the alternative -- print and continue -- is the silently-green gate that
+    #371 kept hitting. `fail` gets one scannable line; the traceback goes to stderr, where it
+    stays fixable without burying the report. BaseException is deliberately NOT caught: a
+    Ctrl-C is the operator talking, not a check failing.
+    """
+    fail = [] if fail is None else fail
+    for check in checks:
+        try:
+            check(fail)
+        except Exception as exc:
+            traceback.print_exc()
+            # Flattened: a SyntaxError's str() is multi-line, and `fail` prints as a bullet
+            # list.
+            detail = ' '.join(('%s: %s' % (type(exc).__name__, exc)).split())
+            fail.append('%s could not run -- %s (traceback on stderr). A check that cannot '
+                        'run is not a check that passed.' % (check.__name__, detail))
+    return fail
+
+
 def main():
-    fail = []
-    for check in (check_python_compiles, check_lua_chunks_load,
-                  check_lua_local_headroom, check_hosted_chapters_declared,
-                  check_tests_pass, check_yaml_parses,
-                  check_chapter_status, check_chapter_deployment_schema,
-                  check_personal_line_injection_routes,
-                  check_injection_order, check_cached_steps_are_config_invariant,
-                  check_tile_changes_outlive_the_retarget,
-                  check_playtest_matrix, check_rom_configs_reach_the_build,
-                  check_decomp_git_calls_strip_the_env,
-                  check_no_shadowed_definitions, check_gate_chapter_window,
-                  check_declared_cases, check_chapter_lua_facts,
-                  check_rescue_targets, check_rescue_fuse_forecast,
-                  check_documented_tileset,
-                  check_harness_local_ratchet,
-                  check_verdict_scenarios_are_guarded,
-                  check_no_hardcoded_symbol_addresses,
-                  check_tool_refs_exist, check_no_dead_concepts,
-                  check_generated_indexes_fresh, check_engine_guards_present,
-                  check_purple_bank_blankers_known,
-                  check_engine_campaign_agnostic,
-                  check_save_layout_stable, check_every_test_actually_runs,
-                  check_recordenemy_knows_every_raw_pid,
-                  check_wrap_widths_are_pixels,
-                  check_vanilla_reads_come_from_head,
-                  check_message_literals_are_registered,
-                  check_handoff_only_on_main,
-                  check_lane_ownership):
-        check(fail)
+    fail = run_checks(CHECKS)
     if fail:
         print('DRIFT (%d):' % len(fail))
         for f in fail:

@@ -4370,8 +4370,10 @@ the_retarget` was written, tested, and never added to `check.py`'s tuple in `mai
 executed only as a side effect of `check_tests_pass` re-invoking its test file as a
 subprocess — and that no-ops when `fireemblem8u/src` is absent, i.e. exactly the lightweight
 CI job it existed to protect. **Adding a check means registering it; the test proving the
-check works does not prove the check runs.** A test asserting the function appears in
-`main()`'s source is the cheap pin.
+check works does not prove the check runs.** The pin was a test asserting the function's NAME
+appears in `main()`'s source, which a comment mentioning the check satisfies too; since #372 the
+gate list is a module-level `CHECKS` tuple, so `check_every_gate_is_registered` answers this for
+every check at once and a per-check pin asserts the function OBJECT is in it.
 
 **A guard matching source text by NAME skips whatever is wrapped.** The same check searched
 for the literal `_inject_tile_changes`, while ch03 calls `_inject_ch03_tile_changes`. A
@@ -4566,9 +4568,10 @@ The split that survives: **`check.py` owns DISCOVERY** -- stdlib-only, so the le
 runs it for real -- and **the BUILD owns OWNERSHIP.** Discovery makes the id safe (it folds into
 `injector_message_ids`, so deadness is checked with no human step); ownership makes it accountable.
 
-The discovery guard is registered in `check.py`'s `main()` tuple and pinned by a test that reads
-that function's source, and it fails when the live scan finds zero literals -- both because of the
-lesson directly above. The build-time half is pinned the same way, by a test reading `main`.
+The discovery guard is registered in `check.py`'s `CHECKS` tuple and pinned by a test asserting
+the function object is in it, and it fails when the live scan finds zero literals -- both because
+of the lesson directly above. The build-time half is pinned by a test reading
+`build_campaign.main`, which has no such tuple to assert against.
 
 - **Dressing a portrait slot and NORMALIZING its mouth/eye window are two steps, and missing the
   second is silent** (2026-08-09, #25). `patch_portrait_geometry` only knew about `PORTRAIT_MAP`
@@ -8728,8 +8731,9 @@ is that they cannot quietly stop agreeing.
 
 **A gate that cannot read its map now REPORTS rather than skipping or crashing.**
 `check_rescue_targets` swallowed every exception from `terrain_grid` as a skip, which hides a
-hard gate not running. The two obvious repairs are both wrong: letting it propagate crashes every
-other check with it (`main` runs them with no isolation), and swallowing is what it already did.
+hard gate not running. The two obvious repairs were both wrong: letting it propagate crashed every
+other check with it (`main` ran them in a bare loop, until #372 below), and swallowing is what it
+already did.
 A missing map — a chapter with no compiled `.mar` yet — stays a legitimate skip; anything else
 appends to `fail`, attributed and without a traceback.
 
@@ -8741,6 +8745,57 @@ produced right answers and could have shipped unnoticed; it is now a gate rather
 coincidence. ch00–ch02 render for the first time; ch07/ch08 still have no compiled `.mar`, and
 now say so precisely — `terrain_grid` raises `MapNotCompiled` for them, while the CLI render
 path still surfaces the underlying `FileNotFoundError`.
+
+### A check that could not RUN is not a check that passed (2026-09-15, #372)
+
+`check.py`'s `main()` ran its 39 checks in a bare `for check in (...): check(fail)`. One check
+raising took down the whole drift guard and every check queued behind it, with a raw traceback and
+a non-zero exit that named nothing — so `make check`'s answer to "is this repo drifted?" was
+decided by whichever guard crashed first, and the ~29 gates behind it neither passed nor ran.
+
+**That loop is why a wrong assumption inside any single guard was severe.** Five review rounds on
+#371 each found a defect, and after the first, every one was in code written to make ONE
+`check.py` guard defensive: a `TypeError` comparing an unfiltered `None`, then two wrong
+discriminators (`except FileNotFoundError`, which a missing tileset *directory* also raises; then
+a sidecar-only existence test, when `load_map` opens the `.mar` too), then an `AttributeError`
+escaping a two-type `except` because `null` / `[]` / `"str"` are all valid JSON without `.get`.
+With no isolation every guard is load-bearing for the entire gate, so each of those was an outage
+rather than a line of output.
+
+**An errored check goes into `fail`.** This was the call to make before writing the loop, because
+it sets `make check`'s exit semantics, and the alternatives are worse in the direction that
+matters. Printing and continuing without failing gives a green CI on a gate that silently did not
+run — the exact failure mode #371 kept hitting. Letting it propagate is the outage. So a check
+that raises is reported as drift, attributed to itself by name, and the run continues: `fail` gets
+one scannable line (flattened, because a `SyntaxError`'s `str()` is multi-line and `fail` prints
+as a bullet list), and the full traceback goes to stderr where it stays fixable without burying
+the report. `BaseException` is deliberately not caught — a Ctrl-C is the operator talking, not a
+check failing.
+
+**Isolation lowers the blast radius; it does not relieve a guard of knowing what it was
+reading.** "check_documented_tileset could not run" names no file, and the guard that was
+opening the sidecar can. So the per-guard error handling #371 added stays exactly as it was, and
+its rationale is now the message quality rather than the survival of the run.
+
+**The old behaviour was written down nine times as load-bearing rationale** — four comments in
+`check.py`, one in `build_campaign.map_tileset`, and four test docstrings, each explaining why a
+guard handles its own errors the way it does. All nine are rewritten, and the retired claim is
+registered in `DEAD_CONCEPTS` in the same commit (registry discipline; the same shape as the
+29-character wrap that was written down three times and survived its own correction). Review
+caught the ninth and a stale prescription in this log — *"a test asserting the function appears in
+`main()`'s source is the cheap pin"* — which #372 replaces with the tuple and its own gate.
+
+The list itself moved out of `main()` to a module-level `CHECKS`, so there is one authoritative
+gate list and one loop that runs it; `main()` is now `fail = run_checks(CHECKS)` plus the report.
+That also fixed how "is this check registered?" is asked. Four tests answered it by grepping
+`inspect.getsource(check.main)` for the check's NAME — a substring of the source, which a comment
+mentioning the check would satisfy just as well. They now assert the function OBJECT is in
+`CHECKS`, which is the thing that actually runs. The question is worth asking at all because
+defined-but-unregistered is how `check_tile_changes_outlive_the_retarget` shipped — and it is now
+asked once for every check rather than four times by hand: `check_every_gate_is_registered` reds
+the build when a `check_*` defined in the file is missing from the tuple. Thirty-five of the
+thirty-nine had no pin at all, and writing thirty-five more of them would have been the wrong
+shape; a module-level list makes it one guard.
 
 ## Open Questions (not yet decided)
 
