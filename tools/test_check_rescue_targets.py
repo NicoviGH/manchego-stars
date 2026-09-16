@@ -63,10 +63,9 @@ class TheGateSurvivesAnUngroundedRosterEntry(unittest.TestCase):
     every roster key -- calls `difficulty.enemy_ai_bytes` on `reinforcements:` and
     `enemy_reinforcements:` entries too, and that call RAISES on an entry with neither
     `donor:` nor `ai_override:` (a normal mid-draft state while a chapter is being
-    authored). No live chapter combines `rescue_boats` with such an entry today, but
-    `check.py`'s `main()` calls every check with zero per-check exception isolation, so this
-    is not a print-and-skip away from crashing the WHOLE gate for an unrelated future
-    chapter -- it is one YAML edit away."""
+    authored). No live chapter combines `rescue_boats` with such an entry today, so this is
+    one YAML edit -- not a refactor -- away from an unrelated future chapter taking this gate
+    out for every chapter. Before #372 it took out the whole drift guard with it."""
 
     def _ch06_with_ungrounded_wave(self):
         import copy

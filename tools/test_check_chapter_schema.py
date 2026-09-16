@@ -226,9 +226,9 @@ class TestDocumentedTileset(unittest.TestCase):
 
     def test_a_tmx_map_file_resolves_to_a_json_sidecar_not_itself(self):
         """ch07/ch08 declare `.tmx` map files. A `.replace('.mar', '.json')` no-ops on those,
-        so the unchanged `.tmx` path went straight into `json.load` -- and with no per-check
-        isolation in `main()`, one real `.tmx` on disk would take down the whole drift guard
-        and every check after it."""
+        so the unchanged `.tmx` path went straight into `json.load` -- and until #372, one
+        real `.tmx` on disk would have taken down the whole drift guard and every check after
+        it."""
         got = check._chapter_sidecar('campaigns/rime-of-the-frostmaiden/chapters/ch07.yaml',
                                      {'map': {'file': 'maps/ch07-blood-in-bremen.tmx'}})
         self.assertTrue(got.endswith('maps/ch07-blood-in-bremen.json'), got)
@@ -268,9 +268,9 @@ class TestDocumentedTileset(unittest.TestCase):
                     check.REPO, check._chapters = original_repo, original_chapters
 
     def test_a_malformed_sidecar_is_reported_not_a_traceback_through_main(self):
-        """`main` runs every check with no isolation, so an unguarded `json.load` on a
-        corrupt sidecar would take the whole drift guard down -- and every check after it --
-        with a raw JSONDecodeError. It is drift, reported and attributed."""
+        """An unguarded `json.load` on a corrupt sidecar raises a JSONDecodeError, which
+        since #372 costs this check rather than the whole gate -- and "check_documented_tileset
+        could not run" names no file. It is drift, reported and attributed."""
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             maps = os.path.join(tmp, 'campaigns', 'c', 'maps')

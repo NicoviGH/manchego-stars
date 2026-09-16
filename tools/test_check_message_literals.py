@@ -197,9 +197,7 @@ class MessageLiteralDiscoveryGuard(unittest.TestCase):
         it ran only via the test subprocess, which check_tests_pass skips whenever
         fireemblem8u/src is absent -- exactly the lightweight CI job it was meant to protect
         (decisions.md 2026-09-02)."""
-        import inspect
-        self.assertIn('check_message_literals_are_registered',
-                      inspect.getsource(check.main))
+        self.assertIn(check.check_message_literals_are_registered, check.CHECKS)
 
     def test_the_live_tree_is_clean(self):
         fail = []

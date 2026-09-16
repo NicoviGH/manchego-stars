@@ -224,9 +224,7 @@ class TestTileChangesOutliveTheRetarget(unittest.TestCase):
         # Defined-but-unregistered is how this guard shipped: it ran only via the test
         # subprocess, which check_tests_pass skips whenever fireemblem8u/src is absent --
         # exactly the lightweight CI job it was meant to protect.
-        import inspect
-        src = inspect.getsource(check.main)
-        self.assertIn('check_tile_changes_outlive_the_retarget', src)
+        self.assertIn(check.check_tile_changes_outlive_the_retarget, check.CHECKS)
 
     def test_the_real_build_campaign_satisfies_it(self):
         fail = []

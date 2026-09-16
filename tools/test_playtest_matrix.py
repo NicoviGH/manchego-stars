@@ -1505,8 +1505,8 @@ class RomConfigsReachTheBuild(unittest.TestCase):
         self.assertEqual([], self._fail(None, None))
 
     def test_the_check_is_registered_in_the_drift_gate(self):
-        import check, inspect
-        self.assertIn('check_rom_configs_reach_the_build', inspect.getsource(check.main))
+        import check
+        self.assertIn(check.check_rom_configs_reach_the_build, check.CHECKS)
 
 
 class RomConfigReachesEveryRegistry(unittest.TestCase):
@@ -1600,8 +1600,8 @@ class NoShadowedDefinitions(unittest.TestCase):
         self.assertIn('defines a twice', fail[0])
 
     def test_the_check_is_registered_in_the_drift_gate(self):
-        import check, inspect
-        self.assertIn('check_no_shadowed_definitions', inspect.getsource(check.main))
+        import check
+        self.assertIn(check.check_no_shadowed_definitions, check.CHECKS)
 
 
 class GitEnvGuardRejectsEvasions(unittest.TestCase):
