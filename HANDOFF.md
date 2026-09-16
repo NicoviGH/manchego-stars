@@ -6,35 +6,23 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-15 (Claude), after #369/#370/#371 merged. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-16 (Claude), after #372/#374/#373 merged. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing. The tree is clean on `main` and no branch is open.** #371 squash-merged 2026-09-15
-(`e3ff529`); every feature branch is deleted and pruned.
+**Nothing. The tree is clean on `main` and no branch is open.** #373 squash-merged 2026-09-16
+(`09fa19e`); every feature branch is deleted and pruned.
 
-## Next task: three filed follow-ups off #371, in this order
-
-All three are SMALL and self-contained, and each carries its own Definition of Done on the
-issue -- read the issue, don't re-derive it here.
-
-1. **#372 -- `check.py`'s `main()` has no per-check isolation.** The highest-value of the
-   three and the reason the other two are only findings rather than outages. One raising
-   check kills the whole drift guard and the ~29 after it. ⚠️ **Make the design call FIRST**
-   (what an errored check does -- the issue lays out the options and a recommendation); the
-   loop itself is ~5 lines.
-2. **#374 -- two `map_changes` sites still hardcode `WINTER_TILESET`.** Mechanically simple.
-   ⚠️ Touches ROM-build metatile resolution, so it needs an OUTPUT DIFF of the emitted
-   change lists, not just green tests.
-3. **#373 -- the gate and the build locate a chapter's map sidecar by different routes.**
-   The subtlest of the three; prefer a guard that the two agree over making either
-   authoritative (the issue explains why -- #371's first attempt picked the wrong winner).
+## Next task: the rest of ch06 (#26)
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
-humans. **`make chapter CH=ch06` is the state; #26's body is the remaining work.**
+humans. What is left: the three cutscenes, the boarding pass, Messie's portrait and wiring, the
+merfolk reskins. Dialogue still waits on voice bibles for the boat crews. **`make chapter CH=ch06`
+is the state; #26's body is the remaining work.** **#377** (below) is the one loose tooling
+thread and is not a prerequisite.
 
 ## PARKED — nothing. ch06's fuse is answered and fixed
 
@@ -65,6 +53,10 @@ construction.
   ⚠️ **ch07 is the one to watch** -- it reuses FE8 Ch6 as its bar, so honest parity there hands
   the party an extra chapter of exp the vanilla curve does not contain, and the per-chapter gate
   cannot see it.
+- **#377** -- the tileset default is re-declared in `map_donor` (which is stdlib-only BY
+  DESIGN and regex-parses `build_campaign`'s source, so `bc.map_tileset` is not available to it)
+  and four more times in `import_map_layout`, on the side that WRITES sidecars. Opened 2026-09-16
+  off #374's review. Needs a call on where a campaign's keyless-sidecar default lives.
 - **#365** -- guard: a hosted chapter DECLARES its fog, and a census over the rest of
   `ROMChapterData`. Opened 2026-09-04 while hosting ch06.
 - **#337** -- guard: a cutscene must LOAD every character it stages (the permadeath invariant).
@@ -72,11 +64,6 @@ construction.
 - **#30** -- `campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one from ch04 on.
   Nothing reads it, so it misleads rather than breaks. Cheap since #312: one reader
   (`tools/campaign_chapters.py`) means the block can be DERIVED rather than hand-kept.
-
-## After the follow-ups: the rest of ch06 (#26)
-
-The three cutscenes, the boarding pass, Messie's portrait and wiring, the merfolk reskins.
-Dialogue still waits on voice bibles for the boat crews. `make chapter CH=ch06` is the state.
 
 ## Map sprites — read before any art session
 
@@ -86,6 +73,17 @@ why a decomp sheet's palette is a meaningless leftover, what `footprint:` actual
 WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
+
+**#372 / #374 / #373 (2026-09-16) — the three follow-ups off #371, all merged.** Three ADRs in
+`docs/decisions.md` carry them and are deliberately not restated: *"A check that could not RUN is
+not a check that passed"*, *"The tileset's one home had three more callers, and they were the ones
+writing TILES"*, and *"Three routes to one sidecar, and the fix is that they must AGREE"*.
+⚠️ **Two things a fresh session should know before writing a new guard**, both from the reviews:
+a `check_*` is now registered in a module-level `CHECKS` tuple that `check_every_gate_is_registered`
+polices, so a per-check "is it registered" test is no longer worth writing; and **a guard that
+imports `build_campaign` or `map_placement_preview` cannot run on the CI `checks` job** — pyyaml
+only, no submodule — which is where `tools/check.py` actually runs. Read from source, like
+`_injection_call_sequence` and `map_donor` do.
 
 **#369 / #370 / #371 (2026-09-15) — the rescue-fuse forecast, ch06's east pursuer, and the
 tileset's one home.** Three ADRs in `docs/decisions.md` carry all of it and are deliberately
@@ -101,8 +99,7 @@ actually ask.
 preconditions.** `check.py` guessed twice at what `load_map` needs -- by exception type, then by
 testing for the sidecar -- and both drifted from what it actually opens. `MapNotCompiled` now
 lives with the reader. Five review rounds on #371, and after the first, every finding was in
-code written to make a `check.py` guard defensive; **#372 (per-check isolation) is why that
-class was severe at all** and is the first follow-up for a reason.
+code written to make a `check.py` guard defensive -- which is why #372 landed first.
 
 **#368 (2026-09-05, MERGED `7786bc5`) — mirror%, and ch02 was never counting its own wave.**
 One ADR in `docs/decisions.md` carries it: *"A parity ratio does not say how much of the twin it
