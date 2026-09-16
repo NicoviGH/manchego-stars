@@ -1134,6 +1134,132 @@ def check_documented_tileset(fail):
         fail.extend(_documented_tileset_violations(rel, d, effective))
 
 
+# --- the three routes to a chapter's map sidecar (#373) ---------------------------------
+# Which sidecar JSON belongs to a chapter is answered in three places, by three different
+# routes: this gate derives it from the YAML's `map.file`; the BUILD gets its stem from the
+# `CHxx_LAYOUT` constants and never reads `map.file` at all; the PREVIEW takes
+# `basename(map.file)` against its own campaign root. They agree today, and nothing made them.
+_REGISTER_CHAPTER_MAP = re.compile(r'_register_chapter_map\(\s*maps_dir,\s*([A-Z][A-Z0-9_]*)')
+
+
+def _build_registered_layouts(text):
+    """{injector name: layout CONSTANT name} for every chapter map the build registers.
+
+    Read from `build_campaign`'s SOURCE, like `_injection_call_sequence` above it, so a newly
+    hosted chapter joins this gate the moment its injector registers a map -- a hand-kept table
+    here would be a fourth place to disagree about the same fact. Matched per injector BODY
+    rather than across the file, so a call cannot be attributed to whatever `def` preceded it.
+    """
+    out = {}
+    for m in re.finditer(r'^def (inject_\w+)\(.*?(?=^def |\Z)', text, re.M | re.S):
+        hit = _REGISTER_CHAPTER_MAP.search(m.group(0))
+        if hit:
+            out[m.group(1)] = hit.group(1)
+    return out
+
+
+def _chapter_of_injector(name):
+    """`inject_ch04` -> `ch04`; the prologue is ch00. None = a shape to be TAUGHT, not skipped."""
+    if name == 'inject_prologue':
+        return 'ch00'
+    m = re.fullmatch(r'inject_(ch\d\d)', name)
+    return m.group(1) if m else None
+
+
+def _sidecar_routes(text, chapters, preview_maps):
+    """One (short id, rel, {route: path}, note) row per chapter, plus rows for registrations
+    that cannot be attributed to a chapter at all.
+
+    A route missing from the dict is a route that has nothing to say about this chapter -- a
+    chapter with no `map.file`, or one whose map is painted but not yet hosted. `note` says
+    which, so "this guard skipped it" and "there was nothing to check" stop looking alike.
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import build_campaign as bc
+
+    layouts = _build_registered_layouts(text)
+    rows, by_chapter, orphans = [], {}, []
+    for injector, const in sorted(layouts.items()):
+        short = _chapter_of_injector(injector)
+        if short is None:
+            orphans.append((injector, const))
+        else:
+            by_chapter[short] = (injector, const)
+
+    for rel, d in chapters:
+        short = str(d.get('id', '')).split('-')[0]
+        mapfile = ((d.get('map') or {}).get('file'))
+        routes, notes = {}, []
+        gate = _chapter_sidecar(rel, d)
+        if gate:
+            routes['gate'] = gate
+            routes['preview'] = os.path.join(
+                preview_maps, os.path.splitext(os.path.basename(mapfile))[0] + '.json')
+        else:
+            notes.append('declares no map')
+        injector, const = by_chapter.get(short, (None, None))
+        if injector is None:
+            notes.append('no injector registers a map for it (painted but not hosted yet)')
+        else:
+            layout = getattr(bc, const, None)
+            if layout is None:
+                notes.append('%s registers %s, which build_campaign does not define'
+                             % (injector, const))
+            else:
+                campaign = rel.split(os.sep)[1]
+                routes['build'] = os.path.join(REPO, 'campaigns', campaign, 'maps',
+                                               layout[1] + '.json')
+        rows.append((short, rel, routes, '; '.join(notes)))
+
+    for injector, const in orphans:
+        rows.append((None, None, {},
+                     '%s registers a chapter map through %s, and this guard cannot tell which '
+                     'chapter it belongs to -- teach _chapter_of_injector the new name'
+                     % (injector, const)))
+    return rows
+
+
+def _sidecar_route_violations(rows):
+    """Where two routes name different files for one chapter, or a registration is unnamed."""
+    out = []
+    for short, rel, routes, note in rows:
+        if short is None:
+            out.append(note)
+            continue
+        if 'does not define' in note:
+            out.append('%s: %s' % (rel, note))
+            continue
+        seen = sorted(set(routes.values()))
+        if len(seen) > 1:
+            named = ', '.join('%s -> %s' % (name, os.path.relpath(path, REPO))
+                              for name, path in sorted(routes.items()))
+            out.append('%s: the routes to its map sidecar disagree (%s) -- the gate would grade '
+                       'a file the cartridge never loads' % (short, named))
+    return out
+
+
+def check_map_sidecar_routes_agree(fail):
+    """The gate, the build and the preview locate a chapter's sidecar at the SAME file (#373).
+
+    Prefer a guard that they agree over making one of them authoritative: #371's first attempt
+    at the tileset bug picked the wrong winner (the YAML) and would have shipped a preview of a
+    tileset the game never loads. Right answers for a wrong reason are only visible when
+    something compares the two.
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    try:
+        import map_placement_preview as pp
+    except ImportError as exc:      # Pillow absent on the lightweight checks job
+        print('check_map_sidecar_routes_agree: skipping (%s; the build job\'s `make test` '
+              'covers it)' % exc)
+        return
+    path = os.path.join(REPO, 'tools', 'build_campaign.py')
+    with open(path, encoding='utf-8') as f:
+        text = f.read()
+    fail.extend(_sidecar_route_violations(
+        _sidecar_routes(text, list(_chapters()), pp.MAPS)))
+
+
 def check_rescue_targets(fail):
     """A chapter's rescue targets are reachable only by units it declared (#26)."""
     sys.path.insert(0, os.path.join(REPO, 'tools'))
@@ -2629,7 +2755,7 @@ CHECKS = (
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
     check_wrap_widths_are_pixels, check_vanilla_reads_come_from_head,
     check_message_literals_are_registered, check_handoff_only_on_main, check_lane_ownership,
-    check_every_gate_is_registered,
+    check_every_gate_is_registered, check_map_sidecar_routes_agree,
 )
 
 
