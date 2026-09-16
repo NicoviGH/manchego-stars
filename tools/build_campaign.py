@@ -475,8 +475,7 @@ def ch02_map_changes(chap, maps_dir):
     TERRAIN, and RUINS_VILLAGE sits in BOTH lists -- a hut ruined into it would be lootable
     again next turn.
     """
-    import map_tileset_tool as mt
-    tileset = mt._tileset_from_dir(os.path.join(maps_dir, 'tilesets', WINTER_TILESET))
+    tileset = _map_changes_tileset(maps_dir, CH02_LAYOUT)
     villages = chap.get('villages', [])
     changes = [(x - 1, y - 1, 3, 2,
                 _drawn_block(tileset, CH02_RUIN_ORIGIN, (3, 2), 'TERRAIN_RUINS_REGULAR',
@@ -5847,6 +5846,41 @@ def map_tileset(meta):
         # error it is instead of a traceback.
         raise ValueError('map sidecar is %s, not a JSON object' % type(meta).__name__)
     return meta.get('tileset', WINTER_TILESET)
+
+
+def _layout_sidecar(maps_dir, stem):
+    """Where the build reads a compiled map's sidecar `<stem>.json`.
+
+    One home for the path, so the four places that read a sidecar -- `_register_chapter_map`
+    (the map's asset indices), `_map_changes_tileset` (replacement metatiles),
+    `_read_map_metatile` and `_map_terrain_grid` (both of which read a map's width) -- cannot
+    end up reading two different files for one chapter. Keyed on the STEM rather than a
+    layout tuple, because two of the four have only a stem to offer.
+    """
+    return os.path.join(maps_dir, '%s.json' % stem)
+
+
+def _map_changes_tileset(maps_dir, layout):
+    """The metatile table a chapter's scripted tile changes must resolve against: the one
+    ITS OWN compiled map is built on (#374).
+
+    `map_changes_asm` emits replacement METATILE NUMBERS, and a metatile number only means a
+    terrain inside one tileset -- so the table has to be the map's own, read off its sidecar
+    through `map_tileset`, the same route `_register_chapter_map` takes. The tiles a change
+    writes and the tiles the cartridge loaded then come from one table by construction.
+
+    Until #374 all three callers named a tileset in code instead: ch02 and ch04
+    `WINTER_TILESET` outright, ch05 a `CH05_TILESET` constant, which is the same hardcode
+    wearing a better name. Every one was CORRECT, because those chapters are those tilesets
+    today -- and `check_documented_tileset` could not have caught them if they stopped being,
+    since it compares the chapter YAML against the sidecar and neither of those is what these
+    sites were reading. A right answer for a wrong reason, which is the shape #371 set out to
+    close (`decisions.md` -> "A map's tileset has one home").
+    """
+    import map_tileset_tool as mt
+    with open(_layout_sidecar(maps_dir, layout[1]), encoding='utf-8') as f:
+        name = map_tileset(json.load(f))
+    return mt._tileset_from_dir(os.path.join(maps_dir, 'tilesets', name))
 WINTER_TEST_LAYOUT = ('ChTestSnowMap', 'ch-test-snowfield')  # (asset label, campaign source stem)
 
 
@@ -6106,6 +6140,16 @@ def inject_winter_tileset(campaign, verbose=True):
     # 2. Copy the test layout source (.mar + .json -> Makefile mar_to_map -> .bin -> .lz),
     #    register its incbin + asset-table slot.
     layout_label, stem = WINTER_TEST_LAYOUT
+    # The test chapter's asset ids come from the tileset registered just above, while the
+    # layout's own sidecar was copied and never read -- the same assumed agreement #374
+    # closed at the map-change sites, and here it is load-bearing for what the load test
+    # actually proves: a flat field built on some other tileset would render through Snow's
+    # tile config and the in-engine check would be vacuous.
+    declared = map_tileset(json.load(open(_layout_sidecar(maps_dir, stem), encoding='utf-8')))
+    if declared != WINTER_TILESET:
+        sys.exit('ERROR: %s.json names tileset %r, but inject_winter_tileset registers %r and '
+                 'points the test chapter at it -- the load-test layout must be built on the '
+                 'tileset it load-tests' % (stem, declared, WINTER_TILESET))
     for ext in ('mar', 'json'):
         shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
                         os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (layout_label, ext)))
@@ -6954,7 +6998,7 @@ def _register_chapter_map(maps_dir, layout, comment):
     for ext in ('mar', 'json'):
         shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
                         os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
-    with open(os.path.join(maps_dir, '%s.json' % stem), encoding='utf-8') as f:
+    with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
         tileset = map_tileset(json.load(f))
     if tileset not in TILESET_STEMS:
         sys.exit('ERROR: %s.json names tileset %r -- add it to TILESET_STEMS and '
@@ -11298,8 +11342,7 @@ def ch05_map_changes(chap, maps_dir):
     Visit here" (CanUnitVisit, bmmenu.c) and "is this worth pillaging" (gTerrainList_Lootable-
     Villages, cp_utility.c) from the TERRAIN, and RUINS_VILLAGE -- the obvious-sounding pick --
     is in both lists. A site ruined into it would be lootable again the next turn."""
-    import map_tileset_tool as mt
-    tileset = mt._tileset_from_dir(os.path.join(maps_dir, 'tilesets', CH05_TILESET))
+    tileset = _map_changes_tileset(maps_dir, CH05_LAYOUT)
     villages = chap.get('villages', [])
     changes = [(x - 1, y - 1, 3, 2,
                 _drawn_block(tileset, CH05_RUIN_ORIGIN, (3, 2), 'TERRAIN_RUINS_REGULAR',
@@ -11549,8 +11592,7 @@ def ch04_map_changes(chap, maps_dir):
     vanilla's positions (our retile preserved them) but resolved to OUR tileset's metatiles by
     terrain. Without the village entry a visited village stays looking un-visited, which vanilla
     never does."""
-    import map_tileset_tool as mt
-    tileset = mt._tileset_from_dir(os.path.join(maps_dir, 'tilesets', WINTER_TILESET))
+    tileset = _map_changes_tileset(maps_dir, CH04_LAYOUT)
     x, y = CH04_SNAG_POS
     w, h = CH04_SNAG_SIZE
     changes = [(x, y, w, h,
@@ -11814,7 +11856,7 @@ def _read_map_metatile(maps_dir, stem, x, y):
     stores each cell as metatile<<5 with no header (map_tileset_tool), row-major over the
     width from the paired .json -- so reading the door's OPEN tile off the map itself tracks
     any re-retile (no hand-copied tile numbers to drift)."""
-    with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
+    with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
         w = json.load(f)['width']
     with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
         mar = f.read()
@@ -11836,7 +11878,7 @@ def _map_terrain_grid(maps_dir, stem):
     """(width, height, terrain[y][x]) for a painted chapter layout, resolved through its OWN
     tileset's terrain table. Reads the campaign tileset asset, not the decomp's copy of it --
     ours is the committed source, the decomp's is the untracked artifact injection writes."""
-    with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
+    with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
         meta = json.load(f)
     width, tileset = meta['width'], map_tileset(meta)
     with open(os.path.join(maps_dir, 'tilesets', tileset, tileset + '.bin'), 'rb') as f:
