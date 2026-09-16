@@ -5848,14 +5848,16 @@ def map_tileset(meta):
     return meta.get('tileset', WINTER_TILESET)
 
 
-def _layout_sidecar(maps_dir, layout):
-    """Where the build reads a chapter layout's sidecar `<stem>.json`.
+def _layout_sidecar(maps_dir, stem):
+    """Where the build reads a compiled map's sidecar `<stem>.json`.
 
-    One home for the path, so `_register_chapter_map` (which resolves the map's asset
-    indices from it) and `_map_changes_tileset` (which resolves replacement metatiles from
-    it) cannot end up reading two different files for one chapter.
+    One home for the path, so the four places that read a sidecar -- `_register_chapter_map`
+    (the map's asset indices), `_map_changes_tileset` (replacement metatiles),
+    `_read_map_metatile` and `_map_terrain_grid` (both of which read a map's width) -- cannot
+    end up reading two different files for one chapter. Keyed on the STEM rather than a
+    layout tuple, because two of the four have only a stem to offer.
     """
-    return os.path.join(maps_dir, '%s.json' % layout[1])
+    return os.path.join(maps_dir, '%s.json' % stem)
 
 
 def _map_changes_tileset(maps_dir, layout):
@@ -5876,7 +5878,7 @@ def _map_changes_tileset(maps_dir, layout):
     close (`decisions.md` -> "A map's tileset has one home").
     """
     import map_tileset_tool as mt
-    with open(_layout_sidecar(maps_dir, layout), encoding='utf-8') as f:
+    with open(_layout_sidecar(maps_dir, layout[1]), encoding='utf-8') as f:
         name = map_tileset(json.load(f))
     return mt._tileset_from_dir(os.path.join(maps_dir, 'tilesets', name))
 WINTER_TEST_LAYOUT = ('ChTestSnowMap', 'ch-test-snowfield')  # (asset label, campaign source stem)
@@ -6138,6 +6140,16 @@ def inject_winter_tileset(campaign, verbose=True):
     # 2. Copy the test layout source (.mar + .json -> Makefile mar_to_map -> .bin -> .lz),
     #    register its incbin + asset-table slot.
     layout_label, stem = WINTER_TEST_LAYOUT
+    # The test chapter's asset ids come from the tileset registered just above, while the
+    # layout's own sidecar was copied and never read -- the same assumed agreement #374
+    # closed at the map-change sites, and here it is load-bearing for what the load test
+    # actually proves: a flat field built on some other tileset would render through Snow's
+    # tile config and the in-engine check would be vacuous.
+    declared = map_tileset(json.load(open(_layout_sidecar(maps_dir, stem), encoding='utf-8')))
+    if declared != WINTER_TILESET:
+        sys.exit('ERROR: %s.json names tileset %r, but inject_winter_tileset registers %r and '
+                 'points the test chapter at it -- the load-test layout must be built on the '
+                 'tileset it load-tests' % (stem, declared, WINTER_TILESET))
     for ext in ('mar', 'json'):
         shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
                         os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (layout_label, ext)))
@@ -6986,7 +6998,7 @@ def _register_chapter_map(maps_dir, layout, comment):
     for ext in ('mar', 'json'):
         shutil.copyfile(os.path.join(maps_dir, '%s.%s' % (stem, ext)),
                         os.path.join(MAP_LAYOUT_DIR, '%s.%s' % (label, ext)))
-    with open(_layout_sidecar(maps_dir, layout), encoding='utf-8') as f:
+    with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
         tileset = map_tileset(json.load(f))
     if tileset not in TILESET_STEMS:
         sys.exit('ERROR: %s.json names tileset %r -- add it to TILESET_STEMS and '
@@ -11844,7 +11856,7 @@ def _read_map_metatile(maps_dir, stem, x, y):
     stores each cell as metatile<<5 with no header (map_tileset_tool), row-major over the
     width from the paired .json -- so reading the door's OPEN tile off the map itself tracks
     any re-retile (no hand-copied tile numbers to drift)."""
-    with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
+    with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
         w = json.load(f)['width']
     with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
         mar = f.read()
@@ -11866,7 +11878,7 @@ def _map_terrain_grid(maps_dir, stem):
     """(width, height, terrain[y][x]) for a painted chapter layout, resolved through its OWN
     tileset's terrain table. Reads the campaign tileset asset, not the decomp's copy of it --
     ours is the committed source, the decomp's is the untracked artifact injection writes."""
-    with open(os.path.join(maps_dir, stem + '.json'), encoding='utf-8') as f:
+    with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
         meta = json.load(f)
     width, tileset = meta['width'], map_tileset(meta)
     with open(os.path.join(maps_dir, 'tilesets', tileset, tileset + '.bin'), 'rb') as f:

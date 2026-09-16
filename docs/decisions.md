@@ -8823,10 +8823,21 @@ it is a second declaration of a fact the sidecar owns; it survives only where it
 `_register_tileset` (which tileset this injector REGISTERS), and that one cannot drift in silence,
 because `_register_chapter_map` exits the build when a sidecar names a tileset nobody registered.
 
-**The sidecar's PATH gets one home too.** `_layout_sidecar(maps_dir, layout)` is now where the
-build says where a chapter's sidecar is, so `_register_chapter_map` (which picks the map's asset
-indices from it) and `_map_changes_tileset` (which picks replacement metatiles from it) cannot end
-up reading two different files for one chapter.
+**Review found a fourth site, and there the assumption was load-bearing for a load test.**
+`inject_winter_tileset` open-codes the registration for the flat test layout: it copies
+`ch-test-snowfield.json` into the decomp and points the test chapter's asset ids at
+`WINTER_TILESET` named in code, without ever reading that sidecar. It agrees today only because
+that sidecar is keyless, and it could never hit `_register_chapter_map`'s `TILESET_STEMS` exit
+because it never looks. The point of that chapter is to load-test the winter tileset in-engine, so
+a flat field built on some other tileset would render through Snow's tile config and make the test
+vacuous. It now reads the sidecar and exits by name if the two disagree — the agreement is
+enforced rather than assumed.
+
+**The sidecar's PATH gets one home too.** `_layout_sidecar(maps_dir, stem)` is now where the build
+says where a compiled map's sidecar is. It keys on the STEM rather than a layout tuple because
+four readers need it and two of them — `_read_map_metatile` and `_map_terrain_grid`, both reading
+a map's width — have only a stem to offer; keyed on the tuple it would have covered two of the
+four, which is the same partial-home this ADR is about.
 
 **Verified byte-identical.** `gMapChangesCh02`, `gMapChangesCh04` and `gMapChangesCh05` emit the
 same bytes before and after (SHA-256 unchanged on all three), because ch02's sidecar is keyless

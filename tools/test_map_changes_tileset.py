@@ -43,11 +43,21 @@ SITES = (('ch02', bc.ch02_map_changes, bc.CH02_LAYOUT),
 
 
 def _maps_dir_naming(tmp, stem, tileset):
-    """A maps_dir that IS the campaign's, except `<stem>.json` names `tileset`."""
+    """A maps_dir that IS the campaign's, except `<stem>.json` names `tileset`.
+
+    `tileset=None` writes the sidecar with no `tileset` key at all -- the shape ch00-ch02's
+    sidecars predate the field in. It is written here rather than read off a live sidecar on
+    purpose: `compile_layout` stamps the key on every export, so re-importing a map through
+    the documented pipeline would turn a test that pins a live sidecar as keyless red on a
+    correct build.
+    """
     os.symlink(os.path.join(MAPS, 'tilesets'), os.path.join(tmp, 'tilesets'))
     with open(os.path.join(MAPS, stem + '.json'), encoding='utf-8') as fh:
         meta = json.load(fh)
-    meta['tileset'] = tileset
+    if tileset is None:
+        meta.pop('tileset', None)
+    else:
+        meta['tileset'] = tileset
     with open(os.path.join(tmp, stem + '.json'), 'w', encoding='utf-8') as fh:
         json.dump(meta, fh)
     return tmp
@@ -65,31 +75,38 @@ class MapChangesReadTheirOwnChaptersSidecar(unittest.TestCase):
                         changes_for(campaign_chapters.load(short), maps)
                 self.assertIn('not-a-vendored-tileset', str(caught.exception))
 
-    def test_ch02s_keyless_sidecar_resolves_exactly_as_naming_the_winter_set_does(self):
+    def test_a_keyless_sidecar_resolves_exactly_as_naming_the_winter_set_does(self):
         """Pins the case the hardcode got right, and the reason it got it right.
 
-        ch02's sidecar predates the `tileset` key entirely, so reading the sidecar has to
-        arrive at the DEFAULT that `map_tileset` documents -- a keyless sidecar must not
-        become a crash or a different table. Equivalence with an explicit `snowy-bern` is
-        the assertion, rather than a tile number nobody would recognise.
+        ch00-ch02's sidecars predate the `tileset` key, so reading the sidecar has to arrive
+        at the DEFAULT `map_tileset` documents -- a keyless one must not become a crash or a
+        different table. Equivalence with an explicit `snowy-bern` is the assertion, rather
+        than a tile number nobody would recognise.
         """
         chap = campaign_chapters.load('ch02')
-        with open(os.path.join(MAPS, bc.CH02_LAYOUT[1] + '.json'), encoding='utf-8') as fh:
-            self.assertNotIn('tileset', json.load(fh))
-        with tempfile.TemporaryDirectory() as tmp:
-            explicit = bc.ch02_map_changes(
-                chap, _maps_dir_naming(tmp, bc.CH02_LAYOUT[1], bc.WINTER_TILESET))
-        self.assertEqual(bc.ch02_map_changes(chap, MAPS), explicit)
+        stem = bc.CH02_LAYOUT[1]
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            keyless = bc.ch02_map_changes(chap, _maps_dir_naming(a, stem, None))
+            explicit = bc.ch02_map_changes(chap, _maps_dir_naming(b, stem, bc.WINTER_TILESET))
+        self.assertEqual(keyless, explicit)
 
-    def test_the_sidecar_route_is_the_one_the_build_registers_the_map_by(self):
-        """The tiles a change writes and the tiles the cartridge loaded come from one table
-        because both sides ask `_layout_sidecar` where the sidecar is -- the same file
-        `_register_chapter_map` reads to pick the map's asset indices."""
-        for _, _, layout in SITES:
-            with self.subTest(layout[0]):
-                self.assertEqual(bc._layout_sidecar(MAPS, layout),
-                                 os.path.join(MAPS, layout[1] + '.json'))
-                self.assertTrue(os.path.exists(bc._layout_sidecar(MAPS, layout)))
+    def test_each_site_asks_layout_sidecar_for_its_own_chapters_stem(self):
+        """One function owns where a sidecar lives, and these sites go through it.
+
+        Asserting what `_layout_sidecar` returns would only restate its body. What is worth
+        holding is that each site CONSULTS it, and with its own chapter's stem -- a site that
+        went back to inlining the path, or reached for another chapter's, fails here.
+        """
+        for short, changes_for, layout in SITES:
+            with self.subTest(short):
+                seen = []
+                real = bc._layout_sidecar
+                bc._layout_sidecar = lambda d, stem: seen.append(stem) or real(d, stem)
+                try:
+                    changes_for(campaign_chapters.load(short), MAPS)
+                finally:
+                    bc._layout_sidecar = real
+                self.assertEqual(seen, [layout[1]])
 
 
 if __name__ == '__main__':
