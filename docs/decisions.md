@@ -102,6 +102,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0028` | [Clear-bot pathing: BFS march + multi-range + stall watchdog landed; #60 still open on boss-breach.](decisions/0028-clear-bot-pathing-bfs-march-multi-range-stall-watchdog.md) | 2026-06-25 | #60 |
 | `0029` | [(a) tools/check.py runs in CI's checks job, which installs pyyaml and nothing else.](decisions/0029-tools-check-py-runs-in-ci-s-checks-job.md) | 2026-08-06 | #237 #239 #240 #241 |
 | `0285` | [Context is the budget, and the expensive thing is what enters it early](decisions/0285-context-is-the-budget-and-it-is-quadratic.md) | 2026-09-17 | #386 |
+| `0288` | [Review the WRITTEN surface, and price effort per PR](decisions/0288-review-the-written-surface-not-the-generated-bulk.md) | 2026-09-17 | #391 |
 
 ---
 

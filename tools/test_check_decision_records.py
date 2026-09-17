@@ -46,11 +46,21 @@ class TheRealCorpusIsClean(unittest.TestCase):
         for rec in gen.adrs():
             self.assertIn(rec['section'], gen.SECTION_ORDER, rec['path'])
 
-    def test_ids_are_dense_and_unique(self):
+    def test_ids_are_unique(self):
+        """Unique, NOT dense.
+
+        Density was the original assertion and it was wrong. Two branches in flight each need
+        an id, and the correct move is for the second one to take the NEXT free number rather
+        than collide -- which leaves a gap on whichever branch merges first. This test failed
+        on exactly that: ADR 287 sat on an unmerged branch while 288 was written on another,
+        so main saw 1..286, 288 and the gate punished the right behaviour.
+
+        A gap costs nothing: the index sorts by id and never counts. A collision costs a
+        decision, so that is what is held.
+        """
         ids = sorted(r['id'] for r in gen.adrs())
-        self.assertEqual(len(ids), len(set(ids)), 'duplicate decision ids')
-        self.assertEqual(ids, list(range(1, len(ids) + 1)),
-                         'decision ids should run 1..N with no gaps')
+        dupes = sorted({i for i in ids if ids.count(i) > 1})
+        self.assertEqual([], dupes, 'duplicate decision ids: %s' % dupes)
 
 
 class ItCatchesWhatItIsFor(unittest.TestCase):

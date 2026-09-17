@@ -141,7 +141,17 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   PR + issue, not a file glob.
 - **Review is `/code-review`, and the author is never the reviewer.** It is the default on every
   PR, not an optional extra, and a hand-rolled reviewer prompt is not a substitute — a skill
-  reconstructed from memory runs last month's process. Use
+  reconstructed from memory runs last month's process.
+- **Review the WRITTEN surface, not the generated or moved bulk.** When a change is mechanical
+  — code moved, files split, output regenerated — and a machine gate proves the output is
+  unchanged (a round-trip diff, a fingerprint of what the injector wrote, a byte-identical ROM),
+  point the review at the hand-written part: the generator, the guards, their tests. Reading 283
+  relocated files at high effort finds nothing a byte-for-byte proof did not already establish,
+  and it is expensive. **This narrows the review's scope, never its existence** — the
+  hand-written surface is exactly where the defects in those changes have actually been.
+- **Effort is a choice per PR.** `effortLevel` in `~/.claude/settings.json` applies to every run,
+  so a global `high` silently prices every review at the expensive end. Default to `medium` and
+  ask for `high`/`max` when a PR earns it. Use
   `superpowers:requesting-code-review` instead only for a STACK or where the PR needs context
   the diff cannot carry: one fresh reviewer per PR, reviewed DOWN the stack, since a fix to an
   earlier PR rebases every PR above it.
