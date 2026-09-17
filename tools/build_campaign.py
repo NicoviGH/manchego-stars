@@ -25,6 +25,7 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 import argparse
 import collections
 import copy
+import functools
 import glob
 import hashlib
 import json
@@ -60,16 +61,10 @@ from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source
 from inject import event_group  # noqa: E402  the ChapterEventGroup census guard (#313)
 from inject import step_cache  # noqa: E402  restore a config-invariant step (#309)
 
-# PyYAML's pure-Python scanner walks a document one character at a time through a chain of
-# Python calls, which made YAML parsing ~22s of a 51s injection (6M reader.forward calls) for
-# a few hundred KB of campaign data. libyaml's C scanner produces the identical documents an
-# order of magnitude faster; fall back to the Python one where libyaml is not built in.
-_YAML_LOADER = getattr(yaml, 'CSafeLoader', yaml.SafeLoader)
-
-
-def _yaml_load(stream):
-    """yaml.safe_load, through libyaml's C scanner when it is available."""
-    return yaml.load(stream, Loader=_YAML_LOADER)
+# The YAML reader lives in tools/yaml_loader.py -- stdlib+pyyaml only, so the lightweight CI
+# job imports the same one. Re-exported here because 18 call sites below say `yaml_load` and
+# because reaching past it to `yaml.safe_load` is the mistake that cost #380 25 seconds.
+from yaml_loader import yaml_load  # noqa: E402,F401
 # The host-slot registry. Stdlib-only and OWNED there so tools/check.py can lint it in the
 # CI job that has no Pillow; re-exported here so the constants read the same at every call
 # site below (#241).
@@ -1194,7 +1189,7 @@ def load_unit(campaign, unit_id):
         path = os.path.join(base, sub, unit_id + '.yaml')
         if os.path.isfile(path):
             with open(path, encoding='utf-8') as f:
-                return _yaml_load(f)
+                return yaml_load(f)
     sys.exit('ERROR: no YAML for unit %r under %s/{pcs,npcs}' % (unit_id, base))
 
 
@@ -1903,7 +1898,7 @@ def inject_item_icons(campaign, verbose=True):
     every copy shows the new art (cf. inject_item_names for the name)."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        icons = (_yaml_load(f) or {}).get('item_icons') or {}
+        icons = (yaml_load(f) or {}).get('item_icons') or {}
     if not icons:
         if verbose:
             print('  (no item_icons declared)')
@@ -2060,7 +2055,7 @@ def arena_presentation_config(campaign):
     campaign_dir = os.path.join(REPO, 'campaigns', campaign)
     campaign_path = os.path.join(campaign_dir, 'campaign.yaml')
     with open(campaign_path, encoding='utf-8') as f:
-        root = _yaml_load(f) or {}
+        root = yaml_load(f) or {}
     campaign_cfg = root.get('arena_presentation') or {}
     if not isinstance(campaign_cfg, dict):
         sys.exit('ERROR: %s: arena_presentation must be a mapping' % campaign_path)
@@ -2070,7 +2065,7 @@ def arena_presentation_config(campaign):
     chapter_dir = os.path.join(campaign_dir, 'chapters')
     for chapter_path in sorted(glob.glob(os.path.join(chapter_dir, 'ch*.yaml'))):
         with open(chapter_path, encoding='utf-8') as f:
-            chapter = _yaml_load(f) or {}
+            chapter = yaml_load(f) or {}
         section = chapter.get('arena_presentation') or {}
         if not section:
             continue
@@ -2223,7 +2218,7 @@ def _pal2_icon_ids(campaign):
     """The iconIds (gItemData.iconId) of the campaign's item_icon_pal2.icons, sorted."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        pal2 = (_yaml_load(f) or {}).get('item_icon_pal2') or {}
+        pal2 = (yaml_load(f) or {}).get('item_icon_pal2') or {}
     return sorted(item_icon_id(e) for e in (pal2.get('icons') or []))
 
 
@@ -2246,7 +2241,7 @@ def inject_item_icon_pal2(campaign, verbose=True):
     """
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        pal2 = (_yaml_load(f) or {}).get('item_icon_pal2') or {}
+        pal2 = (yaml_load(f) or {}).get('item_icon_pal2') or {}
     if not pal2:
         if verbose:
             print('  (no item_icon_pal2 declared)')
@@ -2270,7 +2265,7 @@ def inject_item_names(campaign, verbose=True):
     documentation only -- the engine can't differ them)."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        renames = (_yaml_load(f) or {}).get('item_names') or {}
+        renames = (yaml_load(f) or {}).get('item_names') or {}
     if not renames:
         if verbose:
             print('  (no item_names declared)')
@@ -2416,12 +2411,22 @@ def _set_field(block, field, value, path, marker):
     return new
 
 
+@functools.lru_cache(maxsize=None)
 def vanilla_decomp_text(relpath):
     """Committed (HEAD) text of a decomp source file -- immune to the working-tree patching
     the build applies to PATCHED_DECOMP_FILES (e.g. data_characters.c portrait slots get
     overwritten, data_classes.c gets enemy-class clones). Anything that wants the *vanilla*
     value (donor stats, class bases, the difficulty engine) must read through here, not the
-    mutable working tree. relpath is under fireemblem8u/, e.g. 'src/data_characters.c'."""
+    mutable working tree. relpath is under fireemblem8u/, e.g. 'src/data_characters.c'.
+
+    MEMOISED, because HEAD does not move inside a process and this is the hottest read in
+    the repo: one `difficulty.curve_report` made 148 calls against 9 unique files -- 199 MB
+    of subprocess I/O for 2.1 MB of content, `src/events_udefs.c` (1.78 MB) 114 times over.
+    That was ~50s of `test_difficulty.py`'s 151s, and the reason a commit took 6-10 minutes
+    with the CPU near idle (the pre-commit hook runs every test file). Returning the SAME
+    str object also makes `difficulty.vanilla_redas`'s memo O(1) to key. A process that
+    genuinely needs to re-read after HEAD moves calls `vanilla_decomp_text.cache_clear()`;
+    nothing in-tree does, because nothing moves HEAD mid-run (#380)."""
     # Strip inherited git env so `git -C DECOMP` discovers the submodule's own gitdir.
     # Git sets GIT_DIR (etc.) when this runs inside a commit hook, and an explicit
     # GIT_DIR overrides the -C discovery -- so `show HEAD:...` resolves against the
@@ -3086,7 +3091,7 @@ def inject_world_tour(campaign, verbose=True):
     montage_yaml = os.path.join(REPO, 'campaigns', campaign, 'events',
                                 'opening-montage.yaml')
     with open(montage_yaml, encoding='utf-8') as f:
-        cards = _yaml_load(f)['town_tour']['cards']
+        cards = yaml_load(f)['town_tour']['cards']
 
     # 1. Backdrop binaries -> decomp graphics (make LZ-compresses 4bpp + tsa).
     os.makedirs(WORLD_MAP_GFX_DIR, exist_ok=True)
@@ -3505,7 +3510,7 @@ def _declared_donor_bases(campaign):
                           recursive=True):
         try:
             with open(path, encoding='utf-8') as f:
-                data = _yaml_load(f)
+                data = yaml_load(f)
         except Exception:
             continue
 
@@ -4315,7 +4320,7 @@ def declared_map_sprite_units(campaign):
             if not name.endswith('.yaml'):
                 continue
             with open(os.path.join(d, name), encoding='utf-8') as f:
-                unit = _yaml_load(f) or {}
+                unit = yaml_load(f) or {}
             ms = (unit.get('art') or {}).get('map_sprite')
             if ms and (ms or {}).get('wiring') != 'pending':
                 declared[unit.get('id') or name[:-5]] = '%s/%s' % (sub, name)
@@ -4324,7 +4329,7 @@ def declared_map_sprite_units(campaign):
         if not name.endswith('.yaml'):
             continue
         with open(os.path.join(chapters, name), encoding='utf-8') as f:
-            chap = _yaml_load(f) or {}
+            chap = yaml_load(f) or {}
         # enemy_units too: Ravisin is ch05's BOSS and carries a full art.map_sprite block,
         # so scanning only the friendly-side keys left her (and every future enemy with our
         # own art) outside the "declared art must actually get wired" guard entirely. She
@@ -4914,7 +4919,7 @@ def enemy_class_reskins(campaign):
     as a list of dicts {id, base, slot, sprite}. Empty if none declared."""
     cfg = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg, encoding='utf-8') as f:
-        return (_yaml_load(f) or {}).get('enemy_class_reskins') or []
+        return (yaml_load(f) or {}).get('enemy_class_reskins') or []
 
 
 # --- Faked battle animations (#65) -----------------------------------------------
@@ -5187,7 +5192,7 @@ def units_with_battle_anim(campaign):
             if not fn.endswith('.yaml'):
                 continue
             with open(os.path.join(d, fn), encoding='utf-8') as f:
-                u = _yaml_load(f)
+                u = yaml_load(f)
             if u and u.get('battle_anim'):
                 out.append((u.get('id', fn[:-5]), u))
     for uid, (chapter_yaml, _pid) in sorted(RAW_PID_BATTLE_ANIMS.items()):
@@ -6286,7 +6291,7 @@ def inject_title_theme(campaign, verbose=True):
 
     cfg_path = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
     with open(cfg_path, encoding='utf-8') as f:
-        theme = (_yaml_load(f) or {}).get('title_theme')
+        theme = (yaml_load(f) or {}).get('title_theme')
     if not theme:
         return
     letters = [tuple(int(h.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4))
@@ -6373,7 +6378,7 @@ def inject_title_theme(campaign, verbose=True):
 def _load_prologue_chapter(campaign):
     path = os.path.join(REPO, 'campaigns', campaign, 'chapters', PROLOGUE_CHAPTER_YAML)
     with open(path, encoding='utf-8') as f:
-        return _yaml_load(f)
+        return yaml_load(f)
 
 
 def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
@@ -6844,7 +6849,7 @@ def _load_chapter_yaml(campaign, filename):
     key = (path, st.st_mtime_ns, st.st_size)
     if key not in _CHAPTER_YAML_CACHE:
         with open(path, encoding='utf-8') as f:
-            _CHAPTER_YAML_CACHE[key] = _yaml_load(f)
+            _CHAPTER_YAML_CACHE[key] = yaml_load(f)
     return copy.deepcopy(_CHAPTER_YAML_CACHE[key])
 
 
@@ -7890,7 +7895,7 @@ def chapter_label_constants(source=None):
     build or the logs to say why. Resolve by VALUE; never spell the name from a number.
     """
     if source is None:
-        source = _vanilla_decomp_text_at_head('include/constants/chapters.h')
+        source = vanilla_decomp_text('include/constants/chapters.h')
     labels = {}
     for name, value in re.findall(r'(CHAPTER_L_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', source):
         labels.setdefault(int(value, 0), name)
@@ -7904,13 +7909,6 @@ def chapter_label_constant(slot, source=None):
         sys.exit('ERROR: no CHAPTER_L_* constant has value 0x%02X -- chapters.h does not name '
                  'chapter slot %d' % (slot, slot))
     return labels[slot]
-
-
-def _vanilla_decomp_text_at_head(relative_path):
-    """A decomp file as HEAD has it -- our injections are build artifacts, so the working
-    tree is the wrong source for any question about what VANILLA says."""
-    return subprocess.check_output(
-        ['git', '-C', DECOMP, 'show', 'HEAD:' + relative_path], text=True, env=git_env())
 
 
 def _assert_ms_symbol(symbol):
@@ -11489,12 +11487,12 @@ def vanilla_village_gifts(layout, eventinfo=None, eventscript=None):
     """
     stem = re.sub(r'Map$', '', layout).lower()          # Ch5Map -> ch5
     if eventinfo is None:
-        eventinfo = _vanilla_decomp_text_at_head('src/events/%s-eventinfo.h' % stem)
+        eventinfo = vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     if eventscript is None:
-        eventscript = _vanilla_decomp_text_at_head('src/events/%s-eventscript.h' % stem)
+        eventscript = vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     by_id = {int(v, 16): n for n, v in re.findall(
         r'(ITEM_\w+)\s*=\s*(0x[0-9A-Fa-f]+)',
-        _vanilla_decomp_text_at_head('include/constants/items.h'))}
+        vanilla_decomp_text('include/constants/items.h'))}
     gifts = {}
     for script, x, y in re.findall(
             r'Village\(\s*[^,]+,\s*(\w+),\s*(\d+),\s*(\d+)\s*\)', eventinfo):
@@ -12963,7 +12961,7 @@ def safe_ai_clients(ai_index, campaign='rime-of-the-frostmaiden'):
     for path in sorted(glob.glob(os.path.join(
             REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml'))):
         with open(path, encoding='utf-8') as source:
-            chap = _yaml_load(source)
+            chap = yaml_load(source)
         stem = os.path.basename(path)[:4]
         for key in difficulty.AI_ROSTER_KEYS:
             for enemy in chap.get(key) or []:

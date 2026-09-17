@@ -11,7 +11,9 @@ import glob
 import os
 import re
 
-import yaml
+import yaml  # noqa: F401  (re-exported for callers that pass a Loader explicitly)
+
+from yaml_loader import yaml_load
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAMPAIGN = 'rime-of-the-frostmaiden'
@@ -42,7 +44,7 @@ def load_all(campaign=CAMPAIGN):
     """
     key = tuple((p, os.stat(p).st_mtime_ns, os.stat(p).st_size) for p in paths(campaign))
     if key not in _CACHE:
-        out = [yaml.safe_load(open(p, encoding='utf-8')) for p in paths(campaign)]
+        out = [yaml_load(open(p, encoding='utf-8')) for p in paths(campaign)]
         out.sort(key=lambda c: int(c['chapter_number']))
         _CACHE.clear()             # one campaign at a time; never grow without bound
         _CACHE[key] = out

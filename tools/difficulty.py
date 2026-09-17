@@ -20,6 +20,7 @@ unit's stat line".
 """
 import collections
 import dataclasses
+import functools
 import os
 import re
 
@@ -498,13 +499,22 @@ def _brace_entries(body):
                 yield body[start:i]
 
 
+@functools.lru_cache(maxsize=None)
 def vanilla_redas(text):
     """`{REDA symbol: [(x, y), ...]}` for every REDA array in a decomp source.
 
     REDA is the scripted movement a unit walks when it loads. It matters here because a
     UnitDefinition's `xPosition`/`yPosition` is frequently a SPAWN tile rather than a battle
     post: vanilla Ch1's entire force enters on (1,9)/(2,9) and Ch5's on (0,0)/(10,0)/(12,0).
-    The last point is where the unit actually ends up."""
+    The last point is where the unit actually ends up.
+
+    MEMOISED on the source text: `vanilla_unit_defs` needs this for every UnitDefinition
+    array it parses, and re-ran the whole-file `re.finditer` each time -- 5,507 scans of the
+    same 1.78 MB `events_udefs.c` in one `test_difficulty.py` run, 27.4s of pure CPU for an
+    answer that never changed. Keying on the text is O(1) in practice because
+    `bc.vanilla_decomp_text` is memoised too and hands back the same str object, whose hash
+    Python caches after the first call (#380). The returned dict is shared, so callers must
+    not mutate it."""
     return {m.group(1): [(int(x), int(y)) for x, y in
                          re.findall(r'\.x = (\d+),\s*\.y = (\d+)', m.group(2))]
             for m in re.finditer(
@@ -1259,7 +1269,7 @@ def chapter_deploy_limit(chap, default):
 def load_field(campaign, ch):
     """Assemble (roster, line_enemies, bosses, deploy_limit, enemy_labels) for a chapter."""
     with open(chapter_path(campaign, ch), encoding='utf-8') as f:
-        chap = bc.yaml.safe_load(f)
+        chap = bc.yaml_load(f)
     roster = [player_combatant(campaign, uid) for uid in ROSTER]
     line, bosses, labels = [], [], []
     for ed in chapter_roster_entries(chap):
@@ -2225,7 +2235,7 @@ def curve_report(campaign, band=0.25, mode=None):
     chaps = []
     for path in paths:
         with open(path, encoding='utf-8') as f:
-            chaps.append(bc.yaml.safe_load(f))
+            chaps.append(bc.yaml_load(f))
     rows = []
     any_dropped_boss = False
     for chap in sorted(chaps, key=lambda c: c.get('chapter_number', 99)):

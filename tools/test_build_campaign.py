@@ -3843,7 +3843,7 @@ class Ch05SahnarIsJoshuaAndBasilIsNatasha(unittest.TestCase):
         return next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')
 
     def _chap(self):
-        return bc._yaml_load(open(os.path.join(
+        return bc.yaml_load(open(os.path.join(
             bc.REPO, 'campaigns/rime-of-the-frostmaiden/chapters',
             bc.CH05_CHAPTER_YAML), encoding='utf-8'))
 
@@ -4943,7 +4943,7 @@ class PerPositionAiReachesTheEmittedRows(unittest.TestCase):
         path = glob.glob(os.path.join(
             bc.REPO, 'campaigns/rime-of-the-frostmaiden/chapters', stem + '*.yaml'))[0]
         with open(path, encoding='utf-8') as source:
-            return bc._yaml_load(source)
+            return bc.yaml_load(source)
 
     def test_ch05_tomb_reavers_emit_three_distinct_behaviours(self):
         chap = self._chap('ch05')
