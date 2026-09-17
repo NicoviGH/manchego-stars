@@ -13,10 +13,19 @@ restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**PR #390 (`feat/389-decompose-injector`) is OPEN and green, and needs `/code-review` before
-it merges.** Two review attempts hit the session limit; it was not merged unreviewed. Nothing
-else is open — the #380/#382/#384/#386 stack merged 2026-09-17 (`fc65180`..`747e7a5`) and its
-branches are pruned.
+**TWO PRs are OPEN, both green, and both need `/code-review` before they merge** — neither was
+merged unreviewed, and the author cannot be the reviewer, so **this is the first job of the next
+session**:
+
+| PR | branch | what |
+|---|---|---|
+| **#390** | `feat/389-decompose-injector` | #389 groundwork: the paths module, the shared HEAD reader, the injection-fingerprint gate. **No domain extracted.** |
+| **#392** | `feat/391-review-the-written-surface` | #391: review the written surface not the generated bulk; ADR-id uniqueness replaces density. |
+
+Review should be cheaper now: `effortLevel` was `high` GLOBALLY in `~/.claude/settings.json`
+and is now `medium` (#391), so ask for `high`/`max` per PR rather than getting it by default.
+
+The #380/#382/#384/#386 stack merged 2026-09-17 (`fc65180`..`747e7a5`); its branches are pruned.
 
 **What #390 contains, and what it deliberately does NOT:** the groundwork for #389 only — a
 new paths module holding the 79 decomp path constants, the memoised HEAD reader and the
