@@ -20,12 +20,35 @@ seconds** because the decomp's make found the ROM up to date. A gate that is sat
 doing nothing is not a gate.
 
 `tools/injection_fingerprint.py` measures the thing that actually matters. It restores the
-decomp to HEAD, hides `.injectcache` and `.build-scopes.json` so the injector cannot skip,
-runs a full injection, and hashes **every file the injection touched** — 972 of them. Two
-manifests that match mean identical ROM input, in ~40 seconds instead of a full compile.
+decomp to HEAD, hides the caches so the injector cannot skip, runs a full injection, and hashes
+**every file the injection touched** — 994 of them. Two manifests that match mean identical ROM
+input, in ~50 seconds instead of a full compile.
 
 It earned its keep immediately: the first extraction pointed `REPO` at `tools/` (a two-`dirname`
 form copied from a file one directory higher), and the fingerprint caught it on the first run.
+
+## "Every file it touched" had to be defined, because 22 of them were invisible
+
+The first version built its manifest from `git status`, and a manifest is only as good as what
+it can see. **`git status` never lists an ignored path, and `git clean` without `-x` never
+removes one** — so the 22 gitignored files the injector writes were outside the gate entirely:
+the seven `chap_title_N.4bpp(.lz)` pairs and the four tilesets' `ObjectType*.4bpp` /
+`MapPalette*.gbapal`. `MapPaletteSnow.gbapal` is incbin'd raw into
+`data/const_data_chapter_maps.s`, so it is ROM content by any definition. A refactor that
+stopped producing all 22 would have printed `IDENTICAL: 972 injected files, byte for byte`.
+
+Extension cannot separate them from the tree's other ignored files, because `make` writes 3,431
+`.lz` and 2,424 `.4bpp` of its own into the same directories. **What separates them is the
+run**: an ignored file counts as injector output when its mtime says this injection wrote it.
+Tracked files keep being judged by content, which is stronger. And because a file the injector
+*deletes* (stale artifacts, dropped so `make` regenerates them) is output that no hash of a
+written file can represent, a path that existed before the run and not after is recorded as
+`DELETED`.
+
+Measured, not argued: dropping the fog-haze derivation in `_register_tileset` — a plausible
+extraction slip, changing nothing but those ignored palette bytes — is reported as
+`differs graphics/map/MapPaletteSnow.gbapal`. The version that shipped in the first draft of
+this PR called that same tree byte-identical.
 
 ## The banners stopped meaning anything years ago
 

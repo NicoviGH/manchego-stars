@@ -25,7 +25,6 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 import argparse
 import collections
 import copy
-import functools
 import glob
 import hashlib
 import json
