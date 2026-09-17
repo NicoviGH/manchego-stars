@@ -15,14 +15,35 @@ restated. Check that a thing has a home before writing it here.
 **Nothing. The tree is clean on `main` and no branch is open.** #373 squash-merged 2026-09-16
 (`09fa19e`); every feature branch is deleted and pruned.
 
-## Next task: the rest of ch06 (#26)
+## Next up — ordered by effort. CLAUDE'S RECOMMENDATION, not a decision Nicolas has made
+
+Sized 2026-09-16 off `make chapter CH=ch06` and the issue bodies, cheapest first. Each line is
+the issue's own scope — read the issue, don't re-derive it here.
+
+| | issue | effort | why now / what it costs |
+|---|---|---|---|
+| 1 | **#30** | XS | `campaign.yaml`'s `chapters:` block is off-by-one from ch04 on. Since #312 there is ONE reader (`tools/campaign_chapters.py`), so the block gets DERIVED rather than hand-kept. Nothing reads it today, so nothing can break. |
+| 2 | **#365** | S | `apply_chapter_fog` over `hosted_chapters()`, mirroring `apply_chapter_difficulty` / `apply_chapter_traps`; `inject_ch06` already refuses a `fog:` it cannot write, which is the shape to generalise. ⚠️ **Split the ROMChapterData census off** — it is the larger half and answers a different question. |
+| 3 | **#377** | S, but BLOCKED | Needs Nicolas's call first: where a campaign's keyless-sidecar default lives, given `map_donor` is stdlib-only BY DESIGN. Cheap to write once that is answered, pointless to start before. |
+| 4 | **#337** | M | The permadeath invariant, and **the prerequisite for ch06's dialogue** — a scene that stages a PC it never `LOAD`s soft-locks the chapter the first time that PC is dead when the beat fires. 14 staging sites today. Sibling of `assert_scripted_move_reachable`, which checks the terrain and not the unit. |
+| 5 | **#367's remainder** | M, and mostly DECISIONS not code | Lock ch03–ch06 or accept the gate is decorative for them; the party-level band into `docs/fe8-pacing-reference.md`. ⚠️ **ch07 is the watch item** — it reuses FE8 Ch6 as its bar. |
+| 6 | **#26 — ch06's own body** | L | The chapter itself, and the reason the rest of this list exists. |
+
+**The recommendation, in one line: #337, then #26** — everything above #337 is cheap enough to
+slot in anywhere, while #337 is the only item that GATES the work that matters. #30 and #365 are
+good warm-ups or filler; #377 should not be started until Nicolas answers it.
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
-humans. What is left: the three cutscenes, the boarding pass, Messie's portrait and wiring, the
-merfolk reskins. Dialogue still waits on voice bibles for the boat crews. **`make chapter CH=ch06`
-is the state; #26's body is the remaining work.** **#377** (below) is the one loose tooling
-thread and is not a prerequisite.
+humans. **`make chapter CH=ch06` is the state**, and on 2026-09-16 it said: all **3 declared
+scenes have no script** (`chapter_start`, `boss_defeated`, `chapter_end`), **8 message ids FREE**
+in block `0x9F6-0x9FF` so no scene costs a redesign, **nerra has no portrait, map sprite or battle
+anim**, and `ch06clock` last PASSed 12 days ago.
+
+⚠️ **One blocker is Nicolas's, not Claude's: the boat crews have no voice.** No file in
+`campaigns/rime-of-the-frostmaiden/lore/` names Tali or either crew, and Tali carries ch06's
+plot-critical hint. The reskins, the boarding pass and nerra's art need none of that and can all
+proceed first.
 
 ## PARKED — nothing. ch06's fuse is answered and fixed
 
