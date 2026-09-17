@@ -9017,6 +9017,15 @@ with the user's environment, so a bare `python3` there resolved to the system 3.
 `make` (via the macOS PATH shim) and CI both ran 3.12 — observed live during #380's commit.
 `make python-bin` is now the one place that choice is made and the hook asks for it.
 
+⚠️ **The split also cost a red CI run, and the lesson is worth more than the fix.** The new
+`tests` job was given a trimmed dependency list under a comment asserting it ran "pure logic".
+It does not: `test_map_tileset` and `test_map_retile_workflow` reach `gen_map_editor`, which
+builds the decomp's own `gbagfx` to turn PNGs into 4bpp, so the job needs `build-essential` and
+`libpng-dev` even though it links no ROM. **Splitting a job means discovering what it actually
+needed, and a comment stating what a job needs is a claim, not a fact** -- this one was written
+from an assumption and CI disproved it in 53 seconds. What the job legitimately skips is the
+expensive half: agbcc, the ARM toolchain and the decomp build.
+
 **The rule: a filter that skips a job must be an allowlist of things nothing derives from, and
 the two copies of it must be machine-checked.** GitHub Actions has no YAML anchors, so
 `build.yml` states its `paths-ignore` twice, and the failure mode is silent and backwards — if

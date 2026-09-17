@@ -44,7 +44,13 @@ on:
 jobs:
   # Unit tests (Python combat/difficulty/build + pure-Lua playtest logic). Needs the
   # submodule, which the decomp-reading tests (vanilla_decomp_text) and the Lua tests use.
-  # No agbcc and no mGBA -- pure logic, so this finishes long before the ROM build does.
+  #
+  # It also needs a HOST C toolchain, which is not obvious and cost this job a red run: the
+  # suite is not pure logic. `test_map_tileset` and `test_map_retile_workflow` go through
+  # gen_map_editor, which builds the decomp's own `gbagfx` to turn PNGs into 4bpp -- so
+  # build-essential and libpng-dev are required here even though no ROM is linked.
+  # What this job still skips is the expensive half: agbcc, the ARM toolchain and the
+  # decomp build, which is why it finishes in ~1 minute against the ROM build's ~3.
   tests:
     runs-on: ubuntu-latest
     steps:
@@ -55,7 +61,8 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y lua5.4
+          sudo apt-get install -y build-essential libpng-dev lua5.4
+          # The Makefile probes for `lua`; ubuntu ships the binary as `lua5.4`.
           sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
           python3 -m pip install ttp numpy pillow pyyaml
 
