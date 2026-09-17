@@ -12,13 +12,19 @@ issues: [391]
 it is pointed at* and *what it costs*, after a session where it was run four times and became
 the single most expensive thing in the session — twice hitting the limit outright.
 
-## Effort was set globally, so every review was priced at the top
+## Effort was set globally, and the per-review lever was never used
 
-`~/.claude/settings.json` carried `"effortLevel": "high"`. That applies to **every** run, so
-reviews were at the expensive end by default rather than by decision. The skill's own contract
-is explicit that low/medium returns fewer, high-confidence findings while high→max buys broader
-coverage and admits uncertain ones — a trade worth making sometimes, and not worth making
-silently every time. Now `medium`, with `high`/`max` asked for per PR.
+`~/.claude/settings.json` carried `"effortLevel": "high"` — the model's **global** reasoning
+effort, which applies to every session in every project and so to every review run here. Reviews
+were therefore at the expensive end by default rather than by decision. It is now `medium`.
+
+The lever that belongs to a review is the level the skill takes as an **argument**:
+`/code-review <PR> high`. Its contract is explicit that low/medium returns fewer, high-confidence
+findings while high→max buys broader coverage and admits uncertain ones — a trade worth making
+sometimes, and not worth making silently every time. **The two must not be confused.** Raising
+`effortLevel` to buy one deep review raises the price of everything that comes after it, in this
+repo and outside it, which is the failure this record exists to stop; asking `/code-review` for
+`high` on the one PR that earns it costs only that run.
 
 Worth ruling out while diagnosing this, because both are plausible and neither was true: the
 four-parallel-agent `code-review` **plugin is not enabled** here (only `superpowers` is), so
