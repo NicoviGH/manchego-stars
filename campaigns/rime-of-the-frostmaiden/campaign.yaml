@@ -1,29 +1,35 @@
 # campaign.yaml — Manchego Stars: Rime of the Frostmaiden
-# Read by tools/build-campaign.ts at build time.
+# Read by tools/build_campaign.py at build time.
 # See docs/PRD.md §6.4 for the engine/content contract.
 
 title: "Manchego Stars: Rime of the Frostmaiden"
 id: rime-of-the-frostmaiden
 
-chapters:
-  count: 7
-  list:
-    - ch01-the-iron-trail
-    - ch02-cold-welcome
-    - ch03-the-termalaine-mine
-    - ch04-the-elven-tomb
-    - ch05-the-maer-monster
-    - ch06-blood-in-bremen
-    - ch07-the-eastway-ambush
+# No `chapters:` list here. A chapter's identity, number and name live in its OWN file under
+# `chapters/ch*.yaml`, `tools/campaign_chapters.py` is the one reader, and `docs/CHAPTERS.md`
+# is generated from it. The copy that used to sit here is why: it was hand-kept, nothing read
+# it, and it drifted into being simply false -- it omitted the prologue, said `count: 7` for a
+# nine-chapter campaign, and from ch04 on named every chapter one number too low (#30).
+# `check_campaign_declares_no_chapter_list` holds this.
 
 progression:
   # FE level all PCs begin at (equivalent to D&D level 1–3)
   starting_fe_level: 1
-  # FE level expected at end of chapter 7 (equivalent to D&D level 5–7)
+  # FE level expected at the END OF THE CAMPAIGN -- ch08, The Eastway Ambush (decisions.md ->
+  # "MVP scope: 8 chapters"). This said "end of chapter 7" until #30: it predates the
+  # 2026-05-31 split of the old Ch 4 into White Moose + Elven Tomb, which is the same
+  # renumbering that left the chapter list here off by one. The NUMBER is not settled --
+  # the party-level band is open work on #367 -- so it is left as written rather than
+  # re-derived here.
   target_end_level: 12
-  # All PCs promote at this FE level (not required within MVP scope)
-  promotion_threshold: 20
-  # Level cap for this campaign (unpromoted)
+  # No `promotion_threshold` here. FE8 owns that gate and sets it at level 10
+  # (`CanUnitUsePromotionItem` -> `unit->level < 10`, bmitemuse.c), so a number in this file
+  # could only ever disagree with the cartridge -- and the one that used to sit here said 20.
+  # What actually keeps the MVP unpromoted is ITEM availability, not level: no Master Seal
+  # exists before Ch 9, and ch05's Guiding Ring is deliberately a Chekhov's gun in the convoy
+  # (decisions.md -> "The promotion seam (Ch 8 -> 9): foreshadow in the MVP, pay off at
+  # Revel's End").
+  # Level cap for this campaign (unpromoted) -- FE8's own UNIT_LEVEL_MAX (bmunit.h)
   level_cap_unpromoted: 20
   # Promoted level cap
   level_cap_promoted: 20
@@ -311,12 +317,6 @@ item_icon_pal2:
   palette: ["#c0f8c8", "#ffffff", "#f4d4e2", "#cf8ea8", "#6b2a4f", "#ffe0ef", "#e876ac",
             "#d85f9a", "#b0447e", "#f0a8c8", "#8a325e", "#c088c0", "#7a2450", "#f7b9d8",
             "#b0447e", "#f7b9d8"]
-
-# D&D content sources (frozen snapshots committed at data/)
-data_sources:
-  srd: data/srd/srd-snapshot.json
-  open5e: data/srd/open5e-snapshot.json
-  homebrew: data/homebrew/
 
 # Arena presentation — winter reaches the arena through PALETTE ONLY, as two small deltas over
 # FE8's untouched graphics and TSA. Every word not named here is copied from the base ROM, so

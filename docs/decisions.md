@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-288 decisions. Read this index, then open the two or three you need — the whole
+289 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -44,6 +44,7 @@ set is ~197,000 tokens and no session has ever needed all of it at once.
 | `0018` | [Chapter cadence taxonomy (the cadence: field)](decisions/0018-chapter-cadence-taxonomy.md) | 2026-05-31 | — |
 | `0019` | [Playtest test-chapter build (make TESTCH=1)](decisions/0019-playtest-test-chapter-build.md) | 2026-06-23 | — |
 | `0284` | [A decision is a FILE, and decisions.md is the index over them](decisions/0284-a-decision-is-a-file-and-decisions-md-is.md) | 2026-09-17 | #384 |
+| `0289` | [campaign.yaml declares what the BUILD reads, and it is scanned like any other doc](decisions/0289-campaign-yaml-declares-what-the-build-reads.md) | 2026-09-17 | #30 |
 
 ---
 
