@@ -25,7 +25,6 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 import argparse
 import collections
 import copy
-import functools
 import glob
 import hashlib
 import json
@@ -56,7 +55,31 @@ from inject.decomp import (  # noqa: E402  shared decomp paths + patch primitive
     REPO, DECOMP, _find_brace_block, _replace_brace_block,
     BATTLEQUOTES_C, BMUNIT_C, LORDSEL_FLAG_BASE,
     WEAPON_ITEM_ENUM, fe_item_enum)  # shared weapon<->ITEM map (used by inject_prologue)
-from inject.decomp import git_env  # noqa: E402  strip inherited GIT_* so `git -C DECOMP` works in a hook
+from inject.decomp import (  # noqa: E402,F401
+    git_env,              # strip inherited GIT_* so `git -C DECOMP` works in a hook
+    vanilla_decomp_text,  # the memoised HEAD reader (#380). It lives beside git_env so a
+    _table_close_line,    # domain module can use it without importing build_campaign (#389)
+)
+# Decomp file locations live in inject/paths.py (#389) -- one home, no behaviour, so any
+# domain module can import them without a cycle. Re-exported here because call sites
+# below name them directly.
+from inject.paths import (  # noqa: E402,F401
+    ASSET_TABLE_S, BACKGROUNDS_H, BANIMCONFUNK_C, BANIMCONF_C, BANIM_BATTLEPARSE_C,
+    BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_LINKER,
+    BANIM_POINTER_H, BANIM_POINTER_H_TERR, BANIM_TERRAIN_DATA_C, BANIM_TERRAIN_GFX,
+    BANIM_TERRAIN_INCBIN_S, BG_GFX_DIR, BG_H, BMIO_C, BMUDISP_C, BUILD_SCOPES_PATH,
+    BUILD_STAMP, CH05_EVENTINFO_H, CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H,
+    CH1_EVENTINFO_H, CH1_EVENTSCRIPT_H, CH1_UDEFS_H, CH2_EVENTINFO_H, CH2_EVENTSCRIPT_H,
+    CH3_EVENTINFO_H, CH3_EVENTSCRIPT_H, CH4_EVENTINFO_H, CH4_EVENTSCRIPT_H, CH5_EVENTINFO_H,
+    CH5_EVENTSCRIPT_H, CHAPTER_SETTINGS_JSON, CHAPTER_SETTINGS_JSON_PLAT, CHARACTERS_C,
+    CLASSES_C, CLASSES_H, CONST_MAPS_S, CP_DATA_C, DATA_BANIM_S, DATA_BG_S,
+    DATA_OPSUBTITLE_S, DATA_TERRAINS_C, EVENTCALL_H, EVENTSCR2_C, EVENTS_UDEFS_C,
+    GAMECONTROL_C, INJECT_CACHE_DIR, ITEMS_C, MAP_GFX_DIR, MAP_LAYOUT_DIR, MOVE_GFX_DIR,
+    MU_C, OPSUBTITLE_C, OP_SUBTITLE_GFX_DIR, PORTRAIT_DATA_C, PORTRAIT_DIR,
+    PREP_UNITSELECT_C, PROLOGUE_EVENTINFO_H, PROLOGUE_EVENTSCRIPT_H, PROLOGUE_UDEFS_H,
+    PROLOGUE_WM_H, TEXTS_TXT, TRAPDATA_C, UIARENA_C, UNITLISTSCREEN_C, UNIT_ICON_MOVE_C,
+    UNIT_ICON_MOVE_S, UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_C, UNIT_ICON_WAIT_S, VARIABLES_H,
+    WAIT_GFX_DIR, WORLDMAP_RM_C, WORLD_MAP_GFX_DIR)
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
 from inject import event_group  # noqa: E402  the ChapterEventGroup census guard (#313)
 from inject import step_cache  # noqa: E402  restore a config-invariant step (#309)
@@ -76,28 +99,10 @@ from inject.hosts import (  # noqa: E402,F401
     HostedChapter, hosted_chapters, injector_chapters, undeclared_injectors,
     MessageLiteral, literal_message_ids)
 
-PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 # Palette index 0 of an FE8 bust is the transparent key, and our authored busts all carry
 # magenta there (see campaigns/*/portraits/*.png). Named because _vendor_mug_to_bust has to
 # WRITE it, not just read it: a community mug arrives keyed on whatever green its artist used.
 PORTRAIT_TRANSPARENT_RGB = (255, 0, 255)
-CHARACTERS_C = os.path.join(DECOMP, 'src', 'data_characters.c')
-CLASSES_C = os.path.join(DECOMP, 'src', 'data_classes.c')
-CLASSES_H = os.path.join(DECOMP, 'include', 'constants', 'classes.h')
-# Faked battle anims (#65): the decomp files the injection appends to / patches.
-BANIM_DATA_C = os.path.join(DECOMP, 'src', 'banim_data.c')
-BANIM_POINTER_H = os.path.join(DECOMP, 'include', 'banim_pointer.h')
-BANIMCONF_C = os.path.join(DECOMP, 'src', 'data_banimconf.c')
-BANIMCONFUNK_C = os.path.join(DECOMP, 'src', 'data_banimconfunk.c')  # gUnitSpecificBanimConfigs
-BANIM_EKRBATTLE_H = os.path.join(DECOMP, 'include', 'ekrbattle.h')
-BANIM_LINKER = os.path.join(DECOMP, 'linker_script_banim.txt')
-BANIM_DATA_DIR = os.path.join(DECOMP, 'data', 'banim')
-BANIM_GFX_DIR = os.path.join(DECOMP, 'graphics', 'banim')
-ITEMS_C = os.path.join(DECOMP, 'src', 'data_items.c')
-TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
-PORTRAIT_DATA_C = os.path.join(DECOMP, 'src', 'portrait_data.c')
-UIARENA_C = os.path.join(DECOMP, 'src', 'uiarena.c')
-CP_DATA_C = os.path.join(DECOMP, 'src', 'cp_data.c')     # the AI script tables + their lists
 # Our busts are all framed identically: the mouth window sits at tile (col 2, row 6)
 # and eyes at (col 3, row 4) -- the geometry portrait_tool extracts the mouth from, and
 # the same xMouth/yMouth/xEyes/yEyes the Eirika/Franz/Vanessa/Neimi slots already carry
@@ -105,67 +110,12 @@ CP_DATA_C = os.path.join(DECOMP, 'src', 'cp_data.c')     # the AI script tables 
 # Gilliam, Moulder = 2,5; Ross = 3,6; Garcia = 2,5; Colm = 3,5) make the engine overwrite
 # the mouth window one tile off -> a second, offset mouth. Normalize every dressed slot.
 PORTRAIT_GEOMETRY = '2, 6, 3, 4'   # xMouth, yMouth, xEyes, yEyes
-# Test-chapter spawn (Milestone B step 3): we hijack the vanilla Ch1 ally roster to
-# stand up our classed cast on one real map -- the first in-engine confirmation of
-# names + portraits + classes + stats together. It touches the three ch1-event files
-# below (udefs + eventinfo + eventscript).
-CH1_UDEFS_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventudefs.h')
-CH1_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventinfo.h')
-CH1_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch1-eventscript.h')
-PROLOGUE_WM_H = os.path.join(DECOMP, 'src', 'events', 'prologue-wm.h')
-GAMECONTROL_C = os.path.join(DECOMP, 'src', 'gamecontrol.c')
-BMIO_C = os.path.join(DECOMP, 'src', 'bmio.c')
-# Opening montage (#43): the lore crawl rides vanilla's 7 prerendered subtitle
-# slides (opsubtitle.c walks gOpSubtitleGfxLut with hardcoded transitions).
-OPSUBTITLE_C = os.path.join(DECOMP, 'src', 'opsubtitle.c')
-OP_SUBTITLE_GFX_DIR = os.path.join(DECOMP, 'graphics', 'op_subtitle')
-DATA_OPSUBTITLE_S = os.path.join(DECOMP, 'data', 'data_opsubtitle.s')
-# Campaign event BGs (#22): vendored winter backdrops appended as NEW gConvoBackgroundData
-# slots (inject_backgrounds). Additive -- never reskin a vanilla BG entry.
-DATA_BG_S = os.path.join(DECOMP, 'data', 'data_bg.s')
-EVENTSCR2_C = os.path.join(DECOMP, 'src', 'eventscr2.c')
-BG_H = os.path.join(DECOMP, 'include', 'bg.h')
-BACKGROUNDS_H = os.path.join(DECOMP, 'include', 'constants', 'backgrounds.h')
-BG_GFX_DIR = os.path.join(DECOMP, 'graphics', 'bg')
-# World-map tour (#43): the two Icewind Dale drawn maps ride the WM_SHOWDRAWNMAP
-# slot (worldmap_rm.c GmapRm_StartUpdateDirect).
-WORLDMAP_RM_C = os.path.join(DECOMP, 'src', 'worldmap_rm.c')
-WORLD_MAP_GFX_DIR = os.path.join(DECOMP, 'graphics', 'world_map')
 TOUR_TEXT_ID = 0x8DB   # vanilla's WM narration message, referenced only here
-# Map (overworld) sprites (#38). FE8 map sprites are CLASS-driven (GetUnitSMSId ->
-# pClassData->SMSId), so two cast on the same class share one sprite and enemies of
-# that class would inherit a swap. We instead give each cast member a custom SMS slot
-# and a per-CHARACTER override in GetUnitSMSId -- stock classes and vanilla enemies
-# untouched. Classes top out at SMSId 106 (verified), so 107+ is free in both the
-# wait array (extended here) and the move table (dead tail; no class reaches it).
-UNIT_ICON_WAIT_C = os.path.join(DECOMP, 'src', 'unit_icon_wait_data.c')
-UNIT_ICON_WAIT_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_wait.s')
-UNIT_ICON_POINTER_H = os.path.join(DECOMP, 'include', 'unit_icon_pointer.h')
-WAIT_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'wait')
 CUSTOM_SMS_BASE = 107
-# The hover/selected + walking sprite is the per-class MU sheet (gMuInfoTable ==
-# unit_icon_move_table, a MuInfo{img, anim} view; 32x480 = 15x 32x32). MuProc carries
-# ->unit, so a per-character override of GetUnitMU's .img (reusing the class .anim/motion)
-# gives a custom walk without touching classes/enemies. Asset: map_sprites/<id>_mu.png.
-MU_C = os.path.join(DECOMP, 'src', 'mu.c')
-UNIT_ICON_MOVE_C = os.path.join(DECOMP, 'src', 'unit_icon_move_data.c')
-UNIT_ICON_MOVE_S = os.path.join(DECOMP, 'data', 'const_data_unit_icon_move.s')
-MOVE_GFX_DIR = os.path.join(DECOMP, 'graphics', 'unit_icon', 'move')
-BMUDISP_C = os.path.join(DECOMP, 'src', 'bmudisp.c')
-PREP_UNITSELECT_C = os.path.join(DECOMP, 'src', 'prep_unitselect.c')
-UNITLISTSCREEN_C = os.path.join(DECOMP, 'src', 'unitlistscreen.c')
 # New-game boots straight into the test chapter (skip the vanilla prologue) so the
 # spawn is one "New Game" away. CHAPTER_L_1 = 0x01 (constants/chapters.h).
 TEST_CHAPTER_INDEX = 1
 
-# --- Prologue chapter (#20) -------------------------------------------------------
-# The real New Game target: our designed ch00 ("A Dagger of Ice") on a winter map --
-# Scramsax (strong Jagen) + frail Hlin vs Sephek (boss, escapes) + 2 guards. Replaces
-# the test-chapter spawn as main()'s in-engine entry. Design SoT:
-# campaigns/.../chapters/ch00-prologue-a-dagger-of-ice.yaml.
-PROLOGUE_UDEFS_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventudefs.h')
-PROLOGUE_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventinfo.h')
-PROLOGUE_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'prologue-eventscript.h')
 # PROLOGUE_CHAPTER_INDEX / PROLOGUE_HOST_INDEX / PROLOGUE_EVENT_GROUP: inject/hosts.py.
 # Cold-open guests ride vanilla character slots that are NOT in PORTRAIT_MAP, so their
 # names/portraits are free placeholders until custom art (see [[feedback_nicolas_not_an_artist]]).
@@ -196,15 +146,6 @@ PROLOGUE_GUEST_SPRITES = [
     ('hlin-trollbane', PROLOGUE_HLIN_SLOT, 'CLASS_FIGHTER', 'Pirate'),
 ]
 
-# --- Chapter 1 (#21): "The Iron Trail" ---------------------------------------------
-# Hosted on chapter slot 2 (CHAPTER_L_2): ch00's ending hands off with MNC2(0x2), and
-# slot-N+1 hosting keeps every campaign chapter on a normal vanilla slot (same dodge
-# as the prologue's slot-0 avoidance). Design SoT: chapters/ch01-the-iron-trail.yaml.
-CH2_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch2-eventinfo.h')
-CH2_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch2-eventscript.h')
-CH3_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventinfo.h')
-CH3_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch3-eventscript.h')
-EVENTS_UDEFS_C = os.path.join(DECOMP, 'src', 'events_udefs.c')
 # CH01_HOST_INDEX / CH01_EVENT_GROUP: inject/hosts.py.
 # The goal WINDOW + status-objective strings are message ids, and hosted chapters used to inherit
 # them from whatever donor slot `_retarget_host_chapter` copied -- which silently shared them
@@ -736,15 +677,6 @@ def _rewind_unchanged_mtimes(snap):
     return n
 
 
-BUILD_STAMP = os.path.join(REPO, '.build-config.json')
-# What each injection step wrote, per scope. Read by tools/playtest/matrix.py to decide
-# which scenarios a change can possibly have affected (#255 phase 2). Gitignored for the
-# same reason as the build stamp: it describes this tree's build, not the source.
-BUILD_SCOPES_PATH = os.path.join(REPO, '.build-scopes.json')
-# Where a config-invariant injection step's output is kept between builds (#309). Gitignored
-# for the same reason as the two above: it describes builds, not source. `NO_INJECT_CACHE=1`
-# turns it off, the way `MX_NO_ROM_CACHE` turns off the matrix's ROM cache.
-INJECT_CACHE_DIR = os.path.join(REPO, '.injectcache')
 # Where the battle-anim steps write, used ONLY to bootstrap the first entry's pre-state hashes
 # (step_cache derives the real path list from what the step actually wrote). `src` and
 # `include` are in it because both steps also touch a handful of shared tables there.
@@ -2281,7 +2213,6 @@ def inject_item_names(campaign, verbose=True):
         f.write('\n'.join(lines))
 
 
-DATA_BANIM_S = os.path.join(DECOMP, 'data', 'data_banim.s')
 
 
 def _gba_lz77_stored(data):
@@ -2411,34 +2342,6 @@ def _set_field(block, field, value, path, marker):
     return new
 
 
-# Bounded, not unbounded: today's readers touch ~9-22 files (~2-5 MB), but #365 proposes a
-# ROMChapterData census, and a census is exactly the caller that walks a big slice of a
-# 6,361-file decomp. 64 entries covers every real working set with room to spare and
-# caps what a future sweep can pin in memory.
-@functools.lru_cache(maxsize=64)
-def vanilla_decomp_text(relpath):
-    """Committed (HEAD) text of a decomp source file -- immune to the working-tree patching
-    the build applies to PATCHED_DECOMP_FILES (e.g. data_characters.c portrait slots get
-    overwritten, data_classes.c gets enemy-class clones). Anything that wants the *vanilla*
-    value (donor stats, class bases, the difficulty engine) must read through here, not the
-    mutable working tree. relpath is under fireemblem8u/, e.g. 'src/data_characters.c'.
-
-    MEMOISED, because HEAD does not move inside a process and this is the hottest read in
-    the repo: one `difficulty.curve_report` made 148 calls against 9 unique files -- 199 MB
-    of subprocess I/O for 2.1 MB of content, `src/events_udefs.c` (1.78 MB) 114 times over.
-    That was ~50s of `test_difficulty.py`'s 151s, and the reason a commit took 6-10 minutes
-    with the CPU near idle (the pre-commit hook runs every test file). Returning the SAME
-    str object also makes `difficulty.vanilla_redas`'s memo O(1) to key. A process that
-    genuinely needs to re-read after HEAD moves calls `vanilla_decomp_text.cache_clear()`;
-    nothing in-tree does, because nothing moves HEAD mid-run (#380)."""
-    # Strip inherited git env so `git -C DECOMP` discovers the submodule's own gitdir.
-    # Git sets GIT_DIR (etc.) when this runs inside a commit hook, and an explicit
-    # GIT_DIR overrides the -C discovery -- so `show HEAD:...` resolves against the
-    # superproject and fails (128). Bit us committing from a content/pipeline worktree,
-    # whose submodule gitdir is separate from the superproject's.
-    env = git_env()
-    return subprocess.check_output(['git', '-C', DECOMP, 'show', 'HEAD:' + relpath],
-                                   encoding='utf-8', env=env)
 
 
 def class_base_stats(class_enum, classes_text=None):
@@ -3700,15 +3603,6 @@ def classed_cast(campaign):
     return out
 
 
-def _table_close_line(lines, decl):
-    """(decl line index, closing `};` line index) for a C array `decl`."""
-    di = next((i for i, ln in enumerate(lines) if decl in ln), None)
-    if di is None:
-        sys.exit('ERROR: %r not found' % decl)
-    ci = next((i for i in range(di + 1, len(lines)) if lines[i].strip() == '};'), None)
-    if ci is None:
-        sys.exit('ERROR: close of %r not found' % decl)
-    return di, ci
 
 
 def _append_table_rows(path, decl, rows):
@@ -5822,11 +5716,6 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
 # `make` + New Game load-tests the tileset in-engine (the same hijack inject_test_chapter
 # uses). Authoring real Tiled layouts (.tmx -> .bin) is the next step (#40 task 2 / #20).
 
-MAP_GFX_DIR = os.path.join(DECOMP, 'graphics', 'map')
-MAP_LAYOUT_DIR = os.path.join(MAP_GFX_DIR, 'layout')
-CONST_MAPS_S = os.path.join(DECOMP, 'data', 'const_data_chapter_maps.s')
-ASSET_TABLE_S = os.path.join(DECOMP, 'data', 'data_8B363C.s')
-CHAPTER_SETTINGS_JSON = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.json')
 
 # The campaign's tilesets (maps/tilesets/<name>/, vendored via map_tileset_tool
 # import). Each registers under ObjectType<Stem>/MapPalette<Stem>/
@@ -7028,7 +6917,6 @@ def _register_chapter_map(maps_dir, layout, comment):
     return obj_idx, pal_idx, cfg_idx, layout_idx
 
 
-TRAPDATA_C = os.path.join(DECOMP, 'src', 'events_trapdata.c')
 # Our trap-type token -> the decomp enum. The list is exactly what `LoadTrapData`
 # (bmtrap.c:245) has a working case for, which is NOT the same as the bmtrick.h enum:
 #   * TRAP_OBSTACLE / TRAP_TORCHLIGHT / TRAP_LIGHT_RUNE have no case at all -- declaring
@@ -7685,7 +7573,6 @@ def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comme
                        items, ai))
 
 
-EVENTCALL_H = os.path.join(DECOMP, 'include', 'eventcall.h')
 
 # Every campaign-owned UnitDefinition table carries this prefix. It is the whole point of
 # declare_unit_table: a symbol's NAME should say whose data is in it.
@@ -9443,8 +9330,6 @@ CH03_MIDMAP_SCRIPT = 'EventScr_089F1BD8'   # dead vanilla Ch4 script (defined-on
 # Pinky-scout beats; the midmap borrows 0x9B4..0x9B7 from the dead Ch4 block.
 CH03_MIDMAP_MSGS = (0x9AF, 0x9B0, 0x9B1, 0x9B4, 0x9B5, 0x9B6, 0x9B7)
 CH03_CRIER_FID = '[FID_VillagerYoungBoy]'   # the boy crying the bounty on his crate (book p.95; generic mug)
-CH4_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventinfo.h')
-CH4_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch4-eventscript.h')
 
 # ── Ch4 "The White Moose" (#24): hosted on chapter slot 5. The authored snowy map
 # preserves vanilla Ch4's 15x15 geometry, and the force preserves its 16 line + 7
@@ -9464,8 +9349,6 @@ CH04_TURN3_SYMBOL = 'UnitDef_088B5914'
 CH04_BOOT_SEED_SYMBOL = 'UnitDef_088B5978'
 CH04_PREP_SCRIPT = 'EventScr_08591FD8'
 CH04_ENDING_SCRIPT = 'EventScr_Ch5_EndingScene'
-CH5_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventinfo.h')
-CH5_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventscript.h')
 CH04_CLASS_IDS = {
     'mauthedoog': 'CLASS_MAUTHEDOOG',
     'revenant': 'CLASS_REVENANT',
@@ -9631,37 +9514,6 @@ CH04_SNAG_TILES = (7, 36, 11)
 # looked broken). These come out of ch04's own dead Ch5 block instead.
 CH04_GOAL_WINDOW_MSG = 0x9C4                    # dead Ch5 text slot -> the on-map goal banner
 CH04_GOAL_STATUS_MSG = 0x9C5                    # dead Ch5 text slot -> the Status-screen objective
-# The EDGE tile it escapes off. Direction is AWAY FROM THE PARTY, who deploy on the NW flank --
-# Nicolas 2026-07-31: "I don't care about the direction, I want it to be away from the party; the
-# southeast corner makes most sense." So the quarry breaks for the far corner and is gone.
-# It was (14, 0) -- the literal NE corner -- and that SOFT-LOCKED the chapter: the corner is
-# TERRAIN_PLAINS but a wall of TERRAIN_CLIFF seals the whole NE pocket off from the clearing, so
-# the MOVE waited forever on a path that cannot be walked. assert_scripted_move_reachable now
-# fails the BUILD on any such destination, and it passes on this one.
-# ── ch05 "The Elven Tomb" (#25) ─────────────────────────────────────────────────
-# THE TWO OFFSETS, stated once, here, so no other line in inject_ch05 has to know them.
-#
-#   OURS:     chapter N is hosted on slot N+1. The prologue occupies a real chapter slot
-#             (slot 0 has special engine paths that break a stripped chapter -- see
-#             inject/hosts.py) and is not numbered, so every chapter sits one slot right of
-#             its number. It cannot be renumbered away; it is a consequence of having a
-#             prologue at all. The player never sees it: the prep header reads "Chapter 5"
-#             off prepScreenNumber (= chapter_number * 2) and the title card is one we draw.
-#
-#   FE8'S:    vanilla inserted chapter 5X at slot 5, so from slot 6 on the slot INDEX and the
-#             vanilla symbol NAME disagree in the BASE GAME -- slot 6 ships Ch5EventData,
-#             slot 7 ships Ch6Events. This is the one that reads like a bug and is not ours.
-#
-# ch05 is a 1:1 retile of vanilla Ch5 and mines Ch5 for everything that is CONTENT -- the
-# geometry, the terrain, all sixteen line placements (Ch5's REDA destinations), the nine
-# player start tiles, the three east-edge reinforcement waves, the villages, the armory, the
-# vendor, the arena, Joshua's tile for Sahnar. None of that is affected by which slot stores
-# it. What it takes from the HOST SLOT is storage and nothing else, and since #25 our rosters
-# no longer squat on the slot's vanilla tables at all (declare_unit_table) -- so the only
-# vanilla names left below are the event lists chapter_settings.json points at structurally.
-# CH05_HOST_INDEX (6) / CH05_EVENT_GROUP ('Ch6Events' -- FE8's offset, not ours): inject/hosts.py.
-CH05_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch6-eventinfo.h')
-CH05_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch6-eventscript.h')
 # The host slot's event-list symbols. These CANNOT be renamed -- the ChapterEventGroup that
 # chapter_settings.json resolves is built from them -- so they are named here and nowhere else.
 CH05_EVENT_LISTS = {
@@ -10094,18 +9946,6 @@ CH05_SAHNAR_PID = '0xba'                         # Sahnar: her own pid so Basil'
 CH05_GENERIC_PID = '0x80'                        # autolevelled trash (vanilla Ch6's own generic)
 
 
-# --- Chapter 6 (#26): "The Maer Monster" -------------------------------------------
-# Hosted on slot 7, filling `Ch7EventData` (CH06_HOST_INDEX / CH06_EVENT_GROUP:
-# inject/hosts.py, which states the slot-vs-symbol offset once for the whole build).
-# ch06 is the sharpest case of the THREE different vanilla chapters a hosted chapter
-# touches, and they are all different on purpose:
-#   * the DONOR (geometry) is Ch13 Ephraim -- the layout was retiled from it (#331);
-#   * the BAR (enemy pressure, levels, inventories, AI) is Ch6 -- `parity_reference`,
-#     and every enemy row derives its donor unit from it (#334/#335);
-#   * the HOST (storage: event lists, scripts, message block, goal donor) is slot 7.
-# Nothing below mines Ch7 for CONTENT. Slot 7 supplies storage and nothing else.
-CH06_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch7-eventinfo.h')
-CH06_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch7-eventscript.h')
 # The host slot's event-list symbols. These CANNOT be renamed -- the ChapterEventGroup
 # chapter_settings.json resolves is built from them -- so they are named here and nowhere else.
 CH06_EVENT_LISTS = {
@@ -14730,21 +14570,6 @@ def inject_pc_death_quotes(campaign, verbose=True):
         print('  death quotes: %d cast members (chapter=any)' % len(rows))
 
 
-# --- Battle ground platforms (#65): vendored snow/ice grounds + terrain remap -------
-# FE8's battle platform (the ground combatants stand on) is terrain-driven
-# (gBanimFloorfx -> battle_terrain_table[idx]); vanilla has no snow ground (the pale
-# siroyuka1 is stone). We vendor F2E platforms from the FE-Repo {Cynon} pack into NEW
-# battle_terrain_table slots, then remap the terrain->ground tables so our snow chapters
-# resolve snow grounds per tile. Sources: campaigns/<c>/platforms/<stem>.png (indexed P,
-# 256x32 -- the vanilla platform format). Decided: decisions.md (Art & Audio, 2026-06-23).
-BANIM_TERRAIN_GFX = os.path.join(DECOMP, 'graphics', 'banim', 'terrain')
-BANIM_TERRAIN_DATA_C = os.path.join(DECOMP, 'src', 'banim_terrain_data.c')
-BANIM_TERRAIN_INCBIN_S = os.path.join(DECOMP, 'data', 'data_banim_terrain.s')
-BANIM_POINTER_H_TERR = os.path.join(DECOMP, 'include', 'banim_pointer.h')
-DATA_TERRAINS_C = os.path.join(DECOMP, 'src', 'data_terrains.c')
-BANIM_BATTLEPARSE_C = os.path.join(DECOMP, 'src', 'banim-battleparse.c')
-VARIABLES_H = os.path.join(DECOMP, 'include', 'variables.h')
-CHAPTER_SETTINGS_JSON_PLAT = os.path.join(DECOMP, 'src', 'data', 'chapter_settings.json')
 
 # (campaign png stem, decomp symbol stem, twilight tint). Grounds get table indices in
 # append order from PLATFORM_BASE_INDEX. Offsets: 0=Snowdrift, 1=rough(SnowUneven), 2=Ice,
