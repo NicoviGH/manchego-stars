@@ -2411,7 +2411,11 @@ def _set_field(block, field, value, path, marker):
     return new
 
 
-@functools.lru_cache(maxsize=None)
+# Bounded, not unbounded: today's readers touch ~9-22 files (~2-5 MB), but #365 proposes a
+# ROMChapterData census, and a census is exactly the caller that walks a big slice of a
+# 6,361-file decomp. 64 entries covers every real working set with room to spare and
+# caps what a future sweep can pin in memory.
+@functools.lru_cache(maxsize=64)
 def vanilla_decomp_text(relpath):
     """Committed (HEAD) text of a decomp source file -- immune to the working-tree patching
     the build applies to PATCHED_DECOMP_FILES (e.g. data_characters.c portrait slots get
