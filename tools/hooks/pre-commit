@@ -2,7 +2,14 @@
 # Drift guard -- runs the repo check before every commit so doc/plan drift can't land.
 # Enabled via `git config core.hooksPath tools/hooks` (done by tools/setup-toolchain.sh).
 # Bypass for a genuine exception with: git commit --no-verify
-python3 tools/check.py || {
+# Use the same interpreter the Makefile picks. Git runs hooks with the user's environment,
+# so a bare `python3` here resolved to the SYSTEM python (3.9.6 on macOS) while `make` and CI
+# both run 3.12 -- the gate on every commit ran on a different runtime than the gate on every
+# push. `make -s python-bin` is the one place that choice is made (#382).
+PYTHON="$(make -s python-bin 2>/dev/null)"
+[ -x "$PYTHON" ] || PYTHON=python3
+
+"$PYTHON" tools/check.py || {
     echo "" >&2
     echo "pre-commit: drift check failed (above). Fix it, or bypass with --no-verify." >&2
     exit 1

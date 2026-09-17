@@ -1,9 +1,9 @@
 name: checks
 
-# Lightweight drift guard. A full `make` is intentionally NOT run here: it needs the
-# copyrighted base ROM (gitignored) and the agbcc toolchain. Instead we catch the cheap,
-# high-value failures -- broken tooling, unparseable campaign data, and docs that point at
-# files which no longer exist (the kind of drift this repo has bitten on before).
+# The drift guard, and it runs on EVERYTHING -- no path filter, deliberately. Catching docs
+# that point at files which no longer exist is most of this job's value, so the one change it
+# must never skip is a docs-only change. It is also cheap (~20s): pyyaml, no submodule, no
+# toolchain. The ROM build lives in build.yml, which is what a docs-only change skips (#382).
 
 on:
   push:
@@ -33,76 +33,6 @@ jobs:
       # (#55 -- enforces on PRs from inst/* branches via GITHUB_HEAD_REF/BASE_REF; no-ops on
       # a direct push to main, where the pre-commit hook is the enforcement point).
       # NOTE: this job intentionally has NO submodule, so check.py's unit-test step
-      # self-skips the decomp-reading tests -- the `build` job (below) runs `make test`.
+      # self-skips the decomp-reading tests -- build.yml's `tests` job runs `make test`.
       - name: Drift guard + seam lane guard (tools/check.py)
         run: python3 tools/check.py
-
-  # The real "make green" gate. Mirrors the fireemblem8u decomp's own build.yml: a
-  # MOCK base ROM (random 16MB) lets `make` compile + link the full ROM without the
-  # copyrighted original -- which is what we want (we diverge from vanilla anyway).
-  # This catches real breakage: bad C, missing symbols, malformed data tables, and a
-  # broken build_campaign.py injection.
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential binutils-arm-none-eabi libpng-dev lua5.4
-          # The Makefile probes for `lua`; ubuntu ships the binary as `lua5.4`.
-          sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
-          python3 -m pip install ttp numpy pillow pyyaml
-
-      # Unit tests (Python combat/difficulty/build + pure-Lua playtest logic). This is the
-      # ONLY CI job with the fireemblem8u submodule checked out, which the decomp-reading
-      # tests (vanilla_decomp_text) and the Lua tests need. Runs before the ~3-min agbcc
-      # build so cheap test failures surface fast. No mGBA -- pure logic test scripts.
-      - name: Unit tests (make test)
-        run: make test
-
-      # agbcc changes rarely; cache the built compiler (~2-3 min of every run otherwise).
-      # Bump the key suffix to force a rebuild if agbcc upstream ever matters.
-      - name: Cache agbcc
-        id: agbcc-cache
-        uses: actions/cache@v4
-        with:
-          path: agbcc
-          key: agbcc-${{ runner.os }}-v1
-
-      - name: Build agbcc (cache miss only)
-        if: steps.agbcc-cache.outputs.cache-hit != 'true'
-        run: |
-          git clone https://github.com/pret/agbcc.git
-          cd agbcc && ./build.sh
-
-      - name: Install agbcc into the decomp
-        run: cd agbcc && ./install.sh "$GITHUB_WORKSPACE/fireemblem8u"
-
-      - name: Build decomp tools
-        run: cd fireemblem8u && ./build_tools.sh
-
-      - name: Mock base ROM (no copyrighted ROM needed to verify the build links)
-        run: head -c 16M /dev/urandom > fireemblem8u/baserom.gba
-
-      - name: make green (inject campaign + build ROM)
-        run: make CAMPAIGN=rime-of-the-frostmaiden
-
-      # Text is compiled from source, so the mock base ROM doesn't affect it. This is
-      # the regression gate for the text-table corruption class (terminator parity,
-      # runaway decodes) that has bitten twice before.
-      - name: Verify ROM text decodes cleanly
-        run: python3 tools/verify_text.py
-
-      # Surface the campaign enemy-pressure curve (ours vs vanilla parity references) on
-      # every build so balance spikes/sags and parity regressions are visible at a glance
-      # (#48), AND hard-fail any chapter content has marked balance-final. PER-CHAPTER gate
-      # (#48 (b)): `--check` enforces only chapters with `balance_locked: true` in their YAML,
-      # so unwritten / mid-authoring chapters stay informational and never redden CI -- we
-      # author chapters as we go and lock each one when it's balanced. With zero locks this
-      # passes (enforces nothing). Reads the decomp HEAD, so it needs the submodule (above).
-      - name: Enemy-pressure parity curve + per-chapter gate
-        run: make CAMPAIGN=rime-of-the-frostmaiden difficulty-gate
