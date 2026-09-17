@@ -29,7 +29,7 @@ export PATH := $(BREW_PY):$(PATH)
 endif
 endif
 
-.PHONY: all clean verify check test matrix difficulty difficulty-gate scene chapter
+.PHONY: all clean verify check test matrix difficulty difficulty-gate scene chapter python-bin
 
 all: fireemblem8.gba
 
@@ -38,6 +38,14 @@ all: fireemblem8.gba
 fireemblem8.gba:
 	python3 tools/build_campaign.py --campaign $(CAMPAIGN) $(if $(MONTAGE),--montage) $(if $(TESTCH),--test-chapter) $(if $(LORDBOOT),--lord-boot) $(if $(CH01BOOT),--ch01-boot) $(if $(CH03BOOT),--ch03-boot) $(if $(CH04BOOT),--ch04-boot) $(if $(CH05BOOT),--ch05-boot) $(if $(CH05LUPIN),--ch05-lupin) $(if $(CH05MOOSE),--ch05-moose) $(if $(CH05ENDING),--ch05-ending=$(CH05ENDING)) $(if $(CH06BOOT),--ch06-boot)
 	$(MAKE) -C fireemblem8u fireemblem8.gba -j$(NPROC)
+
+# The interpreter this repo builds with, resolved ONCE here (the macOS shim above puts
+# Homebrew's python ahead of the system 3.9 on PATH). `tools/hooks/pre-commit` asks for it
+# rather than calling a bare `python3`, which used to resolve to the system 3.9 while `make`
+# and CI both ran 3.12 -- one gate, two runtimes (#382).
+.PHONY: python-bin
+python-bin:
+	@command -v python3
 
 # Drift guard: docs/tooling consistency. Same logic CI and the git pre-commit hook run.
 check:
@@ -50,8 +58,12 @@ verify:
 
 # Run the Python unit tests (combat math + stat resolution + difficulty engine).
 # Also run by `make check` / CI / the pre-commit hook.
+# tools/run_tests.py is the ONE runner -- `make check` (via check.py check_tests_pass) and
+# this target both go through it, instead of each keeping its own serial loop. Parallel,
+# because every test file is its own process: serially this was the slowest thing in a
+# commit (#382).
 test:
-	@for t in tools/test_*.py tools/playtest/test_*.py; do echo "== $$t =="; python3 $$t || exit 1; done
+	@python3 tools/run_tests.py
 	@if command -v lua >/dev/null 2>&1; then \
 		for t in tools/playtest/test_*.lua; do echo "== $$t =="; lua $$t || exit 1; done; \
 	else echo "== skipping Lua playtest tests (no 'lua'; brew install lua) =="; fi

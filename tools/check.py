@@ -184,13 +184,12 @@ def check_tests_pass(fail):
         print('check_tests_pass: skipping unit tests (fireemblem8u submodule not checked '
               'out; the CI build job runs `make test`)')
         return
-    for t in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))
-                    + glob.glob(os.path.join(REPO, 'tools', 'playtest', 'test_*.py'))):
-        r = subprocess.run([sys.executable, t], capture_output=True, text=True)
-        if r.returncode != 0:
-            tail = (r.stderr or r.stdout).strip().splitlines()
-            fail.append('unit tests fail: %s (%s)' % (
-                os.path.relpath(t, REPO), tail[-1] if tail else 'see output'))
+    # tools/run_tests.py is the one runner; `make test` invokes the same module, so the
+    # gate and the target can never drift into testing different sets (#382).
+    import run_tests
+    for rel, output in run_tests.run():
+        tail = output.strip().splitlines()
+        fail.append('unit tests fail: %s (%s)' % (rel, tail[-1] if tail else 'see output'))
 
 
 # gen_symbols.py outputs, gitignored and absent in CI -- a gate that fails on a missing
@@ -2791,6 +2790,49 @@ def check_every_gate_is_registered(fail):
                         'add it to the tuple (a check nothing runs cannot fail)' % name)
 
 
+def check_build_workflow_filters_agree(fail):
+    """build.yml's two `paths-ignore` lists must be identical, and must stay an allowlist.
+
+    GitHub Actions does not support YAML anchors, so the list of inert docs is written twice
+    -- once under `push`, once under `pull_request`. Two copies of one decision is the shape
+    this repo keeps getting bitten by, and here the failure is silent in the worst direction:
+    if the `pull_request` copy gained an entry the `push` copy lacks, a PR would skip the ROM
+    build and the merge to main would run it, so the build breaks on main having been green
+    on the PR.
+
+    Also refuses a broad `**.md`. The filter is safe only because it names files nothing
+    derives from; `docs/scenes/` is a GENERATED book that tools/test_scene_preview.py diffs,
+    and a glob would skip the test that polices it (#382).
+    """
+    import yaml
+    path = os.path.join(REPO, '.github', 'workflows', 'build.yml')
+    if not os.path.exists(path):
+        fail.append('.github/workflows/build.yml is missing -- the ROM build has no workflow')
+        return
+    with open(path, encoding='utf-8') as fh:
+        wf = yaml.safe_load(fh)
+    # PyYAML parses the `on:` key as the boolean True (YAML 1.1), which is why this reads
+    # `wf[True]` rather than wf['on'].
+    triggers = wf.get(True) or wf.get('on') or {}
+    push = (triggers.get('push') or {}).get('paths-ignore')
+    pull = (triggers.get('pull_request') or {}).get('paths-ignore')
+    if push is None or pull is None:
+        fail.append('build.yml: both push and pull_request need a paths-ignore list '
+                    '(one without the other means main and PRs disagree about what to build)')
+        return
+    if push != pull:
+        only_push = [p for p in push if p not in pull]
+        only_pull = [p for p in pull if p not in push]
+        fail.append('build.yml: push/pull_request paths-ignore disagree -- push-only %s, '
+                    'pull-only %s. A PR and its merge must build the same things.'
+                    % (only_push or 'none', only_pull or 'none'))
+    broad = [p for p in push if '**' in p or p.strip() in ('*.md', 'docs/')]
+    if broad:
+        fail.append('build.yml: paths-ignore must name inert files, not globs -- %s would '
+                    'also skip generated docs (docs/scenes/) whose tests live in the job '
+                    'being skipped' % broad)
+
+
 # The authoritative gate list: one check_* per gate, run through run_checks() and never a
 # bare loop (#372).
 CHECKS = (
@@ -2808,6 +2850,7 @@ CHECKS = (
     check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
     check_wrap_widths_are_pixels, check_vanilla_reads_come_from_head,
+    check_build_workflow_filters_agree,
     check_message_literals_are_registered, check_handoff_only_on_main, check_lane_ownership,
     check_every_gate_is_registered, check_map_sidecar_routes_agree,
 )

@@ -1,0 +1,126 @@
+name: build
+
+# The heavy half: the unit tests and the real ROM build. Two jobs, not one, because
+# `make test` and `make green` are independent and used to run back to back inside a single
+# job -- 53s + 129s serialised for no reason. In parallel the wall clock is the ROM build
+# alone (#382).
+#
+# A full `make` needs the copyrighted base ROM (gitignored) and the agbcc toolchain, so the
+# ROM build here links against a MOCK base ROM -- see the `build` job.
+
+on:
+  push:
+    branches: [main]
+    # Prose with nothing derived from it. 98 of the last 200 commits were docs-only and 96
+    # of those touched ONLY these files -- HANDOFF.md alone was 80 -- so skipping the
+    # toolchain for them removes most of this workflow's wasted runs.
+    #
+    # Deliberately an ALLOWLIST of inert files, never `**.md`: docs/scenes/ is a GENERATED
+    # book that tools/test_scene_preview.py regenerates and diffs, and AGENTS.md /
+    # docs/CHAPTERS.md / docs/CLASSES.md are derived or linted. A broad glob would skip the
+    # very tests that police those.
+    #
+    # Everything here is still covered by checks.yml, which has NO path filter -- a
+    # docs-only change is still checked for drift, it just doesn't compile a GBA ROM.
+    #
+    # Listed twice because GitHub Actions does not support YAML anchors; keep the two lists
+    # identical (tools/check.py check_build_workflow_filters_agree pins that).
+    paths-ignore:
+      - 'HANDOFF.md'
+      - 'README.md'
+      - 'CREDITS.md'
+      - 'docs/decisions.md'
+      - 'docs/PRD.md'
+      - 'docs/roadmap.md'
+  pull_request:
+    paths-ignore:
+      - 'HANDOFF.md'
+      - 'README.md'
+      - 'CREDITS.md'
+      - 'docs/decisions.md'
+      - 'docs/PRD.md'
+      - 'docs/roadmap.md'
+
+jobs:
+  # Unit tests (Python combat/difficulty/build + pure-Lua playtest logic). Needs the
+  # submodule, which the decomp-reading tests (vanilla_decomp_text) and the Lua tests use.
+  # No agbcc and no mGBA -- pure logic, so this finishes long before the ROM build does.
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.4
+          sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
+          python3 -m pip install ttp numpy pillow pyyaml
+
+      - name: Unit tests (make test)
+        run: make test
+
+  # The real "make green" gate. Mirrors the fireemblem8u decomp's own build.yml: a
+  # MOCK base ROM (random 16MB) lets `make` compile + link the full ROM without the
+  # copyrighted original -- which is what we want (we diverge from vanilla anyway).
+  # This catches real breakage: bad C, missing symbols, malformed data tables, and a
+  # broken build_campaign.py injection.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential binutils-arm-none-eabi libpng-dev lua5.4
+          # The Makefile probes for `lua`; ubuntu ships the binary as `lua5.4`.
+          sudo ln -sf "$(command -v lua5.4)" /usr/local/bin/lua
+          python3 -m pip install ttp numpy pillow pyyaml
+
+      # agbcc changes rarely; cache the built compiler (~2-3 min of every run otherwise).
+      # Bump the key suffix to force a rebuild if agbcc upstream ever matters.
+      - name: Cache agbcc
+        id: agbcc-cache
+        uses: actions/cache@v4
+        with:
+          path: agbcc
+          key: agbcc-${{ runner.os }}-v1
+
+      - name: Build agbcc (cache miss only)
+        if: steps.agbcc-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone https://github.com/pret/agbcc.git
+          cd agbcc && ./build.sh
+
+      - name: Install agbcc into the decomp
+        run: cd agbcc && ./install.sh "$GITHUB_WORKSPACE/fireemblem8u"
+
+      - name: Build decomp tools
+        run: cd fireemblem8u && ./build_tools.sh
+
+      - name: Mock base ROM (no copyrighted ROM needed to verify the build links)
+        run: head -c 16M /dev/urandom > fireemblem8u/baserom.gba
+
+      - name: make green (inject campaign + build ROM)
+        run: make CAMPAIGN=rime-of-the-frostmaiden
+
+      # Text is compiled from source, so the mock base ROM doesn't affect it. This is
+      # the regression gate for the text-table corruption class (terminator parity,
+      # runaway decodes) that has bitten twice before.
+      - name: Verify ROM text decodes cleanly
+        run: python3 tools/verify_text.py
+
+      # Surface the campaign enemy-pressure curve (ours vs vanilla parity references) on
+      # every build so balance spikes/sags and parity regressions are visible at a glance
+      # (#48), AND hard-fail any chapter content has marked balance-final. PER-CHAPTER gate
+      # (#48 (b)): `--check` enforces only chapters with `balance_locked: true` in their YAML,
+      # so unwritten / mid-authoring chapters stay informational and never redden CI -- we
+      # author chapters as we go and lock each one when it's balanced. With zero locks this
+      # passes (enforces nothing). Reads the decomp HEAD, so it needs the submodule (above).
+      - name: Enemy-pressure parity curve + per-chapter gate
+        run: make CAMPAIGN=rime-of-the-frostmaiden difficulty-gate
