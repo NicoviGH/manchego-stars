@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-284 decisions. Read this index, then open the two or three you need — the whole
+285 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -101,6 +101,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0027` | [Ch2 load-test: automate the STRUCTURAL half in the harness; the PACING half stays human.](decisions/0027-ch2-load-test-automate-the-structural-half-in-the.md) | 2026-06-25 | — |
 | `0028` | [Clear-bot pathing: BFS march + multi-range + stall watchdog landed; #60 still open on boss-breach.](decisions/0028-clear-bot-pathing-bfs-march-multi-range-stall-watchdog.md) | 2026-06-25 | #60 |
 | `0029` | [(a) tools/check.py runs in CI's checks job, which installs pyyaml and nothing else.](decisions/0029-tools-check-py-runs-in-ci-s-checks-job.md) | 2026-08-06 | #237 #239 #240 #241 |
+| `0285` | [Context is the budget, and the expensive thing is what enters it early](decisions/0285-context-is-the-budget-and-it-is-quadratic.md) | 2026-09-17 | #386 |
 
 ---
 

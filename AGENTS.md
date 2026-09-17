@@ -57,6 +57,53 @@ Read these at the top of every session before touching code:
 > hypotheses would need, not one run per guess. Long form + what it cost: `docs/decisions.md` →
 > "Playtest runs are the most expensive thing in this repo". The permanent fix is **#255**.
 
+## Searching: 86% of this repo is not this repo
+
+`rg --files` counts **7,423 files, and 6,361 of them (86%) are the `fireemblem8u` submodule.**
+An unscoped search pays for that in TOKENS, not seconds — `rg` is fast either way, but the
+matches come back and sit in context for the rest of the session:
+
+| query | repo-wide | scoped out of the decomp |
+|---|---|---|
+| `unit` | 17,556 | 3,738 |
+| `chapter` | 5,748 | 4,353 |
+| `tileset` | 1,459 | 652 |
+
+So **scope by default, and reach into the decomp deliberately**:
+
+- **Our code, our content, our docs** — `rg <pat> -g '!fireemblem8u'`. This is almost always
+  what you want when changing tooling, YAML or prose.
+- **What vanilla FE8 does** — search `fireemblem8u/` ON PURPOSE and say so. Grounding an FE8
+  claim in the decomp is required (`docs/decisions.md` → "Always use the decomp"); stumbling
+  into it while grepping for one of our own symbols is not the same thing.
+- **Never** read a decomp source file whole. They run to 1.78 MB (`src/events_udefs.c`);
+  `build_campaign.vanilla_decomp_text` exists to read them at HEAD and is memoised for exactly
+  this reason.
+
+## Context is the budget, and it is quadratic
+
+Every tool call re-reads the whole context, so **cost is `size × remaining calls`, not size.**
+Measured over 37 sessions of this project: 6.92B raw input tokens, **830M billed-equivalent**,
+**82% of it `cache_read`**. Mean context per call **335,046 tokens**; one session peaked at
+**940,921**. The 2,000th call of a session bills roughly 24x what the 1st did for the same work.
+
+What follows from that:
+
+- **Hand off before the context gets huge, not when the task ends.** `/handoff` at task
+  boundaries, `/clear` on task switches. A session that ends at 400k costs less than half one
+  that ends at 940k.
+- **What enters context early and never leaves is the expensive thing.** This is why
+  `docs/decisions.md` is an index (#384) and why you open two or three records rather than the
+  corpus.
+- **Don't leave a session idle for an hour.** The prompt cache has a 1-hour TTL, and a miss
+  re-writes the whole prefix at 1.25x instead of reading it at 0.1x — **a 12.5x penalty**. 175
+  such events were measured; **37% of them followed a gap over an hour**, against 0% of normal
+  calls. The worst single one re-paid 433,984 tokens. Hand off and start fresh instead.
+- **Prefer `sed -n` / `grep` over reading a file whole**, and redirect big output to a file and
+  grep it. Measured: Bash results average 314 tokens, Read results 18,808. `make matrix
+  SUITE=all` run with `> file` and `run_in_background` returned a **392-character** tool result
+  for a job that would otherwise have dumped ~450k tokens.
+
 ## Key File Locations
 
 | What | Where |
