@@ -6,15 +6,30 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-17 (Claude), after the #380/#382/#384/#386 efficiency stack merged. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-17 (Claude), after the #380/#382/#384/#386 efficiency stack merged and
+#389's groundwork was opened as PR #390. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing. The tree is clean on `main` and no branch is open.** The #380/#382/#384/#386
-efficiency stack merged 2026-09-17 (`fc65180`..`747e7a5`); every feature branch is deleted and
-pruned.
+**PR #390 (`feat/389-decompose-injector`) is OPEN and green, and needs `/code-review` before
+it merges.** Two review attempts hit the session limit; it was not merged unreviewed. Nothing
+else is open — the #380/#382/#384/#386 stack merged 2026-09-17 (`fc65180`..`747e7a5`) and its
+branches are pruned.
+
+**What #390 contains, and what it deliberately does NOT:** the groundwork for #389 only — a
+new paths module holding the 79 decomp path constants, the memoised HEAD reader and the
+table-close helper moved into the shared `inject/decomp` layer, and a new injection-fingerprint
+gate. **No domain is extracted yet.** Verified byte-identical over 972 injected files. Read the
+PR for the file list (they are not on `main` yet); the why is ADR 0287, do not restate it.
+
+⚠️ **Read ADR 0287 before touching #389.** Two things it records will otherwise be re-derived
+the hard way: a byte-identical ROM is NOT a usable gate (make skips work it thinks is done —
+the first check "passed" in 1.1s), and **the file's 18 section banners are not domain
+boundaries** — `inject_ch03`/`ch04`/`ch05` all sit under a banner reading "Chapter 6". An
+extraction along the `Enemy class reskins` banner passed the fingerprint gate byte-identical
+and still broke four unit tests, and was reverted.
 
 ⚠️ **Three operating facts changed under you on 2026-09-17. The ADRs carry the why; these are
 the parts that change what you DO:**
@@ -25,8 +40,8 @@ the parts that change what you DO:**
 - **CI is two workflows now.** `checks.yml` runs on everything; `build.yml` (jobs `tests` and
   `build`) skips an allowlist of inert docs. A docs-only commit no longer builds a ROM.
 
-**Still open from the audit: #388** — tooling has outrun content 22:1 in September (7,899 lines
-vs 352). That issue is a QUESTION for Nicolas, not queued work, and nothing depends on it.
+**#388 is CLOSED** — Nicolas answered it: September's ratio is an artefact of him being away
+on other work, not drift. Not a signal, not queued work.
 
 ## Next up — ordered by effort. CLAUDE'S RECOMMENDATION, not a decision Nicolas has made
 
@@ -42,6 +57,7 @@ the issue's own scope — read the issue, don't re-derive it here.
 | 5 | **#337** | M | The permadeath invariant, and **the prerequisite for ch06's dialogue** — a scene that stages a PC it never `LOAD`s soft-locks the chapter the first time that PC is dead when the beat fires. 14 staging sites today. Sibling of `assert_scripted_move_reachable`, which checks the terrain and not the unit. |
 | 6 | **#367's remainder** | M, and mostly DECISIONS not code | Lock ch03–ch06 or accept the gate is decorative for them; the party-level band into `docs/fe8-pacing-reference.md`. ⚠️ **ch07 is the watch item** — it reuses FE8 Ch6 as its bar. |
 | 7 | **#26 — ch06's own body** | L | The chapter itself, and the reason the rest of this list exists. |
+| 8 | **#389's remainder** | L, incremental | Decompose `build_campaign.py` (15,128 lines, ~249k tokens — bigger than a context window, so it can only be grepped). #390 lands the gate and the shared layer; the work left is cluster-by-cluster extraction. **Next concrete step: cluster the file by DEPENDENCY, not by banner** (ADR 0287). ⚠️ **ch06 is extracted LAST, after it ships** — Nicolas's call, so it gets written into the clean structure rather than appended to the pile. |
 
 **The recommendation, in one line: #337, then #26** — everything above #337 is cheap enough to
 slot in anywhere, while #337 is the only item that GATES the work that matters. #30, #365 and #379
