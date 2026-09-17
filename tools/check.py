@@ -1996,27 +1996,42 @@ def check_tool_refs_exist(fail):
 def check_no_dead_concepts(fail):
     """Retired terms/mechanisms must not survive in docs OR hand-written code
     comments (the 2026-07-02 incident: a superseded mechanism lived on in a
-    build_campaign.py header and got copied into an ADR as fact)."""
+    build_campaign.py header and got copied into an ADR as fact).
+
+    The decision record is exempt, because a decision to RETIRE something has to name the
+    thing it retired -- that is the whole content of the record. The exemption used to be the
+    single file `decisions.md`; since #384 the records are `docs/decisions/*.md` and the
+    index is generated from them, so the exemption follows the content into the directory.
+    Everything outside it is still held: the point of this gate is that a dead concept must
+    not be restated anywhere it could be mistaken for current fact."""
     pat = re.compile('|'.join(DEAD_CONCEPTS), re.I)
+    decisions_dir = os.path.join(REPO, 'docs', 'decisions') + os.sep
     for d in _docs() + _handwritten_sources():
-        if os.path.basename(d) == 'decisions.md':
+        if os.path.basename(d) == 'decisions.md' or d.startswith(decisions_dir):
             continue
-        for i, line in enumerate(open(d, encoding='utf-8'), 1):
-            m = pat.search(line)
-            if m:
-                fail.append('dead concept %r in %s:%d'
-                            % (m.group(0), os.path.relpath(d, REPO), i))
+        with open(d, encoding='utf-8') as fh:
+            for i, line in enumerate(fh, 1):
+                m = pat.search(line)
+                if m:
+                    fail.append('dead concept %r in %s:%d'
+                                % (m.group(0), os.path.relpath(d, REPO), i))
 
 
 def check_generated_indexes_fresh(fail):
-    """docs/CHAPTERS.md + docs/CLASSES.md are GENERATED from campaign YAML; a
-    hand edit or a YAML change without a regen is silent drift. Regenerate in
-    memory and diff against the committed file."""
+    """docs/CHAPTERS.md, docs/CLASSES.md and docs/decisions.md are GENERATED; a hand edit or
+    a source change without a regen is silent drift. Regenerate in memory and diff against
+    the committed file.
+
+    decisions.md joined this list on #384, when it stopped being a 728 KB document and became
+    the index over docs/decisions/*.md. Editing the index by hand now loses the edit
+    on the next regen, so the gate has to say so."""
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     import gen_chapter_index
     import gen_class_index
+    import gen_decisions_index
     for mod, rel in ((gen_chapter_index, 'docs/CHAPTERS.md'),
-                     (gen_class_index, 'docs/CLASSES.md')):
+                     (gen_class_index, 'docs/CLASSES.md'),
+                     (gen_decisions_index, 'docs/decisions.md')):
         path = os.path.join(REPO, rel)
         want = mod.generate()[0]
         have = open(path, encoding='utf-8').read() if os.path.isfile(path) else None
@@ -2833,6 +2848,48 @@ def check_build_workflow_filters_agree(fail):
                     'being skipped' % broad)
 
 
+def check_decision_records_wellformed(fail):
+    """Every docs/decisions/ file parses, and its id is unique and matches its filename.
+
+    The corpus is the source of truth now, so a malformed ADR is a decision that silently
+    stops being indexed -- the same failure as a check that is defined but never registered.
+    Cheap to hold: ids come from the filename, so the only way to collide is to hand-copy a
+    file and forget to renumber, which is exactly what people do (#384).
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import gen_decisions_index as gen
+
+    seen = {}
+    try:
+        records = gen.adrs()
+    except Exception as exc:
+        fail.append('docs/decisions/: an ADR could not be parsed -- %s' % exc)
+        return
+    for rec in records:
+        name = rec['path'].split('/')[-1]
+        if not rec.get('title'):
+            fail.append('%s has no title in its front matter' % name)
+        if not rec.get('section'):
+            fail.append('%s has no section, so the index cannot place it' % name)
+        ident = rec.get('id')
+        if not isinstance(ident, int):
+            fail.append('%s has a non-integer id (%r) -- YAML reads 0009 as a string and '
+                        '0001 as octal, so ids are written unpadded' % (name, ident))
+            continue
+        if '%04d' % ident != name.split('-')[0]:
+            fail.append('%s declares id %d, which its filename does not match' % (name, ident))
+        if ident in seen:
+            fail.append('id %d is used by both %s and %s' % (ident, seen[ident], name))
+        seen[ident] = name
+
+    notes = gen.section_notes()
+    known = set(gen.SECTION_ORDER) | {r.get('section') for r in records}
+    for section in notes:
+        if section not in known:
+            fail.append('a section note claims section %r, which no decision uses and '
+                        'SECTION_ORDER does not name' % section)
+
+
 # The authoritative gate list: one check_* per gate, run through run_checks() and never a
 # bare loop (#372).
 CHECKS = (
@@ -2850,7 +2907,7 @@ CHECKS = (
     check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
     check_wrap_widths_are_pixels, check_vanilla_reads_come_from_head,
-    check_build_workflow_filters_agree,
+    check_build_workflow_filters_agree, check_decision_records_wellformed,
     check_message_literals_are_registered, check_handoff_only_on_main, check_lane_ownership,
     check_every_gate_is_registered, check_map_sidecar_routes_agree,
 )
