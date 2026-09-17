@@ -21,7 +21,10 @@ were therefore at the expensive end by default rather than by decision. It is no
 The lever that belongs to a review is the level the skill takes as an **argument**:
 `/code-review <PR> high`. Its contract is explicit that low/medium returns fewer, high-confidence
 findings while high→max buys broader coverage and admits uncertain ones — a trade worth making
-sometimes, and not worth making silently every time. **The two must not be confused.** Raising
+sometimes, and not worth making silently every time. **It is typed every time, because omitting
+it does not mean `medium`**: the skill reuses the level typed last, so a single `max` run makes
+every later bare review a `max` review, which is this record's own failure wearing a different
+hat. **The two must not be confused.** Raising
 `effortLevel` to buy one deep review raises the price of everything that comes after it, in this
 repo and outside it, which is the failure this record exists to stop; asking `/code-review` for
 `high` on the one PR that earns it costs only that run.

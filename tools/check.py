@@ -135,9 +135,13 @@ DEAD_CONCEPTS = [
     # sorts by id and its header counts records. Keyed tightly on DECISION/ADR ids, because
     # `dense` is load-bearing elsewhere and must keep matching nothing there -- gMsgTable[], the
     # GetMuImg array and the platform palette are all genuinely dense.
-    r'(?:decision|ADR)s? ids? (?:are|is|should be|must be|run)\b[^.\n]{0,40}\bdense',
-    r'\b(?:decision|ADR)s? ids? should run 1\.\.',
-    r'dense (?:decision|ADR) ids?',
+    # Each pattern refuses to fire on a NEGATED statement of the invariant: "decision ids are
+    # unique, not dense" is the rule being stated correctly, and a guard that rejects its own
+    # warning is worse than none (see `hasPrepScreen` and `_script_to_message` above).
+    r'(?:decision|ADR)s? ids? (?:are|is|should be|must be|run)\b'
+    r'(?:(?!\b(?:not|never|no|unique)\b)[^.\n]){0,40}\bdense',
+    r'\b(?:decision|ADR)s? ids? should (?!not )run 1\.\.',
+    r'(?<!not )(?<!never )(?<!no )dense (?:decision|ADR) ids?',
 ]
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as

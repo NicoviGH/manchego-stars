@@ -152,9 +152,12 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   relocated files at high effort finds nothing a byte-for-byte proof did not already establish,
   and it is expensive. **This narrows the review's scope, never its existence** — the
   hand-written surface is exactly where the defects in those changes have actually been.
-- **Review depth is an ARGUMENT, not a setting: `/code-review <PR> high`.** The level rides with
-  that one run — low/medium return fewer, high-confidence findings; high/max buy broader coverage
-  and admit uncertain ones. Default to `medium` and ask for `high`/`max` when a PR earns it.
+- **Review depth is an ARGUMENT, not a setting: `/code-review <PR> medium`.** The level rides
+  with that one run — low/medium return fewer, high-confidence findings; high/max buy broader
+  coverage and admit uncertain ones. **Say the level every time.** Omitting it does not mean
+  `medium`: the skill reuses the level typed LAST, so one `max` run quietly prices every later
+  bare review at `max`. `medium` is the right default to type; type `high`/`max` when a PR
+  earns it.
   ⚠️ **Never reach for `effortLevel` in `~/.claude/settings.json` to do this** — that is the
   model's GLOBAL reasoning effort for every session in every project, so raising it to buy one
   deep review prices all later work at the top, outside this repo included. What it is set to on
