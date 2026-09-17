@@ -9543,8 +9543,8 @@ scenarios.ch06clock = function()
     -- mover near it was still three tiles out. A scenario that watches two units cannot tell
     -- "the AI did something surprising" from "the loaded map is not the table we emitted", so
     -- it dumps what actually LOADED -- which is the reading the next run needs and the one
-    -- this scenario was too narrow to take (decisions.md -> one INSTRUMENTED run, not one run
-    -- per guess).
+    -- this scenario was too narrow to take (AGENTS.md's playtest block: spend ONE instrumented
+    -- run that dumps what your next three hypotheses need, not one run per guess).
     for i = 0, 49 do
         local u = unitAt(SYM.gUnitArrayRed, i)
         if u and not isDead(u) and u.onMap then

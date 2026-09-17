@@ -553,8 +553,8 @@ def check_personal_line_injection_routes(fail):
 
     The registries live in build_campaign, which pulls in the art pipeline (Pillow). The `checks`
     CI job runs on a bare interpreter with neither Pillow nor the submodule, so this skips there
-    exactly as the submodule-dependent checks do -- `make test` in the BUILD job drives the same
-    public gate through test_check_chapter_schema, so nothing goes unchecked.
+    exactly as the submodule-dependent checks do -- `make test` in the `tests` job drives the
+    same public gate through test_check_chapter_schema, so nothing goes unchecked.
     """
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
@@ -2894,6 +2894,78 @@ def check_decision_records_wellformed(fail):
                         'SECTION_ORDER does not name' % section)
 
 
+def check_decision_citations_resolve(fail):
+    """A `decisions.md -> "Some Title"` pointer must name something that exists.
+
+    The repo cites decisions by prose title in 29 places, and before #384 there was no way to
+    validate one: the target was a sentence somewhere inside a 728 KB file. Now that decisions
+    are records with front matter, the set of legal citation targets is enumerable, so the
+    pointers become machine-checked instead of hopeful.
+
+    This gate exists because a review caught the author of #386 adding a pointer to
+    "Always use the decomp" -- a title that has never existed anywhere in this repo. Nothing
+    would have caught it, and the surrounding pointers it was copied from had themselves gone
+    stale across the #384 split (#386).
+
+    Resolution is a full-text search over the records, not a structural match. Pointers name
+    titles, bold sub-phrases and plain prose interchangeably -- "Playtest runs are the most
+    expensive thing in this repo" is body text in 0232 -- and every attempt to enumerate the
+    legal targets structurally produced false positives on good pointers. A gate that cries
+    wolf is worse than no gate, so this asks only: does the cited phrase appear anywhere in
+    docs/decisions/?
+    """
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import gen_decisions_index as gen
+
+    def norm(text):
+        return re.sub(r'[^a-z0-9]+', ' ', (text or '').lower()).strip()
+
+    corpus = gen.citation_corpus()
+    pat = re.compile(r'decisions\.md`?\s*(?:->|\u2192)\s*[*_"\u201c]*'
+                     r'([^"\u201d\n*_;]{12,120})')
+    decisions_dir = os.path.join(REPO, 'docs', 'decisions') + os.sep
+    for d in _docs() + _handwritten_sources():
+        if d.startswith(decisions_dir):
+            continue          # records cite each other by relative link, not by this form
+        with open(d, encoding='utf-8') as fh:
+            text = fh.read()
+        for m in pat.finditer(text):
+            raw = m.group(1).strip().rstrip('.,`')
+            # A citation runs into the sentence that follows it ("Coordination model. The
+            # operating rules:"), and titles legitimately contain ':' so truncating on
+            # punctuation would break them. Instead accept the pointer if ANY leading
+            # phrase of it resolves -- shortest sensible prefix wins.
+            words = norm(raw).split()
+            if not words:
+                continue
+            # The probe must match a target from its START, not merely appear somewhere
+            # inside one. Substring-anywhere was too loose: "a decision that was never
+            # written down" resolved against some target's middle, so the gate could not
+            # fail. Prefix matching still handles the real cases -- "Working Conventions"
+            # against the section "Working Conventions (Definition of Done)".
+            resolved = False
+            probed = False
+            # Two words is the floor -- "Working Conventions" is a real target -- but the
+            # probe must still be 16+ characters, which suppresses regex artifacts like
+            # "the 2026-07-23" without suppressing a short real section name.
+            for n in range(len(words), 1, -1):
+                probe = ' '.join(words[:n])
+                if len(probe) < 16:
+                    break
+                probed = True
+                if probe in corpus:
+                    resolved = True
+                    break
+            # A pointer too short to probe is one this gate CANNOT check -- "Two arms of one"
+            # is a capture truncated out of a real title. Saying nothing is correct; reporting
+            # it would be a check claiming a result it never computed (#372's lesson).
+            if resolved or not probed:
+                continue
+            fail.append('%s cites decisions.md -> %r, which names no title, heading or '
+                        'phrase appearing anywhere in docs/decisions/'
+                        % (os.path.relpath(d, REPO), m.group(1).strip()[:70]))
+
+
 # The authoritative gate list: one check_* per gate, run through run_checks() and never a
 # bare loop (#372).
 CHECKS = (
@@ -2912,6 +2984,7 @@ CHECKS = (
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
     check_wrap_widths_are_pixels, check_vanilla_reads_come_from_head,
     check_build_workflow_filters_agree, check_decision_records_wellformed,
+    check_decision_citations_resolve,
     check_message_literals_are_registered, check_handoff_only_on_main, check_lane_ownership,
     check_every_gate_is_registered, check_map_sidecar_routes_agree,
 )

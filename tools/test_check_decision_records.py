@@ -101,5 +101,48 @@ class ItCatchesWhatItIsFor(unittest.TestCase):
         self.assertTrue(any('non-integer id' in f for f in fail), fail)
 
 
+class CitationsResolve(unittest.TestCase):
+    """A `decisions.md -> "Title"` pointer must name something real (#386).
+
+    This gate exists because a review caught a pointer to "Always use the decomp" -- a title
+    that has never existed in this repo -- and because two more pointers had gone stale across
+    the #384 split with nothing to notice. Before #384 there was no way to validate one: the
+    target was a sentence inside a 728 KB file.
+    """
+
+    def test_the_tree_has_no_broken_citations(self):
+        fail = []
+        check.check_decision_citations_resolve(fail)
+        self.assertEqual([], fail)
+
+    def test_the_corpus_covers_body_text_and_section_names(self):
+        """9 of the repo's 29 pointers name body text rather than a title -- "Playtest runs
+        are the most expensive thing in this repo" is prose inside 0232. A validator that
+        knew only titles would call all of them broken, which is worse than no validator."""
+        corpus = gen.citation_corpus()
+        for phrase in ('playtest runs are the most expensive thing in this repo',
+                       'what terrain cannot do is stop a ranged weapon',
+                       'working conventions'):          # a SECTION, which lives in no record
+            self.assertIn(phrase, corpus)
+
+    def test_it_goes_red_on_a_pointer_that_names_nothing(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            doc = os.path.join(tmp, 'FAKE.md')
+            with open(doc, 'w', encoding='utf-8') as fh:
+                fh.write('see `decisions.md` -> "A decision that was never written down"\n')
+            real_docs = check._docs
+            real_src = check._handwritten_sources
+            check._docs = lambda: [doc]
+            check._handwritten_sources = lambda: []
+            try:
+                fail = []
+                check.check_decision_citations_resolve(fail)
+            finally:
+                check._docs, check._handwritten_sources = real_docs, real_src
+        self.assertEqual(1, len(fail), fail)
+        self.assertIn('names no title, heading or phrase', fail[0])
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -30,7 +30,8 @@ the 2,000th call bills roughly 24x what the 1st did for identical work.
 
 No single file dominates. It is accretion: 9,172 Bash calls at **314 tokens** average. What
 makes a thing expensive is not being big, it is **entering context early and never leaving**.
-That is the whole argument for [[0284-a-decision-is-a-file-and-decisions-md-is]]: a
+That is the whole argument for
+[A decision is a FILE, and decisions.md is the index over them](0284-a-decision-is-a-file-and-decisions-md-is.md): a
 197k-token file read at call 10 of a 700-call session costs ~13.6M billed-equivalent tokens.
 
 ## 2. Cache misses, which are 15.3% from 1.5% of the tokens
@@ -70,3 +71,24 @@ submodule**. Unscoped searches are fast but return decomp matches that then sit 
 `unit` matches 17,556 times repo-wide against 3,738 scoped. A blanket ignore would be wrong,
 because grounding an FE8 claim in the decomp is required; the rule is to scope by default and
 reach into the decomp deliberately.
+
+## A pointer that names nothing, and why #384 made it checkable
+
+A review of this change caught it adding `decisions.md` → *"Always use the decomp"* — a title
+that has never existed anywhere in this repo. Two more pointers were broken the same way
+(`decisions.md` → *"stacked PRs"*, and a `harness.lua` comment naming a rule that lives in
+`AGENTS.md`), and a fourth **paraphrased** its target: `ch05.lua` cited *"box count is no longer
+a witness"* against a record that says *"box count is **not** a witness"*.
+
+Nothing could have caught any of them before, because the target was a sentence somewhere
+inside a 728 KB file. Records with front matter make the legal set enumerable, so
+`check_decision_citations_resolve` now holds all 29 of the repo's title-style pointers.
+
+**Getting it to converge took four attempts, and the failures are the lesson.** Matching titles
+only called 9 good pointers broken. Adding headings and bold spans still missed prose. Structural
+matching anywhere-in-target was so loose the gate could not fail its own test. What works is a
+full-text search over the records plus the section names, with two rules: **a probe must be 16+
+characters** (which suppresses regex artifacts like `"the 2026-07-23"`), and **a pointer too short
+to probe is not reported at all** — "Two arms of one" is a real title truncated by the capture,
+and a gate that cannot check something must not claim it is broken. That is #372's rule again:
+a check that could not RUN is not a check that failed, either.

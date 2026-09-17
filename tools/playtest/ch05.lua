@@ -48,7 +48,7 @@ return {
 
     -- Message ids a BRANCH turns on. Box count cannot witness which arm played -- the Talk
     -- recruit's two arms are both 21 A-presses -- so a scenario asserts the id via
-    -- INSPECT.activeMsg() instead (decisions.md -> "box count is no longer a witness").
+    -- INSPECT.activeMsg() instead (decisions.md -> "Two arms of one branch can be the same LENGTH").
     MSG = {
         RECRUIT_NO_LUPIN = 0x9D1,   -- the fallback arm: the wolf is absent, benched or dead
         ENDING_FULL      = 0x9C9,   -- Basil alive + Sahnar recruited

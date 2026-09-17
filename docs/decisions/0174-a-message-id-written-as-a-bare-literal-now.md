@@ -389,7 +389,7 @@ of the lesson directly above. The build-time half is pinned by a test reading
 - **Vanilla decomp reads go through `build_campaign.vanilla_decomp_text()` (HEAD)**, never the worktree.
 - **`make`-green can't prove apply timing OR rendering** — `tools/playtest/` is the dynamic arbiter. Needs a
   built ROM + `lua`; `run.sh` regenerates `symbols.lua` after a rebuild.
-- **CI unit tests run in the `build` job, not the lightweight `checks` job** (need submodule + numpy/PIL).
+- **CI unit tests run in the `tests` job, not the lightweight `checks` job** (need submodule + numpy/PIL). They ran in the `build` job until #382 split them out.
   mGBA playtest *scenarios* are NOT CI-gated; the `test_*.lua` cores ARE, via `make test`.
 - **Distribution is the private pre-patched `.gba`** (decomp build is non-matching vs retail).
 - **Save layout must stay stable for testers** (#59): `check_save_layout_stable` reds on layout drift.
