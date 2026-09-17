@@ -6,32 +6,28 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-17 (Claude), after the #380/#382/#384/#386 efficiency stack merged and
-#389's groundwork was opened as PR #390. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-17 (Claude), after #390 and #392 were reviewed and merged. Deep-cleaned
+2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**TWO PRs are OPEN, both green, and both need `/code-review` before they merge** — neither was
-merged unreviewed, and the author cannot be the reviewer, so **this is the first job of the next
-session**:
+**Nothing. No open PRs, no branches.** #390 and #392 were reviewed and squash-merged
+2026-09-17 (`b02e336`, `02d5227`) and their branches are pruned; #391 is closed. The
+#380/#382/#384/#386 stack merged the same day (`fc65180`..`747e7a5`).
 
-| PR | branch | what |
-|---|---|---|
-| **#390** | `feat/389-decompose-injector` | #389 groundwork: the paths module, the shared HEAD reader, the injection-fingerprint gate. **No domain extracted.** |
-| **#392** | `feat/391-review-the-written-surface` | #391: review the written surface not the generated bulk; ADR-id uniqueness replaces density. |
+**#389's groundwork is ON MAIN, and no domain is extracted yet** — the paths module, the shared
+HEAD reader, and `tools/injection_fingerprint.py`. **Run the gate around every extraction:**
+`--write before.json`, move the code, `--check before.json`. ~50s, and it reports 975 injected
+files. The why, and what "every file it touched" had to be made to mean, is ADR 0287.
 
-Review should be cheaper now: `effortLevel` was `high` GLOBALLY in `~/.claude/settings.json`
-and is now `medium` (#391), so ask for `high`/`max` per PR rather than getting it by default.
-
-The #380/#382/#384/#386 stack merged 2026-09-17 (`fc65180`..`747e7a5`); its branches are pruned.
-
-**What #390 contains, and what it deliberately does NOT:** the groundwork for #389 only — a
-new paths module holding the 79 decomp path constants, the memoised HEAD reader and the
-table-close helper moved into the shared `inject/decomp` layer, and a new injection-fingerprint
-gate. **No domain is extracted yet.** Verified byte-identical over 972 injected files. Read the
-PR for the file list (they are not on `main` yet); the why is ADR 0287, do not restate it.
+⚠️ **Three review rounds across those two PRs found nine defects, and every one was in the
+hand-written surface** — the gate itself, its registry patterns, its own ADR's evidence. That is
+ADR 0288's claim holding on the first PR it was applied to. Two are worth knowing before writing
+the next guard, both recorded where they belong and not restated here: a gate built on
+`git status` cannot see what the injector writes into ignored paths, and a `DEAD_CONCEPTS`
+pattern that spans a negation fires on the rule being stated correctly.
 
 ⚠️ **Read ADR 0287 before touching #389.** Two things it records will otherwise be re-derived
 the hard way: a byte-identical ROM is NOT a usable gate (make skips work it thinks is done —
@@ -40,9 +36,11 @@ boundaries** — `inject_ch03`/`ch04`/`ch05` all sit under a banner reading "Cha
 extraction along the `Enemy class reskins` banner passed the fingerprint gate byte-identical
 and still broke four unit tests, and was reverted.
 
-⚠️ **Three operating facts changed under you on 2026-09-17. The ADRs carry the why; these are
+⚠️ **Four operating facts changed under you on 2026-09-17. The ADRs carry the why; these are
 the parts that change what you DO:**
 - **A commit is ~45s, not 6-10 minutes.** Don't background it.
+- **Type the review level every time** (`/code-review <PR> medium`). Omitting it does not mean
+  medium — the skill reuses the level typed last. AGENTS.md carries the rule.
 - **`docs/decisions.md` is a generated INDEX** over `docs/decisions/NNNN-*.md`. Read the index,
   open the two or three records you need, and **never hand-edit the index** — `check.py`
   regenerates and diffs it. New decision = a new file + `python3 tools/gen_decisions_index.py`.
@@ -66,7 +64,7 @@ the issue's own scope — read the issue, don't re-derive it here.
 | 5 | **#337** | M | The permadeath invariant, and **the prerequisite for ch06's dialogue** — a scene that stages a PC it never `LOAD`s soft-locks the chapter the first time that PC is dead when the beat fires. 14 staging sites today. Sibling of `assert_scripted_move_reachable`, which checks the terrain and not the unit. |
 | 6 | **#367's remainder** | M, and mostly DECISIONS not code | Lock ch03–ch06 or accept the gate is decorative for them; the party-level band into `docs/fe8-pacing-reference.md`. ⚠️ **ch07 is the watch item** — it reuses FE8 Ch6 as its bar. |
 | 7 | **#26 — ch06's own body** | L | The chapter itself, and the reason the rest of this list exists. |
-| 8 | **#389's remainder** | L, incremental | Decompose `build_campaign.py` (15,128 lines, ~249k tokens — bigger than a context window, so it can only be grepped). #390 lands the gate and the shared layer; the work left is cluster-by-cluster extraction. **Next concrete step: cluster the file by DEPENDENCY, not by banner** (ADR 0287). ⚠️ **ch06 is extracted LAST, after it ships** — Nicolas's call, so it gets written into the clean structure rather than appended to the pile. |
+| 8 | **#389's remainder** | L, incremental | Decompose `build_campaign.py` (15,126 lines, ~249k tokens — bigger than a context window, so it can only be grepped). The gate and the shared layer are on main; the work left is cluster-by-cluster extraction, each move wrapped in `injection_fingerprint --write`/`--check`. **Next concrete step: cluster the file by DEPENDENCY, not by banner** (ADR 0287). ⚠️ **ch06 is extracted LAST, after it ships** — Nicolas's call, so it gets written into the clean structure rather than appended to the pile. |
 
 **The recommendation, in one line: #337, then #26** — everything above #337 is cheap enough to
 slot in anywhere, while #337 is the only item that GATES the work that matters. #30, #365 and #379
