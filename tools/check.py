@@ -177,12 +177,15 @@ def check_tests_pass(fail):
     # Several tests read the FE8 decomp via `git -C fireemblem8u show HEAD:...`
     # (vanilla_decomp_text). When the submodule isn't checked out -- the lightweight CI
     # `checks` job omits it (2.3GB) -- they cannot run; that job instead leans on CI's
-    # `build` job (submodule + deps), which runs `make test`. Skip here so the drift guard
+    # `tests` job (submodule + deps), which runs `make test`. Skip here so the drift guard
     # stays decoupled from the heavy checkout. Locally the submodule is present, so the
     # pre-commit hook and `make check` still run the full suite.
+    # NOTE: this said "the `build` job" until #382 split `make test` out of it. If the job
+    # names move again, every skip message below has to move with them -- which is the
+    # argument in #379 for machine-checking these claims instead of asserting them in prose.
     if not os.path.isdir(os.path.join(REPO, 'fireemblem8u', 'src')):
         print('check_tests_pass: skipping unit tests (fireemblem8u submodule not checked '
-              'out; the CI build job runs `make test`)')
+              'out; the CI `tests` job runs `make test`)')
         return
     # tools/run_tests.py is the one runner; `make test` invokes the same module, so the
     # gate and the target can never drift into testing different sets (#382).
@@ -557,7 +560,7 @@ def check_personal_line_injection_routes(fail):
     try:
         import build_campaign as bc
     except ImportError as e:
-        print('check_personal_line_injection_routes: skipping (%s; the build job\'s '
+        print('check_personal_line_injection_routes: skipping (%s; the `tests` job\'s '
               '`make test` covers this gate)' % e)
         return
     injected_ids = {uid for _yaml, uid in bc.RAW_PID_PERSONAL_SOURCES.values()}
@@ -1112,7 +1115,7 @@ def check_documented_tileset(fail):
     try:
         import build_campaign as bc
     except ImportError as exc:      # Pillow absent on the lightweight checks job
-        print('check_documented_tileset: skipping (%s; the build job\'s `make test` '
+        print('check_documented_tileset: skipping (%s; the `tests` job\'s `make test` '
               'covers it)' % exc)
         return
     import json
@@ -1321,7 +1324,8 @@ def check_rescue_targets(fail):
         import map_placement_preview as pp
         import chapter_status as cs
     except ImportError as exc:      # Pillow / submodule absent on the lightweight checks job
-        print('check_rescue_targets: skipping (%s; the build job\'s `make test` covers it)' % exc)
+        print('check_rescue_targets: skipping (%s; the `tests` job\'s `make test` covers it)'
+              % exc)
         return
     for rel, doc in _chapters():
         boats = doc.get('rescue_boats') or []
@@ -1424,7 +1428,7 @@ def check_rescue_fuse_forecast(fail):
     try:
         import rescue_forecast as rf
     except ImportError as exc:      # Pillow / submodule absent on the lightweight checks job
-        print('check_rescue_fuse_forecast: skipping (%s; the build job\'s `make test` '
+        print('check_rescue_fuse_forecast: skipping (%s; the `tests` job\'s `make test` '
              'covers it)' % exc)
         return
     for rel, doc in _chapters():
