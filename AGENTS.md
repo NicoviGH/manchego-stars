@@ -57,6 +57,34 @@ Read these at the top of every session before touching code:
 > hypotheses would need, not one run per guess. Long form + what it cost: `docs/decisions.md` →
 > "Playtest runs are the most expensive thing in this repo". The permanent fix is **#255**.
 
+## Searching: 86% of this repo is not this repo
+
+`rg --files` counts 7,423 files and **6,361 of them (86%) are the `fireemblem8u` submodule**.
+Searches are fast either way; the cost is that decomp matches land in context and stay there
+(`unit`: 17,556 hits repo-wide vs 3,738 scoped).
+
+- **Our code, content, docs** — `rg <pat> -g '!fireemblem8u'`. The default.
+- **What vanilla FE8 does** — search `fireemblem8u/` ON PURPOSE and say so. Grounding an FE8
+  claim in the decomp is required — see "The decomp answers 'what does vanilla do.'" above;
+  stumbling into it while grepping for one of our own symbols is not the same thing.
+- **Never read a decomp source whole** (`src/events_udefs.c` is 1.78 MB).
+  `build_campaign.vanilla_decomp_text` reads them at HEAD and is memoised for that reason.
+
+## Context is the budget
+
+Every call re-reads the whole context, so **cost is `size × remaining calls`, not size**. The
+measurements are in `docs/decisions/` → *"Context is the budget, and the expensive thing is what
+enters it early"*; the rules that follow from them:
+
+- **Hand off before the context gets large, not when the task ends.** `/handoff` at task
+  boundaries, `/clear` on task switches.
+- **Don't leave a session idle for an hour** — the prompt cache expires and the whole prefix is
+  re-paid at 12.5x. Hand off and start fresh instead.
+- **What enters context early and never leaves is the expensive thing.** Read `decisions.md`'s
+  index and open the two or three records you need, not the corpus.
+- **`sed -n`/`grep` over whole-file reads; redirect big output to a file and grep it.** Bash
+  results average 314 tokens, Read results 18,808.
+
 ## Key File Locations
 
 | What | Where |
@@ -119,7 +147,8 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   earlier PR rebases every PR above it.
 - **A stack of PRs lands with `--merge`, not `--squash`, and every child is retargeted to `main`
   (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted** — deleting a base branch
-  closes the PRs on it, and a closed PR can't be retargeted (`decisions.md` → stacked PRs).
+  closes the PRs on it, and a closed PR can't be retargeted. This rule lives here, not in the
+  decision record — the pointer that used to claim otherwise named nothing.
 - **Concurrent agents each get their own worktree** (two ROM builds in one tree corrupt each other;
   a single writer may work the provisioned main tree — see `HANDOFF.md`).
 - **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine hooks in

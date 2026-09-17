@@ -95,6 +95,29 @@ def section_notes():
     return notes
 
 
+def citation_corpus():
+    """Every word of every decision record, normalised, as ONE string.
+
+    A `decisions.md -> "..."` pointer does not reliably name a title. 9 of the repo's 29 such
+    pointers name a bold sub-phrase inside a record ("Playtest runs are the most expensive
+    thing in this repo" is body text in 0232), and others name plain prose. Attempts to
+    enumerate the legal targets structurally -- titles, headings, bold spans -- kept producing
+    FALSE POSITIVES on pointers that were perfectly good, and a gate that cries wolf is worse
+    than no gate.
+
+    So the question this answers is the honest one: does the cited phrase appear ANYWHERE in
+    the decision record? That still catches the failure worth catching -- a pointer to
+    something nobody ever wrote (#386).
+    """
+    # Section names live in the index, not in any record, and pointers name them
+    # ("decisions.md -> Working Conventions"), so they are part of the corpus.
+    parts = list(SECTION_ORDER)
+    for path in sorted(glob.glob(os.path.join(ADR_DIR, '*.md'))):
+        with open(path, encoding='utf-8') as fh:
+            parts.append(fh.read())
+    return re.sub(r'[^a-z0-9]+', ' ', ' '.join(parts).lower())
+
+
 def squish(text, limit=150):
     """One line, no markdown emphasis, trimmed on a word boundary.
 

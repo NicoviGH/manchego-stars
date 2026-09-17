@@ -14,7 +14,7 @@ try:
     from PIL import Image, ImageDraw
     import make_gif as mg
     HAVE_PIL = True
-except ImportError:          # PIL-less CI checks job: the build job runs this
+except ImportError:          # PIL-less CI checks job: the `tests` job runs this
     HAVE_PIL = False
 
 
