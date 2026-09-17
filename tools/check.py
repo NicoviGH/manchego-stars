@@ -129,6 +129,19 @@ DEAD_CONCEPTS = [
     # warning, and a guard that rejects its own warning is worse than none.
     r"width 42\b", r"backdrop's 42", r"\b42 for the full-screen",
     r"\b29 for the on-map",
+    # retired by #391 (2026-09-17): decision ids are UNIQUE, not dense. Two branches in flight
+    # each need an id, and the second taking the next free number -- the correct, collision-
+    # avoiding move -- leaves a gap on whichever merges first. Nothing needs density: the index
+    # sorts by id and its header counts records. Keyed tightly on DECISION/ADR ids, because
+    # `dense` is load-bearing elsewhere and must keep matching nothing there -- gMsgTable[], the
+    # GetMuImg array and the platform palette are all genuinely dense.
+    # Each pattern refuses to fire on a NEGATED statement of the invariant: "decision ids are
+    # unique, not dense" is the rule being stated correctly, and a guard that rejects its own
+    # warning is worse than none (see `hasPrepScreen` and `_script_to_message` above).
+    r'(?:decision|ADR)s? ids? (?:are|is|should be|must be|run)\b'
+    r'(?:(?!\b(?:not|never|no|unique)\b)[^.\n]){0,40}\bdense',
+    r'\b(?:decision|ADR)s? ids? should (?!not )run 1\.\.',
+    r'(?<!not )(?<!never )(?<!no )dense (?:decision|ADR) ids?',
 ]
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as

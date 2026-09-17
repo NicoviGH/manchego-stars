@@ -145,6 +145,23 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   `superpowers:requesting-code-review` instead only for a STACK or where the PR needs context
   the diff cannot carry: one fresh reviewer per PR, reviewed DOWN the stack, since a fix to an
   earlier PR rebases every PR above it.
+- **Review the WRITTEN surface, not the generated or moved bulk.** When a change is mechanical
+  — code moved, files split, output regenerated — and a machine gate proves the output is
+  unchanged (a round-trip diff, a fingerprint of what the injector wrote, a byte-identical ROM),
+  point the review at the hand-written part: the generator, the guards, their tests. Reading 283
+  relocated files at high effort finds nothing a byte-for-byte proof did not already establish,
+  and it is expensive. **This narrows the review's scope, never its existence** — the
+  hand-written surface is exactly where the defects in those changes have actually been.
+- **Review depth is an ARGUMENT, not a setting: `/code-review <PR> medium`.** The level rides
+  with that one run — low/medium return fewer, high-confidence findings; high/max buy broader
+  coverage and admit uncertain ones. **Say the level every time.** Omitting it does not mean
+  `medium`: the skill reuses the level typed LAST, so one `max` run quietly prices every later
+  bare review at `max`. `medium` is the right default to type; type `high`/`max` when a PR
+  earns it.
+  ⚠️ **Never reach for `effortLevel` in `~/.claude/settings.json` to do this** — that is the
+  model's GLOBAL reasoning effort for every session in every project, so raising it to buy one
+  deep review prices all later work at the top, outside this repo included. What it is set to on
+  any given machine is not this repo's business and is deliberately not recorded here.
 - **A stack of PRs lands with `--merge`, not `--squash`, and every child is retargeted to `main`
   (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted** — deleting a base branch
   closes the PRs on it, and a closed PR can't be retargeted. This rule lives here, not in the
