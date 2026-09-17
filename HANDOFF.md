@@ -6,14 +6,27 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-16 (Claude), after #372/#374/#373 merged. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
+Refreshed 2026-09-17 (Claude), after the #380/#382/#384/#386 efficiency stack merged. Deep-cleaned 2026-08-20 at Nicolas's instruction: anything already
 recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
 restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing. The tree is clean on `main` and no branch is open.** #373 squash-merged 2026-09-16
-(`09fa19e`); every feature branch is deleted and pruned.
+**Nothing. The tree is clean on `main` and no branch is open.** The #380/#382/#384/#386
+efficiency stack merged 2026-09-17 (`fc65180`..`747e7a5`); every feature branch is deleted and
+pruned.
+
+⚠️ **Three operating facts changed under you on 2026-09-17. The ADRs carry the why; these are
+the parts that change what you DO:**
+- **A commit is ~45s, not 6-10 minutes.** Don't background it.
+- **`docs/decisions.md` is a generated INDEX** over `docs/decisions/NNNN-*.md`. Read the index,
+  open the two or three records you need, and **never hand-edit the index** — `check.py`
+  regenerates and diffs it. New decision = a new file + `python3 tools/gen_decisions_index.py`.
+- **CI is two workflows now.** `checks.yml` runs on everything; `build.yml` (jobs `tests` and
+  `build`) skips an allowlist of inert docs. A docs-only commit no longer builds a ROM.
+
+**Still open from the audit: #388** — tooling has outrun content 22:1 in September (7,899 lines
+vs 352). That issue is a QUESTION for Nicolas, not queued work, and nothing depends on it.
 
 ## Next up — ordered by effort. CLAUDE'S RECOMMENDATION, not a decision Nicolas has made
 
@@ -25,7 +38,7 @@ the issue's own scope — read the issue, don't re-derive it here.
 | 1 | **#30** | XS | `campaign.yaml`'s `chapters:` block is off-by-one from ch04 on. Since #312 there is ONE reader (`tools/campaign_chapters.py`), so the block gets DERIVED rather than hand-kept. Nothing reads it today, so nothing can break. |
 | 2 | **#365** | S | `apply_chapter_fog` over `hosted_chapters()`, mirroring `apply_chapter_difficulty` / `apply_chapter_traps`; `inject_ch06` already refuses a `fog:` it cannot write, which is the shape to generalise. ⚠️ **Split the ROMChapterData census off** — it is the larger half and answers a different question. |
 | 3 | **#377** | S, but BLOCKED | Needs Nicolas's call first: where a campaign's keyless-sidecar default lives, given `map_donor` is stdlib-only BY DESIGN. Cheap to write once that is answered, pointless to start before. |
-| 4 | **#379** | S–M | Four guards (`check_documented_tileset`, `check_personal_line_injection_routes`, `check_rescue_targets`, `check_rescue_fuse_forecast`) cannot run on the CI job that runs `check.py` — pyyaml only, no submodule — and each says "the build job's `make test` covers it" in PROSE. It is true today (all four have live-tree assertions there) and nothing holds it there. Their skip PATHS are untested too, which is the bug #373's review caught. Either machine-check the claim or stop skipping, the way #373 did. |
+| 4 | **#379** | S–M | Four guards (`check_documented_tileset`, `check_personal_line_injection_routes`, `check_rescue_targets`, `check_rescue_fuse_forecast`) cannot run on the CI job that runs `check.py` — pyyaml only, no submodule — and each says "the `tests` job's `make test` covers it" in PROSE (it said "the build job" until #382 split that job out, and the prose had to be hand-corrected -- which is itself the argument for this issue). It is true today (all four have live-tree assertions there) and nothing holds it there. Their skip PATHS are untested too, which is the bug #373's review caught. Either machine-check the claim or stop skipping, the way #373 did. |
 | 5 | **#337** | M | The permadeath invariant, and **the prerequisite for ch06's dialogue** — a scene that stages a PC it never `LOAD`s soft-locks the chapter the first time that PC is dead when the beat fires. 14 staging sites today. Sibling of `assert_scripted_move_reachable`, which checks the terrain and not the unit. |
 | 6 | **#367's remainder** | M, and mostly DECISIONS not code | Lock ch03–ch06 or accept the gate is decorative for them; the party-level band into `docs/fe8-pacing-reference.md`. ⚠️ **ch07 is the watch item** — it reuses FE8 Ch6 as its bar. |
 | 7 | **#26 — ch06's own body** | L | The chapter itself, and the reason the rest of this list exists. |
@@ -296,12 +309,12 @@ Two live workflow facts that are not decisions and have nowhere better to sit:
   `git -C fireemblem8u restore src/data/chapter_settings.json data/data_8B363C.s`.
 - **`HANDOFF.md` is authored on `main` ONLY**, gated by `check.py check_handoff_only_on_main`. If
   the guard fires on a branch: `git checkout main -- HANDOFF.md`.
-- **A commit takes 6-10 MINUTES here and is not hung.** The pre-commit hook runs the full
-  `tools/check.py`, which spawns every test file as its own process; CPU stays near zero while
-  it does. Run `git commit` with `run_in_background` and wait for the notification. Commit with
-  a message FILE (`git commit -F <file>`), never a heredoc -- a heredoc's stdin has hung the
-  hook. Killing a commit mid-hook is safe (nothing is written until it passes), but re-running
-  costs the full cycle again, so get the message right first.
+- **A commit takes ~45 SECONDS** (it was 6-10 minutes until #380/#382 on 2026-09-17). The
+  pre-commit hook still runs the full `tools/check.py` -- coverage is unchanged -- but the
+  decomp reads are memoised and the test files run in parallel through `tools/run_tests.py`.
+  Backgrounding a commit is no longer necessary. Still commit with a message FILE
+  (`git commit -F <file>`), never a heredoc -- a heredoc's stdin has hung the hook. Killing a
+  commit mid-hook is safe (nothing is written until it passes).
 - **A SUBAGENT is not woken by its own background task.** One ended its turn waiting on a
   backgrounded `make check`, stalled, and on resume raced a commit the main session had already
   started -- two `git commit` processes on one repo. If you dispatch one, tell it to run long
