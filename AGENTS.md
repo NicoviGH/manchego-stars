@@ -40,7 +40,11 @@ silent, ask; don't infer it from the ROM.
 Read these at the top of every session before touching code:
 1. `AGENTS.md` (this file)
 2. `HANDOFF.md` (project root, if it exists) — most recent session's state, blockers, and next steps
-3. `docs/decisions.md` — settled design decisions, do not re-litigate
+3. `docs/decisions.md` — the INDEX of settled decisions (283 of them, one file each under
+   `docs/decisions/`). Read the index, then open the two or three your task needs. Do not
+   re-litigate what is in there. It was a single 728 KB file until #384 — ~197,000 tokens,
+   which is a whole context window spent before any work starts, so this line was being
+   skipped rather than followed.
 4. The current chapter or feature YAML/source file being worked on
 5. `git status` + `git log --oneline -10`
 
