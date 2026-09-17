@@ -15,12 +15,19 @@ Three of those ways were invisible to the first version, and each has a test her
     ignored sweep has to be keyed on THIS RUN (mtime) rather than on extension, or a build
     between two fingerprints reads as an injection change;
   * the injector DELETES stale artifacts so `make` regenerates them. Nothing about hashing
-    written files notices that stopping, so a removed path is recorded as `DELETED`.
+    written files notices that stopping, so a removed path is recorded as `DELETED` -- and
+    weighed only against a run that HAD the file to delete, because `git clean` without `-x`
+    never restores one and a straight set difference would fail an unchanged tree.
+
+And the scope the manifest is taken over is DERIVED from `inject/paths.py`, not listed: the
+listed form dropped `linker_script_banim.txt`, which lives at the decomp root and which two
+injection steps append to.
 
 Plus the `-z` parse: a rename is two records, and slicing `[3:]` off both corrupts the second.
 
 Run: python3 tools/test_injection_fingerprint.py
 """
+import json
 import os
 import sys
 import tempfile
@@ -116,15 +123,6 @@ class TheIgnoredSweep(unittest.TestCase):
         got = self._run([], [], now, ignored_before={'graphics/title/pal.gbapal'})
         self.assertEqual({'graphics/title/pal.gbapal': 'DELETED'}, got)
 
-    def test_no_longer_removing_it_is_a_difference(self):
-        now = time.time()
-        removed = self._run([], [], now, ignored_before={'graphics/title/pal.gbapal'})
-        # ...refactor stops deleting it: it survives the run, untouched and old.
-        self._write('graphics/title/pal.gbapal', b'old', mtime=now - 3600)
-        kept = self._run([], ['graphics/title/pal.gbapal'], time.time(),
-                         ignored_before={'graphics/title/pal.gbapal'})
-        self.assertNotEqual(removed, kept)
-
     def test_a_tracked_file_is_judged_by_CONTENT_not_mtime(self):
         """git status already proved it changed; an old mtime must not exclude it."""
         now = time.time()
@@ -135,20 +133,130 @@ class TheIgnoredSweep(unittest.TestCase):
 
 class TheBuildStateItTouches(unittest.TestCase):
 
-    def test_the_rom_stamp_is_stashed_with_the_caches(self):
+    def test_the_rom_stamp_is_stashed_at_every_speed(self):
         """A fingerprint run injects without building, so it must not relabel the ROM.
 
         `.build-config.json` is what `playtest/matrix.py` reads to know which ROM is in the
         tree. Injection rewrites it, so leaving it in place hands `matrix.check_rom` a stamp
-        for a ROM that was never built.
+        for a ROM that was never built. It is NOT in CACHES, because `--keep-caches` is a
+        speed choice and this is a correctness one -- a run must not be able to opt out.
         """
-        self.assertIn('.build-config.json', fp.CACHES)
+        self.assertIn('.build-config.json', fp.BUILD_STATE)
+        self.assertNotIn('.build-config.json', fp.CACHES)
+
+    def test_keep_caches_does_not_reach_the_rom_stamp(self):
+        """--keep-caches is a SPEED choice; the stamp is a correctness one."""
+        tmp = tempfile.mkdtemp()
+        for name in fp.BUILD_STATE + fp.CACHES:
+            with open(os.path.join(tmp, name), 'w') as fh:
+                fh.write('{}')
+        stashed = []
+        saved = (fp.REPO, fp.restore_decomp, fp.inject, fp._ignored_paths, fp.fingerprint)
+        try:
+            fp.REPO = tmp
+            fp.restore_decomp = lambda: None
+            fp.inject = lambda: stashed.extend(
+                n for n in fp.BUILD_STATE + fp.CACHES
+                if not os.path.exists(os.path.join(tmp, n)))
+            fp._ignored_paths = lambda: set()
+            fp.fingerprint = lambda *a: {}
+            fp.build(stash_caches=False)
+        finally:
+            (fp.REPO, fp.restore_decomp, fp.inject,
+             fp._ignored_paths, fp.fingerprint) = saved
+        self.assertIn('.build-config.json', stashed)      # hidden while the injector ran
+        self.assertNotIn('.injectcache', stashed)         # deliberately left in place
 
     def test_the_restore_comes_from_HEAD_not_the_index(self):
         with open(os.path.abspath(fp.__file__)) as fh:
             src = fh.read()
         self.assertIn("'checkout', 'HEAD', '--'", src)
         self.assertNotIn("'checkout', '--', '.'", src)
+
+
+class DeletionIsOnlyComparableWhereBothRunsCouldDelete(unittest.TestCase):
+    """The marker must not cry wolf, which is the failure mode that matters most.
+
+    `git clean` without `-x` does not restore an ignored file, so after one run removes a
+    stale artifact the next run has nothing to delete. Comparing the two as sets reports
+    `only before` on a tree nobody touched -- and a gate that fails on an unchanged tree
+    teaches people to stop reading it.
+    """
+
+    def _man(self, files, precondition):
+        return {'files': dict(files), 'precondition': sorted(precondition)}
+
+    def test_an_unchanged_tree_is_identical_even_though_the_artifact_is_gone(self):
+        stale = 'graphics/op_subtitle/OpSubtitle_00.feimg2.bin'
+        first = self._man({'src/a.c': 'aa', stale: 'DELETED'}, [stale])
+        second = self._man({'src/a.c': 'aa'}, [])       # it was already gone this time
+        self.assertEqual(([], [], []), fp.compare(first, second))
+
+    def test_a_real_content_change_still_fails(self):
+        first = self._man({'src/a.c': 'aa'}, [])
+        second = self._man({'src/a.c': 'bb'}, [])
+        self.assertEqual(['src/a.c'], fp.compare(first, second)[2])
+
+    def test_where_both_runs_had_the_file_a_dropped_deletion_IS_caught(self):
+        stale = 'graphics/title/pal.gbapal'
+        deleted = self._man({stale: 'DELETED'}, [stale])
+        kept = self._man({}, [stale])                   # same start, not deleted this time
+        self.assertEqual([stale], fp.compare(deleted, kept)[1])
+
+    def test_a_manifest_without_a_precondition_is_refused_not_guessed(self):
+        """An older manifest cannot answer the deletion question, and must not pretend to."""
+        path = os.path.join(tempfile.mkdtemp(), 'old.json')
+        with open(path, 'w') as fh:
+            json.dump({'src/a.c': 'aa'}, fh)          # the pre-precondition shape
+        with self.assertRaises(SystemExit) as caught:
+            fp.load_manifest(path)
+        self.assertIn('predates the precondition field', str(caught.exception))
+
+    def test_an_unreadable_manifest_is_refused_BEFORE_the_injection_runs(self):
+        """50 seconds is a long time to wait for an error knowable at the start."""
+        with open(os.path.abspath(fp.__file__)) as fh:
+            src = fh.read()
+        self.assertLess(src.index('load_manifest(args.check)'),
+                        src.index('manifest = build('))
+
+
+class TheStash(unittest.TestCase):
+
+    def test_an_interrupted_run_s_backup_is_never_clobbered(self):
+        """The backup IS the real file. Overwriting it destroys what it was saving."""
+        tmp = tempfile.mkdtemp()
+        real, bak = os.path.join(tmp, '.build-config.json'), None
+        with open(real, 'w') as fh:
+            fh.write('{"rom": "current"}')
+        bak = real + '.fingerprint-bak'
+        with open(bak, 'w') as fh:
+            fh.write('{"rom": "from the killed run"}')
+        repo = fp.REPO
+        fp.REPO = tmp
+        self.addCleanup(setattr, fp, 'REPO', repo)
+        with self.assertRaises(SystemExit):
+            fp.build()
+        with open(bak) as fh:
+            self.assertIn('killed run', fh.read())
+
+
+class TheScopeIsDerivedNotListed(unittest.TestCase):
+    """A hand-kept directory list is a blind spot waiting for the next path constant."""
+
+    def test_the_root_level_banim_linker_is_in_scope(self):
+        """The regression: it is not under src/data/include/graphics/texts, and IS injected."""
+        self.assertIn('linker_script_banim.txt', fp.INJECTED_SCOPE)
+
+    def test_every_decomp_path_constant_is_covered(self):
+        from inject import paths
+        for name in dir(paths):
+            value = getattr(paths, name)
+            if not isinstance(value, str) or name in ('REPO', 'DECOMP'):
+                continue
+            rel = os.path.relpath(value, fp.DECOMP)
+            if rel.startswith('..') or rel == '.':
+                continue
+            self.assertIn(rel.split(os.sep)[0], fp.INJECTED_SCOPE, name)
 
 
 if __name__ == '__main__':

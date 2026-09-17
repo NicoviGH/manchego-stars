@@ -191,13 +191,6 @@ CH5_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventinfo.h')
 
 CH5_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch5-eventscript.h')
 
-# The EDGE tile it escapes off. Direction is AWAY FROM THE PARTY, who deploy on the NW flank --
-# Nicolas 2026-07-31: "I don't care about the direction, I want it to be away from the party; the
-# southeast corner makes most sense." So the quarry breaks for the far corner and is gone.
-# It was (14, 0) -- the literal NE corner -- and that SOFT-LOCKED the chapter: the corner is
-# TERRAIN_PLAINS but a wall of TERRAIN_CLIFF seals the whole NE pocket off from the clearing, so
-# the MOVE waited forever on a path that cannot be walked. assert_scripted_move_reachable now
-# fails the BUILD on any such destination, and it passes on this one.
 # ── ch05 "The Elven Tomb" (#25) ─────────────────────────────────────────────────
 # THE TWO OFFSETS, stated once, here, so no other line in inject_ch05 has to know them.
 #

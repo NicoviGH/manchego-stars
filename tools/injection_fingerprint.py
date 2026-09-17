@@ -54,10 +54,37 @@ CAMPAIGN = 'rime-of-the-frostmaiden'
 # stamp `playtest/matrix.py` reads to know WHICH ROM is in the tree -- but injection rewrites
 # it, so a fingerprint run would relabel a ROM it never built and defeat `matrix.check_rom`.
 # It is stashed and restored for that reason, not for speed.
-CACHES = ('.injectcache', '.build-scopes.json', '.build-config.json')
+CACHES = ('.injectcache', '.build-scopes.json')
 
-# The directories injection writes into. Everything outside them is the decomp's own business.
-INJECTED_DIRS = ('src', 'data', 'include', 'graphics', 'texts')
+# NOT a cache, and NOT covered by --keep-caches: `.build-config.json` is the stamp
+# `playtest/matrix.py` reads to know WHICH ROM is in the tree. Injection rewrites it and this
+# tool never builds a ROM, so leaving it in place makes `matrix.check_rom` vouch for a ROM that
+# was never built. It is stashed on every run, at every speed.
+BUILD_STATE = ('.build-config.json',)
+
+def _injected_scope():
+    """The decomp pathspecs injection touches, DERIVED from `inject/paths.py`.
+
+    A hand-kept list of directories gets this wrong the moment the injector learns a new file,
+    and it did: `linker_script_banim.txt` sits at the decomp ROOT -- two injection steps append
+    to it -- so `src data include graphics texts` silently dropped it out of the manifest.
+    `paths.py` is the one place that knows every decomp file we write, so the scope is read
+    from there and a new constant extends this gate for free.
+    """
+    from inject import paths
+    scope = set()
+    for name in dir(paths):
+        value = getattr(paths, name)
+        if not isinstance(value, str) or name in ('REPO', 'DECOMP'):
+            continue
+        rel = os.path.relpath(value, DECOMP)
+        if rel.startswith('..') or rel == '.':
+            continue
+        scope.add(rel.split(os.sep)[0])
+    return tuple(sorted(scope))
+
+
+INJECTED_SCOPE = _injected_scope()
 
 # A filesystem timestamp can sit marginally behind the clock we sampled, and nothing else is
 # writing this tree while we inject, so a couple of seconds of slack costs nothing.
@@ -70,7 +97,7 @@ def restore_decomp():
     # staged in the decomp survives the restore and the injector never has to rewrite it.
     # `build_campaign.restore_vanilla_sources` documents the same trap.
     subprocess.run(['git', '-C', DECOMP, 'checkout', 'HEAD', '--', '.'], env=git_env(), check=True)
-    subprocess.run(['git', '-C', DECOMP, 'clean', '-fdq', '--'] + list(INJECTED_DIRS),
+    subprocess.run(['git', '-C', DECOMP, 'clean', '-fdq', '--'] + list(INJECTED_SCOPE),
                    env=git_env(), check=True)
 
 
@@ -107,7 +134,7 @@ def _ignored_paths():
     `--ignored=matching` is what makes the injector's `.gbapal`/`.4bpp` output visible at all;
     `git status` alone never lists an ignored path.
     """
-    return set(_status('--ignored=matching', '--', *INJECTED_DIRS))
+    return set(_status('--ignored=matching', '--', *INJECTED_SCOPE))
 
 
 def fingerprint(started, ignored_before):
@@ -118,7 +145,10 @@ def fingerprint(started, ignored_before):
     (git status), which is stronger, so mtime never gets a say in those.
     """
     manifest = {}
-    for rel in _status():
+    # Scoped to the injected directories, like the clean in `restore_decomp`: a stray untracked
+    # file elsewhere in the decomp is the tree's business, not this injection's output, and
+    # hashing it would fail a refactor that is byte-identical.
+    for rel in _status('--', *INJECTED_SCOPE):
         path = os.path.join(DECOMP, rel)
         if not os.path.isfile(path):
             continue
@@ -141,31 +171,81 @@ def fingerprint(started, ignored_before):
 
     # A stale artifact the injector REMOVES is output too -- a refactor that stops removing it
     # leaves `make` compiling last build's bytes, and no hash of a written file would say so.
+    # These are only meaningful against a run that HAD the file to delete; see `compare`.
     for rel in ignored_before - ignored_after:
         manifest.setdefault(rel, 'DELETED')
     return manifest
 
 
+def compare(before, after):
+    """(added, removed, changed) between two recorded runs.
+
+    DELETION IS ONLY COMPARABLE WHERE BOTH RUNS COULD HAVE DELETED. `git clean` without `-x`
+    does not restore an ignored file, so once a run removes a stale artifact it stays gone and
+    the next run has nothing to delete -- a straight set difference would then report
+    `only before` on an unchanged tree and exit 1. Worse in the other direction: where the
+    artifact is absent, "stopped deleting it" produces no difference at all, so the marker
+    would be loudest exactly when it means least.
+
+    Each manifest therefore records the ignored paths that existed when its run started, and a
+    `DELETED` marker is only weighed over the paths both runs started with. Outside that
+    intersection the runs were asked different questions, and the honest answer is silence.
+    """
+    comparable = set(before['precondition']) & set(after['precondition'])
+
+    def files(man):
+        return {k: v for k, v in man['files'].items()
+                if v != 'DELETED' or k in comparable}
+
+    a, b = files(before), files(after)
+    return (sorted(set(b) - set(a)),
+            sorted(set(a) - set(b)),
+            sorted(k for k in set(a) & set(b) if a[k] != b[k]))
+
+
 def build(stash_caches=True):
+    """One measured injection: {'files': {...}, 'precondition': [...]}."""
+    names = list(BUILD_STATE) + (list(CACHES) if stash_caches else [])
     saved = []
-    if stash_caches:
-        for name in CACHES:
-            src = os.path.join(REPO, name)
-            if os.path.exists(src):
-                dst = src + '.fingerprint-bak'
-                os.rename(src, dst)
-                saved.append((src, dst))
     try:
+        for name in names:
+            src = os.path.join(REPO, name)
+            if not os.path.exists(src):
+                continue
+            dst = src + '.fingerprint-bak'
+            if os.path.exists(dst):
+                # A killed run left this behind. Restoring it is this tool's job and
+                # clobbering it would destroy the real file, so stop and say so.
+                sys.exit('ERROR: %s exists -- a previous run was interrupted. Move it back '
+                         'over %s (or delete it) before running again.' % (dst, src))
+            os.rename(src, dst)
+            saved.append((src, dst))
+
         restore_decomp()
         ignored_before = _ignored_paths()
         started = time.time()
         inject()
-        return fingerprint(started, ignored_before)
+        return {'files': fingerprint(started, ignored_before),
+                'precondition': sorted(ignored_before)}
     finally:
         for src, dst in saved:
             if os.path.exists(src):
                 subprocess.run(['rm', '-rf', src], check=False)
             os.rename(dst, src)
+
+
+def load_manifest(path):
+    """A recorded run, refused rather than guessed at if it is not one."""
+    try:
+        with open(path) as fh:
+            man = json.load(fh)
+    except (OSError, ValueError) as exc:
+        sys.exit('ERROR: cannot read %s: %s' % (path, exc))
+    if not (isinstance(man, dict) and isinstance(man.get('files'), dict)
+            and isinstance(man.get('precondition'), list)):
+        sys.exit('ERROR: %s predates the precondition field, so it cannot answer the deletion '
+                 'question -- re-record it with --write.' % path)
+    return man
 
 
 def main():
@@ -174,24 +254,25 @@ def main():
     mode.add_argument('--write', metavar='PATH', help='record a manifest')
     mode.add_argument('--check', metavar='PATH', help='compare against a recorded manifest')
     ap.add_argument('--keep-caches', action='store_true',
-                    help='do not hide .injectcache (faster, but measures the cache)')
+                    help='do not hide .injectcache/.build-scopes.json (faster, but measures '
+                         'the cache). .build-config.json is stashed either way.')
     args = ap.parse_args()
+
+    # Read the recorded manifest BEFORE injecting: an unreadable one is a 50-second wait for
+    # an error that was knowable at the start.
+    before = load_manifest(args.check) if args.check else None
 
     manifest = build(stash_caches=not args.keep_caches)
 
     if args.write:
         with open(args.write, 'w') as fh:
             json.dump(manifest, fh, indent=1, sort_keys=True)
-        print('wrote %s: %d injected files' % (args.write, len(manifest)))
+        print('wrote %s: %d injected files' % (args.write, len(manifest['files'])))
         return 0
 
-    with open(args.check) as fh:
-        before = json.load(fh)
-    added = sorted(set(manifest) - set(before))
-    removed = sorted(set(before) - set(manifest))
-    changed = sorted(k for k in set(before) & set(manifest) if before[k] != manifest[k])
+    added, removed, changed = compare(before, manifest)
     if not (added or removed or changed):
-        print('IDENTICAL: %d injected files, byte for byte' % len(manifest))
+        print('IDENTICAL: %d injected files, byte for byte' % len(manifest['files']))
         return 0
     print('INJECTION OUTPUT CHANGED')
     for label, rows in (('only after', added), ('only before', removed), ('differs', changed)):

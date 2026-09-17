@@ -21,7 +21,7 @@ doing nothing is not a gate.
 
 `tools/injection_fingerprint.py` measures the thing that actually matters. It restores the
 decomp to HEAD, hides the caches so the injector cannot skip, runs a full injection, and hashes
-**every file the injection touched** — 994 of them. Two manifests that match mean identical ROM
+**every file the injection touched** — 975 of them. Two manifests that match mean identical ROM
 input, in ~50 seconds instead of a full compile.
 
 It earned its keep immediately: the first extraction pointed `REPO` at `tools/` (a two-`dirname`
@@ -49,6 +49,17 @@ Measured, not argued: dropping the fog-haze derivation in `_register_tileset` �
 extraction slip, changing nothing but those ignored palette bytes — is reported as
 `differs graphics/map/MapPaletteSnow.gbapal`. The version that shipped in the first draft of
 this PR called that same tree byte-identical.
+
+**And the scope is derived, not listed.** Naming the injected directories by hand
+(`src data include graphics texts`) read as obviously complete and was not:
+`linker_script_banim.txt` sits at the decomp ROOT, two injection steps append to it, and it
+fell straight out of the manifest. `paths.py` is now the one place that knows which decomp
+files we write, so the gate reads its scope from there — which also means a new path constant
+extends the gate without anyone remembering to. A deletion marker, finally, is only weighed
+over paths BOTH runs started with: `git clean` without `-x` never restores an ignored file, so
+once a stale artifact is removed the next run has nothing to delete, and a straight set
+difference would fail an unchanged tree. A gate that cries wolf gets ignored, which costs more
+than the blind spot it was covering.
 
 ## The banners stopped meaning anything years ago
 
