@@ -55,8 +55,9 @@ class TheRealCorpusIsClean(unittest.TestCase):
         on exactly that: ADR 287 sat on an unmerged branch while 288 was written on another,
         so main saw 1..286, 288 and the gate punished the right behaviour.
 
-        A gap costs nothing: the index sorts by id and never counts. A collision costs a
-        decision, so that is what is held.
+        A gap costs nothing: the index sorts by id, and its header counts RECORDS
+        (gen.generate's len(found)), never the id range. A collision costs a decision, so
+        that is what is held.
         """
         ids = sorted(r['id'] for r in gen.adrs())
         dupes = sorted({i for i in ids if ids.count(i) > 1})

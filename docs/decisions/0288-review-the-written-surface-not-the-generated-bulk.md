@@ -41,11 +41,17 @@ diff (7,780 lines, zero differences) and a token-level corpus check.
 **So: when a change is mechanical and a machine gate proves the output unchanged, review the
 hand-written surface** — the generator, the guards, their tests — and not the moved bulk.
 
-This narrows scope, never existence. The evidence says the hand-written surface is exactly
-where the defects live: on that same PR, review found that the index generator's `squish()` was
-stripping `_` and corrupting every identifier it cited, and that a pointer named a decision title
-that had never existed. Both were in the ~5 files somebody actually wrote. Neither was in the
-283 that moved.
+This narrows scope, never existence. Every defect these mechanical changes actually produced sat
+in the handful of files somebody wrote. On the split PR the gate `check_tool_refs_exist` caught
+the index generator's `squish()` stripping `_` and corrupting every identifier it cited, and
+`check_no_dead_concepts` fired on 17 lines whose exemption the move had invalidated (both in ADR
+0284). On its sibling #386, review caught a pointer naming a decision title that had never
+existed, three more broken the same way, and a fourth that paraphrased its target (ADR 0285).
+
+Note what that does *not* say: on the split PR itself, the finds were the gates' and not the
+reviewer's. That is the same argument from the other side — the machine checks are cheap and ran
+over everything, while the expensive attention was spent on 283 files that had already been
+proven byte-for-byte. **Not one defect, from either source, was in the bulk that moved.**
 
 ## The general shape
 
@@ -62,5 +68,6 @@ next free number rather than collide. Main then saw `1..286, 288` and the gate p
 the right behaviour.
 
 Density was an invariant invented alongside the split, not one the corpus needs — the index
-sorts by id and never counts. **Uniqueness is the real requirement**, because a collision costs
-a decision while a gap costs nothing, so that is what the test holds now.
+sorts by id, and the header counts RECORDS (`len(found)`), never the id range, so a gap changes
+nothing it prints. **Uniqueness is the real requirement**, because a collision costs a decision
+while a gap costs nothing, so that is what the test holds now.

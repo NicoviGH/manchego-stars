@@ -157,8 +157,8 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   and admit uncertain ones. Default to `medium` and ask for `high`/`max` when a PR earns it.
   ⚠️ **Never reach for `effortLevel` in `~/.claude/settings.json` to do this** — that is the
   model's GLOBAL reasoning effort for every session in every project, so raising it to buy one
-  deep review prices all later work at the top. It sat at `high` for exactly that reason and is
-  now `medium`.
+  deep review prices all later work at the top, outside this repo included. What it is set to on
+  any given machine is not this repo's business and is deliberately not recorded here.
 - **A stack of PRs lands with `--merge`, not `--squash`, and every child is retargeted to `main`
   (`gh pr edit <child> --base main`) BEFORE the parent's branch is deleted** — deleting a base branch
   closes the PRs on it, and a closed PR can't be retargeted. This rule lives here, not in the
