@@ -61,8 +61,23 @@ def _find_brace_block(text, marker, path):
     sys.exit('ERROR: unbalanced braces for %r in %s' % (marker, path))
 
 
+# Validators run on every EVENT SCENE body written through `_replace_brace_block`, which is
+# the one place any injector writes one. Registered from outside (build_campaign appends the
+# #337 cutscene-actor check at import) so this module keeps importing nothing of its own --
+# a scene check needs the campaign's cast, and this layer must stay dependency-free or every
+# extraction of #389 gets an import cycle back (ADR 0287).
+#
+# A hook rather than a call per injector, for the reason `apply_chapter_fog` is a total pass:
+# 79 call sites through here means "somebody forgets to call the guard on the new scene" is a
+# question of when, not whether.
+SCENE_VALIDATORS = []
+
+
 def _replace_brace_block(text, marker, new_body, path):
     """Replace the `{...}` after `marker` with `new_body` (a `{...}` string)."""
+    if marker.startswith('EventScr_'):
+        for validate in SCENE_VALIDATORS:
+            validate(new_body, marker.split('[')[0])
     s, e = _find_brace_block(text, marker, path)
     return text[:s] + new_body + text[e:]
 

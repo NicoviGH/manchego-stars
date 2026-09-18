@@ -25,6 +25,7 @@ Milestones B+ (characters, chapter, dialogue codegen) hang off the same CLI.
 import argparse
 import collections
 import copy
+import functools
 import glob
 import hashlib
 import json
@@ -80,6 +81,7 @@ from inject.paths import (  # noqa: E402,F401
     PROLOGUE_WM_H, TEXTS_TXT, TRAPDATA_C, UIARENA_C, UNITLISTSCREEN_C, UNIT_ICON_MOVE_C,
     UNIT_ICON_MOVE_S, UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_C, UNIT_ICON_WAIT_S, VARIABLES_H,
     WAIT_GFX_DIR, WORLDMAP_RM_C, WORLD_MAP_GFX_DIR)
+from inject import decomp as _decomp  # noqa: E402  the shared writer's validator hook
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
 from inject import event_group  # noqa: E402  the ChapterEventGroup census guard (#313)
 from inject import step_cache  # noqa: E402  restore a config-invariant step (#309)
@@ -7308,6 +7310,130 @@ def recruit_initial_faction(unit):
         sys.exit('ERROR: %s recruit.initial_faction must be green or red, got %r'
                  % (unit.get('id', '?'), faction))
     return token
+
+
+# `MOVE(speed, pid, x, y)` -- EAstdlib.h:117. The pid is the SECOND argument, and reading it
+# as the first is not a small error: vanilla's speeds are 0x10/0x0, every one of them parses as
+# a character id, and the naive version of this guard flagged 378 sites campaign-wide.
+_STAGING_COMMANDS = (
+    (re.compile(r'\bMOVE\(\s*[^,]+,\s*([^,)\s]+)'), 'MOVE'),
+    (re.compile(r'\bMOVE_DEFINED\(\s*([^,)\s]+)'), 'MOVE_DEFINED'),
+    (re.compile(r'\bCUMO_CHAR\(\s*([^,)\s]+)'), 'CUMO_CHAR'),
+)
+_LOAD_COMMAND = re.compile(r'\bLOAD[12]\(\s*[^,]+,\s*(\w+)\s*\)')
+
+
+@functools.lru_cache(maxsize=None)
+def _character_enum():
+    """{CHARACTER_FOO: value} from the decomp's own header."""
+    return {m.group(1): int(m.group(2), 0) for m in re.finditer(
+        r'(CHARACTER_\w+|CHAR_EVT_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)',
+        vanilla_decomp_text('include/constants/characters.h'))}
+
+
+def character_pid(token):
+    """`CHARACTER_EIRIKA` or `0xce` -> int, or None if it is neither."""
+    token = str(token).strip()
+    enum = _character_enum()
+    if token in enum:
+        return enum[token]
+    try:
+        return int(token, 0)
+    except ValueError:
+        return None
+
+
+def scene_staged_pids(body):
+    """Every character pid a scene body STAGES -- the ones resolved through
+    `GetUnitFromCharId`, which returns NULL for a character that is not on the map."""
+    out = set()
+    for pattern, _cmd in _STAGING_COMMANDS:
+        for m in pattern.finditer(body):
+            pid = character_pid(m.group(1))
+            if pid is not None:
+                out.add(pid)
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def player_character_pids():
+    """{pid: unit_id} for the cast the player can LOSE.
+
+    A PC rides its `PORTRAIT_MAP` slot, so its on-map pid is `CHARACTER_<slot>`. This set is
+    the whole scope of the guard: every OTHER thing a scene stages is on the map because the
+    chapter put it there (a boss, a generic, a scripted neutral), while a PC is there only if
+    the player still has them and chose to deploy them."""
+    out = {}
+    for unit_id, slot in PORTRAIT_MAP.items():
+        pid = character_pid('CHARACTER_%s' % str(slot).upper())
+        if pid is not None:
+            out[pid] = unit_id
+    return out
+
+
+def assert_scene_loads_its_actors(body, scene, loaded_pids=None):
+    """A scene must LOAD every PLAYER CHARACTER it stages (#337).
+
+    The permadeath policy (`decisions.md` -> "Permadeath is a combat rule, not a narrative
+    one") puts all eight PCs in every cutscene alive or dead. That is only safe while a scene
+    LOADs the actors it stages: `LoadUnit` has no death check, so loading a dead character
+    works, but `GetUnitFromCharId` returns NULL for an ABSENT one and `CUMO_CHAR` / `MOVE` /
+    `MOVE_DEFINED` all resolve through it. A beat naming a PC the scene never loaded is a
+    never-returns soft-lock that fires the first time a player reaches it having lost that
+    character -- and never before, which is why no playtest has found one.
+
+    SCOPED TO THE PCs, and that scoping was measured rather than assumed. "Every staged
+    character must be LOADed" flags 73 sites in untouched VANILLA, which plainly works:
+    vanilla stages Eirika without loading her because Eirika is always there. We have no
+    always-present character -- the player picks their own lord, and any PC can be dead or
+    simply not picked at PREP -- so vanilla's guarantee is exactly the one that does not
+    transfer. Everything else is guaranteed by construction; ch05 stages Ravisin the same way
+    and she has been on the map since turn 1."""
+    loaded = set(loaded_pids or ())
+    for m in _LOAD_COMMAND.finditer(body):
+        loaded |= _unit_def_pids(m.group(1))
+    pcs = player_character_pids()
+    missing = sorted((pid for pid in scene_staged_pids(body)
+                      if pid in pcs and pid not in loaded), key=lambda p: pcs[p])
+    if missing:
+        sys.exit(
+            'ERROR: %s stages %s without LOADing %s.\n'
+            '  A PC is on the map only if the player still has them AND deployed them, so '
+            'GetUnitFromCharId returns NULL and the CUMO/MOVE never returns -- the chapter '
+            'hangs, the first time someone reaches this beat having lost them.\n'
+            '  Add a LOAD1 naming a UnitDefinition that carries %s, or stage the beat with '
+            'CUMO_AT (a tile) instead of a character (#337).'
+            % (scene, ', '.join(pcs[p] for p in missing),
+               'them' if len(missing) > 1 else 'that character',
+               'each of them' if len(missing) > 1 else 'that character'))
+
+
+def _unit_def_pids(symbol):
+    """The character pids a UnitDefinition array carries, ours or vanilla's."""
+    import difficulty
+    for text in (_live_decomp_text(EVENTS_UDEFS_C), vanilla_decomp_text('src/events_udefs.c')):
+        if not text or (symbol + '[]') not in text:
+            continue
+        try:
+            return {character_pid(e.get('charIndex'))
+                    for e in difficulty.vanilla_unit_defs(text, symbol)} - {None}
+        except BaseException:               # noqa: BLE001 -- an unparseable array is not
+            continue                        # this guard's business to diagnose
+    return set()
+
+
+def _live_decomp_text(path):
+    try:
+        with open(path, encoding='utf-8') as fh:
+            return fh.read()
+    except OSError:
+        return ''
+
+
+# Register the #337 check on the one writer every scene body goes through, so a scene cannot
+# be authored without it. Here rather than in `inject/decomp.py` because the check needs
+# PORTRAIT_MAP, and that layer stays dependency-free (ADR 0287).
+_decomp.SCENE_VALIDATORS.append(assert_scene_loads_its_actors)
 
 
 def _classed_cast(campaign, available_at=None):
