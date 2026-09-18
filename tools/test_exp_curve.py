@@ -239,6 +239,18 @@ class Simulation(unittest.TestCase):
         self.assertEqual(sorted(numbers), numbers)
         self.assertGreaterEqual(len(numbers), 7)     # ch00-ch06 are hosted today
 
+    def test_a_unit_that_has_not_joined_is_not_part_of_the_chapters_exp_pot(self):
+        """The pot is what the chapter pays the FIELD, so it averages over the units on it.
+        A career that has not joined is not on the field, and a level-1 career earns MORE per
+        body than a veteran -- so averaging one in reports a chapter as paying more than it
+        can pay anybody."""
+        here = ec.Career('here', 'CLASS_PIRATE', joins=0)
+        here.level = 6
+        not_yet = ec.Career('not-yet', 'CLASS_PIRATE', joins=9)
+        bodies = [ec.Fighter('grunt', 'CLASS_FIGHTER', 6)]
+        self.assertEqual(here.chapter_pot(bodies),
+                         ec.field_pot([here, not_yet], bodies, 5))
+
     def test_a_recruit_earns_nothing_from_the_chapters_it_was_not_in(self):
         """basil and sahnar join in ch05 and every recruit joins at level 1. Crediting them
         with ch01-ch04 would hand four units an exp history they never had and pull the

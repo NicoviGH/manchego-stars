@@ -399,6 +399,18 @@ def _banks_exp(chap):
     return (chap.get('deployment') or {}).get('deploy_limit') is not None
 
 
+def field_pot(careers, bodies, chapter_number):
+    """What this chapter pays the FIELD: the average over the careers actually on it.
+
+    A career that has not joined yet is not on the field, and a level-1 career earns MORE per
+    body than a veteran does (round exp shrinks with the level gap), so averaging one in
+    reports a chapter as paying more than it can pay anybody. With one share each, this
+    average IS the chapter's whole payout -- the field is `field_cap` units taking `pot/cap`
+    apiece."""
+    here = [c for c in careers if chapter_number >= c.joins]
+    return sum(c.chapter_pot(bodies) for c in here) / len(here)
+
+
 def _founding(careers):
     """Careers that have been on the field since the campaign began.
 
@@ -439,10 +451,11 @@ def simulate(campaign='rime-of-the-frostmaiden'):
         cap = field_cap(chap)
         banks = _banks_exp(chap)
         number = int(chap.get('chapter_number'))
-        # Both pots at OUR party's state, before anybody fights this chapter.
-        pot = sum(c.chapter_pot(bodies) for c in ours) / len(ours)
-        twin_pot = (sum(c.chapter_pot(twin) for c in ours) / len(ours)
-                    if twin is not None else None)
+
+        # Both pots over OUR party, at its state before anybody fights this chapter -- so a
+        # ratio is never contaminated by the two curves having drifted apart.
+        pot = field_pot(ours, bodies, number)
+        twin_pot = field_pot(ours, twin, number) if twin is not None else None
         # The recruit floor, read at the START of the chapter: every recruit joins at level
         # 1, so the newest unit ON THE FIELD here is one this chapter has to be survivable
         # for. None until somebody has joined.
