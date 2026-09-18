@@ -69,24 +69,51 @@ scenes and a fresh set of pointers, and whether it happens to overwrite the righ
 
 `build_campaign.assert_reachable_scenes_load_their_actors` runs in the build beside the
 ChapterEventGroup census (0288/#313), and for the same reason: the census rules on the twenty
-fields, this rules on everything those fields lead to. 149 reachable scripts across the seven
+fields, this rules on everything those fields lead to. 166 reachable scripts across the seven
 hosted chapters today, none of them staging an unloaded PC.
 
-Two things it refuses to do:
+Three things it refuses to do:
 
 - **It will not answer from a walk it could not complete.** A script whose body is unreadable
   ends its branch silently, and every scene behind it then reads "unreachable" for the one
   reason that proves nothing. Unresolved symbols fail the build instead. This is not
   theoretical — the first cut indexed only `src/events` and truncated at six shared helpers in
   `src/` (`EventScr_LoadReinforce` and friends), reporting a clean result it had not earned.
+- **It will not read an edge out of PROSE.** Edges come from code with comments stripped.
+  ch05's header explains itself by naming `EventScr_RemoveBGIfNeeded` and
+  `EventScr_TextShowWithFadeIn` in a paragraph, and an unfiltered token match walks into both;
+  the day a comment names a *retired* scene, that becomes a build stopped by a sentence.
 - **It is scoped to the PCs**, for the reason measured on #337: the same rule applied to every
   staged character flags 73 sites in untouched vanilla, which plainly works.
+
+## `MS_` is half the graph, and the first cut walked past it
+
+Every scene this campaign *defines* is named `MS_*` (`declare_event_script`, enforced by
+`_assert_ms_symbol`), so a token set spelled for vanilla walks the donor's scenes and stops
+dead at our own. Measured: **ch05 reaches 40 scripts, not the 26** the first cut reported, and
+ch06 22 rather than 19 — the fourteen it could not see are every ch05 talk, visit and arena
+trigger. The undercount is the smaller half of the problem. A vanilla scene reachable *only*
+through one of ours would have been invisible to this guard **and** to the writer-side one,
+which is precisely the gap this record exists to close. #337's first cut made the same mistake
+from the same cause, filtering on `EventScr_` at the write hook.
+
+## A loading CALLER is reported, never subtracted
+
+A caller that `LOAD`s the actor before calling makes that chain safe, and vanilla relies on it:
+of the twelve sites this flags on the donor, **five are reached from a caller that loads the
+staged pid** — including two of #398's own five. It is tempting to subtract those.
+
+It would be wrong. *Some* caller loads it is not the same claim as *every path* does, and a
+scene with two callers can be reached by the one that does not. So the verdict stays **per
+scene**, identical to the rule for the scenes we write, and a loading caller is **named in the
+error** instead. That turns a build stop into a one-line decision made with the evidence in
+hand, rather than a verdict this walk is not in a position to make.
 
 And it carries its own positive control. `script_bodies_from` parses a file's *vanilla* text
 the same way it parses the injected one, so a test re-runs the whole walk over the donor and
 asserts all five sites are flagged there. A gate whose clean run has never been shown capable
 of a dirty one is not evidence (0272, *"A check that could not RUN is not a check that
-passed"*) — and on vanilla this one reports ten sites, five of them these.
+passed"*) — and on vanilla this one reports twelve sites, five of them these.
 
 ## The trap this generalises
 

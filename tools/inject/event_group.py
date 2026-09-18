@@ -231,7 +231,24 @@ _GROUP_DEFN = re.compile(r'^struct ChapterEventGroup\s+(\w+)\s*=\s*\{', re.M)
 # four of #398's five sites were reached by in vanilla. The indirection is in the ENGINE, not
 # in the text: the symbol is still written in the caller's body, so matching the token catches
 # it without having to model event slots.
-_SCRIPT_TOKEN = re.compile(r'\b(EventScr\w*|EventListScr\w*)\b')
+#
+# `MS_` IS HALF THE GRAPH AND WAS MISSED ONCE. Every scene this campaign DEFINES is named
+# `MS_*` (`declare_event_script`, and `_assert_ms_symbol` enforces it), so a vanilla-only token
+# set walks the donor's scenes and stops dead at our own -- measured: ch05 reaches 40 scripts,
+# not the 26 an `EventScr_`-only walk reports, and ch06 22 rather than 19. The 14 it could not
+# see include every ch05 talk, visit and arena trigger. Worse than the undercount: a vanilla
+# scene reachable ONLY through one of ours would be invisible here AND to the writer-side
+# guard, which is exactly the gap #398 exists to close. Same mistake, same cause, as #337's
+# first cut filtering on `EventScr_` at the write hook.
+_SCRIPT_TOKEN = re.compile(r'\b(EventScr\w*|EventListScr\w*|MS_\w*)\b')
+
+# Edges are read from CODE, never from prose. A body's comments name symbols freely -- ch05's
+# header explains itself by naming `EventScr_RemoveBGIfNeeded` and `EventScr_TextShowWithFadeIn`
+# in a paragraph, and an unfiltered token match walks into both. Harmless while they exist;
+# the moment a comment names a retired scene the walk reports an unresolved symbol and stops
+# the build over a sentence. A guard must not be steerable by prose (`decisions.md` ->
+# *"Comments are testimony"*).
+_COMMENT = re.compile(r'/\*.*?\*/|//[^\n]*', re.S)
 
 _BODIES = None
 
@@ -306,6 +323,17 @@ def script_bodies(search_dirs=None):
     return bodies
 
 
+def script_edges(body):
+    """Every symbol a script body points at -- its successors in the graph.
+
+    One definition of "edge", shared by the walk and by anything that needs to ask the same
+    question the other way round (who points AT this?). Two readings of that would drift, and
+    a caller list built from a different rule than the reachable set is a caller list about a
+    different graph.
+    """
+    return [m.group(1) for m in _SCRIPT_TOKEN.finditer(_COMMENT.sub(' ', body))]
+
+
 def reachable_scripts(roots, bodies=None):
     """(reached, unresolved) -- every symbol reachable from `roots`, and the scripts among
     them whose body this could not read.
@@ -333,9 +361,9 @@ def reachable_scripts(roots, bodies=None):
             if _SCRIPT_TOKEN.fullmatch(symbol):
                 unresolved.add(symbol)
             continue
-        for match in _SCRIPT_TOKEN.finditer(found[1]):
-            if match.group(1) not in reached:
-                queue.append(match.group(1))
+        for symbol_ahead in script_edges(found[1]):
+            if symbol_ahead not in reached:
+                queue.append(symbol_ahead)
     return reached, unresolved
 
 

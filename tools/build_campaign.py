@@ -7481,7 +7481,7 @@ def assert_scene_loads_its_actors(body, scene, loaded_pids=None):
 # the two is the entire audit.
 
 SceneActorFinding = collections.namedtuple(
-    'SceneActorFinding', 'chapter script file unit_id outcome')
+    'SceneActorFinding', 'chapter script file unit_id outcome loaded_by')
 
 
 def reachable_scenes_staging_unloaded_pcs(roots_by_chapter=None, bodies=None,
@@ -7497,29 +7497,55 @@ def reachable_scenes_staging_unloaded_pcs(roots_by_chapter=None, bodies=None,
         roots_by_chapter = dict(
             (h.name, event_group.chapter_script_roots(h.name, rows)) for h in rows)
     pcs = player_character_pids()
+
+    def loads(body):
+        if loaded_pids is None:
+            return scene_loaded_pids(body)
+        out = set()
+        for match in _LOAD_COMMAND.finditer(body):
+            out |= set(loaded_pids.get(match.group(1), ()))
+        return out
+
     found = []
     for chapter, roots in sorted(roots_by_chapter.items()):
         reached, _ = event_group.reachable_scripts(roots, bodies)
+        # Who points AT each reachable script, within the same reachable set. Not part of the
+        # verdict -- see below -- but the difference between an error a reader can act on and
+        # one they have to re-derive.
+        callers = collections.defaultdict(set)
+        for symbol in reached:
+            entry = bodies.get(symbol)
+            if entry is None:
+                continue
+            for match in event_group.script_edges(entry[1]):
+                if match != symbol and match in reached:
+                    callers[match].add(symbol)
         for symbol in sorted(reached):
             entry = bodies.get(symbol)
             if entry is None:
                 continue
             relpath, body = entry
-            if loaded_pids is None:
-                loaded = scene_loaded_pids(body)
-            else:
-                loaded = set()
-                for match in _LOAD_COMMAND.finditer(body):
-                    loaded |= set(loaded_pids.get(match.group(1), ()))
+            loaded = loads(body)
             for pid, outcome in sorted(scene_staged_pids(body).items()):
-                if pid in pcs and pid not in loaded:
-                    found.append(SceneActorFinding(chapter, symbol, relpath,
-                                                   pcs[pid], outcome))
+                if pid not in pcs or pid in loaded:
+                    continue
+                # THE VERDICT IS PER SCENE, exactly as it is for the scenes we write (#337).
+                # A caller that LOADs the actor before calling does make the chain safe, and
+                # vanilla relies on that in five of the twelve sites this flags on the donor
+                # -- but "some caller loads it" is not the same claim as "every path does",
+                # and a scene with two callers can be reached by the one that does not. So a
+                # loading caller is REPORTED, never subtracted: it turns a build stop into a
+                # one-line decision made with the evidence in front of you, instead of a
+                # verdict this walk is not in a position to make.
+                loaded_by = sorted(c for c in callers.get(symbol, ())
+                                   if pid in loads(bodies[c][1]))
+                found.append(SceneActorFinding(chapter, symbol, relpath, pcs[pid],
+                                               outcome, tuple(loaded_by)))
     return found
 
 
 def assert_reachable_scenes_load_their_actors(roots_by_chapter=None, bodies=None,
-                                              hosted=None, verbose=False):
+                                              loaded_pids=None, hosted=None, verbose=False):
     """Guard: no scene a hosted chapter can REACH stages a PC it never LOADs (#398).
 
     Runs in the build after the injectors, like the census beside it, because the question is
@@ -7545,7 +7571,7 @@ def assert_reachable_scenes_load_their_actors(roots_by_chapter=None, bodies=None
                  'reaches that scene" is not an answer it can give (#398):\n  - %s'
                  % (sum(len(v) for v in blind.values()),
                     '\n  - '.join('%s: %s' % (c, ', '.join(s)) for c, s in blind.items())))
-    found = reachable_scenes_staging_unloaded_pcs(roots_by_chapter, bodies)
+    found = reachable_scenes_staging_unloaded_pcs(roots_by_chapter, bodies, loaded_pids)
     if found:
         sys.exit(
             'ERROR: reachable scenes stage player characters they never LOAD (#398):\n  - %s\n'
@@ -7553,10 +7579,14 @@ def assert_reachable_scenes_load_their_actors(roots_by_chapter=None, bodies=None
             'AND deployed them, so the unit lookup returns NULL the first time someone reaches '
             'the beat having lost them.\n'
             '  If the scene is vanilla\'s, the fix is usually to stop POINTING at it; if it is '
-            'ours, LOAD the actor or stage the beat with CUMO_AT (a tile).'
-            % '\n  - '.join('%s reaches %s (%s): %s -- the chapter %s'
-                            % (f.chapter, f.script, f.file, f.unit_id, f.outcome)
-                            for f in found))
+            'ours, LOAD the actor or stage the beat with CUMO_AT (a tile). Where a CALLER is '
+            'named below it already LOADs that character, so the chain may well be safe -- '
+            'check that EVERY path to the scene goes through it, then say so here.'
+            % '\n  - '.join(
+                '%s reaches %s (%s): %s -- the chapter %s%s'
+                % (f.chapter, f.script, f.file, f.unit_id, f.outcome,
+                   '; but caller(s) %s LOAD it' % ', '.join(f.loaded_by) if f.loaded_by else '')
+                for f in found))
     if verbose:
         total = sum(len(event_group.reachable_scripts(r, bodies)[0])
                     for r in roots_by_chapter.values())

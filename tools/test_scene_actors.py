@@ -313,5 +313,47 @@ class TheLiveBuildPassesTheInheritedGuardToo(unittest.TestCase):
                           '%s is reachable in vanilla and the guard did not flag it' % site)
 
 
+
+
+class ALoadingCallerIsREPORTEDNeverSubtracted(unittest.TestCase):
+    """A caller that LOADs the actor before calling does make that chain safe, and vanilla
+    relies on it in five of the twelve sites this flags on the donor. But "some caller loads
+    it" is not "every path does" -- a scene with two callers can be reached by the one that
+    does not -- so the verdict stays per scene, exactly as it is for the scenes we write, and
+    the loading caller is named in the message instead.
+    """
+
+    def test_a_loading_caller_is_named_on_the_finding(self):
+        bodies = {'L': ('f.h', '{ EventScr_Caller }'),
+                  'EventScr_Caller': ('f.h', '{ LOAD1(0x1, UnitDef_Ours) '
+                                             'CALL(EventScr_Inner) }'),
+                  'EventScr_Inner': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}
+        found = bc.reachable_scenes_staging_unloaded_pcs(
+            roots_by_chapter={'ch06': ['L']}, bodies=bodies,
+            loaded_pids={'UnitDef_Ours': {bc.character_pid('CHARACTER_EIRIKA')}})
+        inner = [f for f in found if f.script == 'EventScr_Inner']
+        self.assertEqual(1, len(inner), 'the chain is still reported, not silently cleared')
+        self.assertEqual(('EventScr_Caller',), inner[0].loaded_by)
+
+    def test_a_caller_that_does_NOT_load_leaves_loaded_by_empty(self):
+        bodies = {'L': ('f.h', '{ EventScr_Caller }'),
+                  'EventScr_Caller': ('f.h', '{ CALL(EventScr_Inner) }'),
+                  'EventScr_Inner': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}
+        found = bc.reachable_scenes_staging_unloaded_pcs(
+            roots_by_chapter={'ch06': ['L']}, bodies=bodies)
+        self.assertEqual((), found[0].loaded_by)
+
+    def test_the_error_message_says_which_caller_loads_it(self):
+        bodies = {'L': ('f.h', '{ EventScr_Caller }'),
+                  'EventScr_Caller': ('f.h', '{ LOAD1(0x1, UnitDef_Ours) '
+                                             'CALL(EventScr_Inner) }'),
+                  'EventScr_Inner': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}
+        with self.assertRaises(SystemExit) as caught:
+            bc.assert_reachable_scenes_load_their_actors(
+                roots_by_chapter={'ch06': ['L']}, bodies=bodies,
+                loaded_pids={'UnitDef_Ours': {bc.character_pid('CHARACTER_EIRIKA')}})
+        self.assertIn('caller(s) EventScr_Caller LOAD it', str(caught.exception))
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
