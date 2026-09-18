@@ -7464,6 +7464,137 @@ def assert_scene_loads_its_actors(body, scene, loaded_pids=None):
         'CUMO_AT (a tile) rather than a character (#337).' % (scene, '\n'.join(lines)))
 
 
+# --- the INHERITED half: scenes we never wrote, that the chapter still REACHES (#398) ---
+#
+# `assert_scene_loads_its_actors` above hooks the two WRITERS, so it sees every scene this
+# build authors and none that it inherits. Our injectors edit a host slot's event-script FILE
+# without rewriting every scene in it, and `git diff` reports that the FILE changed, never
+# that a given scene did -- so untouched vanilla scenes sit in the files we write.
+#
+# Five of them stage `CHARACTER_EIRIKA` or `CHARACTER_NEIMI`, which are braulo and pinky. That
+# is the same soft-lock #337 exists to prevent, in code nobody here wrote.
+#
+# The rule does not change; the POPULATION does. A scene LOADs the PCs it stages, whether we
+# authored it or adopted it -- so this applies the identical test to everything a chapter's
+# ChapterEventGroup can actually reach (`event_group.reachable_scripts`), which is the set
+# that can run. A vanilla scene nothing points at is dead weight, and the difference between
+# the two is the entire audit.
+
+SceneActorFinding = collections.namedtuple(
+    'SceneActorFinding', 'chapter script file unit_id outcome loaded_by')
+
+
+def reachable_scenes_staging_unloaded_pcs(roots_by_chapter=None, bodies=None,
+                                          loaded_pids=None, hosted=None):
+    """Every REACHABLE script that stages a player character it does not LOAD.
+
+    `loaded_pids` maps a UnitDefinition symbol to the pids it carries, for tests that have no
+    decomp to resolve against; left None, the real resolver is used.
+    """
+    bodies = event_group.script_bodies() if bodies is None else bodies
+    if roots_by_chapter is None:
+        rows = hosted if hosted is not None else hosted_chapters()
+        roots_by_chapter = dict(
+            (h.name, event_group.chapter_script_roots(h.name, rows)) for h in rows)
+    pcs = player_character_pids()
+
+    def loads(body):
+        if loaded_pids is None:
+            return scene_loaded_pids(body)
+        out = set()
+        for match in _LOAD_COMMAND.finditer(body):
+            out |= set(loaded_pids.get(match.group(1), ()))
+        return out
+
+    found = []
+    for chapter, roots in sorted(roots_by_chapter.items()):
+        reached, _ = event_group.reachable_scripts(roots, bodies)
+        # Who points AT each reachable script, within the same reachable set. Not part of the
+        # verdict -- see below -- but the difference between an error a reader can act on and
+        # one they have to re-derive.
+        callers = collections.defaultdict(set)
+        for symbol in reached:
+            entry = bodies.get(symbol)
+            if entry is None:
+                continue
+            for match in event_group.script_edges(entry[1]):
+                if match != symbol and match in reached:
+                    callers[match].add(symbol)
+        for symbol in sorted(reached):
+            entry = bodies.get(symbol)
+            if entry is None:
+                continue
+            relpath, body = entry
+            loaded = loads(body)
+            for pid, outcome in sorted(scene_staged_pids(body).items()):
+                if pid not in pcs or pid in loaded:
+                    continue
+                # THE VERDICT IS PER SCENE, exactly as it is for the scenes we write (#337).
+                # A caller that LOADs the actor before calling does make the chain safe, and
+                # vanilla relies on that in five of the twelve sites this flags on the donor
+                # -- but "some caller loads it" is not the same claim as "every path does",
+                # and a scene with two callers can be reached by the one that does not. So a
+                # loading caller is REPORTED, never subtracted: it turns a build stop into a
+                # one-line decision made with the evidence in front of you, instead of a
+                # verdict this walk is not in a position to make.
+                loaded_by = sorted(c for c in callers.get(symbol, ())
+                                   if pid in loads(bodies[c][1]))
+                found.append(SceneActorFinding(chapter, symbol, relpath, pcs[pid],
+                                               outcome, tuple(loaded_by)))
+    return found
+
+
+def assert_reachable_scenes_load_their_actors(roots_by_chapter=None, bodies=None,
+                                              loaded_pids=None, hosted=None, verbose=False):
+    """Guard: no scene a hosted chapter can REACH stages a PC it never LOADs (#398).
+
+    Runs in the build after the injectors, like the census beside it, because the question is
+    what our build points at -- at HEAD every one of these fields still points at the donor's
+    scenes, and the guard would report the donor's bugs as ours.
+
+    An unreadable script is raised, not skipped. The product of this guard is a NEGATIVE, and
+    a symbol whose body could not be read ends its branch silently: everything behind it then
+    reads unreachable for the one reason that proves nothing.
+    """
+    bodies = event_group.script_bodies() if bodies is None else bodies
+    if roots_by_chapter is None:
+        rows = hosted if hosted is not None else hosted_chapters()
+        roots_by_chapter = dict(
+            (h.name, event_group.chapter_script_roots(h.name, rows)) for h in rows)
+    blind = {}
+    for chapter, roots in sorted(roots_by_chapter.items()):
+        _, unresolved = event_group.reachable_scripts(roots, bodies)
+        if unresolved:
+            blind[chapter] = sorted(unresolved)
+    if blind:
+        sys.exit('ERROR: the reachability walk could not read %d script(s), so "nothing '
+                 'reaches that scene" is not an answer it can give (#398):\n  - %s'
+                 % (sum(len(v) for v in blind.values()),
+                    '\n  - '.join('%s: %s' % (c, ', '.join(s)) for c, s in blind.items())))
+    found = reachable_scenes_staging_unloaded_pcs(roots_by_chapter, bodies, loaded_pids)
+    if found:
+        sys.exit(
+            'ERROR: reachable scenes stage player characters they never LOAD (#398):\n  - %s\n'
+            '  These run in OUR chapter. A PC is on the map only if the player still has them '
+            'AND deployed them, so the unit lookup returns NULL the first time someone reaches '
+            'the beat having lost them.\n'
+            '  If the scene is vanilla\'s, the fix is usually to stop POINTING at it; if it is '
+            'ours, LOAD the actor or stage the beat with CUMO_AT (a tile). Where a CALLER is '
+            'named below it already LOADs that character, so the chain may well be safe -- '
+            'check that EVERY path to the scene goes through it, then say so here.'
+            % '\n  - '.join(
+                '%s reaches %s (%s): %s -- the chapter %s%s'
+                % (f.chapter, f.script, f.file, f.unit_id, f.outcome,
+                   '; but caller(s) %s LOAD it' % ', '.join(f.loaded_by) if f.loaded_by else '')
+                for f in found))
+    if verbose:
+        total = sum(len(event_group.reachable_scripts(r, bodies)[0])
+                    for r in roots_by_chapter.values())
+        print('  %d reachable script(s) across %d hosted chapter(s) stage no unloaded PC'
+              % (total, len(roots_by_chapter)))
+    return True
+
+
 # Every file a UnitDefinition array can live in: vanilla's, and the per-chapter headers our
 # own `declare_unit_table` writes. Searching only `events_udefs.c` silently returns an empty
 # set for `UnitDef_Event_Ch1Ally` -- and an empty set reads as "the scene loaded nobody",
@@ -15368,6 +15499,14 @@ def main():
         print('event group census (#313):')
         event_group.assert_census_declared()
         print('  every ChapterEventGroup field is written or declared-inherited')
+        # The census rules on the twenty FIELDS; this rules on everything those fields lead
+        # to. Our injectors edit a host slot's event-script file without rewriting every scene
+        # in it, so untouched vanilla scenes sit in the files we write -- five of them staging
+        # CHARACTER_EIRIKA, which is braulo. They are unreachable today because the injectors
+        # overwrote the scenes that pointed at them, which is a fact about this build's output
+        # and not a property anything held in place. Held here now (#398).
+        print('reachable scene actors (#398):')
+        assert_reachable_scenes_load_their_actors(verbose=True)
     # Close the scope manifest BEFORE the mtime rewind below: the rewind moves mtimes
     # backwards on byte-identical files, and this attribution watches mtimes.
     _scope_manifest = _scopes.write_manifest(
