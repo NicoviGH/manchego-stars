@@ -37,7 +37,17 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # still taught the 29/42-CHARACTER wrap that #298 replaced with pixel budgets. A doc that
 # instructs is exactly the kind this guard exists for.
 DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md',
-             '.github/**/*.md', '.claude/skills/**/*.md']
+             '.github/**/*.md', '.claude/skills/**/*.md',
+             # campaign.yaml is a DECLARATION the build reads, and its comments are doctrine
+             # like any docstring's -- it opens by telling the reader which tool consumes it.
+             # It went unscanned until #30, and what it named there was `build-campaign.ts`:
+             # a tool that NEVER EXISTED, planned in the PRD's Node toolchain and dropped by
+             # ADR 0004 before a line of it was written. Its name is in the dead registry for
+             # that reason, alongside the `data_sources:` block's two more, whose files were
+             # never committed either.
+             # The CHAPTER yaml is deliberately not here yet: it carries eight live hits of
+             # the retired 29/42-CHARACTER wrap vocabulary, which is its own sweep (#393).
+             'campaigns/*/campaign.yaml']
 
 # Terms that are NEVER legitimate in vision/ops docs OR hand-written code comments:
 # abandoned tools, dead code symbols, retired implementation phrases. decisions.md
@@ -156,6 +166,11 @@ def _docs():
     for g in DOC_GLOBS:
         out += glob.glob(os.path.join(REPO, g), recursive=True)
     return [d for d in out if os.path.isfile(d)]
+
+
+def _campaign_yamls():
+    """Every campaign's top-level declaration file."""
+    return sorted(glob.glob(os.path.join(REPO, 'campaigns', '*', 'campaign.yaml')))
 
 
 def _handwritten_sources():
@@ -2010,6 +2025,29 @@ def check_tool_refs_exist(fail):
                     fail.append('%s references %s which does not exist' % (rel, target))
 
 
+def check_campaign_declares_no_chapter_list(fail):
+    """`campaign.yaml` must not restate the chapter list; the chapter files own it.
+
+    A chapter's number and name live in its own `chapters/ch*.yaml`,
+    `tools/campaign_chapters.py` is the single reader (#312), and `docs/CHAPTERS.md` is
+    generated from that. The copy that used to sit in `campaign.yaml` was hand-kept and
+    unread, which is the combination that rots without symptom: by the time #30 looked, it
+    omitted the prologue, declared `count: 7` for a nine-chapter campaign, and named every
+    chapter from ch04 on one number too low.
+
+    Nothing read it, so nothing broke -- it misled a reader instead, which is the whole
+    cost and the whole reason this is a gate rather than a fixed typo."""
+    import yaml
+    for path in _campaign_yamls():
+        with open(path, encoding='utf-8') as fh:
+            data = yaml.safe_load(fh)
+        if isinstance(data, dict) and 'chapters' in data:
+            fail.append(
+                '%s restates the chapter list (`chapters:`) -- that fact belongs to '
+                'chapters/ch*.yaml, read through tools/campaign_chapters.py and generated '
+                'into docs/CHAPTERS.md' % os.path.relpath(path, REPO))
+
+
 def check_no_dead_concepts(fail):
     """Retired terms/mechanisms must not survive in docs OR hand-written code
     comments (the 2026-07-02 incident: a superseded mechanism lived on in a
@@ -2992,6 +3030,7 @@ CHECKS = (
     check_chapter_lua_facts, check_rescue_targets, check_rescue_fuse_forecast,
     check_documented_tileset, check_harness_local_ratchet, check_verdict_scenarios_are_guarded,
     check_no_hardcoded_symbol_addresses, check_tool_refs_exist, check_no_dead_concepts,
+    check_campaign_declares_no_chapter_list,
     check_generated_indexes_fresh, check_engine_guards_present,
     check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,

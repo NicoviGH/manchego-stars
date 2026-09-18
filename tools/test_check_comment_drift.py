@@ -89,6 +89,19 @@ class HandwrittenSourceScan(unittest.TestCase):
         # decisions.md IS globbed; its exemption is applied inside check_no_dead_concepts,
         # not by narrowing the scan -- so do not assert its absence here.
 
+    def test_the_scan_covers_the_campaign_DECLARATIONS(self):
+        """campaign.yaml is prose-carrying content the build READS, and it was never scanned.
+
+        The same re-narrowing failure as the `.github/` and skills-dir gaps above, one
+        directory over: `campaign.yaml` opens by naming `tools/build-campaign.ts` -- a tool
+        retired long enough ago that its name is IN the registry -- and a `data_sources:`
+        block pointing at `data/srd/*-snapshot.json`, two more registered dead names, for
+        paths that do not exist. Nothing could see any of it.
+        """
+        scanned = [os.path.relpath(p, check.REPO)
+                   for p in check._docs() + check._handwritten_sources()]
+        self.assertIn('campaigns/rime-of-the-frostmaiden/campaign.yaml', scanned)
+
     def test_the_live_repo_is_clean(self):
         fail = []
         check.check_no_dead_concepts(fail)
