@@ -6,7 +6,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-18 (Claude), after #401 landed. Deep-cleaned 2026-08-20 at Nicolas's
+Refreshed 2026-09-18 (Claude), after #402/#404/#405 landed. Deep-cleaned 2026-08-20 at Nicolas's
 instruction: anything already recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was
 deleted from here rather than restated. Check that a thing has a home before writing it here.
 
@@ -14,58 +14,63 @@ deleted from here rather than restated. Check that a thing has a home before wri
 
 **Nothing. No open PRs, no branches.**
 
-**#398 is ANSWERED and CLOSED** (PR #401, squash-merged). ADR 0294 carries it and is deliberately
-not restated. The one-line version: all five inherited vanilla scenes that stage a PC are
-**unreachable**, so there was no live soft-lock — but nothing was HOLDING them dead, and that is
-now a build guard (`assert_reachable_scenes_load_their_actors`, beside the #313 census).
+**Nicolas's 2026-09-18 instruction is SPENT.** *"the fresh instance will pick up the issues you
+filed and proposal 3"* — #367's proposal 3 (#402), #393 (#404) and #396 (#405) are all merged,
+and #398 closed before them. ADRs 0295 and 0296 carry the two that needed one; nothing below
+restates them.
 
-⚠️ **Two things from that work a fresh session needs before writing anything near the event
-graph**, because both were review findings and both will recur:
+⚠️ **Three things a fresh session needs before writing anything near this machinery.** All
+three were review findings on those PRs, and all three will recur:
 
 - **Our own scenes are named `MS_*`, and a vanilla-spelled symbol filter walks straight past
-  them.** The first cut of the reachability walk reported ch05 reaching 26 scripts; it reaches
-  **40**. #337's first cut made the identical mistake at the write hook. Any new code that
-  matches `EventScr_` must ask whether it also means `MS_`.
+  them.** The first cut of #401's reachability walk reported ch05 reaching 26 scripts; it
+  reaches **40**. #337's first cut made the identical mistake at the write hook. Any new code
+  that matches `EventScr_` must ask whether it also means `MS_`.
+- **A guard that claims to MEASURE something must be watched failing.** #405's camera-bounds
+  check read a JSON key the map layouts do not carry, so it returned "nothing out of bounds"
+  without ever finding a map, and its test passed vacuously. Same shape as #404's, where a
+  dead-vocabulary sweep swapped characters for pixels and kept four conclusions the retired
+  rule had produced. ADR 0296 is the long form.
 - **`make chapter CH=ch06` is still the state of ch06**, and it is HOSTED, not FINISHED: 3
   declared scenes with no script, 8 free message ids in `0x9F6-0x9FF`, nerra with no portrait,
   map sprite or battle anim.
 
-**Opened 2026-09-17 and still NOT started: #393 and #396.** Each carries its own measured
-evidence — read the issue rather than re-deriving it.
-
-## Next up — NICOLAS'S INSTRUCTION, in order
-
-Nicolas, 2026-09-18: *"the fresh instance will pick up the issues you filed and proposal 3."*
-#398 is done; what remains of that instruction is below, unchanged in priority.
+## Next up
 
 | | work | effort | what it is |
 |---|---|---|---|
-| 1 | **#367's proposal 3 — the party-level band** | M | Land it into `docs/fe8-pacing-reference.md`, **derived and regenerated, not hand-kept** (that file is hand-written prose today, so this needs a generated block plus a freshness guard — `check_generated_indexes_fresh` is the pattern). The exp model was spike code and was never committed; transcribe it from the decomp at HEAD — `GetUnitExpLevel` / `GetUnitRoundExp` / `GetUnitPowerLevel` / `GetUnitKillExpBonus` / `GetBattleUnitExpGain` are all in `src/bmbattle.c:1680-1805`, and the term that does the work is `classRelativePower`. Reuse `difficulty.py` rather than a second roster reader: `chapter_roster_entries` / `entry_body_levels` for our side, `vanilla_unit_defs` + `PARITY_REFERENCE_UDEFS` for the twin (both give class AND level, which the `Combatant` does not carry). Numbers to reproduce are in #367's 2026-09-04 comment: mean party level 1→7 across ch00–ch06, exp yield within ±12% of the twin every chapter. **Read it as a BAND (~L5–L9 entering ch07), not a point** — the simulation splits exp evenly across the deploy cap, so it understates leaders and overstates the tail. A stat GROWTH model is explicitly not wanted. ⚠️ **ch07 is the watch item**: it reuses FE8 Ch6 as its bar, so honest parity there hands the party an extra chapter of exp the vanilla curve does not contain, and the per-chapter gate structurally cannot see it — exp is the only quantity that integrates across chapters. |
-| 2 | **#393** | S–M | The chapter YAML is outside the drift scan; ch05 carries 8 hits of the retired CHARACTER-wrap vocabulary. ⚠️ **Not a sweep** — some of those lines are past-tense narration of the very change that retired the term, and a guard that rejects its own warning is worse than none. Read each in context, then add the glob. |
-| 3 | **#396** | M | The `ROMChapterData` census, in the shape #313 built for `ChapterEventGroup`: every field WRITTEN or DECLARED-INHERITED. Fog (#365) was the fifth such field found one at a time; this answers "is there a sixth" once instead of five more times. Most entries should be "inherited, and here is why that is safe". |
-
-**Then #26 — ch06's own body.** #337 landed, so **the dialogue pass is no longer gated**.
-
-⚠️ **#367's proposal 4 is BLOCKED on Nicolas and must not be decided by an agent.** *Lock
-ch03–ch06, or accept the gate is decorative for them.* It is not the mechanical yes it looks
-like: the same investigation finds the parity ratio converging on a tautology — ch06 reads a
-perfect x1.00 because it reproduces 100% of FE8 Ch6's force, which is a checksum on the donor
-pipeline rather than a measurement. Locking ch06 would gate it on a number #367 says means
-nothing there. Ask; do not infer.
+| 1 | **#26 — ch06's own body** | L | The dialogue pass is no longer gated (#337 landed), and ch06's fuse is answered. Read `make chapter CH=ch06` for what is declared-but-unbuilt rather than any list written here. ⚠️ **Tali and the boat crews have no voice** — that blocker is Nicolas's, below — but the reskins, the boarding pass and nerra's art need none of it and can all proceed first. |
+| 2 | **#335** | M | The AI audit opened 2026-08-29: #48 measures STATS, so behavioural drift is invisible to every gate, and ch00–ch06 are biased toward aggression. It carries its own evidence and proposes the guard (an `ai_divergence:` allowlist, modelled on `terrain_divergence`). |
+| 3 | **#135** | S | Real v0.1.0 playtester feedback on art consistency and difficulty, **never triaged** — the only open item that is player-facing. |
 
 **#389's remainder** stays open and unscheduled: decompose `build_campaign.py` cluster by
 cluster, each move wrapped in `injection_fingerprint`, clustering by **dependency and not by
 banner** (ADR 0287). ch06 is extracted LAST, after it ships.
 
-⚠️ **`tools/injection_fingerprint.py` is the tool to reach for on ANY mechanical change.** #401
-used it again to prove a new build-time guard changed nothing (975 files, ~70s): `--write
-before.json`, change, `--check before.json`. It is what turns "this should be equivalent" into a
-measurement.
+⚠️ **`tools/injection_fingerprint.py` is the tool to reach for on ANY mechanical change.**
+#405 used it again to prove a new build-time guard writes nothing (975 files, ~70s): `--write
+before.json`, change, `--check before.json`. It is what turns "this should be equivalent" into
+a measurement.
 
-⚠️ **One blocker is Nicolas's, not Claude's: the boat crews have no voice.** No file in
-`campaigns/rime-of-the-frostmaiden/lore/` names Tali or either crew, and Tali carries ch06's
-plot-critical hint. The reskins, the boarding pass and nerra's art need none of that and can all
-proceed first.
+**Where the party's LEVEL comes from, now that it is derived:** `python3 tools/exp_curve.py`
+(and `--write` regenerates the block in `docs/fe8-pacing-reference.md`). Read that rather than
+any number written down here — the same rule `make chapter` already earns.
+
+## Owed by NICOLAS, not by the next session
+
+- **#367's proposal 4** — lock ch03–ch06, or accept the gate is decorative for them. The rest
+  of #367 is answered (its 2026-09-04 comment, superseded on ch02 by the 2026-09-05 one, and
+  proposal 3 by #402). ⚠️ Not the mechanical yes it looks like: the same investigation finds
+  the parity ratio converging on a tautology, and ch06 reads a perfect x1.00 because it
+  reproduces 100% of FE8 Ch6's force — a checksum on the donor pipeline, not a measurement.
+  Locking ch06 would gate it on a number #367 says means nothing there. Ask; do not infer.
+- **#403 — our recruits join at level 1 into a level-6 party** (opened 2026-09-18, off #402's
+  band). Vanilla's Ch5 talk-recruit is declared L5. Three arms on the issue: scale them, leave
+  them as underdogs, or split per unit. Sahnar is the sharp end — a ch05 red talk-recruit meant
+  to fight the back half of her own chapter at L1. **A design fork, so it is not an agent's
+  call.**
+- **The boat crews have no voice.** No file in `campaigns/rime-of-the-frostmaiden/lore/` names
+  Tali or either crew, and Tali carries ch06's plot-critical hint.
 
 ## PARKED — nothing. ch06's fuse is answered and fixed
 
@@ -81,21 +86,6 @@ door, west 8/3). That was wrong** -- it came from measuring the west hull at a c
 is not its tile. Both hulls have exactly ONE melee door, as their YAML always declared. The
 real asymmetry was reachability, not geometry.
 
-**#367 is ANSWERED** (2026-09-04 investigation comment; its ch02 numbers are superseded by the
-2026-09-05 comment). The rosters, the donor derivation and the exp curve through ch06 are
-sound; the parity *ratio* is not a statement about difficulty, and at ch02 and ch06 says
-nothing at all, because both reproduce 100% of their twin's force and so read x1.00 by
-construction.
-
-## Owed, filed, not started
-
-What is left here is owed BY NICOLAS, not by the next session:
-
-- **#367's proposal 4** -- lock ch03-ch06, or accept the gate is decorative for them. The rest
-  of #367 is answered in its 2026-09-04 comment (**do not re-derive it, do not restate it
-  here**); proposal 3 is assigned work in the table above. Only this call is outstanding, and
-  the Next-up table says why it is not the easy yes it looks like.
-
 ## Map sprites — read before any art session
 
 All of it is in `docs/decisions.md` → **"A map sprite is 32x32 or it is nothing"**: the hard engine
@@ -104,6 +94,31 @@ why a decomp sheet's palette is a meaningless leftover, what `footprint:` actual
 WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
+
+**#405 (2026-09-18) — the ROMChapterData census (#396).** Every one of `chapter_settings.json`'s
+98 leaf fields is WRITTEN, owned by a named pass, or declared-inherited with a reason that cites
+its engine reader — so the five fields found one at a time (goal text ids #207, battle grounds
+#289, difficulty #303, `.traps` #302, fog #365) have no sixth to be found that way. Runs last in
+the injection sequence, like #313's. ⚠️ Two things it added that a later session will meet:
+ownership is **chapter-aware** (the prologue calls none of `_retarget_host_chapter`, so it has
+its own rulings), and `intro_camera_out_of_bounds()` is the one ruling that is a measurement —
+a hosted chapter inherits its intro camera tile from its host SLOT while its map is a DONOR's
+geometry, and nothing else compares those two.
+
+**#404 (2026-09-18) — the chapter YAML joined the drift scan (#393).** ADR 0296 carries the
+lesson and is deliberately not restated: a `DEAD_CONCEPTS` pattern is keyed on the UNIT, not on
+the sentence that happened to survive. The issue measured 8 hits; there were **21**, five of them
+in `build_campaign.py`, which had been scanned all along. Also landed: `DEAD_CONCEPT_CITATIONS`,
+so citing the record that retired a concept stops being flagged as restating it.
+
+**#402 (2026-09-18) — the party-level band is DERIVED (#367 proposal 3).** ADR 0295 carries it.
+`tools/exp_curve.py` transcribes FE8's four exp functions and runs them over `difficulty.py`'s
+roster readers; the band is generated into `docs/fe8-pacing-reference.md` and held fresh by
+`tools/test_exp_curve.py`, which also asserts every chapter within ±12% of its twin — **the only
+quantity in this repo that integrates across chapters.** ⚠️ **ch07 is where that alarm will
+fire**: it is planned against FE8 Ch6, which ch06 already banked. Also found: `CA_BOSS` is a
+question about the SLOT's attributes and `ENEMY_BASE_SLOT` is the stat table, so
+`build_campaign.ENEMY_CHARACTER_SLOT` now answers the attribute one.
 
 **#401 (2026-09-18) — #398's audit, and the guard that keeps its answer true.** ADR 0294
 carries it and is deliberately not restated. ⚠️ **Two review findings a fresh session should
@@ -257,9 +272,7 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
 - **Backlog swept 2026-08-22** — do NOT re-survey it by issue title or checkbox. ch03 taught that
   an unchecked box records what someone intended, not what the repo contains: #23 read as "7 open
   items" while git history and the live YAML showed the work shipped long ago. Cross-reference the
-  artifact. Two the sweep surfaced are still open and still carry their own evidence: **#335**
-  (the AI audit, opened 2026-08-29) and **#135** (real v0.1.0 playtester feedback on art
-  consistency and difficulty, **never triaged** — the only item here that is player-facing).
+  artifact. The two it surfaced (#335, #135) are now items 2 and 3 in the Next-up table.
 - ⚠️ **Branch BEFORE editing, and check whether a file's "stale" content is already fixed on an
   unmerged branch.** 2026-08-28 cost a rework round: ch06's `parity_reference` read `FE8 Ch5` on
   `main`, so it got "fixed" there — while PR #331 had already corrected it on its branch. A whole
