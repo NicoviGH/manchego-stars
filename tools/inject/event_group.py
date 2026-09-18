@@ -11,6 +11,7 @@ attribute set and require every attribute to be accounted for.
 Kept STDLIB-ONLY, like `hosts.py` and `decomp.py` beside it, so `tools/check.py` can lint it in
 CI's lightweight job (which installs pyyaml and nothing else).
 """
+import collections
 import os
 import re
 import subprocess
@@ -201,6 +202,158 @@ def rewritten_symbols(tokens):
         if _definition(token, mine) != _definition(token, theirs):
             out.add(token)
     return out
+
+
+# --- reachability: which scripts a chapter can actually RUN (#398) ----------------------
+#
+# A hosted chapter adopts a vanilla slot whose event-script FILE our injectors edit without
+# rewriting every scene in it. So untouched vanilla scenes sit in the files we write, and
+# `git diff` says the FILE changed -- never that a given scene did.
+#
+# That matters because vanilla scenes stage vanilla's cast, and our cast wears vanilla's
+# slots: `CHARACTER_EIRIKA` is braulo, `CHARACTER_NEIMI` is pinky. Vanilla could stage Eirika
+# without loading her because Eirika is always there; the player picks their own lord here, so
+# any PC can be dead or simply not deployed. A leftover scene doing that is the soft-lock
+# #337 exists to prevent, in code we never wrote -- IF it still runs.
+#
+# Whether it runs is a question about POINTERS, and it has an answer: a scene executes only
+# when the chapter's ChapterEventGroup still reaches it. This is that walk. It is the same
+# shape as the census above -- enumerate rather than spot-check -- and it is the half the
+# census cannot see, because the census rules on the twenty FIELDS and this rules on
+# everything those fields lead to.
+
+# Both the array definitions (`CONST_DATA EventListScr Foo[] = {`) and the groups themselves.
+_ARRAY_DEFN = re.compile(r'^(?:[A-Za-z_][\w \t\*]*?)\b(\w+)\s*\[\s*\]\s*=\s*\{', re.M)
+_GROUP_DEFN = re.compile(r'^struct ChapterEventGroup\s+(\w+)\s*=\s*\{', re.M)
+
+# What counts as an edge. A script names its successors by SYMBOL wherever it points at one --
+# a list entry, a `CALL`, or the `SVAL(EVT_SLOT_2, EventScr_X)` load-then-call-indirect that
+# four of #398's five sites were reached by in vanilla. The indirection is in the ENGINE, not
+# in the text: the symbol is still written in the caller's body, so matching the token catches
+# it without having to model event slots.
+_SCRIPT_TOKEN = re.compile(r'\b(EventScr\w*|EventListScr\w*)\b')
+
+_BODIES = None
+
+
+def _brace_body(text, open_at):
+    """The `{...}` starting at `open_at`, brace-balanced.
+
+    Counted rather than cut at the first `};`: an event list holds macros that themselves
+    carry braces, and stopping at the first one would truncate a scene -- silently dropping
+    whatever it points at, which in a reachability walk reads as "nothing reaches that".
+    """
+    depth = 0
+    for i in range(open_at, len(text)):
+        if text[i] == '{':
+            depth += 1
+        elif text[i] == '}':
+            depth -= 1
+            if depth == 0:
+                return text[open_at:i + 1]
+    return text[open_at:]
+
+
+def script_bodies_from(text, relpath):
+    """symbol -> (relpath, BODY) for one source file's definitions.
+
+    Split out from `script_bodies` so the same parse can run over a file's VANILLA text
+    (`vanilla_header`) as well as the injected one -- which is what lets the guard prove it
+    can still SEE the sites it is meant to catch. A gate whose clean run has never been shown
+    to be capable of a dirty one is not evidence (`decisions.md` -> "A check that could not
+    RUN is not a check that passed").
+    """
+    out = {}
+    for match in list(_ARRAY_DEFN.finditer(text)) + list(_GROUP_DEFN.finditer(text)):
+        out.setdefault(match.group(1),
+                       (relpath, _brace_body(text, text.index('{', match.start()))))
+    return out
+
+
+def script_bodies(search_dirs=None):
+    """symbol -> (decomp-relative path, BODY TEXT) for every definition in the decomp sources.
+
+    One pass, memoised, for the same reason `_symbol_index` is: the walk resolves a few
+    hundred symbols across seven hosted chapters, and re-scanning per symbol turned a guard
+    that runs inside every build into a ten-second one.
+
+    Scoped to `src/events` plus `src` because that is where the graph actually closes --
+    measured, not assumed: indexing only `src/events` truncates at six shared helpers
+    (`EventScr_LoadReinforce` and friends) that live in `src/events_script_utils.c` and
+    `src/eventscr.c`.
+    """
+    global _BODIES
+    if search_dirs is None and _BODIES is not None:
+        return _BODIES
+    bodies = {}
+    for rel_dir in (search_dirs or (os.path.join('src', 'events'), 'src')):
+        base = os.path.join(DECOMP, rel_dir)
+        if not os.path.isdir(base):
+            continue
+        for name in sorted(os.listdir(base)):
+            if not (name.endswith('.h') or name.endswith('.c')):
+                continue
+            rel = os.path.join(rel_dir, name)
+            try:
+                with open(os.path.join(DECOMP, rel), encoding='utf-8', errors='replace') as fh:
+                    text = fh.read()
+            except OSError:
+                continue
+            for symbol, found in script_bodies_from(text, rel).items():
+                bodies.setdefault(symbol, found)
+    if search_dirs is None:
+        _BODIES = bodies
+    return bodies
+
+
+def reachable_scripts(roots, bodies=None):
+    """(reached, unresolved) -- every symbol reachable from `roots`, and the scripts among
+    them whose body this could not read.
+
+    `unresolved` is the honest half and the reason this returns a pair. The walk's product is
+    a NEGATIVE -- "nothing reaches that scene" -- and a symbol with no body silently ends its
+    branch, so everything behind it reads unreachable for a reason that proves nothing.
+    Reporting it makes "I could not check" impossible to mistake for "it is fine", which is
+    the same rule `_defining_file` above is written to.
+
+    Only SCRIPT symbols count as unresolved. `traps` and `playerUnitsInNormal` point at
+    TrapData_/UnitDef_ arrays that live outside these directories and carry no script
+    pointers; reporting all 38 of those would bury any real finding.
+    """
+    bodies = script_bodies() if bodies is None else bodies
+    reached, unresolved = set(), set()
+    queue = collections.deque(roots)
+    while queue:
+        symbol = queue.popleft()
+        if symbol in reached:
+            continue
+        reached.add(symbol)
+        found = bodies.get(symbol)
+        if found is None:
+            if _SCRIPT_TOKEN.fullmatch(symbol):
+                unresolved.add(symbol)
+            continue
+        for match in _SCRIPT_TOKEN.finditer(found[1]):
+            if match.group(1) not in reached:
+                queue.append(match.group(1))
+    return reached, unresolved
+
+
+def chapter_script_roots(chapter, hosted=None):
+    """The non-NULL ChapterEventGroup targets a hosted chapter's walk starts from.
+
+    Read from the INJECTED tree, because the whole question is what our build points at --
+    at HEAD every one of these still points at the donor's scenes.
+    """
+    from . import hosts
+    rows = hosted if hosted is not None else hosts.hosted_chapters()
+    row = next((h for h in rows if h.name == chapter), None)
+    if row is None:
+        raise KeyError('%s is not a hosted chapter' % chapter)
+    relpath = header_for(row.event_group)
+    with open(os.path.join(DECOMP, relpath), encoding='utf-8') as fh:
+        ours = initializer(row.event_group, fh.read())
+    return [value for value in ours.values() if value != 'NULL']
 
 
 def vanilla_header(relpath):

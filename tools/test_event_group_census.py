@@ -191,5 +191,73 @@ class UnclassifiedIsABuildFailure(unittest.TestCase):
                 self.assertIn('#29', reason, field)
 
 
+class WhichScriptsAChapterCanActuallyRUN(unittest.TestCase):
+    """The reachability walk behind #398.
+
+    A hosted chapter adopts a vanilla slot whose event-script FILE we edit without rewriting
+    every scene in it, so untouched vanilla scenes sit in our files. `git diff` says the FILE
+    changed, never that a given scene did. Whether one of them still RUNS is a question about
+    pointers: a scene executes only if the chapter's ChapterEventGroup still reaches it.
+    """
+
+    def test_the_walk_follows_a_list_to_the_scripts_it_names(self):
+        bodies = {'L': ('f.h', '{ EventScr_A, EventScr_B, NULL }'),
+                  'EventScr_A': ('f.h', '{ END_MAIN }'),
+                  'EventScr_B': ('f.h', '{ END_MAIN }')}
+        reached, unresolved = event_group.reachable_scripts(['L'], bodies)
+        self.assertEqual({'L', 'EventScr_A', 'EventScr_B'}, reached)
+        self.assertEqual(set(), unresolved)
+
+    def test_the_walk_is_TRANSITIVE_because_a_scene_can_call_another(self):
+        """`SVAL(EVT_SLOT_2, EventScr_X)` then a call through the slot is how four of #398's
+        five sites were reached in vanilla -- an indirect call, but the symbol is still
+        written in the caller's body."""
+        bodies = {'L': ('f.h', '{ EventScr_A }'),
+                  'EventScr_A': ('f.h', '{ SVAL(EVT_SLOT_2, EventScr_B) }'),
+                  'EventScr_B': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}
+        reached, _ = event_group.reachable_scripts(['L'], bodies)
+        self.assertIn('EventScr_B', reached)
+
+    def test_a_script_nothing_points_at_is_NOT_reached(self):
+        bodies = {'L': ('f.h', '{ EventScr_A }'),
+                  'EventScr_A': ('f.h', '{ END_MAIN }'),
+                  'EventScr_Orphan': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}
+        reached, _ = event_group.reachable_scripts(['L'], bodies)
+        self.assertNotIn('EventScr_Orphan', reached)
+
+    def test_a_script_the_walk_cannot_READ_is_reported_not_treated_as_a_leaf(self):
+        """The whole value of this walk is a NEGATIVE -- "nothing reaches that scene". A
+        symbol with no body silently ends its branch, and every scene behind it then reads as
+        unreachable for the one reason that proves nothing. Same rule as `_defining_file`:
+        "I could not check" must never render as "it is fine"."""
+        bodies = {'L': ('f.h', '{ EventScr_Missing }')}
+        reached, unresolved = event_group.reachable_scripts(['L'], bodies)
+        self.assertEqual({'EventScr_Missing'}, unresolved)
+
+    def test_a_non_script_leaf_is_not_reported_unresolved(self):
+        """`traps` and `playerUnitsInNormal` point at TrapData_/UnitDef_ arrays, which live
+        outside src/ and carry no script pointers. Reporting those as unresolved would bury
+        the real finding under 38 of them."""
+        bodies = {'L': ('f.h', '{ TrapData_Event_Ch7 }')}
+        _, unresolved = event_group.reachable_scripts(['L'], bodies)
+        self.assertEqual(set(), unresolved)
+
+
+class TheWalkOverTheLiveTree(unittest.TestCase):
+    def test_every_hosted_chapter_resolves_its_whole_script_graph(self):
+        """Measured, not assumed: the first cut of this walk indexed only `src/events` and
+        truncated at six shared helpers in `src/` (EventScr_LoadReinforce and friends), which
+        is exactly the silent-leaf failure the test above describes."""
+        from inject import hosts
+        bodies = event_group.script_bodies()
+        for chapter in hosts.hosted_chapters():
+            roots = event_group.chapter_script_roots(chapter.name)
+            self.assertTrue(roots, '%s starts from nothing' % chapter.name)
+            _, unresolved = event_group.reachable_scripts(roots, bodies)
+            self.assertEqual(set(), unresolved,
+                             '%s: unreadable scripts make its reachability answer worthless'
+                             % chapter.name)
+
+
 if __name__ == '__main__':
     unittest.main()

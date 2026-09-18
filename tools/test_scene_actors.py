@@ -202,5 +202,116 @@ class TheLOADHalf(unittest.TestCase):
                         '%s resolved to nobody, so a LOAD naming it reads as missing' % ours)
 
 
+
+
+class TheINHERITEDHalf(unittest.TestCase):
+    """#398: the same rule, applied to the scenes we did NOT write.
+
+    Our injectors edit a host slot's event-script FILE without rewriting every scene in it, so
+    untouched vanilla scenes sit in the files we write and `git diff` says only that the FILE
+    changed. The per-write guard above hooks the WRITERS, so it cannot see one. Vanilla stages
+    `CHARACTER_EIRIKA` -- braulo -- in five such scenes, which is the exact soft-lock #337
+    exists to prevent, in code we never wrote.
+
+    The population is different; the rule is the same. A scene LOADs the PCs it stages, whether
+    we wrote it or inherited it.
+    """
+
+    def test_a_reachable_inherited_scene_staging_a_PC_is_a_finding(self):
+        bodies = {'EventListScr_X_Turn': ('ch7-eventscript.h', '{ EventScr_Leftover }'),
+                  'EventScr_Leftover': ('ch7-eventscript.h',
+                                        '{ CUMO_CHAR(CHARACTER_EIRIKA) END_MAIN }')}
+        found = bc.reachable_scenes_staging_unloaded_pcs(
+            roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies)
+        self.assertEqual(1, len(found))
+        self.assertEqual('ch06', found[0].chapter)
+        self.assertEqual('EventScr_Leftover', found[0].script)
+        self.assertEqual('braulo', found[0].unit_id)
+
+    def test_an_UNREACHABLE_inherited_scene_is_not_a_finding(self):
+        """The whole audit: a vanilla scene nothing points at is dead weight, not a bug. Four
+        of #398's five sites lost their only referrer when our injector overwrote the scene
+        that held it."""
+        bodies = {'EventListScr_X_Turn': ('ch7-eventscript.h', '{ END_MAIN }'),
+                  'EventScr_Leftover': ('ch7-eventscript.h',
+                                        '{ CUMO_CHAR(CHARACTER_EIRIKA) END_MAIN }')}
+        self.assertEqual([], bc.reachable_scenes_staging_unloaded_pcs(
+            roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies))
+
+    def test_a_reachable_scene_that_LOADS_its_actor_is_not_a_finding(self):
+        bodies = {'EventListScr_X_Turn': ('f.h', '{ EventScr_Fine }'),
+                  'EventScr_Fine': ('f.h', '{ LOAD1(0x1, UnitDef_Ours) '
+                                           'CUMO_CHAR(CHARACTER_EIRIKA) END_MAIN }')}
+        found = bc.reachable_scenes_staging_unloaded_pcs(
+            roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies,
+            loaded_pids={'UnitDef_Ours': {bc.character_pid('CHARACTER_EIRIKA')}})
+        self.assertEqual([], found)
+
+    def test_a_staged_NON_PC_is_not_a_finding(self):
+        """Scope is PORTRAIT_MAP, for the reason measured on #337: the same rule applied to
+        every staged character flags 73 sites in untouched vanilla, which plainly works.
+        Ravisin is on the map because her chapter's table put her there."""
+        bodies = {'EventListScr_X_Turn': ('f.h', '{ EventScr_Boss }'),
+                  'EventScr_Boss': ('f.h', '{ CUMO_CHAR(0xb8) END_MAIN }')}
+        self.assertEqual([], bc.reachable_scenes_staging_unloaded_pcs(
+            roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies))
+
+    def test_a_script_the_walk_could_not_READ_is_raised_not_passed(self):
+        """A negative result is only worth what the walk could see. An unreadable script ends
+        its branch, and everything behind it then reads unreachable for a reason that proves
+        nothing -- so the guard refuses to return a clean answer it cannot stand behind."""
+        bodies = {'EventListScr_X_Turn': ('f.h', '{ EventScr_Missing }')}
+        with self.assertRaises(SystemExit) as caught:
+            bc.assert_reachable_scenes_load_their_actors(
+                roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies)
+        self.assertIn('EventScr_Missing', str(caught.exception))
+
+
+class TheLiveBuildPassesTheInheritedGuardToo(unittest.TestCase):
+    def test_no_reachable_scene_in_any_hosted_chapter_stages_an_unloaded_PC(self):
+        """#398's answer, re-measured rather than transcribed. Requires an INJECTED tree: on a
+        clean one every field still points at the donor's scenes, which is the state this
+        guard is FOR, not the state it should be read in."""
+        from inject import event_group
+        if not event_group.injected():
+            self.skipTest('decomp is not injected -- the walk would read the donor, not us')
+        self.assertEqual([], bc.reachable_scenes_staging_unloaded_pcs())
+
+    def test_the_guard_FIRES_on_vanilla_which_is_what_makes_the_clean_run_mean_anything(self):
+        """The positive control. Every one of #398's five sites is reachable in vanilla, so a
+        guard that cannot see them there is not measuring anything on our tree either."""
+        from inject import event_group, hosts
+        bodies, seen = {}, set()
+        for _, (rel, _body) in event_group.script_bodies().items():
+            if rel in seen:
+                continue
+            seen.add(rel)
+            try:
+                text = event_group.vanilla_header(rel)
+            except KeyError:
+                continue
+            bodies.update(event_group.script_bodies_from(text, rel))
+
+        # Vanilla's OWN roots, read from the donor's initializer. Naming a root by hand picks
+        # which answer the control gets: `EventListScr_Ch7_Turn` alone misses the site, because
+        # vanilla reaches it from the beginning scene.
+        roots = {}
+        for chapter in hosts.hosted_chapters():
+            rel = event_group.header_for(chapter.event_group)
+            init = event_group.initializer(chapter.event_group,
+                                           event_group.vanilla_header(rel))
+            roots[chapter.name] = [v for v in init.values() if v != 'NULL']
+
+        found = bc.reachable_scenes_staging_unloaded_pcs(roots_by_chapter=roots, bodies=bodies)
+        self.assertTrue(any(f.unit_id == 'braulo' for f in found),
+                        'vanilla stages braulo in reachable scenes and the guard missed it')
+        # The five #398 sites specifically, by the symbol each was reported at.
+        by_script = {f.script for f in found}
+        for site in ('EventScr_Ch2Tutorial22', 'EventScr_089F16EC', 'EventScr_089F1CC4',
+                     'EventScr_089F2AE4', 'EventScr_089F2EBC'):
+            self.assertIn(site, by_script,
+                          '%s is reachable in vanilla and the guard did not flag it' % site)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)
