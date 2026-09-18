@@ -29,6 +29,9 @@ difficulty:
   normal:    2
   difficult: 2
 
+# No fog. Declared rather than inherited (#365).
+fog: none
+
 
 # Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
 # so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list

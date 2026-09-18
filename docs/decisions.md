@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-289 decisions. Read this index, then open the two or three you need — the whole
+290 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -214,7 +214,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0099` | [The parity model prices the YAML; only the EMITTED ROWS are the ROM](decisions/0099-the-parity-model-prices-the-yaml-only-the-emitted.md) | 2026-09-04 | #26 #364 |
 | `0100` | [A load-test that reads the roster before PREP settles is a diagnostic that LIES](decisions/0100-a-load-test-that-reads-the-roster-before-prep.md) | 2026-09-04 | #26 |
 | `0101` | [The asset table is addressed by a u8, so ch06 RECLAIMS a slot rather than appending](decisions/0101-the-asset-table-is-addressed-by-a-u8-so.md) | 2026-09-03 | #26 |
-| `0102` | [A hosted chapter inherits its host slot's FOG, and nothing guards that](decisions/0102-a-hosted-chapter-inherits-its-host-slot-s-fog.md) | 2026-09-03 | #26 |
+| `0102` | [Hosting ch06 on a FOGGED slot is what found the fifth inheritable field](decisions/0102-a-hosted-chapter-inherits-its-host-slot-s-fog.md) | 2026-09-03 | #26 |
 | `0103` | [A chapter declares its traps; .traps is the fourth inherited field](decisions/0103-a-chapter-declares-its-traps-traps-is-the-fourth.md) | 2026-08-22 | #302 |
 | `0104` | [The arena tutorial is safety text, so it plays in every mode](decisions/0104-the-arena-tutorial-is-safety-text-so-it-plays.md) | 2026-08-22 | #303 |
 | `0105` | [Ravisin was holding a bar that had moved](decisions/0105-ravisin-was-holding-a-bar-that-had-moved.md) | 2026-08-22 | #303 |
@@ -429,6 +429,7 @@ session state. `HANDOFF.md` points here._
 | `0283` | [Work that does not depend on other work should not wait for it](decisions/0283-work-that-does-not-depend-on-other-work-should.md) | 2026-09-17 | #382 |
 | `0286` | [ccache cannot wrap this build, and make green is already near its floor](decisions/0286-ccache-cannot-wrap-this-build-and-make-green-is.md) | 2026-09-17 | #382 |
 | `0287` | [A banner is not a domain boundary, and the gate for moving code is its OUTPUT](decisions/0287-a-banner-is-not-a-domain-boundary.md) | 2026-09-17 | #389 |
+| `0290` | [A hosted chapter DECLARES its fog, and that was the last field it could inherit](decisions/0290-a-hosted-chapter-declares-its-fog.md) | 2026-09-17 | #365 |
 
 ---
 

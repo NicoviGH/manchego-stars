@@ -7139,6 +7139,72 @@ def chapter_difficulty_shifts(chap):
     return out
 
 
+# `initialFogLevel` is a u8 (chapterdata.h:36), not a bitfield like the difficulty maluses,
+# so the only hard bound is the byte. Vanilla itself uses exactly two values across all 79
+# slots -- 0 on 74 of them and 3 on five (slots 7, 19, 32, 61, 62) -- so a level is a vision
+# RADIUS in tiles and a small number. 256 is the trap worth naming: it truncates to 0, which
+# reads as "no fog" and looks like somebody meant it.
+FOG_LEVEL_MAX = 255
+FOG_NONE = 'none'            # the declared spelling of zero, so `fog:` is never blank
+
+
+def chapter_fog_level(chap):
+    """A chapter's DECLARED fog level, validated, as the u8 the engine reads (#365).
+
+    Declared in the chapter YAML for the same reason the difficulty triple is: the
+    alternative is inheritance. A hosted chapter keeps whatever `initialFogLevel` its
+    squatted host slot shipped, and vanilla carries fog on five slots -- one of them slot 7,
+    which hosts ch06. ch06 is a route puzzle across concentric water with eight crossings,
+    so three-tile vision would have hidden the entire design while failing nothing.
+
+    ch04 is why this reads from the YAML rather than only guarding inheritance: it WANTS
+    fog, and got it from a literal `3` inside its injector, which means "ch04 is a fogged
+    chapter" was written down nowhere a reader of ch04 would think to look."""
+    if not isinstance(chap, dict):
+        sys.exit('ERROR: a chapter YAML parsed as %r, not a mapping -- an empty or '
+                 'comment-only chapter file reaches every declaration reader this way, so '
+                 'it is refused here rather than crashing on the first `.get`' % type(chap))
+    if 'fog' not in chap:
+        sys.exit('ERROR: chapter %s declares no `fog:` -- a chapter that names none '
+                 'INHERITS its host slot\'s initialFogLevel, which belongs to a different '
+                 'chapter. Declare `fog: none` for no fog, or a vision radius in tiles '
+                 '(vanilla\'s fogged chapters all use 3) (#365)' % chap.get('id', '?'))
+    value = chap['fog']
+    if value == FOG_NONE:
+        return 0
+    if isinstance(value, bool) or not isinstance(value, int) \
+            or not 1 <= value <= FOG_LEVEL_MAX:
+        sys.exit('ERROR: chapter %s declares `fog: %r` -- must be `%s` or a vision radius '
+                 '1..%d. The engine field is a u8, so %d truncates to 0 and reads as no fog '
+                 'at all' % (chap.get('id', '?'), value, FOG_NONE, FOG_LEVEL_MAX,
+                             FOG_LEVEL_MAX + 1))
+    return value
+
+
+def apply_chapter_fog(campaign, verbose=False):
+    """Write every hosted chapter's DECLARED fog level into its own host slot (#365).
+
+    The fifth and last `chapter_settings` field a hosted chapter could inherit unexamined.
+    The other four each got a total pass after something went wrong once: goal text ids
+    (#207), battle grounds (`CHAPTER_BATTLE_TILESETS`), difficulty (#303) and `.traps`
+    (#302). This is the same shape and deliberately TOTAL -- every hosted chapter is
+    mentioned, so "nobody wrote a line for this chapter" stops being reachable."""
+    from inject.hosts import hosted_chapters
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    applied = []
+    for chapter in hosted_chapters():
+        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
+        level = chapter_fog_level(chap)
+        settings['chapters'][chapter.host_index]['initialFogLevel'] = level
+        applied.append((chapter.name, level))
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+    if verbose:
+        print('  fog: %s' % ', '.join('%s=%d' % (n, l) for n, l in applied))
+    return applied
+
+
 def apply_chapter_difficulty(campaign, verbose=False):
     """Write every hosted chapter's DECLARED difficulty triple into its own host slot.
 
@@ -12375,14 +12441,12 @@ def inject_ch04(campaign, boot=False, verbose=True):
         indices, chap['chapter_number'], CH04_EVENT_GROUP,
         (CH04_GOAL_WINDOW_MSG, CH04_GOAL_STATUS_MSG))
 
-    # Fog is chapter state, not painted-map data. The battle GROUND is not set here: every
-    # chapter's is declared once in CHAPTER_BATTLE_TILESETS, because the chapters that ended up
-    # standing on vanilla grass were exactly the ones no injector had written a line for.
-    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
-        settings = json.load(f)
-    settings['chapters'][CH04_HOST_INDEX]['initialFogLevel'] = 3
-    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
+    # Fog is NOT set here any more: ch04 declares `fog: 3` in its own YAML and
+    # `apply_chapter_fog` writes every hosted chapter's declaration (#365). The literal that
+    # used to sit here is the reason -- "ch04 is a fogged chapter" was a fact about the
+    # chapter recorded only inside its injector. Same argument as the battle GROUND, which is
+    # declared once in CHAPTER_BATTLE_TILESETS because the chapters left standing on vanilla
+    # grass were exactly the ones no injector had written a line for.
 
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
     for uid, _slot, ce, _dce, _level in cast:
@@ -14229,21 +14293,12 @@ def inject_ch06(campaign, boot=False, verbose=True):
         % CH06_GOAL_DONOR, indices, chap['chapter_number'], CH06_EVENT_GROUP,
         (CH06_GOAL_WINDOW_MSG, CH06_GOAL_STATUS_MSG))
 
-    # Fog is chapter state, and slot 7 SHIPS `initialFogLevel: 3` -- vanilla Ch7 is a fogged
-    # chapter. ch06 declares `fog: none` and means it: our donor puts 40% of the map in
-    # concentric water with eight crossings, so the route is the puzzle and it is one the
-    # player is meant to be able to see and solve. Inheriting the host slot's fog would have
-    # been invisible in every gate and would have hidden the whole design (cf. ch04, which
-    # writes this field for the opposite reason). Read from the YAML rather than pinned here,
-    # so the declaration is what decides.
-    if chap.get('fog') not in ('none', None):
-        sys.exit('ERROR: ch06 declares fog %r, but the injector only knows how to write '
-                 '`none` -- author the level here before declaring it' % chap.get('fog'))
-    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
-        settings = json.load(f)
-    settings['chapters'][CH06_HOST_INDEX]['initialFogLevel'] = 0
-    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
+    # Fog is not written here any more either -- `apply_chapter_fog` writes ch06's declared
+    # `fog: none` along with every other hosted chapter's (#365). This block is what the
+    # generalisation was built from: slot 7 SHIPS `initialFogLevel: 3` (vanilla Ch7 is fogged),
+    # and ch06's donor puts 40% of the map in concentric water with eight crossings, so the
+    # route is the puzzle and one the player is meant to see and solve. Inheriting three-tile
+    # vision would have hidden the entire design and failed nothing.
 
     # 2. Rosters. The cap template is NEVER LOADed -- PREP reads its entry count (the cap) and
     #    the YAML's deploy_slots tiles, then redeploys the player's picks (cf. ch03/ch04/ch05).
@@ -15093,6 +15148,12 @@ def main():
         # the donor's (#303). Order-independent against _retarget_host_chapter (which does
         # not touch these fields), but running it last keeps "what the slot carries" one
         # decision made in one place.
+        # Fog is the fifth and last chapter_settings field that could be inherited unexamined
+        # (#365). Two injectors wrote it inline and five chapters kept whatever their squatted
+        # slot shipped -- including ch06, whose host slot 7 is one of vanilla's five FOGGED
+        # slots. Total pass, so "no injector wrote a line for this chapter" is unreachable.
+        print('fog (#365):')
+        apply_chapter_fog(args.campaign, verbose=True)
         print('difficulty modes (#303):')
         apply_chapter_difficulty(args.campaign, verbose=True)
         # Same pass, same reason: `.traps` is a ChapterEventGroup field our injectors fill

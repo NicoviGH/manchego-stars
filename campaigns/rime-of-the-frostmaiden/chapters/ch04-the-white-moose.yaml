@@ -31,6 +31,15 @@ difficulty:
   normal:    2
   difficult: 3
 
+# FOG, three tiles -- the hunt gimmick, and the whole reason this chapter reads as the tone
+# shift to monsters: the white hide is hard to spot in a snowbound forest. This is a real
+# divergence from the twin rather than parity: vanilla Ch4 carries no fog, and we layer it
+# on its map instead of borrowing the Ch11 fog maps, because fog is chapter state and not a
+# map feature (this file's own header says so). Three is the level every one of vanilla's
+# five fogged slots uses. It lived as a literal `3` inside inject_ch04 until #365, so the
+# fact that ch04 is a FOGGED CHAPTER was written nowhere a reader of ch04 would look.
+fog: 3
+
 
 # Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
 # so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list
@@ -72,7 +81,10 @@ map:
   file: maps/ch04-lonelywood-forest.mar
   tileset: snowy-bern           # shared winter set; preserves vanilla Ch4 geometry + forest sequences
   size: "15×15"                 # exact vanilla Ch4 footprint (Ancient Horrors twin)
-  fog_of_war: true              # vanilla FE fog — the hunt gimmick: the white hide is hard to spot
+  # (fog is NOT map data -- it is chapter state, declared once as this file's top-level
+  #  `fog:` and written to the host slot by apply_chapter_fog. A `fog_of_war: true` here
+  #  said the same thing in a second vocabulary, could not carry the LEVEL, and was read
+  #  by nothing (#365).)
   description: >
     Dense, snowbound forest under fog of war (limited vision). Tree tiles give
     avoid on the approach; a few clearings expose the party. Monsters hold the

@@ -7048,6 +7048,93 @@ class ChapterDifficulty(unittest.TestCase):
         self.assertEqual(bc.chapter_difficulty_shifts(chap)['normal'], 2)
 
 
+class ChapterFog(unittest.TestCase):
+    """#365: `initialFogLevel` was the last chapter_settings field with no total pass.
+
+    Two chapters wrote it inline and the other five inherited whatever their squatted host
+    slot shipped. That is survivable right up until it isn't: vanilla carries fog on five
+    slots, one of which is SLOT 7 -- ch06's host -- and ch06's whole design is a route
+    puzzle across concentric water with eight crossings. Inheriting three-tile vision
+    would have hidden the map, failed nothing, and shipped.
+
+    ch04 is the other half of the argument. It wanted fog and got it from a literal `3`
+    inside its injector, so the fact that ch04 is a FOGGED CHAPTER was written down nowhere
+    a reader of ch04 would look.
+    """
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _chap(self, name):
+        from inject import hosts
+        for chapter in hosts.hosted_chapters():
+            if chapter.name == name:
+                return bc._load_chapter_yaml(self.CAMPAIGN,
+                                             bc.chapter_yaml_for(chapter.name))
+        self.fail('%s is not a hosted chapter' % name)
+
+    def test_every_hosted_chapter_declares_its_fog(self):
+        """Total, like the difficulty triple -- not "only the ones whose donor has fog"."""
+        from inject import hosts
+        for chapter in hosts.hosted_chapters():
+            chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.chapter_yaml_for(chapter.name))
+            level = bc.chapter_fog_level(chap)
+            self.assertIsInstance(level, int, chapter.name)
+
+    def test_ch06_declares_none_and_that_means_zero(self):
+        self.assertEqual(0, bc.chapter_fog_level(self._chap('ch06')))
+
+    def test_ch04s_fog_is_declared_in_its_yaml_not_pinned_in_its_injector(self):
+        """The literal that used to live in inject_ch04, now a fact about the chapter."""
+        self.assertEqual(3, bc.chapter_fog_level(self._chap('ch04')))
+
+    def test_a_chapter_that_declares_nothing_is_refused(self):
+        with self.assertRaises(SystemExit) as caught:
+            bc.chapter_fog_level({'id': 'chXX'})
+        self.assertIn('fog', str(caught.exception))
+
+    def test_a_level_wider_than_the_engine_field_is_refused(self):
+        """initialFogLevel is a u8 (chapterdata.h:36), so 256 silently truncates to 0 --
+        which reads as "no fog" and is the one wrong answer that looks deliberate."""
+        with self.assertRaises(SystemExit):
+            bc.chapter_fog_level({'id': 'chXX', 'fog': 256})
+
+    def test_a_nonsense_declaration_is_refused_rather_than_coerced(self):
+        for bad in ('thick', True, 1.5, -1):
+            with self.assertRaises(SystemExit):
+                bc.chapter_fog_level({'id': 'chXX', 'fog': bad})
+
+    def test_the_write_pass_lands_each_chapters_declared_fog_on_its_own_slot(self):
+        from inject import hosts
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, 'chapter_settings.json')
+            with open(path, 'w', encoding='utf-8') as f:
+                json.dump(vanilla, f)
+            original = bc.CHAPTER_SETTINGS_JSON
+            bc.CHAPTER_SETTINGS_JSON = path
+            try:
+                bc.apply_chapter_fog(self.CAMPAIGN)
+            finally:
+                bc.CHAPTER_SETTINGS_JSON = original
+            with open(path, encoding='utf-8') as f:
+                written = json.load(f)
+        for chapter in hosts.hosted_chapters():
+            chap = bc._load_chapter_yaml(self.CAMPAIGN, bc.chapter_yaml_for(chapter.name))
+            self.assertEqual(bc.chapter_fog_level(chap),
+                             written['chapters'][chapter.host_index]['initialFogLevel'],
+                             chapter.name)
+
+    def test_ch06_stops_inheriting_slot_sevens_fog(self):
+        """The founding case, pinned as the two numbers that differ."""
+        from inject import hosts
+        vanilla = json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+        host = next(c.host_index for c in hosts.hosted_chapters() if c.name == 'ch06')
+        self.assertEqual(3, vanilla['chapters'][host]['initialFogLevel'],
+                         'slot 7 is supposed to be the fogged donor that made this a bug')
+        self.assertEqual(0, bc.chapter_fog_level(self._chap('ch06')))
+
+
+
 class RawPidBossBaseLevel(unittest.TestCase):
     """A raw-pid boss must declare `baseLevel`, or the difficulty malus wipes its line.
 

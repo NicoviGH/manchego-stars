@@ -34,6 +34,10 @@ difficulty:
   normal:    2
   difficult: 3
 
+# No fog, as this chapter has said in prose twice: the tension is the escort plus the
+# eruption race, not obscured vision. Declared rather than inherited (#365).
+fog: none
+
 
 # Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
 # so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list
