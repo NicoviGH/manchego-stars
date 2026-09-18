@@ -216,7 +216,7 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
      the next regen silently discards it, and tools/test_exp_curve.py fails the
      build while it is stale. -->
 
-| chapter | bar | field | exp ours/twin | benched | typical | fed | newest |
+| chapter | bar | field | exp ours/twin | benched | typical | fed | lowest |
 |---|---|---|---|---|---|---|---|
 | ch00 † | FE8 Prologue | 2 | 152 / 147 (x1.03) | L1 | **L1** | L1 | -- |
 | ch01 | FE8 Ch1 | 4 | 370 / 378 (x0.98) | L1 | **L1** | L3 | -- |
@@ -227,10 +227,9 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
 | ch06 | FE8 Ch6 | 10 | 1078 / 1078 (x1.00) | L3 | **L6** | L12 | L1 |
 
 **Entering ch07 the party is L6** -- L3 for a founding unit that rides the bench,
-L12 for one fed every kill, and **L1 for the newest thing recruited into it** --
-a recruit starts at the level its chapter PLACES it at, which is 1 for everyone
-joined off-map or by the recruit pass and 5 for sahnar, whom ch05 places at her
-donor's own level.
+L12 for one fed every kill, and **L1 for the lowest-level recruit on the field**.
+A recruit starts at the level its own chapter PLACES it at:
+L1 for trex, baxby, lupin and basil; L5 for sahnar.
 
 The same cast fed each chapter's VANILLA twin instead of ours reaches **L6** over
 the same span: the party lands where FE8's party lands, which is what makes the
@@ -245,10 +244,11 @@ more for the same body.
 
 **Who is in the party, and when.** A unit earns from the chapter AFTER the one that recruits
 it (`build_campaign.recruit_chapter_number` — the same answer `cast_available_at` sizes the
-deploy caps from), starting at **the level its chapter places it at**: 1 for a recruit joined
-off-map or by the recruit pass, and 5 for sahnar, whom ch05's own roster places at Joshua's
-level because she is his archetype. The `newest` column is the floor a chapter actually has to
-be survivable for. `benched` / `typical` / `fed` are three shares of
+deploy caps from), starting at **the level its chapter places it at** — 1 for a recruit joined
+off-map or by the recruit pass, and higher for one its roster places itself, which the block
+above states per unit. The `lowest` column is the floor a chapter actually has to be survivable
+for: it is a MINIMUM over the recruits on the field, not "the newest", because once a recruit
+can join above level 1 those stop being the same unit. `benched` / `typical` / `fed` are three shares of
 one career and are read over the FOUNDING party only: mixing a ch05 recruit into the low edge
 pins it at L1 for every chapter after a recruitment, which stops being a statement about how
 much a unit is fed and becomes one about when it joined.

@@ -277,29 +277,42 @@ def vanilla_bodies(parity_ref):
             for u in units]
 
 
-def join_level(campaign, uid):
+_UNSET = object()
+
+
+def join_level(campaign, uid, unit=None, recruited=_UNSET):
     """The level a unit is ON THE FIELD at when it joins.
 
     Two statements of this exist and the ROM reads the more specific one. A recruit PLACED by
     its recruit chapter's own roster carries that entry's level -- sahnar is placed RED at
     LEVEL 5, Joshua's level, cited to his bytes, because she is his archetype and vanilla's
     Joshua joins at 5 -- and `UnitInitFromDefinition` takes `unit->level` straight from that
-    UnitDefinition. The unit YAML's `fe_stats.level` writes CharacterData.baseLevel, which for
-    a placed recruit the engine reads only through `UnitAutolevelRealistic`, and no player
-    recruit of ours sets `autolevel`. A recruit with no roster placement (basil, trex, lupin,
-    baxby -- joined by the recruit pass or off-map) has only the YAML number, so that is what
-    it starts at.
+    UnitDefinition. The unit YAML's `fe_stats.level` writes CharacterData.baseLevel, which the
+    engine reads on two paths a placed player recruit of ours takes neither of:
+    `UnitAutolevelRealistic` (needs `.autolevel`, which no player recruit of ours sets) and
+    `UnitAutolevelPenalty` (the difficulty-mode shift, which `eventscr.c` applies only from pid
+    0x3C up). A recruit with no roster placement -- basil, trex, lupin, baxby, joined by the
+    recruit pass or off-map -- has only the YAML number, so that is what it starts at.
+
+    Searched across EVERY placing key, not just the enemy ones: GREEN is the default recruit
+    flavour, so the next green recruit given its own entry would otherwise fall back to the
+    YAML silently -- which is the error this function exists to fix, one key over.
     """
-    unit = bc.load_unit(campaign, uid)
-    recruited = bc.recruit_chapter_number(campaign, dict(unit, id=uid))
+    unit = bc.load_unit(campaign, uid) if unit is None else unit
+    # `recruited` is passed by `party_classes`, which has just computed it; a caller that
+    # has not gets it looked up. A founding unit's is genuinely None, so the two cases need
+    # a sentinel rather than a falsy default -- reading None as "not a recruit" is what made
+    # this return 1 for sahnar the first time.
+    if recruited is _UNSET:
+        recruited = bc.recruit_chapter_number(campaign, dict(unit, id=uid))
     if recruited is not None:
-        chapter = next((c for c in bc.hosted_chapters()
-                        if c.number == int(recruited)), None)
+        chapter = next((c for c in bc.hosted_chapters() if c.number == int(recruited)), None)
         if chapter is not None:
             chap = bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))
-            placed = bc._entry_base_level_in(chap, uid)
-            if placed is not None:
-                return int(placed)
+            placed = [max(bc.entry_body_levels(ed)) for ed in bc.placed_entries(chap)
+                      if ed.get('id') == uid]
+            if placed:
+                return int(placed[0])
     return int((unit.get('fe_stats') or {}).get('level') or 1)
 
 
@@ -318,7 +331,7 @@ def party_classes(campaign):
         recruited = bc.recruit_chapter_number(campaign, unit)
         out.append((uid, bc.class_enum_for(unit),
                     0 if recruited is None else int(recruited) + 1,
-                    join_level(campaign, uid)))
+                    join_level(campaign, uid, unit, recruited)))
     return out
 
 
@@ -484,10 +497,12 @@ def simulate(campaign='rime-of-the-frostmaiden'):
         # ratio is never contaminated by the two curves having drifted apart.
         pot = field_pot(ours, bodies, number)
         twin_pot = field_pot(ours, twin, number) if twin is not None else None
-        # The recruit floor, read at the START of the chapter: every recruit joins at level
-        # 1, so the newest unit ON THE FIELD here is one this chapter has to be survivable
-        # for. None until somebody has joined.
-        newest = min([c.level for c in ours if c.joins and number >= c.joins] or [None])
+        # The recruit floor, read at the START of the chapter: the LOWEST level among the
+        # recruits on the field, which is the number a chapter's survivability has to clear.
+        # Deliberately a minimum and not "the newest": once a recruit can join above level 1
+        # -- sahnar joins at 5 -- the newest and the lowest stop being the same unit, and it
+        # is the lowest that the design question is about. None until somebody has joined.
+        lowest = min([c.level for c in ours if c.joins and number >= c.joins] or [None])
         if banks:
             for career in ours + lead + tail:
                 career.fight(bodies, cap, number)
@@ -513,7 +528,7 @@ def simulate(campaign='rime-of-the-frostmaiden'):
             'level_after_exact': _mean_level_exact(_founding(ours)),
             'band_low': min(c.level for c in _founding(tail)),
             'band_high': max(c.level for c in _founding(lead)),
-            'newest': newest,
+            'lowest_recruit': lowest,
             # Read over the FOUNDING careers, exactly as `level_after` is -- comparing a
             # mean over one population against a mean over another says nothing.
             'twin_level_after': (_mean_level(_founding(twin_party))
@@ -534,6 +549,23 @@ def _mean_level(careers):
 # The generated block in docs/fe8-pacing-reference.md.
 # ---------------------------------------------------------------------------------------
 
+def _join_levels_phrase(campaign):
+    """"L1 for baxby, trex, lupin and basil; L5 for sahnar" -- DERIVED.
+
+    The block is generated, so every statement in it has to be a reading of the data. A
+    sentence that names a level in prose goes stale the moment a chapter is retuned, and the
+    freshness test cannot see it because it compares the doc against this same function."""
+    by_level = {}
+    for uid, _cls, joins, level in party_classes(campaign):
+        if joins:
+            by_level.setdefault(level, []).append(uid)
+    parts = []
+    for level, uids in sorted(by_level.items()):
+        names = ', '.join(uids[:-1]) + ' and ' + uids[-1] if len(uids) > 1 else uids[0]
+        parts.append('L%d for %s' % (level, names))
+    return '; '.join(parts)
+
+
 def render(rows=None, campaign='rime-of-the-frostmaiden'):
     """The generated block, fences included. Everything it states is a column of `simulate`
     -- there is no prose here that the model cannot recompute."""
@@ -542,7 +574,7 @@ def render(rows=None, campaign='rime-of-the-frostmaiden'):
            '<!-- Derived from FE8\'s own exp formulas over the real rosters. Do not hand-edit:',
            '     the next regen silently discards it, and tools/test_exp_curve.py fails the',
            '     build while it is stale. -->', '',
-           '| chapter | bar | field | exp ours/twin | benched | typical | fed | newest |',
+           '| chapter | bar | field | exp ours/twin | benched | typical | fed | lowest |',
            '|---|---|---|---|---|---|---|---|']
     for r in rows:
         ratio = ('%d / %d (x%.2f)' % (round(r['pot']), round(r['twin_pot']), r['yield_ratio'])
@@ -551,7 +583,8 @@ def render(rows=None, campaign='rime-of-the-frostmaiden'):
                    % (r['id'].split('-')[0], '' if r['banks'] else ' †',
                       r['reference'] or '--', r['field_cap'], ratio,
                       r['band_low'], r['level_after'], r['band_high'],
-                      ('L%d' % r['newest']) if r['newest'] is not None else '--'))
+                      ('L%d' % r['lowest_recruit'])
+                      if r['lowest_recruit'] is not None else '--'))
     last = rows[-1]
     nxt = 'ch%02d' % (last['chapter_number'] + 1)
     twin = ('L%d' % last['twin_level_after'] if last['twin_level_after'] is not None
@@ -560,11 +593,11 @@ def render(rows=None, campaign='rime-of-the-frostmaiden'):
     out += ['',
             '**Entering %s the party is L%d** -- L%d for a founding unit that rides the bench,'
             % (nxt, last['level_after'], last['band_low']),
-            'L%d for one fed every kill, and **L%s for the newest thing recruited into it** --'
-            % (last['band_high'], last['newest'] if last['newest'] is not None else '?'),
-            'a recruit starts at the level its chapter PLACES it at, which is 1 for everyone',
-            'joined off-map or by the recruit pass and 5 for sahnar, whom ch05 places at her',
-            'donor\'s own level.', '',
+            'L%d for one fed every kill, and **L%s for the lowest-level recruit on the field**.'
+            % (last['band_high'],
+               last['lowest_recruit'] if last['lowest_recruit'] is not None else '?'),
+            'A recruit starts at the level its own chapter PLACES it at:',
+            _join_levels_phrase(campaign) + '.', '',
             'The same cast fed each chapter\'s VANILLA twin instead of ours reaches **%s** over'
             % twin,
             'the same span: the party lands where FE8\'s party lands, which is what makes the',
@@ -602,13 +635,14 @@ def print_table(rows):
     print(bar)
     print('  %-24s %-13s %6s %8s %8s   %s'
           % ('chapter', 'bar', 'field', 'exp', 'vs twin',
-             'founding party after (low/typical/high) + newest'))
+             'founding party after (low/typical/high) + lowest recruit'))
     for r in rows:
         print('  %-24s %-13s %6d %8d %8s   L%-2d L%-2d L%-3d %-8s%s'
               % (r['id'][:24], (r['reference'] or '--')[:13], r['field_cap'], round(r['pot']),
                  ('x%.2f' % r['yield_ratio']) if r['yield_ratio'] else '--',
                  r['band_low'], r['level_after'], r['band_high'],
-                 ('newest L%d' % r['newest']) if r['newest'] is not None else '',
+                 ('lowest recruit L%d' % r['lowest_recruit'])
+                 if r['lowest_recruit'] is not None else '',
                  '' if r['banks'] else '   (fixed roster -- the party banks none of it)'))
 
 
