@@ -72,6 +72,21 @@ class Ruling(unittest.TestCase):
                 declared={'battleTileSet': 'a reason nobody needs'})
         self.assertIn('stale', str(e.exception))
 
+    def test_a_reason_NO_chapter_needs_is_stale_and_fails_in_the_BUILD(self):
+        """The stale-declaration check has to run where the build runs it, not only where a
+        test passes `declared=`. It fires only when NO chapter inherits the field, because a
+        field one chapter writes and another inherits still needs its reason."""
+        with self.assertRaises(SystemExit) as e:
+            cd.assert_census_declared(
+                censuses={'ch05': {'initialWeather': cd.WRITTEN},
+                          'ch06': {'initialWeather': cd.WRITTEN}})
+        self.assertIn('stale', str(e.exception))
+
+    def test_a_reason_ANOTHER_chapter_still_needs_is_not_stale(self):
+        self.assertTrue(cd.assert_census_declared(
+            censuses={'ch05': {'initialWeather': cd.WRITTEN},
+                      'ch06': {'initialWeather': cd.INHERITED}}))
+
     def test_a_field_upstream_ADDS_tomorrow_fails_until_somebody_rules(self):
         with self.assertRaises(SystemExit) as e:
             cd.assert_census_declared(
@@ -89,6 +104,13 @@ class IntroCamera(unittest.TestCase):
 
     def test_every_hosted_chapters_inherited_camera_tile_is_inside_its_map(self):
         self.assertEqual([], cd.intro_camera_out_of_bounds())
+
+    def test_the_map_size_is_actually_READ(self):
+        """The check is only a measurement if it finds the map. Reading a key the layout
+        JSONs do not carry returns None for every chapter, `out_of_bounds` returns [] for all
+        of them, and the test above passes while measuring nothing -- which is what it did."""
+        self.assertEqual((22, 22), cd._map_size('ch06'))
+        self.assertEqual((15, 10), cd._map_size('prologue'))
 
     def test_a_camera_tile_past_the_map_edge_is_reported(self):
         self.assertEqual(
@@ -135,6 +157,24 @@ class PassOwnership(unittest.TestCase):
             self.assertIn(leaf, src,
                           '%s claims `%s` writes it, and that pass never names %r'
                           % (field, pass_name, leaf))
+
+    def test_the_prologue_is_not_credited_to_the_pass_it_never_calls(self):
+        """`_retarget_host_chapter` is called by the six chapter injectors and NOT by
+        `inject_prologue` -- the prologue runs on the slot it was given (inject/hosts.py),
+        which is why the event-group census declares nine of its fields inherited for that
+        same reason. Crediting it here would skip the ruling on every field that pass owns,
+        `prepScreenNumber` included: the prologue keeps vanilla's 2."""
+        self.assertIsNone(cd.owner_for('prologue', 'prepScreenNumber'))
+        self.assertEqual('_retarget_host_chapter',
+                         cd.owner_for('ch03', 'prepScreenNumber'))
+
+    def test_what_the_prologue_DOES_write_is_still_owned(self):
+        self.assertEqual('inject_prologue', cd.owner_for('prologue', 'map.mainLayerId'))
+        self.assertEqual('inject_prologue', cd.owner_for('prologue', 'fadeToBlack'))
+
+    def test_a_total_pass_covers_the_prologue_too(self):
+        for field in ('initialFogLevel', 'battleTileSet', 'normalModeLevelMalus'):
+            self.assertIsNotNone(cd.owner_for('prologue', field), field)
 
     def test_no_field_is_both_owned_and_declared_inherited(self):
         both = sorted(set(cd.OWNED_BY_PASS) & set(cd.DECLARED_INHERITED))

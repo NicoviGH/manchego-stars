@@ -137,6 +137,41 @@ OWNED_BY_PASS = dict(
      ('difficultModeLevelBonus', 'apply_chapter_difficulty'),
      ('battleTileSet', 'inject_battle_platforms')])
 
+# The prologue is the exception, and it is the same exception the event-group census records:
+# it does NOT retarget its host slot (inject/hosts.py) -- it runs on the slot it was given and
+# writes the map and the fade directly. So it calls none of `_retarget_host_chapter`'s twelve
+# writes, and crediting that pass for every chapter would skip the ruling on four fields the
+# prologue really does inherit, `prepScreenNumber` among them.
+PROLOGUE = 'prologue'
+PROLOGUE_WRITES = tuple(['map.' + f for f in
+                         ('obj1Id', 'obj2Id', 'paletteId', 'tileConfigId', 'mainLayerId',
+                          'objAnimId', 'paletteAnimId', 'changeLayerId')] + ['fadeToBlack'])
+
+# pass -> the chapters it covers, or None for "every hosted chapter". The three TOTAL passes
+# iterate `hosted_chapters()` and so cover all of them by construction; that is what "total"
+# was for (#365, #303, `CHAPTER_BATTLE_TILESETS`).
+PASS_COVERS = {
+    '_retarget_host_chapter': None,     # narrowed below: every hosted chapter but the prologue
+    'inject_prologue': (PROLOGUE,),
+    'apply_chapter_fog': None,
+    'apply_chapter_difficulty': None,
+    'inject_battle_platforms': None,
+}
+
+
+def owner_for(chapter, field):
+    """The pass that WRITES this field for this chapter, or None if nobody does.
+
+    Chapter-aware, because `_retarget_host_chapter` is not called by every injector. A census
+    that answered this globally would mark a field written for a chapter whose injector never
+    touches it -- which is the failure class this whole guard exists for, inside the guard.
+    """
+    if chapter == PROLOGUE:
+        return 'inject_prologue' if field in PROLOGUE_WRITES else (
+            None if OWNED_BY_PASS.get(field) == '_retarget_host_chapter'
+            else OWNED_BY_PASS.get(field))
+    return OWNED_BY_PASS.get(field)
+
 
 # --- the ruling --------------------------------------------------------------------------
 #
@@ -276,9 +311,24 @@ def reason_for(chapter, field):
     return per.get(field) or DECLARED_INHERITED.get(field)
 
 
-# chapter -> {field: reason}, consulted before the shared table. Empty today: every hosted
-# chapter inherits the same set, because they all squat slots of the same vanilla shape.
-DECLARED_INHERITED_BY_CHAPTER = {}
+# chapter -> {field: reason}, consulted before the shared table above.
+DECLARED_INHERITED_BY_CHAPTER = {
+    # The prologue does not retarget its slot, so the two fields `_retarget_host_chapter`
+    # writes that `inject_prologue` does not are genuinely inherited here. Both are safe, and
+    # both name what would make them unsafe.
+    PROLOGUE: {
+        'mapEventDataId':
+            'the prologue keeps the slot\'s own event group (Ch1Events) and writes its scenes '
+            'into that slot\'s scripts -- it does not retarget (inject/hosts.py), which is the '
+            'same fact event_group.DECLARED_INHERITED_BY_CHAPTER records for nine of its '
+            'fields. Retargeting the prologue means writing this.',
+        'prepScreenNumber':
+            'the double-wide glyph index the PREP header reads. The prologue has no prep '
+            'screen -- prep is standing protocol from ch01 on (AGENTS.md / decisions.md), and '
+            'the prologue is a fixed two-guest tutorial -- so nothing reads vanilla\'s 2. A '
+            'prologue that gains prep writes it.',
+    },
+}
 
 
 def assert_census_declared(censuses=None, declared=None, hosted=None):
@@ -302,7 +352,7 @@ def assert_census_declared(censuses=None, declared=None, hosted=None):
     problems = []
     for chapter, verdicts in sorted(censuses.items()):
         for field, verdict in sorted(verdicts.items()):
-            owner = OWNED_BY_PASS.get(field)
+            owner = owner_for(chapter, field)
             reason = (declared.get(field) if declared is not None
                       else reason_for(chapter, field))
             if field not in known:
@@ -324,9 +374,19 @@ def assert_census_declared(censuses=None, declared=None, hosted=None):
                 problems.append('%s carries no `%s` at all, so the generated struct takes '
                                 'whatever json2c defaults it to -- a third answer nobody '
                                 'chose. Declare it or write it.' % (chapter, field))
-            elif verdict == WRITTEN and reason and declared is not None:
-                problems.append('%s WRITES `%s` but still declares a reason to inherit it -- '
-                                'the declaration is stale' % (chapter, field))
+    # A reason NO chapter needs any more is stale, and this runs in the BUILD rather than only
+    # where a test passes `declared=`: a declaration nobody needs is a declaration nobody
+    # rechecks. It asks the whole census rather than one row, because a field one chapter
+    # WRITES and another INHERITS still needs its reason -- that is the ordinary case here.
+    for field in sorted(set().union(*(set(v) for v in censuses.values())) if censuses else ()):
+        reason = (declared.get(field) if declared is not None
+                  else DECLARED_INHERITED.get(field))
+        if not reason:
+            continue
+        verdicts = [v.get(field) for v in censuses.values() if field in v]
+        if verdicts and all(v == WRITTEN for v in verdicts):
+            problems.append('`%s` is WRITTEN by every hosted chapter and still declares a '
+                            'reason to inherit it -- the declaration is stale' % field)
     if problems:
         sys.exit('ERROR: ROMChapterData census (#396):\n  - ' + '\n  - '.join(problems))
     return True
@@ -342,9 +402,8 @@ def _map_size(chapter_name, campaign='rime-of-the-frostmaiden'):
     for path in sorted(glob.glob(pattern)):
         with open(path, encoding='utf-8') as fh:
             data = json.load(fh)
-        rows = data.get('layout') or data.get('tiles')
-        if isinstance(rows, list) and rows:
-            return len(rows[0]), len(rows)
+        if 'width' in data and 'height' in data:
+            return int(data['width']), int(data['height'])
     return None
 
 
