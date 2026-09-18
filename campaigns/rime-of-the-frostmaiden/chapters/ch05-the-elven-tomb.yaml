@@ -766,9 +766,12 @@ enemy_units:
 # ever takes a turn. Only three things below it carry real triggers, exactly as vanilla wires
 # them: 9C5 anatomy = a mid-battle turn event (`EventScr_089F22A4`), 9C6 = a Talk
 # (`EventScr_089F2270`), 9C9 = `EventScr_Ch5_EndingScene`.
-# CHANNEL drives the LINE WIDTH we hand-box to: on-map bubbles wrap at 29 chars, Text_BG at
-# ~42. Vanilla puts the two command scenes on a backdrop because they happen elsewhere -- which
-# is why our 9BC/9BD (Sephek's briefing, Ravisin's errand) are backdrop scenes too.
+# CHANNEL DOES NOT DRIVE THE LINE WIDTH (corrected by #298). Both geometries were measured
+# against what vanilla ships and they AGREE: one budget, `fe8_talk_font.TALK_BUDGET_PX` (203px),
+# read off the widest line in the tighter of the two. Every box below is hand-boxed to that,
+# and `make scene SCENE=ch05/<n>` draws each line against it. What the channel decides is
+# STAGING: vanilla puts the two command scenes on a backdrop because they happen elsewhere --
+# which is why our 9BC/9BD (Sephek's briefing, Ravisin's errand) are backdrop scenes too.
 #
 # SLOT-ID CAVEAT (2026-07-29, CORRECTED same day): Ch5's messages live in TWO places, and an
 # eventscript-only grep sees just one -- which produced a wrong caveat here (that 9C6/9C7/9C8
@@ -1095,7 +1098,8 @@ events:
       introduced). LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas). Hand-boxed to GBA
       width. Wiring: Basil enters green, converts to a player unit on the join.
       WIRED 2026-08-14 (#25) at host id 0x9EE, no-Lupin arm at 0x9EF. The opening's FIRST on-map
-      beat, so it wraps at the talk bubble's 29 and not the backdrop scenes' 42.
+      beat — which is a staging fact and not a width one: both channels share one pixel
+      budget (#298).
       PLACEMENT is the one thing this scene does NOT inherit from its twin. Vanilla plays 0x9C2
       before its prep CALL because it LOAD1s Eirika's group onto the street first; our party is
       placed BY prep (the ally table is never LOADed on a prep chapter), so before the CALL the
@@ -1124,8 +1128,7 @@ events:
         whole revelation. Arguably the purer version — it needs no other unit to exist.
         Boxes 1 and 3 are unchanged in both branches.
       # ONE replaced box, TWO boxes of substitute — the nested list is the shape that says so.
-      # The line was chosen as PROSE and is 74 characters; this scene is the opening's first
-      # ON-MAP beat, so it wraps at the talk bubble's 29 and not the backdrop scenes' 42, and it
+      # The line was chosen as PROSE and runs well past one drawn line at any podium, so it
       # simply does not fit one box. Left flowed, the wrapper picked the A-press for us and put it
       # mid-clause ("You just-- came" / "here. On your own."), which is the failure the reliquary
       # lines already taught: the authored A-press breaks ARE the pacing.
@@ -1158,7 +1161,7 @@ events:
       not free a prisoner, he tells her what she is actually defending.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 6 boxes.
       WIRED 2026-08-14 (#25) at host id 0x9F0, as a PLAIN ON-MAP BUBBLE — the twin's channel
-      taken whole, wrapping at 29. It only became affordable that day: while Sahnar was a
+      taken whole. It only became affordable that day: while Sahnar was a
       turn-2 riser there was nothing on the field for a bubble to anchor to, and this scene was
       priced as needing a BACKDROP of its own. Ravisin's scene-3 summon puts her on the arena
       tile from turn 1, so the beat is vanilla's 0x9C3 exactly — CUMO_AT(12, 6), STAL/CURE, the
@@ -1168,7 +1171,7 @@ events:
       NO no_lupin_fallback: she has never met the wolf and never mentions him, so this is one
       arm and one id.
       ONE BOX GAINED AN AUTHORED A-PRESS, and the wording is untouched — 7 presses, not 6. The
-      scene was boxed against the backdrop's 42 and now plays at the bubble's 29, and "No one
+      scene was boxed for a backdrop and now plays in a bubble, and "No one
       ever came. I stopped counting somewhere in the middle." is 60 characters: it needs three
       lines and a box holds two. Left flowed, the wrapper chose the A-press for us and put it
       mid-clause ("I stopped counting somewhere in the" / "middle."), which is the failure the
@@ -1229,7 +1232,7 @@ events:
       Not deferred, not homeless: cut. Her nerve is not a beat this chapter needs stated, and 0x9BB
       already establishes what she is walking toward.
       LOCKED 2026-07-29 (dialogue-pass, co-written with Nicolas). 2 boxes.
-      WIRED 2026-08-14 (#25) at host message 0x9F1, as an ON-MAP bubble (wraps at 29) played
+      WIRED 2026-08-14 (#25) at host message 0x9F1, as an ON-MAP bubble played
       AFTER the prep CALL alongside scenes 5 and 6 — the last thing before turn 1. The two boxes
       share ONE id: the wordless middle beat is a `stage_break:`, vanilla's `[BreakTalk]`, which
       pauses the message so the event script can act and `TEXTCONT` resumes it. Splitting the
@@ -1442,7 +1445,7 @@ events:
       # HAND-BOXED, which is VANILLA'S CONVENTION and not a house style: every [LF] and every
       # [A] in `texts.txt` is authored, and MSG_9CC — the Natasha→Joshua recruit this very
       # scene is the twin of — places all 32 of its own page breaks. Nothing there is flowed.
-      # The substitute is 61 characters against the bubble's 29, so it cannot be one box; left
+      # The substitute runs to more than twice one drawn line, so it cannot be one box; left
       # to the wrapper it paged itself at "We could go free as" / "well.", which is the
       # mid-clause break the reliquary lines and scene 5's fallback both already taught.
       # BREAK ON THE ELLIPSIS. It is the only punctuation the line has, and it is also the
@@ -1569,7 +1572,7 @@ events:
       - wolfram: "I found some old elven helmets at the arena..."
       - wolfram: "...it's great metal, I can repair it to hold soil..."
       - basil: "A pot. ...Mine?"
-      # (Nicolas's line, split across two A-presses: on-map bubbles wrap at 29 and the whole
+      # (Nicolas's line, split across two A-presses: one drawn line is 203px and the whole
       #  sentence runs to 5 lines. The split also gives "...into your cause?" its own button.)
       - basil: "I don't have much to offer, but what I can I offer willingly,"
       - basil: "if you'll accept a goodberry bush into your cause?"

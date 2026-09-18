@@ -45,9 +45,12 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
              # ADR 0004 before a line of it was written. Its name is in the dead registry for
              # that reason, alongside the `data_sources:` block's two more, whose files were
              # never committed either.
-             # The CHAPTER yaml is deliberately not here yet: it carries eight live hits of
-             # the retired 29/42-CHARACTER wrap vocabulary, which is its own sweep (#393).
-             'campaigns/*/campaign.yaml']
+             # The CHAPTER yaml joined in #393, once the eight live hits of the retired
+             # 29/42-CHARACTER wrap vocabulary it was carrying were read in context and
+             # cleared. It holds more authored prose than any doc in this repo -- dialogue
+             # rationale, wiring notes, the locked-beat record -- and every line of it is
+             # doctrine the next session reads.
+             'campaigns/*/campaign.yaml', 'campaigns/*/chapters/*.yaml']
 
 # Terms that are NEVER legitimate in vision/ops docs OR hand-written code comments:
 # abandoned tools, dead code symbols, retired implementation phrases. decisions.md

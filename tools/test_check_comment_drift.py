@@ -102,6 +102,19 @@ class HandwrittenSourceScan(unittest.TestCase):
                    for p in check._docs() + check._handwritten_sources()]
         self.assertIn('campaigns/rime-of-the-frostmaiden/campaign.yaml', scanned)
 
+    def test_the_scan_covers_the_CHAPTER_declarations(self):
+        """A chapter YAML carries more authored prose than any doc in this repo -- the
+        dialogue rationale, the wiring notes, the locked-beat record -- and every line of it
+        is doctrine the next session reads. It stayed outside the scan while it held eight
+        live hits of the retired 29/42-CHARACTER wrap vocabulary (#393), which is the exact
+        shape of drift the registry exists to catch: `campaign.yaml` joined in #30 and the
+        chapters were left because clearing them was its own job.
+        """
+        scanned = [os.path.relpath(p, check.REPO)
+                   for p in check._docs() + check._handwritten_sources()]
+        self.assertIn('campaigns/rime-of-the-frostmaiden/chapters/ch05-the-elven-tomb.yaml',
+                      scanned)
+
     def test_the_live_repo_is_clean(self):
         fail = []
         check.check_no_dead_concepts(fail)
