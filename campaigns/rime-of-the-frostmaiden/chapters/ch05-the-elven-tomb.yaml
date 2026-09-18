@@ -1027,7 +1027,8 @@ events:
       punchline is not a setup. He keeps the spotting line, which is the right note to end an
       arrival scene on: the party has found what it came for.
       LOCKED 2026-07-23, extended 2026-07-29 (dialogue-pass, co-written with Nicolas). Hand-boxed
-      to GBA width (~29-30 ch/line, 2 lines/box); [A]/[LF] encoding is ROM-gated.
+      to GBA width (`fe8_talk_font.TALK_BUDGET_PX` per line, 2 lines/box); [A]/[LF] encoding
+      is ROM-gated.
     script:                           # LOCKED 2026-07-23 (dialogue-pass, co-written with Nicolas)
       # (Night. An iced elven gateway of standing stones — open arch, no roof, no door — and
       #  beyond it the ground falls into a wide moonlit hollow: the open-air tomb. The moose's
@@ -1085,7 +1086,7 @@ events:
   #  last thing before the map and can absorb one clause of acknowledgement if we want it. Do not
   #  reopen this as a slot -- fold it there or leave it.
   # ── 9C2 — the recruit reaches the party; BATTLE ───────────────────────────────
-  - trigger: chapter_start       # opening event list, ON-MAP (bubbles ≤29 ch/line)
+  - trigger: chapter_start       # opening event list, ON-MAP (same 203px line as a backdrop)
     slot: "vanilla 0x9C2"
     type: cutscene
     ea_file: events/ch05-basil-joins.ea
@@ -1128,10 +1129,11 @@ events:
         whole revelation. Arguably the purer version — it needs no other unit to exist.
         Boxes 1 and 3 are unchanged in both branches.
       # ONE replaced box, TWO boxes of substitute — the nested list is the shape that says so.
-      # The line was chosen as PROSE and runs well past one drawn line at any podium, so it
-      # simply does not fit one box. Left flowed, the wrapper picked the A-press for us and put it
-      # mid-clause ("You just-- came" / "here. On your own."), which is the failure the reliquary
-      # lines already taught: the authored A-press breaks ARE the pacing.
+      # The line was chosen as PROSE: 323px, which flows to two lines and ONE box would hold.
+      # So the split is PACING, not capacity — the capacity argument was an artifact of the
+      # character wrap (#298/#393). Left flowed, the wrapper picks the A-press for us and puts
+      # it mid-clause ("...You" / "just-- came here."), which is the failure the reliquary lines
+      # already taught: the authored A-press breaks ARE the pacing.
       # BREAK CHOSEN 2026-08-14 (Nicolas): after the shock, not at the sentence boundary. Box 2a
       # is the realisation landing on her; 2b is then one unbroken tumble, which is her register
       # (lore/basil.md §Voice — "runs on when she cares", corpus twin Ewan). Splitting on the full
@@ -1172,9 +1174,11 @@ events:
       arm and one id.
       ONE BOX GAINED AN AUTHORED A-PRESS, and the wording is untouched — 7 presses, not 6. The
       scene was boxed for a backdrop and now plays in a bubble, and "No one
-      ever came. I stopped counting somewhere in the middle." is 60 characters: it needs three
-      lines and a box holds two. Left flowed, the wrapper chose the A-press for us and put it
-      mid-clause ("I stopped counting somewhere in the" / "middle."), which is the failure the
+      ever came. I stopped counting somewhere in the middle." is 283px: it flows to two lines,
+      which one box holds, so the second press is a PACING choice and not a capacity one (the
+      "needs three lines" reading was the character wrap talking, #298/#393). Left flowed, the
+      wrapper chose the A-press for us and put it mid-clause ("I stopped counting" /
+      "somewhere in the middle."), which is the failure the
       reliquary lines and scene 5's fallback already taught — the authored A-press breaks ARE
       the pacing. Break placed at the full stop, which is also the better read: "No one ever
       came." lands as its own flat beat, and the understatement she is budgeted one of per
@@ -1188,7 +1192,8 @@ events:
       - sahnar: "...Someone has come."
       - sahnar: "Four thousand years, and someone has finally come."
       - sahnar: "...I was given a purpose. To defend this tomb."
-      # (One locked box, two authored presses at the 29-wrap -- see the note above.)
+      # (One locked box, two authored presses -- pacing, not capacity: the line is 283px and
+      #  flows to two, which one box holds. See the note above.)
       - sahnar: "No one ever came."
       - sahnar: "I stopped counting somewhere in the middle."
       - sahnar: "...Well. Something has come now."
@@ -1366,8 +1371,9 @@ events:
       #  is the chapter's own word for the sites; "houses"/"mausoleums" were both tried and both
       #  collide -- the west resident calls the whole TOMB "this house", and only Orem is buried
       #  here, so there are no mausoleums to raid. Nicolas, 2026-08-09.)
-      # (No leading "...And": it is what pushes "reliquaries" onto a third line at the on-map
-      #  29-column wrap, and dropping it also stops two boxes in four opening on the same tic.)
+      # (No leading "...And". The third-line argument was an artifact of the character wrap --
+      #  measured at 203px both readings flow to two lines -- but dropping it still stops two
+      #  boxes in four opening on the same tic, which is why the cut stands.)
       - ravisin: "I better make sure they don't get to the reliquaries..."
       - ravisin: "No matter. The dead will destroy them first."
       # (9BC callback: "the warrior... the one under the stone", now spent. "BLADE" not "one" --
@@ -1445,9 +1451,10 @@ events:
       # HAND-BOXED, which is VANILLA'S CONVENTION and not a house style: every [LF] and every
       # [A] in `texts.txt` is authored, and MSG_9CC — the Natasha→Joshua recruit this very
       # scene is the twin of — places all 32 of its own page breaks. Nothing there is flowed.
-      # The substitute runs to more than twice one drawn line, so it cannot be one box; left
-      # to the wrapper it paged itself at "We could go free as" / "well.", which is the
-      # mid-clause break the reliquary lines and scene 5's fallback both already taught.
+      # The substitute is 270px, so it flows to two lines and one box would hold it — the
+      # split is pacing, not capacity (#298/#393). Left to the wrapper it breaks at "We could" /
+      # "go free as well.", which is the mid-clause break the reliquary lines and scene 5's
+      # fallback both already taught.
       # BREAK ON THE ELLIPSIS. It is the only punctuation the line has, and it is also the
       # right read: the observation lands flat, and then the OFFER — which IS proof #1 in this
       # arm, Basil arguing the two of them could go rather than citing a wolf who went — takes
@@ -1512,7 +1519,8 @@ events:
       joined on the map; there is no discovery and no naming beat, LOCKED 2026-07-23). They turn
       down the coast toward Bremen, where Ravisin woke something in the lake.
       MINED SKELETON — vanilla MSG_9C9 (34 boxes, `EventScr_Ch5_EndingScene`, a BACKDROP scene
-      so the full-screen window wraps at ~42 — see the anatomy table's correction). Its beat
+      — a channel that changes the staging and not the width, both being one 203px line; see
+      the anatomy note at the top of this block). Its beat
       order, which ours follows: (1) aftermath before anyone does business;
       (2) the ESCORT is thanked and becomes the scene's centre; (3) the party asks her a question
       and she TELLS THEM THE PLOT — the escort, not a party member, carries the chapter's forward
@@ -1572,8 +1580,8 @@ events:
       - wolfram: "I found some old elven helmets at the arena..."
       - wolfram: "...it's great metal, I can repair it to hold soil..."
       - basil: "A pot. ...Mine?"
-      # (Nicolas's line, split across two A-presses: one drawn line is 203px and the whole
-      #  sentence runs to 5 lines. The split also gives "...into your cause?" its own button.)
+      # (Nicolas's line, split across two A-presses: the whole sentence is 504px, which flows
+      #  to three lines — one more than a box holds, so this split IS a capacity one. The split also gives "...into your cause?" its own button.)
       - basil: "I don't have much to offer, but what I can I offer willingly,"
       - basil: "if you'll accept a goodberry bush into your cause?"
       # (ONLY IF SAHNAR WAS RECRUITED -- the `no_sahnar_cut:` block below drops these six

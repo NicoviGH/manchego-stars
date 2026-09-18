@@ -7,8 +7,8 @@
 English text takes). The `/8 + 2` turns pixels into the bubble's tile width plus its border.
 
 So a character count is not a conservative proxy for the real constraint; it is an unrelated
-quantity that merely correlates. `i` and `.` are 2px while `W` is 8px, so two 29-character lines
-can differ by more than a factor of three. Long form: `docs/decisions.md` -> "We wrapped on-map
+quantity that merely correlates. `i` and `.` are 2px while `W` is 8px, so two lines of the same
+character count can differ in drawn width by more than a factor of three. Long form: `docs/decisions.md` -> "We wrapped on-map
 talk at 29 CHARACTERS; the engine measures PIXELS".
 
 PROVENANCE. Read out of `TextGlyphs_Talk` in the built ROM -- an array of `struct Glyph *`

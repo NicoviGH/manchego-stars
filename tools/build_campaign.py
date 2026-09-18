@@ -2915,7 +2915,7 @@ def inject_opening_montage(campaign, verbose=True):
 
 def _tour_message_body(cards):
     """Render the town_tour cards as the WM narration message (vanilla 0x8DB
-    shape): pages of up to two ~42-char lines ([LF] within a page, [A][LF]
+    shape): pages of up to two drawn lines ([LF] within a page, [A][LF]
     between pages), cards separated by [BreakTalk] -- each one is a TEXTCONT
     boundary in the event script -- and [X] terminated."""
     segs = []
@@ -9561,7 +9561,7 @@ def inject_ch02(campaign, verbose=True):
         lines = f.read().split('\n')
     set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
     # The two Targos hut visits. One `visit_text` entry per BOX (ch04's lesson: a flowed
-    # scalar reflows at 42 columns and buttons mid-sentence), each over BG_NORMAL_VILLAGE.
+    # scalar reflows at the pixel budget and buttons mid-sentence), each over BG_NORMAL_VILLAGE.
     # Glimmerfrost speaks with the green chwinga bust; the east hut takes a villager mug.
     for village in chap.get('villages', []):
         _symbol, msg, fid, _bg = CH02_VILLAGE_SLOTS[village['id']]
@@ -11322,7 +11322,7 @@ def village_boxes(village):
     A-press.
 
     Village text is dialogue, so its buttons belong on its beats. Flowed as a single scalar it
-    reflows wherever the 42-column wrap lands and buttons mid-sentence: the axe village's
+    reflows wherever the pixel budget runs out and buttons mid-sentence: the axe village's
     "vanilla 1:1" text came out as THREE boxes breaking on "a handy bridge if / you could knock
     it over", where vanilla's own MSG_9B5 is FOUR broken on its sentences -- 1:1 in words but
     not on screen, which is not what 1:1 meant (Nicolas, 2026-08-02). A flowed scalar is
@@ -13077,7 +13077,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     #
     # One `visit_text` entry per BOX: consecutive turns by one speaker coalesce into a single
     # [OpenX] block with each entry's pages kept whole, so the authored beats survive as the
-    # A-press breaks instead of being reflowed into wherever 42 columns happen to land.
+    # A-press breaks instead of being reflowed into wherever the pixel budget runs out.
     for village in chap['villages']:
         _symbol, msg, fid, _bg = CH04_VILLAGE_SLOTS[village['id']]
         set_message_body(lines, msg, _script_to_message(
@@ -14570,7 +14570,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # BG_HOUSE -- a full-screen backdrop, wrapped at the same talk budget as the BG scenes, not at
     # the on-map bubble. One `visit_text` entry per BOX, ch04's lesson: the authored A-press
     # breaks are the pacing (27 boxes against vanilla Ch5's own 26), and a flowed scalar would
-    # reflow them to wherever 42 columns happen to land.
+    # reflow them to wherever the pixel budget runs out.
     for village in chap['villages']:
         _symbol, msg, fid = CH05_VILLAGE_SLOTS[village['id']]
         set_message_body(lines, msg, _script_to_message(

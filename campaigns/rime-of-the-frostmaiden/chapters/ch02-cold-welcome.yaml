@@ -482,7 +482,8 @@ events:
       pun-professor register — mask-drop warmth is reserved for the finale Wish — while Pinky
       takes it to heart. LOCKED 2026-06-24 (dialogue pass, co-written with Nicolas). PENDING
       (not wired): the eventscript + Text_BG fit (RBG's line paginates — it's a portrait
-      cutscene, not a 29-char on-map bubble); consider a proximity trigger (Pinky near bow
+      cutscene, not an on-map bubble; the channel is a STAGING choice, both wrap at the same
+      pixel budget); consider a proximity trigger (Pinky near bow
       range) over turn-1 if the wiring supports it cleanly.
     script:                     # LOCKED 2026-06-24 (dialogue pass, co-written with Nicolas)
       # (Turn 1. The Chardalyn Hunter sits in the eastern treeline, bow strung. RBG marks it,
@@ -509,8 +510,9 @@ events:
       the rear and plants himself between the raiders and the spirits: terse FE8
       reinforcement-bark cadence, ends on the order. LOCKED dialogue-pass text below
       (reground 2026-06-24; speaker chosen by Nicolas 2026-06-19). PENDING (not wired yet):
-      the eventscript that consumes this + on-map bubble fit — both lines are ≤21 chars
-      (well inside the 29-char bubble wrap); verify the right-side bubble isn't pushed
+      the eventscript that consumes this + on-map bubble fit — both lines draw under 100px,
+      well inside one drawn line (`fe8_talk_font.TALK_BUDGET_PX`); verify the right-side bubble
+      isn't pushed
       offscreen by the width measure.
     script:                     # LOCKED 2026-06-24 (dialogue pass, reground; speaker chosen by Nicolas 2026-06-19)
       # (Turn 3. Two chardalyn raiders drop in at the rear edge, opposite the captain,
