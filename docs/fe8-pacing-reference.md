@@ -195,37 +195,79 @@ post-MVP question — see `docs/roadmap.md`.)
 
 ---
 
-## Expected party level, by chapter — a stated PLANNING ASSUMPTION
+## Expected party level, by chapter — DERIVED from the exp economy
 
-Not derived, and it cannot be: vanilla's ally `UnitDefinition` level is only read on a unit's
-FIRST load, so IS never declares what the party is by Ch6. It is a pacing fact, not a data fact.
-It is written down anyway, because every ABSOLUTE question needs it as a floor.
+Every ABSOLUTE question this project asks needs a party level as its floor — *can this unit
+survive that trip, is this fuse long enough for a real party, is this objective a coin flip.*
+During #26 a ch06-era flier was assessed off her LEVEL 1 stat line and a chapter's design
+nearly turned on it.
 
-| chapter | deployed-throughout unit, unpromoted |
-|---|---|
-| ch00–ch01 | 1–3 |
-| ch02–ch03 | 3–7 |
-| ch04–ch05 | 6–10 |
-| ch06–ch07 | **8–12** |
-| ch08 | 10–14 |
+This table is that floor, and it is **derived, not asserted**: FE8's own exp formulas
+(`GetUnitRoundExp` / `GetUnitPowerLevel` / `GetUnitKillExpBonus` / `GetBattleUnitExpGain`,
+`fireemblem8u/src/bmbattle.c`, transcribed in `tools/exp_curve.py` and unit-tested against
+hand-computed values) run over the real per-chapter rosters — ours and each chapter's vanilla
+twin — and the level curve falls out of the force the party eats. Regenerate with
+`python3 tools/exp_curve.py --write`; `tools/test_exp_curve.py` fails while it is stale.
 
-**What this is for, and what it is NOT for.**
 
-`tools/difficulty.py` does not use it and should not. `player_combatant` resolves the cast *at
-base level* on purpose, and the parity ratio compares our chapter to its vanilla twin with the
-same understated party on both sides, so the bias cancels — the same argument
-`decisions.md` → *"AI behaviour is MEASURED and REPORTED"* makes for not weighting AI. Feeding a
-projected level into one side only would break that cancellation, not improve it.
+<!-- BEGIN GENERATED: party-level band (python3 tools/exp_curve.py --write) -->
+
+<!-- Derived from FE8's own exp formulas over the real rosters. Do not hand-edit:
+     the next regen silently discards it, and tools/test_exp_curve.py fails the
+     build while it is stale. -->
+
+| chapter | bar | bodies ours/twin | field | exp ours/twin | benched | typical | fed |
+|---|---|---|---|---|---|---|---|
+| ch00 † | FE8 Prologue | 3 / 3 | 2 | 154 / 149 (x1.03) | L1 | **L1** | L1 |
+| ch01 | FE8 Ch1 | 10 / 10 | 4 | 375 / 385 (x0.97) | L1 | **L1** | L3 |
+| ch02 | FE8 Ch2 | 9 / 9 | 5 | 421 / 421 (x1.00) | L1 | **L2** | L4 |
+| ch03 | FE8 Ch3 | 10 / 10 | 9 | 405 / 424 (x0.95) | L2 | **L3** | L5 |
+| ch04 | FE8 Ch4 | 23 / 23 | 9 | 830 / 812 (x1.02) | L2 | **L4** | L7 |
+| ch05 | FE8 Ch5 | 23 / 23 | 9 | 943 / 882 (x1.07) | L3 | **L5** | L9 |
+| ch06 | FE8 Ch6 | 27 / 27 | 10 | 1030 / 1030 (x1.00) | L3 | **L6** | L12 |
+
+**Entering ch07 the party is L6** -- L3 for a unit that rides the bench, L12 for one fed
+every kill. The same cast fed each chapter's VANILLA twin instead of ours reaches **L6**
+over the same span: the party lands where FE8's party lands, which is what makes the
+absolute number usable.
+
+† ch00 pays its exp to units the party never gets -- a fixed-roster chapter whose guests do
+not join. Vanilla's prologue pays Eirika and Seth, who stay for the whole game, so the twin
+banks a chapter we do not. The two curves still converge, because FE8 pays a lower-level unit
+more for the same body.
+
+<!-- END GENERATED: party-level band -->
+
+**What the model does and does not count.** Every body on a chapter's roster dies once, to
+one member of the field, and the chapter's exp is split across the field. Chip damage that
+does not kill, staff and arena exp, and anything the player farms on purpose are not counted
+on either side, so the **typical** column is a floor rather than a forecast. Stat *growth* is
+deliberately not modelled (#367): growths are random, and a projected stat line would be a
+precision the dice do not support. The `benched` and `fed` columns are not the typical column
+scaled — each runs its own career through every chapter, so FE8's own catch-up terms apply: a
+unit that is already ahead earns less from the same body, because round exp shrinks with the
+level gap and the kill bonus subtracts the killer's power level. That trims the spread, and
+only trims it — most of the distance between a fed unit and a benched one is the player's
+choice, not the engine's arithmetic.
+
+**What it is for, and what it is NOT for.** `tools/difficulty.py` does not use it and should
+not. `player_combatant` resolves the cast *at base level* on purpose, and the parity ratio
+compares our chapter to its vanilla twin with the same understated party on both sides, so the
+bias cancels — the same argument `decisions.md` → *"AI behaviour is MEASURED and REPORTED"*
+makes for not weighting AI. Feeding a projected level into one side only would break that
+cancellation, not improve it.
 
 ⚠️ The cancellation is first-order, not exact: `kills_per_round` and `durability` are threshold
-functions (doubling breakpoints, integer rounds-to-kill), so a party far below the enemies' level
-can saturate against both sides and flatten the ratio toward x1.00. The error is smallest at ch00
-and **grows with every chapter**. Tracked on #367.
+functions (doubling breakpoints, integer rounds-to-kill), so a party far below the enemies'
+level can saturate against both sides and flatten the ratio toward x1.00. The error is smallest
+at ch00 and **grows with every chapter**. Tracked on #367.
 
-What the band IS for is sanity-checking any absolute claim before it becomes a design decision —
-*"can this unit survive that flight", "is this fuse long enough for a real party", "is this
-objective a coin flip"*. During #26 a ch06-era flier was assessed as fragile off her LEVEL 1 stat
-line and a chapter's design nearly turned on it. A number in a table would have stopped that.
+⚠️ **The exp column is the only quantity in this repo that integrates across chapters**, which
+is why `tools/test_exp_curve.py` asserts every chapter within ±12% of its twin. A chapter that
+reuses a twin an earlier chapter already spent — ch07 is planned against FE8 Ch6, which ch06
+already banked — hands the party an extra chapter of exp the vanilla curve does not contain,
+and no per-chapter gate can see it. That is the alarm, not a bug in the row.
+
 Absolute questions still end at tier 3 (`decisions.md` → *"Difficulty is checked in fidelity
 tiers"*): a chapter is not difficulty-verified until it has been played.
 
