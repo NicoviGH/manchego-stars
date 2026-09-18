@@ -291,8 +291,20 @@ class TestDocumentedTileset(unittest.TestCase):
                 check.REPO, check._chapters = original_repo, original_chapters
 
     def test_every_shipped_chapter_agrees_with_its_build_tileset(self):
+        """Asserts the guard RAN, not just that it found nothing.
+
+        This is the `tests` job's half of the SKIP_COVERAGE claim (#379). `check.py` skips
+        this guard on the lightweight `checks` job and prints that this test covers it -- so
+        if the dependency ever goes missing HERE too, the guard skips on both jobs and an
+        `assertEqual([], fail)` passes on a run that checked nothing at all."""
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
         fail = []
-        check.check_documented_tileset(fail)
+        with redirect_stdout(buf):
+            check.check_documented_tileset(fail)
+        self.assertNotIn('skipping', buf.getvalue(),
+                         'the guard skipped on the tests job, so this test proves nothing')
         self.assertEqual([], fail)
 
 
@@ -316,8 +328,15 @@ class TestRealChapters(unittest.TestCase):
         self.assertEqual(fail, [])
 
     def test_personal_line_routes_gate_passes(self):
+        """Asserts the guard RAN -- see the tileset test above for why (#379)."""
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
         fail = []
-        check.check_personal_line_injection_routes(fail)
+        with redirect_stdout(buf):
+            check.check_personal_line_injection_routes(fail)
+        self.assertNotIn('skipping', buf.getvalue(),
+                         'the guard skipped on the tests job, so this test proves nothing')
         self.assertEqual(fail, [])
 
 

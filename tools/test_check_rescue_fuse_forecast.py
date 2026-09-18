@@ -110,8 +110,19 @@ class TheGuardIsAdvisoryAndReproducesCh06(unittest.TestCase):
     contract has to hold either way, so this class no longer needs a live finding to test it."""
 
     def test_the_check_never_fails_the_build(self):
+        """Asserts the guard RAN, not just that it found nothing (#379).
+
+        `check.py` skips this guard on the lightweight `checks` job and names this test as
+        the coverage. If `rescue_forecast` ever stops importing on the `tests` job too, the
+        guard skips on both and an empty `fail` proves nothing."""
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
         fail = []
-        check.check_rescue_fuse_forecast(fail)
+        with redirect_stdout(buf):
+            check.check_rescue_fuse_forecast(fail)
+        self.assertNotIn('skipping', buf.getvalue(),
+                         'the guard skipped on the tests job, so this test proves nothing')
         self.assertEqual(fail, [])
 
     def test_ch06s_pursuers_are_now_clean_so_it_prints_nothing_about_them(self):

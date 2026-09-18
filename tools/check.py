@@ -168,6 +168,176 @@ def _docs():
     return [d for d in out if os.path.isfile(d)]
 
 
+# A guard that cannot RUN on the job it is invoked from has to say who covers it instead, and
+# that sentence used to be the only thing holding the coverage. `SKIP_COVERAGE` makes it a
+# declaration: guard -> (test file, test name). `check_skip_claims_name_a_live_test` then holds
+# it -- the named test must exist, be collected by `run_tests.py`, and CALL the guard, so
+# deleting it, renaming it or fixture-ifying it fails the build instead of the coverage (#379).
+#
+# Only guards that claim coverage ELSEWHERE belong here. A guard that skips because there is
+# genuinely nothing to check (no lua on PATH, submodule absent) makes no such claim.
+SKIP_COVERAGE = {
+    'check_documented_tileset':
+        ('tools/test_check_chapter_schema.py',
+         'test_every_shipped_chapter_agrees_with_its_build_tileset'),
+    'check_personal_line_injection_routes':
+        ('tools/test_check_chapter_schema.py', 'test_personal_line_routes_gate_passes'),
+    'check_rescue_targets':
+        ('tools/test_check_rescue_targets.py',
+         'test_an_unreadable_TILESET_is_reported_not_silently_skipped'),
+    'check_rescue_fuse_forecast':
+        ('tools/test_check_rescue_fuse_forecast.py', 'test_the_check_never_fails_the_build'),
+}
+
+# What an import of one of those modules can actually raise on the lightweight `checks` job.
+# NOT just ImportError: `map_placement_preview` opens the decomp's `terrains.h` at module
+# scope, so with no submodule it raises FileNotFoundError -- #373's review caught a clause
+# that would therefore have reddened every PR on the one job it was written to protect.
+#
+# And not OSError either, which was the first fix and was too wide: a genuine module-scope I/O
+# failure (a path broken by a refactor, a permission error) would then be reported as an
+# intentional coverage delegation on EVERY job, when it should escape and be reported by
+# `run_checks` as a guard that could not run. Absent dependency, absent file -- nothing else.
+SKIP_IMPORT_ERRORS = (ImportError, FileNotFoundError)
+
+
+def _skip_covered_elsewhere(guard, exc):
+    """Print the one legal form of "I could not run, and here is who did".
+
+    Routed through the registry so the claim and the message cannot drift apart: the test
+    named in the printed line is the same string the gate verifies.
+    """
+    claim = SKIP_COVERAGE.get(guard)
+    if claim is None:
+        # `check_skip_claims_name_a_live_test` makes this unreachable, but a bare KeyError
+        # here would fire ONLY on the lightweight job -- the one nobody runs locally.
+        print('%s: skipping (%s) -- NO COVERAGE DECLARED, add it to SKIP_COVERAGE' % (guard, exc))
+        return
+    rel, name = claim
+    print('%s: skipping (%s; covered by %s::%s on the `tests` job)' % (guard, exc, rel, name))
+
+
+def _covering_test_nodes(rel, name):
+    """(source, node) for test `name` in `rel`, or a reason string it could not be resolved."""
+    path = os.path.join(REPO, rel)
+    if not os.path.isfile(path):
+        return 'the file does not exist'
+    with open(path, encoding='utf-8') as fh:
+        text = fh.read()
+    found = [n for n in ast.walk(ast.parse(text))
+             if isinstance(n, ast.FunctionDef) and n.name == name]
+    if not found:
+        return 'no such test'
+    if len(found) > 1:
+        # Two classes can hold the same method name, and then "the covering test" names two
+        # different tests -- one of which may be the fixture-only one.
+        return 'the name is defined %d times, so the claim is ambiguous' % len(found)
+    return ast.get_source_segment(text, found[0]), found[0]
+
+
+def _calls_guard(node, guard):
+    """True if the test body really CALLS `guard`, by AST rather than by substring.
+
+    A substring match is satisfied by the guard's name surviving in a docstring or a comment
+    after the call itself was fixture-ified -- which is the exact hole #379 exists to close."""
+    for sub in ast.walk(node):
+        if not isinstance(sub, ast.Call):
+            continue
+        func = sub.func
+        if isinstance(func, ast.Attribute) and func.attr == guard:
+            return True
+        if isinstance(func, ast.Name) and func.id == guard:
+            return True
+    return False
+
+
+def _is_skipped_test(node):
+    """`@unittest.skip`/`skipIf`/`skipUnless` on the covering test makes it no coverage."""
+    for dec in node.decorator_list:
+        target = dec.func if isinstance(dec, ast.Call) else dec
+        name = target.attr if isinstance(target, ast.Attribute) else getattr(target, 'id', '')
+        if str(name).startswith('skip'):
+            return True
+    return False
+
+
+def _helper_call_sites():
+    """Guard names passed to `_skip_covered_elsewhere` in this file, by AST."""
+    with open(os.path.abspath(__file__), encoding='utf-8') as fh:
+        tree = ast.parse(fh.read())
+    sites = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Call) and getattr(sub.func, 'id', None) == \
+                    '_skip_covered_elsewhere' and sub.args:
+                literal = sub.args[0]
+                sites.append((node.name, getattr(literal, 'value', None)))
+    return sites
+
+
+def check_skip_claims_name_a_live_test(fail):
+    """A guard that SKIPS must name a test that exists, is collected, and CALLS it (#379).
+
+    Four guards cannot run on the `checks` job -- it installs pyyaml, checks out no submodule,
+    and they import `build_campaign` / `difficulty` / `map_placement_preview` /
+    `chapter_status`. Each printed "the `tests` job's `make test` covers it" and returned. That
+    was true when written, and a sentence is not a gate: fixture-ify the test it means and the
+    guard covers nothing on either job while still printing the reassurance. This repo has
+    shipped that shape -- `check_tile_changes_outlive_the_retarget` ran only via its own test
+    file's subprocess, which no-ops exactly where the lightweight job needed it.
+
+    Verified here: the file exists, `run_tests.py` collects it, the test is defined, and its
+    body names the guard. The last one is what makes the claim load-bearing rather than
+    decorative."""
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import run_tests
+    collected = {os.path.relpath(p, REPO) for p in run_tests.test_files()}
+
+    for guard, claimed in sorted(_helper_call_sites()):
+        if claimed not in SKIP_COVERAGE:
+            fail.append('%s calls _skip_covered_elsewhere(%r), which is not in SKIP_COVERAGE '
+                        '-- the message would be wrong and the lookup would fail on the '
+                        '`checks` job only' % (guard, claimed))
+        elif claimed != guard:
+            fail.append('%s claims coverage under the name %r -- a guard must declare its own'
+                        % (guard, claimed))
+
+    for guard, (rel, name) in sorted(SKIP_COVERAGE.items()):
+        if not callable(globals().get(guard)):
+            fail.append('SKIP_COVERAGE names %s, which is not a check in this file' % guard)
+            continue
+        if rel not in collected:
+            fail.append('%s claims %s, which `run_tests.py` does not collect -- the coverage '
+                        'would never run' % (guard, rel))
+            continue
+        resolved = _covering_test_nodes(rel, name)
+        if isinstance(resolved, str):
+            fail.append('%s claims %s::%s, but %s -- the skip message is now false'
+                        % (guard, rel, name, resolved))
+            continue
+        src, node = resolved
+        if _is_skipped_test(node):
+            fail.append('%s claims %s::%s, which is decorated to SKIP -- coverage that never '
+                        'runs is not coverage' % (guard, rel, name))
+        if not _calls_guard(node, guard):
+            fail.append('%s claims %s::%s, but that test does not call %s -- it was renamed, '
+                        'fixture-ified or repointed, and the guard now covers nothing on '
+                        'either job' % (guard, rel, name, guard))
+        elif 'skipping' not in src:
+            # The subtler half, and the one the first version of this gate missed. Proving the
+            # test CALLS the guard does not prove the guard RAN: if the dependency goes missing
+            # on the `tests` job too (pillow dropped from build.yml, a submodule checkout that
+            # omits terrains.h), the guard skips there as well and a test asserting only
+            # `fail == []` passes on an empty run. So the covering test has to assert it did
+            # not skip, and that assertion is what is required here.
+            fail.append('%s claims %s::%s, which never mentions `skipping` -- it therefore '
+                        'passes just as happily when the guard SKIPPED on the tests job too. '
+                        'Assert on the printed output, not only on an empty fail list'
+                        % (guard, rel, name))
+
+
 def _campaign_yamls():
     """Every campaign's top-level declaration file."""
     return sorted(glob.glob(os.path.join(REPO, 'campaigns', '*', 'campaign.yaml')))
@@ -587,9 +757,8 @@ def check_personal_line_injection_routes(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
         import build_campaign as bc
-    except ImportError as e:
-        print('check_personal_line_injection_routes: skipping (%s; the `tests` job\'s '
-              '`make test` covers this gate)' % e)
+    except SKIP_IMPORT_ERRORS as exc:
+        _skip_covered_elsewhere('check_personal_line_injection_routes', exc)
         return
     injected_ids = {uid for _yaml, uid in bc.RAW_PID_PERSONAL_SOURCES.values()}
     slot_ids = set(bc.ENEMY_BASE_SLOT)
@@ -1142,9 +1311,8 @@ def check_documented_tileset(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
         import build_campaign as bc
-    except ImportError as exc:      # Pillow absent on the lightweight checks job
-        print('check_documented_tileset: skipping (%s; the `tests` job\'s `make test` '
-              'covers it)' % exc)
+    except SKIP_IMPORT_ERRORS as exc:   # Pillow absent / no submodule on the `checks` job
+        _skip_covered_elsewhere('check_documented_tileset', exc)
         return
     import json
     for rel, d in _chapters():
@@ -1351,9 +1519,8 @@ def check_rescue_targets(fail):
         import difficulty
         import map_placement_preview as pp
         import chapter_status as cs
-    except ImportError as exc:      # Pillow / submodule absent on the lightweight checks job
-        print('check_rescue_targets: skipping (%s; the `tests` job\'s `make test` covers it)'
-              % exc)
+    except SKIP_IMPORT_ERRORS as exc:   # Pillow / submodule absent on the `checks` job
+        _skip_covered_elsewhere('check_rescue_targets', exc)
         return
     for rel, doc in _chapters():
         boats = doc.get('rescue_boats') or []
@@ -1455,9 +1622,8 @@ def check_rescue_fuse_forecast(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
         import rescue_forecast as rf
-    except ImportError as exc:      # Pillow / submodule absent on the lightweight checks job
-        print('check_rescue_fuse_forecast: skipping (%s; the `tests` job\'s `make test` '
-             'covers it)' % exc)
+    except SKIP_IMPORT_ERRORS as exc:   # Pillow / submodule absent on the `checks` job
+        _skip_covered_elsewhere('check_rescue_fuse_forecast', exc)
         return
     for rel, doc in _chapters():
         if not (doc.get('rescue_boats') and doc.get('rescue_pursuers')):
@@ -3030,7 +3196,7 @@ CHECKS = (
     check_chapter_lua_facts, check_rescue_targets, check_rescue_fuse_forecast,
     check_documented_tileset, check_harness_local_ratchet, check_verdict_scenarios_are_guarded,
     check_no_hardcoded_symbol_addresses, check_tool_refs_exist, check_no_dead_concepts,
-    check_campaign_declares_no_chapter_list,
+    check_campaign_declares_no_chapter_list, check_skip_claims_name_a_live_test,
     check_generated_indexes_fresh, check_engine_guards_present,
     check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
