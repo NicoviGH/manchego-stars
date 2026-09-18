@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-291 decisions. Read this index, then open the two or three you need — the whole
+292 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -431,6 +431,7 @@ session state. `HANDOFF.md` points here._
 | `0286` | [ccache cannot wrap this build, and make green is already near its floor](decisions/0286-ccache-cannot-wrap-this-build-and-make-green-is.md) | 2026-09-17 | #382 |
 | `0287` | [A banner is not a domain boundary, and the gate for moving code is its OUTPUT](decisions/0287-a-banner-is-not-a-domain-boundary.md) | 2026-09-17 | #389 |
 | `0290` | [A hosted chapter DECLARES its fog, and that was the last field it could inherit](decisions/0290-a-hosted-chapter-declares-its-fog.md) | 2026-09-17 | #365 |
+| `0292` | [A scene LOADs the PLAYER CHARACTERS it stages, and only those need it](decisions/0292-a-scene-loads-the-player-characters-it-stages.md) | 2026-09-17 | #337 |
 
 ---
 
