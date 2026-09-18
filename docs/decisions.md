@@ -214,7 +214,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0099` | [The parity model prices the YAML; only the EMITTED ROWS are the ROM](decisions/0099-the-parity-model-prices-the-yaml-only-the-emitted.md) | 2026-09-04 | #26 #364 |
 | `0100` | [A load-test that reads the roster before PREP settles is a diagnostic that LIES](decisions/0100-a-load-test-that-reads-the-roster-before-prep.md) | 2026-09-04 | #26 |
 | `0101` | [The asset table is addressed by a u8, so ch06 RECLAIMS a slot rather than appending](decisions/0101-the-asset-table-is-addressed-by-a-u8-so.md) | 2026-09-03 | #26 |
-| `0102` | [A hosted chapter inherits its host slot's FOG, and nothing guards that](decisions/0102-a-hosted-chapter-inherits-its-host-slot-s-fog.md) | 2026-09-03 | #26 |
+| `0102` | [Hosting ch06 on a FOGGED slot is what found the fifth inheritable field](decisions/0102-a-hosted-chapter-inherits-its-host-slot-s-fog.md) | 2026-09-03 | #26 |
 | `0103` | [A chapter declares its traps; .traps is the fourth inherited field](decisions/0103-a-chapter-declares-its-traps-traps-is-the-fourth.md) | 2026-08-22 | #302 |
 | `0104` | [The arena tutorial is safety text, so it plays in every mode](decisions/0104-the-arena-tutorial-is-safety-text-so-it-plays.md) | 2026-08-22 | #303 |
 | `0105` | [Ravisin was holding a bar that had moved](decisions/0105-ravisin-was-holding-a-bar-that-had-moved.md) | 2026-08-22 | #303 |

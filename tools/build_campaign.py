@@ -7160,7 +7160,11 @@ def chapter_fog_level(chap):
     ch04 is why this reads from the YAML rather than only guarding inheritance: it WANTS
     fog, and got it from a literal `3` inside its injector, which means "ch04 is a fogged
     chapter" was written down nowhere a reader of ch04 would think to look."""
-    if 'fog' not in (chap if isinstance(chap, dict) else {}):
+    if not isinstance(chap, dict):
+        sys.exit('ERROR: a chapter YAML parsed as %r, not a mapping -- an empty or '
+                 'comment-only chapter file reaches every declaration reader this way, so '
+                 'it is refused here rather than crashing on the first `.get`' % type(chap))
+    if 'fog' not in chap:
         sys.exit('ERROR: chapter %s declares no `fog:` -- a chapter that names none '
                  'INHERITS its host slot\'s initialFogLevel, which belongs to a different '
                  'chapter. Declare `fog: none` for no fog, or a vision radius in tiles '
