@@ -6,69 +6,50 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-17 (Claude), after #390 and #392 were reviewed and merged. Deep-cleaned
-2026-08-20 at Nicolas's instruction: anything already
-recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was deleted from here rather than
-restated. Check that a thing has a home before writing it here.
+Refreshed 2026-09-17 (Claude), after six PRs landed in one session. Deep-cleaned 2026-08-20 at
+Nicolas's instruction: anything already recorded in `docs/decisions.md`, `CLAUDE.md` or a
+GitHub issue was deleted from here rather than restated. Check that a thing has a home before
+writing it here.
 
 ## In flight
 
-**Nothing. No open PRs, no branches.** #390 and #392 were reviewed and squash-merged
-2026-09-17 (`b02e336`, `02d5227`) and their branches are pruned; #391 is closed. The
-#380/#382/#384/#386 stack merged the same day (`fc65180`..`747e7a5`).
+**Nothing. No open PRs, no branches.** Everything below ch06 on the old Next-up list is done.
 
-**#389's groundwork is ON MAIN, and no domain is extracted yet** — the paths module, the shared
-HEAD reader, and `tools/injection_fingerprint.py`. **Run the gate around every extraction:**
-`--write before.json`, move the code, `--check before.json`. ~50s, and it reports 975 injected
-files. The why, and what "every file it touched" had to be made to mean, is ADR 0287.
+Landed 2026-09-17, each reviewed and squash-merged (`b02e336`..`bd9e118`): **#390** (#389's
+groundwork + the injection-fingerprint gate), **#392** (#391, review the written surface),
+**#394** (#30, campaign.yaml), **#395** (#365, `apply_chapter_fog`), **#397** (#379, skip
+claims), **#399** (#337, the cutscene-actor guard), **#400** (#377, one tileset default).
+Their ADRs are 0287-0293 and are deliberately not restated here.
 
-⚠️ **Three review rounds across those two PRs found nine defects, and every one was in the
-hand-written surface** — the gate itself, its registry patterns, its own ADR's evidence. That is
-ADR 0288's claim holding on the first PR it was applied to. Two are worth knowing before writing
-the next guard, both recorded where they belong and not restated here: a gate built on
-`git status` cannot see what the injector writes into ignored paths, and a `DEAD_CONCEPTS`
-pattern that spans a negation fires on the rule being stated correctly.
+⚠️ **`tools/injection_fingerprint.py` is the tool to reach for on ANY mechanical change**, not
+just #389's extractions. Four of this session's PRs used it to prove byte-identical output
+across a refactor (975 files, ~50s): `--write before.json`, change, `--check before.json`. It
+is what turned "this should be equivalent" into a measurement each time.
 
-⚠️ **Read ADR 0287 before touching #389.** Two things it records will otherwise be re-derived
-the hard way: a byte-identical ROM is NOT a usable gate (make skips work it thinks is done —
-the first check "passed" in 1.1s), and **the file's 18 section banners are not domain
-boundaries** — `inject_ch03`/`ch04`/`ch05` all sit under a banner reading "Chapter 6". An
-extraction along the `Enemy class reskins` banner passed the fingerprint gate byte-identical
-and still broke four unit tests, and was reverted.
-
-⚠️ **Four operating facts changed under you on 2026-09-17. The ADRs carry the why; these are
-the parts that change what you DO:**
-- **A commit is ~45s, not 6-10 minutes.** Don't background it.
-- **Type the review level every time** (`/code-review <PR> medium`). Omitting it does not mean
-  medium — the skill reuses the level typed last. AGENTS.md carries the rule.
-- **`docs/decisions.md` is a generated INDEX** over `docs/decisions/NNNN-*.md`. Read the index,
-  open the two or three records you need, and **never hand-edit the index** — `check.py`
-  regenerates and diffs it. New decision = a new file + `python3 tools/gen_decisions_index.py`.
-- **CI is two workflows now.** `checks.yml` runs on everything; `build.yml` (jobs `tests` and
-  `build`) skips an allowlist of inert docs. A docs-only commit no longer builds a ROM.
-
-**#388 is CLOSED** — Nicolas answered it: September's ratio is an artefact of him being away
-on other work, not drift. Not a signal, not queued work.
+**Opened this session and NOT started** — each carries its own measured evidence, so read the
+issue rather than re-deriving:
+- **#393** — the chapter YAML is outside the drift scan, and ch05 carries 8 hits of the retired
+  CHARACTER-wrap vocabulary. Some are past-tense narration and must not be swept blind.
+- **#396** — the `ROMChapterData` census. Fog was the FIFTH inheritable field found one at a
+  time; this answers "is there a sixth" once.
+- **#398** — ⚠️ **inherited vanilla scenes stage `CHARACTER_EIRIKA`, which is braulo.** #337's
+  guard only sees scenes we WRITE. Whether any inherited one still runs is unanswered, and if
+  one does it is the soft-lock #337 exists to prevent, in code we never wrote.
 
 ## Next up — ordered by effort. CLAUDE'S RECOMMENDATION, not a decision Nicolas has made
 
-Sized 2026-09-16 off `make chapter CH=ch06` and the issue bodies, cheapest first. Each line is
-the issue's own scope — read the issue, don't re-derive it here.
+The 2026-09-16 list is spent: #30, #365, #379, #337 and #377 all landed 2026-09-17. What is
+left of it is **#367's remainder**, and then **ch06 itself**.
 
 | | issue | effort | why now / what it costs |
 |---|---|---|---|
-| 1 | **#30** | XS | `campaign.yaml`'s `chapters:` block is off-by-one from ch04 on. Since #312 there is ONE reader (`tools/campaign_chapters.py`), so the block gets DERIVED rather than hand-kept. Nothing reads it today, so nothing can break. |
-| 2 | **#365** | S | `apply_chapter_fog` over `hosted_chapters()`, mirroring `apply_chapter_difficulty` / `apply_chapter_traps`; `inject_ch06` already refuses a `fog:` it cannot write, which is the shape to generalise. ⚠️ **Split the ROMChapterData census off** — it is the larger half and answers a different question. |
-| 3 | **#377** | S, but BLOCKED | Needs Nicolas's call first: where a campaign's keyless-sidecar default lives, given `map_donor` is stdlib-only BY DESIGN. Cheap to write once that is answered, pointless to start before. |
-| 4 | **#379** | S–M | Four guards (`check_documented_tileset`, `check_personal_line_injection_routes`, `check_rescue_targets`, `check_rescue_fuse_forecast`) cannot run on the CI job that runs `check.py` — pyyaml only, no submodule — and each says "the `tests` job's `make test` covers it" in PROSE (it said "the build job" until #382 split that job out, and the prose had to be hand-corrected -- which is itself the argument for this issue). It is true today (all four have live-tree assertions there) and nothing holds it there. Their skip PATHS are untested too, which is the bug #373's review caught. Either machine-check the claim or stop skipping, the way #373 did. |
-| 5 | **#337** | M | The permadeath invariant, and **the prerequisite for ch06's dialogue** — a scene that stages a PC it never `LOAD`s soft-locks the chapter the first time that PC is dead when the beat fires. 14 staging sites today. Sibling of `assert_scripted_move_reachable`, which checks the terrain and not the unit. |
-| 6 | **#367's remainder** | M, and mostly DECISIONS not code | Lock ch03–ch06 or accept the gate is decorative for them; the party-level band into `docs/fe8-pacing-reference.md`. ⚠️ **ch07 is the watch item** — it reuses FE8 Ch6 as its bar. |
-| 7 | **#26 — ch06's own body** | L | The chapter itself, and the reason the rest of this list exists. |
-| 8 | **#389's remainder** | L, incremental | Decompose `build_campaign.py` (15,126 lines, ~249k tokens — bigger than a context window, so it can only be grepped). The gate and the shared layer are on main; the work left is cluster-by-cluster extraction, each move wrapped in `injection_fingerprint --write`/`--check`. **Next concrete step: cluster the file by DEPENDENCY, not by banner** (ADR 0287). ⚠️ **ch06 is extracted LAST, after it ships** — Nicolas's call, so it gets written into the clean structure rather than appended to the pile. |
+| 1 | **#367's remainder** | M, and HALF of it is Nicolas's call | Two of its four proposals are open. **Proposal 3** (land the party-level band into `docs/fe8-pacing-reference.md`, derived and regenerated) is code and is derivable — the exp model was spike code, never committed, and its numbers are in the 2026-09-04 comment. **Proposal 4** (lock ch03–ch06, or accept the gate is decorative for them) is a DECISION and is blocked on Nicolas: the same investigation argues the parity ratio is converging on a tautology, so locking ch06 would gate on a number it says means nothing. ⚠️ **ch07 is the watch item** — it reuses FE8 Ch6 as its bar. |
+| 2 | **#26 — ch06's own body** | L | The chapter itself, and the reason the rest of this list existed. **#337 has landed, so the dialogue pass is no longer gated.** |
+| 3 | **#389's remainder** | L, incremental | Decompose `build_campaign.py`. The gate and the shared layer are on main; the work is cluster-by-cluster extraction, each move wrapped in `injection_fingerprint`. **Cluster by DEPENDENCY, not by banner** (ADR 0287). ⚠️ ch06 is extracted LAST, after it ships. |
+| 4 | **#393 · #396 · #398** | S–M each | Opened this session off measured evidence; see In flight. **#398 first of the three** — it is a possible live soft-lock, not a cleanup. |
 
-**The recommendation, in one line: #337, then #26** — everything above #337 is cheap enough to
-slot in anywhere, while #337 is the only item that GATES the work that matters. #30, #365 and #379
-are good warm-ups or filler; #377 should not be started until Nicolas answers it.
+**The recommendation, in one line: answer #367's proposal 4, then start #26.** Nothing else
+gates ch06 any more.
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
