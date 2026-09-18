@@ -134,6 +134,65 @@ class TheGateCatchesABrokenClaim(unittest.TestCase):
                                 'test_personal_line_routes_gate_passes')})
         self.assertTrue(fail)
 
+    def test_a_test_decorated_to_SKIP_is_reported(self):
+        """Coverage that never runs is not coverage, and it stays green forever."""
+        import tempfile
+        d = tempfile.mkdtemp(dir=os.path.join(check.REPO, 'tools'))
+        rel = os.path.join('tools', os.path.basename(d), 'test_fixture.py')
+        with open(os.path.join(check.REPO, rel), 'w') as fh:
+            fh.write('import unittest\n@unittest.skip("x")\n'
+                     'def test_it():\n    check.check_documented_tileset([])\n')
+        try:
+            original = check.SKIP_COVERAGE
+            collected = __import__('run_tests').test_files
+            check.SKIP_COVERAGE = {'check_documented_tileset': (rel, 'test_it')}
+            __import__('run_tests').test_files = lambda: [os.path.join(check.REPO, rel)]
+            fail = []
+            check.check_skip_claims_name_a_live_test(fail)
+            self.assertTrue(any('SKIP' in f for f in fail), fail)
+        finally:
+            check.SKIP_COVERAGE = original
+            __import__('run_tests').test_files = collected
+            import shutil
+            shutil.rmtree(d, ignore_errors=True)
+
+    def test_a_guard_name_surviving_only_in_a_COMMENT_is_not_a_call(self):
+        """The substring hole: fixture-ify the body, leave the name in a docstring."""
+        node = ast.parse('def t():\n    """calls check_documented_tileset"""\n    pass\n')
+        fn = node.body[0]
+        self.assertFalse(check._calls_guard(fn, 'check_documented_tileset'))
+
+    def test_a_real_call_is_recognised_through_the_module_attribute(self):
+        node = ast.parse('def t():\n    check.check_documented_tileset([])\n')
+        self.assertTrue(check._calls_guard(node.body[0], 'check_documented_tileset'))
+
+    def test_every_call_site_of_the_helper_is_registered(self):
+        """A fifth guard copying the pattern without a table entry used to be green
+        locally and on `tests`, and raise KeyError only on `checks`."""
+        for guard, claimed in check._helper_call_sites():
+            self.assertEqual(guard, claimed)
+            self.assertIn(claimed, check.SKIP_COVERAGE)
+
+    def test_an_unregistered_guard_does_not_raise_on_the_lightweight_job(self):
+        import io
+        from contextlib import redirect_stdout
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            check._skip_covered_elsewhere('check_not_registered', ImportError('x'))
+        self.assertIn('NO COVERAGE DECLARED', buf.getvalue())
+
+    def test_the_exception_set_is_the_two_that_really_happen(self):
+        """OSError was too wide: a permission error or a path broken by a refactor must
+        ESCAPE and be reported as a guard that could not run, not printed as a delegation."""
+        self.assertEqual((ImportError, FileNotFoundError), check.SKIP_IMPORT_ERRORS)
+
+    def test_a_covering_test_that_cannot_prove_the_guard_RAN_is_reported(self):
+        """The vacuity hole: `assertEqual([], fail)` passes on a run that checked nothing."""
+        fail = self._run_with({'check_rescue_targets':
+                               ('tools/test_check_skip_claims.py',
+                                'test_a_real_call_is_recognised_through_the_module_attribute')})
+        self.assertTrue(fail)
+
     def test_the_live_table_passes(self):
         fail = []
         check.check_skip_claims_name_a_live_test(fail)

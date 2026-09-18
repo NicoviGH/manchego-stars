@@ -35,6 +35,29 @@ the call means renaming it, deleting it, repointing it or fixture-ifying it **fa
 rather than the coverage. The gate's own tests prove it fails on each of those, because a gate
 that only ever passes is the thing being fixed here, not something to reproduce.
 
+Three details decide whether that tie holds, and the first version of this gate got all three
+wrong:
+
+- **the call is found by AST, not substring.** A guard's name surviving in a docstring after the
+  call was fixture-ified satisfies `guard in source` — reopening the exact hole;
+- **the test must resolve to exactly one definition.** Two classes can hold the same method
+  name, and then "the covering test" names two different tests, one of which may be the
+  fixture-only one;
+- **a test decorated `@unittest.skip` is not coverage.** It keeps its name, keeps its call, and
+  never runs.
+
+## Proving the test CALLS the guard does not prove the guard RAN
+
+The subtler half, and the reason the first version of this gate was itself vacuous. If the
+dependency goes missing on the `tests` job too — pillow dropped from `build.yml`'s pip line, a
+submodule checkout without `terrains.h` — the guard skips **there as well**, and a covering test
+whose whole body is `check.check_documented_tileset(fail); assertEqual([], fail)` passes on a run
+that checked nothing. Three of the four covering tests were exactly that shape.
+
+So each covering test now captures stdout and asserts the guard **did not skip**, and the gate
+requires that assertion to be present. The claim is only worth what its weakest link is, and the
+weakest link was never the table.
+
 The printed message now names the covering test, so a reader of a CI log can go and read the
 coverage instead of being told it exists.
 
@@ -46,8 +69,12 @@ caught exactly this in another guard, where it would have reddened every PR on t
 was written to protect. All four guards carried those same three lines and **no test exercised
 any of them**: they only ever ran on a machine where the import succeeds.
 
-`SKIP_IMPORT_ERRORS = (ImportError, OSError)` now, and the skip paths are driven with the module
-genuinely unimportable — a `meta_path` finder whose `find_spec` raises. Two details that decide
+`SKIP_IMPORT_ERRORS = (ImportError, FileNotFoundError)` now — **not** `OSError`, which was the
+first fix and was too wide: a genuine module-scope I/O failure (a path broken by a refactor, a
+permission error) would then be printed as an intentional coverage delegation on every job, when
+it should escape and be reported by `run_checks` as a guard that could not run. Absent
+dependency, absent file, nothing else. The skip paths are driven with the module genuinely
+unimportable — a `meta_path` finder whose `find_spec` raises. Two details that decide
 whether that test is worth anything:
 
 - it asserts **what was printed**, not just that `fail` is empty. `fail == []` passes just as
@@ -56,6 +83,11 @@ whether that test is worth anything:
   would have made the test rot silently.
 
 Verified by regression: restoring the narrow `(ImportError,)` clause fails two of them.
+
+One last hole the helper itself had: `SKIP_COVERAGE[guard]` was an unguarded lookup, so a fifth
+guard copying the pattern without a table entry would be green locally and on `tests`, and raise
+`KeyError` only on `checks` — the one job nobody runs by hand. The lookup degrades to a loud
+message, and the gate checks that every call site passes its own name and is registered.
 
 ## Why machine-check the claim rather than stop skipping
 

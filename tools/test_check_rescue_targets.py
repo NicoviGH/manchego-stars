@@ -90,8 +90,17 @@ class TheGateSurvivesAnUngroundedRosterEntry(unittest.TestCase):
         real = bc.map_tileset
         bc.map_tileset = lambda meta: 'snowy-bern-NOPE'
         try:
+            import io
+            from contextlib import redirect_stdout
+            buf = io.StringIO()
             fail = []
-            check.check_rescue_targets(fail)          # must not raise
+            with redirect_stdout(buf):
+                check.check_rescue_targets(fail)      # must not raise
+            # A non-empty `fail` already proves the guard ran, but say so explicitly: this
+            # test is what SKIP_COVERAGE names as the `tests` job's half of the claim (#379),
+            # and the gate requires each covering test to rule out its own vacuity.
+            self.assertNotIn('skipping', buf.getvalue(),
+                             'the guard skipped on the tests job, so this test proves nothing')
             self.assertTrue(fail, 'an unreadable tileset must be reported, not skipped')
             self.assertTrue(any('ch06' in f for f in fail), fail)
         finally:

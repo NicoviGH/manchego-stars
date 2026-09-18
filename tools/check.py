@@ -193,7 +193,12 @@ SKIP_COVERAGE = {
 # NOT just ImportError: `map_placement_preview` opens the decomp's `terrains.h` at module
 # scope, so with no submodule it raises FileNotFoundError -- #373's review caught a clause
 # that would therefore have reddened every PR on the one job it was written to protect.
-SKIP_IMPORT_ERRORS = (ImportError, OSError)
+#
+# And not OSError either, which was the first fix and was too wide: a genuine module-scope I/O
+# failure (a path broken by a refactor, a permission error) would then be reported as an
+# intentional coverage delegation on EVERY job, when it should escape and be reported by
+# `run_checks` as a guard that could not run. Absent dependency, absent file -- nothing else.
+SKIP_IMPORT_ERRORS = (ImportError, FileNotFoundError)
 
 
 def _skip_covered_elsewhere(guard, exc):
@@ -202,21 +207,74 @@ def _skip_covered_elsewhere(guard, exc):
     Routed through the registry so the claim and the message cannot drift apart: the test
     named in the printed line is the same string the gate verifies.
     """
-    rel, name = SKIP_COVERAGE[guard]
+    claim = SKIP_COVERAGE.get(guard)
+    if claim is None:
+        # `check_skip_claims_name_a_live_test` makes this unreachable, but a bare KeyError
+        # here would fire ONLY on the lightweight job -- the one nobody runs locally.
+        print('%s: skipping (%s) -- NO COVERAGE DECLARED, add it to SKIP_COVERAGE' % (guard, exc))
+        return
+    rel, name = claim
     print('%s: skipping (%s; covered by %s::%s on the `tests` job)' % (guard, exc, rel, name))
 
 
-def _covering_test_source(rel, name):
-    """The source of test `name` in `rel`, or None if either is missing."""
+def _covering_test_nodes(rel, name):
+    """(source, node) for test `name` in `rel`, or a reason string it could not be resolved."""
     path = os.path.join(REPO, rel)
     if not os.path.isfile(path):
-        return None
+        return 'the file does not exist'
     with open(path, encoding='utf-8') as fh:
         text = fh.read()
-    for node in ast.walk(ast.parse(text)):
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            return ast.get_source_segment(text, node)
-    return None
+    found = [n for n in ast.walk(ast.parse(text))
+             if isinstance(n, ast.FunctionDef) and n.name == name]
+    if not found:
+        return 'no such test'
+    if len(found) > 1:
+        # Two classes can hold the same method name, and then "the covering test" names two
+        # different tests -- one of which may be the fixture-only one.
+        return 'the name is defined %d times, so the claim is ambiguous' % len(found)
+    return ast.get_source_segment(text, found[0]), found[0]
+
+
+def _calls_guard(node, guard):
+    """True if the test body really CALLS `guard`, by AST rather than by substring.
+
+    A substring match is satisfied by the guard's name surviving in a docstring or a comment
+    after the call itself was fixture-ified -- which is the exact hole #379 exists to close."""
+    for sub in ast.walk(node):
+        if not isinstance(sub, ast.Call):
+            continue
+        func = sub.func
+        if isinstance(func, ast.Attribute) and func.attr == guard:
+            return True
+        if isinstance(func, ast.Name) and func.id == guard:
+            return True
+    return False
+
+
+def _is_skipped_test(node):
+    """`@unittest.skip`/`skipIf`/`skipUnless` on the covering test makes it no coverage."""
+    for dec in node.decorator_list:
+        target = dec.func if isinstance(dec, ast.Call) else dec
+        name = target.attr if isinstance(target, ast.Attribute) else getattr(target, 'id', '')
+        if str(name).startswith('skip'):
+            return True
+    return False
+
+
+def _helper_call_sites():
+    """Guard names passed to `_skip_covered_elsewhere` in this file, by AST."""
+    with open(os.path.abspath(__file__), encoding='utf-8') as fh:
+        tree = ast.parse(fh.read())
+    sites = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        for sub in ast.walk(node):
+            if isinstance(sub, ast.Call) and getattr(sub.func, 'id', None) == \
+                    '_skip_covered_elsewhere' and sub.args:
+                literal = sub.args[0]
+                sites.append((node.name, getattr(literal, 'value', None)))
+    return sites
 
 
 def check_skip_claims_name_a_live_test(fail):
@@ -236,6 +294,16 @@ def check_skip_claims_name_a_live_test(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     import run_tests
     collected = {os.path.relpath(p, REPO) for p in run_tests.test_files()}
+
+    for guard, claimed in sorted(_helper_call_sites()):
+        if claimed not in SKIP_COVERAGE:
+            fail.append('%s calls _skip_covered_elsewhere(%r), which is not in SKIP_COVERAGE '
+                        '-- the message would be wrong and the lookup would fail on the '
+                        '`checks` job only' % (guard, claimed))
+        elif claimed != guard:
+            fail.append('%s claims coverage under the name %r -- a guard must declare its own'
+                        % (guard, claimed))
+
     for guard, (rel, name) in sorted(SKIP_COVERAGE.items()):
         if not callable(globals().get(guard)):
             fail.append('SKIP_COVERAGE names %s, which is not a check in this file' % guard)
@@ -244,14 +312,30 @@ def check_skip_claims_name_a_live_test(fail):
             fail.append('%s claims %s, which `run_tests.py` does not collect -- the coverage '
                         'would never run' % (guard, rel))
             continue
-        src = _covering_test_source(rel, name)
-        if src is None:
-            fail.append('%s claims %s::%s, which does not exist -- the skip message is now '
-                        'false' % (guard, rel, name))
-        elif guard not in src:
+        resolved = _covering_test_nodes(rel, name)
+        if isinstance(resolved, str):
+            fail.append('%s claims %s::%s, but %s -- the skip message is now false'
+                        % (guard, rel, name, resolved))
+            continue
+        src, node = resolved
+        if _is_skipped_test(node):
+            fail.append('%s claims %s::%s, which is decorated to SKIP -- coverage that never '
+                        'runs is not coverage' % (guard, rel, name))
+        if not _calls_guard(node, guard):
             fail.append('%s claims %s::%s, but that test does not call %s -- it was renamed, '
                         'fixture-ified or repointed, and the guard now covers nothing on '
                         'either job' % (guard, rel, name, guard))
+        elif 'skipping' not in src:
+            # The subtler half, and the one the first version of this gate missed. Proving the
+            # test CALLS the guard does not prove the guard RAN: if the dependency goes missing
+            # on the `tests` job too (pillow dropped from build.yml, a submodule checkout that
+            # omits terrains.h), the guard skips there as well and a test asserting only
+            # `fail == []` passes on an empty run. So the covering test has to assert it did
+            # not skip, and that assertion is what is required here.
+            fail.append('%s claims %s::%s, which never mentions `skipping` -- it therefore '
+                        'passes just as happily when the guard SKIPPED on the tests job too. '
+                        'Assert on the printed output, not only on an empty fail list'
+                        % (guard, rel, name))
 
 
 def _campaign_yamls():
