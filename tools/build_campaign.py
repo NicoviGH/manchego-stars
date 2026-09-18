@@ -85,6 +85,7 @@ import map_tileset_tool  # noqa: E402  owns tilesets; DEFAULT_TILESET lives ther
 from inject import decomp as _decomp  # noqa: E402  the shared writer's validator hook
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
 from inject import event_group  # noqa: E402  the ChapterEventGroup census guard (#313)
+from inject import chapter_data  # noqa: E402  the ROMChapterData census guard (#396)
 from inject import step_cache  # noqa: E402  restore a config-invariant step (#309)
 
 # The YAML reader lives in tools/yaml_loader.py -- stdlib+pyyaml only, so the lightweight CI
@@ -15510,6 +15511,14 @@ def main():
         print('event group census (#313):')
         event_group.assert_census_declared()
         print('  every ChapterEventGroup field is written or declared-inherited')
+        # The same question about the OTHER struct a hosted chapter squats. Five
+        # chapter_settings fields have shipped inherited-unexamined -- goal text ids (#207),
+        # battle grounds (#289), the difficulty triple (#303), `.traps` (#302), fog (#365) --
+        # each found one at a time by something else going wrong. This rules on all 98 at
+        # once, so there is no sixth to find that way (#396).
+        print('chapter data census (#396):')
+        chapter_data.assert_census_declared()
+        print('  every ROMChapterData field is written, pass-owned or declared-inherited')
         # The census rules on the twenty FIELDS; this rules on everything those fields lead
         # to. Our injectors edit a host slot's event-script file without rewriting every scene
         # in it, so untouched vanilla scenes sit in the files we write -- five of them staging
