@@ -447,7 +447,8 @@ events:
   #    deal MOVE to the talk. This fixes an ORDERING bug — a freely-timed talk recruit can't
   #    put its intro in a fixed Brute-defeat cutscene (a player who talks to green Trex first
   #    would recruit him BEFORE the cutscene "introduces" him, and his line would thank RBG for
-  #    an execution that hadn't happened). See decisions.md → Ch3 recruit-wiring ADR.
+  #    an execution that hadn't happened). See decisions.md → "Each recruit's JOIN uses vanilla
+  #    FE8 primitives, wired per its own method", which records this decoupling on its own line.
   - trigger: trex_entrance     # light green-NPC beat (Colm's turn-1 pattern); rides the #23 Cutscenes item
     type: cutscene
     description: >

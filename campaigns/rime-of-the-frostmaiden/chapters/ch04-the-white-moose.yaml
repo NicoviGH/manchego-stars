@@ -413,7 +413,8 @@ villages:
     # 2026-07-03 consolidated the dread there), so this is the setup, not a second seed.
     # Register twin is vanilla's own lore village MSG_963 — a villager who names the local
     # menace, repeats himself, and trails off. Form twin is MSG_9B5: one speaker, BG village.
-    # ONE ENTRY PER BOX; each is exactly two lines at the Text_BG wrap of 42.
+    # ONE ENTRY PER BOX; each is exactly two lines at the 203px budget (re-measured under the
+    # pixel wrap, #298/#393 -- all five still flow to two, so the boxing is unchanged).
     visit_text:
       - "I'll talk through the door, if it's all the same. Nothing personal."
       - "Woman came to the cutting camps in autumn. White furs. Said put the axes down."

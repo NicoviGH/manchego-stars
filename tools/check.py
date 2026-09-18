@@ -45,9 +45,12 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
              # ADR 0004 before a line of it was written. Its name is in the dead registry for
              # that reason, alongside the `data_sources:` block's two more, whose files were
              # never committed either.
-             # The CHAPTER yaml is deliberately not here yet: it carries eight live hits of
-             # the retired 29/42-CHARACTER wrap vocabulary, which is its own sweep (#393).
-             'campaigns/*/campaign.yaml']
+             # The CHAPTER yaml joined in #393, once the eight live hits of the retired
+             # 29/42-CHARACTER wrap vocabulary it was carrying were read in context and
+             # cleared. It holds more authored prose than any doc in this repo -- dialogue
+             # rationale, wiring notes, the locked-beat record -- and every line of it is
+             # doctrine the next session reads.
+             'campaigns/*/campaign.yaml', 'campaigns/*/chapters/*.yaml']
 
 # Terms that are NEVER legitimate in vision/ops docs OR hand-written code comments:
 # abandoned tools, dead code symbols, retired implementation phrases. decisions.md
@@ -108,7 +111,19 @@ DEAD_CONCEPTS = [
     # sums glyph->width -- and the 29 was generalised from MSG_910, one narrow vanilla message.
     # A comment that still prices a channel in characters is describing a wrapper we deleted,
     # and mixing the units is what shipped ch05's moose scene at seven characters a line.
-    r'(?:wraps?|wrapped|wrapping) at (?:the )?(?:on-?map |scenic |full-screen )?(?:29|42|28)\b',
+    #
+    # KEY THESE ON THE UNIT, NOT ON A SENTENCE. The first sweep (#298) matched the phrasings it
+    # could see, the second (#311) found three more in docstrings, and #393 found SEVEN more
+    # the moment the chapter YAML joined the scan -- `29-char bubble`, `Text_BG wrap of 42`,
+    # `~29-30 ch/line`, `the 29-wrap`, `29-column wrap`, `wraps at ~42`. Every one of them says
+    # the same retired thing in a spelling the previous pattern did not anticipate, because a
+    # pattern written from the hits in front of you only ever matches the hits in front of you.
+    # So: a retired number ADJACENT TO A CHARACTER UNIT, however it is punctuated.
+    r'(?:wraps?|wrapped|wrapping) (?:at|of|to) (?:the )?'
+    r'(?:on-?map |scenic |full-screen |Text_?BG )?~?\s*(?:29|42|28)\b',
+    r'(?<![\d.])~?\s*(?:28|29|42)\s*-?\s*(?:char|column)\w*',
+    r'\b(?:28|29|30|42)(?:\s*-\s*\d+)?\s*ch\s*(?:/|per )\s*line',
+    r'\b(?:28|29|42)[- ]wrap\b',
     r'(?:map[- ])?bubble\'?s? (?:own )?29\b', r'scenic 42\b', r'the on-map 28\b',
     r'(?:eruption|quake).{0,30}(?:wakes?|cracks?).{0,20}(?:Sahnar|sarcophagus)',
     r'Sahnar.{0,20}rises? (?:HOSTILE )?(?:at|with) the eruption',
@@ -2269,6 +2284,21 @@ def check_campaign_declares_no_chapter_list(fail):
                 'into docs/CHAPTERS.md' % os.path.relpath(path, REPO))
 
 
+# Lines that NAME the record rather than restate the concept. A retirement's TITLE has to
+# contain the words it retired -- "We wrapped on-map talk at 29 CHARACTERS; the engine measures
+# PIXELS" is the name of the very decision that killed the character wrap -- so a comment citing
+# it by name is testimony, exactly as docs/decisions/ is exempt wholesale. Kept to EXACT title
+# phrases: a general "mentions decisions.md" escape would let any drift hide behind a citation,
+# and the registry's own notes warn twice that a guard which rejects its own warning is worse
+# than none.
+DEAD_CONCEPT_CITATIONS = (
+    # The title fragment, WITHOUT its "We wrapped on-map" opening: a wrapped comment breaks
+    # the line wherever it breaks, and three of the four live citations put the break inside
+    # the title. Matching from "talk at" is still specific to this one record.
+    r'talk at 29 CHARACTERS',
+)
+
+
 def check_no_dead_concepts(fail):
     """Retired terms/mechanisms must not survive in docs OR hand-written code
     comments (the 2026-07-02 incident: a superseded mechanism lived on in a
@@ -2281,6 +2311,7 @@ def check_no_dead_concepts(fail):
     Everything outside it is still held: the point of this gate is that a dead concept must
     not be restated anywhere it could be mistaken for current fact."""
     pat = re.compile('|'.join(DEAD_CONCEPTS), re.I)
+    cited = re.compile('|'.join(DEAD_CONCEPT_CITATIONS), re.I)
     decisions_dir = os.path.join(REPO, 'docs', 'decisions') + os.sep
     for d in _docs() + _handwritten_sources():
         if os.path.basename(d) == 'decisions.md' or d.startswith(decisions_dir):
@@ -2288,7 +2319,7 @@ def check_no_dead_concepts(fail):
         with open(d, encoding='utf-8') as fh:
             for i, line in enumerate(fh, 1):
                 m = pat.search(line)
-                if m:
+                if m and not cited.search(line):
                     fail.append('dead concept %r in %s:%d'
                                 % (m.group(0), os.path.relpath(d, REPO), i))
 

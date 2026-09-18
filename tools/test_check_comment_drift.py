@@ -39,6 +39,28 @@ class DeadConceptPatterns(unittest.TestCase):
         self.assertIsNotNone(DEAD_PAT.search('zeroed growths'))
         self.assertIsNotNone(DEAD_PAT.search('pure-class growth'))
 
+    def test_a_retired_wrap_WIDTH_is_caught_in_every_spelling(self):
+        """#393: seven more of these were sitting in the chapter YAML in spellings the first
+        two sweeps never anticipated. A pattern written from the hits in front of you only
+        matches the hits in front of you, so these key on the UNIT next to the number."""
+        for dead in ('a 29-char on-map bubble',
+                     'two lines at the Text_BG wrap of 42',
+                     'boxed to GBA width (~29-30 ch/line, 2 lines/box)',
+                     'two authored presses at the 29-wrap',
+                     'the 29-column wrap',
+                     'the full-screen window wraps at ~42',
+                     'pages of up to two ~42-char lines',
+                     'reflows at 42 columns and buttons mid-sentence'):
+            self.assertIsNotNone(DEAD_PAT.search(dead), dead)
+
+    def test_a_COLOUR_count_is_not_a_wrap_width(self):
+        """`col\\w*` reaches "colours", and a palette depth that happens to end in 28 is not a
+        line width. The registry is read by people fixing real drift; a guard that cries wolf
+        gets bypassed."""
+        for ok in ('4bpp per 8x8 tile -> 128 colours max',
+                   'the bank holds 28 colours'):
+            self.assertIsNone(DEAD_PAT.search(ok), ok)
+
     def test_live_donor_vocabulary_is_not_flagged(self):
         for ok in ('growths copied verbatim from the growth donor',
                    'the donor personal bases',
@@ -101,6 +123,38 @@ class HandwrittenSourceScan(unittest.TestCase):
         scanned = [os.path.relpath(p, check.REPO)
                    for p in check._docs() + check._handwritten_sources()]
         self.assertIn('campaigns/rime-of-the-frostmaiden/campaign.yaml', scanned)
+
+    def test_citing_the_record_that_RETIRED_a_concept_is_not_drift(self):
+        """A retirement's title has to contain the retired words -- "We wrapped on-map talk at
+        29 CHARACTERS; the engine measures PIXELS" is the name of the very decision that killed
+        the character wrap. A comment citing it by name is testimony, the same reason
+        docs/decisions/ is exempt wholesale, and a guard that rejects its own warning is worse
+        than none."""
+        path = self._with_planted_file(
+            '# see decisions.md -> "We wrapped\n# on-map talk at 29 CHARACTERS".\n')
+        try:
+            orig_docs, orig_src = check._docs, check._handwritten_sources
+            check._docs = lambda: []
+            check._handwritten_sources = lambda: [path]
+            fail = []
+            check.check_no_dead_concepts(fail)
+            self.assertEqual([], fail)
+        finally:
+            check._docs, check._handwritten_sources = orig_docs, orig_src
+            os.unlink(path)
+
+    def test_the_scan_covers_the_CHAPTER_declarations(self):
+        """A chapter YAML carries more authored prose than any doc in this repo -- the
+        dialogue rationale, the wiring notes, the locked-beat record -- and every line of it
+        is doctrine the next session reads. It stayed outside the scan while it held eight
+        live hits of the retired 29/42-CHARACTER wrap vocabulary (#393), which is the exact
+        shape of drift the registry exists to catch: `campaign.yaml` joined in #30 and the
+        chapters were left because clearing them was its own job.
+        """
+        scanned = [os.path.relpath(p, check.REPO)
+                   for p in check._docs() + check._handwritten_sources()]
+        self.assertIn('campaigns/rime-of-the-frostmaiden/chapters/ch05-the-elven-tomb.yaml',
+                      scanned)
 
     def test_the_live_repo_is_clean(self):
         fail = []
