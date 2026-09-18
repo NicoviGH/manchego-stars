@@ -168,6 +168,92 @@ def _docs():
     return [d for d in out if os.path.isfile(d)]
 
 
+# A guard that cannot RUN on the job it is invoked from has to say who covers it instead, and
+# that sentence used to be the only thing holding the coverage. `SKIP_COVERAGE` makes it a
+# declaration: guard -> (test file, test name). `check_skip_claims_name_a_live_test` then holds
+# it -- the named test must exist, be collected by `run_tests.py`, and CALL the guard, so
+# deleting it, renaming it or fixture-ifying it fails the build instead of the coverage (#379).
+#
+# Only guards that claim coverage ELSEWHERE belong here. A guard that skips because there is
+# genuinely nothing to check (no lua on PATH, submodule absent) makes no such claim.
+SKIP_COVERAGE = {
+    'check_documented_tileset':
+        ('tools/test_check_chapter_schema.py',
+         'test_every_shipped_chapter_agrees_with_its_build_tileset'),
+    'check_personal_line_injection_routes':
+        ('tools/test_check_chapter_schema.py', 'test_personal_line_routes_gate_passes'),
+    'check_rescue_targets':
+        ('tools/test_check_rescue_targets.py',
+         'test_an_unreadable_TILESET_is_reported_not_silently_skipped'),
+    'check_rescue_fuse_forecast':
+        ('tools/test_check_rescue_fuse_forecast.py', 'test_the_check_never_fails_the_build'),
+}
+
+# What an import of one of those modules can actually raise on the lightweight `checks` job.
+# NOT just ImportError: `map_placement_preview` opens the decomp's `terrains.h` at module
+# scope, so with no submodule it raises FileNotFoundError -- #373's review caught a clause
+# that would therefore have reddened every PR on the one job it was written to protect.
+SKIP_IMPORT_ERRORS = (ImportError, OSError)
+
+
+def _skip_covered_elsewhere(guard, exc):
+    """Print the one legal form of "I could not run, and here is who did".
+
+    Routed through the registry so the claim and the message cannot drift apart: the test
+    named in the printed line is the same string the gate verifies.
+    """
+    rel, name = SKIP_COVERAGE[guard]
+    print('%s: skipping (%s; covered by %s::%s on the `tests` job)' % (guard, exc, rel, name))
+
+
+def _covering_test_source(rel, name):
+    """The source of test `name` in `rel`, or None if either is missing."""
+    path = os.path.join(REPO, rel)
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding='utf-8') as fh:
+        text = fh.read()
+    for node in ast.walk(ast.parse(text)):
+        if isinstance(node, ast.FunctionDef) and node.name == name:
+            return ast.get_source_segment(text, node)
+    return None
+
+
+def check_skip_claims_name_a_live_test(fail):
+    """A guard that SKIPS must name a test that exists, is collected, and CALLS it (#379).
+
+    Four guards cannot run on the `checks` job -- it installs pyyaml, checks out no submodule,
+    and they import `build_campaign` / `difficulty` / `map_placement_preview` /
+    `chapter_status`. Each printed "the `tests` job's `make test` covers it" and returned. That
+    was true when written, and a sentence is not a gate: fixture-ify the test it means and the
+    guard covers nothing on either job while still printing the reassurance. This repo has
+    shipped that shape -- `check_tile_changes_outlive_the_retarget` ran only via its own test
+    file's subprocess, which no-ops exactly where the lightweight job needed it.
+
+    Verified here: the file exists, `run_tests.py` collects it, the test is defined, and its
+    body names the guard. The last one is what makes the claim load-bearing rather than
+    decorative."""
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    import run_tests
+    collected = {os.path.relpath(p, REPO) for p in run_tests.test_files()}
+    for guard, (rel, name) in sorted(SKIP_COVERAGE.items()):
+        if not callable(globals().get(guard)):
+            fail.append('SKIP_COVERAGE names %s, which is not a check in this file' % guard)
+            continue
+        if rel not in collected:
+            fail.append('%s claims %s, which `run_tests.py` does not collect -- the coverage '
+                        'would never run' % (guard, rel))
+            continue
+        src = _covering_test_source(rel, name)
+        if src is None:
+            fail.append('%s claims %s::%s, which does not exist -- the skip message is now '
+                        'false' % (guard, rel, name))
+        elif guard not in src:
+            fail.append('%s claims %s::%s, but that test does not call %s -- it was renamed, '
+                        'fixture-ified or repointed, and the guard now covers nothing on '
+                        'either job' % (guard, rel, name, guard))
+
+
 def _campaign_yamls():
     """Every campaign's top-level declaration file."""
     return sorted(glob.glob(os.path.join(REPO, 'campaigns', '*', 'campaign.yaml')))
@@ -587,9 +673,8 @@ def check_personal_line_injection_routes(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
         import build_campaign as bc
-    except ImportError as e:
-        print('check_personal_line_injection_routes: skipping (%s; the `tests` job\'s '
-              '`make test` covers this gate)' % e)
+    except SKIP_IMPORT_ERRORS as exc:
+        _skip_covered_elsewhere('check_personal_line_injection_routes', exc)
         return
     injected_ids = {uid for _yaml, uid in bc.RAW_PID_PERSONAL_SOURCES.values()}
     slot_ids = set(bc.ENEMY_BASE_SLOT)
@@ -1142,9 +1227,8 @@ def check_documented_tileset(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
         import build_campaign as bc
-    except ImportError as exc:      # Pillow absent on the lightweight checks job
-        print('check_documented_tileset: skipping (%s; the `tests` job\'s `make test` '
-              'covers it)' % exc)
+    except SKIP_IMPORT_ERRORS as exc:   # Pillow absent / no submodule on the `checks` job
+        _skip_covered_elsewhere('check_documented_tileset', exc)
         return
     import json
     for rel, d in _chapters():
@@ -1351,9 +1435,8 @@ def check_rescue_targets(fail):
         import difficulty
         import map_placement_preview as pp
         import chapter_status as cs
-    except ImportError as exc:      # Pillow / submodule absent on the lightweight checks job
-        print('check_rescue_targets: skipping (%s; the `tests` job\'s `make test` covers it)'
-              % exc)
+    except SKIP_IMPORT_ERRORS as exc:   # Pillow / submodule absent on the `checks` job
+        _skip_covered_elsewhere('check_rescue_targets', exc)
         return
     for rel, doc in _chapters():
         boats = doc.get('rescue_boats') or []
@@ -1455,9 +1538,8 @@ def check_rescue_fuse_forecast(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
         import rescue_forecast as rf
-    except ImportError as exc:      # Pillow / submodule absent on the lightweight checks job
-        print('check_rescue_fuse_forecast: skipping (%s; the `tests` job\'s `make test` '
-             'covers it)' % exc)
+    except SKIP_IMPORT_ERRORS as exc:   # Pillow / submodule absent on the `checks` job
+        _skip_covered_elsewhere('check_rescue_fuse_forecast', exc)
         return
     for rel, doc in _chapters():
         if not (doc.get('rescue_boats') and doc.get('rescue_pursuers')):
@@ -3030,7 +3112,7 @@ CHECKS = (
     check_chapter_lua_facts, check_rescue_targets, check_rescue_fuse_forecast,
     check_documented_tileset, check_harness_local_ratchet, check_verdict_scenarios_are_guarded,
     check_no_hardcoded_symbol_addresses, check_tool_refs_exist, check_no_dead_concepts,
-    check_campaign_declares_no_chapter_list,
+    check_campaign_declares_no_chapter_list, check_skip_claims_name_a_live_test,
     check_generated_indexes_fresh, check_engine_guards_present,
     check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
