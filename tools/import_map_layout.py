@@ -15,7 +15,7 @@ import sys
 
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (worktree-aware)
 sys.path.insert(0, os.path.join(ROOT,'tools'))
-from map_tileset_tool import (_tileset_from_dir, compile_layout,
+from map_tileset_tool import (DEFAULT_TILESET, _tileset_from_dir, compile_layout,
                               preserved_terrain_targets, render_grid,
                               tilesets_are_compatible_variants,
                               vanilla_layout_data)
@@ -56,7 +56,7 @@ def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root, declar
     if len(grid) != width * height:
         return                        # dimension mismatch is reported by the checks below
     tileset = _tileset_from_dir(os.path.join(
-        maps_root, 'tilesets', export_data.get('tileset', 'snowy-bern')))
+        maps_root, 'tilesets', export_data.get('tileset', DEFAULT_TILESET)))
     errors = []
     for cell, (painted, vanilla_metatile) in enumerate(zip(grid, source_cells)):
         want = source_terrain[vanilla_metatile]
@@ -76,7 +76,10 @@ def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root, declar
         raise ValueError(
             'retile changed terrain on %d cell(s) -- re-author the metatile terrain byte '
             'in maps/tilesets/%s/, do not swap the tile: %s'
-            % (len(errors), export_data.get('tileset'), '; '.join(errors[:8])
+            # the tileset actually validated against, not the raw key: a keyless export
+            # printed `maps/tilesets/None/` while having been checked against the default
+            % (len(errors), export_data.get('tileset', DEFAULT_TILESET),
+               '; '.join(errors[:8])
                + (' ...' if len(errors) > 8 else '')))
 
 
@@ -95,8 +98,8 @@ def validate_vanilla_retile(export_data, decomp_root, maps_root, declared=None, 
     its 23 forest cells become snow drifts. The exemption is per-coordinate, so a chapter that
     merely retiles a forest is still held to the sequence, cell for cell.
     """
-    tileset = export_data.get('tileset', 'snowy-bern')
-    if not tilesets_are_compatible_variants(maps_root, 'snowy-bern', tileset):
+    tileset = export_data.get('tileset', DEFAULT_TILESET)
+    if not tilesets_are_compatible_variants(maps_root, DEFAULT_TILESET, tileset):
         return
 
     mode = export_data.get('retile_mode')
@@ -236,7 +239,7 @@ def main(argv=None):
         sys.exit('ERROR: grid size mismatch')
     grid = [flat[row * width:(row + 1) * width] for row in range(height)]
 
-    tileset = export_data.get('tileset', 'snowy-bern')
+    tileset = export_data.get('tileset', DEFAULT_TILESET)
     mapdir = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/maps')
     out_bin = os.path.join(mapdir, '%s.mar' % stem)
     compile_layout(grid, out_bin, stem, tileset=tileset)

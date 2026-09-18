@@ -119,7 +119,7 @@ class Tileset:
         return out[:top]
 
 
-def compile_layout(grid, out_bin, map_id, tileset='snowy-bern'):
+def compile_layout(grid, out_bin, map_id, tileset=DEFAULT_TILESET):
     """grid = list of rows of metatile indices -> decomp FEBuilder .mar + .json.
 
     The build runs this .mar through scripts/mar_to_map.py (Makefile %.bin: %.mar),

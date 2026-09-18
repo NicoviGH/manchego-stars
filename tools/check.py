@@ -2191,6 +2191,44 @@ def check_tool_refs_exist(fail):
                     fail.append('%s references %s which does not exist' % (rel, target))
 
 
+def _tileset_default_readers():
+    """Our own tools -- the files that could re-declare what a keyless sidecar means."""
+    out = []
+    for g in ('tools/*.py', 'tools/inject/*.py'):
+        out += glob.glob(os.path.join(REPO, g))
+    home = os.path.join(REPO, 'tools', 'map_tileset_tool.py')
+    return [p for p in sorted(out)
+            if os.path.isfile(p) and p != home
+            and not os.path.basename(p).startswith('test_')]
+
+
+def check_one_tileset_default(fail):
+    """A sidecar that names no tileset means `snowy-bern`, and ONE module may say so (#377).
+
+    `map_tileset_tool.DEFAULT_TILESET` is the home: it owns tilesets, it imports nothing but
+    stdlib, and every reader can therefore reach it -- including `map_donor`, which commits to
+    "stdlib + our own map_tileset_tool only" and reads `CHNN_LAYOUT` out of build_campaign's
+    SOURCE with a regex rather than importing it.
+
+    The copies were not harmless. `map_donor` is the READ side: its keyless resolution decides
+    which tileset a map is scored against, which decides IMPASSABLE, which decides the donor it
+    REPORTS -- the number an ADR quotes. `import_map_layout` is the WRITE side, so a divergence
+    there is baked into the sidecar rather than merely misread. Repointing the default with
+    five spellings in the tree moves some readers and not others, and nothing would have said
+    so."""
+    pat = re.compile(r"""get\(\s*['"]tileset['"]\s*,\s*['"]([^'"]+)['"]""")
+    for path in _tileset_default_readers():
+        with open(path, encoding='utf-8') as fh:
+            for i, line in enumerate(fh, 1):
+                m = pat.search(line)
+                if m:
+                    fail.append(
+                        '%s:%d re-declares the keyless-sidecar default as %r -- read '
+                        'map_tileset_tool.DEFAULT_TILESET instead, so repointing it moves '
+                        'every reader together (#377)'
+                        % (os.path.relpath(path, REPO), i, m.group(1)))
+
+
 def check_campaign_declares_no_chapter_list(fail):
     """`campaign.yaml` must not restate the chapter list; the chapter files own it.
 
@@ -3197,6 +3235,7 @@ CHECKS = (
     check_documented_tileset, check_harness_local_ratchet, check_verdict_scenarios_are_guarded,
     check_no_hardcoded_symbol_addresses, check_tool_refs_exist, check_no_dead_concepts,
     check_campaign_declares_no_chapter_list, check_skip_claims_name_a_live_test,
+    check_one_tileset_default,
     check_generated_indexes_fresh, check_engine_guards_present,
     check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
