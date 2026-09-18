@@ -6,7 +6,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-18 (Claude), after #402/#404/#405 landed. Deep-cleaned 2026-08-20 at Nicolas's
+Refreshed 2026-09-18 (Claude), after #402/#404/#405/#406 landed. Deep-cleaned 2026-08-20 at Nicolas's
 instruction: anything already recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was
 deleted from here rather than restated. Check that a thing has a home before writing it here.
 
@@ -64,11 +64,13 @@ any number written down here — the same rule `make chapter` already earns.
   the parity ratio converging on a tautology, and ch06 reads a perfect x1.00 because it
   reproduces 100% of FE8 Ch6's force — a checksum on the donor pipeline, not a measurement.
   Locking ch06 would gate it on a number #367 says means nothing there. Ask; do not infer.
-- **#403 — our recruits join at level 1 into a level-6 party** (opened 2026-09-18, off #402's
-  band). Vanilla's Ch5 talk-recruit is declared L5. Three arms on the issue: scale them, leave
-  them as underdogs, or split per unit. Sahnar is the sharp end — a ch05 red talk-recruit meant
-  to fight the back half of her own chapter at L1. **A design fork, so it is not an agent's
-  call.**
+- **#403's REMAINDER.** The issue as filed was wrong on both halves and is corrected on the
+  issue itself (#406): sahnar joins at **L5**, placed by ch05's own roster at Joshua's level,
+  and vanilla does not scale its recruits either — Natasha joins Ch5 at L1 and Seth is a L1
+  Paladin. What is left is one narrow question, and it is yours: **lupin and trex inherit a
+  mid-game donor's personal line (Kyle L6, Colm L2) while declaring level 1**, so those lines
+  run HOT, not cold. Same shape ADR 0042 ruled on once, when Knoll's L9 bases were too hot for
+  the shamans and the fix was a different BASE donor rather than a different level.
 - **The boat crews have no voice.** No file in `campaigns/rime-of-the-frostmaiden/lore/` names
   Tali or either crew, and Tali carries ch06's plot-critical hint.
 
@@ -104,6 +106,15 @@ ownership is **chapter-aware** (the prologue calls none of `_retarget_host_chapt
 its own rulings), and `intro_camera_out_of_bounds()` is the one ruling that is a measurement —
 a hosted chapter inherits its intro camera tile from its host SLOT while its map is a DONOR's
 geometry, and nothing else compares those two.
+
+**#406 (2026-09-18) — a recruit starts at the level its CHAPTER places it at (#403).** The
+join level is read from the placing entry across every roster key (`PLACED_ROSTER_KEYS` — GREEN
+is the default recruit flavour, so the enemy keys alone are not the roster), and falls back to
+the unit YAML only for a recruit nothing places. sahnar enters ch07 at L5, not L2. ⚠️ Two
+review findings worth carrying: **a generated block cannot hold a hand-written number** — the
+freshness test compares the doc against the same renderer, so it is structurally blind to one —
+and the band's recruit column is a MINIMUM, now named `lowest`, because "newest" and "lowest"
+stopped being the same unit the moment a recruit could join above L1.
 
 **#404 (2026-09-18) — the chapter YAML joined the drift scan (#393).** ADR 0296 carries the
 lesson and is deliberately not restated: a `DEAD_CONCEPTS` pattern is keyed on the UNIT, not on
