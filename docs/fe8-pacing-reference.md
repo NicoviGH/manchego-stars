@@ -224,12 +224,13 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
 | ch03 | FE8 Ch3 | 9 | 399 / 419 (x0.95) | L2 | **L3** | L5 | L1 |
 | ch04 | FE8 Ch4 | 9 | 833 / 815 (x1.02) | L2 | **L4** | L7 | L1 |
 | ch05 | FE8 Ch5 | 9 | 964 / 902 (x1.07) | L3 | **L5** | L9 | L1 |
-| ch06 | FE8 Ch6 | 10 | 1100 / 1100 (x1.00) | L3 | **L6** | L12 | L1 |
+| ch06 | FE8 Ch6 | 10 | 1078 / 1078 (x1.00) | L3 | **L6** | L12 | L1 |
 
 **Entering ch07 the party is L6** -- L3 for a founding unit that rides the bench,
-L12 for one fed every kill, and **L1 for anyone recruited into it**, because every
-recruit joins at level 1 (`newest` is the lowest level actually on the field that
-chapter).
+L12 for one fed every kill, and **L1 for the newest thing recruited into it** --
+a recruit starts at the level its chapter PLACES it at, which is 1 for everyone
+joined off-map or by the recruit pass and 5 for sahnar, whom ch05 places at her
+donor's own level.
 
 The same cast fed each chapter's VANILLA twin instead of ours reaches **L6** over
 the same span: the party lands where FE8's party lands, which is what makes the
@@ -244,8 +245,10 @@ more for the same body.
 
 **Who is in the party, and when.** A unit earns from the chapter AFTER the one that recruits
 it (`build_campaign.recruit_chapter_number` — the same answer `cast_available_at` sizes the
-deploy caps from), and **every recruit joins at level 1**, so the `newest` column is the floor
-a chapter actually has to be survivable for. `benched` / `typical` / `fed` are three shares of
+deploy caps from), starting at **the level its chapter places it at**: 1 for a recruit joined
+off-map or by the recruit pass, and 5 for sahnar, whom ch05's own roster places at Joshua's
+level because she is his archetype. The `newest` column is the floor a chapter actually has to
+be survivable for. `benched` / `typical` / `fed` are three shares of
 one career and are read over the FOUNDING party only: mixing a ch05 recruit into the low edge
 pins it at L1 for every chapter after a recruitment, which stops being a statement about how
 much a unit is fed and becomes one about when it joined.

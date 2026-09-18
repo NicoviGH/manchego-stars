@@ -277,9 +277,35 @@ def vanilla_bodies(parity_ref):
             for u in units]
 
 
+def join_level(campaign, uid):
+    """The level a unit is ON THE FIELD at when it joins.
+
+    Two statements of this exist and the ROM reads the more specific one. A recruit PLACED by
+    its recruit chapter's own roster carries that entry's level -- sahnar is placed RED at
+    LEVEL 5, Joshua's level, cited to his bytes, because she is his archetype and vanilla's
+    Joshua joins at 5 -- and `UnitInitFromDefinition` takes `unit->level` straight from that
+    UnitDefinition. The unit YAML's `fe_stats.level` writes CharacterData.baseLevel, which for
+    a placed recruit the engine reads only through `UnitAutolevelRealistic`, and no player
+    recruit of ours sets `autolevel`. A recruit with no roster placement (basil, trex, lupin,
+    baxby -- joined by the recruit pass or off-map) has only the YAML number, so that is what
+    it starts at.
+    """
+    unit = bc.load_unit(campaign, uid)
+    recruited = bc.recruit_chapter_number(campaign, dict(unit, id=uid))
+    if recruited is not None:
+        chapter = next((c for c in bc.hosted_chapters()
+                        if c.number == int(recruited)), None)
+        if chapter is not None:
+            chap = bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))
+            placed = bc._entry_base_level_in(chap, uid)
+            if placed is not None:
+                return int(placed)
+    return int((unit.get('fe_stats') or {}).get('level') or 1)
+
+
 def party_classes(campaign):
-    """(uid, class enum, first chapter number this unit can earn in) for the cast whose
-    levels this band describes.
+    """(uid, class enum, first chapter number this unit can earn in, join level) for the cast
+    whose levels this band describes.
 
     `difficulty`'s own ROSTER, so there is one answer to "who is the party" in this repo,
     and `build_campaign.recruit_chapter_number` for when each joins -- the same answer
@@ -291,7 +317,8 @@ def party_classes(campaign):
         unit = dict(bc.load_unit(campaign, uid), id=uid)
         recruited = bc.recruit_chapter_number(campaign, unit)
         out.append((uid, bc.class_enum_for(unit),
-                    0 if recruited is None else int(recruited) + 1))
+                    0 if recruited is None else int(recruited) + 1,
+                    join_level(campaign, uid)))
     return out
 
 
@@ -336,12 +363,12 @@ LEVEL_CAP = 20
 class Career:
     """One unit's exp ledger across the campaign. Levels at 100 exp, as the engine does."""
 
-    def __init__(self, name, class_enum, share=1.0, joins=0):
+    def __init__(self, name, class_enum, share=1.0, joins=0, level=1):
         self.name = name
         self.class_enum = class_enum
         self.share = share
         self.joins = joins          # first chapter_number this unit can earn in
-        self.level = 1
+        self.level = level          # the level it is ON THE FIELD at when it joins
         self.exp = 0
 
     @property
@@ -422,7 +449,8 @@ def _founding(careers):
 
 
 def _party(campaign, share=1.0):
-    return [Career(uid, cls, share, joins) for uid, cls, joins in party_classes(campaign)]
+    return [Career(uid, cls, share, joins, level)
+            for uid, cls, joins, level in party_classes(campaign)]
 
 
 def simulate(campaign='rime-of-the-frostmaiden'):
@@ -532,10 +560,11 @@ def render(rows=None, campaign='rime-of-the-frostmaiden'):
     out += ['',
             '**Entering %s the party is L%d** -- L%d for a founding unit that rides the bench,'
             % (nxt, last['level_after'], last['band_low']),
-            'L%d for one fed every kill, and **L1 for anyone recruited into it**, because every'
-            % last['band_high'],
-            'recruit joins at level 1 (`newest` is the lowest level actually on the field that',
-            'chapter).', '',
+            'L%d for one fed every kill, and **L%s for the newest thing recruited into it** --'
+            % (last['band_high'], last['newest'] if last['newest'] is not None else '?'),
+            'a recruit starts at the level its chapter PLACES it at, which is 1 for everyone',
+            'joined off-map or by the recruit pass and 5 for sahnar, whom ch05 places at her',
+            'donor\'s own level.', '',
             'The same cast fed each chapter\'s VANILLA twin instead of ours reaches **%s** over'
             % twin,
             'the same span: the party lands where FE8\'s party lands, which is what makes the',

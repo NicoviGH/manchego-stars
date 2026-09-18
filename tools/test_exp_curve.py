@@ -260,6 +260,21 @@ class Simulation(unittest.TestCase):
         self.assertEqual(1, before['levels']['basil'])
         self.assertGreater(before['levels']['braulo'], 1)
 
+    def test_a_recruit_PLACED_on_the_map_starts_at_the_level_it_is_placed_at(self):
+        """sahnar is a RED talk-recruit placed by ch05's own roster at level 5 -- Joshua's
+        level, cited to his bytes in the chapter YAML, because she is his archetype and
+        vanilla's Joshua joins at 5. Starting her career at 1 (her unit YAML's default, which
+        writes CharacterData.baseLevel and nothing the engine reads for her) understated her
+        by four levels and published it in the band's `newest` column."""
+        joined = [r for r in self.rows if r['chapter_number'] == 6][0]
+        self.assertGreaterEqual(joined['levels']['sahnar'], 5)
+
+    def test_a_recruit_with_no_map_placement_starts_at_its_unit_YAML_level(self):
+        # basil is placed GREEN by the recruit pass, not by a roster entry, so her unit
+        # YAML's level is the only statement of it.
+        self.assertEqual(1, ec.join_level('rime-of-the-frostmaiden', 'basil'))
+        self.assertEqual(5, ec.join_level('rime-of-the-frostmaiden', 'sahnar'))
+
     def test_a_recruit_starts_earning_once_it_has_joined(self):
         joined = [r for r in self.rows if r['chapter_number'] == 6][0]
         self.assertGreater(joined['levels']['basil'], 1)
