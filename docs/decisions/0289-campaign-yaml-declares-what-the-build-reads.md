@@ -31,14 +31,17 @@ that. The block is deleted and `check_campaign_declares_no_chapter_list` keeps i
 Nothing broke while it was wrong, and that is the point: it could only ever mislead a reader,
 which no build gate can catch.
 
-## The file was outside the drift scan, so it kept teaching a retired tool
+## The file was outside the drift scan, so it kept pointing at a tool that never existed
 
-`campaign.yaml`'s first comment told the reader it was *"Read by tools/build-campaign.ts"* — a
-tool retired when this repo moved to Python, and a name that has been **in the `DEAD_CONCEPTS`
-registry** the whole time. Two more registered dead names sat in a `data_sources:` block
-(`srd-snapshot`, `open5e-snapshot`) pointing at `data/srd/*.json`, a directory that does not
-exist. The registry could not see any of it, because `DOC_GLOBS` covered markdown and code and
-stopped there.
+`campaign.yaml`'s first comment told the reader it was *"Read by `tools/build-campaign.ts`"* — a
+tool that **never existed**. It was the PRD's planned Node/TypeScript toolchain, dropped by ADR
+0004 on 2026-06-04 before a line of it was written; `git log --all -- tools/build-campaign.ts`
+is empty, and its name is in the `DEAD_CONCEPTS` registry for exactly that reason. Two more
+registered names from the same dead plan sat in a `data_sources:` block (`srd-snapshot`,
+`open5e-snapshot`), pointing at a `data/srd/` that was never committed either. So the file
+opened by telling every reader to go look at a toolchain that was cancelled about a week after
+the line was written, and went on saying it for three and a half months. The registry could not
+see any of it, because `DOC_GLOBS` covered markdown and code and stopped there.
 
 This is the same re-narrowing that let `.github/ISSUE_TEMPLATE/custom_unit.md` teach the retired
 `clone_into` binding and the dialogue-pass skill teach the retired CHARACTER wrap. A campaign

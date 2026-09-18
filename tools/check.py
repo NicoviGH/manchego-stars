@@ -40,9 +40,11 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
              '.github/**/*.md', '.claude/skills/**/*.md',
              # campaign.yaml is a DECLARATION the build reads, and its comments are doctrine
              # like any docstring's -- it opens by telling the reader which tool consumes it.
-             # It went unscanned until #30, and what it said there was a tool we retired years
-             # ago (`build-campaign.ts`, a name that is IN the dead registry) plus a
-             # `data_sources:` block naming two more for files that do not exist.
+             # It went unscanned until #30, and what it named there was `build-campaign.ts`:
+             # a tool that NEVER EXISTED, planned in the PRD's Node toolchain and dropped by
+             # ADR 0004 before a line of it was written. Its name is in the dead registry for
+             # that reason, alongside the `data_sources:` block's two more, whose files were
+             # never committed either.
              # The CHAPTER yaml is deliberately not here yet: it carries eight live hits of
              # the retired 29/42-CHARACTER wrap vocabulary, which is its own sweep (#393).
              'campaigns/*/campaign.yaml']
