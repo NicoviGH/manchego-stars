@@ -849,6 +849,17 @@ ENEMY_BASE_SLOT = {
 }
 
 
+# The same question asked about ATTRIBUTES rather than stats: our enemy id -> the vanilla
+# CHARACTER_ slot whose `.attributes` the deployed unit carries. It is a superset of
+# ENEMY_BASE_SLOT, because zeroing a slot's personal STAT line (inject_prologue's guests) does
+# not clear its CA_BOSS bit -- Sephek's DefeatBoss fires precisely because he keeps ONEILL's.
+# Read this, never ENEMY_BASE_SLOT, for "does the engine treat this body as a boss": the exp
+# economy pays a 40-point kill bonus off CA_BOSS (exp_curve.py), and the stat table answers a
+# different question.
+ENEMY_CHARACTER_SLOT = dict(
+    ENEMY_BASE_SLOT, **{'sephek-kaltro': 'CHARACTER_%s' % PROLOGUE_SEPHEK_SLOT})
+
+
 # our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
 # Slots are FE8's earliest-available cast so one early chapter shows many faces.
 # (Started as the portrait mapping; it is now the general character-slot key --
