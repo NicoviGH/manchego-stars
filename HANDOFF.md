@@ -6,7 +6,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-17 (Claude), after six PRs landed in one session. Deep-cleaned 2026-08-20 at
+Refreshed 2026-09-18 (Claude), after seven PRs landed 2026-09-17. Deep-cleaned 2026-08-20 at
 Nicolas's instruction: anything already recorded in `docs/decisions.md`, `CLAUDE.md` or a
 GitHub issue was deleted from here rather than restated. Check that a thing has a home before
 writing it here.
@@ -36,20 +36,31 @@ issue rather than re-deriving:
   guard only sees scenes we WRITE. Whether any inherited one still runs is unanswered, and if
   one does it is the soft-lock #337 exists to prevent, in code we never wrote.
 
-## Next up — ordered by effort. CLAUDE'S RECOMMENDATION, not a decision Nicolas has made
+## Next up — NICOLAS'S INSTRUCTION, in order
 
-The 2026-09-16 list is spent: #30, #365, #379, #337 and #377 all landed 2026-09-17. What is
-left of it is **#367's remainder**, and then **ch06 itself**.
+Nicolas, 2026-09-18: *"the fresh instance will pick up the issues you filed and proposal 3."*
+So the first four items below are assigned work, not a recommendation. Read each issue — every
+one carries measured evidence, and re-deriving it is the waste this list exists to prevent.
 
-| | issue | effort | why now / what it costs |
+| | work | effort | what it is |
 |---|---|---|---|
-| 1 | **#367's remainder** | M, and HALF of it is Nicolas's call | Two of its four proposals are open. **Proposal 3** (land the party-level band into `docs/fe8-pacing-reference.md`, derived and regenerated) is code and is derivable — the exp model was spike code, never committed, and its numbers are in the 2026-09-04 comment. **Proposal 4** (lock ch03–ch06, or accept the gate is decorative for them) is a DECISION and is blocked on Nicolas: the same investigation argues the parity ratio is converging on a tautology, so locking ch06 would gate on a number it says means nothing. ⚠️ **ch07 is the watch item** — it reuses FE8 Ch6 as its bar. |
-| 2 | **#26 — ch06's own body** | L | The chapter itself, and the reason the rest of this list existed. **#337 has landed, so the dialogue pass is no longer gated.** |
-| 3 | **#389's remainder** | L, incremental | Decompose `build_campaign.py`. The gate and the shared layer are on main; the work is cluster-by-cluster extraction, each move wrapped in `injection_fingerprint`. **Cluster by DEPENDENCY, not by banner** (ADR 0287). ⚠️ ch06 is extracted LAST, after it ships. |
-| 4 | **#393 · #396 · #398** | S–M each | Opened this session off measured evidence; see In flight. **#398 first of the three** — it is a possible live soft-lock, not a cleanup. |
+| 1 | **#398** | S–M | ⚠️ **Do this one first: it may be a LIVE soft-lock, not a cleanup.** Inherited vanilla scenes stage `CHARACTER_EIRIKA` — which is **braulo**. Vanilla could stage Eirika without loading her because Eirika is always there; braulo is not. #337's guard only sees scenes we WRITE. **It is an AUDIT before it is a fix:** a scene only runs if its chapter's `ChapterEventGroup` still reaches it, so resolve reachability first (`inject/event_group.py` already reads those) and classify each of the five sites reachable-or-dead. Proving one dead is a real answer. |
+| 2 | **#367's proposal 3 — the party-level band** | M | Land it into `docs/fe8-pacing-reference.md`, **derived and regenerated, not hand-kept**. The exp model was spike code and was never committed; transcribe it from the decomp at HEAD (`bmbattle.c` → `GetUnitRoundExp` / `GetUnitPowerLevel` / `GetUnitKillExpBonus` / `GetBattleUnitExpGain`). The numbers to reproduce are in #367's 2026-09-04 comment: mean party level 1→7 across ch00–ch06, exp yield within ±12% of the twin every chapter. **Read it as a BAND (~L5–L9 entering ch07), not a point** — the simulation splits exp evenly across the deploy cap, so it understates leaders and overstates the tail. A stat GROWTH model is explicitly not wanted. ⚠️ **ch07 is the watch item**: it reuses FE8 Ch6 as its bar, so honest parity there hands the party an extra chapter of exp the vanilla curve does not contain, and the per-chapter gate structurally cannot see it — exp is the only quantity that integrates across chapters. |
+| 3 | **#393** | S–M | The chapter YAML is outside the drift scan; ch05 carries 8 hits of the retired CHARACTER-wrap vocabulary. ⚠️ **Not a sweep** — some of those lines are past-tense narration of the very change that retired the term, and a guard that rejects its own warning is worse than none. Read each in context, then add the glob. |
+| 4 | **#396** | M | The `ROMChapterData` census, in the shape #313 built for `ChapterEventGroup`: every field WRITTEN or DECLARED-INHERITED. Fog (#365) was the fifth such field found one at a time; this answers "is there a sixth" once instead of five more times. Most entries should be "inherited, and here is why that is safe". |
 
-**The recommendation, in one line: answer #367's proposal 4, then start #26.** Nothing else
-gates ch06 any more.
+**Then #26 — ch06's own body.** #337 landed, so **the dialogue pass is no longer gated**.
+
+⚠️ **#367's proposal 4 is BLOCKED on Nicolas and must not be decided by an agent.** *Lock
+ch03–ch06, or accept the gate is decorative for them.* It is not the mechanical yes it looks
+like: the same investigation finds the parity ratio converging on a tautology — ch06 reads a
+perfect x1.00 because it reproduces 100% of FE8 Ch6's force, which is a checksum on the donor
+pipeline rather than a measurement. Locking ch06 would gate it on a number #367 says means
+nothing there. Ask; do not infer.
+
+**#389's remainder** stays open and unscheduled: decompose `build_campaign.py` cluster by
+cluster, each move wrapped in `injection_fingerprint`, clustering by **dependency and not by
+banner** (ADR 0287). ch06 is extracted LAST, after it ships.
 
 ⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
 its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
@@ -85,24 +96,13 @@ construction.
 
 ## Owed, filed, not started
 
-- **#367** -- ANSWERED, and now the work item. Findings + proposals are in its 2026-09-04
-  comment; **do not re-derive them, and do not restate them here.** Two of its four proposals are
-  the Next task. Still open on it and not started: locking ch03-ch06 (or accepting the gate is
-  decorative for them), and the party-level band into `docs/fe8-pacing-reference.md`.
-  ⚠️ **ch07 is the one to watch** -- it reuses FE8 Ch6 as its bar, so honest parity there hands
-  the party an extra chapter of exp the vanilla curve does not contain, and the per-chapter gate
-  cannot see it.
-- **#377** -- the tileset default is re-declared in `map_donor` (which is stdlib-only BY
-  DESIGN and regex-parses `build_campaign`'s source, so `bc.map_tileset` is not available to it)
-  and four more times in `import_map_layout`, on the side that WRITES sidecars. Opened 2026-09-16
-  off #374's review. Needs a call on where a campaign's keyless-sidecar default lives.
-- **#365** -- guard: a hosted chapter DECLARES its fog, and a census over the rest of
-  `ROMChapterData`. Opened 2026-09-04 while hosting ch06.
-- **#337** -- guard: a cutscene must LOAD every character it stages (the permadeath invariant).
-  Wanted BEFORE ch06's dialogue pass writes the Messie scene; the why is on the issue.
-- **#30** -- `campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one from ch04 on.
-  Nothing reads it, so it misleads rather than breaks. Cheap since #312: one reader
-  (`tools/campaign_chapters.py`) means the block can be DERIVED rather than hand-kept.
+Everything this section listed on 2026-09-17 shipped that day (#30, #337, #365, #377) and is
+gone from here rather than restated. What is left is owed BY NICOLAS, not by the next session:
+
+- **#367's proposal 4** -- lock ch03-ch06, or accept the gate is decorative for them. The rest
+  of #367 is answered in its 2026-09-04 comment (**do not re-derive it, do not restate it
+  here**); proposal 3 is assigned work in the table above. Only this call is outstanding, and
+  the Next-up table says why it is not the easy yes it looks like.
 
 ## Map sprites — read before any art session
 
@@ -173,7 +173,7 @@ picture ch06's clock was designed on.**
 
 **#364 (2026-09-04) — ch06 is hosted on slot 7, and the asset table hit its 8-bit CEILING.** Five
 ADRs in `docs/decisions.md` carry all of it and are deliberately not restated here: *"The asset
-table is addressed by a u8…"*, *"A hosted chapter inherits its host slot's FOG…"* (now #365), *"A
+table is addressed by a u8…"*, the fog one (which became #365, closed 2026-09-17), *"A
 load-test that reads the roster before PREP settles is a diagnostic that LIES"*, *"A NAMED raw pid
 must be exclusive; a GENERIC one need not be"*, and *"The parity model prices the YAML; only the
 EMITTED ROWS are the ROM"*.
@@ -194,7 +194,9 @@ also proposes the guard (an `ai_divergence:` allowlist, modelled on `terrain_div
 a combat rule, not a narrative one"*: the eight PCs appear in every cutscene alive or dead, because
 the player picks their own lord and there is no always-present character to hand a dead PC's lines
 to the way vanilla hands Artur's to Eirika — and these scenes record a campaign that happened. The
-invariant is **a cutscene LOADs its actors** (guard proposed in **#337**). And *"The FE-Repo is
+invariant is **a cutscene LOADs its actors**, and #337 landed the guard for it 2026-09-17
+(ADR 0292 -- scoped to the PCs, because they are the only actors the chapter cannot
+guarantee). And *"The FE-Repo is
 READ, not grepped"*: pull the git trees per directory and read the categories, because every asset
 ch06 needed is named `Squidsmith` / `IronShell-Tiny General` / `[Spider-Variant] Cavalier Rider`
 and no keyword sweep finds those.
@@ -255,13 +257,9 @@ skirmish rosters each, dormant only while we expose no world map. Owed on #302.
 - **Backlog swept 2026-08-22** — do NOT re-survey it by issue title or checkbox. ch03 taught that
   an unchecked box records what someone intended, not what the repo contains: #23 read as "7 open
   items" while git history and the live YAML showed the work shipped long ago. Cross-reference the
-  artifact. Closed in the sweep: #303, #23, #133, #244. Still open and each carrying its own fresh
-  evidence: **#335** (the AI audit) and **#337** (the cutscene-actor guard), both opened
-  2026-08-29, **#135** (real v0.1.0 playtester feedback on art consistency and difficulty, never
-  triaged) and **#30** (`campaign.yaml`'s `chapters:` block omits the prologue and is off-by-one
-  from ch04 on — nothing reads it, so it misleads rather than breaks). #30 is now cheap: since
-  #312 there is one reader for the chapter YAML (`tools/campaign_chapters.py`), so that block
-  can be derived from it rather than hand-kept.
+  artifact. Two the sweep surfaced are still open and still carry their own evidence: **#335**
+  (the AI audit, opened 2026-08-29) and **#135** (real v0.1.0 playtester feedback on art
+  consistency and difficulty, **never triaged** — the only item here that is player-facing).
 - ⚠️ **Branch BEFORE editing, and check whether a file's "stale" content is already fixed on an
   unmerged branch.** 2026-08-28 cost a rework round: ch06's `parity_reference` read `FE8 Ch5` on
   `main`, so it got "fixed" there — while PR #331 had already corrected it on its branch. A whole
