@@ -13,11 +13,21 @@ whether or not they are alive. That policy rests on one invariant, and nothing e
 
 > **A cutscene LOADs its actors; it never assumes they are standing on the map.**
 
-`LoadUnit` performs no death check, so loading a dead character is fine. `GetUnitFromCharId`
-returns **NULL** for an *absent* one, and `CUMO_CHAR` / `MOVE` / `MOVE_DEFINED` all resolve
-through it — so a beat naming a PC the scene never loaded is the same never-returns soft-lock
-`assert_scripted_move_reachable` was written for. It fires the first time a player reaches that
-beat having lost that character, and never before, which is why no playtest has found one.
+`LoadUnit` performs no death check, so loading a *dead* character is fine. The unit lookup
+returns **NULL** for an *absent* one — and what happens then depends on the command. The decomp
+is explicit, and the two outcomes are not the same bug:
+
+| outcome | commands | why |
+|---|---|---|
+| **The chapter HANGS** | `CUMO_CHAR`, `CAMERA2_CAHR`, and the **target** of `MOVEONTO` / `MOVE_NEXTTO` | they return `EVC_ERROR`, and `EventEngine_Main` (`event.c:106-112`) breaks on it **without advancing `pEventCurrent`** — so the same command re-runs forever |
+| **The scene plays without them** | the **mover** of any move command, `MOVE_DEFINED` included | returns `EVC_ADVANCE_CONTINUE` (`eventscr.c:2960`), so the script advances and the walk silently never happens |
+
+Both are refused. Only one wedges the cartridge, and calling the silent one a soft-lock would
+be an overstatement the next reader has to re-derive — this record's first draft made exactly
+that mistake, about the two commands it checks most.
+
+Either way it fires the first time a player reaches that beat having lost that character, and
+never before, which is why no playtest has found one.
 
 ## The scope is the PCs, and that was measured, not assumed
 
@@ -34,7 +44,7 @@ Flagging her would have been the gate crying wolf on the first real chapter it r
 A PC rides its `PORTRAIT_MAP` slot, so its on-map pid is `CHARACTER_<slot>` — braulo is
 `CHARACTER_EIRIKA`, pinky is `CHARACTER_NEIMI`. That map is the whole scope.
 
-## `MOVE`'s pid is its SECOND argument
+## `MOVE`'s pid is its SECOND argument, and `MOVE` is a prefix of five other commands
 
 `MOVE(speed, pid, x, y)` (`EAstdlib.h:117`). Reading the pid as the first argument is not a
 small error: vanilla's speeds are `0x10` and `0x0`, **every one of them parses as a character
@@ -43,10 +53,20 @@ parsed and correctly scoped, the live tree has **none**.
 
 ## Where it runs, and why not in the injectors
 
-The check is registered on `_replace_brace_block` — the single writer all 79 block writes go
-through — and fires on any marker starting with `EventScr_`. A hook rather than a call per
-injector for the reason `apply_chapter_fog` is a total pass: with that many call sites,
-"somebody forgets to call the guard on the new scene" is a question of when, not whether.
+The check is registered on **both** writers a scene body can reach, and finding the second one
+is the difference between a guard that works and a guard that misses its own motivating case:
+
+- `_replace_brace_block`, the single writer all 79 block writes go through, for scenes that
+  overwrite a vanilla `EventScr_*`;
+- `declare_event_script`, which **appends** with a plain `f.write` and never touches the brace
+  writer at all. That is the path every campaign-owned scene takes — ch05's talks, villages and
+  arena — and `_assert_ms_symbol` names them `MS_*`, so an `EventScr_`-only filter would have
+  rejected them twice over. **ch06's Messie scene, the reason this guard exists, would have
+  been declared exactly that way and gone unchecked.**
+
+A hook rather than a call per injector for the reason `apply_chapter_fog` is a total pass: with
+that many call sites, "somebody forgets to call the guard on the new scene" is a question of
+when, not whether.
 
 The validator is registered from `build_campaign` rather than defined in `inject/decomp.py`,
 because the check needs `PORTRAIT_MAP` and that layer stays dependency-free — otherwise every

@@ -7312,15 +7312,42 @@ def recruit_initial_faction(unit):
     return token
 
 
-# `MOVE(speed, pid, x, y)` -- EAstdlib.h:117. The pid is the SECOND argument, and reading it
-# as the first is not a small error: vanilla's speeds are 0x10/0x0, every one of them parses as
-# a character id, and the naive version of this guard flagged 378 sites campaign-wide.
+# Every event command that resolves a character id through `GetUnitStructFromEventParameter`,
+# with the ARGUMENT INDEX the pid sits at (EAstdlib.h:101-124). The index matters: `MOVE` is
+# `MOVE(speed, pid, x, y)`, so reading argument 0 reads a SPEED -- vanilla's speeds are 0x10
+# and 0x0, every one parses as a character id, and doing that flags 378 sites campaign-wide.
+#
+# The two severities are different failures and the decomp is explicit about which is which:
+#
+#   HANGS. The handler returns EVC_ERROR, and `EventEngine_Main` (event.c:106-112) `break`s
+#   on EVC_ERROR WITHOUT advancing `pEventCurrent` -- so the engine re-runs the same command
+#   forever. CUMO_CHAR (eventscr.c:3765) and the TARGET of MOVEONTO/MOVE_NEXTTO
+#   (eventscr.c:2995) both do this.
+#
+#   NO-OPS SILENTLY. The MOVER of any move command returns EVC_ADVANCE_CONTINUE when NULL
+#   (eventscr.c:2960), so the script advances and the walk simply never happens. Not a hang --
+#   a scene that plays wrong, with the actor missing from a beat written around them.
+#
+# Both are worth refusing; only one wedges the cartridge, and saying "soft-lock" about the
+# silent one would be an overstatement that the next reader would have to re-derive.
+_HANGS, _NOOPS = 'hangs', 'plays without them'
 _STAGING_COMMANDS = (
-    (re.compile(r'\bMOVE\(\s*[^,]+,\s*([^,)\s]+)'), 'MOVE'),
-    (re.compile(r'\bMOVE_DEFINED\(\s*([^,)\s]+)'), 'MOVE_DEFINED'),
-    (re.compile(r'\bCUMO_CHAR\(\s*([^,)\s]+)'), 'CUMO_CHAR'),
+    ('CUMO_CHAR', 0, _HANGS),
+    ('CAMERA2_CAHR', 0, _HANGS),
+    ('MOVEONTO', 2, _HANGS),          # the TARGET; its mover is arg 1 and only no-ops
+    ('MOVE_NEXTTO', 2, _HANGS),
+    ('MOVE', 1, _NOOPS),
+    ('MOVE_CLOSEST', 1, _NOOPS),
+    ('MOVEONTO', 1, _NOOPS),
+    ('MOVE_NEXTTO', 1, _NOOPS),
+    ('MOVE_1STEP', 1, _NOOPS),
+    ('MOVE_1STEP_CLOSEST', 1, _NOOPS),
+    ('MOVE_DEFINED', 0, _NOOPS),
+    ('MOVE_DEFINED_CLOSEST', 0, _NOOPS),
 )
-_LOAD_COMMAND = re.compile(r'\bLOAD[12]\(\s*[^,]+,\s*(\w+)\s*\)')
+# LOAD3/LOAD4 exist and vanilla uses LOAD3 nine times; matching only LOAD[12] would accuse a
+# scene that correctly loads its actor.
+_LOAD_COMMAND = re.compile(r'\bLOAD[1-4]\(\s*[^,]+,\s*(\w+)\s*\)')
 
 
 @functools.lru_cache(maxsize=None)
@@ -7343,15 +7370,26 @@ def character_pid(token):
         return None
 
 
-def scene_staged_pids(body):
-    """Every character pid a scene body STAGES -- the ones resolved through
-    `GetUnitFromCharId`, which returns NULL for a character that is not on the map."""
-    out = set()
-    for pattern, _cmd in _STAGING_COMMANDS:
-        for m in pattern.finditer(body):
-            pid = character_pid(m.group(1))
-            if pid is not None:
-                out.add(pid)
+def scene_staged_pids(body, severity=None):
+    """{pid: severity} for every character a scene body stages.
+
+    A pid staged by two commands keeps the WORSE outcome: being told a beat plays without the
+    actor is no help when another line in the same scene hangs on them."""
+    out = {}
+    for name, index, outcome in _STAGING_COMMANDS:
+        if severity is not None and outcome != severity:
+            continue
+        # `\b` plus the literal `(` keeps MOVE from matching MOVE_DEFINED: the longer name
+        # has no `(` right after `MOVE`.
+        for m in re.finditer(r'\b%s\(([^)]*)\)' % name, body):
+            args = [a.strip() for a in m.group(1).split(',')]
+            if len(args) <= index:
+                continue
+            pid = character_pid(args[index])
+            if pid is None:
+                continue
+            if out.get(pid) != _HANGS:
+                out[pid] = outcome
     return out
 
 
@@ -7360,7 +7398,7 @@ def player_character_pids():
     """{pid: unit_id} for the cast the player can LOSE.
 
     A PC rides its `PORTRAIT_MAP` slot, so its on-map pid is `CHARACTER_<slot>`. This set is
-    the whole scope of the guard: every OTHER thing a scene stages is on the map because the
+    the whole scope of the guard: everything else a scene stages is on the map because the
     chapter put it there (a boss, a generic, a scripted neutral), while a PC is there only if
     the player still has them and chose to deploy them."""
     out = {}
@@ -7371,48 +7409,68 @@ def player_character_pids():
     return out
 
 
+def scene_loaded_pids(body):
+    """Every character pid the scene itself LOADs onto the map."""
+    loaded = set()
+    for m in _LOAD_COMMAND.finditer(body):
+        loaded |= _unit_def_pids(m.group(1))
+    return loaded
+
+
 def assert_scene_loads_its_actors(body, scene, loaded_pids=None):
     """A scene must LOAD every PLAYER CHARACTER it stages (#337).
 
     The permadeath policy (`decisions.md` -> "Permadeath is a combat rule, not a narrative
     one") puts all eight PCs in every cutscene alive or dead. That is only safe while a scene
-    LOADs the actors it stages: `LoadUnit` has no death check, so loading a dead character
-    works, but `GetUnitFromCharId` returns NULL for an ABSENT one and `CUMO_CHAR` / `MOVE` /
-    `MOVE_DEFINED` all resolve through it. A beat naming a PC the scene never loaded is a
-    never-returns soft-lock that fires the first time a player reaches it having lost that
-    character -- and never before, which is why no playtest has found one.
+    LOADs the actors it stages: `LoadUnit` has no death check, so loading a DEAD character
+    works, but `GetUnitStructFromEventParameter` returns NULL for an ABSENT one.
 
-    SCOPED TO THE PCs, and that scoping was measured rather than assumed. "Every staged
-    character must be LOADed" flags 73 sites in untouched VANILLA, which plainly works:
-    vanilla stages Eirika without loading her because Eirika is always there. We have no
-    always-present character -- the player picks their own lord, and any PC can be dead or
-    simply not picked at PREP -- so vanilla's guarantee is exactly the one that does not
-    transfer. Everything else is guaranteed by construction; ch05 stages Ravisin the same way
-    and she has been on the map since turn 1."""
-    loaded = set(loaded_pids or ())
-    for m in _LOAD_COMMAND.finditer(body):
-        loaded |= _unit_def_pids(m.group(1))
+    What happens then depends on the command, and the two outcomes are not the same bug.
+    `CUMO_CHAR` and the TARGET of `MOVEONTO`/`MOVE_NEXTTO` return EVC_ERROR, which
+    `EventEngine_Main` handles by breaking WITHOUT advancing the script pointer -- the same
+    command re-runs forever and the chapter HANGS. A move command's own mover returns
+    EVC_ADVANCE_CONTINUE instead, so the script advances and the walk silently never happens:
+    the scene plays, wrong, around an actor who is not there.
+
+    SCOPED TO THE PCs, measured rather than assumed. "Every staged character must be LOADed"
+    flags 73 sites in untouched VANILLA, which plainly works: vanilla stages Eirika without
+    loading her because Eirika is always there. We have no always-present character -- the
+    player picks their own lord, and any PC can be dead or unpicked at PREP -- so vanilla's
+    guarantee is the one thing that does not transfer. Everything else is guaranteed by
+    construction; ch05 stages Ravisin the same way and she has held the arena since turn 1."""
+    loaded = set(loaded_pids or ()) | scene_loaded_pids(body)
     pcs = player_character_pids()
-    missing = sorted((pid for pid in scene_staged_pids(body)
-                      if pid in pcs and pid not in loaded), key=lambda p: pcs[p])
-    if missing:
-        sys.exit(
-            'ERROR: %s stages %s without LOADing %s.\n'
-            '  A PC is on the map only if the player still has them AND deployed them, so '
-            'GetUnitFromCharId returns NULL and the CUMO/MOVE never returns -- the chapter '
-            'hangs, the first time someone reaches this beat having lost them.\n'
-            '  Add a LOAD1 naming a UnitDefinition that carries %s, or stage the beat with '
-            'CUMO_AT (a tile) instead of a character (#337).'
-            % (scene, ', '.join(pcs[p] for p in missing),
-               'them' if len(missing) > 1 else 'that character',
-               'each of them' if len(missing) > 1 else 'that character'))
+    missing = {pid: outcome for pid, outcome in scene_staged_pids(body).items()
+               if pid in pcs and pid not in loaded}
+    if not missing:
+        return
+    lines = ['  %s -- the chapter %s' % (pcs[pid], outcome)
+             for pid, outcome in sorted(missing.items(), key=lambda kv: pcs[kv[0]])]
+    sys.exit(
+        'ERROR: %s stages player characters it never LOADs:\n%s\n'
+        '  A PC is on the map only if the player still has them AND deployed them, so the '
+        'unit lookup returns NULL the first time someone reaches this beat having lost them.\n'
+        '  Add a LOAD naming a UnitDefinition that carries them, or stage the beat with '
+        'CUMO_AT (a tile) rather than a character (#337).' % (scene, '\n'.join(lines)))
+
+
+# Every file a UnitDefinition array can live in: vanilla's, and the per-chapter headers our
+# own `declare_unit_table` writes. Searching only `events_udefs.c` silently returns an empty
+# set for `UnitDef_Event_Ch1Ally` -- and an empty set reads as "the scene loaded nobody",
+# which turns a correct LOAD into a false accusation.
+def _udef_sources():
+    import glob as _glob
+    paths = [EVENTS_UDEFS_C] + sorted(
+        _glob.glob(os.path.join(DECOMP, 'src', 'events', '*eventudefs.h')))
+    return [t for t in (_live_decomp_text(p) for p in paths) if t] + \
+        [vanilla_decomp_text('src/events_udefs.c')]
 
 
 def _unit_def_pids(symbol):
     """The character pids a UnitDefinition array carries, ours or vanilla's."""
     import difficulty
-    for text in (_live_decomp_text(EVENTS_UDEFS_C), vanilla_decomp_text('src/events_udefs.c')):
-        if not text or (symbol + '[]') not in text:
+    for text in _udef_sources():
+        if (symbol + '[]') not in text:
             continue
         try:
             return {character_pid(e.get('charIndex'))
@@ -7430,9 +7488,11 @@ def _live_decomp_text(path):
         return ''
 
 
-# Register the #337 check on the one writer every scene body goes through, so a scene cannot
-# be authored without it. Here rather than in `inject/decomp.py` because the check needs
-# PORTRAIT_MAP, and that layer stays dependency-free (ADR 0287).
+# Registered on BOTH writers a scene body can go through. `_replace_brace_block` covers the
+# scenes that overwrite a vanilla `EventScr_*`; `declare_event_script` covers the ones we
+# DEFINE, which are the campaign's own `MS_*` scripts -- ch05's talks, villages and arena, and
+# the ch06 Messie scene this guard was built for. Hooking only the first would have left the
+# motivating case unchecked.
 _decomp.SCENE_VALIDATORS.append(assert_scene_loads_its_actors)
 
 
@@ -7879,6 +7939,11 @@ def declare_event_script(path, symbol, body, comment):
         sys.exit('ERROR: event script %s is already defined this build -- two injectors are '
                  'claiming one symbol name' % symbol)
     _assert_ms_symbol(symbol)
+    # The campaign's OWN scenes are defined here, not written through `_replace_brace_block`,
+    # so the #337 cutscene-actor check has to run on this path too -- it is the path ch05's
+    # talks and villages take, and the one ch06's Messie scene will (#337).
+    for validate in _decomp.SCENE_VALIDATORS:
+        validate(body, symbol)
     with open(path, 'a', encoding='utf-8') as f:
         f.write('\n/* %s */\nCONST_DATA EventListScr %s[] = %s;\n' % (comment, symbol, body))
     with open(EVENTCALL_H, encoding='utf-8') as f:

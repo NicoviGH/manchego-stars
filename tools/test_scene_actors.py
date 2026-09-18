@@ -7,11 +7,19 @@ enforced:
 
     A cutscene LOADs its actors; it never assumes they are standing on the map.
 
-`LoadUnit` performs no death check, so loading a dead character is fine. `GetUnitFromCharId`
-returns NULL for an ABSENT one, and `CUMO_CHAR` / `MOVE` / `MOVE_DEFINED` resolve through it --
-so a beat naming a PC the scene never loaded is the same never-returns soft-lock
-`assert_scripted_move_reachable` was written for, and it fires only once a player has actually
-lost that character before that beat.
+`LoadUnit` performs no death check, so loading a dead character is fine. The unit lookup
+returns NULL for an ABSENT one, and what happens next depends on the command -- the decomp is
+explicit, and the two outcomes are not the same bug:
+
+    CUMO_CHAR, and the TARGET of MOVEONTO/MOVE_NEXTTO, return EVC_ERROR. `EventEngine_Main`
+    (event.c:106-112) breaks on EVC_ERROR WITHOUT advancing `pEventCurrent`, so the same
+    command re-runs forever and the chapter HANGS.
+
+    A move command's own MOVER returns EVC_ADVANCE_CONTINUE (eventscr.c:2960), so the script
+    advances and the walk silently never happens -- the scene plays, wrong, around an actor
+    who is not there.
+
+Either way it fires only once a player has actually lost that character before that beat.
 
 WHY ONLY THE PCs, measured rather than assumed. Applying "every staged character must be
 LOADed" to the emitted scripts flags 73 sites in UNTOUCHED VANILLA, which obviously works:
@@ -45,14 +53,40 @@ class TheStagedPidIsFoundWhereTheMacroPUTSIt(unittest.TestCase):
 
     def test_MOVE_reads_its_pid_from_the_second_argument(self):
         staged = bc.scene_staged_pids('    MOVE(0x10, CHARACTER_EIRIKA, 3, 4)\n')
-        self.assertEqual({bc.character_pid('CHARACTER_EIRIKA')}, staged)
+        self.assertEqual([bc.character_pid('CHARACTER_EIRIKA')], list(staged))
 
     def test_a_MOVE_speed_is_not_mistaken_for_a_character(self):
         self.assertNotIn(0x10, bc.scene_staged_pids('    MOVE(0x10, 0xce, 3, 4)\n'))
 
     def test_CUMO_CHAR_and_MOVE_DEFINED_read_their_first(self):
-        self.assertEqual({0xce}, bc.scene_staged_pids('    CUMO_CHAR(0xce)\n'))
-        self.assertEqual({0xce}, bc.scene_staged_pids('    MOVE_DEFINED(0xce)\n'))
+        self.assertIn(0xce, bc.scene_staged_pids('    CUMO_CHAR(0xce)\n'))
+        self.assertIn(0xce, bc.scene_staged_pids('    MOVE_DEFINED(0xce)\n'))
+
+    def test_MOVE_does_not_swallow_MOVE_DEFINED(self):
+        """`MOVE` is a prefix of five other commands, each with a different pid position."""
+        staged = bc.scene_staged_pids('    MOVE_DEFINED(CHARACTER_EIRIKA)\n')
+        self.assertEqual([bc.character_pid('CHARACTER_EIRIKA')], list(staged))
+
+    def test_MOVEONTO_stages_BOTH_its_mover_and_its_target(self):
+        staged = bc.scene_staged_pids('    MOVEONTO(0x10, 0xce, CHARACTER_EIRIKA)\n')
+        self.assertIn(0xce, staged)
+        self.assertIn(bc.character_pid('CHARACTER_EIRIKA'), staged)
+
+    def test_the_two_failure_modes_are_told_apart(self):
+        """EVC_ERROR hangs the engine; EVC_ADVANCE_CONTINUE just skips the walk.
+
+        `EventEngine_Main` (event.c:106-112) breaks on EVC_ERROR WITHOUT advancing
+        `pEventCurrent`, so the command re-runs forever -- that is the hang. A move whose
+        MOVER is NULL returns EVC_ADVANCE_CONTINUE (eventscr.c:2960) and the script carries
+        on, so calling that a soft-lock would overstate it."""
+        hangs = bc.scene_staged_pids('    CUMO_CHAR(0xce)\n')
+        self.assertEqual('hangs', hangs[0xce])
+        noop = bc.scene_staged_pids('    MOVE(0x10, 0xce, 1, 2)\n')
+        self.assertNotEqual('hangs', noop[0xce])
+
+    def test_a_pid_staged_twice_keeps_the_WORSE_outcome(self):
+        both = bc.scene_staged_pids('    MOVE(0x10, 0xce, 1, 2)\n    CUMO_CHAR(0xce)\n')
+        self.assertEqual('hangs', both[0xce])
 
 
 class ASceneMustLoadThePCsItStages(unittest.TestCase):
@@ -109,9 +143,63 @@ class TheGuardRidesTheWriteItself(unittest.TestCase):
                                           '{\n    CUMO_CHAR(CHARACTER_EIRIKA)\n}', 'test.h')
         self.assertIn('CUMO_CHAR', out)
 
-    def test_the_live_build_passes_its_own_guard(self):
-        """Every scene the injectors write today, checked as they are written."""
-        self.assertTrue(callable(bc.assert_scene_loads_its_actors))
+    def test_a_campaign_owned_scene_is_checked_too(self):
+        """`declare_event_script` APPENDS its scene; it never touches _replace_brace_block.
+
+        That is the path ch05's talks, villages and arena take, and the one ch06's Messie
+        scene will -- so hooking only the brace writer would have left the motivating case
+        of this whole guard unchecked."""
+        import inspect
+        src = inspect.getsource(bc.declare_event_script)
+        self.assertIn('SCENE_VALIDATORS', src)
+
+    def test_an_MS_scene_name_is_not_filtered_out(self):
+        """Campaign scenes are named MS_*, not EventScr_*, by `_assert_ms_symbol`."""
+        with self.assertRaises(SystemExit):
+            bc.assert_scene_loads_its_actors(
+                '{\n    CUMO_CHAR(CHARACTER_EIRIKA)\n}', 'MS_Ch06Messie')
+
+
+class TheLOADHalf(unittest.TestCase):
+    """The half that decides whether an accusation is TRUE -- and had no coverage at all."""
+
+    def test_LOAD3_counts_as_loading(self):
+        """LOAD3 and LOAD4 exist (EAstdlib.h:112-113) and vanilla uses LOAD3 nine times.
+
+        Matching only LOAD[12] fails the build on a scene that correctly loads its actor."""
+        body = '{\n    LOAD3(0x1, %s)\n    CUMO_CHAR(CHARACTER_EIRIKA)\n}'
+        sym = self._udef_carrying('CHARACTER_EIRIKA')
+        bc.assert_scene_loads_its_actors(body % sym, 'EventScr_Test')
+
+    def _udef_carrying(self, token):
+        """A real UnitDefinition symbol that carries `token`, found in the live tree."""
+        pid = bc.character_pid(token)
+        import re as _re
+        for text in bc._udef_sources():
+            for m in _re.finditer(r'(UnitDef_\w+|MS_\w+)\[\]', text):
+                if pid in bc._unit_def_pids(m.group(1)):
+                    return m.group(1)
+        self.skipTest('no UnitDefinition in this tree carries %s' % token)
+
+    def test_a_campaign_owned_unit_table_resolves(self):
+        """`_unit_def_pids` must search the per-chapter `ch*-eventudefs.h` headers too.
+
+        Searching only `events_udefs.c` returns an EMPTY set for our own tables -- and an
+        empty set reads as "this scene loaded nobody", turning a correct LOAD into a false
+        accusation on exactly the scenes we write."""
+        import re as _re
+        ours = None
+        for text in bc._udef_sources():
+            for m in _re.finditer(r'\b(UnitDef_Event_\w+)\[\]', text):
+                if bc._unit_def_pids(m.group(1)):
+                    ours = m.group(1)
+                    break
+            if ours:
+                break
+        if ours is None:
+            self.skipTest('no campaign-owned UnitDefinition in this tree')
+        self.assertTrue(bc._unit_def_pids(ours),
+                        '%s resolved to nobody, so a LOAD naming it reads as missing' % ours)
 
 
 if __name__ == '__main__':
