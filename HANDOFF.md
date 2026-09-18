@@ -6,48 +6,43 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-18 (Claude), after seven PRs landed 2026-09-17. Deep-cleaned 2026-08-20 at
-Nicolas's instruction: anything already recorded in `docs/decisions.md`, `CLAUDE.md` or a
-GitHub issue was deleted from here rather than restated. Check that a thing has a home before
-writing it here.
+Refreshed 2026-09-18 (Claude), after #401 landed. Deep-cleaned 2026-08-20 at Nicolas's
+instruction: anything already recorded in `docs/decisions.md`, `CLAUDE.md` or a GitHub issue was
+deleted from here rather than restated. Check that a thing has a home before writing it here.
 
 ## In flight
 
-**Nothing. No open PRs, no branches.** Everything below ch06 on the old Next-up list is done.
+**Nothing. No open PRs, no branches.**
 
-Landed 2026-09-17, each reviewed and squash-merged (`b02e336`..`bd9e118`): **#390** (#389's
-groundwork + the injection-fingerprint gate), **#392** (#391, review the written surface),
-**#394** (#30, campaign.yaml), **#395** (#365, `apply_chapter_fog`), **#397** (#379, skip
-claims), **#399** (#337, the cutscene-actor guard), **#400** (#377, one tileset default).
-Their ADRs are 0287-0293 and are deliberately not restated here.
+**#398 is ANSWERED and CLOSED** (PR #401, squash-merged). ADR 0294 carries it and is deliberately
+not restated. The one-line version: all five inherited vanilla scenes that stage a PC are
+**unreachable**, so there was no live soft-lock — but nothing was HOLDING them dead, and that is
+now a build guard (`assert_reachable_scenes_load_their_actors`, beside the #313 census).
 
-⚠️ **`tools/injection_fingerprint.py` is the tool to reach for on ANY mechanical change**, not
-just #389's extractions. Four of this session's PRs used it to prove byte-identical output
-across a refactor (975 files, ~50s): `--write before.json`, change, `--check before.json`. It
-is what turned "this should be equivalent" into a measurement each time.
+⚠️ **Two things from that work a fresh session needs before writing anything near the event
+graph**, because both were review findings and both will recur:
 
-**Opened this session and NOT started** — each carries its own measured evidence, so read the
-issue rather than re-deriving:
-- **#393** — the chapter YAML is outside the drift scan, and ch05 carries 8 hits of the retired
-  CHARACTER-wrap vocabulary. Some are past-tense narration and must not be swept blind.
-- **#396** — the `ROMChapterData` census. Fog was the FIFTH inheritable field found one at a
-  time; this answers "is there a sixth" once.
-- **#398** — ⚠️ **inherited vanilla scenes stage `CHARACTER_EIRIKA`, which is braulo.** #337's
-  guard only sees scenes we WRITE. Whether any inherited one still runs is unanswered, and if
-  one does it is the soft-lock #337 exists to prevent, in code we never wrote.
+- **Our own scenes are named `MS_*`, and a vanilla-spelled symbol filter walks straight past
+  them.** The first cut of the reachability walk reported ch05 reaching 26 scripts; it reaches
+  **40**. #337's first cut made the identical mistake at the write hook. Any new code that
+  matches `EventScr_` must ask whether it also means `MS_`.
+- **`make chapter CH=ch06` is still the state of ch06**, and it is HOSTED, not FINISHED: 3
+  declared scenes with no script, 8 free message ids in `0x9F6-0x9FF`, nerra with no portrait,
+  map sprite or battle anim.
+
+**Opened 2026-09-17 and still NOT started: #393 and #396.** Each carries its own measured
+evidence — read the issue rather than re-deriving it.
 
 ## Next up — NICOLAS'S INSTRUCTION, in order
 
 Nicolas, 2026-09-18: *"the fresh instance will pick up the issues you filed and proposal 3."*
-So the first four items below are assigned work, not a recommendation. Read each issue — every
-one carries measured evidence, and re-deriving it is the waste this list exists to prevent.
+#398 is done; what remains of that instruction is below, unchanged in priority.
 
 | | work | effort | what it is |
 |---|---|---|---|
-| 1 | **#398** | S–M | ⚠️ **Do this one first: it may be a LIVE soft-lock, not a cleanup.** Inherited vanilla scenes stage `CHARACTER_EIRIKA` — which is **braulo**. Vanilla could stage Eirika without loading her because Eirika is always there; braulo is not. #337's guard only sees scenes we WRITE. **It is an AUDIT before it is a fix:** a scene only runs if its chapter's `ChapterEventGroup` still reaches it, so resolve reachability first (`inject/event_group.py` already reads those) and classify each of the five sites reachable-or-dead. Proving one dead is a real answer. |
-| 2 | **#367's proposal 3 — the party-level band** | M | Land it into `docs/fe8-pacing-reference.md`, **derived and regenerated, not hand-kept**. The exp model was spike code and was never committed; transcribe it from the decomp at HEAD (`bmbattle.c` → `GetUnitRoundExp` / `GetUnitPowerLevel` / `GetUnitKillExpBonus` / `GetBattleUnitExpGain`). The numbers to reproduce are in #367's 2026-09-04 comment: mean party level 1→7 across ch00–ch06, exp yield within ±12% of the twin every chapter. **Read it as a BAND (~L5–L9 entering ch07), not a point** — the simulation splits exp evenly across the deploy cap, so it understates leaders and overstates the tail. A stat GROWTH model is explicitly not wanted. ⚠️ **ch07 is the watch item**: it reuses FE8 Ch6 as its bar, so honest parity there hands the party an extra chapter of exp the vanilla curve does not contain, and the per-chapter gate structurally cannot see it — exp is the only quantity that integrates across chapters. |
-| 3 | **#393** | S–M | The chapter YAML is outside the drift scan; ch05 carries 8 hits of the retired CHARACTER-wrap vocabulary. ⚠️ **Not a sweep** — some of those lines are past-tense narration of the very change that retired the term, and a guard that rejects its own warning is worse than none. Read each in context, then add the glob. |
-| 4 | **#396** | M | The `ROMChapterData` census, in the shape #313 built for `ChapterEventGroup`: every field WRITTEN or DECLARED-INHERITED. Fog (#365) was the fifth such field found one at a time; this answers "is there a sixth" once instead of five more times. Most entries should be "inherited, and here is why that is safe". |
+| 1 | **#367's proposal 3 — the party-level band** | M | Land it into `docs/fe8-pacing-reference.md`, **derived and regenerated, not hand-kept** (that file is hand-written prose today, so this needs a generated block plus a freshness guard — `check_generated_indexes_fresh` is the pattern). The exp model was spike code and was never committed; transcribe it from the decomp at HEAD — `GetUnitExpLevel` / `GetUnitRoundExp` / `GetUnitPowerLevel` / `GetUnitKillExpBonus` / `GetBattleUnitExpGain` are all in `src/bmbattle.c:1680-1805`, and the term that does the work is `classRelativePower`. Reuse `difficulty.py` rather than a second roster reader: `chapter_roster_entries` / `entry_body_levels` for our side, `vanilla_unit_defs` + `PARITY_REFERENCE_UDEFS` for the twin (both give class AND level, which the `Combatant` does not carry). Numbers to reproduce are in #367's 2026-09-04 comment: mean party level 1→7 across ch00–ch06, exp yield within ±12% of the twin every chapter. **Read it as a BAND (~L5–L9 entering ch07), not a point** — the simulation splits exp evenly across the deploy cap, so it understates leaders and overstates the tail. A stat GROWTH model is explicitly not wanted. ⚠️ **ch07 is the watch item**: it reuses FE8 Ch6 as its bar, so honest parity there hands the party an extra chapter of exp the vanilla curve does not contain, and the per-chapter gate structurally cannot see it — exp is the only quantity that integrates across chapters. |
+| 2 | **#393** | S–M | The chapter YAML is outside the drift scan; ch05 carries 8 hits of the retired CHARACTER-wrap vocabulary. ⚠️ **Not a sweep** — some of those lines are past-tense narration of the very change that retired the term, and a guard that rejects its own warning is worse than none. Read each in context, then add the glob. |
+| 3 | **#396** | M | The `ROMChapterData` census, in the shape #313 built for `ChapterEventGroup`: every field WRITTEN or DECLARED-INHERITED. Fog (#365) was the fifth such field found one at a time; this answers "is there a sixth" once instead of five more times. Most entries should be "inherited, and here is why that is safe". |
 
 **Then #26 — ch06's own body.** #337 landed, so **the dialogue pass is no longer gated**.
 
@@ -62,12 +57,10 @@ nothing there. Ask; do not infer.
 cluster, each move wrapped in `injection_fingerprint`, clustering by **dependency and not by
 banner** (ADR 0287). ch06 is extracted LAST, after it ships.
 
-⚠️ **ch06 is HOSTED, not FINISHED, and the difference is most of the chapter.** It boots, deploys
-its full cap and can be won — with no dialogue, no cutscenes, and merfolk rendering as vanilla FE8
-humans. **`make chapter CH=ch06` is the state**, and on 2026-09-16 it said: all **3 declared
-scenes have no script** (`chapter_start`, `boss_defeated`, `chapter_end`), **8 message ids FREE**
-in block `0x9F6-0x9FF` so no scene costs a redesign, **nerra has no portrait, map sprite or battle
-anim**, and `ch06clock` last PASSed 12 days ago.
+⚠️ **`tools/injection_fingerprint.py` is the tool to reach for on ANY mechanical change.** #401
+used it again to prove a new build-time guard changed nothing (975 files, ~70s): `--write
+before.json`, change, `--check before.json`. It is what turns "this should be equivalent" into a
+measurement.
 
 ⚠️ **One blocker is Nicolas's, not Claude's: the boat crews have no voice.** No file in
 `campaigns/rime-of-the-frostmaiden/lore/` names Tali or either crew, and Tali carries ch06's
@@ -96,8 +89,7 @@ construction.
 
 ## Owed, filed, not started
 
-Everything this section listed on 2026-09-17 shipped that day (#30, #337, #365, #377) and is
-gone from here rather than restated. What is left is owed BY NICOLAS, not by the next session:
+What is left here is owed BY NICOLAS, not by the next session:
 
 - **#367's proposal 4** -- lock ch03-ch06, or accept the gate is decorative for them. The rest
   of #367 is answered in its 2026-09-04 comment (**do not re-derive it, do not restate it
@@ -112,6 +104,14 @@ why a decomp sheet's palette is a meaningless leftover, what `footprint:` actual
 WALK-vs-GLIDE split that decides whether PixelLab is worth paying for. Do not restate it here.
 
 ## Recently landed — do not redo
+
+**#401 (2026-09-18) — #398's audit, and the guard that keeps its answer true.** ADR 0294
+carries it and is deliberately not restated. ⚠️ **Two review findings a fresh session should
+know before writing any graph-walking guard**: our own scenes are `MS_*`, so a vanilla-spelled
+symbol filter silently walks past half the graph (ch05: 26 reported, 40 real); and a walk must
+read its edges from CODE with comments stripped, or a sentence naming a retired scene stops the
+build. Also: a caller that LOADs the actor is REPORTED on the finding, never subtracted — "some
+caller loads it" is not "every path does".
 
 **#372 / #374 / #373 (2026-09-16) — the three follow-ups off #371, all merged.** Three ADRs in
 `docs/decisions.md` carry them and are deliberately not restated: *"A check that could not RUN is
