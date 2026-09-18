@@ -35,7 +35,7 @@ for a in sys.argv[1:]:
         FLAGS[k]=v
     else:
         ARGS.append(a)
-TILESET=FLAGS.get('--tileset','snowy-bern')
+TILESET=FLAGS.get('--tileset',DEFAULT_TILESET)
 BLANK=FLAGS.get('--blank')
 VANILLA_REF=FLAGS.get('--vanilla')  # blank mode: render this vanilla layout in the reference pane
 if BLANK:

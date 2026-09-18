@@ -100,6 +100,24 @@ class TheGateCatchesACopy(unittest.TestCase):
         self.assertEqual([], self._run_on(
             "ts = meta.get('tileset', mt.DEFAULT_TILESET)\n"))
 
+    def test_a_default_under_a_DIFFERENT_key_is_caught_too(self):
+        """`--tileset`'s CLI default was the same literal, and a `tileset`-keyed check
+        could not see it: a repoint would have left the blank-canvas editor behind."""
+        self.assertTrue(self._run_on("TILESET = FLAGS.get('--tileset', 'snowy-bern')\n"))
+
+    def test_a_default_that_WRAPPED_onto_the_next_line_is_caught(self):
+        """A line scan misses this; the AST does not."""
+        self.assertTrue(self._run_on(
+            "ts = meta.get('tileset',\n               'snowy-bern')\n"))
+
+    def test_the_rule_written_in_PROSE_is_not_flagged(self):
+        """The home module explains this rule in the words a text scan would flag, and a
+        guard that rejects its own warning is worse than none."""
+        self.assertEqual([], self._run_on(
+            "# an absent key means snowy-bern -- everyone used to spell\n"
+            "# get('tileset', 'snowy-bern') themselves\n"
+            "ts = meta.get('tileset', mt.DEFAULT_TILESET)\n"))
+
     def test_a_keyless_get_with_no_default_is_fine(self):
         """Some callers want None and handle it themselves; that is not a second default."""
         self.assertEqual([], self._run_on("ts = meta.get('tileset')\n"))

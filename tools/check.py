@@ -2194,7 +2194,7 @@ def check_tool_refs_exist(fail):
 def _tileset_default_readers():
     """Our own tools -- the files that could re-declare what a keyless sidecar means."""
     out = []
-    for g in ('tools/*.py', 'tools/inject/*.py'):
+    for g in ('tools/*.py', 'tools/inject/*.py', 'tools/playtest/*.py'):
         out += glob.glob(os.path.join(REPO, g))
     home = os.path.join(REPO, 'tools', 'map_tileset_tool.py')
     return [p for p in sorted(out)
@@ -2213,20 +2213,37 @@ def check_one_tileset_default(fail):
     The copies were not harmless. `map_donor` is the READ side: its keyless resolution decides
     which tileset a map is scored against, which decides IMPASSABLE, which decides the donor it
     REPORTS -- the number an ADR quotes. `import_map_layout` is the WRITE side, so a divergence
-    there is baked into the sidecar rather than merely misread. Repointing the default with
-    five spellings in the tree moves some readers and not others, and nothing would have said
-    so."""
-    pat = re.compile(r"""get\(\s*['"]tileset['"]\s*,\s*['"]([^'"]+)['"]""")
+    there is baked into the sidecar rather than merely misread.
+
+    Matched by AST, not by line. A line scan misses a `get(` whose default wrapped onto the
+    next line, and -- worse -- FIRES ON PROSE: the home module's own comment explains this rule
+    in exactly the words it would flag, and a guard that rejects its own warning is worse than
+    none. It also keys on the DEFAULT VALUE rather than the key name, because the same literal
+    was also the default of a `--tileset` CLI flag, which a `'tileset'`-keyed check cannot see.
+    """
+    import map_tileset_tool
+    default = map_tileset_tool.DEFAULT_TILESET
     for path in _tileset_default_readers():
         with open(path, encoding='utf-8') as fh:
-            for i, line in enumerate(fh, 1):
-                m = pat.search(line)
-                if m:
-                    fail.append(
-                        '%s:%d re-declares the keyless-sidecar default as %r -- read '
-                        'map_tileset_tool.DEFAULT_TILESET instead, so repointing it moves '
-                        'every reader together (#377)'
-                        % (os.path.relpath(path, REPO), i, m.group(1)))
+            text = fh.read()
+        if default not in text:
+            continue
+        try:
+            tree = ast.parse(text)
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if not (isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Attribute) and node.func.attr == 'get'
+                    and len(node.args) == 2):
+                continue
+            arg = node.args[1]
+            if isinstance(arg, ast.Constant) and arg.value == default:
+                fail.append(
+                    '%s:%d re-declares the keyless-sidecar default as %r -- read '
+                    'map_tileset_tool.DEFAULT_TILESET instead, so repointing it moves every '
+                    'reader together (#377)'
+                    % (os.path.relpath(path, REPO), node.lineno, default))
 
 
 def check_campaign_declares_no_chapter_list(fail):

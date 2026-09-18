@@ -43,11 +43,23 @@ what the build resolved caught it: **one literal in the tree, but still a snapsh
 source rather than one spelling of a copy. That is the same mistake as the seven, made one level
 up, and it is worth naming because it looks like the fix.
 
+It was made twice: `compile_layout(..., tileset=DEFAULT_TILESET)` binds the same snapshot in a
+signature, on the **write** side, where it is stamped into the sidecar. It takes `None` and
+resolves in the body.
+
 ## Gated, because the constant alone was not enough
 
-`check_one_tileset_default` rejects any `get('tileset', '<literal>')` outside the home module.
+`check_one_tileset_default` rejects any `.get(..., '<the default>')` outside the home module.
 The constant already existed and five copies coexisted with it for months — nothing said they
 could not. The gate is what makes the home load-bearing instead of advisory.
+
+It matches by **AST, and on the default VALUE rather than the key name**, because the first cut
+matched text line-by-line against `get('tileset', ...)` and that version had three holes at
+once: it missed a default that **wrapped** onto the next line, it missed
+`FLAGS.get('--tileset', 'snowy-bern')` — the same literal under a different key, which would
+have left the blank-canvas editor on the old tileset after a repoint — and it would have fired
+on **prose**, since the home module explains this very rule in the words the scan looks for. A
+guard that rejects its own warning is worse than none.
 
 The `maps/tilesets/None/` message is fixed with it: a keyless export told the author to
 re-author terrain in `maps/tilesets/None/` while having validated against the default.
