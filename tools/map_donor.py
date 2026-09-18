@@ -108,7 +108,7 @@ def our_map(stem):
         info = json.load(source)
     width, height = info['width'], info['height']
     tileset = mt._tileset_from_dir(
-        os.path.join(MAPS, 'tilesets', info.get('tileset', 'snowy-bern')))
+        os.path.join(MAPS, 'tilesets', info.get('tileset', mt.DEFAULT_TILESET)))
     with open(os.path.join(MAPS, stem + '.mar'), 'rb') as source:
         raw = source.read()
     cells = [struct.unpack_from('<H', raw, i * 2)[0] >> 5 for i in range(width * height)]

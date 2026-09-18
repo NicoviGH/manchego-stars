@@ -16,7 +16,7 @@ import sys, os, struct, collections, json, io, base64
 ROOT=os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # repo root (worktree-aware)
 DEC=os.path.join(ROOT,'fireemblem8u')
 sys.path.insert(0, os.path.join(ROOT,'tools'))
-from map_tileset_tool import (_tileset_from_dir, preserved_terrain_targets,
+from map_tileset_tool import (DEFAULT_TILESET, _tileset_from_dir, preserved_terrain_targets,
                               render_grid, Tileset, vanilla_layout_data,
                               vanilla_layout_tileset_assets,
                               tilesets_are_compatible_variants)
@@ -35,7 +35,7 @@ for a in sys.argv[1:]:
         FLAGS[k]=v
     else:
         ARGS.append(a)
-TILESET=FLAGS.get('--tileset','snowy-bern')
+TILESET=FLAGS.get('--tileset',DEFAULT_TILESET)
 BLANK=FLAGS.get('--blank')
 VANILLA_REF=FLAGS.get('--vanilla')  # blank mode: render this vanilla layout in the reference pane
 if BLANK:
@@ -178,7 +178,7 @@ else:
     # base plus edits confined to unused slots -- snowy-bern-ice (a palette change plus
     # ch06's snow piles in empty slots) inherits Nicolas's conventions instead of
     # silently falling back to the smeared auto-reskin.
-    _learned_ts=_learned_json.get('tileset','snowy-bern')
+    _learned_ts=_learned_json.get('tileset',DEFAULT_TILESET)
     _ts_ok=tilesets_are_compatible_variants(MAPS_ROOT,_learned_ts,TILESET)
     _learned=(_learned_json.get('map',{}) if _ts_ok and _src_ok else {})
     if TILESET!=_learned_ts and _ts_ok:
@@ -220,10 +220,10 @@ if SEED_MAR:
     if (sj['width'],sj['height'])!=(W,H):
         sys.exit('ERROR: seed .mar is %dx%d but layout %s is %dx%d'
                  %(sj['width'],sj['height'],LAYOUT,W,H))
-    if not tilesets_are_compatible_variants(MAPS_ROOT,sj.get('tileset','snowy-bern'),TILESET):
+    if not tilesets_are_compatible_variants(MAPS_ROOT,sj.get('tileset',DEFAULT_TILESET),TILESET):
         sys.exit('ERROR: seed .mar was painted on tileset %r but this canvas is %r '
                  '-- its metatile indices would reinterpret as the wrong art/terrain'
-                 %(sj.get('tileset','snowy-bern'),TILESET))
+                 %(sj.get('tileset',DEFAULT_TILESET),TILESET))
     grid=[struct.unpack_from('<H',seed,i*2)[0]>>5 for i in range(W*H)]
     print('seeded editable grid from',SEED_MAR)
 

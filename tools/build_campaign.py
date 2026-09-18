@@ -81,6 +81,7 @@ from inject.paths import (  # noqa: E402,F401
     PROLOGUE_WM_H, TEXTS_TXT, TRAPDATA_C, UIARENA_C, UNITLISTSCREEN_C, UNIT_ICON_MOVE_C,
     UNIT_ICON_MOVE_S, UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_C, UNIT_ICON_WAIT_S, VARIABLES_H,
     WAIT_GFX_DIR, WORLDMAP_RM_C, WORLD_MAP_GFX_DIR)
+import map_tileset_tool  # noqa: E402  owns tilesets; DEFAULT_TILESET lives there (#377)
 from inject import decomp as _decomp  # noqa: E402  the shared writer's validator hook
 from inject import engine_hooks  # noqa: E402  campaign-agnostic engine C-source hooks
 from inject import event_group  # noqa: E402  the ChapterEventGroup census guard (#313)
@@ -5724,7 +5725,12 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
 # TileConfiguration<Stem> asset labels (_register_tileset). Further tilesets
 # (e.g. cave-interior, #40/#23) register in the chapter injector that first
 # consumes them.
-WINTER_TILESET = 'snowy-bern'         # shared winter overworld (#41), stem Snow
+# The shared winter overworld (#41), stem Snow -- and the meaning of a keyless sidecar.
+# It is IMPORTED rather than spelled again: `map_tileset_tool` owns tilesets, imports
+# nothing but stdlib, and is therefore reachable by every reader including the
+# deliberately stdlib-only `map_donor`. Five copies of this literal had accumulated
+# across the read and write sides before #377, and repointing it moved some of them.
+WINTER_TILESET = map_tileset_tool.DEFAULT_TILESET
 
 
 def map_tileset(meta):
@@ -5745,7 +5751,11 @@ def map_tileset(meta):
         # not run" instead of naming the file -- can catch a malformed sidecar as the data
         # error it is instead of a traceback.
         raise ValueError('map sidecar is %s, not a JSON object' % type(meta).__name__)
-    return meta.get('tileset', WINTER_TILESET)
+    # `map_tileset_tool.DEFAULT_TILESET` read HERE rather than through the module-level
+    # `WINTER_TILESET`, so the default is resolved at call time and there is exactly one
+    # live source of it. A module-level copy is how the five spellings #377 removed got
+    # made in the first place -- by assignment rather than by literal, but still a copy.
+    return meta.get('tileset', map_tileset_tool.DEFAULT_TILESET)
 
 
 def _layout_sidecar(maps_dir, stem):

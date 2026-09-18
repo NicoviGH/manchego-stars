@@ -119,7 +119,7 @@ class Tileset:
         return out[:top]
 
 
-def compile_layout(grid, out_bin, map_id, tileset='snowy-bern'):
+def compile_layout(grid, out_bin, map_id, tileset=None):
     """grid = list of rows of metatile indices -> decomp FEBuilder .mar + .json.
 
     The build runs this .mar through scripts/mar_to_map.py (Makefile %.bin: %.mar),
@@ -128,7 +128,13 @@ def compile_layout(grid, out_bin, map_id, tileset='snowy-bern'):
     .mar must carry NO header (mar_to_map adds it) and store each tile as
     metatile_index << 5, so >>3 yields the engine's index<<2. (Writing index*4 + a
     header here scrambles the map: mar_to_map eats the header as a tile and halves the
-    magnitudes.)"""
+    magnitudes.)
+
+    `tileset=None` resolves to `DEFAULT_TILESET` HERE rather than in the signature, because a
+    default bound at def time is a snapshot -- the same copy-by-assignment #377 removed from
+    `map_tileset`, and this is the WRITE side, so it stamps the answer into the sidecar."""
+    if tileset is None:
+        tileset = DEFAULT_TILESET
     h = len(grid)
     w = len(grid[0])
     if any(len(row) != w for row in grid):
@@ -458,12 +464,12 @@ def terrain_impact(maps_root, tileset, metatiles):
         stem = os.path.splitext(os.path.basename(path))[0]
         with open(path) as source:
             meta = json.load(source)
-        # An ABSENT `tileset` key means snowy-bern -- the repo-wide default (map_donor,
-        # import_map_layout, gen_map_editor all spell it `get('tileset', 'snowy-bern')`),
-        # and four of our eight maps omit it. Comparing a bare .get() against the name
-        # made those four invisible, so a snowy-bern terrain flip would have printed a
-        # clean blast radius while silently re-terraining ch00, ch01 and ch02. The whole
-        # point of this function is to be believed before a destructive write.
+        # An ABSENT `tileset` key means DEFAULT_TILESET, and four of our eight maps omit it.
+        # Comparing a bare .get() against the name made those four invisible, so a snowy-bern
+        # terrain flip would have printed a clean blast radius while silently re-terraining
+        # ch00, ch01 and ch02. The whole point of this function is to be believed before a
+        # destructive write. (map_donor, import_map_layout and gen_map_editor each used to
+        # spell the literal here too; #377 pointed them at the constant above and gated it.)
         if meta.get('tileset', DEFAULT_TILESET) != tileset or 'width' not in meta:
             continue
         with open(os.path.join(maps_root, stem + '.mar'), 'rb') as source:
