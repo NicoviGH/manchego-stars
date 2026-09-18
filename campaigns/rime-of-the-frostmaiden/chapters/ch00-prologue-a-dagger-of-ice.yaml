@@ -32,6 +32,10 @@ difficulty:
   normal:    0
   difficult: 1
 
+# No fog. The prologue teaches movement and one kill; obscured vision is not a thing the
+# player has been taught to read yet. Declared rather than inherited (#365).
+fog: none
+
 
 # Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
 # so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list

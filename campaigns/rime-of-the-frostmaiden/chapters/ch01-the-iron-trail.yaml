@@ -37,6 +37,10 @@ difficulty:
   normal:    0
   difficult: 1
 
+# No fog. ch04 is the campaign's first fog map, on purpose -- it is the tone shift to
+# monsters. Declared rather than inherited (#365).
+fog: none
+
 
 # Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
 # so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list

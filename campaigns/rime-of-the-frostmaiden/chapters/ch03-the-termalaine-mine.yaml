@@ -27,6 +27,10 @@ difficulty:
   normal:    2
   difficult: 2
 
+# No fog, and the chapter already said so where it matters: the grell is VISIBLE at (14,1)
+# from turn 1, Bazba-style. Declared rather than inherited (#365).
+fog: none
+
 
 # Traps (#302). `.traps` is a ChapterEventGroup field, and our injectors FILL the group --
 # so a chapter that says nothing keeps whatever its donor carried. Declaring the empty list
