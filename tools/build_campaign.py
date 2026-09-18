@@ -10578,6 +10578,20 @@ def raw_pid_base_levels(campaign):
 ENEMY_ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
 
 
+# Every roster key that PLACES a body on the map, enemy or not. `ENEMY_ROSTER_KEYS` is the
+# enemy half and is what the difficulty math grades; a recruit can be placed by either half,
+# because `recruit_initial_faction` defaults to GREEN (a neutral bystander recruited in place,
+# the Colm/Neimi pattern) and only opts into RED. A reader asking "what level does this unit
+# deploy at" that sees one half is the #368 failure in a new key.
+PLACED_ROSTER_KEYS = ENEMY_ROSTER_KEYS + ('neutral_units', 'green_allies')
+
+
+def placed_entries(chap):
+    """Every entry that places a body, across ALL roster keys (see PLACED_ROSTER_KEYS)."""
+    return [ed for key in PLACED_ROSTER_KEYS for ed in (chap.get(key) or [])
+            if isinstance(ed, dict)]
+
+
 def chapter_roster_entries(chap):
     """Every enemy entry a chapter fields, across ALL of its roster keys.
 
