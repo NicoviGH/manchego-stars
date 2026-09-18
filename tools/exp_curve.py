@@ -30,10 +30,8 @@ Stat GROWTH is deliberately not modelled (#367): growths are random, and a level
 planning quantity -- a projected stat line would be a precision the dice do not support.
 """
 import argparse
-import collections
 import dataclasses
 import functools
-import glob
 import os
 import re
 import sys
@@ -223,7 +221,10 @@ def battle_exp_gain(actor, target):
 
 # Classes whose exp ModifyUnitSpecialExp overrides outright. If a roster ever fields one,
 # this model is quietly wrong about it, so the simulation refuses to be quiet.
-SPECIAL_EXP_CLASSES = ('CLASS_GORGONEGG', 'CLASS_DEMON_KING', 'CLASS_PHANTOM')
+# Both egg classes: UNIT_IS_GORGON_EGG (bmunit.h) tests CLASS_GORGONEGG *and*
+# CLASS_GORGONEGG2, and a guard that knows only the first still mis-prices half of them.
+SPECIAL_EXP_CLASSES = ('CLASS_GORGONEGG', 'CLASS_GORGONEGG2', 'CLASS_DEMON_KING',
+                       'CLASS_PHANTOM')
 
 
 # ---------------------------------------------------------------------------------------
@@ -277,10 +278,21 @@ def vanilla_bodies(parity_ref):
 
 
 def party_classes(campaign):
-    """(uid, class enum) for the cast whose levels this band describes -- `difficulty`'s own
-    ROSTER, so there is one answer to "who is the party" in this repo."""
-    return [(uid, bc.class_enum_for(dict(bc.load_unit(campaign, uid), id=uid)))
-            for uid in d.ROSTER]
+    """(uid, class enum, first chapter number this unit can earn in) for the cast whose
+    levels this band describes.
+
+    `difficulty`'s own ROSTER, so there is one answer to "who is the party" in this repo,
+    and `build_campaign.recruit_chapter_number` for when each joins -- the same answer
+    `cast_available_at` sizes the deploy caps from. A recruit is on the field from the
+    chapter AFTER the one that recruits it, and every recruit joins at level 1, so crediting
+    one with the chapters before it joined hands it an exp history it never had."""
+    out = []
+    for uid in d.ROSTER:
+        unit = dict(bc.load_unit(campaign, uid), id=uid)
+        recruited = bc.recruit_chapter_number(campaign, unit)
+        out.append((uid, bc.class_enum_for(unit),
+                    0 if recruited is None else int(recruited) + 1))
+    return out
 
 
 def unmodelled_special_exp_bodies(campaign):
@@ -324,10 +336,11 @@ LEVEL_CAP = 20
 class Career:
     """One unit's exp ledger across the campaign. Levels at 100 exp, as the engine does."""
 
-    def __init__(self, name, class_enum, share=1.0):
+    def __init__(self, name, class_enum, share=1.0, joins=0):
         self.name = name
         self.class_enum = class_enum
         self.share = share
+        self.joins = joins          # first chapter_number this unit can earn in
         self.level = 1
         self.exp = 0
 
@@ -344,7 +357,9 @@ class Career:
         me = self.fighter
         return sum(battle_exp_gain(me, body) for body in bodies)
 
-    def fight(self, bodies, deploy_cap):
+    def fight(self, bodies, deploy_cap, chapter_number=None):
+        if chapter_number is not None and chapter_number < self.joins:
+            return 0
         gained = int(self.chapter_pot(bodies) * self.share / deploy_cap)
         self.exp += gained
         while self.exp >= EXP_PER_LEVEL and self.level < LEVEL_CAP:
@@ -384,8 +399,18 @@ def _banks_exp(chap):
     return (chap.get('deployment') or {}).get('deploy_limit') is not None
 
 
+def _founding(careers):
+    """Careers that have been on the field since the campaign began.
+
+    The band's three columns are three SHARES of one career, so they are read over one
+    population. Mixing a late recruit into the low edge pinned it at level 1 for every
+    chapter after a recruitment, which stops being a statement about how much a unit is fed
+    and becomes one about when it joined -- the recruit floor is its own column instead."""
+    return [c for c in careers if c.joins == 0]
+
+
 def _party(campaign, share=1.0):
-    return [Career(uid, cls, share) for uid, cls in party_classes(campaign)]
+    return [Career(uid, cls, share, joins) for uid, cls, joins in party_classes(campaign)]
 
 
 def simulate(campaign='rime-of-the-frostmaiden'):
@@ -413,23 +438,27 @@ def simulate(campaign='rime-of-the-frostmaiden'):
         twin = vanilla_bodies(ref)
         cap = field_cap(chap)
         banks = _banks_exp(chap)
+        number = int(chap.get('chapter_number'))
         # Both pots at OUR party's state, before anybody fights this chapter.
         pot = sum(c.chapter_pot(bodies) for c in ours) / len(ours)
         twin_pot = (sum(c.chapter_pot(twin) for c in ours) / len(ours)
                     if twin is not None else None)
+        # The recruit floor, read at the START of the chapter: every recruit joins at level
+        # 1, so the newest unit ON THE FIELD here is one this chapter has to be survivable
+        # for. None until somebody has joined.
+        newest = min([c.level for c in ours if c.joins and number >= c.joins] or [None])
         if banks:
             for career in ours + lead + tail:
-                career.fight(bodies, cap)
-            if twin is not None:
-                for career in twin_party:
-                    career.fight(twin, cap)
-        elif twin is not None:
-            # The party skips this chapter; the twin's does not (see _banks_exp).
+                career.fight(bodies, cap, number)
+        if twin is not None:
+            # The twin party fights its own chapter whether or not ours banks this one
+            # (see _banks_exp), and its members join on OUR recruitment schedule, so the
+            # only difference between the two curves stays the enemy force.
             for career in twin_party:
-                career.fight(twin, cap)
+                career.fight(twin, cap, number)
         rows.append({
             'id': chap.get('id'),
-            'chapter_number': int(chap.get('chapter_number')),
+            'chapter_number': number,
             'reference': ref,
             'bodies': len(bodies),
             'twin_bodies': len(twin) if twin is not None else None,
@@ -438,11 +467,16 @@ def simulate(campaign='rime-of-the-frostmaiden'):
             'pot': pot,
             'twin_pot': twin_pot,
             'yield_ratio': (pot / twin_pot) if twin_pot else None,
-            'level_after': _mean_level(ours),
-            'level_after_exact': _mean_level_exact(ours),
-            'band_low': min(c.level for c in tail),
-            'band_high': max(c.level for c in lead),
-            'twin_level_after': _mean_level(twin_party) if twin is not None else None,
+            'levels': {c.name: c.level for c in ours},
+            'level_after': _mean_level(_founding(ours)),
+            'level_after_exact': _mean_level_exact(_founding(ours)),
+            'band_low': min(c.level for c in _founding(tail)),
+            'band_high': max(c.level for c in _founding(lead)),
+            'newest': newest,
+            # Read over the FOUNDING careers, exactly as `level_after` is -- comparing a
+            # mean over one population against a mean over another says nothing.
+            'twin_level_after': (_mean_level(_founding(twin_party))
+                                 if twin is not None else None),
         })
     return rows
 
@@ -467,26 +501,31 @@ def render(rows=None, campaign='rime-of-the-frostmaiden'):
            '<!-- Derived from FE8\'s own exp formulas over the real rosters. Do not hand-edit:',
            '     the next regen silently discards it, and tools/test_exp_curve.py fails the',
            '     build while it is stale. -->', '',
-           '| chapter | bar | bodies ours/twin | field | exp ours/twin | benched | typical | fed |',
+           '| chapter | bar | field | exp ours/twin | benched | typical | fed | newest |',
            '|---|---|---|---|---|---|---|---|']
     for r in rows:
         ratio = ('%d / %d (x%.2f)' % (round(r['pot']), round(r['twin_pot']), r['yield_ratio'])
                  if r['yield_ratio'] else '%d / --' % round(r['pot']))
-        out.append('| %s%s | %s | %d / %s | %d | %s | L%d | **L%d** | L%d |'
+        out.append('| %s%s | %s | %d | %s | L%d | **L%d** | L%d | %s |'
                    % (r['id'].split('-')[0], '' if r['banks'] else ' †',
-                      r['reference'] or '--', r['bodies'],
-                      r['twin_bodies'] if r['twin_bodies'] is not None else '--',
-                      r['field_cap'], ratio,
-                      r['band_low'], r['level_after'], r['band_high']))
+                      r['reference'] or '--', r['field_cap'], ratio,
+                      r['band_low'], r['level_after'], r['band_high'],
+                      ('L%d' % r['newest']) if r['newest'] is not None else '--'))
     last = rows[-1]
     nxt = 'ch%02d' % (last['chapter_number'] + 1)
+    twin = ('L%d' % last['twin_level_after'] if last['twin_level_after'] is not None
+            else '-- (%s is not a curated reference, so there is no twin curve)'
+                 % (last['reference'] or 'its bar'))
     out += ['',
-            '**Entering %s the party is L%d** -- L%d for a unit that rides the bench, L%d for '
-            'one fed' % (nxt, last['level_after'], last['band_low'], last['band_high']),
-            'every kill. The same cast fed each chapter\'s VANILLA twin instead of ours reaches '
-            '**L%d**' % last['twin_level_after'],
-            'over the same span: the party lands where FE8\'s party lands, which is what makes '
-            'the',
+            '**Entering %s the party is L%d** -- L%d for a founding unit that rides the bench,'
+            % (nxt, last['level_after'], last['band_low']),
+            'L%d for one fed every kill, and **L1 for anyone recruited into it**, because every'
+            % last['band_high'],
+            'recruit joins at level 1 (`newest` is the lowest level actually on the field that',
+            'chapter).', '',
+            'The same cast fed each chapter\'s VANILLA twin instead of ours reaches **%s** over'
+            % twin,
+            'the same span: the party lands where FE8\'s party lands, which is what makes the',
             'absolute number usable.', '']
     unbanked = [r for r in rows if not r['banks']]
     if unbanked:
@@ -520,12 +559,14 @@ def print_table(rows):
           'average share' % (SHARE_TAIL, SHARE_LEAD))
     print(bar)
     print('  %-24s %-13s %6s %8s %8s   %s'
-          % ('chapter', 'bar', 'field', 'exp', 'vs twin', 'party after (low/typical/high)'))
+          % ('chapter', 'bar', 'field', 'exp', 'vs twin',
+             'founding party after (low/typical/high) + newest'))
     for r in rows:
-        print('  %-24s %-13s %6d %8d %8s   L%-2d L%-2d L%-2d%s'
+        print('  %-24s %-13s %6d %8d %8s   L%-2d L%-2d L%-3d %-8s%s'
               % (r['id'][:24], (r['reference'] or '--')[:13], r['field_cap'], round(r['pot']),
                  ('x%.2f' % r['yield_ratio']) if r['yield_ratio'] else '--',
                  r['band_low'], r['level_after'], r['band_high'],
+                 ('newest L%d' % r['newest']) if r['newest'] is not None else '',
                  '' if r['banks'] else '   (fixed roster -- the party banks none of it)'))
 
 

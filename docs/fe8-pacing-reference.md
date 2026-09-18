@@ -216,19 +216,23 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
      the next regen silently discards it, and tools/test_exp_curve.py fails the
      build while it is stale. -->
 
-| chapter | bar | bodies ours/twin | field | exp ours/twin | benched | typical | fed |
+| chapter | bar | field | exp ours/twin | benched | typical | fed | newest |
 |---|---|---|---|---|---|---|---|
-| ch00 † | FE8 Prologue | 3 / 3 | 2 | 154 / 149 (x1.03) | L1 | **L1** | L1 |
-| ch01 | FE8 Ch1 | 10 / 10 | 4 | 375 / 385 (x0.97) | L1 | **L1** | L3 |
-| ch02 | FE8 Ch2 | 9 / 9 | 5 | 421 / 421 (x1.00) | L1 | **L2** | L4 |
-| ch03 | FE8 Ch3 | 10 / 10 | 9 | 405 / 424 (x0.95) | L2 | **L3** | L5 |
-| ch04 | FE8 Ch4 | 23 / 23 | 9 | 830 / 812 (x1.02) | L2 | **L4** | L7 |
-| ch05 | FE8 Ch5 | 23 / 23 | 9 | 943 / 882 (x1.07) | L3 | **L5** | L9 |
-| ch06 | FE8 Ch6 | 27 / 27 | 10 | 1030 / 1030 (x1.00) | L3 | **L6** | L12 |
+| ch00 † | FE8 Prologue | 2 | 154 / 149 (x1.03) | L1 | **L1** | L1 | -- |
+| ch01 | FE8 Ch1 | 4 | 375 / 385 (x0.97) | L1 | **L1** | L3 | -- |
+| ch02 | FE8 Ch2 | 5 | 424 / 424 (x1.00) | L1 | **L2** | L4 | L1 |
+| ch03 | FE8 Ch3 | 9 | 415 / 435 (x0.95) | L2 | **L3** | L5 | L1 |
+| ch04 | FE8 Ch4 | 9 | 846 / 829 (x1.02) | L2 | **L4** | L7 | L1 |
+| ch05 | FE8 Ch5 | 9 | 993 / 932 (x1.07) | L3 | **L5** | L9 | L1 |
+| ch06 | FE8 Ch6 | 10 | 1100 / 1100 (x1.00) | L3 | **L6** | L12 | L1 |
 
-**Entering ch07 the party is L6** -- L3 for a unit that rides the bench, L12 for one fed
-every kill. The same cast fed each chapter's VANILLA twin instead of ours reaches **L6**
-over the same span: the party lands where FE8's party lands, which is what makes the
+**Entering ch07 the party is L6** -- L3 for a founding unit that rides the bench,
+L12 for one fed every kill, and **L1 for anyone recruited into it**, because every
+recruit joins at level 1 (`newest` is the lowest level actually on the field that
+chapter).
+
+The same cast fed each chapter's VANILLA twin instead of ours reaches **L6** over
+the same span: the party lands where FE8's party lands, which is what makes the
 absolute number usable.
 
 † ch00 pays its exp to units the party never gets -- a fixed-roster chapter whose guests do
@@ -237,6 +241,14 @@ banks a chapter we do not. The two curves still converge, because FE8 pays a low
 more for the same body.
 
 <!-- END GENERATED: party-level band -->
+
+**Who is in the party, and when.** A unit earns from the chapter AFTER the one that recruits
+it (`build_campaign.recruit_chapter_number` — the same answer `cast_available_at` sizes the
+deploy caps from), and **every recruit joins at level 1**, so the `newest` column is the floor
+a chapter actually has to be survivable for. `benched` / `typical` / `fed` are three shares of
+one career and are read over the FOUNDING party only: mixing a ch05 recruit into the low edge
+pins it at L1 for every chapter after a recruitment, which stops being a statement about how
+much a unit is fed and becomes one about when it joined.
 
 **What the model does and does not count.** Every body on a chapter's roster dies once, to
 one member of the field, and the chapter's exp is split across the field. Chip damage that

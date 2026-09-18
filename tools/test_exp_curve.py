@@ -208,6 +208,12 @@ class ChapterBodies(unittest.TestCase):
         self.assertEqual(1, len(sephek))
         self.assertTrue(sephek[0].boss)
 
+    def test_both_gorgon_egg_classes_count_as_special_exp(self):
+        # UNIT_IS_GORGON_EGG (bmunit.h) tests CLASS_GORGONEGG *and* CLASS_GORGONEGG2, so a
+        # guard that knows only the first still mis-prices half the eggs in the game.
+        self.assertIn('CLASS_GORGONEGG', ec.SPECIAL_EXP_CLASSES)
+        self.assertIn('CLASS_GORGONEGG2', ec.SPECIAL_EXP_CLASSES)
+
     def test_no_hosted_chapter_fields_a_class_the_exp_model_cannot_price(self):
         self.assertEqual([], ec.unmodelled_special_exp_bodies(self.campaign))
 
@@ -233,9 +239,37 @@ class Simulation(unittest.TestCase):
         self.assertEqual(sorted(numbers), numbers)
         self.assertGreaterEqual(len(numbers), 7)     # ch00-ch06 are hosted today
 
+    def test_a_recruit_earns_nothing_from_the_chapters_it_was_not_in(self):
+        """basil and sahnar join in ch05 and every recruit joins at level 1. Crediting them
+        with ch01-ch04 would hand four units an exp history they never had and pull the
+        typical column up with it (`build_campaign.recruit_chapter_number` is the same
+        answer `cast_available_at` sizes the deploy caps from)."""
+        before = [r for r in self.rows if r['chapter_number'] == 4][0]
+        self.assertEqual(1, before['levels']['basil'])
+        self.assertGreater(before['levels']['braulo'], 1)
+
+    def test_a_recruit_starts_earning_once_it_has_joined(self):
+        joined = [r for r in self.rows if r['chapter_number'] == 6][0]
+        self.assertGreater(joined['levels']['basil'], 1)
+
     def test_the_party_level_never_goes_backwards(self):
         levels = [r['level_after'] for r in self.rows]
         self.assertEqual(sorted(levels), levels)
+
+    def test_the_band_describes_units_that_have_been_there_all_along(self):
+        """benched/typical/fed are three SHARES of one career, so they have to be read over
+        the same population -- the founding party. Mixing a ch05 recruit into the low edge
+        pinned it at L1 for every chapter after a recruitment, which stops being a statement
+        about how much a unit is fed and becomes one about when it joined."""
+        last = self.rows[-1]
+        self.assertGreater(last['band_low'], 1)
+
+    def test_the_newest_recruit_is_reported_separately(self):
+        """The recruit floor is the other number a design question needs -- basil and sahnar
+        join in ch05 at level 1, and a chapter that assumes L5 of everyone is wrong about
+        two units on the field."""
+        joined = [r for r in self.rows if r['chapter_number'] == 5][0]
+        self.assertEqual(1, joined['newest'])
 
     def test_the_band_brackets_the_even_split(self):
         for r in self.rows:
@@ -277,6 +311,15 @@ class GeneratedBlock(unittest.TestCase):
         have = open(ec.PACING_DOC, encoding='utf-8').read()
         self.assertEqual(1, have.count(ec.BEGIN))
         self.assertEqual(1, have.count(ec.END))
+
+    def test_a_final_chapter_with_no_curated_twin_renders_instead_of_crashing(self):
+        """Every hosted chapter has a curated `parity_reference` today. The next one may
+        land before its twin is curated, and the failure then must be a row that says so --
+        not a TypeError out of the renderer that takes the whole test module with it."""
+        rows = [dict(r) for r in ec.simulate()]
+        rows[-1].update(reference='FE8 Ch7', twin_bodies=None, twin_pot=None,
+                        yield_ratio=None, twin_level_after=None)
+        self.assertIn('--', ec.render(rows))
 
     def test_rewriting_a_doc_with_no_fence_is_refused(self):
         with self.assertRaises(ValueError):

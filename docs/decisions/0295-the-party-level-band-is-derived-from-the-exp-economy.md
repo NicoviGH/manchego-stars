@@ -28,8 +28,8 @@ new game at mode 1 and only `ch8-eventscript.h`'s route split ever writes anothe
 needs a world map we do not have. So mode 1 is our whole campaign, and it is equally FE8's own
 Prologue–Ch8, which is every twin we measure against.
 
-**What it says.** Entering ch07 the party is **L6** typical — L3 for a unit on the bench, L12
-for one fed every kill — and the same cast fed each chapter's vanilla twin instead of ours
+**What it says.** Entering ch07 the founding party is **L6** typical — L3 for a unit on the
+bench, L12 for one fed every kill, and **L1 for anything recruited into it** — and the same cast fed each chapter's vanilla twin instead of ours
 reaches the same level over the same span. Every chapter's exp yield is within ±12% of its
 twin, which `tools/test_exp_curve.py` asserts, because exp is the only quantity in this repo
 that **integrates across chapters**: no per-chapter gate can see a chapter reusing a twin an
@@ -40,6 +40,15 @@ is a fixed-roster chapter whose two units are guests — Hlin and Scramsax never
 exp is banked by nobody, while FE8's prologue pays Eirika and Seth, who stay for the whole game.
 The two curves converge anyway, because FE8 pays a lower-level unit more for the same body; that
 convergence is the cross-check that makes the absolute number usable rather than a coincidence.
+
+**A unit earns from the chapter after it JOINS, and every recruit joins at level 1.** The
+first cut ran all thirteen roster members from ch01 and handed four of them an exp history
+they never had. Availability is `recruit_chapter_number`, the same answer `cast_available_at`
+sizes the deploy caps from. It also splits the band's population from the recruit floor: the
+three share columns describe the FOUNDING party, because mixing a ch05 recruit into the low
+edge pins it at L1 for every chapter after a recruitment — which stops being a statement about
+how much a unit is fed and becomes one about when it joined. The recruit floor gets its own
+column, and it is the number a chapter's survivability has to clear.
 
 **A body's field count is what the chapter FIELDS, not what the roster holds.** `deploy_limit`
 answers it wherever there is Pick Units; a fixed-roster chapter has none, and falling through to
