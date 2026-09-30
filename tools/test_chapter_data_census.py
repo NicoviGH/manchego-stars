@@ -131,27 +131,28 @@ class PassOwnership(unittest.TestCase):
         total pass writes its fields through a table (`DIFFICULTY_FIELDS`) rather than by
         spelling each one inside its body."""
         import ast
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'build_campaign.py')
-        with open(path, encoding='utf-8') as fh:
-            src = fh.read()
-        tree = ast.parse(src)
-        func = next((n for n in tree.body
-                     if isinstance(n, ast.FunctionDef) and n.name == func_name), None)
-        if func is None:
+        from inject import source as injector
+        defs = injector.top_level_definitions()
+        hits = defs.get(func_name, [])
+        funcs = [(path, n) for path, n in hits if isinstance(n, ast.FunctionDef)]
+        if not funcs:
             return None
-        chunks = [ast.get_source_segment(src, func) or '']
+        path, func = funcs[-1]
+        chunks = [injector.segment(path, func)]
+        # The constants may live in any injector file once #389 moves them, so they are
+        # looked up by name across all of them rather than beside the pass.
         wanted = {n.id for n in ast.walk(func)
                   if isinstance(n, ast.Name) and n.id.isupper()}
-        for node in tree.body:
-            if isinstance(node, ast.Assign) and any(
-                    isinstance(t, ast.Name) and t.id in wanted for t in node.targets):
-                chunks.append(ast.get_source_segment(src, node) or '')
+        for name in sorted(wanted):
+            for where, node in defs.get(name, []):
+                if isinstance(node, ast.Assign):
+                    chunks.append(injector.segment(where, node))
         return '\n'.join(chunks)
 
     def test_every_owning_pass_exists_and_names_the_field_it_owns(self):
         for field, pass_name in sorted(cd.OWNED_BY_PASS.items()):
             src = self._source_of(pass_name)
-            self.assertIsNotNone(src, '%s: no top-level `%s` in build_campaign.py'
+            self.assertIsNotNone(src, '%s: no top-level `%s` in any injector file'
                                       % (field, pass_name))
             leaf = field.split('.')[-1]
             self.assertIn(leaf, src,

@@ -18,8 +18,9 @@ import os
 import re
 import sys
 
+from . import source as _source  # noqa: E402  the injector's source, wherever it lives (#389)
+
 _TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUILD_CAMPAIGN_PY = os.path.join(_TOOLS, 'build_campaign.py')
 
 # --- the declarations themselves -------------------------------------------------------
 # Declaring CHNN_HOST_INDEX + CHNN_EVENT_GROUP here is what ENROLS a chapter. There is no
@@ -122,27 +123,28 @@ def hosted_chapters(scope=None):
     return sorted(found, key=lambda c: c.number)
 
 
-def injector_chapters(path=BUILD_CAMPAIGN_PY, source=None):
-    """The chapters build_campaign actually has an injector for, read from its SOURCE.
+def injector_chapters(source=None):
+    """The chapters the injector actually has an injector for, read from its SOURCE.
 
     ast.parse rather than import, for the same reason this module is stdlib-only: the lint
-    that consumes it runs in a CI job with no Pillow.
+    that consumes it runs in a CI job with no Pillow. Every injector file is read
+    (`inject/source.py`), so an `inject_chNN` that moves out of build_campaign.py still counts.
     """
-    if source is None:
-        with open(path, encoding='utf-8') as f:
-            source = f.read()
+    trees = ([ast.parse(source)] if source is not None
+             else [_source.parse(path) for path in _source.injector_files()])
     found = []
-    for node in ast.walk(ast.parse(source)):
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            continue
-        match = _INJECTOR_RE.match(node.name)
-        if match:
-            found.append(('prologue', 0) if match.group(1) == 'prologue'
-                         else (match.group(1), int(match.group(2))))
+    for tree in trees:
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            match = _INJECTOR_RE.match(node.name)
+            if match:
+                found.append(('prologue', 0) if match.group(1) == 'prologue'
+                             else (match.group(1), int(match.group(2))))
     return [name for name, _ in sorted(set(found), key=lambda pair: pair[1])]
 
 
-def undeclared_injectors(path=BUILD_CAMPAIGN_PY, source=None, scope=None):
+def undeclared_injectors(source=None, scope=None):
     """Injectors that exist but enrol nothing -- discovery's blind spot.
 
     Discovery covers a chapter that spells its constants right. `inject_ch05` with a typo'd
@@ -151,12 +153,13 @@ def undeclared_injectors(path=BUILD_CAMPAIGN_PY, source=None, scope=None):
     out to close, so it is a gate, not a convention (#241).
     """
     enrolled = {c.name for c in hosted_chapters(scope)}
-    return [name for name in injector_chapters(path, source) if name not in enrolled]
+    return [name for name in injector_chapters(source) if name not in enrolled]
 
 
 # --- bare-literal message ids (#346) ----------------------------------------------------
 
-MessageLiteral = collections.namedtuple('MessageLiteral', 'msg_id chapter lineno')
+MessageLiteral = collections.namedtuple('MessageLiteral', 'msg_id chapter lineno path',
+                                        defaults=(None,))
 
 # The one function that WRITES a message body. Every id the build spends passes through it.
 MESSAGE_WRITER = 'set_message_body'
@@ -177,7 +180,7 @@ def _callsites():
     return callsites
 
 
-def literal_message_ids(path=BUILD_CAMPAIGN_PY, source=None):
+def literal_message_ids(source=None, path='<source>'):
     """Message ids written as a BARE LITERAL at a `set_message_body` call site, from SOURCE.
 
     `build_campaign.injector_message_ids` finds an id by the NAME of the constant holding
@@ -203,20 +206,36 @@ def literal_message_ids(path=BUILD_CAMPAIGN_PY, source=None):
     for a file full of literals -- a scan that quietly stops scanning, which is the failure
     #341 shipped and decisions.md 2026-09-02 names.
     """
-    if source is None and path in _literal_cache:
-        return _literal_cache[path]
-    cache_key = None
-    if source is None:
-        with open(path, encoding='utf-8') as f:
-            source = f.read()
-        cache_key = path
+    if source is not None:
+        return _literals_in(source, path, source)
+    if _literal_cache.get('stamps') == _source._stamps():
+        return _literal_cache['found']
+    writer = _source.defining_file(MESSAGE_WRITER)
+    if writer is None:
+        raise ValueError('no injector file defines %s, so no call site can be bound and every '
+                         'bare literal would read as absent' % MESSAGE_WRITER)
+    found = []
+    for file_path, text in _source.injector_sources():
+        found.extend(_literals_in(text, file_path, _source.read(writer), writer))
+    found = tuple(sorted(found, key=lambda lit: (lit.path, lit.lineno)))
+    # ast.parse of a 14k-line module costs ~60ms; injector_message_ids is called from the
+    # build AND from a dozen tests. Keyed on every injector file's stamp; a caller-supplied
+    # source is never cached, since it is never the file on disk.
+    _literal_cache.update(stamps=_source._stamps(), found=found)
+    return found
 
+
+def _literals_in(source, path, defining, defining_path=None):
+    """The bare literals at `set_message_body` call sites in one file's source, bound against
+    the writer's signature as DEFINED in `defining` -- the writer lives in one file and is
+    called from many, and a call site has no local definition to bind positionals against."""
     callsites = _callsites()
-    params = callsites.signature(source, MESSAGE_WRITER, path)
+    params = callsites.signature(defining, MESSAGE_WRITER, defining_path or path)
     if 'msg_id' not in params:
         raise ValueError(
             '%s does not define %s(.., msg_id, ..), so its call sites cannot be bound and '
-            'every bare literal in it would read as absent' % (path, MESSAGE_WRITER))
+            'every bare literal in it would read as absent' % (defining_path or path,
+                                                               MESSAGE_WRITER))
 
     tree = ast.parse(source, path)
     # Injectors never nest, so a line span is enough to say which one owns a call. A call in
@@ -240,11 +259,5 @@ def literal_message_ids(path=BUILD_CAMPAIGN_PY, source=None):
         except (TypeError, ValueError):
             continue          # a named constant or an expression: discovery by NAME owns it
         chapter = next((c for lo, hi, c in spans if lo <= site.lineno <= hi), None)
-        found.append(MessageLiteral(value, chapter, site.lineno))
-    found = tuple(sorted(found, key=lambda lit: lit.lineno))
-    if cache_key is not None:
-        # ast.parse of a 14k-line module costs ~60ms; injector_message_ids is called from the
-        # build AND from a dozen tests. Keyed by path and skipped for a caller-supplied
-        # source, which is never the file on disk.
-        _literal_cache[cache_key] = found
-    return found
+        found.append(MessageLiteral(value, chapter, site.lineno, path))
+    return tuple(sorted(found, key=lambda lit: lit.lineno))

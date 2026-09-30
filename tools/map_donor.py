@@ -42,12 +42,12 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import map_tileset_tool as mt                                   # noqa: E402
+from inject import source as injector_source                   # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DECOMP = os.path.join(REPO, 'fireemblem8u')
 MAPS = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
 LAYOUT_DIR = os.path.join(DECOMP, 'graphics/map/layout')
-BUILD_CAMPAIGN = os.path.join(REPO, 'tools', 'build_campaign.py')
 
 # The blocked set: terrain a foot unit cannot enter. Declared, not derived -- see the
 # docstring. Ids are terrains.h, named as gen_map_editor's palette names them.
@@ -69,18 +69,19 @@ IMPASSABLE = {
 _LAYOUT_CONST = re.compile(r"^(?:CH\d+|PROLOGUE)_LAYOUT\s*=\s*\(\s*'([A-Za-z0-9_]+)'")
 
 
-def our_layout_labels(path=BUILD_CAMPAIGN):
+def our_layout_labels(text=None):
     """The asset labels our build writes into the decomp's layout directory.
 
-    Read from build_campaign's SOURCE so a newly registered chapter is excluded the moment
-    its constant exists -- there is no second list to remember.
+    Read from the injector's SOURCE -- every file of it (`inject/source.py`) -- so a newly
+    registered chapter is excluded the moment its constant exists, wherever that constant
+    lives. There is no second list to remember.
     """
+    text = injector_source.injector_source() if text is None else text
     labels = set()
-    with open(path, encoding='utf-8') as source:
-        for line in source:
-            match = _LAYOUT_CONST.match(line)
-            if match:
-                labels.add(match.group(1))
+    for line in text.splitlines():
+        match = _LAYOUT_CONST.match(line)
+        if match:
+            labels.add(match.group(1))
     return labels
 
 
