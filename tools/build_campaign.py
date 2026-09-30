@@ -100,7 +100,7 @@ from inject.hosts import (  # noqa: E402,F401
     CH01_HOST_INDEX, CH01_EVENT_GROUP, CH02_HOST_INDEX, CH02_EVENT_GROUP,
     CH03_HOST_INDEX, CH03_EVENT_GROUP, CH04_HOST_INDEX, CH04_EVENT_GROUP,
     CH05_HOST_INDEX, CH05_EVENT_GROUP, CH06_HOST_INDEX, CH06_EVENT_GROUP,
-    HostedChapter, hosted_chapters, injector_chapters, undeclared_injectors,
+    HostedChapter, hosted_chapters, injected_chapters, injector_chapters, undeclared_injectors,
     MessageLiteral, literal_message_ids)
 
 # Palette index 0 of an FE8 bust is the transparent key, and our authored busts all carry
@@ -15474,6 +15474,7 @@ def main():
         print('chapter 6 (#26):')
         _scopes.run(inject_ch06, args.campaign, boot=args.ch06_boot)
         chain_ch05_to_ch06()
+        prologue_injected = False     # only the canonical New Game path below runs it
         if args.ch06_boot:
             print('CH06 BOOT (playtest: New Game -> Maer Dualdon, party + merfolk + boats):')
             _configure_boot(CH06_HOST_INDEX)
@@ -15499,6 +15500,7 @@ def main():
             else:
                 print('prologue (New Game target):')
                 _scopes.run(inject_prologue, args.campaign, montage=args.montage)
+                prologue_injected = True
                 _configure_boot(PROLOGUE_HOST_INDEX, montage=args.montage)
         print('death quotes (#6):')
         inject_pc_death_quotes(args.campaign)
@@ -15524,7 +15526,7 @@ def main():
         # ChapterEventGroup field must be WRITTEN or DECLARED-INHERITED, and anything nobody
         # has ruled on fails the build here rather than being found by shipping a bug (#313).
         print('event group census (#313):')
-        event_group.assert_census_declared()
+        event_group.assert_census_declared(hosted=injected_chapters(prologue_injected))
         print('  every ChapterEventGroup field is written or declared-inherited')
         # The same question about the OTHER struct a hosted chapter squats. Five
         # chapter_settings fields have shipped inherited-unexamined -- goal text ids (#207),
@@ -15532,7 +15534,7 @@ def main():
         # each found one at a time by something else going wrong. This rules on all 98 at
         # once, so there is no sixth to find that way (#396).
         print('chapter data census (#396):')
-        chapter_data.assert_census_declared()
+        chapter_data.assert_census_declared(hosted=injected_chapters(prologue_injected))
         print('  every ROMChapterData field is written, pass-owned or declared-inherited')
         # The census rules on the twenty FIELDS; this rules on everything those fields lead
         # to. Our injectors edit a host slot's event-script file without rewriting every scene
@@ -15541,7 +15543,8 @@ def main():
         # overwrote the scenes that pointed at them, which is a fact about this build's output
         # and not a property anything held in place. Held here now (#398).
         print('reachable scene actors (#398):')
-        assert_reachable_scenes_load_their_actors(verbose=True)
+        assert_reachable_scenes_load_their_actors(
+            hosted=injected_chapters(prologue_injected), verbose=True)
     # Close the scope manifest BEFORE the mtime rewind below: the rewind moves mtimes
     # backwards on byte-identical files, and this attribution watches mtimes.
     _scope_manifest = _scopes.write_manifest(
