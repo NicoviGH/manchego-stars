@@ -31,6 +31,12 @@ import traceback
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _read_text(path):
+    """A file's text, closed behind it (a bare `open().read()` leaks the handle until GC)."""
+    with open(path, encoding='utf-8') as fh:
+        return fh.read()
+
+
 def _injector():
     """`inject.source` -- the injector's SOURCE, every file of it, not just build_campaign.py.
 
@@ -708,7 +714,7 @@ def check_yaml_parses(fail):
     import yaml
     for f in glob.glob(os.path.join(REPO, 'campaigns/**/*.yaml'), recursive=True):
         try:
-            yaml.safe_load(open(f, encoding='utf-8'))
+            yaml.safe_load(_read_text(f))
         except Exception as e:
             fail.append('YAML does not parse: %s (%s)' % (os.path.relpath(f, REPO), e))
 
@@ -808,7 +814,7 @@ def _chapters():
     import yaml
     for f in sorted(glob.glob(os.path.join(REPO, 'campaigns/*/chapters/ch*.yaml'))):
         try:
-            d = yaml.safe_load(open(f, encoding='utf-8')) or {}
+            d = yaml.safe_load(_read_text(f)) or {}
         except Exception:
             continue
         yield os.path.relpath(f, REPO), d
@@ -1166,7 +1172,7 @@ def check_recordenemy_knows_every_raw_pid(fail):
         m = _re.search(r'^%s\s*=\s*\'(0x[0-9a-fA-F]+)\'' % _re.escape(const), src, _re.M)
         if m:
             pids[uid] = int(m.group(1), 16)
-    harness = open(os.path.join(REPO, 'tools', 'playtest', 'harness.lua'), encoding='utf-8').read()
+    harness = _read_text(os.path.join(REPO, 'tools', 'playtest', 'harness.lua'))
     bench = {uid: int(pid, 16) for uid, pid
              in _re.findall(r'\["([\w-]+)"\]\s*=\s*(0x[0-9a-fA-F]+)', harness)}
     for uid, pid in sorted(pids.items()):
@@ -2268,7 +2274,7 @@ def check_tool_refs_exist(fail):
         return subprocess.run(['git', 'check-ignore', '-q', rel], cwd=REPO).returncode == 0
 
     for d in _docs() + _handwritten_sources():
-        text = open(d, encoding='utf-8').read()
+        text = _read_text(d)
         rel = os.path.relpath(d, REPO)
         for prefix, pat in (('tools', tool_pat), ('docs', doc_pat)):
             for m in pat.findall(text):
@@ -2412,7 +2418,7 @@ def check_generated_indexes_fresh(fail):
                      (gen_decisions_index, 'docs/decisions.md')):
         path = os.path.join(REPO, rel)
         want = mod.generate()[0]
-        have = open(path, encoding='utf-8').read() if os.path.isfile(path) else None
+        have = _read_text(path) if os.path.isfile(path) else None
         if have != want:
             fail.append('%s is stale vs the YAML -- regenerate: python3 tools/%s.py'
                         % (rel, mod.__name__))
@@ -2436,7 +2442,7 @@ def check_engine_guards_present(fail):
     # orchestrated from tools/build_campaign.py (#50 file seam). Two precise checks per
     # hook: it must be DEFINED in the engine-hooks module AND CALLED from the orchestrator.
     # A refactor that drops either side fails here loudly.
-    eh = open(os.path.join(REPO, 'tools', 'inject', 'engine_hooks.py'), encoding='utf-8').read()
+    eh = _read_text(os.path.join(REPO, 'tools', 'inject', 'engine_hooks.py'))
     bc = _injector().injector_source()
     for fn, mechanic in (
             ('_patch_player_start_cursor_guard',
@@ -2518,7 +2524,7 @@ def _campaign_character_ids():
     ids = set()
     for sub in ('pcs', 'npcs'):
         for f in glob.glob(os.path.join(REPO, 'campaigns/**', sub, '*.yaml'), recursive=True):
-            m = re.search(r'(?m)^id:\s*([A-Za-z0-9_-]+)', open(f, encoding='utf-8').read())
+            m = re.search(r'(?m)^id:\s*([A-Za-z0-9_-]+)', _read_text(f))
             if m:
                 ids.add(m.group(1).lower())
     return ids
@@ -2605,7 +2611,7 @@ def check_engine_campaign_agnostic(fail):
     for g in ENGINE_SOURCE_GLOBS:
         for path in glob.glob(os.path.join(REPO, g), recursive=True):
             rel = os.path.relpath(path, REPO)
-            for tok, n in _engine_name_hits(ids, open(path, encoding='utf-8').read()):
+            for tok, n in _engine_name_hits(ids, _read_text(path)):
                 fail.append('engine: %s:%d names campaign character %r -- engine code must be '
                             'campaign-agnostic; inject it from YAML (AGENTS.md Engine/Content '
                             'Boundary Rule)' % (rel, n, tok))
@@ -2663,7 +2669,7 @@ def check_save_layout_stable(fail):
     if not os.path.isfile(header):
         print('check_save_layout_stable: skipping (fireemblem8u submodule not checked out)')
         return
-    found = _parse_save_layout_constants(open(header, encoding='utf-8').read())
+    found = _parse_save_layout_constants(_read_text(header))
     fail.extend(_save_layout_drift(found))
 
 
@@ -2803,7 +2809,7 @@ def check_every_test_actually_runs(fail):
     """
     for path in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))
                        + glob.glob(os.path.join(REPO, 'tools', 'playtest', 'test_*.py'))):
-        src = open(path, encoding='utf-8').read()
+        src = _read_text(path)
         try:
             tree = ast.parse(src)
         except SyntaxError as exc:

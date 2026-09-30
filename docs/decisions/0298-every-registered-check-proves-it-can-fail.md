@@ -61,3 +61,10 @@ Three harness details a later canary will meet:
   (review of #414).
 - "Was read" is the other half of the proof: a canary also fails when the check never opens
   the file it doctored, which is a check that stopped reading its own input.
+
+## Sharded, because it is 49 real check runs
+
+In one file the canaries take ~41 seconds, and `run_tests.py` parallelises by FILE, so that
+one file set the pre-commit hook's wall time (45s -> 63s, measured). They are dealt across
+`test_check_canaries.py` and `test_check_canaries_shard{1,2}.py` by name (`shard(k)`), ~14s
+each, and a test fails if a shard has no file -- a shard nothing runs is canaries nothing runs.

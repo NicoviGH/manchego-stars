@@ -502,11 +502,24 @@ NEEDS = {'decomp': (HAS_DECOMP, 'fireemblem8u submodule not checked out'),
          'lua': (HAS_LUA, 'no lua on PATH')}
 
 
-class EveryCheckCanFail(unittest.TestCase):
-    """One subTest per check: the doctored run must report the named failure."""
+# The canaries are 49 real check runs, ~41s in one process. `run_tests.py` runs FILES in
+# parallel, so they are dealt across SHARDS files -- this one and test_check_canaries_shard*.py
+# -- or this file alone would set the pre-commit hook's wall time (45s -> 63s, measured).
+SHARDS = 3
 
-    def test_every_canary_fires(self):
-        for name, (canary, expect, needs) in sorted(CANARIES.items()):
+
+def shard(k):
+    """Every k-th canary (by name), so each shard file runs a third of them."""
+    return sorted(CANARIES)[k::SHARDS]
+
+
+class CanariesFire(unittest.TestCase):
+    """One subTest per check: the doctored run must report the named failure."""
+    SHARD = 0
+
+    def test_every_canary_in_this_shard_fires(self):
+        for name in shard(self.SHARD):
+            canary, expect, needs = CANARIES[name]
             with self.subTest(check=name):
                 if needs and not NEEDS[needs][0]:
                     self.skipTest('%s: %s' % (name, NEEDS[needs][1]))
@@ -517,7 +530,6 @@ class EveryCheckCanFail(unittest.TestCase):
                 self.assertIn(expect, said,
                               '%s reported something, but not the planted fault:\n%s'
                               % (name, said[:2000]))
-
 
 
 class TheHarnessBlamesTheRightThing(unittest.TestCase):
@@ -536,6 +548,16 @@ class TheHarnessBlamesTheRightThing(unittest.TestCase):
 
 
 class TheRegistryIsComplete(unittest.TestCase):
+
+    def test_every_canary_lands_in_exactly_one_shard_file(self):
+        dealt = [n for k in range(SHARDS) for n in shard(k)]
+        self.assertEqual(sorted(CANARIES), sorted(dealt))
+        here = os.path.dirname(os.path.abspath(__file__))
+        for k in range(1, SHARDS):
+            path = os.path.join(here, 'test_check_canaries_shard%d.py' % k)
+            self.assertTrue(os.path.isfile(path), 'shard %d has no file, so it never runs' % k)
+            with open(path, encoding='utf-8') as f:
+                self.assertIn('SHARD = %d' % k, f.read())
 
     def test_every_registered_check_has_a_canary_or_a_reason(self):
         names = {c.__name__ for c in check.CHECKS}
