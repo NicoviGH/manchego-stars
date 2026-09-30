@@ -42,16 +42,17 @@ REPO = check.REPO
 CHAPTERS = 'campaigns/rime-of-the-frostmaiden/chapters/'
 CH01 = CHAPTERS + 'ch01-the-iron-trail.yaml'
 CH02 = CHAPTERS + 'ch02-cold-welcome.yaml'
+CH03 = CHAPTERS + 'ch03-the-termalaine-mine.yaml'
 CH06 = CHAPTERS + 'ch06-the-maer-monster.yaml'
 BC = 'tools/build_campaign.py'
 HARNESS = 'tools/playtest/harness.lua'
 # A guarded tool (tools/**, not a test, not the injector) to plant a bad line in.
 TOOL = 'tools/map_donor.py'
-# Every file a canary doctors, spelled out (check.py reads it with literal_eval). `doctored()`
-# refuses any other, so this cannot fall behind the
-# canaries -- and check.py reads it (by AST) to decide when the pre-commit hook must run them:
-# an edit here can move the anchor a canary plants its fault at.
-DOCTORED_FILES = (
+# Every file a canary doctors OR reads to aim its fault, spelled out: check.py reads it with
+# literal_eval to decide when the pre-commit hook must run the canaries, since an edit here
+# can move the anchor a fault is planted at. `doctored()` refuses to doctor a file not listed,
+# so the doctored half cannot fall behind; a READ input is listed beside the canary using it.
+CANARY_FILES = (
     '.github/workflows/build.yml', 'Makefile', 'campaigns/rime-of-the-frostmaiden/campaign.yaml',
     'campaigns/rime-of-the-frostmaiden/chapters/ch01-the-iron-trail.yaml',
     'campaigns/rime-of-the-frostmaiden/chapters/ch02-cold-welcome.yaml',
@@ -62,6 +63,7 @@ DOCTORED_FILES = (
     'fireemblem8u/include/bmsave.h', 'tools/build_campaign.py', 'tools/inject/engine_hooks.py',
     'tools/map_donor.py', 'tools/map_placement_preview.py', 'tools/playtest/ch06.lua',
     'tools/playtest/controller.lua', 'tools/playtest/harness.lua',
+    'tools/playtest/matrix.yaml',                # READ by c_rom_configs to pick its env
     'tools/test_check_canaries.py', 'tools/test_check_chapter_schema.py', 'tools/test_map_donor.py',
 )
 HAS_DECOMP = os.path.isdir(os.path.join(REPO, 'fireemblem8u', 'src'))
@@ -86,9 +88,9 @@ def doctored(edits):
     "the check stayed silent" -- blaming a working check for a canary whose anchor moved.
     And "was read" is half the proof: a check that never opens the file it is supposed to
     guard is exactly the vacuous pass this file exists to catch."""
-    undeclared = sorted(set(edits) - set(DOCTORED_FILES))
+    undeclared = sorted(set(edits) - set(CANARY_FILES))
     if undeclared:
-        raise AssertionError('canary doctors %s, which DOCTORED_FILES does not list -- add it, or '
+        raise AssertionError('canary doctors %s, which CANARY_FILES does not list -- add it, or '
                              'the hook skips the canaries when that file changes' % undeclared)
     targets = {os.path.realpath(os.path.join(REPO, rel)): fn for rel, fn in edits.items()}
     served, unchanged = set(), set()
@@ -217,15 +219,10 @@ def c_chapter_status():
 
 
 def c_personal_line_routes():
-    import build_campaign as bc
-    uid = sorted(uid for _yaml, uid in bc.RAW_PID_PERSONAL_SOURCES.values())[0]
-    edits = {}
-    for rel in sorted(f for f in os.listdir(os.path.join(REPO, CHAPTERS)) if f.endswith('.yaml')):
-        with open(os.path.join(REPO, CHAPTERS, rel), encoding='utf-8') as f:
-            if re.search(r'id:\s*%s\b' % re.escape(uid), f.read()):
-                edits[CHAPTERS + rel] = sub1(r'(id:\s*)%s\b' % re.escape(uid),
-                                             r'\g<1>%s-canary' % uid)
-    with doctored(edits):
+    # grell's personal line is carried by RAW_PID_PERSONAL_SOURCES and fielded only in ch03;
+    # rename it there and the route names an enemy no chapter fields. A FIXED target, so the
+    # hook's CANARY_FILES can name it -- if grell moves, the anchor-moved error says so.
+    with doctored({CH03: sub1(r'(id:\s*)grell\b', r'\g<1>grell-canary')}):
         return run(check.check_personal_line_injection_routes)
 
 
@@ -602,15 +599,20 @@ class TheHookSkipsCanariesOnlyWhenNoCheckCodeIsStaged(unittest.TestCase):
 
         def fake_run(cmd, **kw):
             seen.update(kw['env'])
-            return mock.Mock(stdout='tools/check.py\n')
+            return mock.Mock(stdout='tools/check.py\n', returncode=0)
         env = {'GIT_INDEX_FILE': '/tmp/next-index', 'GIT_DIR': '/elsewhere/.git'}
         with mock.patch.dict(os.environ, env), mock.patch('subprocess.run', fake_run):
             self.assertEqual(['tools/check.py'], check._staged_files())
         self.assertEqual('/tmp/next-index', seen.get('GIT_INDEX_FILE'))
         self.assertNotIn('GIT_DIR', seen)
 
+    def test_a_git_failure_runs_them_rather_than_skipping(self):
+        with mock.patch.dict(os.environ, {'MS_PRECOMMIT': '1'}), \
+                mock.patch.object(check, '_staged_files', lambda: None):
+            self.assertFalse(check._hook_skips_canaries())
+
     def test_an_undeclared_doctoring_is_refused(self):
-        with self.assertRaisesRegex(AssertionError, 'DOCTORED_FILES'):
+        with self.assertRaisesRegex(AssertionError, 'CANARY_FILES'):
             with doctored({'docs/roadmap.md': append('x')}):
                 pass
 

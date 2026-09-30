@@ -399,16 +399,16 @@ def check_python_compiles(fail):
 # and the test phase is throughput-bound, so they cost the hook ~15s wherever they sit. Their
 # answer moves when CHECK code moves (any Python under tools/ -- check logic lives in callsites,
 # declared, matrix, inject.hosts and more) or when a file a canary DOCTORS moves the anchor it
-# plants at (DOCTORED_FILES, read from CANARY_FILE). The pre-commit hook (MS_PRECOMMIT=1) runs
+# plants at, or reads to aim it (CANARY_FILES, read from CANARY_FILE). The pre-commit hook (MS_PRECOMMIT=1) runs
 # them only then; `make check`, `make test` and CI always do.
-def _canary_doctored_files():
+def _canary_input_files():
     with open(os.path.join(REPO, CANARY_FILE), encoding='utf-8') as fh:
         tree = ast.parse(fh.read(), CANARY_FILE)
     for node in tree.body:
         if (isinstance(node, ast.Assign) and len(node.targets) == 1
-                and getattr(node.targets[0], 'id', None) == 'DOCTORED_FILES'):
+                and getattr(node.targets[0], 'id', None) == 'CANARY_FILES'):
             return set(ast.literal_eval(node.value))
-    raise ValueError('%s has no literal DOCTORED_FILES tuple' % CANARY_FILE)
+    raise ValueError('%s has no literal CANARY_FILES tuple' % CANARY_FILE)
 
 
 def _staged_files():
@@ -420,15 +420,20 @@ def _staged_files():
            if not k.startswith('GIT_') or k == 'GIT_INDEX_FILE'}
     r = subprocess.run(['git', '-C', REPO, 'diff', '--cached', '--name-only'],
                        capture_output=True, text=True, env=env)
+    if r.returncode != 0:
+        return None                      # unknown -- and unknown must RUN the canaries
     return [line for line in r.stdout.splitlines() if line.strip()]
 
 
 def _hook_skips_canaries():
     if os.environ.get('MS_PRECOMMIT') != '1':
         return False
-    doctored = _canary_doctored_files()
-    return not any((path.startswith('tools/') and path.endswith('.py')) or path in doctored
-                   for path in _staged_files())
+    staged = _staged_files()
+    if staged is None:
+        return False
+    inputs = _canary_input_files()
+    return not any((path.startswith('tools/') and path.endswith('.py')) or path in inputs
+                   for path in staged)
 
 
 def check_tests_pass(fail):

@@ -78,9 +78,11 @@ Their answer moves in two ways, and the first cut named neither whole (review of
 
 - **Check code**, which is any Python under `tools/`: check logic lives in `callsites`,
   `declared`, `matrix`, `inject.hosts` and more, not only in `check.py`.
-- **A file a canary DOCTORS**, whose edit can move the anchor the fault is planted at.
-  `DOCTORED_FILES` lists them, and `doctored()` refuses any file it does not list, so the
-  trigger cannot fall behind the canaries.
+- **A file a canary DOCTORS or READS to aim its fault**, whose edit can move the anchor.
+  `CANARY_FILES` lists them, and `doctored()` refuses to doctor a file it does not list, so
+  the doctored half cannot fall behind. That is also why every canary's target is FIXED: one
+  chose its chapter at run time, which no static list can name (second review of #414).
+- A `git diff --cached` that FAILS returns "unknown", and unknown runs the canaries.
 
 And the staged list is read from the index git is COMMITTING: `git commit -a` gives the hook
 a temporary index through `GIT_INDEX_FILE`, which the repo's `_git` helper strips on purpose,
