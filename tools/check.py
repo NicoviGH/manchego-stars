@@ -30,6 +30,19 @@ import traceback
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+
+def _injector():
+    """`inject.source` -- the injector's SOURCE, every file of it, not just build_campaign.py.
+
+    #389 moves code out of build_campaign.py into tools/inject/. A guard that kept opening the
+    old path would not fail when its target moved; it would go quiet. Stdlib-only, so the lean
+    `checks` CI job can import it."""
+    tools = os.path.join(REPO, 'tools')
+    if tools not in sys.path:
+        sys.path.insert(0, tools)
+    from inject import source
+    return source
+
 # Docs that carry prose facts (decisions.md is handled specially per-check).
 # Every doc a HUMAN OR AGENT FOLLOWS, not just the ones under docs/. `.github/` and
 # `.claude/skills/` were unscanned until 2026-08-26 and both had already drifted:
@@ -681,7 +694,7 @@ def check_hosted_chapters_declared(fail):
     try:
         stranded = hosts.undeclared_injectors()
     except (OSError, SyntaxError) as exc:         # pragma: no cover - source-read guard
-        fail.append('hosted chapters: cannot read build_campaign.py: %s' % exc)
+        fail.append('hosted chapters: cannot read the injector source: %s' % exc)
         return
     if stranded:
         fail.append(
@@ -741,7 +754,7 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
                        'it' % (rel, uid))
         elif uid not in injected_ids:
             out.append('%s: enemy %r declares `personal:` with no way into the ROM -- add it to '
-                       'RAW_PID_PERSONAL_SOURCES in build_campaign.py, or the boss will measure '
+                       'RAW_PID_PERSONAL_SOURCES, or the boss will measure '
                        'fixed and play as a naked class base' % (rel, uid))
     return out
 
@@ -1003,8 +1016,7 @@ def _cached_step_violations(text):
 
 def check_cached_steps_are_config_invariant(fail):
     """The ordering the injection cache's soundness rests on (#309)."""
-    path = os.path.join(REPO, 'tools', 'build_campaign.py')
-    fail.extend(_cached_step_violations(open(path, encoding='utf-8').read()))
+    fail.extend(_cached_step_violations('\n' + (_injector().def_source('main') or '')))
 
 
 # ch03 registers its map changes through _inject_ch03_tile_changes, a per-chapter wrapper
@@ -1068,16 +1080,72 @@ def _tile_change_order_violations(text):
 
 def check_tile_changes_outlive_the_retarget(fail):
     """A chapter's tile-change layer must survive its host retarget (#335)."""
-    path = os.path.join(REPO, 'tools', 'build_campaign.py')
-    fail.extend(_tile_change_order_violations(open(path, encoding='utf-8').read()))
+    fail.extend(_tile_change_order_violations(_injector().defs_source()))
 
 
 def check_injection_order(fail):
     """Injection steps run in a dependency order that used to live only in main()'s
     comments (audit 2.6): pin the documented MUST-precede pairs."""
-    path = os.path.join(REPO, 'tools', 'build_campaign.py')
     fail.extend(_injection_order_violations(
-        _injection_call_sequence(open(path, encoding='utf-8').read())))
+        _injection_call_sequence('\n' + (_injector().def_source('main') or ''))))
+
+
+# ── The injector has ONE source reader (#389) ─────────────────────────────────────────
+# Files that name build_campaign.py for a reason other than reading its SOURCE. Everything
+# else reads the injector through `inject.source`, which spans every file #389 moves code
+# into; a guard that opened the old path would go quiet when its target moved, not fail.
+INJECTOR_PATH_NAMERS = {
+    'tools/inject/source.py': 'it IS the reader',
+    'tools/injection_fingerprint.py': 'it RUNS the injector as a subprocess',
+    'tools/probe_invalidation.py': 'it RUNS the injector as a subprocess',
+    'tools/test_playtest_matrix.py': 'it touches the file to prove the ROM-input digest moves',
+    'tools/test_injector_source.py': 'it writes a throwaway injector to prove readers follow '
+                                     'moved code',
+}
+
+
+def _injector_path_builds(text, rel):
+    """Lines where `rel` builds a path to build_campaign.py: an open() or os.path.join() with
+    that name as a literal argument. AST, so a comment or docstring naming the file is free."""
+    hits = []
+    for node in ast.walk(ast.parse(text, rel)):
+        if not isinstance(node, ast.Call):
+            continue
+        fn = node.func
+        name = fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, 'id', None)
+        if name in ('open', 'join') and any(
+                isinstance(a, ast.Constant) and isinstance(a.value, str)
+                and a.value.endswith('build_campaign.py') for a in node.args):
+            hits.append(node.lineno)
+    return hits
+
+
+def check_injector_source_has_one_reader(fail, sources=None):
+    """Nothing reads the injector's source by opening build_campaign.py (#389)."""
+    if sources is None:
+        sources = {}
+        for path in sorted(glob.glob(os.path.join(REPO, 'tools', '**', '*.py'), recursive=True)):
+            with open(path, encoding='utf-8') as fh:
+                sources[os.path.relpath(path, REPO).replace(os.sep, '/')] = fh.read()
+    for rel, text in sorted(sources.items()):
+        try:
+            hits = _injector_path_builds(text, rel)
+        except SyntaxError:
+            continue                              # check_python_compiles owns this
+        if rel in INJECTOR_PATH_NAMERS:
+            if not hits:
+                fail.append('INJECTOR_PATH_NAMERS excuses %s (%s), and it no longer builds a '
+                            'path to build_campaign.py -- drop the entry, or it excuses the '
+                            'next reader for a reason that stopped being true'
+                            % (rel, INJECTOR_PATH_NAMERS[rel]))
+            continue
+        for line in hits:
+            fail.append('%s:%d builds a path to build_campaign.py. Read the injector through '
+                        '`inject.source` (injector_source / def_source / defs_source) -- #389 '
+                        'moves code out of that file, and a reader of the old path goes quiet '
+                        'rather than failing. A file that RUNS it names why in '
+                        'INJECTOR_PATH_NAMERS.' % (rel, line))
+    return fail
 
 
 def check_recordenemy_knows_every_raw_pid(fail):
@@ -1089,10 +1157,10 @@ def check_recordenemy_knows_every_raw_pid(fail):
     The pid also has to MATCH -- benching the wrong pid silently films the wrong unit."""
     import re as _re
     pids = {}
-    src = open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+    src = _injector().injector_source()
     block = _re.search(r'RAW_PID_BATTLE_ANIMS = \{(.*?)\n\}', src, _re.S)
     if not block:
-        fail.append('build_campaign.py: RAW_PID_BATTLE_ANIMS not in the expected form')
+        fail.append('injector: RAW_PID_BATTLE_ANIMS not in the expected form')
         return
     for uid, const in _re.findall(r"'([\w-]+)':\s*\([^,]+,\s*(\w+)\)", block.group(1)):
         m = _re.search(r'^%s\s*=\s*\'(0x[0-9a-fA-F]+)\'' % _re.escape(const), src, _re.M)
@@ -1392,7 +1460,7 @@ def _chapter_of_injector(name):
     return m.group(1) if m else None
 
 
-def _sidecar_routes(build_src, preview_src, chapters, hosted):
+def _sidecar_routes(build_src, preview_src, chapters, hosted, build_defs=None):
     """One row per chapter, plus rows for anything that belongs to no chapter.
 
     A row is `{'short', 'rel', 'routes', 'problems', 'note'}`. `routes` maps a route name to
@@ -1407,13 +1475,16 @@ def _sidecar_routes(build_src, preview_src, chapters, hosted):
     """
     rows = []
     want = {('ch00' if h == 'prologue' else h) for h in hosted}
-    layouts = _build_registered_layouts(build_src)
+    # The registration walk goes function by function (`^def ...(?=^def )`), so it is fed the
+    # functions-only view when there is one: over whole files an injector that is the last
+    # function of its module would run on into the next module (ADR 0297).
+    layouts = _build_registered_layouts(build_src if build_defs is None else build_defs)
     stems = dict(_LAYOUT_CONST.findall(build_src))
 
     if not layouts:
         rows.append({'short': None, 'rel': None, 'routes': {}, 'note': '', 'problems': [
             ('build-unreadable',
-             'no chapter map registration is recognisable in build_campaign.py -- '
+             'no chapter map registration is recognisable in the injector -- '
              '_REGISTER_CHAPTER_MAP no longer matches how the build registers a map, so this '
              'gate would compare nothing and pass')]})
 
@@ -1518,13 +1589,11 @@ def check_map_sidecar_routes_agree(fail):
         return
     finally:
         sys.path.remove(os.path.join(REPO, 'tools'))
-    sources = []
-    for rel in ('tools/build_campaign.py', 'tools/map_placement_preview.py'):
-        with open(os.path.join(REPO, rel), encoding='utf-8') as f:
-            sources.append(f.read())
+    with open(os.path.join(REPO, 'tools', 'map_placement_preview.py'), encoding='utf-8') as f:
+        sources = [_injector().injector_source(), f.read()]
     fail.extend(_sidecar_route_violations(_sidecar_routes(
         sources[0], sources[1], list(_chapters()),
-        [h.name for h in hosts.hosted_chapters()])))
+        [h.name for h in hosts.hosted_chapters()], build_defs=_injector().defs_source())))
 
 
 def check_rescue_targets(fail):
@@ -1834,7 +1903,9 @@ def check_rom_configs_reach_the_build(fail, matrix_text=None, makefile_text=None
 
     sources = sources or {}
     mk = _read('Makefile', makefile_text if makefile_text is not None else sources.get('Makefile'))
-    bc = _read('tools/build_campaign.py', sources.get('build_campaign'))
+    bc = sources.get('build_campaign')
+    if bc is None:
+        bc = _injector().def_source('main') or ''
     probe = _read('tools/probe_invalidation.py', sources.get('probe'))
     # A regex that stops matching must FAIL, not quietly skip its arm: three of the four
     # registry checks would then be disabled while the gate still prints "clean" -- the exact
@@ -1850,8 +1921,8 @@ def check_rom_configs_reach_the_build(fail, matrix_text=None, makefile_text=None
         return found.group(1)
 
     stamp_text = _region(r'_requested_flags = \{(.*?)\}', bc, '_requested_flags',
-                         'build_campaign.py')
-    boots_text = _region(r'_boots = \[(.*?)\]', bc, '_boots', 'build_campaign.py')
+                         'build_campaign.main()')
+    boots_text = _region(r'_boots = \[(.*?)\]', bc, '_boots', 'build_campaign.main()')
     flag_text = _region(r'FLAG_ARGS = \{(.*?)\}', probe, 'FLAG_ARGS',
                         'probe_invalidation.py')
     if stamp_text is None or boots_text is None or flag_text is None:
@@ -2366,7 +2437,7 @@ def check_engine_guards_present(fail):
     # hook: it must be DEFINED in the engine-hooks module AND CALLED from the orchestrator.
     # A refactor that drops either side fails here loudly.
     eh = open(os.path.join(REPO, 'tools', 'inject', 'engine_hooks.py'), encoding='utf-8').read()
-    bc = open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+    bc = _injector().injector_source()
     for fn, mechanic in (
             ('_patch_player_start_cursor_guard',
              'the prologue garbage-band / off-map-cursor crash guard'),
@@ -2424,7 +2495,7 @@ def check_engine_guards_present(fail):
                         '-- would silently drop %s (see docs/decisions.md)' % (fn, mechanic))
         if ('engine_hooks.%s(' % fn) not in bc:
             fail.append('engine hook %s() never CALLED (engine_hooks.%s(...)) from '
-                        'tools/build_campaign.py -- would silently drop %s '
+                        'the injector -- would silently drop %s '
                         '(see docs/decisions.md)' % (fn, fn, mechanic))
 
 
@@ -2490,7 +2561,7 @@ def check_purple_bank_blankers_known(fail):
         print('check_purple_bank_blankers_known: skipping (fireemblem8u submodule not '
               'checked out)')
         return
-    bc = open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+    bc = _injector().injector_source()
     # Which decomp files PURPLE_BANK_BLANKERS covers. Its entries are (PATH_CONST, orig,
     # hooked), so read the constant names out of the tuple rather than importing
     # build_campaign (which would pull in Pillow/yaml for a lint).
@@ -2830,15 +2901,17 @@ def check_wrap_widths_are_pixels(fail, sources=None, funcs=None):
     # Resolve each signature ONCE from the file that defines it, then apply it everywhere.
     # Without this a call in another module has no local definition to bind its positional
     # arguments against -- and a positional width is precisely the form that shipped.
-    with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
-        defining = fh.read()
-    signatures = {f: callsites.signature(defining, f, 'build_campaign.py') for f in funcs}
+    injector = _injector()
+    signatures = {}
+    for f in funcs:
+        where = injector.defining_file(f)
+        signatures[f] = (callsites.signature(injector.read(where), f, where) if where else [])
     # An unresolvable signature switches positional binding OFF (scan falls back to arg0/arg1),
     # so the guard would quietly stop guarding exactly the form that shipped. Say so instead.
     for func, params in sorted(signatures.items()):
         if not params:
             fail.append('check_wrap_widths_are_pixels: %s is registered in PIXEL_WIDTH_FUNCS '
-                        'but build_campaign.py does not define it, so its POSITIONAL widths '
+                        'but no injector file defines it, so its POSITIONAL widths '
                         'cannot be bound. Fix the name or drop the entry.' % func)
 
     for path, source in sources.items():
@@ -2882,12 +2955,12 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
     existed the whole time and reads from HEAD; the only thing missing was anything making its
     use mandatory.
     """
-    # Read the registry out of build_campaign.py's SOURCE rather than importing it. The
+    # Read the registry out of the injector's SOURCE rather than importing it. The
     # module pulls in portrait_tool -> PIL, which the lean `checks` CI job does not install,
     # and its siblings answer that by skipping -- but a guard that skips in CI is half a
     # guard, and this one exists precisely because the mistake it catches is silent.
-    with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
-        registry = ast.parse(fh.read(), 'build_campaign.py')
+    registry = ast.parse(_injector().def_source('PATCHED_DECOMP_FILES') or '',
+                         'PATCHED_DECOMP_FILES')
     # Collect the STRING CONSTANTS in the assignment's subtree rather than literal_eval-ing
     # it: the registry is assembled by concatenation, so it is a BinOp and not a literal.
     patched = []
@@ -2898,7 +2971,7 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
                        if isinstance(n, ast.Constant) and isinstance(n.value, str)]
     if not patched:
         fail.append('check_vanilla_reads_come_from_head: could not read '
-                    'PATCHED_DECOMP_FILES out of build_campaign.py -- the guard has nothing '
+                    'PATCHED_DECOMP_FILES out of the injector -- the guard has nothing '
                     'to police and would pass vacuously.')
         return fail
     if sources is None:
@@ -2961,7 +3034,7 @@ def check_message_literals_are_registered(fail, source=None):
     literal 0x13 that nothing claimed. At build time the dict is a real Python object and the
     answer is exact. **Do not re-implement the registry statically; import it where it is real.**
 
-    Reads build_campaign.py's SOURCE and never imports it (no Pillow in the lean `checks` job),
+    Reads the injector's SOURCE and never imports it (no Pillow in the lean `checks` job),
     through the stdlib-only `inject.hosts` -- the same route check_hosted_chapters_declared
     takes for the host-slot registry.
     """
@@ -2977,13 +3050,10 @@ def check_message_literals_are_registered(fail, source=None):
         sys.path.remove(os.path.join(REPO, 'tools'))
 
     live = source is None
-    if live:
-        with open(os.path.join(REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
-            source = fh.read()
     try:
         literals = hosts.literal_message_ids(source=source)
     except (ValueError, SyntaxError, callsites.ParseError) as exc:
-        fail.append('check_message_literals_are_registered: cannot scan build_campaign.py: %s'
+        fail.append('check_message_literals_are_registered: cannot scan the injector: %s'
                     % exc)
         return fail
 
@@ -2992,7 +3062,7 @@ def check_message_literals_are_registered(fail, source=None):
     # the scan broke, not that the campaign stopped writing them.
     if live and not literals:
         fail.append('check_message_literals_are_registered: found NO bare message-id literal '
-                    'in build_campaign.py. There are some, so the scan is broken and the '
+                    'in the injector. There are some, so the scan is broken and the '
                     'guard would pass vacuously.')
         return fail
 
@@ -3001,10 +3071,11 @@ def check_message_literals_are_registered(fail, source=None):
             # No injector encloses it, so nothing can say whose id it is -- and the build-time
             # ownership assertion has no chapter to check it against either.
             fail.append(
-                'build_campaign.py:%d writes message 0x%X as a BARE LITERAL outside every '
+                '%s:%d writes message 0x%X as a BARE LITERAL outside every '
                 'injector, so no chapter can claim it and `assert_literals_are_claimed` cannot '
                 'see it. Move it inside its injector, or hold the id in a named constant.'
-                % (lit.lineno, lit.msg_id))
+                % (os.path.relpath(lit.path, REPO) if lit.path and os.path.isabs(lit.path)
+                   else lit.path or '<source>', lit.lineno, lit.msg_id))
     return fail
 
 
@@ -3276,6 +3347,7 @@ CHECKS = (
     check_hosted_chapters_declared, check_tests_pass, check_yaml_parses, check_chapter_status,
     check_chapter_deployment_schema, check_personal_line_injection_routes,
     check_injection_order, check_cached_steps_are_config_invariant,
+    check_injector_source_has_one_reader,
     check_tile_changes_outlive_the_retarget, check_playtest_matrix,
     check_rom_configs_reach_the_build, check_decomp_git_calls_strip_the_env,
     check_no_shadowed_definitions, check_gate_chapter_window, check_declared_cases,

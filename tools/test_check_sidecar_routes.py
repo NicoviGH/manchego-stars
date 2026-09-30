@@ -35,8 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import check
 
-BUILD_SRC = open(os.path.join(check.REPO, 'tools', 'build_campaign.py'),
-                 encoding='utf-8').read()
+BUILD_SRC = check._injector().injector_source()
 PREVIEW_SRC = open(os.path.join(check.REPO, 'tools', 'map_placement_preview.py'),
                    encoding='utf-8').read()
 HOSTED = ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06']

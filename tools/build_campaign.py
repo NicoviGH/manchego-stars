@@ -11088,12 +11088,13 @@ def assert_literals_are_claimed(literals=None, claims=None):
             holder = ('PROLOGUE_LITERAL_MSGS' if lit.chapter == 'ch00'
                       else '%s_LITERAL_MSGS' % lit.chapter.upper())
             sys.exit(
-                'ERROR: build_campaign.py:%d writes message 0x%X as a BARE LITERAL in %s, but '
+                'ERROR: %s:%d writes message 0x%X as a BARE LITERAL in %s, but '
                 '%s does not claim it in HOSTED_CHAPTER_MESSAGE_IDS -- so the id has no owner, '
                 'assert_message_ids_unique cannot collide on it, and `make chapter CH=%s` '
                 'counts it as free headroom it has already spent. Add 0x%X to %s.'
-                % (lit.lineno, lit.msg_id, lit.chapter, lit.chapter, lit.chapter,
-                   lit.msg_id, holder))
+                % (os.path.relpath(lit.path, REPO) if lit.path and os.path.isabs(lit.path)
+                   else lit.path or '<source>', lit.lineno, lit.msg_id, lit.chapter,
+                   lit.chapter, lit.chapter, lit.msg_id, holder))
     return literals
 
 

@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_campaign as bc
 import fe8_talk_font as font
 from inject import engine_hooks as eh
+from inject import source as injector  # the injector's source, every file of it (#389)
 
 # Read the COMMITTED decomp, not the working tree -- the build overwrites donor portrait
 # slots (Gilliam/Neimi/Moulder/Vanessa), so a working-tree read would be non-hermetic.
@@ -4048,8 +4049,7 @@ class Ch05SahnarAloneOnTheArena(unittest.TestCase):
         """Basil's walk is checked against Sahnar's fighting tile, not her load tile -- they
         are different tiles now, and the load tile is one she is never on when the Talk
         happens."""
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
+        src = injector.injector_source()
         self.assertIn('must_reach=ch05_sahnar_station(chap)[1]', src)
 
     def test_she_loads_ONCE_and_after_prep_where_vanilla_loads_joshua(self):
@@ -4396,8 +4396,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
     def test_an_unreachable_charge_tile_is_a_hang_and_is_gated(self):
         """MOVE + ENUN to a tile the unit cannot WALK to never returns -- ch04's own soft-lock,
         on this same animal. The flood fill runs at injection time."""
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
+        src = injector.injector_source()
         self.assertIn("'the white moose (ch05 scene 7)'", src)
         maps_dir = os.path.join(bc.REPO, 'campaigns', self.CAMPAIGN, 'maps')
         _pen, start, route = bc.ch05_moose_station(self._chap())
@@ -4912,9 +4911,7 @@ class ArenaPresentation(unittest.TestCase):
         self.assertIn('src/uiarena.c', bc.PATCHED_DECOMP_FILES)
         self.assertIn('src/banim-ekrarena.c', bc.PATCHED_DECOMP_FILES)
         self.assertIn('src/banim_terrain_data.c', bc.PATCHED_DECOMP_FILES)
-        with open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                  encoding='utf-8') as f:
-            build = f.read()
+        build = injector.injector_source()
         self.assertIn('engine_hooks._patch_arena_presentation()', build)
         self.assertIn('inject_arena_presentation(args.campaign)', build)
 
@@ -5147,8 +5144,7 @@ class MessageBlockGuardHasNoBlindSpots(unittest.TestCase):
     def test_the_build_refuses_a_block_over_a_spent_id(self):
         # The guard's two siblings run in main() before any injector; this one ran only from
         # the tests, so a plain `make` with an edited block table still produced a ROM.
-        src = open(os.path.join(bc.REPO, 'tools/build_campaign.py'), encoding='utf-8').read()
-        main = src[src.index('\ndef main():'):]
+        main = injector.def_source('main')
         self.assertIn('live_ids_in_declared_blocks()', main,
                       'the deadness guard must run in the build, like its siblings')
 
@@ -5864,10 +5860,7 @@ class SmsFreeListReclaimsDeadVanillaRows(unittest.TestCase):
                            'conservative reclaim should still free well over a dozen rows')
 
     def test_the_free_list_is_computed_not_hardcoded(self):
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
-        body = src[src.index('def sms_free_rows('):]
-        body = body[:body.index('\ndef ')]
+        body = injector.def_source('sms_free_rows')
         self.assertIn('sms_reachable_rows(', body,
                       'derive the free list from live reachability every build')
         self.assertNotRegex(body, r'\[\s*\d+\s*,\s*\d+\s*,\s*\d+',
@@ -5910,10 +5903,7 @@ class CustomSmsIdsStayUnderTheEngineMask(unittest.TestCase):
         self.assertEqual(bc.sms_id_max(), 127)
 
     def test_the_mask_read_fails_loudly_if_the_define_moves(self):
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
-        body = src[src.index('def _sms_id_mask_bits('):]
-        body = body[:body.index('\ndef ')]
+        body = injector.def_source('_sms_id_mask_bits')
         self.assertIn('sys.exit', body)
         self.assertIn('vanilla_decomp_text', body,
                       'read the mask from HEAD -- the working tree is our own artifact')
@@ -5921,8 +5911,7 @@ class CustomSmsIdsStayUnderTheEngineMask(unittest.TestCase):
     def test_every_wait_table_append_goes_through_the_guarded_helper(self):
         """A new sprite pass must not be able to append a row unguarded. The choke point
         is _append_wait_rows; nothing else may append to unit_icon_wait_table[]."""
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
+        src = injector.injector_source()
         self.assertNotIn('_append_table_rows(UNIT_ICON_WAIT_C', src,
                          'wait rows are placed by _write_wait_row, never blind-appended')
         self.assertGreaterEqual(src.count('_write_wait_row('), 6,
@@ -5991,10 +5980,7 @@ class CustomSmsIdsStayUnderTheEngineMask(unittest.TestCase):
     def test_the_remaining_headroom_is_reported_while_it_is_still_cheap_to_act_on(self):
         """Running low is worth knowing BEFORE the build that runs out, so the allocator
         reports what is left and says so loudly when it is nearly gone."""
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
-        body = src[src.index('def sms_alloc_report('):]
-        body = body[:body.index('\ndef ')]
+        body = injector.def_source('sms_alloc_report')
         self.assertIn('SMS_ID_LOW_WATER', body)
         self.assertIn('print(', body, 'report the headroom, do not only enforce it')
 
@@ -6041,10 +6027,7 @@ class CastPaletteBankSurvivesEveryRosterScreen(unittest.TestCase):
     def test_the_hook_rejects_a_site_that_drifted(self):
         """A decomp bump that reworks one of these screens must FAIL the build loudly,
         not silently leave that screen's roster black."""
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
-        body = src[src.index('def _drop_purple_bank_fills('):]
-        body = body[:body.index('\ndef ')]
+        body = injector.def_source('_drop_purple_bank_fills')
         self.assertIn('sys.exit', body)
 
 
@@ -6100,7 +6083,7 @@ class PreRecruitVariant(unittest.TestCase):
             shutil.rmtree(tmp, ignore_errors=True)
 
     def test_every_override_hook_consults_the_variant_before_the_cast_override(self):
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
+        src = injector.injector_source()
         self.assertIn('gPreRecruitVariant', src)
         # The lookup is gated on faction: a JOINED unit must fall through to the cast look.
         self.assertIn('UNIT_FACTION(%s) != FACTION_BLUE', bc._pre_recruit_lookup('%s'))
@@ -6133,11 +6116,9 @@ class PreRecruitVariant(unittest.TestCase):
     def test_every_hook_defines_charId_before_the_lookup_uses_it(self):
         """C89 + the reuse above: `int charId = ...` must precede the emitted lookup in
         each of the three hooks, or the generated source will not compile."""
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'), encoding='utf-8').read()
         for fn in ('_inject_sms_override_hook', '_inject_mu_override_hook',
                    '_inject_palette_bank_hook'):
-            body = src[src.index('def %s(' % fn):]
-            body = body[:body.index('\ndef ')]
+            body = injector.def_source(fn)
             self.assertLess(body.index('int charId = UNIT_CHAR_ID'),
                             body.index('_pre_recruit_lookup('),
                             '%s must set charId before the pre-recruit lookup' % fn)
@@ -6322,8 +6303,7 @@ class Ch04Stage4Scenes(unittest.TestCase):
 
     def test_both_chapters_actually_CALL_the_pid_guard(self):
         """A guard nothing calls is a comment. Both injectors run it on their own pid."""
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
+        src = injector.injector_source()
         for pid in ('CH04_MOOSE_PID', 'CH05_MOOSE_PID'):
             self.assertIn("assert_custom_art_pid_wired(%s, 'white-moose'" % pid, src)
 
@@ -6331,10 +6311,7 @@ class Ch04Stage4Scenes(unittest.TestCase):
         """Two pids are two override ROWS, not two sprites: the sheets and the SMS id are
         claimed once per asset, so a chapter reusing a creature costs table space and nothing
         else. Asserted on the injector's shape, since the tables only exist post-build."""
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
-        body = src[src.index('def _inject_scripted_neutral_sprites'):]
-        body = body[:body.index('\ndef ', 1)]
+        body = injector.def_source('_inject_scripted_neutral_sprites')
         self.assertEqual(1, body.count('sms = claim_sms_id()'))
         self.assertLess(body.index('sms = claim_sms_id()'), body.index('for char_id in char_ids:'))
 
@@ -6411,9 +6388,7 @@ class DecompShebangsSurviveASubmoduleCheckout(unittest.TestCase):
     """
 
     def test_the_build_normalises_shebangs_before_injecting(self):
-        src = open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'),
-                   encoding='utf-8').read()
-        body = src[src.index('def main():'):]
+        body = injector.def_source('main')
         self.assertIn('normalise_decomp_shebangs(', body,
                       'every build must re-apply the fix, not just tools/build.sh')
 
@@ -7263,8 +7238,7 @@ class ArenaTutorialPlaysInEveryMode(unittest.TestCase):
     def test_no_tutorial_mode_gate_remains_anywhere_in_the_build(self):
         # Guards the scope claim: if a future chapter adds one, this test says so rather
         # than letting mode-gated content appear again by inheritance.
-        with open(os.path.join(bc.REPO, 'tools', 'build_campaign.py'), encoding='utf-8') as fh:
-            src = fh.read()
+        src = injector.injector_source()
         # The CALL SITE, not the word: the docstrings explain the gate we removed and why,
         # and banning the term would only push that explanation out of the code.
         self.assertEqual(src.count('CALL(EventScr_CallOnTutorialMode)'), 0)

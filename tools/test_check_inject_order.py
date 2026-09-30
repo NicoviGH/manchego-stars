@@ -216,9 +216,9 @@ class TestTileChangesOutliveTheRetarget(unittest.TestCase):
         # correct for a chapter with no map changes and a BLIND SPOT for one whose call it
         # cannot recognise, and the two look identical from outside.
         import build_campaign  # noqa: F401
-        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'build_campaign.py')
-        text = open(path, encoding='utf-8').read()
-        self.assertIn('inject_ch03', check._tile_change_injectors_seen(text))
+        from inject import source as injector
+        seen = check._tile_change_injectors_seen(injector.defs_source())
+        self.assertIn('inject_ch03', seen)
 
     def test_the_check_is_registered_in_the_drift_gate(self):
         # Defined-but-unregistered is how this guard shipped: it ran only via the test

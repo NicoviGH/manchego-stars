@@ -39,15 +39,27 @@ class DependencyFree(unittest.TestCase):
     def test_it_imports_without_pillow_or_yaml(self):
         """The CRITICAL finding: this is what CI actually runs the lint in."""
         blocker = _BlockImports('PIL', 'yaml', 'numpy')
+        # inject.source too: hosts reads the injector through it, so it is on the same
+        # no-Pillow path and a heavy import there would break the same CI job.
+        fresh = ('inject.hosts', 'inject.source')
+        saved = {m: sys.modules[m] for m in fresh if m in sys.modules}
         sys.meta_path.insert(0, blocker)
         try:
-            for name in [m for m in sys.modules if m.startswith('inject.hosts')]:
-                del sys.modules[name]
+            for name in fresh:
+                sys.modules.pop(name, None)
             module = importlib.import_module('inject.hosts')
             self.assertTrue(module.hosted_chapters())
         finally:
             sys.meta_path.remove(blocker)
-            importlib.import_module('inject.hosts')
+            # Put back the SAME module objects, not a re-import: a test module that imported
+            # `hosts` at load time and monkeypatches it would otherwise be patching a copy
+            # nothing else reads any more (it made test_check_message_literals order-dependent).
+            import inject
+            for name in fresh:
+                sys.modules.pop(name, None)
+            for name, mod in saved.items():
+                sys.modules[name] = mod
+                setattr(inject, name.split('.')[1], mod)
 
 
 class Discovery(unittest.TestCase):
@@ -148,16 +160,19 @@ class TheLintRunsInTheCiEnvironment(unittest.TestCase):
         """The regression this whole module exists for: `checks` runs `python3
         tools/check.py` with pyyaml and nothing else installed."""
         blocker = _BlockImports('PIL', 'numpy')
+        saved = sys.modules.get('check')
         sys.meta_path.insert(0, blocker)
         try:
-            for name in [m for m in sys.modules if m == 'check']:
-                del sys.modules[name]
+            sys.modules.pop('check', None)
             check = importlib.import_module('check')
             fail = []
             check.check_hosted_chapters_declared(fail)
             self.assertEqual(fail, [])
         finally:
             sys.meta_path.remove(blocker)
+            sys.modules.pop('check', None)
+            if saved is not None:
+                sys.modules['check'] = saved
 
 
 if __name__ == '__main__':
