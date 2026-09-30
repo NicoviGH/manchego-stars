@@ -9,7 +9,9 @@
 PYTHON="$(make -s python-bin 2>/dev/null)"
 [ -x "$PYTHON" ] || PYTHON=python3
 
-"$PYTHON" tools/check.py || {
+# MS_PRECOMMIT tells check.py it is the hook, so it may skip the canaries when no check code
+# is staged (#407). Everything else runs exactly as `make check` does.
+MS_PRECOMMIT=1 "$PYTHON" tools/check.py || {
     echo "" >&2
     echo "pre-commit: drift check failed (above). Fix it, or bypass with --no-verify." >&2
     exit 1

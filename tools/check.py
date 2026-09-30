@@ -395,6 +395,20 @@ def check_python_compiles(fail):
         fail.append('tools/ has a Python file that does not compile')
 
 
+# The canaries (#407) re-prove that every check can fail: 49 real check runs, ~55 CPU-seconds,
+# and the test phase is throughput-bound, so they cost the hook ~15s wherever they sit. Their
+# answer only moves when CHECK code moves, so the pre-commit hook (which sets MS_PRECOMMIT=1)
+# runs them only when a commit stages one of these; `make check`, `make test` and CI always do.
+CANARY_TRIGGERS = ('tools/check.py', 'tools/test_check_canaries', 'tools/inject/source.py')
+
+
+def _hook_skips_canaries():
+    if os.environ.get('MS_PRECOMMIT') != '1':
+        return False
+    staged = _git(['diff', '--cached', '--name-only']).splitlines()
+    return not any(path.startswith(CANARY_TRIGGERS) for path in staged)
+
+
 def check_tests_pass(fail):
     """Run the Python unit tests (tools/test_*.py AND tools/playtest/test_*.py). The combat
     math in fe_combat.py is the difficulty engine's arbiter -- a silent regression there
@@ -422,7 +436,12 @@ def check_tests_pass(fail):
     # tools/run_tests.py is the one runner; `make test` invokes the same module, so the
     # gate and the target can never drift into testing different sets (#382).
     import run_tests
-    for rel, output in run_tests.run():
+    paths = run_tests.test_files()
+    if _hook_skips_canaries():
+        paths = [p for p in paths if not os.path.basename(p).startswith('test_check_canaries')]
+        print('check_tests_pass: canaries skipped in the hook -- nothing under %s is staged; '
+              '`make check`, `make test` and CI run them' % ', '.join(CANARY_TRIGGERS))
+    for rel, output in run_tests.run(paths):
         tail = output.strip().splitlines()
         fail.append('unit tests fail: %s (%s)' % (rel, tail[-1] if tail else 'see output'))
 

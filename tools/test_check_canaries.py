@@ -547,6 +547,28 @@ class TheHarnessBlamesTheRightThing(unittest.TestCase):
                 run(check.check_chapter_status)
 
 
+class TheHookSkipsCanariesOnlyWhenNoCheckCodeIsStaged(unittest.TestCase):
+
+    def _skips(self, staged, hook='1'):
+        env = {'MS_PRECOMMIT': hook} if hook else {}
+        with mock.patch.dict(os.environ, env, clear=False), \
+                mock.patch.object(check, '_git', lambda args: '\n'.join(staged)):
+            if not hook:
+                os.environ.pop('MS_PRECOMMIT', None)
+            return check._hook_skips_canaries()
+
+    def test_a_content_commit_skips_them(self):
+        self.assertTrue(self._skips([CH01, 'docs/decisions.md']))
+
+    def test_a_commit_touching_check_code_runs_them(self):
+        for path in ('tools/check.py', 'tools/test_check_canaries_shard2.py',
+                     'tools/inject/source.py'):
+            self.assertFalse(self._skips([CH01, path]), path)
+
+    def test_outside_the_hook_they_always_run(self):
+        self.assertFalse(self._skips([CH01], hook=None))
+
+
 class TheRegistryIsComplete(unittest.TestCase):
 
     def test_every_canary_lands_in_exactly_one_shard_file(self):

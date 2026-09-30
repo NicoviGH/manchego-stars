@@ -68,3 +68,10 @@ In one file the canaries take ~41 seconds, and `run_tests.py` parallelises by FI
 one file set the pre-commit hook's wall time (45s -> 63s, measured). They are dealt across
 `test_check_canaries.py` and `test_check_canaries_shard{1,2}.py` by name (`shard(k)`), ~14s
 each, and a test fails if a shard has no file -- a shard nothing runs is canaries nothing runs.
+
+Sharding removed the long pole and not the cost: the test phase is THROUGHPUT-bound (332
+CPU-seconds over 8 workers), so ~55 CPU-seconds of canaries cost the hook ~15s wherever they
+sit. Their answer only moves when check code moves, so the pre-commit hook (`MS_PRECOMMIT=1`)
+skips them unless the commit stages `tools/check.py`, a canary file or `inject/source.py`,
+and prints that it did. `make check`, `make test` and CI always run them, so a canary whose
+anchor drifted under a content edit is caught before merge, one step later.
