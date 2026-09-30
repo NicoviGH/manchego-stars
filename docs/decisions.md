@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-298 decisions. Read this index, then open the two or three you need — the whole
+299 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -438,6 +438,7 @@ session state. `HANDOFF.md` points here._
 | `0293` | [The keyless-sidecar default already had a home, and five copies had been made anyway](decisions/0293-the-keyless-sidecar-default-had-a-home-and-five-copies.md) | 2026-09-17 | #377 |
 | `0294` | [An inherited scene runs only if something still POINTS at it, and five of them no longer do](decisions/0294-an-inherited-scene-runs-only-if-something-still-points-at-it.md) | 2026-09-18 | #398 #337 |
 | `0297` | [The injector is every file of it, and it has ONE source reader](decisions/0297-the-injector-is-every-file-of-it-and-has-one-source-reader.md) | 2026-09-30 | #389 |
+| `0299` | [CI caches the VANILLA decomp build, and the mock base ROM is seeded](decisions/0299-ci-caches-the-vanilla-decomp-build.md) | 2026-09-30 | #416 |
 
 ---
 
