@@ -100,7 +100,7 @@ def _vanilla_card(idx):
     """The VANILLA chap_title PNG from the submodule's git HEAD. The atlas cuts vanilla
     letterforms, and the build overwrites some cards (img1/img2/img3 become our hosted
     chapters) BEFORE later chapters compose -- reading the working tree would cut a glyph
-    from the wrong (already-injected) card. Mirror build_campaign.vanilla_decomp_text's
+    from the wrong (already-injected) card. Mirror inject.decomp.vanilla_decomp_text's
     env handling (a commit hook sets GIT_DIR, which would override -C discovery). Falls
     back to the working tree if git/HEAD is unavailable (ad-hoc standalone use)."""
     env = git_env()

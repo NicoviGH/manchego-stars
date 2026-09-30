@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests for bare-literal message-id discovery (#346).
 
-The hole: `build_campaign.injector_message_ids` finds a message id by the NAME of the
+The hole: `inject.messages.injector_message_ids` finds a message id by the NAME of the
 constant holding it, so an id written as hex AT the `set_message_body` call site has no
 name to be found by. Twelve exist on main -- the prologue's eight and ch01's four -- and
 they reached the deadness guard only because someone grepped for them once and
@@ -29,6 +29,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject import source as injector
 import check
 from inject import hosts
 
@@ -141,13 +142,13 @@ class LiteralMessageIdScan(unittest.TestCase):
         """The deadness half. With this, a block drawn over 0xC25 is refused whether or not
         anybody wrote the id down -- which is the whole ask of #346."""
         try:
-            import build_campaign as bc
+            import inject.messages
         except ImportError as exc:                # pragma: no cover - lean environment
             self.skipTest('build_campaign does not import here: %s' % exc)
-        spent = bc.injector_message_ids()
+        spent = inject.messages.injector_message_ids()
         for lit in hosts.literal_message_ids():
             self.assertIn(lit.msg_id, spent, hex(lit.msg_id))
-        self.assertTrue(bc.live_ids_in_declared_blocks(blocks={'zz': ((0xC25, 0xC25),)}),
+        self.assertTrue(inject.messages.live_ids_in_declared_blocks(blocks={'zz': ((0xC25, 0xC25),)}),
                         'a block over the prologue\'s 0xC25 literal must be refused')
 
 
@@ -207,7 +208,7 @@ class MessageLiteralDiscoveryGuard(unittest.TestCase):
 
 
 class LiteralOwnershipAtBuildTime(unittest.TestCase):
-    """build_campaign owns OWNERSHIP, because there the registry is a real dict.
+    """inject.messages owns OWNERSHIP, because there the registry is a real dict.
 
     The static version died in #356's review: HOSTED_CHAPTER_MESSAGE_IDS is written as
     generators, subscripts and tuple-unpacked constants, so an AST evaluator of it was wrong
@@ -218,19 +219,19 @@ class LiteralOwnershipAtBuildTime(unittest.TestCase):
 
     def setUp(self):
         try:
-            import build_campaign as bc
+            from inject import messages
         except ImportError as exc:                # pragma: no cover - lean environment
-            self.skipTest('build_campaign does not import here: %s' % exc)
-        self.bc = bc
+            self.skipTest('the injector does not import here: %s' % exc)
+        self.messages = messages
         self.lit = hosts.MessageLiteral
 
     def test_a_claimed_literal_passes(self):
-        self.bc.assert_literals_are_claimed(
+        self.messages.assert_literals_are_claimed(
             literals=[self.lit(0xBF4, 'ch07', 10)], claims={'ch07': (0xBF4,)})
 
     def test_an_unclaimed_literal_exits_the_BUILD(self):
         with self.assertRaises(SystemExit) as caught:
-            self.bc.assert_literals_are_claimed(
+            self.messages.assert_literals_are_claimed(
                 literals=[self.lit(0xBF4, 'ch07', 10)], claims={'ch07': (0x1,)})
         self.assertIn('0xBF4', str(caught.exception))
         self.assertIn('CH07_LITERAL_MSGS', str(caught.exception))
@@ -239,21 +240,21 @@ class LiteralOwnershipAtBuildTime(unittest.TestCase):
         """ch00's tuple is not CH00_-shaped, and telling the author to create CH00_LITERAL_MSGS
         would invent a second registry beside the one that works."""
         with self.assertRaises(SystemExit) as caught:
-            self.bc.assert_literals_are_claimed(
+            self.messages.assert_literals_are_claimed(
                 literals=[self.lit(0xC25, 'ch00', 10)], claims={'ch00': ()})
         self.assertIn('PROLOGUE_LITERAL_MSGS', str(caught.exception))
 
     def test_an_unattributed_literal_is_left_to_the_discovery_guard(self):
-        self.bc.assert_literals_are_claimed(
+        self.messages.assert_literals_are_claimed(
             literals=[self.lit(0xBF4, None, 10)], claims={})
 
     def test_the_LIVE_tree_passes_against_the_REAL_registry(self):
         """The whole point of moving here: ch04's tuple-unpacked claims resolve exactly."""
-        self.bc.assert_literals_are_claimed()
+        self.messages.assert_literals_are_claimed()
 
     def test_it_runs_in_the_build(self):
         import inspect
-        self.assertIn('assert_literals_are_claimed', inspect.getsource(self.bc.main))
+        self.assertIn('assert_literals_are_claimed', injector.def_source('main'))
 
 
 if __name__ == '__main__':

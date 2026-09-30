@@ -24,7 +24,18 @@ import functools
 import os
 import re
 
-import build_campaign as bc
+import inject.cast  # noqa: E402
+import inject.chapter_settings  # noqa: E402
+import inject.decomp  # noqa: E402
+import inject.hosting  # noqa: E402
+import inject.hosts  # noqa: E402
+import inject.paths  # noqa: E402
+import inject.raw_pids  # noqa: E402
+import inject.stats  # noqa: E402
+import argparse
+import json
+import sys
+import yaml_loader  # noqa: E402
 import fe_combat as fc
 from inject.decomp import WEAPON_ITEM_ENUM   # shared weapon<->ITEM map (seam-neutral)
 
@@ -50,28 +61,28 @@ _vanilla_classes = None
 def _characters_text():
     global _vanilla_chars
     if _vanilla_chars is None:
-        _vanilla_chars = bc.vanilla_decomp_text('src/data_characters.c')
+        _vanilla_chars = inject.decomp.vanilla_decomp_text('src/data_characters.c')
     return _vanilla_chars
 
 
 def _classes_text():
     global _vanilla_classes
     if _vanilla_classes is None:
-        _vanilla_classes = bc.vanilla_decomp_text('src/data_classes.c')
+        _vanilla_classes = inject.decomp.vanilla_decomp_text('src/data_classes.c')
     return _vanilla_classes
 
 
 def _class_base(class_enum):
-    return bc.class_base_stats(class_enum, _classes_text())
+    return inject.stats.class_base_stats(class_enum, _classes_text())
 
 
 def _class_growths(class_enum):
     """Read a class's growth rates (for autoleveling enemies) from vanilla data_classes.c."""
     text = _classes_text()
-    s, e = bc._find_brace_block(text, '[%s - 1]' % class_enum, bc.CLASSES_C)
+    s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % class_enum, inject.paths.CLASSES_C)
     block = text[s:e]
     out = {}
-    for gf in bc.GROWTH_FIELDS:
+    for gf in inject.stats.GROWTH_FIELDS:
         m = re.search(r'\.' + gf + r'\s*=\s*(-?\d+)', block)
         out[gf] = int(m.group(1)) if m else 0
     return out
@@ -83,7 +94,7 @@ def autolevel(base, growths, level):
     stat: base + round-half-up((level-1) * growth%). Con/Mov don't grow."""
     out = dict(base)
     gains = level - 1
-    for gf in bc.GROWTH_FIELDS:
+    for gf in inject.stats.GROWTH_FIELDS:
         field = 'base' + gf[len('growth'):]      # growthHP -> baseHP
         out[field] = base.get(field, 0) + int(gains * growths.get(gf, 0) / 100 + 0.5)
     return out
@@ -130,7 +141,7 @@ def mode_stats(base, growths, level, mode, shifts, base_level=1):
         return projected
     if mode == 'difficult':
         out = dict(projected)
-        for gf in bc.GROWTH_FIELDS:
+        for gf in inject.stats.GROWTH_FIELDS:
             field = 'base' + gf[len('growth'):]
             out[field] = projected[field] + int(shift * growths.get(gf, 0) / 100 + 0.5)
         return out
@@ -168,12 +179,12 @@ def _stats_to_combatant(name, stats, weapon, tags=frozenset()):
 def player_combatant(campaign, uid):
     """Resolve a cast member's effective fe_combat.Combatant: class base + donor personal
     base (donor-base inheritance), at base level, wielding its first real weapon."""
-    unit = bc.load_unit(campaign, uid)
+    unit = inject.cast.load_unit(campaign, uid)
     unit.setdefault('id', uid)
-    class_enum = bc.class_enum_for(unit)
+    class_enum = inject.cast.class_enum_for(unit)
     cbase = _class_base(class_enum)
-    dbase = bc.donor_base_stats(_characters_text(), bc.BASE_DONOR[uid])
-    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in bc.BASE_FIELDS}
+    dbase = inject.stats.donor_base_stats(_characters_text(), inject.stats.BASE_DONOR[uid])
+    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
     weapon = _weapon_for(unit.get('inventory'))
     return _stats_to_combatant(uid, eff, weapon, CLASS_TAGS.get(class_enum, frozenset()))
 
@@ -199,7 +210,7 @@ def vanilla_personal_line(char_enum):
     if not char_enum or not str(char_enum).startswith('CHARACTER_'):
         return {}
     try:
-        return bc.donor_base_stats(_characters_text(), char_enum)
+        return inject.stats.donor_base_stats(_characters_text(), char_enum)
     except Exception:
         return {}
 
@@ -227,7 +238,7 @@ def _character_number(token):
     numeric literal (the generic autolevelled-trash pids). None if unresolvable."""
     global _char_numbers
     if _char_numbers is None:
-        text = bc.vanilla_decomp_text('include/constants/characters.h')
+        text = inject.decomp.vanilla_decomp_text('include/constants/characters.h')
         _char_numbers = {m.group(1): int(m.group(2), 0) for m in re.finditer(
             r'(CHARACTER_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', text)}
     if token in _char_numbers:
@@ -264,7 +275,7 @@ def _character_base_level(char_index):
     text = _characters_text()
     for marker in ('[%s - 1]' % char_index, '[%s - 1]' % str(char_index).lower()):
         try:
-            start, end = bc._find_brace_block(text, marker, bc.CHARACTERS_C)
+            start, end = inject.decomp._find_brace_block(text, marker, inject.paths.CHARACTERS_C)
         except SystemExit:
             continue
         found = re.search(r'\.baseLevel\s*=\s*(-?\d+)', text[start:end])
@@ -302,7 +313,7 @@ def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shift
 # roster keys on build_campaign's desk -- the ROM emitters, the raw-pid registry and every
 # metric here have to agree on it, and they did not (decisions.md -> "A parity ratio does not
 # say how much of the twin it COPIED").
-_body_levels = bc.entry_body_levels
+_body_levels = inject.raw_pids.entry_body_levels
 
 
 def _entry_body_count(enemy_def):
@@ -440,7 +451,7 @@ def _ai_macros():
     Only the multi-byte AI-vector macros and the single-byte field constants matter here;
     both are plain `#define NAME 0x..[,0x..]` lines, so one regex covers them."""
     out = {}
-    for line in bc.vanilla_decomp_text(AI_HELPERS_H).splitlines():
+    for line in inject.decomp.vanilla_decomp_text(AI_HELPERS_H).splitlines():
         m = re.match(r'\s*#define\s+(\w+)\s+((?:0x[0-9A-Fa-f]+)(?:\s*,\s*0x[0-9A-Fa-f]+)*)\s*$',
                      line)
         if m:
@@ -512,7 +523,7 @@ def vanilla_redas(text):
     array it parses, and re-ran the whole-file `re.finditer` each time -- 5,507 scans of the
     same 1.78 MB `events_udefs.c` in one `test_difficulty.py` run, 27.4s of pure CPU for an
     answer that never changed. Keying on the text is O(1) in practice because
-    `bc.vanilla_decomp_text` is memoised too and hands back the same str object, whose hash
+    `inject.decomp.vanilla_decomp_text` is memoised too and hands back the same str object, whose hash
     Python caches after the first call (#380). The returned dict is shared, so callers must
     not mutate it."""
     return {m.group(1): [(int(x), int(y)) for x, y in
@@ -528,7 +539,7 @@ def vanilla_unit_defs(text, array_name):
     character enum for allies/bosses (a numeric token for generics, None if absent). `itemDrop`
     is the `.itemDrop = 1` bit -- when set, the unit drops its LAST item on death (US_DROP_ITEM,
     statscreen.c:726), the enemy-drop channel the economy reads (#176)."""
-    s, e = bc._find_brace_block(text, array_name + '[]', '<udef:%s>' % array_name)
+    s, e = inject.decomp._find_brace_block(text, array_name + '[]', '<udef:%s>' % array_name)
     body = text[s + 1:e - 1]
     redas = vanilla_redas(text)
     out = []
@@ -576,7 +587,7 @@ def vanilla_units(parity_ref, allegiance='RED'):
     if spec is None:
         return None
     relpath, arrays = spec
-    text = bc.vanilla_decomp_text(relpath)
+    text = inject.decomp.vanilla_decomp_text(relpath)
     want = 'FACTION_ID_%s' % allegiance
     return [d for array_name in arrays
             for d in vanilla_unit_defs(text, array_name)
@@ -594,7 +605,7 @@ def vanilla_red_units(parity_ref):
     if spec is None:
         return None
     relpath, arrays = spec
-    text = bc.vanilla_decomp_text(relpath)
+    text = inject.decomp.vanilla_decomp_text(relpath)
     return [d for array_name in arrays
             for d in vanilla_unit_defs(text, array_name)
             if d['allegiance'] == 'FACTION_ID_RED']
@@ -668,13 +679,13 @@ def vanilla_enemies(parity_ref, mode=None):
     if spec is None:
         return None
     relpath, arrays = spec
-    text = bc.vanilla_decomp_text(relpath)
+    text = inject.decomp.vanilla_decomp_text(relpath)
     shifts = vanilla_chapter_shifts(parity_ref) if mode else None
     if mode and shifts is None:
         # Silently returning an UNSHIFTED vanilla force here would compare our shifted
         # side against vanilla's authored table and still print a verdict -- exactly the
         # unnamed-configuration bug #303 exists to kill. Refuse instead.
-        bc.sys.exit('ERROR: parity_reference %r does not resolve to a vanilla chapter, so '
+        sys.exit('ERROR: parity_reference %r does not resolve to a vanilla chapter, so '
                     'its difficulty numbers are unknown and a --mode read would compare '
                     'our SHIFTED force against an UNSHIFTED reference' % parity_ref)
     out = []
@@ -727,7 +738,7 @@ def vanilla_chapter_shifts(parity_ref):
     name = _vanilla_internal_name(parity_ref)
     if name is None:
         return None
-    settings = bc.json.loads(bc.vanilla_decomp_text('src/data/chapter_settings.json'))
+    settings = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
     for chapter in settings['chapters']:
         if chapter.get('internalName') == name:
             return {'tutorial': chapter['easyModeLevelMalus'],
@@ -743,7 +754,7 @@ def vanilla_named_bosses(parity_ref, with_personal=True):
     if spec is None:
         return []
     relpath, arrays = spec
-    text = bc.vanilla_decomp_text(relpath)
+    text = inject.decomp.vanilla_decomp_text(relpath)
     out = []
     for array_name in arrays:
         for d in vanilla_unit_defs(text, array_name):
@@ -803,8 +814,8 @@ def _ally_combatant(char_enum, class_enum, weapon):
     allies aren't autoleveled, their CharacterData stats are already the join-level display.
     Named off charIndex (CHARACTER_EIRIKA -> 'Eirika')."""
     cbase = _class_base(class_enum)
-    dbase = bc.donor_base_stats(_characters_text(), char_enum)
-    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in bc.BASE_FIELDS}
+    dbase = inject.stats.donor_base_stats(_characters_text(), char_enum)
+    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
     name = char_enum.replace('CHARACTER_', '').title()
     return _stats_to_combatant(name, eff, weapon, CLASS_TAGS.get(class_enum, frozenset()))
 
@@ -819,7 +830,7 @@ def vanilla_allies(parity_ref):
     if spec is None:
         return None
     relpath, arrays = spec
-    text = bc.vanilla_decomp_text(relpath)
+    text = inject.decomp.vanilla_decomp_text(relpath)
     out = []
     for array_name in arrays:
         for d in vanilla_unit_defs(text, array_name):
@@ -867,9 +878,9 @@ def bosses_over_their_donor_base_level(campaign):
     CHARACTER_ slots it is merely true today, and at ZERO margin -- Breguet 4/4, Bone 4/4,
     Bazba 6/6. One level bump and the ROM starts applying the malus while the model still
     assumes it does not, which is the silent model/ROM divergence in miniature."""
-    return sorted(uid for chapter in bc.hosted_chapters()
+    return sorted(uid for chapter in inject.hosts.hosted_chapters()
                   for uid in _boss_entries_over_donor_base_level(
-                      bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))))
+                      inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))))
 
 
 def _boss_entries_over_donor_base_level(chap):
@@ -880,7 +891,7 @@ def _boss_entries_over_donor_base_level(chap):
     for enemy in chapter_roster_entries(chap):
         if not (enemy.get('is_boss') or enemy.get('is_miniboss')):
             continue
-        donor = bc.ENEMY_BASE_SLOT.get(enemy.get('id'))
+        donor = inject.cast.ENEMY_BASE_SLOT.get(enemy.get('id'))
         if not donor:
             continue
         if max(_body_levels(enemy)) > _character_base_level(donor):
@@ -896,7 +907,7 @@ def _our_takes_difficulty_shift(enemy_def):
     (BASE_DONOR) rides a playable slot and is therefore difficulty-immune: ch05's Sahnar is
     the live case, and the ROM agrees, reading identical stats in all three modes. An enemy
     on a vanilla boss slot (ENEMY_BASE_SLOT) or on a raw pid sits well above the gate."""
-    donor = bc.BASE_DONOR.get(enemy_def.get('id')) or bc.ENEMY_BASE_SLOT.get(enemy_def.get('id'))
+    donor = inject.stats.BASE_DONOR.get(enemy_def.get('id')) or inject.cast.ENEMY_BASE_SLOT.get(enemy_def.get('id'))
     return _takes_difficulty_shift(donor) if donor else True
 
 
@@ -916,10 +927,10 @@ def _our_base_level(enemy_def):
 # ch06 ran into this first and worked around it privately, by declaring its turn-4 wave
 # inside `enemy_units` -- its own YAML says declaring them "is what makes the two sides count
 # the same force". ch02 used the `reinforcements:` key instead and was simply never counted.
-# The definition lives in build_campaign, which owns the chapter schema, so the parity
+# The definition lives in the injector (inject/raw_pids.py), which owns the chapter schema, so the parity
 # metric, the AI guard, the personal-line routes and the raw-pid registry cannot drift apart
 # on which units a chapter fields.
-chapter_roster_entries = bc.chapter_roster_entries
+chapter_roster_entries = inject.raw_pids.chapter_roster_entries
 
 
 def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff=True,
@@ -1240,13 +1251,13 @@ def lord_team_sweep(roster, line_enemies, bosses, deploy_limit, terrain_avoid=0)
 # ── Chapter loading + report (I/O + presentation) ─────────────────────────────────
 import glob       # noqa: E402
 
-ROSTER = list(bc.BASE_DONOR.keys())     # the playable cast (each has a stat donor)
+ROSTER = list(inject.stats.BASE_DONOR.keys())     # the playable cast (each has a stat donor)
 
 
 def chapter_path(campaign, ch):
     """Resolve a short id ('ch01') to its chapter YAML path."""
     hits = sorted(glob.glob(os.path.join(
-        bc.REPO, 'campaigns', campaign, 'chapters', ch + '*.yaml')))
+        inject.decomp.REPO, 'campaigns', campaign, 'chapters', ch + '*.yaml')))
     if not hits:
         raise SystemExit('ERROR: no chapter YAML matching %r' % ch)
     return hits[0]
@@ -1269,7 +1280,7 @@ def chapter_deploy_limit(chap, default):
 def load_field(campaign, ch):
     """Assemble (roster, line_enemies, bosses, deploy_limit, enemy_labels) for a chapter."""
     with open(chapter_path(campaign, ch), encoding='utf-8') as f:
-        chap = bc.yaml_load(f)
+        chap = yaml_loader.yaml_load(f)
     roster = [player_combatant(campaign, uid) for uid in ROSTER]
     line, bosses, labels = [], [], []
     for ed in chapter_roster_entries(chap):
@@ -1398,7 +1409,7 @@ def _chapter_pressure(chap, band=0.25, mode=None):
     before #303 graded; the difference matters because a chapter whose normal malus is
     non-zero ships a force the authored read never describes."""
     deploy_cap = chapter_deploy_limit(chap, len(ROSTER))
-    shifts = bc.chapter_difficulty_shifts(chap) if mode else None
+    shifts = inject.chapter_settings.chapter_difficulty_shifts(chap) if mode else None
     ours_force = chapter_enemy_force(chap, mode=mode, shifts=shifts)
     ours = enemy_pressure(ours_force, deploy_cap)
     ref = chap.get('parity_reference')
@@ -1474,8 +1485,8 @@ def _terrain_tables():
     if 'tables' not in _TERRAIN_CACHE:
         ids = {int(v, 16): k for k, v in re.findall(
             r'(TERRAIN_\w+)\s*=\s*(0x[0-9A-Fa-f]+)',
-            bc.vanilla_decomp_text('include/constants/terrains.h'))}
-        text = bc.vanilla_decomp_text('src/data_terrains.c')
+            inject.decomp.vanilla_decomp_text('include/constants/terrains.h'))}
+        text = inject.decomp.vanilla_decomp_text('src/data_terrains.c')
 
         def table(name):
             i = text.find('s8 %s[] = {' % name)
@@ -1501,7 +1512,7 @@ def vanilla_terrain_at(layout_name, x, y):
         import map_tileset_tool as mtt
         key = ('layout', layout_name)
         if key not in _TERRAIN_CACHE:
-            _TERRAIN_CACHE[key] = mtt.vanilla_layout_data(bc.DECOMP, layout_name)
+            _TERRAIN_CACHE[key] = mtt.vanilla_layout_data(inject.decomp.DECOMP, layout_name)
         w, h, cells, terrain = _TERRAIN_CACHE[key]
         if not (0 <= x < w and 0 <= y < h):
             return None
@@ -1550,7 +1561,7 @@ def unit_real_article(enemy_def, combatant):
     personal = enemy_def.get('personal')
     if not personal:
         uid = enemy_def.get('id')
-        donor = bc.BASE_DONOR.get(uid) or bc.ENEMY_BASE_SLOT.get(uid)
+        donor = inject.stats.BASE_DONOR.get(uid) or inject.cast.ENEMY_BASE_SLOT.get(uid)
         if donor:
             personal = vanilla_personal_line(donor)
     return _apply_personal(combatant, personal) if personal else combatant
@@ -1619,7 +1630,7 @@ def solo_contributors(chap, parity_ref, deploy_cap, floor=1.0, share=0.10):
 # Where a chapter's red force is authored. ch02 puts two of its nine under
 # `reinforcements:`, and a guard reading only `enemy_units:` would grade a chapter that
 # does not ship.
-AI_ROSTER_KEYS = bc.ENEMY_ROSTER_KEYS   # the AI guard was this roster's first reader
+AI_ROSTER_KEYS = inject.raw_pids.ENEMY_ROSTER_KEYS   # the AI guard was this roster's first reader
 
 
 def _donor_specs(enemy):
@@ -1792,7 +1803,7 @@ def print_role_findings(chap, parity_ref):
 
 
 # ── Item-economy parity (#170) ──────────────────────────────────────────────────
-# The vanilla twin's payout, read from HEAD via bc.vanilla_decomp_text -- NEVER the working
+# The vanilla twin's payout, read from HEAD via inject.decomp.vanilla_decomp_text -- NEVER the working
 # tree, which the build injects our own chapters into (reading the tree by hand once had our
 # ch03 chests reported as vanilla Ch4's). Same ground-truth discipline as the enemy rosters:
 # chests + village/house gifts + shops + enemy drops, valued from data_items.c. (#170 shipped
@@ -1815,7 +1826,7 @@ def _item_gold_values():
     gem/booster's value is that product; sell is ~half. Cached (one decomp read)."""
     global _ITEM_VALUES
     if _ITEM_VALUES is None:
-        text = bc.vanilla_decomp_text('src/data_items.c')
+        text = inject.decomp.vanilla_decomp_text('src/data_items.c')
         _ITEM_VALUES = {}
         for m in re.finditer(r'\[(ITEM_\w+)\]\s*=\s*\{(.*?)\n\s*\},', text, re.S):
             body = m.group(2)
@@ -1836,7 +1847,7 @@ def _item_id_to_enum():
     GIVEITEMTO gifts name their item by numeric id (SVAL), so we resolve id -> enum -> value."""
     global _ITEM_IDS
     if _ITEM_IDS is None:
-        text = bc.vanilla_decomp_text('include/constants/items.h')
+        text = inject.decomp.vanilla_decomp_text('include/constants/items.h')
         _ITEM_IDS = {}
         val = -1
         for line in text.splitlines():
@@ -1886,7 +1897,7 @@ def vanilla_drops(parity_ref):
     if spec is None:
         return None
     relpath, arrays = spec
-    text = bc.vanilla_decomp_text(relpath)
+    text = inject.decomp.vanilla_decomp_text(relpath)
     out = []
     for array_name in arrays:
         for d in vanilla_unit_defs(text, array_name):
@@ -1905,9 +1916,9 @@ def vanilla_economy(parity_ref):
     stem = PARITY_REFERENCE_STEM.get(parity_ref)
     if stem is None:
         return None
-    info = bc.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-    script = bc.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    shoptext = bc.vanilla_decomp_text('src/events_shoplist.c')
+    info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
     chests = [(it, item_gold_value(it)) for it in re.findall(r'Chest\((ITEM_\w+)', info)]
     gifts = [(it, item_gold_value(it)) for it in _gift_items(script)]
     drops = vanilla_drops(parity_ref) or []
@@ -2012,7 +2023,7 @@ def _event_block(script_text, sym):
 def _vanilla_convertible_chars(stem):
     """CHARACTER_ enums that are recruitable enemies (a CHAR macro's target) in the twin --
     they flip to allies, so they aren't a kill the player must make."""
-    info = bc.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     return {m.group(1) for m in re.finditer(
         r'CHAR\([^,]+,\s*\w+,\s*CHARACTER_\w+,\s*(CHARACTER_\w+)\)', info)}
 
@@ -2057,8 +2068,8 @@ def _vanilla_reinforcement_turns(stem):
     a temp-flag-gated turn event or an AREA load (Ch4 "Ancient Horrors"' Revenant wave), which
     arrive on zone-entry and are modeled as _ZONE_ENTRY_TURN (#177). Turn-1 unconditional events
     (the initial line force) contribute nothing."""
-    info = bc.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-    script = bc.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     out = {}
     for eid, scr, turn in _player_turn_events(info):
         if _is_flag_gated(eid):
@@ -2086,7 +2097,7 @@ def chapter_enemy_groups(chap):
             units = _entry_combatants(ed)
             if ed.get('convertible'):
                 g['convertibles'].extend(units)
-            elif not bc.entry_is_turn1(key, ed):
+            elif not inject.raw_pids.entry_is_turn1(key, ed):
                 # the KEY is what makes ch02's wave a reinforcement: it carries
                 # `trigger_turn`, not `arrives_turn`, so an arrives_turn test alone read it
                 # as turn-1 line. `entry_is_turn1` is the one place that now knows it
@@ -2107,7 +2118,7 @@ def vanilla_enemy_groups(parity_ref):
     stem = PARITY_REFERENCE_STEM.get(parity_ref)
     conv_chars = _vanilla_convertible_chars(stem) if stem else set()
     reinf_turns = _vanilla_reinforcement_turns(stem) if stem else {}
-    text = bc.vanilla_decomp_text(relpath)
+    text = inject.decomp.vanilla_decomp_text(relpath)
     g = {'line': [], 'reinforcements': [], 'convertibles': []}
     for arr in arrays:
         turn = reinf_turns.get(arr, 1)
@@ -2215,7 +2226,7 @@ def curve_report(campaign, band=0.25, mode=None):
     banner says which, because a verdict that does not name its configuration is the thing
     #303 set out to fix."""
     paths = sorted(glob.glob(os.path.join(
-        bc.REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml')))
+        inject.decomp.REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml')))
     bar = '=' * 86
     print(bar)
     print('CAMPAIGN ENEMY-PRESSURE CURVE -- ours vs vanilla parity_reference   '
@@ -2235,7 +2246,7 @@ def curve_report(campaign, band=0.25, mode=None):
     chaps = []
     for path in paths:
         with open(path, encoding='utf-8') as f:
-            chaps.append(bc.yaml_load(f))
+            chaps.append(yaml_loader.yaml_load(f))
     rows = []
     any_dropped_boss = False
     for chap in sorted(chaps, key=lambda c: c.get('chapter_number', 99)):
@@ -2346,7 +2357,7 @@ def lord_floor_report(campaign, ch, target=3.5, def_cap=4, res_cap=4, hp_cap=12)
 
 
 def main():
-    ap = bc.argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--chapter', help='chapter id, e.g. ch01 (omit with --curve)')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
     ap.add_argument('--curve', action='store_true',
@@ -2376,7 +2387,7 @@ def main():
                 print('\n!! PARITY GATE: %d locked chapter(s) off-parity, unreliable, or '
                       'carrying a role finding: %s'
                       % (len(fails), ', '.join(fails)))
-                bc.sys.exit(1)
+                sys.exit(1)
             print('\nPARITY GATE: all referenced chapters at parity.')
         return
     if not args.chapter:

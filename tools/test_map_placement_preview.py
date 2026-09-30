@@ -12,6 +12,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject.namespace import stubbed  # noqa: E402
 import campaign_chapters as cc                                       # noqa: E402
 import map_placement_preview as pp                                   # noqa: E402
 import map_tileset_tool as mt                                        # noqa: E402
@@ -94,8 +95,8 @@ class Board(unittest.TestCase):
         """The failure this tool exists to make impossible: a coordinate that looks fine on
         a grid and is water, wall or pocket to the class standing on it."""
         import re
-        import build_campaign as bc
-        classes = bc.vanilla_decomp_text('src/data_classes.c')
+        import inject.decomp
+        classes = inject.decomp.vanilla_decomp_text('src/data_classes.c')
         enums = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
                  'cavalier': 'CLASS_CAVALIER', 'mercenary': 'CLASS_MERCENARY',
                  'armor-knight': 'CLASS_ARMOR_KNIGHT', 'shaman': 'CLASS_SHAMAN',
@@ -164,15 +165,10 @@ class TerrainGridSaysWhenAMapIsNotCompiledYet(unittest.TestCase):
     def test_a_map_that_exists_but_cannot_be_READ_is_not_MapNotCompiled(self):
         """The distinction the whole exception exists to draw: absent is a skip, broken is a
         real failure, and they must not collapse into each other."""
-        import build_campaign as bc
-        real = bc.map_tileset
-        bc.map_tileset = lambda meta: 'snowy-bern-NOPE'
-        try:
+        with stubbed('map_tileset', lambda meta: 'snowy-bern-NOPE'):
             with self.assertRaises(Exception) as ctx:
                 pp.terrain_grid(self.chap)
             self.assertNotIsInstance(ctx.exception, pp.MapNotCompiled)
-        finally:
-            bc.map_tileset = real
 
 
 class LoadMapResolvesTheTilesetTheBuildWillUse(unittest.TestCase):
@@ -180,7 +176,7 @@ class LoadMapResolvesTheTilesetTheBuildWillUse(unittest.TestCase):
     `KeyError: 'tileset'` on ch00-ch02, whose sidecars predate that key.
 
     The fix is NOT to read the chapter YAML's `map.tileset` instead. Nothing in the ROM
-    build reads that field -- `build_campaign._register_chapter_map` reads the SIDECAR,
+    build reads that field -- `inject.maps._register_chapter_map` reads the SIDECAR,
     defaulting to `WINTER_TILESET` when the key is absent, and that default is exactly why
     ch00-ch02 build fine today. A preview that sourced its tileset from the YAML would be
     rendering a fact the game never consults, and could draw a confident picture of a
@@ -197,9 +193,9 @@ class LoadMapResolvesTheTilesetTheBuildWillUse(unittest.TestCase):
     def test_a_keyless_sidecar_resolves_to_the_builds_own_default(self):
         """ch00-ch02's sidecars have no `tileset` key; the build gives them WINTER_TILESET,
         so the preview must give them the same thing rather than raising."""
-        import build_campaign as bc
+        import inject.maps
         _grid, _terrain, ts = pp.load_map('ch01-the-iron-trail')
-        self.assertEqual(ts.palettes, self._ts(bc.WINTER_TILESET).palettes)
+        self.assertEqual(ts.palettes, self._ts(inject.maps.WINTER_TILESET).palettes)
 
     def test_a_sidecar_that_names_a_tileset_uses_that_one(self):
         _grid, _terrain, ts = pp.load_map('ch06-maer-monster')
@@ -216,7 +212,7 @@ class LoadMapResolvesTheTilesetTheBuildWillUse(unittest.TestCase):
     def test_the_preview_agrees_with_the_build_for_every_compiled_map(self):
         """The property that matters, asserted directly rather than chapter by chapter:
         whatever the build would compile a map against is what the preview draws it with."""
-        import build_campaign as bc
+        import inject.maps
         import glob
         import json
         for path in sorted(glob.glob(os.path.join(pp.MAPS, '*.json'))):
@@ -226,7 +222,7 @@ class LoadMapResolvesTheTilesetTheBuildWillUse(unittest.TestCase):
             with open(path, encoding='utf-8') as f:
                 meta = json.load(f)
             _grid, _terrain, ts = pp.load_map(stem)
-            self.assertEqual(ts.palettes, self._ts(bc.map_tileset(meta)).palettes, stem)
+            self.assertEqual(ts.palettes, self._ts(inject.maps.map_tileset(meta)).palettes, stem)
 
     def test_terrain_grid_no_longer_crashes_on_the_oldest_chapters(self):
         """The regression itself: ch00-ch02 could not be previewed at all."""
@@ -369,7 +365,7 @@ class EnemyBodiesAndUnitsReachingReadEveryRosterKey(unittest.TestCase):
     def test_placed_units_marks_a_reinforcements_key_wave_as_LATE(self):
         """The render draws a late body as a hollow ring -- 'not here at turn 1'. A
         reinforcement-key entry is never turn-1 regardless of its own fields, per
-        `build_campaign.entry_is_turn1`."""
+        `inject.raw_pids.entry_is_turn1`."""
         chap = {'reinforcements': [self._reinforcement_entry()]}
         _tile, _code, _beh, _eid, late = pp.placed_units(chap)[0]
         self.assertTrue(late)

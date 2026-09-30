@@ -1,6 +1,6 @@
 """Shared decomp source-access layer: paths + brace-patch primitives.
 
-Imported by BOTH tools/build_campaign.py (content) and
+Imported by BOTH the content passes (tools/inject/*, tools/build_campaign.py) and
 tools/inject/engine_hooks.py (pipeline). Keep it dependency-free so neither
 side creates an import cycle. See docs/decisions.md -> Engine/content file seam.
 """
@@ -62,8 +62,8 @@ def _find_brace_block(text, marker, path):
 
 
 # Validators run on every EVENT SCENE body written through `_replace_brace_block`, which is
-# the one place any injector writes one. Registered from outside (build_campaign appends the
-# #337 cutscene-actor check at import) so this module keeps importing nothing of its own --
+# the one place any injector writes one. Registered from outside (inject/scene_actors.py appends
+# the #337 cutscene-actor check at import) so this module keeps importing nothing of its own --
 # a scene check needs the campaign's cast, and this layer must stay dependency-free or every
 # extraction of #389 gets an import cycle back (ADR 0287).
 #

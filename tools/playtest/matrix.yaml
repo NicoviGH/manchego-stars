@@ -74,7 +74,7 @@ rom_configs:
   # boss kill, so the boot came BEFORE the first film this time rather than after the third.
   # `full` = Basil alive + Sahnar recruited; the other two arms build the same way with
   # CH05ENDING set to `no-sahnar` or `basil-died`. There is no Lupin variant: neither ending
-  # branches on him (build_campaign -> CH05_ENDING_MSGS).
+  # branches on him (inject/chapter_ids.py -> CH05_ENDING_MSGS).
   ch05endingboot:
     CH05BOOT: 1
     CH05ENDING: full

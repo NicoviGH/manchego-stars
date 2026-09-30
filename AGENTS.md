@@ -68,7 +68,7 @@ Searches are fast either way; the cost is that decomp matches land in context an
   claim in the decomp is required — see "The decomp answers 'what does vanilla do.'" above;
   stumbling into it while grepping for one of our own symbols is not the same thing.
 - **Never read a decomp source whole** (`src/events_udefs.c` is 1.78 MB).
-  `build_campaign.vanilla_decomp_text` reads them at HEAD and is memoised for that reason.
+  `inject.decomp.vanilla_decomp_text` reads them at HEAD and is memoised for that reason.
 
 ## Context is the budget
 

@@ -824,7 +824,7 @@ def _build(rom, make_flags, log_dir, quiet=True, use_cache=True):
 # the correct granularity, and `harness_shared` is what keeps the closure honest.
 #
 # HONEST CEILING: keying on rom_input_hash means any build_campaign.py or campaign.yaml edit
-# invalidates every scenario, and nearly every feature task touches build_campaign.py. This
+# invalidates every scenario, and nearly every feature task touches the injector. This
 # phase buys doc-only changes, harness-only changes, and repeat runs while debugging
 # something else. Build-attributed scoping (#255 phase 2) is where that ceiling lifts.
 VERDICT_CACHE_DIR = os.path.join(REPO, '.matrix-verdictcache')

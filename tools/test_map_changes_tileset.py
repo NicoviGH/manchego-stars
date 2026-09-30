@@ -1,7 +1,7 @@
 """Regression tests for #374: a chapter's scripted tile changes resolve their replacement
 metatiles from THAT chapter's own map, never from a tileset named in the code.
 
-#371 made `build_campaign.map_tileset(meta)` the one place the rule
+#371 made `inject.maps.map_tileset(meta)` the one place the rule
 `meta.get('tileset', WINTER_TILESET)` lives, and claimed every caller used it. Three did not.
 `ch02_map_changes` and `ch04_map_changes` resolved their metatiles from `WINTER_TILESET`
 outright; `ch05_map_changes` from a `CH05_TILESET` constant, which is the same hardcode
@@ -29,17 +29,22 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject.namespace import stubbed
 
-import build_campaign as bc
+import inject.chapters.ch02
+import inject.chapters.ch04
+import inject.chapters.ch05
+import inject.decomp
+import inject.maps
 import campaign_chapters
 
-MAPS = os.path.join(bc.REPO, 'campaigns', campaign_chapters.CAMPAIGN, 'maps')
+MAPS = os.path.join(inject.decomp.REPO, 'campaigns', campaign_chapters.CAMPAIGN, 'maps')
 
 # Every site that emits a `map_changes_asm` change list, with the layout whose sidecar names
 # the table it must resolve against. A fourth chapter's map changes belong in this tuple.
-SITES = (('ch02', bc.ch02_map_changes, bc.CH02_LAYOUT),
-         ('ch04', bc.ch04_map_changes, bc.CH04_LAYOUT),
-         ('ch05', bc.ch05_map_changes, bc.CH05_LAYOUT))
+SITES = (('ch02', inject.chapters.ch02.ch02_map_changes, inject.chapters.ch02.CH02_LAYOUT),
+         ('ch04', inject.chapters.ch04.ch04_map_changes, inject.chapters.ch04.CH04_LAYOUT),
+         ('ch05', inject.chapters.ch05.ch05_map_changes, inject.chapters.ch05.CH05_LAYOUT))
 
 
 def _maps_dir_naming(tmp, stem, tileset):
@@ -84,10 +89,10 @@ class MapChangesReadTheirOwnChaptersSidecar(unittest.TestCase):
         than a tile number nobody would recognise.
         """
         chap = campaign_chapters.load('ch02')
-        stem = bc.CH02_LAYOUT[1]
+        stem = inject.chapters.ch02.CH02_LAYOUT[1]
         with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
-            keyless = bc.ch02_map_changes(chap, _maps_dir_naming(a, stem, None))
-            explicit = bc.ch02_map_changes(chap, _maps_dir_naming(b, stem, bc.WINTER_TILESET))
+            keyless = inject.chapters.ch02.ch02_map_changes(chap, _maps_dir_naming(a, stem, None))
+            explicit = inject.chapters.ch02.ch02_map_changes(chap, _maps_dir_naming(b, stem, inject.maps.WINTER_TILESET))
         self.assertEqual(keyless, explicit)
 
     def test_each_site_asks_layout_sidecar_for_its_own_chapters_stem(self):
@@ -100,12 +105,10 @@ class MapChangesReadTheirOwnChaptersSidecar(unittest.TestCase):
         for short, changes_for, layout in SITES:
             with self.subTest(short):
                 seen = []
-                real = bc._layout_sidecar
-                bc._layout_sidecar = lambda d, stem: seen.append(stem) or real(d, stem)
-                try:
+                real = inject.maps._layout_sidecar
+                with stubbed('_layout_sidecar',
+                             lambda d, stem: seen.append(stem) or real(d, stem)):
                     changes_for(campaign_chapters.load(short), MAPS)
-                finally:
-                    bc._layout_sidecar = real
                 self.assertEqual(seen, [layout[1]])
 
 

@@ -2,7 +2,7 @@
 """Tests that the keyless-sidecar tileset default has ONE home (#377).
 
 A sidecar that names no tileset means `snowy-bern` — the three oldest maps (ch00–ch02) predate
-the key entirely. #371 gave that rule one home in `build_campaign.map_tileset`, #374 fixed
+the key entirely. #371 gave that rule one home in `inject.maps.map_tileset`, #374 fixed
 three `map_changes` sites that bypassed it and #376 a fourth. Two tools outside the build still
 re-declared the rule AND spelled the literal themselves: `map_donor` (the READ side, whose
 score decides which donor a map is reported to have) and `import_map_layout` (the WRITE side,
@@ -52,15 +52,15 @@ class RepointingItMovesEveryReader(unittest.TestCase):
     """
 
     def test_the_build_reads_the_shared_constant(self):
-        import build_campaign as bc
-        self.assertEqual(mt.DEFAULT_TILESET, bc.WINTER_TILESET)
+        import inject.maps
+        self.assertEqual(mt.DEFAULT_TILESET, inject.maps.WINTER_TILESET)
 
     def test_a_keyless_sidecar_resolves_through_it_in_the_build(self):
-        import build_campaign as bc
+        import inject.maps
         original = mt.DEFAULT_TILESET
         try:
             mt.DEFAULT_TILESET = 'repointed-for-this-test'
-            self.assertEqual('repointed-for-this-test', bc.map_tileset({}))
+            self.assertEqual('repointed-for-this-test', inject.maps.map_tileset({}))
         finally:
             mt.DEFAULT_TILESET = original
 

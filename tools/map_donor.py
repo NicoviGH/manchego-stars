@@ -22,7 +22,7 @@ Three things this gets right that an ad-hoc version does not:
     artifact and reports it as ch01's donor at ~100%. Worse, `_vanilla_tileconfig_path`
     cannot resolve a tile config for them: it WARNs and falls back to TileConfiguration1,
     which silently scores against the wrong terrain table. The exclusion list is READ from
-    build_campaign's `CHNN_LAYOUT` constants, not matched on a name prefix -- registering a
+    the injector's `CHNN_LAYOUT` constants, not matched on a name prefix -- registering a
     new chapter map excludes it automatically.
   * TIES ARE REPORTED. `Ch5Map.mar` and `Ch5TownMapPast.mar` are BYTE-IDENTICAL, so ch05
     scores 100% against both and no amount of geometry will separate them. A tool that

@@ -14,7 +14,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import build_campaign as bc  # noqa: E402
+import inject.crit_flourish  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 D20 = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/battle_anims/d20-crit.png')
@@ -46,12 +46,12 @@ def unlz(d):
 class TestStoredLz(unittest.TestCase):
     def test_roundtrip(self):
         for payload in (b'', b'x', bytes(range(256)) * 9):
-            self.assertEqual(unlz(bc._gba_lz77_stored(payload)), payload)
+            self.assertEqual(unlz(inject.crit_flourish._gba_lz77_stored(payload)), payload)
 
 
 class TestFlourishBins(unittest.TestCase):
     def setUp(self):
-        self.img_lz, self.pal, self.tsa_lz = bc._crit_flourish_bins(D20)
+        self.img_lz, self.pal, self.tsa_lz = inject.crit_flourish._crit_flourish_bins(D20)
         self.img = unlz(self.img_lz)
         self.tsa = unlz(self.tsa_lz)
 
@@ -98,7 +98,7 @@ class TestFlourishBins(unittest.TestCase):
             p = os.path.join(d, 'x.png')
             im.save(p)
             with self.assertRaises(SystemExit):
-                bc._crit_flourish_bins(p)
+                inject.crit_flourish._crit_flourish_bins(p)
 
 
 if __name__ == '__main__':

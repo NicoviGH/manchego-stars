@@ -217,7 +217,7 @@ of the lesson directly above. The build-time half is pinned by a test reading
   there writes its events into the `Ch5*` symbols (`Ch5EventData`). Slots 1–4 are correct only by
   the coincidence that index == chapter number there. `_retarget_host_chapter` therefore takes a
   mandatory `event_group` and repoints `mapEventDataId` itself, so map and events stay ONE decision;
-  `HostChapterEventGroup` in `tools/test_build_campaign.py` pins both the trap and the repoint.
+  `HostChapterEventGroup` in `tools/test_inject_hosting.py` pins both the trap and the repoint.
   **Why this one is worth a durable entry: it fails silently and totally.** Retargeting the map ids
   alone makes the chapter *look* injected — correct `gBmMapSize`, correct tileset, correct goal
   banner — while the slot runs the host's roster and scripts underneath. The observable symptoms all

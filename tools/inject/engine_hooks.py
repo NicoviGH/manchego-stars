@@ -13,7 +13,7 @@ from inject.decomp import (
 
 # Decomp source files the engine hooks read or patch. One exception to "patched
 # here": BANIM_DATA_C is only READ by the hooks (_vanilla_banim_count); the content
-# side appends its rows (build_campaign.py inject_battle_anims).
+# side appends its rows (inject/battle_anims.py inject_battle_anims).
 BANIM_EKRBATTLEINTRO_C = os.path.join(DECOMP, 'src', 'banim-ekrbattleintro.c')
 BANIM_EKRMAIN_C = os.path.join(DECOMP, 'src', 'banim-ekrmain.c')
 BANIM_MAIN_C = os.path.join(DECOMP, 'src', 'banim-main.c')
@@ -1190,7 +1190,7 @@ def _inject_crit_d20_flourish():
     tilemap mid-display (the clobber class a timed teardown would create). It is
     a centered HUD overlay copied through the non-mirrored tilemap path, so the
     "20" never mirrors with attacker side. Asset symbols (Img/Pal/Tsa_MsD20Crit)
-    are injected from the campaign by build_campaign.inject_crit_flourish -- this
+    are injected from the campaign by inject.crit_flourish.inject_crit_flourish -- this
     patch is campaign-agnostic."""
     with open(BANIM_EFXHIT_C, encoding='utf-8') as f:
         text = f.read()

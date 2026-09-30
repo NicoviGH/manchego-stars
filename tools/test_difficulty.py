@@ -16,7 +16,12 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fe_combat as fc
 import difficulty as df
-import build_campaign as bc
+import inject.cast
+import inject.chapter_settings
+import inject.chapters.prologue
+import inject.hosting
+import inject.stats
+import yaml
 
 
 def combatant(name='u', hp=20, pow_=0, skl=8, spd=0, dfc=0, res=0, lck=0, con=20,
@@ -591,7 +596,7 @@ class ReinforcementsAreOurForce(unittest.TestCase):
     """
 
     def _ch02(self):
-        return bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for('ch02'))
+        return inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.hosting.chapter_yaml_for('ch02'))
 
     def test_our_side_fields_as_many_bodies_as_the_twin(self):
         p = df._chapter_pressure(self._ch02())
@@ -619,7 +624,7 @@ class OneForceEveryReader(unittest.TestCase):
     reads the same roster."""
 
     def _ch02(self):
-        return bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for('ch02'))
+        return inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.hosting.chapter_yaml_for('ch02'))
 
     def test_the_dynamics_split_buckets_the_wave_the_verdict_counted(self):
         g = df.chapter_enemy_groups(self._ch02())
@@ -711,7 +716,7 @@ class RoleFindingsGradeTypesNotBodies(unittest.TestCase):
         # ch08 is `status: planned`, so it has no host slot and no CH08_CHAPTER_YAML --
         # read the file directly. It is the live case: a `count: 4` boss entry.
         with open(df.chapter_path('rime-of-the-frostmaiden', 'ch08'), encoding='utf-8') as f:
-            return bc.yaml.safe_load(f)
+            return yaml.safe_load(f)
 
     def test_a_multi_copy_boss_entry_is_ONE_boss(self):
         findings = df.role_findings(self._ch08(), self._ch08().get('parity_reference'))
@@ -747,7 +752,7 @@ class GuardsSeeTheWholeRoster(unittest.TestCase):
         # `_our_base_level` treats every boss as malus-immune; this guard is what makes that
         # true. A boss declared under `reinforcements:`, or one whose level comes from
         # `levels:`, was invisible to it while still riding the assumption.
-        donor = sorted(bc.ENEMY_BASE_SLOT.items())[0]
+        donor = sorted(inject.cast.ENEMY_BASE_SLOT.items())[0]
         uid, slot = donor
         over = df._character_base_level(slot) + 5
         chap = {'reinforcements': [{'id': uid, 'is_boss': True, 'levels': [over],
@@ -816,7 +821,7 @@ class MirrorShareOnRealChapters(unittest.TestCase):
     """Against the real campaign, because the wiring is the thing under test."""
 
     def _mirror(self, ch):
-        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.chapter_yaml_for(ch))
+        chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.hosting.chapter_yaml_for(ch))
         return df.mirror_share(chap)
 
     def test_ch06_reproduces_its_twin_exactly(self):
@@ -918,7 +923,7 @@ class VanillaUnitDestinations(unittest.TestCase):
         posts = {u['position'] for u in df.vanilla_red_units('FE8 Ch5')}
         with open(df.chapter_path('rime-of-the-frostmaiden', 'ch05'),
                   encoding='utf-8') as source:
-            chap = bc.yaml.safe_load(source)
+            chap = yaml.safe_load(source)
         ours = [tuple(p) for key in df.AI_ROSTER_KEYS
                 for e in (chap.get(key) or []) if isinstance(e, dict)
                 for p in (e.get('positions') or [])]
@@ -1859,8 +1864,8 @@ class PersonalBossLine(unittest.TestCase):
         zeroes its guests' personal bases, so Sephek is a naked class base despite deploying
         on O'Neill's slot -- reading him off that line inflated his threat to 2.9x the
         Prologue's ceiling and tripped the gate, which is how this was caught."""
-        zeroed = {'CHARACTER_%s' % s for s in bc.PROLOGUE_ZEROED_GUEST_SLOTS}
-        self.assertEqual(zeroed & set(bc.ENEMY_BASE_SLOT.values()), set())
+        zeroed = {'CHARACTER_%s' % s for s in inject.chapters.prologue.PROLOGUE_ZEROED_GUEST_SLOTS}
+        self.assertEqual(zeroed & set(inject.cast.ENEMY_BASE_SLOT.values()), set())
 
     def test_an_authored_line_wins_over_the_slot(self):
         """`personal:` is the explicit authored article; it must not be silently added to a
@@ -2190,7 +2195,7 @@ class BossesAreImmuneToTheMalus(unittest.TestCase):
     def test_a_boss_at_its_base_level_keeps_its_line_under_any_malus(self):
         base = {'baseHP': 30, 'basePow': 10, 'baseSkl': 5, 'baseSpd': 5,
                 'baseDef': 8, 'baseRes': 6, 'baseLck': 3, 'baseCon': 9}
-        growths = {g: 50 for g in bc.GROWTH_FIELDS}
+        growths = {g: 50 for g in inject.stats.GROWTH_FIELDS}
         shifts = {'tutorial': 4, 'normal': 2, 'difficult': 3}
         for mode in ('tutorial', 'normal'):
             self.assertEqual(
@@ -2211,7 +2216,7 @@ class BossesAreImmuneToTheMalus(unittest.TestCase):
 
     def test_our_ch05_boss_is_unshifted_in_every_mode(self):
         chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
-        shifts = bc.chapter_difficulty_shifts(chap)
+        shifts = inject.chapter_settings.chapter_difficulty_shifts(chap)
         hp = {}
         for mode in (None, 'tutorial', 'normal'):
             force = df.chapter_enemy_force(chap, mode=mode,
@@ -2242,7 +2247,7 @@ class RavisinHoldsSaarsBar(unittest.TestCase):
 
     def test_ravisin_is_within_reach_of_saars_measured_durability(self):
         chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
-        shifts = bc.chapter_difficulty_shifts(chap)
+        shifts = inject.chapter_settings.chapter_difficulty_shifts(chap)
         ours = df.chapter_enemy_force(chap, mode='normal', shifts=shifts)
         ravisin = max(df.metric_rounds_to_kill(e) for e in ours)
         saar = self._rounds(lambda n: 'SAAR' in n.upper(),
@@ -2279,7 +2284,7 @@ class OurUnitsOnPlayableSlotsAreImmune(unittest.TestCase):
 
     def _ch05(self):
         chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
-        return chap, bc.chapter_difficulty_shifts(chap)
+        return chap, inject.chapter_settings.chapter_difficulty_shifts(chap)
 
     def test_sahnar_is_identical_in_every_mode(self):
         chap, shifts = self._ch05()

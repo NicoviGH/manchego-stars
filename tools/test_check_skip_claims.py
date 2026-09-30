@@ -240,14 +240,14 @@ class TheSkipPathItself(unittest.TestCase):
 
     def test_a_missing_dependency_skips_rather_than_raising(self):
         fail, out = self._guard_with_broken_import(
-            'check_documented_tileset', 'build_campaign', ImportError("No module named 'PIL'"))
+            'check_documented_tileset', 'inject.maps', ImportError("No module named 'PIL'"))
         self.assertEqual([], fail)
         self.assertIn('check_documented_tileset: skipping', out)
 
     def test_the_skip_message_names_the_test_that_covers_it(self):
         """So the reader of a CI log can go and read the coverage, not just be told it exists."""
         _fail, out = self._guard_with_broken_import(
-            'check_documented_tileset', 'build_campaign', ImportError("No module named 'PIL'"))
+            'check_documented_tileset', 'inject.maps', ImportError("No module named 'PIL'"))
         rel, name = check.SKIP_COVERAGE['check_documented_tileset']
         self.assertIn(rel, out)
         self.assertIn(name, out)
@@ -257,7 +257,7 @@ class TheSkipPathItself(unittest.TestCase):
         import time raises FileNotFoundError, not ImportError, when the submodule is absent --
         so a clause catching only ImportError reddens the job it was written to protect."""
         fail, out = self._guard_with_broken_import(
-            'check_documented_tileset', 'build_campaign',
+            'check_documented_tileset', 'inject.maps',
             FileNotFoundError(2, 'No such file or directory',
                               'fireemblem8u/include/constants/terrains.h'))
         self.assertEqual([], fail)
@@ -265,8 +265,8 @@ class TheSkipPathItself(unittest.TestCase):
 
     def test_every_registered_guard_survives_an_unimportable_dependency(self):
         """All four, not just the one -- they shared the bug because they shared the shape."""
-        modules = {'check_documented_tileset': 'build_campaign',
-                   'check_personal_line_injection_routes': 'build_campaign',
+        modules = {'check_documented_tileset': 'inject.maps',
+                   'check_personal_line_injection_routes': 'inject.cast',
                    'check_rescue_targets': 'difficulty',
                    'check_rescue_fuse_forecast': 'rescue_forecast'}
         for guard, module in modules.items():

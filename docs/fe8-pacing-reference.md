@@ -243,7 +243,7 @@ more for the same body.
 <!-- END GENERATED: party-level band -->
 
 **Who is in the party, and when.** A unit earns from the chapter AFTER the one that recruits
-it (`build_campaign.recruit_chapter_number` — the same answer `cast_available_at` sizes the
+it (`inject.hosting.recruit_chapter_number` — the same answer `cast_available_at` sizes the
 deploy caps from), starting at **the level its chapter places it at** — 1 for a recruit joined
 off-map or by the recruit pass, and higher for one its roster places itself, which the block
 above states per unit. The `lowest` column is the floor a chapter actually has to be survivable

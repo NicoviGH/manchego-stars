@@ -47,7 +47,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
-import build_campaign as bc                                          # noqa: E402
+import inject.raw_pids                                          # noqa: E402
 import difficulty as dif                                             # noqa: E402
 import fe_combat as fc                                                # noqa: E402
 import map_placement_preview as pp                                   # noqa: E402
@@ -243,7 +243,7 @@ def chapter_forecast(chapter):
     if not boats or not pursuers:
         return []
     terrain = pp.terrain_grid(chapter)
-    roster = {e.get('id'): e for e in bc.chapter_roster_entries(chapter)}
+    roster = {e.get('id'): e for e in inject.raw_pids.chapter_roster_entries(chapter)}
     out = []
     for pursuer in pursuers:
         enemy_def = roster.get(pursuer['id'])

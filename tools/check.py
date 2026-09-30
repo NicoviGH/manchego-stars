@@ -720,7 +720,7 @@ def check_hosted_chapters_declared(fail):
     registry's constants; this runs it early, without the decomp submodule, so a bad
     declaration fails in 0s rather than at ROM-build time. The deeper check -- that the
     retargeted slot actually resolves to that group in the vanilla asset table -- lives in
-    HostChapterEventGroup (tools/test_build_campaign.py), which needs the submodule.
+    HostChapterEventGroup (tools/test_inject_hosting.py), which needs the submodule.
 
     Why it is worth a rule at all: retargeting a host slot's MAP ids alone is enough to
     make a chapter look right while it runs the host slot's roster and scripts, so this
@@ -811,7 +811,7 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
     return out
 
 
-# Mirrors build_campaign.ENEMY_ROSTER_KEYS. Named here rather than imported because this
+# Mirrors inject.raw_pids.ENEMY_ROSTER_KEYS. Named here rather than imported because this
 # module's `checks` CI job runs on a bare interpreter with no Pillow and no submodule, so it
 # must stay import-free; the schema tests fail if the two ever diverge.
 ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
@@ -836,12 +836,13 @@ def check_personal_line_injection_routes(fail):
     """
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
-        import build_campaign as bc
+        import inject.cast
+        import inject.raw_pids
     except SKIP_IMPORT_ERRORS as exc:
         _skip_covered_elsewhere('check_personal_line_injection_routes', exc)
         return
-    injected_ids = {uid for _yaml, uid in bc.RAW_PID_PERSONAL_SOURCES.values()}
-    slot_ids = set(bc.ENEMY_BASE_SLOT)
+    injected_ids = {uid for _yaml, uid in inject.raw_pids.RAW_PID_PERSONAL_SOURCES.values()}
+    slot_ids = set(inject.cast.ENEMY_BASE_SLOT)
     seen = set()
     for rel, d in _chapters():
         fail.extend(_personal_line_route_violations(rel, d, injected_ids, slot_ids))
@@ -1410,7 +1411,7 @@ def _documented_tileset_violations(rel, d, effective):
     """The chapter YAML's `map.tileset` must name the tileset the BUILD will actually use.
 
     Nothing in the build reads this field -- `_register_chapter_map` resolves the tileset
-    from the map's sidecar JSON via `build_campaign.map_tileset` -- so it is documentation,
+    from the map's sidecar JSON via `inject.maps.map_tileset` -- so it is documentation,
     and documentation nothing reads is documentation free to rot. It very nearly did: the
     first fix for ch00-ch02's `KeyError: 'tileset'` promoted this field to the preview's
     source of truth, which would have let an edit here render a confident picture of a
@@ -1420,7 +1421,7 @@ def _documented_tileset_violations(rel, d, effective):
     if documented is None or documented == effective:
         return []
     return ['%s: map.tileset documents %r but the build compiles this map as %r (its '
-            'sidecar JSON, via build_campaign.map_tileset) -- fix whichever is stale'
+            'sidecar JSON, via inject.maps.map_tileset) -- fix whichever is stale'
             % (rel, documented, effective)]
 
 
@@ -1445,7 +1446,7 @@ def check_documented_tileset(fail):
     """#26: a chapter's documented `map.tileset` agrees with the one the build resolves."""
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
-        import build_campaign as bc
+        import inject.maps
     except SKIP_IMPORT_ERRORS as exc:   # Pillow absent / no submodule on the `checks` job
         _skip_covered_elsewhere('check_documented_tileset', exc)
         return
@@ -1456,7 +1457,7 @@ def check_documented_tileset(fail):
             continue              # a planned chapter with no compiled map yet
         try:
             with open(sidecar, encoding='utf-8') as f:
-                effective = bc.map_tileset(json.load(f))
+                effective = inject.maps.map_tileset(json.load(f))
         except (ValueError, OSError) as exc:
             # `run_checks` would now contain a raised JSONDecodeError to this check
             # (#372), but "check_documented_tileset could not run" does not say WHICH
@@ -2604,7 +2605,7 @@ def check_purple_bank_blankers_known(fail):
     the second because the first was reported as a bug -- they are spelled differently
     (`PAL_OBJ(0x0B)` vs the raw `gPaletteBuffer + 0x1B0`, which is 0x100 + 0x0B*0x10). This
     check closes that: every literal reference to bank 0x0B in a palette fill anywhere in
-    the decomp must be a site build_campaign.PURPLE_BANK_BLANKERS already patches out. A
+    the decomp must be a site inject.map_sprites.PURPLE_BANK_BLANKERS already patches out. A
     third screen -- new, or arriving with a decomp bump -- fails here instead of silently
     blackening a roster.
     """
@@ -2645,7 +2646,7 @@ def check_purple_bank_blankers_known(fail):
         if m.group(1).lower() not in known:
             fail.append(
                 'src/%s.c blanks the cast map-sprite OBJ bank 0x0B but is not in '
-                'build_campaign.PURPLE_BANK_BLANKERS -- the cast would render as black '
+                'inject.map_sprites.PURPLE_BANK_BLANKERS -- the cast would render as black '
                 'silhouettes on that screen (#218). Add it there, do not silence this.'
                 % m.group(1))
 
@@ -2731,9 +2732,37 @@ PIPELINE_EXCLUSIVE_FILES = {
     'tools/make_bps.py', 'tools/test_make_bps.py', 'tools/test_llm_player.py',
 }
 PIPELINE_EXCLUSIVE_DIRS = ('tools/playtest/', 'tools/hooks/', '.github/workflows/')
+# build_campaign.py's passes moved to tools/inject/ in #389 and stayed content; the older
+# inject modules beside them (decomp, engine_hooks, hosts, ...) are shared, as they were.
 CONTENT_EXCLUSIVE_FILES = {
     'tools/build_campaign.py', 'tools/portrait_tool.py', 'tools/map_sprite_tool.py',
-    'tools/ref_to_bust.py', 'tools/test_build_campaign.py',
+    'tools/ref_to_bust.py', 'tools/inject/arena.py', 'tools/inject/asset_table.py',
+    'tools/inject/backgrounds.py', 'tools/inject/battle_anims.py', 'tools/inject/boot.py',
+    'tools/inject/cast.py', 'tools/inject/chapter_ids.py', 'tools/inject/chapter_settings.py',
+    'tools/inject/chapters/ch01.py', 'tools/inject/chapters/ch02.py',
+    'tools/inject/chapters/ch03.py', 'tools/inject/chapters/ch04.py',
+    'tools/inject/chapters/ch05.py', 'tools/inject/chapters/ch06.py',
+    'tools/inject/chapters/prologue.py', 'tools/inject/crit_flourish.py',
+    'tools/inject/death_quotes.py', 'tools/inject/hosting.py', 'tools/inject/item_icons.py',
+    'tools/inject/map_sprites.py', 'tools/inject/maps.py', 'tools/inject/messages.py',
+    'tools/inject/montage.py', 'tools/inject/names.py', 'tools/inject/platforms.py',
+    'tools/inject/portraits.py', 'tools/inject/raw_pids.py', 'tools/inject/recruit.py',
+    'tools/inject/reskins.py', 'tools/inject/scene_actors.py', 'tools/inject/scenes.py',
+    'tools/inject/sms.py', 'tools/inject/stats.py', 'tools/inject/terrain.py',
+    'tools/inject/test_chapter.py', 'tools/inject/text.py', 'tools/inject/title.py',
+    'tools/inject/traps.py', 'tools/inject/units.py', 'tools/inject/villages.py',
+    'tools/inject/warm.py', 'tools/test_inject_arena.py', 'tools/test_inject_asset_table.py',
+    'tools/test_inject_battle_anims.py', 'tools/test_inject_cast.py', 'tools/test_inject_ch01.py',
+    'tools/test_inject_ch03.py', 'tools/test_inject_ch04.py', 'tools/test_inject_ch05.py',
+    'tools/test_inject_ch06.py', 'tools/test_inject_chapter_settings.py',
+    'tools/test_inject_decomp.py', 'tools/test_inject_hosting.py', 'tools/test_inject_hosts.py',
+    'tools/test_inject_item_icons.py', 'tools/test_inject_map_sprites.py',
+    'tools/test_inject_messages.py', 'tools/test_inject_platforms.py',
+    'tools/test_inject_prologue.py', 'tools/test_inject_raw_pids.py',
+    'tools/test_inject_recruit.py', 'tools/test_inject_reskins.py', 'tools/test_inject_scenes.py',
+    'tools/test_inject_sms.py', 'tools/test_inject_stats.py', 'tools/test_inject_text.py',
+    'tools/test_inject_traps.py', 'tools/test_inject_units.py', 'tools/test_inject_villages.py',
+    'tools/test_inject_warm.py',
 }
 CONTENT_EXCLUSIVE_DIRS = ('campaigns/',)
 
@@ -2840,7 +2869,7 @@ def check_every_test_actually_runs(fail):
     is dead: it never runs, it never fails, and `-m unittest` still collects it, so the two
     ways of running the suite disagree in silence.
 
-    Found 2026-08-15 in tools/test_build_campaign.py, where the runner sat at line ~4776 of
+    Found 2026-08-15 in the injector's then-single test file, where the runner sat at line ~4776 of
     5723 and TWELVE classes -- 88 tests, all 26 of Ch04Stage4Scenes among them -- had never
     run under CI. They all passed once enabled, which is the point: nothing was going to tell
     us. Same family as `check_verdict_scenarios_are_guarded` -- a green suite that is not
@@ -3003,7 +3032,7 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
     It has bitten three times: `vanilla_scene.py` (fixed in `46f8b12`; #25 still owes an audit
     of every number mined before it), `difficulty.py` (which warns about it in prose beside its
     own reads), and a 2026-08-21 session that read the generated `events_info.s` and reasoned
-    about our injected output as if it were vanilla. `build_campaign.vanilla_decomp_text()` has
+    about our injected output as if it were vanilla. `inject.decomp.vanilla_decomp_text()` has
     existed the whole time and reads from HEAD; the only thing missing was anything making its
     use mandatory.
     """
@@ -3058,7 +3087,7 @@ def check_vanilla_reads_come_from_head(fail, sources=None):
                     fail.append(
                         '%s:%d opens the PATCHED decomp file %s directly. After any build that '
                         'holds OUR text, not vanilla\'s -- read it through '
-                        'build_campaign.vanilla_decomp_text(), which reads HEAD.'
+                        'inject.decomp.vanilla_decomp_text(), which reads HEAD.'
                         % (path, lineno, rel))
     return fail
 
@@ -3076,7 +3105,7 @@ def check_message_literals_are_registered(fail, source=None):
 
     This check owns the DISCOVERY half only -- that the scan runs, finds what is there, and can
     name an owner for each hit. **OWNERSHIP is asserted at BUILD time**, by
-    `build_campaign.assert_literals_are_claimed`, and deliberately not here. It was tried here
+    `inject.messages.assert_literals_are_claimed`, and deliberately not here. It was tried here
     first and the review of #356 killed it: `HOSTED_CHAPTER_MESSAGE_IDS` is written as
     generators, subscripts and splats (`*(msg for (_slot, msg, _boxes, _what) in
     CH05_OPENING_SLOTS)`, `CH05_ARRIVAL_SLOT[1]`, `CH04_VILLAGE_MSG` from a tuple-unpacked

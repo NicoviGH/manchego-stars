@@ -11,6 +11,7 @@ edited. The scene books under `docs/scenes/` are the opposite case -- determinis
 are generated, committed and diffed.
 """
 import collections
+import importlib
 import os
 import sys
 
@@ -28,11 +29,11 @@ Room = collections.namedtuple('Room', 'claimed block used_in_block borrowed free
 
 def _try_import(name):
     """`name`, imported, or `None` where it cannot be -- the one implementation behind
-    `_preview_module`/`_build_campaign`/`_rescue_forecast_module`, which were three copies
-    of this exact template. Each stays its own module-level function (not a single
+    `_preview_module`/`_messages_module`/`_text_module`/`_rescue_forecast_module`, which
+    were copies of this exact template. Each stays its own module-level function (not a single
     parameterized one) because callers monkeypatch them individually by name in tests."""
     try:
-        return __import__(name)
+        return importlib.import_module(name)     # `__import__('a.b')` returns `a`
     except ImportError:
         return None
 
@@ -40,7 +41,7 @@ def _try_import(name):
 def _preview_module():
     """`scene_preview`, or None where it cannot be imported.
 
-    It reaches build_campaign, which imports Pillow at module scope -- so on the lightweight
+    It reaches the injector (inject.cast), which imports Pillow at module scope -- so on the lightweight
     CI job that installs pyyaml and nothing else this is absent, and a status report is still
     worth printing without its preview column. Everything else here is stdlib + pyyaml.
     """
@@ -65,9 +66,14 @@ def _previews_by_event(chapter_short):
     return out
 
 
-def _build_campaign():
-    """`build_campaign`, or None where Pillow is absent (see `_preview_module`)."""
-    return _try_import('build_campaign')
+def _messages_module():
+    """`inject.messages`, or None where Pillow is absent (see `_preview_module`)."""
+    return _try_import('inject.messages')
+
+
+def _text_module():
+    """`inject.text`, or None where it cannot be imported (see `_preview_module`)."""
+    return _try_import('inject.text')
 
 
 def _rescue_forecast_module():
@@ -99,19 +105,19 @@ def _rescue_clock_findings(name, campaign=campaign_chapters.CAMPAIGN):
 def _boxes(script):
     """Authored boxes in a script -- stage directions are not boxes.
 
-    Delegates to `build_campaign._script_box_count`, which is what the injectors count with:
+    Delegates to `inject.text._script_box_count`, which is what the injectors count with:
     a second implementation would drift the moment a directive was added, and the whole point
     of this report is that it cannot drift.
     """
     if not script:
         return 0
-    bc = _build_campaign()
-    if bc is None:
+    text = _text_module()
+    if text is None:
         # No directive vocabulary, so every count would be an OVERCOUNT (20 where ch05's
         # scene 1 has 19). A wrong number in the same column as the right ones, with nothing
         # to mark it, is worse than an honest blank.
         return None
-    return bc._script_box_count(script)
+    return text._script_box_count(script)
 
 
 _scenes_cache = {}
@@ -161,15 +167,15 @@ def message_ids(name, campaign=campaign_chapters.CAMPAIGN):
     tightest chapter in the campaign look like the ones nobody has measured.
     """
     chapter = campaign_chapters.short_id(load(name, campaign))
-    bc = _build_campaign()
-    if bc is None:
+    messages = _messages_module()
+    if messages is None:
         return Room(None, UNKNOWN, (), (), None)
-    claimed = tuple(sorted(set(bc.HOSTED_CHAPTER_MESSAGE_IDS.get(chapter, ()))))
-    ranges = bc.message_block_ranges(chapter)
+    claimed = tuple(sorted(set(messages.HOSTED_CHAPTER_MESSAGE_IDS.get(chapter, ()))))
+    ranges = messages.message_block_ranges(chapter)
     if not ranges:
         return Room(claimed, None, (), (), None)
     owner = {}
-    for other, ids in bc.HOSTED_CHAPTER_MESSAGE_IDS.items():
+    for other, ids in messages.HOSTED_CHAPTER_MESSAGE_IDS.items():
         for mid in ids:
             owner[mid] = other
     # A chapter may hold SEVERAL ranges (#335 follow-up): ch05 spent its slot-6 block to
@@ -178,7 +184,7 @@ def message_ids(name, campaign=campaign_chapters.CAMPAIGN):
     inside = lambda m: any(lo <= m <= hi for lo, hi in ranges)
     used = tuple(sorted(m for m in owner if inside(m)))
     borrowed = tuple(sorted(m for m in used if owner[m] != chapter))
-    capacity = bc.message_block_capacity(chapter)
+    capacity = messages.message_block_capacity(chapter)
     return Room(claimed, ranges, used, borrowed, capacity - len(used))
 
 

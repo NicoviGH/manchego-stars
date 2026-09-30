@@ -23,22 +23,22 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import build_campaign as bc                                          # noqa: E402
+import inject.decomp                                          # noqa: E402
 
-DEC = bc.DECOMP
+DEC = inject.decomp.DECOMP
 
 
 def _decomp_text(relpath):
     """Vanilla (HEAD) text of a decomp file -- NEVER the working tree.
 
     The build patches `texts/texts.txt` in place (it is the first entry in
-    `build_campaign.PATCHED_DECOMP_FILES`), so after any `make` the on-disk file holds OUR
+    `inject.warm.PATCHED_DECOMP_FILES`), so after any `make` the on-disk file holds OUR
     injected campaign text under vanilla's own MSG ids. Reading it directly would make this
     tool report our own lines back as the vanilla pacing benchmark -- the exact failure
-    `bc.vanilla_decomp_text` exists to prevent, and the one `difficulty.py` warns about beside
+    `inject.decomp.vanilla_decomp_text` exists to prevent, and the one `difficulty.py` warns about beside
     its own reads. A miner that under-reports is bad; one that reports our text as vanilla's
     is worse, because it reads as independent evidence."""
-    return bc.vanilla_decomp_text(relpath)
+    return inject.decomp.vanilla_decomp_text(relpath)
 
 
 def load_messages():

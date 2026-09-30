@@ -116,7 +116,7 @@ def census(chapter, hosted=None):
 # count those as written, or it will demand passes that already exist."
 #
 # The value of an entry here is the pass that owns the field. `tools/test_chapter_data_census`
-# checks each one against `build_campaign`'s SOURCE, so a pass that stops writing its field --
+# checks each one against the injector's SOURCE, so a pass that stops writing its field --
 # or gets renamed -- fails rather than leaving a claim nobody rechecks.
 OWNED_BY_PASS = dict(
     [('map.' + f, '_retarget_host_chapter') for f in

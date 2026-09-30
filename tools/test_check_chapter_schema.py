@@ -203,7 +203,7 @@ class TestPersonalLineRoutes(unittest.TestCase):
 
 class TestDocumentedTileset(unittest.TestCase):
     """`map.tileset` in a chapter YAML is DOCUMENTATION -- the build resolves the real
-    tileset from the map's sidecar JSON (`build_campaign.map_tileset`). Documentation
+    tileset from the map's sidecar JSON (`inject.maps.map_tileset`). Documentation
     nothing reads is free to rot, and it nearly did: the first fix for ch00-ch02's
     `KeyError: 'tileset'` promoted this field to the preview's source of truth, which would
     have let an edit here draw a confident picture of a tileset the cartridge never loads."""
@@ -313,10 +313,10 @@ class TestRosterKeysAgree(unittest.TestCase):
         # check.py names them rather than importing, so the bare-interpreter `checks` job
         # stays import-free -- which is only safe if a divergence fails here.
         try:
-            import build_campaign as bc
+            import inject.raw_pids
         except ImportError as e:
             self.skipTest('build_campaign unavailable (%s)' % e)
-        self.assertEqual(check.ROSTER_KEYS, bc.ENEMY_ROSTER_KEYS)
+        self.assertEqual(check.ROSTER_KEYS, inject.raw_pids.ENEMY_ROSTER_KEYS)
 
 
 class TestRealChapters(unittest.TestCase):

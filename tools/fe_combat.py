@@ -59,7 +59,7 @@ W = {
     'flux':         Weapon('flux',         7, 80,  0, 8,  'magic', rng=(1, 2)),
     # Extended vanilla weapons carried only by enemy parity-reference forces (FE8 Ch4/Ch6),
     # never by our cast. The difficulty engine maps the decomp items to these for the static
-    # threat proxy; they are NOT in build_campaign.WEAPON_ITEM_ENUM (content-owned). #53.
+    # threat proxy; they are NOT in inject.decomp.WEAPON_ITEM_ENUM (content-owned). #53.
     'thunder':      Weapon('thunder',      8, 80,  5, 6,  'magic', rng=(1, 2)),
     'iron-blade':   Weapon('iron-blade',   9, 70,  0, 12, 'sword'),
     'steel-lance':  Weapon('steel-lance',  10, 70, 0, 13, 'lance'),

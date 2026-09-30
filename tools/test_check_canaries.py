@@ -45,6 +45,7 @@ CH02 = CHAPTERS + 'ch02-cold-welcome.yaml'
 CH03 = CHAPTERS + 'ch03-the-termalaine-mine.yaml'
 CH06 = CHAPTERS + 'ch06-the-maer-monster.yaml'
 BC = 'tools/build_campaign.py'
+MAP_SPRITES = 'tools/inject/map_sprites.py'   # PURPLE_BANK_BLANKERS
 HARNESS = 'tools/playtest/harness.lua'
 # A guarded tool (tools/**, not a test, not the injector) to plant a bad line in.
 TOOL = 'tools/map_donor.py'
@@ -61,6 +62,7 @@ CANARY_FILES = (
     'docs/CHAPTERS.md', 'docs/CLASSES.md',
     'docs/decisions/0297-the-injector-is-every-file-of-it-and-has-one-source-reader.md',
     'fireemblem8u/include/bmsave.h', 'tools/build_campaign.py', 'tools/inject/engine_hooks.py',
+    'tools/inject/map_sprites.py',
     'tools/map_donor.py', 'tools/map_placement_preview.py', 'tools/playtest/ch06.lua',
     'tools/playtest/controller.lua', 'tools/playtest/harness.lua',
     'tools/playtest/matrix.yaml',                # READ by c_rom_configs to pick its env
@@ -371,7 +373,7 @@ def c_purple_bank():
         head, tail = text[:start], text[start:]
         return head + re.sub(r'^(\s*\()(\w+)_C,', r'\g<1>\g<2>_CANARY_C,', tail, count=1,
                              flags=re.M)
-    with doctored({BC: drop_first}):
+    with doctored({MAP_SPRITES: drop_first}):
         return run(check.check_purple_bank_blankers_known)
 
 

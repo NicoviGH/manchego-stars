@@ -95,7 +95,7 @@ def restore_decomp():
     """Put the decomp back to HEAD so the injector has to do all of its work."""
     # `HEAD --`, never `-- .`: `git checkout -- <path>` restores from the INDEX, so anything
     # staged in the decomp survives the restore and the injector never has to rewrite it.
-    # `build_campaign.restore_vanilla_sources` documents the same trap.
+    # `inject.warm.restore_vanilla_sources` documents the same trap.
     subprocess.run(['git', '-C', DECOMP, 'checkout', 'HEAD', '--', '.'], env=git_env(), check=True)
     subprocess.run(['git', '-C', DECOMP, 'clean', '-fdq', '--'] + list(INJECTED_SCOPE),
                    env=git_env(), check=True)
