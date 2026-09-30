@@ -51,6 +51,10 @@ tools/playtest/states/
 # which boot flags built the .gba currently in the tree (build_campaign writes it;
 # the playtest matrix reads it to refuse a wrong-ROM run) -- describes an artifact
 .build-config.json
+# what the last successful compile consumed, and what injections since wrote (#416's mtime
+# rewind baseline, inject.warm) -- describe this tree's build, not the source
+.build-compiled/
+.build-injected.json
 
 # battle-anim hand-paint scratch (tools/banim_paint.py) -- the painted FRAMES are what ships
 campaigns/*/battle_anims/*/.paint/

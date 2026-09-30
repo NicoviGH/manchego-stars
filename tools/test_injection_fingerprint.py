@@ -165,6 +165,7 @@ class TheBuildStateItTouches(unittest.TestCase):
             (fp.REPO, fp.restore_decomp, fp.inject,
              fp._ignored_paths, fp.fingerprint) = saved
         self.assertIn('.build-config.json', stashed)      # hidden while the injector ran
+        self.assertIn('.build-compiled', stashed)         # #416: no restore from build history
         self.assertNotIn('.injectcache', stashed)         # deliberately left in place
 
     def test_the_restore_comes_from_HEAD_not_the_index(self):

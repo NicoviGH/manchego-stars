@@ -59,8 +59,10 @@ CACHES = ('.injectcache', '.build-scopes.json')
 # NOT a cache, and NOT covered by --keep-caches: `.build-config.json` is the stamp
 # `playtest/matrix.py` reads to know WHICH ROM is in the tree. Injection rewrites it and this
 # tool never builds a ROM, so leaving it in place makes `matrix.check_rom` vouch for a ROM that
-# was never built. It is stashed on every run, at every speed.
-BUILD_STATE = ('.build-config.json',)
+# was never built. It is stashed on every run, at every speed. So is `.build-compiled` (#416):
+# with it in place the injector restores what the last compile wrote (include/constants/msg.h),
+# and the manifest would then hash the tree's build history instead of the injection.
+BUILD_STATE = ('.build-config.json', '.build-compiled')
 
 def _injected_scope():
     """The decomp pathspecs injection touches, DERIVED from `inject/paths.py`.

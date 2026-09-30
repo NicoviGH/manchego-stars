@@ -36,7 +36,7 @@ Clean build (`workflow_dispatch`, `no_cache`), cache miss and cache hit all prin
 
 ## What it exposed
 
-The cache removed less than the vanilla asset count suggested, because the build AFTER
-injection still does 1,515 conversions, re-links all 2,199 battle-anim sheets and recompiles
-every C file -- identically on a miss and a hit, so injection causes it. That is #416, and it
-is the larger lever: it is most of the local build too.
+The cache removed less than the vanilla asset count suggested: the build after injection still
+does 1,515 conversions, re-links all 2,199 battle-anim sheets and recompiles every C file, on a
+miss and a hit alike. On CI that is real work. It is our own injected content, which no vanilla
+build holds (ADR 0301 measured it, #416). Caching the injected build's outputs is the next lever.

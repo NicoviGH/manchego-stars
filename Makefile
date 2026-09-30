@@ -37,7 +37,9 @@ all: fireemblem8.gba
 # the dev straight-to-map boot cut. Distribution builds (#37) must set it.
 fireemblem8.gba:
 	python3 tools/build_campaign.py --campaign $(CAMPAIGN) $(if $(MONTAGE),--montage) $(if $(TESTCH),--test-chapter) $(if $(LORDBOOT),--lord-boot) $(if $(CH01BOOT),--ch01-boot) $(if $(CH03BOOT),--ch03-boot) $(if $(CH04BOOT),--ch04-boot) $(if $(CH05BOOT),--ch05-boot) $(if $(CH05LUPIN),--ch05-lupin) $(if $(CH05MOOSE),--ch05-moose) $(if $(CH05ENDING),--ch05-ending=$(CH05ENDING)) $(if $(CH06BOOT),--ch06-boot)
+	python3 tools/compiled_manifest.py forget
 	$(MAKE) -C fireemblem8u fireemblem8.gba -j$(NPROC)
+	python3 tools/compiled_manifest.py record
 
 # The interpreter this repo builds with, resolved ONCE here (the macOS shim above puts
 # Homebrew's python ahead of the system 3.9 on PATH). `tools/hooks/pre-commit` asks for it

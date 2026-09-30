@@ -11,9 +11,10 @@ issues: [24]
 Because injection rewrites the decomp's own sources every build (above), and `restore_vanilla_sources`
 re-`git checkout`s them, every touched file's mtime moved on every build — and `make` keys off mtime, not
 content. A no-change rebuild therefore paid the full ~354-TU cascade from restored widely-included headers
-plus the serial `data_banim.o` link over 1752 assets. `build_campaign` now snapshots the previous build's
-injection footprint (content sha1 + `mtime_ns`) before injecting and rewinds the mtime of every file whose
-bytes come out **identical**. Only mtime is written, and only on unchanged content, so the ROM cannot move.
+plus the serial `data_banim.o` link over 1752 assets. `build_campaign` rewinds the mtime of every file whose bytes come out **identical** to
+what the last successful compile consumed (content sha1 + `mtime_ns`, recorded by the Makefile around the
+compile), falling back to the previous injection's footprint when there is no such record (ADR 0301 has
+why the baseline is the compile). Only mtime is written, and only on unchanged content, so the ROM cannot move.
 **Measured on the ch04 branch (CH04BOOT, `-j`):** warm rebuild **188s → 28s** (6.7×); clean build 232s
 without vs 236s with, and all of {clean-without, warm-without, warm-with ×2, clean-with} produced the same
 ROM `sha256 dc1c56bf…`. The risk this design carries is that a wrong content-check would be invisible to

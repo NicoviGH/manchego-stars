@@ -8,13 +8,15 @@ import hashlib
 import json
 import os
 import platform
+import shutil
 import subprocess
+import time
 
 from inject import step_cache
 import build_scopes
 import gen_subtitle_cards
 from inject.decomp import DECOMP, git_env, REPO
-from inject.paths import BUILD_STAMP, INJECT_CACHE_DIR
+from inject.paths import BUILD_STAMP, COMPILED_DIR, INJECT_CACHE_DIR, INJECTED_PATHS
 
 
 # Decomp source files we patch in place. We git-restore them to vanilla at the start
@@ -209,20 +211,199 @@ def _snapshot_mtimes(paths):
     return snap
 
 
-def _rewind_unchanged_mtimes(snap):
-    """Rewind the mtime of every snapshotted file whose bytes are unchanged, so make
-    skips its (redundant) recompile/recompression. Returns the count rewound. Only
-    ever touches mtime, and only for byte-identical content -- never file bytes."""
+def _rewind_unchanged_mtimes(snap, compiled=None):
+    """Rewind the mtime of every tracked file whose bytes are unchanged, so make skips its
+    (redundant) recompile/recompression. Returns the count rewound. Only ever touches mtime,
+    and only for byte-identical content -- never file bytes.
+
+    `compiled` (load_compiled) is consulted first: identical to what `make` last compiled
+    means the objects already hold these bytes, whatever injector-only runs wrote since
+    (#416). `snap`, the previous injection, is the fallback when there is no such record.
+    A tracked file the COMPILE wrote that a checkout has since reverted is put back as the
+    compile left it (_restore_compile_output)."""
+    compiled = compiled or {}
     n = 0
-    for p, (mtime_ns, digest) in snap.items():
+    for p in set(snap) | set(compiled):
         try:
             with open(p, 'rb') as f:
-                if hashlib.sha1(f.read()).digest() == digest:
-                    os.utime(p, ns=(mtime_ns, mtime_ns))
-                    n += 1
+                digest = hashlib.sha1(f.read()).digest()
+        except OSError:
+            continue
+        if p in compiled and compiled[p][1] != digest and _restore_compile_output(p, compiled[p]):
+            n += 1
+            continue
+        for base in (compiled, snap):
+            if p in base and base[p][1] == digest:
+                os.utime(p, ns=(base[p][0], base[p][0]))
+                n += 1
+                break
+    return n
+
+
+# The rewind above keys off the PREVIOUS INJECTION, which is only what `make` compiled when a
+# compile followed it. Anything that injects without compiling -- the fingerprint gate's
+# checkout-and-inject per configuration, a manual build_campaign.py, a config switch -- became
+# the baseline instead, and the next `make` found every re-emitted file newer than its object:
+# 1,529 conversions and all 357 C files, 380s against a 31s warm build (#416). So the Makefile
+# records what a SUCCESSFUL compile consumed, and forgets it before every compile (a failed one
+# leaves objects no record describes). A forgotten record keeps only the compile's start time.
+#
+# A compile that bypassed the Makefile would leave the record describing objects it no longer
+# matches, so load_compiled voids the record when any file newer than it is neither tracked,
+# recorded, nor written by an injection since. Injections accumulate into INJECTED_PATHS until
+# the next record for exactly that reason.
+
+
+def _walk_decomp():
+    """(path, mtime_ns) for every decomp file outside .git."""
+    for root, dirs, files in os.walk(DECOMP):
+        dirs[:] = [d for d in dirs if d != '.git']
+        for name in files:
+            path = os.path.join(root, name)
+            try:
+                yield path, os.lstat(path).st_mtime_ns
+            except OSError:
+                pass
+
+
+def _written_since(t0_ns):
+    """Every decomp file (outside .git) whose mtime is at or after `t0_ns` -- what this
+    injection wrote, including the gitignored copies (the map tilesets' .4bpp) and the
+    restored-to-vanilla files that `git status` never lists."""
+    return [p for p, mtime_ns in _walk_decomp() if mtime_ns >= t0_ns]
+
+
+def _injected():
+    try:
+        with open(INJECTED_PATHS) as fh:
+            return set(json.load(fh))
+    except (OSError, ValueError):
+        return set()
+
+
+def record_injected(paths):
+    """The injector's half of the record: the paths this run wrote, added to what every
+    injection since the last compile wrote."""
+    paths = sorted(_injected() | set(paths))   # read BEFORE the 'w' open truncates it
+    with open(INJECTED_PATHS, 'w') as fh:
+        json.dump(paths, fh)
+
+
+def _tracked():
+    """Every file git tracks in the decomp, as absolute paths ([] if git cannot say)."""
+    try:
+        out = subprocess.run(['git', '-C', DECOMP, 'ls-files', '-z'], env=git_env(),
+                             check=True, capture_output=True).stdout
+    except (subprocess.SubprocessError, OSError):
+        return []
+    return [os.path.join(DECOMP, p.decode('utf-8', 'surrogateescape'))
+            for p in out.split(b'\0') if p]
+
+
+def _record_path():
+    return os.path.join(COMPILED_DIR, 'record.json')
+
+
+def _copy_path(digest):
+    return os.path.join(COMPILED_DIR, digest.hex())
+
+
+def _read_record():
+    try:
+        with open(_record_path()) as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return {}
+
+
+def _write_record(record):
+    os.makedirs(COMPILED_DIR, exist_ok=True)
+    with open(_record_path(), 'w') as fh:
+        json.dump(record, fh)
+
+
+def forget_compiled(now_ns=None):
+    """Before a compile: whatever it leaves behind, the old record no longer describes it.
+    What remains is when this compile started and which paths the old record covered, for
+    record_compiled."""
+    old = _read_record()
+    if 'compiling_since_ns' in old:
+        # The last compile never recorded (it failed): carry ITS lists through, or a failed
+        # compile would drop what the one before it regenerated.
+        previous, regenerated = old.get('previous', []), old.get('previous_regenerated', [])
+    else:
+        previous, regenerated = sorted(old.get('files', {})), old.get('regenerated', [])
+    _write_record({'compiling_since_ns': time.time_ns() if now_ns is None else now_ns,
+                   'previous': previous, 'previous_regenerated': regenerated})
+
+
+def record_compiled():
+    """After a SUCCESSFUL compile: the injected paths as that compile consumed them, plus the
+    tracked files a compile regenerated (include/constants/msg.h, via textprocess, only when
+    the texts change -- so earlier records' paths carry forward), with a copy of each: a later
+    `git checkout` reverts them, and nothing but the compile would write them back."""
+    pending = _read_record()
+    since = pending.get('compiling_since_ns')
+    if since is None:
+        return 0
+    injected = _injected()
+    regenerated = set(pending.get('previous_regenerated', [])) - injected
+    for p in _tracked():
+        try:
+            if p not in injected and os.lstat(p).st_mtime_ns >= since:
+                regenerated.add(p)
         except OSError:
             pass
-    return n
+    # The previous record's paths ride forward: this compile consumed them as they are now.
+    snap = _snapshot_mtimes(sorted(injected | regenerated | set(pending.get('previous', []))))
+    regenerated &= set(snap)
+    keep = set()
+    for p in regenerated:
+        keep.add(_copy_path(snap[p][1]))
+        shutil.copyfile(p, _copy_path(snap[p][1]))
+    for name in os.listdir(COMPILED_DIR):
+        path = os.path.join(COMPILED_DIR, name)
+        if path != _record_path() and path not in keep:
+            os.remove(path)
+    _write_record({'recorded_ns': time.time_ns(), 'regenerated': sorted(regenerated),
+                   'files': {p: [m, d.hex()] for p, (m, d) in snap.items()}})
+    try:
+        os.remove(INJECTED_PATHS)
+    except FileNotFoundError:
+        pass
+    return len(snap)
+
+
+def load_compiled():
+    """{abs_path: (mtime_ns, sha1_digest)} as the last successful compile consumed them, or
+    {} when there is no record or something other than an injection has written the decomp
+    since (a compile behind the Makefile's back)."""
+    record = _read_record()
+    recorded_ns = record.get('recorded_ns')
+    if recorded_ns is None:
+        return {}
+    files = {p: (m, bytes.fromhex(d)) for p, (m, d) in record.get('files', {}).items()}
+    accounted = set(files) | _injected() | set(_tracked())
+    if any(mtime_ns > recorded_ns and p not in accounted for p, mtime_ns in _walk_decomp()):
+        return {}
+    return files
+
+
+def _restore_compile_output(path, recorded):
+    """Put back a file the compile wrote, as it wrote it, if the record kept a copy -- which
+    it keeps only for tracked files the compile regenerated, never for injected ones."""
+    mtime_ns, digest = recorded
+    try:
+        with open(_copy_path(digest), 'rb') as f:
+            data = f.read()
+    except OSError:
+        return False
+    if hashlib.sha1(data).digest() != digest:
+        return False
+    with open(path, 'wb') as f:
+        f.write(data)
+    os.utime(path, ns=(mtime_ns, mtime_ns))
+    return True
 
 
 # Where the battle-anim steps write, used ONLY to bootstrap the first entry's pre-state hashes
