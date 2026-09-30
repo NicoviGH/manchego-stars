@@ -305,7 +305,8 @@ def c_shadowed_definitions():
 
 
 def c_rom_configs():
-    matrix = open(os.path.join(REPO, 'tools/playtest/matrix.yaml'), encoding='utf-8').read()
+    with open(os.path.join(REPO, 'tools/playtest/matrix.yaml'), encoding='utf-8') as f:
+        matrix = f.read()
     block = re.search(r'^rom_configs:\n(.*?)(?=^\S|\Z)', matrix, re.S | re.M).group(1)
     env = sorted(set(re.findall(r'^\s+([A-Z][A-Z0-9_]*):\s', block, re.M)))[0]
     with doctored({'Makefile': lambda t: t.replace('$(%s)' % env, '$(CANARY)')}):
