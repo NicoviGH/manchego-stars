@@ -26,11 +26,16 @@ The injector is `build_campaign.py` plus every module under `tools/inject/`, and
 read through `tools/inject/source.py` (stdlib-only, so CI can import it). Three views,
 because the readers want three different things:
 
-- `injector_source()` -- all files concatenated, for a pattern that names ONE thing
-  (`RAW_PID_BATTLE_ANIMS = {`, `engine_hooks.X(`).
+- `injector_source()` -- every file's CODE concatenated, for a pattern that names ONE
+  thing (a table's assignment, `engine_hooks.X(`). Module docstrings and import statements
+  are blanked, lines kept: once there are many modules, a module docstring can spell a
+  table's assignment line and an import names the very helper a guard searches for, and
+  either satisfies a first-match search for the real thing (review of #413 -- the reader's
+  own docstring did exactly that).
 - `def_source(name)` -- one top-level definition, wherever it lives, for a reader that
   inspects one function's body. A name defined in two FILES raises: that is a move that
-  left a copy behind, and letting whichever sorts first win would be a coin toss.
+  left a copy behind, and letting whichever sorts first win would be a coin toss. Only a
+  name an assignment BINDS counts -- `TABLE[KEY] = v` defines neither `TABLE` nor `KEY`.
 - `defs_source()` -- every top-level function and nothing between them, for a
   `^def X(.*?(?=^def |\Z)` walk. Over whole files that lookahead runs the last function of
   one module on into the next module's docstring and IMPORTS, and an import line names

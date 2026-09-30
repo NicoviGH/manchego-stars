@@ -1460,7 +1460,7 @@ def _chapter_of_injector(name):
     return m.group(1) if m else None
 
 
-def _sidecar_routes(build_src, preview_src, chapters, hosted):
+def _sidecar_routes(build_src, preview_src, chapters, hosted, build_defs=None):
     """One row per chapter, plus rows for anything that belongs to no chapter.
 
     A row is `{'short', 'rel', 'routes', 'problems', 'note'}`. `routes` maps a route name to
@@ -1475,7 +1475,10 @@ def _sidecar_routes(build_src, preview_src, chapters, hosted):
     """
     rows = []
     want = {('ch00' if h == 'prologue' else h) for h in hosted}
-    layouts = _build_registered_layouts(build_src)
+    # The registration walk goes function by function (`^def ...(?=^def )`), so it is fed the
+    # functions-only view when there is one: over whole files an injector that is the last
+    # function of its module would run on into the next module (ADR 0297).
+    layouts = _build_registered_layouts(build_src if build_defs is None else build_defs)
     stems = dict(_LAYOUT_CONST.findall(build_src))
 
     if not layouts:
@@ -1590,7 +1593,7 @@ def check_map_sidecar_routes_agree(fail):
         sources = [_injector().injector_source(), f.read()]
     fail.extend(_sidecar_route_violations(_sidecar_routes(
         sources[0], sources[1], list(_chapters()),
-        [h.name for h in hosts.hosted_chapters()])))
+        [h.name for h in hosts.hosted_chapters()], build_defs=_injector().defs_source())))
 
 
 def check_rescue_targets(fail):

@@ -99,6 +99,27 @@ class ReadersFollowMovedCode(_TwoFileInjector):
     def test_the_tile_change_guard_sees_the_moved_chapter(self):
         self.assertIn('inject_ch09', check._tile_change_injectors_seen(source.defs_source()))
 
+    def test_the_code_view_blanks_module_docstrings_and_imports_but_keeps_lines(self):
+        """An import line names the very helpers a guard searches for, and a docstring can
+        spell a table's assignment; neither is the real thing."""
+        text = source.injector_source()
+        self.assertNotIn('import', text)
+        self.assertNotIn('A chapter that moved', text)
+        moved = source.code_text(os.path.join(self.tmp, 'inject', 'chapters.py'))
+        self.assertEqual(MOVED.count('\n'), moved.count('\n'), 'line numbers must survive')
+
+    def test_a_subscript_assignment_defines_nothing(self):
+        """`TABLE[KEY] = v` binds neither TABLE nor KEY. Counting them made def_source('KEY')
+        either return that line or raise a false 'defined in two files'."""
+        with open(os.path.join(self.tmp, 'inject', 'tables.py'), 'w', encoding='utf-8') as f:
+            f.write('TABLE = {}\nTABLE[KEY] = 1\nA, (B, *C) = 1, (2, 3)\n')
+        with open(source.BUILD_CAMPAIGN_PY, 'a', encoding='utf-8') as f:
+            f.write('\nKEY = 3\n')
+        self.assertEqual('KEY = 3\n', source.def_source('KEY'))
+        self.assertEqual('TABLE = {}\n', source.def_source('TABLE'))
+        for name in ('A', 'B', 'C'):
+            self.assertTrue(source.defining_file(name).endswith('tables.py'), name)
+
     def test_a_name_defined_in_two_files_is_an_error_not_a_coin_toss(self):
         with open(os.path.join(self.tmp, 'inject', 'copy.py'), 'w', encoding='utf-8') as f:
             f.write('def inject_ch09(campaign):\n    pass\n')
@@ -140,6 +161,11 @@ class TheLiveInjector(unittest.TestCase):
         self.assertEqual('build_campaign.py', files[0])
         self.assertIn('engine_hooks.py', files)
         self.assertIn('source.py', files)
+
+    def test_a_table_appears_once_however_many_modules_describe_it(self):
+        """inject/source.py's own docstring names `RAW_PID_BATTLE_ANIMS = {`; a first-match
+        regex over the code view must still land on the real table."""
+        self.assertEqual(1, source.injector_source().count('RAW_PID_BATTLE_ANIMS = {'))
 
     def test_an_engine_hook_resolves_to_its_real_home(self):
         self.assertTrue(source.defining_file('_patch_terrain_name_guard')

@@ -11,8 +11,9 @@ nothing wrong. That is ADR 0296's vacuous-pass shape, arriving by code movement.
 So the injector is one thing here, however many files it spans: `build_campaign.py` plus
 every module under `tools/inject/`. Three views, because the readers want three things:
 
-  * `injector_source()`   -- every file, concatenated. For a pattern that names ONE thing
-                             (`RAW_PID_BATTLE_ANIMS = {`, `engine_hooks.X(`, a call text).
+  * `injector_source()`   -- every file's CODE, concatenated: module docstrings and imports
+                             blanked. For a pattern that names ONE thing (a table's
+                             assignment, `engine_hooks.X(`, a call text).
   * `def_source(name)`    -- one top-level definition, wherever it lives. For a reader that
                              inspects a single function's body.
   * `defs_source()`       -- every top-level function, and nothing between them. For a regex
@@ -84,16 +85,54 @@ def injector_sources():
     return [(path, read(path)) for path in injector_files()]
 
 
+def code_text(path):
+    """One file's text with its module docstring and import statements blanked out.
+
+    Lines are kept (blank), so a line number still means the same line, and every comment
+    stays. What goes is prose ABOUT the code and the names a module imports: a module
+    docstring can spell a table's assignment line verbatim, and an import line names exactly
+    the helpers a guard searches for, so either would satisfy a search for the real thing.
+    (A FUNCTION's docstring is code's own business and stays -- so this one says it in words.)
+    """
+    return _code_text(path, _stamp(path))
+
+
+@functools.lru_cache(maxsize=None)
+def _code_text(path, _stamp):
+    lines = list(_lines(path, _stamp))
+    body = parse(path).body
+    blank = [node for node in body if isinstance(node, (ast.Import, ast.ImportFrom))]
+    if (body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant)
+            and isinstance(body[0].value.value, str)):
+        blank.append(body[0])
+    for node in blank:
+        for i in range(node.lineno - 1, node.end_lineno):
+            lines[i] = '\n'
+    return ''.join(lines)
+
+
 def injector_source():
-    """Every injector file's text, concatenated."""
-    return '\n'.join(text for _path, text in injector_sources())
+    """Every injector file's CODE, concatenated -- `code_text` of each, in file order."""
+    return '\n'.join(code_text(path) for path in injector_files())
+
+
+def _bound_names(target):
+    """The names an assignment target BINDS: `A = `, `A, B = `. Not `TABLE[KEY] = ` or
+    `obj.attr = `, which bind nothing and would otherwise register TABLE and KEY."""
+    if isinstance(target, ast.Name):
+        return [target.id]
+    if isinstance(target, (ast.Tuple, ast.List)):
+        return [name for elt in target.elts for name in _bound_names(elt)]
+    if isinstance(target, ast.Starred):
+        return _bound_names(target.value)
+    return []
 
 
 def _top_level_names(node):
     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
         return [node.name]
     if isinstance(node, ast.Assign):
-        return [n.id for t in node.targets for n in ast.walk(t) if isinstance(n, ast.Name)]
+        return [name for t in node.targets for name in _bound_names(t)]
     if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
         return [node.target.id]
     return []
