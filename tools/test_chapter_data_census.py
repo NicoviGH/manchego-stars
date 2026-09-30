@@ -94,6 +94,37 @@ class Ruling(unittest.TestCase):
         self.assertIn('someFieldUpstreamAdded', str(e.exception))
 
 
+class OnlyTheChaptersThisBuildInjected(unittest.TestCase):
+    """A boot build never runs inject_prologue, so slot 1 holds bytes no injector wrote.
+
+    Censusing it there demanded rulings on the two goal ids the prologue writes, and every
+    boot and test-chapter build died at this guard -- the whole playtest matrix but one ROM.
+    With that fixed, ch01/ch03 boots died one guard later, on #398's reachable scenes.
+    """
+
+    def test_a_build_that_skips_the_prologue_does_not_census_it(self):
+        names = [h.name for h in hosts.injected_chapters(prologue_injected=False)]
+        self.assertNotIn('prologue', names)
+        self.assertEqual([h.name for h in hosts.hosted_chapters()][1:], names)
+
+    def test_the_canonical_build_censuses_every_hosted_chapter(self):
+        self.assertEqual(hosts.hosted_chapters(),
+                         hosts.injected_chapters(prologue_injected=True))
+
+    def test_every_guard_that_reads_a_hosted_slot_gets_the_chapters_it_injected(self):
+        # The two censuses and #398's reachable-scene guard all read what sits in each
+        # hosted slot; the last one failed ch01/ch03 boots on vanilla Ch1's tutorial scenes.
+        import re
+        from inject.source import def_source
+        main = def_source('main')
+        for guard in ('event_group.assert_census_declared(',
+                      'chapter_data.assert_census_declared(',
+                      'assert_reachable_scenes_load_their_actors('):
+            call = main[main.index(guard) + len(guard):]
+            self.assertTrue(re.match(r'\s*hosted=injected_chapters\(', call),
+                            '%s is not scoped to the chapters this build injected' % guard)
+
+
 class IntroCamera(unittest.TestCase):
     """`initialPosX/Y` is the chapter-intro camera centre (`chapterintrofx.c:864`), and it is
     the one inherited field whose safety is a property of OUR map rather than of vanilla's

@@ -123,6 +123,18 @@ def hosted_chapters(scope=None):
     return sorted(found, key=lambda c: c.number)
 
 
+def injected_chapters(prologue_injected, rows=None):
+    """The hosted chapters whose slot THIS build injected -- what a census may read.
+
+    Every build runs ch01-ch06, but only the canonical one runs `inject_prologue`: a boot or
+    test-chapter build leaves slot 1 vanilla (or hands it to the sandbox). A census of that
+    slot reads bytes no injector wrote, and demanded rulings on the two goal ids the prologue
+    writes -- which failed every boot build at the #396 guard.
+    """
+    rows = hosted_chapters() if rows is None else rows
+    return [h for h in rows if prologue_injected or h.name != 'prologue']
+
+
 def injector_chapters(source=None):
     """The chapters the injector actually has an injector for, read from its SOURCE.
 
