@@ -44,8 +44,12 @@ fi
 # absent from a fresh submodule checkout. They are static native binaries -- safe
 # to symlink and share across worktrees on the same machine. The list is
 # tools/build_tree.py's, which links the same set into the build tree.
+# An assignment, not `< <(...)`: set -e does not see a failed process substitution, and an
+# empty list would "succeed" into a worktree with no compiler.
+TOOLCHAIN_LIST="$(python3 "$REPO/tools/build_tree.py" toolchain)"
+[ -n "$TOOLCHAIN_LIST" ] || { echo "ERROR: tools/build_tree.py listed no toolchain" >&2; exit 1; }
 TOOLCHAIN=()
-while IFS= read -r t; do TOOLCHAIN+=("$t"); done < <(python3 "$REPO/tools/build_tree.py" toolchain)
+while IFS= read -r t; do TOOLCHAIN+=("$t"); done <<< "$TOOLCHAIN_LIST"
 
 cd "$REPO"
 
@@ -110,5 +114,5 @@ for t in "${TOOLCHAIN[@]}"; do
 done
 
 echo ">> done. Build there with:  ( cd $WT_PATH && tools/build.sh test )"
-echo "   (build.sh re-applies the macOS shebang fix idempotently.)"
+echo "   (every build re-applies the macOS shebang fix in the build tree.)"
 echo "   Remove when finished with:  git worktree remove $WT_PATH"

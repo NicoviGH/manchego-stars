@@ -84,5 +84,23 @@ class TheBuildTree(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.tree, 'src', 'a.c')))
 
 
+    def test_a_moved_checkout_is_repaired(self):
+        # The tree's .git file and its admin entry hold absolute paths: moving or renaming
+        # the checkout broke every `make` and the pre-commit hook with a traceback (review).
+        build_tree.ensure(verbose=False)
+        with open(os.path.join(self.tree, 'src', 'a.c'), 'w') as fh:
+            fh.write('injected\n')
+        moved = self.tmp + '-moved'
+        os.rename(self.tmp, moved)
+        self.addCleanup(shutil.rmtree, moved, True)
+        sub, tree = (os.path.join(moved, os.path.relpath(p, self.tmp))
+                     for p in (self.sub, self.tree))
+        with mock.patch.object(build_tree, 'SUBMODULE', sub), \
+                mock.patch.object(build_tree, 'DECOMP', tree):
+            build_tree.ensure(verbose=False)
+        self.assertEqual(git(tree, 'rev-parse', 'HEAD'), git(sub, 'rev-parse', 'HEAD'))
+        with open(os.path.join(tree, 'src', 'a.c')) as fh:
+            self.assertEqual(fh.read(), 'injected\n', 'repaired in place, not recreated')
+
 if __name__ == '__main__':
     unittest.main()

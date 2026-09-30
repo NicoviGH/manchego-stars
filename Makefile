@@ -23,7 +23,7 @@ BUILD_TREE := build/fireemblem8u
 #      Command Line Tools' own c++/v1 is incomplete on recent Apple clang.
 #   2. Several gfx scripts use `match`/`case`, which require python >= 3.10; the
 #      system python3 is 3.9, so put Homebrew's python ahead on PATH for the
-#      `#!/usr/bin/env python3` shebangs (normalised by tools/setup-toolchain.sh).
+#      `#!/usr/bin/env python3` shebangs (normalised in the build tree by every injection).
 ifeq ($(shell uname),Darwin)
 SDK_CXX := $(shell xcrun --show-sdk-path 2>/dev/null)/usr/include/c++/v1
 export CPLUS_INCLUDE_PATH := $(SDK_CXX)$(if $(CPLUS_INCLUDE_PATH),:$(CPLUS_INCLUDE_PATH),)
@@ -137,4 +137,4 @@ else
 endif
 
 clean:
-	$(MAKE) -C $(BUILD_TREE) clean
+	if [ -d $(BUILD_TREE) ]; then $(MAKE) -C $(BUILD_TREE) clean; fi

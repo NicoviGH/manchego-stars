@@ -56,6 +56,22 @@ def _link_toolchain(verbose):
         os.symlink(target, dst)
 
 
+def _tree_head():
+    """The tree's commit, repairing its link first if the checkout was moved: the worktree's
+    `.git` file and its entry in the submodule's gitdir both hold absolute paths."""
+    try:
+        return _git(DECOMP, 'rev-parse', 'HEAD', capture=True)
+    except subprocess.CalledProcessError:
+        pass
+    try:
+        _git(SUBMODULE, 'worktree', 'repair', DECOMP, capture=True)
+        return _git(DECOMP, 'rev-parse', 'HEAD', capture=True)
+    except subprocess.CalledProcessError:
+        sys.exit('ERROR: %s is not a working git worktree of %s, and `git worktree repair` '
+                 'could not fix it. Delete %s and build again; it is recreated from the '
+                 'submodule.' % (DECOMP, SUBMODULE, os.path.dirname(DECOMP)))
+
+
 def ensure(verbose=True):
     """Make the build tree exist at the submodule's commit, with the toolchain linked."""
     head = _git(SUBMODULE, 'rev-parse', 'HEAD', capture=True)
@@ -65,7 +81,7 @@ def ensure(verbose=True):
         _git(SUBMODULE, 'worktree', 'add', '--detach', '--quiet', DECOMP, head)
         if verbose:
             print('  build tree: created %s at %s' % (os.path.relpath(DECOMP), head[:12]))
-    elif _git(DECOMP, 'rev-parse', 'HEAD', capture=True) != head:
+    elif _tree_head() != head:
         # A submodule bump. Drop the last injection first -- a checkout refuses to move over
         # modified files -- then follow; the next injection rewrites everything anyway.
         _git(DECOMP, 'checkout', '--quiet', 'HEAD', '--', '.')
