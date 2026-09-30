@@ -16,9 +16,11 @@ toolchain, and of nothing we author.
 
 ## The rule
 
-The vanilla build's outputs (every file `make` adds to the untracked set) are cached on the
-submodule commit, the agbcc cache version and the mock version -- a key they cannot go stale
-under. On a hit they are unpacked, tracked sources are pinned to an old mtime so `make` reads
+The vanilla build's outputs (every file `make` adds to the untracked set) are cached on what
+they were BUILT WITH: the submodule commit, the runner image, the ARM binutils version, a hash
+of the agbcc binaries actually installed, and the mock version. Not on hand-bumped labels: the
+first cut keyed on `agbcc-v1`, and the agbcc cache rebuilds from pret/agbcc's tip on a miss,
+so a new compiler or runner image would have reused old objects (review of #415). On a hit they are unpacked, tracked sources are pinned to an old mtime so `make` reads
 the outputs as up to date, and injection then makes only its own dependants rebuild. Safe
 because the decomp's rules depend on SOURCES only (never on tool binaries, which are rebuilt
 every run) and C header dependencies ride in the cached `.d` files.

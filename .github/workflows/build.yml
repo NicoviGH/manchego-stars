@@ -135,9 +135,16 @@ jobs:
           git ls-files -z | xargs -0 touch -h -d '2000-01-01T00:00:00Z'
           touch -d '2000-01-01T00:00:00Z' baserom.gba
 
+      # The key names everything the cached objects were BUILT WITH, not labels someone bumps:
+      # the submodule commit, the runner image, the ARM binutils version, and the agbcc
+      # binaries actually installed (the agbcc cache rebuilds from pret/agbcc's tip on a miss).
       - name: Vanilla build cache key
         id: vanilla
-        run: echo "key=vanilla-build-${{ runner.os }}-$(git -C fireemblem8u rev-parse HEAD)-agbcc-v1-mock-v1" >> "$GITHUB_OUTPUT"
+        run: |
+          toolchain=$( { echo "$ImageOS $ImageVersion"; arm-none-eabi-as --version | head -1;
+                         find fireemblem8u/tools/agbcc -type f -print0 | sort -z | xargs -0 sha1sum; } \
+                       | sha1sum | cut -c1-16 )
+          echo "key=vanilla-build-${{ runner.os }}-$(git -C fireemblem8u rev-parse HEAD)-$toolchain-mock-v1" >> "$GITHUB_OUTPUT"
 
       - name: Restore vanilla build
         id: vanilla-cache
