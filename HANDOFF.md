@@ -6,7 +6,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-30 (Claude), after #417/#418 landed. **What landed and why is in `git log`
+Refreshed 2026-09-30 (Claude), after #419 (#416) and #420 (#408's main change) landed. **What landed and why is in `git log`
 and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
@@ -26,9 +26,11 @@ comments** (latest: 2026-09-30, "the moves landed").
 | 1-2 | PR A (#413) + #407 canaries (#414), CI decomp cache (#415) | **done** |
 | 3 | #389 the moves -- `build_campaign.py` is 379 lines, passes in `tools/inject/` (#418, ADR 0300) | **done** |
 | -- | #417: boot/test-chapter builds died at the #396/#398 guards (found by the moves' gate) | **done** |
-| 4 | **#416** -- injection forces ~1,500 asset conversions + every C file to rebuild per build | **NEXT** |
-| 5 | #408 out-of-tree build -> #409 declared steps -> #410 decomp fork -> #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | in that order |
-| 6 | Trim this file again once the sequence lands | last |
+| 4 | #416 -- the mtime rewind keys off what `make` compiled (#419, ADR 0301) | **done** |
+| 5a | #408 -- the ROM is built in `build/fireemblem8u`, a worktree of the submodule (#420, ADR 0302) | **done** |
+| 5b | **#408's last box** -- CI caches the INJECTED build outputs + `.build-compiled/` (its comment has the one extra rule it needs); then close #408 | **NEXT** |
+| 6 | #409 declared steps -> #410 decomp fork -> #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | in that order |
+| 7 | Trim this file again once the sequence lands | last |
 
 Then ch06's own body (#26) resumes -- see "Chapter work" below.
 
@@ -45,6 +47,8 @@ Then ch06's own body (#26) resumes -- see "Chapter work" below.
   `import inject.X` makes `inject` local to the whole function).
 - **Refactor gate**: `tools/injection_fingerprint.py --write/--check PATH --flags="..."`, one
   manifest per configuration; the ten configurations are listed in ADR 0300. ~2 min each.
+- **`inject.decomp.DECOMP` is the BUILD TREE; `inject.decomp.SUBMODULE` is vanilla** (ADR 0302).
+  A new vanilla reader uses SUBMODULE; anything reading the injected tree or the ROM uses DECOMP.
 
 ## Owed by NICOLAS, not by the next session
 
@@ -85,8 +89,10 @@ Then ch06's own body (#26) resumes -- see "Chapter work" below.
   2026-09-30: VS Code's `chrome_crashpad_handler` was burning ~430% CPU, which made every timing
   noisy — suspect it before believing a slowdown.
 - **Primary checkout: `/Users/Yonick/Projects/manchego-stars`**, holding `main`. Clean except the
-  intentionally dirty `fireemblem8u` submodule and the untracked `.agents/`, `map-review/`,
-  `review/` — preserve those and **stage paths explicitly**.
+  untracked `.agents/`, `map-review/`, `review/` — preserve those and **stage paths explicitly**.
+  The submodule is pristine now; the ROM is `build/fireemblem8u/fireemblem8.gba` (ADR 0302).
+- **This Mac's disk is ~97% full (6.3 GB free, 2026-09-30).** A decomp tree with outputs is
+  ~470 MB; don't add per-config build trees or keep scratch ROM copies around.
 - **Two sandbox false negatives on this Mac:** `gh auth status` reports the token invalid (a
   restricted process cannot read the Keychain — run `gh` with escalation); an mGBA AppKit abort
   before the ROM runs is the sandbox, not the ROM.
