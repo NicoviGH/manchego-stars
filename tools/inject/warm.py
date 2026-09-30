@@ -327,9 +327,14 @@ def forget_compiled(now_ns=None):
     What remains is when this compile started and which paths the old record covered, for
     record_compiled."""
     old = _read_record()
+    if 'compiling_since_ns' in old:
+        # The last compile never recorded (it failed): carry ITS lists through, or a failed
+        # compile would drop what the one before it regenerated.
+        previous, regenerated = old.get('previous', []), old.get('previous_regenerated', [])
+    else:
+        previous, regenerated = sorted(old.get('files', {})), old.get('regenerated', [])
     _write_record({'compiling_since_ns': time.time_ns() if now_ns is None else now_ns,
-                   'previous': sorted(old.get('files', {})),
-                   'previous_regenerated': old.get('regenerated', [])})
+                   'previous': previous, 'previous_regenerated': regenerated})
 
 
 def record_compiled():

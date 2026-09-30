@@ -257,6 +257,24 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
             self.assertEqual(f.read(), b'ours')
         self.assertEqual(os.stat(header).st_mtime_ns, 3 * 10**18)
 
+    def test_a_failed_compile_does_not_drop_what_earlier_ones_regenerated(self):
+        # forget, compile fails, forget again: the second forget reads a PENDING record, and
+        # must carry its lists through or msg.h silently leaves the record (review).
+        header = self._write(os.path.join(self.tmp, 'include', 'msg.h'), b'vanilla',
+                             mtime_ns=10**18)
+        self.tracked = [header]
+        inject.warm.record_injected([])
+        inject.warm.forget_compiled(now_ns=2 * 10**18)
+        self._write(header, b'ours', mtime_ns=3 * 10**18)
+        inject.warm.record_compiled()
+        inject.warm.forget_compiled(now_ns=4 * 10**18)         # this compile fails
+        inject.warm.forget_compiled(now_ns=4 * 10**18)         # the retry, which succeeds
+        inject.warm.record_compiled()                          # without regenerating it
+        self._write(header, b'vanilla', mtime_ns=5 * 10**18)   # a checkout reverts it
+        inject.warm._rewind_unchanged_mtimes({}, inject.warm.load_compiled())
+        with open(header, 'rb') as f:
+            self.assertEqual(f.read(), b'ours')
+
     def test_an_injected_file_is_never_restored_from_the_record(self):
         # Only what the COMPILE wrote is put back; the injector owns its own files.
         src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
