@@ -27,10 +27,7 @@ import json
 import os
 import subprocess
 
-from .decomp import git_env
-
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DECOMP = os.path.join(REPO, 'fireemblem8u')
+from .decomp import DECOMP, git_env, REPO, SUBMODULE
 SETTINGS = 'src/data/chapter_settings.json'
 
 WRITTEN, INHERITED, ABSENT = 'WRITTEN', 'INHERITED', 'ABSENT'
@@ -44,7 +41,7 @@ def _read(path):
 def _read_head(path):
     """The COMMITTED settings, never the working tree's -- the working tree is what the build
     mutates, and the census's whole question is what we changed away from vanilla."""
-    out = subprocess.run(['git', '-C', DECOMP, 'show', 'HEAD:' + path],
+    out = subprocess.run(['git', '-C', SUBMODULE, 'show', 'HEAD:' + path],
                          capture_output=True, text=True, env=git_env())
     if out.returncode != 0:
         raise RuntimeError('cannot read HEAD:%s from the decomp: %s' % (path, out.stderr))

@@ -55,6 +55,16 @@ def run_one(path):
     return rel, (proc.stderr or proc.stdout).strip()
 
 
+def _ensure_build_tree():
+    """The census and scene-actor tests read the LIVE tree the injector writes (#408). It used
+    to be the submodule's working tree, so it always existed -- vanilla on CI, injected after
+    a local build. Keep that: make the build tree where the submodule is checked out."""
+    if os.path.isdir(os.path.join(REPO, 'fireemblem8u', 'src')):
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        import build_tree
+        build_tree.ensure(verbose=False)
+
+
 def run(paths=None, workers=DEFAULT_WORKERS, report=None):
     """Run every test file; return [(relpath, output), ...] for the ones that failed.
 
@@ -62,6 +72,7 @@ def run(paths=None, workers=DEFAULT_WORKERS, report=None):
     live progress; the RETURNED list is always in discovery order.
     """
     paths = test_files() if paths is None else paths
+    _ensure_build_tree()
     results = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
         for rel, output in pool.map(run_one, paths):

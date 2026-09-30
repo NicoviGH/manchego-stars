@@ -11,10 +11,9 @@
 #               primary checkout holds `main`, so each instance lives on its own
 #               short-lived branch and integrates to main frequently (trunk-based).
 #
-# WHY this script exists: the decomp build mutates the `fireemblem8u` submodule
-# working tree, so two instances sharing one checkout would race and corrupt each
-# other's build. A separate worktree gives each its OWN submodule working tree +
-# index (git 2.x stores it under .git/worktrees/<wt>/modules/, verified isolated).
+# WHY this script exists: a build writes the checkout's build tree
+# (build/fireemblem8u, #408), so two instances sharing one checkout would race and
+# corrupt each other's build. A separate worktree gives each its OWN build tree.
 # But a fresh worktree's submodule is empty AND the build toolchain (agbcc + the
 # small native binaries) is gitignored, so it doesn't come with the checkout.
 # This script populates the submodule from the LOCAL object store (no re-clone)
@@ -43,18 +42,10 @@ fi
 
 # These toolchain artifacts are gitignored (built by setup-toolchain.sh) and so
 # absent from a fresh submodule checkout. They are static native binaries -- safe
-# to symlink and share across worktrees on the same machine.
-TOOLCHAIN=(
-    tools/agbcc
-    tools/aif2pcm/aif2pcm
-    tools/bin2c/bin2c
-    tools/gbagfx/gbagfx
-    tools/jsonproc/jsonproc
-    tools/mid2agb/mid2agb
-    tools/scaninc/scaninc
-    tools/textencode/textencode
-    baserom.gba
-)
+# to symlink and share across worktrees on the same machine. The list is
+# tools/build_tree.py's, which links the same set into the build tree.
+TOOLCHAIN=()
+while IFS= read -r t; do TOOLCHAIN+=("$t"); done < <(python3 "$REPO/tools/build_tree.py" toolchain)
 
 cd "$REPO"
 

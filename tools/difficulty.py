@@ -1512,7 +1512,7 @@ def vanilla_terrain_at(layout_name, x, y):
         import map_tileset_tool as mtt
         key = ('layout', layout_name)
         if key not in _TERRAIN_CACHE:
-            _TERRAIN_CACHE[key] = mtt.vanilla_layout_data(inject.decomp.DECOMP, layout_name)
+            _TERRAIN_CACHE[key] = mtt.vanilla_layout_data(inject.decomp.SUBMODULE, layout_name)
         w, h, cells, terrain = _TERRAIN_CACHE[key]
         if not (0 <= x < w and 0 <= y < h):
             return None

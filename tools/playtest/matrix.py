@@ -52,6 +52,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, os.path.join(REPO, 'tools'))     # build_scopes, inject.hosts
 import build_scopes                                 # noqa: E402  the build's own bookkeeping
+from inject.decomp import DECOMP                    # noqa: E402  the build tree (#408)
 
 MANIFEST = os.path.join(HERE, 'matrix.yaml')
 HARNESS = os.path.join(HERE, 'harness.lua')
@@ -702,12 +703,12 @@ def check_rom(manifest, scenario, stamp_path=None):
 # DECOMP HEAD (our decomp edits are build artifacts restored from HEAD each build, so the
 # commit is the real input). `harness.lua`, `matrix.py` and `matrix.yaml` are deliberately
 # absent -- they drive the emulator, never the ROM, which is exactly the case this speeds up.
-# The ROM lands INSIDE the submodule (the top-level target delegates: `make -C
-# fireemblem8u fireemblem8.gba`), while the config stamp is written at the repo root.
-# Getting this pair wrong is silent -- store_cached_rom just finds nothing to copy and
+# The ROM lands in the BUILD TREE (the top-level target delegates: `make -C
+# build/fireemblem8u fireemblem8.gba`, #408), while the config stamp is written at the repo
+# root. Getting this pair wrong is silent -- store_cached_rom just finds nothing to copy and
 # every run rebuilds, which is exactly how the first cut of this cache did nothing.
-ROM_PATH = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.gba')
-ELF_PATH = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.elf')
+ROM_PATH = os.path.join(DECOMP, 'fireemblem8.gba')
+ELF_PATH = os.path.join(DECOMP, 'fireemblem8.elf')
 STAMP_PATH = os.path.join(REPO, '.build-config.json')
 # What build_campaign.py recorded each injection step as having written (#255 phase 2).
 SCOPES_PATH = os.path.join(REPO, '.build-scopes.json')

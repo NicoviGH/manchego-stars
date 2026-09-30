@@ -43,10 +43,10 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from inject.decomp import git_env                                     # noqa: E402
+from inject.decomp import DECOMP, git_env                             # noqa: E402
+import build_tree                                                     # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DECOMP = os.path.join(REPO, 'fireemblem8u')
 CAMPAIGN = 'rime-of-the-frostmaiden'
 
 # Injection rewrites these; the caches below make a second run skip work, which is exactly
@@ -94,7 +94,8 @@ MTIME_SLACK = 2.0
 
 
 def restore_decomp():
-    """Put the decomp back to HEAD so the injector has to do all of its work."""
+    """Put the build tree back to HEAD so the injector has to do all of its work."""
+    build_tree.ensure(verbose=False)
     # `HEAD --`, never `-- .`: `git checkout -- <path>` restores from the INDEX, so anything
     # staged in the decomp survives the restore and the injector never has to rewrite it.
     # `inject.warm.restore_vanilla_sources` documents the same trap.

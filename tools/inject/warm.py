@@ -276,9 +276,11 @@ def _written_since(t0_ns):
 def _injected():
     try:
         with open(INJECTED_PATHS) as fh:
-            return set(json.load(fh))
+            paths = json.load(fh)
     except (OSError, ValueError):
         return set()
+    root = os.path.join(DECOMP, '')     # a list from another tree is not this tree's writes
+    return {p for p in paths if p.startswith(root)}
 
 
 def record_injected(paths):
@@ -365,7 +367,8 @@ def record_compiled():
         path = os.path.join(COMPILED_DIR, name)
         if path != _record_path() and path not in keep:
             os.remove(path)
-    _write_record({'recorded_ns': time.time_ns(), 'regenerated': sorted(regenerated),
+    _write_record({'recorded_ns': time.time_ns(), 'tree': DECOMP,
+                   'regenerated': sorted(regenerated),
                    'files': {p: [m, d.hex()] for p, (m, d) in snap.items()}})
     try:
         os.remove(INJECTED_PATHS)
@@ -380,8 +383,8 @@ def load_compiled():
     since (a compile behind the Makefile's back)."""
     record = _read_record()
     recorded_ns = record.get('recorded_ns')
-    if recorded_ns is None:
-        return {}
+    if recorded_ns is None or record.get('tree') != DECOMP:
+        return {}               # no record, or one describing another tree's objects (#408)
     files = {p: (m, bytes.fromhex(d)) for p, (m, d) in record.get('files', {}).items()}
     accounted = set(files) | _injected() | set(_tracked())
     if any(mtime_ns > recorded_ns and p not in accounted for p, mtime_ns in _walk_decomp()):
@@ -476,17 +479,13 @@ def restore_vanilla_sources():
 def normalise_decomp_shebangs(verbose=False):
     """Rewrite the decomp's Linux `#!/bin/python3` shebangs for macOS. Idempotent.
 
-    fireemblem8u/scripts/ ships `#!/bin/python3`, which does not exist on macOS (and /bin is
-    SIP-protected, so it cannot be created). setup-toolchain.sh rewrites them once -- but ANY
-    `git checkout` inside the submodule reverts them: restore_vanilla_sources, a manual reset,
-    a branch switch, `git checkout -- .` after a build. The NEXT build then dies on
-    `bad interpreter: No such file or directory`, several minutes in, from a Makefile rule
-    that looks unrelated (tsa_generator.py on a BG image).
-
-    tools/build.sh already re-applies it, but the DOCUMENTED build command is plain `make`
-    (CLAUDE.md), which bypassed the wrapper -- so the failure kept recurring. Every build
-    runs this module via the Makefile, so doing it here closes the hole for good rather than
-    relying on remembering the wrapper."""
+    The decomp's scripts/ ships `#!/bin/python3`, which does not exist on macOS (and /bin is
+    SIP-protected, so it cannot be created). ANY `git checkout` in the build tree reverts the
+    rewrite: restore_vanilla_sources, the fingerprint gate's reset, a submodule bump. The NEXT
+    build then dies on `bad interpreter: No such file or directory`, several minutes in, from
+    a Makefile rule that looks unrelated (tsa_generator.py on a BG image). Every build runs
+    this, so it is the one place the fix lives; it writes the build tree, never the submodule
+    (#408)."""
     if platform.system() != 'Darwin':
         return 0
     fixed = 0

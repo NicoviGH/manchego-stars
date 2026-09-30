@@ -143,7 +143,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 APP="$REPO/tools/emulator/mGBA-dev.app/Contents/MacOS/mGBA"
-ROM="$REPO/fireemblem8u/fireemblem8.gba"
+ROM="$REPO/build/fireemblem8u/fireemblem8.gba"   # the build tree (#408)
 SCENARIO="${1:?usage: run.sh <scenario>  (see header: win|ch01win|recordending|recordprep|...)}"
 KEEP_OPEN="${2:-}"
 STATE_DIR="$HERE/states"
@@ -303,7 +303,7 @@ PLAYTEST_HEADLESS = "$hl"
 PLAYTEST_CASE = "$case"
 dofile("$HERE/harness.lua")
 EOF
-    rm -f "$REPO/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
+    rm -f "$REPO/build/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
     # Muted by DEFAULT and deliberately: a scenario is watched, often many times, and at
     # 240fps the audio is a screech. `PT_SOUND=1` unmutes for the runs where the SOUND is the
     # thing under review (ch05's moose bellow was the first, 2026-08-15) -- and it pins

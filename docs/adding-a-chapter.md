@@ -250,10 +250,10 @@ Three traps this replaces, all of which cost real sessions:
 - **No `deployment.deploy_slots` yet?** The real PREP flow (`_deploy_cap_entries`) sys.exits without
   them — fast-boot deploys statically at an authored spawn list instead (author `deploy_slots` when
   wiring the real prep/cutscene pass).
-- **Never commit the `fireemblem8u` submodule pointer** — decomp edits are build artifacts restored
-  from HEAD each build.
-- **Vanilla decomp reads go through HEAD**, never the (dirty) worktree — the build leaves the submodule
-  patched, so `git show HEAD:<file>` is the source of truth for vanilla data.
+- **Never commit the `fireemblem8u` submodule pointer** — decomp edits live in the build tree,
+  `build/fireemblem8u`, restored from HEAD each build.
+- **Vanilla decomp reads go to the submodule** (`inject.decomp.SUBMODULE`, or HEAD through
+  `vanilla_decomp_text`), never the build tree — the build leaves that one patched.
 - **Vanilla-map screenshot reference:** `fe8.triangleattack.com` hosts a native-resolution
   (272×256px, 1:1 = 17×16 metatiles, no upscaling) screenshot per vanilla chapter at a predictable
   path (`fe8.triangleattack.com/chapters/<slug>`) — useful ground truth when repainting a Borgo-style

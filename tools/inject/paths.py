@@ -15,11 +15,7 @@ Every injector module imports the paths it reads from here directly.
 """
 import os
 
-# tools/inject/paths.py -> tools/inject -> tools -> repo root. THREE levels, not two:
-# build_campaign.py sits one directory higher, so copying its two-dirname form here pointed
-# REPO at tools/ and every decomp path went with it.
-REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DECOMP = os.path.join(REPO, 'fireemblem8u')
+from inject.decomp import DECOMP, REPO  # noqa: F401  (the build tree, #408)
 
 PORTRAIT_DIR = os.path.join(DECOMP, 'graphics', 'portrait')
 

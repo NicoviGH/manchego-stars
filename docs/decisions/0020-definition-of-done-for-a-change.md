@@ -12,7 +12,7 @@ issues: []
 2. If it completes tracked work, the commit/PR says `Closes #N`; if it changes scope, open/retitle the issue.
 3. `make` builds green; `tools/verify_text.py` is clean after any text change.
 4. New non-obvious decision → an entry in this file.
-5. Don't commit the `fireemblem8u` submodule pointer (our decomp edits are build artifacts).
+5. Don't commit the `fireemblem8u` submodule pointer (our decomp edits live in `build/fireemblem8u`).
 
 **Commits:** imperative subject; reference issues (`Closes #N` / `Refs #N`). Co-author trailer per repo norm.
 

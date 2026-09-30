@@ -129,11 +129,16 @@ jobs:
       # `make` then rebuilds only what our injection touches. Sources are pinned to an old
       # mtime first so the restored outputs read as up to date; the decomp's rules depend on
       # sources only (never on tool binaries), and header deps ride in the cached .d files.
+      # The ROM is compiled in build/fireemblem8u, a git worktree of the submodule (#408), so
+      # that is where the cached outputs go and whose sources are pinned.
+      - name: Build tree
+        run: python3 tools/build_tree.py ensure
+
       - name: Pin decomp source mtimes
         run: |
-          cd fireemblem8u
+          cd build/fireemblem8u
           git ls-files -z | xargs -0 touch -h -d '2000-01-01T00:00:00Z'
-          touch -d '2000-01-01T00:00:00Z' baserom.gba
+          touch -d '2000-01-01T00:00:00Z' "$GITHUB_WORKSPACE/fireemblem8u/baserom.gba"
 
       # The key names everything the cached objects were BUILT WITH, not labels someone bumps:
       # the submodule commit, the runner image, the ARM binutils version, and the agbcc
@@ -156,16 +161,17 @@ jobs:
 
       - name: Unpack vanilla build (cache hit)
         if: steps.vanilla-cache.outputs.cache-hit == 'true'
-        run: tar -xf vanilla-build.tar -C fireemblem8u
+        run: tar -xf vanilla-build.tar -C build/fireemblem8u
 
       - name: Build vanilla decomp and save it (cache miss only)
         if: ${{ !inputs.no_cache && steps.vanilla-cache.outputs.cache-hit != 'true' }}
         run: |
-          cd fireemblem8u
-          git ls-files -o -z | sort -z > ../before.lst
+          cd build/fireemblem8u
+          git ls-files -o -z | sort -z > "$RUNNER_TEMP/before.lst"
           make fireemblem8.gba -j"$(nproc)"
-          git ls-files -o -z | sort -z > ../after.lst
-          comm -z -13 ../before.lst ../after.lst | tar --null -T - -cf ../vanilla-build.tar
+          git ls-files -o -z | sort -z > "$RUNNER_TEMP/after.lst"
+          comm -z -13 "$RUNNER_TEMP/before.lst" "$RUNNER_TEMP/after.lst" \
+            | tar --null -T - -cf "$GITHUB_WORKSPACE/vanilla-build.tar"
 
       - name: Save vanilla build
         if: ${{ !inputs.no_cache && steps.vanilla-cache.outputs.cache-hit != 'true' }}
@@ -178,7 +184,7 @@ jobs:
         run: make CAMPAIGN=rime-of-the-frostmaiden
 
       - name: ROM checksum
-        run: sha1sum fireemblem8u/fireemblem8.gba
+        run: sha1sum build/fireemblem8u/fireemblem8.gba
 
       # Text is compiled from source, so the mock base ROM doesn't affect it. This is
       # the regression gate for the text-table corruption class (terminator parity,

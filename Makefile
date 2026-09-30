@@ -1,16 +1,20 @@
 CAMPAIGN ?= rime-of-the-frostmaiden
 
 # Phase 2: content pipeline. `make` first runs the campaign generator
-# (tools/build_campaign.py), which injects our content into the fireemblem8u
-# working tree, then builds the decomp ROM target directly.
+# (tools/build_campaign.py), which injects our content into the build tree --
+# build/fireemblem8u, a git worktree of the submodule (tools/build_tree.py), so the
+# fireemblem8u submodule itself stays vanilla (#408) -- then builds the decomp ROM
+# target there. The ROM is build/fireemblem8u/fireemblem8.gba.
 #
 # NOTE: we now intentionally diverge from vanilla, so we build the decomp's
 # `fireemblem8.gba` target (NOT its default `compare` goal, which sha1-checks
 # against the vanilla ROM). "make green" now means THE ROM BUILDS, not
-# byte-identical-to-vanilla. Restore vanilla art with:
-#   git -C fireemblem8u checkout graphics/portrait
+# byte-identical-to-vanilla.
 
 NPROC := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu)
+
+# Where the ROM is compiled (#408); tools read it as inject.decomp.DECOMP.
+BUILD_TREE := build/fireemblem8u
 
 # --- macOS toolchain shims (see tools/setup-toolchain.sh) ---------------------
 # The decomp build assumes a Linux host. On macOS two adjustments keep a plain
@@ -38,7 +42,7 @@ all: fireemblem8.gba
 fireemblem8.gba:
 	python3 tools/build_campaign.py --campaign $(CAMPAIGN) $(if $(MONTAGE),--montage) $(if $(TESTCH),--test-chapter) $(if $(LORDBOOT),--lord-boot) $(if $(CH01BOOT),--ch01-boot) $(if $(CH03BOOT),--ch03-boot) $(if $(CH04BOOT),--ch04-boot) $(if $(CH05BOOT),--ch05-boot) $(if $(CH05LUPIN),--ch05-lupin) $(if $(CH05MOOSE),--ch05-moose) $(if $(CH05ENDING),--ch05-ending=$(CH05ENDING)) $(if $(CH06BOOT),--ch06-boot)
 	python3 tools/compiled_manifest.py forget
-	$(MAKE) -C fireemblem8u fireemblem8.gba -j$(NPROC)
+	$(MAKE) -C $(BUILD_TREE) fireemblem8.gba -j$(NPROC)
 	python3 tools/compiled_manifest.py record
 
 # The interpreter this repo builds with, resolved ONCE here (the macOS shim above puts
@@ -133,4 +137,4 @@ else
 endif
 
 clean:
-	$(MAKE) -C fireemblem8u clean
+	$(MAKE) -C $(BUILD_TREE) clean

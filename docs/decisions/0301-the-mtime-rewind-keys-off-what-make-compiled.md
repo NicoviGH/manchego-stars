@@ -20,7 +20,7 @@ newer than its object.
 ## The rule
 
 The top-level `Makefile` brackets the compile. `compiled_manifest.py forget` runs before
-`make -C fireemblem8u` and `record` runs after it succeeds. The record (`.build-compiled/`)
+the decomp compile and `record` runs after it succeeds. The record (`.build-compiled/`)
 holds sha1 + mtime of:
 
 - every decomp file an injection wrote since the last record (`.build-injected.json`,

@@ -182,12 +182,22 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         self.assertEqual(os.stat(src).st_mtime_ns, 3 * 10**18)
 
     def test_a_compile_nobody_recorded_voids_the_manifest(self):
-        # A bare `make -C fireemblem8u` that rebuilt f.o from other bytes and died before
+        # A bare `make -C build/fireemblem8u` that rebuilt f.o from other bytes and died before
         # relinking: trusting the record would rewind f and hide the stale object (review).
         src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
         self._compile([src])
         self._write(os.path.join(self.tmp, 'src', 'a.o'), b'from B', mtime_ns=4 * 10**18)
         self.assertEqual(inject.warm.load_compiled(), {})
+
+    def test_a_record_describes_only_the_tree_it_was_taken_in(self):
+        # #408 moved the build out of the submodule: a record taken in the old tree restored
+        # msg.h INTO the submodule, and its mtimes say nothing about the new tree's objects.
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        self._compile([src])
+        elsewhere = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, elsewhere, True)
+        with stubbed('DECOMP', elsewhere):
+            self.assertEqual(inject.warm.load_compiled(), {})
 
     def test_injector_only_runs_do_not_void_the_manifest(self):
         # What an injector-only run writes (here a file the compile never saw) is its own,
@@ -302,7 +312,7 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         with open(os.path.join(inject.decomp.REPO, 'Makefile'), encoding='utf-8') as f:
             recipe = f.read().split('\nfireemblem8.gba:\n', 1)[1].split('\n\n', 1)[0]
         lines = [l.strip() for l in recipe.splitlines()]
-        compile_at = next(i for i, l in enumerate(lines) if l.startswith('$(MAKE) -C fireemblem8u'))
+        compile_at = next(i for i, l in enumerate(lines) if l.startswith('$(MAKE) -C $(BUILD_TREE)'))
         self.assertTrue(any('compiled_manifest.py forget' in l for l in lines[:compile_at]),
                         'the manifest must be forgotten BEFORE the compile')
         self.assertTrue(any('compiled_manifest.py record' in l for l in lines[compile_at + 1:]),

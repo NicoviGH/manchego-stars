@@ -25,20 +25,10 @@ case "$MODE" in
     *) echo "usage: tools/build.sh test|dist" >&2; exit 2 ;;
 esac
 
-# The decomp ships Linux-only `#!/bin/python3` shebangs in fireemblem8u/scripts;
-# setup-toolchain.sh rewrites them for macOS, but ANY `git checkout` inside the
-# submodule (e.g. restore_vanilla_sources, a manual reset) reverts them and the
-# next build dies on `bad interpreter`. Re-apply the fix here -- idempotent.
-if [ "$(uname)" = "Darwin" ]; then
-    while IFS= read -r f; do
-        sed -i '' '1s|^#!/bin/python3|#!/usr/bin/env python3|' "$f"
-    done < <(grep -rl '^#!/bin/python3' fireemblem8u/scripts 2>/dev/null || true)
-fi
-
 if [ "$MODE" = "test" ]; then
     echo ">> test build (no montage)"
     make CAMPAIGN="$CAMPAIGN"
-    echo ">> built fireemblem8u/fireemblem8.gba (test: straight-to-map boot)"
+    echo ">> built build/fireemblem8u/fireemblem8.gba (test: straight-to-map boot)"
     exit 0
 fi
 
@@ -51,7 +41,7 @@ make CAMPAIGN="$CAMPAIGN" MONTAGE=1
 VERSION="$(tr -d ' \t\n\r' < VERSION)"
 OUT="dist/ManchegoStars-v${VERSION}-$(date +%Y-%m-%d).gba"
 mkdir -p dist
-cp fireemblem8u/fireemblem8.gba "$OUT"
+cp build/fireemblem8u/fireemblem8.gba "$OUT"
 echo ">> stamped $OUT"
 echo "   md5: $(md5 -q "$OUT" 2>/dev/null || md5sum "$OUT" | cut -d' ' -f1)"
 echo "   (a montage ROM's md5 MUST differ from the no-opener 142971e3 build)"
