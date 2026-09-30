@@ -3183,6 +3183,53 @@ def check_every_gate_is_registered(fail):
                         'add it to the tuple (a check nothing runs cannot fail)' % name)
 
 
+CANARY_FILE = 'tools/test_check_canaries.py'
+
+
+def _canary_registry():
+    """({checks with a canary}, {checks declared uncanaried}) read out of CANARY_FILE by AST.
+
+    AST, not import: the canaries import build_campaign's world, and this runs on the lean
+    `checks` CI job, which has none of it."""
+    with open(os.path.join(REPO, CANARY_FILE), encoding='utf-8') as fh:
+        tree = ast.parse(fh.read(), CANARY_FILE)
+    found = {}
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id in ('CANARIES', 'UNCANARIED')
+                and isinstance(node.value, ast.Dict)):
+            found[node.targets[0].id] = {k.value for k in node.value.keys
+                                         if isinstance(k, ast.Constant)}
+    if 'CANARIES' not in found:
+        raise ValueError('%s has no literal CANARIES dict' % CANARY_FILE)
+    return found['CANARIES'], found.get('UNCANARIED', set())
+
+
+def check_every_gate_has_a_canary(fail):
+    """Every registered check proves it can FAIL (#407).
+
+    A guard that passes by checking nothing looks exactly like one that passes because the
+    tree is clean -- #405's camera check, #401's MS_* walk, the fingerprint's first cut. Each
+    registered check carries a canary in CANARY_FILE: the real check, run with one input
+    doctored bad, which must produce a named failure. `test_check_canaries.py` RUNS them;
+    this makes sure a new check cannot skip having one, including on the lean CI job."""
+    try:
+        canaried, excused = _canary_registry()
+    except (OSError, SyntaxError, ValueError) as exc:
+        fail.append('check_every_gate_has_a_canary: cannot read the canary registry: %s' % exc)
+        return
+    names = {c.__name__ for c in CHECKS}
+    for name in sorted(names - canaried - excused):
+        fail.append('%s has no canary in %s -- add one that doctors a real input and names the '
+                    'failure it must produce, or declare it in UNCANARIED with the reason. A '
+                    'check never watched failing cannot be told apart from one that checks '
+                    'nothing.' % (name, CANARY_FILE))
+    for name in sorted((canaried | excused) - names):
+        fail.append('%s registers a canary for %s, which is not a registered check'
+                    % (CANARY_FILE, name))
+
+
 def check_build_workflow_filters_agree(fail):
     """build.yml's two `paths-ignore` lists must be identical, and must stay an allowlist.
 
@@ -3363,7 +3410,8 @@ CHECKS = (
     check_build_workflow_filters_agree, check_decision_records_wellformed,
     check_decision_citations_resolve,
     check_message_literals_are_registered, check_handoff_only_on_main, check_lane_ownership,
-    check_every_gate_is_registered, check_map_sidecar_routes_agree,
+    check_every_gate_is_registered, check_every_gate_has_a_canary,
+    check_map_sidecar_routes_agree,
 )
 
 
