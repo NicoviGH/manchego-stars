@@ -122,5 +122,118 @@ class DecompShebangsSurviveASubmoduleCheckout(unittest.TestCase):
             self.assertEqual(inject.warm.normalise_decomp_shebangs(), 0)
 
 
+class RewindAgainstWhatMakeCompiled(unittest.TestCase):
+    """#416: the rewind's baseline is what `make` last COMPILED, not what the injector last
+    WROTE. An injector-only run between two builds (the fingerprint gate, a manual
+    build_campaign.py, a config switch) used to become the baseline, so the next `make` saw
+    every re-emitted file as newer than its object and rebuilt ~1,500 assets and every C file."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.elf = os.path.join(self.tmp, 'fireemblem8.elf')
+        self._write(self.elf, b'elf')
+        self.compiled = os.path.join(self.tmp, 'compiled.json')
+        self.injected = os.path.join(self.tmp, 'injected.json')
+        for name, value in (('DECOMP', self.tmp), ('COMPILED_MANIFEST', self.compiled),
+                            ('INJECTED_PATHS', self.injected)):
+            ctx = stubbed(name, value)
+            ctx.__enter__()
+            self.addCleanup(ctx.__exit__, None, None, None)
+
+    def _write(self, path, data, mtime_ns=None):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
+            f.write(data)
+        if mtime_ns is not None:
+            os.utime(path, ns=(mtime_ns, mtime_ns))
+        return path
+
+    def _compile(self, paths):
+        # The Makefile's bracket: forget, compile (a no-op here), record.
+        inject.warm.record_injected(paths)
+        inject.warm.forget_compiled()
+        with mock.patch.object(inject.warm, '_tracked', lambda: []):
+            inject.warm.record_compiled()
+
+    def test_an_injector_only_run_does_not_become_the_baseline(self):
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        self._compile([src])
+        # The fingerprint gate: checkout + re-inject, no compile. Same bytes, fresh mtime.
+        self._write(src, b'A', mtime_ns=2 * 10**18)
+        snap = inject.warm._snapshot_mtimes([src])
+        # The next build re-emits the same bytes again.
+        self._write(src, b'A', mtime_ns=3 * 10**18)
+        inject.warm._rewind_unchanged_mtimes(snap, inject.warm.load_compiled())
+        self.assertEqual(os.stat(src).st_mtime_ns, 10**18,
+                         'rewound to the injector-only run, not to what make compiled')
+
+    def test_changed_content_is_never_rewound_to_the_compiled_mtime(self):
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        self._compile([src])
+        self._write(src, b'B', mtime_ns=3 * 10**18)
+        inject.warm._rewind_unchanged_mtimes({}, inject.warm.load_compiled())
+        self.assertEqual(os.stat(src).st_mtime_ns, 3 * 10**18)
+
+    def test_a_compile_nobody_recorded_voids_the_manifest(self):
+        # A bare `make -C fireemblem8u` relinks the elf from whatever the tree held; the
+        # manifest no longer describes the objects, so it must not be trusted.
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        self._compile([src])
+        self._write(self.elf, b'relinked', mtime_ns=4 * 10**18)
+        self.assertEqual(inject.warm.load_compiled(), {})
+
+    def test_a_compile_in_flight_leaves_no_manifest(self):
+        # The Makefile forgets the manifest before compiling and records it only after a
+        # successful compile, so a failed one leaves objects the manifest cannot describe.
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A')
+        self._compile([src])
+        inject.warm.forget_compiled()
+        self.assertEqual(inject.warm.load_compiled(), {})
+
+    def test_it_falls_back_to_the_previous_injection(self):
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=2 * 10**18)
+        snap = inject.warm._snapshot_mtimes([src])
+        self._write(src, b'A', mtime_ns=3 * 10**18)
+        self.assertEqual(inject.warm._rewind_unchanged_mtimes(snap, {}), 1)
+        self.assertEqual(os.stat(src).st_mtime_ns, 2 * 10**18)
+
+    def test_the_record_covers_tracked_files_the_compile_regenerated(self):
+        # include/constants/msg.h is tracked AND rewritten by the compile (textprocess). A
+        # later `git checkout HEAD -- .` rewrites it -- same bytes, fresh mtime -- and 16 C
+        # files recompiled for nothing.
+        header = self._write(os.path.join(self.tmp, 'include', 'msg.h'), b'h', mtime_ns=10**18)
+        untouched = self._write(os.path.join(self.tmp, 'include', 'x.h'), b'x', mtime_ns=10**18)
+        inject.warm.record_injected([])
+        inject.warm.forget_compiled(now_ns=2 * 10**18)
+        self._write(header, b'h', mtime_ns=3 * 10**18)       # the compile regenerates it
+        with mock.patch.object(inject.warm, '_tracked', lambda: [header, untouched]):
+            inject.warm.record_compiled()
+        self.assertEqual(set(inject.warm.load_compiled()), {header})
+
+    def test_what_the_injector_wrote_includes_files_git_never_lists(self):
+        # The map tilesets are copied into gitignored .4bpp files: `git status` never lists
+        # them, so a git-derived footprint re-converted all four on every warm build.
+        old = self._write(os.path.join(self.tmp, 'graphics', 'old.png'), b'o', mtime_ns=10**18)
+        t0 = 2 * 10**18
+        new = self._write(os.path.join(self.tmp, 'graphics', 'map', 'ObjectTypeSnow.4bpp'),
+                          b'n', mtime_ns=3 * 10**18)
+        git = self._write(os.path.join(self.tmp, '.git', 'index'), b'i', mtime_ns=3 * 10**18)
+        written = inject.warm._written_since(t0)
+        self.assertIn(new, written)
+        self.assertNotIn(old, written)
+        self.assertNotIn(git, written)
+
+    def test_the_makefile_brackets_the_compile(self):
+        with open(os.path.join(inject.decomp.REPO, 'Makefile'), encoding='utf-8') as f:
+            recipe = f.read().split('\nfireemblem8.gba:\n', 1)[1].split('\n\n', 1)[0]
+        lines = [l.strip() for l in recipe.splitlines()]
+        compile_at = next(i for i, l in enumerate(lines) if l.startswith('$(MAKE) -C fireemblem8u'))
+        self.assertTrue(any('compiled_manifest.py forget' in l for l in lines[:compile_at]),
+                        'the manifest must be forgotten BEFORE the compile')
+        self.assertTrue(any('compiled_manifest.py record' in l for l in lines[compile_at + 1:]),
+                        'and recorded only AFTER it succeeds')
+
+
 if __name__ == '__main__':
     unittest.main()

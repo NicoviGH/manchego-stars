@@ -162,6 +162,13 @@ BUILD_STAMP = os.path.join(REPO, '.build-config.json')
 # same reason as the build stamp: it describes this tree's build, not the source.
 BUILD_SCOPES_PATH = os.path.join(REPO, '.build-scopes.json')
 
+# What `make` last COMPILED: every decomp file the injector wrote, with the sha1 and mtime it
+# had when a compile of it SUCCEEDED (#416). The mtime rewind's baseline -- see
+# inject.warm.load_compiled. INJECTED_PATHS is the injector's half: what this run wrote, read
+# by `tools/compiled_manifest.py record` once the compile succeeds. Both gitignored.
+COMPILED_MANIFEST = os.path.join(REPO, '.build-compiled.json')
+INJECTED_PATHS = os.path.join(REPO, '.build-injected.json')
+
 # Where a config-invariant injection step's output is kept between builds (#309). Gitignored
 # for the same reason as the two above: it describes builds, not source. `NO_INJECT_CACHE=1`
 # turns it off, the way `MX_NO_ROM_CACHE` turns off the matrix's ROM cache.

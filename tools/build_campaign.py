@@ -16,6 +16,7 @@ maps, ...), one module per domain pass, and `inject/chapters/` for the chapter i
 import argparse
 import os
 import sys
+import time
 
 # The tools/ modules (portrait_tool, map_tileset_tool, ...) sit next to us.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -62,7 +63,8 @@ from inject.title import inject_title_screen, inject_title_theme  # noqa: E402
 from inject.traps import apply_chapter_traps  # noqa: E402
 from inject.warm import (  # noqa: E402
     _anim_step_cache, _decomp_footprint, _rewind_unchanged_mtimes, _snapshot_mtimes,
-    _stamp_build_config, normalise_decomp_shebangs, restore_vanilla_sources)
+    _stamp_build_config, _written_since, load_compiled, normalise_decomp_shebangs,
+    record_injected, restore_vanilla_sources)
 
 
 def main():
@@ -171,6 +173,10 @@ def main():
     # Snapshot the previous build's injection footprint BEFORE we touch anything, so
     # we can rewind mtimes for whatever comes out byte-identical (fast warm rebuilds).
     _mtime_snapshot = _snapshot_mtimes(_decomp_footprint())
+    # Everything written from here on is this injection's; the compiled record (#416) is read
+    # up front for the same reason as the snapshot.
+    _injection_start_ns = time.time_ns()
+    _compiled = load_compiled()
     # Watch what each chapter injector actually writes, so the playtest matrix can tell a
     # ch05 edit from a global one and stop re-running the prologue for it (#255 phase 2).
     # Only the CHAPTER steps are wrapped: everything else falls through to `global`, which
@@ -367,7 +373,8 @@ def main():
     print('build scopes: %s' % ', '.join(
         '%s=%d file(s)' % (scope, len(entry['paths']))
         for scope, entry in sorted(_scope_manifest.items())))
-    rewound = _rewind_unchanged_mtimes(_mtime_snapshot)
+    record_injected(_written_since(_injection_start_ns))
+    rewound = _rewind_unchanged_mtimes(_mtime_snapshot, _compiled)
     if rewound:
         print('idempotent injection: rewound %d unchanged file(s) -> make skips them'
               % rewound)

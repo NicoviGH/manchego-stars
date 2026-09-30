@@ -9,12 +9,13 @@ import json
 import os
 import platform
 import subprocess
+import time
 
 from inject import step_cache
 import build_scopes
 import gen_subtitle_cards
 from inject.decomp import DECOMP, git_env, REPO
-from inject.paths import BUILD_STAMP, INJECT_CACHE_DIR
+from inject.paths import BUILD_STAMP, COMPILED_MANIFEST, INJECT_CACHE_DIR, INJECTED_PATHS
 
 
 # Decomp source files we patch in place. We git-restore them to vanilla at the start
@@ -209,20 +210,125 @@ def _snapshot_mtimes(paths):
     return snap
 
 
-def _rewind_unchanged_mtimes(snap):
-    """Rewind the mtime of every snapshotted file whose bytes are unchanged, so make
-    skips its (redundant) recompile/recompression. Returns the count rewound. Only
-    ever touches mtime, and only for byte-identical content -- never file bytes."""
+def _rewind_unchanged_mtimes(snap, compiled=None):
+    """Rewind the mtime of every tracked file whose bytes are unchanged, so make skips its
+    (redundant) recompile/recompression. Returns the count rewound. Only ever touches mtime,
+    and only for byte-identical content -- never file bytes.
+
+    `compiled` (load_compiled) is consulted first: identical to what `make` last compiled
+    means the objects already hold these bytes, whatever injector-only runs wrote since
+    (#416). `snap`, the previous injection, is the fallback when there is no such record."""
+    compiled = compiled or {}
     n = 0
-    for p, (mtime_ns, digest) in snap.items():
+    for p in set(snap) | set(compiled):
         try:
             with open(p, 'rb') as f:
-                if hashlib.sha1(f.read()).digest() == digest:
-                    os.utime(p, ns=(mtime_ns, mtime_ns))
-                    n += 1
+                digest = hashlib.sha1(f.read()).digest()
+        except OSError:
+            continue
+        for base in (compiled, snap):
+            if p in base and base[p][1] == digest:
+                os.utime(p, ns=(base[p][0], base[p][0]))
+                n += 1
+                break
+    return n
+
+
+# The rewind above keys off the PREVIOUS INJECTION, which is only what `make` compiled when a
+# compile followed it. Anything that injects without compiling -- the fingerprint gate's
+# checkout-and-inject per configuration, a manual build_campaign.py, a config switch -- became
+# the baseline instead, and the next `make` found every re-emitted file newer than its object:
+# 1,529 conversions and all 357 C files, 380s against a 31s warm build (#416). So the Makefile
+# records what a SUCCESSFUL compile consumed, and forgets it before every compile (a failed one
+# leaves objects no record describes). A forgotten record keeps only the compile's start time. The elf's mtime rides along: a compile that bypassed the
+# Makefile relinks it, which voids the record rather than trusting it.
+
+ELF = 'fireemblem8.elf'
+
+
+def _written_since(t0_ns):
+    """Every decomp file (outside .git) whose mtime is at or after `t0_ns` -- what this
+    injection wrote, including the gitignored copies (the map tilesets' .4bpp) and the
+    restored-to-vanilla files that `git status` never lists."""
+    written = []
+    for root, dirs, files in os.walk(DECOMP):
+        dirs[:] = [d for d in dirs if d != '.git']
+        for name in files:
+            path = os.path.join(root, name)
+            try:
+                if os.lstat(path).st_mtime_ns >= t0_ns:
+                    written.append(path)
+            except OSError:
+                pass
+    return written
+
+
+def record_injected(paths):
+    """The injector's half of the record: the paths this run wrote."""
+    with open(INJECTED_PATHS, 'w') as fh:
+        json.dump(sorted(paths), fh)
+
+
+def _elf_mtime():
+    try:
+        return os.stat(os.path.join(DECOMP, ELF)).st_mtime_ns
+    except OSError:
+        return None
+
+
+def _tracked():
+    """Every file git tracks in the decomp, as absolute paths ([] if git cannot say)."""
+    try:
+        out = subprocess.run(['git', '-C', DECOMP, 'ls-files', '-z'], env=git_env(),
+                             check=True, capture_output=True).stdout
+    except (subprocess.SubprocessError, OSError):
+        return []
+    return [os.path.join(DECOMP, p.decode('utf-8', 'surrogateescape'))
+            for p in out.split(b'\0') if p]
+
+
+def forget_compiled(now_ns=None):
+    """Before a compile: whatever it leaves behind, the old record no longer describes it.
+    What remains is only when this compile started, for record_compiled."""
+    with open(COMPILED_MANIFEST, 'w') as fh:
+        json.dump({'compiling_since_ns': time.time_ns() if now_ns is None else now_ns}, fh)
+
+
+def record_compiled():
+    """After a SUCCESSFUL compile: the injected paths as that compile consumed them, plus the
+    tracked files the compile itself regenerated (include/constants/msg.h, via textprocess),
+    which a later `git checkout` rewrites with the same bytes."""
+    try:
+        with open(INJECTED_PATHS) as fh:
+            paths = set(json.load(fh))
+        with open(COMPILED_MANIFEST) as fh:
+            since = json.load(fh)['compiling_since_ns']
+    except (OSError, ValueError, KeyError, TypeError):
+        return 0
+    for p in _tracked():
+        try:
+            if os.lstat(p).st_mtime_ns >= since:
+                paths.add(p)
         except OSError:
             pass
-    return n
+    snap = _snapshot_mtimes(sorted(paths))
+    with open(COMPILED_MANIFEST, 'w') as fh:
+        json.dump({'elf_mtime_ns': _elf_mtime(),
+                   'files': {p: [m, d.hex()] for p, (m, d) in snap.items()}}, fh)
+    return len(snap)
+
+
+def load_compiled():
+    """{abs_path: (mtime_ns, sha1_digest)} as the last successful compile consumed them, or
+    {} when there is no record or a compile since has relinked the elf behind its back."""
+    try:
+        with open(COMPILED_MANIFEST) as fh:
+            record = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    if record.get('elf_mtime_ns') is None or record['elf_mtime_ns'] != _elf_mtime():
+        return {}
+    return {p: (m, bytes.fromhex(d)) for p, (m, d) in record.get('files', {}).items()}
 
 
 # Where the battle-anim steps write, used ONLY to bootstrap the first entry's pre-state hashes
