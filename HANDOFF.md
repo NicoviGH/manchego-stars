@@ -6,55 +6,45 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-30 (Claude), after #413/#414/#415 landed. **What landed and why is in `git log`
-and the ADRs it cites** — this file no longer keeps a "recently landed" list; it went stale
-faster than anything else in it.
+Refreshed 2026-09-30 (Claude), after #417/#418 landed. **What landed and why is in `git log`
+and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
 **Nothing. No open PRs, no branches.**
 
-## The sequence Nicolas agreed (2026-09-30) — run it without asking
+## The sequence Nicolas agreed (2026-09-30) -- run it without asking
 
-Nicolas's instruction: work these **in order, one PR at a time, without his input** — branch →
-PR → `/code-review <n> medium` → fix every finding → CI green → squash-merge → next. Come to him
-only for a genuine design fork (record the question + your pick on the issue and keep going on
-the next item) or when ready for a handoff. The canonical list is **#389's 2026-09-30 comment**;
-state as of now:
+Nicolas's instruction: work these **in order, one PR at a time, without his input** -- branch ->
+PR -> `/code-review medium` on the checked-out branch -> fix every finding -> CI green ->
+squash-merge -> next. Come to him only for a genuine design fork (record the question + your
+pick on the issue and keep going) or when ready for a handoff. The canonical list is **#389's
+comments** (latest: 2026-09-30, "the moves landed").
 
 | | item | state |
 |---|---|---|
-| 1 | PR A — one source reader for the injector (#413, ADR 0297) | **done** |
-| 2 | #407 — every check carries a canary (#414, ADR 0298) | **done** |
-| — | CI: cache the vanilla decomp build (#415, ADR 0299) | **done** (added by Nicolas mid-sequence) |
-| 3 | **#389 — the moves.** `build_campaign.py` → `tools/inject/` bottom-up, ch06 INCLUDED, `test_build_campaign.py` split alongside | **NEXT** |
-| 4 | #416 — injection forces ~1,500 asset conversions + every C file to rebuild on every build | after the moves (my pick: it is the biggest remaining build-time lever, local AND CI) |
-| 5 | #408 out-of-tree build → #409 declared steps → #410 decomp fork → #411 message-id allocation + YAML schema → #412 blank-template chapters (with #302's driver) | in that order |
+| 1-2 | PR A (#413) + #407 canaries (#414), CI decomp cache (#415) | **done** |
+| 3 | #389 the moves -- `build_campaign.py` is 379 lines, passes in `tools/inject/` (#418, ADR 0300) | **done** |
+| -- | #417: boot/test-chapter builds died at the #396/#398 guards (found by the moves' gate) | **done** |
+| 4 | **#416** -- injection forces ~1,500 asset conversions + every C file to rebuild per build | **NEXT** |
+| 5 | #408 out-of-tree build -> #409 declared steps -> #410 decomp fork -> #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | in that order |
 | 6 | Trim this file again once the sequence lands | last |
 
-Then ch06's own body (#26) resumes — see "Chapter work" below.
+Then ch06's own body (#26) resumes -- see "Chapter work" below.
 
-### What the moves (#389) need to know before the first cut
+### Working in the split injector (ADR 0300 has the why)
 
-- **Gate every move on `tools/injection_fingerprint.py`** (`--write before.json` on main, move,
-  `--check before.json`; ~2 min, 975 files) **plus the unit suite** — ADR 0287. The fingerprint
-  cannot see monkeypatching; the tests can.
-- **Measured 2026-09-30: `build_campaign.py`'s top-level definition graph is a DAG** — the only
-  cycles are three trivial 2-node pairs (`_HANGS`/`_NOOPS`, two `CH04_*_MSG`/`_SCRIPT` pairs). So
-  any downward-closed set can move: extract bottom-up (shared layer first — text/script
-  helpers, unit entries, asset table, SMS, tileset/map registration — then domains, then
-  chapter injectors). Of ~15.5k lines: ~9.3k are owned by exactly one `inject_*`, ~2.8k shared
-  by several, ~2k reached by no injector (main, guards, re-exported readers). Recompute with an
-  `ast` pass rather than trusting these numbers.
-- **Every source-reading guard now reads through `tools/inject/source.py`**, and
-  `check_injector_source_has_one_reader` fails anything that opens `build_campaign.py` by path.
-  A moved function is found wherever it lives — but a name defined in TWO injector files makes
-  `def_source` raise: move, don't copy.
-- **Tests patch `bc.X`** (e.g. `UNIT_ICON_WAIT_C`, `REPO`, `CHAPTER_SETTINGS_JSON`,
-  `_layout_sidecar`). Once the function that reads `X` moves, the patch must target its new
-  module. Expect these as the moves' main test churn.
-- **`inject/hosts.py` discovers `inject_chNN` by AST across every injector file** and attributes
-  bare message literals to the enclosing injector, so chapter injectors may move freely.
+- **Where a name lives**: `inject.source.def_source(name)` or grep `^def name`/`^NAME =` under
+  `tools/inject/`. A chapter id another module reads lives in `inject/chapter_ids.py`; one only
+  its chapter reads stays in `inject/chapters/chNN.py`.
+- **Stub in tests with `inject.namespace.stubbed('NAME', value)`**, never
+  `mock.patch.object(inject.X, ...)`: each importer holds its own binding.
+- **Registries discover constants via `inject.namespace.injector_constants(pattern)`**, never
+  `globals()`.
+- **Never name a local `inject`** in a file that uses `inject.X` (and a function-local
+  `import inject.X` makes `inject` local to the whole function).
+- **Refactor gate**: `tools/injection_fingerprint.py --write/--check PATH --flags="..."`, one
+  manifest per configuration; the ten configurations are listed in ADR 0300. ~2 min each.
 
 ## Owed by NICOLAS, not by the next session
 
@@ -82,7 +72,7 @@ Then ch06's own body (#26) resumes — see "Chapter work" below.
 - **A new `check_*` must ship a canary** in `tools/test_check_canaries.py` (ADR 0298;
   `check_every_gate_has_a_canary` enforces it). A canary doctors a real input at `open()` and
   names the fault; a file it doctors or reads to aim goes in `CANARY_FILES`.
-- **A guard that imports `build_campaign` or `map_placement_preview` cannot run on the CI
+- **A guard that imports `build_campaign`, an `inject/` pass module, or `map_placement_preview` cannot run on the CI
   `checks` job** (pyyaml only, no submodule). Read source through `inject.source` instead.
 - **Before changing a signature, or what a parameter MEANS**: `tools/callsites.py`, then diff
   the OUTPUT (decisions.md → "We wrapped on-map talk at 29 CHARACTERS").
@@ -128,7 +118,7 @@ This list is the INDEX; do not re-inline the content.
 - **Why anything is the way it is** → `docs/decisions.md` (index; open the two or three you need).
   Most likely to bite: *"Playtest runs are the most expensive thing in this repo"*, *"A scenario
   written against the old design will FAIL ON SUCCESS"*, *"An artifact is not its inputs"*, and
-  for this sequence 0287, 0296, 0297, 0298, 0299.
+  for this sequence 0287, 0296, 0297, 0298, 0299, 0300.
 - **What is left to build** → GitHub issues; #20–#28 per chapter; #302 is the live epic.
 - **Which asset the FE-Repo has** → `docs/fe-repo-scouting.md` (its table says where an anim
   LIVES, not what it does).
