@@ -163,10 +163,11 @@ BUILD_STAMP = os.path.join(REPO, '.build-config.json')
 BUILD_SCOPES_PATH = os.path.join(REPO, '.build-scopes.json')
 
 # What `make` last COMPILED: every decomp file the injector wrote, with the sha1 and mtime it
-# had when a compile of it SUCCEEDED (#416). The mtime rewind's baseline -- see
-# inject.warm.load_compiled. INJECTED_PATHS is the injector's half: what this run wrote, read
-# by `tools/compiled_manifest.py record` once the compile succeeds. Both gitignored.
-COMPILED_MANIFEST = os.path.join(REPO, '.build-compiled.json')
+# had when a compile of it SUCCEEDED, plus copies of the tracked files the compile itself wrote
+# (#416). The mtime rewind's baseline -- see inject.warm.load_compiled. INJECTED_PATHS is the
+# injector's half: what injections since the last compile wrote, read by
+# `tools/compiled_manifest.py record` once the compile succeeds. Both gitignored.
+COMPILED_DIR = os.path.join(REPO, '.build-compiled')
 INJECTED_PATHS = os.path.join(REPO, '.build-injected.json')
 
 # Where a config-invariant injection step's output is kept between builds (#309). Gitignored

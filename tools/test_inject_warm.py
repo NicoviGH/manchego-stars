@@ -133,13 +133,20 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp, True)
         self.elf = os.path.join(self.tmp, 'fireemblem8.elf')
         self._write(self.elf, b'elf')
-        self.compiled = os.path.join(self.tmp, 'compiled.json')
-        self.injected = os.path.join(self.tmp, 'injected.json')
-        for name, value in (('DECOMP', self.tmp), ('COMPILED_MANIFEST', self.compiled),
+        # Outside the decomp, as in the repo: the records are not decomp writes.
+        state = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, state, True)
+        self.compiled = os.path.join(state, 'compiled')
+        self.injected = os.path.join(state, 'injected.json')
+        for name, value in (('DECOMP', self.tmp), ('COMPILED_DIR', self.compiled),
                             ('INJECTED_PATHS', self.injected)):
             ctx = stubbed(name, value)
             ctx.__enter__()
             self.addCleanup(ctx.__exit__, None, None, None)
+        self.tracked = []
+        patcher = mock.patch.object(inject.warm, '_tracked', lambda: list(self.tracked))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def _write(self, path, data, mtime_ns=None):
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -153,8 +160,7 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         # The Makefile's bracket: forget, compile (a no-op here), record.
         inject.warm.record_injected(paths)
         inject.warm.forget_compiled()
-        with mock.patch.object(inject.warm, '_tracked', lambda: []):
-            inject.warm.record_compiled()
+        inject.warm.record_compiled()
 
     def test_an_injector_only_run_does_not_become_the_baseline(self):
         src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
@@ -176,12 +182,23 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         self.assertEqual(os.stat(src).st_mtime_ns, 3 * 10**18)
 
     def test_a_compile_nobody_recorded_voids_the_manifest(self):
-        # A bare `make -C fireemblem8u` relinks the elf from whatever the tree held; the
-        # manifest no longer describes the objects, so it must not be trusted.
+        # A bare `make -C fireemblem8u` that rebuilt f.o from other bytes and died before
+        # relinking: trusting the record would rewind f and hide the stale object (review).
         src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
         self._compile([src])
-        self._write(self.elf, b'relinked', mtime_ns=4 * 10**18)
+        self._write(os.path.join(self.tmp, 'src', 'a.o'), b'from B', mtime_ns=4 * 10**18)
         self.assertEqual(inject.warm.load_compiled(), {})
+
+    def test_injector_only_runs_do_not_void_the_manifest(self):
+        # What an injector-only run writes (here a file the compile never saw) is its own,
+        # so it must not read as a compile behind the Makefile's back.
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        self._compile([src])
+        other = self._write(os.path.join(self.tmp, 'graphics', 'ch05.png'), b'x',
+                            mtime_ns=4 * 10**18)
+        inject.warm.record_injected([other])
+        inject.warm.record_injected([])        # a second run must not drop the first's
+        self.assertIn(src, inject.warm.load_compiled())
 
     def test_a_compile_in_flight_leaves_no_manifest(self):
         # The Makefile forgets the manifest before compiling and records it only after a
@@ -207,9 +224,48 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         inject.warm.record_injected([])
         inject.warm.forget_compiled(now_ns=2 * 10**18)
         self._write(header, b'h', mtime_ns=3 * 10**18)       # the compile regenerates it
-        with mock.patch.object(inject.warm, '_tracked', lambda: [header, untouched]):
-            inject.warm.record_compiled()
+        self.tracked = [header, untouched]
+        inject.warm.record_compiled()
         self.assertEqual(set(inject.warm.load_compiled()), {header})
+
+    def test_the_record_carries_forward_what_an_earlier_compile_regenerated(self):
+        # msg.h is regenerated only when the texts change, so the compile that wrote it is
+        # rarely the last one -- and a record of only the LAST compile's writes dropped it.
+        header = self._write(os.path.join(self.tmp, 'include', 'msg.h'), b'h', mtime_ns=10**18)
+        self.tracked = [header]
+        inject.warm.record_injected([])
+        inject.warm.forget_compiled(now_ns=10**18)
+        inject.warm.record_compiled()                      # the compile that regenerated it
+        self._compile([])                                  # a later one that did not
+        self.assertIn(header, inject.warm.load_compiled())
+
+    def test_a_checkout_that_reverts_a_compile_output_is_undone(self):
+        # msg.h is textprocess's SIDE output, and ours differs from HEAD. A `git checkout
+        # HEAD -- .` reverts it; the rewind then (rightly) keeps texts.txt older than
+        # msg_data.c, so make never reruns textprocess and 16 files compile against the
+        # VANILLA header. The rewind must put back what the compile wrote.
+        header = self._write(os.path.join(self.tmp, 'include', 'msg.h'), b'vanilla',
+                             mtime_ns=10**18)
+        self.tracked = [header]
+        inject.warm.record_injected([])
+        inject.warm.forget_compiled(now_ns=2 * 10**18)
+        self._write(header, b'ours', mtime_ns=3 * 10**18)    # the compile regenerates it
+        inject.warm.record_compiled()
+        self._write(header, b'vanilla', mtime_ns=4 * 10**18)  # the checkout reverts it
+        inject.warm._rewind_unchanged_mtimes({}, inject.warm.load_compiled())
+        with open(header, 'rb') as f:
+            self.assertEqual(f.read(), b'ours')
+        self.assertEqual(os.stat(header).st_mtime_ns, 3 * 10**18)
+
+    def test_an_injected_file_is_never_restored_from_the_record(self):
+        # Only what the COMPILE wrote is put back; the injector owns its own files.
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        self.tracked = [src]
+        self._compile([src])
+        self._write(src, b'B', mtime_ns=4 * 10**18)
+        inject.warm._rewind_unchanged_mtimes({}, inject.warm.load_compiled())
+        with open(src, 'rb') as f:
+            self.assertEqual(f.read(), b'B')
 
     def test_what_the_injector_wrote_includes_files_git_never_lists(self):
         # The map tilesets are copied into gitignored .4bpp files: `git status` never lists
