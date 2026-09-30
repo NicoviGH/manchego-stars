@@ -31,6 +31,12 @@ import traceback
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def _read_text(path):
+    """A file's text, closed behind it (a bare `open().read()` leaks the handle until GC)."""
+    with open(path, encoding='utf-8') as fh:
+        return fh.read()
+
+
 def _injector():
     """`inject.source` -- the injector's SOURCE, every file of it, not just build_campaign.py.
 
@@ -389,6 +395,47 @@ def check_python_compiles(fail):
         fail.append('tools/ has a Python file that does not compile')
 
 
+# The canaries (#407) re-prove that every check can fail: 49 real check runs, ~55 CPU-seconds,
+# and the test phase is throughput-bound, so they cost the hook ~15s wherever they sit. Their
+# answer moves when CHECK code moves (any Python under tools/ -- check logic lives in callsites,
+# declared, matrix, inject.hosts and more) or when a file a canary DOCTORS moves the anchor it
+# plants at, or reads to aim it (CANARY_FILES, read from CANARY_FILE). The pre-commit hook (MS_PRECOMMIT=1) runs
+# them only then; `make check`, `make test` and CI always do.
+def _canary_input_files():
+    with open(os.path.join(REPO, CANARY_FILE), encoding='utf-8') as fh:
+        tree = ast.parse(fh.read(), CANARY_FILE)
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and getattr(node.targets[0], 'id', None) == 'CANARY_FILES'):
+            return set(ast.literal_eval(node.value))
+    raise ValueError('%s has no literal CANARY_FILES tuple' % CANARY_FILE)
+
+
+def _staged_files():
+    """What this commit stages. Keeps GIT_INDEX_FILE, which `_git` strips: under
+    `git commit -a` / `git commit <paths>` the hook runs against a TEMPORARY index, and the
+    default one would say nothing is staged."""
+    import subprocess
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith('GIT_') or k == 'GIT_INDEX_FILE'}
+    r = subprocess.run(['git', '-C', REPO, 'diff', '--cached', '--name-only'],
+                       capture_output=True, text=True, env=env)
+    if r.returncode != 0:
+        return None                      # unknown -- and unknown must RUN the canaries
+    return [line for line in r.stdout.splitlines() if line.strip()]
+
+
+def _hook_skips_canaries():
+    if os.environ.get('MS_PRECOMMIT') != '1':
+        return False
+    staged = _staged_files()
+    if staged is None:
+        return False
+    inputs = _canary_input_files()
+    return not any((path.startswith('tools/') and path.endswith('.py')) or path in inputs
+                   for path in staged)
+
+
 def check_tests_pass(fail):
     """Run the Python unit tests (tools/test_*.py AND tools/playtest/test_*.py). The combat
     math in fe_combat.py is the difficulty engine's arbiter -- a silent regression there
@@ -416,7 +463,12 @@ def check_tests_pass(fail):
     # tools/run_tests.py is the one runner; `make test` invokes the same module, so the
     # gate and the target can never drift into testing different sets (#382).
     import run_tests
-    for rel, output in run_tests.run():
+    paths = run_tests.test_files()
+    if _hook_skips_canaries():
+        paths = [p for p in paths if not os.path.basename(p).startswith('test_check_canaries')]
+        print('check_tests_pass: canaries skipped in the hook -- no tools/ Python and no file '
+              'a canary doctors is staged; `make check`, `make test` and CI run them')
+    for rel, output in run_tests.run(paths):
         tail = output.strip().splitlines()
         fail.append('unit tests fail: %s (%s)' % (rel, tail[-1] if tail else 'see output'))
 
@@ -708,7 +760,7 @@ def check_yaml_parses(fail):
     import yaml
     for f in glob.glob(os.path.join(REPO, 'campaigns/**/*.yaml'), recursive=True):
         try:
-            yaml.safe_load(open(f, encoding='utf-8'))
+            yaml.safe_load(_read_text(f))
         except Exception as e:
             fail.append('YAML does not parse: %s (%s)' % (os.path.relpath(f, REPO), e))
 
@@ -808,7 +860,7 @@ def _chapters():
     import yaml
     for f in sorted(glob.glob(os.path.join(REPO, 'campaigns/*/chapters/ch*.yaml'))):
         try:
-            d = yaml.safe_load(open(f, encoding='utf-8')) or {}
+            d = yaml.safe_load(_read_text(f)) or {}
         except Exception:
             continue
         yield os.path.relpath(f, REPO), d
@@ -1166,7 +1218,7 @@ def check_recordenemy_knows_every_raw_pid(fail):
         m = _re.search(r'^%s\s*=\s*\'(0x[0-9a-fA-F]+)\'' % _re.escape(const), src, _re.M)
         if m:
             pids[uid] = int(m.group(1), 16)
-    harness = open(os.path.join(REPO, 'tools', 'playtest', 'harness.lua'), encoding='utf-8').read()
+    harness = _read_text(os.path.join(REPO, 'tools', 'playtest', 'harness.lua'))
     bench = {uid: int(pid, 16) for uid, pid
              in _re.findall(r'\["([\w-]+)"\]\s*=\s*(0x[0-9a-fA-F]+)', harness)}
     for uid, pid in sorted(pids.items()):
@@ -2268,7 +2320,7 @@ def check_tool_refs_exist(fail):
         return subprocess.run(['git', 'check-ignore', '-q', rel], cwd=REPO).returncode == 0
 
     for d in _docs() + _handwritten_sources():
-        text = open(d, encoding='utf-8').read()
+        text = _read_text(d)
         rel = os.path.relpath(d, REPO)
         for prefix, pat in (('tools', tool_pat), ('docs', doc_pat)):
             for m in pat.findall(text):
@@ -2412,7 +2464,7 @@ def check_generated_indexes_fresh(fail):
                      (gen_decisions_index, 'docs/decisions.md')):
         path = os.path.join(REPO, rel)
         want = mod.generate()[0]
-        have = open(path, encoding='utf-8').read() if os.path.isfile(path) else None
+        have = _read_text(path) if os.path.isfile(path) else None
         if have != want:
             fail.append('%s is stale vs the YAML -- regenerate: python3 tools/%s.py'
                         % (rel, mod.__name__))
@@ -2436,7 +2488,7 @@ def check_engine_guards_present(fail):
     # orchestrated from tools/build_campaign.py (#50 file seam). Two precise checks per
     # hook: it must be DEFINED in the engine-hooks module AND CALLED from the orchestrator.
     # A refactor that drops either side fails here loudly.
-    eh = open(os.path.join(REPO, 'tools', 'inject', 'engine_hooks.py'), encoding='utf-8').read()
+    eh = _read_text(os.path.join(REPO, 'tools', 'inject', 'engine_hooks.py'))
     bc = _injector().injector_source()
     for fn, mechanic in (
             ('_patch_player_start_cursor_guard',
@@ -2518,7 +2570,7 @@ def _campaign_character_ids():
     ids = set()
     for sub in ('pcs', 'npcs'):
         for f in glob.glob(os.path.join(REPO, 'campaigns/**', sub, '*.yaml'), recursive=True):
-            m = re.search(r'(?m)^id:\s*([A-Za-z0-9_-]+)', open(f, encoding='utf-8').read())
+            m = re.search(r'(?m)^id:\s*([A-Za-z0-9_-]+)', _read_text(f))
             if m:
                 ids.add(m.group(1).lower())
     return ids
@@ -2605,7 +2657,7 @@ def check_engine_campaign_agnostic(fail):
     for g in ENGINE_SOURCE_GLOBS:
         for path in glob.glob(os.path.join(REPO, g), recursive=True):
             rel = os.path.relpath(path, REPO)
-            for tok, n in _engine_name_hits(ids, open(path, encoding='utf-8').read()):
+            for tok, n in _engine_name_hits(ids, _read_text(path)):
                 fail.append('engine: %s:%d names campaign character %r -- engine code must be '
                             'campaign-agnostic; inject it from YAML (AGENTS.md Engine/Content '
                             'Boundary Rule)' % (rel, n, tok))
@@ -2663,7 +2715,7 @@ def check_save_layout_stable(fail):
     if not os.path.isfile(header):
         print('check_save_layout_stable: skipping (fireemblem8u submodule not checked out)')
         return
-    found = _parse_save_layout_constants(open(header, encoding='utf-8').read())
+    found = _parse_save_layout_constants(_read_text(header))
     fail.extend(_save_layout_drift(found))
 
 
@@ -2803,7 +2855,7 @@ def check_every_test_actually_runs(fail):
     """
     for path in sorted(glob.glob(os.path.join(REPO, 'tools', 'test_*.py'))
                        + glob.glob(os.path.join(REPO, 'tools', 'playtest', 'test_*.py'))):
-        src = open(path, encoding='utf-8').read()
+        src = _read_text(path)
         try:
             tree = ast.parse(src)
         except SyntaxError as exc:
@@ -3183,6 +3235,53 @@ def check_every_gate_is_registered(fail):
                         'add it to the tuple (a check nothing runs cannot fail)' % name)
 
 
+CANARY_FILE = 'tools/test_check_canaries.py'
+
+
+def _canary_registry():
+    """({checks with a canary}, {checks declared uncanaried}) read out of CANARY_FILE by AST.
+
+    AST, not import: the canaries import build_campaign's world, and this runs on the lean
+    `checks` CI job, which has none of it."""
+    with open(os.path.join(REPO, CANARY_FILE), encoding='utf-8') as fh:
+        tree = ast.parse(fh.read(), CANARY_FILE)
+    found = {}
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id in ('CANARIES', 'UNCANARIED')
+                and isinstance(node.value, ast.Dict)):
+            found[node.targets[0].id] = {k.value for k in node.value.keys
+                                         if isinstance(k, ast.Constant)}
+    if 'CANARIES' not in found:
+        raise ValueError('%s has no literal CANARIES dict' % CANARY_FILE)
+    return found['CANARIES'], found.get('UNCANARIED', set())
+
+
+def check_every_gate_has_a_canary(fail):
+    """Every registered check proves it can FAIL (#407).
+
+    A guard that passes by checking nothing looks exactly like one that passes because the
+    tree is clean -- #405's camera check, #401's MS_* walk, the fingerprint's first cut. Each
+    registered check carries a canary in CANARY_FILE: the real check, run with one input
+    doctored bad, which must produce a named failure. `test_check_canaries.py` RUNS them;
+    this makes sure a new check cannot skip having one, including on the lean CI job."""
+    try:
+        canaried, excused = _canary_registry()
+    except (OSError, SyntaxError, ValueError) as exc:
+        fail.append('check_every_gate_has_a_canary: cannot read the canary registry: %s' % exc)
+        return
+    names = {c.__name__ for c in CHECKS}
+    for name in sorted(names - canaried - excused):
+        fail.append('%s has no canary in %s -- add one that doctors a real input and names the '
+                    'failure it must produce, or declare it in UNCANARIED with the reason. A '
+                    'check never watched failing cannot be told apart from one that checks '
+                    'nothing.' % (name, CANARY_FILE))
+    for name in sorted((canaried | excused) - names):
+        fail.append('%s registers a canary for %s, which is not a registered check'
+                    % (CANARY_FILE, name))
+
+
 def check_build_workflow_filters_agree(fail):
     """build.yml's two `paths-ignore` lists must be identical, and must stay an allowlist.
 
@@ -3363,7 +3462,8 @@ CHECKS = (
     check_build_workflow_filters_agree, check_decision_records_wellformed,
     check_decision_citations_resolve,
     check_message_literals_are_registered, check_handoff_only_on_main, check_lane_ownership,
-    check_every_gate_is_registered, check_map_sidecar_routes_agree,
+    check_every_gate_is_registered, check_every_gate_has_a_canary,
+    check_map_sidecar_routes_agree,
 )
 
 

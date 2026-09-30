@@ -44,7 +44,10 @@ def load_all(campaign=CAMPAIGN):
     """
     key = tuple((p, os.stat(p).st_mtime_ns, os.stat(p).st_size) for p in paths(campaign))
     if key not in _CACHE:
-        out = [yaml_load(open(p, encoding='utf-8')) for p in paths(campaign)]
+        out = []
+        for p in paths(campaign):
+            with open(p, encoding='utf-8') as fh:
+                out.append(yaml_load(fh))
         out.sort(key=lambda c: int(c['chapter_number']))
         _CACHE.clear()             # one campaign at a time; never grow without bound
         _CACHE[key] = out
