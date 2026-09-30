@@ -397,16 +397,38 @@ def check_python_compiles(fail):
 
 # The canaries (#407) re-prove that every check can fail: 49 real check runs, ~55 CPU-seconds,
 # and the test phase is throughput-bound, so they cost the hook ~15s wherever they sit. Their
-# answer only moves when CHECK code moves, so the pre-commit hook (which sets MS_PRECOMMIT=1)
-# runs them only when a commit stages one of these; `make check`, `make test` and CI always do.
-CANARY_TRIGGERS = ('tools/check.py', 'tools/test_check_canaries', 'tools/inject/source.py')
+# answer moves when CHECK code moves (any Python under tools/ -- check logic lives in callsites,
+# declared, matrix, inject.hosts and more) or when a file a canary DOCTORS moves the anchor it
+# plants at (DOCTORED_FILES, read from CANARY_FILE). The pre-commit hook (MS_PRECOMMIT=1) runs
+# them only then; `make check`, `make test` and CI always do.
+def _canary_doctored_files():
+    with open(os.path.join(REPO, CANARY_FILE), encoding='utf-8') as fh:
+        tree = ast.parse(fh.read(), CANARY_FILE)
+    for node in tree.body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and getattr(node.targets[0], 'id', None) == 'DOCTORED_FILES'):
+            return set(ast.literal_eval(node.value))
+    raise ValueError('%s has no literal DOCTORED_FILES tuple' % CANARY_FILE)
+
+
+def _staged_files():
+    """What this commit stages. Keeps GIT_INDEX_FILE, which `_git` strips: under
+    `git commit -a` / `git commit <paths>` the hook runs against a TEMPORARY index, and the
+    default one would say nothing is staged."""
+    import subprocess
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith('GIT_') or k == 'GIT_INDEX_FILE'}
+    r = subprocess.run(['git', '-C', REPO, 'diff', '--cached', '--name-only'],
+                       capture_output=True, text=True, env=env)
+    return [line for line in r.stdout.splitlines() if line.strip()]
 
 
 def _hook_skips_canaries():
     if os.environ.get('MS_PRECOMMIT') != '1':
         return False
-    staged = _git(['diff', '--cached', '--name-only']).splitlines()
-    return not any(path.startswith(CANARY_TRIGGERS) for path in staged)
+    doctored = _canary_doctored_files()
+    return not any((path.startswith('tools/') and path.endswith('.py')) or path in doctored
+                   for path in _staged_files())
 
 
 def check_tests_pass(fail):
@@ -439,8 +461,8 @@ def check_tests_pass(fail):
     paths = run_tests.test_files()
     if _hook_skips_canaries():
         paths = [p for p in paths if not os.path.basename(p).startswith('test_check_canaries')]
-        print('check_tests_pass: canaries skipped in the hook -- nothing under %s is staged; '
-              '`make check`, `make test` and CI run them' % ', '.join(CANARY_TRIGGERS))
+        print('check_tests_pass: canaries skipped in the hook -- no tools/ Python and no file '
+              'a canary doctors is staged; `make check`, `make test` and CI run them')
     for rel, output in run_tests.run(paths):
         tail = output.strip().splitlines()
         fail.append('unit tests fail: %s (%s)' % (rel, tail[-1] if tail else 'see output'))

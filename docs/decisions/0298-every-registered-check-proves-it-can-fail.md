@@ -71,7 +71,17 @@ each, and a test fails if a shard has no file -- a shard nothing runs is canarie
 
 Sharding removed the long pole and not the cost: the test phase is THROUGHPUT-bound (332
 CPU-seconds over 8 workers), so ~55 CPU-seconds of canaries cost the hook ~15s wherever they
-sit. Their answer only moves when check code moves, so the pre-commit hook (`MS_PRECOMMIT=1`)
-skips them unless the commit stages `tools/check.py`, a canary file or `inject/source.py`,
-and prints that it did. `make check`, `make test` and CI always run them, so a canary whose
-anchor drifted under a content edit is caught before merge, one step later.
+sit. The pre-commit hook (`MS_PRECOMMIT=1`) therefore runs them only when their answer can
+move, and prints when it skipped them; `make check`, `make test` and CI always run them.
+
+Their answer moves in two ways, and the first cut named neither whole (review of #414):
+
+- **Check code**, which is any Python under `tools/`: check logic lives in `callsites`,
+  `declared`, `matrix`, `inject.hosts` and more, not only in `check.py`.
+- **A file a canary DOCTORS**, whose edit can move the anchor the fault is planted at.
+  `DOCTORED_FILES` lists them, and `doctored()` refuses any file it does not list, so the
+  trigger cannot fall behind the canaries.
+
+And the staged list is read from the index git is COMMITTING: `git commit -a` gives the hook
+a temporary index through `GIT_INDEX_FILE`, which the repo's `_git` helper strips on purpose,
+so it would have reported nothing staged and skipped the canaries on a `check.py` edit.

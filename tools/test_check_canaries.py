@@ -47,6 +47,23 @@ BC = 'tools/build_campaign.py'
 HARNESS = 'tools/playtest/harness.lua'
 # A guarded tool (tools/**, not a test, not the injector) to plant a bad line in.
 TOOL = 'tools/map_donor.py'
+# Every file a canary doctors, spelled out (check.py reads it with literal_eval). `doctored()`
+# refuses any other, so this cannot fall behind the
+# canaries -- and check.py reads it (by AST) to decide when the pre-commit hook must run them:
+# an edit here can move the anchor a canary plants its fault at.
+DOCTORED_FILES = (
+    '.github/workflows/build.yml', 'Makefile', 'campaigns/rime-of-the-frostmaiden/campaign.yaml',
+    'campaigns/rime-of-the-frostmaiden/chapters/ch01-the-iron-trail.yaml',
+    'campaigns/rime-of-the-frostmaiden/chapters/ch02-cold-welcome.yaml',
+    'campaigns/rime-of-the-frostmaiden/chapters/ch03-the-termalaine-mine.yaml',
+    'campaigns/rime-of-the-frostmaiden/chapters/ch06-the-maer-monster.yaml',
+    'docs/CHAPTERS.md', 'docs/CLASSES.md',
+    'docs/decisions/0297-the-injector-is-every-file-of-it-and-has-one-source-reader.md',
+    'fireemblem8u/include/bmsave.h', 'tools/build_campaign.py', 'tools/inject/engine_hooks.py',
+    'tools/map_donor.py', 'tools/map_placement_preview.py', 'tools/playtest/ch06.lua',
+    'tools/playtest/controller.lua', 'tools/playtest/harness.lua',
+    'tools/test_check_canaries.py', 'tools/test_check_chapter_schema.py', 'tools/test_map_donor.py',
+)
 HAS_DECOMP = os.path.isdir(os.path.join(REPO, 'fireemblem8u', 'src'))
 HAS_LUA = shutil.which('lua') is not None
 
@@ -69,6 +86,10 @@ def doctored(edits):
     "the check stayed silent" -- blaming a working check for a canary whose anchor moved.
     And "was read" is half the proof: a check that never opens the file it is supposed to
     guard is exactly the vacuous pass this file exists to catch."""
+    undeclared = sorted(set(edits) - set(DOCTORED_FILES))
+    if undeclared:
+        raise AssertionError('canary doctors %s, which DOCTORED_FILES does not list -- add it, or '
+                             'the hook skips the canaries when that file changes' % undeclared)
     targets = {os.path.realpath(os.path.join(REPO, rel)): fn for rel, fn in edits.items()}
     served, unchanged = set(), set()
     real_open = builtins.open
@@ -552,21 +573,46 @@ class TheHookSkipsCanariesOnlyWhenNoCheckCodeIsStaged(unittest.TestCase):
     def _skips(self, staged, hook='1'):
         env = {'MS_PRECOMMIT': hook} if hook else {}
         with mock.patch.dict(os.environ, env, clear=False), \
-                mock.patch.object(check, '_git', lambda args: '\n'.join(staged)):
+                mock.patch.object(check, '_staged_files', lambda: list(staged)):
             if not hook:
                 os.environ.pop('MS_PRECOMMIT', None)
             return check._hook_skips_canaries()
 
     def test_a_content_commit_skips_them(self):
-        self.assertTrue(self._skips([CH01, 'docs/decisions.md']))
+        self.assertTrue(self._skips([CHAPTERS + 'ch05-the-elven-tomb.yaml', 'docs/roadmap.md']))
 
-    def test_a_commit_touching_check_code_runs_them(self):
-        for path in ('tools/check.py', 'tools/test_check_canaries_shard2.py',
-                     'tools/inject/source.py'):
-            self.assertFalse(self._skips([CH01, path]), path)
+    def test_any_staged_tool_python_runs_them(self):
+        # Check logic lives across tools/: callsites, declared, matrix, inject.hosts, ...
+        for path in ('tools/check.py', 'tools/callsites.py', 'tools/playtest/matrix.py',
+                     'tools/inject/hosts.py', 'tools/test_check_canaries_shard2.py'):
+            self.assertFalse(self._skips(['docs/roadmap.md', path]), path)
+
+    def test_a_file_a_canary_doctors_runs_them(self):
+        # An edit there can move the anchor the canary plants its fault at.
+        for path in (CH01, HARNESS, 'Makefile', '.github/workflows/build.yml'):
+            self.assertFalse(self._skips([path]), path)
 
     def test_outside_the_hook_they_always_run(self):
         self.assertFalse(self._skips([CH01], hook=None))
+
+    def test_the_staged_list_reads_the_index_git_is_committing(self):
+        """`git commit -a` hands the hook a TEMPORARY index via GIT_INDEX_FILE; reading the
+        default one says nothing is staged and would skip the canaries on a check.py edit."""
+        seen = {}
+
+        def fake_run(cmd, **kw):
+            seen.update(kw['env'])
+            return mock.Mock(stdout='tools/check.py\n')
+        env = {'GIT_INDEX_FILE': '/tmp/next-index', 'GIT_DIR': '/elsewhere/.git'}
+        with mock.patch.dict(os.environ, env), mock.patch('subprocess.run', fake_run):
+            self.assertEqual(['tools/check.py'], check._staged_files())
+        self.assertEqual('/tmp/next-index', seen.get('GIT_INDEX_FILE'))
+        self.assertNotIn('GIT_DIR', seen)
+
+    def test_an_undeclared_doctoring_is_refused(self):
+        with self.assertRaisesRegex(AssertionError, 'DOCTORED_FILES'):
+            with doctored({'docs/roadmap.md': append('x')}):
+                pass
 
 
 class TheRegistryIsComplete(unittest.TestCase):
