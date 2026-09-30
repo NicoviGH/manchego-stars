@@ -50,7 +50,14 @@ positional `29` in a function whose width is its sixth parameter, so the value b
 `slot`. That is the check working. It binds arguments by signature, not by position, which
 is why it exists.
 
-Two harness details a later canary will meet: `inject.source` memoises by file mtime, and a
-doctored read changes no mtime, so `doctored()` clears those caches on entry and exit; and
-a doctoring that changes nothing raises, so a canary whose anchor text has moved says so
-rather than quietly testing the real, clean file.
+Three harness details a later canary will meet:
+
+- `inject.source` memoises by file mtime, and a doctored read changes no mtime, so
+  `doctored()` clears those caches on entry and exit.
+- **`doctored()` asserts on EXIT that every target was read and actually changed**, never
+  inside `open()`. The first version raised from `open()` when an anchor had moved, and
+  several checks swallow a read error (`_chapters()` skips a file it cannot parse), so the
+  error came back as "the check stayed silent" -- blaming a working check for a stale canary
+  (review of #414).
+- "Was read" is the other half of the proof: a canary also fails when the check never opens
+  the file it doctored, which is a check that stopped reading its own input.

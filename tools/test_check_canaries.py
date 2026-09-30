@@ -61,19 +61,26 @@ def _clear_read_caches():
 
 @contextlib.contextmanager
 def doctored(edits):
-    """Serve `edits[rel](real_text)` for every READ of that repo path, and nothing else."""
+    """Serve `edits[rel](real_text)` for every READ of that repo path, and nothing else.
+
+    Asserts on exit, OUTSIDE the check, that every target was read and actually changed. A
+    miss is recorded rather than raised inside `open()`: several checks swallow a read error
+    (`_chapters()` skips a file it cannot parse), so an error raised there would come back as
+    "the check stayed silent" -- blaming a working check for a canary whose anchor moved.
+    And "was read" is half the proof: a check that never opens the file it is supposed to
+    guard is exactly the vacuous pass this file exists to catch."""
     targets = {os.path.realpath(os.path.join(REPO, rel)): fn for rel, fn in edits.items()}
+    served, unchanged = set(), set()
     real_open = builtins.open
 
     def fake_open(file, mode='r', *args, **kwargs):
         if (isinstance(file, (str, os.PathLike)) and not set(mode) & set('wax+')
                 and os.path.realpath(os.fspath(file)) in targets):
+            path = os.path.realpath(os.fspath(file))
             with real_open(file, 'r', encoding='utf-8') as fh:
                 text = fh.read()
-            new = targets[os.path.realpath(os.fspath(file))](text)
-            if new == text:
-                raise AssertionError('canary doctoring of %s changed nothing -- the anchor it '
-                                     'edits has moved' % file)
+            new = targets[path](text)
+            (unchanged if new == text else served).add(path)
             return io.BytesIO(new.encode('utf-8')) if 'b' in mode else io.StringIO(new)
         return real_open(file, mode, *args, **kwargs)
 
@@ -84,6 +91,15 @@ def doctored(edits):
             yield
     finally:
         _clear_read_caches()
+    moved = sorted(os.path.relpath(p, REPO) for p in unchanged - served)
+    unread = sorted(os.path.relpath(p, REPO) for p in set(targets) - served - unchanged)
+    if moved:
+        raise AssertionError('canary doctoring changed nothing in %s -- the anchor it edits has '
+                             'moved; fix the canary, the check is not at fault' % moved)
+    if unread:
+        raise AssertionError('the check never READ %s, the input this canary doctors -- either '
+                             'the canary targets the wrong file or the check stopped reading '
+                             'its own input' % unread)
 
 
 class _Captured(io.StringIO):
@@ -502,6 +518,21 @@ class EveryCheckCanFail(unittest.TestCase):
                               '%s reported something, but not the planted fault:\n%s'
                               % (name, said[:2000]))
 
+
+
+class TheHarnessBlamesTheRightThing(unittest.TestCase):
+    """A canary that cannot plant its fault must say so -- not report the check as silent."""
+
+    def test_a_moved_anchor_is_reported_as_the_canary_s_fault(self):
+        # check_chapter_status reads chapters through _chapters(), which SWALLOWS a read error.
+        with self.assertRaisesRegex(AssertionError, 'anchor it edits has moved'):
+            with doctored({CH01: sub1(r'^no-such-anchor$', 'x')}):
+                run(check.check_chapter_status)
+
+    def test_a_check_that_never_reads_the_doctored_file_is_reported(self):
+        with self.assertRaisesRegex(AssertionError, 'never READ'):
+            with doctored({'docs/CLASSES.md': append('x')}):
+                run(check.check_chapter_status)
 
 
 class TheRegistryIsComplete(unittest.TestCase):
