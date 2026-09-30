@@ -155,7 +155,7 @@ class TheBuildStateItTouches(unittest.TestCase):
         try:
             fp.REPO = tmp
             fp.restore_decomp = lambda: None
-            fp.inject = lambda: stashed.extend(
+            fp.inject = lambda *a: stashed.extend(
                 n for n in fp.BUILD_STATE + fp.CACHES
                 if not os.path.exists(os.path.join(tmp, n)))
             fp._ignored_paths = lambda: set()
@@ -218,6 +218,35 @@ class DeletionIsOnlyComparableWhereBothRunsCouldDelete(unittest.TestCase):
             src = fh.read()
         self.assertLess(src.index('load_manifest(args.check)'),
                         src.index('manifest = build('))
+
+
+class TheFlags(unittest.TestCase):
+    """The default build never reaches a boot flag's code, so the gate takes the flags."""
+
+    def test_the_flags_reach_the_injector_command(self):
+        ran = []
+        real = fp.subprocess.run
+        try:
+            fp.subprocess.run = lambda cmd, **k: ran.append(cmd)
+            fp.inject(['--ch05-boot', '--ch05-lupin'])
+        finally:
+            fp.subprocess.run = real
+        self.assertEqual(['--ch05-boot', '--ch05-lupin'], ran[0][-2:])
+
+    def test_a_manifest_from_other_flags_is_refused_BEFORE_the_injection_runs(self):
+        """Two configurations inject different trees: comparing them measures the flags."""
+        path = os.path.join(tempfile.mkdtemp(), 'boot.json')
+        with open(path, 'w') as fh:
+            json.dump({'files': {}, 'precondition': [], 'flags': ['--ch05-boot']}, fh)
+        argv, build = sys.argv, fp.build
+        try:
+            sys.argv = ['injection_fingerprint.py', '--check', path]
+            fp.build = lambda **k: self.fail('injected before refusing the manifest')
+            with self.assertRaises(SystemExit) as caught:
+                fp.main()
+        finally:
+            sys.argv, fp.build = argv, build
+        self.assertIn("recorded with flags ['--ch05-boot']", str(caught.exception))
 
 
 class TheStash(unittest.TestCase):
