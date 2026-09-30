@@ -72,11 +72,26 @@ def _find_brace_block(text, marker, path):
 # question of when, not whether.
 SCENE_VALIDATORS = []
 
+# The modules that REGISTER one, loaded by name on first use -- not imported here, which would
+# pull the cast (and Pillow) into this layer. Importing build_campaign used to register the
+# #337 check as a side effect; once the injector split (#389), a caller that imported only a
+# chapter module wrote its scenes with no check at all. Loading on use makes "every scene is
+# checked" independent of who imported what.
+SCENE_VALIDATOR_MODULES = ('inject.scene_actors',)
+
+
+def scene_validators():
+    """Every registered scene validator, with the modules that register them loaded first."""
+    import importlib
+    for name in SCENE_VALIDATOR_MODULES:
+        importlib.import_module(name)
+    return SCENE_VALIDATORS
+
 
 def _replace_brace_block(text, marker, new_body, path):
     """Replace the `{...}` after `marker` with `new_body` (a `{...}` string)."""
     if marker.startswith('EventScr_'):
-        for validate in SCENE_VALIDATORS:
+        for validate in scene_validators():
             validate(new_body, marker.split('[')[0])
     s, e = _find_brace_block(text, marker, path)
     return text[:s] + new_body + text[e:]

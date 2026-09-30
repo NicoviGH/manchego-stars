@@ -212,7 +212,7 @@ def declare_event_script(path, symbol, body, comment):
     # The campaign's OWN scenes are defined here, not written through `_replace_brace_block`,
     # so the #337 cutscene-actor check has to run on this path too -- it is the path ch05's
     # talks and villages take, and the one ch06's Messie scene will (#337).
-    for validate in _decomp.SCENE_VALIDATORS:
+    for validate in _decomp.scene_validators():
         validate(body, symbol)
     with open(path, 'a', encoding='utf-8') as f:
         f.write('\n/* %s */\nCONST_DATA EventListScr %s[] = %s;\n' % (comment, symbol, body))

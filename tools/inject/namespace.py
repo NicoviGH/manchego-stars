@@ -56,10 +56,14 @@ def injector_constants(pattern):
 def stubbed(name, value):
     """Rebind `name` to `value` in every injector module that binds it, then restore it.
 
-    What `bc.NAME = value` did while the injector was one namespace. Raises KeyError when no
-    module binds the name, so a stub of a renamed or deleted name fails instead of passing."""
+    What `bc.NAME = value` did while the injector was one namespace -- and a little more: a name
+    DEFINED in several modules to the same value (a path) is stubbed in all of them. Raises
+    KeyError when no module binds the name, so a stub of a renamed or deleted name fails
+    instead of passing."""
     real = injector_constants('^%s$' % re.escape(name)).get(name)
-    holders = [m for m in injector_modules() if name in vars(m) and vars(m)[name] is real]
+    # EQUAL, not identical: REPO and DECOMP are defined (not imported) in four modules each,
+    # so the same path is four string objects, and matching by identity stubbed one of them.
+    holders = [m for m in injector_modules() if name in vars(m) and vars(m)[name] == real]
     if not holders:
         raise KeyError('no injector module binds %s' % name)
     for module in holders:

@@ -136,6 +136,21 @@ class TheGuardRidesTheWriteItself(unittest.TestCase):
                 text, 'EventScr_New[] =',
                 '{\n    CUMO_CHAR(CHARACTER_EIRIKA)\n    ENDA\n}', 'test.h')
 
+    def test_the_guard_is_armed_however_the_writer_was_imported(self):
+        """Importing build_campaign used to register it; after #389 a caller that imports
+        only a chapter module -- a test, a tool, a future driver -- wrote scenes unchecked.
+        A fresh interpreter, because this module imports scene_actors itself."""
+        import subprocess
+        code = ('import sys; sys.path.insert(0, %r)\n'
+                'from inject import decomp\n'
+                'decomp._replace_brace_block("CONST_DATA EventListScr EventScr_New[] = '
+                '{\\n    ENDA\\n};\\n", "EventScr_New[] =", '
+                '"{\\n    CUMO_CHAR(CHARACTER_EIRIKA)\\n    ENDA\\n}", "test.h")\n'
+                % os.path.dirname(os.path.abspath(__file__)))
+        run = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+        self.assertNotEqual(0, run.returncode, 'the scene was written with no actor check')
+        self.assertIn('braulo', run.stderr)
+
     def test_a_non_scene_block_is_not_inspected(self):
         """UnitDefs and tables go through the same writer and are not scenes."""
         from inject import decomp
@@ -152,7 +167,7 @@ class TheGuardRidesTheWriteItself(unittest.TestCase):
         of this whole guard unchecked."""
         import inspect
         src = inspect.getsource(inject.chapters.ch05.declare_event_script)
-        self.assertIn('SCENE_VALIDATORS', src)
+        self.assertIn('scene_validators()', src)
 
     def test_an_MS_scene_name_is_not_filtered_out(self):
         """Campaign scenes are named MS_*, not EventScr_*, by `_assert_ms_symbol`."""

@@ -34,7 +34,7 @@ names ch05's pids), and the shared layer reads them too (`messages` registers ev
 `cast` binds boss pids to faces). No layering of whole chapter modules is acyclic under that. A
 leaf of public ids is, and it is the same shape `hosts.py` already had for host slots.
 
-## Three consequences for code that is not moving
+## Consequences for code that is not moving
 
 - **A registry that scanned `globals()` now scans `inject.namespace`.** `injector_message_ids`,
   `raw_pid_claims` and `chapter_yaml_for` discover ids from constant NAMES. Split across modules,
@@ -44,8 +44,14 @@ leaf of public ids is, and it is the same shape `hosts.py` already had for host 
 - **A test stubs with `inject.namespace.stubbed(name, value)`.** `from inject.paths import REPO`
   gives each importer its own binding, so `mock.patch.object(inject.paths, 'REPO', tmp)` leaves
   the code under test reading the real path: a stub that stubs nothing. `stubbed` rebinds the
-  name in every injector module that holds it, which is what `bc.REPO = tmp` did while there was
-  one namespace. It raises if no module binds the name.
+  name in every injector module that holds an EQUAL value (REPO and DECOMP are defined, not
+  imported, in four modules each, so identity missed three), which is what `bc.REPO = tmp`
+  did while there was one namespace. It raises if no module binds the name.
+- **Every scene write is checked, however its writer was imported.** Importing `build_campaign`
+  registered the #337 cutscene-actor validator as a side effect; after the split, a caller that
+  imported only a chapter module wrote scenes unchecked. `decomp.scene_validators()` loads the
+  registering modules (`SCENE_VALIDATOR_MODULES`) by name on first use, so the check no longer
+  depends on import order.
 - **Callers outside the injector name the module**: `inject.cast.PORTRAIT_MAP`, not `bc.X`.
   `build_campaign` re-exports nothing, so a stale `bc.X` fails with AttributeError.
 
