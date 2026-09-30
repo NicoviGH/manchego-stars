@@ -40,6 +40,14 @@ on:
       - 'docs/decisions.md'
       - 'docs/PRD.md'
       - 'docs/roadmap.md'
+  # Manual run, optionally WITHOUT the vanilla-build cache: the proof that a cached build and
+  # a clean one produce the same ROM (compare the "ROM checksum" step of both).
+  workflow_dispatch:
+    inputs:
+      no_cache:
+        description: 'Build the decomp from scratch (skip the vanilla-build cache)'
+        type: boolean
+        default: false
 
 jobs:
   # Unit tests (Python combat/difficulty/build + pure-Lua playtest logic). Needs the
@@ -110,11 +118,67 @@ jobs:
       - name: Build decomp tools
         run: cd fireemblem8u && ./build_tools.sh
 
+      # Deterministic, not /dev/urandom: vanilla `.s` files incbin from it, so a random mock
+      # made every build unique -- no cached output could be reused and no two ROMs compared.
       - name: Mock base ROM (no copyrighted ROM needed to verify the build links)
-        run: head -c 16M /dev/urandom > fireemblem8u/baserom.gba
+        run: python3 -c "import random, sys; sys.stdout.buffer.write(random.Random(8).randbytes(16 << 20))" > fireemblem8u/baserom.gba
+
+      # ~120s of every build was the VANILLA decomp's own assets (6,000 gbagfx conversions,
+      # 2,200 compressions, the music) -- a function of the submodule commit and the toolchain
+      # and nothing we author. So the vanilla build's outputs are cached on exactly those, and
+      # `make` then rebuilds only what our injection touches. Sources are pinned to an old
+      # mtime first so the restored outputs read as up to date; the decomp's rules depend on
+      # sources only (never on tool binaries), and header deps ride in the cached .d files.
+      - name: Pin decomp source mtimes
+        run: |
+          cd fireemblem8u
+          git ls-files -z | xargs -0 touch -h -d '2000-01-01T00:00:00Z'
+          touch -d '2000-01-01T00:00:00Z' baserom.gba
+
+      # The key names everything the cached objects were BUILT WITH, not labels someone bumps:
+      # the submodule commit, the runner image, the ARM binutils version, and the agbcc
+      # binaries actually installed (the agbcc cache rebuilds from pret/agbcc's tip on a miss).
+      - name: Vanilla build cache key
+        id: vanilla
+        run: |
+          toolchain=$( { echo "$ImageOS $ImageVersion"; arm-none-eabi-as --version | head -1;
+                         find fireemblem8u/tools/agbcc -type f -print0 | sort -z | xargs -0 sha1sum; } \
+                       | sha1sum | cut -c1-16 )
+          echo "key=vanilla-build-${{ runner.os }}-$(git -C fireemblem8u rev-parse HEAD)-$toolchain-mock-v1" >> "$GITHUB_OUTPUT"
+
+      - name: Restore vanilla build
+        id: vanilla-cache
+        if: ${{ !inputs.no_cache }}
+        uses: actions/cache/restore@v4
+        with:
+          path: vanilla-build.tar
+          key: ${{ steps.vanilla.outputs.key }}
+
+      - name: Unpack vanilla build (cache hit)
+        if: steps.vanilla-cache.outputs.cache-hit == 'true'
+        run: tar -xf vanilla-build.tar -C fireemblem8u
+
+      - name: Build vanilla decomp and save it (cache miss only)
+        if: ${{ !inputs.no_cache && steps.vanilla-cache.outputs.cache-hit != 'true' }}
+        run: |
+          cd fireemblem8u
+          git ls-files -o -z | sort -z > ../before.lst
+          make fireemblem8.gba -j"$(nproc)"
+          git ls-files -o -z | sort -z > ../after.lst
+          comm -z -13 ../before.lst ../after.lst | tar --null -T - -cf ../vanilla-build.tar
+
+      - name: Save vanilla build
+        if: ${{ !inputs.no_cache && steps.vanilla-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: vanilla-build.tar
+          key: ${{ steps.vanilla.outputs.key }}
 
       - name: make green (inject campaign + build ROM)
         run: make CAMPAIGN=rime-of-the-frostmaiden
+
+      - name: ROM checksum
+        run: sha1sum fireemblem8u/fireemblem8.gba
 
       # Text is compiled from source, so the mock base ROM doesn't affect it. This is
       # the regression gate for the text-table corruption class (terminator parity,
