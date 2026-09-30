@@ -9,8 +9,8 @@ issues: []
 # A test below `unittest.main()` is not a test
 
 `make test` — what CI runs — executes each file as a **script**, so `unittest.main()` collects
-only what is defined by the time it is reached and then exits. In `tools/test_build_campaign.py`
-that call sat at line ~4776 of a 5723-line file, and the **twelve TestCase classes below it — 88
+only what is defined by the time it is reached and then exits. In the injector's test file (then
+one file, since split by #389) that call sat at line ~4776 of a 5723-line file, and the **twelve TestCase classes below it — 88
 tests, including all 26 of `Ch04Stage4Scenes` — had never run.**
 
 **Nothing could have told us.** The file passed. The suite was green. `python3 -m unittest` still

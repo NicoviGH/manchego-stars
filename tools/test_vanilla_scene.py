@@ -132,7 +132,7 @@ class VanillaSceneChannels(unittest.TestCase):
 class MessageBodiesComeFromHead(unittest.TestCase):
     """The bodies are read at HEAD, never from the working tree.
 
-    `texts/texts.txt` is the FIRST entry in `build_campaign.PATCHED_DECOMP_FILES` -- the build
+    `texts/texts.txt` is the FIRST entry in `inject.warm.PATCHED_DECOMP_FILES` -- the build
     rewrites it in place with OUR campaign text under vanilla's own MSG ids. A miner that
     opened it directly would hand our own lines back as the vanilla pacing benchmark, which is
     worse than under-reporting because it reads as independent evidence. Found reviewing

@@ -21,7 +21,8 @@ import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import map_tileset_tool as mt  # noqa: E402
-import build_campaign as bc  # noqa: E402
+import inject.decomp  # noqa: E402
+import inject.maps  # noqa: E402
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAVE = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps/tilesets/cave-interior')
@@ -446,8 +447,8 @@ class TestFogHalfOfTheTilesetPalette(unittest.TestCase):
         self.assertGreater(fog, 0, 'the vendored FOG half is not')
 
     def test_derived_fog_half_carries_the_winter_lit_half(self):
-        derived = bc.derive_fog_banks(self._snow_palette(),
-                                      bc.TILESET_FOG_HAZE['snowy-bern'])
+        derived = inject.maps.derive_fog_banks(self._snow_palette(),
+                                      inject.maps.TILESET_FOG_HAZE['snowy-bern'])
         banks = self._banks(derived)
         self.assertEqual(0, sum(self._greenish(c) for b in banks[5:] for c in b))
         # Fog is a HAZE, not a repaint: every fog colour is lighter than its lit twin, and
@@ -461,7 +462,7 @@ class TestFogHalfOfTheTilesetPalette(unittest.TestCase):
 
     def test_lit_half_is_untouched(self):
         pal = self._snow_palette()
-        derived = bc.derive_fog_banks(pal, bc.TILESET_FOG_HAZE['snowy-bern'])
+        derived = inject.maps.derive_fog_banks(pal, inject.maps.TILESET_FOG_HAZE['snowy-bern'])
         self.assertEqual(pal[:5 * 32], derived[:5 * 32])
 
 
@@ -725,7 +726,7 @@ class TestVisitableTerrainSurvivesTheReskin(unittest.TestCase):
             self.snow_terrain = f.read()[8192:]
         self.names = {int(value, 0): name for name, value in re.findall(
             r'(TERRAIN_[A-Z0-9_]+)\s*=\s*(0[xX][0-9A-Fa-f]+|\d+)',
-            bc.vanilla_decomp_text('include/constants/terrains.h'))}
+            inject.decomp.vanilla_decomp_text('include/constants/terrains.h'))}
 
     def test_a_visitable_tile_stays_visitable_through_the_learned_map(self):
         broken = []
@@ -763,7 +764,7 @@ class TestCh04MapAndRosterPlacement(unittest.TestCase):
         tileset = mt._tileset_from_dir(os.path.join(maps, 'tilesets/snowy-bern'))
         names = {int(value, 0): name for name, value in re.findall(
             r'(TERRAIN_[A-Z0-9_]+)\s*=\s*(0[xX][0-9A-Fa-f]+|\d+)',
-            bc.vanilla_decomp_text('include/constants/terrains.h'))}
+            inject.decomp.vanilla_decomp_text('include/constants/terrains.h'))}
         for x, y in ((8, 2), (1, 11)):
             metatile = struct.unpack_from('<H', mar, (y * width + x) * 2)[0] >> 5
             self.assertEqual('TERRAIN_VILLAGE_REGULAR',

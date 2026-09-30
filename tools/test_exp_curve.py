@@ -254,7 +254,7 @@ class Simulation(unittest.TestCase):
     def test_a_recruit_earns_nothing_from_the_chapters_it_was_not_in(self):
         """basil and sahnar join in ch05 and every recruit joins at level 1. Crediting them
         with ch01-ch04 would hand four units an exp history they never had and pull the
-        typical column up with it (`build_campaign.recruit_chapter_number` is the same
+        typical column up with it (`inject.hosting.recruit_chapter_number` is the same
         answer `cast_available_at` sizes the deploy caps from)."""
         before = [r for r in self.rows if r['chapter_number'] == 4][0]
         self.assertEqual(1, before['levels']['basil'])

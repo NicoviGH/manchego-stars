@@ -151,7 +151,7 @@ class IntroCamera(unittest.TestCase):
 
 
 class PassOwnership(unittest.TestCase):
-    """`OWNED_BY_PASS` is a claim about `build_campaign`'s code, so it is checked against that
+    """`OWNED_BY_PASS` is a claim about the injector's code, so it is checked against that
     code. A claim nobody rechecks is how a field keeps a justification after the pass that
     justified it was renamed or stopped writing it -- the failure mode the whole census is
     about, one level up."""

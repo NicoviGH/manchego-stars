@@ -15,6 +15,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject.namespace import stubbed  # noqa: E402
 import check                                            # noqa: E402
 
 SAFE = (0x08, 0x03, 0, 0)      # ActionInRange_ExceptCivilian -- cannot target a hull
@@ -86,10 +87,7 @@ class TheGateSurvivesAnUngroundedRosterEntry(unittest.TestCase):
         EXISTS, not which exception came back. Driven here by a bogus tileset name rather
         than an injected exception, because the previous test injected a `ValueError` that no
         real code path raises and so proved nothing."""
-        import build_campaign as bc
-        real = bc.map_tileset
-        bc.map_tileset = lambda meta: 'snowy-bern-NOPE'
-        try:
+        with stubbed('map_tileset', lambda meta: 'snowy-bern-NOPE'):
             import io
             from contextlib import redirect_stdout
             buf = io.StringIO()
@@ -103,8 +101,6 @@ class TheGateSurvivesAnUngroundedRosterEntry(unittest.TestCase):
                              'the guard skipped on the tests job, so this test proves nothing')
             self.assertTrue(fail, 'an unreadable tileset must be reported, not skipped')
             self.assertTrue(any('ch06' in f for f in fail), fail)
-        finally:
-            bc.map_tileset = real
 
     def test_a_chapter_with_no_compiled_map_is_still_just_skipped(self):
         chap = {'id': 'ch99-planned', 'rescue_boats': [{'id': 'b', 'tile': [1, 1]}],

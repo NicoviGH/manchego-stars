@@ -53,7 +53,7 @@ wood without altering the shared palette or any existing metatile. Banks 5–9 a
 fog half, not spare palettes, so the authoring tool rejects them. No other Super Fields art is
 mixed into Snowy Bern.
 
-`build_campaign.inject_winter_tileset()` registers it as asset-table entries
+`inject.maps.inject_winter_tileset()` registers it as asset-table entries
 `ObjectTypeSnow` / `MapPaletteSnow` / `TileConfigurationSnow` and repoints the **test chapter**
 (the `inject_test_chapter` target) at it, so `make` + New Game load-tests the tileset in-engine.
 
@@ -63,7 +63,7 @@ mixed into Snowy Bern.
 from FE-Repo. It provides a second coherent winter visual language with native Snag /
 Bridge Snag terrain, expanded forests, and Fields-style buildings. It is an on-hand
 alternative, not a replacement for `snowy-bern`, and is deliberately not registered in
-`build_campaign.py` until a chapter selects the complete tileset.
+the injector until a chapter selects the complete tileset.
 
 - `Fields + Customs - Tileset.mapchip_config` → `snowy-fields.bin`
 - `Fields + Customs - Tileset Object Palette (Snow) {N426}.png` →
@@ -120,7 +120,8 @@ way; its test-map render is pinned pixel-exact against
    Hand-encoding, if ever needed: each `.mar` cell is 2 bytes encoding `metatile_index × 32`
    (so `mar_to_map`'s `>>3` yields the `.bin` value `metatile_index × 4`); the `atlas`
    subcommand renders which metatile is which.
-3. Register + wire it in `build_campaign.py`: `_register_tileset(campaign, '<name>', '<Stem>', …)`
+3. Register + wire it in the chapter's injector (`tools/inject/chapters/`, helpers in
+   `tools/inject/maps.py`): `_register_tileset(campaign, '<name>', '<Stem>', …)`
    once per tileset; per chapter, `_register_chapter_map(maps_dir, layout, comment)` reads the
    tileset from the layout's own `.json` `tileset` stamp (resolved via `TILESET_STEMS`), then
    `_retarget_host_chapter` sets the chapter's `chapter_settings.json` map indices. The winter

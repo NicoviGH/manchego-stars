@@ -16,7 +16,11 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import build_campaign as bc
+import inject.cast
+import inject.chapter_ids
+import inject.chapters.ch05
+import inject.hosting
+import inject.text
 import fe8_talk_font
 
 CAMPAIGN = 'rime-of-the-frostmaiden'
@@ -96,9 +100,9 @@ def _speakers():
     spell the same slot differently (`decisions.md` -> "A portrait SLOT name is not a face TAG").
     """
     out = {}
-    for uid, slot in list(bc.PORTRAIT_MAP.items()) + list(bc.GUEST_PORTRAIT_MAP.items()):
-        out.setdefault(bc._fid_tag(slot)[len('[FID_'):-1], uid)
-    out[bc._fid_tag(bc.PROLOGUE_SEPHEK_SLOT)[len('[FID_'):-1]] = 'sephek-kaltro'
+    for uid, slot in list(inject.cast.PORTRAIT_MAP.items()) + list(inject.cast.GUEST_PORTRAIT_MAP.items()):
+        out.setdefault(inject.text._fid_tag(slot)[len('[FID_'):-1], uid)
+    out[inject.text._fid_tag(inject.chapter_ids.PROLOGUE_SEPHEK_SLOT)[len('[FID_'):-1]] = 'sephek-kaltro'
     return out
 
 
@@ -139,54 +143,54 @@ def _claim(reg, key, title, msg_id, builder, width, event):
 
 
 def _ch05_registry():
-    arrival = bc.CH05_ARRIVAL_SLOT
-    join = bc.CH05_BASIL_JOIN_SLOT
-    alone = bc.CH05_SAHNAR_ALONE_SLOT
-    moose = bc.CH05_MOOSE_CHARGE_SLOT
-    talk = bc.ch05_sahnar_talk_messages
-    ending = bc.ch05_ending_messages
+    arrival = inject.chapter_ids.CH05_ARRIVAL_SLOT
+    join = inject.chapter_ids.CH05_BASIL_JOIN_SLOT
+    alone = inject.chapter_ids.CH05_SAHNAR_ALONE_SLOT
+    moose = inject.chapter_ids.CH05_MOOSE_CHARGE_SLOT
+    talk = inject.chapters.ch05.ch05_sahnar_talk_messages
+    ending = inject.chapters.ch05.ch05_ending_messages
     opening = lambda slot: Event('chapter_start', slot)
     reg = collections.OrderedDict()
-    for n, (slot, msg, _boxes, what) in enumerate(bc.CH05_OPENING_SLOTS, 1):
-        _claim(reg, 'ch05/%d' % n, what, msg, bc.ch05_opening_messages, TALK, opening(slot))
-    _claim(reg, 'ch05/4', arrival[3], arrival[1], bc.ch05_opening_messages, TALK,
+    for n, (slot, msg, _boxes, what) in enumerate(inject.chapter_ids.CH05_OPENING_SLOTS, 1):
+        _claim(reg, 'ch05/%d' % n, what, msg, inject.chapters.ch05.ch05_opening_messages, TALK, opening(slot))
+    _claim(reg, 'ch05/4', arrival[3], arrival[1], inject.chapters.ch05.ch05_opening_messages, TALK,
            opening(arrival[0]))
     _claim(reg, 'ch05/4-no-lupin', arrival[3] + ' (no Lupin)',
-           bc.CH05_ARRIVAL_NO_LUPIN_MSG, bc.ch05_opening_messages, TALK, opening(arrival[0]))
-    _claim(reg, 'ch05/5', join[3], join[1], bc.ch05_basil_join_messages, TALK,
+           inject.chapter_ids.CH05_ARRIVAL_NO_LUPIN_MSG, inject.chapters.ch05.ch05_opening_messages, TALK, opening(arrival[0]))
+    _claim(reg, 'ch05/5', join[3], join[1], inject.chapters.ch05.ch05_basil_join_messages, TALK,
            opening(join[0]))
     _claim(reg, 'ch05/5-no-lupin', join[3] + ' (no Lupin)',
-           bc.CH05_BASIL_JOIN_NO_LUPIN_MSG, bc.ch05_basil_join_messages, TALK,
+           inject.chapter_ids.CH05_BASIL_JOIN_NO_LUPIN_MSG, inject.chapters.ch05.ch05_basil_join_messages, TALK,
            opening(join[0]))
-    _claim(reg, 'ch05/6', alone[3], alone[1], bc.ch05_sahnar_alone_message, TALK,
+    _claim(reg, 'ch05/6', alone[3], alone[1], inject.chapters.ch05.ch05_sahnar_alone_message, TALK,
            opening(alone[0]))
-    _claim(reg, 'ch05/7', moose[3], moose[1], bc.ch05_moose_charge_message, TALK,
+    _claim(reg, 'ch05/7', moose[3], moose[1], inject.chapters.ch05.ch05_moose_charge_message, TALK,
            opening(moose[0]))
     _claim(reg, 'ch05/7-quip', moose[3] + ' (the punchline)',
-           bc.CH05_MOOSE_QUIP_MSG, bc.ch05_moose_charge_message, TALK, opening(moose[0]))
+           inject.chapter_ids.CH05_MOOSE_QUIP_MSG, inject.chapters.ch05.ch05_moose_charge_message, TALK, opening(moose[0]))
     _claim(reg, 'ch05/talk-recruit', 'Basil talks Sahnar out of the sarcophagus',
-           bc.CH05_SAHNAR_TALK_MSG, talk, TALK, Event('sahnar_talk', None))
+           inject.chapter_ids.CH05_SAHNAR_TALK_MSG, talk, TALK, Event('sahnar_talk', None))
     _claim(reg, 'ch05/talk-recruit-no-lupin',
            'Basil talks Sahnar out of the sarcophagus (no Lupin)',
-           bc.CH05_SAHNAR_TALK_NO_LUPIN_MSG, talk, TALK, Event('sahnar_talk', None))
+           inject.chapter_ids.CH05_SAHNAR_TALK_NO_LUPIN_MSG, talk, TALK, Event('sahnar_talk', None))
     _claim(reg, 'ch05/eruption', 'Ravisin warns the party, turn 2',
-           bc.CH05_ERUPTION_MSG, bc.ch05_eruption_message, TALK,
+           inject.chapter_ids.CH05_ERUPTION_MSG, inject.chapters.ch05.ch05_eruption_message, TALK,
            Event('eruption_turn', None))
     _claim(reg, 'ch05/ravisin-taunt', 'Ravisin, first engagement',
-           bc.CH05_RAVISIN_TAUNT_MSG, bc.ch05_ravisin_taunt_message, BATTLE,
+           inject.chapter_ids.CH05_RAVISIN_TAUNT_MSG, inject.chapters.ch05.ch05_ravisin_taunt_message, BATTLE,
            Event('boss_battle', None))
     _claim(reg, 'ch05/ravisin-death', 'Ravisin dies',
-           bc.CH05_RAVISIN_DEATH_MSG, bc.ch05_ravisin_death_message, BATTLE,
+           inject.chapter_ids.CH05_RAVISIN_DEATH_MSG, inject.chapters.ch05.ch05_ravisin_death_message, BATTLE,
            Event('boss_death', None))
     _claim(reg, 'ch05/ending', 'the ending, Sahnar recruited',
-           bc.CH05_ENDING_MSGS[True], ending, TALK,
-           Event('chapter_end', bc.CH05_ENDING_SLOT))
+           inject.chapter_ids.CH05_ENDING_MSGS[True], ending, TALK,
+           Event('chapter_end', inject.chapters.ch05.CH05_ENDING_SLOT))
     _claim(reg, 'ch05/ending-no-sahnar', 'the ending, the berry exchange cut',
-           bc.CH05_ENDING_MSGS[False], ending, TALK,
-           Event('chapter_end', bc.CH05_ENDING_SLOT))
+           inject.chapter_ids.CH05_ENDING_MSGS[False], ending, TALK,
+           Event('chapter_end', inject.chapters.ch05.CH05_ENDING_SLOT))
     _claim(reg, 'ch05/ending-basil-died', "the ending, over Basil's body",
-           bc.CH05_ENDING_LOST_MSG, ending, TALK,
-           Event('chapter_end', bc.CH05_ENDING_LOST_SLOT))
+           inject.chapter_ids.CH05_ENDING_LOST_MSG, ending, TALK,
+           Event('chapter_end', inject.chapters.ch05.CH05_ENDING_LOST_SLOT))
     # DELIBERATELY absent: the arena tutorial (`ch05_arena_messages`). Its two boxes are locked
     # to vanilla MSG_9D5/9D6 VERBATIM and the builder proves that by reading them out of the
     # decomp's texts.txt -- so previewing it would put a decomp read inside the one tool whose
@@ -198,7 +202,7 @@ def _ch05_registry():
 # their scenes INLINE inside their injectors rather than through pure builders, so covering
 # them means extracting those call sites first (`decisions.md` -> "A scene is readable without
 # a ROM"). ch06 is a row here plus its registry rows.
-CHAPTER_YAML = {'ch05': bc.CH05_CHAPTER_YAML}
+CHAPTER_YAML = {'ch05': inject.chapter_ids.CH05_CHAPTER_YAML}
 
 _REGISTRY = None
 
@@ -259,7 +263,7 @@ def preview(key, campaign=CAMPAIGN):
     chapter = key.split('/')[0]
     if chapter not in CHAPTER_YAML:
         raise KeyError('no chapter YAML registered for %r' % chapter)
-    chap = bc._load_chapter_yaml(campaign, CHAPTER_YAML[chapter])
+    chap = inject.hosting._load_chapter_yaml(campaign, CHAPTER_YAML[chapter])
     built = builder(chap)
     # Two builder shapes, because a one-box scene has nothing to pair its body WITH: most
     # return [(msg_id, body)], the single-message ones return the body itself. The registry

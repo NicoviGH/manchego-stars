@@ -16,15 +16,16 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
 
-import build_campaign as bc  # noqa: E402
+import inject.cast  # noqa: E402
+import inject.portraits  # noqa: E402
 
 
 def main():
-    source = os.path.join(HERE, 'vendor', bc.RAVISIN_VENDOR_MUG)
+    source = os.path.join(HERE, 'vendor', inject.portraits.RAVISIN_VENDOR_MUG)
     if not os.path.isfile(source):
         raise SystemExit('ERROR: missing vendored Ravisin source: %s' % source)
     out = os.path.join(HERE, 'ravisin.png')
-    bc._vendor_mug_to_bust(source, bc.RAVISIN_RECOLOR).save(out)
+    inject.cast._vendor_mug_to_bust(source, inject.portraits.RAVISIN_RECOLOR).save(out)
     print('-> %s' % out)
 
 

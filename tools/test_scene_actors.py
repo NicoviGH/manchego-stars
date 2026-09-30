@@ -41,7 +41,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import build_campaign as bc
+import inject.chapters.ch05
+import inject.scene_actors
 
 
 class TheStagedPidIsFoundWhereTheMacroPUTSIt(unittest.TestCase):
@@ -52,25 +53,25 @@ class TheStagedPidIsFoundWhereTheMacroPUTSIt(unittest.TestCase):
     """
 
     def test_MOVE_reads_its_pid_from_the_second_argument(self):
-        staged = bc.scene_staged_pids('    MOVE(0x10, CHARACTER_EIRIKA, 3, 4)\n')
-        self.assertEqual([bc.character_pid('CHARACTER_EIRIKA')], list(staged))
+        staged = inject.scene_actors.scene_staged_pids('    MOVE(0x10, CHARACTER_EIRIKA, 3, 4)\n')
+        self.assertEqual([inject.scene_actors.character_pid('CHARACTER_EIRIKA')], list(staged))
 
     def test_a_MOVE_speed_is_not_mistaken_for_a_character(self):
-        self.assertNotIn(0x10, bc.scene_staged_pids('    MOVE(0x10, 0xce, 3, 4)\n'))
+        self.assertNotIn(0x10, inject.scene_actors.scene_staged_pids('    MOVE(0x10, 0xce, 3, 4)\n'))
 
     def test_CUMO_CHAR_and_MOVE_DEFINED_read_their_first(self):
-        self.assertIn(0xce, bc.scene_staged_pids('    CUMO_CHAR(0xce)\n'))
-        self.assertIn(0xce, bc.scene_staged_pids('    MOVE_DEFINED(0xce)\n'))
+        self.assertIn(0xce, inject.scene_actors.scene_staged_pids('    CUMO_CHAR(0xce)\n'))
+        self.assertIn(0xce, inject.scene_actors.scene_staged_pids('    MOVE_DEFINED(0xce)\n'))
 
     def test_MOVE_does_not_swallow_MOVE_DEFINED(self):
         """`MOVE` is a prefix of five other commands, each with a different pid position."""
-        staged = bc.scene_staged_pids('    MOVE_DEFINED(CHARACTER_EIRIKA)\n')
-        self.assertEqual([bc.character_pid('CHARACTER_EIRIKA')], list(staged))
+        staged = inject.scene_actors.scene_staged_pids('    MOVE_DEFINED(CHARACTER_EIRIKA)\n')
+        self.assertEqual([inject.scene_actors.character_pid('CHARACTER_EIRIKA')], list(staged))
 
     def test_MOVEONTO_stages_BOTH_its_mover_and_its_target(self):
-        staged = bc.scene_staged_pids('    MOVEONTO(0x10, 0xce, CHARACTER_EIRIKA)\n')
+        staged = inject.scene_actors.scene_staged_pids('    MOVEONTO(0x10, 0xce, CHARACTER_EIRIKA)\n')
         self.assertIn(0xce, staged)
-        self.assertIn(bc.character_pid('CHARACTER_EIRIKA'), staged)
+        self.assertIn(inject.scene_actors.character_pid('CHARACTER_EIRIKA'), staged)
 
     def test_the_two_failure_modes_are_told_apart(self):
         """EVC_ERROR hangs the engine; EVC_ADVANCE_CONTINUE just skips the walk.
@@ -79,13 +80,13 @@ class TheStagedPidIsFoundWhereTheMacroPUTSIt(unittest.TestCase):
         `pEventCurrent`, so the command re-runs forever -- that is the hang. A move whose
         MOVER is NULL returns EVC_ADVANCE_CONTINUE (eventscr.c:2960) and the script carries
         on, so calling that a soft-lock would overstate it."""
-        hangs = bc.scene_staged_pids('    CUMO_CHAR(0xce)\n')
+        hangs = inject.scene_actors.scene_staged_pids('    CUMO_CHAR(0xce)\n')
         self.assertEqual('hangs', hangs[0xce])
-        noop = bc.scene_staged_pids('    MOVE(0x10, 0xce, 1, 2)\n')
+        noop = inject.scene_actors.scene_staged_pids('    MOVE(0x10, 0xce, 1, 2)\n')
         self.assertNotEqual('hangs', noop[0xce])
 
     def test_a_pid_staged_twice_keeps_the_WORSE_outcome(self):
-        both = bc.scene_staged_pids('    MOVE(0x10, 0xce, 1, 2)\n    CUMO_CHAR(0xce)\n')
+        both = inject.scene_actors.scene_staged_pids('    MOVE(0x10, 0xce, 1, 2)\n    CUMO_CHAR(0xce)\n')
         self.assertEqual('hangs', both[0xce])
 
 
@@ -95,22 +96,22 @@ class ASceneMustLoadThePCsItStages(unittest.TestCase):
 
     def test_a_staged_PC_with_no_LOAD_is_refused(self):
         with self.assertRaises(SystemExit) as caught:
-            bc.assert_scene_loads_its_actors(
+            inject.scene_actors.assert_scene_loads_its_actors(
                 '{\n    CUMO_CHAR(%s)\n    ENUN\n}' % self.BRAULO, 'EventScr_Test')
         self.assertIn('braulo', str(caught.exception))
 
     def test_the_error_names_the_scene_and_what_to_do(self):
         with self.assertRaises(SystemExit) as caught:
-            bc.assert_scene_loads_its_actors(
+            inject.scene_actors.assert_scene_loads_its_actors(
                 '{\n    MOVE(0x10, %s, 3, 4)\n}' % self.BRAULO, 'EventScr_Messie')
         message = str(caught.exception)
         self.assertIn('EventScr_Messie', message)
         self.assertIn('LOAD', message)
 
     def test_a_staged_PC_the_scene_LOADS_is_fine(self):
-        bc.assert_scene_loads_its_actors(
+        inject.scene_actors.assert_scene_loads_its_actors(
             '{\n    LOAD1(0x1, UnitDef_TestParty)\n    ENUN\n    CUMO_CHAR(%s)\n}' % self.BRAULO,
-            'EventScr_Test', loaded_pids={bc.character_pid(self.BRAULO)})
+            'EventScr_Test', loaded_pids={inject.scene_actors.character_pid(self.BRAULO)})
 
     def test_a_boss_the_chapter_owns_is_NOT_flagged(self):
         """ch05's Ravisin (0xb8) is on the map from turn 1 by the chapter's own table.
@@ -118,10 +119,10 @@ class ASceneMustLoadThePCsItStages(unittest.TestCase):
         She is the reason this guard is scoped to the PCs: she is staged without a LOAD in
         her own scene, she is not a soft-lock, and flagging her would be the gate crying wolf
         on the first real chapter it read."""
-        bc.assert_scene_loads_its_actors('{\n    CUMO_CHAR(0xb8)\n}', 'EventScr_089F2B74')
+        inject.scene_actors.assert_scene_loads_its_actors('{\n    CUMO_CHAR(0xb8)\n}', 'EventScr_089F2B74')
 
     def test_a_generic_pid_is_not_flagged(self):
-        bc.assert_scene_loads_its_actors('{\n    CUMO_CHAR(0xce)\n}', 'EventScr_Moose')
+        inject.scene_actors.assert_scene_loads_its_actors('{\n    CUMO_CHAR(0xce)\n}', 'EventScr_Moose')
 
 
 class TheGuardRidesTheWriteItself(unittest.TestCase):
@@ -134,6 +135,21 @@ class TheGuardRidesTheWriteItself(unittest.TestCase):
             decomp._replace_brace_block(
                 text, 'EventScr_New[] =',
                 '{\n    CUMO_CHAR(CHARACTER_EIRIKA)\n    ENDA\n}', 'test.h')
+
+    def test_the_guard_is_armed_however_the_writer_was_imported(self):
+        """Importing build_campaign used to register it; after #389 a caller that imports
+        only a chapter module -- a test, a tool, a future driver -- wrote scenes unchecked.
+        A fresh interpreter, because this module imports scene_actors itself."""
+        import subprocess
+        code = ('import sys; sys.path.insert(0, %r)\n'
+                'from inject import decomp\n'
+                'decomp._replace_brace_block("CONST_DATA EventListScr EventScr_New[] = '
+                '{\\n    ENDA\\n};\\n", "EventScr_New[] =", '
+                '"{\\n    CUMO_CHAR(CHARACTER_EIRIKA)\\n    ENDA\\n}", "test.h")\n'
+                % os.path.dirname(os.path.abspath(__file__)))
+        run = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+        self.assertNotEqual(0, run.returncode, 'the scene was written with no actor check')
+        self.assertIn('braulo', run.stderr)
 
     def test_a_non_scene_block_is_not_inspected(self):
         """UnitDefs and tables go through the same writer and are not scenes."""
@@ -150,13 +166,13 @@ class TheGuardRidesTheWriteItself(unittest.TestCase):
         scene will -- so hooking only the brace writer would have left the motivating case
         of this whole guard unchecked."""
         import inspect
-        src = inspect.getsource(bc.declare_event_script)
-        self.assertIn('SCENE_VALIDATORS', src)
+        src = inspect.getsource(inject.chapters.ch05.declare_event_script)
+        self.assertIn('scene_validators()', src)
 
     def test_an_MS_scene_name_is_not_filtered_out(self):
         """Campaign scenes are named MS_*, not EventScr_*, by `_assert_ms_symbol`."""
         with self.assertRaises(SystemExit):
-            bc.assert_scene_loads_its_actors(
+            inject.scene_actors.assert_scene_loads_its_actors(
                 '{\n    CUMO_CHAR(CHARACTER_EIRIKA)\n}', 'MS_Ch06Messie')
 
 
@@ -169,15 +185,15 @@ class TheLOADHalf(unittest.TestCase):
         Matching only LOAD[12] fails the build on a scene that correctly loads its actor."""
         body = '{\n    LOAD3(0x1, %s)\n    CUMO_CHAR(CHARACTER_EIRIKA)\n}'
         sym = self._udef_carrying('CHARACTER_EIRIKA')
-        bc.assert_scene_loads_its_actors(body % sym, 'EventScr_Test')
+        inject.scene_actors.assert_scene_loads_its_actors(body % sym, 'EventScr_Test')
 
     def _udef_carrying(self, token):
         """A real UnitDefinition symbol that carries `token`, found in the live tree."""
-        pid = bc.character_pid(token)
+        pid = inject.scene_actors.character_pid(token)
         import re as _re
-        for text in bc._udef_sources():
+        for text in inject.scene_actors._udef_sources():
             for m in _re.finditer(r'(UnitDef_\w+|MS_\w+)\[\]', text):
-                if pid in bc._unit_def_pids(m.group(1)):
+                if pid in inject.scene_actors._unit_def_pids(m.group(1)):
                     return m.group(1)
         self.skipTest('no UnitDefinition in this tree carries %s' % token)
 
@@ -189,16 +205,16 @@ class TheLOADHalf(unittest.TestCase):
         accusation on exactly the scenes we write."""
         import re as _re
         ours = None
-        for text in bc._udef_sources():
+        for text in inject.scene_actors._udef_sources():
             for m in _re.finditer(r'\b(UnitDef_Event_\w+)\[\]', text):
-                if bc._unit_def_pids(m.group(1)):
+                if inject.scene_actors._unit_def_pids(m.group(1)):
                     ours = m.group(1)
                     break
             if ours:
                 break
         if ours is None:
             self.skipTest('no campaign-owned UnitDefinition in this tree')
-        self.assertTrue(bc._unit_def_pids(ours),
+        self.assertTrue(inject.scene_actors._unit_def_pids(ours),
                         '%s resolved to nobody, so a LOAD naming it reads as missing' % ours)
 
 
@@ -221,7 +237,7 @@ class TheINHERITEDHalf(unittest.TestCase):
         bodies = {'EventListScr_X_Turn': ('ch7-eventscript.h', '{ EventScr_Leftover }'),
                   'EventScr_Leftover': ('ch7-eventscript.h',
                                         '{ CUMO_CHAR(CHARACTER_EIRIKA) END_MAIN }')}
-        found = bc.reachable_scenes_staging_unloaded_pcs(
+        found = inject.scene_actors.reachable_scenes_staging_unloaded_pcs(
             roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies)
         self.assertEqual(1, len(found))
         self.assertEqual('ch06', found[0].chapter)
@@ -235,16 +251,16 @@ class TheINHERITEDHalf(unittest.TestCase):
         bodies = {'EventListScr_X_Turn': ('ch7-eventscript.h', '{ END_MAIN }'),
                   'EventScr_Leftover': ('ch7-eventscript.h',
                                         '{ CUMO_CHAR(CHARACTER_EIRIKA) END_MAIN }')}
-        self.assertEqual([], bc.reachable_scenes_staging_unloaded_pcs(
+        self.assertEqual([], inject.scene_actors.reachable_scenes_staging_unloaded_pcs(
             roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies))
 
     def test_a_reachable_scene_that_LOADS_its_actor_is_not_a_finding(self):
         bodies = {'EventListScr_X_Turn': ('f.h', '{ EventScr_Fine }'),
                   'EventScr_Fine': ('f.h', '{ LOAD1(0x1, UnitDef_Ours) '
                                            'CUMO_CHAR(CHARACTER_EIRIKA) END_MAIN }')}
-        found = bc.reachable_scenes_staging_unloaded_pcs(
+        found = inject.scene_actors.reachable_scenes_staging_unloaded_pcs(
             roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies,
-            loaded_pids={'UnitDef_Ours': {bc.character_pid('CHARACTER_EIRIKA')}})
+            loaded_pids={'UnitDef_Ours': {inject.scene_actors.character_pid('CHARACTER_EIRIKA')}})
         self.assertEqual([], found)
 
     def test_a_staged_NON_PC_is_not_a_finding(self):
@@ -253,7 +269,7 @@ class TheINHERITEDHalf(unittest.TestCase):
         Ravisin is on the map because her chapter's table put her there."""
         bodies = {'EventListScr_X_Turn': ('f.h', '{ EventScr_Boss }'),
                   'EventScr_Boss': ('f.h', '{ CUMO_CHAR(0xb8) END_MAIN }')}
-        self.assertEqual([], bc.reachable_scenes_staging_unloaded_pcs(
+        self.assertEqual([], inject.scene_actors.reachable_scenes_staging_unloaded_pcs(
             roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies))
 
     def test_a_script_the_walk_could_not_READ_is_raised_not_passed(self):
@@ -262,7 +278,7 @@ class TheINHERITEDHalf(unittest.TestCase):
         nothing -- so the guard refuses to return a clean answer it cannot stand behind."""
         bodies = {'EventListScr_X_Turn': ('f.h', '{ EventScr_Missing }')}
         with self.assertRaises(SystemExit) as caught:
-            bc.assert_reachable_scenes_load_their_actors(
+            inject.scene_actors.assert_reachable_scenes_load_their_actors(
                 roots_by_chapter={'ch06': ['EventListScr_X_Turn']}, bodies=bodies)
         self.assertIn('EventScr_Missing', str(caught.exception))
 
@@ -275,7 +291,7 @@ class TheLiveBuildPassesTheInheritedGuardToo(unittest.TestCase):
         from inject import event_group
         if not event_group.injected():
             self.skipTest('decomp is not injected -- the walk would read the donor, not us')
-        self.assertEqual([], bc.reachable_scenes_staging_unloaded_pcs())
+        self.assertEqual([], inject.scene_actors.reachable_scenes_staging_unloaded_pcs())
 
     def test_the_guard_FIRES_on_vanilla_which_is_what_makes_the_clean_run_mean_anything(self):
         """The positive control. Every one of #398's five sites is reachable in vanilla, so a
@@ -302,7 +318,7 @@ class TheLiveBuildPassesTheInheritedGuardToo(unittest.TestCase):
                                            event_group.vanilla_header(rel))
             roots[chapter.name] = [v for v in init.values() if v != 'NULL']
 
-        found = bc.reachable_scenes_staging_unloaded_pcs(roots_by_chapter=roots, bodies=bodies)
+        found = inject.scene_actors.reachable_scenes_staging_unloaded_pcs(roots_by_chapter=roots, bodies=bodies)
         self.assertTrue(any(f.unit_id == 'braulo' for f in found),
                         'vanilla stages braulo in reachable scenes and the guard missed it')
         # The five #398 sites specifically, by the symbol each was reported at.
@@ -328,9 +344,9 @@ class ALoadingCallerIsREPORTEDNeverSubtracted(unittest.TestCase):
                   'EventScr_Caller': ('f.h', '{ LOAD1(0x1, UnitDef_Ours) '
                                              'CALL(EventScr_Inner) }'),
                   'EventScr_Inner': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}
-        found = bc.reachable_scenes_staging_unloaded_pcs(
+        found = inject.scene_actors.reachable_scenes_staging_unloaded_pcs(
             roots_by_chapter={'ch06': ['L']}, bodies=bodies,
-            loaded_pids={'UnitDef_Ours': {bc.character_pid('CHARACTER_EIRIKA')}})
+            loaded_pids={'UnitDef_Ours': {inject.scene_actors.character_pid('CHARACTER_EIRIKA')}})
         inner = [f for f in found if f.script == 'EventScr_Inner']
         self.assertEqual(1, len(inner), 'the chain is still reported, not silently cleared')
         self.assertEqual(('EventScr_Caller',), inner[0].loaded_by)
@@ -339,7 +355,7 @@ class ALoadingCallerIsREPORTEDNeverSubtracted(unittest.TestCase):
         bodies = {'L': ('f.h', '{ EventScr_Caller }'),
                   'EventScr_Caller': ('f.h', '{ CALL(EventScr_Inner) }'),
                   'EventScr_Inner': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}
-        found = bc.reachable_scenes_staging_unloaded_pcs(
+        found = inject.scene_actors.reachable_scenes_staging_unloaded_pcs(
             roots_by_chapter={'ch06': ['L']}, bodies=bodies)
         self.assertEqual((), found[0].loaded_by)
 
@@ -349,9 +365,9 @@ class ALoadingCallerIsREPORTEDNeverSubtracted(unittest.TestCase):
                                              'CALL(EventScr_Inner) }'),
                   'EventScr_Inner': ('f.h', '{ CUMO_CHAR(CHARACTER_EIRIKA) }')}
         with self.assertRaises(SystemExit) as caught:
-            bc.assert_reachable_scenes_load_their_actors(
+            inject.scene_actors.assert_reachable_scenes_load_their_actors(
                 roots_by_chapter={'ch06': ['L']}, bodies=bodies,
-                loaded_pids={'UnitDef_Ours': {bc.character_pid('CHARACTER_EIRIKA')}})
+                loaded_pids={'UnitDef_Ours': {inject.scene_actors.character_pid('CHARACTER_EIRIKA')}})
         self.assertIn('caller(s) EventScr_Caller LOAD it', str(caught.exception))
 
 

@@ -740,19 +740,20 @@ def _build_campaign_docs(campaign):
     sheet exists -- a WALK/MU doc (<id>_mu.png, key uid+':mu', 32x32 frames). Geometry/
     reference/motion come from each one's donor (YAML art.map_sprite.base); reset snapshots
     live in map_sprites/.base/. ORDER lists the characters (for the picker)."""
-    import build_campaign as bc
-    adir = os.path.join(bc.REPO, 'campaigns', campaign, 'map_sprites')
+    import inject.cast
+    import inject.decomp
+    adir = os.path.join(inject.decomp.REPO, 'campaigns', campaign, 'map_sprites')
     palette = os.path.join(adir, 'cast_palette.png')
     if not os.path.isfile(palette):
         sys.exit('ERROR: no %s' % palette)
     basedir = os.path.join(adir, '.base')
-    gfx = os.path.join(bc.REPO, 'fireemblem8u', 'graphics', 'unit_icon')
+    gfx = os.path.join(inject.decomp.REPO, 'fireemblem8u', 'graphics', 'unit_icon')
     docs, order = {}, []
-    for uid, slot, cls, sms in bc.classed_cast(campaign):
+    for uid, slot, cls, sms in inject.cast.classed_cast(campaign):
         sheet = os.path.join(adir, uid + '.png')
         if not os.path.isfile(sheet):
             continue
-        base = bc.load_unit(campaign, uid).get('art', {}).get('map_sprite', {}).get('base')
+        base = inject.cast.load_unit(campaign, uid).get('art', {}).get('map_sprite', {}).get('base')
         wait_donor = os.path.join(gfx, 'wait', 'unit_icon_wait_%s_sheet.png' % base) if base else None
         docs[uid] = Doc(sheet, palette,
                         wait_donor if wait_donor and os.path.isfile(wait_donor) else None,
@@ -777,11 +778,11 @@ def _add_extra(docs, order, campaign, uid, base, geom=None):
     whose idle is the 32x32 flight) without touching the real cast. `geom` forces the idle
     frame size (e.g. (32,32) for a flight-as-idle); then the donor MOVE sheet is the
     reference. Not injected by the build (it only iterates classed_cast)."""
-    import build_campaign as bc
-    adir = os.path.join(bc.REPO, 'campaigns', campaign, 'map_sprites')
+    import inject.decomp
+    adir = os.path.join(inject.decomp.REPO, 'campaigns', campaign, 'map_sprites')
     palette = os.path.join(adir, 'cast_palette.png')
     basedir = os.path.join(adir, '.base')
-    gfx = os.path.join(bc.REPO, 'fireemblem8u', 'graphics', 'unit_icon')
+    gfx = os.path.join(inject.decomp.REPO, 'fireemblem8u', 'graphics', 'unit_icon')
     sheet = os.path.join(adir, uid + '.png')
     if not os.path.isfile(sheet):
         sys.exit('ERROR: --extra %s: no %s' % (uid, sheet))

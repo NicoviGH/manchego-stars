@@ -37,10 +37,16 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import build_campaign as bc
+import inject.cast
+import inject.decomp
+import inject.hosting
+import inject.hosts
+import inject.paths
+import inject.raw_pids
+import yaml_loader
 import difficulty as d
 
-REPO = bc.REPO
+REPO = inject.decomp.REPO
 PACING_DOC = os.path.join(REPO, 'docs', 'fe8-pacing-reference.md')
 
 # The generated block's fence in docs/fe8-pacing-reference.md. Everything between these two
@@ -55,18 +61,18 @@ EXP_PER_LEVEL = 100
 
 
 # ---------------------------------------------------------------------------------------
-# ClassData reads. Vanilla data, so HEAD text through build_campaign.vanilla_decomp_text --
+# ClassData reads. Vanilla data, so HEAD text through inject.decomp.vanilla_decomp_text --
 # never the working tree, which the build mutates.
 # ---------------------------------------------------------------------------------------
 
 def _classes_text():
-    return bc.vanilla_decomp_text('src/data_classes.c')
+    return inject.decomp.vanilla_decomp_text('src/data_classes.c')
 
 
 @functools.lru_cache(maxsize=None)
 def _class_block(class_enum):
     text = _classes_text()
-    s, e = bc._find_brace_block(text, '[%s - 1]' % class_enum, bc.CLASSES_C)
+    s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % class_enum, inject.paths.CLASSES_C)
     return text[s:e]
 
 
@@ -108,9 +114,9 @@ def character_attributes(char_enum):
     lives -- a boss is a character, never a class. Empty for a generic or unknown slot."""
     if not char_enum or not str(char_enum).startswith('CHARACTER_'):
         return frozenset()
-    text = bc.vanilla_decomp_text('src/data_characters.c')
+    text = inject.decomp.vanilla_decomp_text('src/data_characters.c')
     try:
-        s, e = bc._find_brace_block(text, '[%s - 1]' % char_enum, bc.CHARACTERS_C)
+        s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % char_enum, inject.paths.CHARACTERS_C)
     except SystemExit:
         return frozenset()
     m = re.search(r'\.attributes\s*=\s*([^;]*?),\n', text[s:e])
@@ -234,7 +240,7 @@ SPECIAL_EXP_CLASSES = ('CLASS_GORGONEGG', 'CLASS_GORGONEGG2', 'CLASS_DEMON_KING'
 
 def load_chapter(campaign, ch):
     with open(d.chapter_path(campaign, ch), encoding='utf-8') as f:
-        return bc.yaml_load(f)
+        return yaml_loader.yaml_load(f)
 
 
 def _entry_boss(enemy_def):
@@ -245,7 +251,7 @@ def _entry_boss(enemy_def):
     deploys on (`ENEMY_CHARACTER_SLOT`) and a boss on a RAW pid -- whose CharacterData gap is
     all zeros -- carries none at all. The engine pays the +40 kill bonus off the ROM's
     answer, not off ours."""
-    slot = bc.ENEMY_CHARACTER_SLOT.get(enemy_def.get('id'))
+    slot = inject.cast.ENEMY_CHARACTER_SLOT.get(enemy_def.get('id'))
     return 'CA_BOSS' in character_attributes(slot)
 
 
@@ -254,10 +260,10 @@ def chapter_bodies(chap):
     contributes nothing to the threat math (which is why `difficulty` drops it) and a full
     kill's worth of exp to this one."""
     out = []
-    for ed in bc.chapter_roster_entries(chap):
+    for ed in inject.raw_pids.chapter_roster_entries(chap):
         name = ed.get('id', ed.get('name', 'enemy'))
         boss = _entry_boss(ed)
-        levels = bc.entry_body_levels(ed)
+        levels = inject.raw_pids.entry_body_levels(ed)
         if 'composition' in ed and 'class' not in ed:
             classes = ed.get('composition') or []
         else:
@@ -298,18 +304,18 @@ def join_level(campaign, uid, unit=None, recruited=_UNSET):
     flavour, so the next green recruit given its own entry would otherwise fall back to the
     YAML silently -- which is the error this function exists to fix, one key over.
     """
-    unit = bc.load_unit(campaign, uid) if unit is None else unit
+    unit = inject.cast.load_unit(campaign, uid) if unit is None else unit
     # `recruited` is passed by `party_classes`, which has just computed it; a caller that
     # has not gets it looked up. A founding unit's is genuinely None, so the two cases need
     # a sentinel rather than a falsy default -- reading None as "not a recruit" is what made
     # this return 1 for sahnar the first time.
     if recruited is _UNSET:
-        recruited = bc.recruit_chapter_number(campaign, dict(unit, id=uid))
+        recruited = inject.hosting.recruit_chapter_number(campaign, dict(unit, id=uid))
     if recruited is not None:
-        chapter = next((c for c in bc.hosted_chapters() if c.number == int(recruited)), None)
+        chapter = next((c for c in inject.hosts.hosted_chapters() if c.number == int(recruited)), None)
         if chapter is not None:
-            chap = bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))
-            placed = [max(bc.entry_body_levels(ed)) for ed in bc.placed_entries(chap)
+            chap = inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))
+            placed = [max(inject.raw_pids.entry_body_levels(ed)) for ed in inject.raw_pids.placed_entries(chap)
                       if ed.get('id') == uid]
             if placed:
                 return int(placed[0])
@@ -321,15 +327,15 @@ def party_classes(campaign):
     whose levels this band describes.
 
     `difficulty`'s own ROSTER, so there is one answer to "who is the party" in this repo,
-    and `build_campaign.recruit_chapter_number` for when each joins -- the same answer
+    and `inject.hosting.recruit_chapter_number` for when each joins -- the same answer
     `cast_available_at` sizes the deploy caps from. A recruit is on the field from the
     chapter AFTER the one that recruits it, and every recruit joins at level 1, so crediting
     one with the chapters before it joined hands it an exp history it never had."""
     out = []
     for uid in d.ROSTER:
-        unit = dict(bc.load_unit(campaign, uid), id=uid)
-        recruited = bc.recruit_chapter_number(campaign, unit)
-        out.append((uid, bc.class_enum_for(unit),
+        unit = dict(inject.cast.load_unit(campaign, uid), id=uid)
+        recruited = inject.hosting.recruit_chapter_number(campaign, unit)
+        out.append((uid, inject.cast.class_enum_for(unit),
                     0 if recruited is None else int(recruited) + 1,
                     join_level(campaign, uid, unit, recruited)))
     return out
@@ -342,8 +348,8 @@ def unmodelled_special_exp_bodies(campaign):
     the model is quietly wrong about that chapter, and quiet is the failure mode this repo
     keeps paying for, so the simulation calls this and refuses to print instead."""
     found = []
-    for chapter in bc.hosted_chapters():
-        chap = bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))
+    for chapter in inject.hosts.hosted_chapters():
+        chap = inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))
         sides = [(chap.get('id'), chapter_bodies(chap))]
         twin = vanilla_bodies(chap.get('parity_reference'))
         if twin is not None:
@@ -423,7 +429,7 @@ def field_cap(chap):
     limit = (chap.get('deployment') or {}).get('deploy_limit')
     if limit is not None:
         return int(limit)
-    return sum(len(bc.entry_body_levels(pu)) for pu in (chap.get('player_units') or []))
+    return sum(len(inject.raw_pids.entry_body_levels(pu)) for pu in (chap.get('player_units') or []))
 
 
 def _banks_exp(chap):
@@ -484,8 +490,8 @@ def simulate(campaign='rime-of-the-frostmaiden'):
     tail = _party(campaign, SHARE_TAIL)
     twin_party = _party(campaign)
     rows = []
-    for chapter in bc.hosted_chapters():
-        chap = bc._load_chapter_yaml(campaign, bc.chapter_yaml_for(chapter.name))
+    for chapter in inject.hosts.hosted_chapters():
+        chap = inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))
         bodies = chapter_bodies(chap)
         ref = chap.get('parity_reference')
         twin = vanilla_bodies(ref)

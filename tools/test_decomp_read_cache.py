@@ -29,7 +29,11 @@ import unittest
 from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject.namespace import injector_constants  # noqa: E402
 import build_campaign as bc                                           # noqa: E402
+import inject.decomp  # noqa: E402
+import inject.units  # noqa: E402
+import subprocess
 import difficulty as dif                                              # noqa: E402
 
 CAMPAIGN = 'rime-of-the-frostmaiden'
@@ -37,7 +41,7 @@ CAMPAIGN = 'rime-of-the-frostmaiden'
 
 def _clear():
     """Drop every memo so a test measures its own reads, not a previous test's."""
-    for fn in (bc.vanilla_decomp_text, dif.vanilla_redas):
+    for fn in (inject.decomp.vanilla_decomp_text, dif.vanilla_redas):
         clear = getattr(fn, 'cache_clear', None)
         if clear:
             clear()
@@ -51,20 +55,20 @@ class OneSubprocessPerFile(unittest.TestCase):
         self.addCleanup(_clear)
 
     def test_reading_one_file_twice_spawns_one_git_show(self):
-        real = bc.subprocess.check_output
-        with mock.patch.object(bc.subprocess, 'check_output', side_effect=real) as spawn:
-            first = bc.vanilla_decomp_text('include/constants/terrains.h')
-            second = bc.vanilla_decomp_text('include/constants/terrains.h')
+        real = subprocess.check_output
+        with mock.patch.object(subprocess, 'check_output', side_effect=real) as spawn:
+            first = inject.decomp.vanilla_decomp_text('include/constants/terrains.h')
+            second = inject.decomp.vanilla_decomp_text('include/constants/terrains.h')
         self.assertEqual(1, spawn.call_count,
                          'a second read of the same decomp file shelled out again')
         self.assertEqual(first, second)
 
     def test_two_different_files_still_spawn_two(self):
         """The memo is per-relpath -- caching must not collapse distinct files."""
-        real = bc.subprocess.check_output
-        with mock.patch.object(bc.subprocess, 'check_output', side_effect=real) as spawn:
-            terrains = bc.vanilla_decomp_text('include/constants/terrains.h')
-            characters = bc.vanilla_decomp_text('include/constants/characters.h')
+        real = subprocess.check_output
+        with mock.patch.object(subprocess, 'check_output', side_effect=real) as spawn:
+            terrains = inject.decomp.vanilla_decomp_text('include/constants/terrains.h')
+            characters = inject.decomp.vanilla_decomp_text('include/constants/characters.h')
         self.assertEqual(2, spawn.call_count)
         self.assertNotEqual(terrains, characters)
 
@@ -73,8 +77,8 @@ class OneSubprocessPerFile(unittest.TestCase):
         cached read hands back the same str object rather than an equal copy."""
         # Compare identity by id() so a failure prints two integers rather than two
         # copies of the file.
-        self.assertEqual(id(bc.vanilla_decomp_text('include/constants/terrains.h')),
-                         id(bc.vanilla_decomp_text('include/constants/terrains.h')),
+        self.assertEqual(id(inject.decomp.vanilla_decomp_text('include/constants/terrains.h')),
+                         id(inject.decomp.vanilla_decomp_text('include/constants/terrains.h')),
                          'the cached read handed back an equal copy, not the same object')
 
 
@@ -93,7 +97,7 @@ class ARealWorkloadReadsEachFileOnce(unittest.TestCase):
         distinct files the report actually needs.
         """
         spawns = []
-        real_spawn = bc.subprocess.check_output
+        real_spawn = subprocess.check_output
 
         def counting_spawn(cmd, *a, **kw):
             if isinstance(cmd, (list, tuple)) and 'show' in cmd:
@@ -102,7 +106,7 @@ class ARealWorkloadReadsEachFileOnce(unittest.TestCase):
 
         import contextlib
         import io
-        with mock.patch.object(bc.subprocess, 'check_output', counting_spawn):
+        with mock.patch.object(subprocess, 'check_output', counting_spawn):
             with contextlib.redirect_stdout(io.StringIO()):
                 dif.curve_report(CAMPAIGN)
 
@@ -124,7 +128,7 @@ class RedasIsParsedOncePerSource(unittest.TestCase):
         self.addCleanup(_clear)
 
     def test_many_unit_def_arrays_parse_redas_once(self):
-        text = bc.vanilla_decomp_text('src/events_udefs.c')
+        text = inject.decomp.vanilla_decomp_text('src/events_udefs.c')
         import re
         arrays = re.findall(r'CONST_DATA struct UnitDefinition (\w+)\[\]', text)[:6]
         self.assertGreaterEqual(len(arrays), 2, 'need >=2 UnitDefinition arrays to prove it')
@@ -149,17 +153,17 @@ class OneHeadReader(unittest.TestCase):
 
     def test_the_private_duplicate_is_gone(self):
         self.assertFalse(
-            hasattr(bc, '_vanilla_decomp_text_at_head'),
+            injector_constants('^_vanilla_decomp_text_at_head$'),
             '_vanilla_decomp_text_at_head is a duplicate of vanilla_decomp_text; '
             'call vanilla_decomp_text instead so the memo covers it too')
 
     def test_chapter_label_constants_reads_through_the_cached_reader(self):
         _clear()
         self.addCleanup(_clear)
-        real = bc.subprocess.check_output
-        with mock.patch.object(bc.subprocess, 'check_output', side_effect=real) as spawn:
-            bc.chapter_label_constants()
-            bc.chapter_label_constants()
+        real = subprocess.check_output
+        with mock.patch.object(subprocess, 'check_output', side_effect=real) as spawn:
+            inject.units.chapter_label_constants()
+            inject.units.chapter_label_constants()
         self.assertLessEqual(spawn.call_count, 1,
                              'chapter_label_constants re-read chapters.h from git')
 

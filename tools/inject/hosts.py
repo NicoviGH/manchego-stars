@@ -5,8 +5,8 @@ Kept STDLIB-ONLY on purpose, like decomp.py next to it. `tools/check.py` lints t
 CI's lightweight `checks` job, which installs pyyaml and nothing else; the first version
 of that lint imported build_campaign, which imports Pillow at module scope, so the job
 would have failed every push with `build_campaign does not import: No module named 'PIL'`
--- a red check that names the wrong problem (#241). build_campaign re-exports everything
-here, so the constants still read as `bc.CH04_HOST_INDEX` at their call sites.
+-- a red check that names the wrong problem (#241). Every injector module imports the
+constants it reads from here directly.
 
 Why a registry at all: retargeting a host slot's MAP ids alone is enough to make a chapter
 LOOK right while it runs the host slot's roster and scripts. That is silent and total, and
@@ -195,7 +195,7 @@ def _callsites():
 def literal_message_ids(source=None, path='<source>'):
     """Message ids written as a BARE LITERAL at a `set_message_body` call site, from SOURCE.
 
-    `build_campaign.injector_message_ids` finds an id by the NAME of the constant holding
+    `inject.messages.injector_message_ids` finds an id by the NAME of the constant holding
     it, so an id passed as hex AT the call site has no name to be found by. The prologue and
     ch01 write twelve of them, and they are visible to the guards today only because someone
     grepped for them once and hand-transcribed them into `PROLOGUE_LITERAL_MSGS` /

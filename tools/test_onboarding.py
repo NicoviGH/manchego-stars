@@ -14,7 +14,9 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import build_campaign as bc
+import inject.chapter_ids
+import inject.chapters.ch05
+import inject.hosting
 import gen_onboarding_index as onb
 
 
@@ -74,24 +76,24 @@ class GeneratedDoc(unittest.TestCase):
         label, entry = coverage[0]
         self.assertEqual(('Ch 5', 'active'), (label, entry.get('status')))
 
-        chap = bc._load_chapter_yaml('rime-of-the-frostmaiden', bc.CH05_CHAPTER_YAML)
-        wiring = bc.ch05_arena_onboarding_wiring(chap)
+        chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.chapter_ids.CH05_CHAPTER_YAML)
+        wiring = inject.chapters.ch05.ch05_arena_onboarding_wiring(chap)
 
         area = ('AREA(%s, %s, 12, 6, 12, 6)'
-                % (bc.CH05_ARENA_TUTORIAL_FLAG, bc.CH05_ARENA_TRIGGER_SCRIPT))
+                % (inject.chapters.ch05.CH05_ARENA_TUTORIAL_FLAG, inject.chapters.ch05.CH05_ARENA_TRIGGER_SCRIPT))
         self.assertEqual(1, wiring['misc'].count(area))
         self.assertEqual(
-            [bc.CH05_ARENA_TUTORIAL_SCRIPT, bc.CH05_ARENA_TRIGGER_SCRIPT],
+            [inject.chapters.ch05.CH05_ARENA_TUTORIAL_SCRIPT, inject.chapters.ch05.CH05_ARENA_TRIGGER_SCRIPT],
             [symbol for symbol, _body, _comment in wiring['scripts']])
         self.assertEqual(
-            [bc.CH05_ARENA_FOUND_MSG, bc.CH05_ARENA_RULES_MSG],
+            [inject.chapter_ids.CH05_ARENA_FOUND_MSG, inject.chapter_ids.CH05_ARENA_RULES_MSG],
             [msg_id for msg_id, _body in wiring['messages']])
 
-        inject = inspect.getsource(bc.inject_ch05)
-        self.assertEqual(1, inject.count('ch05_arena_onboarding_wiring(chap)'))
+        source = inspect.getsource(inject.chapters.ch05.inject_ch05)
+        self.assertEqual(1, source.count('ch05_arena_onboarding_wiring(chap)'))
         for output in ("arena_wiring['misc']", "arena_wiring['scripts']",
                        "arena_wiring['messages']"):
-            self.assertIn(output, inject,
+            self.assertIn(output, source,
                           'inject_ch05 does not consume live onboarding output %s' % output)
 
 

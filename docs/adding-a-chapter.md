@@ -1,7 +1,7 @@
 # Runbook — Hosting a New Chapter
 
 The repeatable recipe for putting a designed chapter into the ROM, distilled from
-`inject_ch01` / `inject_ch02` / `inject_ch03` in `tools/build_campaign.py`. Follow this
+`inject_ch01` / `inject_ch02` / `inject_ch03` in `tools/inject/chapters/`. Follow this
 instead of re-deriving the host machinery each time. **Reference implementations:**
 `inject_ch03` (defeat-boss, self-registers a new tileset — the leanest) and `inject_ch02`
 (defeat-all + cutscenes + green allies — the full-featured one).
@@ -63,11 +63,11 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    ch04: a whole session chasing a "harness soft-lock" that was only the cursor initialising onto
    an undeployed unit's off-map sentinel. Resolve the symbol → index with
    `_asm_table_word_index(ASSET_TABLE_S, 'gChapterDataAssetTable', ...)`; `HostChapterEventGroup`
-   in `tools/test_build_campaign.py` pins it.
+   in `tools/test_inject_hosting.py` pins it.
 
    **You get this guard for free, and you cannot forget to opt in.** Declare `CHNN_HOST_INDEX` +
    `CHNN_EVENT_GROUP` in **`tools/inject/hosts.py`** (the registry — stdlib-only so CI can lint it
-   without Pillow; `build_campaign` re-exports both). `hosted_chapters()` discovers chapters from
+   without Pillow). `hosted_chapters()` discovers chapters from
    that pair, so writing it is what enrols your chapter in the event-group check; there is no list
    to update. `make check` fails in 0s on a host slot with no event group, on two chapters claiming
    one slot (the prologue's slot 1 included), and — since #241 — on an `inject_chNN` that declares

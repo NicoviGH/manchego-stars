@@ -1,6 +1,6 @@
 """Shared decomp source-access layer: paths + brace-patch primitives.
 
-Imported by BOTH tools/build_campaign.py (content) and
+Imported by BOTH the content passes (tools/inject/*, tools/build_campaign.py) and
 tools/inject/engine_hooks.py (pipeline). Keep it dependency-free so neither
 side creates an import cycle. See docs/decisions.md -> Engine/content file seam.
 """
@@ -62,8 +62,8 @@ def _find_brace_block(text, marker, path):
 
 
 # Validators run on every EVENT SCENE body written through `_replace_brace_block`, which is
-# the one place any injector writes one. Registered from outside (build_campaign appends the
-# #337 cutscene-actor check at import) so this module keeps importing nothing of its own --
+# the one place any injector writes one. Registered from outside (inject/scene_actors.py appends
+# the #337 cutscene-actor check at import) so this module keeps importing nothing of its own --
 # a scene check needs the campaign's cast, and this layer must stay dependency-free or every
 # extraction of #389 gets an import cycle back (ADR 0287).
 #
@@ -72,11 +72,26 @@ def _find_brace_block(text, marker, path):
 # question of when, not whether.
 SCENE_VALIDATORS = []
 
+# The modules that REGISTER one, loaded by name on first use -- not imported here, which would
+# pull the cast (and Pillow) into this layer. Importing build_campaign used to register the
+# #337 check as a side effect; once the injector split (#389), a caller that imported only a
+# chapter module wrote its scenes with no check at all. Loading on use makes "every scene is
+# checked" independent of who imported what.
+SCENE_VALIDATOR_MODULES = ('inject.scene_actors',)
+
+
+def scene_validators():
+    """Every registered scene validator, with the modules that register them loaded first."""
+    import importlib
+    for name in SCENE_VALIDATOR_MODULES:
+        importlib.import_module(name)
+    return SCENE_VALIDATORS
+
 
 def _replace_brace_block(text, marker, new_body, path):
     """Replace the `{...}` after `marker` with `new_body` (a `{...}` string)."""
     if marker.startswith('EventScr_'):
-        for validate in SCENE_VALIDATORS:
+        for validate in scene_validators():
             validate(new_body, marker.split('[')[0])
     s, e = _find_brace_block(text, marker, path)
     return text[:s] + new_body + text[e:]

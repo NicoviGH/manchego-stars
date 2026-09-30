@@ -95,16 +95,16 @@ def restore_decomp():
     """Put the decomp back to HEAD so the injector has to do all of its work."""
     # `HEAD --`, never `-- .`: `git checkout -- <path>` restores from the INDEX, so anything
     # staged in the decomp survives the restore and the injector never has to rewrite it.
-    # `build_campaign.restore_vanilla_sources` documents the same trap.
+    # `inject.warm.restore_vanilla_sources` documents the same trap.
     subprocess.run(['git', '-C', DECOMP, 'checkout', 'HEAD', '--', '.'], env=git_env(), check=True)
     subprocess.run(['git', '-C', DECOMP, 'clean', '-fdq', '--'] + list(INJECTED_SCOPE),
                    env=git_env(), check=True)
 
 
-def inject():
+def inject(flags=()):
     env = dict(os.environ)
     subprocess.run([sys.executable, os.path.join(REPO, 'tools', 'build_campaign.py'),
-                    '--campaign', CAMPAIGN],
+                    '--campaign', CAMPAIGN] + list(flags),
                    cwd=REPO, env=env, check=True, stdout=subprocess.DEVNULL)
 
 
@@ -203,8 +203,8 @@ def compare(before, after):
             sorted(k for k in set(a) & set(b) if a[k] != b[k]))
 
 
-def build(stash_caches=True):
-    """One measured injection: {'files': {...}, 'precondition': [...]}."""
+def build(stash_caches=True, flags=()):
+    """One measured injection: {'files': {...}, 'precondition': [...], 'flags': [...]}."""
     names = list(BUILD_STATE) + (list(CACHES) if stash_caches else [])
     saved = []
     try:
@@ -224,9 +224,10 @@ def build(stash_caches=True):
         restore_decomp()
         ignored_before = _ignored_paths()
         started = time.time()
-        inject()
+        inject(flags)
         return {'files': fingerprint(started, ignored_before),
-                'precondition': sorted(ignored_before)}
+                'precondition': sorted(ignored_before),
+                'flags': list(flags)}
     finally:
         for src, dst in saved:
             if os.path.exists(src):
@@ -256,13 +257,22 @@ def main():
     ap.add_argument('--keep-caches', action='store_true',
                     help='do not hide .injectcache/.build-scopes.json (faster, but measures '
                          'the cache). .build-config.json is stashed either way.')
+    ap.add_argument('--flags', default='',
+                    help='build_campaign flags to inject with, e.g. "--ch05-boot --ch05-lupin". '
+                         'The default build never reaches a boot flag\'s code, so a refactor '
+                         'is gated on every configuration, not just this one.')
     args = ap.parse_args()
+    flags = args.flags.split()
 
     # Read the recorded manifest BEFORE injecting: an unreadable one is a 50-second wait for
     # an error that was knowable at the start.
     before = load_manifest(args.check) if args.check else None
+    if before is not None and before.get('flags', []) != flags:
+        sys.exit('ERROR: %s was recorded with flags %r, not %r -- two configurations inject '
+                 'different trees, so comparing them measures the flags.'
+                 % (args.check, before.get('flags', []), flags))
 
-    manifest = build(stash_caches=not args.keep_caches)
+    manifest = build(stash_caches=not args.keep_caches, flags=flags)
 
     if args.write:
         with open(args.write, 'w') as fh:

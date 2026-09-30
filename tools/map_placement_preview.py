@@ -61,8 +61,8 @@ def mov_cost_row(table='TerrainTable_MovCost_CommonT1Normal'):
 
     Any class row works: PirateNormal is Braulo's, FlyNormal is Pinky's, HorseT1Normal is
     the cavalry's. A chapter whose whole shape is who-can-cross-what needs all of them."""
-    import build_campaign as bc
-    src = bc.vanilla_decomp_text('src/data_terrains.c')
+    import inject.decomp
+    src = inject.decomp.vanilla_decomp_text('src/data_terrains.c')
     m = re.search(r'CONST_DATA s8 %s\[\]\s*=\s*\{(.*?)\n\};' % table, src, re.S)
     if not m:
         sys.exit('ERROR: no move-cost table %r in data_terrains.c' % table)
@@ -112,7 +112,7 @@ def load_map(stem):
     """(grid, terrain, tileset) for one of our compiled maps.
 
     The tileset comes from the map's sidecar `<stem>.json`, resolved through
-    `build_campaign.map_tileset` -- the SAME function the ROM build resolves it with. This
+    `inject.maps.map_tileset` -- the SAME function the ROM build resolves it with. This
     used to be a bare `meta['tileset']`, which hard-crashed with `KeyError: 'tileset'` on
     ch00-ch02, whose sidecars predate that key; the build never had that problem because it
     has always defaulted a keyless sidecar to `WINTER_TILESET`.
@@ -124,12 +124,12 @@ def load_map(stem):
     build's own resolver instead makes disagreement between the picture and the ROM
     impossible by construction (`decisions.md` -> "A map's tileset has one home").
     """
-    import build_campaign as bc
+    import inject.maps
     meta = json.load(open(os.path.join(MAPS, stem + '.json')))
     w, h = meta['width'], meta['height']
     raw = open(os.path.join(MAPS, stem + '.mar'), 'rb').read()
     cells = [struct.unpack_from('<H', raw, i * 2)[0] >> 5 for i in range(w * h)]
-    ts = mt._tileset_from_dir(os.path.join(MAPS, 'tilesets', bc.map_tileset(meta)))
+    ts = mt._tileset_from_dir(os.path.join(MAPS, 'tilesets', inject.maps.map_tileset(meta)))
     grid = [[cells[y * w + x] for x in range(w)] for y in range(h)]
     terrain = [[ts.terrain(m) for m in row] for row in grid]
     return grid, terrain, ts
@@ -264,13 +264,13 @@ def enemy_bodies(chapter):
     testing `arrives_turn` alone against a bare `chapter.get('enemy_units')` loop both missed
     those entries' bodies AND, on a naive widen-the-loop fix, would have read them as turn-1
     (`arrives_turn` absent reads as falsy) -- exactly backwards, since a reinforcement KEY is
-    the one shape definitely not on the opening board. `build_campaign.entry_is_turn1` is the
+    the one shape definitely not on the opening board. `inject.raw_pids.entry_is_turn1` is the
     one place that now decides this, shared with `difficulty.chapter_enemy_groups` (#367)."""
-    import build_campaign as bc
+    import inject.raw_pids
     out = set()
-    for key in bc.ENEMY_ROSTER_KEYS:
+    for key in inject.raw_pids.ENEMY_ROSTER_KEYS:
         for enemy in chapter.get(key) or ():
-            if not isinstance(enemy, dict) or not bc.entry_is_turn1(key, enemy):
+            if not isinstance(enemy, dict) or not inject.raw_pids.entry_is_turn1(key, enemy):
                 continue
             for tile in enemy.get('positions') or ():
                 out.add(tuple(tile))
@@ -296,14 +296,14 @@ def class_movement(class_token):
 
 
 def _classes_text():
-    import build_campaign as bc
-    return bc.vanilla_decomp_text('src/data_classes.c')
+    import inject.decomp
+    return inject.decomp.vanilla_decomp_text('src/data_classes.c')
 
 
 def units_reaching(chapter, terrain, targets):
     """[(enemy id, ai bytes)] for every unit that can ATTACK one of `targets`.
 
-    REINFORCEMENTS ARE INCLUDED, across every roster key (`build_campaign.chapter_roster_entries`)
+    REINFORCEMENTS ARE INCLUDED, across every roster key (`inject.raw_pids.chapter_roster_entries`)
     -- not just `enemy_units`. They are not on the opening board, but a hull's fuse is costed
     against the units a chapter DECLARES as its clock, and an undeclared unit that reaches a
     hull on turn 5 sinks it exactly as surely as one that reaches it on turn 1 -- it just does
@@ -325,11 +325,11 @@ def units_reaching(chapter, terrain, targets):
     Weapon range comes from `difficulty._weapon_for`, so a staff-only unit is correctly no
     threat and a javelin correctly reaches two.
     """
-    import build_campaign as bc
+    import inject.raw_pids
     import difficulty
     import chapter_status as cs
     out = []
-    for enemy in bc.chapter_roster_entries(chapter):
+    for enemy in inject.raw_pids.chapter_roster_entries(chapter):
         # MAX range over the whole inventory, not the first weapon. FE8's AI equips whatever
         # lets it attack, and ch06's ironshell-horseslayer proved it in-engine: its items[0] is
         # a range-1 Horseslayer, and it threw its JAVELIN at the hull from two tiles away.
@@ -422,15 +422,15 @@ def placed_units(chapter, concept=None):
     Reads every roster key (#367/#369) -- was `enemy_units` alone, the THIRD copy of the
     same bug `enemy_bodies` and `units_reaching` were fixed for: a `reinforcements:`/
     `enemy_reinforcements:` wave was simply absent from the picture. `late` (drawn as a
-    hollow ring) is `build_campaign.entry_is_turn1`'s KEY-aware answer OR'd with
+    hollow ring) is `inject.raw_pids.entry_is_turn1`'s KEY-aware answer OR'd with
     `hard_mode_only` -- a separate, MODE-gated axis `entry_is_turn1` does not model, since
     ch06's Difficult-only crab riders declare it while staying inside `enemy_units`."""
-    import build_campaign as bc
+    import inject.raw_pids
     import difficulty as dif
     import chapter_status as cs
     override = (json.load(open(concept))['units'] if concept else {})
     out = []
-    for key in bc.ENEMY_ROSTER_KEYS:
+    for key in inject.raw_pids.ENEMY_ROSTER_KEYS:
         for enemy in chapter.get(key) or ():
             if not isinstance(enemy, dict):
                 continue
@@ -444,7 +444,7 @@ def placed_units(chapter, concept=None):
                 # as static.
                 behaviour = cs.ai_shape(ai) or cs.ai_family(ai[1]) or '?'
                 code = 'B' if enemy.get('is_boss') else ROLE_CODE.get(enemy.get('class'), '??')
-                late = not bc.entry_is_turn1(key, enemy) or bool(enemy.get('hard_mode_only'))
+                late = not inject.raw_pids.entry_is_turn1(key, enemy) or bool(enemy.get('hard_mode_only'))
                 out.append((tuple(tile), code, behaviour, eid, late))
     return out
 

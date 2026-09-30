@@ -13,7 +13,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import build_campaign as bc
+import inject.chapter_ids
 import scene_preview as sp
 
 
@@ -122,7 +122,7 @@ class TheRegistry(unittest.TestCase):
         invents a page break". It does: a turn wrapping past two lines pages, and each page
         is its own press. Scene 1 is 19 authored boxes and costs the player 23. Reporting the
         authored count would have under-priced every scene with a long line in it."""
-        _slot, _msg, authored, _what = bc.CH05_OPENING_SLOTS[0]
+        _slot, _msg, authored, _what = inject.chapter_ids.CH05_OPENING_SLOTS[0]
         self.assertEqual(19, authored)
         self.assertEqual(23, len(sp.preview('ch05/1').boxes))
 
@@ -130,7 +130,7 @@ class TheRegistry(unittest.TestCase):
         """Most builders return [(msg_id, body)]; the one-box ones return the body itself.
         The registry names a message id either way, so the caller never has to know which."""
         scene = sp.preview('ch05/eruption')
-        self.assertEqual(bc.CH05_ERUPTION_MSG, scene.msg_id)
+        self.assertEqual(inject.chapter_ids.CH05_ERUPTION_MSG, scene.msg_id)
         self.assertEqual('ravisin', scene.boxes[0].speaker)
 
     def test_a_battle_quote_is_previewed_against_the_BATTLE_bubble_budget(self):

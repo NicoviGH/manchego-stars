@@ -11,7 +11,7 @@ Paths only. Anything that computes, decides or patches belongs in the domain mod
 owns the decision -- a path constant is the one kind of fact with no behaviour attached, so
 this module can be imported by anything without creating a cycle.
 
-`build_campaign.py` re-exports every name here, so existing call sites are unchanged.
+Every injector module imports the paths it reads from here directly.
 """
 import os
 

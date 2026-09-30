@@ -58,9 +58,9 @@ class MessageIds(unittest.TestCase):
     scene costs an id or a redesign."""
 
     def test_ch05_claims_the_ids_the_ownership_registry_says_it_does(self):
-        import build_campaign as bc
+        import inject.messages
         room = cs.message_ids('ch05')
-        self.assertEqual(set(bc.HOSTED_CHAPTER_MESSAGE_IDS['ch05']), set(room.claimed))
+        self.assertEqual(set(inject.messages.HOSTED_CHAPTER_MESSAGE_IDS['ch05']), set(room.claimed))
 
     def test_headroom_counts_only_ids_inside_the_chapter_s_own_host_block(self):
         """ch05 hosts on slot 6, so it owns vanilla Ch6's dead block -- NOT vanilla Ch5's,
@@ -84,10 +84,10 @@ class MessageIds(unittest.TestCase):
     def test_two_chapters_may_not_declare_overlapping_blocks(self):
         """`assert_message_ids_unique` catches two chapters writing the same id. This catches
         the setup that makes that inevitable, before either has spent anything."""
-        import build_campaign as bc
-        self.assertTrue(bc.assert_message_blocks_disjoint())
+        import inject.messages
+        self.assertTrue(inject.messages.assert_message_blocks_disjoint())
         with self.assertRaises(SystemExit):
-            bc.assert_message_blocks_disjoint({'a': ((0x100, 0x110),),
+            inject.messages.assert_message_blocks_disjoint({'a': ((0x100, 0x110),),
                                                'b': ((0x105, 0x120),)})
 
     def test_a_chapter_with_no_declared_block_says_so_rather_than_guessing(self):
@@ -208,7 +208,7 @@ class TheReport(unittest.TestCase):
 
 
 class TryImport(unittest.TestCase):
-    """`_preview_module`/`_build_campaign`/`_rescue_forecast_module` were three copies of
+    """`_preview_module`/`_messages_module`/`_rescue_forecast_module` were copies of
     the same `try: import X; return X; except ImportError: return None` template, differing
     only in the module name -- this is the one shared implementation each now calls."""
 
@@ -221,7 +221,8 @@ class TryImport(unittest.TestCase):
     def test_each_wrapper_still_resolves_its_own_module_by_name(self):
         """The refactor must not collapse the three into one shared cache keyed wrong --
         each wrapper is independently callable and returns ITS module."""
-        self.assertIs(cs._build_campaign(), __import__('build_campaign'))
+        import inject.messages
+        self.assertIs(cs._messages_module(), inject.messages)
 
 
 class DegradedModesMustSayCannotTell(unittest.TestCase):
@@ -230,10 +231,12 @@ class DegradedModesMustSayCannotTell(unittest.TestCase):
     are true. Each of these silently lied."""
 
     def setUp(self):
-        self._preview, self._bc = cs._preview_module, cs._build_campaign
+        self._preview = cs._preview_module
+        self._messages, self._text = cs._messages_module, cs._text_module
         self._rf = cs._rescue_forecast_module
         self.addCleanup(setattr, cs, '_preview_module', self._preview)
-        self.addCleanup(setattr, cs, '_build_campaign', self._bc)
+        self.addCleanup(setattr, cs, '_messages_module', self._messages)
+        self.addCleanup(setattr, cs, '_text_module', self._text)
         self.addCleanup(setattr, cs, '_rescue_forecast_module', self._rf)
         cs._scenes_cache.clear()
 
@@ -250,18 +253,18 @@ class DegradedModesMustSayCannotTell(unittest.TestCase):
         cs._rescue_forecast_module = lambda: None
         self.assertFalse(any('merfolk-thrower' in e for e in cs.loose_ends('ch06')))
 
-    def test_without_build_campaign_a_full_block_is_not_reported_as_undeclared(self):
+    def test_without_the_message_registry_a_full_block_is_not_reported_as_undeclared(self):
         """ch05's block is FULL. Rendering that as 'no host block declared' makes it
         indistinguishable from ch01, whose block genuinely was never written down."""
-        cs._build_campaign = lambda: None
+        cs._messages_module = lambda: None
         text = cs.report('ch05')
         self.assertNotIn('no host block declared', text)
         self.assertIn('cannot tell', text)
 
-    def test_without_build_campaign_box_counts_are_blank_rather_than_wrong(self):
+    def test_without_the_script_vocabulary_box_counts_are_blank_rather_than_wrong(self):
         """Counting every script entry gives 20 where the truth is 19: stage directions are
         not boxes. A wrong number in the same column with no marker is the worst option."""
-        cs._build_campaign = lambda: None
+        cs._text_module = lambda: None
         row = next(r for r in cs.scenes('ch05') if r.slot == 'vanilla 0x9BB')
         self.assertIsNone(row.boxes)
 
@@ -363,8 +366,8 @@ class AiBehaviourTable(unittest.TestCase):
         DESIGNATED initialisers (`[AI_B_0A] = ...`), so the index is read from the designator
         rather than from position -- a table with a hole would otherwise silently shift.
         """
-        import build_campaign as bc, re
-        text = bc.vanilla_decomp_text('src/cp_data.c')
+        import inject.decomp, re
+        text = inject.decomp.vanilla_decomp_text('src/cp_data.c')
         body = text.split('gAi2ScriptTable[] = {', 1)[1].split('};', 1)[0]
         return {int(i, 16): sym
                 for i, sym in re.findall(r'\[AI_B_([0-9A-Fa-f]{2})\]\s*=\s*(\w+)', body)}
@@ -419,9 +422,9 @@ class Ai1Table(unittest.TestCase):
                0x08: 'gAiScript_ActionInRange_ExceptCivilian'}
 
     def _table(self):
-        import build_campaign as bc
+        import inject.decomp
         body = re.search(r'gAi1ScriptTable\[\] = \{(.*?)\n\};',
-                         bc.vanilla_decomp_text('src/cp_data.c'), re.S).group(1)
+                         inject.decomp.vanilla_decomp_text('src/cp_data.c'), re.S).group(1)
         return {int(i, 16): sym
                 for i, sym in re.findall(r'\[AI_A_([0-9A-Fa-f]{2})\]\s*=\s*(\w+)', body)}
 

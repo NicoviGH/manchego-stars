@@ -20,7 +20,7 @@ Two hard engine constraints shape the art (see HANDOFF / issue #38):
 
 This tool does NOT generate art; it validates that a sheet conforms so the build
 won't silently emit garbage, and reports its SMS size class. Injection into the
-decomp (table slot + character override) lives in build_campaign.inject_map_sprites,
+decomp (table slot + character override) lives in inject.map_sprites.inject_map_sprites,
 parallel to portrait injection.
 """
 
