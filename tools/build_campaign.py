@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""build_campaign.py -- inject campaign content into the fireemblem8u decomp build.
+"""build_campaign.py -- inject campaign content into the decomp build tree.
 
 Reads campaign data (YAML + authored busts) and writes decomp-native source/asset
-files into the fireemblem8u submodule working tree, so a plain `make` compiles a
-ROM carrying our content. The generated files are reproducible build artifacts --
-restore vanilla with `git -C fireemblem8u checkout <path>`.
+files into build/fireemblem8u -- a git worktree of the fireemblem8u submodule
+(tools/build_tree.py, #408) -- so a plain `make` compiles a ROM carrying our content.
+The submodule itself stays vanilla; the generated files are reproducible build artifacts.
 
 Engine/Content boundary (AGENTS.md): the GENERATOR knows character/chapter names;
 the C/asm it EMITS is just data. No campaign name is ever hardcoded in engine C.
@@ -21,6 +21,7 @@ import time
 # The tools/ modules (portrait_tool, map_tileset_tool, ...) sit next to us.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_scopes  # noqa: E402
+import build_tree  # noqa: E402
 from inject import chapter_data  # noqa: E402
 from inject import engine_hooks  # noqa: E402
 from inject import event_group  # noqa: E402
@@ -166,6 +167,8 @@ def main():
         sys.exit('ERROR: %s are mutually exclusive -- each repoints New Game at its own '
                  'chapter slot' % ' and '.join(_boots))
 
+    # The tree we write into (#408): created on first use, and following a submodule bump.
+    build_tree.ensure()
     print('build_campaign: injecting "%s" into %s' % (args.campaign, DECOMP))
     # Before anything else: undo whatever the last submodule checkout did to the decomp's
     # Linux shebangs, or this build dies minutes later on `bad interpreter`.

@@ -18,9 +18,7 @@ import subprocess
 
 _TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(_TOOLS)
-from .decomp import git_env  # noqa: E402  strip inherited GIT_* (hook safety)
-
-DECOMP = os.path.join(REPO, 'fireemblem8u')
+from .decomp import DECOMP, git_env, SUBMODULE  # noqa: E402  (git_env: hook safety)
 
 CHAPTERDATA_H = os.path.join(DECOMP, 'include', 'chapterdata.h')
 EVENTS_INFO_S = os.path.join(DECOMP, 'src', 'events_info.s')
@@ -393,7 +391,7 @@ def vanilla_header(relpath):
     the superproject instead of the submodule.
     """
     env = git_env()
-    out = subprocess.run(['git', '-C', DECOMP, 'show', 'HEAD:%s' % relpath],
+    out = subprocess.run(['git', '-C', SUBMODULE, 'show', 'HEAD:%s' % relpath],
                          capture_output=True, text=True, env=env)
     if out.returncode != 0:
         raise KeyError('cannot read %s at HEAD: %s' % (relpath, out.stderr.strip()))

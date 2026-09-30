@@ -119,7 +119,8 @@ cd fireemblem8u
 - No `stdint.h` types in engine files — use the decomp's existing typedefs (`u8`, `u16`, `u32`, `s8`, `s16`, `s32`)
 - Match the existing file and function naming conventions in `fireemblem8u/src/`
 - New engine behavior ships as string-patch hooks in `tools/inject/engine_hooks.py` — never hand-edits
-  to `fireemblem8u/src/` (our decomp edits are build artifacts, restored on every build)
+  to the decomp. The injector writes `build/fireemblem8u` (a git worktree of the submodule, restored
+  on every build) and the `fireemblem8u` submodule itself stays vanilla (#408)
 - Comments say **why**; the **what** lives in code + tests. When a change retires a mechanism or term,
   register its key phrases in `tools/check.py` `DEAD_CONCEPTS` in the same commit — the drift lint scans
   docs AND hand-written code comments (`docs/decisions.md` → "Comments are testimony").
@@ -193,7 +194,7 @@ Rationale and the long form: `docs/decisions.md` → Working Conventions. Every 
 - says `Closes #N` if it completes tracked work; open/retitle the issue if scope changes;
 - builds `make` green, and passes `python3 tools/verify_text.py` after any text change;
 - records a new non-obvious decision in `docs/decisions.md` (dated) — not only in chat/memory;
-- never commits the `fireemblem8u` submodule pointer (our decomp edits are build artifacts).
+- never commits the `fireemblem8u` submodule pointer (our decomp edits live in `build/fireemblem8u`).
 
 Single source of truth: don't restate a fact that lives elsewhere — link to it. Keep this
 file lean (operating instructions + pointers, not a fact store).

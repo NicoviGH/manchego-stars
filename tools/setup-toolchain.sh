@@ -50,16 +50,7 @@ else
   say "agbcc already installed — skipping"
 fi
 
-# 4. Normalise Linux-only shebangs in the submodule's python scripts. Upstream
-#    ships `#!/bin/python3`, which does not exist on macOS (and /bin is SIP-
-#    protected, so it cannot be symlinked). Rewrite to the portable env form.
-#    Idempotent; only touches files that still need it.
-say "Normalising #!/bin/python3 shebangs in fireemblem8u/scripts"
-while IFS= read -r f; do
-  sed -i '' '1s|^#!/bin/python3|#!/usr/bin/env python3|' "$f"
-done < <(grep -rl '^#!/bin/python3' "${DECOMP_DIR}/scripts" 2>/dev/null || true)
-
-# 5. Base ROM. Never committed (see .gitignore); copied in from the source folder.
+# 4. Base ROM. Never committed (see .gitignore); copied in from the source folder.
 if [[ ! -f "${DECOMP_DIR}/baserom.gba" ]]; then
   if [[ -f "${BASEROM_SRC}" ]]; then
     say "Copying baserom.gba"
@@ -69,7 +60,7 @@ if [[ ! -f "${DECOMP_DIR}/baserom.gba" ]]; then
   fi
 fi
 
-# 6. Enable the repo's git hooks (pre-commit drift guard -- see tools/hooks/).
+# 5. Enable the repo's git hooks (pre-commit drift guard -- see tools/hooks/).
 say "Enabling git hooks (core.hooksPath -> tools/hooks)"
 git -C "${REPO_DIR:-.}" config core.hooksPath tools/hooks
 

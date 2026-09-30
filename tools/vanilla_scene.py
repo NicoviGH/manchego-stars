@@ -25,7 +25,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.decomp                                          # noqa: E402
 
-DEC = inject.decomp.DECOMP
+DEC = inject.decomp.SUBMODULE   # vanilla: the submodule, never the build tree (#408)
 
 
 def _decomp_text(relpath):

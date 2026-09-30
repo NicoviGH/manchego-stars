@@ -29,7 +29,9 @@ import sys
 from collections import namedtuple
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-ELF = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.elf')
+sys.path.insert(0, os.path.join(REPO, 'tools'))
+from inject.decomp import DECOMP  # noqa: E402  the build tree the ROM lands in (#408)
+ELF = os.path.join(DECOMP, 'fireemblem8.elf')
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, 'symbols.lua')
 OUT_PROCSCR = os.path.join(HERE, 'procscr.lua')

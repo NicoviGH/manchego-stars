@@ -14,7 +14,7 @@ talk at 29 CHARACTERS; the engine measures PIXELS".
 PROVENANCE. Read out of `TextGlyphs_Talk` in the built ROM -- an array of `struct Glyph *`
 indexed by ASCII, with `width` at offset 5 (fontgrp.h: a 4-byte `sjisNext`, then `sjisByte1`,
 then `width`). Re-verify with `python3 tools/fe8_talk_font.py --regenerate`, which reads the
-address out of `fireemblem8u/fireemblem8.map`. CHECKED IN rather than read during the build,
+address out of the built `fireemblem8.map`. CHECKED IN rather than read during the build,
 because the campaign build is what PRODUCES that ROM -- reading it there would be circular.
 """
 import os
@@ -88,8 +88,10 @@ def text_px(text):
 
 def _regenerate():
     import struct
-    rom = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.gba')
-    mapf = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.map')
+    sys.path.insert(0, os.path.join(REPO, 'tools'))
+    from inject.decomp import DECOMP     # the build tree the ROM lands in (#408)
+    rom = os.path.join(DECOMP, 'fireemblem8.gba')
+    mapf = os.path.join(DECOMP, 'fireemblem8.map')
     addr = None
     with open(mapf, encoding='utf-8', errors='replace') as fh:
         for line in fh:

@@ -11,7 +11,12 @@ import subprocess
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-DECOMP = os.path.join(REPO, 'fireemblem8u')
+# The submodule: vanilla FE8, and nothing writes to it (#408). Read vanilla from its HEAD.
+SUBMODULE = os.path.join(REPO, 'fireemblem8u')
+# The tree the injector writes and `make` compiles: a git worktree of the submodule at the
+# same commit (tools/build_tree.py makes it), so `git status`/`checkout HEAD --` work in it
+# exactly as they did in the submodule, and the submodule's own working tree stays clean.
+DECOMP = os.path.join(REPO, 'build', 'fireemblem8u')
 
 # Decomp source files patched by hooks that BOTH tracks touch (content injects
 # lord quotes / map sprites into these; engine_hooks patches lord-select into them).
@@ -139,7 +144,7 @@ def vanilla_decomp_text(relpath):
     # superproject and fails (128). Bit us committing from a content/pipeline worktree,
     # whose submodule gitdir is separate from the superproject's.
     env = git_env()
-    return subprocess.check_output(['git', '-C', DECOMP, 'show', 'HEAD:' + relpath],
+    return subprocess.check_output(['git', '-C', SUBMODULE, 'show', 'HEAD:' + relpath],
                                    encoding='utf-8', env=env)
 
 

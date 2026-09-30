@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """compiled_manifest.py forget|record -- bracket the decomp compile for the mtime rewind (#416).
 
-The Makefile runs `forget` before `make -C fireemblem8u` and `record` after it succeeds, so
+The Makefile runs `forget` before the decomp compile and `record` after it succeeds, so
 the record always describes the objects on disk. inject.warm has the why.
 """
 import os

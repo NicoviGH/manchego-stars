@@ -11,10 +11,9 @@
 #               primary checkout holds `main`, so each instance lives on its own
 #               short-lived branch and integrates to main frequently (trunk-based).
 #
-# WHY this script exists: the decomp build mutates the `fireemblem8u` submodule
-# working tree, so two instances sharing one checkout would race and corrupt each
-# other's build. A separate worktree gives each its OWN submodule working tree +
-# index (git 2.x stores it under .git/worktrees/<wt>/modules/, verified isolated).
+# WHY this script exists: a build writes the checkout's build tree
+# (build/fireemblem8u, #408), so two instances sharing one checkout would race and
+# corrupt each other's build. A separate worktree gives each its OWN build tree.
 # But a fresh worktree's submodule is empty AND the build toolchain (agbcc + the
 # small native binaries) is gitignored, so it doesn't come with the checkout.
 # This script populates the submodule from the LOCAL object store (no re-clone)
@@ -43,18 +42,14 @@ fi
 
 # These toolchain artifacts are gitignored (built by setup-toolchain.sh) and so
 # absent from a fresh submodule checkout. They are static native binaries -- safe
-# to symlink and share across worktrees on the same machine.
-TOOLCHAIN=(
-    tools/agbcc
-    tools/aif2pcm/aif2pcm
-    tools/bin2c/bin2c
-    tools/gbagfx/gbagfx
-    tools/jsonproc/jsonproc
-    tools/mid2agb/mid2agb
-    tools/scaninc/scaninc
-    tools/textencode/textencode
-    baserom.gba
-)
+# to symlink and share across worktrees on the same machine. The list is
+# tools/build_tree.py's, which links the same set into the build tree.
+# An assignment, not `< <(...)`: set -e does not see a failed process substitution, and an
+# empty list would "succeed" into a worktree with no compiler.
+TOOLCHAIN_LIST="$(python3 "$REPO/tools/build_tree.py" toolchain)"
+[ -n "$TOOLCHAIN_LIST" ] || { echo "ERROR: tools/build_tree.py listed no toolchain" >&2; exit 1; }
+TOOLCHAIN=()
+while IFS= read -r t; do TOOLCHAIN+=("$t"); done <<< "$TOOLCHAIN_LIST"
 
 cd "$REPO"
 
@@ -119,5 +114,5 @@ for t in "${TOOLCHAIN[@]}"; do
 done
 
 echo ">> done. Build there with:  ( cd $WT_PATH && tools/build.sh test )"
-echo "   (build.sh re-applies the macOS shebang fix idempotently.)"
+echo "   (every build re-applies the macOS shebang fix in the build tree.)"
 echo "   Remove when finished with:  git worktree remove $WT_PATH"

@@ -19,8 +19,10 @@ import re
 import sys
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MAP = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.map')
-ROM = os.path.join(REPO, 'fireemblem8u', 'fireemblem8.gba')
+sys.path.insert(0, os.path.join(REPO, 'tools'))
+from inject.decomp import DECOMP  # noqa: E402  the build tree the ROM lands in (#408)
+MAP = os.path.join(DECOMP, 'fireemblem8.map')
+ROM = os.path.join(DECOMP, 'fireemblem8.gba')
 BASE = 0x08000000
 MSG_COUNT = 0xD4C
 # Longest legit vanilla message (an epilogue paragraph) is ~2133 decoded values;
