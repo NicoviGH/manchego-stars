@@ -1370,6 +1370,15 @@ class PlayerArrivesLeveled(unittest.TestCase):
         wolfram = next(u for u in roster if u.name == 'wolfram')
         self.assertEqual(wolfram.hp, df.player_combatant(CAMPAIGN, 'wolfram').hp)  # L1 into ch02
 
+    def test_the_report_survives_an_exp_model_refusal_and_says_so(self):
+        import exp_curve
+        from unittest import mock
+        out = io.StringIO()
+        with mock.patch.object(exp_curve, 'entering', side_effect=ValueError('gorgon egg')), \
+                contextlib.redirect_stdout(out):
+            df.report(CAMPAIGN, 'ch02')
+        self.assertIn('the exp model refused: gorgon egg', out.getvalue())
+
     def test_a_vanilla_ally_grows_only_above_its_own_base_level(self):
         at_base = {u.name: u for u in df.vanilla_allies('FE8 Ch2')}
         grown = {u.name: u for u in df.vanilla_allies('FE8 Ch2', level=1)}

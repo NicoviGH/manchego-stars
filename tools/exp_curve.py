@@ -26,7 +26,7 @@ kill (which pays round exp and is left out of both sides), staff and arena exp, 
 a player farms by choosing to. All of those ADD, so the curve here is a floor.
 
 Stat GROWTH is not modelled HERE: a level is this module's answer. `difficulty.grown` turns a
-level into the mean stat line for the absolute readings (ADR 0310).
+level into the median stat line for the absolute readings (ADR 0310).
 """
 import argparse
 import dataclasses

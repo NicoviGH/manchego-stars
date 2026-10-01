@@ -1470,9 +1470,17 @@ def _fmt_dura_delta(ours, van):
 
 
 def report(campaign, ch, mode=None):
-    chap, roster, line, bosses, deploy_limit, labels = load_field(campaign, ch, leveled=True)
     import exp_curve                        # exp_curve imports this module
-    arriving = exp_curve.entering(campaign, int(chap['chapter_number']))
+    number = int(chapter_schema.load(chapter_path(campaign, ch))['chapter_number'])
+    try:
+        arriving = exp_curve.entering(campaign, number)
+    except ValueError as refusal:           # the exp model refuses a body it cannot price
+        print('!! no arriving party -- the exp model refused: %s\n'
+              '!! every absolute reading below is the JOIN line, not the arriving party\n'
+              % refusal)
+        arriving = None
+    chap, roster, line, bosses, deploy_limit, labels = load_field(
+        campaign, ch, leveled=arriving is not None)
     num = chap.get('chapter_number')
     bar = '=' * 80
     print(bar)
@@ -1501,7 +1509,7 @@ def report(campaign, ch, mode=None):
         do = durability(u, line, 0)
         dfst = durability(u, line, 20)
         print('  %-11s %3d %3d%3d%3d%3d%3d%3d%3d%3d  %-12s  %4.1f /%4.1f    %.2f%s'
-              % (u.name, arriving['party'][u.name][1], u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con,
+              % (u.name, arriving['party'][u.name][1] if arriving else 1, u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con,
                  u.weapon.name if u.weapon else '(staff)', do, dfst, best[0],
                  (' vs ' + best[1].name) if best[1] else ''))
 
@@ -1522,11 +1530,11 @@ def report(campaign, ch, mode=None):
                  ', '.join(u.name for u in r['team'])))
 
     ref = chap.get('parity_reference')
-    van = vanilla_allies(ref, arriving['twin_level'])
+    van = vanilla_allies(ref, arriving['twin_level'] if arriving else None)
     if van:
         vm = _metrics(van, line, bosses)
         print('\n-- VANILLA Ch%s PARITY DELTA (%s deploy, from HEAD, grown to L%d where below) '
-              % (num, ref, arriving['twin_level']) + '-' * 4)
+              % (num, ref, arriving['twin_level'] if arriving else 1) + '-' * 4)
         print('  vanilla (%s): thru %.2f · dura(min) %.1f%s'
               % ('/'.join(u.name for u in van), vm['throughput'], vm['min_durability'],
                  ' · carry %s' % _fmt_rounds(vm['carry'][1]) if 'carry' in vm else ''))
