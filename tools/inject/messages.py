@@ -21,12 +21,13 @@ from inject.chapter_ids import (
     CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG, CH05_ARRIVAL_NO_LUPIN_MSG, CH05_ARRIVAL_SLOT,
     CH05_BASIL_JOIN_NO_LUPIN_MSG, CH05_BASIL_JOIN_SLOT, CH05_ENDING_LOST_MSG, CH05_ENDING_MSGS,
     CH05_ERUPTION_MSG, CH05_GOAL_STATUS_MSG, CH05_GOAL_WINDOW_MSG, CH05_MOOSE_CHARGE_SLOT,
-    CH05_MOOSE_NAME_MSG, CH05_MOOSE_QUIP_MSG, CH05_OPENING_SLOTS, CH05_RAVISIN_DEATH_MSG,
+    CH05_MOOSE_QUIP_MSG, CH05_OPENING_SLOTS, CH05_RAVISIN_DEATH_MSG,
     CH05_RAVISIN_TAUNT_MSG, CH05_SAHNAR_ALONE_SLOT, CH05_SAHNAR_TALK_MSG,
-    CH05_SAHNAR_TALK_NO_LUPIN_MSG, CH05_VILLAGE_SLOTS, CH06_BOAT_NAME_MSGS, CH06_GOAL_STATUS_MSG,
+    CH05_SAHNAR_TALK_NO_LUPIN_MSG, CH05_VILLAGE_SLOTS, CH06_GOAL_STATUS_MSG,
     CH06_GOAL_WINDOW_MSG, PROLOGUE_LITERAL_MSGS)
 from inject.decomp import REPO
 from inject.hosts import literal_message_ids
+from inject.message_alloc import VANILLA_MESSAGE_COUNT, allocated_message_ids
 
 
 HOSTED_CHAPTER_MESSAGE_IDS = {
@@ -64,9 +65,6 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              # reaches them lives in ch5-eventscript.h, which inject_ch04 rewrites. Scene 17
              # takes the host block's last free id plus one appended past MSG_D4B.
              *CH05_ENDING_MSGS.values(), CH05_ENDING_LOST_MSG,
-             # The moose's NAME -- appended past vanilla's last id rather than taken from a
-             # donor, so it is claimed here like any other id ch05 writes.
-             CH05_MOOSE_NAME_MSG,
              CH05_GOAL_WINDOW_MSG, CH05_GOAL_STATUS_MSG,
              *(slot[1] for slot in CH05_VILLAGE_SLOTS.values())),
     # ch06 hosts on slot 7 and takes vanilla CH7's dead block -- not vanilla Ch6's, which ch05
@@ -74,10 +72,7 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # whose ids it WRITES INTO are two chapters apart here, which is the offset stated once in
     # the CH06_* constant block. Only the goal pair is spent today: ch06's scenes are declared
     # with empty text on purpose and the dialogue pass claims the rest of the run.
-    'ch06': (CH06_GOAL_WINDOW_MSG, CH06_GOAL_STATUS_MSG,
-             # the two boats' name plates -- appended past vanilla's last id rather than taken
-             # from a donor, so they are claimed here like any other id ch06 writes
-             *CH06_BOAT_NAME_MSGS.values()),
+    'ch06': (CH06_GOAL_WINDOW_MSG, CH06_GOAL_STATUS_MSG),
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
     # still have to be unique against every other hosted chapter (#207).
     'ch01': (*CH01_LITERAL_MSGS, CH01_GOAL_WINDOW_MSG, CH01_GOAL_STATUS_MSG),
@@ -87,6 +82,19 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
              *CH02_TURN1_MSGS,
              *(msg for _sym, msg, _fid, _bg in CH02_VILLAGE_SLOTS.values())),
 }
+
+
+def _with_allocated(claims):
+    """`claims` plus every id the build allocates (#411): a chapter owns what it declared by
+    name, so the uniqueness guard and `make chapter` see an appended message without anyone
+    transcribing it here."""
+    out = dict(claims)
+    for (chapter, _name), mid in sorted(allocated_message_ids().items(), key=lambda kv: kv[1]):
+        out[chapter] = tuple(out.get(chapter, ())) + (mid,)
+    return out
+
+
+HOSTED_CHAPTER_MESSAGE_IDS = _with_allocated(HOSTED_CHAPTER_MESSAGE_IDS)
 
 # The DEAD VANILLA BLOCK each hosted chapter draws its ids from, inclusive. A hosted chapter
 # takes its HOST SLOT's block, which is not the block of the chapter it mines -- ch05 is
@@ -107,9 +115,12 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
 # since blanking slot N's events kills slot N's text references. It also caps a chapter at
 # whatever that one vanilla chapter happened to spend, and ch05 hit 0 free at 18 ids while
 # 528 ids belonging to chapters we never ship sat unclaimed in contiguous runs up to 48 wide.
-# Extra ranges come from that pool; `live_ids_in_declared_blocks` is what makes taking them
+# Extra ranges came from that pool; `live_ids_in_declared_blocks` is what makes taking them
 # safe, by CHECKING deadness rather than assuming it. Existing ranges are never renumbered --
 # a shipped message id moving is a text regression nobody would see until the ROM ran.
+#
+# No range needs to grow again: a NEW message is named in inject/message_alloc.py and the build
+# appends it past vanilla's table (#411). These ranges hold what already shipped.
 HOSTED_CHAPTER_MESSAGE_BLOCKS = {
     'ch02': ((0xAC0, 0xAEF),),                    # from the never-shipped pool (48 ids)
     'ch03': ((0x9A3, 0x9B9),),                    # the dead vanilla Ch4 block (slot 4)
@@ -127,9 +138,6 @@ HOSTED_CHAPTER_MESSAGE_BLOCKS = {
     # the block stays the ten ids the hosting derivation named.
     'ch06': ((0x9F6, 0x9FF),),
 }
-
-# The size of vanilla's message table (gMsgTable). Ids at or above this are not messages.
-VANILLA_MESSAGE_COUNT = 0xD4C
 
 def message_block_ranges(chapter, blocks=None):
     """The (lo, hi) ranges a hosted chapter may spend. Empty when it declares none.
@@ -328,10 +336,10 @@ def assert_message_ids_unique(claims=None):
                                 else HOSTED_CHAPTER_MESSAGE_IDS).items()):
         for mid in ids:
             if mid in owner:
-                sys.exit('ERROR: message id 0x%X is claimed by BOTH %s and %s. Hosted '
-                         'chapters take their host slot\'s dead message block -- pick ids '
-                         'from the block %s actually owns (see HOSTED_CHAPTER_MESSAGE_IDS).'
-                         % (mid, owner[mid], chapter, chapter))
+                sys.exit('ERROR: message id 0x%X is claimed by BOTH %s and %s. A new message '
+                         'takes no hand-picked id: name it in inject/message_alloc.py '
+                         'APPENDED_MESSAGES and read it back with appended_message_id.'
+                         % (mid, owner[mid], chapter))
             owner[mid] = chapter
     return owner
 

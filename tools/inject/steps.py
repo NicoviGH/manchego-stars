@@ -64,6 +64,7 @@ from inject.reskins import inject_enemy_class_battle_anims, inject_enemy_class_r
 from inject.sms import sms_alloc_report, sms_alloc_reset
 from inject.stats import patch_character_data
 from inject.test_chapter import inject_test_chapter
+from inject.text import reserve_appended_messages
 from inject.title import inject_title_screen, inject_title_theme
 from inject.traps import apply_chapter_traps
 from inject.warm import PATCHED_DECOMP_FILES, restore_vanilla_sources
@@ -90,8 +91,8 @@ FACTS = {
     'ch05-hosted': 'chapter hosts are injected in campaign order, and a chain into ch05 points '
                    'at the slot inject_ch05 hosts',
     'ch05-landing': "chain_ch05_to_ch06 rewrites the dev-placeholder landing inject_ch05 wrote",
-    'ch05-messages': "ch06 appends its boats' name plates past ch05's moose, and "
-                     'set_message_body requires the table dense',
+    'appended-messages': 'a message id past vanilla\'s last exists only once its header is '
+                         'reserved (inject/message_alloc.py)',
     'ch06-hosted': 'a chain into ch06 points at the slot inject_ch06 hosts',
 }
 
@@ -194,7 +195,11 @@ STEPS = [
          provides=('engine-patches',)),
     Step(inject_arena_presentation, needs=('engine-patches',),
          writes=('src/banim-ekrarena.c', 'src/uiarena.c')),
-    Step(inject_names, title='names:', writes=('texts/texts.txt',)),
+    # Every allocated message id gets its header before anything writes one (#411).
+    Step(reserve_appended_messages, title='appended messages (#411):',
+         writes=('texts/texts.txt',), provides=('appended-messages',)),
+    Step(inject_names, title='names:', needs=('appended-messages',),
+         writes=('texts/texts.txt',)),
     Step(inject_item_names, title='item names:', writes=('texts/texts.txt',)),
     Step(inject_item_icons, title='item icons:', writes=('graphics/item_icon/*',)),
     Step(inject_item_icon_pal2,
@@ -277,7 +282,7 @@ STEPS = [
                                moose_only=a.ch05_moose, ending_arm=a.ch05_ending),
          flags=('ch05_boot', 'ch05_lupin', 'ch05_moose', 'ch05_ending'),
          needs=('tileset-labels', 'ch04-hosted'),
-         provides=('ch05-hosted', 'ch05-landing', 'ch05-messages'),
+         provides=('ch05-hosted', 'ch05-landing'),
          writes=_host(6, 'Ch05ElvenTombMap', 'include/eventcall.h', 'src/cp_data.c',
                       *_tileset('PortTown'))),
     # The four reliquary residents' skeleton busts.
@@ -286,7 +291,7 @@ STEPS = [
          writes=('src/events/ch5-eventscript.h',)),
     Step(inject_ch06, title='chapter 6 (#26):', scope='chapter:ch06',
          call=lambda fn, a: fn(a.campaign, boot=a.ch06_boot), flags=('ch06_boot',),
-         needs=('reskin-classes', 'tileset-labels', 'ch05-hosted', 'ch05-messages'),
+         needs=('reskin-classes', 'tileset-labels', 'ch05-hosted'),
          provides=('ch06-hosted',),
          writes=_host(7, 'Ch06MaerMonsterMap', 'include/eventcall.h', 'src/cp_data.c',
                       *_tileset('SnowIce'))),

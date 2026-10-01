@@ -24,10 +24,22 @@ from inject.decomp import DECOMP  # noqa: E402  the build tree the ROM lands in 
 MAP = os.path.join(DECOMP, 'fireemblem8.map')
 ROM = os.path.join(DECOMP, 'fireemblem8.gba')
 BASE = 0x08000000
-MSG_COUNT = 0xD4C
+# textprocess.py writes the table's real size here. Vanilla's 0xD4C stopped being it the moment
+# the build appended its own messages (inject/message_alloc.py), and a sweep pinned to it never
+# decoded one of them.
+MSG_H = os.path.join(DECOMP, 'include', 'constants', 'msg.h')
 # Longest legit vanilla message (an epilogue paragraph) is ~2133 decoded values;
 # anything past this is almost certainly a tree<->data mismatch.
 RUNAWAY_LEN = 2600
+
+
+def message_count():
+    """gMsgTable's size in the build, from the header generated alongside it."""
+    with open(MSG_H, encoding='utf-8') as f:
+        m = re.search(r'^#define MSG_COUNT (0x[0-9A-Fa-f]+)$', f.read(), re.M)
+    if not m:
+        sys.exit('ERROR: no MSG_COUNT in %s -- build first (make)' % MSG_H)
+    return int(m.group(1), 16)
 
 
 def find_syms(names):
@@ -123,14 +135,15 @@ def main(argv):
         return 0
 
     bad = 0
-    for idx in range(MSG_COUNT):
+    count = message_count()
+    for idx in range(count):
         vals = decode(rom, ht, root_idx, msg_offset(rom, gt, idx))
         runaway = any(isinstance(v, str) for v in vals) or len(vals) > RUNAWAY_LEN
         if runaway:
             bad += 1
             if bad <= 10:
                 print('  RUNAWAY MSG_%03X len=%d: %r' % (idx, len(vals), render(vals)[:80]))
-    print('SWEEP: %d messages, %d runaway' % (MSG_COUNT, bad))
+    print('SWEEP: %d messages, %d runaway' % (count, bad))
     return 1 if bad else 0
 
 
