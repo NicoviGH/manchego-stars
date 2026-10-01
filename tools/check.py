@@ -1855,7 +1855,7 @@ def check_rom_configs_reach_the_build(fail, matrix_text=None, makefile_text=None
     mk = _read('Makefile', makefile_text if makefile_text is not None else sources.get('Makefile'))
     bc = sources.get('build_campaign')
     if bc is None:
-        bc = _injector().def_source('main') or ''
+        bc = _injector().def_source('parse_args') or ''
     probe = _read('tools/probe_invalidation.py', sources.get('probe'))
     # A regex that stops matching must FAIL, not quietly skip its arm: three of the four
     # registry checks would then be disabled while the gate still prints "clean" -- the exact
@@ -1871,8 +1871,8 @@ def check_rom_configs_reach_the_build(fail, matrix_text=None, makefile_text=None
         return found.group(1)
 
     stamp_text = _region(r'_requested_flags = \{(.*?)\}', bc, '_requested_flags',
-                         'build_campaign.main()')
-    boots_text = _region(r'_boots = \[(.*?)\]', bc, '_boots', 'build_campaign.main()')
+                         'build_campaign.parse_args()')
+    boots_text = _region(r'_boots = \[(.*?)\]', bc, '_boots', 'build_campaign.parse_args()')
     flag_text = _region(r'FLAG_ARGS = \{(.*?)\}', probe, 'FLAG_ARGS',
                         'probe_invalidation.py')
     if stamp_text is None or boots_text is None or flag_text is None:

@@ -265,7 +265,8 @@ def main():
     ap.add_argument('--flags', default='',
                     help='build_campaign flags to inject with, e.g. "--ch05-boot --ch05-lupin". '
                          'The default build never reaches a boot flag\'s code, so a refactor '
-                         'is gated on every configuration, not just this one.')
+                         'is gated on each configuration it can reach: '
+                         'tools/fingerprint_reach.py prints them, with these flags (#424).')
     args = ap.parse_args()
     flags = args.flags.split()
 
