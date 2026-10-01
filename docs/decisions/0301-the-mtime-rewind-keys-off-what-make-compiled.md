@@ -62,9 +62,6 @@ two gates).
 
 ## CI is a different case
 
-CI's 1,516 conversions are the same set, but there they are real work. The cache holds the
-VANILLA build (ADR 0299), and all 1,160 `graphics/banim` sources are our untracked anims,
-which no vanilla build has. This change leaves CI time as it was. The remaining lever is caching
-the INJECTED build's outputs together with this record. It needs one more rule: a recorded file
-whose bytes differ must be made newer than its record, because CI pins every tracked source to
-2000-01-01. It belongs with the out-of-tree build (#408), which moves where outputs live.
+CI's 1,516 conversions are the same set, but there they are real work: the cache holds the
+VANILLA build (ADR 0299), and all 1,160 `graphics/banim` sources are our untracked anims. This
+record is what lets CI cache the injected build too (ADR 0303).

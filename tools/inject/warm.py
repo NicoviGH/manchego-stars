@@ -9,6 +9,7 @@ import json
 import os
 import platform
 import shutil
+import stat
 import subprocess
 import time
 
@@ -220,7 +221,12 @@ def _rewind_unchanged_mtimes(snap, compiled=None):
     means the objects already hold these bytes, whatever injector-only runs wrote since
     (#416). `snap`, the previous injection, is the fallback when there is no such record.
     A tracked file the COMPILE wrote that a checkout has since reverted is put back as the
-    compile left it (_restore_compile_output)."""
+    compile left it (_restore_compile_output).
+
+    The converse holds too: bytes that DIFFER from what was compiled are left newer than that
+    compile. CI pins every tracked source to 2000-01-01 under the last main build's objects
+    (#408), so a file injected then but vanilla now would otherwise read as older than the
+    object built from its injected bytes."""
     compiled = compiled or {}
     n = 0
     for p in set(snap) | set(compiled):
@@ -229,9 +235,13 @@ def _rewind_unchanged_mtimes(snap, compiled=None):
                 digest = hashlib.sha1(f.read()).digest()
         except OSError:
             continue
-        if p in compiled and compiled[p][1] != digest and _restore_compile_output(p, compiled[p]):
-            n += 1
-            continue
+        if p in compiled and compiled[p][1] != digest:
+            if _restore_compile_output(p, compiled[p]):
+                n += 1
+                continue
+            if os.stat(p).st_mtime_ns <= compiled[p][0]:
+                os.utime(p)
+                continue
         for base in (compiled, snap):
             if p in base and base[p][1] == digest:
                 os.utime(p, ns=(base[p][0], base[p][0]))
@@ -255,15 +265,22 @@ def _rewind_unchanged_mtimes(snap, compiled=None):
 
 
 def _walk_decomp():
-    """(path, mtime_ns) for every decomp file outside .git."""
+    """(path, mtime_ns) for every decomp file outside git's metadata -- the `.git` directory,
+    or the `.git` FILE of a worktree (#408) -- and that is not a link. Links are the toolchain
+    build_tree.ensure points into the submodule: neither an injection nor a compile writes one,
+    and a fresh checkout makes them newer than any restored record."""
     for root, dirs, files in os.walk(DECOMP):
         dirs[:] = [d for d in dirs if d != '.git']
         for name in files:
             path = os.path.join(root, name)
+            if name == '.git' and root == DECOMP:
+                continue
             try:
-                yield path, os.lstat(path).st_mtime_ns
+                st = os.lstat(path)
             except OSError:
-                pass
+                continue
+            if not stat.S_ISLNK(st.st_mode):
+                yield path, st.st_mtime_ns
 
 
 def _written_since(t0_ns):
@@ -273,14 +290,20 @@ def _written_since(t0_ns):
     return [p for p, mtime_ns in _walk_decomp() if mtime_ns >= t0_ns]
 
 
+def _in_tree(paths):
+    """The paths under this tree: a list from another tree says nothing about this one's files
+    (#408 moved the build out of the submodule)."""
+    root = os.path.join(DECOMP, '')
+    return {p for p in paths if p.startswith(root)}
+
+
 def _injected():
     try:
         with open(INJECTED_PATHS) as fh:
             paths = json.load(fh)
     except (OSError, ValueError):
         return set()
-    root = os.path.join(DECOMP, '')     # a list from another tree is not this tree's writes
-    return {p for p in paths if p.startswith(root)}
+    return _in_tree(paths)
 
 
 def record_injected(paths):
@@ -334,9 +357,10 @@ def forget_compiled(now_ns=None):
         # compile would drop what the one before it regenerated.
         previous, regenerated = old.get('previous', []), old.get('previous_regenerated', [])
     else:
-        previous, regenerated = sorted(old.get('files', {})), old.get('regenerated', [])
+        previous, regenerated = old.get('files', {}), old.get('regenerated', [])
     _write_record({'compiling_since_ns': time.time_ns() if now_ns is None else now_ns,
-                   'previous': previous, 'previous_regenerated': regenerated})
+                   'previous': sorted(_in_tree(previous)),
+                   'previous_regenerated': sorted(_in_tree(regenerated))})
 
 
 def record_compiled():

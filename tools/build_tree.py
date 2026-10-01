@@ -10,6 +10,7 @@ working tree, so `git -C fireemblem8u status` stays clean.
 
   ensure      create the tree, follow a submodule bump, link the toolchain (every build)
   toolchain   print the gitignored toolchain paths, one per line (tools/worktree-setup.sh)
+  outputs     print what the last compile left in the tree, NUL-separated (CI's build cache)
 """
 import os
 import subprocess
@@ -92,13 +93,34 @@ def ensure(verbose=True):
     _link_toolchain(verbose)
 
 
+def outputs():
+    """Tree-relative paths of every build output: the files git does not track (ignored ones
+    included) that are neither a toolchain link nor a file the injector wrote. The injected
+    sources are left out because the next build injects them afresh and the compiled record
+    (.build-compiled) holds their mtimes; restoring them would make the injector's writes look
+    like the tree's own state."""
+    import inject.warm
+    injected = set(inject.warm.load_compiled())
+    if not injected:
+        sys.exit('ERROR: no compiled record for %s -- run `make` first' % DECOMP)
+    out = subprocess.run(['git', '-C', DECOMP, 'ls-files', '-o', '-z'], env=git_env(),
+                         check=True, capture_output=True).stdout
+    for rel in out.decode('utf-8', 'surrogateescape').split('\0'):
+        path = os.path.join(DECOMP, rel)
+        if rel and path not in injected and not os.path.islink(path):
+            yield rel
+
+
 def main(argv):
     if argv == ['ensure']:
         ensure()
     elif argv == ['toolchain']:
         print('\n'.join(TOOLCHAIN))
+    elif argv == ['outputs']:
+        sys.stdout.buffer.write(b''.join(
+            p.encode('utf-8', 'surrogateescape') + b'\0' for p in outputs()))
     else:
-        sys.exit('usage: build_tree.py ensure|toolchain')
+        sys.exit('usage: build_tree.py ensure|toolchain|outputs')
 
 
 if __name__ == '__main__':

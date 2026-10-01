@@ -134,11 +134,16 @@ jobs:
       - name: Build tree
         run: python3 tools/build_tree.py ensure
 
+      # agbcc's headers too: "Install agbcc" rewrites them every run and every object depends
+      # on them, so unpinned they rebuilt all 357 C files on every cache hit. Safe because the
+      # cache key below hashes every file under tools/agbcc.
       - name: Pin decomp source mtimes
         run: |
           cd build/fireemblem8u
           git ls-files -z | xargs -0 touch -h -d '2000-01-01T00:00:00Z'
           touch -d '2000-01-01T00:00:00Z' "$GITHUB_WORKSPACE/fireemblem8u/baserom.gba"
+          find "$GITHUB_WORKSPACE/fireemblem8u/tools/agbcc/include" -type f -print0 \
+            | xargs -0 touch -d '2000-01-01T00:00:00Z'
 
       # The key names everything the cached objects were BUILT WITH, not labels someone bumps:
       # the submodule commit, the runner image, the ARM binutils version, and the agbcc
@@ -151,9 +156,32 @@ jobs:
                        | sha1sum | cut -c1-16 )
           echo "key=vanilla-build-${{ runner.os }}-$(git -C fireemblem8u rev-parse HEAD)-$toolchain-mock-v1" >> "$GITHUB_OUTPUT"
 
+      # The last build's outputs, injected content included (#408). The vanilla cache alone
+      # left ~1,500 conversions and 357 C files of OUR content to rebuild on every run. Keyed
+      # on the vanilla key (the objects embed that compile) plus the run, and restored by
+      # prefix: the newest build of this ref, else of main. A hit stands in for the vanilla
+      # cache -- it is a superset of it. Correctness rides on the compiled record it carries
+      # (.build-compiled): the injector rewinds a file to its recorded mtime only when its
+      # bytes match, and leaves one that differs newer than its record (inject.warm).
+      - name: Restore injected build
+        id: injected-cache
+        if: ${{ !inputs.no_cache }}
+        uses: actions/cache/restore@v4
+        with:
+          path: injected-build.tar
+          key: injected-build-${{ steps.vanilla.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: injected-build-${{ steps.vanilla.outputs.key }}-
+
+      - name: Unpack injected build (cache hit)
+        id: injected
+        if: steps.injected-cache.outputs.cache-matched-key != ''
+        run: |
+          tar -xf injected-build.tar
+          echo "hit=true" >> "$GITHUB_OUTPUT"
+
       - name: Restore vanilla build
         id: vanilla-cache
-        if: ${{ !inputs.no_cache }}
+        if: ${{ !inputs.no_cache && steps.injected.outputs.hit != 'true' }}
         uses: actions/cache/restore@v4
         with:
           path: vanilla-build.tar
@@ -164,17 +192,17 @@ jobs:
         run: tar -xf vanilla-build.tar -C build/fireemblem8u
 
       - name: Build vanilla decomp and save it (cache miss only)
-        if: ${{ !inputs.no_cache && steps.vanilla-cache.outputs.cache-hit != 'true' }}
+        if: ${{ !inputs.no_cache && steps.injected.outputs.hit != 'true' && steps.vanilla-cache.outputs.cache-hit != 'true' }}
         run: |
           cd build/fireemblem8u
           git ls-files -o -z | sort -z > "$RUNNER_TEMP/before.lst"
           make fireemblem8.gba -j"$(nproc)"
           git ls-files -o -z | sort -z > "$RUNNER_TEMP/after.lst"
           comm -z -13 "$RUNNER_TEMP/before.lst" "$RUNNER_TEMP/after.lst" \
-            | tar --null -T - -cf "$GITHUB_WORKSPACE/vanilla-build.tar"
+            | tar --format=posix --null -T - -cf "$GITHUB_WORKSPACE/vanilla-build.tar"
 
       - name: Save vanilla build
-        if: ${{ !inputs.no_cache && steps.vanilla-cache.outputs.cache-hit != 'true' }}
+        if: ${{ !inputs.no_cache && steps.injected.outputs.hit != 'true' && steps.vanilla-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: vanilla-build.tar
@@ -182,6 +210,21 @@ jobs:
 
       - name: make green (inject campaign + build ROM)
         run: make CAMPAIGN=rime-of-the-frostmaiden
+
+      # Every run saves, PRs included: a PR's next push restores its own last build first.
+      - name: Pack injected build
+        if: ${{ !inputs.no_cache }}
+        run: |
+          python3 tools/build_tree.py outputs | sed -z 's|^|build/fireemblem8u/|' \
+            | tar --format=posix --null -T - -cf injected-build.tar
+          tar --format=posix -rf injected-build.tar .build-compiled
+
+      - name: Save injected build
+        if: ${{ !inputs.no_cache }}
+        uses: actions/cache/save@v4
+        with:
+          path: injected-build.tar
+          key: injected-build-${{ steps.vanilla.outputs.key }}-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: ROM checksum
         run: sha1sum build/fireemblem8u/fireemblem8.gba
