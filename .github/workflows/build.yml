@@ -134,11 +134,16 @@ jobs:
       - name: Build tree
         run: python3 tools/build_tree.py ensure
 
+      # agbcc's headers too: "Install agbcc" rewrites them every run and every object depends
+      # on them, so unpinned they rebuilt all 357 C files on every cache hit. Safe because the
+      # cache key below hashes every file under tools/agbcc.
       - name: Pin decomp source mtimes
         run: |
           cd build/fireemblem8u
           git ls-files -z | xargs -0 touch -h -d '2000-01-01T00:00:00Z'
           touch -d '2000-01-01T00:00:00Z' "$GITHUB_WORKSPACE/fireemblem8u/baserom.gba"
+          find "$GITHUB_WORKSPACE/fireemblem8u/tools/agbcc/include" -type f -print0 \
+            | xargs -0 touch -d '2000-01-01T00:00:00Z'
 
       # The key names everything the cached objects were BUILT WITH, not labels someone bumps:
       # the submodule commit, the runner image, the ARM binutils version, and the agbcc
@@ -194,7 +199,7 @@ jobs:
           make fireemblem8.gba -j"$(nproc)"
           git ls-files -o -z | sort -z > "$RUNNER_TEMP/after.lst"
           comm -z -13 "$RUNNER_TEMP/before.lst" "$RUNNER_TEMP/after.lst" \
-            | tar --null -T - -cf "$GITHUB_WORKSPACE/vanilla-build.tar"
+            | tar --format=posix --null -T - -cf "$GITHUB_WORKSPACE/vanilla-build.tar"
 
       - name: Save vanilla build
         if: ${{ !inputs.no_cache && steps.injected.outputs.hit != 'true' && steps.vanilla-cache.outputs.cache-hit != 'true' }}
@@ -202,14 +207,6 @@ jobs:
         with:
           path: vanilla-build.tar
           key: ${{ steps.vanilla.outputs.key }}
-
-      - name: DEBUG why C files rebuild (temporary)
-        run: |
-          python3 tools/build_campaign.py --campaign rime-of-the-frostmaiden > /dev/null
-          cd build/fireemblem8u
-          make --debug=b -n src/agb_sram.o 2>&1 | grep -iE "newer|must remake|does not exist" | head -40
-          cat .dep/src/agb_sram.d | head -30
-          ls -la --time-style=full-iso src/agb_sram.o src/agb_sram.c include/global.h include/constants/msg.h tools/agbcc/bin/agbcc 2>&1
 
       - name: make green (inject campaign + build ROM)
         run: make CAMPAIGN=rime-of-the-frostmaiden
@@ -219,8 +216,8 @@ jobs:
         if: ${{ !inputs.no_cache }}
         run: |
           python3 tools/build_tree.py outputs | sed -z 's|^|build/fireemblem8u/|' \
-            | tar --null -T - -cf injected-build.tar
-          tar -rf injected-build.tar .build-compiled
+            | tar --format=posix --null -T - -cf injected-build.tar
+          tar --format=posix -rf injected-build.tar .build-compiled
 
       - name: Save injected build
         if: ${{ !inputs.no_cache }}
