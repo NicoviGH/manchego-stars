@@ -225,37 +225,49 @@ GROWTH_SEED = 430           # fixed: the report is a reading, and it reads the s
 
 
 @functools.lru_cache(maxsize=None)
-def _grown_cached(stats, growths, gained, caps):
+def _careers_cached(stats, growths, gained, caps):
     stats, growths, caps = dict(stats), dict(growths), dict(caps)
     rng = random.Random(GROWTH_SEED)
-    finals = {f: [] for f in _STAT_ORDER}
+    rows = []
     for _ in range(GROWTH_TRIALS):
         line = {f: stats.get('base' + f, 0) for f in _STAT_ORDER}
         for _ in range(gained):
             for f, up in level_up(growths, rng).items():
                 cap = caps.get('base' + f)
                 line[f] = min(line[f] + up, cap) if cap is not None else line[f] + up
-        for f in _STAT_ORDER:
-            finals[f].append(line[f])
-    out = dict(stats)
+        rows.append(tuple(line[f] for f in _STAT_ORDER))
+    return tuple(rows)
+
+
+def careers(stats, growths, gained, caps):
+    """`stats` after `gained` player level-ups, once per simulated career: GROWTH_TRIALS stat
+    lines of the engine's own level-up (`level_up`), held to `caps` after every level as
+    `CheckBattleUnitStatCaps` holds them. A unit that has not levelled has one career, its own
+    line. These are the dice the absolute metrics are averaged over (`dice_profile`)."""
+    if gained <= 0:
+        return [dict(stats)]
+    rows = _careers_cached(tuple(sorted(stats.items())), tuple(sorted(growths.items())),
+                           int(gained), tuple(sorted(caps.items())))
+    return [dict(stats, **{'base' + f: v for f, v in zip(_STAT_ORDER, row)}) for row in rows]
+
+
+def _median_line(lines):
+    out = dict(lines[0])
     for f in _STAT_ORDER:
-        out['base' + f] = sorted(finals[f])[GROWTH_TRIALS // 2]
+        out['base' + f] = sorted(line.get('base' + f, 0) for line in lines)[len(lines) // 2]
     return out
 
 
 def grown(stats, growths, gained, caps):
-    """`stats` after `gained` player level-ups: each stat's MEDIAN over GROWTH_TRIALS simulated
-    careers of the engine's own level-up (`level_up`), held to `caps` after every level as
-    `CheckBattleUnitStatCaps` holds them.
+    """`stats` after `gained` player level-ups: each stat's MEDIAN over the simulated
+    `careers`.
 
     The median rather than the mean, at Nicolas's suggestion (2026-10-01): a rounded mean is
     not a value the dice land on most, and it differs from the median by a point in about one
     stat line in seven (an 80% HP growth over three levels is +2 rounded, +3 median). It is a
-    per-stat median, so the line is a planning number and not one unit anybody will roll."""
-    if gained <= 0:
-        return dict(stats)
-    return _grown_cached(tuple(sorted(stats.items())), tuple(sorted(growths.items())),
-                         int(gained), tuple(sorted(caps.items())))
+    per-stat median, so the line is a planning number and not one unit anybody will roll; the
+    report's absolute metrics are averaged over the careers instead (ADR 0311)."""
+    return _median_line(careers(stats, growths, gained, caps))
 
 
 def placed_entry(campaign, uid, unit, recruited):
@@ -293,6 +305,25 @@ def _player_weapon(campaign, uid, unit, class_enum):
     return _weapon_from_item_enums(inject.cast.CLASS_LOADOUT.get(class_enum, ()))
 
 
+def _player_lines(campaign, uid, gained):
+    """(career stat lines, weapon, tags) for a cast member `gained` levels above its join
+    level: class base + donor personal base (donor-base inheritance), grown on its growth
+    donor's growths."""
+    unit = inject.cast.load_unit(campaign, uid)
+    unit.setdefault('id', uid)
+    class_enum = inject.cast.class_enum_for(unit)
+    cbase = _class_base(class_enum)
+    dbase = inject.stats.donor_base_stats(_characters_text(), inject.stats.BASE_DONOR[uid])
+    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
+    lines = [eff]
+    if gained:
+        growths, _ = inject.stats.donor_growths_and_ranks(
+            _characters_text(), inject.stats.GROWTH_DONOR[uid])
+        lines = careers(eff, growths, gained, _class_caps(class_enum))
+    weapon = _player_weapon(campaign, uid, unit, class_enum)
+    return lines, weapon, CLASS_TAGS.get(class_enum, frozenset())
+
+
 def player_combatant(campaign, uid, gained=0):
     """Resolve a cast member's effective fe_combat.Combatant: class base + donor personal
     base (donor-base inheritance), wielding its first real weapon.
@@ -301,18 +332,14 @@ def player_combatant(campaign, uid, gained=0):
     growth donor's growths (`grown`: the median of simulated level-ups). 0 is the join-level line, which is what the injector
     sizes ch01's lord floor from; `load_field(leveled=True)` passes the exp model's answer
     (#430 step 1)."""
-    unit = inject.cast.load_unit(campaign, uid)
-    unit.setdefault('id', uid)
-    class_enum = inject.cast.class_enum_for(unit)
-    cbase = _class_base(class_enum)
-    dbase = inject.stats.donor_base_stats(_characters_text(), inject.stats.BASE_DONOR[uid])
-    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
-    if gained:
-        growths, _ = inject.stats.donor_growths_and_ranks(
-            _characters_text(), inject.stats.GROWTH_DONOR[uid])
-        eff = grown(eff, growths, gained, _class_caps(class_enum))
-    weapon = _player_weapon(campaign, uid, unit, class_enum)
-    return _stats_to_combatant(uid, eff, weapon, CLASS_TAGS.get(class_enum, frozenset()))
+    lines, weapon, tags = _player_lines(campaign, uid, gained)
+    return _stats_to_combatant(uid, _median_line(lines), weapon, tags)
+
+
+def player_careers(campaign, uid, gained=0):
+    """`player_combatant`, once per simulated career (`careers`)."""
+    lines, weapon, tags = _player_lines(campaign, uid, gained)
+    return [_stats_to_combatant(uid, line, weapon, tags) for line in lines]
 
 
 def _enemy_class_enum(token):
@@ -924,6 +951,23 @@ def vanilla_projection(parity_ref, deploy_cap):
             'proof': sum(1 for e in van if fc.damage(YARDSTICK, e) <= 0)}
 
 
+def _ally_lines(char_enum, class_enum, level):
+    """Career stat lines for one vanilla ally: class base + the named character's personal
+    line, grown on its OWN curve above its join level (one line when it is not above it)."""
+    cbase = _class_base(class_enum)
+    dbase = inject.stats.donor_base_stats(_characters_text(), char_enum)
+    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
+    gained = level - _character_base_level(char_enum) if level is not None else 0
+    if gained <= 0:
+        return [eff]
+    growths, _ = inject.stats.donor_growths_and_ranks(_characters_text(), char_enum)
+    return careers(eff, growths, gained, _class_caps(class_enum))
+
+
+def _ally_name(char_enum):
+    return char_enum.replace('CHARACTER_', '').title()
+
+
 def _ally_combatant(char_enum, class_enum, weapon, level=None):
     """One vanilla ally Combatant: class base + the named character's personal line (the same
     donor-base inheritance our cast uses, mirroring player_combatant). Allies aren't
@@ -931,16 +975,9 @@ def _ally_combatant(char_enum, class_enum, weapon, level=None):
     it is above that join level, grows them on their OWN curve the way `player_combatant`
     grows ours, so a leveled read compares like with like.
     Named off charIndex (CHARACTER_EIRIKA -> 'Eirika')."""
-    cbase = _class_base(class_enum)
-    dbase = inject.stats.donor_base_stats(_characters_text(), char_enum)
-    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
-    if level is not None:
-        gained = level - _character_base_level(char_enum)
-        if gained > 0:
-            growths, _ = inject.stats.donor_growths_and_ranks(_characters_text(), char_enum)
-            eff = grown(eff, growths, gained, _class_caps(class_enum))
-    name = char_enum.replace('CHARACTER_', '').title()
-    return _stats_to_combatant(name, eff, weapon, CLASS_TAGS.get(class_enum, frozenset()))
+    return _stats_to_combatant(_ally_name(char_enum),
+                               _median_line(_ally_lines(char_enum, class_enum, level)),
+                               weapon, CLASS_TAGS.get(class_enum, frozenset()))
 
 
 # Eirika's route up to the last twin a hosted chapter is graded against. The vanilla party at
@@ -1034,23 +1071,43 @@ def _named_item_grants(stem):
     return out
 
 
+def _vanilla_members(parity_ref):
+    """(char, class_enum, weapon) for every vanilla recruit that can deploy into `parity_ref`,
+    or None for a twin off VANILLA_CHAIN."""
+    if parity_ref not in VANILLA_CHAIN:
+        return None
+    index = VANILLA_CHAIN.index(parity_ref)
+    granted = collections.defaultdict(list)
+    for ref in VANILLA_CHAIN[:index + 1]:
+        for char, item in _named_item_grants(PARITY_REFERENCE_STEM[ref]):
+            granted[char].append(item)
+    return [(r.char, r.class_enum, _weapon_from_item_enums(r.items + tuple(granted[r.char])))
+            for r in vanilla_recruits() if r.fields_from <= index]
+
+
 def vanilla_party(parity_ref, levels=None):
     """The vanilla party that can deploy into `parity_ref`, as Combatants, or None for a twin off
     VANILLA_CHAIN. `levels` maps CHARACTER_* to the level it arrives at (`exp_curve.entering`);
     a character missing from it is at its join level. Weapon = the joining load's first
     attacking item, as our cast is armed; a staff-only healer is weaponless support (#62)."""
-    if parity_ref not in VANILLA_CHAIN:
+    members = _vanilla_members(parity_ref)
+    if members is None:
         return None
-    index = VANILLA_CHAIN.index(parity_ref)
     levels = levels or {}
-    granted = collections.defaultdict(list)
-    for ref in VANILLA_CHAIN[:index + 1]:
-        for char, item in _named_item_grants(PARITY_REFERENCE_STEM[ref]):
-            granted[char].append(item)
-    return [_ally_combatant(r.char, r.class_enum,
-                            _weapon_from_item_enums(r.items + tuple(granted[r.char])),
-                            levels.get(r.char))
-            for r in vanilla_recruits() if r.fields_from <= index]
+    return [_ally_combatant(char, class_enum, weapon, levels.get(char))
+            for char, class_enum, weapon in members]
+
+
+def vanilla_party_careers(parity_ref, levels=None):
+    """`vanilla_party`, once per simulated career: {name: [Combatant]}."""
+    members = _vanilla_members(parity_ref)
+    if members is None:
+        return None
+    levels = levels or {}
+    return {_ally_name(char): [_stats_to_combatant(_ally_name(char), line, weapon,
+                                                   CLASS_TAGS.get(class_enum, frozenset()))
+                               for line in _ally_lines(char, class_enum, levels.get(char))]
+            for char, class_enum, weapon in members}
 
 
 def pressure_verdict(ours, vanilla, band=0.25):
@@ -1319,6 +1376,67 @@ def carry(boss, party, terrain_avoid=0):
     return best, fc.rounds_to_kill(best, boss, terrain_avoid)
 
 
+# ── Over the dice: the same metrics, once per simulated career (ADR 0311) ───────────
+# A per-stat median line is a planning number nobody rolls. Near a doubling breakpoint it
+# misreads the metric a party actually meets, so the report averages each metric over the
+# careers and pairs it with a bad-luck reading.
+
+BAD_LUCK_PERCENTILE = 10    # the bad-luck reading: the career one in ten does worse than
+
+
+def spread(values, low_is_bad=True):
+    """(average, bad-luck) of a metric over the careers. Bad luck is the
+    BAD_LUCK_PERCENTILE-th career counted from the bad side: the low end for durability and
+    kill rate, the high end (`low_is_bad=False`) for rounds to kill a boss."""
+    values = sorted(values, reverse=not low_is_bad)
+    return sum(values) / len(values), values[len(values) * BAD_LUCK_PERCENTILE // 100]
+
+
+def dice_profile(careers, line, bosses):
+    """One unit's metrics, once per career: durability on open ground and in a forest
+    (20 avoid), its best kill rate against the line, and its fastest kill of any boss.
+
+    A unit's careers repeat themselves, but rarely as whole lines, so each half of the fight
+    is keyed on the stats `fe_combat` reads for it: being hit reads Def, Res, Spd, Con and Lck
+    (HP only divides), hitting reads Pow, Skl, Spd, Con and Lck. `MetricsOverTheDice` checks
+    this against the plain metrics, so a new stat read in `fe_combat` fails a test."""
+    inf = float('inf')
+    struck, striking, out = {}, {}, {'open': [], 'forest': [], 'kill': [], 'boss': []}
+    for u in careers:
+        dk = (u.df, u.res, u.spd, u.con, u.lck)
+        if dk not in struck:
+            struck[dk] = [[fc.damage_per_round(e, u, avoid) for e in line] for avoid in (0, 20)]
+        ok = (u.pow, u.skl, u.spd, u.con, u.lck)
+        if ok not in striking:
+            striking[ok] = (max((fc.kills_per_round(u, e) for e in line), default=0.0),
+                            min((fc.rounds_to_kill(u, b) for b in bosses), default=inf))
+        for key, dprs in zip(('open', 'forest'), struck[dk]):
+            out[key].append(min((u.hp / d if d > 0 else inf for d in dprs), default=inf))
+        out['kill'].append(striking[ok][0])
+        out['boss'].append(striking[ok][1])
+    return out
+
+
+def dice_party(profiles):
+    """A fielded party's metrics, once per joint career. `profiles` maps a unit to its
+    `dice_profile`. Each unit's careers are shuffled on a seed of its own before they are
+    paired, so career i of one unit is independent of career i of another (they share the
+    growth RNG's seed). A unit with one career, one that has not levelled, is that career in
+    every pairing."""
+    n = max(len(p['open']) for p in profiles.values())
+    order = {}
+    for name, p in profiles.items():
+        k = len(p['open'])
+        perm = list(range(k))
+        random.Random('%d:%s' % (GROWTH_SEED, name)).shuffle(perm)
+        order[name] = [perm[i % k] for i in range(n)]
+    def joint(key, combine):
+        return [combine(profiles[u][key][order[u][i]] for u in profiles) for i in range(n)]
+    return {'throughput': joint('kill', sum),
+            'min_durability': joint('open', min),
+            'carry': joint('boss', min)}
+
+
 # A fixed, campaign-neutral reference attacker/defender. enemy_pressure measures every
 # enemy against THIS unit, so a chapter's pressure is comparable to its vanilla reference's
 # on the same scale; the yardstick's exact stats cancel in an ours-vs-vanilla ratio. Chosen
@@ -1515,14 +1633,45 @@ def load_field(campaign, ch, leveled=False):
     return chap, roster, line, bosses, chapter_deploy_limit(chap, len(roster)), labels
 
 
-def _metrics(party, line, bosses):
-    """Headline numbers for a fielded party."""
-    m = {'throughput': party_throughput(party, line),
-         'min_durability': min((durability(u, line) for u in party), default=float('inf'))}
-    if bosses:
-        u, r = min((carry(b, party) for b in bosses), key=lambda x: x[1])
-        m['carry'] = (u.name, r)
+def arriving_careers(campaign, ch):
+    """{uid: [Combatant]}: the party the exp model says arrives at `ch` (`exp_curve.entering`),
+    each unit once per simulated career (`player_careers`)."""
+    import exp_curve                        # exp_curve imports this module
+    chap = chapter_schema.load(chapter_path(campaign, ch))
+    return _party_careers(campaign,
+                          exp_curve.entering(campaign, int(chap['chapter_number']))['party'])
+
+
+def _party_careers(campaign, party):
+    return {uid: player_careers(campaign, uid, level - joined)
+            for uid, (joined, level) in party.items()}
+
+
+def _metrics(field, profiles):
+    """Headline numbers for a fielded party, over the dice: each is (average, bad luck)
+    (`spread`), and the carry names the unit with the fastest median-line kill."""
+    joint = dice_party({u.name: profiles[u.name] for u in field})
+    m = {'throughput': spread(joint['throughput']),
+         'min_durability': spread(joint['min_durability'])}
+    if not all(r == float('inf') for r in joint['carry']):
+        m['carry'] = spread(joint['carry'], low_is_bad=False)
     return m
+
+
+def _fmt_spread(pair, fmt=None):
+    avg, bad = pair
+    if fmt:
+        return '%s (bad %s)' % (fmt % avg, fmt % bad)
+    return '%s (bad %s)' % (_fmt_rounds(avg), _fmt_rounds(bad))
+
+
+def _print_metrics(label, field, m, bosses):
+    carrier = (' · carry %s %s rounds vs boss'
+               % (min(field, key=lambda u: min(fc.rounds_to_kill(u, b) for b in bosses)).name,
+                  _fmt_spread(m['carry']))) if 'carry' in m else ''
+    print('  %sthroughput %s kills/round (cap 1/unit) · durability(min) %s%s'
+          % (label, _fmt_spread(m['throughput'], '%.2f'), _fmt_spread(m['min_durability']),
+             carrier))
 
 
 def _best_field(party, line, deploy_limit):
@@ -1547,21 +1696,27 @@ def _fmt_dura_delta(ours, van):
     return '%+.1f' % (ours - van)
 
 
-def _print_cast(title, roster, levels, line):
-    """One arriving cast as a table: each unit's level, stats, weapon, durability on open
-    ground / in a forest, and its best kill rate against the chapter's line."""
+def _print_cast(title, roster, levels, line, profiles):
+    """One arriving cast as a table: each unit's level, its median stat line and weapon, then
+    over the dice its durability on open ground / in a forest and its best kill rate against
+    the chapter's line, each an average with its bad-luck reading."""
     print('\n-- %s --' % title)
-    print('  %-11s %3s %3s%3s%3s%3s%3s%3s%3s%3s  %-12s  %-13s  %s'
+    print('  stats: each stat\'s median career · metrics: average (bad luck: %d%% of careers '
+          'do worse)' % BAD_LUCK_PERCENTILE)
+    print('  %-11s %3s %3s%3s%3s%3s%3s%3s%3s%3s  %-12s  %-11s  %-11s  %s'
           % ('unit', 'Lv', 'HP', 'Pw', 'Sk', 'Sp', 'Df', 'Rs', 'Lk', 'Cn',
-             'weapon', 'durab open/for', 'best kill/round'))
-    for u in sorted(roster, key=lambda x: max((fc.kills_per_round(x, e) for e in line),
-                                              default=0.0), reverse=True):
+             'weapon', 'durab open', 'forest', 'best kill/round'))
+    for u in sorted(roster, key=lambda x: spread(profiles[x.name]['kill'])[0], reverse=True):
         best = max(((fc.kills_per_round(u, e), e) for e in line),
                    key=lambda x: x[0], default=(0.0, None))
-        print('  %-11s %3s %3d%3d%3d%3d%3d%3d%3d%3d  %-12s  %4.1f /%4.1f    %.2f%s'
+        p = profiles[u.name]
+        cells = [spread(p['open']), spread(p['forest']), spread(p['kill'])]
+        print('  %-11s %3s %3d%3d%3d%3d%3d%3d%3d%3d  %-12s  %4s (%4s)  %4s (%4s)  %.2f (%.2f)%s'
               % (u.name, levels.get(u.name, '?'), u.hp, u.pow, u.skl, u.spd, u.df, u.res,
                  u.lck, u.con, u.weapon.name if u.weapon else '(staff)',
-                 durability(u, line, 0), durability(u, line, 20), best[0],
+                 _fmt_rounds(cells[0][0]), _fmt_rounds(cells[0][1]),
+                 _fmt_rounds(cells[1][0]), _fmt_rounds(cells[1][1]),
+                 cells[2][0], cells[2][1],
                  (' vs ' + best[1].name) if best[1] else ''))
 
 
@@ -1595,19 +1750,20 @@ def report(campaign, ch, mode=None):
                                                           '; '.join(labels)))
 
     ours_lv = {uid: lv for uid, (_j, lv) in arriving['party'].items()} if arriving else {}
+    ours_careers = (_party_careers(campaign, arriving['party']) if arriving
+                    else {u.name: [u] for u in roster})
+    profiles = {uid: dice_profile(c, line, bosses) for uid, c in ours_careers.items()}
     _print_cast('OUR CAST, AS IT ARRIVES (class base + donor line, grown to the exp model\'s '
-                'typical level)', roster, ours_lv, line)
+                'typical level)', roster, ours_lv, line, profiles)
 
     field = _best_field(roster, line, deploy_limit)
-    m = _metrics(field, line, bosses)
+    m = _metrics(field, profiles)
     print('\n-- PARTY (best %d fielded: %s) %s' % (
         deploy_limit, ', '.join(u.name for u in field), '-' * 12))
-    print('  throughput %.2f kills/round (cap 1/unit) · durability(min) %.1f%s'
-          % (m['throughput'], m['min_durability'],
-             ' · carry %s %s rounds vs boss' % (m['carry'][0], _fmt_rounds(m['carry'][1]))
-             if 'carry' in m else ''))
+    _print_metrics('', field, m, bosses)
 
-    print('\n-- LORD x TEAM SWEEP (each candidate forced-deployed as the must-survive lord) --')
+    print('\n-- LORD x TEAM SWEEP (each candidate forced-deployed as the must-survive lord; '
+          'median lines) --')
     for r in lord_team_sweep(roster, line, bosses, deploy_limit):
         boss = (' boss %s' % _fmt_rounds(r['carry_rounds'])) if 'carry_rounds' in r else ''
         print('  lord=%-11s thru %.2f  dura %.1f%s   team[%s]'
@@ -1618,22 +1774,23 @@ def report(campaign, ch, mode=None):
     vanilla_lv = arriving['vanilla'] if arriving else None
     roster_van = vanilla_party(ref, vanilla_lv)
     if roster_van:
+        van_profiles = {name: dice_profile(c, line, bosses)
+                        for name, c in vanilla_party_careers(ref, vanilla_lv).items()}
         _print_cast('VANILLA %s PARTY, AS IT ARRIVES (every recruit so far, its own exp history)'
                     % ref, roster_van,
-                    {k.replace('CHARACTER_', '').title(): v for k, v in (vanilla_lv or {}).items()},
-                    line)
+                    {_ally_name(k): v for k, v in (vanilla_lv or {}).items()},
+                    line, van_profiles)
         van = _best_field(roster_van, line, deploy_limit)
-        vm = _metrics(van, line, bosses)
-        print('\n-- VANILLA Ch%s PARITY DELTA (best %d of each arriving party) '
-              % (num, deploy_limit) + '-' * 30)
-        print('  vanilla (%s): thru %.2f · dura(min) %.1f%s'
-              % ('/'.join(u.name for u in van), vm['throughput'], vm['min_durability'],
-                 ' · carry %s' % _fmt_rounds(vm['carry'][1]) if 'carry' in vm else ''))
-        print('  ours (best %d):  thru %.2f (%+.2f) · dura(min) %s (%s)%s'
-              % (deploy_limit, m['throughput'], m['throughput'] - vm['throughput'],
-                 _fmt_rounds(m['min_durability']),
-                 _fmt_dura_delta(m['min_durability'], vm['min_durability']),
-                 ' · carry %s' % _fmt_rounds(m['carry'][1]) if 'carry' in m else ''))
+        vm = _metrics(van, van_profiles)
+        print('\n-- VANILLA Ch%s PARITY DELTA (best %d of each arriving party; averages over '
+              'the dice, bad luck in brackets) ' % (num, deploy_limit) + '-' * 4)
+        print('  vanilla (%s):' % '/'.join(u.name for u in van))
+        _print_metrics('  ', van, vm, bosses)
+        print('  ours (best %d), average delta: thru %+.2f · dura(min) %s%s'
+              % (deploy_limit, m['throughput'][0] - vm['throughput'][0],
+                 _fmt_dura_delta(m['min_durability'][0], vm['min_durability'][0]),
+                 ' · carry %s' % _fmt_dura_delta(m['carry'][0], vm['carry'][0])
+                 if 'carry' in m and 'carry' in vm else ''))
     else:
         print('\n(no vanilla reference field for Ch%s (parity_reference=%r) -- delta skipped)'
               % (num, ref))
