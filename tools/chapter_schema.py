@@ -13,6 +13,7 @@ key exist", which no reader can.
 
 Stdlib only, operating on parsed documents, so the CI `checks` job runs it beside `campaign_chapters`.
 """
+import os
 import sys
 
 # A spec is one of:
@@ -28,41 +29,33 @@ class Keyed(object):
         self.spec = spec
 
 
-INVENTORY = [{'id': ANY, 'damage_type': ANY, 'fe_base': ANY, 'is_key_item': ANY}]
-DONOR = {'at': ANY, 'allegiance': ANY, 'class': ANY, 'level': ANY}
 ART = {'portrait': ANY, 'source': ANY, 'hand_pass': ANY, 'palette': ANY, 'vendored': ANY,
        'map_sprite': {'mu': ANY, 'wait': ANY},
        'render': {'bg_thresh': ANY, 'crop': ANY, 'hand_pass': ANY, 'ref': ANY, 'zoom': ANY}}
 REWARD = [{'id': ANY, 'amount': ANY}]
 
-ENEMY_UNIT = {
+# One shape for every unit a chapter places, whatever roster key holds it: the readers treat
+# them interchangeably (`raw_pids.PLACED_ROSTER_KEYS`, `check.ROSTER_KEYS`, map_placement_preview,
+# difficulty), so a field legal on an enemy is legal on a reinforcement, a guest or an ally.
+UNIT = {
     'id': ANY, 'name': ANY, 'fe_name': ANY, 'class': ANY, 'deploy_class': ANY, 'level': ANY,
-    'autolevel': ANY, 'count': ANY, 'composition': ANY, 'position': ANY, 'positions': ANY,
-    'boss_tile': ANY, 'is_boss': ANY, 'is_miniboss': ANY, 'hard_mode_only': ANY,
-    'convertible': ANY, 'inventory': INVENTORY, 'inventory_by_class': Keyed(ANY),
-    'weapon': ANY, 'item_drop': ANY, 'damage_type': ANY, 'personal': ANY,
-    'donor': ANY, 'ai_pattern': ANY, 'ai_override': {'ai': ANY, 'why': ANY},
+    'levels': ANY, 'autolevel': ANY, 'count': ANY, 'composition': ANY,
+    'position': ANY, 'positions': ANY, 'boss_tile': ANY, 'camera_at': ANY,
+    'is_boss': ANY, 'is_miniboss': ANY, 'hard_mode_only': ANY, 'required': ANY, 'is_npc': ANY,
+    'convertible': ANY, 'inventory': ANY, 'inventory_by_class': Keyed(ANY), 'weapon': ANY,
+    'item_drop': ANY, 'gift': ANY, 'damage_type': ANY, 'personal': ANY, 'donor': ANY,
+    'ai_pattern': ANY, 'ai_override': {'ai': ANY, 'why': ANY}, 'behavior': ANY,
     'arrives': {'turn': ANY}, 'arrives_turn': ANY, 'spawn_edge': ANY, 'spawn_turn': ANY,
-    'charge_from': ANY, 'charge_route': ANY, 'walks_to': ANY,
-    'death_quote': ANY, 'taunt': ANY, 'flavor': ANY, 'flavor_traits': ANY,
-    'fe_mechanic': ANY,
+    'trigger_turn': ANY, 'charge_from': ANY, 'charge_route': ANY, 'walks_to': ANY,
+    'flee_route': ANY, 'flees_to': ANY,
+    'death_quote': ANY, 'defeat_quote': ANY, 'taunt': ANY, 'flavor': ANY, 'flavor_traits': ANY,
+    'fe_mechanic': ANY, 'note': ANY,
     'parley': {'by': ANY, 'recruits_npc': ANY, 'result': ANY},
     'skin': {'fallback': ANY, 'look': ANY, 'source': ANY},
     'art': ART,
     'map_sprite': {'base': ANY, 'credit': ANY, 'palette': ANY, 'recipe': ANY, 'source': ANY},
     'battle_anim': {'abbr': ANY, 'clone_from': ANY, 'frames': ANY,
                     'import': {'frames_dir': ANY, 'palette_edit': ANY, 'txt': ANY}},
-}
-
-PLAYER_UNIT = {
-    'id': ANY, 'name': ANY, 'fe_name': ANY, 'class': ANY, 'level': ANY, 'position': ANY,
-    'inventory': INVENTORY, 'required': ANY, 'is_npc': ANY, 'death_quote': ANY,
-    'defeat_quote': ANY, 'art': ART,
-}
-
-GREEN_ALLY = {
-    'id': ANY, 'name': ANY, 'fe_name': ANY, 'class': ANY, 'level': ANY, 'position': ANY,
-    'inventory': ANY, 'gift': ANY, 'donor': DONOR,
 }
 
 # A scene's fallback cut: its `script:` is the scene preview's to read.
@@ -118,16 +111,13 @@ CHAPTER = {
     'difficulty': {'tutorial': ANY, 'normal': ANY, 'difficult': ANY},
     # the units
     'deployment': {'deploy_limit': ANY, 'deploy_slots': ANY, 'note': ANY, 'prep_screen': ANY,
-                   'start_area': ANY, 'green_allies': [GREEN_ALLY]},
-    'player_units': [PLAYER_UNIT],
-    'enemy_units': [ENEMY_UNIT],
-    'reinforcements': [{'id': ANY, 'name': ANY, 'class': ANY, 'count': ANY, 'levels': ANY,
-                        'autolevel': ANY, 'positions': ANY, 'spawn_edge': ANY,
-                        'trigger_turn': ANY, 'inventory': INVENTORY, 'donor': ANY,
-                        'fe_mechanic': ANY}],
-    'neutral_units': [{'id': ANY, 'name': ANY, 'fe_name': ANY, 'class': ANY, 'note': ANY,
-                       'behavior': ANY, 'camera_at': ANY, 'flee_route': ANY, 'flees_to': ANY,
-                       'art': ART}],
+                   'start_area': ANY, 'green_allies': [UNIT]},
+    'player_units': [UNIT],
+    'enemy_units': [UNIT],
+    'reinforcements': [UNIT],
+    'enemy_reinforcements': [UNIT],
+    'neutral_units': [UNIT],
+    'green_units': [UNIT],
     'npc_units': [{'id': ANY, 'count': ANY, 'behavior': ANY, 'must_not_be_killed': ANY,
                    'penalty_if_killed': {'gold': ANY, 'reputation': ANY}}],
     'rescue_boats': [{'id': ANY, 'fe_name': ANY, 'class': ANY, 'donor': ANY, 'faction': ANY,
@@ -139,6 +129,7 @@ CHAPTER = {
     'cutscene_actors': ANY,
     'events': [EVENT],
     'arena_presentation': {'attendant': {'face_slot': ANY, 'portrait': ANY}},
+    'available_shops': ANY,      # difficulty.py reads it here as well as under post_chapter
     'economy': {'elven_store': {'armory': ANY, 'vendor': ANY},
                 'reward_sites': [{'gift': ANY}],
                 'save_all_bonus': ANY, 'save_all_gate': ANY},
@@ -191,6 +182,14 @@ def _suggest(key, spec):
     import difflib
     close = difflib.get_close_matches(str(key), [str(k) for k in spec], n=1)
     return ' -- did you mean `%s`?' % close[0] if close else ''
+
+
+def load(path):
+    """Parse the chapter YAML at `path` and validate it. Every reader that parses a chapter
+    file itself goes through here, so no path through the tooling skips the schema."""
+    from yaml_loader import yaml_load
+    with open(path, encoding='utf-8') as f:
+        return validate(os.path.basename(path), yaml_load(f))
 
 
 def validate(rel, doc):

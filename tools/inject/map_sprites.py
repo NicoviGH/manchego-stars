@@ -8,6 +8,7 @@ import tempfile
 
 from PIL import Image
 
+import chapter_schema
 from yaml_loader import yaml_load
 import map_sprite_tool
 from inject.cast import classed_cast, load_unit, SCRIPTED_NEUTRAL_SPRITES
@@ -589,8 +590,7 @@ def declared_map_sprite_units(campaign):
     for name in sorted(os.listdir(chapters)):
         if not name.endswith('.yaml'):
             continue
-        with open(os.path.join(chapters, name), encoding='utf-8') as f:
-            chap = yaml_load(f) or {}
+        chap = chapter_schema.load(os.path.join(chapters, name)) or {}
         # enemy_units too: Ravisin is ch05's BOSS and carries a full art.map_sprite block,
         # so scanning only the friendly-side keys left her (and every future enemy with our
         # own art) outside the "declared art must actually get wired" guard entirely. She

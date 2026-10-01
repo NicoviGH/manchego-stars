@@ -5,7 +5,7 @@ import os
 import re
 import sys
 
-from yaml_loader import yaml_load
+import chapter_schema
 from inject.decomp import REPO, vanilla_decomp_text
 from inject.paths import EVENTCALL_H, EVENTS_UDEFS_C
 
@@ -304,8 +304,7 @@ def safe_ai_clients(ai_index, campaign='rime-of-the-frostmaiden'):
     out = []
     for path in sorted(glob.glob(os.path.join(
             REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml'))):
-        with open(path, encoding='utf-8') as source:
-            chap = yaml_load(source)
+        chap = chapter_schema.load(path)
         stem = os.path.basename(path)[:4]
         for key in difficulty.AI_ROSTER_KEYS:
             for enemy in chap.get(key) or []:

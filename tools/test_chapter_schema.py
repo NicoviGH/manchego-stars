@@ -45,6 +45,16 @@ class BadKeysFail(unittest.TestCase):
         self.assertEqual(['ch05: objective must be a mapping, not a list'],
                          schema.violations('ch05', self.ch05))
 
+    def test_every_roster_key_takes_the_one_unit_shape(self):
+        # The readers treat these keys interchangeably (raw_pids.PLACED_ROSTER_KEYS), so a boss
+        # with a personal line is as legal in a wave as on the opening board (#426 review).
+        boss = {'id': 'b', 'class': 'druid', 'level': 7, 'is_boss': True,
+                'personal': {'baseHP': 3}, 'weapon': 'flux', 'art': {'portrait': 'b.png'}}
+        for key in ('enemy_units', 'reinforcements', 'enemy_reinforcements', 'neutral_units',
+                    'green_units', 'player_units'):
+            self.assertEqual([], schema.violations('chNN', {key: [dict(boss)]}), key)
+        self.assertEqual([], schema.violations('chNN', {'deployment': {'green_allies': [boss]}}))
+
     def test_free_keyed_mappings_accept_any_key(self):
         doc = {'rescue_boats': [{'id': 'b', 'reached_on': {'anything-goes': 3}}]}
         self.assertEqual([], schema.violations('chNN', doc))

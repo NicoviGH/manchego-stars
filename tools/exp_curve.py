@@ -37,13 +37,13 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import chapter_schema
 import inject.cast
 import inject.decomp
 import inject.hosting
 import inject.hosts
 import inject.paths
 import inject.raw_pids
-import yaml_loader
 import difficulty as d
 
 REPO = inject.decomp.REPO
@@ -239,8 +239,7 @@ SPECIAL_EXP_CLASSES = ('CLASS_GORGONEGG', 'CLASS_GORGONEGG2', 'CLASS_DEMON_KING'
 # ---------------------------------------------------------------------------------------
 
 def load_chapter(campaign, ch):
-    with open(d.chapter_path(campaign, ch), encoding='utf-8') as f:
-        return yaml_loader.yaml_load(f)
+    return chapter_schema.load(d.chapter_path(campaign, ch))
 
 
 def _entry_boss(enemy_def):
