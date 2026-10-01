@@ -181,6 +181,26 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         inject.warm._rewind_unchanged_mtimes({}, inject.warm.load_compiled())
         self.assertEqual(os.stat(src).st_mtime_ns, 3 * 10**18)
 
+    def test_changed_content_older_than_its_record_is_made_newer(self):
+        # CI pins every tracked source to 2000-01-01 and restores the last main build's
+        # objects (#408). A file injected in that build but vanilla now carries the pinned
+        # mtime, older than the object compiled from its injected bytes: left alone, `make`
+        # would keep that stale object.
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        self._compile([src])
+        self._write(src, b'vanilla', mtime_ns=5 * 10**17)
+        inject.warm._rewind_unchanged_mtimes({}, inject.warm.load_compiled())
+        self.assertGreater(os.stat(src).st_mtime_ns, 10**18)
+
+    def test_a_fresh_checkout_of_the_tree_does_not_void_the_manifest(self):
+        # The CI restore (#408): build_tree.ensure creates the worktree's `.git` file and the
+        # toolchain links after the cached record was taken. Neither is a compile's output.
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        self._compile([src])
+        self._write(os.path.join(self.tmp, '.git'), b'gitdir: elsewhere', mtime_ns=4 * 10**18)
+        os.symlink(self.elf, os.path.join(self.tmp, 'baserom.gba'))
+        self.assertIn(src, inject.warm.load_compiled())
+
     def test_a_compile_nobody_recorded_voids_the_manifest(self):
         # A bare `make -C build/fireemblem8u` that rebuilt f.o from other bytes and died before
         # relinking: trusting the record would rewind f and hide the stale object (review).

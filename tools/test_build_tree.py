@@ -77,6 +77,17 @@ class TheBuildTree(unittest.TestCase):
         build_tree.ensure(verbose=False)                   # idempotent
         self.assertTrue(os.path.islink(link))
 
+    def test_its_outputs_are_what_git_ignores_minus_links_and_injected_files(self):
+        # What CI caches (#408): the compile's outputs, never the injector's writes (the next
+        # build injects those afresh) and never the toolchain links.
+        build_tree.ensure(verbose=False)
+        ours, obj = (os.path.join(self.tree, 'src', n) for n in ('ours.c', 'ours.o'))
+        for path in (ours, obj):
+            with open(path, 'w') as fh:
+                fh.write('x')
+        with mock.patch('inject.warm.load_compiled', lambda: {ours: (0, b'')}):
+            self.assertEqual(sorted(build_tree.outputs()), ['src/ours.o'])
+
     def test_a_deleted_tree_is_recreated(self):
         build_tree.ensure(verbose=False)
         shutil.rmtree(os.path.dirname(self.tree))
