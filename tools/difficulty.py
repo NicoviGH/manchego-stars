@@ -22,6 +22,7 @@ import collections
 import dataclasses
 import functools
 import os
+import random
 import re
 
 import chapter_schema  # noqa: E402
@@ -191,15 +192,70 @@ def _class_caps(class_enum):
     return caps
 
 
-def grown(stats, growths, gained, caps):
-    """`stats` after `gained` player level-ups at their EXPECTED value, held to `caps`.
+_STAT_ORDER = ('HP', 'Pow', 'Skl', 'Spd', 'Def', 'Res', 'Lck')   # the order FE8 rolls them in
 
-    A player level-up rolls each stat against its growth (`GetStatIncrease`, bmbattle.c), so
-    n levels add n x growth% to the mean. Rounded half-up per stat, exactly as `autolevel`
-    projects an enemy, so the two sides of any absolute read share one convention. A mean
-    line, not a unit anybody will roll: the planning number #367 asked for."""
-    out = autolevel(stats, growths, 1 + max(0, gained))
-    return {f: min(v, caps[f]) if f in caps else v for f, v in out.items()}
+
+def _stat_increase(growth, rng):
+    """`GetStatIncrease` (bmbattle.c): +1 per whole 100 of growth, then one `Roll1RN` on the
+    rest (rng.c: `threshold > NextRN_100()`)."""
+    result = 0
+    while growth > 100:
+        result += 1
+        growth -= 100
+    return result + (1 if growth > rng.randrange(100) else 0)
+
+
+def level_up(growths, rng):
+    """One player level-up's stat gains, transcribed from `CheckBattleUnitLevelUp`
+    (bmbattle.c). Every stat rolls once; an EMPTY level then re-rolls up to twice, walking the
+    stats in order and stopping at the first that gains. That re-roll couples the stats, which
+    is why `grown` simulates rather than reading each stat off a binomial."""
+    gains = {f: _stat_increase(growths.get('growth' + f, 0), rng) for f in _STAT_ORDER}
+    if not any(gains.values()):
+        for _ in range(2):
+            for f in _STAT_ORDER:
+                gains[f] = _stat_increase(growths.get('growth' + f, 0), rng)
+                if gains[f]:
+                    return gains
+    return gains
+
+
+GROWTH_TRIALS = 1001        # odd, so a median is one career's value and never a midpoint
+GROWTH_SEED = 430           # fixed: the report is a reading, and it reads the same every run
+
+
+@functools.lru_cache(maxsize=None)
+def _grown_cached(stats, growths, gained, caps):
+    stats, growths, caps = dict(stats), dict(growths), dict(caps)
+    rng = random.Random(GROWTH_SEED)
+    finals = {f: [] for f in _STAT_ORDER}
+    for _ in range(GROWTH_TRIALS):
+        line = {f: stats.get('base' + f, 0) for f in _STAT_ORDER}
+        for _ in range(gained):
+            for f, up in level_up(growths, rng).items():
+                cap = caps.get('base' + f)
+                line[f] = min(line[f] + up, cap) if cap is not None else line[f] + up
+        for f in _STAT_ORDER:
+            finals[f].append(line[f])
+    out = dict(stats)
+    for f in _STAT_ORDER:
+        out['base' + f] = sorted(finals[f])[GROWTH_TRIALS // 2]
+    return out
+
+
+def grown(stats, growths, gained, caps):
+    """`stats` after `gained` player level-ups: each stat's MEDIAN over GROWTH_TRIALS simulated
+    careers of the engine's own level-up (`level_up`), held to `caps` after every level as
+    `CheckBattleUnitStatCaps` holds them.
+
+    The median rather than the mean, at Nicolas's suggestion (2026-10-01): a rounded mean is
+    not a value the dice land on most, and it differs from the median by a point in about one
+    stat line in seven (an 80% HP growth over three levels is +2 rounded, +3 median). It is a
+    per-stat median, so the line is a planning number and not one unit anybody will roll."""
+    if gained <= 0:
+        return dict(stats)
+    return _grown_cached(tuple(sorted(stats.items())), tuple(sorted(growths.items())),
+                         int(gained), tuple(sorted(caps.items())))
 
 
 def placed_entry(campaign, uid, unit, recruited):
@@ -241,8 +297,8 @@ def player_combatant(campaign, uid, gained=0):
     """Resolve a cast member's effective fe_combat.Combatant: class base + donor personal
     base (donor-base inheritance), wielding its first real weapon.
 
-    `gained` is how many levels the unit has risen above the one it joined at, projected on
-    its growth donor's curve (`grown`). 0 is the join-level line, which is what the injector
+    `gained` is how many levels the unit has risen above the one it joined at, grown on its
+    growth donor's growths (`grown`: the median of simulated level-ups). 0 is the join-level line, which is what the injector
     sizes ch01's lord floor from; `load_field(leveled=True)` passes the exp model's answer
     (#430 step 1)."""
     unit = inject.cast.load_unit(campaign, uid)

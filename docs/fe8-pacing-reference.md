@@ -267,7 +267,7 @@ choice, not the engine's arithmetic.
 
 **What reads it.** `make difficulty`'s per-chapter report fields the party this curve says
 arrives (`exp_curve.entering`): only the units that have joined, each at its typical level on
-entering, grown on its growth donor's mean curve. The vanilla allies it is compared with grow to
+entering, grown to the median of simulated level-ups on its growth donor. The vanilla allies it is compared with grow to
 the twin curve's level the same way. The cast table, the fielded party, the lord sweep and the
 vanilla delta all read that party (ADR 0310). The parity ratio does not read a party at all. It
 compares two enemy forces against a fixed yardstick, so a level fed to it would change nothing.

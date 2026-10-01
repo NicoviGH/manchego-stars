@@ -1328,8 +1328,8 @@ class PlayerArrivesLeveled(unittest.TestCase):
     growth donor's curve -- not at its join line against enemies at their real levels."""
 
     def test_gained_levels_grow_on_the_growth_donor(self):
-        # Gilliam grows HP90 Pow45 Skl35 Spd30 Def55 Res20 Lck30; four levels at the mean,
-        # rounded half-up per stat as `autolevel` rounds an enemy.
+        # Gilliam grows HP90 Pow45 Skl35 Spd30 Def55 Res20 Lck30; each stat's median over
+        # four simulated level-ups.
         u = df.player_combatant(CAMPAIGN, 'wolfram', gained=4)
         self.assertEqual((u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con),
                          (29, 11, 7, 4, 11, 4, 4, 14))
@@ -1340,6 +1340,19 @@ class PlayerArrivesLeveled(unittest.TestCase):
                        {'growthHP': 100, 'growthPow': 100, 'growthLck': 100}, 5, caps)
         self.assertEqual((out['baseHP'], out['basePow'], out['baseLck'], out['baseCon']),
                          (60, 20, 30, 9))
+
+    def test_an_empty_level_rerolls_twice(self):
+        # CheckBattleUnitLevelUp re-rolls an empty level up to twice, so a lone 50% stat
+        # gains on 1 - 0.5**3 = 87.5% of level-ups, not 50%.
+        rng = df.random.Random(0)
+        n = 4000
+        ups = sum(df.level_up({'growthLck': 50}, rng)['Lck'] for _ in range(n))
+        self.assertAlmostEqual(ups / n, 0.875, delta=0.02)
+
+    def test_the_median_is_not_the_rounded_mean(self):
+        # 80% HP over three levels: mean 2.4 rounds to 2, but P(+3) = 0.512 -- the median is 3.
+        out = df.grown({'baseHP': 20}, {'growthHP': 80}, 3, {'baseHP': 60})
+        self.assertEqual(out['baseHP'], 23)
 
     def test_a_placed_recruit_fights_with_its_placing_entrys_weapon(self):
         # sahnar's unit YAML carries no inventory; ch05 places her with the Killing Edge.

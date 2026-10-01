@@ -17,11 +17,13 @@ units that have joined by that chapter and the typical (even-share) level each h
 entering it, which is the previous hosted chapter's closing level. `load_field(leveled=True)`
 fields exactly that party. The cast table prints each unit's level.
 
-**A level becomes stats on the growth donor's mean curve.** `difficulty.grown` adds
-`levels x growth%` per stat, rounded half-up, the same convention `autolevel` uses for an
-enemy. It caps at `CheckBattleUnitStatCaps`'s ceilings (class max, 60 HP, 30 Lck). This is the
-mean line, and no unit will roll exactly that. A planning read needs the mean, and the dice
-spread is the playtest's job.
+**A level becomes stats by simulating the engine's own level-ups.** `difficulty.level_up`
+transcribes `CheckBattleUnitLevelUp`, including its re-roll of an empty level, which couples
+the stats. `grown` runs 1001 seeded careers on the growth donor's growths, caps every level at
+`CheckBattleUnitStatCaps`'s ceilings (class max, 60 HP, 30 Lck), and takes each stat's median.
+The median was Nicolas's call (2026-10-01). A rounded mean differs from it by a point in about
+one stat line in seven. A per-stat median is a planning line, and no single unit rolls exactly
+that. The dice spread is the playtest's job.
 
 **The vanilla allies grow too.** They grow on their own growths to the twin curve's level
 wherever that is above their base level, so the parity delta compares two arriving parties.
