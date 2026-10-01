@@ -37,6 +37,7 @@ Clean build (`workflow_dispatch`, `no_cache`), cache miss and cache hit all prin
 ## What it exposed
 
 The cache removed less than the vanilla asset count suggested: the build after injection still
-does 1,515 conversions, re-links all 2,199 battle-anim sheets and recompiles every C file, on a
-miss and a hit alike. On CI that is real work. It is our own injected content, which no vanilla
-build holds (ADR 0301 measured it, #416). Caching the injected build's outputs is the next lever.
+did 1,515 conversions, re-linked all 2,199 battle-anim sheets and recompiled every C file, on a
+miss and a hit alike. The conversions are our own injected content, which no vanilla build
+holds. The C files were agbcc's headers: "Install agbcc" rewrites them every run and every
+object depends on them. ADR 0303 caches the injected build and pins those headers.
