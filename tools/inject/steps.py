@@ -295,8 +295,9 @@ STEPS = [
          call=lambda fn, a: fn(a.campaign, boot=a.ch01_boot), flags=('ch01_boot',),
          needs=('reskin-classes', 'tileset-labels'), provides=('slot1-goal-copied',),
          writes=_host(2, 'Ch01IronTrailMap', 'include/eventcall.h')),
-    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing).
-    Step(inject_northlook_bitey, scope='chapter:ch01', writes=('graphics/bg/bg_Fireplace.png',)),
+    # 'Ol Bitey over the tavern hearth (Beat 1 set dressing). Global: the fireplace is also
+    # the backdrop of the dev placeholder scene the later chapters' endings play.
+    Step(inject_northlook_bitey, writes=('graphics/bg/bg_Fireplace.png',)),
     # Hosts slot 3; ch01's ending MNC2(0x3) lands here.
     Step(inject_ch02, title='chapter 2 (#22):', scope='chapter:ch02',
          needs=('reskin-classes', 'tileset-labels'), provides=('ch02-goal',),
