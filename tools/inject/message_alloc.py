@@ -16,6 +16,7 @@ renumbering a shipped vanilla-range id changes the ROM for no gain. A NEW messag
 
 Stdlib only and a leaf: `inject.chapter_ids` imports it.
 """
+import re
 import sys
 
 # The size of vanilla's message table (gMsgTable). Ids at or above this are ours, appended.
@@ -33,12 +34,20 @@ APPENDED_MESSAGES = {
 }
 
 
+_CHAPTER_KEY = re.compile(r'^ch\d\d$')
+
+
 def allocated_message_ids(ledger=None):
     """{(chapter, name): message id} for every appended message."""
     ledger = APPENDED_MESSAGES if ledger is None else ledger
     out = {}
     next_id = VANILLA_MESSAGE_COUNT
     for chapter in sorted(ledger):
+        # `chNN` (the prologue is ch00, as in HOSTED_CHAPTER_MESSAGE_IDS) is what makes a sort
+        # by name a sort by campaign order.
+        if not _CHAPTER_KEY.match(chapter):
+            sys.exit('ERROR: APPENDED_MESSAGES key %r is not a chNN chapter id (the prologue is '
+                     'ch00)' % (chapter,))
         seen = set()
         for name in ledger[chapter]:
             if name in seen:

@@ -37,6 +37,11 @@ class AllocationIsDerivedFromTheLedger(unittest.TestCase):
         after = alloc.allocated_message_ids({'ch05': ('a', 'new'), 'ch06': ('b',)})
         self.assertEqual(after[('ch06', 'b')], before[('ch06', 'b')] + 1)
 
+    def test_a_key_that_would_not_sort_in_campaign_order_is_refused(self):
+        with self.assertRaises(SystemExit) as caught:
+            alloc.allocated_message_ids({'prologue': ('a',)})
+        self.assertIn('ch00', str(caught.exception))
+
     def test_a_duplicate_key_is_refused(self):
         with self.assertRaises(SystemExit) as caught:
             alloc.allocated_message_ids({'ch05': ('a', 'a')})
