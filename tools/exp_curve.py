@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """The campaign's EXP economy, and the party-level band derived from it (#367 proposal 3).
 
-`difficulty.py` answers *is this chapter's force at parity with its vanilla twin*. It says
-nothing about what the party BRINGS to that force, because `player_combatant` resolves the
-cast at base level on purpose -- the parity ratio compares two forces against a fixed
-yardstick and a projected party level would break that cancellation rather than improve it.
+`difficulty.py`'s parity ratio answers *is this chapter's force at parity with its vanilla
+twin*. It says nothing about what the party BRINGS to that force: it compares two enemy forces
+against a fixed yardstick and reads no party at all.
 
 So every ABSOLUTE question -- *can this unit survive that trip, is this fuse long enough for
-a real party, is this objective a coin flip* -- has had no floor to stand on. During #26 a
-ch06-era flier was assessed off her LEVEL 1 stat line and a chapter's design nearly turned
-on it.
+a real party, is this objective a coin flip* -- needs the party's level, and had none. During
+#26 a ch06-era flier was assessed off her LEVEL 1 stat line and a chapter's design nearly
+turned on it. `entering` hands that level to `difficulty.load_field(leveled=True)`.
 
 This is that floor, and it is DERIVED rather than asserted: FE8's own exp formulas
 (`fireemblem8u/src/bmbattle.c`, transcribed below and cited per function) run over the real
@@ -26,8 +25,8 @@ that lead and overstates the tail. Not modelled, on either side: chip damage tha
 kill (which pays round exp and is left out of both sides), staff and arena exp, and the exp
 a player farms by choosing to. All of those ADD, so the curve here is a floor.
 
-Stat GROWTH is deliberately not modelled (#367): growths are random, and a level is the
-planning quantity -- a projected stat line would be a precision the dice do not support.
+Stat GROWTH is not modelled HERE: a level is this module's answer. `difficulty.grown` turns a
+level into the mean stat line for the absolute readings (ADR 0310).
 """
 import argparse
 import dataclasses
@@ -310,14 +309,9 @@ def join_level(campaign, uid, unit=None, recruited=_UNSET):
     # this return 1 for sahnar the first time.
     if recruited is _UNSET:
         recruited = inject.hosting.recruit_chapter_number(campaign, dict(unit, id=uid))
-    if recruited is not None:
-        chapter = next((c for c in inject.hosts.hosted_chapters() if c.number == int(recruited)), None)
-        if chapter is not None:
-            chap = inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))
-            placed = [max(inject.raw_pids.entry_body_levels(ed)) for ed in inject.raw_pids.placed_entries(chap)
-                      if ed.get('id') == uid]
-            if placed:
-                return int(placed[0])
+    entry = d.placed_entry(campaign, uid, unit, recruited)
+    if entry is not None:
+        return int(max(inject.raw_pids.entry_body_levels(entry)))
     return int((unit.get('fe_stats') or {}).get('level') or 1)
 
 
@@ -540,6 +534,28 @@ def simulate(campaign='rime-of-the-frostmaiden'):
                                  if twin is not None else None),
         })
     return rows
+
+
+@functools.lru_cache(maxsize=None)
+def _simulated(campaign):
+    return tuple(simulate(campaign))
+
+
+def entering(campaign, chapter_number):
+    """The party that walks INTO `chapter_number`, as the typical (even-share) career sees it.
+
+    {'party': {uid: (join level, level on entering)} for every unit that has joined by this
+    chapter, 'twin_level': the twin party's founding mean on entering}. "On entering" is the
+    previous hosted chapter's closing level, so a chapter is never credited with its own exp.
+    This is what `difficulty.load_field(leveled=True)` fields (#430 step 1)."""
+    before = [r for r in _simulated(campaign) if r['chapter_number'] < chapter_number]
+    prior = before[-1] if before else None
+    party = {}
+    for uid, _cls, joins, joined in party_classes(campaign):
+        if chapter_number >= joins:
+            party[uid] = (joined, prior['levels'][uid] if prior else joined)
+    twin = prior['twin_level_after'] if prior and prior['twin_level_after'] else 1
+    return {'party': party, 'twin_level': twin}
 
 
 def _mean_level_exact(careers):

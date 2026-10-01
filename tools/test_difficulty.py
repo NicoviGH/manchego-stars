@@ -1323,6 +1323,47 @@ class PlayerStatResolution(unittest.TestCase):
         self.assertEqual(fc.kills_per_round(u, goblin), 0.0)
 
 
+class PlayerArrivesLeveled(unittest.TestCase):
+    """#430 step 1: our cast is scored at the level the exp model says it arrives at, on its
+    growth donor's curve -- not at its join line against enemies at their real levels."""
+
+    def test_gained_levels_grow_on_the_growth_donor(self):
+        # Gilliam grows HP90 Pow45 Skl35 Spd30 Def55 Res20 Lck30; four levels at the mean,
+        # rounded half-up per stat as `autolevel` rounds an enemy.
+        u = df.player_combatant(CAMPAIGN, 'wolfram', gained=4)
+        self.assertEqual((u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con),
+                         (29, 11, 7, 4, 11, 4, 4, 14))
+
+    def test_growth_stops_at_the_class_cap(self):
+        caps = {'baseHP': 60, 'baseLck': 30, 'basePow': 20}
+        out = df.grown({'baseHP': 58, 'basePow': 19, 'baseLck': 29, 'baseCon': 9},
+                       {'growthHP': 100, 'growthPow': 100, 'growthLck': 100}, 5, caps)
+        self.assertEqual((out['baseHP'], out['basePow'], out['baseLck'], out['baseCon']),
+                         (60, 20, 30, 9))
+
+    def test_a_placed_recruit_fights_with_its_placing_entrys_weapon(self):
+        # sahnar's unit YAML carries no inventory; ch05 places her with the Killing Edge.
+        self.assertEqual(df.player_combatant(CAMPAIGN, 'sahnar').weapon.name, 'killing-edge')
+
+    def test_an_off_map_join_fights_with_its_join_load_kit(self):
+        # lupin joins off-map; the join-LOAD arms him from CLASS_LOADOUT, a sword first.
+        self.assertEqual(df.player_combatant(CAMPAIGN, 'lupin').weapon.name, 'iron-sword')
+
+    def test_the_leveled_field_is_who_has_joined_at_the_level_they_arrive(self):
+        roster = df.load_field(CAMPAIGN, 'ch02', leveled=True)[1]
+        names = {u.name for u in roster}
+        self.assertIn('wolfram', names)
+        self.assertNotIn('sahnar', names)           # ch05 recruit: not on ch02's field
+        wolfram = next(u for u in roster if u.name == 'wolfram')
+        self.assertEqual(wolfram.hp, df.player_combatant(CAMPAIGN, 'wolfram').hp)  # L1 into ch02
+
+    def test_a_vanilla_ally_grows_only_above_its_own_base_level(self):
+        at_base = {u.name: u for u in df.vanilla_allies('FE8 Ch2')}
+        grown = {u.name: u for u in df.vanilla_allies('FE8 Ch2', level=1)}
+        self.assertEqual({n: u.hp for n, u in at_base.items()},
+                         {n: u.hp for n, u in grown.items()})
+
+
 class EnemyStatResolution(unittest.TestCase):
     def test_autolevel_projects_class_base_by_growths(self):
         # Armor Knight base + 3 levels of class growth (round half up): the lv4 boss.

@@ -265,17 +265,12 @@ level gap and the kill bonus subtracts the killer's power level. That trims the 
 only trims it — most of the distance between a fed unit and a benched one is the player's
 choice, not the engine's arithmetic.
 
-**What it is for, and what it is NOT for.** `tools/difficulty.py` does not use it and should
-not. `player_combatant` resolves the cast *at base level* on purpose, and the parity ratio
-compares our chapter to its vanilla twin with the same understated party on both sides, so the
-bias cancels — the same argument `decisions.md` → *"AI behaviour is MEASURED and REPORTED"*
-makes for not weighting AI. Feeding a projected level into one side only would break that
-cancellation, not improve it.
-
-⚠️ The cancellation is first-order, not exact: `kills_per_round` and `durability` are threshold
-functions (doubling breakpoints, integer rounds-to-kill), so a party far below the enemies'
-level can saturate against both sides and flatten the ratio toward x1.00. The error is smallest
-at ch00 and **grows with every chapter**. Tracked on #367.
+**What reads it.** `make difficulty`'s per-chapter report fields the party this curve says
+arrives (`exp_curve.entering`): only the units that have joined, each at its typical level on
+entering, grown on its growth donor's mean curve. The vanilla allies it is compared with grow to
+the twin curve's level the same way. The cast table, the fielded party, the lord sweep and the
+vanilla delta all read that party (ADR 0310). The parity ratio does not read a party at all. It
+compares two enemy forces against a fixed yardstick, so a level fed to it would change nothing.
 
 ⚠️ **The exp column is the only quantity in this repo that integrates across chapters**, which
 is why `tools/test_exp_curve.py` asserts every chapter within ±12% of its twin. A chapter that

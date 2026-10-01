@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-309 decisions. Read this index, then open the two or three you need — the whole
+310 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -175,6 +175,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0078` | [Seize-map legibility: the seize tile must read as a seize point and the boss sits on it — a level-design checkpoint](decisions/0078-seize-map-legibility-the-seize-tile-must-read-as.md) | 2026-06-19 | #56 #57 |
 | `0079` | [Title banner theme: "glacial blue", a pure PALETTE recolor (no pixel edits).](decisions/0079-title-banner-theme-glacial-blue-a-pure-palette-recolor.md) | 2026-06-09 | — |
 | `0295` | [The party-level band is DERIVED from the exp economy, and the prologue pays it nothing](decisions/0295-the-party-level-band-is-derived-from-the-exp-economy.md) | 2026-09-18 | #367 |
+| `0310` | [The difficulty report fields the party that arrives, at the level it arrives at](decisions/0310-the-difficulty-report-fields-the-party-that-arrives.md) | 2026-10-01 | #430 #367 |
 
 ---
 
