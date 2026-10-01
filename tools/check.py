@@ -966,6 +966,14 @@ def check_chapter_deployment_schema(fail):
         fail.extend(_chapter_deployment_violations(rel, d))
 
 
+def check_chapter_yaml_schema(fail):
+    """Every chapter YAML key is one `tools/chapter_schema.py` names (#411). The loaders refuse a
+    bad key too; this is the same check in the first second of `make check`, with no build."""
+    import chapter_schema
+    for rel, d in _chapters():
+        fail.extend(chapter_schema.violations(rel, d))
+
+
 # ch03 registers its map changes through _inject_ch03_tile_changes, a per-chapter wrapper
 # around _inject_tile_changes. A guard matching only the bare name never sees it, so the
 # chapter drops out of the gate entirely and looks identical to one with no tile changes at
@@ -3279,7 +3287,8 @@ def check_decision_citations_resolve(fail):
 CHECKS = (
     check_python_compiles, check_lua_chunks_load, check_lua_local_headroom,
     check_hosted_chapters_declared, check_tests_pass, check_yaml_parses, check_chapter_status,
-    check_chapter_deployment_schema, check_personal_line_injection_routes,
+    check_chapter_deployment_schema, check_chapter_yaml_schema,
+    check_personal_line_injection_routes,
     check_injector_source_has_one_reader,
     check_tile_changes_outlive_the_retarget, check_playtest_matrix,
     check_rom_configs_reach_the_build, check_decomp_git_calls_strip_the_env,

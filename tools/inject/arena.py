@@ -9,6 +9,7 @@ import sys
 from PIL import Image
 
 from yaml_loader import yaml_load
+from inject.hosting import _load_chapter_yaml
 import portrait_tool
 from inject.cast import _vendor_mug_to_bust, GUEST_PORTRAIT_MAP, PORTRAIT_MAP
 from inject.chapter_ids import CH02_CHWINGA_PORTRAIT_SLOT, CH05_VISIT_FACES
@@ -198,8 +199,7 @@ def arena_presentation_config(campaign):
     chapters = {}
     chapter_dir = os.path.join(campaign_dir, 'chapters')
     for chapter_path in sorted(glob.glob(os.path.join(chapter_dir, 'ch*.yaml'))):
-        with open(chapter_path, encoding='utf-8') as f:
-            chapter = yaml_load(f) or {}
+        chapter = _load_chapter_yaml(campaign, os.path.basename(chapter_path)) or {}
         section = chapter.get('arena_presentation') or {}
         if not section:
             continue
