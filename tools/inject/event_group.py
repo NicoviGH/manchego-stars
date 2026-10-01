@@ -23,24 +23,32 @@ _TOOLS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO = os.path.dirname(_TOOLS)
 from .decomp import DECOMP, git_env, SUBMODULE  # noqa: E402  (git_env: hook safety)
 
-CHAPTERDATA_H = os.path.join(DECOMP, 'include', 'chapterdata.h')
 EVENTS_INFO_S = os.path.join(DECOMP, 'src', 'events_info.s')
 
 _FIELD = re.compile(r'^\s*/\*\s*[0-9A-Fa-f]+\s*\*/\s*const\s+void\s*\*\s*(\w+)\s*;',
                     re.M)
 
 
-def fields(path=CHAPTERDATA_H, source=None):
+_FIELDS = None
+
+
+def fields(source=None):
     """Every ChapterEventGroup field, IN STRUCT ORDER, read from the decomp header.
 
     Order is identity here, not presentation: the group is emitted as twenty bare `.word`s,
     so a field is known only by its position. Read from the source rather than transcribed,
     because a transcription cannot notice a field being added upstream -- and a field the
     census does not know about is exactly the silent inheritance this exists to stop.
+
+    Read from the VANILLA submodule at HEAD (no engine patch touches the struct), so the
+    listing answers before any build has made the build tree. Memoised: the frame asks once
+    per hosted chapter.
     """
+    global _FIELDS
     if source is None:
-        with open(path, encoding='utf-8') as fh:
-            source = fh.read()
+        if _FIELDS is None:
+            _FIELDS = fields(vanilla_header('include/chapterdata.h'))
+        return list(_FIELDS)
     start = source.index('struct ChapterEventGroup')
     body = source[start:source.index('};', start)]
     return [m.group(1) for m in _FIELD.finditer(body)]

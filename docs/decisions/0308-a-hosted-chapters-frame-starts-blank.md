@@ -30,10 +30,14 @@ Now `tools/inject/chapter_frame.py` writes both structs from blank:
   the two scene fields at `scenes`. `traps` belongs to `apply_chapter_traps`. The six skirmish
   rosters and `extraTrapsInHard` are inherited with reasons in `event_group.DECLARED_INHERITED`.
 
-Three things follow:
+Four things follow:
 
 - **The censuses are listings.** `event_group.census` and `chapter_data.census` read the
-  declarations, not the bytes, so `make chapter` lists the ruling on a clean checkout.
+  declarations, not the bytes, so `make chapter` lists the ruling with no build (the struct's
+  field list comes from the vanilla submodule).
+- **A writer frames only its own chapter.** Both writers check the slot, group and eventinfo
+  header they are handed against `inject/hosts.py`. Framing a copy-pasted neighbour's group
+  would otherwise pass every guard while the chapter's real group kept the donor's lists.
 - **The build's post-pass guards check two things.** `assert_framed` checks that every injected
   chapter came through both writers. The census guards check that every field the frame left
   inherited still reads as the donor's, pointer and target. A pass that writes an inherited

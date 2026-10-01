@@ -22,11 +22,13 @@ What stays the chapter's own code: rosters, scenes and texts. The frame is the p
 chapter shares, and the part whose default used to be wrong.
 """
 import json
+import os
 import re
 import sys
 
 from . import chapter_data, event_group
-from .decomp import _replace_brace_block
+from .decomp import _replace_brace_block, DECOMP
+from .hosts import hosted_chapters
 from .paths import CHAPTER_SETTINGS_JSON
 
 # chapter -> the structs this build framed for it. The post-pass guards read it: a chapter that
@@ -84,8 +86,32 @@ def frame_settings_row(chapter, row, writes):
     return row
 
 
+def assert_wired(chapter, host_index=None, group=None, info_path=None):
+    """Exit unless the slot, group and eventinfo header handed to a frame writer are this
+    chapter's own (inject/hosts.py). Framing the WRONG group passes every other guard -- the
+    chapter is marked framed, its real group keeps every donor list -- which is the silent,
+    total failure `docs/adding-a-chapter.md` step 4 is about, one copy-paste away."""
+    row = next((h for h in hosted_chapters() if h.name == chapter), None)
+    if row is None:
+        sys.exit('ERROR: %s is not a hosted chapter (inject/hosts.py) -- it cannot be framed'
+                 % chapter)
+    problems = []
+    if host_index is not None and host_index != row.host_index:
+        problems.append('slot %d, but %s hosts on slot %d' % (host_index, chapter, row.host_index))
+    if group is not None and group != row.event_group:
+        problems.append('group %s, but %s fills %s' % (group, chapter, row.event_group))
+    if info_path is not None:
+        own = os.path.join(DECOMP, event_group.header_for(row.event_group))
+        if os.path.abspath(info_path) != os.path.abspath(own):
+            problems.append('%s, but %s\'s group lives in %s' % (info_path, chapter, own))
+    if problems:
+        sys.exit('ERROR: %s was handed another chapter\'s frame: %s'
+                 % (chapter, '; '.join(problems)))
+
+
 def write_settings_row(chapter, host_index, writes):
     """Frame slot `host_index`'s chapter_settings.json row for `chapter`; returns the row."""
+    assert_wired(chapter, host_index=host_index)
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
     row = frame_settings_row(chapter, settings['chapters'][host_index], writes)
@@ -178,6 +204,7 @@ def frame_event_group(chapter, info, group, lists, roster, scenes, path='<info>'
 
 def write_event_group(chapter, info_path, group, lists, roster, scenes):
     """Frame `group` in `info_path` for `chapter` (see frame_event_group)."""
+    assert_wired(chapter, group=group, info_path=info_path)
     with open(info_path, encoding='utf-8') as f:
         info = f.read()
     info = frame_event_group(chapter, info, group, lists, roster, scenes, info_path)

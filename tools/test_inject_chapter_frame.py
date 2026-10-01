@@ -226,6 +226,36 @@ class TheSettingsRowStartsBlank(unittest.TestCase):
         self.assertTrue(set(changed) <= set(self.writes()), changed)
 
 
+class AChapterFramesOnlyItsOwnSlot(unittest.TestCase):
+    """Framing another chapter's group passes every other guard: the chapter reads as framed
+    while its own group keeps every donor list. A copy-pasted injector is all it takes."""
+
+    def test_another_chapters_group_is_refused(self):
+        with self.assertRaises(SystemExit) as caught:
+            chapter_frame.assert_wired('ch06', group=inject.hosts.CH05_EVENT_GROUP)
+        self.assertIn(inject.hosts.CH06_EVENT_GROUP, str(caught.exception))
+
+    def test_another_chapters_slot_is_refused(self):
+        with self.assertRaises(SystemExit):
+            chapter_frame.assert_wired('ch06', host_index=inject.hosts.CH05_HOST_INDEX)
+
+    def test_another_chapters_eventinfo_header_is_refused(self):
+        with self.assertRaises(SystemExit):
+            chapter_frame.assert_wired('ch06', info_path=inject.paths.CH05_EVENTINFO_H)
+
+    def test_a_chapter_that_is_not_hosted_is_refused(self):
+        with self.assertRaises(SystemExit):
+            chapter_frame.assert_wired('ch99')
+
+    def test_a_chapters_own_frame_passes(self):
+        chapter_frame.assert_wired('ch06', host_index=inject.hosts.CH06_HOST_INDEX,
+                                   group=inject.hosts.CH06_EVENT_GROUP,
+                                   info_path=inject.paths.CH06_EVENTINFO_H)
+        chapter_frame.assert_wired('prologue', host_index=inject.hosts.PROLOGUE_HOST_INDEX,
+                                   group=inject.hosts.PROLOGUE_EVENT_GROUP,
+                                   info_path=inject.paths.CH1_EVENTINFO_H)
+
+
 class EveryChapterIsFramed(unittest.TestCase):
     def test_a_hosted_chapter_that_skipped_the_frame_fails_the_build(self):
         rows = [inject.hosts.HostedChapter('chNN', 9, 9, 'ChNEvents')]

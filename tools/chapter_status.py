@@ -573,11 +573,12 @@ def _last_verdict(matrix, scenario, cache_dir=None):
 
 
 def event_group_census(name, campaign=campaign_chapters.CAMPAIGN):
-    """{field: WRITTEN/INHERITED/UNRULED} for this chapter, or None if it is not hosted.
+    """{field: WRITTEN/INHERITED/UNRULED} for this chapter, or None if it is not hosted or the
+    decomp submodule cannot be read.
 
     The SAME ruling the chapter frame writes from (#412) -- `make chapter` lists it and the
-    build enforces it, off one table. It is read from the declarations, so a clean checkout
-    can answer too.
+    build enforces it, off one table. It needs the vanilla submodule (the struct's field list)
+    and no build.
     """
     try:
         sys.path.insert(0, os.path.join(REPO, 'tools'))
@@ -587,7 +588,10 @@ def event_group_census(name, campaign=campaign_chapters.CAMPAIGN):
     short = campaign_chapters.short_id(load(name, campaign))
     if not any(h.name == short for h in hosts.hosted_chapters()):
         return None
-    return event_group.census(short)
+    try:
+        return event_group.census(short)
+    except (KeyError, OSError):
+        return None
 
 
 def inherited_reasons(name, campaign=campaign_chapters.CAMPAIGN):
@@ -802,7 +806,8 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     out.append('  event group fields')
     verdicts = event_group_census(name, campaign)
     if verdicts is None:
-        out.append('    not a hosted chapter')
+        out.append('    cannot tell -- not a hosted chapter, or the decomp submodule could '
+                   'not be read')
     else:
         written = [f for f, v in verdicts.items() if v == 'WRITTEN']
         out.append('    %d WRITTEN, %d declared-inherited' % (len(written),
