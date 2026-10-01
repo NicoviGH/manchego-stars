@@ -6,63 +6,16 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-01 (Claude), after #427 (#412). **What landed and why is in `git log`
-and the ADRs it cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-01 (Claude), after #428 (#424) and #429. **What landed and why is in
+`git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-**Nothing. No open PRs, no branches.**
+**Nothing. No open PRs, no branches.** The build-refactor sequence Nicolas agreed on 2026-09-30
+(#389's comments) is complete: #407-#412, #416, #417 and #424, ADRs 0299-0309. How to work in
+the split injector now lives in `tools/inject/__init__.py`'s docstring.
 
-## The sequence Nicolas agreed (2026-09-30) -- run it without asking
-
-Nicolas's instruction: work these **in order, one PR at a time, without his input** -- branch ->
-PR -> `/code-review medium` on the checked-out branch -> fix every finding -> CI green ->
-squash-merge -> next. Come to him only for a genuine design fork (record the question + your
-pick on the issue and keep going) or when ready for a handoff. The canonical list is **#389's
-comments** (latest: 2026-09-30, "the moves landed").
-
-| | item | state |
-|---|---|---|
-| 1-2 | PR A (#413) + #407 canaries (#414), CI decomp cache (#415) | **done** |
-| 3 | #389 the moves -- `build_campaign.py` is 379 lines, passes in `tools/inject/` (#418, ADR 0300) | **done** |
-| -- | #417: boot/test-chapter builds died at the #396/#398 guards (found by the moves' gate) | **done** |
-| 4 | #416 -- the mtime rewind keys off what `make` compiled (#419, ADR 0301) | **done** |
-| 5a | #408 -- the ROM is built in `build/fireemblem8u`, a worktree of the submodule (#420, ADR 0302) | **done** |
-| 5b | #408's last box: CI caches the injected build (#421, ADR 0303) | **done** |
-| 6a | #409 declared steps (#422, ADR 0304) | **done** |
-| 6b | #410 engine changes as a patch series (#423, ADR 0305) | **done** |
-| 6c | #411 message ids allocated by name (#425, ADR 0306) + chapter YAML schema at load (#426, ADR 0307) | **done** |
-| 6d | #412 a hosted chapter's frame starts blank (#427, ADR 0308); #302's driver narrowed to the frame (comment on #302) | **done** |
-| 6e | #424 prune the ROM configurations; a change is gated only on the configs it can reach (never all twelve by default) | **NEXT** |
-| 7 | Trim this file again once the sequence lands | last |
-
-Then ch06's own body (#26) resumes -- see "Chapter work" below.
-
-### Working in the split injector (ADR 0300 has the why)
-
-- **Where a name lives**: `inject.source.def_source(name)` or grep `^def name`/`^NAME =` under
-  `tools/inject/`. A chapter id another module reads lives in `inject/chapter_ids.py`; one only
-  its chapter reads stays in `inject/chapters/chNN.py`.
-- **Stub in tests with `inject.namespace.stubbed('NAME', value)`**, never
-  `mock.patch.object(inject.X, ...)`: each importer holds its own binding.
-- **Registries discover constants via `inject.namespace.injector_constants(pattern)`**, never
-  `globals()`.
-- **Never name a local `inject`** in a file that uses `inject.X` (and a function-local
-  `import inject.X` makes `inject` local to the whole function).
-- **A new injection pass is a `Step` in `inject/steps.py`** declaring its `writes`, `needs`,
-  `flags` and `scope` (ADR 0304). `INJECT_STRICT=1` (CI, the fingerprint gate) names the step
-  behind an undeclared write; an ordinary build only names the path.
-- **Refactor gate**: `tools/injection_fingerprint.py --write/--check PATH --flags="..."`, one
-  manifest per configuration; the twelve configurations are in ADR 0304. ~2.5 min each on an
-  idle Mac. A KILLED run leaves `.build-config.json`, `.build-scopes.json`, `.build-compiled`
-  and `.injectcache` stashed as `*.fingerprint-bak`; move them back before the next run.
-- **A hosted chapter's settings row and event group go through `inject/chapter_frame.py`**
-  (ADR 0308): a field is written, pass-owned, or a declared reason; anything else stops the build.
-- **A new message takes no hand-picked id**: name it in `inject/message_alloc.py`
-  `APPENDED_MESSAGES`, read it with `appended_message_id` (ADR 0306). **A new chapter YAML key**
-  goes into `tools/chapter_schema.py` first, or every loader refuses the file (ADR 0307).
-- **`inject.decomp.DECOMP` is the BUILD TREE; `inject.decomp.SUBMODULE` is vanilla** (ADR 0302).
-  A new vanilla reader uses SUBMODULE; anything reading the injected tree or the ROM uses DECOMP.
+**Next: ch06's own body (#26)** -- see "Chapter work" below.
 
 ## Owed by NICOLAS, not by the next session
 
@@ -75,7 +28,7 @@ Then ch06's own body (#26) resumes -- see "Chapter work" below.
 - **The boat crews have no voice.** No lore file names Tali or either crew, and Tali carries
   ch06's plot-critical hint.
 
-## Chapter work, when the sequence is done
+## Chapter work
 
 - **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). The
   reskins, the boarding pass and nerra's art need no dialogue and can go first.
@@ -138,7 +91,7 @@ This list is the INDEX; do not re-inline the content.
 - **Why anything is the way it is** → `docs/decisions.md` (index; open the two or three you need).
   Most likely to bite: *"Playtest runs are the most expensive thing in this repo"*, *"A scenario
   written against the old design will FAIL ON SUCCESS"*, *"An artifact is not its inputs"*, and
-  for this sequence 0287, 0296, 0297, 0298, 0299, 0300.
+  for injector work 0300 and 0304.
 - **What is left to build** → GitHub issues; #20–#28 per chapter; #302 is the live epic.
 - **Which asset the FE-Repo has** → `docs/fe-repo-scouting.md` (its table says where an anim
   LIVES, not what it does).
