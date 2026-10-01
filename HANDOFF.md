@@ -32,6 +32,7 @@ comments** (latest: 2026-09-30, "the moves landed").
 | 6a | #409 declared steps (#422, ADR 0304) | **done** |
 | 6b | #410 engine changes as a patch series (#423, ADR 0305) | **done** |
 | 6c | #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | **NEXT**, in that order |
+| 6d | #424 prune the ROM configurations; a change is gated only on the configs it can reach (never all twelve by default) | after #412 |
 | 7 | Trim this file again once the sequence lands | last |
 
 Then ch06's own body (#26) resumes -- see "Chapter work" below.
