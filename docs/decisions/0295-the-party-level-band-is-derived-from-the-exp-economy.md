@@ -66,7 +66,5 @@ for the attribute question, and it is derived from the stats one rather than rep
 **Not modelled, on purpose.** Stat *growth* (growths are random; a projected stat line is a
 precision the dice do not support — #367 says so explicitly). Chip damage that does not kill,
 staff exp, arena exp, and anything the player farms: all of them ADD, on both sides, so the
-typical column is a floor rather than a forecast. And `difficulty.py` still does not read any of
-this — `player_combatant` resolves the cast at base level on purpose, because the parity ratio
-cancels an understated party on both sides and a projected level fed to one side only would
-break that cancellation rather than improve it.
+typical column is a floor rather than a forecast. `difficulty.py`'s absolute readings field the
+party at these levels (ADR 0310); its parity ratio reads no party at all.

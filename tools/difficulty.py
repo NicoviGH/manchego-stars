@@ -22,6 +22,7 @@ import collections
 import dataclasses
 import functools
 import os
+import random
 import re
 
 import chapter_schema  # noqa: E402
@@ -176,16 +177,141 @@ def _stats_to_combatant(name, stats, weapon, tags=frozenset()):
                         con=stats['baseCon'], weapon=weapon, tags=tags)
 
 
-def player_combatant(campaign, uid):
+def _class_caps(class_enum):
+    """A PLAYER unit's stat ceilings in `class_enum` (`CheckBattleUnitStatCaps`, bmbattle.c,
+    through bmunit.h's UNIT_*_MAX): the class's own max for Pow/Skl/Spd/Def/Res, and the two
+    fixed ones -- 60 HP for a non-red unit, 30 Lck for everyone."""
+    text = _classes_text()
+    s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % class_enum, inject.paths.CLASSES_C)
+    block = text[s:e]
+    caps = {'baseHP': 60, 'baseLck': 30}
+    for field in ('Pow', 'Skl', 'Spd', 'Def', 'Res'):
+        m = re.search(r'\.max' + field + r'\s*=\s*(\d+)', block)
+        if m:
+            caps['base' + field] = int(m.group(1))
+    return caps
+
+
+_STAT_ORDER = ('HP', 'Pow', 'Skl', 'Spd', 'Def', 'Res', 'Lck')   # the order FE8 rolls them in
+
+
+def _stat_increase(growth, rng):
+    """`GetStatIncrease` (bmbattle.c): +1 per whole 100 of growth, then one `Roll1RN` on the
+    rest (rng.c: `threshold > NextRN_100()`)."""
+    result = 0
+    while growth > 100:
+        result += 1
+        growth -= 100
+    return result + (1 if growth > rng.randrange(100) else 0)
+
+
+def level_up(growths, rng):
+    """One player level-up's stat gains, transcribed from `CheckBattleUnitLevelUp`
+    (bmbattle.c). Every stat rolls once; an EMPTY level then re-rolls up to twice, walking the
+    stats in order and stopping at the first that gains. That re-roll couples the stats, which
+    is why `grown` simulates rather than reading each stat off a binomial."""
+    gains = {f: _stat_increase(growths.get('growth' + f, 0), rng) for f in _STAT_ORDER}
+    if not any(gains.values()):
+        for _ in range(2):
+            for f in _STAT_ORDER:
+                gains[f] = _stat_increase(growths.get('growth' + f, 0), rng)
+                if gains[f]:
+                    return gains
+    return gains
+
+
+GROWTH_TRIALS = 1001        # odd, so a median is one career's value and never a midpoint
+GROWTH_SEED = 430           # fixed: the report is a reading, and it reads the same every run
+
+
+@functools.lru_cache(maxsize=None)
+def _grown_cached(stats, growths, gained, caps):
+    stats, growths, caps = dict(stats), dict(growths), dict(caps)
+    rng = random.Random(GROWTH_SEED)
+    finals = {f: [] for f in _STAT_ORDER}
+    for _ in range(GROWTH_TRIALS):
+        line = {f: stats.get('base' + f, 0) for f in _STAT_ORDER}
+        for _ in range(gained):
+            for f, up in level_up(growths, rng).items():
+                cap = caps.get('base' + f)
+                line[f] = min(line[f] + up, cap) if cap is not None else line[f] + up
+        for f in _STAT_ORDER:
+            finals[f].append(line[f])
+    out = dict(stats)
+    for f in _STAT_ORDER:
+        out['base' + f] = sorted(finals[f])[GROWTH_TRIALS // 2]
+    return out
+
+
+def grown(stats, growths, gained, caps):
+    """`stats` after `gained` player level-ups: each stat's MEDIAN over GROWTH_TRIALS simulated
+    careers of the engine's own level-up (`level_up`), held to `caps` after every level as
+    `CheckBattleUnitStatCaps` holds them.
+
+    The median rather than the mean, at Nicolas's suggestion (2026-10-01): a rounded mean is
+    not a value the dice land on most, and it differs from the median by a point in about one
+    stat line in seven (an 80% HP growth over three levels is +2 rounded, +3 median). It is a
+    per-stat median, so the line is a planning number and not one unit anybody will roll."""
+    if gained <= 0:
+        return dict(stats)
+    return _grown_cached(tuple(sorted(stats.items())), tuple(sorted(growths.items())),
+                         int(gained), tuple(sorted(caps.items())))
+
+
+def placed_entry(campaign, uid, unit, recruited):
+    """The roster entry that PLACES `uid` in its recruit chapter, or None.
+
+    The ROM builds a placed recruit from that entry's UnitDefinition -- its level and its
+    items -- so wherever the entry speaks, it outranks the unit YAML (sahnar is placed RED at
+    Joshua's level with his Killing Edge). `recruited` is the recruit chapter number, or None
+    for a founding unit."""
+    if recruited is None:
+        return None
+    chapter = next((c for c in inject.hosts.hosted_chapters() if c.number == int(recruited)),
+                   None)
+    if chapter is None:
+        return None
+    chap = inject.hosting._load_chapter_yaml(campaign,
+                                             inject.hosting.chapter_yaml_for(chapter.name))
+    return next((ed for ed in inject.raw_pids.placed_entries(chap) if ed.get('id') == uid),
+                None)
+
+
+def _player_weapon(campaign, uid, unit, class_enum):
+    """The weapon a cast member actually fights with, read where the ROM reads it.
+
+    The unit YAML's `inventory:` where it has one. A recruit without one is armed by the ROM
+    elsewhere: a placed recruit by its placing entry, an off-map join by the join-LOAD's
+    `CLASS_LOADOUT` kit (ch05's join-LOAD, `inject.cast`). Reading only the YAML scored lupin
+    and sahnar as weaponless -- 0 kills/round for a Cavalier and a sword duelist."""
+    if unit.get('inventory'):
+        return _weapon_for(unit['inventory'])
+    entry = placed_entry(campaign, uid, unit,
+                         inject.hosting.recruit_chapter_number(campaign, unit))
+    if entry and entry.get('inventory'):
+        return _weapon_for(entry['inventory'])
+    return _weapon_from_item_enums(inject.cast.CLASS_LOADOUT.get(class_enum, ()))
+
+
+def player_combatant(campaign, uid, gained=0):
     """Resolve a cast member's effective fe_combat.Combatant: class base + donor personal
-    base (donor-base inheritance), at base level, wielding its first real weapon."""
+    base (donor-base inheritance), wielding its first real weapon.
+
+    `gained` is how many levels the unit has risen above the one it joined at, grown on its
+    growth donor's growths (`grown`: the median of simulated level-ups). 0 is the join-level line, which is what the injector
+    sizes ch01's lord floor from; `load_field(leveled=True)` passes the exp model's answer
+    (#430 step 1)."""
     unit = inject.cast.load_unit(campaign, uid)
     unit.setdefault('id', uid)
     class_enum = inject.cast.class_enum_for(unit)
     cbase = _class_base(class_enum)
     dbase = inject.stats.donor_base_stats(_characters_text(), inject.stats.BASE_DONOR[uid])
     eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
-    weapon = _weapon_for(unit.get('inventory'))
+    if gained:
+        growths, _ = inject.stats.donor_growths_and_ranks(
+            _characters_text(), inject.stats.GROWTH_DONOR[uid])
+        eff = grown(eff, growths, gained, _class_caps(class_enum))
+    weapon = _player_weapon(campaign, uid, unit, class_enum)
     return _stats_to_combatant(uid, eff, weapon, CLASS_TAGS.get(class_enum, frozenset()))
 
 
@@ -377,6 +503,10 @@ VANILLA_ONLY_ITEM_TO_WEAPON = {
     'ITEM_MONSTER_FIREFANG':  'fire-fang',
     'ITEM_MONSTER_HELLFANG':  'hell-fang',
     'ITEM_MONSTER_EVILEYE':   'evil-eye',
+    # Carried by the vanilla PARTY (`vanilla_party`): Ross joins with a Hatchet, Artur with
+    # Lightning. Without them both read as weaponless support.
+    'ITEM_AXE_HATCHET':       'hatchet',
+    'ITEM_LIGHT_LIGHTNING':   'lightning',
 }
 ITEM_TO_WEAPON = {item: key for key, item in WEAPON_ITEM_ENUM.items()}
 ITEM_TO_WEAPON.update(VANILLA_ONLY_ITEM_TO_WEAPON)
@@ -423,19 +553,6 @@ PARITY_REFERENCE_UDEFS = {
     'FE8 Ch6': ('src/events_udefs.c',
                 ['UnitDef_088B61A8', 'UnitDef_088B64F0']),
 }
-
-# parity_reference -> (decomp relpath, [UnitDefinition array names]) for its vanilla PLAYER
-# deploy field (#61) -- the player-side analogue of PARITY_REFERENCE_UDEFS. The blue force the
-# reference chapter force-deploys (its force-deploy + reinforcement arrays), derived from HEAD
-# so the party-side yardstick stays honest with no hand-maintained stat table. Each named ally
-# resolves to class base + its personal line (the same donor-base inheritance our cast uses);
-# a staff-only ally (Moulder) resolves to weaponless support (#62). Extend as references curate.
-PARITY_REFERENCE_ALLY_UDEFS = {
-    'FE8 Ch1': ('src/events/ch1-eventudefs.h',
-                ['UnitDef_Event_Ch1Ally', 'UnitDef_Event_Ch1AllyReinforce']),
-    'FE8 Ch2': ('src/events_udefs.c', ['UnitDef_Event_Ch2Ally']),
-}
-
 
 # The decomp's own AI vector macros, read from the header the decomp COMPILES
 # (include/EA_Standard_Library/AI_Helpers.h, pulled in by events_udefs.c through EAstdlib.h
@@ -491,7 +608,6 @@ PARITY_REFERENCE_GREEN_UDEFS = {
 
 def _udef_registry(allegiance):
     return {'RED': PARITY_REFERENCE_UDEFS,
-            'BLUE': PARITY_REFERENCE_ALLY_UDEFS,
             'GREEN': PARITY_REFERENCE_GREEN_UDEFS}[allegiance]
 
 
@@ -808,37 +924,133 @@ def vanilla_projection(parity_ref, deploy_cap):
             'proof': sum(1 for e in van if fc.damage(YARDSTICK, e) <= 0)}
 
 
-def _ally_combatant(char_enum, class_enum, weapon):
+def _ally_combatant(char_enum, class_enum, weapon, level=None):
     """One vanilla ally Combatant: class base + the named character's personal line (the same
-    donor-base inheritance our cast uses, mirroring player_combatant), at its stored base --
-    allies aren't autoleveled, their CharacterData stats are already the join-level display.
+    donor-base inheritance our cast uses, mirroring player_combatant). Allies aren't
+    autoleveled: their CharacterData stats are already the join-level display. `level`, when
+    it is above that join level, grows them on their OWN curve the way `player_combatant`
+    grows ours, so a leveled read compares like with like.
     Named off charIndex (CHARACTER_EIRIKA -> 'Eirika')."""
     cbase = _class_base(class_enum)
     dbase = inject.stats.donor_base_stats(_characters_text(), char_enum)
     eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
+    if level is not None:
+        gained = level - _character_base_level(char_enum)
+        if gained > 0:
+            growths, _ = inject.stats.donor_growths_and_ranks(_characters_text(), char_enum)
+            eff = grown(eff, growths, gained, _class_caps(class_enum))
     name = char_enum.replace('CHARACTER_', '').title()
     return _stats_to_combatant(name, eff, weapon, CLASS_TAGS.get(class_enum, frozenset()))
 
 
-def vanilla_allies(parity_ref):
-    """The vanilla reference chapter's PLAYER deploy field as a list of Combatants -- the
-    party-side parity yardstick (#61), derived from the decomp (HEAD) the same way the enemy
-    force is. None if the reference isn't curated yet. Each named blue unit resolves off class
-    base + personal line; a staff-only ally (Moulder) resolves to weaponless support (#62),
-    kept as a body for durability. Weapon = first attacking item (as our cast is modeled)."""
-    spec = PARITY_REFERENCE_ALLY_UDEFS.get(parity_ref)
-    if spec is None:
-        return None
-    relpath, arrays = spec
-    text = inject.decomp.vanilla_decomp_text(relpath)
-    out = []
-    for array_name in arrays:
-        for d in vanilla_unit_defs(text, array_name):
-            if d['allegiance'] != 'FACTION_ID_BLUE' or not d['charIndex']:
+# Eirika's route up to the last twin a hosted chapter is graded against. The vanilla party at
+# any of these is everybody recruited so far, which the decomp states chapter by chapter.
+VANILLA_CHAIN = ('FE8 Prologue', 'FE8 Ch1', 'FE8 Ch2', 'FE8 Ch3', 'FE8 Ch4', 'FE8 Ch5',
+                 'FE8 Ch6')
+
+# include/constants/characters.h: Eirika (0x01) to Tana (0x22) are the playable characters.
+# From 0x23 up are cutscene and creature-campaign copies (LYON_CC ...) and bosses.
+PLAYABLE_PIDS = range(0x01, 0x23)
+
+
+@dataclasses.dataclass(frozen=True)
+class VanillaRecruit:
+    char: str              # CHARACTER_* enum
+    class_enum: str
+    level: int             # the level its joining UnitDefinition places it at
+    items: tuple
+    fields_from: int       # VANILLA_CHAIN index of the first chapter it can be deployed in
+
+
+def _talk_recruits(stem):
+    """Characters a chapter's talk events recruit: the TARGET of each `CHAR(flag, script,
+    actor, target)` in its eventinfo (Eirika->Ross, Ross->Garcia, Neimi->Colm,
+    Natasha->Joshua)."""
+    relpath = 'src/events/%s-eventinfo.h' % stem
+    if not os.path.exists(os.path.join(inject.decomp.SUBMODULE, relpath)):
+        return set()
+    info = inject.decomp.vanilla_decomp_text(relpath)
+    return set(re.findall(r'\bCHAR\([^,]+,[^,]+,\s*\w+\s*,\s*(CHARACTER_\w+)\s*\)', info))
+
+
+def _chapter_udefs(stem):
+    """Every UnitDefinition a vanilla chapter's eventscript loads, in the order it names them,
+    parsed from wherever the decomp defines them."""
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    sources = [inject.decomp.vanilla_decomp_text('src/events_udefs.c')]
+    own = 'src/events/%s-eventudefs.h' % stem      # only the Prologue and Ch1 have their own
+    if os.path.exists(os.path.join(inject.decomp.SUBMODULE, own)):
+        sources.insert(0, inject.decomp.vanilla_decomp_text(own))
+    for name in dict.fromkeys(re.findall(r'\b(UnitDef_\w+)', script)):
+        text = next((t for t in sources if re.search(re.escape(name) + r'\[\]', t)), None)
+        if text is not None:
+            yield from vanilla_unit_defs(text, name)
+
+
+@functools.lru_cache(maxsize=None)
+def vanilla_recruits():
+    """Everyone FE8 recruits along VANILLA_CHAIN, assuming every recruit succeeds, in join order.
+
+    A character joins at its first ARMED load. Cutscene loads carry no items (the throne room
+    stands Moulder and Vanessa up as Generals, Ephraim appears as a Soldier), the same rule the
+    red registry uses to drop cutscene villains. A BLUE load is on the field that chapter. A
+    GREEN or RED load joins only if a talk event recruits it, and fields from the next chapter,
+    which is our own convention for a recruit too (`exp_curve.party_classes`). That second rule
+    keeps out Ch4's Larachel, Dozla and Rennac, who are armed green cameos there and join much
+    later."""
+    seen, out = set(), []
+    for index, ref in enumerate(VANILLA_CHAIN):
+        stem = PARITY_REFERENCE_STEM[ref]
+        talk = _talk_recruits(stem)
+        for u in _chapter_udefs(stem):
+            char = u['charIndex']
+            if (not char or char in seen or not u['items']
+                    or _character_number(char) not in PLAYABLE_PIDS):
                 continue
-            weapon = _weapon_from_item_enums(d['items'])
-            out.append(_ally_combatant(d['charIndex'], d['classIndex'], weapon))
+            if u['allegiance'] == 'FACTION_ID_BLUE':
+                fields_from = index
+            elif char in talk:
+                fields_from = index + 1
+            else:
+                continue
+            seen.add(char)
+            out.append(VanillaRecruit(char, u['classIndex'], u['level'], tuple(u['items']),
+                                      fields_from))
+    return tuple(out)
+
+
+def _named_item_grants(stem):
+    """[(CHARACTER_*, ITEM_*)] a chapter's script hands to a NAMED character -- Eirika's Rapier
+    is `SVAL(EVT_SLOT_3, ITEM_SWORD_RAPIER)` + `GIVEITEMTO(CHARACTER_EIRIKA)` in the Prologue,
+    not on her joining load. Village gifts go to whoever visits (`CHAR_EVT_ACTIVE_UNIT`), so
+    they are left out, as our own cast leaves them out."""
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    out = []
+    for item, char in re.findall(r'SVAL\(EVT_SLOT_3,\s*(\w+)\)\s*GIVEITEMTO\((CHARACTER_\w+)\)',
+                                 script):
+        if not item.startswith('ITEM_'):
+            item = _item_id_to_enum().get(int(item, 0), item)
+        out.append((char, item))
     return out
+
+
+def vanilla_party(parity_ref, levels=None):
+    """The vanilla party that can deploy into `parity_ref`, as Combatants, or None for a twin off
+    VANILLA_CHAIN. `levels` maps CHARACTER_* to the level it arrives at (`exp_curve.entering`);
+    a character missing from it is at its join level. Weapon = the joining load's first
+    attacking item, as our cast is armed; a staff-only healer is weaponless support (#62)."""
+    if parity_ref not in VANILLA_CHAIN:
+        return None
+    index = VANILLA_CHAIN.index(parity_ref)
+    levels = levels or {}
+    granted = collections.defaultdict(list)
+    for ref in VANILLA_CHAIN[:index + 1]:
+        for char, item in _named_item_grants(PARITY_REFERENCE_STEM[ref]):
+            granted[char].append(item)
+    return [_ally_combatant(r.char, r.class_enum,
+                            _weapon_from_item_enums(r.items + tuple(granted[r.char])),
+                            levels.get(r.char))
+            for r in vanilla_recruits() if r.fields_from <= index]
 
 
 def pressure_verdict(ours, vanilla, band=0.25):
@@ -1277,10 +1489,21 @@ def chapter_deploy_limit(chap, default):
     return int(limit) if limit is not None else int(default)
 
 
-def load_field(campaign, ch):
-    """Assemble (roster, line_enemies, bosses, deploy_limit, enemy_labels) for a chapter."""
+def load_field(campaign, ch, leveled=False):
+    """Assemble (roster, line_enemies, bosses, deploy_limit, enemy_labels) for a chapter.
+
+    `leveled` fields the party the exp model says arrives: only the units that have joined by
+    this chapter, each grown to its expected level on entering it (`exp_curve.entering`).
+    Off, it is the whole cast at join level -- the line the injector's lord floor is sized
+    from, so `--lord-floor` keeps reading it."""
     chap = chapter_schema.load(chapter_path(campaign, ch))
-    roster = [player_combatant(campaign, uid) for uid in ROSTER]
+    if leveled:
+        import exp_curve                    # exp_curve imports this module
+        party = exp_curve.entering(campaign, int(chap['chapter_number']))['party']
+        roster = [player_combatant(campaign, uid, level - joined)
+                  for uid, (joined, level) in party.items()]
+    else:
+        roster = [player_combatant(campaign, uid) for uid in ROSTER]
     line, bosses, labels = [], [], []
     for ed in chapter_roster_entries(chap):
         units = _entry_combatants(ed, drop_staff=False)
@@ -1324,8 +1547,37 @@ def _fmt_dura_delta(ours, van):
     return '%+.1f' % (ours - van)
 
 
+def _print_cast(title, roster, levels, line):
+    """One arriving cast as a table: each unit's level, stats, weapon, durability on open
+    ground / in a forest, and its best kill rate against the chapter's line."""
+    print('\n-- %s --' % title)
+    print('  %-11s %3s %3s%3s%3s%3s%3s%3s%3s%3s  %-12s  %-13s  %s'
+          % ('unit', 'Lv', 'HP', 'Pw', 'Sk', 'Sp', 'Df', 'Rs', 'Lk', 'Cn',
+             'weapon', 'durab open/for', 'best kill/round'))
+    for u in sorted(roster, key=lambda x: max((fc.kills_per_round(x, e) for e in line),
+                                              default=0.0), reverse=True):
+        best = max(((fc.kills_per_round(u, e), e) for e in line),
+                   key=lambda x: x[0], default=(0.0, None))
+        print('  %-11s %3s %3d%3d%3d%3d%3d%3d%3d%3d  %-12s  %4.1f /%4.1f    %.2f%s'
+              % (u.name, levels.get(u.name, '?'), u.hp, u.pow, u.skl, u.spd, u.df, u.res,
+                 u.lck, u.con, u.weapon.name if u.weapon else '(staff)',
+                 durability(u, line, 0), durability(u, line, 20), best[0],
+                 (' vs ' + best[1].name) if best[1] else ''))
+
+
 def report(campaign, ch, mode=None):
-    chap, roster, line, bosses, deploy_limit, labels = load_field(campaign, ch)
+    import exp_curve                        # exp_curve imports this module
+    head = chapter_schema.load(chapter_path(campaign, ch))
+    number, parity_ref = int(head['chapter_number']), head.get('parity_reference')
+    try:
+        arriving = exp_curve.entering(campaign, number, parity_ref)
+    except ValueError as refusal:           # the exp model refuses a body it cannot price
+        print('!! no arriving party -- the exp model refused: %s\n'
+              '!! every absolute reading below is the JOIN line, not the arriving party\n'
+              % refusal)
+        arriving = None
+    chap, roster, line, bosses, deploy_limit, labels = load_field(
+        campaign, ch, leveled=arriving is not None)
     num = chap.get('chapter_number')
     bar = '=' * 80
     print(bar)
@@ -1342,20 +1594,9 @@ def report(campaign, ch, mode=None):
     print('Field: deploy %d of %d cast   Enemies: %s' % (deploy_limit, len(roster),
                                                           '; '.join(labels)))
 
-    print('\n-- OUR CAST (effective = class base + donor personal line) ' + '-' * 21)
-    print('  %-11s %3s%3s%3s%3s%3s%3s%3s%3s  %-9s  %-13s  %s'
-          % ('unit', 'HP', 'Pw', 'Sk', 'Sp', 'Df', 'Rs', 'Lk', 'Cn',
-             'weapon', 'durab open/for', 'best kill/round'))
-    for u in sorted(roster, key=lambda x: max((fc.kills_per_round(x, e) for e in line),
-                                              default=0.0), reverse=True):
-        best = max(((fc.kills_per_round(u, e), e) for e in line),
-                   key=lambda x: x[0], default=(0.0, None))
-        do = durability(u, line, 0)
-        dfst = durability(u, line, 20)
-        print('  %-11s %3d%3d%3d%3d%3d%3d%3d%3d  %-9s  %4.1f /%4.1f    %.2f%s'
-              % (u.name, u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con,
-                 u.weapon.name if u.weapon else '(staff)', do, dfst, best[0],
-                 (' vs ' + best[1].name) if best[1] else ''))
+    ours_lv = {uid: lv for uid, (_j, lv) in arriving['party'].items()} if arriving else {}
+    _print_cast('OUR CAST, AS IT ARRIVES (class base + donor line, grown to the exp model\'s '
+                'typical level)', roster, ours_lv, line)
 
     field = _best_field(roster, line, deploy_limit)
     m = _metrics(field, line, bosses)
@@ -1374,10 +1615,17 @@ def report(campaign, ch, mode=None):
                  ', '.join(u.name for u in r['team'])))
 
     ref = chap.get('parity_reference')
-    van = vanilla_allies(ref)
-    if van:
+    vanilla_lv = arriving['vanilla'] if arriving else None
+    roster_van = vanilla_party(ref, vanilla_lv)
+    if roster_van:
+        _print_cast('VANILLA %s PARTY, AS IT ARRIVES (every recruit so far, its own exp history)'
+                    % ref, roster_van,
+                    {k.replace('CHARACTER_', '').title(): v for k, v in (vanilla_lv or {}).items()},
+                    line)
+        van = _best_field(roster_van, line, deploy_limit)
         vm = _metrics(van, line, bosses)
-        print('\n-- VANILLA Ch%s PARITY DELTA (%s deploy, from HEAD) ' % (num, ref) + '-' * 24)
+        print('\n-- VANILLA Ch%s PARITY DELTA (best %d of each arriving party) '
+              % (num, deploy_limit) + '-' * 30)
         print('  vanilla (%s): thru %.2f · dura(min) %.1f%s'
               % ('/'.join(u.name for u in van), vm['throughput'], vm['min_durability'],
                  ' · carry %s' % _fmt_rounds(vm['carry'][1]) if 'carry' in vm else ''))
