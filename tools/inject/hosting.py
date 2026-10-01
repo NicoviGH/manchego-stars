@@ -5,6 +5,7 @@ import json
 import os
 import sys
 
+import chapter_schema
 from yaml_loader import yaml_load
 from inject.namespace import injector_constants
 from inject.asset_table import _asm_table_word_index
@@ -30,7 +31,7 @@ def _load_chapter_yaml(campaign, filename):
     key = (path, st.st_mtime_ns, st.st_size)
     if key not in _CHAPTER_YAML_CACHE:
         with open(path, encoding='utf-8') as f:
-            _CHAPTER_YAML_CACHE[key] = yaml_load(f)
+            _CHAPTER_YAML_CACHE[key] = chapter_schema.validate(filename, yaml_load(f))
     return copy.deepcopy(_CHAPTER_YAML_CACHE[key])
 
 

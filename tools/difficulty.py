@@ -24,6 +24,7 @@ import functools
 import os
 import re
 
+import chapter_schema  # noqa: E402
 import inject.cast  # noqa: E402
 import inject.chapter_settings  # noqa: E402
 import inject.decomp  # noqa: E402
@@ -35,7 +36,6 @@ import inject.stats  # noqa: E402
 import argparse
 import json
 import sys
-import yaml_loader  # noqa: E402
 import fe_combat as fc
 from inject.decomp import WEAPON_ITEM_ENUM   # shared weapon<->ITEM map (seam-neutral)
 
@@ -1279,8 +1279,7 @@ def chapter_deploy_limit(chap, default):
 
 def load_field(campaign, ch):
     """Assemble (roster, line_enemies, bosses, deploy_limit, enemy_labels) for a chapter."""
-    with open(chapter_path(campaign, ch), encoding='utf-8') as f:
-        chap = yaml_loader.yaml_load(f)
+    chap = chapter_schema.load(chapter_path(campaign, ch))
     roster = [player_combatant(campaign, uid) for uid in ROSTER]
     line, bosses, labels = [], [], []
     for ed in chapter_roster_entries(chap):
@@ -2245,8 +2244,7 @@ def curve_report(campaign, band=0.25, mode=None):
           % ('chapter', 'reference', 'threat/slot', 'clear-load/slot', 'mirror', 'verdict'))
     chaps = []
     for path in paths:
-        with open(path, encoding='utf-8') as f:
-            chaps.append(yaml_loader.yaml_load(f))
+        chaps.append(chapter_schema.load(path))
     rows = []
     any_dropped_boss = False
     for chap in sorted(chaps, key=lambda c: c.get('chapter_number', 99)):

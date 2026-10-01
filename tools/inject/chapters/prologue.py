@@ -5,7 +5,7 @@ import os
 import re
 import sys
 
-from yaml_loader import yaml_load
+from inject.hosting import _load_chapter_yaml
 import fe8_talk_font
 from inject.chapter_ids import PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT
 from inject.decomp import _find_brace_block, _replace_brace_block, fe_item_enum, REPO
@@ -42,9 +42,7 @@ PROLOGUE_CHAPTER_YAML = 'ch00-prologue-a-dagger-of-ice.yaml'
 # names are read from that YAML so they live in one place.
 
 def _load_prologue_chapter(campaign):
-    path = os.path.join(REPO, 'campaigns', campaign, 'chapters', PROLOGUE_CHAPTER_YAML)
-    with open(path, encoding='utf-8') as f:
-        return yaml_load(f)
+    return _load_chapter_yaml(campaign, PROLOGUE_CHAPTER_YAML)
 
 
 def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):

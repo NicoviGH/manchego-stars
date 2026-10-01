@@ -13,6 +13,7 @@ import re
 
 import yaml  # noqa: F401  (re-exported for callers that pass a Loader explicitly)
 
+import chapter_schema
 from yaml_loader import yaml_load
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -47,7 +48,7 @@ def load_all(campaign=CAMPAIGN):
         out = []
         for p in paths(campaign):
             with open(p, encoding='utf-8') as fh:
-                out.append(yaml_load(fh))
+                out.append(chapter_schema.validate(os.path.basename(p), yaml_load(fh)))
         out.sort(key=lambda c: int(c['chapter_number']))
         _CACHE.clear()             # one campaign at a time; never grow without bound
         _CACHE[key] = out

@@ -174,12 +174,11 @@ def _chapter_for_map(stem):
     path = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/chapters')
     if not os.path.isdir(path):
         return None
-    import yaml
+    import chapter_schema
     for name in sorted(os.listdir(path)):
         if not name.endswith(('.yaml', '.yml')):
             continue
-        with open(os.path.join(path, name), encoding='utf-8') as handle:
-            data = yaml.safe_load(handle) or {}
+        data = chapter_schema.load(os.path.join(path, name)) or {}
         declared = (data.get('map') or {}).get('file') or ''
         if os.path.splitext(os.path.basename(declared))[0] == stem:
             return data

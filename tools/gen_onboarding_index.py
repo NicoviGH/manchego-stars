@@ -22,6 +22,7 @@ import os
 import re
 import sys
 
+import chapter_schema
 import yaml
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -47,7 +48,7 @@ def load_catalog():
 
 def _chapters():
     files = sorted(glob.glob(os.path.join(CHAPTERS, 'ch*.yaml')))
-    chapters = [yaml.safe_load(open(f, encoding='utf-8')) for f in files]
+    chapters = [chapter_schema.load(f) for f in files]
     chapters.sort(key=lambda c: int(c['chapter_number']))
     return chapters
 

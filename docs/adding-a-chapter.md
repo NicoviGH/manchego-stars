@@ -159,6 +159,8 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    **Any other message the chapter writes** (a scene, a name plate, a goal string) takes no
    hand-picked id: name it in `inject/message_alloc.py` `APPENDED_MESSAGES` and read the id back
    with `appended_message_id(chapter, name)` (ADR 0306).
+   **A chapter YAML key nobody has used before** goes into `tools/chapter_schema.py` first: every
+   loader refuses a key the schema does not name (ADR 0307).
 
 9. **`PATCHED_DECOMP_FILES`** — add every decomp file the injector writes (`src/events/chM-eventinfo.h`,
    `src/events/chM-eventscript.h`; `events_udefs.c` + the asset-table `.s` + `chapter_settings.json`
