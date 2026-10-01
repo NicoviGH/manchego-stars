@@ -6,21 +6,12 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-01 (Claude), after #421 (#408), #422 (#409) and the #410 draft (#423). **What landed and why is in `git log`
+Refreshed 2026-10-01 (Claude), after #421 (#408), #422 (#409) and #423 (#410). **What landed and why is in `git log`
 and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-**#423 (draft), branch `engine-patch-series` -- #410: the engine hooks are now a patch series,
-`engine/patches/` (ADR 0305; my pick of a patch series over a GitHub fork is on #410).** Built,
-reviewed by nobody yet, check.py clean. Owed before it leaves draft:
-1. `injection_fingerprint --check` on the other 11 configurations (`--montage`,
-   `--test-chapter`, `--lord-boot`, `--ch01/03/04/05/06-boot`, ch05 `--ch05-lupin`,
-   `--ch05-moose`, `--ch05-ending=full`). Baselines: record them on `main` first (`--write`),
-   then `--check` on the branch. Default is already IDENTICAL. They did not run because the Mac
-   was at load ~44 (VS Code's `chrome_crashpad_handler` at 400% + a Unity batchmode job): one
-   configuration took ~2h. Check `uptime` before starting.
-2. `/code-review medium` on the checked-out branch, fix findings, CI green, mark ready, merge.
+**Nothing. No open PRs, no branches.**
 
 ## The sequence Nicolas agreed (2026-09-30) -- run it without asking
 
@@ -39,8 +30,8 @@ comments** (latest: 2026-09-30, "the moves landed").
 | 5a | #408 -- the ROM is built in `build/fireemblem8u`, a worktree of the submodule (#420, ADR 0302) | **done** |
 | 5b | #408's last box: CI caches the injected build (#421, ADR 0303) | **done** |
 | 6a | #409 declared steps (#422, ADR 0304) | **done** |
-| 6b | #410 engine changes as a patch series (#423, ADR 0305) | **draft: finish the gate above** |
-| 6c | #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | in that order |
+| 6b | #410 engine changes as a patch series (#423, ADR 0305) | **done** |
+| 6c | #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | **NEXT**, in that order |
 | 7 | Trim this file again once the sequence lands | last |
 
 Then ch06's own body (#26) resumes -- see "Chapter work" below.
