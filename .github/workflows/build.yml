@@ -203,6 +203,14 @@ jobs:
           path: vanilla-build.tar
           key: ${{ steps.vanilla.outputs.key }}
 
+      - name: DEBUG why C files rebuild (temporary)
+        run: |
+          python3 tools/build_campaign.py --campaign rime-of-the-frostmaiden > /dev/null
+          cd build/fireemblem8u
+          make --debug=b -n src/agb_sram.o 2>&1 | grep -iE "newer|must remake|does not exist" | head -40
+          cat .dep/src/agb_sram.d | head -30
+          ls -la --time-style=full-iso src/agb_sram.o src/agb_sram.c include/global.h include/constants/msg.h tools/agbcc/bin/agbcc 2>&1
+
       - name: make green (inject campaign + build ROM)
         run: make CAMPAIGN=rime-of-the-frostmaiden
 
