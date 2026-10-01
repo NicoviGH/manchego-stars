@@ -32,6 +32,7 @@ import inject.raw_pids
 import inject.recruit
 import inject.sms
 import inject.stats
+import inject.text
 import inject.test_chapter
 import inject.units
 import inject.villages
@@ -497,6 +498,7 @@ class RavisinPortrait(unittest.TestCase):
             with open(texts, 'w', encoding='utf-8') as f:
                 f.write(inject.decomp.vanilla_decomp_text('texts/texts.txt'))
             with stubbed('TEXTS_TXT', texts):
+                inject.text.reserve_appended_messages(verbose=False)   # as the build runs it
                 inject.names.inject_names(self.CAMPAIGN, verbose=False)
             with open(texts, encoding='utf-8') as f:
                 written = f.read()

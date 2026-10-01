@@ -38,7 +38,7 @@ from inject import hosts
 # a POSITIONAL msg_id, which is how all 71 real call sites pass it), one chapter's literal
 # tuple, and the claims registry that gives the id an owner.
 WRITER = """
-def set_message_body(lines, msg_id, body, create=False):
+def set_message_body(lines, msg_id, body):
     pass
 """
 

@@ -54,8 +54,8 @@ class Scenes(unittest.TestCase):
 
 
 class MessageIds(unittest.TestCase):
-    """How much room a chapter has left, which is the number that decides whether the next
-    scene costs an id or a redesign."""
+    """How much room a chapter has left in its dead vanilla block. A new message no longer
+    needs any (it is allocated past vanilla by name, #411); this is what the shipped ids use."""
 
     def test_ch05_claims_the_ids_the_ownership_registry_says_it_does(self):
         import inject.messages
@@ -134,12 +134,16 @@ class Scenarios(unittest.TestCase):
 
 
 class LooseEnds(unittest.TestCase):
-    def test_ch05_is_no_longer_out_of_message_ids(self):
-        """It WAS full -- 0x9E4-0x9F5, all eighteen spent -- because the first allocation
-        rule capped every chapter at whatever its host slot happened to spend. A second
-        range from the never-shipped pool is what unblocks its next scene."""
-        self.assertGreater(cs.message_ids('ch05').free, 0)
-        self.assertFalse(any('block is full' in e for e in cs.loose_ends('ch05')))
+    def test_a_full_block_is_not_a_loose_end(self):
+        """ch06's dead Ch7 block holds ten ids. Filling it is not work owed: the next message
+        is a name in APPENDED_MESSAGES (#411)."""
+        import inject.messages
+        from inject.namespace import stubbed
+        claims = dict(inject.messages.HOSTED_CHAPTER_MESSAGE_IDS)
+        claims['ch06'] = claims['ch06'] + tuple(range(0x9F6, 0x9FE))
+        with stubbed('HOSTED_CHAPTER_MESSAGE_IDS', claims):
+            self.assertEqual(0, cs.message_ids('ch06').free)
+            self.assertFalse(any('message' in e for e in cs.loose_ends('ch06')))
 
     def test_a_planned_chapter_reports_its_unwritten_scenes_and_missing_art(self):
         ends = cs.loose_ends('ch06')

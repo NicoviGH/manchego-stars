@@ -24,20 +24,10 @@ def inject_names(campaign, verbose=True):
         set_message_body(lines, text_id, name_message_body(name))
         if verbose:
             print('  %-10s -> MSG_%03X (was %s): %s' % (unit_id, text_id, slot, name))
-    # Ordered by the TEXT ID and not by the pid, which is what the append rule actually
-    # constrains: gMsgTable[] is dense, so `set_message_body(create=True)` refuses any id that
-    # is not exactly one past the last header. Sorting by pid made that hold only by luck --
-    # ch05's moose owns 0xD4C on pid 0xb9, so ch06's two boats on 0xb4/0xb5 sorted AHEAD of it
-    # and tried to append 0xD4D before 0xD4C existed. A raw pid's NAME and its NUMBER have
-    # nothing to do with each other; the id is the thing being extended, so the id orders it.
-    # Slot-donor rows (a vanilla name message we overwrite) are unordered among themselves and
-    # sort first, since only an appended id has a predecessor to be dense against.
-    for _pid, (unit_id, slot, _portrait_id, name) in sorted(
-            RAW_PID_PORTRAITS.items(),
-            key=lambda row: (isinstance(row[1][1], int), raw_pid_name_text_id(row[1][1]))):
+    for _pid, (unit_id, slot, _portrait_id, name) in sorted(RAW_PID_PORTRAITS.items()):
         text_id = raw_pid_name_text_id(slot)
-        appended = isinstance(slot, int)   # an id we own and extend the table with
-        set_message_body(lines, text_id, name_message_body(name), create=appended)
+        appended = isinstance(slot, int)   # an id the build allocated (inject/message_alloc.py)
+        set_message_body(lines, text_id, name_message_body(name))
         if verbose:
             print('  %-10s -> MSG_%03X (%s): %s'
                   % (unit_id, text_id, 'appended' if appended else 'was %s' % slot, name))

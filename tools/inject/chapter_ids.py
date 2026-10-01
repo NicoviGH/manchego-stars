@@ -6,6 +6,7 @@ and ch04's texts -- and chapters read each other's in both directions. Kept in o
 `hosts.py`'s host slots, so no chapter module has to import another. A constant only its own
 chapter reads stays in `inject/chapters/`.
 """
+from inject.message_alloc import appended_message_id
 
 
 
@@ -364,21 +365,15 @@ CH05_MOOSE_CHARGE_SLOT = ('vanilla 0x9C4', 0x9F1, 2,
 # 0x9F1 across a `[BreakTalk]` until the CG went in; a scene change tears the talk down, so the
 # quip has to be a second message (filmed 2026-08-15: with a break, it never appeared at all).
 # 0x9D2 was ch05's one spare, so the block is now EXACTLY spent -- the endings and the taunt fit
-# and nothing is left over. If another beat needs an id, re-run the neighbourhood sweep
-# (decisions.md -> "A host block is not the whole id budget"); do not assume there is slack.
+# and nothing is left over. Another beat names its message in inject/message_alloc.py (#411).
 CH05_MOOSE_QUIP_MSG = 0x9D2
 # Raw charIndexes. Pids need only be unique WITHIN a chapter -- gDefeatTalkList entries carry
 # .chapter, so ch03's 0xb7 and ch04's 0xb7 coexist -- but the boss and the moose need their own
 # so their flagged death entries key to them alone.
 CH05_BOSS_PID = '0xb8'                           # Ravisin: flagged EVFLAG_DEFEAT_BOSS -> the WIN
 CH05_MOOSE_PID = '0xb9'                          # the white moose: named, but NOT the win condition
-# The moose's NAME, appended past the last vanilla message (MSG_D4B). gMsgTable[] is generated
-# from texts.txt and self-sizes -- GetStringFromIndex has no bounds check and there is no count
-# constant -- so a new id EXTENDS the table rather than squatting on anything. This is the
-# kobolds' #90 rule in the message-id space: append your own, never burn a scarce vanilla slot.
-# A raw pid's stock nameTextId (0x255) is the GENERIC monster name shared by every 0xB0-range
-# gap, so it can never be retitled for one creature -- which is why the moose read "Monster".
-CH05_MOOSE_NAME_MSG = 0xD4C
+# The moose's NAME, appended past vanilla's last message by the build (inject/message_alloc.py).
+CH05_MOOSE_NAME_MSG = appended_message_id('ch05', 'moose-name')
                                       # vanilla's own move: its ending returns to the backdrop
                                       # the fight happened over rather than buying a new one.
 # Scene 16 in TWO copies -- Sahnar recruited or not -- and each is ONE continuous message.
@@ -416,8 +411,8 @@ CH05_ENDING_LOST_MSG = 0x9F3               # the host block's last free id
                                                  # windowDataType does (Nicolas, 2026-09-03).
 # ch06's message block is vanilla Ch7's own dead ids (HOSTED_CHAPTER_MESSAGE_BLOCKS), which
 # fall dead the moment the event lists and the beginning scene below are rewritten. The goal
-# pair takes the block's LAST two ids, as ch05's does, so the dialogue pass gets a contiguous
-# run to author into.
+# pair takes the block's LAST two ids, as ch05's does. New scenes take no block id at all: they
+# name their messages in inject/message_alloc.py (#411).
 CH06_GOAL_WINDOW_MSG = 0x9FE
 CH06_GOAL_STATUS_MSG = 0x9FF
                                                  # and vanilla Ch6's (both spend 0x80)
@@ -437,12 +432,9 @@ CH06_GOAL_STATUS_MSG = 0x9FF
 # same shape as every pid above. `assert_named_raw_pids_are_exclusive` now makes the mistake
 # impossible rather than leaving the next chapter to re-read this comment.
 CH06_BOAT_PIDS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
-# Their NAMES, appended past the last vanilla message (ch05's moose took 0xD4C). A raw pid's
-# stock nameTextId is the generic monster plate shared by every 0xB0-range gap, so a boat reads
-# "Monster" without this -- the #90 rule in the message-id space: append your own rather than
-# burn a scarce vanilla slot. One id each, not one shared, so the boarding pass can name the
-# Burly Ram and the Pronged Goat apart without moving a shipped id.
-CH06_BOAT_NAME_MSGS = {'boat-east': 0xD4D, 'boat-west': 0xD4E}
+# Their NAMES, appended past vanilla's last message by the build (inject/message_alloc.py).
+CH06_BOAT_NAME_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-name'),
+                       'boat-west': appended_message_id('ch06', 'boat-west-name')}
 # ch05's four INFANTRY classes deploy on their skeleton reskins (#25, campaign.yaml
 # `enemy_class_reskins`): every ch05 unit wearing one of them is a risen tomb-guardian, and
 # this dict is read for RED units only, so the repoint is wholesale rather than per-enemy.

@@ -634,16 +634,9 @@ def loose_ends(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     room = message_ids(name, campaign)
     if room.block is UNKNOWN:
         pass                          # the registry could not be read; say nothing rather than guess
-    elif room.block is None and room.claimed:
-        out.append('claims %d message id(s) but declares no host block, so headroom is '
-                   'unknown (see HOSTED_CHAPTER_MESSAGE_BLOCKS)' % len(room.claimed))
-    elif room.block is not None and room.free == 0:
-        out.append('the host block is full: %s, all %d spent -- the next scene costs a '
-                   'redesign, not an id (extend it from the never-shipped pool; see '
-                   'HOSTED_CHAPTER_MESSAGE_BLOCKS)'
-                   % (' + '.join('0x%03X-0x%03X' % r for r in room.block),
-                      len(room.used_in_block)))
-    if room.borrowed:
+    # A full or undeclared block is not a loose end: a new message is a name in
+    # inject/message_alloc.py APPENDED_MESSAGES, and the build numbers it (#411).
+    elif room.borrowed:
         out.append('%d id(s) inside this block are held by another chapter: %s'
                    % (len(room.borrowed), ', '.join('0x%03X' % m for m in room.borrowed)))
 
@@ -735,6 +728,9 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
         if room.borrowed:
             out.append('               held by another chapter: %s'
                        % ', '.join('0x%03X' % m for m in room.borrowed))
+    if room.block is not UNKNOWN:
+        out.append('               a NEW message takes no block id: name it in '
+                   'inject/message_alloc.py APPENDED_MESSAGES (#411)')
 
     out.append('')
     out.append('  art       portrait  sprite  banim  unit')

@@ -7,6 +7,7 @@ import re
 import sys
 
 import fe8_talk_font
+from inject.message_alloc import allocated_message_ids
 from inject.paths import CHARACTERS_C, TEXTS_TXT
 
 
@@ -93,7 +94,7 @@ def name_message_body(name):
     return name + pad + '[X]'
 
 
-def set_message_body(lines, msg_id, body, create=False):
+def set_message_body(lines, msg_id, body):
     """Replace the content lines of `## MSG_<id>` with `body` (in place). Idempotent:
     matches the header and rewrites everything up to the NEXT header.
 
@@ -105,10 +106,9 @@ def set_message_body(lines, msg_id, body, create=False):
     reported no runaway. It was dead text in the table and a trap for the next id claimed out
     of the 74.
 
-    `create` APPENDS the header when it does not exist, for an id past the last vanilla message
-    (MSG_D4B). gMsgTable[] is generated from this file and self-sizes, so a new trailing header
-    extends the table. It stays opt-in: for every id that should already be there, a missing
-    header means the wrong id, and that has to keep failing loudly.
+    A missing header is always an error: an id past vanilla's last message exists only once
+    `reserve_message_headers` has appended it (inject/message_alloc.py), so a missing one means
+    the wrong id, or one nobody declared.
     """
     header = '## MSG_%03X' % msg_id
     for i, line in enumerate(lines):
@@ -119,25 +119,52 @@ def set_message_body(lines, msg_id, body, create=False):
             # Keep one blank line before the next header, as the file is formatted.
             lines[i + 1:j] = [body, '']
             return True
-    if not create:
-        sys.exit('ERROR: message header %r not found in %s' % (header, TEXTS_TXT))
-    last = max((i for i, ln in enumerate(lines) if ln.strip().startswith('## MSG_')), default=-1)
-    if last < 0:
-        sys.exit('ERROR: no message headers at all in %s' % TEXTS_TXT)
-    last_id = int(lines[last].strip()[len('## MSG_'):], 16)
-    if msg_id <= last_id:
-        sys.exit('ERROR: refusing to append MSG_%03X at or below the last id MSG_%03X -- an '
-                 'appended id must EXTEND the table, never land inside it' % (msg_id, last_id))
-    if msg_id != last_id + 1:
-        sys.exit('ERROR: appending MSG_%03X would leave a hole after MSG_%03X; gMsgTable[] is a '
-                 'dense array, so a gap shifts every id past it' % (msg_id, last_id))
-    while lines and not lines[-1].strip():
-        lines.pop()
-    # texts.txt ends with a trailing newline; the writer joins on '\n', so the list has to end
-    # with an empty element. Dropping it left the file without its final newline and put an
-    # unrelated one-line delta in the submodule on every build.
-    lines.extend(['', header, body, ''])
-    return True
+    sys.exit('ERROR: message header %r not found in %s' % (header, TEXTS_TXT))
+
+
+def reserve_message_headers(lines, msg_ids):
+    """Append an empty `## MSG_<id>` for each id in `msg_ids` (ascending) not already present.
+
+    gMsgTable[] is generated from texts.txt and self-sizes, so a trailing header EXTENDS the
+    table -- but it is a dense array, so each new id must be exactly one past the last header.
+    Reserving every allocated id in one place up front is what lets any later pass write any of
+    them in any order; when each writer appended its own, two passes had to run in id order
+    (ch06's boats once tried to append 0xD4D before ch05's moose had 0xD4C).
+    """
+    present = set(ln.strip() for ln in lines if ln.strip().startswith('## MSG_'))
+    for msg_id in sorted(msg_ids):
+        header = '## MSG_%03X' % msg_id
+        if header in present:
+            continue
+        last = max((i for i, ln in enumerate(lines) if ln.strip().startswith('## MSG_')),
+                   default=-1)
+        if last < 0:
+            sys.exit('ERROR: no message headers at all in %s' % TEXTS_TXT)
+        last_id = int(lines[last].strip()[len('## MSG_'):], 16)
+        if msg_id != last_id + 1:
+            sys.exit('ERROR: reserving MSG_%03X after MSG_%03X would leave a hole or land inside '
+                     'the table; gMsgTable[] is a dense array, so a gap shifts every id past it'
+                     % (msg_id, last_id))
+        while lines and not lines[-1].strip():
+            lines.pop()
+        # texts.txt ends with a trailing newline; the writer joins on '\n', so the list has to
+        # end with an empty element. Dropping it left the file without its final newline and put
+        # an unrelated one-line delta in the submodule on every build.
+        lines.extend(['', header, '[X]', ''])
+        present.add(header)
+    return lines
+
+
+def reserve_appended_messages(verbose=True):
+    """Give every message id the build allocates (inject/message_alloc.py) its header."""
+    ids = sorted(allocated_message_ids().values())
+    with open(TEXTS_TXT, encoding='utf-8') as f:
+        lines = f.read().split('\n')
+    reserve_message_headers(lines, ids)
+    with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines))
+    if verbose and ids:
+        print('  %d appended message id(s): MSG_%03X-MSG_%03X' % (len(ids), ids[0], ids[-1]))
 
 
 def _fe_dialogue_text(s):
