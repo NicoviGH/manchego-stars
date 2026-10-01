@@ -1,0 +1,50 @@
+From: Manchego Stars engine
+Subject: [PATCH 1/14] GetPlayerStartCursorPosition: fall back to first player unit if leader undeployed
+
+Guard GetPlayerStartCursorPosition against a non-deployed player leader.
+
+At chapter start ProcFun_ResetCursorPosition centers the cursor on the player leader:
+GetUnitFromCharId(GetPlayerLeaderPid()). FE8 assumes the leader (a LORD-class unit) is
+always deployed -- but our campaign's lords ride ordinary slots, so that lookup returns
+NULL and the original code dereferences it (`unit->xPos`), reading BIOS garbage and
+parking the cursor OFF-MAP. The off-map cursor then drives out-of-bounds map/terrain
+reads -> a runaway text decode -> gBmSt corruption (garbage band) -> crash. Watchpoint-
+confirmed root cause. Fix: if the leader isn't deployed, fall back to the first valid
+player unit, and never dereference NULL. Campaign-agnostic engine hardening.
+---
+diff --git a/src/bmcamadjust.c b/src/bmcamadjust.c
+index 8a6785d2b01c70d4f60532c4290761b8a16ce0e7..ed7a89115adfafbe31dd2c5bc310bf48a5f93dd2 100755
+--- a/src/bmcamadjust.c
++++ b/src/bmcamadjust.c
+@@ -28,14 +28,29 @@ struct ProcCmd CONST_DATA gProcScr_ADJUSTSFROMXI[] = {
+ void GetPlayerStartCursorPosition(int *px, int *py)
+ {
+     struct Unit *unit;
++    int i;
++
++    /* Leader may ride a non-LORD slot (campaign): if not deployed, fall back to
++     * the first valid player unit so the cursor never lands off-map. */
++    unit = GetUnitFromCharId(GetPlayerLeaderPid());
++    if (unit == NULL) {
++        for (i = 1; i < 0x40; ++i) {
++            struct Unit *u = GetUnit(i);
++            if (UNIT_IS_VALID(u)) {
++                unit = u;
++                break;
++            }
++        }
++    }
++    if (unit == NULL)
++        return;
++
+     if (1 == gPlaySt.chapterTurnNumber) {
+-        unit = GetUnitFromCharId(GetPlayerLeaderPid());
+         gPlaySt.xCursor = unit->xPos;
+         gPlaySt.yCursor = unit->yPos;
+     }
+ 
+     if (1 != gPlaySt.config.autoCursor) {
+-        unit = GetUnitFromCharId(GetPlayerLeaderPid());
+         *px = unit->xPos;
+         *py = unit->yPos;
+     } else {

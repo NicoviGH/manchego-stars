@@ -1,8 +1,7 @@
 """Shared decomp source-access layer: paths + brace-patch primitives.
 
-Imported by BOTH the content passes (tools/inject/*, tools/build_campaign.py) and
-tools/inject/engine_hooks.py (pipeline). Keep it dependency-free so neither
-side creates an import cycle. See docs/decisions.md -> Engine/content file seam.
+Imported by every injector module (tools/inject/*, tools/build_campaign.py). Keep it
+dependency-free so it never creates an import cycle. See docs/decisions.md -> Engine/content file seam.
 """
 
 import functools
@@ -19,7 +18,7 @@ SUBMODULE = os.path.join(REPO, 'fireemblem8u')
 DECOMP = os.path.join(REPO, 'build', 'fireemblem8u')
 
 # Decomp source files patched by hooks that BOTH tracks touch (content injects
-# lord quotes / map sprites into these; engine_hooks patches lord-select into them).
+# lord quotes / map sprites into these; engine patch 0005 adds lord select to them).
 BATTLEQUOTES_C = os.path.join(DECOMP, 'src', 'data_battlequotes.c')
 BMUNIT_C = os.path.join(DECOMP, 'src', 'bmunit.c')
 LORDSEL_FLAG_BASE = 0xF0

@@ -159,7 +159,7 @@ class TheLiveInjector(unittest.TestCase):
     def test_it_spans_the_package(self):
         files = [os.path.basename(p) for p in source.injector_files()]
         self.assertEqual('build_campaign.py', files[0])
-        self.assertIn('engine_hooks.py', files)
+        self.assertIn('engine_patches.py', files)
         self.assertIn('source.py', files)
 
     def test_a_table_appears_once_however_many_modules_describe_it(self):
@@ -167,9 +167,9 @@ class TheLiveInjector(unittest.TestCase):
         regex over the code view must still land on the real table."""
         self.assertEqual(1, source.injector_source().count('RAW_PID_BATTLE_ANIMS = {'))
 
-    def test_an_engine_hook_resolves_to_its_real_home(self):
-        self.assertTrue(source.defining_file('_patch_terrain_name_guard')
-                        .endswith(os.path.join('inject', 'engine_hooks.py')))
+    def test_a_definition_resolves_to_its_real_home(self):
+        self.assertTrue(source.defining_file('apply_engine_patches')
+                        .endswith(os.path.join('inject', 'engine_patches.py')))
 
 
 if __name__ == '__main__':

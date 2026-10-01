@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Tests for the nat-20 crit flourish pipeline (#11).
 
-The ROM side is a campaign-agnostic engine hook (engine_hooks.
-_inject_crit_d20_flourish, guarded by check_engine_guards_present); these tests
+The ROM side is a campaign-agnostic engine patch
+(engine/patches/optional/crit-d20-flourish.patch); these tests
 pin the ASSET pipeline: the stored-form GBA LZ77 container, the 4bpp/palette/TSA
 conversion, and a full decode-back roundtrip proving the injected bytes redraw
 the source art pixel-exactly.

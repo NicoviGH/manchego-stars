@@ -49,6 +49,7 @@ MAP_SPRITES = 'tools/inject/map_sprites.py'   # PURPLE_BANK_BLANKERS
 HARNESS = 'tools/playtest/harness.lua'
 # A guarded tool (tools/**, not a test, not the injector) to plant a bad line in.
 TOOL = 'tools/map_donor.py'
+ENGINE_PATCH = 'engine/patches/0001-patch-player-start-cursor-guard.patch'
 # Every file a canary doctors OR reads to aim its fault, spelled out: check.py reads it with
 # literal_eval to decide when the pre-commit hook must run the canaries, since an edit here
 # can move the anchor a fault is planted at. `doctored()` refuses to doctor a file not listed,
@@ -61,7 +62,8 @@ CANARY_FILES = (
     'campaigns/rime-of-the-frostmaiden/chapters/ch06-the-maer-monster.yaml',
     'docs/CHAPTERS.md', 'docs/CLASSES.md',
     'docs/decisions/0297-the-injector-is-every-file-of-it-and-has-one-source-reader.md',
-    'fireemblem8u/include/bmsave.h', 'tools/build_campaign.py', 'tools/inject/engine_hooks.py',
+    'fireemblem8u/include/bmsave.h', 'tools/build_campaign.py',
+    'engine/patches/0001-patch-player-start-cursor-guard.patch',
     'tools/inject/map_sprites.py',
     'tools/map_donor.py', 'tools/map_placement_preview.py', 'tools/playtest/ch06.lua',
     'tools/playtest/controller.lua', 'tools/playtest/harness.lua',
@@ -350,12 +352,6 @@ def c_generated_indexes():
         return run(check.check_generated_indexes_fresh)
 
 
-def c_engine_guards():
-    with doctored({'tools/inject/engine_hooks.py':
-                   sub1(r'def _patch_terrain_name_guard\(', 'def _patch_terrain_name_guard_gone(')}):
-        return run(check.check_engine_guards_present)
-
-
 def c_purple_bank():
     def drop_first(text):
         start = text.index('PURPLE_BANK_BLANKERS = (')
@@ -368,7 +364,7 @@ def c_purple_bank():
 
 def c_engine_agnostic():
     name = sorted(check._campaign_character_ids())[0]
-    with doctored({'tools/inject/engine_hooks.py': append('\n# %s\n' % name)}):
+    with doctored({ENGINE_PATCH: append('\n+/* %s */\n' % name)}):
         return run(check.check_engine_campaign_agnostic)
 
 
@@ -486,9 +482,8 @@ CANARIES = {
     'check_campaign_declares_no_chapter_list': (c_no_chapter_list, 'campaign.yaml', None),
     'check_no_dead_concepts': (c_dead_concepts, 'build-campaign', None),
     'check_generated_indexes_fresh': (c_generated_indexes, 'CHAPTERS.md', None),
-    'check_engine_guards_present': (c_engine_guards, '_patch_terrain_name_guard', None),
     'check_purple_bank_blankers_known': (c_purple_bank, 'PURPLE_BANK_BLANKERS', 'decomp'),
-    'check_engine_campaign_agnostic': (c_engine_agnostic, 'engine_hooks.py', None),
+    'check_engine_campaign_agnostic': (c_engine_agnostic, '0001-', None),
     'check_save_layout_stable': (c_save_layout, 'not found', 'decomp'),
     'check_every_test_actually_runs': (c_every_test_runs, 'CanaryAfterMain', None),
     'check_wrap_widths_are_pixels': (c_wrap_widths, 'map_donor.py', None),

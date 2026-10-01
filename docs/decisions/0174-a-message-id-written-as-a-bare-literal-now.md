@@ -367,7 +367,7 @@ of the lesson directly above. The build-time half is pinned by a test reading
   to force a rebuild. (A battle-anim frame change IS a build change → re-record from a fresh ROM.)
 - **Additive, never global** (content art): clone classes / new terrain/banim/BG slots; never edit a shared
   vanilla one in place.
-- **Engine hooks live in `tools/inject/engine_hooks.py`** (guarded by `check_engine_guards_present`).
+- **Engine changes live in `engine/patches/`**, a patch series applied whole or not at all (ADR 0305).
 - **Turning fog OFF takes TWO steps: the vision range AND a map refresh** (2026-08-01, #204). Fog
   does two independent things, and zeroing `gPlaySt.chapterVisionRange` only undoes one of them.
   `bmtarget.c` gates target-picking on the vision range, so zeroing it does re-open targeting — but

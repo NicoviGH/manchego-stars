@@ -1,0 +1,108 @@
+From: Manchego Stars engine
+Subject: [PATCH 6/14] lord floor (#45 3c): chosen lead's survivability top-up baked in once at ch start
+
+Lord survivability floor (#45 3c), engine side: bake the player-chosen lead's
+base-level top-up into its stats ONCE, the first player phase it is fielded.
+
+Consumes the build-generated gLordFloorDeltas[] table (inject_ch01, events_udefs.c):
+one { +maxHP, +Def, +Res } row per candidate, parallel to gLordSelectCandidates[]. Two
+campaign-agnostic hooks, on top of patch 0005 (they anchor on its LordSelect_GetPid):
+
+  1. LordFloor_ApplyOnce (new, eventinfo.c): find the chosen lead's index via the
+     lord-select flags, look up its floor row, add it to maxHP/curHP/def/res, then set a
+     permanent "applied" flag. No-op once applied; no-op until a pick exists (prologue:
+     nothing chosen -> skip) and the lead is on the field. The applied flag is spent ONLY
+     on a real application, so it can never be consumed early -> the floor always lands.
+
+  2. EndPrepScreen (prep_sallycursor.c): call it once the prep "Fight!" has finalized
+     deployment (right after ShrinkPlayerUnits compacts the roster). The chosen lead is
+     deployed + VALID here and the pick is already recorded (the menu runs earlier, in the
+     beginning scene). Phase-start seams (BmMain_StartPhase, the cursor reset) fire BEFORE
+     prep deployment finalizes on turn 1 -- the lead isn't findable yet, so the floor lands
+     a phase late (ch01 verified -- tools/playtest lordfloor showed +7 at turn 2, not turn
+     1). Lord-select is always a prep chapter, so this single deployment seam suffices; the
+     apply-once flag covers later Fight!s.
+
+Notes:
+
+1: eventinfo.c -- LordFloor_ApplyOnce, right after the injected LordSelect_GetPid.
+
+2: prep_sallycursor.c -- call it at the END of EndPrepScreen, right after
+   ShrinkPlayerUnits() has compacted the deployed roster. This is the deployment-
+   finalization point on the prep "Fight!" path: the chosen lead is force-deployed and
+   VALID here, and the ch01 lord-select menu (which runs earlier, in the beginning scene)
+   has already recorded the pick. Phase-start seams (BmMain_StartPhase, the cursor reset)
+   fire BEFORE prep deployment finalizes on turn 1, so the lead isn't yet findable and
+   the floor lands a phase late (ch01 verified via tools/playtest lordfloor: those seams
+   gave +7 at turn 2, not turn 1). Lord-select is always a prep chapter, and the
+   apply-once flag covers every later Fight!, so this single seam suffices.
+---
+diff --git a/src/eventinfo.c b/src/eventinfo.c
+index be5552b55f933b39a2a06de4836ae3782a63469d..eef423182efce39027fba8df77b6d84ffd1a537a 100644
+--- a/src/eventinfo.c
++++ b/src/eventinfo.c
+@@ -1964,6 +1964,44 @@ u16 LordSelect_GetPid(void)
+     return gLordSelectCandidates[0];
+ }
+ 
++/* Lord survivability floor (campaign engine, #45 3c): once, at the first
++   player phase the chosen lead is fielded, add its base-level top-up
++   (gLordFloorDeltas, events_udefs.c -- { +maxHP, +Def, +Res } per candidate,
++   parallel to gLordSelectCandidates) to maxHP/curHP/Def/Res. A permanent
++   "applied" flag makes it happen exactly once and bake into the save, then
++   fade as the unit levels (Jagen-style). No-op until the ch01 menu has
++   recorded a pick (prologue: skip, flag stays clear) and the lead is on the
++   map -- the applied flag is spent ONLY on a real application, never early. */
++void LordFloor_ApplyOnce(void)
++{
++    extern const u16 gLordSelectCandidates[];
++    extern const s8 gLordFloorDeltas[];
++    struct Unit * unit;
++    int i;
++
++    if (CheckFlag(0xFA))
++        return;
++
++    /* the ch01 menu records the pick as permanent flag 0xF0 + menu index */
++    for (i = 0; gLordSelectCandidates[i] != 0xFFFF; i++) {
++        if (CheckFlag(0xF0 + i))
++            break;
++    }
++    if (gLordSelectCandidates[i] == 0xFFFF)
++        return; /* no pick yet (prologue) -- retry next chapter */
++
++    unit = GetUnitFromCharId(gLordSelectCandidates[i]);
++    if (unit == NULL)
++        return; /* chosen lead not on the field yet -- retry, flag stays clear */
++
++    unit->maxHP += gLordFloorDeltas[i * 3 + 0];
++    unit->curHP += gLordFloorDeltas[i * 3 + 0];
++    unit->def   += gLordFloorDeltas[i * 3 + 1];
++    unit->res   += gLordFloorDeltas[i * 3 + 2];
++
++    SetFlag(0xFA);
++}
++
+ //! FE8U = 0x08084800
+ bool IsCharacterForceDeployed_(u16 pid)
+ {
+diff --git a/src/prep_sallycursor.c b/src/prep_sallycursor.c
+index 4ef47c0e055fe9719f2e04eaa625775e5c68facd..ce86d930761506de63b1da0f585653f25b767d48 100644
+--- a/src/prep_sallycursor.c
++++ b/src/prep_sallycursor.c
+@@ -1334,6 +1334,15 @@ void EndPrepScreen(void)
+     }
+ 
+     ShrinkPlayerUnits();
++
++    /* Lord survivability floor (campaign engine, #45 3c): now that the chosen
++       lead is deployed and the roster is finalized, bake its base-level top-up
++       in once. Apply-once flag makes later prep Fight!s no-ops. */
++    {
++        extern void LordFloor_ApplyOnce(void);
++        LordFloor_ApplyOnce();
++    }
++
+     Proc_EndEach(gProcScr_SALLYCURSOR);
+     gBmSt.gameStateBits &= ~BM_FLAG_PREPSCREEN;
+     gPlaySt.chapterStateBits &= ~PLAY_FLAG_PREPSCREEN;

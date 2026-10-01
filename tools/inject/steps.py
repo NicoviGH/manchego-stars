@@ -31,7 +31,6 @@ import inspect
 import os
 import sys
 
-from inject import engine_hooks
 from inject.arena import inject_arena_attendant_portraits, inject_arena_presentation
 from inject.backgrounds import inject_backgrounds
 from inject.battle_anims import inject_battle_anims
@@ -47,6 +46,7 @@ from inject.chapters.prologue import inject_prologue
 from inject.crit_flourish import inject_crit_flourish
 from inject.death_quotes import inject_pc_death_quotes
 from inject.decomp import DECOMP
+from inject.engine_patches import apply_engine_patches, patched_files
 from inject.hosts import (
     CH01_HOST_INDEX, CH03_HOST_INDEX, CH04_HOST_INDEX, CH05_HOST_INDEX, CH06_HOST_INDEX,
     PROLOGUE_HOST_INDEX)
@@ -72,7 +72,8 @@ from inject.warm import PATCHED_DECOMP_FILES, restore_vanilla_sources
 # What a step can need, and why the order matters. A fact with no provider, or a provider
 # listed after a step that needs it, fails the build.
 FACTS = {
-    'lord-select-getpid': "the lord floor anchors on lord select's LordSelect_GetPid",
+    'engine-patches': 'a step that edits or reads a file the engine patches changed, as they '
+                      'left it (git apply needs the vanilla text under them)',
     'sms-pool': 'one SMS id pool for the whole build -- both sprite passes spend from it (#227)',
     'map-sprite-sms-ids': 'reskins consume the SMS ids map-sprite injection allocates',
     'reskin-classes': 'the reskinned clone classes: their battle anims bind .pBattleAnimDef on '
@@ -188,56 +189,11 @@ STEPS = [
     Step(inject_arena_attendant_portraits, writes=PORTRAIT),
     # A clean base each build (idempotent; vanilla donor reads).
     Step(restore_vanilla_sources, writes=PATCHED_DECOMP_FILES),
-    Step(engine_hooks._patch_player_start_cursor_guard, title='engine hardening:',
-         note='GetPlayerStartCursorPosition: fall back to first player unit if leader undeployed',
-         writes=('src/bmcamadjust.c',)),
-    Step(engine_hooks._patch_terrain_name_guard,
-         note='GetTerrainName: bounds-guarded against OOB terrain ids (defensive)',
-         writes=('src/bmmap.c',)),
-    Step(engine_hooks._patch_battle_map_kind_fallback,
-         note='GetBattleMapKind: no-world-map fallback = STORY (slot 2+ chapters)',
-         writes=('src/worldmap_path.c',)),
-    Step(engine_hooks._patch_chapter_title_wm_fallback,
-         note='GetChapterTitleWM: no-world-map fallback = ROM chapTitleId (not a WM skirmish name)',
-         writes=('src/chapter_title.c',)),
-    Step(engine_hooks._inject_lord_select_engine,
-         note='lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead',
-         writes=('src/bmdifficulty.c', 'src/bmmenu.c', 'src/bmunit.c', 'src/data_battlequotes.c',
-                 'src/data_event_trigger.c', 'src/eventinfo.c'),
-         provides=('lord-select-getpid',)),
-    Step(engine_hooks._inject_lord_floor_engine,
-         note="lord floor (#45 3c): chosen lead's survivability top-up baked in once at ch start",
-         writes=('src/eventinfo.c', 'src/prep_sallycursor.c'), needs=('lord-select-getpid',)),
-    Step(engine_hooks._patch_banim_character_unique,
-         note='banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique '
-              '(per-character _u25)',
-         writes=('src/banim-ekrbattleintro.c',)),
-    Step(engine_hooks._patch_banim_palette_custom_guard,
-         note='banim (#65): GetBanimPalette -> custom (appended) banims keep own palette '
-              '(RBG cyan fix)',
-         writes=('src/banim-ekrmain.c',)),
-    Step(engine_hooks._patch_banim_unique_pal_custom_guard,
-         note="banim (#206): the per-CHARACTER palette no longer overwrites a custom banim's "
-              "own (Baxby wore Forde's green)",
-         writes=('src/banim-ekrbattleintro.c',)),
-    Step(engine_hooks._patch_banim_spell_palette_tint,
-         note='banim (#165): character/weapon spell palettes support campaign-declared tints',
-         writes=('include/ekrbattle.h', 'src/banim-efxmagic.c', 'src/banim-ekrbattle.c',
-                 'src/banim-ekrdispup.c', 'src/banim-ekrutils.c')),
-    Step(engine_hooks._patch_banim_charge_flash,
-         note='banim (#183): casters pulse their signature colour on the wind-up charge beat',
-         writes=('include/efxbattle.h', 'include/ekrbattle.h', 'src/banim-efxmisc.c',
-                 'src/banim-main.c')),
-    Step(engine_hooks._patch_draw_icon_pal2,
-         note='item icons (#23): DrawIcon routes gMSPal2IconIds from BG bank 4 to custom bank 15',
-         writes=('include/icon.h', 'src/icon.c')),
-    Step(engine_hooks._patch_arena_presentation,
-         note='Arena (#265): ArenaUi_Init selects optional campaign palette + chapter face',
-         writes=('src/uiarena.c',)),
-    Step(engine_hooks._patch_arena_battle_background,
-         note='Arena (#265): battle fade-in and palette cycle share campaign backdrop data',
-         writes=('src/banim-ekrarena.c',)),
-    Step(inject_arena_presentation, writes=('src/banim-ekrarena.c', 'src/uiarena.c')),
+    # The campaign-agnostic engine changes (#410): engine/patches/, applied in one go.
+    Step(apply_engine_patches, title='engine patches:', writes=patched_files(),
+         provides=('engine-patches',)),
+    Step(inject_arena_presentation, needs=('engine-patches',),
+         writes=('src/banim-ekrarena.c', 'src/uiarena.c')),
     Step(inject_names, title='names:', writes=('texts/texts.txt',)),
     Step(inject_item_names, title='item names:', writes=('texts/texts.txt',)),
     Step(inject_item_icons, title='item icons:', writes=('graphics/item_icon/*',)),
@@ -310,7 +266,8 @@ STEPS = [
          writes=_host(4, 'Ch03TermalaineMineMap', *_tileset('Cave'))),
     Step(inject_ch04, title='chapter 4 (#24):', scope='chapter:ch04',
          call=lambda fn, a: fn(a.campaign, boot=a.ch04_boot), flags=('ch04_boot',),
-         needs=('reskin-classes', 'tileset-labels', 'ch02-goal', 'ch03-hosted'),
+         needs=('engine-patches', 'reskin-classes', 'tileset-labels', 'ch02-goal',
+                'ch03-hosted'),
          provides=('ch04-hosted', 'ch04-landing'),
          writes=_host(5, 'Ch04LonelywoodForestMap', 'src/data_event_trigger.c')),
     Step(chain_ch03_to_ch04, needs=('ch03-landing', 'ch04-hosted'),

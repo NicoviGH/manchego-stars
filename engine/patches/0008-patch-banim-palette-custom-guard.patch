@@ -1,0 +1,42 @@
+From: Manchego Stars engine
+Subject: [PATCH 8/14] banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)
+
+Make GetBanimPalette honour a custom unit's OWN palette (#65 M-B, the RBG cyan fix).
+
+Companion to patch 0007: that routes the combat ANIM lookup through
+the per-character _u25 table, but the PALETTE still loads via GetBanimPalette, whose
+vanilla archer/sniper class special-case mis-redirects a custom-anim archer to the stock
+bow palette (cyan). This guards it so appended banim rows keep their own palette.
+Campaign-agnostic.
+
+In GetBanimPalette, CUSTOM (appended) banim ids short-circuit to their OWN palette before
+the vanilla archer/sniper class->palette redirect.
+
+Vanilla GetBanimPalette loads the combatant's banim palette from
+banim_data[GetBanimPalette(banim_id, pos)], but for CLASS_ARCHER/_F/SNIPER/_F it returns
+a hardcoded canonical bow palette row (0x25/0x27/0x29/0x2B) regardless of banim_id -- a
+palette-share that is correct ONLY when the unit runs the stock bow anim. A custom (#65)
+unit deployed AS a real archer via the per-character _u25 path runs an APPENDED banim
+whose tiles index its own palette in its own banim_data row; the redirect then paints
+those tiles with the vanilla archer palette -- the RBG 'cyan' mis-render. Appended rows
+are ids >= the vanilla banim count, so bypass the switch for them. Vanilla units (ids <
+the count) hit the switch byte-for-byte as before.
+
+The threshold is a literal: the number of banim_data[] rows in vanilla, which is the id of
+the first row inject_battle_anims appends. test_engine_patches pins it to the vanilla count,
+so a decomp bump that moves the count fails there.
+---
+diff --git a/src/banim-ekrmain.c b/src/banim-ekrmain.c
+index 558f91ab96b64657b5bc855406e4ac72a7e1686d..42f926b834fd677ecf20935b65d499cbbd8538a7 100644
+--- a/src/banim-ekrmain.c
++++ b/src/banim-ekrmain.c
+@@ -184,6 +184,9 @@ int GetBanimPalette(int banim_id, enum ekr_battle_unit_position pos)
+     else
+         bu = gpEkrBattleUnitRight;
+ 
++    if (banim_id >= 0xC9) /* MS #65: a custom (appended) banim keeps its own palette; the
++                              vanilla archer/sniper palette-share below is for stock bow anims only. */
++        return banim_id;
+     jid = bu->unit.pClassData->number;
+     switch (jid) {
+     case CLASS_ARCHER:

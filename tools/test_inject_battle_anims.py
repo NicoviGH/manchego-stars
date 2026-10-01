@@ -23,7 +23,7 @@ import inject.raw_pids
 import inject.reskins
 import inject.test_chapter
 import inject.text
-from inject import engine_hooks as eh
+from inject.engine_patches import patched_text, vanilla_banim_count
 from inject import source as injector  # the injector's source, every file of it (#389)
 
 
@@ -180,64 +180,26 @@ class CharacterUniqueBanim(unittest.TestCase):
         self.assertIn('._u25 = { 7, 7 },', twice)
         self.assertEqual(twice.count('._u25'), 1)           # replaced, not duplicated
 
-    def test_combat_anim_hook_swaps_all_calls_and_widens_out_param(self):
-        from inject import engine_hooks as eh
-        src = ('    u32 animid1, animid2;\n'
-               '    a = GetBattleAnimationId(unit_bu1, animdef1, bu1->weapon, &animid1);\n'
-               '    b = GetBattleAnimationId(unit_bu2, animdef2, bu2->weapon, &animid2);\n')
-        out = eh._swap_combat_anim_to_unique(src)
+    def test_combat_anim_patch_swaps_all_calls_and_widens_out_param(self):
+        out = patched_text('src/banim-ekrbattleintro.c')
         self.assertIn('int animid1, animid2;', out)
         self.assertNotIn('u32 animid1', out)
-        self.assertEqual(out.count('GetBattleAnimationId_WithUnique(unit_bu'), 2)
+        vanilla = inject.decomp.vanilla_decomp_text('src/banim-ekrbattleintro.c')
+        self.assertEqual(out.count('GetBattleAnimationId_WithUnique(unit_bu'),
+                         vanilla.count('GetBattleAnimationId(unit_bu'))
         self.assertNotIn('GetBattleAnimationId(unit_bu', out)
-
-    def test_combat_anim_hook_is_idempotent(self):
-        from inject import engine_hooks as eh
-        src = ('    u32 animid1, animid2;\n'
-               '    a = GetBattleAnimationId(unit_bu1, animdef1, bu1->weapon, &animid1);\n')
-        once = eh._swap_combat_anim_to_unique(src)
-        self.assertEqual(eh._swap_combat_anim_to_unique(once), once)
 
     # GetBanimPalette: a CUSTOM (appended) banim must keep its OWN palette. Vanilla forces
     # CLASS_ARCHER/_F/SNIPER/_F to the canonical bow palette (0x25/0x27/0x29/0x2B) regardless
     # of banim_id -- right for the stock anim, but it mis-paints a custom-anim unit deployed
     # AS a real archer (the per-character _u25 path). That was the RBG "cyan" bug (#65).
-    PALFN = ('int GetBanimPalette(int banim_id, enum ekr_battle_unit_position pos)\n'
-             '{\n'
-             '    u32 jid;\n'
-             '    struct BattleUnit *bu;\n\n'
-             '    if (EKR_POS_L == pos)\n'
-             '        bu = gpEkrBattleUnitLeft;\n'
-             '    else\n'
-             '        bu = gpEkrBattleUnitRight;\n\n'
-             '    jid = bu->unit.pClassData->number;\n'
-             '    switch (jid) {\n'
-             '    case CLASS_ARCHER:\n'
-             '        return 0x25;\n'
-             '    default:\n'
-             '        return banim_id;\n'
-             '    }\n'
-             '}\n')
-
     def test_banim_palette_guard_short_circuits_custom_ids_before_the_switch(self):
-        from inject import engine_hooks as eh
-        out = eh._guard_banim_palette_custom(self.PALFN, 0xC9)
+        out = patched_text('src/banim-ekrmain.c')
+        fn = out[out.index('int GetBanimPalette('):]
+        guard = 'if (banim_id >= 0x%X)' % vanilla_banim_count()
         # the guard returns banim_id for any appended id, BEFORE the class switch runs
-        self.assertIn('if (banim_id >= 0xC9)', out)
-        self.assertLess(out.index('if (banim_id >= 0xC9)'),
-                        out.index('switch (jid)'))
-        # vanilla switch body is left intact
-        self.assertIn('case CLASS_ARCHER:\n        return 0x25;', out)
-
-    def test_banim_palette_guard_is_idempotent(self):
-        from inject import engine_hooks as eh
-        once = eh._guard_banim_palette_custom(self.PALFN, 0xC9)
-        self.assertEqual(eh._guard_banim_palette_custom(once, 0xC9), once)
-
-    def test_banim_palette_guard_noops_when_form_unexpected(self):
-        from inject import engine_hooks as eh
-        self.assertEqual(eh._guard_banim_palette_custom('something else', 0xC9),
-                         'something else')
+        self.assertIn(guard, fn)
+        self.assertLess(fn.index(guard), fn.index('switch (jid)'))
 
     # The SECOND palette path, and the one that cost a session (#206, Baxby). FE8 also carries
     # a per-CHARACTER battle palette keyed on character x CLASS (gAnimCharaPalConfig), applied
@@ -246,57 +208,15 @@ class CharacterUniqueBanim(unittest.TestCase):
     # Baxby wears FORDE, whose row is [CLASS_CAVALIER -> 0x57], and Baxby IS a Cavalier, so his
     # custom axe-beak palette was clobbered by Forde's green. Lupin escaped only by luck --
     # Duessel's personal palettes are all magic classes.
-    UNIQPALFN = ('    pid = unit_bu1->pCharacterData->number - 1;\n'
-                 '    jid = unit_bu1->pClassData->number;\n\n'
-                 '    if (valid_l)\n'
-                 '        gBanimUniquePal[POS_L] = -1;\n\n'
-                 '    for (i = 0; i < 7; i++)\n'
-                 '    {\n'
-                 '        if (gAnimCharaPalConfig[pid][i] == jid && valid_l)\n'
-                 '        {\n'
-                 '            gBanimUniquePal[POS_L] = gAnimCharaPalIt[pid][i] - 1;\n'
-                 '            break;\n'
-                 '        }\n'
-                 '    }\n\n'
-                 '    pid = unit_bu2->pCharacterData->number - 1;\n'
-                 '    jid = unit_bu2->pClassData->number;\n\n'
-                 '    if (valid_r)\n'
-                 '        gBanimUniquePal[POS_R] = -1;\n\n'
-                 '    for (i = 0; i < 7; i++)\n'
-                 '    {\n'
-                 '        if (gAnimCharaPalConfig[pid][i] == jid && valid_r)\n'
-                 '        {\n'
-                 '            gBanimUniquePal[POS_R] = gAnimCharaPalIt[pid][i] - 1;\n'
-                 '            break;\n'
-                 '        }\n'
-                 '    }\n')
-
     def test_unique_pal_guard_suppresses_the_character_palette_on_both_sides(self):
-        """A custom (appended) banim keeps its own palette wherever it is standing."""
-        from inject import engine_hooks as eh
-        out = eh._guard_banim_unique_pal_custom(self.UNIQPALFN, 0xC9)
-        self.assertIn('gAnimCharaPalConfig[pid][i] == jid && valid_l '
-                      '&& gBanimIdx[POS_L] < 0xC9', out)
-        self.assertIn('gAnimCharaPalConfig[pid][i] == jid && valid_r '
-                      '&& gBanimIdx[POS_R] < 0xC9', out)
-
-    def test_unique_pal_guard_leaves_vanilla_units_alone(self):
-        """A stock banim id is BELOW the threshold, so vanilla's character palette still
-        applies -- Seth keeps his personal Paladin colours."""
-        from inject import engine_hooks as eh
-        out = eh._guard_banim_unique_pal_custom(self.UNIQPALFN, 0xC9)
-        self.assertIn('gBanimUniquePal[POS_L] = gAnimCharaPalIt[pid][i] - 1;', out)
-        self.assertIn('gBanimUniquePal[POS_R] = gAnimCharaPalIt[pid][i] - 1;', out)
-
-    def test_unique_pal_guard_is_idempotent(self):
-        from inject import engine_hooks as eh
-        once = eh._guard_banim_unique_pal_custom(self.UNIQPALFN, 0xC9)
-        self.assertEqual(eh._guard_banim_unique_pal_custom(once, 0xC9), once)
-
-    def test_unique_pal_guard_noops_when_form_unexpected(self):
-        from inject import engine_hooks as eh
-        self.assertEqual(eh._guard_banim_unique_pal_custom('something else', 0xC9),
-                         'something else')
+        """A custom (appended) banim keeps its own palette wherever it is standing, and a stock
+        id is BELOW the threshold, so Seth keeps his personal Paladin colours."""
+        out = patched_text('src/banim-ekrbattleintro.c')
+        first_custom = vanilla_banim_count()
+        for side, valid in (('POS_L', 'valid_l'), ('POS_R', 'valid_r')):
+            self.assertIn('gAnimCharaPalConfig[pid][i] == jid && %s && gBanimIdx[%s] < 0x%X'
+                          % (valid, side, first_custom), out)
+            self.assertIn('gBanimUniquePal[%s] = gAnimCharaPalIt[pid][i] - 1;' % side, out)
 
 
 class TestRawPidBattleAnim(unittest.TestCase):
@@ -648,8 +568,8 @@ class BattleSpellPaletteTint(unittest.TestCase):
         # The dispatch in BanimSpellPaletteCopy ends in `else -> Green`, so a colour that is
         # named in YAML and enumerated but NOT branched on would compile, run, and quietly
         # cast GREEN. That failure has no symptom to read, so it gets a test.
-        hooks = open(os.path.join(inject.decomp.REPO, 'tools', 'inject', 'engine_hooks.py'),
-                     encoding='utf-8').read()
+        hooks = '\n'.join(patched_text(rel) for rel in ('include/ekrbattle.h',
+                                                          'src/banim-ekrutils.c'))
         self.assertIn('BANIM_SPELL_TINT_GOLD = 4', hooks)
         self.assertIn('static u16 BanimSpellTintGold(u16 color)', hooks)
         self.assertIn('gMSSpellTint == BANIM_SPELL_TINT_GOLD', hooks)
@@ -666,62 +586,44 @@ class BattleSpellPaletteTint(unittest.TestCase):
         self.assertIn('{ CHARACTER_SETH, ITYPE_DARK, BANIM_SPELL_TINT_GREEN },', out)
         self.assertIn('{ 0, 0, BANIM_SPELL_TINT_NONE },', out)
 
-    def test_engine_hook_records_the_tint_in_the_dedicated_global(self):
-        src = ('void StartSpellAnimation(struct Anim *anim)\n'
-               '{\n'
-               '    s16 index = gEkrSpellAnimIndex[GetAnimPosition(anim)];\n'
-               '}\n')
-        self.assertTrue(hasattr(eh, '_spell_palette_tint_start'))
-        out = eh._spell_palette_tint_start(src)
+    def test_engine_patch_records_the_tint_in_the_dedicated_global(self):
+        out = patched_text('src/banim-efxmagic.c')
+        out = out[out.index('void StartSpellAnimation(struct Anim *anim)'):]
         self.assertIn('gMSSpellTint = GetBanimSpellPaletteTint(anim);', out)
         self.assertLess(out.index('s16 index'), out.index('gMSSpellTint'))
 
     def test_tint_rides_a_dedicated_overlay_global_leaving_the_lifecycle_flag_vanilla(self):
         """The tint rides its own EWRAM_OVERLAY(banim) global; gEfxSpellAnimExists stays vanilla."""
-        patched = ('BANIM_EKRBATTLE_H', 'BANIM_EFXMAGIC_C', 'BANIM_EKRUTILS_C',
-                   'BANIM_EKRBATTLE_C', 'BANIM_EKRDISPUP_C')
-        before = {name: open(getattr(eh, name), encoding='utf-8').read() for name in patched}
-
-        try:
-            eh._patch_banim_spell_palette_tint()
-            with open(eh.BANIM_EKRBATTLE_H, encoding='utf-8') as f:
-                header = f.read()
-            with open(eh.BANIM_EKRBATTLE_C, encoding='utf-8') as f:
-                battle = f.read()
-            with open(eh.BANIM_EKRUTILS_C, encoding='utf-8') as f:
-                utils = f.read()
-            with open(eh.BANIM_EKRDISPUP_C, encoding='utf-8') as f:
-                dispup = f.read()
-            # A dedicated global, declared beside the proven-writable lifecycle flag.
-            self.assertIn('extern u8 gMSSpellTint;', header)
-            self.assertIn('EWRAM_OVERLAY(banim) u8 gMSSpellTint = BANIM_SPELL_TINT_NONE;', battle)
-            # The abandoned transient global is gone everywhere (the plural
-            # gBanimSpellPaletteTints table is the legitimate data symbol).
-            self.assertIsNone(re.search(r'gBanimSpellPaletteTint\b', header))
-            self.assertIsNone(re.search(r'gBanimSpellPaletteTint\b', utils))
-            # SpellFx_Begin's lifecycle flag is untouched (no tint guard smuggled in).
-            begin = utils[utils.index('void SpellFx_Begin'):]
-            begin = begin[:begin.index('void SpellFx_Finish')]
-            self.assertIn('gEfxSpellAnimExists = true;', begin)
-            self.assertNotIn('BANIM_SPELL_TINT', begin)
-            # The palette copy reads the dedicated global, not the lifecycle flag, and
-            # dispatches per tint id (NONE = passthrough, BLUE = ice recolor, CYAN = flame
-            # cyan, else green).
-            palette_copy = utils[utils.index('static void BanimSpellPaletteCopy'):]
-            self.assertIn('if (gMSSpellTint == BANIM_SPELL_TINT_NONE)', palette_copy)
-            self.assertIn('BANIM_SPELL_TINT_BLUE', palette_copy)
-            self.assertIn('BANIM_SPELL_TINT_CYAN', palette_copy)
-            self.assertNotIn('gEfxSpellAnimExists', palette_copy)
-            # The dedicated flame-cyan tint function exists and pins BOTH green and blue high
-            # (distinct from the blue-dominant BanimSpellTintBlue).
-            self.assertIn('static u16 BanimSpellTintCyan(u16 color)', utils)
-            self.assertIn('BANIM_SPELL_TINT_CYAN = 3,', header)
-            # Teardown clears the tint beside the vanilla lifecycle reset.
-            self.assertIn('gMSSpellTint = BANIM_SPELL_TINT_NONE;', dispup)
-        finally:
-            for name, text in before.items():
-                with open(getattr(eh, name), 'w', encoding='utf-8') as f:
-                    f.write(text)
+        header = patched_text('include/ekrbattle.h')
+        battle = patched_text('src/banim-ekrbattle.c')
+        utils = patched_text('src/banim-ekrutils.c')
+        dispup = patched_text('src/banim-ekrdispup.c')
+        # A dedicated global, declared beside the proven-writable lifecycle flag.
+        self.assertIn('extern u8 gMSSpellTint;', header)
+        self.assertIn('EWRAM_OVERLAY(banim) u8 gMSSpellTint = BANIM_SPELL_TINT_NONE;', battle)
+        # The abandoned transient global is gone everywhere (the plural
+        # gBanimSpellPaletteTints table is the legitimate data symbol).
+        self.assertIsNone(re.search(r'gBanimSpellPaletteTint\b', header))
+        self.assertIsNone(re.search(r'gBanimSpellPaletteTint\b', utils))
+        # SpellFx_Begin's lifecycle flag is untouched (no tint guard smuggled in).
+        begin = utils[utils.index('void SpellFx_Begin'):]
+        begin = begin[:begin.index('void SpellFx_Finish')]
+        self.assertIn('gEfxSpellAnimExists = true;', begin)
+        self.assertNotIn('BANIM_SPELL_TINT', begin)
+        # The palette copy reads the dedicated global, not the lifecycle flag, and
+        # dispatches per tint id (NONE = passthrough, BLUE = ice recolor, CYAN = flame
+        # cyan, else green).
+        palette_copy = utils[utils.index('static void BanimSpellPaletteCopy'):]
+        self.assertIn('if (gMSSpellTint == BANIM_SPELL_TINT_NONE)', palette_copy)
+        self.assertIn('BANIM_SPELL_TINT_BLUE', palette_copy)
+        self.assertIn('BANIM_SPELL_TINT_CYAN', palette_copy)
+        self.assertNotIn('gEfxSpellAnimExists', palette_copy)
+        # The dedicated flame-cyan tint function exists and pins BOTH green and blue high
+        # (distinct from the blue-dominant BanimSpellTintBlue).
+        self.assertIn('static u16 BanimSpellTintCyan(u16 color)', utils)
+        self.assertIn('BANIM_SPELL_TINT_CYAN = 3,', header)
+        # Teardown clears the tint beside the vanilla lifecycle reset.
+        self.assertIn('gMSSpellTint = BANIM_SPELL_TINT_NONE;', dispup)
 
 
 class BattleChargeFlash(unittest.TestCase):
@@ -783,43 +685,34 @@ class BattleChargeFlash(unittest.TestCase):
         self.assertIn(('CHARACTER_ROSS', 'ITYPE_STAFF', cyan, 1), rows)
         self.assertIn(('CHARACTER_ROSS', 'ITYPE_LIGHT', cyan, 1), rows)
 
-    def test_hook_arms_the_flash_from_the_existing_charge_command(self):
+    def test_patch_arms_the_flash_from_the_existing_charge_command(self):
         """The pulse is armed by the elec-charge command ALREADY in the magic body (case 40),
         so the donor-matched animation script is never altered. Injects the lookup + proc."""
-        self.assertTrue(hasattr(eh, '_patch_banim_charge_flash'))
-        patched = ('BANIM_EKRBATTLE_H', 'BANIM_EFXMISC_C', 'BANIM_MAIN_C')
-        before = {name: open(getattr(eh, name), encoding='utf-8').read() for name in patched}
-        try:
-            eh._patch_banim_charge_flash()
-            header = open(eh.BANIM_EKRBATTLE_H, encoding='utf-8').read()
-            efxmisc = open(eh.BANIM_EFXMISC_C, encoding='utf-8').read()
-            main = open(eh.BANIM_MAIN_C, encoding='utf-8').read()
-            # data contract: a per-character/weapon table of BGR555 targets + a waveform pick.
-            self.assertIn('struct BanimChargeFlash', header)
-            self.assertIn('gMSChargeFlashes[]', header)
-            self.assertIn('u8 waveform;', header)
-            # the arm reads the CURRENT attacker (character + weapon), like the spell tint.
-            self.assertIn('void MSChargeFlashArm(struct Anim *anim)', efxmisc)
-            self.assertIn('GetItemType(bu->weaponBefore)', efxmisc)
-            # two LUTs: the vanilla 3-throb pulse (byte-identical) and a new single-swell build.
-            self.assertIn('static const u8 sMSChargeFlashSine[55] = { 0, 1, 3, 6, 10, 13, 17, '
-                          '20, 22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, '
-                          '22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, 22, '
-                          '23, 22, 20, 17, 13, 10, 6, 3, 1, 0 };', efxmisc)
-            self.assertIn('static const u8 sMSChargeFlashBuild[55]', efxmisc)
-            # proc + arm pick the LUT per-row via a waveform field.
-            self.assertIn('proc->waveform', efxmisc)
-            self.assertIn('it->waveform', efxmisc)
-            self.assertIn('proc->waveform ? sMSChargeFlashBuild[proc->timer] : '
-                          'sMSChargeFlashSine[proc->timer]', efxmisc)
-            # armed from the existing start-attack command (case 0x07) -- no motion.s change,
-            # and ~one settle beat before the wind-up arm-raise.
-            self.assertIn('MSChargeFlashArm(anim)', main)
-            self.assertIn('case 0x07:', main)
-        finally:
-            for name, text in before.items():
-                with open(getattr(eh, name), 'w', encoding='utf-8') as f:
-                    f.write(text)
+        header = patched_text('include/ekrbattle.h')
+        efxmisc = patched_text('src/banim-efxmisc.c')
+        main = patched_text('src/banim-main.c')
+        # data contract: a per-character/weapon table of BGR555 targets + a waveform pick.
+        self.assertIn('struct BanimChargeFlash', header)
+        self.assertIn('gMSChargeFlashes[]', header)
+        self.assertIn('u8 waveform;', header)
+        # the arm reads the CURRENT attacker (character + weapon), like the spell tint.
+        self.assertIn('void MSChargeFlashArm(struct Anim *anim)', efxmisc)
+        self.assertIn('GetItemType(bu->weaponBefore)', efxmisc)
+        # two LUTs: the vanilla 3-throb pulse (byte-identical) and a new single-swell build.
+        self.assertIn('static const u8 sMSChargeFlashSine[55] = { 0, 1, 3, 6, 10, 13, 17, '
+                      '20, 22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, '
+                      '22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, 22, '
+                      '23, 22, 20, 17, 13, 10, 6, 3, 1, 0 };', efxmisc)
+        self.assertIn('static const u8 sMSChargeFlashBuild[55]', efxmisc)
+        # proc + arm pick the LUT per-row via a waveform field.
+        self.assertIn('proc->waveform', efxmisc)
+        self.assertIn('it->waveform', efxmisc)
+        self.assertIn('proc->waveform ? sMSChargeFlashBuild[proc->timer] : '
+                      'sMSChargeFlashSine[proc->timer]', efxmisc)
+        # armed from the existing start-attack command (case 0x07) -- no motion.s change,
+        # and ~one settle beat before the wind-up arm-raise.
+        self.assertIn('MSChargeFlashArm(anim)', main)
+        self.assertIn('case 0x07:', main)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,71 @@
+From: Manchego Stars engine
+Subject: [PATCH] crit flourish (#11): a d20 pops on the crit-flash teardown
+
+#11: the cosmetic nat-20 flourish. When an FE crit fires in a battle anim,
+a d20 showing 20 pops on the effect layer (BG1) the exact frame the vanilla
+crit flash tears down -- both the plain crit flash AND the pierce-crit flash
+(Silencer is deliberately excluded: it has its own distinctive Chill flourish,
+and no MVP cast member can Silencer anyway). FE crit math stays the SOLE
+trigger: these teardowns only ever run on a crit round.
+
+The die is PROC-LESS: registered once, then the vanilla effect lifecycle owns
+BG1 -- a successor effect (brave second hit, magic counter's spell background)
+simply draws over it, and the battle-scene exit resets the layer. Nothing of
+ours ever clears BG1 later, so no lingering proc can blank a newcomer's
+tilemap mid-display (the clobber class a timed teardown would create). It is
+a centered HUD overlay copied through the non-mirrored tilemap path, so the
+"20" never mirrors with attacker side. Asset symbols (Img/Pal/Tsa_MsD20Crit)
+are injected from the campaign by inject.crit_flourish.inject_crit_flourish -- this
+patch is campaign-agnostic.
+
+Notes:
+
+hook BOTH crit-flash teardowns (plain + pierce); the bare body appears in
+more than one proc, so anchor on each enclosing function
+---
+diff --git a/src/banim-efxhit.c b/src/banim-efxhit.c
+index 76c28b9c22578a38f60ab530946f107b3a13121b..d2b658b8ad36e16e7104dbd9a80a205c881c49f0 100644
+--- a/src/banim-efxhit.c
++++ b/src/banim-efxhit.c
+@@ -82,6 +82,25 @@ void efxDamageMojiEffectOBJMain(struct ProcEfxDamageMojiEffectOBJ * proc)
+     }
+ }
+ 
++#include "constants/video-banim.h" /* OBJPAL_BANIM_SPELL_BG (MS #11) */
++
++/* MS #11: cosmetic nat-20 flourish -- drawn once at a crit flash teardown;
++   the vanilla effect lifecycle owns BG1 from there (a successor effect
++   overwrites it, the scene exit resets it). */
++extern const u16 Img_MsD20Crit[];
++extern const u16 Pal_MsD20Crit[];
++extern const u16 Tsa_MsD20Crit[];
++
++static void MsD20CritShow(void)
++{
++    SpellFx_RegisterBgGfx(Img_MsD20Crit, 0x2000);
++    SpellFx_RegisterBgPal(Pal_MsD20Crit, 0x20);
++    LZ77UnCompWram(Tsa_MsD20Crit, gEkrTsaBuffer);
++    EfxTmCpyBG(gEkrTsaBuffer, gBG1TilemapBuffer, 30, 20,
++               OBJPAL_BANIM_SPELL_BG, 0x100);
++    BG_EnableSyncByMask(BG1_SYNC_BIT);
++}
++
+ CONST_DATA struct ProcCmd ProcScr_efxCriricalEffect[] = {
+     PROC_NAME("efxCriticalEffect"),
+     PROC_REPEAT(efxCriricalEffectMain),
+@@ -142,6 +161,7 @@ void efxCriricalEffectBGMain(struct ProcEfxBG * proc)
+     if (++proc->timer == 0x11) {
+         SpellFx_ClearBG1();
+         SetDefaultColorEffects_();
++        MsD20CritShow(); /* MS #11: the nat-20 die takes the cleared layer */
+         Proc_Break(proc);
+     }
+ }
+@@ -373,6 +393,7 @@ void efxPierceCriticalEffectBGMain(struct ProcEfxBG * proc)
+     if (++proc->timer == 0x11) {
+         SpellFx_ClearBG1();
+         SetDefaultColorEffects_();
++        MsD20CritShow(); /* MS #11: the nat-20 die takes the cleared layer */
+         Proc_Break(proc);
+     }
+ }

@@ -1,0 +1,52 @@
+From: Manchego Stars engine
+Subject: [PATCH 7/14] banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)
+
+Route FE8 combat anim selection through the per-character unique table (#65 M-B).
+
+Vanilla FE8 picks the battle anim purely by CLASS (GetBattleAnimationId); the
+per-character _u25 -> gUnitSpecificBanimConfigs path (a FE7 holdover) is only wired to
+the weapon-triangle preview, not real combat. This swaps the four combat call sites to
+the _WithUnique variant so every NAMED unit (PCs, bosses) can carry a custom battle anim
+via data alone -- no cloned class slot per unit (the slot budget is only ~3). Generic
+enemy classes are unaffected (no unique character id). Campaign-agnostic.
+
+The out param widens from u32 animid to int, to match GetBattleAnimationId_WithUnique's
+signature.
+---
+diff --git a/src/banim-ekrbattleintro.c b/src/banim-ekrbattleintro.c
+index 0439092d236739931783b9dd907703a2ee843186..e74455df4edc17c4147048361a10dd4436f0ecd4 100644
+--- a/src/banim-ekrbattleintro.c
++++ b/src/banim-ekrbattleintro.c
+@@ -873,7 +873,7 @@ bool PrepareBattleGraphicsMaybe(void)
+     const void * animdef2;
+     s16 valid_l;
+     s16 valid_r;
+-    u32 animid1, animid2;
++    int animid1, animid2;
+ 
+     int char_cnt = 1;
+ 
+@@ -1003,19 +1003,19 @@ bool PrepareBattleGraphicsMaybe(void)
+ 
+     if (gEkrDistanceType == EKR_DISTANCE_PROMOTION)
+     {
+-        gBanimIdx[POS_L] = gBanimIdx_bak[POS_L] = GetBattleAnimationId(unit_bu1, animdef1, bu1->weapon, &animid1);
+-        gBanimIdx[POS_R] = gBanimIdx_bak[POS_R] = GetBattleAnimationId(unit_bu2, animdef2, bu2->weapon, &animid2);
++        gBanimIdx[POS_L] = gBanimIdx_bak[POS_L] = GetBattleAnimationId_WithUnique(unit_bu1, animdef1, bu1->weapon, &animid1);
++        gBanimIdx[POS_R] = gBanimIdx_bak[POS_R] = GetBattleAnimationId_WithUnique(unit_bu2, animdef2, bu2->weapon, &animid2);
+     }
+     else
+     {
+         if (valid_l)
+         {
+-            gBanimIdx[POS_L] = gBanimIdx_bak[POS_L] = GetBattleAnimationId(unit_bu1, animdef1, bu1->weaponBefore, &animid1);
++            gBanimIdx[POS_L] = gBanimIdx_bak[POS_L] = GetBattleAnimationId_WithUnique(unit_bu1, animdef1, bu1->weaponBefore, &animid1);
+         }
+ 
+         if (valid_r)
+         {
+-            gBanimIdx[POS_R] = gBanimIdx_bak[POS_R] = GetBattleAnimationId(unit_bu2, animdef2, bu2->weaponBefore, &animid2);
++            gBanimIdx[POS_R] = gBanimIdx_bak[POS_R] = GetBattleAnimationId_WithUnique(unit_bu2, animdef2, bu2->weaponBefore, &animid2);
+         }
+     }
+ 

@@ -50,7 +50,8 @@ class TheRegistry(unittest.TestCase):
         # What check.py's hand-pinned INJECTION_ORDER held (audit 2.6, #110), now carried by
         # the declarations: moving the later step ahead of the earlier one must be refused.
         for first, then in (
-                ('_inject_lord_select_engine', '_inject_lord_floor_engine'),
+                ('apply_engine_patches', 'inject_arena_presentation'),
+                ('apply_engine_patches', 'inject_ch04'),
                 ('inject_map_sprites', 'inject_enemy_class_reskins'),
                 ('inject_enemy_class_reskins', 'inject_enemy_class_battle_anims'),
                 ('inject_enemy_class_reskins', 'inject_ch01'),
