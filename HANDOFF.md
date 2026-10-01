@@ -6,7 +6,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-01 (Claude), after #421 (#408), #422 (#409) and #423 (#410). **What landed and why is in `git log`
+Refreshed 2026-10-01 (Claude), after #425 and #426 (#411). **What landed and why is in `git log`
 and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
@@ -31,8 +31,9 @@ comments** (latest: 2026-09-30, "the moves landed").
 | 5b | #408's last box: CI caches the injected build (#421, ADR 0303) | **done** |
 | 6a | #409 declared steps (#422, ADR 0304) | **done** |
 | 6b | #410 engine changes as a patch series (#423, ADR 0305) | **done** |
-| 6c | #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | **NEXT**, in that order |
-| 6d | #424 prune the ROM configurations; a change is gated only on the configs it can reach (never all twelve by default) | after #412 |
+| 6c | #411 message ids allocated by name (#425, ADR 0306) + chapter YAML schema at load (#426, ADR 0307) | **done** |
+| 6d | #412 blank-template chapters, landing with #302's shared chapter driver | **NEXT** |
+| 6e | #424 prune the ROM configurations; a change is gated only on the configs it can reach (never all twelve by default) | after #412 |
 | 7 | Trim this file again once the sequence lands | last |
 
 Then ch06's own body (#26) resumes -- see "Chapter work" below.
@@ -55,6 +56,9 @@ Then ch06's own body (#26) resumes -- see "Chapter work" below.
   manifest per configuration; the twelve configurations are in ADR 0304. ~2.5 min each on an
   idle Mac. A KILLED run leaves `.build-config.json`, `.build-scopes.json`, `.build-compiled`
   and `.injectcache` stashed as `*.fingerprint-bak`; move them back before the next run.
+- **A new message takes no hand-picked id**: name it in `inject/message_alloc.py`
+  `APPENDED_MESSAGES`, read it with `appended_message_id` (ADR 0306). **A new chapter YAML key**
+  goes into `tools/chapter_schema.py` first, or every loader refuses the file (ADR 0307).
 - **`inject.decomp.DECOMP` is the BUILD TREE; `inject.decomp.SUBMODULE` is vanilla** (ADR 0302).
   A new vanilla reader uses SUBMODULE; anything reading the injected tree or the ROM uses DECOMP.
 
