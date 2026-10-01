@@ -52,6 +52,7 @@ W = {
     'iron-axe':     Weapon('iron-axe',     8, 75,  0, 10, 'axe'),
     'steel-axe':    Weapon('steel-axe',    11, 65, 0, 15, 'axe'),
     'hand-axe':     Weapon('hand-axe',     7, 60,  0, 12, 'axe',   rng=(1, 2)),
+    'hatchet':      Weapon('hatchet',      4, 85,  0, 5,  'axe',   rng=(1, 2)),   # Ross's
     'iron-bow':     Weapon('iron-bow',     6, 85,  0, 5,  'bow',   rng=(2, 2),
                            effective=frozenset({'flier'})),
     'fire':         Weapon('fire',         5, 90,  0, 4,  'magic', rng=(1, 2)),

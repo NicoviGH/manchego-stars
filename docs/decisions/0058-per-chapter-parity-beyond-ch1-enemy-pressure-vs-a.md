@@ -82,14 +82,13 @@ vanilla Moulder, instead of an inflated 0.84 kills/round. **Healing itself stays
 disclaims it; both our and vanilla fields run a healer, so `durability(min)` understatement is largely a
 canceling artifact) — modeling heal-per-turn was scoped out as optional. _Implemented: 2026-06-20 (CLAUDE; pipeline track, TDD)_
 
-**The vanilla PLAYER deploy field is derived from the decomp per chapter, not hand-maintained (#61).**
-The party-side parity delta (our cast vs vanilla's deploy on the same enemy set) was keyed off a hand-curated
-`VANILLA_FIELDS` dict that only held Ch1, so every other chapter printed "delta skipped." It now derives from
-the decomp (HEAD) the same way the enemy force does: `PARITY_REFERENCE_ALLY_UDEFS` maps a chapter's
-`parity_reference` to the reference chapter's blue force-deploy + reinforcement `UnitDefinition` arrays
-(e.g. `UnitDef_Event_Ch1Ally`/`…AllyReinforce`, `UnitDef_Event_Ch2Ally`). Each named ally resolves to
+**The vanilla PLAYER party is derived from the decomp, not hand-maintained (#61).**
+The party-side parity delta (our cast vs vanilla's party on the same enemy set) derives from the decomp (HEAD)
+the same way the enemy force does. `vanilla_party` is everyone FE8 has recruited along Eirika's route by the
+twin chapter (`vanilla_recruits`, ADR 0310), so every twin on that route has a party. Each named ally resolves to
 **class base + its personal line** (the same donor-base inheritance our cast uses, via the unit's `.charIndex`)
-— allies are **not** autoleveled (CharacterData stores their join-level display stats), and the weapon is the
+— allies are **not** autoleveled (CharacterData stores their join-level display stats; ADR 0310 grows them to
+the level their own exp history reaches), and the weapon is the
 **first attacking item** (symmetry with how `player_combatant` models our cast; a staff-only ally → weaponless
 support per #62). `VANILLA_FIELDS` is deleted. The Ch1 delta is materially unchanged (throughput 3.74 → 3.69,
 durability/carry identical) — the small shift is *more* faithful (Seth/Franz now use their equipped first weapon

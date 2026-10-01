@@ -352,7 +352,14 @@ class Entering(unittest.TestCase):
                          {uid for uid, j in joins.items() if row['chapter_number'] >= j})
         self.assertEqual({uid: lv for uid, (_j, lv) in got['party'].items()},
                          {uid: prior['levels'][uid] for uid in got['party']})
-        self.assertEqual(got['twin_level'], prior['twin_level_after'])
+        self.assertEqual(got['vanilla'], prior['vanilla_levels'])
+
+    def test_the_vanilla_party_banks_the_prologue_our_guests_do_not(self):
+        # Eirika and Seth fight FE8's Prologue and keep the exp; Hlin and Scramsax are guests.
+        # Both fight a Ch1 worth about one level; only Eirika also carries the Prologue's exp.
+        into_ch2 = ec.entering('rime-of-the-frostmaiden', 2)
+        self.assertEqual(into_ch2['vanilla']['CHARACTER_EIRIKA'], 2)
+        self.assertEqual(into_ch2['party']['wolfram'], (1, 1))
 
 
 class GeneratedBlock(unittest.TestCase):

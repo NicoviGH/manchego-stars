@@ -267,8 +267,9 @@ choice, not the engine's arithmetic.
 
 **What reads it.** `make difficulty`'s per-chapter report fields the party this curve says
 arrives (`exp_curve.entering`): only the units that have joined, each at its typical level on
-entering, grown to the median of simulated level-ups on its growth donor. The vanilla allies it is compared with grow to
-the twin curve's level the same way. The cast table, the fielded party, the lord sweep and the
+entering, grown to the median of simulated level-ups on its growth donor. FE8's own party is set beside
+it: every vanilla recruit so far, run through the same exp model on vanilla's own force from
+its own join level, and grown the same way. The cast tables, the fielded party, the lord sweep and the
 vanilla delta all read that party (ADR 0310). The parity ratio does not read a party at all. It
 compares two enemy forces against a fixed yardstick, so a level fed to it would change nothing.
 

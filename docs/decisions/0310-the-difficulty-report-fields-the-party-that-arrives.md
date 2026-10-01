@@ -34,8 +34,20 @@ averages 1.77 rounds over the dice, and both point lines read 1.25. A minority o
 a doubling threshold, and that minority moves the average. A per-stat median is a planning
 line, and no single unit rolls exactly that.
 
-**The vanilla allies grow too.** They grow on their own growths to the twin curve's level
-wherever that is above their base level, so the parity delta compares two arriving parties.
+**FE8's own party arrives the same way.** `vanilla_recruits` walks Eirika's route from the
+Prologue to Ch6 and reads who joins from the decomp, assuming every recruit succeeds. A
+playable character (pid 0x01-0x22) joins at its first ARMED load, because cutscene loads carry
+no items. A blue load is on the field that chapter. A green or red load must be the target of a
+talk event and fields from the next chapter, which is our own recruit convention too. Item grants
+to a named character count (Eirika's Prologue Rapier); village gifts to whoever visits do not,
+as they do not for our cast. Cross-checked against Serenes Forest's recruit, base-stat and
+growth tables: all 14 recruits match on join level, bases and growths. One fine point: Lute
+joins by a Ch4 village visit, and the derivation fields her for the whole of Ch4.
+
+The exp model runs that party through vanilla's own force from each recruit's own join level
+(`exp_curve.simulate`'s `vanilla_levels`). The report prints it as a cast table beside ours, and
+the parity delta fields the best `deploy_limit` of each arriving party. The hand-curated
+force-deploy table (Ch1 and Ch2 only) is gone.
 
 **A recruit fights with the weapon the ROM gives it.** The unit YAML's `inventory:` where it
 has one. Otherwise the placing roster entry's inventory (sahnar's Killing Edge), and otherwise

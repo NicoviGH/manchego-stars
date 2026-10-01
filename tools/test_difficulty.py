@@ -1252,36 +1252,50 @@ class ReportSmoke(unittest.TestCase):
         self.assertIn('(staff)', out)          # Sclorbo rendered as weaponless support
 
 
-class VanillaAllies(unittest.TestCase):
-    """Integration: derive a parity reference's vanilla PLAYER deploy field from the decomp
-    (HEAD), keyed off the chapter's parity_reference -- the player-side yardstick (#61). Named
-    units resolve to class base + their personal line (mirroring our cast); a staff-only ally
-    (Moulder) resolves to weaponless support (mirroring our Sclorbo, #62)."""
+class VanillaParty(unittest.TestCase):
+    """Integration: FE8's own party at any twin on VANILLA_CHAIN, derived from the decomp (HEAD)
+    the way the enemy force is. Cross-checked 2026-10-01 against Serenes Forest's FE8 recruit,
+    base-stat and growth tables: all 14 recruits through Ch6 match on join level, bases and
+    growths. Named units resolve to class base + their personal line (mirroring our cast); a
+    staff-only healer resolves to weaponless support (mirroring our Sclorbo, #62)."""
 
-    def test_unmapped_reference_returns_none(self):
-        self.assertIsNone(df.vanilla_allies('FE8 Ch99'))
+    def test_a_twin_off_the_chain_has_no_party(self):
+        self.assertIsNone(df.vanilla_party('FE8 Ch13'))
 
-    def test_ch1_reference_is_the_four_deploy_units(self):
-        # FE8 Ch1 deploy: Eirika + Seth (Ally) + Franz + Gilliam (AllyReinforce), all blue.
-        allies = df.vanilla_allies('FE8 Ch1')
-        self.assertEqual({u.name for u in allies},
-                         {'Eirika', 'Seth', 'Franz', 'Gilliam'})
-        eirika = next(u for u in allies if u.name == 'Eirika')
-        self.assertEqual(eirika.weapon.name, 'rapier')
-        gilliam = next(u for u in allies if u.name == 'Gilliam')
-        # Stored personal line + Armor Knight base (from HEAD); not autoleveled.
+    def test_the_roster_is_fe8s_early_recruits_in_join_order(self):
+        joined = [(r.char.replace('CHARACTER_', '').title(), r.level,
+                   df.VANILLA_CHAIN[r.fields_from]) for r in df.vanilla_recruits()]
+        self.assertEqual(joined, [
+            ('Seth', 1, 'FE8 Prologue'), ('Eirika', 1, 'FE8 Prologue'),
+            ('Franz', 1, 'FE8 Ch1'), ('Gilliam', 4, 'FE8 Ch1'),
+            ('Vanessa', 1, 'FE8 Ch2'), ('Ross', 1, 'FE8 Ch3'), ('Garcia', 4, 'FE8 Ch3'),
+            ('Moulder', 3, 'FE8 Ch2'), ('Neimi', 1, 'FE8 Ch3'), ('Colm', 2, 'FE8 Ch4'),
+            ('Artur', 2, 'FE8 Ch4'), ('Lute', 1, 'FE8 Ch4'), ('Natasha', 1, 'FE8 Ch5'),
+            ('Joshua', 5, 'FE8 Ch6')])
+
+    def test_cutscene_loads_and_cameos_do_not_join(self):
+        # The Prologue throne room stands Moulder/Vanessa up unarmed, and Ch4's armed green
+        # Larachel/Dozla/Rennac have no talk recruit there.
+        chars = {r.char for r in df.vanilla_recruits()}
+        self.assertNotIn('CHARACTER_EPHRAIM', chars)
+        self.assertNotIn('CHARACTER_LARACHEL', chars)
+
+    def test_ch1_party_is_the_four_deploy_units(self):
+        party = df.vanilla_party('FE8 Ch1')
+        self.assertEqual({u.name for u in party}, {'Eirika', 'Seth', 'Franz', 'Gilliam'})
+        gilliam = next(u for u in party if u.name == 'Gilliam')
         self.assertEqual((gilliam.hp, gilliam.pow, gilliam.skl, gilliam.spd,
                           gilliam.df, gilliam.res, gilliam.lck, gilliam.con),
                          (25, 9, 6, 3, 9, 3, 3, 14))
 
-    def test_ch2_reference_fields_moulder_as_staff_only_support(self):
-        # FE8 Ch2 deploy adds Moulder (base Priest, heal staff only) -> weaponless support,
-        # exactly the healer-modeling #62 handles; the run must not crash.
-        allies = df.vanilla_allies('FE8 Ch2')
-        self.assertEqual({u.name for u in allies},
-                         {'Eirika', 'Seth', 'Franz', 'Gilliam', 'Moulder'})
-        moulder = next(u for u in allies if u.name == 'Moulder')
-        self.assertIsNone(moulder.weapon)
+    def test_eirika_carries_the_rapier_the_prologue_gives_her(self):
+        # Her joining load holds only a Vulnerary; GIVEITEMTO(CHARACTER_EIRIKA) adds the Rapier.
+        eirika = next(u for u in df.vanilla_party('FE8 Prologue') if u.name == 'Eirika')
+        self.assertEqual(eirika.weapon.name, 'rapier')
+
+    def test_every_recruit_but_the_healers_is_armed(self):
+        unarmed = {u.name for u in df.vanilla_party('FE8 Ch6') if u.weapon is None}
+        self.assertEqual(unarmed, {'Moulder', 'Natasha'})
 
 
 CAMPAIGN = 'rime-of-the-frostmaiden'
@@ -1379,11 +1393,13 @@ class PlayerArrivesLeveled(unittest.TestCase):
             df.report(CAMPAIGN, 'ch02')
         self.assertIn('the exp model refused: gorgon egg', out.getvalue())
 
-    def test_a_vanilla_ally_grows_only_above_its_own_base_level(self):
-        at_base = {u.name: u for u in df.vanilla_allies('FE8 Ch2')}
-        grown = {u.name: u for u in df.vanilla_allies('FE8 Ch2', level=1)}
-        self.assertEqual({n: u.hp for n, u in at_base.items()},
-                         {n: u.hp for n, u in grown.items()})
+    def test_a_vanilla_unit_grows_only_above_its_own_base_level(self):
+        # Gilliam's line is his L4 line: arriving at L4 grows nothing, at L5 it grows.
+        def gilliam(level):
+            return next(u for u in df.vanilla_party('FE8 Ch2', {'CHARACTER_GILLIAM': level})
+                        if u.name == 'Gilliam')
+        self.assertEqual(gilliam(4).hp, 25)
+        self.assertGreater(gilliam(8).hp, 25)
 
 
 class EnemyStatResolution(unittest.TestCase):

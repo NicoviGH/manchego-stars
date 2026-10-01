@@ -482,6 +482,11 @@ def simulate(campaign='rime-of-the-frostmaiden'):
     lead = _party(campaign, SHARE_LEAD)
     tail = _party(campaign, SHARE_TAIL)
     twin_party = _party(campaign)
+    # FE8's OWN party on its own route: each recruit at the level and chapter the decomp
+    # recruits it (`difficulty.vanilla_recruits`), fed the twin force. This is the party our
+    # cast is compared WITH; `twin_party` above is our cast fed the twin, the yield cross-check.
+    vanilla = [Career(r.char, r.class_enum, 1.0, r.fields_from, r.level)
+               for r in d.vanilla_recruits()]
     rows = []
     for chapter in inject.hosts.hosted_chapters():
         chap = inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))
@@ -511,6 +516,9 @@ def simulate(campaign='rime-of-the-frostmaiden'):
             # only difference between the two curves stays the enemy force.
             for career in twin_party:
                 career.fight(twin, cap, number)
+        if ref in d.VANILLA_CHAIN:
+            for career in vanilla:
+                career.fight(twin, cap, d.VANILLA_CHAIN.index(ref))
         rows.append({
             'id': chap.get('id'),
             'chapter_number': number,
@@ -523,6 +531,7 @@ def simulate(campaign='rime-of-the-frostmaiden'):
             'twin_pot': twin_pot,
             'yield_ratio': (pot / twin_pot) if twin_pot else None,
             'levels': {c.name: c.level for c in ours},
+            'vanilla_levels': {c.name: c.level for c in vanilla},
             'level_after': _mean_level(_founding(ours)),
             'level_after_exact': _mean_level_exact(_founding(ours)),
             'band_low': min(c.level for c in _founding(tail)),
@@ -545,17 +554,19 @@ def entering(campaign, chapter_number):
     """The party that walks INTO `chapter_number`, as the typical (even-share) career sees it.
 
     {'party': {uid: (join level, level on entering)} for every unit that has joined by this
-    chapter, 'twin_level': the twin party's founding mean on entering}. "On entering" is the
-    previous hosted chapter's closing level, so a chapter is never credited with its own exp.
-    This is what `difficulty.load_field(leveled=True)` fields (#430 step 1)."""
+    chapter, 'vanilla': {CHARACTER_*: level on entering} for FE8's own party, every recruit
+    so far, which `difficulty.vanilla_party` grows}. "On entering" is the previous hosted
+    chapter's closing level, so a chapter is never credited with its own exp. This is what
+    `difficulty.load_field(leveled=True)` fields (#430 step 1)."""
     before = [r for r in _simulated(campaign) if r['chapter_number'] < chapter_number]
     prior = before[-1] if before else None
     party = {}
     for uid, _cls, joins, joined in party_classes(campaign):
         if chapter_number >= joins:
             party[uid] = (joined, prior['levels'][uid] if prior else joined)
-    twin = prior['twin_level_after'] if prior and prior['twin_level_after'] else 1
-    return {'party': party, 'twin_level': twin}
+    vanilla = {r.char: prior['vanilla_levels'][r.char] if prior else r.level
+               for r in d.vanilla_recruits()}
+    return {'party': party, 'vanilla': vanilla}
 
 
 def _mean_level_exact(careers):
