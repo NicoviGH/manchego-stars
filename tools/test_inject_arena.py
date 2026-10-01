@@ -23,7 +23,7 @@ import inject.chapter_ids
 import inject.decomp
 import inject.hosts
 import inject.warm
-from inject import engine_hooks as eh
+from inject.engine_patches import patched_text
 from inject import source as injector  # the injector's source, every file of it (#389)
 
 
@@ -262,9 +262,8 @@ class ArenaPresentation(unittest.TestCase):
         self.assertIn('return 0x4B;', source)
         self.assertIn('return 0x67;', source)
 
-    def test_engine_hook_reaches_real_arena_ui_init_without_replacing_art_or_tsa(self):
-        vanilla = inject.decomp.vanilla_decomp_text('src/uiarena.c')
-        patched = eh._patch_arena_presentation_text(vanilla)
+    def test_engine_patch_reaches_real_arena_ui_init_without_replacing_art_or_tsa(self):
+        patched = patched_text('src/uiarena.c')
         init = patched[patched.index('void ArenaUi_Init'):patched.index('void sub_80B5970')]
         self.assertIn('StartTalkFace(GetArenaPresentationFace()', init)
         self.assertIn('ApplyPalettes(GetArenaPresentationPalette(), 0xC, 4);', init)
@@ -273,10 +272,8 @@ class ArenaPresentation(unittest.TestCase):
         self.assertNotIn('StartTalkFace(0x67,', init)
         self.assertNotIn('ApplyPalettes(gPal_ArenaBuildingFront,', init)
 
-    def test_combat_backdrop_hook_uses_the_cycle_binding_from_frame_zero(self):
-        vanilla = inject.decomp.vanilla_decomp_text('src/banim-ekrarena.c')
-        transform = getattr(eh, '_patch_arena_battle_background_text', lambda text: text)
-        patched = transform(vanilla)
+    def test_combat_backdrop_patch_uses_the_cycle_binding_from_frame_zero(self):
+        patched = patched_text('src/banim-ekrarena.c')
         self.assertIn('extern u16 * CONST_DATA PalArray_ArenaBattleBg[];', patched)
         self.assertIn('CpuFastCopy(PalArray_ArenaBattleBg[0], gPaletteBuffer + 0x60, 0x80);',
                       patched)
@@ -318,9 +315,12 @@ class ArenaPresentation(unittest.TestCase):
         self.assertIn('src/banim-ekrarena.c', inject.warm.PATCHED_DECOMP_FILES)
         self.assertIn('src/banim_terrain_data.c', inject.warm.PATCHED_DECOMP_FILES)
         from inject import steps
+        from inject import engine_patches
         ran = [step.name for step in steps.STEPS]
-        self.assertIn('_patch_arena_presentation', ran)
+        self.assertIn('apply_engine_patches', ran)
         self.assertIn('inject_arena_presentation', ran)
+        self.assertIn('src/uiarena.c', engine_patches.patched_files())
+        self.assertIn('src/banim-ekrarena.c', engine_patches.patched_files())
 
 
 if __name__ == '__main__':

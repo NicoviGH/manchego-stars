@@ -1,0 +1,28 @@
+From: Manchego Stars engine
+Subject: [PATCH 2/14] GetTerrainName: bounds-guarded against OOB terrain ids (defensive)
+
+Bounds-guard GetTerrainName against out-of-range terrain ids.
+
+gUnknown_0880D374 (the terrain -> name-message-id table) has only 65 entries.
+An out-of-range id -- e.g. the terrain-display window reading gBmMapTerrain at an
+OFF-MAP cursor position (which happens at chapter start when the lord rides a
+non-LORD-class slot, so the auto-cursor never centers it) -- indexes past the table,
+yielding a garbage gMsgTable[] pointer. The text decompressor then runs away and
+overruns gBmSt (camera/cursor), corrupting the screen and soft-locking. Vanilla never
+hit this because its lords are LORD-class; our campaign's aren't. Campaign-agnostic
+engine hardening: an invalid terrain id renders as terrain 0 instead of crashing.
+---
+diff --git a/src/bmmap.c b/src/bmmap.c
+index a8e3da933e84e15894d7f07d204fdc8b12570837..84765831c8443547583df2c19d5015e1076d9a4f 100644
+--- a/src/bmmap.c
++++ b/src/bmmap.c
+@@ -659,6 +659,9 @@ void RefreshEntityBmMaps(void) {
+ }
+ 
+ char* GetTerrainName(int terrainId) {
++    /* Guard OOB ids (e.g. off-map cursor); table has 65 entries. */
++    if ((unsigned int)terrainId >= 65)
++        terrainId = 0;
+     return GetStringFromIndex(gUnknown_0880D374[terrainId]);
+ }
+ 

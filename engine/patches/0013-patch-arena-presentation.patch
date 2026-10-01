@@ -1,0 +1,43 @@
+From: Manchego Stars engine
+Subject: [PATCH 13/14] Arena (#265): ArenaUi_Init selects optional campaign palette + chapter face
+
+Install the campaign-agnostic Arena presentation seam at the real init call site.
+
+Notes:
+
+_patch_arena_presentation_text: Route ArenaUi_Init's palette and attendant through build-generated selectors.
+
+Graphics and TSA stay on their vanilla symbols. The generated selectors carry explicit
+vanilla fallbacks, so an unconfigured campaign remains byte-semantically vanilla here.
+---
+diff --git a/src/uiarena.c b/src/uiarena.c
+index 1dc97807e7cd081df02064733fb80190d01887f5..3ded56b4d18db68f3a743f26060b7d641d46a03d 100644
+--- a/src/uiarena.c
++++ b/src/uiarena.c
+@@ -28,6 +28,8 @@ extern struct ProcCmd gProcScr_ArenaUiResultBgm[];
+ 
+ void StartArenaDialogue(int, ProcPtr);
+ void DrawArenaOpponentDetailsText(ProcPtr);
++const u16 * GetArenaPresentationPalette(void);
++int GetArenaPresentationFace(void);
+ 
+ //! FE8U = 0x080B5730
+ s8 sub_80B5730(void) {
+@@ -64,7 +66,7 @@ void ArenaUi_Init(ProcPtr proc) {
+ 
+     InitTalk(0x200, 2, 0);
+     ResetFaces();
+-    StartTalkFace(0x67, 0x20, 8, 3, 1);
++    StartTalkFace(GetArenaPresentationFace(), 0x20, 8, 3, 1);
+ 
+     Decompress(Tsa_ShopWindows, gGenericBuffer);
+ 
+@@ -118,7 +120,7 @@ void ArenaUi_Init(ProcPtr proc) {
+ 
+     Decompress(gGfx_ArenaBuildingFront, (void*)(GetBackgroundTileDataOffset(3) + VRAM));
+     CallARM_FillTileRect(gBG3TilemapBuffer, gTsa_ArenaBuildingFront, 0xc000);
+-    ApplyPalettes(gPal_ArenaBuildingFront, 0xC, 4);
++    ApplyPalettes(GetArenaPresentationPalette(), 0xC, 4);
+ 
+     BG_EnableSyncByMask(8);
+ 

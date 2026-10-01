@@ -4,7 +4,7 @@ import os
 import struct
 import sys
 
-from inject import engine_hooks
+from inject import engine_patches
 from inject.decomp import DECOMP, REPO
 from inject.paths import DATA_BANIM_S
 
@@ -76,7 +76,7 @@ def _crit_flourish_bins(png_path):
 
 def inject_crit_flourish(campaign, verbose=True):
     """The cosmetic nat-20 crit flourish (#11): the ENGINE half is a campaign-
-    agnostic hook (engine_hooks._inject_crit_d20_flourish -- a d20 pops on the
+    agnostic patch (engine/patches/optional/crit-d20-flourish.patch -- a d20 pops on the
     SpellFx layer when the vanilla crit flash tears down); the ART comes from the
     campaign (battle_anims/d20-crit.png). No asset -> neither half applies and
     combat stays pure vanilla."""
@@ -93,9 +93,9 @@ def inject_crit_flourish(campaign, verbose=True):
     with open(DATA_BANIM_S, encoding='utf-8') as f:
         already = '.global Img_MsD20Crit' in f.read()
     if already:
-        # idempotent like the C-side 'MS #11' guard: a second run in one process
-        # must not append duplicate labels (assembler: symbol already defined)
-        engine_hooks._inject_crit_d20_flourish()
+        # idempotent like the patch: a second run in one process must not append
+        # duplicate labels (assembler: symbol already defined)
+        engine_patches.apply_optional('crit-d20-flourish')
         return
     with open(DATA_BANIM_S, 'a', encoding='utf-8') as f:
         f.write('\n'.join([
@@ -106,7 +106,7 @@ def inject_crit_flourish(campaign, verbose=True):
                                        ('Pal_MsD20Crit', 'msd20crit_pal'),
                                        ('Tsa_MsD20Crit', 'msd20crit_tsa'))), []))
             + '\n')
-    engine_hooks._inject_crit_d20_flourish()
+    engine_patches.apply_optional('crit-d20-flourish')
     if verbose:
         print('  d20 flourish armed: %d B gfx + %d B tsa on the crit-flash teardown'
               % (len(img), len(tsa)))

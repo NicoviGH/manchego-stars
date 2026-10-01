@@ -1,0 +1,66 @@
+From: Manchego Stars engine
+Subject: [PATCH 12/14] item icons (#23): DrawIcon routes gMSPal2IconIds from BG bank 4 to custom bank 15
+
+Append a custom item palette without repurposing the two vanilla icon palettes.
+
+The palette asset grows from two to three source banks. An opted-in standard item icon loads the
+custom source into reserved BG bank 15 after the UI's own palette setup; the stock banks remain at
+4/5. Campaign-specific icon ids live in gMSPal2IconIds, not in this hook.
+
+Notes:
+
+_patch_draw_icon_pal2_text: Pure icon.c transform for the additive custom item palette hook.
+
+LoadIconPalettes preserves the vanilla two-bank load everywhere. DrawIcon loads source palette 2
+into reserved BG bank 15 only while drawing an opted-in standard item icon, after the caller has
+initialized its own UI palettes. Callers using other palette bases retain their vanilla selection.
+---
+diff --git a/include/icon.h b/include/icon.h
+index e6abfe8ed73c5b1a17da61391298f69f5012fa3a..82e8f126e8e026260d6d6bea7b5e46b3af1c0126 100644
+--- a/include/icon.h
++++ b/include/icon.h
+@@ -18,7 +18,7 @@ void DrawIcon(u16* BgOut, int IconIndex, int OamPalBase);
+ void ClearIconGfx(u32 Index);
+ void LoadIconObjectGraphics(int Index, int b);
+ 
+-extern const u16 item_icon_palette[2][16]; // Item Icon Palette
++extern const u16 item_icon_palette[3][16]; // Item Icon Palette + custom bank
+ extern const u8 item_icon_tiles[]; // Item Icon GFX
+ 
+ #endif  // GUARD_ICON_H
+diff --git a/src/icon.c b/src/icon.c
+index c85e1fcdb703f4e1fb72e05b0136f7dc2e00a80c..4da7b8f0507cd2df30e42aa10d25c6e7395dd4ba 100644
+--- a/src/icon.c
++++ b/src/icon.c
+@@ -2,6 +2,9 @@
+ #include "icon.h"
+ #include "hardware.h"
+ 
++/* MS (#23): iconIds that draw from the additive custom item palette. */
++extern const u16 gMSPal2IconIds[];
++
+ #define MAX_ICON_COUNT 224
+ #define MAX_ICON_GFX_COUNT 32
+ 
+@@ -91,7 +94,20 @@ void DrawIcon(u16* BgOut, int IconIndex, int OamPalBase)
+         BgOut[32] = 0;
+         BgOut[33] = 0;
+     } else {
+-        u16 Tile = GetIconTileIndex(IconIndex) + OamPalBase;
++        u16 Tile;
++        const u16* msPal2 = gMSPal2IconIds;
++        /* MS (#23): only the normal item-UI base (BG bank 4) can move to the
++           dedicated custom bank 15. Loading here follows the caller's UI setup. */
++        while (*msPal2 != 0xFFFF) {
++            if (*msPal2++ == IconIndex) {
++                if ((OamPalBase & 0xF000) == 0x4000) {
++                    ApplyPalette(item_icon_palette[2], 15);
++                    OamPalBase = (OamPalBase & 0x0FFF) | 0xF000;
++                }
++                break;
++            }
++        }
++        Tile = GetIconTileIndex(IconIndex) + OamPalBase;
+ 
+         BgOut[0]  = Tile++;
+         BgOut[1]  = Tile++;

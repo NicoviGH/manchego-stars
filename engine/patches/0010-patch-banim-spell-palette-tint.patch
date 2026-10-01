@@ -1,0 +1,257 @@
+From: Manchego Stars engine
+Subject: [PATCH 10/14] banim (#165): character/weapon spell palettes support campaign-declared tints
+
+Add a data-driven, caster-scoped spell-palette tint seam.
+
+Campaign data appends character/weapon-type rows. The engine records the matching
+tint for that spell dispatch in a dedicated EWRAM_OVERLAY(banim) global gMSSpellTint
+(declared beside gEfxSpellAnimExists, the proven-writable overlay section), recolors
+the spell's BG/OBJ palette uploads, and clears it with the existing SpellFx lifecycle.
+gEfxSpellAnimExists stays byte-vanilla. Normal effects and every unconfigured combatant
+remain vanilla.
+
+Notes:
+
+Ice/frost: blue channel dominant, green kept mid so the tint reads as a
+bright cyan-white frost rather than a dark navy; red suppressed.
+
+Flame cyan: red suppressed, GREEN and BLUE both pinned to the highlight so
+the tint reads as a bright equal-green-blue cyan (RGB 31,219,219), not the
+blue-dominant navy-ice of BanimSpellTintBlue.
+
+Gold: the MIRROR of the cyan above -- red pinned to the highlight and
+green just under it (a warm gold, not a lemon yellow), with blue
+suppressed the way cyan suppresses red. Exists so two casters sharing
+one donor AnimConf can still be told apart by the colour they cast;
+which characters those are is campaign data, not engine business.
+
+Clear the tint at spell teardown, alongside the vanilla gEfxSpellAnimExists reset.
+
+_spell_palette_tint_start: Record the current caster's tint in the dedicated spell-tint global.
+
+This decomp targets C89: keep all local declarations before executable
+statements in StartSpellAnimation.
+---
+diff --git a/include/ekrbattle.h b/include/ekrbattle.h
+index c1e8e8a11b95fbdcb4a2b8b596ed436fccd0fc9f..4ce04b515ff43a5ef58a36469de627495335e190 100644
+--- a/include/ekrbattle.h
++++ b/include/ekrbattle.h
+@@ -12,6 +12,23 @@ enum ekr_battle_unit_position {
+ 
+ int GetAnimPosition(struct Anim * anim);
+ 
++enum BanimSpellPaletteTintId {
++    BANIM_SPELL_TINT_NONE = 0,
++    BANIM_SPELL_TINT_GREEN = 1,
++    BANIM_SPELL_TINT_BLUE = 2,
++    BANIM_SPELL_TINT_CYAN = 3,
++    BANIM_SPELL_TINT_GOLD = 4,
++};
++
++struct BanimSpellPaletteTint {
++    u8 character;
++    u8 weapon_type;
++    u8 tint;
++};
++
++extern CONST_DATA struct BanimSpellPaletteTint gBanimSpellPaletteTints[];
++extern u8 gMSSpellTint;
++
+ enum ekr_hit_identifer {
+     EKR_HITTED = 0,
+     EKR_MISS
+diff --git a/src/banim-efxmagic.c b/src/banim-efxmagic.c
+index 81f30961668f718b0cce2a987c847feb5b898600..815ceaa8515a9f395c3f2377ef0e2fe7e17a6cb4 100644
+--- a/src/banim-efxmagic.c
++++ b/src/banim-efxmagic.c
+@@ -5,8 +5,28 @@
+ #include "efxmagic.h"
+ #include "hardware.h"
+ #include "bmlib.h"
++#include "bmbattle.h"
+ #include "ekrdragon.h"
+ 
++static u8 GetBanimSpellPaletteTint(struct Anim *anim)
++{
++    struct BattleUnit *bu;
++    const struct BanimSpellPaletteTint *it;
++
++    if (GetAnimPosition(anim) == EKR_POS_L)
++        bu = gpEkrBattleUnitLeft;
++    else
++        bu = gpEkrBattleUnitRight;
++
++    for (it = gBanimSpellPaletteTints; it->character != 0; it++) {
++        if (it->character == bu->unit.pCharacterData->number
++            && it->weapon_type == GetItemType(bu->weaponBefore))
++            return it->tint;
++    }
++
++    return BANIM_SPELL_TINT_NONE;
++}
++
+ CONST_DATA SpellAnimFunc gEkrSpellAnimLut[] = {
+     StartSpellAnimDummy,
+     StartSpellAnimHandAxe,
+@@ -95,6 +115,7 @@ u32 FramScr_Unk5D4F90[] = {
+ void StartSpellAnimation(struct Anim *anim)
+ {
+     s16 index = gEkrSpellAnimIndex[GetAnimPosition(anim)];
++    gMSSpellTint = GetBanimSpellPaletteTint(anim);
+ 
+ #if BUGFIX
+     if (gEkrSpellAnimLut[index](anim) == NULL)
+diff --git a/src/banim-ekrbattle.c b/src/banim-ekrbattle.c
+index 78fa029275233ff2d39ae229fddd6daa715396f5..c0574f2d5fc56a45c9aef2977383beb13a1ad893 100644
+--- a/src/banim-ekrbattle.c
++++ b/src/banim-ekrbattle.c
+@@ -66,6 +66,7 @@ EWRAM_OVERLAY(banim) u32 gEkrBattleEndFlag = 0;
+ /* efx */
+ EWRAM_OVERLAY(banim) u32 gEkrHpBarCount = 0;
+ EWRAM_OVERLAY(banim) u32 gEfxSpellAnimExists = 0;
++EWRAM_OVERLAY(banim) u8 gMSSpellTint = BANIM_SPELL_TINT_NONE;
+ EWRAM_OVERLAY(banim) u32 gUnknown_02017730 = 0;
+ EWRAM_OVERLAY(banim) u32 gEkrDeadExist = 0;
+ EWRAM_OVERLAY(banim) u32 gEkrDeadEventExist = 0;
+diff --git a/src/banim-ekrdispup.c b/src/banim-ekrdispup.c
+index c641efd4153acb77119610668fe9da82eff2ab7c..52d29551696814e6ea2eec2d954f06a5d36b7a0d 100644
+--- a/src/banim-ekrdispup.c
++++ b/src/banim-ekrdispup.c
+@@ -339,6 +339,7 @@ void EkrEfxStatusClear(void)
+ {
+     gEkrHpBarCount = 0;
+     gEfxSpellAnimExists = 0;
++    gMSSpellTint = BANIM_SPELL_TINT_NONE;
+     gUnknown_02017730 = 0;
+     gEkrDeadEventExist = 0;
+     gEfxQuakeExist = 0;
+diff --git a/src/banim-ekrutils.c b/src/banim-ekrutils.c
+index 8d82b4d02a3090a2605026b98bbc724fb00e65be..d8c1f2016e1f6d61e3aef811444673637cf4fe5a 100644
+--- a/src/banim-ekrutils.c
++++ b/src/banim-ekrutils.c
+@@ -340,6 +340,107 @@ void SpellFx_WriteBgMapExt(struct Anim * anim, const u16 * src, int width, int h
+     BG_EnableSyncByMask(BG1_SYNC_BIT);
+ }
+ 
++static u16 BanimSpellTintGreen(u16 color)
++{
++    int r = color & 0x1F;
++    int g = (color >> 5) & 0x1F;
++    int b = (color >> 10) & 0x1F;
++    int high = r;
++    int low = r;
++
++    if (g > high) high = g;
++    if (b > high) high = b;
++    if (g < low) low = g;
++    if (b < low) low = b;
++    if (high - low < 3)
++        return color;
++
++    return (low + (high - low) / 4)
++        | (high << 5)
++        | ((low + (high - low) / 6) << 10);
++}
++
++static u16 BanimSpellTintBlue(u16 color)
++{
++    int r = color & 0x1F;
++    int g = (color >> 5) & 0x1F;
++    int b = (color >> 10) & 0x1F;
++    int high = r;
++    int low = r;
++
++    if (g > high) high = g;
++    if (b > high) high = b;
++    if (g < low) low = g;
++    if (b < low) low = b;
++    if (high - low < 3)
++        return color;
++
++    return (low + (high - low) / 6)
++        | ((low + (high - low) / 2) << 5)
++        | (high << 10);
++}
++
++static u16 BanimSpellTintCyan(u16 color)
++{
++    int r = color & 0x1F;
++    int g = (color >> 5) & 0x1F;
++    int b = (color >> 10) & 0x1F;
++    int high = r;
++    int low = r;
++
++    if (g > high) high = g;
++    if (b > high) high = b;
++    if (g < low) low = g;
++    if (b < low) low = b;
++    if (high - low < 3)
++        return color;
++
++    return (low + (high - low) / 6)
++        | (high << 5)
++        | (high << 10);
++}
++
++static u16 BanimSpellTintGold(u16 color)
++{
++    int r = color & 0x1F;
++    int g = (color >> 5) & 0x1F;
++    int b = (color >> 10) & 0x1F;
++    int high = r;
++    int low = r;
++
++    if (g > high) high = g;
++    if (b > high) high = b;
++    if (g < low) low = g;
++    if (b < low) low = b;
++    if (high - low < 3)
++        return color;
++
++    return high
++        | ((low + (high - low) * 3 / 4) << 5)
++        | ((low + (high - low) / 6) << 10);
++}
++
++static void BanimSpellPaletteCopy(const u16 *src, u16 *dst, u32 size)
++{
++    u32 i;
++
++    if (gMSSpellTint == BANIM_SPELL_TINT_NONE) {
++        CpuFastCopy(src, dst, size);
++        return;
++    }
++
++    for (i = 0; i < size / sizeof(u16); i++) {
++        if (gMSSpellTint == BANIM_SPELL_TINT_BLUE)
++            dst[i] = BanimSpellTintBlue(src[i]);
++        else if (gMSSpellTint == BANIM_SPELL_TINT_CYAN)
++            dst[i] = BanimSpellTintCyan(src[i]);
++        else if (gMSSpellTint == BANIM_SPELL_TINT_GOLD)
++            dst[i] = BanimSpellTintGold(src[i]);
++        else
++            dst[i] = BanimSpellTintGreen(src[i]);
++    }
++}
++
+ void SpellFx_RegisterObjGfx(const u16 * img, u32 size)
+ {
+     u16 * dst = OBJ_VRAM0 + VRAMOFF_BANIM_SPELL_OBJ;
+@@ -349,7 +450,7 @@ void SpellFx_RegisterObjGfx(const u16 * img, u32 size)
+ 
+ void SpellFx_RegisterObjPal(const u16 * pal, u32 size)
+ {
+-    CpuFastCopy(pal, PAL_OBJ(OBJPAL_BANIM_SPELL_OBJ), size);
++    BanimSpellPaletteCopy(pal, PAL_OBJ(OBJPAL_BANIM_SPELL_OBJ), size);
+     EnablePaletteSync();
+ }
+ 
+@@ -362,7 +463,7 @@ void SpellFx_RegisterBgGfx(const u16 * img, u32 size)
+ 
+ void SpellFx_RegisterBgPal(const u16 * pal, u32 size)
+ {
+-    CpuFastCopy(pal, PAL_BG(OBJPAL_BANIM_SPELL_BG), size);
++    BanimSpellPaletteCopy(pal, PAL_BG(OBJPAL_BANIM_SPELL_BG), size);
+     EnablePaletteSync();
+ }
+ 

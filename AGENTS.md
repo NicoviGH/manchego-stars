@@ -94,7 +94,7 @@ enters it early"*; the rules that follow from them:
 | PC D&D Beyond JSON sheets | `data/pc-sheets/*.json` |
 | PC portrait URLs | `data/pc-sheets/portraits.json` |
 | FE8 decomp | `fireemblem8u/` (git submodule) |
-| Engine hooks (decomp string-patches) | `tools/inject/engine_hooks.py` (+ `tools/inject/decomp.py`) |
+| Engine changes (a patch series on the decomp) | `engine/patches/` (applied by `tools/inject/engine_patches.py`) |
 | Campaign data | `campaigns/rime-of-the-frostmaiden/` |
 | Planning docs | `docs/` |
 
@@ -118,9 +118,10 @@ cd fireemblem8u
 - No C99 features: no VLAs, no `//` comments in new C files (use `/* */`), no designated initializers (`.field = value`)
 - No `stdint.h` types in engine files — use the decomp's existing typedefs (`u8`, `u16`, `u32`, `s8`, `s16`, `s32`)
 - Match the existing file and function naming conventions in `fireemblem8u/src/`
-- New engine behavior ships as string-patch hooks in `tools/inject/engine_hooks.py` — never hand-edits
-  to the decomp. The injector writes `build/fireemblem8u` (a git worktree of the submodule, restored
-  on every build) and the `fireemblem8u` submodule itself stays vanilla (#408)
+- New engine behavior ships as a patch in `engine/patches/` (a plain C diff, applied with `git apply`;
+  `tools/inject/engine_patches.py` says how to edit one) — never hand-edits to the decomp. The
+  injector writes `build/fireemblem8u` (a git worktree of the submodule, restored on every build)
+  and the `fireemblem8u` submodule itself stays vanilla (#408)
 - Comments say **why**; the **what** lives in code + tests. When a change retires a mechanism or term,
   register its key phrases in `tools/check.py` `DEAD_CONCEPTS` in the same commit — the drift lint scans
   docs AND hand-written code comments (`docs/decisions.md` → "Comments are testimony").
@@ -132,7 +133,7 @@ cd fireemblem8u
 - Engine code (`engine/`, `fireemblem8u/src/`) must be campaign-agnostic
 - Campaign data (`campaigns/rime-of-the-frostmaiden/`) is injected at build time by `tools/build_campaign.py`
 - If you're about to hardcode "braulo" or "ch03" in a `.c` file — stop. It belongs in YAML.
-- Enforced: `check.py check_engine_campaign_agnostic` (CI + pre-commit) scans the hand-written engine sources (`engine/**`, `tools/inject/engine_hooks.py`, `decomp.py`) for any campaign character id and rejects it. (Chapter-number / plot-event references stay a review-judgment call.)
+- Enforced: `check.py check_engine_campaign_agnostic` (CI + pre-commit) scans the hand-written engine sources (`engine/**`, the patch series included, and `decomp.py`) for any campaign character id and rejects it. (Chapter-number / plot-event references stay a review-judgment call.)
 
 ## Coordination: feature-flow (one feature, one branch, one PR)
 
@@ -169,9 +170,9 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   decision record — the pointer that used to claim otherwise named nothing.
 - **Concurrent agents each get their own worktree** (two ROM builds in one tree corrupt each other;
   a single writer may work the provisioned main tree — see `HANDOFF.md`).
-- **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine hooks in
-  `tools/inject/`, guarded by `check.py check_engine_guards_present` — its tuple is the
-  authoritative hook list, don't cite a count). Desk ownership is a review judgment
+- **Engine/content invariant is a HARD gate** (the Boundary Rule above + the engine patch series in
+  `engine/patches/`, which applies whole or fails the build — the directory is the authoritative
+  list, don't cite a count). Desk ownership is a review judgment
   (`check_lane_ownership` is advisory).
 - Never commit the `fireemblem8u` submodule pointer.
 

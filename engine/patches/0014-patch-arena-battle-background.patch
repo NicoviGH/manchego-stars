@@ -1,0 +1,31 @@
+From: Manchego Stars engine
+Subject: [PATCH 14/14] Arena (#265): battle fade-in and palette cycle share campaign backdrop data
+
+Install the campaign-agnostic Arena combat palette seam at fade-in.
+
+Notes:
+
+_patch_arena_battle_background_text: Make the Arena battle fade-in use the same palette pointer array as its cycle.
+---
+diff --git a/src/banim-ekrarena.c b/src/banim-ekrarena.c
+index c1138d51e66d17a1a02c35fcdda32f4767f3c0cb..edf337109ea6a917286702ab9071b0fde037776d 100644
+--- a/src/banim-ekrarena.c
++++ b/src/banim-ekrarena.c
+@@ -8,6 +8,8 @@
+ #include "ekrbattle.h"
+ #include "constants/songs.h"
+ 
++extern u16 * CONST_DATA PalArray_ArenaBattleBg[];
++
+ EWRAM_DATA int gBaArenaFlag = 0;
+ 
+ //! FE8U = 0x0805B01C
+@@ -125,7 +127,7 @@ void ekrTogiInit_Init(ProcPtr proc)
+     NewEkrDispUP();
+     NewEkrBattle();
+ 
+-    CpuFastCopy(Pal_ArenaBattleBg_A, gPaletteBuffer + 0x60, 0x80);
++    CpuFastCopy(PalArray_ArenaBattleBg[0], gPaletteBuffer + 0x60, 0x80);
+     CpuFastCopy(gPaletteBuffer, gEfxPal, 0x400);
+     CpuFastCopy(gEfxPal, gPaletteBuffer, 0x400);
+     EfxPalBlackInOut(gPaletteBuffer, 0, 0x20, 0x10);

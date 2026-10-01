@@ -10,7 +10,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.arena
 import inject.item_icons
-from inject import engine_hooks as eh
+from inject.engine_patches import patched_text
 
 
 class ItemIconPal2(unittest.TestCase):
@@ -53,20 +53,8 @@ class ItemIconPal2(unittest.TestCase):
         self.assertIn('.hword 5', asm)
         self.assertIn('.hword 0xFFFF', asm)                     # terminator (no valid iconId is 0xFFFF)
 
-    def test_hook_loads_custom_bank_fifteen_without_changing_vanilla_load(self):
-        source = ('#include "hardware.h"\n\n'
-                  'void LoadIconPalettes(u32 Dest)\n'
-                  '{\n'
-                  '    ApplyPalettes(item_icon_palette[0], Dest, 2);\n'
-                  '}\n\n'
-                  'void DrawIcon(int IconIndex, int TileX, int TileY, int TILEREF)\n'
-                  '{\n'
-                  '    if (TILEREF == 0xFFFF) {\n'
-                  '    } else {\n'
-                  '        u16 Tile = GetIconTileIndex(IconIndex) + OamPalBase;\n'
-                  '    }\n'
-                  '}\n')
-        out = eh._patch_draw_icon_pal2_text(source)
+    def test_patch_loads_custom_bank_fifteen_without_changing_vanilla_load(self):
+        out = patched_text('src/icon.c')
         self.assertIn('ApplyPalettes(item_icon_palette[0], Dest, 2);', out)
         self.assertNotIn('ApplyPalette(item_icon_palette[2], 15);\n}', out)
         self.assertIn('gMSPal2IconIds', out)

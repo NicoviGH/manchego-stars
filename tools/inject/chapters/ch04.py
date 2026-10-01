@@ -3,14 +3,13 @@
 import os
 import sys
 
-from inject import engine_hooks
 from inject.cast import _classed_cast, char_symbol, CLASS_LOADOUT, PORTRAIT_MAP
 from inject.chapter_ids import (
     CH04_ENDING_MSG, CH04_ENDING_NO_LUPIN_MSG, CH04_GOAL_STATUS_MSG, CH04_GOAL_WINDOW_MSG,
     CH04_LUPIN_TALK_MSG, CH04_MOOSE_MOV_TABLE, CH04_MOOSE_MSG, CH04_MOOSE_PID, CH04_NIMSY_FID,
     CH04_OPENING_CARD_MSG, CH04_OPENING_FOREST_BG, CH04_OPENING_MSGS, CH04_REVEAL_MSGS,
     CH04_VILLAGE_SLOTS)
-from inject.decomp import _replace_brace_block, REPO
+from inject.decomp import _replace_brace_block, DECOMP, REPO
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH02_HOST_INDEX, CH04_EVENT_GROUP, CH04_HOST_INDEX
 from inject.maps import (
@@ -33,10 +32,11 @@ from inject.villages import (
     location_events, village_boxes, village_reward_item, village_script)
 
 
-# The cleared gForceDeploymentList terminator (engine_hooks hook 6). Campaign injection inserts
-# per-chapter force-deploy entries BEFORE it -- "any future per-chapter forced unit is added our
-# way, not via the vanilla by-slot table" (engine_hooks docstring).
+# The cleared gForceDeploymentList terminator (engine/patches/0005, lord select). Campaign
+# injection inserts per-chapter force-deploy entries BEFORE it -- "any future per-chapter forced
+# unit is added our way, not via the vanilla by-slot table" (that patch's message).
 _FORCE_DEPLOY_TERMINATOR = '    {-1, 0, 0},\n}'
+DATA_EVENT_TRIGGER_C = os.path.join(DECOMP, 'src', 'data_event_trigger.c')
 
 
 def _force_deployment_entries(pids, host_index):
@@ -57,14 +57,14 @@ def _force_deploy_units(pids, host_index):
     each build, so entries never accumulate across builds."""
     if not pids:
         return
-    with open(engine_hooks.DATA_EVENT_TRIGGER_C, encoding='utf-8') as f:
+    with open(DATA_EVENT_TRIGGER_C, encoding='utf-8') as f:
         text = f.read()
     if text.count(_FORCE_DEPLOY_TERMINATOR) != 1:
-        sys.exit('ERROR: gForceDeploymentList not in the expected cleared form (engine_hooks '
-                 'hook 6) -- cannot add a per-chapter force-deploy entry')
+        sys.exit('ERROR: gForceDeploymentList not in the expected cleared form (engine '
+                 'patch 0005) -- cannot add a per-chapter force-deploy entry')
     text = text.replace(_FORCE_DEPLOY_TERMINATOR,
                         _force_deployment_entries(pids, host_index) + _FORCE_DEPLOY_TERMINATOR, 1)
-    with open(engine_hooks.DATA_EVENT_TRIGGER_C, 'w', encoding='utf-8') as f:
+    with open(DATA_EVENT_TRIGGER_C, 'w', encoding='utf-8') as f:
         f.write(text)
 
 # ── Ch4 "The White Moose" (#24): hosted on chapter slot 5. The authored snowy map

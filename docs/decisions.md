@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-304 decisions. Read this index, then open the two or three you need — the whole
+305 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -444,6 +444,7 @@ session state. `HANDOFF.md` points here._
 | `0302` | [The ROM is built in build/fireemblem8u, a git worktree of the submodule; the submodule stays vanilla](decisions/0302-the-rom-is-built-in-a-worktree-of-the-submodule.md) | 2026-09-30 | #408 |
 | `0303` | [CI caches the INJECTED build with its compiled record, and pins agbcc's headers](decisions/0303-ci-caches-the-injected-build.md) | 2026-10-01 | #408 |
 | `0304` | [Injection steps declare what they write and need; the build holds them to it](decisions/0304-injection-steps-declare-what-they-write-and-need.md) | 2026-10-01 | #409 |
+| `0305` | [The engine changes are a patch series in this repo, not Python string patches (and not yet a fork)](decisions/0305-the-engine-changes-are-a-patch-series.md) | 2026-10-01 | #410 |
 
 ---
 

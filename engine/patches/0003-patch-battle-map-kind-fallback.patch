@@ -1,0 +1,33 @@
+From: Manchego Stars engine
+Subject: [PATCH 3/14] GetBattleMapKind: no-world-map fallback = STORY (slot 2+ chapters)
+
+A chapter load that resolves no world-map node is a STORY chapter, not a
+skirmish.
+
+GetBattleMapKind (worldmap_path.c) classifies most chapter slots by scanning
+gGMData's world-map node states and falls back to BATTLEMAP_KIND_SKIRMISH when
+no node matches. Vanilla can rely on that: story chapters on node slots are
+always entered THROUGH the world map, so a node always matches. Our campaign
+has no world map (boot and MNC2 go straight to the battle map), so gGMData is
+never populated and every node-slot chapter (slot 2+) misclassified as a
+SKIRMISH -- which swaps in EventScr_SkirmishCommonBeginning instead of the
+chapter's own beginning scene (bm.c CallBeginningEvents), hides the ally
+unit-definition table, and disables force-deployment. Campaign-agnostic
+hardening: the no-node fallback becomes STORY. (Skirmishes are unreachable
+without a world map, so the old fallback had no remaining legitimate hit.)
+---
+diff --git a/src/worldmap_path.c b/src/worldmap_path.c
+index cb4072afdb30c5cd80a798527ef7f92a059e2b03..84cebed7976c64cf4220cc78054e1d151bc5aeb5 100644
+--- a/src/worldmap_path.c
++++ b/src/worldmap_path.c
+@@ -2027,7 +2027,9 @@ u32 GetBattleMapKind(void)
+             return BATTLEMAP_KIND_STORY;
+     }
+ 
+-    return BATTLEMAP_KIND_SKIRMISH;
++    /* No world map in this hack: a load that resolves no node is a
++       story chapter (vanilla only reached this via WM skirmishes). */
++    return BATTLEMAP_KIND_STORY;
+ }
+ 
+ //! FE8U = 0x080BD20C

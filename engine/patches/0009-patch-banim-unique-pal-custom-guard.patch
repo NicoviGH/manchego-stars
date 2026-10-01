@@ -1,0 +1,64 @@
+From: Manchego Stars engine
+Subject: [PATCH 9/14] banim (#206): the per-CHARACTER palette no longer overwrites a custom banim's own
+
+Keep a custom unit's OWN palette against the per-CHARACTER override (#206).
+
+Third member of the #65 per-character set, after _patch_banim_character_unique (the anim
+lookup) and _patch_banim_palette_custom_guard (the class-keyed palette redirect). This
+one closes the character-keyed palette path -- see `_guard_banim_unique_pal_custom` for
+why a correct sprite came out miscoloured. Campaign-agnostic: the condition is "is this
+an appended banim", never "is this character X", so it covers every present and future
+custom-anim unit whatever slot it lands on. Guarded here and asserted by check.py
+check_engine_guards_present.
+
+Notes:
+
+_guard_banim_unique_pal_custom: Pure transform: stop FE8's per-CHARACTER battle palette from overwriting a CUSTOM
+(appended) banim's own palette.
+
+The second palette path, and the one that is invisible until a slot happens to collide.
+Beyond the class-keyed redirect `_guard_banim_palette_custom` covers, FE8 carries a
+per-character override keyed on character x CLASS: if `gAnimCharaPalConfig[pid][i]`
+matches the unit's class, `gBanimUniquePal[pos]` is set, and UpdateBanimFrame then
+LZ77s that palette OVER the one just loaded from the unit's own banim_data row.
+
+For vanilla that is the point (Seth's personal Paladin colours). For a #65 unit it is a
+silent repaint, because our cast wears vanilla character SLOTS: whenever a cast member's
+slot is a character that vanilla gave a personal palette for the very class the unit
+deploys as, the match fires and the custom palette is discarded. The sprite still draws
+perfectly -- tiles, OAM, sheets and binding are all untouched -- and ONLY the colours are
+wrong, which is what makes it so slow to find. Whether a given unit trips it is luck of
+the slot, so one custom anim can ship correct while the next is repainted. The worked
+case is in docs/decisions.md (Art & Audio, #206).
+
+So: require the unit's banim id to be a VANILLA one before the character palette may
+apply. Appended ids (>= first_custom_banim) keep the palette their own row carries, on
+whichever side of the screen they are standing. Vanilla units are byte-unchanged.
+Idempotent.
+
+_vanilla_banim_count: Count banim_data[] rows in the (vanilla, freshly-restored) banim_data.c. Engine hooks
+run after restore_vanilla_sources() and BEFORE inject_battle_anims appends our rows, so
+this is the vanilla count = the id of the first custom (appended) row.
+---
+diff --git a/src/banim-ekrbattleintro.c b/src/banim-ekrbattleintro.c
+index e74455df4edc17c4147048361a10dd4436f0ecd4..36a239298277472abdd6b0f5b519ea422330687b 100644
+--- a/src/banim-ekrbattleintro.c
++++ b/src/banim-ekrbattleintro.c
+@@ -1027,7 +1027,7 @@ bool PrepareBattleGraphicsMaybe(void)
+ 
+     for (i = 0; i < 7; i++)
+     {
+-        if (gAnimCharaPalConfig[pid][i] == jid && valid_l)
++        if (gAnimCharaPalConfig[pid][i] == jid && valid_l && gBanimIdx[POS_L] < 0xC9)
+         {
+             gBanimUniquePal[POS_L] = gAnimCharaPalIt[pid][i] - 1;
+             break;
+@@ -1042,7 +1042,7 @@ bool PrepareBattleGraphicsMaybe(void)
+ 
+     for (i = 0; i < 7; i++)
+     {
+-        if (gAnimCharaPalConfig[pid][i] == jid && valid_r)
++        if (gAnimCharaPalConfig[pid][i] == jid && valid_r && gBanimIdx[POS_R] < 0xC9)
+         {
+             gBanimUniquePal[POS_R] = gAnimCharaPalIt[pid][i] - 1;
+             break;

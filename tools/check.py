@@ -157,6 +157,9 @@ DEAD_CONCEPTS = [
     r'`?main\(?\)?`? (?:runs|calls) (?:every|~?\d+|all) checks? with (?:no|zero)',
     r'(?:no|zero) per-check (?:exception )?isolation in `?main',
     r'runs them with no isolation',
+    # retired by #410 (2026-10-01): the engine changes are a patch series, engine/patches/,
+    # applied with `git apply`. There is no hook module and no presence guard to cite.
+    r'engine_hooks', r'check_engine_guards_present', r'string-patch(?:es| hooks?)',
     # NOT registered here: `hasPrepScreen`. It IS a dead field (FE7 leftover, chapterdata.h:37 --
     # false for every chapter, including ones that plainly have prep) and citing it as evidence is
     # exactly the mistake that produced a bogus "our prep is a divergence" claim on 2026-07-29.
@@ -2353,98 +2356,16 @@ def check_generated_indexes_fresh(fail):
                         % (rel, mod.__name__))
 
 
-def check_engine_guards_present(fail):
-    """Engine-hardening guards + campaign-engine hooks must stay wired into the build.
-
-    The prologue garbage-band crash (debrief in docs/decisions.md) was a chapter whose
-    "lord" rides a non-LORD-class slot: FE8's chapter-start cursor centering derefs a NULL
-    leader unit, parks the cursor off-map, and an out-of-bounds terrain read runs the text
-    decoder away into gBmSt. Our whole cast uses non-lord slots, so EVERY chapter needs
-    these two campaign-agnostic guards (defined in tools/inject/engine_hooks.py, called
-    from build_campaign.py). Removing either silently
-    re-introduces the crash, so guard their presence here. (The patches themselves also
-    fail the build if the decomp source form changes -- see their `if orig not in text`.)
-    The campaign-engine hooks below are likewise build-time string-replaces that leave no
-    other trace, so a refactor could silently drop a shipped mechanic -- guard them too.
-    """
-    # The hooks now live in tools/inject/engine_hooks.py (pipeline-owned) and are
-    # orchestrated from tools/build_campaign.py (#50 file seam). Two precise checks per
-    # hook: it must be DEFINED in the engine-hooks module AND CALLED from the orchestrator.
-    # A refactor that drops either side fails here loudly.
-    eh = _read_text(os.path.join(REPO, 'tools', 'inject', 'engine_hooks.py'))
-    bc = _injector().injector_source()
-    for fn, mechanic in (
-            ('_patch_player_start_cursor_guard',
-             'the prologue garbage-band / off-map-cursor crash guard'),
-            ('_patch_terrain_name_guard',
-             'the out-of-bounds terrain-name read guard'),
-            ('_patch_battle_map_kind_fallback',
-             'the no-world-map STORY fallback for slot-2+ chapters'),
-            ('_patch_chapter_title_wm_fallback',
-             'the no-world-map chapter-title fallback (GetChapterTitleWM -> ROM chapTitleId); '
-             'without it a story chapter on a spawn-node slot (e.g. ch03 = Za\'ha Woods) '
-             'renders the WM skirmish name instead of its own title card'),
-            ('_inject_lord_select_engine',
-             'the #42 lord-select mechanic (GetPid / force-deploy / Seize / game-over '
-             'keyed to the chosen lead)'),
-            ('_inject_lord_floor_engine',
-             'the #45 lord survivability-floor one-time HP/Def/Res top-up, without which '
-             'the glass picks become traps'),
-            ('_patch_banim_character_unique',
-             'the #65 per-character battle-anim hook (combat -> GetBattleAnimationId_WithUnique, '
-             'reading _u25); without it every PC custom anim silently reverts to its class anim'),
-            ('_patch_banim_palette_custom_guard',
-             'the #65 GetBanimPalette guard (a custom appended banim keeps its OWN palette); '
-             'without it a custom-anim unit on an archer/sniper class mis-loads the vanilla bow '
-             'palette -- the RBG cyan mis-render'),
-            ('_patch_banim_unique_pal_custom_guard',
-             'the #206 per-CHARACTER banim-palette guard (gAnimCharaPalConfig may not repaint '
-             'an appended banim); without it any cast member whose vanilla SLOT had a personal '
-             'palette for the class it deploys as is silently miscoloured -- Baxby, on Forde\'s '
-             'slot, wore Forde\'s green Cavalier palette over his own axe-beak one'),
-            ('_patch_banim_spell_palette_tint',
-             'the #165 caster-scoped spell-palette tint seam (data-driven green Dark magic); '
-             'without it Marty\'s Flux (and any future tinted tome) silently reverts to the '
-             'vanilla spell palette'),
-            ('_patch_banim_charge_flash',
-             'the #183 per-caster charge flash (the caster\'s sprite pulses its signature '
-             'colour on the wind-up beat, armed from the existing elec-charge command); '
-             'without it the casters silently lose their charge tell'),
-            ('_inject_crit_d20_flourish',
-             'the #11 nat-20 crit flourish (a d20 pops on the SpellFx layer at the '
-             'crit-flash teardown) -- the d20, the whole D&D thesis, would silently '
-             'vanish from crits'),
-            ('_patch_draw_icon_pal2',
-             'the #23 additive item-icon palette hook (DrawIcon routes gMSPal2IconIds to '
-             'reserved BG bank 15); without it the pink Tourmaline silently reverts to pal-0 colours'),
-            ('_patch_arena_presentation',
-             'the #265 Arena presentation seam (ArenaUi_Init selects a generated campaign '
-             'palette and chapter attendant with vanilla fallbacks); without it the winter '
-             'palette and undead attendant are generated but never displayed'),
-            ('_patch_arena_battle_background',
-             'the #265 Arena combat backdrop seam (fade-in and three-state cycle share the '
-             'generated winter palettes); without it Arena fights remain warm or flash a '
-             'stale vanilla phase')):
-        if ('def %s(' % fn) not in eh:
-            fail.append('engine hook %s() not DEFINED in tools/inject/engine_hooks.py '
-                        '-- would silently drop %s (see docs/decisions.md)' % (fn, mechanic))
-        # Called directly, or registered as a step (inject/steps.py, #409).
-        if not re.search(r'engine_hooks\.%s(?=\s*[(,])' % fn, bc):
-            fail.append('engine hook %s() never CALLED (engine_hooks.%s(...)) from '
-                        'the injector -- would silently drop %s '
-                        '(see docs/decisions.md)' % (fn, fn, mechanic))
-
-
 # ── Engine campaign-agnosticism (the Engine/Content Boundary Rule, mechanized) ─────
 # Hand-written engine code must never name a campaign character: build_campaign INJECTS
 # names into the fireemblem8u working tree at build time, so the committed engine sources
 # stay reusable for any campaign ("braulo" belongs in YAML, not a .c). This was a
 # code-review rule (AGENTS.md Engine/Content Boundary Rule); now a gate. Scope = what WE
-# author -- engine/** + the engine-hook injectors; the fireemblem8u submodule is vanilla +
+# author -- engine/** (the engine patch series included, #410); the submodule is vanilla +
 # build-injected and never committed by us, so it's deliberately excluded. Decision:
 # docs/decisions.md -> Coordination model (mechanize the name-in-C check).
 ENGINE_SOURCE_GLOBS = ('engine/**/*.c', 'engine/**/*.h', 'engine/**/*.s',
-                       'tools/inject/engine_hooks.py', 'tools/inject/decomp.py')
+                       'engine/patches/**/*.patch', 'tools/inject/decomp.py')
 
 
 def _campaign_character_ids():
@@ -2616,7 +2537,7 @@ PIPELINE_EXCLUSIVE_FILES = {
 }
 PIPELINE_EXCLUSIVE_DIRS = ('tools/playtest/', 'tools/hooks/', '.github/workflows/')
 # build_campaign.py's passes moved to tools/inject/ in #389 and stayed content; the older
-# inject modules beside them (decomp, engine_hooks, hosts, ...) are shared, as they were.
+# inject modules beside them (decomp, hosts, ...) are shared, as they were.
 CONTENT_EXCLUSIVE_FILES = {
     'tools/build_campaign.py', 'tools/portrait_tool.py', 'tools/map_sprite_tool.py',
     'tools/ref_to_bust.py', 'tools/inject/arena.py', 'tools/inject/asset_table.py',
@@ -2823,7 +2744,7 @@ def _guarded_python_sources():
     """Every python source these two guards police: `tools/**`, RECURSIVELY.
 
     A non-recursive `tools/*.py` skipped `tools/inject/` and `tools/playtest/` outright --
-    including `engine_hooks.py`, whose whole job is decomp files. Two things are exempt and
+    the very modules whose whole job is decomp files. Two things are exempt and
     both for the same stated reason: `build_campaign.py` and `tools/inject/` DO the patching,
     so naming a patched path is their function rather than a mistake, and `check.py` hosts the
     registry itself.
@@ -3113,8 +3034,8 @@ def check_lane_ownership(fail):
     anim capture = its record* scenario + the sandbox build it fires on), and a hard glob block
     sawed such a feature in half. So this no longer fails -- it just surfaces, on a legacy
     `inst/<track>` branch, that a change touches the other desk's historical files, so the PR
-    review names the cross-desk contract. The HARD invariant is now check_engine_guards_present
-    (every hook in its guarded tuple -- count-free on purpose, the tuple is the truth); desk
+    review names the cross-desk contract. The HARD invariants are the engine patch series
+    (engine/patches/, applied whole or not at all) and check_engine_campaign_agnostic; desk
     ownership is reviewed at the PR. The glob map (above) is the seed
     of the desk map. Dormant on `feat/*` branches (no lane), which is the steady state."""
     for path, owner in _lane_violations(_current_lane(), _changed_files()):
@@ -3366,7 +3287,7 @@ CHECKS = (
     check_no_hardcoded_symbol_addresses, check_tool_refs_exist, check_no_dead_concepts,
     check_campaign_declares_no_chapter_list, check_skip_claims_name_a_live_test,
     check_one_tileset_default,
-    check_generated_indexes_fresh, check_engine_guards_present,
+    check_generated_indexes_fresh,
     check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
     check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
     check_wrap_widths_are_pixels, check_vanilla_reads_come_from_head,

@@ -10,7 +10,7 @@ issues: []
 
 So the pipeline track never has to open the content track's file. `tools/inject/decomp.py` holds the
 shared decomp-patch primitives (`_find_brace_block`, `_replace_brace_block`) + the decomp paths both
-sides patch; `tools/inject/engine_hooks.py` holds the 5 hooks (player-start-cursor guard, terrain-name
+sides patch; `inject/engine_hooks.py` holds the 5 hooks (player-start-cursor guard, terrain-name
 guard, battle-map-kind fallback, lord-select, lord-floor) + their engine-only path/flag constants.
 `build_campaign.py` imports from `decomp` and orchestrates `engine_hooks.*`. The 6 sprite/palette
 injection hooks **stay** in `build_campaign.py` (content-owned): new chapters bring new cast art, so

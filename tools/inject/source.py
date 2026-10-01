@@ -13,7 +13,7 @@ every module under `tools/inject/`. Three views, because the readers want three 
 
   * `injector_source()`   -- every file's CODE, concatenated: module docstrings and imports
                              blanked. For a pattern that names ONE thing (a table's
-                             assignment, `engine_hooks.X(`, a call text).
+                             assignment, a call text).
   * `def_source(name)`    -- one top-level definition, wherever it lives. For a reader that
                              inspects a single function's body.
   * `defs_source()`       -- every top-level function, and nothing between them. For a regex

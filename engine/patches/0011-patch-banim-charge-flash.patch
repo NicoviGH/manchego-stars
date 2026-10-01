@@ -1,0 +1,176 @@
+From: Manchego Stars engine
+Subject: [PATCH 11/14] banim (#183): casters pulse their signature colour on the wind-up charge beat
+
+Per-caster charge flash (#183): the caster's OWN battle sprite pulses toward a signature
+colour on the wind-up beat, WITHOUT altering the donor-matched animation script.
+
+Armed by the elec-charge command (0x28, `case 40`) ALREADY present in the faked magic body
+-- so no motion.s change. The arm looks up the current attacker (character + equipped weapon
+type) in the campaign-declared gMSChargeFlashes table; a configured caster spawns a proc that
+snapshots its OBJ palette and blends it toward the target BGR555 by a precomputed sine each
+frame, restoring it when the throb completes (bleeding into the cast). Vanilla casters hit the
+same command, find no row, and are byte-unchanged. Character binding + colour live in data.
+
+Notes:
+
+1. data contract in the banim header (beside the spell-tint struct).
+
+2. the extern arm prototype, beside the vanilla flash effect.
+
+3. the blend helper + pulse proc + arm, beside the vanilla flash effect handler.
+
+4. arm from the existing start-attack command (case 0x07) -- NO motion.s change. This is
+   ~one settle beat before the wind-up arm-raise (Nicolas: "start when he raises his arms,
+   or a tiny bit sooner"), vs the elec-charge marker which fires ~18 ticks too late. The arm
+   self-guards (Proc_Find) so the skill-flag re-entry in case 0x07 spawns exactly one pulse.
+
+The two lookup tables are precomputed so the engine needs no sin(); both are indexed by the
+proc timer over the same 54-frame window, so the shared timer bound needs no per-waveform
+special-casing:
+- pulse (waveform 0): a raised cosine (0 -> peak -> 0) repeated 3 times, as a fixed-point
+  wash factor out of 32 -- matching the approved multi-pulse mockup, NOT a single throb.
+  Peak ~0.72 (23/32); starts and ends at 0 (clean restore).
+- build (waveform 1, #191): one slow raised-cosine swell to 26/32, no repeats -- a building
+  glow for a caster whose YAML opts into it.
+---
+diff --git a/include/efxbattle.h b/include/efxbattle.h
+index 96960204c499d4feafa211cc23cba4b9fa6dd43b..aff6846c8a1891a7be50986c18c4f0d63793b394 100644
+--- a/include/efxbattle.h
++++ b/include/efxbattle.h
+@@ -2760,6 +2760,7 @@ void EfxLokmsunaIOBJMain(struct ProcEfxOBJ * proc);
+ void NewEfxKingPika(struct Anim * anim);
+ void EfxKingPikaMain(struct ProcEfx * proc);
+ void NewEfxFlashFX(struct Anim * anim);
++void MSChargeFlashArm(struct Anim * anim);
+ void EfxFlashFXMain(struct ProcEfx * proc);
+ void NewEfxSongOBJ2(struct Anim * anim);
+ void EfxSongOBJ2Main(struct ProcEfxOBJ * proc);
+diff --git a/include/ekrbattle.h b/include/ekrbattle.h
+index 4ce04b515ff43a5ef58a36469de627495335e190..d6f72e7df52773cbc97158a6157f3f311e328cad 100644
+--- a/include/ekrbattle.h
++++ b/include/ekrbattle.h
+@@ -29,6 +29,15 @@ struct BanimSpellPaletteTint {
+ extern CONST_DATA struct BanimSpellPaletteTint gBanimSpellPaletteTints[];
+ extern u8 gMSSpellTint;
+ 
++struct BanimChargeFlash {
++    u8 character;
++    u8 weapon_type;
++    u16 target;   /* BGR555 blend target */
++    u8 waveform;  /* 0 = pulse (3-throb), 1 = build (single slow swell) */
++};
++
++extern CONST_DATA struct BanimChargeFlash gMSChargeFlashes[];
++
+ enum ekr_hit_identifer {
+     EKR_HITTED = 0,
+     EKR_MISS
+diff --git a/src/banim-efxmisc.c b/src/banim-efxmisc.c
+index cea36d0748038a86b79593ac7e29e8ec32711aa0..2f457d8429ae22b0fc786f6343d54c04b701a9db 100644
+--- a/src/banim-efxmisc.c
++++ b/src/banim-efxmisc.c
+@@ -805,6 +805,91 @@ void EfxKingPikaMain(struct ProcEfx * proc)
+     }
+ }
+ 
++static const u8 sMSChargeFlashSine[55] = { 0, 1, 3, 6, 10, 13, 17, 20, 22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, 22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0, 1, 3, 6, 10, 13, 17, 20, 22, 23, 22, 20, 17, 13, 10, 6, 3, 1, 0 };
++
++/* #191: a single slow swell (waveform=1), vs the 3-throb pulse above (waveform=0). */
++static const u8 sMSChargeFlashBuild[55] = { 0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18, 19, 21, 22, 23, 24, 25, 25, 26, 26, 26, 26, 26, 25, 25, 24, 23, 22, 21, 20, 18, 17, 15, 14, 12, 11, 9, 8, 6, 5, 4, 3, 2, 1, 1, 0, 0, 0 };
++
++static u16 MSChargeBlend(u16 base, u16 target, int f)
++{
++    int r = base & 0x1F;
++    int g = (base >> 5) & 0x1F;
++    int b = (base >> 10) & 0x1F;
++    r += ((target & 0x1F) - r) * f / 32;
++    g += (((target >> 5) & 0x1F) - g) * f / 32;
++    b += (((target >> 10) & 0x1F) - b) * f / 32;
++    return r | (g << 5) | (b << 10);
++}
++
++struct ProcMSChargeFlash {
++    PROC_HEADER;
++    int timer;
++    u16 target;
++    u16 *pal;
++    u8 waveform;     /* 0 = pulse, 1 = build -- which LUT to index (#191) */
++    u16 saved[16];   /* snapshot of the actor palette (no .bss statics allowed here) */
++};
++
++void MSChargeFlashMain(struct ProcMSChargeFlash *proc);
++
++CONST_DATA struct ProcCmd ProcScr_msChargeFlash[] = {
++    PROC_NAME("msChargeFlash"),
++    PROC_REPEAT(MSChargeFlashMain),
++    PROC_END,
++};
++
++void MSChargeFlashMain(struct ProcMSChargeFlash *proc)
++{
++    int i;
++    int f = proc->waveform ? sMSChargeFlashBuild[proc->timer] : sMSChargeFlashSine[proc->timer];
++
++    for (i = 0; i < 16; i++)
++        proc->pal[i] = MSChargeBlend(proc->saved[i], proc->target, f);
++    EnablePaletteSync();
++
++    if (++proc->timer > 54) {
++        for (i = 0; i < 16; i++)
++            proc->pal[i] = proc->saved[i];
++        EnablePaletteSync();
++        Proc_Break(proc);
++    }
++}
++
++void MSChargeFlashArm(struct Anim *anim)
++{
++    struct BattleUnit *bu;
++    const struct BanimChargeFlash *it;
++    struct ProcMSChargeFlash *proc;
++    u16 *pal;
++    int i;
++    int pos = GetAnimPosition(anim);
++
++    if (Proc_Find(ProcScr_msChargeFlash) != NULL)
++        return;   /* one pulse per attack -- armed once at start-attack (case 0x07) */
++
++    if (pos == EKR_POS_L) {
++        bu = gpEkrBattleUnitLeft;
++        pal = PAL_OBJ(0x7);
++    } else {
++        bu = gpEkrBattleUnitRight;
++        pal = PAL_OBJ(0x9);
++    }
++
++    for (it = gMSChargeFlashes; it->character != 0; it++) {
++        if (it->character == bu->unit.pCharacterData->number
++            && it->weapon_type == GetItemType(bu->weaponBefore)) {
++            proc = Proc_Start(ProcScr_msChargeFlash, PROC_TREE_3);
++            proc->timer = 0;
++            proc->target = it->target;
++            proc->pal = pal;
++            proc->waveform = it->waveform;
++            for (i = 0; i < 16; i++)
++                proc->saved[i] = pal[i];
++            return;
++        }
++    }
++}
++
+ /**
+  * C51: banim_code_flash_white
+  */
+diff --git a/src/banim-main.c b/src/banim-main.c
+index 79bd2685c103ddaafb4d887a08fe298961d44808..0fc7eeabda25c13670689a061c440bc0f999ed75 100644
+--- a/src/banim-main.c
++++ b/src/banim-main.c
+@@ -188,6 +188,8 @@ void BattleAIS_ExecCommands(void)
+                  * Start attack animation
+                  */
+                 case 0x07:
++                    if (GetAISLayerId(anim) == 0)
++                        MSChargeFlashArm(anim);   /* MS #183: sync the charge flash to start-attack (just before the arm-raise) */
+                     if (GetRoundFlagByAnim(anim) & ANIM_ROUND_SURE_SHOT) {
+                         if (!(anim->state3 & ANIM_BIT3_BLOCKING)) {
+                             anim->state3 |= ANIM_BIT3_BLOCKING;
