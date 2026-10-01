@@ -76,6 +76,22 @@ class TheReach(unittest.TestCase):
         """`yaml_loader` is not under tools/inject, but every chapter reads YAML through it."""
         self.assertTrue(CH05_ARMS <= self.reached('tools/yaml_loader.py'))
 
+    def test_a_relative_import_is_followed(self):
+        """`chapter_frame` imports `event_group` as `from . import ...`, and ch05 frames its
+        event group through it (#428 review)."""
+        self.assertTrue(CH05_ARMS <= self.reached('tools/inject/event_group.py'))
+
+    def test_a_package_init_runs_for_every_module_under_it(self):
+        self.assertTrue(CH05_ARMS <= self.reached('tools/inject/chapters/__init__.py'))
+
+    def test_no_injector_file_reaches_nothing(self):
+        """Every file under tools/inject/ is a ROM input, so the default build at least."""
+        import glob
+        for path in glob.glob(os.path.join(fr.REPO, 'tools', 'inject', '**', '*.py'),
+                              recursive=True):
+            rel = os.path.relpath(path, fr.REPO)
+            self.assertIn('canonical', self.reached(rel), rel)
+
     def test_every_reached_configuration_says_why(self):
         for config, reasons in fr.reach(['tools/inject/chapters/ch05.py']).items():
             self.assertTrue(reasons, config)

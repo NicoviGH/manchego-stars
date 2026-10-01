@@ -67,19 +67,32 @@ def _module_files():
     return out
 
 
-def _imports(path, modules):
-    """The modules in `modules` that the file at `path` imports, by name."""
+def _imports(name, modules):
+    """The modules in `modules` that module `name` imports, by name.
+
+    Relative imports resolve against `name`'s package (`chapter_frame` imports `event_group`
+    as `from . import ...`), and importing a module runs every package `__init__` above it."""
+    path = modules[name]
     with open(os.path.join(REPO, path)) as fh:
         tree = ast.parse(fh.read(), path)
-    found = set()
+    package = name if path.endswith('__init__.py') else name.rpartition('.')[0]
+    named = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
-            found.update(a.name for a in node.names if a.name in modules)
-        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
-            if node.module in modules:
-                found.add(node.module)
-            found.update(node.module + '.' + a.name for a in node.names
-                         if node.module + '.' + a.name in modules)
+            named.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ''
+            if node.level:
+                up = package.split('.') if package else []
+                up = up[:len(up) - (node.level - 1)]
+                base = '.'.join(up + ([node.module] if node.module else []))
+            named.add(base)
+            named.update(base + '.' + a.name if base else a.name for a in node.names)
+    found = set()
+    for module in named:
+        parts = module.split('.')
+        found.update(p for p in ('.'.join(parts[:i]) for i in range(1, len(parts) + 1))
+                     if p in modules and p != name)
     return found
 
 
@@ -95,11 +108,13 @@ def _closures():
     while todo:
         name = todo.pop()
         if name not in graph:
-            graph[name] = _imports(modules[name], modules)
+            graph[name] = _imports(name, modules)
             todo.extend(graph[name])
 
     def closure(name):
-        seen, todo = set(), [name]
+        parts = name.split('.')
+        seen, todo = set(), [m for m in ('.'.join(parts[:i]) for i in range(1, len(parts) + 1))
+                             if m in graph]
         while todo:
             current = todo.pop()
             if current not in seen:
@@ -134,12 +149,16 @@ def reach(changed, configs=None):
 
     for path in changed:
         python = path.endswith('.py')
-        if (python and path not in injector) or (not python and not _rom_input(path)):
+        imported = python and path in injector
+        if not imported and not _rom_input(path):
             continue
         charge('canonical', '%s is read by the injection' % path)
-        if path in EVERYWHERE or not python:
-            why = ('%s holds every step\'s `when` and `call`' % path if python else
-                   '%s is data, and no step declares what it reads' % path)
+        if path in EVERYWHERE or not imported:
+            # A ROM input no import reaches is one the build loads some other way, so it
+            # cannot be charged to a step either.
+            why = ('%s holds every step\'s `when` and `call`' % path if path in EVERYWHERE
+                   else '%s is data, and no step declares what it reads' % path if not python
+                   else '%s is an injector file no import reaches' % path)
             for config in configs:
                 charge(config, why)
             continue
