@@ -317,9 +317,10 @@ class ArenaPresentation(unittest.TestCase):
         self.assertIn('src/uiarena.c', inject.warm.PATCHED_DECOMP_FILES)
         self.assertIn('src/banim-ekrarena.c', inject.warm.PATCHED_DECOMP_FILES)
         self.assertIn('src/banim_terrain_data.c', inject.warm.PATCHED_DECOMP_FILES)
-        build = injector.injector_source()
-        self.assertIn('engine_hooks._patch_arena_presentation()', build)
-        self.assertIn('inject_arena_presentation(args.campaign)', build)
+        from inject import steps
+        ran = [step.name for step in steps.STEPS]
+        self.assertIn('_patch_arena_presentation', ran)
+        self.assertIn('inject_arena_presentation', ran)
 
 
 if __name__ == '__main__':

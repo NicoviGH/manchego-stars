@@ -208,7 +208,10 @@ jobs:
           path: vanilla-build.tar
           key: ${{ steps.vanilla.outputs.key }}
 
+      # Strict: each injection step's writes are checked as it runs, naming the step (#409).
       - name: make green (inject campaign + build ROM)
+        env:
+          INJECT_STRICT: '1'
         run: make CAMPAIGN=rime-of-the-frostmaiden
 
       # Every run saves, PRs included: a PR's next push restores its own last build first.
