@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_scopes  # noqa: E402
 import build_tree  # noqa: E402
 from inject import chapter_data  # noqa: E402
+from inject import chapter_frame  # noqa: E402
 from inject import event_group  # noqa: E402
 from inject import steps  # noqa: E402
 from inject.chapter_ids import CH05_ENDING_ARMS  # noqa: E402
@@ -155,20 +156,16 @@ def main():
     # Every pass, in order, each declaring what it writes and needs (#409): inject/steps.py.
     ran = steps.run(steps.STEPS, args, _scopes, _anims)
     prologue_injected = 'inject_prologue' in [step.name for step in ran]
-    # LAST, because it reads what every injector above actually wrote: every
-    # ChapterEventGroup field must be WRITTEN or DECLARED-INHERITED, and anything nobody
-    # has ruled on fails the build here rather than being found by shipping a bug (#313).
-    print('event group census (#313):')
-    event_group.assert_census_declared(hosted=injected_chapters(prologue_injected))
-    print('  every ChapterEventGroup field is written or declared-inherited')
-    # The same question about the OTHER struct a hosted chapter squats. Five
-    # chapter_settings fields have shipped inherited-unexamined -- goal text ids (#207),
-    # battle grounds (#289), the difficulty triple (#303), `.traps` (#302), fog (#365) --
-    # each found one at a time by something else going wrong. This rules on all 98 at
-    # once, so there is no sixth to find that way (#396).
-    print('chapter data census (#396):')
-    chapter_data.assert_census_declared(hosted=injected_chapters(prologue_injected))
-    print('  every ROMChapterData field is written, pass-owned or declared-inherited')
+    # LAST, because they read what every injector above actually wrote. Each hosted chapter's
+    # settings row and event group were FRAMED from blank (#412): every field written, owned by
+    # a total pass, or inherited with a declared reason. These check that every chapter came
+    # through the frame, and that no pass wrote an inherited field behind its back.
+    print('chapter frame (#412):')
+    hosted = injected_chapters(prologue_injected)
+    chapter_frame.assert_framed(hosted)
+    event_group.assert_census_declared(hosted=hosted)
+    chapter_data.assert_census_declared(hosted=hosted)
+    print('  every hosted chapter is framed, and every inherited field still reads as its donor\'s')
     # The census rules on the twenty FIELDS; this rules on everything those fields lead
     # to. Our injectors edit a host slot's event-script file without rewriting every scene
     # in it, so untouched vanilla scenes sit in the files we write -- five of them staging

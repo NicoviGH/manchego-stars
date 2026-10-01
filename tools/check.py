@@ -85,6 +85,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #412: the chapter frame points the roster and reads list symbols from the group
+    r'assert_event_group_roster', r'CH0\d_EVENT_LISTS',
     # retired by #411: an appended message is reserved by the allocator, never by its writer
     r'set_message_body\([^)]*create=', r'neighbourhood sweep',
     r'build-campaign\.ts', r'build-events\.ts', r'pull-srd', r'map-class\.ts',

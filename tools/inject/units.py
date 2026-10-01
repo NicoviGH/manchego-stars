@@ -168,53 +168,6 @@ def declare_unit_table(symbol, rows, comment):
     return symbol
 
 
-def point_event_group_at(info, group, field, symbol):
-    """Pure: `info` (a chN-eventinfo.h) with ChapterEventGroup `group`.`field` -> `symbol`.
-
-    Declaring our own roster table is only half the job: the ENGINE reads the roster through
-    the ChapterEventGroup, so a table nobody points at is inert and the slot quietly keeps
-    using the vanilla one. That is not a hypothetical -- it shipped for one build of ch05 and
-    put the party on vanilla Ch6's start tiles, four of them inside walls, on a map whose
-    geometry is vanilla Ch5's. Nothing failed: PREP ran, the map drew, the scenario PASSed,
-    and only a unit-position dump showed it (INSPECT.units, added for exactly this).
-
-    ch03/ch04 never hit it because they block-overwrote the very table the group already
-    pointed at, so the link could not come undone. Owning the symbol means owning the pointer
-    too, and this is the half that has no symptom.
-    """
-    pattern = re.compile(r'(\.%s\s*=\s*)([A-Za-z_]\w*)' % re.escape(field))
-    body_start = info.index('struct ChapterEventGroup %s = {' % group)
-    body_end = info.index('};', body_start)
-    head, body, tail = info[:body_start], info[body_start:body_end], info[body_end:]
-    body, n = pattern.subn(lambda m: m.group(1) + symbol, body)
-    if n == 0:
-        sys.exit('ERROR: ChapterEventGroup %s has no .%s field to repoint' % (group, field))
-    return head + body + tail
-
-
-def assert_event_group_roster(info_path, group, symbol):
-    """Fail the BUILD if `group` does not deploy `symbol` on both difficulties.
-
-    The bug this closes has no symptom: a chapter whose group still points at the vanilla
-    ally table boots, runs PREP, draws the map, deploys a party and PASSes a load-test --
-    just on another map's coordinates. It is the ally-table twin of the host-slot/event-group
-    mis-target in docs/adding-a-chapter.md step 4, and it cost a build here.
-    """
-    with open(info_path, encoding='utf-8') as f:
-        info = f.read()
-    body = info[info.index('struct ChapterEventGroup %s = {' % group):]
-    body = body[:body.index('};')]
-    for field in ('playerUnitsInNormal', 'playerUnitsInHard'):
-        match = re.search(r'\.%s\s*=\s*([A-Za-z_]\w*)' % field, body)
-        if not match:
-            sys.exit('ERROR: %s has no .%s' % (group, field))
-        if match.group(1) != symbol:
-            sys.exit('ERROR: %s.%s deploys %s, not %s -- the chapter would field its roster '
-                     'on the HOST SLOT\'s tiles, which belong to a different map. Declaring '
-                     'a roster table does not wire it; point_event_group_at does.'
-                     % (group, field, match.group(1), symbol))
-
-
 def unit_table_definition(udefs, symbol, rows, comment):
     """Pure: `udefs` with a campaign-owned UnitDefinition table appended.
 

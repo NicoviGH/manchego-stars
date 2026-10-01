@@ -7,6 +7,7 @@ import sys
 from inject.cast import _classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT
 from inject.chapter_ids import CH06_BOAT_PIDS, CH06_GOAL_STATUS_MSG, CH06_GOAL_WINDOW_MSG
 from inject.decomp import _replace_brace_block, REPO
+from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
 from inject.maps import _register_chapter_map, _register_tileset, TILESET_STEMS
@@ -18,22 +19,9 @@ from inject.text import (
     vanilla_name_text_id)
 from inject.units import (
     _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, _items_with_drop_last,
-    assert_event_group_roster, chapter_label_constant, declare_unit_table, enemy_ai_initialiser,
-    point_event_group_at, safe_ai_clients)
+    chapter_label_constant, declare_unit_table, enemy_ai_initialiser, safe_ai_clients)
 
 
-# The host slot's event-list symbols. These CANNOT be renamed -- the ChapterEventGroup
-# chapter_settings.json resolves is built from them -- so they are named here and nowhere else.
-CH06_EVENT_LISTS = {
-    'turn': 'EventListScr_Ch7_Turn',
-    'character': 'EventListScr_Ch7_Character',
-    'location': 'EventListScr_Ch7_Location',
-    'misc': 'EventListScr_Ch7_Misc',
-    'select_unit': 'EventListScr_Ch7_SelectUnit',
-    'select_dest': 'EventListScr_Ch7_SelectDestination',
-    'unit_move': 'EventListScr_Ch7_UnitMove',
-    'tutorial': 'EventListScr_Ch7_Tutorial',
-}
 CH06_BEGINNING_SCRIPT = 'EventScr_Ch7_BeginningScene'
 CH06_ENDING_SCRIPT = 'EventScr_Ch7_EndingScene'
 # The Hard-only reinforcement wave. Vanilla Ch6 keeps three extra Cavaliers in their own
@@ -345,40 +333,25 @@ def inject_ch06(campaign, boot=False, verbose=True):
     repoint_boat_safe_ai_list([CH06_BOAT_PIDS['boat-east'], CH06_BOAT_PIDS['boat-west']],
                               'ch06 the two marooned hulls', owner='ch06')
 
-    # 3. Strip the host slot's event lists and wire ours. The list SYMBOLS are the only vanilla
-    #    names left in this function, and they come from CH06_EVENT_LISTS.
-    with open(CH06_EVENTINFO_H, encoding='utf-8') as f:
-        info = f.read()
-    info = _replace_brace_block(
-        info, CH06_EVENT_LISTS['turn'] + '[] =',
-        '{\n    TurnEventPlayer(0, %s, %d) /* Difficult-only crab-rider wave: %d */\n'
-        '    END_MAIN\n}' % (CH06_HARD_WAVE_SCRIPT, CH06_HARD_WAVE_TURN, len(wave_rows)),
-        CH06_EVENTINFO_H)
-    # Misc = the win/lose machinery and nothing else. DefeatBoss is an AFEV on
-    # EVFLAG_DEFEAT_BOSS, which Nerra's FLAGGED defeat quote sets on her death (step 5) --
-    # CA_BOSS alone fires nothing.
-    info = _replace_brace_block(
-        info, CH06_EVENT_LISTS['misc'] + '[] =',
-        '{\n    DefeatBoss(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}'
-        % CH06_ENDING_SCRIPT, CH06_EVENTINFO_H)
-    # Everything else is emptied, INCLUDING Location. That is a real decision and not an
-    # oversight: vanilla Ch7's list is a Seize plus two Houses, and ch06 has no village
-    # terrain anywhere on the map (the two former village bodies are the boat pockets, and
-    # their doors were repainted to FOREST precisely so no dead Visit prompt survives -- see
-    # the YAML's `terrain_divergence`). The boarding Talks are CHARACTER events, not Location
-    # ones, and they land with the boarding pass.
-    for key in ('character', 'location', 'select_unit', 'select_dest', 'unit_move', 'tutorial'):
-        info = _replace_brace_block(info, CH06_EVENT_LISTS[key] + '[] =',
-                                    '{\n    END_MAIN\n}', CH06_EVENTINFO_H)
-    # Point the group at OUR roster table. Declaring it is not enough -- the engine reads the
-    # roster through the ChapterEventGroup, and without this ch06 would run vanilla Ch7's ally
-    # table: the party deployed on another map's coordinates, with PREP running, the map drawn,
-    # and a load test that PASSes. See point_event_group_at.
-    for field in ('playerUnitsInNormal', 'playerUnitsInHard'):
-        info = point_event_group_at(info, CH06_EVENT_GROUP, field, CH06_ALLY_TABLE)
-    with open(CH06_EVENTINFO_H, 'w', encoding='utf-8') as f:
-        f.write(info)
-    assert_event_group_roster(CH06_EVENTINFO_H, CH06_EVENT_GROUP, CH06_ALLY_TABLE)
+    # 3. Wire ours into the host slot's event group; every list not named here is written
+    #    empty, INCLUDING Location. That is a real decision and not an oversight: vanilla Ch7's
+    #    list is a Seize plus two Houses, and ch06 has no village terrain anywhere on the map
+    #    (the two former village bodies are the boat pockets, and their doors were repainted to
+    #    FOREST precisely so no dead Visit prompt survives -- see the YAML's
+    #    `terrain_divergence`). The boarding Talks are CHARACTER events, not Location ones, and
+    #    they land with the boarding pass (#26). The roster is OUR table: pointing at vanilla
+    #    Ch7's would deploy the party on another map's coordinates, with PREP running, the map
+    #    drawn, and a load test that PASSes.
+    write_event_group('ch06', CH06_EVENTINFO_H, CH06_EVENT_GROUP, lists={
+        'turnBasedEvents':
+            '{\n    TurnEventPlayer(0, %s, %d) /* Difficult-only crab-rider wave: %d */\n'
+            '    END_MAIN\n}' % (CH06_HARD_WAVE_SCRIPT, CH06_HARD_WAVE_TURN, len(wave_rows)),
+        # Misc = the win/lose machinery and nothing else. DefeatBoss is an AFEV on
+        # EVFLAG_DEFEAT_BOSS, which Nerra's FLAGGED defeat quote sets on her death (step 5) --
+        # CA_BOSS alone fires nothing.
+        'miscBasedEvents': '{\n    DefeatBoss(%s)\n    CauseGameOverIfLordDies\n    END_MAIN\n}'
+                           % CH06_ENDING_SCRIPT,
+    }, roster=CH06_ALLY_TABLE, scenes=(CH06_BEGINNING_SCRIPT, CH06_ENDING_SCRIPT))
 
     # 4. The beginning scene, the Hard wave script and the ending. The beginning is the bare
     #    spine: LOMA rebuilds the battle map fresh, the line and both hulls LOAD, then CALL

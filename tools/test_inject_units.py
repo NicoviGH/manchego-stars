@@ -8,10 +8,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import inject.chapters.ch05
 import inject.decomp
 import inject.hosts
-import inject.paths
 import inject.units
 
 # Read the COMMITTED decomp, not the working tree -- the build overwrites donor portrait
@@ -98,57 +96,6 @@ class ChapterLabelConstants(unittest.TestCase):
         # Guards the parse against a chapters.h reformat, and pins the live ch05 answer.
         self.assertEqual(inject.units.chapter_label_constant(inject.hosts.CH05_HOST_INDEX), 'CHAPTER_L_5')
         self.assertEqual(inject.units.chapter_label_constant(inject.hosts.CH03_HOST_INDEX), 'CHAPTER_L_4')
-
-
-class EventGroupRosterPointer(unittest.TestCase):
-    """Declaring our own roster table is half the job -- the ENGINE reads the roster through
-    the ChapterEventGroup. A table nobody points at is inert, and the slot silently keeps
-    deploying the vanilla one: ch05 shipped one build that put the party on vanilla Ch6's
-    start tiles, four of them inside walls, while PREP ran and the load-test PASSed."""
-
-    INFO = ('CONST_DATA EventListScr EventListScr_Ch6_Turn[] = {\n    END_MAIN\n};\n\n'
-            'CONST_DATA struct ChapterEventGroup Ch6Events = {\n'
-            '    .turnBasedEvents = EventListScr_Ch6_Turn,\n'
-            '    .playerUnitsInNormal = UnitDef_Event_Ch6Ally,\n'
-            '    .playerUnitsInHard   = UnitDef_Event_Ch6Ally,\n'
-            '};\n')
-
-    def test_it_repoints_the_named_field(self):
-        out = inject.units.point_event_group_at(self.INFO, 'Ch6Events', 'playerUnitsInNormal',
-                                      'MS_Ch05DeployCap')
-        self.assertIn('.playerUnitsInNormal = MS_Ch05DeployCap,', out)
-        # the OTHER difficulty is a separate decision and must not move on its own
-        self.assertIn('.playerUnitsInHard   = UnitDef_Event_Ch6Ally,', out)
-
-    def test_it_does_not_touch_fields_outside_the_group(self):
-        out = inject.units.point_event_group_at(self.INFO, 'Ch6Events', 'playerUnitsInNormal',
-                                      'MS_Ch05DeployCap')
-        self.assertIn('EventListScr EventListScr_Ch6_Turn[] = {', out)
-        self.assertIn('.turnBasedEvents = EventListScr_Ch6_Turn,', out)
-
-    def test_a_missing_field_is_refused(self):
-        with self.assertRaises(SystemExit):
-            inject.units.point_event_group_at(self.INFO, 'Ch6Events', 'nosuchField', 'MS_Ch05DeployCap')
-
-    def test_the_live_ch05_group_deploys_our_table(self):
-        """The regression itself. Runs against the INJECTED tree, so it only means anything
-        after a build -- skipped on a clean checkout rather than failing or passing vacuously.
-
-        The skip has to key on a symbol only WE write. It used to look for
-        `struct ChapterEventGroup Ch6Events`, which is VANILLA's own and is present in a
-        pristine checkout -- so the guard never fired, and on CI (which runs `make test` before
-        any injection) the assertion ran against vanilla data and reported our roster pointer
-        missing. Nobody found out, because this class sat below `unittest.main()` and had never
-        run. `MS_Ch05DeployCap` is ours: absent pristine, present once injected.
-        """
-        if not os.path.exists(inject.paths.CH05_EVENTINFO_H):
-            self.skipTest('decomp not present')
-        with open(inject.paths.CH05_EVENTINFO_H, encoding='utf-8') as f:
-            if inject.chapters.ch05.CH05_ALLY_TABLE not in f.read():
-                self.skipTest('tree not injected (no %s) -- run a build first'
-                              % inject.chapters.ch05.CH05_ALLY_TABLE)
-        inject.units.assert_event_group_roster(inject.paths.CH05_EVENTINFO_H, inject.hosts.CH05_EVENT_GROUP,
-                                     inject.chapters.ch05.CH05_ALLY_TABLE)
 
 
 if __name__ == '__main__':

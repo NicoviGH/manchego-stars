@@ -1,12 +1,15 @@
-"""The ChapterEventGroup census: every field WRITTEN, or DECLARED-INHERITED with a reason.
+"""The ChapterEventGroup ruling: every field WRITTEN, owned by a pass, or DECLARED-INHERITED.
 
-A hosted chapter adopts a vanilla host slot, and every field we do not write keeps the donor's
-value. Silently. That failure class has landed five times -- goal text ids (#207), battle
+A hosted chapter adopts a vanilla host slot, and every field we did not write used to keep the
+donor's value. Silently. That failure class landed five times -- goal text ids (#207), battle
 grounds (#289), difficulty numbers (#303), `.traps` (#306, which would have shipped vanilla
 Ch7's two ballistae on ch06) -- and each was found one at a time, by something else going
 wrong. In IaC terms it is `terraform import`: adopt a pre-existing resource and every unlisted
-attribute keeps whatever it had. The answer is never a better runbook; it is to enumerate the
-attribute set and require every attribute to be accounted for.
+attribute keeps whatever it had.
+
+The group is now FRAMED from blank (`chapter_frame.write_event_group`, #412), and the tables at
+the bottom of this module are what the frame reads. The census lists them; the build checks the
+bytes only for what they leave inherited. The reachability walk (#398) lives here too.
 
 Kept STDLIB-ONLY, like `hosts.py` and `decomp.py` beside it, so `tools/check.py` can lint it in
 CI's lightweight job (which installs pyyaml and nothing else).
@@ -416,47 +419,33 @@ def injected(paths=('src/events',)):
     return out.returncode == 0 and bool(out.stdout.strip())
 
 
-def census(chapter, hosted=None):
-    """{field: WRITTEN/INHERITED/ABSENT} for one hosted chapter's ChapterEventGroup.
-
-    Only meaningful on an INJECTED tree -- see `injected()`. The build guard runs after every
-    injector for exactly that reason.
-    """
-    from . import hosts
-    rows = hosted if hosted is not None else hosts.hosted_chapters()
-    row = next((h for h in rows if h.name == chapter), None)
-    if row is None:
-        raise KeyError('%s is not a hosted chapter' % chapter)
-    relpath = header_for(row.event_group)
-    with open(os.path.join(DECOMP, relpath), encoding='utf-8') as fh:
-        ours = initializer(row.event_group, fh.read())
-    vanilla = initializer(row.event_group, vanilla_header(relpath))
-    return classify(fields(), ours, vanilla, rewritten_symbols(ours.values()))
-
-
 # --- the ruling ------------------------------------------------------------------------
 #
-# Every field a hosted chapter INHERITS needs a reason here, and a field with no reason fails
-# the build. That is the whole guard: this failure class has landed five times -- goal text
-# ids (#207), battle grounds (#289), difficulty numbers (#303), `.traps` (#306) -- and every
-# instance was found one at a time, by something else going wrong.
-#
-# These reasons hold for every hosted chapter, because the inherited SET is the same eleven
-# fields on ch01-ch05. A chapter needing its own ruling gets an entry in
-# DECLARED_INHERITED_BY_CHAPTER, which is consulted first.
+# A hosted chapter's group is FRAMED from blank (`chapter_frame.write_event_group`, #412): every
+# field is written by the frame, owned by a total pass, or inherited with a reason below. The
+# frame refuses a field nobody rules on before it writes anything, so this table is the data it
+# reads, and `census` is a listing of it rather than a guess from the bytes.
+
+LISTS = ('turnBasedEvents', 'characterBasedEvents', 'locationBasedEvents', 'miscBasedEvents',
+         'specialEventsWhenUnitSelected', 'specialEventsWhenDestSelected',
+         'specialEventsAfterUnitMoved', 'tutorialEvents')
+ROSTERS = ('playerUnitsInNormal', 'playerUnitsInHard')
+SCENES = ('beginningSceneEvents', 'endingSceneEvents')
+
+FRAME_WRITER = 'write_event_group'
+OWNED_BY_PASS = dict([(f, FRAME_WRITER) for f in LISTS + ROSTERS + SCENES] +
+                     # Total over the hosted chapters, from each chapter YAML's `traps:` (#306).
+                     [('traps', 'apply_chapter_traps')])
+
+
+def owner_for(field):
+    """The pass that writes this group field for every hosted chapter, or None."""
+    return OWNED_BY_PASS.get(field)
+
+
 DECLARED_INHERITED = {
-    # Vanilla ships these four lists EMPTY -- the bodies are a bare `END_MAIN`. There is no
-    # donor behaviour to leak, so inheriting them is inheriting nothing. Checked, not assumed:
-    # the census compares the TARGET, so if vanilla ever filled one of these the field would
-    # still read INHERITED and this reason would be wrong -- which is why the reason names
-    # the emptiness rather than the field.
-    'specialEventsWhenUnitSelected': 'vanilla ships this list empty (END_MAIN): nothing to leak',
-    'specialEventsWhenDestSelected': 'vanilla ships this list empty (END_MAIN): nothing to leak',
-    'specialEventsAfterUnitMoved':   'vanilla ships this list empty (END_MAIN): nothing to leak',
-    'tutorialEvents':                'vanilla ships this list empty (END_MAIN): nothing to leak',
-    # Same shape, different table: TrapData_Event_ChNHard is TRAP_NONE on every slot we host.
-    # ch05's NORMAL traps ARE written (#306 declared the tomb depression open ground), and the
-    # hard-mode table needs no declaration of its own while it is already empty.
+    # The hard-mode trap table is TRAP_NONE on every slot we host, so there is nothing to leak.
+    # A chapter whose hard mode wants traps of its own makes this a pass like `.traps`.
     'extraTrapsInHard': 'vanilla ships this table as TRAP_NONE on every slot we host',
 
     # THE SIX SKIRMISH ROSTERS. Nicolas, 2026-08-23: *"Vanilla has those optional skirmishes
@@ -478,39 +467,10 @@ DECLARED_INHERITED = {
     'enemyUnitsChoice3InEncounter':  'skirmishes are IN scope; rosters authored with the world map (#29)',
 }
 
-# chapter -> {field: reason}, consulted before the shared table above.
-DECLARED_INHERITED_BY_CHAPTER = {
-    # FOUND BY THIS GUARD, on the day it was written -- a sixth instance of the failure class,
-    # and the first that was not discovered by something else going wrong. Every other hosted
-    # chapter writes its misc list; ch02 alone keeps the donor's. Checked rather than assumed:
-    # vanilla Ch3's misc list is exactly `CauseGameOverIfLordDies` and nothing else, which IS
-    # ch02's declared lose_condition (`all_player_units_defeated`, the FE8 lord rule), and its
-    # `defeat_all` objective is FE8's default when no DefeatBoss/Seize is declared, so it wants
-    # no misc entry of its own. The donor's value is correct here by coincidence of design, not
-    # by intent -- which is the reason worth writing down.
-    'ch02': {'miscBasedEvents': "vanilla Ch3's misc list is CauseGameOverIfLordDies alone, "
-                                "which is ch02's declared lose_condition; its defeat_all "
-                                "objective needs no misc entry"},
-    # ch06 is the first hosted chapter with NOTHING in its Character list, and vanilla Ch7's is
-    # already `{ END_MAIN }` -- so the injector writes the same bytes the donor ships and the
-    # census correctly reads INHERITED. Nothing leaks, because there is nothing there.
-    #
-    # This one is TEMPORARY by construction and says so: ch06 owes two boarding Talks (one CHAR
-    # entry per deployable PC x boat, sharing that boat's flag -- the chapter YAML's
-    # `rescue_boats` engine note). The moment they are wired the field becomes WRITTEN, and this
-    # guard then fails on the STALE DECLARATION rather than letting it sit here forever.
-    'ch06': {'characterBasedEvents': "vanilla Ch7 ships this list empty (END_MAIN): nothing to "
-                                     "leak. ch06's only character events are the boat-boarding "
-                                     'Talks, which land with the boarding pass (#26)'},
-    # The prologue is the one chapter that does NOT retarget its host slot (inject/hosts.py):
-    # it keeps Ch1Events and writes its scenes into the slot's own scripts, so almost the whole
-    # group reads inherited by construction rather than by oversight.
-    'prologue': dict((f, 'the prologue does not retarget its slot -- it keeps Ch1Events '
-                         '(see inject/hosts.py)') for f in (
-        'turnBasedEvents', 'characterBasedEvents', 'locationBasedEvents', 'miscBasedEvents',
-        'traps', 'playerUnitsInNormal', 'playerUnitsInHard',
-        'beginningSceneEvents', 'endingSceneEvents')),
-}
+# chapter -> {field: reason}, consulted before the shared table above. Empty: every chapter's
+# frame writes all eight lists, its roster and its scenes. A chapter that keeps one of its
+# donor's lists on purpose says so here, and the frame leaves that list alone.
+DECLARED_INHERITED_BY_CHAPTER = {}
 
 
 def reason_for(chapter, field):
@@ -519,42 +479,56 @@ def reason_for(chapter, field):
     return per.get(field) or DECLARED_INHERITED.get(field)
 
 
-def assert_census_declared(censuses=None, declared=None, hosted=None):
-    """Guard: every ChapterEventGroup field is WRITTEN or DECLARED-INHERITED, nothing else.
+UNRULED = 'UNRULED'
 
-    Runs in the build, after the injectors, because the census reads what they actually wrote.
-    A field nobody has ruled on -- including one that appears in the struct upstream tomorrow
-    -- fails here rather than being discovered by shipping a bug.
 
-    A declaration for a field we actually WRITE fails too. A reason nobody needs is a reason
-    nobody rechecks, and left standing it is how a field keeps a stale justification after it
-    stops being inherited.
-    """
-    import sys
-    known = set(fields())
-    if censuses is None:
-        from . import hosts
-        rows = hosted if hosted is not None else hosts.hosted_chapters()
-        censuses = dict((h.name, census(h.name, rows)) for h in rows)
+def census(chapter):
+    """{field: WRITTEN/INHERITED/UNRULED} for one hosted chapter: the frame's ruling, listed.
+
+    Read from the declarations, not the tree, so `make chapter` can list it on a clean checkout.
+    UNRULED never survives a build -- the frame exits on it -- and is reported so a listing
+    of a half-edited table says so rather than guessing."""
+    out = {}
+    for field in fields():
+        reason = reason_for(chapter, field)
+        if owner_for(field) and not (field in LISTS and reason):
+            out[field] = WRITTEN
+        else:
+            out[field] = INHERITED if reason else UNRULED
+    return out
+
+
+def behind_the_frame(chapter, kept, ours, vanilla, rewritten=None):
+    """Pure: a problem for each field the frame left INHERITED that no longer reads as the
+    donor's -- pointer changed, target rewritten, or zero-filled."""
+    return ['%s declares `%s` inherited, but the build %s it -- something wrote it behind the '
+            'frame' % (chapter, field, 'zero-filled' if verdict == ABSENT else 'rewrote')
+            for field, verdict in sorted(classify(kept, ours, vanilla, rewritten).items())
+            if verdict != INHERITED]
+
+
+def assert_census_declared(hosted=None):
+    """Guard: every field the frame left INHERITED still reads as the donor's, pointer AND
+    target. Runs after every pass, because a pass that wrote an inherited field behind the
+    frame's back is exactly what the declaration would then be wrong about."""
+    from . import hosts
+    rows = hosted if hosted is not None else hosts.hosted_chapters()
+    known = fields()
     problems = []
-    for chapter, verdicts in sorted(censuses.items()):
-        for field, verdict in sorted(verdicts.items()):
-            reason = (declared.get(field) if declared is not None
-                      else reason_for(chapter, field))
-            if field not in known:
-                problems.append('%s: %r is not a ChapterEventGroup field -- the census and '
-                                'the struct disagree' % (chapter, field))
-            elif verdict == INHERITED and not reason:
-                problems.append('%s inherits `%s` and nobody has ruled on it. Either write '
-                                'the field or declare why the donor\'s value is correct, in '
-                                'event_group.DECLARED_INHERITED.' % (chapter, field))
-            elif verdict == ABSENT and not reason:
-                problems.append('%s leaves `%s` uninitialised, so C zero-fills it -- which is '
-                                'a third answer nobody chose. Declare it or write it.'
-                                % (chapter, field))
-            elif verdict == WRITTEN and reason and declared is not None:
-                problems.append('%s WRITES `%s` but still declares a reason to inherit it -- '
-                                'the declaration is stale' % (chapter, field))
+    for row in rows:
+        verdicts = census(row.name)
+        problems += ['%s: `%s` is UNRULED' % (row.name, f)
+                     for f, v in sorted(verdicts.items()) if v == UNRULED]
+        kept = [f for f, v in verdicts.items() if v == INHERITED]
+        relpath = header_for(row.event_group)
+        with open(os.path.join(DECOMP, relpath), encoding='utf-8') as fh:
+            ours = initializer(row.event_group, fh.read())
+        vanilla = initializer(row.event_group, vanilla_header(relpath))
+        rewritten = rewritten_symbols(ours.get(f) for f in kept if ours.get(f))
+        problems += behind_the_frame(row.name, kept, ours, vanilla, rewritten)
+    problems += ['%r is ruled on but is not a ChapterEventGroup field' % f
+                 for f in sorted(set(OWNED_BY_PASS) | set(DECLARED_INHERITED)) if f not in known]
     if problems:
-        sys.exit('ERROR: ChapterEventGroup census (#313):\n  - ' + '\n  - '.join(problems))
+        import sys
+        sys.exit('ERROR: ChapterEventGroup census (#313, #412):\n  - ' + '\n  - '.join(problems))
     return True

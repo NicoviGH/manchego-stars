@@ -51,7 +51,10 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    `host = _retarget_host_chapter(CHNN_HOST_INDEX, GOAL_DONOR, '<goal_type>', err, indices, chapter_number, CHNN_EVENT_GROUP)`.
    It points the slot's map at `indices`, **repoints the slot's `mapEventDataId` at `CHNN_EVENT_GROUP`**,
    **copies vanilla slot `GOAL_DONOR`'s goal banner** (asserting its `windowDataType == goal_type`),
-   and sets `prepScreenNumber = chapter_number * 2`.
+   and sets `prepScreenNumber = chapter_number * 2`. The row is **framed from blank**
+   (`inject/chapter_frame.py`, #412): every other field is owned by a total pass (fog, difficulty,
+   battle grounds) or inherited with a reason in `chapter_data.DECLARED_INHERITED`, and a field
+   with neither stops the build before anything is written.
 
    **`CHNN_EVENT_GROUP` is the `ChapterEventGroup` symbol your injector fills, and you must name it
    — never assume the slot already points there.** Vanilla's slot index tracks the chapter number
@@ -86,16 +89,16 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    (or `Location`) event list, plus — for defeat-boss — a **flagged defeat quote** (see step 7).
 
 5. **Rosters** — build rows with `_ally_unit_entry` / `_enemy_unit_entry`, then **declare your own
-   table** with `declare_unit_table('MS_ChNN<Role>', rows, comment)` and **point the event group at
-   it**: `point_event_group_at(info, CHNN_EVENT_GROUP, 'playerUnitsInNormal'|'playerUnitsInHard',
-   CHNN_ALLY_TABLE)`, then `assert_event_group_roster(...)`.
+   table** with `declare_unit_table('MS_ChNN<Role>', rows, comment)`. The party table is the
+   `roster=` you hand the event-group frame in step 6, which points both difficulties at it.
 
-   > **Declaring the table does not wire it, and forgetting the pointer has NO symptom.** ch05
-   > shipped one build where the group still named `UnitDef_Event_Ch6Ally`: the party deployed on
-   > vanilla Ch6's start tiles — another map's coordinates — with PREP running, the map drawn, the
-   > load-test PASSing, and four units standing inside walls. `assert_event_group_roster` now fails
-   > the build instead. Verify placement from `INSPECT.units` (in `mapshot`), never from a
-   > screenshot: FE8 draws a map sprite offset upward, so a unit reads a row high.
+   > **Declaring the table does not wire it, and a group still naming the vanilla table has NO
+   > symptom.** ch05 shipped one build where the group still named `UnitDef_Event_Ch6Ally`: the
+   > party deployed on vanilla Ch6's start tiles — another map's coordinates — with PREP running,
+   > the map drawn, the load-test PASSing, and four units standing inside walls. The frame's
+   > `roster=` argument is required for that reason. Verify placement from `INSPECT.units` (in
+   > `mapshot`), never from a screenshot: FE8 draws a map sprite offset upward, so a unit reads a
+   > row high.
 
    Do NOT block-overwrite a vanilla table the stripped cutscenes left free (the old ch01–ch04 idiom;
    see `decisions.md` → "Campaign rosters live in campaign-named symbols"). Only the event-LIST
@@ -114,9 +117,13 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    - A convertible/recruitable enemy gets its OWN table and pid even before its Talk is wired — a
      shared pid is unaddressable, which is what #203 cost ch04's wolf pack.
 
-6. **Strip cutscenes** (`ChM_EVENTINFO_H` + `ChM_EVENTSCRIPT_H`) — empty `Turn`/`Character`/
-   `Location` to `{ END_MAIN }`, set `Misc` to the win/lose machinery, empty `Tutorial` to
-   `{ END_MAIN }` (**see gotcha #1**), and replace `EventScr_ChM_BeginningScene` with a bare
+6. **Frame the event group** — `write_event_group('chNN', ChM_EVENTINFO_H, CHNN_EVENT_GROUP,
+   lists={'miscBasedEvents': ..., 'turnBasedEvents': ...}, roster=CHNN_ALLY_TABLE,
+   scenes=(beginning, ending))`. Name the lists your chapter fills, by `ChapterEventGroup` field;
+   **every other list is written EMPTY**, never left as the donor's (the list symbols are read from
+   the group, and a tutorial pointer array blanks to `NULL`, the rest to `END_MAIN`). A list you
+   mean to keep from the donor is a declared reason in `event_group.DECLARED_INHERITED_BY_CHAPTER`.
+   Then replace `EventScr_ChM_BeginningScene` (in `ChM_EVENTSCRIPT_H`) with a bare
    `{ LOAD1(0x1, <enemies>) ENUN LOAD1(0x1, <ally>) ENUN ENDA }`.
 
 7. **Win/lose wiring** —
@@ -246,9 +253,6 @@ Three traps this replaces, all of which cost real sessions:
 
 ## Gotchas (learned the hard way)
 
-- **Tutorial-list terminator is per-chapter typed.** Slot 4's `EventListScr_ChM_Tutorial` is an
-  `EventListScr[]` (struct array) → terminate with `END_MAIN`. The prologue's is a pointer array →
-  `NULL`. Using the wrong one is an `int-from-pointer` compile error (`events_info.o`).
 - **The goal banner ≠ the win trigger.** Copying a `seize`/`defeat_boss` goal only changes the HUD
   text; you still must place the `Seize`/`DefeatBoss` event macro (+ flagged quote) or the map never ends.
 - **Register the tileset before the map** or `_register_chapter_map` sys.exits by asset label.

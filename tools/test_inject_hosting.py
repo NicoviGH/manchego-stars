@@ -75,7 +75,9 @@ class HostChapterEventGroup(unittest.TestCase):
         # they are now explicit, so the next hosted chapter cannot inherit the coincidence.
         # Enumerated, NOT listed: a hand-written tuple would leave the next chapter
         # uncovered by the guard written for exactly its failure (#138).
-        chapters = inject.hosts.hosted_chapters()
+        # The prologue is the one chapter that does not retarget: it frames its own slot and
+        # keeps that slot's prep number, which the frame refuses to let a retarget overwrite.
+        chapters = [c for c in inject.hosts.hosted_chapters() if c.name != 'prologue']
         self.assertTrue(chapters, 'no hosted chapters discovered')
         for chapter in chapters:
             host = self._retarget(chapter.host_index, chapter.event_group)

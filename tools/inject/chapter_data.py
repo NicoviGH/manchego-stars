@@ -1,9 +1,9 @@
-"""The ROMChapterData census: every `chapter_settings.json` field is WRITTEN or
-DECLARED-INHERITED, and anything nobody has ruled on fails the build (#396).
+"""The ROMChapterData ruling: every `chapter_settings.json` field is WRITTEN, owned by a pass,
+or DECLARED-INHERITED (#396).
 
-A hosted chapter SQUATS a vanilla slot, so every field it does not write it keeps -- tuned
-for a different chapter. That has shipped five times, each found one at a time by something
-else going wrong:
+A hosted chapter SQUATS a vanilla slot, so every field it did not write it used to keep -- tuned
+for a different chapter. That shipped five times, each found one at a time by something else
+going wrong:
 
     goal window / status text ids   #207   shared across vanilla slots, inherited
     battle grounds                  #289   chapters left standing on vanilla grass
@@ -11,10 +11,9 @@ else going wrong:
     `.traps`                        #302   nearly shipped ch06 vanilla Ch7's ballistae
     `initialFogLevel`               #365   ch06 hosts on slot 7, a fogged vanilla slot
 
-Five incidents say nothing about the sixth. This is the same answer `event_group.py` gives
-for `ChapterEventGroup` (#313), in the same shape and for the same reason -- and like that
-one it runs LAST in the injection sequence, because the census reads what every injector
-above it actually wrote.
+The row is now FRAMED from blank (`chapter_frame.write_settings_row`, #412), and the tables
+below are what the frame reads -- the same shape `event_group.py` gives `ChapterEventGroup`. The
+census lists them; the build checks the bytes only for what they leave inherited.
 
 WHAT A FIELD IS HERE. `chapter_settings.json` is the decomp's serialized `struct
 ROMChapterData` (`include/chapterdata.h`), and it groups some of the struct's arrays into
@@ -30,7 +29,7 @@ import subprocess
 from .decomp import DECOMP, git_env, REPO, SUBMODULE
 SETTINGS = 'src/data/chapter_settings.json'
 
-WRITTEN, INHERITED, ABSENT = 'WRITTEN', 'INHERITED', 'ABSENT'
+WRITTEN, INHERITED, ABSENT, UNRULED = 'WRITTEN', 'INHERITED', 'ABSENT', 'UNRULED'
 
 
 def _read(path):
@@ -60,14 +59,21 @@ def leaves(entry, prefix=''):
     return out
 
 
+_FIELDS = None
+
+
 def fields(entry=None):
     """Every field of a chapter entry, in file order, read from the decomp at HEAD.
 
     Read rather than listed, so a field the decomp gains upstream tomorrow arrives here
-    undeclared and fails the build -- which is the guard, not a side effect of it."""
-    if entry is None:
-        entry = _read_head(SETTINGS)['chapters'][1]
-    return list(leaves(entry))
+    undeclared and fails the build -- which is the guard, not a side effect of it. Memoised:
+    the frame asks once per hosted chapter, and each read is a `git show`."""
+    global _FIELDS
+    if entry is not None:
+        return list(leaves(entry))
+    if _FIELDS is None:
+        _FIELDS = list(leaves(_read_head(SETTINGS)['chapters'][1]))
+    return list(_FIELDS)
 
 
 def classify(names, ours, vanilla):
@@ -88,20 +94,19 @@ def classify(names, ours, vanilla):
     return out
 
 
-def census(chapter, hosted=None):
-    """{field: verdict} for one hosted chapter's ROMChapterData entry.
+def census(chapter):
+    """{field: WRITTEN/INHERITED/UNRULED} for one hosted chapter: the frame's ruling, listed.
 
-    Only meaningful on an INJECTED tree -- `event_group.injected(paths=(SETTINGS,))` answers
-    that, and the build guard runs after every injector for exactly that reason.
-    """
-    from . import hosts
-    rows = hosted if hosted is not None else hosts.hosted_chapters()
-    row = next((h for h in rows if h.name == chapter), None)
-    if row is None:
-        raise KeyError('%s is not a hosted chapter' % chapter)
-    ours = leaves(_read(SETTINGS)['chapters'][row.host_index])
-    vanilla = leaves(_read_head(SETTINGS)['chapters'][row.host_index])
-    return classify(fields(), ours, vanilla)
+    Read from the declarations, not the tree: the row is framed from blank
+    (`chapter_frame.write_settings_row`, #412), so what a field holds is decided here before
+    anything is written. UNRULED never survives a build -- the frame exits on it."""
+    out = {}
+    for field in fields():
+        if owner_for(chapter, field):
+            out[field] = WRITTEN
+        else:
+            out[field] = INHERITED if reason_for(chapter, field) else UNRULED
+    return out
 
 
 # --- who WRITES what ---------------------------------------------------------------------
@@ -122,11 +127,13 @@ OWNED_BY_PASS = dict(
     [('mapEventDataId', '_retarget_host_chapter'),
      ('prepScreenNumber', '_retarget_host_chapter'),
      ('fadeToBlack', '_retarget_host_chapter'),
-     # The two the chapter OWNS (#207). The rest of the `goal` block is the donor template's
-     # own parameters and is declared below, not claimed here.
+     # The two the chapter OWNS (#207), and the goal template's own parameters, copied from a
+     # vanilla slot whose objective TYPE the chapter names (`GOAL_TEMPLATE`).
      ('goal.windowTextId', '_retarget_host_chapter'),
-     ('goal.statusObjectiveTextId', '_retarget_host_chapter'),
-     # The three TOTAL passes: each mentions every hosted chapter, which is what makes
+     ('goal.statusObjectiveTextId', '_retarget_host_chapter')] +
+    [('goal.' + f, '_retarget_host_chapter') for f in
+     ('windowDataType', 'destPosX', 'destPosY', 'protectCharacterIndex', 'windowEndTurnNumber')] +
+    [# The three TOTAL passes: each mentions every hosted chapter, which is what makes
      # "nobody wrote a line for this chapter" unreachable.
      ('initialFogLevel', 'apply_chapter_fog'),
      ('easyModeLevelMalus', 'apply_chapter_difficulty'),
@@ -134,26 +141,21 @@ OWNED_BY_PASS = dict(
      ('difficultModeLevelBonus', 'apply_chapter_difficulty'),
      ('battleTileSet', 'inject_battle_platforms')])
 
-# The prologue is the exception, and it is the same exception the event-group census records:
-# it does NOT retarget its host slot (inject/hosts.py) -- it runs on the slot it was given and
-# writes the map and the fade directly. So it calls none of `_retarget_host_chapter`'s twelve
-# writes, and crediting that pass for every chapter would skip the ruling on four fields the
-# prologue really does inherit, `prepScreenNumber` among them.
+# The prologue is the exception: it does NOT retarget its host slot (inject/hosts.py) -- it runs
+# on the slot it was given and frames the row itself. It writes the map, the goal, the fade and
+# its own event group id, and keeps the slot's `prepScreenNumber` (declared below).
 PROLOGUE = 'prologue'
 PROLOGUE_WRITES = tuple(['map.' + f for f in
                          ('obj1Id', 'obj2Id', 'paletteId', 'tileConfigId', 'mainLayerId',
-                          'objAnimId', 'paletteAnimId', 'changeLayerId')] + ['fadeToBlack'])
+                          'objAnimId', 'paletteAnimId', 'changeLayerId')] +
+                        ['goal.' + f for f in
+                         ('windowTextId', 'statusObjectiveTextId', 'windowDataType', 'destPosX',
+                          'destPosY', 'protectCharacterIndex', 'windowEndTurnNumber')] +
+                        ['mapEventDataId', 'fadeToBlack'])
 
-# pass -> the chapters it covers, or None for "every hosted chapter". The three TOTAL passes
-# iterate `hosted_chapters()` and so cover all of them by construction; that is what "total"
-# was for (#365, #303, `CHAPTER_BATTLE_TILESETS`).
-PASS_COVERS = {
-    '_retarget_host_chapter': None,     # narrowed below: every hosted chapter but the prologue
-    'inject_prologue': (PROLOGUE,),
-    'apply_chapter_fog': None,
-    'apply_chapter_difficulty': None,
-    'inject_battle_platforms': None,
-}
+# The two passes that FRAME a row (`chapter_frame.write_settings_row`): every field they own
+# must come in their `writes`, and nothing they do not own may.
+FRAME_WRITERS = ('_retarget_host_chapter', 'inject_prologue')
 
 
 def owner_for(chapter, field):
@@ -220,27 +222,6 @@ DECLARED_INHERITED = {
         'the world-map merchant tile, 255 (= none) on every slot we host. No world map (#29).',
     'merchantPosY': 'see merchantPosX',
 
-    # --- the goal template's own parameters ----------------------------------------------
-    #
-    # `_retarget_host_chapter` copies the goal block wholesale from the vanilla slot whose
-    # objective TYPE the chapter names, then overrides the two text ids the chapter owns
-    # (#207). These three are the template's parameters, and they are inherited from a
-    # vanilla goal of the same type ON PURPOSE -- that is what "copy the template" means.
-    'goal.windowDataType':
-        'the objective TYPE, and the retarget FAILS THE BUILD unless the template slot '
-        'matches the type the chapter declared (`goal_err`). Checked, not inherited blindly.',
-    'goal.destPosX':
-        'the Seize marker the goal window draws (bmudisp.c:1029). Vanilla\'s OWN Seize '
-        'chapters carry 255 here -- FE8 takes the seize tile from the event script\'s '
-        'Seize(x,y), not from this field -- so 255 is the vanilla answer and not a gap.',
-    'goal.destPosY': 'see goal.destPosX',
-    'goal.protectCharacterIndex':
-        'the unit a PROTECT objective watches (eventinfo.c:558), 0 = nobody on every slot we '
-        'host. No hosted chapter declares a protect objective; one that does writes this.',
-    'goal.windowEndTurnNumber':
-        'the turn a SURVIVE objective counts to (player_interface.c:1616). No hosted chapter '
-        'declares a survive objective; one that does writes this.',
-
     # --- FE7 leftovers the decomp itself marks dead ---------------------------------------
     #
     # Every one of these is commented "left over from FE7" in include/chapterdata.h. FE8 has
@@ -299,26 +280,16 @@ DECLARED_INHERITED.update(dict.fromkeys((
 
 
 def reason_for(chapter, field):
-    """The declared reason a chapter may inherit a field, or None if nobody has ruled.
-
-    `chapter` is accepted for symmetry with `event_group.reason_for` and for the per-chapter
-    table a future ruling will need; no field needs one today, and an empty table is a better
-    statement of that than a parameter nobody passes."""
+    """The declared reason a chapter may inherit a field, or None if nobody has ruled."""
     per = DECLARED_INHERITED_BY_CHAPTER.get(chapter) or {}
     return per.get(field) or DECLARED_INHERITED.get(field)
 
 
 # chapter -> {field: reason}, consulted before the shared table above.
 DECLARED_INHERITED_BY_CHAPTER = {
-    # The prologue does not retarget its slot, so the two fields `_retarget_host_chapter`
-    # writes that `inject_prologue` does not are genuinely inherited here. Both are safe, and
-    # both name what would make them unsafe.
+    # The one field `_retarget_host_chapter` writes that `inject_prologue` does not: the
+    # prologue has no prep screen, so it keeps its slot's number.
     PROLOGUE: {
-        'mapEventDataId':
-            'the prologue keeps the slot\'s own event group (Ch1Events) and writes its scenes '
-            'into that slot\'s scripts -- it does not retarget (inject/hosts.py), which is the '
-            'same fact event_group.DECLARED_INHERITED_BY_CHAPTER records for nine of its '
-            'fields. Retargeting the prologue means writing this.',
         'prepScreenNumber':
             'the double-wide glyph index the PREP header reads. The prologue has no prep '
             'screen -- prep is standing protocol from ch01 on (AGENTS.md / decisions.md), and '
@@ -328,64 +299,38 @@ DECLARED_INHERITED_BY_CHAPTER = {
 }
 
 
-def assert_census_declared(censuses=None, declared=None, hosted=None):
-    """Guard: every ROMChapterData field is WRITTEN, owned by a pass, or DECLARED-INHERITED.
+def behind_the_frame(chapter, kept, ours, vanilla):
+    """Pure: a problem for each field the frame left INHERITED that no longer holds the donor
+    slot's value."""
+    return ['%s declares `%s` inherited, but the build changed it -- something wrote it '
+            'behind the frame' % (chapter, field)
+            for field, verdict in sorted(classify(kept, ours, vanilla).items())
+            if verdict != INHERITED]
 
-    Runs in the build after the injectors, because the census reads what they actually wrote.
-    A field nobody has ruled on -- including one the decomp gains upstream tomorrow -- fails
-    here rather than being discovered by shipping a bug, which is how the other five were
-    found.
 
-    A declaration for a field we actually WRITE fails too: a reason nobody needs is a reason
-    nobody rechecks, and left standing it is how a field keeps a stale justification after it
-    stops being inherited.
-    """
+def assert_census_declared(hosted=None):
+    """Guard: every field the frame left INHERITED still holds the donor slot's value.
+
+    Runs after every pass. The frame rules on each field before it writes, so what is left to
+    check is the claim itself: a pass that writes an "inherited" field behind the frame's back
+    makes its declared reason wrong, and only the bytes can say so."""
     import sys
-    known = set(fields())
-    if censuses is None:
-        from . import hosts
-        rows = hosted if hosted is not None else hosts.hosted_chapters()
-        censuses = dict((h.name, census(h.name, rows)) for h in rows)
+    from . import hosts
+    rows = hosted if hosted is not None else hosts.hosted_chapters()
+    ours_all, head_all = _read(SETTINGS)['chapters'], _read_head(SETTINGS)['chapters']
     problems = []
-    for chapter, verdicts in sorted(censuses.items()):
-        for field, verdict in sorted(verdicts.items()):
-            owner = owner_for(chapter, field)
-            reason = (declared.get(field) if declared is not None
-                      else reason_for(chapter, field))
-            if field not in known:
-                problems.append('%s: %r is not a ROMChapterData field -- the census and '
-                                'chapter_settings.json disagree' % (chapter, field))
-            elif owner and reason:
-                # A reason to inherit a field a PASS writes is stale by construction, and
-                # unlike the byte-level case this does not depend on the tree being injected
-                # -- ownership is a property of the code, not of the values.
-                problems.append('%s declares a reason to inherit `%s`, but `%s` writes it -- '
-                                'the declaration is stale' % (chapter, field, owner))
-            elif owner:
-                continue          # a pass owns it, whatever the bytes happen to say
-            elif verdict == INHERITED and not reason:
-                problems.append('%s inherits `%s` and nobody has ruled on it. Either write '
-                                'the field or declare why the donor slot\'s value is correct, '
-                                'in chapter_data.DECLARED_INHERITED.' % (chapter, field))
-            elif verdict == ABSENT and not reason:
-                problems.append('%s carries no `%s` at all, so the generated struct takes '
-                                'whatever json2c defaults it to -- a third answer nobody '
-                                'chose. Declare it or write it.' % (chapter, field))
-    # A reason NO chapter needs any more is stale, and this runs in the BUILD rather than only
-    # where a test passes `declared=`: a declaration nobody needs is a declaration nobody
-    # rechecks. It asks the whole census rather than one row, because a field one chapter
-    # WRITES and another INHERITS still needs its reason -- that is the ordinary case here.
-    for field in sorted(set().union(*(set(v) for v in censuses.values())) if censuses else ()):
-        reason = (declared.get(field) if declared is not None
-                  else DECLARED_INHERITED.get(field))
-        if not reason:
-            continue
-        verdicts = [v.get(field) for v in censuses.values() if field in v]
-        if verdicts and all(v == WRITTEN for v in verdicts):
-            problems.append('`%s` is WRITTEN by every hosted chapter and still declares a '
-                            'reason to inherit it -- the declaration is stale' % field)
+    for row in rows:
+        verdicts = census(row.name)
+        problems += ['%s: `%s` is UNRULED' % (row.name, f)
+                     for f, v in sorted(verdicts.items()) if v == UNRULED]
+        kept = [f for f, v in verdicts.items() if v == INHERITED]
+        problems += behind_the_frame(row.name, kept, leaves(ours_all[row.host_index]),
+                                     leaves(head_all[row.host_index]))
+    known = set(fields())
+    problems += ['%r is ruled on but is not a ROMChapterData field' % f
+                 for f in sorted(set(OWNED_BY_PASS) | set(DECLARED_INHERITED)) if f not in known]
     if problems:
-        sys.exit('ERROR: ROMChapterData census (#396):\n  - ' + '\n  - '.join(problems))
+        sys.exit('ERROR: ROMChapterData census (#396, #412):\n  - ' + '\n  - '.join(problems))
     return True
 
 
