@@ -1402,6 +1402,78 @@ class PlayerArrivesLeveled(unittest.TestCase):
         self.assertGreater(gilliam(8).hp, 25)
 
 
+class MetricsOverTheDice(unittest.TestCase):
+    """#430 step 1: the absolute metrics are scored over the simulated careers, not on one
+    median stat line. Near a doubling breakpoint the line misreads the average (ADR 0311)."""
+
+    def test_the_median_line_is_the_median_of_the_careers(self):
+        stats = {'baseHP': 20, 'basePow': 5, 'baseSpd': 6, 'baseCon': 7}
+        growths = {'growthHP': 80, 'growthPow': 45, 'growthSpd': 55}
+        caps = {'baseHP': 60, 'basePow': 20, 'baseSpd': 20}
+        lines = df.careers(stats, growths, 4, caps)
+        self.assertEqual(len(lines), df.GROWTH_TRIALS)
+        med = df.grown(stats, growths, 4, caps)
+        for f in ('baseHP', 'basePow', 'baseSpd'):
+            self.assertEqual(med[f], sorted(l[f] for l in lines)[df.GROWTH_TRIALS // 2])
+        self.assertTrue(all(l['baseCon'] == 7 for l in lines))
+
+    def test_a_unit_that_has_not_levelled_has_one_career(self):
+        self.assertEqual(len(df.player_careers(CAMPAIGN, 'wolfram', gained=0)), 1)
+
+    def test_marty_ch06_durability_averages_past_its_median_line(self):
+        # ADR 0310's measurement: a minority of careers clear a doubling threshold, and they
+        # move the average. ~1.77 rounds over the dice, 1.25 on the median line. 1001
+        # careers carry a standard error of 0.017 rounds, so the seeded reading is 1.74.
+        chap, roster, line, bosses, _cap, _ = df.load_field(CAMPAIGN, 'ch06', leveled=True)
+        marty = next(u for u in roster if u.name == 'marty')
+        self.assertAlmostEqual(df.durability(marty, line), 1.25, places=2)
+        careers = df.arriving_careers(CAMPAIGN, 'ch06')['marty']
+        avg, bad = df.spread(df.dice_profile(careers, line, bosses)['open'])
+        self.assertAlmostEqual(avg, 1.77, delta=0.05)
+        self.assertLessEqual(bad, 1.25)
+
+    def test_the_keyed_profile_matches_the_plain_metrics(self):
+        # dice_profile scores each half of the fight once per distinct stat key; that is only
+        # right while fe_combat reads no other stat. Every career, both terrains, vs boss.
+        chap, roster, line, bosses, _cap, _ = df.load_field(CAMPAIGN, 'ch06', leveled=True)
+        careers = df.arriving_careers(CAMPAIGN, 'ch06')
+        for uid in ('marty', 'wolfram', 'sahnar'):
+            got = df.dice_profile(careers[uid], line, bosses)
+            self.assertEqual(got['open'], [df.durability(u, line, 0) for u in careers[uid]])
+            self.assertEqual(got['forest'], [df.durability(u, line, 20) for u in careers[uid]])
+            self.assertEqual(got['kill'], [max(fc.kills_per_round(u, e) for e in line)
+                                           for u in careers[uid]])
+            self.assertEqual(got['boss'], [min(fc.rounds_to_kill(u, b) for b in bosses)
+                                           for u in careers[uid]])
+
+    def test_bad_luck_is_the_tenth_percentile_career_on_the_bad_side(self):
+        self.assertEqual(df.spread(range(10)), (4.5, 1))
+        self.assertEqual(df.spread(range(10), low_is_bad=False), (4.5, 8))
+        self.assertEqual(df.spread([3.0, float('inf')])[0], float('inf'))
+
+    def test_party_careers_are_paired_independently(self):
+        # Two units with the same dice must not share a career index, or a field's min
+        # durability would be one unit's, not the worse of two independent rolls.
+        p = {k: list(range(1001)) for k in ('open', 'forest', 'kill', 'boss')}
+        party = df.dice_party({'a': p, 'b': p})
+        avg_min = sum(party['min_durability']) / len(party['min_durability'])
+        self.assertLess(avg_min, 400)                 # independent: ~333; lockstep: 500
+
+    def test_a_single_career_broadcasts_across_the_party(self):
+        one = {'open': [2.0], 'forest': [3.0], 'kill': [0.5], 'boss': [4.0]}
+        many = {'open': [1.0, 5.0], 'forest': [1.0, 5.0], 'kill': [1.0, 1.0],
+                'boss': [9.0, 9.0]}
+        party = df.dice_party({'a': one, 'b': many})
+        self.assertEqual(sorted(party['min_durability']), [1.0, 2.0])
+        self.assertEqual(party['throughput'], [1.5, 1.5])
+
+    def test_vanilla_careers_grow_only_above_the_base_level(self):
+        def gilliam(level):
+            return df.vanilla_party_careers('FE8 Ch2', {'CHARACTER_GILLIAM': level})['Gilliam']
+        self.assertEqual(len(gilliam(4)), 1)
+        self.assertEqual(len(gilliam(8)), df.GROWTH_TRIALS)
+
+
 class EnemyStatResolution(unittest.TestCase):
     def test_autolevel_projects_class_base_by_growths(self):
         # Armor Knight base + 3 levels of class growth (round half up): the lv4 boss.
