@@ -77,8 +77,9 @@ W = {
     'horseslayer':  Weapon('horseslayer',  7, 70,  0, 13, 'lance',
                            effective=frozenset({'cav'})),
     # Monster claws are plain physical might (off-triangle); Evil Eye is monster dark magic.
-    # Venin weapons poison rather than deal HP damage in vanilla -- modeled at base might as a
-    # low static-DPR proxy (#53 note) so the unit still resolves and counts as modeled.
+    # A venin hit deals its might like any weapon AND poisons (`BattleGenerateHitEffects`,
+    # bmbattle.c): 1-3 HP a phase for 5 phases. These metrics count the hit only;
+    # `danger_map` adds the poison.
     'fetid-claw':   Weapon('fetid-claw',   12, 75, 0, 10, 'monster'),
     'rotten-claw':  Weapon('rotten-claw',  7, 80,  0, 8,  'monster'),
     'venin-claw':   Weapon('venin-claw',   6, 65,  0, 10, 'monster'),
