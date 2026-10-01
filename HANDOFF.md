@@ -15,7 +15,12 @@ Refreshed 2026-10-01 (Claude), after #428 (#424) and #429. **What landed and why
 (#389's comments) is complete: #407-#412, #416, #417 and #424, ADRs 0299-0309. How to work in
 the split injector now lives in `tools/inject/__init__.py`'s docstring.
 
-**Next: ch06's own body (#26)** -- see "Chapter work" below.
+**Next: epic #430, step 1, before ch06's body (#26).** Nicolas's call (2026-10-01): trust the
+difficulty and progression measurements before building more chapters on them. #430's
+checklist is the plan and its order is agreed. Run steps 1-3 without asking; those steps change
+no game data. Bring him the step-3 report BEFORE any balance, level or lock change. Steps 4 and
+6 are his calls. **A built, signed-off or locked chapter is not evidence of correctness**, ch00-ch02's
+existing locks included.
 
 ## Owed by NICOLAS, not by the next session
 
@@ -28,7 +33,7 @@ the split injector now lives in `tools/inject/__init__.py`'s docstring.
 - **The boat crews have no voice.** No lore file names Tali or either crew, and Tali carries
   ch06's plot-critical hint.
 
-## Chapter work
+## Chapter work, after #430
 
 - **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). The
   reskins, the boarding pass and nerra's art need no dialogue and can go first.
