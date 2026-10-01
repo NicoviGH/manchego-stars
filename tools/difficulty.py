@@ -1567,9 +1567,10 @@ def _print_cast(title, roster, levels, line):
 
 def report(campaign, ch, mode=None):
     import exp_curve                        # exp_curve imports this module
-    number = int(chapter_schema.load(chapter_path(campaign, ch))['chapter_number'])
+    head = chapter_schema.load(chapter_path(campaign, ch))
+    number, parity_ref = int(head['chapter_number']), head.get('parity_reference')
     try:
-        arriving = exp_curve.entering(campaign, number)
+        arriving = exp_curve.entering(campaign, number, parity_ref)
     except ValueError as refusal:           # the exp model refuses a body it cannot price
         print('!! no arriving party -- the exp model refused: %s\n'
               '!! every absolute reading below is the JOIN line, not the arriving party\n'

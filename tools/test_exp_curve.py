@@ -352,12 +352,18 @@ class Entering(unittest.TestCase):
                          {uid for uid, j in joins.items() if row['chapter_number'] >= j})
         self.assertEqual({uid: lv for uid, (_j, lv) in got['party'].items()},
                          {uid: prior['levels'][uid] for uid in got['party']})
-        self.assertEqual(got['vanilla'], prior['vanilla_levels'])
+        self.assertIsNone(got['vanilla'])          # no parity_ref given
+
+    def test_a_twin_reused_later_is_entered_at_the_same_levels(self):
+        # ch07 is graded against FE8 Ch6 too; FE8's party does not play Ch6 twice.
+        ch06 = ec.entering('rime-of-the-frostmaiden', 6, 'FE8 Ch6')['vanilla']
+        ch07 = ec.entering('rime-of-the-frostmaiden', 7, 'FE8 Ch6')['vanilla']
+        self.assertEqual(ch06, ch07)
 
     def test_the_vanilla_party_banks_the_prologue_our_guests_do_not(self):
         # Eirika and Seth fight FE8's Prologue and keep the exp; Hlin and Scramsax are guests.
         # Both fight a Ch1 worth about one level; only Eirika also carries the Prologue's exp.
-        into_ch2 = ec.entering('rime-of-the-frostmaiden', 2)
+        into_ch2 = ec.entering('rime-of-the-frostmaiden', 2, 'FE8 Ch2')
         self.assertEqual(into_ch2['vanilla']['CHARACTER_EIRIKA'], 2)
         self.assertEqual(into_ch2['party']['wolfram'], (1, 1))
 

@@ -44,8 +44,9 @@ as they do not for our cast. Cross-checked against Serenes Forest's recruit, bas
 growth tables: all 14 recruits match on join level, bases and growths. One fine point: Lute
 joins by a Ch4 village visit, and the derivation fields her for the whole of Ch4.
 
-The exp model runs that party through vanilla's own force from each recruit's own join level
-(`exp_curve.simulate`'s `vanilla_levels`). The report prints it as a cast table beside ours, and
+The exp model runs that party through vanilla's own force from each recruit's own join level,
+in FE8's chapter order (`exp_curve.vanilla_arrivals`). Each twin is fought once, so ch07, which
+reuses FE8 Ch6 as its bar, meets the party FE8 brings into Ch6. The report prints it as a cast table beside ours, and
 the parity delta fields the best `deploy_limit` of each arriving party. The hand-curated
 force-deploy table (Ch1 and Ch2 only) is gone.
 
