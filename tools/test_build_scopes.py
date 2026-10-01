@@ -27,31 +27,6 @@ def _write(path, text):
         fh.write(text)
 
 
-class StepScope(unittest.TestCase):
-    """A step's scope comes from its own function NAME -- nothing hand-declared."""
-
-    def test_a_chapter_injector_is_scoped_to_its_chapter(self):
-        self.assertEqual(bs.scope_of_step('inject_ch05'), 'chapter:ch05')
-        self.assertEqual(bs.scope_of_step('inject_ch05_visit_faces'), 'chapter:ch05')
-
-    def test_the_prologue_is_a_chapter_of_its_own(self):
-        self.assertEqual(bs.scope_of_step('inject_prologue'), 'chapter:prologue')
-
-    def test_a_global_injector_is_global(self):
-        for name in ('inject_portraits', 'inject_names', 'inject_battle_anims'):
-            self.assertEqual(bs.scope_of_step(name), 'global')
-
-    def test_a_step_naming_TWO_chapters_is_global(self):
-        """`chain_ch04_to_ch05` writes for both sides of a seam. Guessing one of them
-        would leave the other's scenarios reading a stale digest, so it is global --
-        unknown means conservative, never optimistic."""
-        self.assertEqual(bs.scope_of_step('chain_ch04_to_ch05'), 'global')
-
-    def test_an_unrecognised_name_is_global(self):
-        self.assertEqual(bs.scope_of_step('_configure_boot'), 'global')
-        self.assertEqual(bs.scope_of_step(''), 'global')
-
-
 class Attribution(unittest.TestCase):
     """What the build ACTUALLY wrote, observed rather than declared."""
 
@@ -69,7 +44,7 @@ class Attribution(unittest.TestCase):
         return self.scopes.finish()
 
     def test_a_file_written_inside_a_step_belongs_to_that_step(self):
-        self.scopes.run(lambda: self.write('a.s', 'one'), name='inject_ch05')
+        self.scopes.watch('chapter:ch05', lambda: self.write('a.s', 'one'))
         m = self.manifest()
         self.assertIn('chapter:ch05', m)
         self.assertIn('data/a.s', m['chapter:ch05']['paths'])
@@ -78,13 +53,13 @@ class Attribution(unittest.TestCase):
         """The build is a script with loose statements between the steps. Anything they
         write is unattributable, and unattributable means shared."""
         self.write('loose.s', 'x')
-        self.scopes.run(lambda: self.write('a.s', 'one'), name='inject_ch05')
+        self.scopes.watch('chapter:ch05', lambda: self.write('a.s', 'one'))
         m = self.manifest()
         self.assertIn('data/loose.s', m['global']['paths'])
         self.assertNotIn('data/loose.s', m['chapter:ch05']['paths'])
 
     def test_a_file_written_after_the_last_step_is_still_seen(self):
-        self.scopes.run(lambda: self.write('a.s', 'one'), name='inject_ch05')
+        self.scopes.watch('chapter:ch05', lambda: self.write('a.s', 'one'))
         self.write('late.s', 'x')
         self.assertIn('data/late.s', self.manifest()['global']['paths'])
 
@@ -92,14 +67,14 @@ class Attribution(unittest.TestCase):
         """The soundness case. If a shared table is written by the portrait pass and then
         again by ch05, attributing it to the last writer alone means a portrait edit moves
         only ch05's digest -- and every global scenario is served a stale PASS."""
-        self.scopes.run(lambda: self.write('shared.s', 'one'), name='inject_portraits')
-        self.scopes.run(lambda: self.write('shared.s', 'two'), name='inject_ch05')
+        self.scopes.watch('global', lambda: self.write('shared.s', 'one'))
+        self.scopes.watch('chapter:ch05', lambda: self.write('shared.s', 'two'))
         m = self.manifest()
         self.assertIn('data/shared.s', m['global']['paths'])
         self.assertIn('data/shared.s', m['chapter:ch05']['paths'])
 
     def test_a_step_that_writes_nothing_claims_nothing(self):
-        self.scopes.run(lambda: None, name='inject_ch01')
+        self.scopes.watch('chapter:ch01', lambda: None)
         self.assertNotIn('chapter:ch01', self.manifest())
 
     def test_a_step_that_RAISES_still_keeps_what_it_wrote(self):
@@ -109,7 +84,7 @@ class Attribution(unittest.TestCase):
             self.write('half.s', 'partial')
             raise RuntimeError('build failed')
         with self.assertRaises(RuntimeError):
-            self.scopes.run(boom, name='inject_ch03')
+            self.scopes.watch('chapter:ch03', boom)
         self.assertIn('data/half.s', self.manifest()['chapter:ch03']['paths'])
 
 
@@ -121,8 +96,8 @@ class Digests(unittest.TestCase):
 
     def build(self, ch05_text, portrait_text='p'):
         scopes = bs.BuildScopes(root=self.tree, roots=('data',))
-        scopes.run(lambda: self._write('port.s', portrait_text), name='inject_portraits')
-        scopes.run(lambda: self._write('ch05.s', ch05_text), name='inject_ch05')
+        scopes.watch('global', lambda: self._write('port.s', portrait_text))
+        scopes.watch('chapter:ch05', lambda: self._write('ch05.s', ch05_text))
         return scopes.finish()
 
     def _write(self, name, text):
@@ -164,14 +139,13 @@ class Reconciliation(unittest.TestCase):
         scopes = bs.BuildScopes(root=self.tree, roots=('data',))
         with open(os.path.join(self.tree, 'elsewhere', 'x.s'), 'w') as fh:
             fh.write('surprise')
-        scopes.run(lambda: None, name='inject_ch05')
+        scopes.watch('chapter:ch05', lambda: None)
         m = scopes.finish(touched=['elsewhere/x.s'])
         self.assertIn('elsewhere/x.s', m['global']['paths'])
 
     def test_reconciliation_does_not_steal_a_file_a_step_already_claimed(self):
         scopes = bs.BuildScopes(root=self.tree, roots=('data',))
-        scopes.run(lambda: _write(os.path.join(self.tree, 'data', 'a.s'), '1'),
-                   name='inject_ch05')
+        scopes.watch('chapter:ch05', lambda: _write(os.path.join(self.tree, 'data', 'a.s'), '1'))
         m = scopes.finish(touched=['data/a.s'])
         self.assertIn('data/a.s', m['chapter:ch05']['paths'])
         self.assertNotIn('data/a.s', m.get('global', {}).get('paths', []))
@@ -202,7 +176,7 @@ class StickyOwnership(unittest.TestCase):
         def step():
             if rewrite:
                 _write(os.path.join(self.tree, 'data', 'sometimes.s'), 'stable')
-        scopes.run(step, name='inject_ch05')
+        scopes.watch('chapter:ch05', step)
         return scopes.finish()
 
     def test_a_scope_keeps_a_file_a_later_build_did_not_rewrite(self):
@@ -250,8 +224,8 @@ class ClaimTimeIsTheStepsEnd(unittest.TestCase):
     def build(self, ch05_body, previous=None):
         """Two chapter steps that both rewrite one shared table, ch04 then ch05."""
         scopes = bs.BuildScopes(root=self.tree, roots=('data',), previous=previous)
-        scopes.run(lambda: _write(self.shared, 'ch04 rows\n'), name='inject_ch04')
-        scopes.run(lambda: _write(self.shared, 'ch04 rows\n' + ch05_body), name='inject_ch05')
+        scopes.watch('chapter:ch04', lambda: _write(self.shared, 'ch04 rows\n'))
+        scopes.watch('chapter:ch05', lambda: _write(self.shared, 'ch04 rows\n' + ch05_body))
         return scopes.finish()
 
     def test_both_chapters_still_OWN_the_shared_table(self):
@@ -272,8 +246,8 @@ class ClaimTimeIsTheStepsEnd(unittest.TestCase):
     def test_a_ch04_edit_still_moves_ch04s_digest(self):
         """The safety direction: an edit to the earlier chapter must not be cached away."""
         scopes = bs.BuildScopes(root=self.tree, roots=('data',))
-        scopes.run(lambda: _write(self.shared, 'ch04 EDITED\n'), name='inject_ch04')
-        scopes.run(lambda: _write(self.shared, 'ch04 EDITED\nch05 rows\n'), name='inject_ch05')
+        scopes.watch('chapter:ch04', lambda: _write(self.shared, 'ch04 EDITED\n'))
+        scopes.watch('chapter:ch05', lambda: _write(self.shared, 'ch04 EDITED\nch05 rows\n'))
         edited = scopes.finish()
         self.assertNotEqual(self.build('ch05 rows\n')['chapter:ch04']['digest'],
                             edited['chapter:ch04']['digest'])
@@ -287,8 +261,7 @@ class ManifestFile(unittest.TestCase):
 
     def test_it_round_trips_through_disk(self):
         scopes = bs.BuildScopes(root=self.tree, roots=('data',))
-        scopes.run(lambda: _write(os.path.join(self.tree, 'data', 'a.s'), '1'),
-                   name='inject_ch05')
+        scopes.watch('chapter:ch05', lambda: _write(os.path.join(self.tree, 'data', 'a.s'), '1'))
         path = os.path.join(self.tree, 'scopes.json')
         written = scopes.write_manifest(path)
         self.assertEqual(bs.load_manifest(path), written)

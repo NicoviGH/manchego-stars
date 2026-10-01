@@ -961,121 +961,10 @@ def check_chapter_deployment_schema(fail):
         fail.extend(_chapter_deployment_violations(rel, d))
 
 
-# ── Injection ordering (audit 2.6 / #110) ─────────────────────────────────────
-# The documented MUST-precede pairs in build_campaign.main(). These lived only in
-# comments ("MUST precede inject_prologue"); one reorder breaks the build at its
-# most expensive point. check_engine_guards_present pins presence; this pins order.
-INJECTION_ORDER = [
-    ('_inject_lord_select_engine', '_inject_lord_floor_engine',
-     'lord floor anchors on lord-select\'s LordSelect_GetPid'),
-    ('inject_map_sprites', 'inject_enemy_class_reskins',
-     'reskins consume the SMS ids map-sprite injection creates'),
-    ('inject_enemy_class_reskins', 'inject_enemy_class_battle_anims',
-     'the class battle-anim binds .pBattleAnimDef on the reskin clone classes'),
-    ('inject_enemy_class_reskins', 'inject_ch01',
-     "ch01's goblin grunts ride the reskinned clone classes"),
-    ('inject_winter_tileset', 'inject_ch01',
-     'chapter maps register against the tileset asset-table labels'),
-    ('inject_winter_tileset', 'inject_prologue',
-     'the prologue map registers against the tileset asset-table labels'),
-    ('inject_ch01', 'inject_prologue',
-     'inject_prologue overwrites the slot-1 Seize goal template inject_ch01 copies'),
-    ('inject_ch03', 'inject_ch04',
-     'chapter hosts are injected in campaign order; ch04 borrows ch02\'s stable Rout goal'),
-    ('inject_ch04', 'inject_ch05',
-     "chapter hosts are injected in campaign order; chain_ch04_to_ch05 rewrites ch04's "
-     'dev-placeholder landing, which inject_ch04 must have written first'),
-    ('inject_ch05', 'inject_ch06',
-     "chapter hosts are injected in campaign order; chain_ch05_to_ch06 rewrites ch05's "
-     'dev-placeholder landing, which inject_ch05 must have written first -- and ch06 appends '
-     "its boats' name plates past ch05's moose, which set_message_body requires be dense"),
-]
-
-
-def _injection_call_sequence(text):
-    """First-call order of top-level steps in build_campaign.main(). Textual order
-    == execution order there (the only branch chooses BETWEEN later steps, never
-    hoists one earlier).
-
-    A step wrapped for build-scope attribution (`_scopes.run(inject_ch05, ...)`, #255
-    phase 2) or for injection caching (`_anims.run(inject_battle_anims, ...)`, #309) is the
-    same step in the same place, so it counts as a call to itself -- otherwise every wrapped
-    injector silently drops out of this gate, taking its ordering constraints with it."""
-    m = re.search(r'\ndef main\(\):.*', text, re.S)
-    if not m:
-        return []
-    names = re.findall(r'^\s+(?:engine_hooks\.)?(?:_\w+\.run\()?(\w+)[(,]',
-                       m.group(0), re.M)
-    seen, order = set(), []
-    for n in names:
-        if n not in seen:
-            seen.add(n)
-            order.append(n)
-    return order
-
-
-def _injection_order_violations(order):
-    msgs = []
-    pos = {n: i for i, n in enumerate(order)}
-    for before, after, why in INJECTION_ORDER:
-        missing = [n for n in (before, after) if n not in pos]
-        if missing:
-            msgs.append('injection-order constraint references unknown step(s) %s '
-                        '-- renamed/removed? update INJECTION_ORDER in check.py'
-                        % ', '.join(missing))
-        elif pos[before] > pos[after]:
-            msgs.append('build_campaign.main(): %s must run before %s -- %s'
-                        % (before, after, why))
-    return msgs
-
-
-def _cached_step_violations(text):
-    """A cached injection step must run before anything that reads a boot flag (#309).
-
-    The injection cache restores a step's output ACROSS ROM configurations, which is only
-    sound while nothing configuration-dependent has run yet. That is a property of main()'s
-    ORDER, so it is checked against main()'s order rather than trusted to a comment.
-
-    The flag names are read out of main()'s own `_requested_flags` table -- the one place
-    that already lists every boot flag -- so adding a flag cannot quietly widen the gap.
-    """
-    m = re.search(r'\ndef main\(\):.*', text, re.S)
-    if not m:
-        return []
-    body = m.group(0).splitlines()
-    flags = set(re.findall(r'args\.(\w+)',
-                           re.search(r'_requested_flags = \{.*?\}', m.group(0), re.S).group(0)
-                           if re.search(r'_requested_flags = \{.*?\}', m.group(0), re.S) else ''))
-    if not flags:
-        return ['build_campaign.main() has no _requested_flags table to read boot flags from']
-    call = re.compile(r'^\s+(?:_\w+\.run\()?((?:inject|_configure|chain)\w*)[(,]')
-    flagged = []          # (line no, step) for every injector that reads a boot flag
-    problems = []
-    for i, line in enumerate(body):
-        hit = call.match(line)
-        if not hit:
-            continue
-        step = hit.group(1)
-        if '_anims.run(' in line:
-            for at, earlier in flagged:
-                problems.append(
-                    'injection cache: %s (line %d of main) is cached across ROM configurations, '
-                    'but %s reads a boot flag at line %d and runs FIRST -- a restored output '
-                    'would then depend on which config built it (#309)' % (step, i, earlier, at))
-        elif any(('args.' + f) in line for f in flags):
-            flagged.append((i, step))
-    return problems
-
-
-def check_cached_steps_are_config_invariant(fail):
-    """The ordering the injection cache's soundness rests on (#309)."""
-    fail.extend(_cached_step_violations('\n' + (_injector().def_source('main') or '')))
-
-
 # ch03 registers its map changes through _inject_ch03_tile_changes, a per-chapter wrapper
 # around _inject_tile_changes. A guard matching only the bare name never sees it, so the
 # chapter drops out of the gate entirely and looks identical to one with no tile changes at
-# all. _injection_call_sequence learned this same lesson for _scopes.run/_anims.run.
+# all.
 TILE_CHANGE_CALL = re.compile(r'_inject_(?:ch\w+_)?tile_changes')
 
 
@@ -1134,13 +1023,6 @@ def _tile_change_order_violations(text):
 def check_tile_changes_outlive_the_retarget(fail):
     """A chapter's tile-change layer must survive its host retarget (#335)."""
     fail.extend(_tile_change_order_violations(_injector().defs_source()))
-
-
-def check_injection_order(fail):
-    """Injection steps run in a dependency order that used to live only in main()'s
-    comments (audit 2.6): pin the documented MUST-precede pairs."""
-    fail.extend(_injection_order_violations(
-        _injection_call_sequence('\n' + (_injector().def_source('main') or ''))))
 
 
 # ── The injector has ONE source reader (#389) ─────────────────────────────────────────
@@ -1490,8 +1372,8 @@ _PREVIEW_MAPS = re.compile(r"^MAPS\s*=\s*os\.path\.join\(CAMPAIGN,\s*'([^']+)'\)
 def _build_registered_layouts(text):
     """{injector name: layout CONSTANT name} for every chapter map the build registers.
 
-    Read from `build_campaign`'s SOURCE, like `_injection_call_sequence` above it, so a newly
-    hosted chapter joins this gate the moment its injector registers a map -- a hand-kept table
+    Read from the injector's SOURCE, so a newly hosted chapter joins this gate the moment its
+    injector registers a map -- a hand-kept table
     here would be a fourth place to disagree about the same fact. Matched per injector BODY
     rather than across the file, so a call cannot be attributed to whatever `def` preceded it,
     and on the LAYOUT argument rather than the caller's local variable name, because renaming
@@ -2546,7 +2428,8 @@ def check_engine_guards_present(fail):
         if ('def %s(' % fn) not in eh:
             fail.append('engine hook %s() not DEFINED in tools/inject/engine_hooks.py '
                         '-- would silently drop %s (see docs/decisions.md)' % (fn, mechanic))
-        if ('engine_hooks.%s(' % fn) not in bc:
+        # Called directly, or registered as a step (inject/steps.py, #409).
+        if not re.search(r'engine_hooks\.%s(?=\s*[(,])' % fn, bc):
             fail.append('engine hook %s() never CALLED (engine_hooks.%s(...)) from '
                         'the injector -- would silently drop %s '
                         '(see docs/decisions.md)' % (fn, fn, mechanic))
@@ -3474,7 +3357,6 @@ CHECKS = (
     check_python_compiles, check_lua_chunks_load, check_lua_local_headroom,
     check_hosted_chapters_declared, check_tests_pass, check_yaml_parses, check_chapter_status,
     check_chapter_deployment_schema, check_personal_line_injection_routes,
-    check_injection_order, check_cached_steps_are_config_invariant,
     check_injector_source_has_one_reader,
     check_tile_changes_outlive_the_retarget, check_playtest_matrix,
     check_rom_configs_reach_the_build, check_decomp_git_calls_strip_the_env,

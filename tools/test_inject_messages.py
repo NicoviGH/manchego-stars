@@ -85,10 +85,12 @@ class MessageBlockGuardHasNoBlindSpots(unittest.TestCase):
         self.assertTrue(inject.messages.live_ids_in_declared_blocks(blocks={'zz': ((0x19D, 0x1A7),)}))
 
     def test_the_build_refuses_a_block_over_a_spent_id(self):
-        # The guard's two siblings run in main() before any injector; this one ran only from
+        # The guard's siblings run as steps before any chapter injector; this one ran only from
         # the tests, so a plain `make` with an edited block table still produced a ROM.
-        main = injector.def_source('main')
-        self.assertIn('live_ids_in_declared_blocks()', main,
+        from inject import steps
+        self.assertIn('live_ids_in_declared_blocks()',
+                      injector.def_source('_assert_declared_blocks_clear'))
+        self.assertIn('_assert_declared_blocks_clear', [s.name for s in steps.STEPS],
                       'the deadness guard must run in the build, like its siblings')
 
 

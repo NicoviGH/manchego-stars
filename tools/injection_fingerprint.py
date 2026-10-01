@@ -105,7 +105,9 @@ def restore_decomp():
 
 
 def inject(flags=()):
-    env = dict(os.environ)
+    # Strict: every step's writes checked step by step, so a refactor that moves a write
+    # between steps fails here by name (#409).
+    env = dict(os.environ, INJECT_STRICT='1')
     subprocess.run([sys.executable, os.path.join(REPO, 'tools', 'build_campaign.py'),
                     '--campaign', CAMPAIGN] + list(flags),
                    cwd=REPO, env=env, check=True, stdout=subprocess.DEVNULL)

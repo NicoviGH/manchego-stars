@@ -233,22 +233,11 @@ def c_deployment_schema():
         return run(check.check_chapter_deployment_schema)
 
 
-def c_cached_steps():
-    # A boot-flag reader hoisted above the cached battle-anim step.
-    with doctored({BC: sub1(r'^def main\(\):\n', 'def main():\n    inject_canary(args.test_chapter)\n')}):
-        return run(check.check_cached_steps_are_config_invariant)
-
-
 def c_tile_changes():
     with doctored({BC: append('\n\ndef inject_ch42(campaign):\n'
                               '    _inject_tile_changes(campaign)\n'
                               '    _retarget_host_chapter(campaign)\n')}):
         return run(check.check_tile_changes_outlive_the_retarget)
-
-
-def c_injection_order():
-    with doctored({BC: sub1(r'^def main\(\):\n', 'def main():\n    inject_ch05(campaign)\n')}):
-        return run(check.check_injection_order)
 
 
 def c_one_reader():
@@ -476,9 +465,7 @@ CANARIES = {
     'check_chapter_status': (c_chapter_status, 'someday', None),
     'check_personal_line_injection_routes': (c_personal_line_routes, 'no chapter fields', 'decomp'),
     'check_chapter_deployment_schema': (c_deployment_schema, 'deploy_limit', None),
-    'check_cached_steps_are_config_invariant': (c_cached_steps, 'injection cache', None),
     'check_tile_changes_outlive_the_retarget': (c_tile_changes, 'inject_ch42', None),
-    'check_injection_order': (c_injection_order, 'must run before', None),
     'check_injector_source_has_one_reader': (c_one_reader, 'map_donor.py', None),
     'check_recordenemy_knows_every_raw_pid': (c_recordenemy, 'pid 0xFFFF', None),
     'check_gate_chapter_window': (c_gate_window, 'host slot 99', None),

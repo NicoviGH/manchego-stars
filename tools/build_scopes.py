@@ -11,7 +11,8 @@ changed ch05, so only ch05's scenarios need re-running".
 impact map rots silently and lets real regressions through, which is the exact failure
 #255 exists to avoid. So this module watches the decomp tree while the build runs and
 records, per injection step, the files that step actually wrote and a digest of their
-contents.
+contents. Which SCOPE a step's writes go to is the step's own declaration (inject/steps.py,
+#409); the same walk also holds each step to the writes it declares.
 
 Two rules keep it honest, and both are the conservative direction:
 
@@ -29,14 +30,12 @@ This is the same shape as `matrix.py`'s `harness_shared`, and for the same reaso
 import hashlib
 import json
 import os
-import re
 
-# The decomp subtrees the injectors write into. Build OUTPUTS (.o/.lz/.4bpp) are elsewhere
-# and are not sources, so they are not walked. Anything written outside these roots is not
-# lost -- `finish(touched=...)` reconciles it into `global`.
+# The decomp subtrees the injectors write into. Build OUTPUTS (.o/.lz/.4bpp) dominate the
+# rest of the tree, so an ordinary build watches only these, and anything written outside
+# them is reconciled into `global` by `finish(touched=...)`. A strict build (#409) walks the
+# whole tree.
 SCOPE_ROOTS = ('src', 'data', 'include', 'graphics', 'scripts')
-
-_CHAPTER = re.compile(r'ch\d\d')
 
 
 # Everything the ROM is built FROM. Lives here rather than in the playtest runner because
@@ -82,22 +81,6 @@ def fingerprint_paths(root, paths, into=None):
     return h
 
 
-def scope_of_step(name):
-    """The scope a step's writes belong to, read off the step's own function name.
-
-    `inject_ch05` and `inject_ch05_visit_faces` are ch05's; `inject_portraits` is global.
-    A name mentioning TWO chapters (`chain_ch04_to_ch05`) is global rather than a guess at
-    which side owns the seam -- picking one would leave the other's scenarios reading a
-    digest that never moved.
-    """
-    if name == 'inject_prologue':
-        return 'chapter:prologue'
-    chapters = sorted(set(_CHAPTER.findall(name or '')))
-    if len(chapters) == 1:
-        return 'chapter:' + chapters[0]
-    return 'global'
-
-
 def _digest_file(path):
     try:
         with open(path, 'rb') as fh:
@@ -109,14 +92,15 @@ def _digest_file(path):
 class BuildScopes(object):
     """Watches a tree across a build and attributes each write to a step.
 
-    Detection is by mtime, snapshotted around every step. `stat` is cheap enough to do this
-    ~20 times over the decomp's source roots (measured: 50 ms a pass, ~1 s a build), and
-    only the files that actually moved are ever hashed.
+    Detection is by mtime, snapshotted around every step over the WHOLE tree (`roots=None`):
+    a step's undeclared write can land anywhere, and `texts/` and the banim linker script
+    sit outside the source roots. ~0.15 s a pass on the Mac, and only the files that actually
+    moved are ever hashed. Git's metadata and links (the toolchain) are not walked.
     """
 
-    def __init__(self, root, roots=SCOPE_ROOTS, previous=None):
+    def __init__(self, root, roots=None, previous=None):
         self.root = root
-        self.roots = tuple(roots)
+        self.roots = None if roots is None else tuple(roots)
         # scope -> {relpath: digest}. Seeded from the previous build's manifest so a scope
         # starts out owning what it has written before (see `finish`), with digests left
         # None until the scope's own step claims -- WHEN a path is hashed is the whole
@@ -126,6 +110,10 @@ class BuildScopes(object):
         self._prev = self._snapshot()
 
     def _snapshot(self):
+        if self.roots is None:
+            seen = {}
+            _walk(self.root, seen, top=True)
+            return seen
         seen = {}
         for rel in self.roots:
             base = os.path.join(self.root, rel)
@@ -150,36 +138,36 @@ class BuildScopes(object):
         it means "the whole build", so its reference point is the end of it, not the middle.
         """
         now = self._snapshot()
+        moved = {os.path.relpath(path, self.root) for path, mtime in now.items()
+                 if self._prev.get(path) != mtime}
         bucket = self.scopes.setdefault(scope, {})
-        for path, mtime in now.items():
-            if self._prev.get(path) != mtime:
-                bucket.setdefault(os.path.relpath(path, self.root))
+        for rel in moved:
+            bucket.setdefault(rel)
         if not bucket:
             del self.scopes[scope]
         elif scope != 'global':
             self._freeze(bucket)
         self._prev = now
+        return moved
 
     def _freeze(self, bucket):
         """Hash every path a scope owns as the tree stands right now."""
         for rel in bucket:
             bucket[rel] = _digest_file(os.path.join(self.root, rel))
 
-    def run(self, fn, *args, **kwargs):
-        """Run one injection step and charge its writes to the scope its name implies.
-
-        `name` overrides the function's `__name__` (only tests need that; the build passes
-        real functions so the scope is derived, not typed). Writes made since the previous
-        step -- loose statements in `main()` -- are charged to `global` first.
-        """
-        name = kwargs.pop('name', None) or getattr(fn, '__name__', '')
+    def watch(self, scope, step):
+        """Run `step()` and charge what it wrote to `scope`; returns those paths, relative to
+        the tree. Writes made since the previous step -- loose statements in `main()` -- are
+        charged to `global` first."""
         self._claim('global')
+        wrote = set()
         try:
-            return fn(*args, **kwargs)
+            step()
         finally:
             # A build that dies half-way must still account for what it wrote, or those
             # files look unattributed to the next pass.
-            self._claim(scope_of_step(name))
+            wrote = self._claim(scope)
+        return wrote
 
     def finish(self, touched=()):
         """Close the manifest: {scope: {'paths': [...], 'digest': ...}}.
@@ -229,6 +217,22 @@ class BuildScopes(object):
         with open(path, 'w') as fh:
             json.dump(manifest, fh, indent=2, sort_keys=True)
         return manifest
+
+
+def _walk(path, seen, top=False):
+    with os.scandir(path) as entries:
+        for entry in entries:
+            if top and entry.name == '.git':       # a directory, or a worktree's file
+                continue
+            if entry.is_symlink():
+                continue
+            if entry.is_dir():
+                _walk(entry.path, seen)
+            else:
+                try:
+                    seen[entry.path] = entry.stat().st_mtime_ns
+                except OSError:
+                    pass
 
 
 def load_manifest(path):

@@ -253,8 +253,8 @@ class LiteralOwnershipAtBuildTime(unittest.TestCase):
         self.messages.assert_literals_are_claimed()
 
     def test_it_runs_in_the_build(self):
-        import inspect
-        self.assertIn('assert_literals_are_claimed', injector.def_source('main'))
+        from inject import steps
+        self.assertIn('assert_literals_are_claimed', [s.name for s in steps.STEPS])
 
 
 if __name__ == '__main__':
