@@ -19,6 +19,7 @@ from inject.chapter_ids import (
     CH05_RAVISIN_DEATH_MSG, CH05_RAVISIN_TAUNT_MSG, CH05_SAHNAR_ALONE_SLOT, CH05_SAHNAR_TALK_MSG,
     CH05_SAHNAR_TALK_NO_LUPIN_MSG, CH05_VILLAGE_SLOTS, CH05_VISIT_FACES, PROLOGUE_SEPHEK_SLOT)
 from inject.decomp import _replace_brace_block, REPO, vanilla_decomp_text
+from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH05_EVENT_GROUP, CH05_HOST_INDEX
 from inject.maps import (
@@ -42,8 +43,8 @@ from inject.text import (
     goal_window_body, name_message_body, SCRIPT_DIRECTIVES, set_message_body)
 from inject.units import (
     _ally_unit_entry, _assert_ms_symbol, _deploy_cap_entries, _enemy_unit_entry,
-    _items_with_drop_last, assert_event_group_roster, chapter_label_constant, declare_unit_table,
-    enemy_ai_initialiser, point_event_group_at, safe_ai_clients)
+    _items_with_drop_last, chapter_label_constant, declare_unit_table,
+    enemy_ai_initialiser, safe_ai_clients)
 from inject.villages import (
     assert_village_gifts_match_vanilla, assert_village_tiles_visitable, DEFAULT_VILLAGE_SPEAKER,
     location_events, village_boxes, village_reward_item, village_script)
@@ -260,18 +261,6 @@ def event_script_extern(header, symbol, comment):
                  % _SCRIPT_EXTERN_ANCHOR)
     return header.replace(_SCRIPT_EXTERN_ANCHOR,
                           '%s\n%s /* %s */' % (_SCRIPT_EXTERN_ANCHOR, decl, comment), 1)
-# The host slot's event-list symbols. These CANNOT be renamed -- the ChapterEventGroup that
-# chapter_settings.json resolves is built from them -- so they are named here and nowhere else.
-CH05_EVENT_LISTS = {
-    'turn': 'EventListScr_Ch6_Turn',
-    'character': 'EventListScr_Ch6_Character',
-    'location': 'EventListScr_Ch6_Location',
-    'misc': 'EventListScr_Ch6_Misc',
-    'select_unit': 'EventListScr_Ch6_SelectUnit',
-    'select_dest': 'EventListScr_Ch6_SelectDestination',
-    'unit_move': 'EventListScr_Ch6_UnitMove',
-    'tutorial': 'EventListScr_Ch6_Tutorial',
-}
 CH05_BEGINNING_SCRIPT = 'EventScr_Ch6_BeginningScene'
 CH05_ENDING_SCRIPT = 'EventScr_Ch6_EndingScene'
 # Dead host-slot scripts repurposed for our reinforcement waves. Unreachable once the event
@@ -2005,27 +1994,11 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         chap, next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')))
     repoint_escort_safe_ai_list(basil_char, 'Basil (ch05 escort)')
 
-    # 3. Strip the host slot's event lists and wire ours. The list SYMBOLS are the only
-    #    vanilla names left in this function, and they come from CH05_EVENT_LISTS.
-    with open(CH05_EVENTINFO_H, encoding='utf-8') as f:
-        info = f.read()
+    # 3. Wire ours into the host slot's event group; every list not named here is written empty.
     turn_rows = ''.join(
         '    TurnEventPlayer(0, %s, %d) /* eruption wave: %d */\n'
         % (CH05_WAVE_SCRIPTS[turn], turn, wave_counts[turn])
         for turn in sorted(CH05_WAVE_TABLES))
-    info = _replace_brace_block(info, CH05_EVENT_LISTS['turn'] + '[] =',
-                                '{\n' + turn_rows + '    END_MAIN\n}', CH05_EVENTINFO_H)
-    # Misc = the win/lose machinery. DefeatBoss is an AFEV on EVFLAG_DEFEAT_BOSS, which
-    # Ravisin's FLAGGED defeat quote sets on her death (step 5) -- CA_BOSS alone fires nothing.
-    info = _replace_brace_block(
-        info, CH05_EVENT_LISTS['misc'] + '[] =',
-        arena_wiring['misc'], CH05_EVENTINFO_H)
-    # Location = the four reliquary visits + the elven store. The shops are wired for good (a
-    # shop needs no script and no text); the visits own their rewards, and each carries its
-    # CH05_VILLAGE_FLAGS event id -- the race (#25).
-    info = _replace_brace_block(
-        info, CH05_EVENT_LISTS['location'] + '[] =',
-        ch05_location_events(chap), CH05_EVENTINFO_H)
     # The race's two tile states: a reliquary DESECRATED by a raider, and one closed behind the
     # party. Must run AFTER _retarget_host_chapter zeroed changeLayerId (as ch04's does).
     _inject_tile_changes('MS_Ch05MapChanges', ch05_map_changes(chap, maps_dir), CH05_HOST_INDEX)
@@ -2039,20 +2012,20 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         # Proof #1 is a wolf ch04's optional parley may never have handed the player, so the
         # scene asks the roster and shows the other copy when he is not on it (#25).
         variant=(CH05_LUPIN_CHARACTER, CH05_SAHNAR_TALK_NO_LUPIN_MSG))
-    info = _replace_brace_block(info, CH05_EVENT_LISTS['character'] + '[] =',
-                                sahnar_char_events, CH05_EVENTINFO_H)
-    for key in ('select_unit', 'select_dest', 'unit_move', 'tutorial'):
-        info = _replace_brace_block(info, CH05_EVENT_LISTS[key] + '[] =',
-                                    '{\n    END_MAIN\n}', CH05_EVENTINFO_H)
-    # Point the group at OUR roster table. Declaring it is not enough -- the engine reads the
-    # roster through the ChapterEventGroup, and until this line ch05 ran vanilla Ch6's ally
-    # table: the party deployed on another map's coordinates, four of them inside walls, with
-    # PREP running and the load-test PASSing. See point_event_group_at.
-    for field in ('playerUnitsInNormal', 'playerUnitsInHard'):
-        info = point_event_group_at(info, CH05_EVENT_GROUP, field, CH05_ALLY_TABLE)
-    with open(CH05_EVENTINFO_H, 'w', encoding='utf-8') as f:
-        f.write(info)
-    assert_event_group_roster(CH05_EVENTINFO_H, CH05_EVENT_GROUP, CH05_ALLY_TABLE)
+    # The roster is OUR table, not vanilla Ch6's: before the group pointed at it, ch05 ran
+    # vanilla Ch6's ally table -- the party deployed on another map's coordinates, four of them
+    # inside walls, with PREP running and the load-test PASSing.
+    write_event_group('ch05', CH05_EVENTINFO_H, CH05_EVENT_GROUP, lists={
+        'turnBasedEvents': '{\n' + turn_rows + '    END_MAIN\n}',
+        # Misc = the win/lose machinery. DefeatBoss is an AFEV on EVFLAG_DEFEAT_BOSS, which
+        # Ravisin's FLAGGED defeat quote sets on her death (step 5) -- CA_BOSS alone fires nothing.
+        'miscBasedEvents': arena_wiring['misc'],
+        # Location = the four reliquary visits + the elven store. The shops are wired for good (a
+        # shop needs no script and no text); the visits own their rewards, and each carries its
+        # CH05_VILLAGE_FLAGS event id -- the race (#25).
+        'locationBasedEvents': ch05_location_events(chap),
+        'characterBasedEvents': sahnar_char_events,
+    }, roster=CH05_ALLY_TABLE, scenes=(CH05_BEGINNING_SCRIPT, CH05_ENDING_SCRIPT))
 
     # 4. Beginning scene + the wave scripts. LOMA rebuilds the battle map fresh, the line
     #    LOADs, then CALL Preparations (which reads the never-LOADed cap template).

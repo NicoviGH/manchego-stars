@@ -102,42 +102,20 @@ NEEDS_BUILD = unittest.skipUnless(
               'which is true and useless (CI runs `make test` BEFORE the build)')
 
 
-@NEEDS_BUILD
-class WhatInheritedActuallyMeans(unittest.TestCase):
-    """The subtlety this guard turns on, and the one that makes a pointer comparison useless.
+class TheCensusListsTheFrame(unittest.TestCase):
+    """The group is framed from blank (#412), so the census is the frame's ruling, listed --
+    readable on a clean checkout, because it no longer guesses from the bytes."""
 
-    Our injectors mostly keep the donor's SYMBOL and rewrite what it points AT --
-    `EventListScr_Ch6_Turn` is still called that and contains none of vanilla's events. A
-    census that compares the initializer token calls all of those INHERITED, which is both
-    wrong and unusable: it would demand a declared reason for twenty fields per chapter,
-    almost all of them false. What leaks the donor's DATA is a field whose target is still
-    vanilla's, so that is what has to be compared.
-    """
-
-    def test_a_field_whose_TARGET_was_rewritten_is_written_even_if_the_pointer_is_not(self):
+    def test_the_event_lists_are_written_although_they_keep_vanillas_names(self):
         got = event_group.census('ch05')
-        # #306 declared ch05's traps empty by rewriting TrapData_Event_Ch6 to TRAP_NONE,
-        # leaving `.traps = TrapData_Event_Ch6` untouched. A pointer census calls this
-        # INHERITED, which is exactly backwards.
-        self.assertEqual('WRITTEN', got['traps'])
-
-    def test_the_event_lists_are_ours_although_they_keep_vanillas_names(self):
-        got = event_group.census('ch05')
-        for field in ('turnBasedEvents', 'characterBasedEvents', 'locationBasedEvents',
-                      'miscBasedEvents'):
+        for field in event_group.LISTS:
             self.assertEqual('WRITTEN', got[field], field)
 
+    def test_traps_are_written_by_their_total_pass(self):
+        # #306 declared ch05's traps by rewriting TrapData_Event_Ch6, leaving the pointer alone.
+        self.assertEqual('apply_chapter_traps', event_group.owner_for('traps'))
+        self.assertEqual('WRITTEN', event_group.census('ch05')['traps'])
 
-class TheLiveCensus(unittest.TestCase):
-    """Against the real decomp, which is the only place the finding can come from."""
-
-    def test_every_hosted_chapter_s_group_can_be_located_and_read(self):
-        from inject import hosts
-        for hosted in hosts.hosted_chapters():
-            path = event_group.header_for(hosted.event_group)
-            self.assertTrue(path.endswith('.h'), hosted.event_group)
-
-    @NEEDS_BUILD
     def test_ch05_still_inherits_the_six_encounter_rosters(self):
         """The finding #313 was opened to surface, asserted so it cannot quietly change
         without somebody ruling on it. ch05 hosts on slot 6, so these are vanilla Ch6's
@@ -147,39 +125,14 @@ class TheLiveCensus(unittest.TestCase):
             if 'InEncounter' in field:
                 self.assertEqual('INHERITED', got[field], field)
 
+    def test_every_field_is_ruled_on_one_way_or_the_other(self):
+        unruled = [f for f in event_group.fields()
+                   if not event_group.owner_for(f) and f not in event_group.DECLARED_INHERITED]
+        self.assertEqual([], unruled)
 
-class UnclassifiedIsABuildFailure(unittest.TestCase):
-    """The deliverable: the field-inheritance failure class stops being discoverable only by
-    shipping a bug. Five instances found it the hard way -- goal text ids, battle grounds,
-    difficulty numbers, `.traps`, and the encounter rosters."""
-
-    @NEEDS_BUILD
-    def test_the_live_tree_passes_because_every_inherited_field_is_declared(self):
-        event_group.assert_census_declared()
-
-    def test_an_undeclared_inherited_field_fails_the_build(self):
-        with self.assertRaises(SystemExit) as caught:
-            event_group.assert_census_declared(
-                censuses={'ch05': {'tutorialEvents': event_group.INHERITED}},
-                declared={})
-        self.assertIn('tutorialEvents', str(caught.exception))
-
-    def test_a_declaration_for_a_field_we_actually_WRITE_is_stale_and_fails(self):
-        """A reason nobody needs is a reason nobody rechecks. Left standing, it is how a
-        field that used to be inherited keeps a stale justification after it stops being."""
-        with self.assertRaises(SystemExit) as caught:
-            event_group.assert_census_declared(
-                censuses={'ch05': {'traps': event_group.WRITTEN}},
-                declared={'traps': 'we do not inherit this'})
-        self.assertIn('traps', str(caught.exception))
-
-    def test_a_NEW_struct_field_nobody_has_ruled_on_fails(self):
-        """Scope item three: a field appearing in the struct fails the build until somebody
-        rules on it. That is the whole point -- the guard has to notice what we did not."""
-        with self.assertRaises(SystemExit):
-            event_group.assert_census_declared(
-                censuses={'ch05': {'someNewFieldUpstreamAdded': event_group.INHERITED}},
-                declared={})
+    def test_no_field_is_both_owned_and_declared_inherited(self):
+        self.assertEqual([], sorted(set(event_group.OWNED_BY_PASS)
+                                    & set(event_group.DECLARED_INHERITED)))
 
     def test_the_six_encounter_rosters_are_declared_KEPT_for_the_world_map(self):
         """Nicolas, 2026-08-23: vanilla has optional skirmishes, so we do too -- the rosters
@@ -189,6 +142,32 @@ class UnclassifiedIsABuildFailure(unittest.TestCase):
         for field, reason in event_group.DECLARED_INHERITED.items():
             if 'InEncounter' in field:
                 self.assertIn('#29', reason, field)
+
+
+class TheLiveCensus(unittest.TestCase):
+    """Against the real decomp, which is the only place the finding can come from."""
+
+    vanilla = {'extraTrapsInHard': 'TrapData_Event_Ch6Hard'}
+
+    def test_every_hosted_chapter_s_group_can_be_located_and_read(self):
+        from inject import hosts
+        for hosted in hosts.hosted_chapters():
+            path = event_group.header_for(hosted.event_group)
+            self.assertTrue(path.endswith('.h'), hosted.event_group)
+
+    def test_a_pass_that_writes_an_inherited_field_is_caught(self):
+        ours = dict(self.vanilla, extraTrapsInHard='MS_SomebodysTraps')
+        self.assertIn('extraTrapsInHard', ' '.join(event_group.behind_the_frame(
+            'ch05', ['extraTrapsInHard'], ours, self.vanilla)))
+        self.assertIn('extraTrapsInHard', ' '.join(event_group.behind_the_frame(
+            'ch05', ['extraTrapsInHard'], self.vanilla, self.vanilla,
+            rewritten={self.vanilla['extraTrapsInHard']})))
+        self.assertEqual([], event_group.behind_the_frame(
+            'ch05', ['extraTrapsInHard'], self.vanilla, self.vanilla))
+
+    @NEEDS_BUILD
+    def test_every_inherited_field_still_reads_as_the_donors(self):
+        self.assertTrue(event_group.assert_census_declared())
 
 
 class WhichScriptsAChapterCanActuallyRUN(unittest.TestCase):

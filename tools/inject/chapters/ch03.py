@@ -12,6 +12,7 @@ from inject.chapter_ids import (
     CH03_ENDING_MSGS, CH03_GOAL_STATUS_MSG, CH03_GOAL_WINDOW_MSG, CH03_MIDMAP_MSGS,
     CH03_OPENING_CARD_MSG, CH03_OPENING_MSGS, CH03_TREX_ENTRANCE_MSG, CH03_TREX_TALK_MSG)
 from inject.decomp import _replace_brace_block, REPO
+from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH03_EVENT_GROUP, CH03_HOST_INDEX
 from inject.maps import (
@@ -309,15 +310,11 @@ def inject_ch03(campaign, boot=False, verbose=True):
     #    beginning scene deploy the enemies + green Trex then run Preparations. DefeatBoss = AFEV on EVFLAG_DEFEAT_BOSS,
     #    which the grell's FLAGGED defeat quote sets on its death (step 5) -> runs the ending script;
     #    CauseGameOverIfLordDies = AFEV on EVFLAG_GAMEOVER (the lord's flagged quote / lord-select hook).
-    with open(CH4_EVENTINFO_H, encoding='utf-8') as f:
-        info = f.read()
     # Turn list: Trex's light entrance beat fires on turn 1 (player phase), the vanilla Colm
-    # turn-1 green-NPC idiom (cf. inject_ch02's turn-1 tutorial TURN). Location stays empty.
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch4_Turn[] =',
-        '{\n    TURN(0x0, %s, 1, 0, FACTION_ID_BLUE)'
-        ' /* turn-1: Trex\'s light entrance (Colm pattern) */\n    END_MAIN\n}'
-        % CH03_TREX_ENTRANCE_SCRIPT, CH4_EVENTINFO_H)
+    # turn-1 green-NPC idiom (cf. inject_ch02's turn-1 tutorial TURN).
+    turn_events = ('{\n    TURN(0x0, %s, 1, 0, FACTION_ID_BLUE)'
+                   ' /* turn-1: Trex\'s light entrance (Colm pattern) */\n    END_MAIN\n}'
+                   % CH03_TREX_ENTRANCE_SCRIPT)
     # Location = the mine chests + doors (#23). Each Chest(item, x, y) makes its tile openable
     # (IsThereClosedChestAt reads this list) and gives the item; each Door_(x, y) makes its tile a
     # thief/key door (TILE_COMMAND_DOOR, script=1 -> CallTileChangeEvent). The paired
@@ -331,25 +328,22 @@ def inject_ch03(campaign, boot=False, verbose=True):
         for c in chap['chests']) + ''.join(
         '    Door_(%d, %d)\n' % (d['position'][0], d['position'][1])
         for d in chap.get('doors', [])) + '    END_MAIN\n}'
-    info = _replace_brace_block(info, 'EventListScr_Ch4_Location[] =', loc_events, CH4_EVENTINFO_H)
-    # Character events = the Trex talk-recruit (#23 item 2): the CHAR-per-candidate list.
-    info = _replace_brace_block(info, 'EventListScr_Ch4_Character[] =', char_events, CH4_EVENTINFO_H)
     # Misc = the win/lose machinery + the mid-map RBG-execution AFEV. DefeatBoss(ending) fires on
     # the grell's death (EVFLAG_DEFEAT_BOSS); the midmap AFEV fires ONCE on the Brute's death (its
     # flagged quote sets CH03_BRUTE_DEFEAT_FLAG), guarded by CH03_MIDMAP_GUARD_FLAG so it doesn't
     # re-run each turn -- the vanilla mid-map death-scene idiom (cf. ch1's tmp-flag AFEV).
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch4_Misc[] =',
-        '{\n    DefeatBoss(%s)\n    %s /* midmap: RBG executes the beaten Brute (#23) */\n'
-        '    CauseGameOverIfLordDies\n    END_MAIN\n}'
-        % (CH03_ENDING_SCRIPT,
-           midmap_afev(CH03_MIDMAP_GUARD_FLAG, CH03_MIDMAP_SCRIPT, CH03_BRUTE_DEFEAT_FLAG)),
-        CH4_EVENTINFO_H)
-    # Ch4's tutorial list is an EventListScr[] (struct array), NOT the prologue's pointer
-    # array -- so it terminates with END_MAIN, not NULL (NULL -> int-from-pointer error).
-    info = _replace_brace_block(info, 'EventListScr_Ch4_Tutorial[] =', '{\n    END_MAIN\n}', CH4_EVENTINFO_H)
-    with open(CH4_EVENTINFO_H, 'w', encoding='utf-8') as f:
-        f.write(info)
+    misc_events = ('{\n    DefeatBoss(%s)\n    %s /* midmap: RBG executes the beaten Brute (#23) */\n'
+                   '    CauseGameOverIfLordDies\n    END_MAIN\n}'
+                   % (CH03_ENDING_SCRIPT,
+                      midmap_afev(CH03_MIDMAP_GUARD_FLAG, CH03_MIDMAP_SCRIPT,
+                                  CH03_BRUTE_DEFEAT_FLAG)))
+    # Character events = the Trex talk-recruit (#23 item 2): the CHAR-per-candidate list.
+    write_event_group('ch03', CH4_EVENTINFO_H, CH03_EVENT_GROUP, lists={
+        'turnBasedEvents': turn_events,
+        'characterBasedEvents': char_events,
+        'locationBasedEvents': loc_events,
+        'miscBasedEvents': misc_events,
+    }, roster='UnitDef_Event_Ch4Ally', scenes=('EventScr_Ch4_BeginningScene', CH03_ENDING_SCRIPT))
 
     # 3b. Tile-changes: pair each Chest()/Door_() location event above with a MapChange -- flips the
     #     FF5 navy chest 17->29 on loot, and each door to the floor tile below it on open (must run

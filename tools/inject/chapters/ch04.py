@@ -10,6 +10,7 @@ from inject.chapter_ids import (
     CH04_OPENING_CARD_MSG, CH04_OPENING_FOREST_BG, CH04_OPENING_MSGS, CH04_REVEAL_MSGS,
     CH04_VILLAGE_SLOTS)
 from inject.decomp import _replace_brace_block, DECOMP, REPO
+from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH02_HOST_INDEX, CH04_EVENT_GROUP, CH04_HOST_INDEX
 from inject.maps import (
@@ -595,17 +596,10 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # she is LOADed onto the map by the beginning scene, so there is no Pick Units to bench her.
     _force_deploy_units(recruiters, CH04_HOST_INDEX)
 
-    with open(CH5_EVENTINFO_H, encoding='utf-8') as f:
-        info = f.read()
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch5_Turn[] =',
-        '{\n    TurnEventPlayer(0, EventScr_089F22A4, 2)'
-        ' /* turn-2 reveal: 5 Mauthe Doogs + Lupin (red pack leader) */\n'
-        '    TurnEventPlayer(0, EventScr_089F22EC, 3) /* turn-3 reinf: revenant + bonewalker packs */\n'
-        '    END_MAIN\n}', CH5_EVENTINFO_H)
-    # Character = the Marty->Lupin parley CHAR list (Stage 2b); the rest stay empty.
-    info = _replace_brace_block(info, 'EventListScr_Ch5_Character[] =',
-                                lupin_char_events, CH5_EVENTINFO_H)
+    turn_events = ('{\n    TurnEventPlayer(0, EventScr_089F22A4, 2)'
+                   ' /* turn-2 reveal: 5 Mauthe Doogs + Lupin (red pack leader) */\n'
+                   '    TurnEventPlayer(0, EventScr_089F22EC, 3) /* turn-3 reinf: revenant + bonewalker packs */\n'
+                   '    END_MAIN\n}')
     # Location = the villages (#205). Vanilla Ch4's Location list is two `Village` entries; ours
     # keeps the ITEM one at the same tile (the parley took the recruit one's job). Blanking this
     # list is what made ch04's Iron Axe unobtainable -- and the map's door tile had ALSO lost its
@@ -615,28 +609,25 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # `vanilla_layout:` and there is no vanilla gift placement to inherit. Wired anyway so the
     # rule travels with the chapter rather than with whoever remembers it (#25).
     assert_village_gifts_match_vanilla(chap, CH04_ITEM_IDS)
-    info = _replace_brace_block(info, 'EventListScr_Ch5_Location[] =',
-                                ch04_location_events(chap), CH5_EVENTINFO_H)
     # Tile flips (#214): the snag falls into a crossing (the Iron Axe's whole purpose) and each
     # visited village closes its door. Must run AFTER _retarget_host_chapter zeroed changeLayerId.
     _inject_tile_changes('MS_Ch04MapChanges', ch04_map_changes(chap, maps_dir), CH04_HOST_INDEX)
-    for symbol in ('EventListScr_Ch5_SelectUnit', 'EventListScr_Ch5_SelectDestination',
-                   'EventListScr_Ch5_UnitMove', 'EventListScr_Ch5_Tutorial'):
-        info = _replace_brace_block(info, symbol + '[] =',
-                                    '{\n    END_MAIN\n}', CH5_EVENTINFO_H)
     # Misc = win/lose + the moose sighting. AREA fires once when a player unit steps into the
     # tomb-side clearing (guarded by its own tmp flag, the vanilla one-shot idiom, cf. ch1's
     # AREA) -- the quarry is seen and lost in the same beat.
     mx1, my1, mx2, my2 = CH04_MOOSE_AREA
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch5_Misc[] =',
-        '{\n    DefeatAll(%s)\n'
-        '    AREA(%s, %s, %d, %d, %d, %d) /* the white moose is sighted, and bolts */\n'
-        '    CauseGameOverIfLordDies\n    END_MAIN\n}'
-        % (CH04_ENDING_SCRIPT, CH04_MOOSE_GUARD_FLAG, CH04_MOOSE_SCRIPT,
-           mx1, my1, mx2, my2), CH5_EVENTINFO_H)
-    with open(CH5_EVENTINFO_H, 'w', encoding='utf-8') as f:
-        f.write(info)
+    misc_events = ('{\n    DefeatAll(%s)\n'
+                   '    AREA(%s, %s, %d, %d, %d, %d) /* the white moose is sighted, and bolts */\n'
+                   '    CauseGameOverIfLordDies\n    END_MAIN\n}'
+                   % (CH04_ENDING_SCRIPT, CH04_MOOSE_GUARD_FLAG, CH04_MOOSE_SCRIPT,
+                      mx1, my1, mx2, my2))
+    # Character = the Marty->Lupin parley CHAR list (Stage 2b); the rest stay empty.
+    write_event_group('ch04', CH5_EVENTINFO_H, CH04_EVENT_GROUP, lists={
+        'turnBasedEvents': turn_events,
+        'characterBasedEvents': lupin_char_events,
+        'locationBasedEvents': ch04_location_events(chap),
+        'miscBasedEvents': misc_events,
+    }, roster='UnitDef_Event_Ch5Ally', scenes=('EventScr_Ch5_BeginningScene', CH04_ENDING_SCRIPT))
 
     with open(CH5_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()

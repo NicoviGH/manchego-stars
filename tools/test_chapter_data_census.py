@@ -7,9 +7,9 @@ different chapter. Goal text ids (#207), battle grounds (#289), the difficulty t
 `.traps` (#306) and `initialFogLevel` (#365) were each found one at a time, by something else
 going wrong. The census answers "is there a sixth" once.
 
-Two halves, like tools/test_event_group_census.py: pure tests over synthetic censuses, which
-run anywhere, and live-tree tests that need an INJECTED decomp and skip when there is not one
--- on a clean tree every field reads INHERITED, which is true and useless.
+The row is now framed from blank (#412, `inject/chapter_frame.py`), so the census is the
+frame's ruling, listed, and runs anywhere. The live-tree half needs an INJECTED decomp: it
+checks the bytes of every field the frame left inherited.
 
 Run:  python3 tools/test_chapter_data_census.py
 """
@@ -54,44 +54,26 @@ class Classify(unittest.TestCase):
 
 
 class Ruling(unittest.TestCase):
-    def test_an_undeclared_inherited_field_fails_the_build(self):
-        with self.assertRaises(SystemExit) as e:
-            cd.assert_census_declared(censuses={'ch05': {'initialWeather': cd.INHERITED}},
-                                      declared={})
-        self.assertIn('initialWeather', str(e.exception))
+    """The row is framed from blank (#412): the census lists the frame's ruling, and the build
+    checks the bytes only for what the frame left INHERITED."""
 
-    def test_a_declared_inherited_field_passes(self):
-        self.assertTrue(cd.assert_census_declared(
-            censuses={'ch05': {'initialWeather': cd.INHERITED}},
-            declared={'initialWeather': 'vanilla ships WEATHER_FINE on every slot we host'}))
+    def test_every_hosted_chapter_has_every_field_ruled(self):
+        for h in hosts.hosted_chapters():
+            census = cd.census(h.name)
+            self.assertEqual(set(cd.fields()), set(census))
+            self.assertNotIn(cd.UNRULED, census.values(), h.name)
 
-    def test_a_declaration_for_a_field_we_actually_WRITE_is_stale_and_fails(self):
-        with self.assertRaises(SystemExit) as e:
-            cd.assert_census_declared(
-                censuses={'ch05': {'battleTileSet': cd.WRITTEN}},
-                declared={'battleTileSet': 'a reason nobody needs'})
-        self.assertIn('stale', str(e.exception))
+    def test_the_goal_template_is_written_not_inherited(self):
+        # Copied from a vanilla slot of the declared objective TYPE: a write the frame makes.
+        for f in ('goal.windowDataType', 'goal.destPosX', 'goal.windowEndTurnNumber'):
+            self.assertEqual(cd.WRITTEN, cd.census('ch05')[f], f)
+            self.assertEqual(cd.WRITTEN, cd.census('prologue')[f], f)
 
-    def test_a_reason_NO_chapter_needs_is_stale_and_fails_in_the_BUILD(self):
-        """The stale-declaration check has to run where the build runs it, not only where a
-        test passes `declared=`. It fires only when NO chapter inherits the field, because a
-        field one chapter writes and another inherits still needs its reason."""
-        with self.assertRaises(SystemExit) as e:
-            cd.assert_census_declared(
-                censuses={'ch05': {'initialWeather': cd.WRITTEN},
-                          'ch06': {'initialWeather': cd.WRITTEN}})
-        self.assertIn('stale', str(e.exception))
-
-    def test_a_reason_ANOTHER_chapter_still_needs_is_not_stale(self):
-        self.assertTrue(cd.assert_census_declared(
-            censuses={'ch05': {'initialWeather': cd.WRITTEN},
-                      'ch06': {'initialWeather': cd.INHERITED}}))
-
-    def test_a_field_upstream_ADDS_tomorrow_fails_until_somebody_rules(self):
-        with self.assertRaises(SystemExit) as e:
-            cd.assert_census_declared(
-                censuses={'ch05': {'someFieldUpstreamAdded': cd.INHERITED}}, declared={})
-        self.assertIn('someFieldUpstreamAdded', str(e.exception))
+    def test_a_write_behind_the_frame_is_caught(self):
+        self.assertIn('initialWeather', ' '.join(cd.behind_the_frame(
+            'ch05', ['initialWeather'], {'initialWeather': 3}, {'initialWeather': 0})))
+        self.assertEqual([], cd.behind_the_frame(
+            'ch05', ['initialWeather'], {'initialWeather': 0}, {'initialWeather': 0}))
 
 
 class OnlyTheChaptersThisBuildInjected(unittest.TestCase):
@@ -117,11 +99,13 @@ class OnlyTheChaptersThisBuildInjected(unittest.TestCase):
         import re
         from inject.source import def_source
         main = def_source('main')
-        for guard in ('event_group.assert_census_declared(',
+        self.assertTrue(re.search(r'\bhosted = injected_chapters\(prologue_injected\)', main))
+        for guard in ('chapter_frame.assert_framed(',
+                      'event_group.assert_census_declared(',
                       'chapter_data.assert_census_declared(',
                       'assert_reachable_scenes_load_their_actors('):
             call = main[main.index(guard) + len(guard):]
-            self.assertTrue(re.match(r'\s*hosted=injected_chapters\(', call),
+            self.assertTrue(re.match(r'\s*(hosted=)?(injected_chapters\(|hosted\b)', call),
                             '%s is not scoped to the chapters this build injected' % guard)
 
 
@@ -160,7 +144,8 @@ class PassOwnership(unittest.TestCase):
     def _source_of(func_name):
         """The pass's own source, plus every ALL_CAPS module constant it names -- because a
         total pass writes its fields through a table (`DIFFICULTY_FIELDS`) rather than by
-        spelling each one inside its body."""
+        spelling each one inside its body -- and every top-level helper it calls, because the
+        two frame writers share one (`map_writes`)."""
         import ast
         from inject import source as injector
         defs = injector.top_level_definitions()
@@ -178,6 +163,12 @@ class PassOwnership(unittest.TestCase):
             for where, node in defs.get(name, []):
                 if isinstance(node, ast.Assign):
                     chunks.append(injector.segment(where, node))
+        called = {n.func.id for n in ast.walk(func)
+                  if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)}
+        for name in sorted(called - {func_name}):
+            for where, node in defs.get(name, []):
+                if isinstance(node, ast.FunctionDef):
+                    chunks.append(injector.segment(where, node))
         return '\n'.join(chunks)
 
     def test_every_owning_pass_exists_and_names_the_field_it_owns(self):
@@ -192,10 +183,9 @@ class PassOwnership(unittest.TestCase):
 
     def test_the_prologue_is_not_credited_to_the_pass_it_never_calls(self):
         """`_retarget_host_chapter` is called by the six chapter injectors and NOT by
-        `inject_prologue` -- the prologue runs on the slot it was given (inject/hosts.py),
-        which is why the event-group census declares nine of its fields inherited for that
-        same reason. Crediting it here would skip the ruling on every field that pass owns,
-        `prepScreenNumber` included: the prologue keeps vanilla's 2."""
+        `inject_prologue` -- the prologue runs on the slot it was given (inject/hosts.py) and
+        frames that row itself. Crediting the retarget here would skip the ruling on the one
+        field the prologue really does inherit: `prepScreenNumber`, vanilla's 2."""
         self.assertIsNone(cd.owner_for('prologue', 'prepScreenNumber'))
         self.assertEqual('_retarget_host_chapter',
                          cd.owner_for('ch03', 'prepScreenNumber'))
@@ -223,16 +213,13 @@ INJECTED = event_group.injected(paths=('src/data/chapter_settings.json',))
 
 
 @unittest.skipUnless(
-    INJECTED, 'the decomp is not injected: on a clean tree every field reads INHERITED, '
-              'which is true and useless -- run a build first')
+    INJECTED, 'the decomp is not injected -- run a build first')
 class LiveTree(unittest.TestCase):
-    def test_every_hosted_chapter_gets_a_verdict_for_every_field(self):
-        for h in hosts.hosted_chapters():
-            self.assertEqual(set(cd.fields()), set(cd.census(h.name)))
-
-    def test_the_live_tree_passes_because_every_inherited_field_is_declared(self):
+    def test_every_inherited_field_still_holds_its_donor_slots_value(self):
         self.assertTrue(cd.assert_census_declared())
 
+
+class TheIncidentsStayFixed(unittest.TestCase):
     def test_the_fields_the_incidents_were_about_are_WRITTEN_where_they_were_fixed(self):
         # #207 goal text ids, #289 battle grounds, #365 fog. Each was a real shipped bug;
         # the census is what keeps the fix visible rather than remembered.

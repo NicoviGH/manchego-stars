@@ -15,6 +15,7 @@ from inject.chapter_ids import (
     CH02_GOAL_STATUS_MSG, CH02_GOAL_WINDOW_MSG, CH02_MINIBOSS_SLOT, CH02_OPENING_BG,
     CH02_TURN1_MSGS, CH02_VILLAGE_SLOTS)
 from inject.decomp import _replace_brace_block, REPO
+from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter, recruit_chapter_number
 from inject.hosts import CH02_EVENT_GROUP, CH02_HOST_INDEX, CH03_HOST_INDEX
 from inject.maps import (
@@ -453,24 +454,21 @@ def inject_ch02(campaign, verbose=True):
         f.write(udefs)
 
     # 3. Event lists (ch3-eventinfo.h). Turn: the rear raiders on turn 3 (FACTION_ID_BLUE
-    #    appear-at-player-phase idiom, cf. inject_ch01). Character/Location cleared: no
-    #    talks, and DROP the vanilla Seize(14,1) + chests/doors so DefeatAll (CountRedUnits)
-    #    is the only win path. Misc keeps its vanilla CauseGameOverIfLordDies untouched.
-    with open(CH3_EVENTINFO_H, encoding='utf-8') as f:
-        info = f.read()
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch3_Turn[] =',
-        '{\n    TURN(0x0, EventScr_Ch3_Turn2Player, 1, 0, FACTION_ID_BLUE)'
-        ' /* turn-1 fliers-vs-bows: RBG warns flier Pinky off the archer */\n'
-        '    TURN(0x0, EventScr_Ch3_Turn1Npc, %d, 0, FACTION_ID_BLUE)'
-        ' /* turn-%d rear raiders + Wolfram bark */\n    END_MAIN\n}'
-        % (reinf['trigger_turn'], reinf['trigger_turn']), CH3_EVENTINFO_H)
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch3_Character[] =', '{\n    END_MAIN\n}', CH3_EVENTINFO_H)
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch3_Location[] =', ch02_location_events(chap), CH3_EVENTINFO_H)
-    with open(CH3_EVENTINFO_H, 'w', encoding='utf-8') as f:
-        f.write(info)
+    #    appear-at-player-phase idiom, cf. inject_ch01). Location: the two Targos huts, and
+    #    no vanilla Seize(14,1), so DefeatAll (CountRedUnits) is the only win path. Misc:
+    #    the lord rule and nothing else; ch02's defeat_all objective is FE8's default when no
+    #    DefeatBoss/Seize is declared, so it needs no misc entry of its own.
+    write_event_group('ch02', CH3_EVENTINFO_H, CH02_EVENT_GROUP, lists={
+        'turnBasedEvents':
+            '{\n    TURN(0x0, EventScr_Ch3_Turn2Player, 1, 0, FACTION_ID_BLUE)'
+            ' /* turn-1 fliers-vs-bows: RBG warns flier Pinky off the archer */\n'
+            '    TURN(0x0, EventScr_Ch3_Turn1Npc, %d, 0, FACTION_ID_BLUE)'
+            ' /* turn-%d rear raiders + Wolfram bark */\n    END_MAIN\n}'
+            % (reinf['trigger_turn'], reinf['trigger_turn']),
+        'locationBasedEvents': ch02_location_events(chap),
+        'miscBasedEvents': '{\n    CauseGameOverIfLordDies\n    END_MAIN\n}',
+    }, roster='UnitDef_Event_Ch3Ally',
+        scenes=('EventScr_Ch3_BeginningScene', 'EventScr_Ch3_EndingScene'))
 
     # 4. Scenes (ch3-eventscript.h). Beginning: Vellynne's opening over a scenic BACG,
     #    then LOMA rebuilds the battle map fresh (the BACG clobbered it, cf. inject_ch01),

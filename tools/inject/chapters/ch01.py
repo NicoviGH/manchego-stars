@@ -13,6 +13,7 @@ from inject.chapter_ids import (
     CH01_BOSS_SLOT, CH01_GOAL_STATUS_MSG, CH01_GOAL_WINDOW_MSG, CH01_LORDSEL_BG,
     PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT)
 from inject.decomp import _replace_brace_block, DECOMP, git_env, LORDSEL_FLAG_BASE, REPO
+from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH01_EVENT_GROUP, CH01_HOST_INDEX, CH02_HOST_INDEX
 from inject.maps import _register_chapter_map
@@ -385,34 +386,24 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # tile step), so the party always reads it. Presence-checked here; wired as the first
     # turn-1 TURN entry below (its script body is EventScr_Ch2_Talk_EirikaRoss, step 4).
     next(e for e in chap['events'] if e.get('trigger') == 'battle_start')
-    with open(CH2_EVENTINFO_H, encoding='utf-8') as f:
-        info = f.read()
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch2_Turn[] =',
-        '{\n    TURN(0x0, EventScr_Ch2_Talk_EirikaRoss, 1, 0, FACTION_ID_BLUE)'
-        ' /* #5: roadsign + body, read at battle start (was a [8,8] tile trigger) */\n'
-        '    TURN(0x0, EventScr_Ch2_Turn2Player, 1, 0, FACTION_ID_BLUE)'
-        ' /* Izobai turn-1 taunt */\n'
-        '    TURN(0x0, EventScr_Ch2_Turn1Player, %d, 0, FACTION_ID_BLUE)'
-        ' /* west reinforcements */\n'
-        '    END_MAIN\n}' % reinf['spawn_turn'], CH2_EVENTINFO_H)
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch2_Character[] =', '{\n    END_MAIN\n}', CH2_EVENTINFO_H)
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch2_Location[] =',
-        '{\n    House(0x0, EventScr_Ch2_Village1, %d, %d)\n'
-        '    House(0x0, EventScr_Ch2_Village2, %d, %d)\n'
-        '    Seize(%d, %d)\n    END_MAIN\n}'
-        % (houses[0]['tile'][0], houses[0]['tile'][1],
-           houses[1]['tile'][0], houses[1]['tile'][1], sx, sy), CH2_EVENTINFO_H)
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch2_Misc[] =',
-        '{\n    CauseGameOverIfLordDies\n    END_MAIN\n}',
-        CH2_EVENTINFO_H)
-    info = _replace_brace_block(
-        info, 'EventListScr_Ch2_Tutorial[] =', '{\n    NULL\n}', CH2_EVENTINFO_H)
-    with open(CH2_EVENTINFO_H, 'w', encoding='utf-8') as f:
-        f.write(info)
+    write_event_group('ch01', CH2_EVENTINFO_H, CH01_EVENT_GROUP, lists={
+        'turnBasedEvents':
+            '{\n    TURN(0x0, EventScr_Ch2_Talk_EirikaRoss, 1, 0, FACTION_ID_BLUE)'
+            ' /* #5: roadsign + body, read at battle start (was a [8,8] tile trigger) */\n'
+            '    TURN(0x0, EventScr_Ch2_Turn2Player, 1, 0, FACTION_ID_BLUE)'
+            ' /* Izobai turn-1 taunt */\n'
+            '    TURN(0x0, EventScr_Ch2_Turn1Player, %d, 0, FACTION_ID_BLUE)'
+            ' /* west reinforcements */\n'
+            '    END_MAIN\n}' % reinf['spawn_turn'],
+        'locationBasedEvents':
+            '{\n    House(0x0, EventScr_Ch2_Village1, %d, %d)\n'
+            '    House(0x0, EventScr_Ch2_Village2, %d, %d)\n'
+            '    Seize(%d, %d)\n    END_MAIN\n}'
+            % (houses[0]['tile'][0], houses[0]['tile'][1],
+               houses[1]['tile'][0], houses[1]['tile'][1], sx, sy),
+        'miscBasedEvents': '{\n    CauseGameOverIfLordDies\n    END_MAIN\n}',
+    }, roster='UnitDef_Event_Ch2Ally',
+        scenes=('EventScr_Ch2_BeginningScene', 'EventScr_Ch2_EndingScene'))
 
     # 4. Scenes (ch2-eventscript.h), mechanical pass -- real dialogue lands in the
     #    dialogue pass (LAST, per the slice plan). Beginning = vanilla prep-chapter

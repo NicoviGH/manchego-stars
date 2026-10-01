@@ -573,11 +573,12 @@ def _last_verdict(matrix, scenario, cache_dir=None):
 
 
 def event_group_census(name, campaign=campaign_chapters.CAMPAIGN):
-    """{field: WRITTEN/INHERITED/ABSENT} for this chapter, or None where it cannot be read.
+    """{field: WRITTEN/INHERITED/UNRULED} for this chapter, or None if it is not hosted or the
+    decomp submodule cannot be read.
 
-    The SAME data the build guard rules on (#313) -- `make chapter` reports it and the build
-    refuses it, off one census. Two censuses would be two answers, which is the drift this
-    whole area is against.
+    The SAME ruling the chapter frame writes from (#412) -- `make chapter` lists it and the
+    build enforces it, off one table. It needs the vanilla submodule (the struct's field list)
+    and no build.
     """
     try:
         sys.path.insert(0, os.path.join(REPO, 'tools'))
@@ -586,10 +587,6 @@ def event_group_census(name, campaign=campaign_chapters.CAMPAIGN):
         return None
     short = campaign_chapters.short_id(load(name, campaign))
     if not any(h.name == short for h in hosts.hosted_chapters()):
-        return None
-    # On an UNINJECTED decomp every field reads INHERITED -- true, and indistinguishable from
-    # a real finding. Say cannot tell rather than report a census of nothing.
-    if not event_group.injected():
         return None
     try:
         return event_group.census(short)
@@ -809,8 +806,8 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     out.append('  event group fields')
     verdicts = event_group_census(name, campaign)
     if verdicts is None:
-        out.append('    cannot tell -- the decomp is not injected (run `make`), '
-                   'or it could not be read')
+        out.append('    cannot tell -- not a hosted chapter, or the decomp submodule could '
+                   'not be read')
     else:
         written = [f for f, v in verdicts.items() if v == 'WRITTEN']
         out.append('    %d WRITTEN, %d declared-inherited' % (len(written),

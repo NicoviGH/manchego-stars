@@ -5,15 +5,17 @@ import os
 import re
 import sys
 
-from inject.hosting import _load_chapter_yaml
+from inject.asset_table import _asm_table_word_index
+from inject.chapter_frame import write_settings_row, write_event_group
+from inject.hosting import _load_chapter_yaml, GOAL_TEMPLATE, map_writes
 import fe8_talk_font
 from inject.chapter_ids import PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT
 from inject.decomp import _find_brace_block, _replace_brace_block, fe_item_enum, REPO
-from inject.hosts import PROLOGUE_CHAPTER_INDEX, PROLOGUE_HOST_INDEX
+from inject.hosts import PROLOGUE_CHAPTER_INDEX, PROLOGUE_EVENT_GROUP, PROLOGUE_HOST_INDEX
 from inject.maps import _register_chapter_map
 from inject.montage import inject_opening_montage, inject_world_tour
 from inject.paths import (
-    CH1_EVENTINFO_H, CH1_EVENTSCRIPT_H, CH1_UDEFS_H, CHAPTER_SETTINGS_JSON, CHARACTERS_C,
+    ASSET_TABLE_S, CH1_EVENTINFO_H, CH1_EVENTSCRIPT_H, CH1_UDEFS_H, CHAPTER_SETTINGS_JSON, CHARACTERS_C,
     GAMECONTROL_C, TEXTS_TXT)
 from inject.scenes import (
     _prepend_battle_quote, _prepend_defeat_quote, _write_chapter_title_card, battle_quote_pair)
@@ -188,22 +190,28 @@ def inject_prologue(campaign, verbose=True, montage=False):
         maps_dir, PROLOGUE_LAYOUT, 'Manchego Stars prologue layout (#20)')
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
-    host = settings['chapters'][PROLOGUE_HOST_INDEX]
-    host['map'].update({'obj1Id': obj_idx, 'obj2Id': 0, 'paletteId': pal_idx,
-                        'tileConfigId': cfg_idx, 'mainLayerId': layout_idx,
-                        'objAnimId': 0, 'paletteAnimId': 0, 'changeLayerId': 0})
     # The goal banner/objective display is chapter data, not events -- the host (vanilla
-    # Ch1) says "Seize gate". Copy the vanilla Prologue's defeat_boss goal block.
-    host['goal'] = settings['chapters'][PROLOGUE_CHAPTER_INDEX]['goal']
+    # Ch1) says "Seize gate". Copy the vanilla Prologue's defeat_boss goal block, text ids too.
+    goal = settings['chapters'][PROLOGUE_CHAPTER_INDEX]['goal']
+    writes = dict(map_writes((obj_idx, pal_idx, cfg_idx, layout_idx)))
+    writes.update(('goal.' + f, goal[f]) for f in GOAL_TEMPLATE)
+    writes['goal.windowTextId'] = goal['windowTextId']
+    writes['goal.statusObjectiveTextId'] = goal['statusObjectiveTextId']
+    # The slot's own group: the prologue keeps Ch1Events rather than retargeting, and says so.
+    writes['mapEventDataId'] = _asm_table_word_index(
+        ASSET_TABLE_S, 'gChapterDataAssetTable', PROLOGUE_EVENT_GROUP)
+    # fadeToBlack=1: the intro ends on black, not a map fade-in (see _retarget_host_chapter) --
+    # our opening is a BG cutscene (the BeginningScene BACGs), so the vanilla map fade-in would
+    # FLASH the map first. Slot 1 shipped with fadeToBlack=0; set it so the prologue matches.
+    writes['fadeToBlack'] = 1
+    host = write_settings_row('prologue', PROLOGUE_HOST_INDEX, writes)
     # The New Game save-slot select draws the VANILLA prologue slot's title-card
     # IMAGE ("Prologue: The Fall of Renais") -- it reads chapter 0's chapTitleId,
     # not the host's. Point slot 0 at the host's card (recomposed in step 4a);
     # slot 0 is never loaded as a chapter, so only this menu metadata matters.
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
     settings['chapters'][PROLOGUE_CHAPTER_INDEX]['chapTitleId'] = host['chapTitleId']
-    # fadeToBlack=1: the intro ends on black, not a map fade-in (see _retarget_host_chapter) --
-    # our opening is a BG cutscene (the BeginningScene BACGs), so the vanilla map fade-in would
-    # FLASH the map first. Slot 1 shipped with fadeToBlack=0; set it so the prologue matches.
-    host['fadeToBlack'] = 1
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
 
@@ -219,25 +227,19 @@ def inject_prologue(campaign, verbose=True, montage=False):
         f.write(udefs)
 
     # 3. Strip the Ch1 cutscene scripting (like inject_test_chapter, which renders cleanly):
-    #    empty the Turn/Character/Location lists and null the tutorial list, then replace the
-    #    beginning scene with a bare deploy of both rosters. The Misc list keeps the win/lose
+    #    the frame writes every list but Misc empty (#412), then the beginning scene is replaced
+    #    with a bare deploy of both rosters. The Misc list keeps the win/lose
     #    machinery in the vanilla Prologue's shape (prologue-eventinfo.h): DefeatBoss = AFEV
     #    on EVFLAG_DEFEAT_BOSS, which Sephek's FLAGGED DEFEAT QUOTE sets on his death
     #    (step 5; CA_BOSS alone sets nothing) -> runs the ending scene; CauseGameOverIfLordDies = AFEV on
     #    EVFLAG_GAMEOVER, which Hlin's flagged defeat quote sets (step 5).
-    with open(CH1_EVENTINFO_H, encoding='utf-8') as f:
-        info = f.read()
-    for name in ('EventListScr_Ch1_Turn', 'EventListScr_Ch1_Character',
-                 'EventListScr_Ch1_Location'):
-        info = _replace_brace_block(info, name + '[] =', '{\n    END_MAIN\n}', CH1_EVENTINFO_H)
-    misc = ('{\n    DefeatBoss(EventScr_Ch1_EndingScene)\n'
-            '    CauseGameOverIfLordDies\n'
-            '    END_MAIN\n}')
-    info = _replace_brace_block(info, 'EventListScr_Ch1_Misc[] =', misc, CH1_EVENTINFO_H)
-    info = _replace_brace_block(info, 'EventListScr_Ch1_Tutorial[] =',
-                                '{\n    NULL\n}', CH1_EVENTINFO_H)
-    with open(CH1_EVENTINFO_H, 'w', encoding='utf-8') as f:
-        f.write(info)
+    write_event_group(
+        'prologue', CH1_EVENTINFO_H, PROLOGUE_EVENT_GROUP,
+        lists={'miscBasedEvents': '{\n    DefeatBoss(EventScr_Ch1_EndingScene)\n'
+                                  '    CauseGameOverIfLordDies\n'
+                                  '    END_MAIN\n}'},
+        roster='UnitDef_Event_Ch1Ally',
+        scenes=('EventScr_Ch1_BeginningScene', 'EventScr_Ch1_EndingScene'))
 
     with open(CH1_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
