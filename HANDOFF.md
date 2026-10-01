@@ -6,12 +6,21 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-09-30 (Claude), after #419 (#416) and #420 (#408's main change) landed. **What landed and why is in `git log`
+Refreshed 2026-10-01 (Claude), after #421 (#408), #422 (#409) and the #410 draft (#423). **What landed and why is in `git log`
 and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-**Nothing. No open PRs, no branches.**
+**#423 (draft), branch `engine-patch-series` -- #410: the engine hooks are now a patch series,
+`engine/patches/` (ADR 0305; my pick of a patch series over a GitHub fork is on #410).** Built,
+reviewed by nobody yet, check.py clean. Owed before it leaves draft:
+1. `injection_fingerprint --check` on the other 11 configurations (`--montage`,
+   `--test-chapter`, `--lord-boot`, `--ch01/03/04/05/06-boot`, ch05 `--ch05-lupin`,
+   `--ch05-moose`, `--ch05-ending=full`). Baselines: record them on `main` first (`--write`),
+   then `--check` on the branch. Default is already IDENTICAL. They did not run because the Mac
+   was at load ~44 (VS Code's `chrome_crashpad_handler` at 400% + a Unity batchmode job): one
+   configuration took ~2h. Check `uptime` before starting.
+2. `/code-review medium` on the checked-out branch, fix findings, CI green, mark ready, merge.
 
 ## The sequence Nicolas agreed (2026-09-30) -- run it without asking
 
@@ -28,8 +37,10 @@ comments** (latest: 2026-09-30, "the moves landed").
 | -- | #417: boot/test-chapter builds died at the #396/#398 guards (found by the moves' gate) | **done** |
 | 4 | #416 -- the mtime rewind keys off what `make` compiled (#419, ADR 0301) | **done** |
 | 5a | #408 -- the ROM is built in `build/fireemblem8u`, a worktree of the submodule (#420, ADR 0302) | **done** |
-| 5b | **#408's last box** -- CI caches the INJECTED build outputs + `.build-compiled/` (its comment has the one extra rule it needs); then close #408 | **NEXT** |
-| 6 | #409 declared steps -> #410 decomp fork -> #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | in that order |
+| 5b | #408's last box: CI caches the injected build (#421, ADR 0303) | **done** |
+| 6a | #409 declared steps (#422, ADR 0304) | **done** |
+| 6b | #410 engine changes as a patch series (#423, ADR 0305) | **draft: finish the gate above** |
+| 6c | #411 message-id allocation + YAML schema -> #412 blank-template chapters (with #302's driver) | in that order |
 | 7 | Trim this file again once the sequence lands | last |
 
 Then ch06's own body (#26) resumes -- see "Chapter work" below.
@@ -45,8 +56,13 @@ Then ch06's own body (#26) resumes -- see "Chapter work" below.
   `globals()`.
 - **Never name a local `inject`** in a file that uses `inject.X` (and a function-local
   `import inject.X` makes `inject` local to the whole function).
+- **A new injection pass is a `Step` in `inject/steps.py`** declaring its `writes`, `needs`,
+  `flags` and `scope` (ADR 0304). `INJECT_STRICT=1` (CI, the fingerprint gate) names the step
+  behind an undeclared write; an ordinary build only names the path.
 - **Refactor gate**: `tools/injection_fingerprint.py --write/--check PATH --flags="..."`, one
-  manifest per configuration; the ten configurations are listed in ADR 0300. ~2 min each.
+  manifest per configuration; the twelve configurations are in ADR 0304. ~2.5 min each on an
+  idle Mac. A KILLED run leaves `.build-config.json`, `.build-scopes.json`, `.build-compiled`
+  and `.injectcache` stashed as `*.fingerprint-bak`; move them back before the next run.
 - **`inject.decomp.DECOMP` is the BUILD TREE; `inject.decomp.SUBMODULE` is vanilla** (ADR 0302).
   A new vanilla reader uses SUBMODULE; anything reading the injected tree or the ROM uses DECOMP.
 
