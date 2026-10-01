@@ -148,6 +148,20 @@ FLAG_ARGS = {'TESTCH': '--test-chapter', 'LORDBOOT': '--lord-boot', 'MONTAGE': '
 VALUED_FLAGS = frozenset({'CH05ENDING'})
 
 
+def switches(make_flags):
+    """The build_campaign.py switches for a ROM configuration's make flags ("CH05BOOT=1").
+
+    A VALUED switch has to carry its value: `--ch05-ending` bare exits argparse 2, and the
+    caller only sees an opaque CalledProcessError (#357 review). resolve_rom yields
+    "CH05ENDING=full" for those, so keep the arm."""
+    out = []
+    for flag in make_flags:
+        name, _, value = flag.partition('=')
+        switch = FLAG_ARGS[name]
+        out.append('%s=%s' % (switch, value) if name in VALUED_FLAGS else switch)
+    return out
+
+
 def keys_for(names, manifests):
     out = {}
     for name in names:
@@ -171,14 +185,7 @@ def build_manifests(roms):
     for rom in roms:
         flags = mx.Manifest.load().resolve_rom(rom)
         cmd = [sys.executable, os.path.join(HERE, 'build_campaign.py'),
-               '--campaign', 'rime-of-the-frostmaiden']
-        # A VALUED switch has to carry its value: `--ch05-ending` bare exits argparse 2, and
-        # the caller only sees an opaque CalledProcessError (#357 review). resolve_rom yields
-        # "CH05ENDING=full" for those, so keep the arm.
-        for flag in flags:
-            name, _, value = flag.partition('=')
-            switch = FLAG_ARGS[name]
-            cmd.append('%s=%s' % (switch, value) if name in VALUED_FLAGS else switch)
+               '--campaign', 'rime-of-the-frostmaiden'] + switches(flags)
         subprocess.run(cmd, cwd=REPO, check=True, capture_output=True)
         out[rom] = build_scopes.load_manifest(
             os.path.join(REPO, '.build-scopes.json'))

@@ -36,7 +36,9 @@ from inject.warm import (  # noqa: E402
     _stamp_build_config, _written_since, load_compiled, normalise_decomp_shebangs,
     record_injected)
 
-def main():
+def parse_args(argv=None):
+    """The CLI, validated: (args, the flags as passed). `injection_fingerprint --reach` reads
+    each ROM configuration through this, so it sees the arguments a build would."""
     ap = argparse.ArgumentParser(description='Inject campaign content into the decomp build.')
     ap.add_argument('--campaign', default='rime-of-the-frostmaiden')
     ap.add_argument('--montage', action='store_true',
@@ -94,7 +96,7 @@ def main():
                     help='PLAYTEST build (#25): with --ch05-boot, LOAD Lupin onto the roster '
                          'before ch05\'s opening so scene 4\'s CHECK_ALIVE branch takes its '
                          'ALIVE arm. The plain boot ROM cannot reach that arm at all.')
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
     # --ch05-lupin MODIFIES --ch05-boot rather than competing with it (it repoints nothing), so
     # it is not in the mutual-exclusion list below -- but on its own it would silently build a
     # plain canonical ROM with one extra unit table nothing loads.
@@ -132,6 +134,11 @@ def main():
     if len(_boots) > 1:
         sys.exit('ERROR: %s are mutually exclusive -- each repoints New Game at its own '
                  'chapter slot' % ' and '.join(_boots))
+    return args, _requested_flags
+
+
+def main():
+    args, _requested_flags = parse_args()
 
     # The tree we write into (#408): created on first use, and following a submodule bump.
     build_tree.ensure()
