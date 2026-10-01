@@ -6,21 +6,30 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-01 (Claude), after #428 (#424) and #429. **What landed and why is in
-`git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-01 (Claude), after #431. **What landed and why is in `git log` and the
+ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-**Nothing. No open PRs, no branches.** The build-refactor sequence Nicolas agreed on 2026-09-30
-(#389's comments) is complete: #407-#412, #416, #417 and #424, ADRs 0299-0309. How to work in
-the split injector now lives in `tools/inject/__init__.py`'s docstring.
+**Nothing. No open PRs, no branches.** Epic #430 is under way. Step 1's first item landed as
+#431 (ADR 0310): the difficulty report now grades our arriving party and FE8's own, derived
+along Eirika's route. #430's latest comment holds the numbers.
 
-**Next: epic #430, step 1, before ch06's body (#26).** Nicolas's call (2026-10-01): trust the
-difficulty and progression measurements before building more chapters on them. #430's
-checklist is the plan and its order is agreed. Run steps 1-3 without asking; those steps change
-no game data. Bring him the step-3 report BEFORE any balance, level or lock change. Steps 4 and
-6 are his calls. **A built, signed-off or locked chapter is not evidence of correctness**, ch00-ch02's
-existing locks included.
+**Next, in this order. Run steps 1-3 without asking; they change no game data.**
+1. **Score the absolute metrics over the dice, not one stat line.** On #430's last comment.
+   Near a doubling breakpoint the median line misreads the averaged metric by up to 40%
+   (marty's ch06 durability: 1.77 averaged over the dice vs 1.25 on the line). `difficulty.level_up` / `grown`
+   already simulate the careers. Report the average plus a bad-luck figure. ADR 0310 has the
+   measurement.
+2. **The danger map** (#430 step 1, second item). After that, calibrate it against the
+   2026-09-04 ch06 boat run.
+3. **#430 step 2, the campaign-wide exp guard.** ⚠️ ch07 still names **FE8 Ch6** as its twin,
+   the same one ch06 uses. It has done so since #48, and it is NOT fixed. Nicolas asked about it
+   2026-10-01. The guard is what catches it. Re-point ch07 to FE8 Ch7 when its slice is
+   grounded. ch08 -> FE8 Ch13 is deliberate.
+4. Step 3's report goes to Nicolas BEFORE any balance, level or lock change. Steps 4 and 6
+   are his calls. **A built, signed-off or locked chapter is not evidence of correctness**,
+   ch00-ch02's existing locks included.
 
 ## Owed by NICOLAS, not by the next session
 
