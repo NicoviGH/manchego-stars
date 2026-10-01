@@ -6,8 +6,7 @@ base-level top-up into its stats ONCE, the first player phase it is fielded.
 
 Consumes the build-generated gLordFloorDeltas[] table (inject_ch01, events_udefs.c):
 one { +maxHP, +Def, +Res } row per candidate, parallel to gLordSelectCandidates[]. Two
-campaign-agnostic hooks (string-replace + count-guard, like _inject_lord_select_engine,
-which MUST run first -- this anchors on its injected LordSelect_GetPid):
+campaign-agnostic hooks, on top of patch 0005 (they anchor on its LordSelect_GetPid):
 
   1. LordFloor_ApplyOnce (new, eventinfo.c): find the chosen lead's index via the
      lord-select flags, look up its floor row, add it to maxHP/curHP/def/res, then set a

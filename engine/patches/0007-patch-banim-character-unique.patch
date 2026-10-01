@@ -8,14 +8,10 @@ per-character _u25 -> gUnitSpecificBanimConfigs path (a FE7 holdover) is only wi
 the weapon-triangle preview, not real combat. This swaps the four combat call sites to
 the _WithUnique variant so every NAMED unit (PCs, bosses) can carry a custom battle anim
 via data alone -- no cloned class slot per unit (the slot budget is only ~3). Generic
-enemy classes are unaffected (no unique character id). Campaign-agnostic; guarded here
-and asserted by check.py check_engine_guards_present.
+enemy classes are unaffected (no unique character id). Campaign-agnostic.
 
-Notes:
-
-_swap_combat_anim_to_unique: Pure transform: route the combat battle-anim lookup through the per-character
-GetBattleAnimationId_WithUnique (#65 M-B), and widen the out param (u32 animid -> int)
-to match its signature. Idempotent -- the swapped name no longer matches the search.
+The out param widens from u32 animid to int, to match GetBattleAnimationId_WithUnique's
+signature.
 ---
 diff --git a/src/banim-ekrbattleintro.c b/src/banim-ekrbattleintro.c
 index 0439092d236739931783b9dd907703a2ee843186..e74455df4edc17c4147048361a10dd4436f0ecd4 100644

@@ -10,7 +10,7 @@ the skirmish name card (0x46 + i) when the chapter's node is a monster-spawn
 location AND `GetNextUnclearedNode(&gGMData) != unk`. Vanilla only takes that
 branch on a postgame revisit; during a story playthrough the node IS the next
 uncleared one, so the branch is skipped and it returns chapTitleId. Our campaign
-has no world map (see _patch_battle_map_kind_fallback), so gGMData's node states
+has no world map (see patch 0003), so gGMData's node states
 are never populated -> GetNextUnclearedNode never matches -> every story chapter
 whose slot maps to a spawn node (e.g. ch03 hosts vanilla slot 4 = WM_NODE_ZahaWoods,
 the first spawn location) renders the "Za'ha Woods" skirmish name instead of its

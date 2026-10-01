@@ -3,16 +3,14 @@ Subject: [PATCH 8/14] banim (#65): GetBanimPalette -> custom (appended) banims k
 
 Make GetBanimPalette honour a custom unit's OWN palette (#65 M-B, the RBG cyan fix).
 
-Companion to _patch_banim_character_unique: that routes the combat ANIM lookup through
+Companion to patch 0007: that routes the combat ANIM lookup through
 the per-character _u25 table, but the PALETTE still loads via GetBanimPalette, whose
 vanilla archer/sniper class special-case mis-redirects a custom-anim archer to the stock
 bow palette (cyan). This guards it so appended banim rows keep their own palette.
-Campaign-agnostic; guarded here and asserted by check.py check_engine_guards_present.
+Campaign-agnostic.
 
-Notes:
-
-_guard_banim_palette_custom: Pure transform: in GetBanimPalette, short-circuit CUSTOM (appended) banim ids to
-their OWN palette before the vanilla archer/sniper class->palette redirect.
+In GetBanimPalette, CUSTOM (appended) banim ids short-circuit to their OWN palette before
+the vanilla archer/sniper class->palette redirect.
 
 Vanilla GetBanimPalette loads the combatant's banim palette from
 banim_data[GetBanimPalette(banim_id, pos)], but for CLASS_ARCHER/_F/SNIPER/_F it returns
@@ -22,11 +20,11 @@ unit deployed AS a real archer via the per-character _u25 path runs an APPENDED 
 whose tiles index its own palette in its own banim_data row; the redirect then paints
 those tiles with the vanilla archer palette -- the RBG 'cyan' mis-render. Appended rows
 are ids >= the vanilla banim count, so bypass the switch for them. Vanilla units (ids <
-the count) hit the switch byte-for-byte as before. Idempotent.
+the count) hit the switch byte-for-byte as before.
 
-_vanilla_banim_count: Count banim_data[] rows in the (vanilla, freshly-restored) banim_data.c. Engine hooks
-run after restore_vanilla_sources() and BEFORE inject_battle_anims appends our rows, so
-this is the vanilla count = the id of the first custom (appended) row.
+The threshold is a literal: the number of banim_data[] rows in vanilla, which is the id of
+the first row inject_battle_anims appends. test_engine_patches pins it to the vanilla count,
+so a decomp bump that moves the count fails there.
 ---
 diff --git a/src/banim-ekrmain.c b/src/banim-ekrmain.c
 index 558f91ab96b64657b5bc855406e4ac72a7e1686d..42f926b834fd677ecf20935b65d499cbbd8538a7 100644

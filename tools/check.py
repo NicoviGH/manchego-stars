@@ -195,7 +195,7 @@ DEAD_CONCEPTS = [
 # docs. The decomp submodule, generated artifacts, and caches are not ours to lint.
 CODE_GLOBS = ['tools/*.py', 'tools/inject/*.py', 'tools/playtest/*.py',
               'tools/playtest/*.lua', 'tools/*.sh', 'tools/playtest/*.sh',
-              'engine/**/*.c', 'engine/**/*.h', 'Makefile']
+              'engine/**/*.c', 'engine/**/*.h', 'engine/**/*.patch', 'Makefile']
 
 
 def _docs():

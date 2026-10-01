@@ -9,8 +9,6 @@ custom source into reserved BG bank 15 after the UI's own palette setup; the sto
 
 Notes:
 
-_patch_draw_icon_pal2_text: Pure icon.c transform for the additive custom item palette hook.
-
 LoadIconPalettes preserves the vanilla two-bank load everywhere. DrawIcon loads source palette 2
 into reserved BG bank 15 only while drawing an opted-in standard item icon, after the caller has
 initialized its own UI palettes. Callers using other palette bases retain their vanilla selection.

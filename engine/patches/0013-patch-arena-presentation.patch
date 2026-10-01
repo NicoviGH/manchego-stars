@@ -5,7 +5,7 @@ Install the campaign-agnostic Arena presentation seam at the real init call site
 
 Notes:
 
-_patch_arena_presentation_text: Route ArenaUi_Init's palette and attendant through build-generated selectors.
+It routes ArenaUi_Init's palette and attendant through build-generated selectors.
 
 Graphics and TSA stay on their vanilla symbols. The generated selectors carry explicit
 vanilla fallbacks, so an unconfigured campaign remains byte-semantically vanilla here.

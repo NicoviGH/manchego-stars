@@ -5,7 +5,7 @@ Install the campaign-agnostic Arena combat palette seam at fade-in.
 
 Notes:
 
-_patch_arena_battle_background_text: Make the Arena battle fade-in use the same palette pointer array as its cycle.
+It makes the Arena battle fade-in use the same palette pointer array as its cycle.
 ---
 diff --git a/src/banim-ekrarena.c b/src/banim-ekrarena.c
 index c1138d51e66d17a1a02c35fcdda32f4767f3c0cb..edf337109ea6a917286702ab9071b0fde037776d 100644
