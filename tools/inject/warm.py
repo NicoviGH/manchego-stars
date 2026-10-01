@@ -290,14 +290,20 @@ def _written_since(t0_ns):
     return [p for p, mtime_ns in _walk_decomp() if mtime_ns >= t0_ns]
 
 
+def _in_tree(paths):
+    """The paths under this tree: a list from another tree says nothing about this one's files
+    (#408 moved the build out of the submodule)."""
+    root = os.path.join(DECOMP, '')
+    return {p for p in paths if p.startswith(root)}
+
+
 def _injected():
     try:
         with open(INJECTED_PATHS) as fh:
             paths = json.load(fh)
     except (OSError, ValueError):
         return set()
-    root = os.path.join(DECOMP, '')     # a list from another tree is not this tree's writes
-    return {p for p in paths if p.startswith(root)}
+    return _in_tree(paths)
 
 
 def record_injected(paths):
@@ -351,9 +357,10 @@ def forget_compiled(now_ns=None):
         # compile would drop what the one before it regenerated.
         previous, regenerated = old.get('previous', []), old.get('previous_regenerated', [])
     else:
-        previous, regenerated = sorted(old.get('files', {})), old.get('regenerated', [])
+        previous, regenerated = old.get('files', {}), old.get('regenerated', [])
     _write_record({'compiling_since_ns': time.time_ns() if now_ns is None else now_ns,
-                   'previous': previous, 'previous_regenerated': regenerated})
+                   'previous': sorted(_in_tree(previous)),
+                   'previous_regenerated': sorted(_in_tree(regenerated))})
 
 
 def record_compiled():

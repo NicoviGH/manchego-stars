@@ -201,6 +201,20 @@ class RewindAgainstWhatMakeCompiled(unittest.TestCase):
         os.symlink(self.elf, os.path.join(self.tmp, 'baserom.gba'))
         self.assertIn(src, inject.warm.load_compiled())
 
+    def test_a_record_never_carries_a_path_outside_its_tree(self):
+        # Records taken before #408 listed the submodule's files, and each record carried the
+        # last one's paths forward, so the submodule's msg.h rode along forever -- and the
+        # rewind would write our msg.h back into the vanilla submodule (review).
+        src = self._write(os.path.join(self.tmp, 'src', 'a.c'), b'A', mtime_ns=10**18)
+        elsewhere = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, elsewhere, True)
+        stale = self._write(os.path.join(elsewhere, 'msg.h'), b'ours', mtime_ns=10**18)
+        inject.warm._write_record({'recorded_ns': 1, 'tree': self.tmp, 'regenerated': [stale],
+                                   'files': {stale: [10**18, '00' * 20]}})
+        self._compile([src])
+        self.assertEqual(sorted(inject.warm.load_compiled()), [src])
+        self.assertEqual(inject.warm._read_record()['regenerated'], [])
+
     def test_a_compile_nobody_recorded_voids_the_manifest(self):
         # A bare `make -C build/fireemblem8u` that rebuilt f.o from other bytes and died before
         # relinking: trusting the record would rewind f and hide the stale object (review).
