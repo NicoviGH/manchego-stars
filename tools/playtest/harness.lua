@@ -3037,6 +3037,8 @@ scenarios.lordfloor = function()
     local BASE_HP, FLOOR_HP = 18, 25   -- base maxHP 18, floor +7 (difficulty --lord-floor oracle)
     local BASE_DEF, FLOOR_DEF = 2, 6   -- base def 2, floor +4
     local APPLIED = 0xFA               -- LORDFLOOR_APPLIED_FLAG (permanent)
+    local FOUNDING_EXP = 72            -- exp_curve.founding_grant()['marty'] (#430 step 4)
+    local FOUNDING_APPLIED = 0xFB      -- FOUNDING_EXP_FLAG (engine patch 0015)
 
     -- Ride the shared, migrated ch01 route and take MARTY as the lead: the save menu, the
     -- Northlook scene, the lead menu, its Yes/No confirm and Preparations are all driven on
@@ -3071,6 +3073,12 @@ scenarios.lordfloor = function()
     if df1 ~= FLOOR_DEF then
         return result("FAIL", string.format(
             "marty def=%d at ch01 t1, want %d (base %d +4 floor)", df1, FLOOR_DEF, BASE_DEF)) end
+    -- the founding party carries the prologue's pay into ch01 (engine patch 0015)
+    local exp1 = ru8(marty.addr + 0x09)
+    if not eventFlag(FOUNDING_APPLIED) or exp1 ~= FOUNDING_EXP then
+        return result("FAIL", string.format("marty exp=%d at ch01 t1 (flag 0x%X %s), want %d "
+            .. "-- the founding grant did not land", exp1, FOUNDING_APPLIED,
+            tostring(eventFlag(FOUNDING_APPLIED)), FOUNDING_EXP)) end
 
     -- advance two player phases; the floor must NOT stack (flag-gated apply-once = the same
     -- early-return that protects the carry into ch02). Enemies poked harmless so marty lives.

@@ -10,7 +10,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from inject import engine_patches  # noqa: E402
-from inject.decomp import LORDSEL_FLAG_BASE  # noqa: E402
+from inject.decomp import FOUNDING_EXP_FLAG, LORDSEL_FLAG_BASE  # noqa: E402
 from inject.warm import PATCHED_DECOMP_FILES  # noqa: E402
 
 
@@ -55,6 +55,13 @@ class ItsLiterals(unittest.TestCase):
                         or re.search(r'\b%d\b' % LORDSEL_FLAG_BASE, eventinfo),
                         'LORDSEL_FLAG_BASE 0x%X is not in the patched eventinfo.c'
                         % LORDSEL_FLAG_BASE)
+
+
+    def test_founding_exp_reads_the_flag_the_campaign_owns(self):
+        eventinfo = engine_patches.patched_text('src/eventinfo.c')
+        self.assertIn('CheckFlag(0x%X)' % FOUNDING_EXP_FLAG, eventinfo)
+        self.assertIn('SetFlag(0x%X)' % FOUNDING_EXP_FLAG, eventinfo)
+        self.assertNotIn(FOUNDING_EXP_FLAG, range(LORDSEL_FLAG_BASE, LORDSEL_FLAG_BASE + 11))
 
 
 if __name__ == '__main__':

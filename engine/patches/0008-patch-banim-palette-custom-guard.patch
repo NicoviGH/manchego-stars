@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 8/14] banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)
+Subject: [PATCH 8/15] banim (#65): GetBanimPalette -> custom (appended) banims keep own palette (RBG cyan fix)
 
 Make GetBanimPalette honour a custom unit's OWN palette (#65 M-B, the RBG cyan fix).
 

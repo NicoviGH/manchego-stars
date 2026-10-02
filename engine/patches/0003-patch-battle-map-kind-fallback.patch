@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 3/14] GetBattleMapKind: no-world-map fallback = STORY (slot 2+ chapters)
+Subject: [PATCH 3/15] GetBattleMapKind: no-world-map fallback = STORY (slot 2+ chapters)
 
 A chapter load that resolves no world-map node is a STORY chapter, not a
 skirmish.

@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 1/14] GetPlayerStartCursorPosition: fall back to first player unit if leader undeployed
+Subject: [PATCH 1/15] GetPlayerStartCursorPosition: fall back to first player unit if leader undeployed
 
 Guard GetPlayerStartCursorPosition against a non-deployed player leader.
 

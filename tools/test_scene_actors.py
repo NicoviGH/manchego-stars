@@ -288,9 +288,20 @@ class TheLiveBuildPassesTheInheritedGuardToo(unittest.TestCase):
         """#398's answer, re-measured rather than transcribed. Requires an INJECTED tree: on a
         clean one every field still points at the donor's scenes, which is the state this
         guard is FOR, not the state it should be read in."""
-        from inject import event_group
+        import json
+        from inject import event_group, paths
         if not event_group.injected():
             self.skipTest('decomp is not injected -- the walk would read the donor, not us')
+        # A debug-boot build (CH05BOOT=1, ...) rewires the openings on purpose, so the tree
+        # holds whatever config the matrix built LAST and this read the boot's wiring as ours.
+        try:
+            flags = json.load(open(paths.BUILD_STAMP))['flags']
+        except (OSError, ValueError, KeyError):
+            flags = {}
+        booted = sorted(k for k, v in flags.items() if v)
+        if booted:
+            self.skipTest('the tree holds a debug-boot build (%s), not the canonical one'
+                          % ', '.join(booted))
         self.assertEqual([], inject.scene_actors.reachable_scenes_staging_unloaded_pcs())
 
     def test_the_guard_FIRES_on_vanilla_which_is_what_makes_the_clean_run_mean_anything(self):

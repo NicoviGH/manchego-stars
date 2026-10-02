@@ -219,15 +219,15 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
 | chapter | bar | field | exp ours/twin | benched | typical | fed | lowest |
 |---|---|---|---|---|---|---|---|
 | ch00 † | FE8 Prologue | 2 | 152 / 147 (x1.03) | L1 | **L1** | L1 | -- |
-| ch01 | FE8 Ch1 | 4 | 370 / 378 (x0.98) | L1 | **L1** | L3 | -- |
-| ch02 | FE8 Ch2 | 5 | 417 / 417 (x1.00) | L1 | **L2** | L4 | L1 |
-| ch03 | FE8 Ch3 | 9 | 386 / 419 (x0.92) | L2 | **L3** | L5 | L1 |
-| ch04 | FE8 Ch4 | 9 | 826 / 815 (x1.01) | L2 | **L4** | L7 | L1 |
-| ch05 | FE8 Ch5 | 9 | 964 / 902 (x1.07) | L3 | **L5** | L9 | L1 |
-| ch06 | FE8 Ch6 | 10 | 1078 / 1078 (x1.00) | L3 | **L6** | L11 | L1 |
+| ch01 | FE8 Ch1 | 4 | 370 / 378 (x0.98) | L2 | **L2** | L3 | -- |
+| ch02 | FE8 Ch2 | 5 | 398 / 398 (x1.00) | L2 | **L3** | L5 | L1 |
+| ch03 | FE8 Ch3 | 9 | 382 / 415 (x0.92) | L2 | **L3** | L6 | L1 |
+| ch04 | FE8 Ch4 | 9 | 822 / 812 (x1.01) | L3 | **L4** | L8 | L1 |
+| ch05 | FE8 Ch5 | 9 | 961 / 899 (x1.07) | L3 | **L5** | L10 | L1 |
+| ch06 | FE8 Ch6 | 10 | 1074 / 1074 (x1.00) | L4 | **L6** | L12 | L1 |
 
-**Entering ch07 the party is L6** -- L3 for a founding unit that rides the bench,
-L11 for one fed every kill, and **L1 for the lowest-level recruit on the field**.
+**Entering ch07 the party is L6** -- L4 for a founding unit that rides the bench,
+L12 for one fed every kill, and **L1 for the lowest-level recruit on the field**.
 A recruit starts at the level its own chapter PLACES it at:
 L1 for trex, baxby, lupin and basil; L5 for sahnar.
 
@@ -235,10 +235,9 @@ The same cast fed each chapter's VANILLA twin instead of ours reaches **L6** ove
 the same span: the party lands where FE8's party lands, which is what makes the
 absolute number usable.
 
-† ch00 pays its exp to units the party never gets -- a fixed-roster chapter whose guests do
-not join. Vanilla's prologue pays Eirika and Seth, who stay for the whole game, so the twin
-banks a chapter we do not. The two curves still converge, because FE8 pays a lower-level unit
-more for the same body.
+† ch00 is fought by guests the party never gets -- a fixed-roster chapter whose guests do
+not join. Vanilla's prologue pays Eirika and Seth, who stay for the whole game, so the founding
+party is handed what the twin pays each of them before it first deploys (ADR 0320).
 
 <!-- END GENERATED: party-level band -->
 

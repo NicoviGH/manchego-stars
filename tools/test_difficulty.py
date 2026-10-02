@@ -1386,7 +1386,8 @@ class PlayerArrivesLeveled(unittest.TestCase):
         self.assertIn('wolfram', names)
         self.assertNotIn('sahnar', names)           # ch05 recruit: not on ch02's field
         wolfram = next(u for u in roster if u.name == 'wolfram')
-        self.assertEqual(wolfram.hp, df.player_combatant(CAMPAIGN, 'wolfram').hp)  # L1 into ch02
+        # L2 into ch02: the prologue's pay (ADR 0320) plus ch01 is a level, as for Eirika
+        self.assertGreater(wolfram.hp, df.player_combatant(CAMPAIGN, 'wolfram').hp)
 
     def test_the_report_survives_an_exp_model_refusal_and_says_so(self):
         import exp_curve

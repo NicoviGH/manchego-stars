@@ -1,12 +1,12 @@
 ---
 id: 295
-title: "The party-level band is DERIVED from the exp economy, and the prologue pays it nothing"
+title: "The party-level band is DERIVED from the exp economy"
 date: "2026-09-18"
 section: "Combat System"
 issues: [367]
 ---
 
-# The party-level band is DERIVED from the exp economy, and the prologue pays it nothing
+# The party-level band is DERIVED from the exp economy
 
 `docs/fe8-pacing-reference.md` carried an expected-party-level table that opened *"Not derived,
 and it cannot be"*, on the grounds that vanilla's ally `UnitDefinition` level is read only on a
@@ -35,11 +35,12 @@ twin, which `tools/test_exp_curve.py` asserts, because exp is the only quantity 
 that **integrates across chapters**: no per-chapter gate can see a chapter reusing a twin an
 earlier chapter already spent (ch07 is planned against FE8 Ch6, which ch06 already banked).
 
-**The prologue pays the party nothing, and its twin pays vanilla's party a full chapter.** ch00
-is a fixed-roster chapter whose two units are guests — Hlin and Scramsax never join — so its
-exp is banked by nobody, while FE8's prologue pays Eirika and Seth, who stay for the whole game.
-The two curves converge anyway, because FE8 pays a lower-level unit more for the same body; that
-convergence is the cross-check that makes the absolute number usable rather than a coincidence.
+**The prologue is fought by guests, so the party is handed its pay.** ch00 is a fixed-roster
+chapter whose two units are guests — Hlin and Scramsax never join — while FE8's prologue pays
+Eirika and Seth, who stay for the whole game. The founding party is handed what the twin pays
+each of them before it first deploys (ADR 0320), so both curves start level, and feeding the
+same party the twins' rosters lands it where ours lands: the cross-check that makes the absolute
+number usable rather than a coincidence.
 
 **A unit earns from the chapter after it JOINS, and every recruit joins at level 1.** The
 first cut ran all thirteen roster members from ch01 and handed four of them an exp history

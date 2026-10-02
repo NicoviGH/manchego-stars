@@ -12,7 +12,8 @@ from inject.cast import _classed_cast, CLASS_LOADOUT, GUEST_PORTRAIT_MAP, load_u
 from inject.chapter_ids import (
     CH01_BOSS_SLOT, CH01_GOAL_STATUS_MSG, CH01_GOAL_WINDOW_MSG, CH01_LORDSEL_BG,
     PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT)
-from inject.decomp import _replace_brace_block, DECOMP, git_env, LORDSEL_FLAG_BASE, REPO
+from inject.decomp import (
+    _replace_brace_block, DECOMP, FOUNDING_EXP_FLAG, git_env, LORDSEL_FLAG_BASE, REPO)
 from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH01_EVENT_GROUP, CH01_HOST_INDEX, CH02_HOST_INDEX
@@ -117,6 +118,27 @@ def dev_placeholder_message():
     return _script_to_message(
         [{DEV_PLACEHOLDER_SPEAKER: DEV_PLACEHOLDER_LINE}],
         {DEV_PLACEHOLDER_SPEAKER: ('[OpenMidLeft]', _fid_tag(slot))})
+
+
+def founding_exp_table(campaign, cast):
+    """gFoundingExpGrants[] as C (#430 step 4, ADR 0320): what the prologue's twin pays each
+    founding career (`exp_curve.founding_grant`), as { pid, exp } byte pairs, 0-terminated.
+    Engine patch 0015 hands it over once, at ch01's prep Fight!, and the model banks the same
+    numbers, so the exp guard and the cartridge read one source. `cast` is [(uid, slot)]."""
+    import exp_curve
+    grant = exp_curve.founding_grant(campaign)
+    founding = [(uid, slot) for uid, slot in cast if uid in grant]
+    if {uid for uid, _ in founding} != set(grant):
+        sys.exit('ERROR: founding grant names %s, but ch01 fields %s'
+                 % (sorted(grant), sorted(uid for uid, _ in founding)))
+    return '\n'.join(
+        ['', '/* Founding exp (#430 step 4, build-generated from exp_curve.founding_grant):',
+         '   { pid, exp } pairs, 0-terminated. FoundingExp_ApplyOnce raises each level-1',
+         '   unit to its grant once, at the first prep Fight! (flag 0x%X). */' % FOUNDING_EXP_FLAG,
+         'CONST_DATA u8 gFoundingExpGrants[] = {'] +
+        ['    CHARACTER_%s, %d, /* %s */' % (slot.upper(), grant[uid], uid)
+         for uid, slot in founding] +
+        ['    0,', '};', ''])
 
 
 def lord_floor_rows(campaign, uids, ch='ch01', target=3.5):
@@ -369,6 +391,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
         ['    %d, %d, %d, /* %s */' % (hp, df, res, uid)
          for uid, hp, df, res in floor_rows] +
         ['};', ''])
+    udefs += founding_exp_table(campaign, [(uid, slot) for uid, slot, _, _, _ in cast])
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
         f.write(udefs)
 

@@ -37,6 +37,29 @@ class LordFloorRows(unittest.TestCase):
         self.assertEqual([uid for uid, *_ in inject.chapters.ch01.lord_floor_rows(self.CAMPAIGN, order)], order)
 
 
+class FoundingExpTable(unittest.TestCase):
+    """gFoundingExpGrants[] (#430 step 4): one { pid, exp } row per founding PC, the numbers
+    exp_curve banks, 0-terminated for FoundingExp_ApplyOnce's loop."""
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_every_founding_pc_gets_the_models_grant(self):
+        import exp_curve
+        grant = exp_curve.founding_grant(self.CAMPAIGN)
+        cast = [(uid, 'SLOT%d' % i) for i, uid in enumerate(sorted(grant))] + [('baxby', 'X')]
+        text = inject.chapters.ch01.founding_exp_table(self.CAMPAIGN, cast)
+        for i, uid in enumerate(sorted(grant)):
+            self.assertIn('CHARACTER_SLOT%d, %d, /* %s */' % (i, grant[uid], uid), text)
+        self.assertNotIn('baxby', text)              # a recruit is not founding
+        self.assertTrue(text.rstrip().endswith('0,\n};'))
+
+    def test_the_lordfloor_scenario_expects_the_models_grant(self):
+        import exp_curve, re
+        lua = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                'playtest', 'harness.lua'), encoding='utf-8').read()
+        self.assertEqual(int(re.search(r'local FOUNDING_EXP = (\d+)', lua).group(1)),
+                         exp_curve.founding_grant(self.CAMPAIGN)['marty'])
+
+
 class LordSelectPitches(unittest.TestCase):
     """The qualitative candidate blurbs (#46) the build emits as sLordSelectPitchMsg[],
     drawn by LordSelect_DrawCard as the cursor lands on each candidate. One (uid, pitch)

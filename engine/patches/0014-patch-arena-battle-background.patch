@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 14/14] Arena (#265): battle fade-in and palette cycle share campaign backdrop data
+Subject: [PATCH 14/15] Arena (#265): battle fade-in and palette cycle share campaign backdrop data
 
 Install the campaign-agnostic Arena combat palette seam at fade-in.
 

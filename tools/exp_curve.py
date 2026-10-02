@@ -401,13 +401,16 @@ class Career:
         if chapter_number is not None and chapter_number < self.joins:
             return 0
         gained = int(self.chapter_pot(bodies) * self.share / deploy_cap)
-        self.exp += gained
+        self.bank(gained)
+        return gained
+
+    def bank(self, exp):
+        self.exp += exp
         while self.exp >= EXP_PER_LEVEL and self.level < LEVEL_CAP:
             self.exp -= EXP_PER_LEVEL
             self.level += 1
         if self.level >= LEVEL_CAP:
             self.exp = 0
-        return gained
 
 
 def field_cap(chap):
@@ -432,10 +435,9 @@ def _banks_exp(chap):
     Read off the deploy cap, because that is what Pick Units is: prep from ch01 on is
     standing protocol and the CAP is the parity (decisions.md -> the deploy cap / prep
     screen). A chapter with no cap is a FIXED-ROSTER chapter, and ours is ch00, whose two
-    units are guests -- Hlin and Scramsax never join, so the prologue's exp is paid to
-    nobody. Vanilla's prologue pays Eirika and Seth, who stay for the whole game, so the
-    twin's curve banks a chapter ours does not. That asymmetry is real and it is the first
-    thing the generated block says."""
+    units are guests -- Hlin and Scramsax never join, so nobody in the party fights it.
+    Vanilla's prologue pays Eirika and Seth, who stay for the whole game, so the founding
+    party is handed what the twin pays instead (`founding_grant`, ADR 0320)."""
     return (chap.get('deployment') or {}).get('deploy_limit') is not None
 
 
@@ -479,9 +481,9 @@ def twin_route_findings(chapters):
 
     FE8's party plays each chapter once, in order. A chapter that names a twin an earlier
     chapter already used, or one behind it, pays our party a chapter of exp the vanilla curve
-    does not contain. The cumulative band cannot be trusted to see that: our party starts a
-    chapter behind (ch00 banks nothing), so one reused twin at ch06 lands at 1.08x, inside
-    it. Skipping ahead is allowed (ch08 -> FE8 Ch13): that only leaves the party behind. A
+    does not contain. The cumulative band sees one reuse today (a canary pointing ch06 at
+    ch05's twin reads 1.22x), but a band only fails on the drift it has accumulated, and the
+    route rule names the chapter that broke it. Skipping ahead is allowed (ch08 -> FE8 Ch13): that only leaves the party behind. A
     twin `_twin_rank` cannot place is reported too, so a new name (a route split) gets ranked
     rather than waved through. A chapter with no twin is skipped."""
     out, last = [], None
@@ -547,6 +549,7 @@ def simulate(campaign='rime-of-the-frostmaiden'):
         if banks:
             for career in ours + lead + tail:
                 career.fight(bodies, cap, number)
+        grant = {}
         if twin is not None and ref not in spent:
             # The twin party fights its own chapter whether or not ours banks this one
             # (see _banks_exp), and its members join on OUR recruitment schedule, so the
@@ -554,7 +557,17 @@ def simulate(campaign='rime-of-the-frostmaiden'):
             # twin ONCE, as FE8's party does: a reused twin pays ours and not it.
             spent.add(ref)
             for career in twin_party:
-                career.fight(twin, cap, number)
+                gained = career.fight(twin, cap, number)
+                if not banks and career.joins == 0:
+                    grant[career.name] = gained
+        if grant:
+            # A fixed-roster chapter's guests bank nothing, so the founding party is HANDED
+            # what its twin pays each of them -- the engine writes this same number at ch01's
+            # first prep (`founding_grant`, ADR 0320). Flat, not share-scaled: the hand-out
+            # does not depend on how a unit is fed.
+            for career in ours + lead + tail:
+                if career.name in grant:
+                    career.bank(grant[career.name])
         rows.append({
             'id': chap.get('id'),
             'chapter_number': number,
@@ -563,6 +576,7 @@ def simulate(campaign='rime-of-the-frostmaiden'):
             'twin_bodies': len(twin) if twin is not None else None,
             'field_cap': cap,
             'banks': banks,
+            'grant': grant,
             'pot': pot,
             'twin_pot': twin_pot,
             'yield_ratio': (pot / twin_pot) if twin_pot else None,
@@ -615,6 +629,31 @@ def vanilla_arrivals(campaign):
 @functools.lru_cache(maxsize=None)
 def _simulated(campaign):
     return tuple(simulate(campaign))
+
+
+def founding_grant(campaign='rime-of-the-frostmaiden'):
+    """{uid: exp} the founding party is handed before it first deploys: what the twin pays
+    each founding career for the fixed-roster chapter ours banks nothing from (ch00, ADR 0320).
+
+    The engine applies it once, at ch01's first prep (`FoundingExp_ApplyOnce`), so it must
+    come from exactly one chapter that precedes every chapter the party fights, and stay
+    under a level: a unit's `exp` byte holds 0-99 and the hand-out levels nobody up."""
+    rows = _simulated(campaign)
+    granting = [r for r in rows if r['grant']]
+    if not granting:
+        return {}
+    first_bank = min((r['chapter_number'] for r in rows if r['banks']), default=None)
+    if len(granting) > 1 or (first_bank is not None
+                             and granting[0]['chapter_number'] > first_bank):
+        raise ValueError('the founding grant is applied once, before the party first fights; '
+                         'it cannot come from %s'
+                         % ', '.join(r['id'] for r in granting))
+    grant = dict(granting[0]['grant'])
+    over = sorted(uid for uid, exp in grant.items() if not 0 <= exp < EXP_PER_LEVEL)
+    if over:
+        raise ValueError('a founding grant of a level or more would need a level-up the engine '
+                         'hook does not perform: %s' % ', '.join(over))
+    return grant
 
 
 def entering(campaign, chapter_number, parity_ref=None):
@@ -703,13 +742,12 @@ def render(rows=None, campaign='rime-of-the-frostmaiden'):
             'absolute number usable.', '']
     unbanked = [r for r in rows if not r['banks']]
     if unbanked:
-        out += ['† %s pays its exp to units the party never gets -- a fixed-roster chapter '
+        out += ['† %s is fought by guests the party never gets -- a fixed-roster chapter '
                 'whose guests do' % ', '.join(r['id'].split('-')[0] for r in unbanked),
                 'not join. Vanilla\'s prologue pays Eirika and Seth, who stay for the whole '
-                'game, so the twin',
-                'banks a chapter we do not. The two curves still converge, because FE8 pays a '
-                'lower-level unit',
-                'more for the same body.', '']
+                'game, so the founding',
+                'party is handed what the twin pays each of them before it first deploys '
+                '(ADR 0320).', '']
     out.append(END)
     return '\n'.join(out)
 

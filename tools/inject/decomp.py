@@ -22,6 +22,8 @@ DECOMP = os.path.join(REPO, 'build', 'fireemblem8u')
 BATTLEQUOTES_C = os.path.join(DECOMP, 'src', 'data_battlequotes.c')
 BMUNIT_C = os.path.join(DECOMP, 'src', 'bmunit.c')
 LORDSEL_FLAG_BASE = 0xF0
+# Engine patch 0015's apply-once flag: beside 0006's 0xFA, past the ten 0xF0 candidates.
+FOUNDING_EXP_FLAG = 0xFB
 
 
 # Vanilla FE8 weapon key -> ITEM_ enum (constants/items.h). The single source mapping a
