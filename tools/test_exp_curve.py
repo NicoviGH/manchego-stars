@@ -218,6 +218,42 @@ class ChapterBodies(unittest.TestCase):
         self.assertEqual([], ec.unmodelled_special_exp_bodies(self.campaign))
 
 
+class TwinRoute(unittest.TestCase):
+    """FE8's party plays each chapter once, in order (#430 step 2)."""
+
+    def test_a_reused_twin_is_reported(self):
+        found = ec.twin_route_findings([('ch06', 'FE8 Ch6'), ('ch07', 'FE8 Ch6')])
+        self.assertEqual(1, len(found))
+        self.assertIn('ch07 names FE8 Ch6', found[0])
+
+    def test_a_twin_behind_the_route_is_reported(self):
+        self.assertEqual(1, len(ec.twin_route_findings([('a', 'FE8 Ch4'), ('b', 'FE8 Ch3')])))
+
+    def test_skipping_ahead_is_allowed(self):
+        self.assertEqual([], ec.twin_route_findings(
+            [('ch00', 'FE8 Prologue'), ('ch07', 'FE8 Ch7'), ('ch08', 'FE8 Ch13')]))
+
+    def test_the_twin_party_fights_a_reused_twin_once(self):
+        """Canary: ch06 doctored to reuse ch05's twin. Ours still banks the chapter, the
+        twin party banks nothing, and the route rule names it."""
+        real = ec.inject.hosting._load_chapter_yaml
+
+        def doctored(campaign, filename):
+            chap = real(campaign, filename)
+            if chap.get('chapter_number') == 6:
+                chap = dict(chap, parity_reference='FE8 Ch5')
+            return chap
+        ec.inject.hosting._load_chapter_yaml = doctored
+        try:
+            rows = {r['chapter_number']: r for r in ec.simulate('rime-of-the-frostmaiden')}
+        finally:
+            ec.inject.hosting._load_chapter_yaml = real
+        self.assertEqual(rows[5]['twin_exp_to_date'], rows[6]['twin_exp_to_date'])
+        self.assertGreater(rows[6]['exp_to_date'], rows[5]['exp_to_date'])
+        self.assertEqual(1, len(ec.twin_route_findings(
+            [(r['id'], r['reference']) for r in rows.values()])))
+
+
 class Simulation(unittest.TestCase):
     """The curve itself. These pin the PROPERTIES the band is read for -- not the literal
     numbers, which move with every roster edit and are published in the doc block instead."""
@@ -315,13 +351,24 @@ class Simulation(unittest.TestCase):
         vanilla twin. It is asserted here because exp is the only quantity that INTEGRATES
         across chapters, so nothing else in the gate can see it drift.
 
-        A chapter that trips this is not automatically wrong: a chapter reusing a twin an
-        earlier chapter already spent (ch07 reuses FE8 Ch6) hands the party an extra
-        chapter of exp the vanilla curve does not contain, and that is the alarm #367 asked
-        for. Read the row, then decide."""
+        This compares one chapter against its own twin, so it cannot see a twin used
+        twice: ch07 against FE8 Ch6 reads about x1.00. The route rule and the exp-to-date
+        band below catch that."""
         off = ['%s %.2fx' % (r['id'], r['yield_ratio']) for r in self.rows
                if r['yield_ratio'] is not None and abs(r['yield_ratio'] - 1.0) > 0.12]
         self.assertEqual([], off)
+
+    def test_the_party_never_runs_ahead_of_vanillas_curve(self):
+        """#430 step 2: exp to date, ours against FE8's route walked once per twin, never
+        more than 12% ahead. Ours starts a chapter behind (ch00 banks nothing)."""
+        ahead = ['%s %.2fx' % (r['id'], r['exp_to_date'] / r['twin_exp_to_date'])
+                 for r in self.rows
+                 if r['twin_exp_to_date'] and r['exp_to_date'] > r['twin_exp_to_date'] * 1.12]
+        self.assertEqual([], ahead)
+
+    def test_the_hosted_chapters_walk_vanillas_route(self):
+        self.assertEqual([], ec.twin_route_findings(
+            [(r['id'], r['reference']) for r in self.rows]))
 
     def test_the_party_lands_where_the_vanilla_partys_lands(self):
         """The cross-check that makes the absolute number trustworthy: feed the same party
