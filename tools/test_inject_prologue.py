@@ -37,9 +37,10 @@ class PrologueRosterFromYaml(unittest.TestCase):
                                               'why': 'see the ch00 YAML'},
                               'inventory': [{'id': 'ice-longsword',
                                              'fe_base': 'steel-sword'}]},
-            'caravan-guard': {'level': 2, 'count': 2, 'positions': [[14, 7], [13, 7]],
+            'caravan-guard': {'class': 'soldier', 'level': 2, 'count': 2,
+                              'positions': [[14, 7], [13, 7]],
                               'donor': {'at': [14, 7], 'level': 2},
-                              'inventory': [{'id': 'iron-axe'}]},
+                              'inventory': [{'id': 'iron-lance'}]},
         }
         for uid, fields in over.items():                 # kwarg ids use _ for -
             units[uid.replace('_', '-')].update(fields)
@@ -51,6 +52,19 @@ class PrologueRosterFromYaml(unittest.TestCase):
                 'enemy_units': [units['sephek-kaltro'], units['caravan-guard']]}
         return inject.chapters.prologue._prologue_roster_blocks(chap, units, self.SLOTS, self.CLASSES,
                                           self.GUEST_ITEMS)
+
+    def test_guard_class_and_weapon_track_the_yaml(self):
+        enemy = self.blocks()[1]
+        self.assertIn('.classIndex = CLASS_SOLDIER,', enemy)
+        self.assertIn('ITEM_LANCE_IRON', enemy)
+        enemy = self.blocks(caravan_guard={'class': 'fighter',
+                                           'inventory': [{'id': 'iron-axe'}]})[1]
+        self.assertIn('.classIndex = CLASS_FIGHTER,', enemy)
+
+    def test_guest_items_come_from_the_yaml_in_order(self):
+        self.assertEqual(inject.chapters.prologue.guest_items_for(
+            {'inventory': [{'id': 'killer-axe'}, {'id': 'hand-axe'}, {'id': 'vulnerary'}]}),
+            'ITEM_AXE_KILLER, ITEM_AXE_HANDAXE, ITEM_VULNERARY')
 
     def test_boss_level_tracks_the_yaml(self):
         self.assertIn('.level = 5,', self.blocks()[1])
@@ -72,9 +86,9 @@ class PrologueRosterFromYaml(unittest.TestCase):
         self.assertIn('.yPosition = 2,', ally)
 
     def test_guard_count_drives_how_many_are_emitted(self):
-        self.assertEqual(self.blocks()[1].count('CLASS_FIGHTER'), 2)
+        self.assertEqual(self.blocks()[1].count('CLASS_SOLDIER'), 2)
         one = self.blocks(caravan_guard={'count': 1, 'positions': [[14, 7]]})[1]
-        self.assertEqual(one.count('CLASS_FIGHTER'), 1)
+        self.assertEqual(one.count('CLASS_SOLDIER'), 1)
 
     def test_guard_count_disagreeing_with_positions_is_fatal(self):
         # Silently emitting `count` guards at the first `count` positions would ship a

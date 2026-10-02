@@ -33,6 +33,14 @@ from inject.units import enemy_ai_initialiser
 PROLOGUE_REWRITTEN_GUEST_SLOTS = (PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
 PROLOGUE_LAYOUT = ('Ch00PrologueMap', 'ch00-prologue')  # (asset label, maps/ source stem)
 PROLOGUE_CHAPTER_YAML = 'ch00-prologue-a-dagger-of-ice.yaml'
+# The consumables a ch00 guest may carry. WEAPON_ITEM_ENUM is weapons-only (#53 seam rule).
+_GUEST_CONSUMABLES = {'vulnerary': 'ITEM_VULNERARY'}
+
+
+def guest_items_for(unit):
+    """A guest's `.items` initialiser body, from its YAML inventory in order."""
+    return ', '.join(_GUEST_CONSUMABLES[i['id']] if i['id'] in _GUEST_CONSUMABLES
+                     else fe_item_enum(i) for i in unit.get('inventory') or ())
 
 
 # Stand up the designed ch00 ("A Dagger of Ice") as the New Game target: register its
@@ -65,9 +73,9 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
     invalidation probe is what exposed it: bumping the boss's `level:` changed no injected
     byte, and two full ROM builds came out byte-identical. Keep this sourced.
 
-    Guest INVENTORIES stay literal (`guest_items`): Hlin carries a Vulnerary, and
-    WEAPON_ITEM_ENUM is weapons-only by the #53 seam rule, so the YAML's consumable has no
-    ITEM_ mapping to resolve through.
+    Guest INVENTORIES come from the YAML too (`guest_items_for`): weapons through
+    WEAPON_ITEM_ENUM, and Hlin's Vulnerary through this module's own consumable map, because
+    WEAPON_ITEM_ENUM is weapons-only by the #53 seam rule.
 
     slots       -- (hlin, scramsax, sephek) vanilla CHARACTER_ slot names
     classes     -- (hlin, scramsax) CLASS_ enums
@@ -115,6 +123,8 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
     # many are emitted and where; a disagreement between them would silently ship a roster
     # nobody authored, so it fails the build instead.
     guard_slots = (0x80, 0x82)
+    import difficulty
+    guard_class = difficulty._enemy_class_enum(guard['class'])
     if len(guard['positions']) != guard['count']:
         sys.exit('ERROR: ch00 caravan-guard has count=%d but %d position(s)'
                  % (guard['count'], len(guard['positions'])))
@@ -125,7 +135,7 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
     guards = ''.join(
         '    {\n'
         '        .charIndex = 0x%02x, /* Torg\'s caravan guard */\n'
-        '        .classIndex = CLASS_FIGHTER,\n'
+        '        .classIndex = %s,\n'
         '        .allegiance = FACTION_ID_RED,\n'
         '        .level = %d,\n'
         '        .xPosition = %d,\n'
@@ -133,7 +143,7 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
         '        .redaCount = 0,\n'
         '        .items = { %s },\n'
         '        .ai = %s,\n'
-        '    },\n' % (slot, guard['level'], pos[0], pos[1],
+        '    },\n' % (slot, guard_class, guard['level'], pos[0], pos[1],
                       fe_item_enum(guard['inventory'][0]),
                       enemy_ai_initialiser(chap, guard, index))
         for index, (slot, pos) in enumerate(zip(guard_slots, guard['positions'])))
@@ -173,12 +183,12 @@ def inject_prologue(campaign, verbose=True, montage=False):
     chap = _load_prologue_chapter(campaign)
     by_id = {u['id']: u for u in chap['player_units'] + chap['enemy_units']}
     # Hlin = frail must-survive lead -> UNPROMOTED Fighter (frail like vanilla Eirika next to a
-    # promoted unit; a custom FEMALE Fighter map sprite distinguishes her from the male Fighter
-    # guards -- see inject_map_sprites). Scramsax = dominant promoted "Jeigan" (Hero, the Seth
-    # analog) -> a real Steel Sword so he can carry the map. (cf. ch00 YAML inventories.)
+    # promoted unit; a custom FEMALE Fighter map sprite makes her read as a woman -- see
+    # inject_map_sprites). Scramsax = dominant promoted "Jeigan" (Hero, the Seth
+    # analog) -> a real Steel Sword so he can carry the map. Items: the ch00 YAML inventories.
     hlin_class, scram_class = 'CLASS_FIGHTER', 'CLASS_HERO'
-    hlin_items = 'ITEM_AXE_HANDAXE, ITEM_VULNERARY'
-    scram_items = 'ITEM_SWORD_STEEL, ITEM_AXE_HANDAXE'
+    hlin_items = guest_items_for(by_id['hlin-trollbane'])
+    scram_items = guest_items_for(by_id['scramsax'])
 
     # 1. Register the prologue layout (.mar + .json -> Makefile mar_to_map -> .bin -> .lz) and
     #    point the HOST chapter (Ch1) at it + the winter tileset. We host the prologue in the
