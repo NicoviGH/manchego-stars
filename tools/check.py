@@ -1619,9 +1619,9 @@ def _fuse_forecast_findings(chapter, rows=None):
         mine = [r for r in (rows or []) if r.enemy_id == pid]
         if mine and not any(r.arrival_turn is not None for r in mine):
             findings.append(
-                '%s: declared a rescue_pursuer but cannot reach a firing cell for any '
-                'rescue target on the contested snapshot -- its fuse describes a unit '
-                'that never arrives' % pid)
+                '%s: declared a rescue_pursuer but never strikes any rescue target -- it '
+                'cannot reach one, spares them, or engages another first -- so its fuse '
+                'describes a unit that never arrives' % pid)
     for boat in chapter.get('rescue_boats') or []:
         declared = boat.get('declared_fuse')
         if declared is None:

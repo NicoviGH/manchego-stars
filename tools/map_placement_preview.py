@@ -173,9 +173,9 @@ def firing_cells(terrain, target, weapon_range):
     before who specifically reaches it is asked. The target's own tile (distance 0) is
     never a firing cell.
 
-    `units_reaching` uses this for the same range check it always ran inline; `rescue_forecast`
-    aliases it rather than keeping its own copy. `danger_map` asks the attacker's own walk
-    instead, since a flier or a swimmer stands where a foot unit cannot."""
+    `units_reaching` uses this for the same range check it always ran inline. `danger_map`
+    asks the attacker's own walk instead, since a flier or a swimmer stands where a foot unit
+    cannot."""
     tx, ty = target
     h, w = len(terrain), len(terrain[0])
     out = []

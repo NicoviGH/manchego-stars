@@ -30,24 +30,24 @@ class FiringCells(unittest.TestCase):
         self.terrain = pp.terrain_grid(ch06())
 
     def test_boat_east_javelin_range_cells_are_exactly_the_measured_four(self):
-        cells = rf.firing_cells(self.terrain, (17, 12), 2)
+        cells = pp.firing_cells(self.terrain, (17, 12), 2)
         self.assertEqual(sorted(cells), sorted([(15, 12), (17, 10), (17, 13), (17, 14)]))
 
     def test_boat_east_melee_range_is_only_its_declared_door(self):
-        cells = rf.firing_cells(self.terrain, (17, 12), 1)
+        cells = pp.firing_cells(self.terrain, (17, 12), 1)
         self.assertEqual(cells, [(17, 13)])
 
     def test_boat_west_javelin_range_cells_are_exactly_the_measured_three(self):
-        cells = rf.firing_cells(self.terrain, (4, 17), 2)
+        cells = pp.firing_cells(self.terrain, (4, 17), 2)
         self.assertEqual(sorted(cells), sorted([(2, 17), (4, 18), (4, 19)]))
 
     def test_boat_west_melee_range_is_only_its_declared_door(self):
-        cells = rf.firing_cells(self.terrain, (4, 17), 1)
+        cells = pp.firing_cells(self.terrain, (4, 17), 1)
         self.assertEqual(cells, [(4, 18)])
 
     def test_a_cell_ON_the_target_is_never_a_firing_cell(self):
         """Distance 0 is the target's own tile, not a place to stand and shoot from."""
-        cells = rf.firing_cells(self.terrain, (17, 12), 2)
+        cells = pp.firing_cells(self.terrain, (17, 12), 2)
         self.assertNotIn((17, 12), cells)
 
 
@@ -114,6 +114,14 @@ class PursuerForecast(unittest.TestCase):
     def test_an_engaged_pursuer_never_reaches_the_other_hull(self):
         self.assertIsNone(self.rows[('merfolk-thrower', 'boat-west')].arrival_turn)
         self.assertIsNone(self.rows[('ice-crab', 'boat-east')].arrival_turn)
+
+    def test_a_difficult_only_pursuer_is_still_forecast(self):
+        import copy
+        chap = copy.deepcopy(ch06())
+        crab = next(e for e in chap['enemy_units'] if e.get('id') == 'ice-crab')
+        crab['hard_mode_only'] = True
+        rows = [r for r in rf.chapter_forecast(chap) if r.enemy_id == 'ice-crab']
+        self.assertTrue(any(r.arrival_turn == 2 for r in rows))
 
     def test_a_civilian_sparing_pursuer_never_arrives(self):
         import copy

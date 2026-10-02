@@ -284,10 +284,6 @@ class FiringCellsLivesHereNotInRescueForecast(unittest.TestCase):
         self.assertEqual(pp.firing_cells(terrain, (2, 2), 1),
                          [(1, 2), (2, 1), (2, 3), (3, 2)])
 
-    def test_rescue_forecast_is_an_alias_not_a_second_copy(self):
-        import rescue_forecast as rf
-        self.assertIs(rf.firing_cells, pp.firing_cells)
-
     def test_units_reaching_shares_the_same_range_rule_firing_cells_uses(self):
         """A STATUE (budget 0 -- cannot move, even to attack) is a threat only from the tile
         it already stands on, which isolates the pure RANGE check from any movement search:

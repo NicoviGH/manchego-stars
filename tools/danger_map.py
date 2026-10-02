@@ -137,15 +137,17 @@ def _arms(enemy, combatant):
     return tuple(dataclasses.replace(combatant, weapon=w) for w in weapons)
 
 
-def bodies(chapter, mode=None):
+def bodies(chapter, mode=None, every_mode=False):
     """Every enemy body the chapter fields on `mode` (None reads the authored table, as
-    `make difficulty` does). An AI vector the decomp does not name reads as a pursuer, the
-    worst case, and keeps its shape None so the report can say so."""
+    `make difficulty` does). `every_mode` keeps the Difficult-only entries on any mode, for
+    a question asked of the chapter rather than of one playthrough. An AI vector the decomp
+    does not name reads as a pursuer, the worst case, and keeps its shape None so the report
+    can say so."""
     shifts = inject.chapter_settings.chapter_difficulty_shifts(chapter) if mode else None
     out = []
     for key in inject.raw_pids.ENEMY_ROSTER_KEYS:
         for enemy in chapter.get(key) or ():
-            if not isinstance(enemy, dict) or (enemy.get('hard_mode_only')
+            if not isinstance(enemy, dict) or (enemy.get('hard_mode_only') and not every_mode
                                                and mode != 'difficult'):
                 continue
             arrives = (1 if inject.raw_pids.entry_is_turn1(key, enemy) else
@@ -196,12 +198,13 @@ class Board:
     what the ch06 runs show: the crab worked the west door from phase 2 to the end, and an
     unconstrained walk would have it cross the map to the east hull as well."""
 
-    def __init__(self, chapter, mode=None, terrain=None, targets=(), spared_by=()):
+    def __init__(self, chapter, mode=None, terrain=None, targets=(), spared_by=(),
+                 every_mode=False):
         self.chapter = chapter
         self.targets = tuple(tuple(t) for t in targets)
         self.spared_by = tuple(spared_by)
         self.terrain = terrain if terrain is not None else pp.terrain_grid(chapter)
-        self.bodies = bodies(chapter, mode)
+        self.bodies = bodies(chapter, mode, every_mode)
         self.blocked = green_bodies(chapter)
         self.statues = {b.source for b in self.bodies
                         if _moves_like(b) == 'statue' and b.arrives <= 1}

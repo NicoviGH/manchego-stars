@@ -27,11 +27,6 @@ import difficulty as dif                                             # noqa: E40
 import map_placement_preview as pp                                   # noqa: E402
 
 
-# `firing_cells` is a terrain/range primitive -- the same family as `foot_reach` -- and
-# `map_placement_preview.units_reaching` needs the identical rule for its own reachability
-# check, so it lives there and this is an alias, not a second copy (#369 review).
-firing_cells = pp.firing_cells
-
 SINK_HORIZON = 30           # enemy phases a fight is simulated for; past it reads as inf
 
 
@@ -64,10 +59,11 @@ def target_combatant(boat):
 
 def hull_board(chapter):
     """The chapter's board with its hulls as the targets the enemy wants, spared by the
-    action bytes `check_rescue_targets` licenses."""
+    action bytes `check_rescue_targets` licenses. Every mode's bodies are on it: a declared
+    pursuer that only fields on Difficult is still a clock the chapter declares."""
     from check import RESCUE_SAFE_ACTIONS
     return dm.Board(chapter, targets=[b['tile'] for b in chapter.get('rescue_boats') or ()],
-                    spared_by=RESCUE_SAFE_ACTIONS)
+                    spared_by=RESCUE_SAFE_ACTIONS, every_mode=True)
 
 
 def _strike_on(board, body, tile, target, avoid, phase):
