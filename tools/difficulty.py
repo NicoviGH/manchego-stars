@@ -1019,18 +1019,28 @@ def _talk_recruits(stem):
     return set(re.findall(r'\bCHAR\([^,]+,[^,]+,\s*\w+\s*,\s*(CHARACTER_\w+)\s*\)', info))
 
 
-def _chapter_udefs(stem):
-    """Every UnitDefinition a vanilla chapter's eventscript loads, in the order it names them,
-    parsed from wherever the decomp defines them."""
-    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+def _udef_sources(stem):
     sources = [inject.decomp.vanilla_decomp_text('src/events_udefs.c')]
     own = 'src/events/%s-eventudefs.h' % stem      # only the Prologue and Ch1 have their own
     if os.path.exists(os.path.join(inject.decomp.SUBMODULE, own)):
         sources.insert(0, inject.decomp.vanilla_decomp_text(own))
+    return sources
+
+
+def vanilla_udefs_named(stem, name):
+    """One UnitDefinition array of a vanilla chapter, parsed from wherever the decomp defines
+    it ([] if nowhere)."""
+    text = next((t for t in _udef_sources(stem) if re.search(re.escape(name) + r'\[\]', t)),
+                None)
+    return vanilla_unit_defs(text, name) if text is not None else []
+
+
+def _chapter_udefs(stem):
+    """Every UnitDefinition a vanilla chapter's eventscript loads, in the order it names them,
+    parsed from wherever the decomp defines them."""
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     for name in dict.fromkeys(re.findall(r'\b(UnitDef_\w+)', script)):
-        text = next((t for t in sources if re.search(re.escape(name) + r'\[\]', t)), None)
-        if text is not None:
-            yield from vanilla_unit_defs(text, name)
+        yield from vanilla_udefs_named(stem, name)
 
 
 @functools.lru_cache(maxsize=None)
@@ -1922,6 +1932,10 @@ def report(campaign, ch, mode=None):
     print_role_findings(chap, chap.get('parity_reference'))  # authored table; see banner
     _print_economy(chap)
     _print_dynamics(chap)
+    import timeline                         # timeline imports this module (via danger_map)
+    t = timeline.chapter_timeline(chap, campaign, mode=mode)
+    if t is not None:
+        timeline.print_timeline(t, chap.get('parity_reference'))
 
 
 def _chapter_pressure(chap, band=0.25, mode=None, campaign='rime-of-the-frostmaiden'):
@@ -1999,8 +2013,25 @@ _MATCHUPS = {}
 
 
 def _chapter_matchup(chap, campaign, mode):
+    fields = arriving_fields(chap, campaign, mode)
+    if fields is None:
+        return None
+    ours = party_matchup(fields['our_force'], fields['our_field'])
+    van = party_matchup(fields['van_force'], fields['van_field'])
+    return {'ours': ours, 'vanilla': van,
+            'field': (list(fields['our_field']), list(fields['van_field'])),
+            'threat_ratio': ours['threat'] / van['threat'] if van['threat'] else float('inf'),
+            'load_ratio': ours['clear'] / van['clear'] if van['clear'] else float('inf')}
+
+
+def arriving_fields(chap, campaign, mode=None):
+    """Both sides of a parity read: each force as [(Combatant, combat-weight table)] and the
+    party each side fields against it, {unit: [Combatant]} over the careers. None for a twin
+    off VANILLA_CHAIN or a party the exp model cannot price -- `chapter_matchup`'s fallback."""
     import exp_curve                        # exp_curve imports this module
     ref = chap.get('parity_reference')
+    if ref not in VANILLA_CHAIN:
+        return None
     try:
         arriving = exp_curve.entering(campaign, int(chap['chapter_number']), ref)
     except ValueError:
@@ -2008,32 +2039,23 @@ def _chapter_matchup(chap, campaign, mode):
     if not arriving['party'] or arriving['vanilla'] is None:
         return None
     cap = chapter_deploy_limit(chap, len(ROSTER))
-    guests = fixed_roster_careers(chap)
     shifts = inject.chapter_settings.chapter_difficulty_shifts(chap) if mode else None
     our_force = chapter_enemy_bodies(chap, mode=mode, shifts=shifts)
-    our_field = fielded_careers(guests or _party_careers(campaign, arriving['party']),
-                                [u for u, _t in our_force], cap)
-    ours = party_matchup(our_force, our_field)
-    van, van_field = vanilla_matchup(ref, arriving['vanilla'], cap, mode)
-    return {'ours': ours, 'vanilla': van, 'field': (list(our_field), van_field),
-            'threat_ratio': ours['threat'] / van['threat'] if van['threat'] else float('inf'),
-            'load_ratio': ours['clear'] / van['clear'] if van['clear'] else float('inf')}
-
-
-def vanilla_matchup(parity_ref, levels, deploy_cap, mode=None):
-    """The twin's half of `chapter_matchup`: its force against its own arriving party at
-    `levels` (`exp_curve.entering`'s 'vanilla'). Returns (party_matchup, fielded names)."""
-    force = [(u, ai_target.combat_weight_table(ai))
-             for u, ai in vanilla_enemy_bodies(parity_ref, mode)]
-    field = fielded_careers(vanilla_party_careers(parity_ref, levels),
-                            [u for u, _t in force], deploy_cap)
-    return party_matchup(force, field), list(field)
+    van_force = [(u, ai_target.combat_weight_table(ai))
+                 for u, ai in vanilla_enemy_bodies(ref, mode)]
+    our_field = fielded_careers(
+        fixed_roster_careers(chap) or _party_careers(campaign, arriving['party']),
+        [u for u, _t in our_force], cap)
+    van_field = fielded_careers(vanilla_party_careers(ref, arriving['vanilla']),
+                                [u for u, _t in van_force], cap)
+    return {'our_force': our_force, 'our_field': our_field,
+            'van_force': van_force, 'van_field': van_field}
 
 
 def planned_target(chap, campaign):
     """The parity target a `status: planned` chapter must hit: its twin's force against the
-    twin's arriving party (`vanilla_matchup`), as {'threat', 'clear'}. None off VANILLA_CHAIN
-    or where the exp model cannot place the chapter."""
+    twin's arriving party, as {'threat', 'clear'}. None off VANILLA_CHAIN or where the exp
+    model cannot place the chapter."""
     import exp_curve                        # exp_curve imports this module
     ref = chap.get('parity_reference')
     if ref not in VANILLA_CHAIN:
@@ -2044,7 +2066,10 @@ def planned_target(chap, campaign):
         return None
     if levels is None:
         return None
-    return vanilla_matchup(ref, levels, chapter_deploy_limit(chap, len(ROSTER)))[0]
+    force = [(u, ai_target.combat_weight_table(ai)) for u, ai in vanilla_enemy_bodies(ref)]
+    field = fielded_careers(vanilla_party_careers(ref, levels), [u for u, _t in force],
+                            chapter_deploy_limit(chap, len(ROSTER)))
+    return party_matchup(force, field)
 
 
 def _warn_dropped(dropped, indent='  '):

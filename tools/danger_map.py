@@ -136,13 +136,27 @@ def bodies(chapter, mode=None, every_mode=False):
                        int(enemy.get('arrives_turn') or enemy.get('trigger_turn') or 1))
             units = dif._entry_combatants(enemy, mode=mode, shifts=shifts, real_article=True,
                                           drop_staff=False)
-            table, mov = pp.class_movement(enemy.get('deploy_class') or enemy['class'])
             for index, tile in enumerate(enemy.get('positions') or ()):
                 ai = dif.enemy_ai_bytes(chapter, enemy, index)
+                table, mov = _movement(enemy, index)
                 out.append(Body(enemy.get('id'), index, tuple(tile), cs.ai_shape(ai), ai[0],
                                 arrives, table, mov,
                                 _arms(enemy, units[min(index, len(units) - 1)])))
     return out
+
+
+def _movement(enemy, index):
+    """(cost table, Mov) for one body. A `composition` bag's body moves as its own member. A
+    `deploy_class` moves as itself when it is a vanilla class; a campaign reskin slot
+    (`enemy_class_reskins`, e.g. ch03's brigand-brute) has no vanilla row, and it clones its
+    `base`, which is the `class:` the entry declares for exactly that reason."""
+    own = enemy['class'] if 'class' in enemy else enemy['composition'][index]
+    if enemy.get('deploy_class'):
+        try:
+            return pp.class_movement(enemy['deploy_class'])
+        except KeyError:
+            pass
+    return pp.class_movement(own)
 
 
 def _moves_like(body):
@@ -181,13 +195,16 @@ class Board:
     unconstrained walk would have it cross the map to the east hull as well."""
 
     def __init__(self, chapter, mode=None, terrain=None, targets=(), spared_by=(),
-                 every_mode=False):
+                 every_mode=False, fielded=None):
+        """`fielded` is a ready list of `Body` for a board that is not one of our chapters
+        (the vanilla twin's, `timeline.vanilla_board`); `chapter` is then None and `terrain`
+        is required."""
         self.chapter = chapter
         self.targets = tuple(tuple(t) for t in targets)
         self.spared_by = tuple(spared_by)
         self.terrain = terrain if terrain is not None else pp.terrain_grid(chapter)
-        self.bodies = bodies(chapter, mode, every_mode)
-        self.blocked = green_bodies(chapter)
+        self.bodies = fielded if fielded is not None else bodies(chapter, mode, every_mode)
+        self.blocked = green_bodies(chapter) if chapter is not None else set()
         self.statues = {b.source for b in self.bodies
                         if _moves_like(b) == 'statue' and b.arrives <= 1}
         self._walks, self._stands, self._engaged = {}, {}, {}
