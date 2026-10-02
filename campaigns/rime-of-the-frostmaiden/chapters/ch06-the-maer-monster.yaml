@@ -140,10 +140,11 @@ difficulty_note: >
                        does not stop it -- only four cells on the map are inside that range
                        ((15,12), (17,10), (17,13), (17,14)) and it starts SIX move points
                        from the nearest, so its first throw lands on enemy phase 2 and not
-                       before. It has to be killed. Sinks the hull on turn 7.
+                       before. It has to be killed. The LONG fuse: median turn 10.
     west / Pronged Goat ice-crab from (7,20), on the door from enemy phase 2. Venin claw is
                        range 1, so it must occupy that one cell -- which also means the
-                       player cannot BOARD until it is dead. Sinks the hull on turn 8.
+                       player cannot BOARD until it is dead. The claw also POISONS, 1-3 a
+                       phase for 5 phases. Median turn 8, on a 28 HP hull.
 
   THOSE TWO AND NOTHING ELSE, and enforcing it took a licence. Measured in-engine (#26): four of
   the line's STRIKERS reached the east hull on enemy phase 1 and sank it on turn 4, because
@@ -159,10 +160,10 @@ difficulty_note: >
   Neither boat is answered by a body-block, and the #360 review is why that is written down:
   the crab reaches the door on turn 2 and the player's earliest arrival anywhere near it is
   Pinky on turn 3, so "race it to the door" was a lever that did not exist. What the west
-  boat actually offers is a SOFTER kill -- a Level 1 Bael, the weakest unit on the map,
-  against five turns of slack -- while the east is a Level 7 soldier that throws from
-  outside melee. That asymmetry is what puts the plot-critical hint (Tali) on the boat a
-  player is likeliest to save.
+  boat offers is a SOFTER kill -- a Level 1 Bael, the weakest unit on the map -- on the
+  FASTER fuse, because its claw poisons. The east is a Level 7 soldier that throws from
+  outside melee, on a long fuse. Each is saved by its own rescuers about nine runs in ten
+  (below), so which boat carries the plot-critical hint (Tali) is a story choice.
 
   WHO CAN ACTUALLY GET THERE is `reached_on_contested:`, not `reached_on:` -- the latter is an
   EMPTY-MAP walk, and a unit cannot move through an enemy body. With the line standing, the WEST
@@ -173,8 +174,15 @@ difficulty_note: >
   builds whole chapters around a flier or a thief; the west hull is the one the party saves
   together.
 
-  Against foot on turn 6 the west clock is vanilla's own slack of one turn. Nerra inherits Novala's
-  softness on purpose -- but note her Flux does 22 to a 19 HP hull, so she is kept on the
+  THE FUSES ARE VANILLA'S SLACK, MEASURED. Vanilla Ch6's foot reaches the villagers a turn
+  before the Bael's one-bite death (decisions.md -> "Vanilla Ch6's urgency is TRAVEL TIME"),
+  so the promise is that foot gets there first. A fuse is a distribution, not a turn
+  (decisions.md -> "A rescue clock is a HIT RATE"), so `declared_fuse:` on each boat is its
+  MEDIAN, and both are measured by `danger_map` (ADR 0312, calibrated against #26's runs).
+  West: on CLASS_FLEET's own 19 HP the poisoned hull sank before foot arrived in 43% of runs;
+  at 28 (its `personal:` line) that is 8%, median turn 8. East keeps 19 HP: Pinky arrives
+  turn 3, and Braulo turn 6 with it afloat 96% of the time. Nerra inherits Novala's
+  softness on purpose -- but note her Flux does 22 a hit, doubled, to either hull, so she is kept on the
   centre shelf, far from both. Messie is a cutscene, not an encounter, so no route skips XP.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
@@ -272,12 +280,10 @@ enemy_units:
     # only foot channel to the west door -- contested foot arrival was turn 11 against a
     # turn-8 fuse, i.e. unsaveable. At (3,14) it is turn 6, which is vanilla Ch6's own
     # foot number. Derived, not eyeballed: `map_placement_preview.reached_on`.
-    # (13,11) -> (13,13): the EAST clock's mirror of the same bug. This body plus
-    # ironshell-horseslayer at (14,12) corked all four of merfolk-thrower's javelin firing
-    # cells, so the declared east pursuer never reached one on the contested snapshot --
-    # its "sinks turn 7" fuse described a unit that never arrived (#26, #367,
-    # `tools/rescue_forecast.py`). At (13,13) the corridor opens: the thrower reaches
-    # (15,12) on turn 2, same as the empty-map design always assumed.
+    # (13,11) -> (13,13) was moved in #370 to uncork merfolk-thrower's javelin cells. That
+    # cork was the old tool's, not the engine's: reds walk through reds (ADR 0312), and run 2
+    # saw the thrower throw on phase 2 with this body still at (13,11). Either tile gives the
+    # same east clock, so the body stays at (13,13).
     positions: [[18, 14], [3, 14], [13, 13], [7, 15]]
     donor: [[14, 9], [15, 7], [20, 7], [19, 13]] # vanilla's four HOLDING L7 soldiers
     skin:
@@ -905,6 +911,7 @@ rescue_boats:
   door: [17, 13]                # the ONE ground cell adjacent to the hull -- board from here,
                                 # and everything that swings at the hull has to stand here too
   donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
+  declared_fuse: 10             # MEDIAN sink turn, measured (danger_map); see difficulty_note
   attackable_sides: 1           # ground. A FLIER may also take any of the 3 pocket cells, and
                                 # a range-2 weapon reaches the hull over the wall from 3 tiles
                                 # -- FE8 has no line of sight, so a wall never stops a javelin,
@@ -934,6 +941,11 @@ rescue_boats:
   tile: [4, 17]                 # E18, inside the pocket; the door is (4,18) directly south
   door: [4, 18]
   donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
+  declared_fuse: 8              # MEDIAN sink turn, measured (danger_map); see difficulty_note
+  personal:
+    baseHP: 9                   # CLASS_FLEET 19 + 9 = 28: foot reaches the door before the
+                                # poisoned hull sinks in 92% of runs, vanilla Ch6's foot slack
+                                # (19 HP: 57%). Routed by RAW_PID_PERSONAL_SOURCES.
   attackable_sides: 1           # as boat-east; a flier adds 3 cells, range-2 reaches from 2
   reached_on: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}   # to the DOOR, EMPTY MAP
   # Contested, as boat-east. The cork here is merfolk-trident at (2,14): removing that one

@@ -9,7 +9,7 @@ import sys
 from inject.cast import ENEMY_BASE_SLOT, RAW_PID_PORTRAITS
 from inject.chapter_ids import (
     CH03_BOSS_PID, CH03_BRUTE_MINIBOSS_PID, CH03_CHAPTER_YAML, CH05_BOSS_PID, CH05_CHAPTER_YAML,
-    CH05_MOOSE_PID)
+    CH05_MOOSE_PID, CH06_BOAT_PIDS, CH06_CHAPTER_YAML)
 from inject.decomp import _find_brace_block
 from inject.hosting import _load_chapter_yaml, chapter_yaml_for
 from inject.hosts import hosted_chapters
@@ -71,8 +71,8 @@ def raw_pid_portrait_data(text, campaign):
         start, end = _find_brace_block(text, marker, CHARACTERS_C)
         block = text[start:end]
         chapter = _load_chapter_yaml(campaign, chapter_yaml)
-        unit = next((enemy for enemy in chapter['enemy_units']
-                     if enemy['id'] == unit_id), None)
+        unit = next((entry for entry in personal_bearers(chapter)
+                     if entry.get('id') == unit_id), None)
         if unit is None or 'personal' not in unit:
             sys.exit('ERROR: raw pid %s personal source %s/%s is missing'
                      % (pid, chapter_yaml, unit_id))
@@ -117,7 +117,18 @@ RAW_PID_PERSONAL_SOURCES = {
     # passenger inside the portrait loop. Its gap's bases are all zeros in vanilla, so without
     # this row the boss really does fight as a naked Mogall and folds in 1.1 rounds.
     CH03_BOSS_PID: (CH03_CHAPTER_YAML, 'grell'),
+    # ch06's west hull (#26). A rescue hull is a raw-pid unit like a boss, and its line is
+    # what the clock is measured on: CLASS_FLEET's 19 HP + 9 = 28 restores vanilla Ch6's
+    # foot slack (the chapter YAML says why).
+    CH06_BOAT_PIDS['boat-west']: (CH06_CHAPTER_YAML, 'boat-west'),
 }
+
+
+def personal_bearers(chapter):
+    """Every entry in a chapter that may carry a `personal:` line: its enemy roster, every
+    key, and its rescue hulls."""
+    return (list(chapter_roster_entries(chapter))
+            + [b for b in chapter.get('rescue_boats') or () if isinstance(b, dict)])
 # Named raw-pid creatures whose BATTLE ANIM binds to a gCharacterData gap instead of a
 # vanilla CHARACTER_ slot. Row = unit id -> (chapter YAML that declares it, its raw pid).
 # The chapter YAML is the authority, exactly as it is for RAW_PID_PERSONAL_SOURCES above:

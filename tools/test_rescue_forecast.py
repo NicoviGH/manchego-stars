@@ -104,12 +104,13 @@ class PursuerForecast(unittest.TestCase):
         self.assertLessEqual(row.sink_low, 12)
         self.assertGreater(row.sink_high, 12)          # afloat at 12 is inside the band
 
-    def test_ice_crab_engages_boat_west_on_turn_2_and_sinks_around_6(self):
+    def test_ice_crab_engages_boat_west_on_turn_2_and_sinks_on_its_declared_8(self):
+        # The 28 HP hull (ADR 0313). Run 2's 19 HP hull is danger_map's calibration case.
         row = self.rows[('ice-crab', 'boat-west')]
         self.assertEqual(row.arrival_turn, 2)
         self.assertAlmostEqual(row.damage_per_phase, 2.73, places=2)
-        self.assertEqual(row.sink_expected, 6)         # with poison; 9 without it
-        self.assertLessEqual(row.sink_low, 5)          # run 2 sank it on turn 5
+        self.assertEqual(row.sink_expected, 8)
+        self.assertGreaterEqual(row.sink_low, 6)       # foot arrives on turn 6
 
     def test_an_engaged_pursuer_never_reaches_the_other_hull(self):
         self.assertIsNone(self.rows[('merfolk-thrower', 'boat-west')].arrival_turn)

@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-312 decisions. Read this index, then open the two or three you need — the whole
+313 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -178,6 +178,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0310` | [The difficulty report fields the party that arrives, at the level it arrives at](decisions/0310-the-difficulty-report-fields-the-party-that-arrives.md) | 2026-10-01 | #430 #367 |
 | `0311` | [The difficulty report reads its absolute metrics over the dice](decisions/0311-the-difficulty-report-reads-its-metrics-over-the-dice.md) | 2026-10-01 | #430 |
 | `0312` | [The danger map reads what the cartridge rolls, and is calibrated against the ch06 runs](decisions/0312-the-danger-map-is-calibrated-against-the-ch06-runs.md) | 2026-10-01 | #430 #367 #26 |
+| `0313` | [ch06's west hull is 28 HP, because its fuse keeps vanilla Ch6's foot slack](decisions/0313-ch06-s-west-hull-keeps-vanilla-s-foot-slack.md) | 2026-10-02 | #26 #430 |
 
 ---
 

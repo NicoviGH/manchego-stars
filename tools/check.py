@@ -806,7 +806,7 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
         boss further than the bug that opened #284, with every gate green.
     """
     out = []
-    for unit in _roster_entries(d):
+    for unit in _personal_bearers(d):
         if not unit.get('personal'):
             continue
         uid = unit.get('id')
@@ -833,6 +833,11 @@ def _roster_entries(d):
     return [u for key in ROSTER_KEYS for u in (d.get(key) or []) if isinstance(u, dict)]
 
 
+def _personal_bearers(d):
+    """`inject.raw_pids.personal_bearers`, import-free: the roster and the rescue hulls."""
+    return _roster_entries(d) + [b for b in d.get('rescue_boats') or [] if isinstance(b, dict)]
+
+
 def check_personal_line_injection_routes(fail):
     """#284's guard: every authored boss line reaches the game, and every mapped slot is real.
 
@@ -857,7 +862,7 @@ def check_personal_line_injection_routes(fail):
     seen = set()
     for rel, d in _chapters():
         fail.extend(_personal_line_route_violations(rel, d, injected_ids, slot_ids))
-        seen.update(u.get('id') for u in _roster_entries(d))
+        seen.update(u.get('id') for u in _personal_bearers(d))
     for uid in sorted(slot_ids - seen):
         fail.append('ENEMY_BASE_SLOT maps %r, which no chapter fields -- a stale key silently '
                     'drops that boss back to a naked-class-base measurement (#284)' % uid)
@@ -1195,25 +1200,27 @@ _LUA_FIELD = re.compile(r'\b(\w+)\s*=\s*(0x[0-9A-Fa-f]+|-?\d+)')
 
 
 def _chapter_lua_coords(doc):
-    """{id: {'xy': (x, y), 'door': (x, y) or None}} for everything a chapter YAML places."""
+    """{id: {'xy': (x, y), 'door': (x, y) or None, 'fuse': turn or None}} for everything a
+    chapter YAML places."""
     out = {}
     for boat in (doc.get('rescue_boats') or ()):
         if boat.get('id') and _int_pair(boat.get('tile')):
             door = boat.get('door')
             out[boat['id']] = {'xy': tuple(boat['tile']),
-                               'door': tuple(door) if _int_pair(door) else None}
+                               'door': tuple(door) if _int_pair(door) else None,
+                               'fuse': boat.get('declared_fuse')}
     for enemy in (doc.get('enemy_units') or ()):
         spots = enemy.get('positions') or ()
         if enemy.get('id') and spots and _int_pair(spots[0]):
-            out[enemy['id']] = {'xy': tuple(spots[0]), 'door': None}
+            out[enemy['id']] = {'xy': tuple(spots[0]), 'door': None, 'fuse': None}
     for village in (doc.get('villages') or ()):
         if village.get('id') and _int_pair(village.get('tile')):
-            out[village['id']] = {'xy': tuple(village['tile']), 'door': None}
+            out[village['id']] = {'xy': tuple(village['tile']), 'door': None, 'fuse': None}
     return out
 
 
 def _chapter_lua_fact_violations(rel, text, chapter_rel, doc):
-    """A chapter Lua chunk's coordinates must be the chapter YAML's own.
+    """A chapter Lua chunk's coordinates, and a hull's fuse, must be the chapter YAML's own.
 
     A chunk restates what the YAML declares -- ch06.lua carries both hulls' pocket cells and
     both pocket DOORS, and ch06clock's verdict is that a melee attacker stands on one of those
@@ -1253,6 +1260,11 @@ def _chapter_lua_fact_violations(rel, text, chapter_rel, doc):
                     'ground cell the pocket can be attacked from, and it IS the verdict'
                     % (rel, uid, got[0], got[1], chapter_rel, want['door'][0],
                        want['door'][1]))
+        if 'sinks_on' in fields and fields['sinks_on'] != want['fuse']:
+            problems.append(
+                '%s logs %r against sinks_on = %d; %s declares declared_fuse %s. A run is '
+                'read against this number, so a stale copy reports every run as a missed fuse'
+                % (rel, uid, fields['sinks_on'], chapter_rel, want['fuse']))
     return problems
 
 
@@ -1606,9 +1618,8 @@ def _fuse_forecast_findings(chapter, rows=None):
         chapter's `rescue_boats` (mirroring `check_rescue_targets`'s own "any hull"
         reading -- a chapter does not wire which pursuer clocks which boat, only that each
         declared pursuer is somebody's clock);
-      * a boat's optional `declared_fuse:` (no shipped chapter has adopted this field yet --
-        ch06's "sinks on turn 7/8" lives as PROSE in `difficulty_note:`) should fall inside
-        the forecast band of whatever pursuer reaches it.
+      * a boat's optional `declared_fuse:` (its median sink turn; ch06 declares both) should
+        fall inside the forecast band of whatever pursuer reaches it.
 
     `rows` is `rescue_forecast.chapter_forecast(chapter)`'s output, threaded in for
     testability; the caller computes it once per chapter and passes it here.

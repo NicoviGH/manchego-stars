@@ -467,6 +467,14 @@ class RavisinPortrait(unittest.TestCase):
         .number = 0xbc,
         .defaultClass = CLASS_DEATHGOYLE,
         .miniPortrait = 0x4,
+        .baseHP = 0,
+        .basePow = 0,
+        .baseSkl = 0,
+        .baseSpd = 0,
+        .baseDef = 0,
+        .baseRes = 0,
+        .baseLck = 0,
+        .baseCon = 0,
     },'''
         patched = inject.raw_pids.raw_pid_portrait_data(source, self.CAMPAIGN)
         self.assertIn('.nameTextId = 0x246,', patched)
@@ -491,6 +499,11 @@ class RavisinPortrait(unittest.TestCase):
             for field in inject.stats.BASE_FIELDS:
                 self.assertIn('.%s = %d,' % (field, unit['personal'].get(field, 0)), patched,
                               '%s personal %s did not reach the character table' % (uid, field))
+        # A rescue hull's line rides the same route (ch06's west boat, #26): its block, and
+        # only its block, gains the HP.
+        west = patched[patched.index('[0xbc - 1]'):]
+        west = west[:west.index('},')]
+        self.assertIn('.baseHP = 9,', west)
 
     def test_name_injector_retitles_the_repurposed_riev_slot(self):
         with tempfile.TemporaryDirectory() as tmp:

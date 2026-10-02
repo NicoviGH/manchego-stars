@@ -431,6 +431,7 @@ CH06_GOAL_STATUS_MSG = 0x9FF
 # 0xbb and 0xbc are the next unnamed gaps -- nameTextId 0x255, the generic monster plate, the
 # same shape as every pid above. `assert_named_raw_pids_are_exclusive` now makes the mistake
 # impossible rather than leaving the next chapter to re-read this comment.
+CH06_CHAPTER_YAML = 'ch06-the-maer-monster.yaml'
 CH06_BOAT_PIDS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
 # Their NAMES, appended past vanilla's last message by the build (inject/message_alloc.py).
 CH06_BOAT_NAME_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-name'),

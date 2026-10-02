@@ -33,6 +33,14 @@ def ch06():
     return pp.load_chapter('ch06')
 
 
+def run_2():
+    """ch06 as run 2 played it: before ADR 0313's west hull line, on CLASS_FLEET's 19 HP."""
+    chap = copy.deepcopy(ch06())
+    for boat in chap['rescue_boats']:
+        boat.pop('personal', None)
+    return chap
+
+
 def before_366():
     """ch06 without #366's fix: the ten strikers it moved onto AI_A_08 take their donor's
     plain ActionInRange back, which is what run 1 played."""
@@ -145,7 +153,7 @@ class TheFuses(unittest.TestCase):
     """Run 2's two outcomes must land inside the forecast, not on its tail."""
 
     def setUp(self):
-        self.chap = ch06()
+        self.chap = run_2()
         self.board = hull_board(self.chap)
 
     def share(self, tile, by):
@@ -158,6 +166,21 @@ class TheFuses(unittest.TestCase):
     def test_west_sinking_by_turn_5_is_ordinary_once_poison_counts(self):
         # Without poison the crab needs four connections in four phases: under 5%.
         self.assertTrue(0.25 < self.share(WEST, 5) < 0.6)
+
+
+class VanillasFootSlack(unittest.TestCase):
+    """ADR 0313: the ch06 that ships keeps vanilla Ch6's promise -- foot reaches the west door
+    (turn 6) before the hull sinks, about nine runs in ten -- and its median is the declared 8."""
+
+    def test_the_west_hull_outlasts_foot_and_sinks_on_its_declared_turn(self):
+        chap = ch06()
+        board = hull_board(chap)
+        turns = dm.sink_turns(board, WEST, hull(chap, WEST), 20, RESCUE_SAFE_ACTIONS)
+        early = sum(1 for t in turns if t is not None and t <= 5) / len(turns)
+        self.assertLess(early, 0.1)
+        self.assertEqual(dm.percentile(turns, 50),
+                         next(b['declared_fuse'] for b in chap['rescue_boats']
+                              if tuple(b['tile']) == WEST))
 
 
 if __name__ == '__main__':

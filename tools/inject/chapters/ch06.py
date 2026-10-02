@@ -5,7 +5,8 @@ import re
 import sys
 
 from inject.cast import _classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT
-from inject.chapter_ids import CH06_BOAT_PIDS, CH06_GOAL_STATUS_MSG, CH06_GOAL_WINDOW_MSG
+from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
+                                CH06_GOAL_WINDOW_MSG)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
@@ -43,7 +44,6 @@ CH06_HARD_WAVE_TABLE = 'MS_Ch06Wave4Hard'        # vanilla Ch6's Difficult-only 
 CH06_BOAT_TABLE = 'MS_Ch06Boats'                 # the two marooned boats, GREEN and killable
 
 CH06_LAYOUT = ('Ch06MaerMonsterMap', 'ch06-maer-monster')   # (asset label, maps/ stem)
-CH06_CHAPTER_YAML = 'ch06-the-maer-monster.yaml'
 CH06_TILESET = 'snowy-bern-ice'                  # stem 'SnowIce' (TILESET_STEMS); ch06 is its
                                                  # first and only user, so it self-registers --
                                                  # the Cave/inject_ch03 idiom. _register_chapter_map
@@ -71,8 +71,8 @@ CH06_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
                   'troubadour': 'CLASS_TROUBADOUR', 'archer': 'CLASS_ARCHER',
                   'bael': 'CLASS_BAEL',
                   # the rescue boats: vanilla's own ship, which ships a 32x32 map sprite
-                  # (SMSId 0x41) and a 19 HP / 5 Def hull -- the numbers the chapter's
-                  # sinking clock is tuned against
+                  # (SMSId 0x41) and a 19 HP / 5 Def hull, which a boat's `personal:`
+                  # line may raise (the west hull is 28)
                   'fleet': 'CLASS_FLEET'}
 CH06_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'javelin': 'ITEM_LANCE_JAVELIN',
                  'iron-sword': 'ITEM_SWORD_IRON', 'iron-blade': 'ITEM_BLADE_IRON',
@@ -216,7 +216,8 @@ def ch06_boat_rows(chap):
     (ActionInRange + MoveToEnemy) would *sail off its own outcrop* toward the party, taking the
     pocket, the door and the entire fuse with it.
 
-    They carry nothing. `CLASS_FLEET`'s 19 HP and 5 Def are the hull the sinking clock is tuned
+    They carry nothing. `CLASS_FLEET`'s 19 HP and 5 Def, plus a boat's own `personal:` line
+    (RAW_PID_PERSONAL_SOURCES), are the hull the sinking clock is tuned
     against, and its weapon rank is a bow it is never given.
     """
     rows = []

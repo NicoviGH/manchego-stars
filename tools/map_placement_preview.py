@@ -601,7 +601,7 @@ def render(chapter, stem, out_png, concept=None, shade=None, zoom=3):
            'ground class, cost 1 to a flier)', fill=(255, 170, 60), font=f_small)
     d.text((pad, ly + 78),
            'board:  blue = deploy block     white = the 8 crossings     '
-           'green = a marooned boat (CLASS_FLEET, 19 HP, Res 0, in a +20-avoid drift)',
+           'green = a marooned boat (CLASS_FLEET, Res 0, in a +20-avoid drift)',
            fill=(210, 210, 216), font=f_small)
 
     os.makedirs(os.path.dirname(out_png) or '.', exist_ok=True)

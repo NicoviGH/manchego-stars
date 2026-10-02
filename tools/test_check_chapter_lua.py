@@ -20,7 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check                                            # noqa: E402
 
 DOC = {
-    'rescue_boats': [{'id': 'boat-east', 'tile': [17, 12], 'door': [17, 13]}],
+    'rescue_boats': [{'id': 'boat-east', 'tile': [17, 12], 'door': [17, 13],
+                      'declared_fuse': 7}],
     'enemy_units': [{'id': 'ice-crab', 'positions': [[7, 20]]}],
 }
 CLEAN = '''return {
@@ -55,6 +56,20 @@ class TestChapterLuaFacts(unittest.TestCase):
         found = run(CLEAN.replace('doorX = 17, doorY = 13', 'doorX = 16, doorY = 13'))
         self.assertEqual(len(found), 1, found)
         self.assertIn('door', found[0])
+
+    def test_a_drifted_fuse_is_reported(self):
+        # `sinks_on` is what ch06clock logs a run against; the YAML's `declared_fuse` is the
+        # number the chapter claims. A stale copy reads every run as a missed fuse.
+        found = run(CLEAN.replace('sinks_on = 7', 'sinks_on = 8'))
+        self.assertEqual(len(found), 1, found)
+        self.assertIn('declared_fuse', found[0])
+
+    def test_a_fuse_the_yaml_does_not_declare_is_reported(self):
+        doc = {'rescue_boats': [{'id': 'boat-east', 'tile': [17, 12], 'door': [17, 13]}],
+               'enemy_units': DOC['enemy_units']}
+        found = run(doc=doc)
+        self.assertEqual(len(found), 1, found)
+        self.assertIn('declared_fuse', found[0])
 
     def test_a_drifted_enemy_start_tile_is_reported(self):
         # A pursuer is FOUND by its start tile (every ch06 enemy shares one generic pid), so

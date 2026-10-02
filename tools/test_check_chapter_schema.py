@@ -193,6 +193,13 @@ class TestPersonalLineRoutes(unittest.TestCase):
                                           key=key))
             self.assertEqual(len(msgs), 1, (key, msgs))
 
+    def test_a_rescue_hulls_line_is_routed_too(self):
+        # A `rescue_boats:` entry is a raw-pid unit like a boss, and its `personal:` line is
+        # what the fuse is measured on (ch06's west hull, #26).
+        chap = self._chap({'id': 'boat-x', 'personal': {'baseHP': 9}}, key='rescue_boats')
+        self.assertEqual(len(self.routes(chap)), 1)
+        self.assertEqual(self.routes(chap, injected=('boat-x',)), [])
+
     def test_a_line_on_a_slot_riding_unit_is_caught(self):
         # The dangerous direction: it never reaches the ROM *and* it displaces the slot's real
         # line in the measurement, understating the boss worse than the bug that started #284.

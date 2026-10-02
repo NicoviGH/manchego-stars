@@ -288,7 +288,8 @@ def c_rescue_targets():
 
 
 def c_rescue_fuse_forecast():
-    with doctored({CH06: sub1(r'^(rescue_boats:\n- id: boat-east\n)', r'\g<1>  declared_fuse: 99\n')}):
+    # boat-east's own declared fuse (its median, 10) pushed far outside the forecast band
+    with doctored({CH06: sub1(r'^(  declared_fuse: )10(\s)', r'\g<1>99\g<2>')}):
         return run(check.check_rescue_fuse_forecast)
 
 
