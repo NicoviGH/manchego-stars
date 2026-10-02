@@ -6,22 +6,20 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-02 (Claude), #430 steps 3 and 4 landed (#441-#449); both reports are posted on #430.
+Refreshed 2026-10-02 (Claude), #430 steps 3 and 4 landed (#441-#450); both reports are posted on #430.
 **What landed and why is in `git log` and the ADRs it cites** -- this file keeps no "recently
 landed" list.
 
 ## In flight
 
-**Waiting on NICOLAS: the no-Seth residual (#430's step-4 comment).** Two calls, both moves
-AWAY from vanilla or accepting a gap, so they are his:
-1. ch01-ch02 clear-load x1.41: vanilla's Seth one-rounds the boss; ours does not (ADR 0042).
-2. ch00 threat x1.98: Hlin's Hand Axe against Eirika's Rapier -- her kit, not her stats (ADR 0319).
+**The no-Seth residual is decided** (Nicolas, 2026-10-02): ch01-ch02's x1.41 clear-load is
+accepted (ADR 0042 stands); ch00's Hlin gap closed by kit (ADR 0322, ch00 now PARITY).
 
 Then, autonomously and data-driven:
 - **Step 5 (#135)** -- v0.1.0 playtester feedback, never triaged.
 - **Step 6 (locks)** -- a chapter re-locks when its re-measure holds parity on v2. Every FORCE
-  now sits x0.93-x1.11 of its twin; what is left is the party residual above, so the locks
-  wait on his call.
+  sits x0.93-x1.11 of its twin; ch01-ch02's clear-load residual is ACCEPTED, so judge their
+  locks on threat plus that acceptance, not on the headline verdict alone.
 - ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
   re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
 - The Monte Carlo simulator stays parked in #430 with its trigger.
