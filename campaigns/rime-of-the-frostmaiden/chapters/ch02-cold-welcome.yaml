@@ -115,16 +115,16 @@ difficulty_note: >
 # lord (#42) is force-deployed. This models our difficulty to vanilla's despite the bigger cast.
 deployment:
   deploy_limit: 5
-  # [col, row] — the NW entry corner, ringing the parked sled. FIRST PASS (parity intent
-  # only): vanilla Ch2's ally tiles land on walls/peaks in Nicolas's hand-retiled paint, so
-  # these are authored against THIS map's actual walkable tiles (plains/forest), not vanilla
-  # coords. The party rolls in NW; the raid converges from the E/SE. Nicolas to adjust on the paint.
+  # [col, row] — vanilla Ch2's own front, in its table order (Eirika's post first): the
+  # REDA ends of UnitDef_Event_Ch2Ally, tucked in the NW corner. Our map keeps vanilla's
+  # terrain on every one of them (#194 preserved it), and the party standing two rows further
+  # south made the raid reach it a phase early (#430 step 3).
   deploy_slots:
+    - [2, 2]
+    - [0, 1]
+    - [1, 1]
     - [0, 3]
-    - [0, 4]
-    - [0, 5]
-    - [1, 5]
-    - [2, 4]
+    - [3, 3]
   note: "Pick Units fields 5 of {7 PCs + Baxby} (vanilla Ch2 fields 5). The party rolls in NW; 3 green chwinga sit just ahead, in the raid's path."
   # ── Protected: 2 GREEN chwinga, on vanilla's own green posts ───────────────────
   # Harmless gift-spirits (book: "Starting Quest: Nature Spirits", p25-26). REWORKED
@@ -188,7 +188,7 @@ enemy_units:
   - id: chardalyn-raider
     name: "Chardalyn Berserker"
     count: 2                          # vanilla 088B4344 #1 + #5 (plain L3 brigands)
-    positions: [[9,6],[10,8]]         # converging through the center
+    positions: [[10,12],[7,14]]       # on their donors' posts, the southern peaks
     fe_mechanic: axe-brigand    # Brigand class, axe-type weapon → in the weapon triangle
     flavor: "an Auril-maddened raider, frost crusting the skin"
     class: brigand
@@ -201,7 +201,7 @@ enemy_units:
   - id: chardalyn-scavenger
     name: "Chardalyn Berserker"
     count: 1                          # vanilla 088B4344 #4 — the L3 dropper
-    positions: [[6,10]]               # vanilla's SW dropper tile (088B4344 #4 = 6,10)
+    positions: [[6,11]]               # on its donor's post
     fe_mechanic: axe-brigand
     flavor: "scavenges the Targos road for the mad-cold"
     class: brigand
@@ -215,7 +215,7 @@ enemy_units:
   - id: chardalyn-skirmisher
     name: "Chardalyn Berserker"
     count: 1                          # vanilla 088B4344 #6 (the lone L2 brigand)
-    positions: [[9,8]]
+    positions: [[12,5]]               # on its donor's post, short of the chwinga
     fe_mechanic: axe-brigand
     flavor: "the youngest of the maddened band"
     class: brigand
@@ -228,7 +228,7 @@ enemy_units:
   - id: frost-archer
     name: "Chardalyn Hunter"
     count: 1                          # vanilla 088B4344 #2 — the single L1 archer
-    positions: [[13,8]]               # eastern treeline (forest avoid), near the boss
+    positions: [[14,9]]               # on its donor's post, the eastern treeline (forest avoid)
     fe_mechanic: archer         # single ranged unit — hard-counters the green pegasi
     flavor: "looses ice-fletched arrows at anything that flies"
     class: archer
@@ -243,7 +243,7 @@ enemy_units:
     fe_name: "Grukk"            # ≤12 — overrides the vanilla "Bone" slot name plate
     is_miniboss: true
     count: 1
-    position: [13, 6]           # guards beside the captain on the eastern edge
+    position: [13, 7]           # on its donor's post, beside the captain
     fe_mechanic: axe-brigand    # named mid-tier, guards near the boss (FE8 "Bone" slot)
     flavor: "the captain's right hand, half-gone to the cold"
     class: brigand
@@ -258,7 +258,7 @@ enemy_units:
     fe_name: "Halvar"          # ≤12 — overrides the vanilla "Bazba" slot name plate
     is_boss: true
     count: 1
-    position: [14, 5]           # anchored on the far-east edge — the band's far corner
+    position: [11, 7]           # on Bazba's post: vanilla's boss raids from mid-map
     fe_mechanic: steel-axe-brigand   # the one real threat = FE8's Steel-Axe Bazba mirror
     flavor: "leads the band the chardalyn drove mad — the last to fully turn"
     class: brigand
@@ -290,7 +290,7 @@ reinforcements:
         damage_type: slashing
     trigger_turn: 3
     spawn_edge: opposite_boss        # flanks a party pushed toward the boss (FE8 pattern)
-    positions: [[0,6],[0,7]]         # west edge (boss anchors east) — emerge behind a pushed party
+    positions: [[0,9],[1,9]]         # on their donors' posts, the SW peaks behind a pushed party
     donor: [[0, 9], [1, 9]]     # vanilla's southwest raider pair, beside the southern village
 
 # ── Rewards (no chest — vanilla Ch2 has none) ─────────────────────────────────────
