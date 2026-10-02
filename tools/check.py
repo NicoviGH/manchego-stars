@@ -1202,6 +1202,7 @@ _LUA_FIELD = re.compile(r'\b(\w+)\s*=\s*(0x[0-9A-Fa-f]+|-?\d+)')
 def _chapter_lua_coords(doc):
     """{id: {'xy': (x, y), 'door': (x, y) or None, 'fuse': turn or None}} for everything a
     chapter YAML places."""
+    import chapter_schema
     out = {}
     for boat in (doc.get('rescue_boats') or ()):
         if boat.get('id') and _int_pair(boat.get('tile')):
@@ -1210,7 +1211,7 @@ def _chapter_lua_coords(doc):
                                'door': tuple(door) if _int_pair(door) else None,
                                'fuse': boat.get('declared_fuse')}
     for enemy in (doc.get('enemy_units') or ()):
-        spots = enemy.get('positions') or ()
+        spots = chapter_schema.entry_tiles(enemy)
         if enemy.get('id') and spots and _int_pair(spots[0]):
             out[enemy['id']] = {'xy': tuple(spots[0]), 'door': None, 'fuse': None}
     for village in (doc.get('villages') or ()):

@@ -86,6 +86,15 @@ class OurBodiesMove(unittest.TestCase):
         self.assertEqual(pp.class_movement('pegasus-knight'), ('TerrainTable_MovCost_FlyNormal', 7))
         self.assertNotEqual(pp.class_movement('cavalier')[0], pp.class_movement('fighter')[0])
 
+    def test_a_lone_position_is_a_body(self):
+        # Bosses are written `position:`; the boards read `positions:` alone and lost every one.
+        import chapter_schema
+        self.assertEqual(chapter_schema.entry_tiles({'position': [3, 4]}), [[3, 4]])
+        self.assertEqual(chapter_schema.entry_tiles({'positions': [[1, 1], [2, 2]]}),
+                         [[1, 1], [2, 2]])
+        ids = {b.id for b in dm.Board(pp.load_chapter('ch02'), None, every_mode=True).bodies}
+        self.assertTrue({'raider-captain', 'raider-bruiser'} <= ids)
+
     def test_vanilla_ch2s_brigands_cross_its_peaks(self):
         # The turn-3 pair spawns on the peaks at (0,9)/(1,9); on the foot table it never moved.
         board = dm.Board(None, terrain=dif.vanilla_terrain('FE8 Ch2'),

@@ -145,6 +145,16 @@ CHAPTER = {
 }
 
 
+def entry_tiles(enemy_def):
+    """The tiles one roster entry places its bodies on, in order: `positions:`, or a lone
+    `position:` -- the shape every boss and single unit is written in (ch01's Izobai, ch02's
+    captain). Reading `positions` alone dropped those bodies off every board (#430). The
+    pairs come back as written, so a shape guard can still see a malformed one."""
+    if enemy_def.get('positions'):
+        return list(enemy_def['positions'])
+    return [enemy_def['position']] if enemy_def.get('position') else []
+
+
 def _kind(value):
     return ('a mapping' if isinstance(value, dict) else 'a list' if isinstance(value, list)
             else 'a %s' % type(value).__name__)
