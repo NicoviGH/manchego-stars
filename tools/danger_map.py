@@ -137,15 +137,17 @@ def _arms(enemy, combatant):
     return tuple(dataclasses.replace(combatant, weapon=w) for w in weapons)
 
 
-def bodies(chapter, mode=None):
+def bodies(chapter, mode=None, every_mode=False):
     """Every enemy body the chapter fields on `mode` (None reads the authored table, as
-    `make difficulty` does). An AI vector the decomp does not name reads as a pursuer, the
-    worst case, and keeps its shape None so the report can say so."""
+    `make difficulty` does). `every_mode` keeps the Difficult-only entries on any mode, for
+    a question asked of the chapter rather than of one playthrough. An AI vector the decomp
+    does not name reads as a pursuer, the worst case, and keeps its shape None so the report
+    can say so."""
     shifts = inject.chapter_settings.chapter_difficulty_shifts(chapter) if mode else None
     out = []
     for key in inject.raw_pids.ENEMY_ROSTER_KEYS:
         for enemy in chapter.get(key) or ():
-            if not isinstance(enemy, dict) or (enemy.get('hard_mode_only')
+            if not isinstance(enemy, dict) or (enemy.get('hard_mode_only') and not every_mode
                                                and mode != 'difficult'):
                 continue
             arrives = (1 if inject.raw_pids.entry_is_turn1(key, enemy) else
@@ -179,7 +181,9 @@ def green_bodies(chapter):
 ENGAGE_HORIZON = 30         # phases a pursuer is walked looking for its first target
 
 
-def _in_range(arm, cell, tile):
+def in_range(arm, cell, tile):
+    """Can `arm` strike `tile` from `cell`? Manhattan distance inside its range; FE8 has no
+    line of sight."""
     d = abs(cell[0] - tile[0]) + abs(cell[1] - tile[1])
     return d > 0 and arm.weapon.rng[0] <= d <= arm.weapon.rng[1]
 
@@ -194,12 +198,13 @@ class Board:
     what the ch06 runs show: the crab worked the west door from phase 2 to the end, and an
     unconstrained walk would have it cross the map to the east hull as well."""
 
-    def __init__(self, chapter, mode=None, terrain=None, targets=(), spared_by=()):
+    def __init__(self, chapter, mode=None, terrain=None, targets=(), spared_by=(),
+                 every_mode=False):
         self.chapter = chapter
         self.targets = tuple(tuple(t) for t in targets)
         self.spared_by = tuple(spared_by)
         self.terrain = terrain if terrain is not None else pp.terrain_grid(chapter)
-        self.bodies = bodies(chapter, mode)
+        self.bodies = bodies(chapter, mode, every_mode)
         self.blocked = green_bodies(chapter)
         self.statues = {b.source for b in self.bodies
                         if _moves_like(b) == 'statue' and b.arrives <= 1}
@@ -230,7 +235,7 @@ class Board:
         key = (body.id, body.index)
         if key not in self._engaged:
             def hits(cell):
-                return any(_in_range(arm, cell, t) for t in self.targets for arm in body.arms)
+                return any(in_range(arm, cell, t) for t in self.targets for arm in body.arms)
             self._engaged[key] = None if body.action in self.spared_by else next(
                 (p for p in range(body.arrives, body.arrives + ENGAGE_HORIZON)
                  if any(hits(c) for c in self._reach(body, p))), None)
@@ -290,7 +295,7 @@ def attacks_on(board, tile, defender, phase, spared_by=()):
         cells = {}
         for c in board.stands(body, phase):
             for arm in body.arms:
-                if _in_range(arm, c, tile):
+                if in_range(arm, c, tile):
                     s = strike(arm, target, avoid)
                     if s.expected > 0 and (c not in cells or s.expected > cells[c].expected):
                         cells[c] = s
@@ -326,33 +331,38 @@ SINK_SEED = 430
 def sink_turns(board, tile, defender, horizon, spared_by=(), trials=SINK_TRIALS):
     """The enemy phase a `defender` that never moves off `tile`, never heals and never
     fights back drops on, over `trials` simulated fights; None for a run it survives
-    `horizon` phases. A rescue hull is exactly this target. Poison ticks at the start of the
-    defender's own phase, which follows the enemy phase it was poisoned on, so a tick that
-    drops it counts to that turn."""
-    per_phase = [attacks_on(board, tile, defender, t, spared_by)
-                 for t in range(1, horizon + 1)]
+    `horizon` phases. A rescue hull is exactly this target."""
+    return simulate_sink(defender.hp, [attacks_on(board, tile, defender, t, spared_by)
+                                       for t in range(1, horizon + 1)], trials)
+
+
+def simulate_sink(hp, per_phase, trials=SINK_TRIALS):
+    """`sink_turns` over a given list of each enemy phase's attacks (phase 1 first). Poison
+    ticks at the start of the defender's own phase, which follows the enemy phase it was
+    poisoned on, so a tick that drops it counts to that turn."""
     rng = random.Random(SINK_SEED)
     out = []
     for _ in range(trials):
-        hp, sunk, poisoned = defender.hp, None, 0
+        left, sunk, poisoned = hp, None, 0
         for t, attacks in enumerate(per_phase, 1):
             for a in attacks:
                 for _ in range(a.strike.strikes):
                     if rng.random() < a.strike.p_hit:
-                        hp -= a.strike.damage * (3 if rng.random() < a.strike.p_crit else 1)
+                        left -= a.strike.damage * (3 if rng.random() < a.strike.p_crit else 1)
                         if a.strike.poisons:
                             poisoned = POISON_PHASES
-            if poisoned and hp > 0:
-                hp -= rng.randint(*POISON_TICK)
+            if poisoned and left > 0:
+                left -= rng.randint(*POISON_TICK)
                 poisoned -= 1
-            if hp <= 0:
+            if left <= 0:
                 sunk = t
                 break
         out.append(sunk)
     return out
 
 
-def _percentile(turns, q):
+def percentile(turns, q):
+    """The `q`th percentile sink turn, inf for one past the horizon."""
     finite = sorted(t if t is not None else float('inf') for t in turns)
     return finite[min(len(finite) - 1, len(finite) * q // 100)]
 
@@ -378,7 +388,7 @@ def _boats_report(chapter, mode, horizon):
         turns = sink_turns(board, tile, hull, horizon, RESCUE_SAFE_ACTIONS)
         afloat = sum(1 for t in turns if t is None) / len(turns)
         print('  sinks: p10 EP%s  median EP%s  p90 EP%s  afloat after EP%d: %.0f%%'
-              % (_percentile(turns, 10), _percentile(turns, 50), _percentile(turns, 90),
+              % (percentile(turns, 10), percentile(turns, 50), percentile(turns, 90),
                  horizon, 100 * afloat))
 
 

@@ -85,8 +85,8 @@ def _rescue_forecast_module():
 def _rescue_clock_findings(name, campaign=campaign_chapters.CAMPAIGN):
     """Advisory findings for a chapter's rescue clock (#367), for `loose_ends` and the
     report -- the same pure logic `check.py check_rescue_fuse_forecast` runs, read here so
-    a fresh session sees ch06's confirmed #26 finding (the east pursuer cannot engage)
-    without leaving the terminal. `[]` on a chapter with no rescue clock, or where the
+    a fresh session sees a pursuer that never arrives, or a declared fuse outside its
+    forecast, without leaving the terminal. `[]` on a chapter with no rescue clock, or where the
     forecast module could not be imported -- silence, never a false "clean"."""
     rf = _rescue_forecast_module()
     if rf is None:

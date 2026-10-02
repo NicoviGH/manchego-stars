@@ -91,8 +91,8 @@ class ADeclaredFuseMustFallInsideTheBand(unittest.TestCase):
 
     def test_a_reaching_pursuer_with_no_sink_band_does_not_crash_the_gate(self):
         """`pursuer_forecast` returns `arrival_turn` set with `sink_low/high=None` when it
-        reaches a firing cell but deals no true damage (`sink_band`'s own `None` case, e.g.
-        0 hit chance or an effectiveness mismatch) -- a real return shape, not a synthetic
+        reaches a firing cell but deals no true damage (0 hit chance, 0 damage) -- a real
+        return shape, not a synthetic
         edge. This guard's whole docstring promise is that it NEVER fails the build; the
         comparison must not blow up on the exact row that promise exists to cover."""
         chap = {'rescue_pursuers': [{'id': 'p'}],

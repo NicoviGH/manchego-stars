@@ -173,8 +173,9 @@ def firing_cells(terrain, target, weapon_range):
     before who specifically reaches it is asked. The target's own tile (distance 0) is
     never a firing cell.
 
-    `units_reaching` uses this for the same range check it always ran inline; `rescue_forecast`
-    aliases it rather than keeping its own copy."""
+    `units_reaching` uses this for the same range check it always ran inline. `danger_map`
+    asks the attacker's own walk instead, since a flier or a swimmer stands where a foot unit
+    cannot."""
     tx, ty = target
     h, w = len(terrain), len(terrain[0])
     out = []
@@ -237,14 +238,11 @@ def arrival_turn_to(terrain, sources, cost_table, mov, targets, blocked=()):
     """The turn a unit moving from ANY of `sources` (at `mov` points/turn on `cost_table`, a
     `pMovCostTable` symbol per `class_movement`) first stands on ANY of `targets`, walking
     the map with `blocked` cells excluded. `None` if no target is reachable at all -- a
-    first-class outcome, not an error (ch06's merfolk-thrower: its own line corks every one
-    of its four javelin cells).
+    first-class outcome, not an error.
 
-    ONE Dijkstra + arrival-turn conversion, shared by two call shapes that are otherwise
-    mirror images of each other: `reached_on` walks MANY sources (the deploy block) to ONE
-    target; `rescue_forecast.arrival_to_cells` walks ONE source (an enemy) to MANY candidate
-    firing cells. Passing both ends as lists covers either direction without the caller
-    having to know which side is plural."""
+    Both ends are lists, so `reached_on`'s MANY sources (the deploy block) to ONE target and
+    ONE source to MANY targets are the same call. An ENEMY's walk is `danger_map`'s: reds
+    pass through reds, so the enemy line is not its `blocked`."""
     if not targets:
         return None
     cost = mov_cost_row(cost_table)

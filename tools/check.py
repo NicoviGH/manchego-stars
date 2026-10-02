@@ -85,6 +85,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #430: rescue_forecast asks danger_map's calibrated model (ADR 0312)
+    r'sink_band', r'concurrent_attacker_cap', r'arrival_to_cells',
     # retired by #430: the vanilla party is derived along the chain, not curated per twin
     r'PARITY_REFERENCE_ALLY_UDEFS', r'vanilla_allies\(',
     # retired by #412: the chapter frame points the roster and reads list symbols from the group
@@ -1617,18 +1619,17 @@ def _fuse_forecast_findings(chapter, rows=None):
         mine = [r for r in (rows or []) if r.enemy_id == pid]
         if mine and not any(r.arrival_turn is not None for r in mine):
             findings.append(
-                '%s: declared a rescue_pursuer but cannot reach a firing cell for any '
-                'rescue target on the contested snapshot -- its fuse describes a unit '
-                'that never arrives' % pid)
+                '%s: declared a rescue_pursuer but never strikes any rescue target -- it '
+                'cannot reach one, spares them, or engages another first -- so its fuse '
+                'describes a unit that never arrives' % pid)
     for boat in chapter.get('rescue_boats') or []:
         declared = boat.get('declared_fuse')
         if declared is None:
             continue
         # `sink_low is not None` too: `pursuer_forecast` returns a row with `arrival_turn`
         # SET but every sink field None when the attacker reaches a firing cell yet deals
-        # no true damage there (`sink_band`'s own None case -- 0 hit chance or an
-        # effectiveness mismatch). Comparing `None <= declared` crashes the very guard whose
-        # whole contract is that it never fails the build.
+        # no true damage there (0 hit chance, 0 damage). Comparing `None <= declared`
+        # crashes the very guard whose whole contract is that it never fails the build.
         reaching = [r for r in (rows or [])
                    if r.boat_id == boat['id'] and r.arrival_turn is not None
                    and r.sink_low is not None]
@@ -1647,14 +1648,9 @@ def check_rescue_fuse_forecast(fail):
     """ADVISORY, not a gate (#367): does a chapter's DECLARED rescue clock actually reach
     its target, and does a declared fuse sit inside the forecast band.
 
-    Deliberately never appends to `fail`. ch06's east pursuer (`merfolk-thrower`) fails the
-    reachability half TODAY -- a real, already-confirmed bug (#26): its own line corks
-    every one of its four javelin firing cells on the contested snapshot, so the chapter's
-    declared "sinks on turn 7" describes a unit that never arrives. The fix is a design
-    call (move the pursuer, or re-declare which hull is the east clock) that belongs to
-    Nicolas, not to this PR, so this prints rather than reddens `main`. Flip the
-    `_fuse_forecast_findings` call below to `fail.extend(...)` once that pursuer is
-    settled -- see `docs/decisions.md` for the dated ADR."""
+    Deliberately never appends to `fail`: a fuse is a distribution (ADR 0270), and ch06's
+    clock is parked until #430 has re-measured it (#26). Both ch06 pursuers reach their hull
+    on turn 2 (`danger_map`, ADR 0312), so today this prints nothing for ch06."""
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     try:
         import rescue_forecast as rf
