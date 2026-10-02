@@ -381,6 +381,7 @@ class Career:
         self.share = share
         self.joins = joins          # first chapter_number this unit can earn in
         self.level = level          # the level it is ON THE FIELD at when it joins
+        self.start_level = level
         self.exp = 0
 
     @property
@@ -465,6 +466,46 @@ def _party(campaign, share=1.0):
             for uid, cls, joins, level in party_classes(campaign)]
 
 
+def _twin_rank(ref):
+    """Where a vanilla twin falls in FE8's own order: the Prologue is 0, `FE8 ChN` is N."""
+    if ref == 'FE8 Prologue':
+        return 0
+    m = re.fullmatch(r'FE8 Ch(\d+)', ref or '')
+    return int(m.group(1)) if m else None
+
+
+def twin_route_findings(chapters):
+    """Twins that break vanilla's route, for [(chapter id, parity_reference)] in chapter order.
+
+    FE8's party plays each chapter once, in order. A chapter that names a twin an earlier
+    chapter already used, or one behind it, pays our party a chapter of exp the vanilla curve
+    does not contain. The cumulative band cannot be trusted to see that: our party starts a
+    chapter behind (ch00 banks nothing), so one reused twin at ch06 lands at 1.08x, inside
+    it. Skipping ahead is allowed (ch08 -> FE8 Ch13): that only leaves the party behind. A
+    twin `_twin_rank` cannot place is reported too, so a new name (a route split) gets ranked
+    rather than waved through. A chapter with no twin is skipped."""
+    out, last = [], None
+    for cid, ref in chapters:
+        if ref is None:
+            continue
+        rank = _twin_rank(ref)
+        if rank is None:
+            out.append('%s names %s, which the route cannot place -- teach _twin_rank it'
+                       % (cid, ref))
+            continue
+        if last is not None and rank <= last[1]:
+            out.append('%s names %s, but %s already reached %s -- vanilla plays each chapter '
+                       'once, in order' % (cid, ref, last[0], last[2]))
+        else:
+            last = (cid, rank, ref)
+    return out
+
+
+def _total_exp(careers):
+    """Mean exp banked to date over `careers`: 100 a level gained plus the exp in hand."""
+    return sum((c.level - c.start_level) * EXP_PER_LEVEL + c.exp for c in careers) / len(careers)
+
+
 def simulate(campaign='rime-of-the-frostmaiden'):
     """One row per HOSTED chapter, in chapter order, carrying the party level forward.
 
@@ -482,6 +523,7 @@ def simulate(campaign='rime-of-the-frostmaiden'):
     lead = _party(campaign, SHARE_LEAD)
     tail = _party(campaign, SHARE_TAIL)
     twin_party = _party(campaign)
+    spent = set()
     rows = []
     for chapter in inject.hosts.hosted_chapters():
         chap = inject.hosting._load_chapter_yaml(campaign, inject.hosting.chapter_yaml_for(chapter.name))
@@ -505,10 +547,12 @@ def simulate(campaign='rime-of-the-frostmaiden'):
         if banks:
             for career in ours + lead + tail:
                 career.fight(bodies, cap, number)
-        if twin is not None:
+        if twin is not None and ref not in spent:
             # The twin party fights its own chapter whether or not ours banks this one
             # (see _banks_exp), and its members join on OUR recruitment schedule, so the
-            # only difference between the two curves stays the enemy force.
+            # only difference between the two curves stays the enemy force. It fights each
+            # twin ONCE, as FE8's party does: a reused twin pays ours and not it.
+            spent.add(ref)
             for career in twin_party:
                 career.fight(twin, cap, number)
         rows.append({
@@ -531,6 +575,11 @@ def simulate(campaign='rime-of-the-frostmaiden'):
             # Read over the FOUNDING careers, exactly as `level_after` is -- comparing a
             # mean over one population against a mean over another says nothing.
             'twin_level_after': (_mean_level(_founding(twin_party))
+                                 if twin is not None else None),
+            # Exp to date, both parties over the founding careers: the curve the per-chapter
+            # yield cannot see, because only this integrates across chapters.
+            'exp_to_date': _total_exp(_founding(ours)),
+            'twin_exp_to_date': (_total_exp(_founding(twin_party))
                                  if twin is not None else None),
         })
     return rows
