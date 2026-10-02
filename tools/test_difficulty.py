@@ -2355,6 +2355,12 @@ class PartyMatchup(unittest.TestCase):
         self.assertAlmostEqual(p['verdict']['threat_ratio'],
                                p['matchup']['threat_ratio'])
 
+    def test_the_force_and_party_effects_multiply_to_the_headline(self):
+        chap = df.load_field('rime-of-the-frostmaiden', 'ch04')[0]
+        m = df.chapter_matchup(chap, 'rime-of-the-frostmaiden')
+        self.assertAlmostEqual(m['force'][0] * m['party'][0], m['threat_ratio'])
+        self.assertAlmostEqual(m['force'][1] * m['party'][1], m['load_ratio'])
+
     def test_a_twin_off_the_chain_falls_back_to_the_yardstick(self):
         chap = dict(df.load_field('rime-of-the-frostmaiden', 'ch04')[0],
                     parity_reference='FE8 Ch13')
