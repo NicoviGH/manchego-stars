@@ -30,7 +30,8 @@ dnd:
 # wings" are exactly that — cosmetic art, NOT a flier (Thief is a foot unit).
 fe_stats:
   class: Thief
-  level: 1
+  level: 2                  # Colm's baseLevel: his personal line IS his L2 line, and he joins
+                            # vanilla Ch3 at L2 -- the chapter trex joins in (#403, ADR 0321)
   # Vanilla FE8 Thief stats, verbatim from data_classes.c [CLASS_THIEF - 1].
   HP: 16
   STR: 3

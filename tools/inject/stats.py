@@ -51,8 +51,11 @@ GROWTH_FIELDS = ('growthHP', 'growthPow', 'growthSkl', 'growthSpd',
 
 # Personal-BASE donor (the starting stat line). Usually the same canonical unit as the
 # rank donor (STAT_DONOR), but the two shamans take EWAN's Ch1-appropriate bases (Knoll's
-# are lv9-inflated). docs/decisions.md "Party-side parity" / issue #45.
-BASE_DONOR = dict(STAT_DONOR, marty='CHARACTER_EWAN', meesmickle='CHARACTER_EWAN')
+# are lv9-inflated) and lupin takes Franz's L1 line over Kyle's L5 one. docs/decisions.md "Party-side parity" / issue #45.
+BASE_DONOR = dict(STAT_DONOR, marty='CHARACTER_EWAN', meesmickle='CHARACTER_EWAN',
+                  # Kyle's bases are his L5 Ch8 line; on lupin's level-1 ch04 join they ran
+                  # hot. Franz's L1 line is the join-appropriate Cavalier (#403, ADR 0321).
+                  lupin='CHARACTER_FRANZ')
 
 # GROWTH donor (the level-up curve). Same as the rank donor except Meesmickle, who grows
 # on EWAN's curve (-> Summoner: dodge/luck) while Marty keeps Knoll's (-> Druid: soak/nuke).
