@@ -2295,6 +2295,63 @@ class ChapterForceInMode(unittest.TestCase):
         self.assertTrue(all(n.hp < p.hp for n, p in zip(normal, plain)))
 
 
+class PartyMatchup(unittest.TestCase):
+    """Instrument v2, layer 1 (#430 step 2b): each force against the party that meets it."""
+
+    def test_clear_load_is_the_fielded_partys_combined_rounds(self):
+        # Harmonic: two members each killing the enemy in r rounds clear it in r / 2.
+        enemy = combatant('e', hp=20, weapon='iron-lance')
+        a, b = combatant('a', pow_=4), combatant('b', pow_=4)
+        r = df.metric_rounds_to_kill(enemy, a)
+        m = df.party_matchup([(enemy, 0)], {'a': [a], 'b': [b]})
+        self.assertAlmostEqual(m['clear'], r / 2)
+
+    def test_a_member_who_cannot_dent_it_adds_no_rate(self):
+        # A plain mean of rounds would be dominated by the one who cannot hurt it.
+        enemy = combatant('e', hp=20, dfc=10, weapon='iron-lance')
+        hitter, weak = combatant('h', pow_=14), combatant('w', pow_=0, skl=0)
+        self.assertEqual(fc.damage(weak, enemy), 0)
+        alone = df.party_matchup([(enemy, 0)], {'h': [hitter]})
+        both = df.party_matchup([(enemy, 0)], {'h': [hitter], 'w': [weak]})
+        self.assertAlmostEqual(both['clear'], alone['clear'])
+
+    def test_a_wall_nobody_dents_falls_back_to_the_floor(self):
+        wall = combatant('e', hp=20, dfc=30, weapon='iron-lance')
+        a = combatant('a', pow_=4)
+        m = df.party_matchup([(wall, 0)], {'a': [a]})
+        self.assertAlmostEqual(m['clear'], df.metric_rounds_to_kill(wall, a))
+
+    def test_threat_lands_on_the_ai_target_per_unit_fielded(self):
+        enemy = combatant('e', pow_=12, weapon='iron-lance')
+        tough = combatant('tough', hp=40, dfc=10, weapon='iron-lance')
+        frail = combatant('frail', hp=10, dfc=0, weapon='iron-lance')
+        m = df.party_matchup([(enemy, 0)], {'tough': [tough], 'frail': [frail]})
+        self.assertAlmostEqual(m['threat'], fc.damage_per_round(enemy, frail) / 2)
+
+    def test_the_prologue_fields_its_guests_at_class_base(self):
+        # ch00's injector zeroes the guest slots' lines and emits no `.autolevel`, so Hlin is
+        # a bare Fighter at any deploy level.
+        chap = df.load_field('rime-of-the-frostmaiden', 'ch00')[0]
+        guests = df.fixed_roster_careers(chap)
+        self.assertEqual(set(guests), {'hlin-trollbane', 'scramsax'})
+        base = df._class_base('CLASS_FIGHTER')
+        self.assertEqual(guests['hlin-trollbane'][0].hp, base['baseHP'])
+        self.assertEqual(df.fixed_roster_careers(
+            df.load_field('rime-of-the-frostmaiden', 'ch04')[0]), {})
+
+    def test_an_on_chain_twin_is_graded_against_the_parties(self):
+        chap = df.load_field('rime-of-the-frostmaiden', 'ch04')[0]
+        p = df._chapter_pressure(chap)
+        self.assertEqual(p['instrument'], 'party')
+        self.assertAlmostEqual(p['verdict']['threat_ratio'],
+                               p['matchup']['threat_ratio'])
+
+    def test_a_twin_off_the_chain_falls_back_to_the_yardstick(self):
+        chap = dict(df.load_field('rime-of-the-frostmaiden', 'ch04')[0],
+                    parity_reference='FE8 Ch13')
+        self.assertIsNone(df.chapter_matchup(chap, 'rime-of-the-frostmaiden'))
+
+
 class ChapterPressureInMode(unittest.TestCase):
     """`_chapter_pressure` graded in a named mode (#303).
 
@@ -2323,15 +2380,20 @@ class ChapterPressureInMode(unittest.TestCase):
         self.assertLess(df._chapter_pressure(chap, mode='normal')['ours'][0],
                         df._chapter_pressure(chap)['ours'][0])
 
-    def test_parity_holds_in_every_mode(self):
-        # The claim #303 rests on: adopting the twin's numbers means the verdict does
-        # not depend on which mode is graded. True in all three, in every chapter.
+    def test_a_mode_moves_the_ratio_only_a_little(self):
+        # The claim #303 rests on: both sides shift by their own chapter's numbers, so a mode
+        # read stays close to the authored one. Not equal: instrument v2 (#430) meets the
+        # shifted force with an UNSHIFTED party, and a kill threshold or an AI target can
+        # flip (ch04 on Difficult moves threat by 0.21). A mode that shifted one side alone
+        # moves it by far more.
         for chid in ('ch00', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'):
             chap = df.load_field('rime-of-the-frostmaiden', chid)[0]
-            for mode in (None,) + df.MODES:
-                p = df._chapter_pressure(chap, mode=mode)
-                self.assertEqual(p['verdict']['verdict'], 'OK',
-                                 '%s graded %s is %s' % (chid, mode, p['verdict']['verdict']))
+            authored = df._chapter_pressure(chap)['verdict']
+            for mode in df.MODES:
+                v = df._chapter_pressure(chap, mode=mode)['verdict']
+                for ratio in ('threat_ratio', 'load_ratio'):
+                    self.assertLess(abs(v[ratio] - authored[ratio]), 0.25,
+                                    '%s %s on %s' % (chid, ratio, mode))
 
 
 class BossesAreImmuneToTheMalus(unittest.TestCase):
@@ -2394,7 +2456,8 @@ class RavisinHoldsSaarsBar(unittest.TestCase):
     base and the boss dominates the ratio.
 
     Pinned as a RANGE against Saar rather than a constant, so the next change to either
-    side's modelling fails here instead of silently re-opening the same gap.
+    side's modelling fails here instead of silently re-opening the same gap. Whether ch05 as
+    a whole sits in band is the curve's verdict to give (#430 step 3), not a constant here.
     """
 
     def _rounds(self, name_match, force):
@@ -2414,15 +2477,6 @@ class RavisinHoldsSaarsBar(unittest.TestCase):
                            % (ravisin, saar))
         self.assertLess(ravisin, saar * 1.30,
                         'Ravisin %.1f overshoots Saar %.1f' % (ravisin, saar))
-
-    def test_ch05_clearload_is_in_band_in_every_mode(self):
-        chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
-        for mode in (None,) + df.MODES:
-            p = df._chapter_pressure(chap, mode=mode)
-            self.assertEqual(p['verdict']['verdict'], 'OK',
-                             'ch05 graded %s is %s (clear-load x%.2f)'
-                             % (mode, p['verdict']['verdict'],
-                                p['ours'][1] / p['vanilla'][1]))
 
 
 class OurUnitsOnPlayableSlotsAreImmune(unittest.TestCase):

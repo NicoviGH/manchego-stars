@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-315 decisions. Read this index, then open the two or three you need — the whole
+316 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -181,6 +181,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0313` | [ch06's west hull is 28 HP, because its fuse keeps vanilla Ch6's foot slack](decisions/0313-ch06-s-west-hull-keeps-vanilla-s-foot-slack.md) | 2026-10-02 | #26 #430 |
 | `0314` | [fe_combat reads the 2RN hit and the crit](decisions/0314-fe-combat-reads-the-2rn-hit-and-the-crit.md) | 2026-10-02 | #430 |
 | `0315` | [The exp guard walks vanilla's route once](decisions/0315-the-exp-guard-walks-vanillas-route-once.md) | 2026-10-02 | #430 |
+| `0316` | [Parity measures each force against the party that meets it](decisions/0316-parity-measures-each-force-against-the-party-that-meets-it.md) | 2026-10-02 | #430 |
 
 ---
 

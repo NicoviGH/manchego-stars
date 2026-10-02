@@ -9,8 +9,9 @@ Emblem map -- can we survive, can we kill, can we crack the boss.
 
     python3 tools/difficulty.py --chapter ch01
 
-HONEST LIMITS: this is a *static* proxy. It assumes every matchup happens, ignores
-positioning, turn order, terrain choice, healing, and enemy AI. It is a fast guardrail
+HONEST LIMITS: this is a *static* proxy. It assumes every matchup happens and ignores
+positioning, turn order, terrain choice and healing; of the enemy AI it models only whom a
+unit would attack (`ai_target`), not where it walks or when. It is a fast guardrail
 against authoring a chapter that drifts off vanilla parity -- NOT a substitute for the
 dynamic playtest harness (tools/playtest/), which is the real arbiter.
 
@@ -37,6 +38,7 @@ import inject.stats  # noqa: E402
 import argparse
 import json
 import sys
+import ai_target
 import fe_combat as fc
 from inject.decomp import WEAPON_ITEM_ENUM   # shared weapon<->ITEM map (seam-neutral)
 
@@ -818,6 +820,12 @@ def vanilla_enemies(parity_ref, mode=None):
     """The vanilla reference chapter's fightable red force as a flat list of Combatants
     (each projected off class base to its level). None if the reference isn't curated yet;
     enemies with no modeled weapon (staff/throwaway only) are dropped."""
+    bodies = vanilla_enemy_bodies(parity_ref, mode)
+    return None if bodies is None else [u for u, _ai in bodies]
+
+
+def vanilla_enemy_bodies(parity_ref, mode=None):
+    """`vanilla_enemies`, each unit paired with its 4 AI bytes: [(Combatant, ai)]."""
     spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
     if spec is None:
         return None
@@ -846,12 +854,13 @@ def vanilla_enemies(parity_ref, mode=None):
             # sides carry lines through different mechanisms. `inf` is no longer a hazard here:
             # metric_rounds_to_kill floors the damage rather than dropping the unit.
             ch = d.get('charIndex')
-            out.append(_enemy_from_enum('%s#%d[%s]' % (array_name, i, ch),
-                                        d['classIndex'], d['level'],
-                                        weapon, vanilla_personal_line(ch),
-                                        mode=mode, shifts=shifts,
-                                        shiftable=_takes_difficulty_shift(ch),
-                                        base_level=_character_base_level(ch)))
+            out.append((_enemy_from_enum('%s#%d[%s]' % (array_name, i, ch),
+                                         d['classIndex'], d['level'],
+                                         weapon, vanilla_personal_line(ch),
+                                         mode=mode, shifts=shifts,
+                                         shiftable=_takes_difficulty_shift(ch),
+                                         base_level=_character_base_level(ch)),
+                        d['ai']))
     return out
 
 
@@ -1270,6 +1279,21 @@ def chapter_units(chap, mode=None, shifts=None):
             for u in _entry_combatants(ed, mode=mode, shifts=shifts, real_article=True)]
 
 
+def chapter_enemy_bodies(chap, mode=None, shifts=None):
+    """`chapter_units`' force, each body paired with its combat-weight table (#430 step 2b):
+    [(Combatant, table)]. A body's AI is its own position's donor, so an entry whose donors
+    run different tables (ch01) is read body by body."""
+    out = []
+    for ed in chapter_roster_entries(chap):
+        bodies = _entry_combatants(ed, mode=mode, shifts=shifts, real_article=True,
+                                   drop_staff=False)
+        for index, unit in enumerate(bodies):
+            if unit.weapon is not None:
+                out.append((unit, ai_target.combat_weight_table(
+                    enemy_ai_bytes(chap, ed, index))))
+    return out
+
+
 def unmodeled_enemies(chap):
     """Enemy entries that contribute NO modeled-weapon units (so chapter_enemy_force drops
     them) -- returned as {id, is_boss} so the report can warn instead of silently skewing the
@@ -1417,19 +1441,27 @@ def dice_profile(careers, line, bosses):
     return out
 
 
+def career_pairing(counts):
+    """(n, {name: [career index] * n}) pairing each unit's careers into n joint careers.
+    `counts` maps a unit to how many careers it has. Each unit's careers are shuffled on a
+    seed of its own, so career i of one unit is independent of career i of another (they
+    share the growth RNG's seed); a unit with fewer careers wraps."""
+    n = max(counts.values())
+    order = {}
+    for name, k in counts.items():
+        perm = list(range(k))
+        random.Random('%d:%s' % (GROWTH_SEED, name)).shuffle(perm)
+        order[name] = [perm[i % k] for i in range(n)]
+    return n, order
+
+
 def dice_party(profiles):
     """A fielded party's metrics, once per joint career. `profiles` maps a unit to its
     `dice_profile`. Each unit's careers are shuffled on a seed of its own before they are
     paired, so career i of one unit is independent of career i of another (they share the
     growth RNG's seed). A unit with one career, one that has not levelled, is that career in
     every pairing."""
-    n = max(len(p['open']) for p in profiles.values())
-    order = {}
-    for name, p in profiles.items():
-        k = len(p['open'])
-        perm = list(range(k))
-        random.Random('%d:%s' % (GROWTH_SEED, name)).shuffle(perm)
-        order[name] = [perm[i % k] for i in range(n)]
+    n, order = career_pairing({name: len(p['open']) for name, p in profiles.items()})
     def joint(key, combine):
         return [combine(profiles[u][key][order[u][i]] for u in profiles) for i in range(n)]
     return {'throughput': joint('kill', sum),
@@ -1490,6 +1522,83 @@ def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
     threat = sum(fc.damage_per_round(e, yardstick) for e in enemies) / cap
     clearload = sum(metric_rounds_to_kill(e, yardstick) for e in enemies) / cap
     return threat, clearload
+
+
+def _stat_key(u):
+    return (u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con, u.weapon, u.tags)
+
+
+def party_matchup(bodies, careers):
+    """Instrument v2, layer 1 (#430 step 2b): a force measured against the party that meets it.
+
+    `bodies` is [(enemy Combatant, combat-weight table)], `careers` is {unit: [Combatant]} for
+    the FIELDED party, once per simulated career (ADR 0311). Per joint career:
+
+      threat/slot = sum over enemies of its damage per round against the unit FE8's AI would
+                    attack (`ai_target.pick_target`), / units fielded
+      clear-load  = sum over enemies of 1 / the field's COMBINED kill rate on it (the sum of
+                    1 / rounds): the party-rounds the force takes to clear. Harmonic, because
+                    a plain mean of rounds is dominated by whoever cannot dent the boss; a
+                    member who cannot dent it, or carries no weapon, adds no rate but stays a
+                    target. Only when NOBODY fielded can dent it does the rate fall back to
+                    `metric_rounds_to_kill`'s floor, the one place the cliff it exists for
+                    reappears.
+
+    Each side is normalised by its own field, so a twin that fields two units (vanilla's
+    prologue) is not divided by our eight. Returns {'threat', 'clear'} as averages over the
+    joint careers, and 'per_enemy': a (name, threat, clear, weapon) average for each body, in
+    order."""
+    names = list(careers)
+    armed = [m for m in names if careers[m][0].weapon is not None]
+    inf = float('inf')
+    # A pairing is read once per DISTINCT (enemy, member line) on the stats it reads, as
+    # `dice_profile` does: the AI's score reads the whole line, being hit reads Def, Res, Spd,
+    # Con and Lck, and hitting reads Pow, Skl, Spd, Con and Lck. The joint careers are then
+    # lookups. Identical enemy bodies share one read.
+    full = {m: [_stat_key(u) for u in careers[m]] for m in names}
+    struck = {m: [(u.df, u.res, u.spd, u.con, u.lck) for u in careers[m]] for m in names}
+    striking = {m: [(u.pow, u.skl, u.spd, u.con, u.lck) for u in careers[m]] for m in names}
+
+    def table(keys, fn):
+        return {m: {k: fn(u) for k, u in dict(zip(keys[m], careers[m])).items()}
+                for m in keys}
+
+    reads = {}
+    for e, weights in bodies:
+        key = (_stat_key(e), weights)
+        if key not in reads:
+            reads[key] = (
+                table(full, lambda u: ai_target.combat_score(e, u, weights)),
+                table(struck, lambda u: fc.damage_per_round(e, u)),
+                table({m: striking[m] for m in armed},
+                      lambda u: (fc.damage_per_round(u, e) / e.hp,
+                                 (lambda r: 0.0 if r == inf else 1.0 / r)(
+                                     metric_rounds_to_kill(e, u)))))
+    read = [reads[(_stat_key(e), weights)] for e, weights in bodies]
+    n, order = career_pairing({m: len(careers[m]) for m in names})
+    rank = {m: -i for i, m in enumerate(names)}         # ties go to the first, as in FE8
+    per = [[0.0, 0.0] for _ in bodies]
+    for i in range(n):
+        at = {m: order[m][i] for m in names}
+        for j, (score, dpr, inv) in enumerate(read):
+            target = max(names, key=lambda m: (score[m][full[m][at[m]]], rank[m]))
+            rates = [inv[m][striking[m][at[m]]] for m in armed]
+            rate = sum(r for r, _floor in rates) or sum(f for _r, f in rates)
+            per[j][0] += dpr[target][struck[target][at[target]]]
+            per[j][1] += 1.0 / rate if rate else inf
+    slots = max(1, len(names))
+    return {'threat': sum(p[0] for p in per) / n / slots,
+            'clear': sum(p[1] for p in per) / n,
+            'per_enemy': [(e.name, p[0] / n, p[1] / n, e.weapon.name)
+                          for (e, _t), p in zip(bodies, per)]}
+
+
+def fielded_careers(careers, force, deploy_cap):
+    """The `deploy_cap` units of an arriving party a player fields, by each unit's median
+    career (`_best_field`'s rule), with all of their careers: {unit: [Combatant]}."""
+    median = {m: c[len(c) // 2] for m, c in careers.items()}
+    field = _best_field(list(median.values()), force, deploy_cap)
+    return {u.name: careers[u.name] for u in field}
 
 
 def bulk_durability(unit, enemies):
@@ -1732,6 +1841,9 @@ def report(campaign, ch, mode=None):
         arriving = None
     chap, roster, line, bosses, deploy_limit, labels = load_field(
         campaign, ch, leveled=arriving is not None)
+    guests = fixed_roster_careers(chap)     # a fixed-roster chapter fields its guests, not us
+    if guests:
+        roster, deploy_limit = [c[0] for c in guests.values()], len(guests)
     num = chap.get('chapter_number')
     bar = '=' * 80
     print(bar)
@@ -1751,6 +1863,9 @@ def report(campaign, ch, mode=None):
     ours_lv = {uid: lv for uid, (_j, lv) in arriving['party'].items()} if arriving else {}
     ours_careers = (_party_careers(campaign, arriving['party']) if arriving
                     else {u.name: [u] for u in roster})
+    if guests:
+        ours_careers = guests
+        ours_lv = {pu['id']: pu.get('level', 1) for pu in chap.get('player_units') or []}
     profiles = {uid: dice_profile(c, line, bosses) for uid, c in ours_careers.items()}
     _print_cast('OUR CAST, AS IT ARRIVES (class base + donor line, grown to the exp model\'s '
                 'typical level)', roster, ours_lv, line, profiles)
@@ -1794,16 +1909,21 @@ def report(campaign, ch, mode=None):
         print('\n(no vanilla reference field for Ch%s (parity_reference=%r) -- delta skipped)'
               % (num, ref))
 
-    _print_pressure(_chapter_pressure(chap))
+    _print_pressure(_chapter_pressure(chap, campaign=campaign))
     print_role_findings(chap, chap.get('parity_reference'))  # authored table; see banner
     _print_economy(chap)
     _print_dynamics(chap)
 
 
-def _chapter_pressure(chap, band=0.25, mode=None):
+def _chapter_pressure(chap, band=0.25, mode=None, campaign='rime-of-the-frostmaiden'):
     """Enemy-pressure parity for one loaded chapter dict: our force vs its parity_reference's
-    vanilla force, threat/slot + clear-load/slot, with a verdict. `vanilla` is None when the
-    reference isn't curated yet (#48 registry).
+    vanilla force, threat + clear-load, with a verdict. `vanilla` is None when the reference
+    isn't curated yet (#48 registry).
+
+    The instrument is instrument v2 (#430 step 2b, `chapter_matchup`): each force against the
+    party that meets it. `instrument` says which one graded the row; 'yardstick' -- every
+    force against one fixed swordsman -- remains only for a twin off VANILLA_CHAIN, whose
+    party is not simulated.
 
     `mode` grades a DIFFICULTY MODE instead of the authored table (#303). Each side is
     shifted by its own chapter's numbers -- ours from the YAML `difficulty:` block, the
@@ -1820,12 +1940,102 @@ def _chapter_pressure(chap, band=0.25, mode=None):
     out = {'reference': ref, 'deploy_cap': deploy_cap, 'ours': ours, 'mode': mode,
            'n_ours': len(ours_force), 'vanilla': None, 'mirror': mirror_share(chap),
            'dropped': unmodeled_enemies(chap)}
+    out['instrument'] = 'yardstick'
     if van is not None:
         out['vanilla'] = enemy_pressure(van, deploy_cap)
         out['n_vanilla'] = len(van)
-        out['verdict'] = pressure_verdict(ours, out['vanilla'], band)
         out['solo'] = solo_contributors(chap, ref, deploy_cap)
+        matchup = chapter_matchup(chap, campaign, mode=mode)
+        if matchup is not None:
+            out.update(instrument='party', matchup=matchup,
+                       ours=(matchup['ours']['threat'], matchup['ours']['clear']),
+                       vanilla=(matchup['vanilla']['threat'], matchup['vanilla']['clear']))
+        out['verdict'] = pressure_verdict(out['ours'], out['vanilla'], band)
     return out
+
+
+def fixed_roster_careers(chap):
+    """{unit: [Combatant]} for a fixed-roster chapter's `player_units` (ch00's guests), or {}
+    for a chapter the party deploys into. The prologue's injector zeroes each guest slot's
+    personal line and its UnitDefinition carries no `.autolevel` (`_prologue_roster_blocks`),
+    so a guest fights at its bare class base at any level: one career, no growth."""
+    out = {}
+    for pu in chap.get('player_units') or []:
+        class_enum = _enemy_class_enum(pu['class'])
+        out[pu['id']] = [_stats_to_combatant(pu['id'], _class_base(class_enum),
+                                             _weapon_for(pu.get('inventory')),
+                                             CLASS_TAGS.get(class_enum, frozenset()))]
+    return out
+
+
+def chapter_matchup(chap, campaign, mode=None):
+    """The headline parity ratio (#430 step 2b): (our force vs our arriving party) /
+    (the twin's force vs the twin's arriving party), threat and clear-load.
+
+    None for a twin off VANILLA_CHAIN (ch08 -> FE8 Ch13: vanilla's party there is not
+    simulated), or when the exp model refuses to price our party -- the caller falls back
+    to the fixed YARDSTICK and says so."""
+    ref = chap.get('parity_reference')
+    if ref not in VANILLA_CHAIN:
+        return None
+    # Keyed on the chapter's CONTENT, not its id: a test or canary that doctors a chapter
+    # dict must not be served the undoctored reading.
+    key = (campaign, mode, json.dumps(chap, sort_keys=True, default=str))
+    if key not in _MATCHUPS:
+        _MATCHUPS[key] = _chapter_matchup(chap, campaign, mode)
+    return _MATCHUPS[key]
+
+
+_MATCHUPS = {}
+
+
+def _chapter_matchup(chap, campaign, mode):
+    import exp_curve                        # exp_curve imports this module
+    ref = chap.get('parity_reference')
+    try:
+        arriving = exp_curve.entering(campaign, int(chap['chapter_number']), ref)
+    except ValueError:
+        return None
+    if not arriving['party'] or arriving['vanilla'] is None:
+        return None
+    cap = chapter_deploy_limit(chap, len(ROSTER))
+    guests = fixed_roster_careers(chap)
+    shifts = inject.chapter_settings.chapter_difficulty_shifts(chap) if mode else None
+    our_force = chapter_enemy_bodies(chap, mode=mode, shifts=shifts)
+    our_field = fielded_careers(guests or _party_careers(campaign, arriving['party']),
+                                [u for u, _t in our_force], cap)
+    ours = party_matchup(our_force, our_field)
+    van, van_field = vanilla_matchup(ref, arriving['vanilla'], cap, mode)
+    return {'ours': ours, 'vanilla': van, 'field': (list(our_field), van_field),
+            'threat_ratio': ours['threat'] / van['threat'] if van['threat'] else float('inf'),
+            'load_ratio': ours['clear'] / van['clear'] if van['clear'] else float('inf')}
+
+
+def vanilla_matchup(parity_ref, levels, deploy_cap, mode=None):
+    """The twin's half of `chapter_matchup`: its force against its own arriving party at
+    `levels` (`exp_curve.entering`'s 'vanilla'). Returns (party_matchup, fielded names)."""
+    force = [(u, ai_target.combat_weight_table(ai))
+             for u, ai in vanilla_enemy_bodies(parity_ref, mode)]
+    field = fielded_careers(vanilla_party_careers(parity_ref, levels),
+                            [u for u, _t in force], deploy_cap)
+    return party_matchup(force, field), list(field)
+
+
+def planned_target(chap, campaign):
+    """The parity target a `status: planned` chapter must hit: its twin's force against the
+    twin's arriving party (`vanilla_matchup`), as {'threat', 'clear'}. None off VANILLA_CHAIN
+    or where the exp model cannot place the chapter."""
+    import exp_curve                        # exp_curve imports this module
+    ref = chap.get('parity_reference')
+    if ref not in VANILLA_CHAIN:
+        return None
+    try:
+        levels = exp_curve.entering(campaign, int(chap['chapter_number']), ref)['vanilla']
+    except ValueError:
+        return None
+    if levels is None:
+        return None
+    return vanilla_matchup(ref, levels, chapter_deploy_limit(chap, len(ROSTER)))[0]
 
 
 def _warn_dropped(dropped, indent='  '):
@@ -1835,6 +2045,19 @@ def _warn_dropped(dropped, indent='  '):
         tag = '!! BOSS DROPPED -- verdict UNRELIABLE' if d['is_boss'] else 'dropped'
         print('%sWARN: %s (%s -- no modeled weapon; add fe_base in its YAML inventory)'
               % (indent, d['id'], tag))
+
+
+def _heaviest(side, top=3):
+    """The units carrying the most of a side's clear-load, bodies of one unit summed, with
+    their share of it. A named vanilla body reads by its charIndex (`...#3[CHARACTER_SAAR]`);
+    a generic's charIndex is a bare pid, so it reads by the weapon it carries."""
+    load = collections.Counter()
+    for name, _t, clear, weapon in side['per_enemy']:
+        label = name[name.index('[') + 1:-1] if '[' in name else name
+        load['%s generic' % weapon if label.startswith('0x') else label] += clear
+    total = sum(load.values()) or 1.0
+    return ', '.join('%s %.0f%%' % (n.replace('CHARACTER_', '').lower(), 100 * c / total)
+                     for n, c in load.most_common(top))
 
 
 def _print_pressure(p):
@@ -1849,12 +2072,29 @@ def _print_pressure(p):
         return
     vt, vl = p['vanilla']
     v = p['verdict']
-    print('  vanilla %-11s (%2d enemies): threat/slot %4.1f · clear-load/slot %4.1f'
-          % (p['reference'], p['n_vanilla'], vt, vl))
-    print('  ours    %-11s (%2d enemies): threat/slot %4.1f (x%.2f %s) · '
-          'clear-load/slot %4.1f (x%.2f %s)'
-          % ('', p['n_ours'], ot, v['threat_ratio'], v['threat'],
-             ol, v['load_ratio'], v['load']))
+    if p['instrument'] == 'party':
+        mu = p['matchup']
+        ours_field, van_field = mu['field']
+        print('  each force against the party that meets it (instrument v2, #430): threat = '
+              'damage/round\n  on the unit FE8\'s AI targets, per unit fielded · clear-load = '
+              'party-rounds to clear')
+        print('  vanilla %-11s (%2d enemies vs %s): threat %4.1f · clear-load %4.1f'
+              % (p['reference'], p['n_vanilla'], '/'.join(van_field), vt, vl))
+        print('  ours    %-11s (%2d enemies vs %s): threat %4.1f (x%.2f %s) · '
+              'clear-load %4.1f (x%.2f %s)'
+              % ('', p['n_ours'], '/'.join(ours_field), ot, v['threat_ratio'], v['threat'],
+                 ol, v['load_ratio'], v['load']))
+        for tag, side in (('ours', mu['ours']), ('vanilla', mu['vanilla'])):
+            print('  heaviest (%s): %s' % (tag, _heaviest(side)))
+    else:
+        print('  vanilla %-11s (%2d enemies): threat/slot %4.1f · clear-load/slot %4.1f'
+              % (p['reference'], p['n_vanilla'], vt, vl))
+        print('  ours    %-11s (%2d enemies): threat/slot %4.1f (x%.2f %s) · '
+              'clear-load/slot %4.1f (x%.2f %s)'
+              % ('', p['n_ours'], ot, v['threat_ratio'], v['threat'],
+                 ol, v['load_ratio'], v['load']))
+        print('  (fixed YARDSTICK -- %s is off VANILLA_CHAIN, so its party is not simulated)'
+              % p['reference'])
     m = p.get('mirror')
     if m:
         # WHAT THE RATIOS ABOVE CANNOT SAY (#367): a ratio is an aggregate over stats, so a
@@ -1862,7 +2102,10 @@ def _print_pressure(p):
         print('  mirror: %.0f%% of %s\'s force reproduced exactly (%d of %d bodies, class '
               '+ level)' % (m['pct'], p['reference'], m['shared'], m['twin']))
         if m['pct'] >= 90:
-            print('          -- at this share the verdict is largely a CHECKSUM on the donor '
+            print('          -- at this share the two forces are near-identical, so the ratio '
+                  'measures the\n             PARTIES that meet them, not the force.' if
+                  p['instrument'] == 'party' else
+                  '          -- at this share the verdict is largely a CHECKSUM on the donor '
                   'pipeline,\n             not evidence about the chapter.')
     print('  verdict: %s' % ('PARITY (within band)' if v['verdict'] == 'OK'
                              else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
@@ -2645,7 +2888,7 @@ def curve_report(campaign, band=0.25, mode=None):
               % mode.upper())
     print(bar)
     print('  %-22s %-13s %-15s %-17s %-7s %s'
-          % ('chapter', 'reference', 'threat/slot', 'clear-load/slot', 'mirror', 'verdict'))
+          % ('chapter', 'reference', 'threat', 'clear-load', 'mirror', 'verdict'))
     chaps = []
     for path in paths:
         chaps.append(chapter_schema.load(path))
@@ -2664,6 +2907,11 @@ def curve_report(campaign, band=0.25, mode=None):
             # computable now (#123): print the reference's own pressure as the forward
             # target the authored chapter must hit within the band. Never gates.
             ref = chap.get('parity_reference', '?') or '?'
+            target = planned_target(chap, campaign)
+            if target is not None:
+                print('  %-22s %-13s %4.1f (target)    %4.1f (target)      %-7s planned'
+                      % (label[:22], ref[:13], target['threat'], target['clear'], '--'))
+                continue
             proj = vanilla_projection(ref, chapter_deploy_limit(chap, len(ROSTER)))
             if proj is None:
                 print('  %-22s %-13s   -- planned (seed; reference not curated yet) --'
@@ -2671,10 +2919,11 @@ def curve_report(campaign, band=0.25, mode=None):
             else:
                 note = (' (%d yardstick-proof units, clear-load floored)'
                         % proj['proof']) if proj['proof'] else ''
+                note = ' [fixed YARDSTICK: off VANILLA_CHAIN]' + note
                 print('  %-22s %-13s %4.1f (target)    %4.1f (target)      %-7s planned%s'
                       % (label[:22], ref[:13], proj['threat'], proj['clearload'], '--', note))
             continue
-        p = _chapter_pressure(chap, band, mode=mode)
+        p = _chapter_pressure(chap, band, mode=mode, campaign=campaign)
         ot, ol = p['ours']
         boss_drop = any(d['is_boss'] for d in p['dropped'])
         any_dropped_boss = any_dropped_boss or boss_drop

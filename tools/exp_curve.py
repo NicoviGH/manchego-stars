@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """The campaign's EXP economy, and the party-level band derived from it (#367 proposal 3).
 
-`difficulty.py`'s parity ratio answers *is this chapter's force at parity with its vanilla
-twin*. It says nothing about what the party BRINGS to that force: it compares two enemy forces
-against a fixed yardstick and reads no party at all.
+`difficulty.py`'s parity ratio answers *is this chapter at parity with its vanilla twin*, and
+since ADR 0316 it answers it against the party this module says arrives: ours against ours,
+the twin's against vanilla's.
 
-So every ABSOLUTE question -- *can this unit survive that trip, is this fuse long enough for
+Every ABSOLUTE question -- *can this unit survive that trip, is this fuse long enough for
 a real party, is this objective a coin flip* -- needs the party's level, and had none. During
 #26 a ch06-era flier was assessed off her LEVEL 1 stat line and a chapter's design nearly
 turned on it. `entering` hands that level to `difficulty.load_field(leveled=True)`.

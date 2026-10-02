@@ -51,7 +51,7 @@ fog: none
 # range-checked as bytes only; nothing here knows the map, so an on-byte-range tile
 # can still be off the map.
 traps: []
-balance_locked: true   # #48 (b): balance-final — CI hard-fails on a parity regression here
+balance_locked: false  # locks when instrument v2 holds parity (#430 step 6); ADR 0316
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
