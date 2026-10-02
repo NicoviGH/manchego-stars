@@ -17,6 +17,7 @@ from inject.maps import (
     _inject_tile_changes, _map_changes_tileset, _register_chapter_map, _snowy_metatile_for)
 from inject.paths import (
     CH4_EVENTSCRIPT_H, CH5_EVENTINFO_H, CH5_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT)
+from inject.raw_pids import entry_body_levels
 from inject.recruit import (
     assert_custom_art_pid_wired, on_map_talk_recruits, parley_recruiters, talk_recruit_wiring)
 from inject.scenes import (
@@ -317,6 +318,7 @@ def ch04_enemy_rows(chap, arrives_turn=None):
             key = item.get('fe_base') or item['id']
             inventory.append(CH04_ITEM_IDS[key])
         drop = enemy.get('item_drop')
+        levels = entry_body_levels(enemy)
         for index, (x, y) in enumerate(enemy['positions']):
             ai = enemy_ai_initialiser(chap, enemy, index)
             items = list(inventory)
@@ -324,7 +326,7 @@ def ch04_enemy_rows(chap, arrives_turn=None):
             if is_dropper:
                 items.append(CH04_ITEM_IDS[drop])
             rows.append(_enemy_unit_entry(
-                pid, cls, int(enemy['level']), bool(enemy.get('autolevel')),
+                pid, cls, levels[index], bool(enemy.get('autolevel')),
                 x, y, ', '.join(items) or '0', ai,
                 ' /* %s -- %s */' % (enemy['id'], enemy['name']),
                 itemdrop=is_dropper))

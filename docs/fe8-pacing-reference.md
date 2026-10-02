@@ -222,7 +222,7 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
 | ch01 | FE8 Ch1 | 4 | 370 / 378 (x0.98) | L1 | **L1** | L3 | -- |
 | ch02 | FE8 Ch2 | 5 | 417 / 417 (x1.00) | L1 | **L2** | L4 | L1 |
 | ch03 | FE8 Ch3 | 9 | 386 / 419 (x0.92) | L2 | **L3** | L5 | L1 |
-| ch04 | FE8 Ch4 | 9 | 833 / 815 (x1.02) | L2 | **L4** | L7 | L1 |
+| ch04 | FE8 Ch4 | 9 | 826 / 815 (x1.01) | L2 | **L4** | L7 | L1 |
 | ch05 | FE8 Ch5 | 9 | 964 / 902 (x1.07) | L3 | **L5** | L9 | L1 |
 | ch06 | FE8 Ch6 | 10 | 1078 / 1078 (x1.00) | L3 | **L6** | L11 | L1 |
 
