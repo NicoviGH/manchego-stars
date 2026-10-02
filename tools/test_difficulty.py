@@ -1726,6 +1726,28 @@ class BattlefieldDynamics(unittest.TestCase):
         self.assertEqual(turns['UnitDef_088B4C88'], 2)     # the timed Bonewalker wave
         self.assertTrue(all(t > 1 for t in turns.values()))
 
+    def test_a_zone_wave_arrives_after_the_partys_earliest_entry(self):
+        # Ch1's wave waits on EVFLAG_TMP(11), which only EIRIKA clears by ending a move in
+        # (0,0)-(7,9). From (12,9) at Mov 5 she reaches x=8 on turn 1 and the zone on turn 2,
+        # so it loads on turn 3 -- the turn ch01 authors, not #177's flat turn-2 placeholder.
+        self.assertEqual(df._vanilla_reinforcement_turns('ch1')['UnitDef_Event_Ch1EnemyReinforce'], 3)
+        self.assertEqual(df._zone_entry_turn('FE8 Ch1', (0, 0, 7, 9), 'CHARACTER_EIRIKA'), 2)
+        # Ch4's Revenants open for ANY blue unit (UnTriggerIfNotFaction).
+        self.assertEqual(df._vanilla_reinforcement_turns('ch4')['UnitDef_088B4C24'], 3)
+
+    def test_who_sets_off_a_zone(self):
+        self.assertEqual(df._zone_trigger('SVAL(EVT_SLOT_2, CHARACTER_EIRIKA)\n'
+                                          '    CALL(EventScr_UnTriggerIfNotUnit)'),
+                         'CHARACTER_EIRIKA')
+        self.assertIsNone(df._zone_trigger('SVAL(EVT_SLOT_2, 0x0)\n'
+                                           '    CALL(EventScr_UnTriggerIfNotFaction)'))
+
+    def test_flags_read_in_every_spelling(self):
+        self.assertEqual(df._flag_number('EVFLAG_TMP(11)'), 11)
+        self.assertEqual(df._flag_number('0xb'), 11)
+        self.assertEqual(df._flag_number('EVFLAG_WIN'), 'EVFLAG_WIN')
+        self.assertFalse(df._is_flag_gated('0x0'))       # Ch1's turn-2 ally event is a fixed turn
+
     def test_ch4_groups_split_the_seven_reinforcements(self):
         # 16 turn-1 line + (3 Bonewalkers + 4 Revenants) reinforcements = the full 23-monster force.
         g = df.vanilla_enemy_groups('FE8 Ch4')

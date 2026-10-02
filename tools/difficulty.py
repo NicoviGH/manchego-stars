@@ -2720,18 +2720,110 @@ def _vanilla_convertible_chars(stem):
         r'CHAR\([^,]+,\s*\w+,\s*CHARACTER_\w+,\s*(CHARACTER_\w+)\)', info)}
 
 
-# A reinforcement that arrives on ZONE-ENTRY (a monster-hunt / room-breach trigger) rather than
-# on a fixed turn -- Ch4 "Ancient Horrors"' Revenant wave. Modeled as an arrival > turn 1 so it
-# lands in the reinforcement split, not the turn-1 line; the exact value is immaterial to the
-# metric (dynamic_pressure only splits on turn == 1 vs > 1). #177.
-_ZONE_ENTRY_TURN = 2
+# ── The twin's board (#430 step 2b) ──────────────────────────────────────────────
+
+def vanilla_layout(parity_ref):
+    """The twin's map layout: its chapter settings' `mainLayerId` into `gChapterDataAssetTable`,
+    both read at HEAD so our repointed chapters cannot shift the index."""
+    import map_tileset_tool
+    name = _vanilla_internal_name(parity_ref)
+    settings = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
+    chapter = next(c for c in settings['chapters'] if c.get('internalName') == name)
+    return map_tileset_tool._asset_names(inject.decomp.SUBMODULE, vanilla=True)[chapter['map']['mainLayerId']]
+
+
+def vanilla_terrain(parity_ref):
+    """The twin's terrain grid, [y][x] terrain ids."""
+    import map_tileset_tool
+    w, h, cells, terrain = map_tileset_tool.vanilla_layout_data(inject.decomp.SUBMODULE,
+                                                   vanilla_layout(parity_ref))
+    return [[terrain[cells[y * w + x]] for x in range(w)] for y in range(h)]
+
+
+def vanilla_front(parity_ref):
+    """The twin's deploy front: every tile of the table its `ChapterEventGroup` names as
+    `playerUnitsInNormal` -- the decomp's own answer. Scanning the eventscript for blue units
+    instead finds cutscene arrays (the Prologue's throne room) and another chapter's table
+    (vanilla Ch5 also loads `UnitDef_Event_Ch4Ally`)."""
+    return sorted({tuple(d['position']) for d in vanilla_deploy_party(parity_ref)
+                   if None not in d['position']})
+
+
+def vanilla_deploy_party(parity_ref):
+    """The twin's `playerUnitsInNormal` table, parsed (`vanilla_unit_defs`)."""
+    stem = PARITY_REFERENCE_STEM[parity_ref]
+    info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    table = re.search(r'\.playerUnitsInNormal\s*=\s*(UnitDef_\w+)', info).group(1)
+    return vanilla_udefs_named(stem, table)
+
+
+# A wave that waits for a ZONE: an AREA entry fires when a player unit ENDS its move inside its
+# box (`EvCheck0B_AREA`, bounds inclusive). Its script either loads the wave itself (it acts
+# that enemy phase) or clears the temp flag a gated TURN event waits on (it loads the next
+# player phase: Ch1's wave on EVFLAG_TMP(11), Ch4's Revenants on 8). The turn is the party's
+# EARLIEST entry, walking at full pace from the twin's deploy front on an empty map -- the
+# same floor `foot_reach` reads everywhere else. #177 modelled it as a flat turn 2; #440's
+# timeline then read that placeholder as vanilla's turn and misfiled ch01's wave as late.
+_ZONE_HORIZON = 30          # turns walked before a zone counts as unreachable
+
+
+def _flag_number(token):
+    """`EVFLAG_TMP(11)` / `11` / `0xb` -> 11 (EVFLAG_TMP(flag) is (flag), event-flags.h); a
+    named flag (`EVFLAG_WIN`) stays its name."""
+    m = re.fullmatch(r'\s*(?:EVFLAG_TMP\(\s*(\w+)\s*\)|(\w+))\s*', token)
+    if not m:
+        return token.strip()
+    word = m.group(1) or m.group(2)
+    try:
+        return int(word, 0)
+    except ValueError:
+        return word
+
+
+def _area_events(info):
+    """[(script, (x1, y1, x2, y2))] for every AREA entry of an eventinfo."""
+    return [(m.group(1), tuple(int(v, 0) for v in m.group(2, 3, 4, 5)))
+            for m in re.finditer(r'AREA\(\s*[^,]+?\s*,\s*(\w+)\s*,\s*(\w+)\s*,\s*(\w+)\s*,'
+                                 r'\s*(\w+)\s*,\s*(\w+)\s*\)', info)]
+
+
+def _zone_trigger(block):
+    """The CHARACTER_ an AREA script answers to (`EventScr_UnTriggerIfNotUnit`), or None when
+    any player unit sets it off (Ch4 guards on the faction only)."""
+    m = re.search(r'SVAL\(\s*EVT_SLOT_2\s*,\s*(CHARACTER_\w+)\s*\)\s*'
+                  r'CALL\(\s*EventScr_UnTriggerIfNotUnit\s*\)', block)
+    return m.group(1) if m else None
+
+
+def _zone_entry_turn(parity_ref, box, trigger=None):
+    """The first player turn a unit of the twin's deploy party (`trigger` alone, if named) can
+    end its move inside `box`, walking its class's cost table turn by turn. None if no one
+    can within _ZONE_HORIZON."""
+    import map_placement_preview as pp
+    terrain = vanilla_terrain(parity_ref)
+    x1, y1, x2, y2 = box
+    inside = lambda c: min(x1, x2) <= c[0] <= max(x1, x2) and min(y1, y2) <= c[1] <= max(y1, y2)
+    best = None
+    for d in vanilla_deploy_party(parity_ref):
+        if None in d['position'] or (trigger and d['charIndex'] != trigger):
+            continue
+        table, mov = pp.class_movement(d['classIndex'][len('CLASS_'):].lower())
+        cost = pp.mov_cost_row(table)
+        reached = {tuple(d['position'])}
+        for turn in range(1, _ZONE_HORIZON + 1):
+            walk = pp.foot_reach(terrain, sorted(reached), cost=cost)
+            reached = {c for c, spent in walk.items() if spent <= mov}
+            if any(inside(c) for c in reached):
+                best = turn if best is None else min(best, turn)
+                break
+    return best
 
 
 def _is_flag_gated(eid):
-    """A turn/area event with a temp-flag condition (EVFLAG_TMP(n) etc.) only fires once that
-    flag is set mid-map -- so a flag-gated turn event is a triggered reinforcement, not a fixed
-    turn-1 spawn. `0` / EVFLAG_NONE mean unconditional."""
-    return eid.strip() not in ('0', 'EVFLAG_NONE')
+    """A turn event with a flag fires only while that flag is CLEAR, and sets it when it runs.
+    The twins set it in the opening scene and an AREA script clears it, so a flag-gated turn
+    event is a zone-triggered wave, not a turn-1 spawn. `0` / EVFLAG_NONE mean unconditional."""
+    return _flag_number(eid) not in (0, 'EVFLAG_NONE')
 
 
 def _player_turn_events(info):
@@ -2746,35 +2838,44 @@ def _player_turn_events(info):
             yield m.group(1), m.group(2), int(m.group(3))
 
 
-def _area_event_scripts(info):
-    """The event scripts a zone/area trigger runs -- AREA (zone-entry) and AFEV (flag) entries.
-    A unit array these LOAD is a zone-triggered reinforcement (#177). (Ch4's AREA sets the flag
-    its gated TURN reads, so the load is caught there too -- this also covers chapters whose AREA
-    script loads the array directly.)"""
-    return [m.group(1) for m in re.finditer(r'(?:AREA|AFEV)\(\s*[^,]+?\s*,\s*(\w+)', info)]
-
-
 def _vanilla_reinforcement_turns(stem):
     """{UnitDef array -> arrival turn} for enemy arrays that are NOT on the field at turn 1:
-    player-phase turn events past turn 1 (Ch5's 2/6/8 waves), plus area/zone-triggered spawns --
-    a temp-flag-gated turn event or an AREA load (Ch4 "Ancient Horrors"' Revenant wave), which
-    arrive on zone-entry and are modeled as _ZONE_ENTRY_TURN (#177). Turn-1 unconditional events
-    (the initial line force) contribute nothing."""
+    player-phase turn events past turn 1 (Ch5's 2/6/8 waves), plus zone-triggered waves (Ch1's
+    west wave, Ch4 "Ancient Horrors"' Revenants), which arrive on the party's earliest entry
+    into their AREA (#177; see _zone_entry_turn). Turn-1 unconditional events (the initial
+    line force) contribute nothing."""
     info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    ref = {v: k for k, v in PARITY_REFERENCE_STEM.items()}[stem]
+    areas = [(scr, box, _event_block(script, scr)) for scr, box in _area_events(info)]
+
+    def entry(box, block, after):
+        turn = _zone_entry_turn(ref, box, _zone_trigger(block))
+        return None if turn is None else turn + after
+
     out = {}
     for eid, scr, turn in _player_turn_events(info):
         if _is_flag_gated(eid):
-            arrival = _ZONE_ENTRY_TURN     # only fires once an area trigger sets its flag
+            # gated on a flag an AREA clears: it loads the player phase after the entry
+            flag = _flag_number(eid)
+            turns = [entry(box, block, 1) for _, box, block in areas
+                     if any(_flag_number(f) == flag
+                            for f in re.findall(r'ENUF\(\s*([^)]*\)?)\s*\)', block))]
+            turns = [t for t in turns if t is not None]
+            if not turns:
+                continue                   # no reachable zone opens it: it never loads
+            arrival = min(turns)
         elif turn > 1:
             arrival = turn
         else:
             continue                       # unconditional turn-1 event = the initial line
         for arr in re.findall(r'UnitDef_\w+', _event_block(script, scr)):
             out[arr] = arrival
-    for scr in _area_event_scripts(info):  # an AREA/AFEV script that loads a force directly
-        for arr in re.findall(r'UnitDef_\w+', _event_block(script, scr)):
-            out.setdefault(arr, _ZONE_ENTRY_TURN)
+    for scr, box, block in areas:          # an AREA script that loads a force directly
+        for arr in re.findall(r'UnitDef_\w+', block):
+            turn = entry(box, block, 0)
+            if turn is not None:
+                out.setdefault(arr, turn)
     return out
 
 

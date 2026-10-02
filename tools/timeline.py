@@ -25,9 +25,7 @@ than this reads; the comparison holds because the twin is read the same way.
 import argparse
 import collections
 import dataclasses
-import json
 import os
-import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -37,27 +35,11 @@ import difficulty as dif                                             # noqa: E40
 import fe_combat as fc                                               # noqa: E402
 import inject.decomp                                                 # noqa: E402
 import map_placement_preview as pp                                   # noqa: E402
-import map_tileset_tool as mtt                                       # noqa: E402
 
 HORIZON = 8                 # enemy phases read; FE8's early chapters are won in about this
 
 
 # ── The twin's board ──────────────────────────────────────────────────────────────
-
-def vanilla_layout(parity_ref):
-    """The twin's map layout: its chapter settings' `mainLayerId` into `gChapterDataAssetTable`,
-    both read at HEAD so our repointed chapters cannot shift the index."""
-    name = dif._vanilla_internal_name(parity_ref)
-    settings = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
-    chapter = next(c for c in settings['chapters'] if c.get('internalName') == name)
-    return mtt._asset_names(inject.decomp.SUBMODULE, vanilla=True)[chapter['map']['mainLayerId']]
-
-
-def vanilla_terrain(parity_ref):
-    w, h, cells, terrain = mtt.vanilla_layout_data(inject.decomp.SUBMODULE,
-                                                   vanilla_layout(parity_ref))
-    return [[terrain[cells[y * w + x]] for x in range(w)] for y in range(h)]
-
 
 def vanilla_bodies(parity_ref, mode=None):
     """The twin's red force as `danger_map.Body`s: each unit at the end of its REDA walk,
@@ -89,18 +71,6 @@ def vanilla_bodies(parity_ref, mode=None):
                                d['ai'][0], turns.get(array, 1), table, mov,
                                tuple(dataclasses.replace(unit, weapon=w) for w in weapons)))
     return out
-
-
-def vanilla_front(parity_ref):
-    """The twin's deploy front: every tile of the table its `ChapterEventGroup` names as
-    `playerUnitsInNormal` -- the decomp's own answer. Scanning the eventscript for blue units
-    instead finds cutscene arrays (the Prologue's throne room) and another chapter's table
-    (vanilla Ch5 also loads `UnitDef_Event_Ch4Ally`)."""
-    stem = dif.PARITY_REFERENCE_STEM[parity_ref]
-    info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-    table = re.search(r'\.playerUnitsInNormal\s*=\s*(UnitDef_\w+)', info).group(1)
-    return sorted({tuple(d['position']) for d in dif.vanilla_udefs_named(stem, table)
-                   if None not in d['position']})
 
 
 def our_front(chapter):
@@ -153,14 +123,14 @@ def chapter_timeline(chapter, campaign, mode=None, horizon=HORIZON):
     except pp.MapNotCompiled:
         return None
     ref = chapter['parity_reference']
-    van_board = dm.Board(None, terrain=vanilla_terrain(ref),
+    van_board = dm.Board(None, terrain=dif.vanilla_terrain(ref),
                          fielded=vanilla_bodies(ref, mode))
     ours_force = [u for u, _t in fields['our_force']]
     van_force = [u for u, _t in fields['van_force']]
     return {
         'ours': read(ours_board, our_front(chapter),
                      _softest(fields['our_field'], ours_force), horizon),
-        'vanilla': read(van_board, vanilla_front(ref),
+        'vanilla': read(van_board, dif.vanilla_front(ref),
                         _softest(fields['van_field'], van_force), horizon),
         'horizon': horizon}
 
