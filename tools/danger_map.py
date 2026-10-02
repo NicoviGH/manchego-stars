@@ -133,7 +133,7 @@ def bodies(chapter, mode=None, every_mode=False):
                                                and mode != 'difficult'):
                 continue
             arrives = (1 if inject.raw_pids.entry_is_turn1(key, enemy) else
-                       int(enemy.get('arrives_turn') or enemy.get('trigger_turn') or 1))
+                       inject.raw_pids.entry_arrival_turn(enemy))
             units = dif._entry_combatants(enemy, mode=mode, shifts=shifts, real_article=True,
                                           drop_staff=False)
             for index, tile in enumerate(enemy.get('positions') or ()):

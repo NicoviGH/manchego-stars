@@ -2688,8 +2688,8 @@ def _print_economy(chap):
 # The static bar counts every enemy as a turn-1 kill. Two vanilla set-pieces break that: a
 # CONVERTIBLE enemy (Joshua/Sahnar) you recruit rather than grind, and REINFORCEMENTS that
 # arrive over turns instead of alpha-striking. Both auto-detected from HEAD for the twin (CHAR
-# macro targets / TurnEventPlayer-loaded arrays) and read from `convertible`/`arrives_turn` in
-# our YAML. Additive view: the static ENEMY-PRESSURE verdict is unchanged (so already-locked
+# macro targets / TurnEventPlayer-loaded arrays) and read from `convertible` and the declared
+# arrival turn (`entry_arrival_turn`) in our YAML. Additive view: the static ENEMY-PRESSURE verdict is unchanged (so already-locked
 # chapters don't shift) -- this shows, alongside it, what that static proxy can't see.
 
 CONVERT_CLEAR_DISCOUNT = 0.5   # a convertible is neutralized by recruiting, not ground down;
@@ -2770,7 +2770,8 @@ def _vanilla_reinforcement_turns(stem):
 
 def chapter_enemy_groups(chap):
     """Our force split by battlefield role (#171): line (turn-1 must-kill), reinforcements
-    (arrives_turn > 1), convertibles (recruitable). Each a Combatant list."""
+    (arriving after turn 1, `inject.raw_pids.entry_arrival_turn`), convertibles
+    (recruitable). Each a Combatant list."""
     g = {'line': [], 'reinforcements': [], 'convertibles': []}
     for key in AI_ROSTER_KEYS:
         for ed in (chap.get(key) or []):
@@ -2780,10 +2781,11 @@ def chapter_enemy_groups(chap):
             if ed.get('convertible'):
                 g['convertibles'].extend(units)
             elif not inject.raw_pids.entry_is_turn1(key, ed):
-                # the KEY is what makes ch02's wave a reinforcement: it carries
-                # `trigger_turn`, not `arrives_turn`, so an arrives_turn test alone read it
-                # as turn-1 line. `entry_is_turn1` is the one place that now knows it
-                # (#367) -- `map_placement_preview.enemy_bodies` shares it too.
+                # the KEY makes ch02's `reinforcements:` wave one, and the declared turn
+                # makes ch01's `enemy_units` wave one, under whichever of its four
+                # spellings it uses. `entry_is_turn1` is the one place that knows both
+                # (#367, #440) -- `map_placement_preview.enemy_bodies` and `danger_map`
+                # share it.
                 g['reinforcements'].extend(units)
             else:
                 g['line'].extend(units)

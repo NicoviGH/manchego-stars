@@ -98,6 +98,15 @@ class EntryIsTurn1(unittest.TestCase):
     def test_an_enemy_units_entry_with_arrives_turn_1_is_turn1(self):
         self.assertTrue(inject.raw_pids.entry_is_turn1('enemy_units', {'id': 'a', 'arrives_turn': 1}))
 
+    def test_every_spelling_of_the_arrival_turn_counts(self):
+        # ch01's goblins sit in `enemy_units` with `spawn_turn: 3`; reading `arrives_turn`
+        # alone put them on the opening board (#440 review).
+        for spelling in ({'spawn_turn': 3}, {'trigger_turn': 3}, {'arrives_turn': 3},
+                         {'arrives': {'turn': 3}}):
+            entry = dict({'id': 'a'}, **spelling)
+            self.assertEqual(inject.raw_pids.entry_arrival_turn(entry), 3, spelling)
+            self.assertFalse(inject.raw_pids.entry_is_turn1('enemy_units', entry), spelling)
+
     def test_an_enemy_units_entry_with_arrives_turn_above_1_is_not(self):
         self.assertFalse(inject.raw_pids.entry_is_turn1('enemy_units', {'id': 'a', 'arrives_turn': 4}))
 

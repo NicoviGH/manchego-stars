@@ -221,7 +221,26 @@ def entry_is_turn1(key, enemy_def):
     which is backwards: a reinforcement key is the one shape definitely not on the opening
     board (`difficulty.chapter_enemy_groups`'s dynamics split, and
     `map_placement_preview.enemy_bodies`'s Dijkstra blockers, #367)."""
-    return key == 'enemy_units' and int(enemy_def.get('arrives_turn', 1) or 1) <= 1
+    return key == 'enemy_units' and entry_arrival_turn(enemy_def) <= 1
+
+
+ARRIVAL_TURN_FIELDS = ('arrives_turn', 'trigger_turn', 'spawn_turn')
+
+
+def entry_arrival_turn(enemy_def):
+    """The turn this entry's bodies reach the board: 1 unless it declares otherwise.
+
+    Our chapters spell it four ways -- `arrives_turn` (ch04-ch06), `trigger_turn` (ch02's
+    `reinforcements:` wave), `spawn_turn` (ch01's goblins, which its injector loads on turn
+    3) and `arrives: {turn: N}` (ch08's seed) -- and a reader that knew only the first put
+    ch01's wave on the opening board in every metric that asked (#440 review)."""
+    for field in ARRIVAL_TURN_FIELDS:
+        if enemy_def.get(field):
+            return int(enemy_def[field])
+    arrives = enemy_def.get('arrives')
+    if isinstance(arrives, dict) and arrives.get('turn'):
+        return int(arrives['turn'])
+    return 1
 
 
 def entry_body_levels(enemy_def):
