@@ -1593,11 +1593,20 @@ def party_matchup(bodies, careers):
                           for (e, _t), p in zip(bodies, per)]}
 
 
+def _median_combatant(careers):
+    """A unit's per-stat median over its careers (`_median_line`'s rule), as one Combatant.
+    The careers come in the order they were rolled, so any one of them is a random draw."""
+    first = careers[0]
+    mid = len(careers) // 2
+    return dataclasses.replace(first, **{
+        f: sorted(getattr(c, f) for c in careers)[mid]
+        for f in ('hp', 'pow', 'skl', 'spd', 'df', 'res', 'lck', 'con')})
+
+
 def fielded_careers(careers, force, deploy_cap):
-    """The `deploy_cap` units of an arriving party a player fields, by each unit's median
-    career (`_best_field`'s rule), with all of their careers: {unit: [Combatant]}."""
-    median = {m: c[len(c) // 2] for m, c in careers.items()}
-    field = _best_field(list(median.values()), force, deploy_cap)
+    """The `deploy_cap` units of an arriving party a player fields, ranked on each unit's
+    median line by `_best_field`'s rule, with all of their careers: {unit: [Combatant]}."""
+    field = _best_field([_median_combatant(c) for c in careers.values()], force, deploy_cap)
     return {u.name: careers[u.name] for u in field}
 
 
@@ -2093,8 +2102,10 @@ def _print_pressure(p):
               'clear-load/slot %4.1f (x%.2f %s)'
               % ('', p['n_ours'], ot, v['threat_ratio'], v['threat'],
                  ol, v['load_ratio'], v['load']))
-        print('  (fixed YARDSTICK -- %s is off VANILLA_CHAIN, so its party is not simulated)'
-              % p['reference'])
+        print('  (fixed YARDSTICK -- %s)'
+              % ('%s is off VANILLA_CHAIN, so its party is not simulated' % p['reference']
+                 if p['reference'] not in VANILLA_CHAIN else
+                 'the exp model could not field an arriving party for this chapter'))
     m = p.get('mirror')
     if m:
         # WHAT THE RATIOS ABOVE CANNOT SAY (#367): a ratio is an aggregate over stats, so a

@@ -41,8 +41,8 @@ bare class base, because the prologue injector zeroes their lines and emits no `
 | ch02 | x1.21 | x1.67 | x1.00 / x1.00 |
 | ch03 | x0.87 | x1.25 | x1.02 / x1.00 |
 | ch04 | x1.06 | x1.23 | x1.14 / x1.15 |
-| ch05 | x1.02 | x1.28 | x1.04 / x1.05 |
-| ch06 | x0.95 | x1.08 | x1.00 / x1.00 |
+| ch05 | x1.00 | x1.30 | x1.04 / x1.05 |
+| ch06 | x1.00 | x1.12 | x1.00 / x1.00 |
 
 Two things drive the clear-load column, and step 3 separates them. Vanilla's field carries
 Seth, and ADR 0042 chose no Seth-tier unit. Our party also runs behind vanilla's curve

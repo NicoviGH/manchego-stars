@@ -2328,6 +2328,15 @@ class PartyMatchup(unittest.TestCase):
         m = df.party_matchup([(enemy, 0)], {'tough': [tough], 'frail': [frail]})
         self.assertAlmostEqual(m['threat'], fc.damage_per_round(enemy, frail) / 2)
 
+    def test_the_field_ranks_on_the_median_line_not_one_rolled_career(self):
+        # Careers come in rolled order: the middle ENTRY of an unsorted list is one random
+        # draw. `steady` has the better median; its middle entry alone is its worst roll.
+        enemy = combatant('e', hp=30, dfc=5, weapon='iron-lance')
+        steady = [combatant('steady', pow_=p) for p in (14, 14, 2, 14, 14)]
+        even = [combatant('even', pow_=10) for _ in range(5)]
+        field = df.fielded_careers({'steady': steady, 'even': even}, [enemy], 1)
+        self.assertEqual(list(field), ['steady'])
+
     def test_the_prologue_fields_its_guests_at_class_base(self):
         # ch00's injector zeroes the guest slots' lines and emits no `.autolevel`, so Hlin is
         # a bare Fighter at any deploy level.
