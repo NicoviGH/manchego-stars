@@ -41,8 +41,9 @@ CH02_CHAPTER_YAML = 'ch02-cold-welcome.yaml'
 # Off-map recruit join-LOAD (#23): Baxby (won over in the ch01-ending cutscene) enters the
 # saved party HERE, his first prep roster. A free vanilla-Ch3-region UnitDef symbol (externed,
 # unused by our ch02 flow); LOAD1'd blue before the PREP CALL -> Pick Units lists him. The join
-# tile is a walkable NW deploy slot (PREP hides everyone and re-picks, so the tile only needs
-# to be valid + collision-free at LOAD time -- clear of the chwinga/raiders).
+# tile is walkable NW plains just south of the deploy slots (PREP hides everyone and re-picks,
+# so the tile only needs to be valid + collision-free at LOAD time -- clear of the deploy
+# slots, the chwinga and the raiders).
 CH02_RECRUIT_JOIN_SYMBOL = 'UnitDef_088B476C'
 CH02_RECRUIT_JOIN_POS = (2, 4)
 # Vellynne Harpell (recurring Brotherhood NPC) has no map unit in ch02; her CUTSCENE FACE
