@@ -6,31 +6,24 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-01 (Claude), after #434. **What landed and why is in `git log` and the
+Refreshed 2026-10-02 (Claude), after #437. **What landed and why is in `git log` and the
 ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-**Nothing. No open PRs, no branches.** Epic #430 step 1 (fix the instrument) is DONE: #432
-(metrics over the dice, ADR 0311), #433 (the danger map, calibrated against the ch06 runs,
-ADR 0312), #434 (`rescue_forecast` asks the danger map). #430's latest comment holds the
-numbers and the findings for step 3.
+**Nothing. No open PRs, no branches.** #430 steps 1 and 2 are DONE (#436 = ADR 0314, the
+2RN hit and crit in `fe_combat`; #437 = ADR 0315, the exp guard). #430's latest comment holds
+the numbers.
 
-**Next, in this order. Run steps 1-3 without asking; they change no game data.**
-1. **`fe_combat`'s metrics read displayed hit and no crit** (ADR 0312's finding). FE8 rolls
-   hit on 2RN and crit on 1RN at x3; `danger_map.true_hit` / `crit_rate` / `strike` already
-   transcribe them. Every `make difficulty` reading and the parity ratio move, on both
-   sides. Fix it in the instrument, then report any VERDICT it flips to Nicolas before
-   anything is changed to match.
-2. **#430 step 2, the campaign-wide exp guard.** ⚠️ ch07 still names **FE8 Ch6** as its twin,
-   the same one ch06 uses. It has done so since #48, and it is NOT fixed. The guard is what
-   catches it. Re-point ch07 to FE8 Ch7 when its slice is grounded. ch08 -> FE8 Ch13 is
-   deliberate.
-3. **#430 step 3**, re-measure ch00-ch06 with the fixed instrument; the report goes to
-   Nicolas BEFORE any balance, level or lock change. Steps 4 and 6 are his calls. **A built,
-   signed-off or locked chapter is not evidence of correctness**, ch00-ch02's locks included.
-   Already known for it: ch06's declared fuses (7 east, 8 west) against forecast medians of
-   10 and 6.
+**Next: #430 step 3**, re-measure ch00-ch06 with the fixed instrument and report each against
+its twin: what holds, what is off, by how much. **Fix every finding that restores measured
+vanilla parity as you go, locked chapters included** (Nicolas, 2026-10-02, said twice: a
+parity correction is not a design change; #436 retuned Sephek and the Grell that way). Only a
+move AWAY from vanilla, or a choice between vanilla-neutral options, goes to him. Already
+known for it: ch06's declared fuses (7 east, 8 west) against forecast medians of 10 and 6;
+ch03's exp yield at x0.92; Marty's ch06 durability at 1.18 rounds on the median line.
+ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
+re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
 
 ## Owed by NICOLAS, not by the next session
 
