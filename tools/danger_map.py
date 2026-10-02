@@ -18,9 +18,8 @@ it for every tile and every enemy body, out of the same parts:
     at once form a transversal matroid, so taking them greedily by damage finds the
     heaviest set that fits.
   * HOW MUCH is the engine's own strike (`strike`): the 2RN hit (`Roll2RN`, bmbattle.c's
-    `BattleGenerateHitAttributes`), the 1RN crit at x3, and a follow-up on a 4-AS lead.
-    `fe_combat`'s metrics read displayed hit and no crit. This module is calibrated against
-    real runs, so it reads what the cartridge rolls.
+    `BattleGenerateHitAttributes`), the 1RN crit at x3, and a follow-up on a 4-AS lead,
+    all read from `fe_combat` (ADR 0314).
 
 HONEST LIMITS. Enemies walk through each other, as FE8's flood fill lets them, and only
 the green hulls block them; the player's own units, which do block, are where the player
@@ -51,23 +50,6 @@ import map_placement_preview as pp                                   # noqa: E40
 
 
 # ── The engine's strike ──────────────────────────────────────────────────────────
-
-@functools.lru_cache(maxsize=None)
-def true_hit(displayed):
-    """P(hit) for a displayed hit rate: `Roll2RN` (rng.c) hits when the floored average of
-    two 0-99 rolls is below the threshold. 47 displayed is 45% true; 80 is 92%."""
-    displayed = max(0, min(100, displayed))
-    return sum(1 for a in range(100) for b in range(100) if (a + b) // 2 < displayed) / 1e4
-
-
-def crit_rate(atk, dfn):
-    """`ComputeBattleUnitCritRate` less `ComputeBattleUnitEffectiveCritRate`'s dodge: weapon
-    crit + Skl/2 - the defender's Lck, floored at 0. Rolled on 1RN, so the rate is the
-    probability. The +15 of a crit-bonus class is not modelled."""
-    if atk.weapon is None:
-        return 0
-    return max(0, min(100, atk.weapon.crit + atk.skl // 2 - dfn.lck))
-
 
 @functools.lru_cache(maxsize=None)
 def poison_weapons():
@@ -106,8 +88,8 @@ def strike(atk, dfn, terrain_avoid=0):
     if atk.weapon is None:
         return Strike(0, 0.0, 0.0, 0)
     return Strike(2 if fc.doubles(atk, dfn) else 1,
-                  true_hit(fc.hit_chance(atk, dfn, terrain_avoid)),
-                  crit_rate(atk, dfn) / 100.0,
+                  fc.true_hit(fc.hit_chance(atk, dfn, terrain_avoid)),
+                  fc.crit_rate(atk, dfn) / 100.0,
                   fc.damage(atk, dfn),
                   atk.weapon.name in poison_weapons())
 

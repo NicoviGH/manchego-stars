@@ -147,31 +147,73 @@ class HitChance(unittest.TestCase):
 
 class DamagePerRound(unittest.TestCase):
     def test_single_hit_at_full_accuracy(self):
-        # 10 dmg, 100% hit, no double (AS 3 vs 0 -> lead 3) -> 10.0.
+        # 10 dmg, 100% hit, no double (AS 3 vs 0 -> lead 3). Skl 8 crits 4%: x 1.08 -> 10.8.
         atk = attacker(5, fc.W['iron-bow'], skl=8, con=20)
         atk.spd = 3
         dfn = defender(df=1, weapon=fc.W['iron-sword'])      # AS 0
-        self.assertAlmostEqual(fc.damage_per_round(atk, dfn), 10.0)
+        self.assertAlmostEqual(fc.damage_per_round(atk, dfn), 10.8)
 
     def test_doubling_strikes_twice(self):
         atk = attacker(5, fc.W['iron-bow'], skl=8, con=20)   # AS 10 vs 0 -> doubles
-        dfn = defender(df=1, weapon=fc.W['iron-sword'])
-        self.assertAlmostEqual(fc.damage_per_round(atk, dfn), 20.0)
+        dfn = defender(df=1, weapon=fc.W['iron-sword'])      # 2 x 10 x 1.08 crit
+        self.assertAlmostEqual(fc.damage_per_round(atk, dfn), 21.6)
 
-    def test_partial_accuracy_scales_damage(self):
-        # 10 dmg, 50% hit, single -> 5.0.
+    def test_partial_accuracy_scales_damage_by_the_true_hit(self):
+        # 10 dmg, 50 displayed, single. 50 displayed is 50.5% true on 2RN -> 5.05.
         atk = attacker(5, fc.W['iron-bow'], skl=0, con=20)
         atk.spd = 3
-        dfn = defender(df=1, spd=15, lck=5, weapon=fc.W['iron-bow'])  # avoid 35 -> 50% hit
-        self.assertAlmostEqual(fc.damage_per_round(atk, dfn), 5.0)
+        dfn = defender(df=1, spd=15, lck=5, weapon=fc.W['iron-bow'])  # avoid 35 -> 50 shown
+        self.assertAlmostEqual(fc.damage_per_round(atk, dfn), 5.05)
+
+    def test_a_crit_triples_the_hits_that_connect(self):
+        # Killing Edge, Skl 14: 103 -> 100 shown, crit 30 + 7 = 37. 14 - 4 = 10 dmg, single,
+        # x (1 + 2 x 0.37) = 17.4.
+        atk = attacker(5, fc.W['killing-edge'], skl=14, con=20)
+        atk.spd = 3
+        dfn = defender(df=4, weapon=fc.W['iron-bow'])        # off-triangle
+        self.assertEqual(fc.crit_rate(atk, dfn), 37)
+        self.assertAlmostEqual(fc.damage_per_round(atk, dfn), 17.4)
+
+
+class TrueHit(unittest.TestCase):
+    """`Roll2RN` (rng.c): hit when the floored average of two 0-99 rolls is under the rate."""
+
+    def test_fifty_shown_is_fifty_point_five_true(self):
+        # P(a + b <= 99) over two 0-99 rolls = (1 + 2 + ... + 100) / 10^4 = 5050 / 10^4.
+        self.assertAlmostEqual(fc.true_hit(50), 0.505)
+
+    def test_low_rates_read_lower_and_high_rates_higher(self):
+        # ADR 0270: the crab's 47 displayed into the west hull's cover is 45% true.
+        self.assertAlmostEqual(fc.true_hit(47), 0.45, delta=0.01)
+        self.assertGreater(fc.true_hit(80), 0.90)
+
+    def test_the_ends_are_exact(self):
+        self.assertEqual((fc.true_hit(0), fc.true_hit(100)), (0.0, 1.0))
+
+
+class CritRate(unittest.TestCase):
+    """Weapon crit + Skl/2 less the defender's Lck, floored at 0; rolled on 1RN."""
+
+    def test_weapon_crit_plus_half_skill_minus_luck(self):
+        atk = attacker(0, fc.W['killing-edge'], skl=9)        # 30 + 4
+        self.assertEqual(fc.crit_rate(atk, defender(lck=5)), 29)
+
+    def test_luck_dodge_floors_at_zero(self):
+        atk = attacker(0, fc.W['iron-sword'], skl=4)          # 0 + 2
+        self.assertEqual(fc.crit_rate(atk, defender(lck=7)), 0)
+
+    def test_a_weaponless_unit_cannot_crit(self):
+        atk = fc.Combatant('s', hp=20, pow=0, skl=20, spd=5, df=0, res=0, lck=0, con=5,
+                           weapon=None)
+        self.assertEqual(fc.crit_rate(atk, defender()), 0)
 
 
 class RoundsToKill(unittest.TestCase):
     def test_hp_over_damage_per_round(self):
         atk = attacker(5, fc.W['iron-bow'], skl=8, con=20)
         atk.spd = 3
-        dfn = defender(df=1, weapon=fc.W['iron-sword'])      # 20 hp, dpr 10 -> 2.0
-        self.assertAlmostEqual(fc.rounds_to_kill(atk, dfn), 2.0)
+        dfn = defender(df=1, weapon=fc.W['iron-sword'])      # 20 hp, dpr 10.8
+        self.assertAlmostEqual(fc.rounds_to_kill(atk, dfn), 20 / 10.8)
 
     def test_infinite_when_it_cannot_damage(self):
         atk = attacker(1, fc.W['iron-sword'], skl=8)
@@ -189,8 +231,8 @@ class KillsPerRound(unittest.TestCase):
     def test_fractional_when_it_takes_multiple_rounds(self):
         atk = attacker(5, fc.W['iron-bow'], skl=8, con=20)
         atk.spd = 3
-        dfn = defender(df=1, weapon=fc.W['iron-sword'])      # dpr 10 vs 20 hp -> 0.5
-        self.assertAlmostEqual(fc.kills_per_round(atk, dfn), 0.5)
+        dfn = defender(df=1, weapon=fc.W['iron-sword'])      # dpr 10.8 vs 20 hp -> 0.54
+        self.assertAlmostEqual(fc.kills_per_round(atk, dfn), 0.54)
 
     def test_zero_when_it_cannot_damage(self):
         atk = attacker(1, fc.W['iron-sword'], skl=8)

@@ -12,12 +12,16 @@ Combat model (bmbattle.c line cites):
   Hit     = Skl*2 + wpnHit + Lck//2 + triangleHit          (l.578)
   Avoid   = AS*2 + terrainAvoid + Lck                       (l.582)
   HitShown= clamp(atkHit - defAvoid, 0, 100)               (l.600-603)
+  P(hit)  = Roll2RN(HitShown): floored mean of two 0-99 rolls < HitShown  (rng.c, l.1008)
+  Crit    = max(0, wpnCrit + Skl//2 - defLck), rolled on 1RN once a strike connects; a crit
+            deals Damage x3                                 (l.1030-1039)
   Atk     = Pow + (wpnMt + triangleDmg)  (the Mt+tri HALF x3 if effective, l.527-556:
             battleAttack = Mt + tri, tripled on effectiveness, THEN += Pow)
   Damage  = max(0, Atk - (Def | Res))                       Res for magic
   Double  if (atkAS - defAS) >= 4                     (BATTLE_FOLLOWUP_SPEED_THRESHOLD)
 Triangle (GBA FE8): advantage +1 Mt / +15 Hit, disadvantage -1 Mt / -15 Hit.
 """
+import functools
 from dataclasses import dataclass, field
 
 
@@ -162,13 +166,37 @@ def hit_chance(atk, dfn, terrain_avoid=0):
     return max(0, min(100, accuracy - avoid))
 
 
-def damage_per_round(atk, dfn, terrain_avoid=0):
-    """Expected damage atk deals dfn over one combat round: per-hit damage x hit count
-    (2 on a follow-up) x hit probability. A static proxy -- no positioning or AI."""
+@functools.lru_cache(maxsize=None)
+def true_hit(displayed):
+    """P(hit) for a displayed hit rate: `Roll2RN` (rng.c) hits when the floored average of
+    two 0-99 rolls is below the threshold. 47 displayed is 45% true; 80 is 92%."""
+    displayed = max(0, min(100, displayed))
+    return sum(1 for a in range(100) for b in range(100) if (a + b) // 2 < displayed) / 1e4
+
+
+def crit_rate(atk, dfn):
+    """`ComputeBattleUnitCritRate` less `ComputeBattleUnitEffectiveCritRate`'s dodge: weapon
+    crit + Skl/2 - the defender's Lck, floored at 0. Rolled on 1RN, so the rate is the
+    probability. The +15 of a crit-bonus class is not modelled."""
+    if atk.weapon is None:
+        return 0
+    return max(0, min(100, atk.weapon.crit + atk.skl // 2 - dfn.lck))
+
+
+def expected_hits(atk, dfn, terrain_avoid=0):
+    """Damage multiples atk lands on dfn per round: strikes (2 on a follow-up) x P(hit) on
+    2RN x (1 + 2 x P(crit)), since a crit triples a strike that connects."""
     if atk.weapon is None:                # weaponless support unit -> no offense
         return 0.0
-    hits = 2 if doubles(atk, dfn) else 1
-    return damage(atk, dfn) * hits * hit_chance(atk, dfn, terrain_avoid) / 100.0
+    strikes = 2 if doubles(atk, dfn) else 1
+    return (strikes * true_hit(hit_chance(atk, dfn, terrain_avoid))
+            * (1 + 2 * crit_rate(atk, dfn) / 100.0))
+
+
+def damage_per_round(atk, dfn, terrain_avoid=0):
+    """Expected damage atk deals dfn over one combat round, as the cartridge rolls it:
+    per-hit damage x `expected_hits`. A static proxy -- no positioning or AI."""
+    return damage(atk, dfn) * expected_hits(atk, dfn, terrain_avoid)
 
 
 def rounds_to_kill(atk, dfn, terrain_avoid=0):

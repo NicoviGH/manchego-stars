@@ -1462,21 +1462,20 @@ def metric_rounds_to_kill(enemy, yardstick=YARDSTICK):
     (more armour is never less work), and preserves the ordering that matters: Saar at Def 13
     scores 22.8 against Ravisin's 13.4, which is the truth about which is the harder wall.
 
-    It must carry the SAME hit-chance divisor `rounds_to_kill` uses, or it is not a floor at
-    all: dropping it makes the load jump DOWN across the cliff (real Saar read 46.8 rounds at
-    Def 11 and 36.0 at Def 12 -- tougher unit, less work), which is the exact pathology this
-    function exists to remove. With it the floor is not merely monotonic but CONTINUOUS: a unit
-    taking exactly 1 damage per hit already scores hp/(hits x accuracy), so the floor meets the
-    last dentable value instead of stepping at it.
+    It must carry the SAME divisor `rounds_to_kill` uses (`fe_combat.expected_hits`: strikes,
+    true hit, crit), or it is not a floor at all: dropping it makes the load jump DOWN across
+    the cliff (real Saar read 46.8 rounds at Def 11 and 36.0 at Def 12 -- tougher unit, less
+    work), which is the exact pathology this function exists to remove. With it the floor is
+    not merely monotonic but CONTINUOUS: a unit taking exactly 1 damage per hit already scores
+    hp/expected_hits, so the floor meets the last dentable value instead of stepping at it.
     """
     rounds = fc.rounds_to_kill(yardstick, enemy)
     if rounds != float('inf'):
         return rounds
-    hits = 2 if fc.doubles(yardstick, enemy) else 1
-    accuracy = fc.hit_chance(yardstick, enemy) / 100.0
-    if accuracy <= 0:                 # cannot connect at all -- no finite load to report
+    connects = fc.expected_hits(yardstick, enemy)
+    if connects <= 0:                 # cannot connect at all -- no finite load to report
         return float('inf')
-    return float(enemy.hp) / (hits * accuracy)
+    return float(enemy.hp) / connects
 
 
 def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
