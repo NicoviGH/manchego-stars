@@ -1390,7 +1390,6 @@ class PlayerArrivesLeveled(unittest.TestCase):
 
     def test_the_report_survives_an_exp_model_refusal_and_says_so(self):
         import exp_curve
-        from unittest import mock
         out = io.StringIO()
         with mock.patch.object(exp_curve, 'entering', side_effect=ValueError('gorgon egg')), \
                 contextlib.redirect_stdout(out):
