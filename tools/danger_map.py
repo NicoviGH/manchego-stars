@@ -179,6 +179,11 @@ def green_bodies(chapter):
 ENGAGE_HORIZON = 30         # phases a pursuer is walked looking for its first target
 
 
+def _in_range(arm, cell, tile):
+    d = abs(cell[0] - tile[0]) + abs(cell[1] - tile[1])
+    return d > 0 and arm.weapon.rng[0] <= d <= arm.weapon.rng[1]
+
+
 class Board:
     """A chapter's terrain and bodies, and each body's standable cells per enemy phase.
 
@@ -220,19 +225,15 @@ class Board:
 
     def engaged(self, body):
         """The first phase a pursuer can hit one of the `targets`, or None. A body whose
-        action spares the targets never engages them."""
+        action spares the targets never engages them. "Can hit" is `attacks_on`'s own rule:
+        a cell it can reach, with a weapon whose range spans the distance."""
         key = (body.id, body.index)
         if key not in self._engaged:
-            cells = set()
-            if body.action not in self.spared_by:
-                for t in self.targets:
-                    for arm in body.arms:
-                        cells |= set(pp.firing_cells(self.terrain, t, arm.weapon.rng[1]))
-                        cells -= {c for c in cells
-                                  if abs(c[0] - t[0]) + abs(c[1] - t[1]) < arm.weapon.rng[0]}
-            self._engaged[key] = next(
+            def hits(cell):
+                return any(_in_range(arm, cell, t) for t in self.targets for arm in body.arms)
+            self._engaged[key] = None if body.action in self.spared_by else next(
                 (p for p in range(body.arrives, body.arrives + ENGAGE_HORIZON)
-                 if cells & self._reach(body, p)), None) if cells else None
+                 if any(hits(c) for c in self._reach(body, p))), None)
         return self._engaged[key]
 
     def stands(self, body, phase):
@@ -288,12 +289,8 @@ def attacks_on(board, tile, defender, phase, spared_by=()):
             continue
         cells = {}
         for c in board.stands(body, phase):
-            d = abs(c[0] - tx) + abs(c[1] - ty)
-            if c == tile or d == 0:
-                continue
             for arm in body.arms:
-                lo, hi = arm.weapon.rng
-                if lo <= d <= hi:
+                if _in_range(arm, c, tile):
                     s = strike(arm, target, avoid)
                     if s.expected > 0 and (c not in cells or s.expected > cells[c].expected):
                         cells[c] = s

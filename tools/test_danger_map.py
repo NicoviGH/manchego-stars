@@ -19,7 +19,9 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import danger_map as dm                                              # noqa: E402
+import dataclasses                                                   # noqa: E402
 import difficulty as dif                                             # noqa: E402
+import fe_combat as fc                                               # noqa: E402
 import map_placement_preview as pp                                   # noqa: E402
 import rescue_forecast as rf                                         # noqa: E402
 from check import RESCUE_SAFE_ACTIONS                                # noqa: E402
@@ -102,6 +104,20 @@ class WhoReachesTheHulls(unittest.TestCase):
                                          for a in on(board, self.chap, EAST, 12))
         self.assertFalse(crab_on_east(self.board))
         self.assertTrue(crab_on_east(dm.Board(self.chap)))
+
+
+class Engagement(unittest.TestCase):
+
+    def test_a_second_weapons_reach_does_not_erase_the_firsts(self):
+        # A sword-and-bow pursuer that can stand only on the west door (mov 0) engages on
+        # phase 1 with the sword; the bow's minimum range must not take the door away.
+        board = hull_board(ch06())
+        unit = board.bodies[0].arms[0]
+        probe = dm.Body('probe', 0, (4, 18), 'pursuer', 0x00, 1,
+                        'TerrainTable_MovCost_CommonT1Normal', 0,
+                        tuple(dataclasses.replace(unit, weapon=fc.W[w])
+                              for w in ('iron-sword', 'iron-bow')))
+        self.assertEqual(board.engaged(probe), 1)
 
 
 class TheMob(unittest.TestCase):
