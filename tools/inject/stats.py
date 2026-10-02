@@ -135,6 +135,32 @@ def donor_base_stats(vanilla_text, donor_char):
     return bases
 
 
+def twin_line_deltas(twin_char, class_enum):
+    """The personal layer that puts a `class_enum` unit on `twin_char`'s vanilla combat line:
+    the twin's effective base (its defaultClass base + its personal base) minus our class's
+    base, for every BASE_FIELD but Con. Negative where our class out-stats the twin's (a
+    Fighter has more HP than Eirika); the fields are signed. Con stays our class's: it is the
+    body that carries OUR weapon, and Eirika's Con 5 under a Hand Axe would let everything
+    double her. Both read at HEAD, so no slot this build patches can leak in. ch00's guests
+    fight on Seth's and Eirika's lines this way (#430)."""
+    chars = vanilla_decomp_text('src/data_characters.c')
+    classes = vanilla_decomp_text('src/data_classes.c')
+    s, e = _find_brace_block(chars, '[%s - 1]' % twin_char, CHARACTERS_C)
+    twin_class = re.search(r'\.defaultClass\s*=\s*(\w+)', chars[s:e]).group(1)
+    twin_class_base = class_base_stats(twin_class, classes)
+    ours = class_base_stats(class_enum, classes)
+    personal = donor_base_stats(chars, twin_char)
+    return {f: twin_class_base.get(f, 0) + personal[f] - ours.get(f, 0)
+            for f in BASE_FIELDS if f != 'baseCon'}
+
+
+def guest_personal_line(unit, class_enum):
+    """The personal base layer a ch00 guest's slot carries: its `twin:` vanilla character's
+    line on `class_enum` (`twin_line_deltas`), or {} -- a bare class base -- with no twin.
+    The one source for the injector and `difficulty.fixed_roster_careers` (#430)."""
+    return twin_line_deltas(unit['twin'], class_enum) if unit.get('twin') else {}
+
+
 def personal_base_deltas(fe_stats, class_base, donor_base):
     """The personal-base layer to patch into a cast slot's gCharacterData, keyed by base
     field. FE8 shows class base + this layer, so each field is (authored fe_stat - class

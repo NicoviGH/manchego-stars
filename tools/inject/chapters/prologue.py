@@ -19,17 +19,18 @@ from inject.paths import (
     GAMECONTROL_C, TEXTS_TXT)
 from inject.scenes import (
     _prepend_battle_quote, _prepend_defeat_quote, _write_chapter_title_card, battle_quote_pair)
-from inject.stats import _set_field, _set_gender, donor_growths_and_ranks
+from inject.stats import _set_field, _set_gender, donor_growths_and_ranks, guest_personal_line
 from inject.text import (
     _fid_tag, _script_to_message, display_name, name_message_body, set_message_body,
     vanilla_name_text_id)
 from inject.units import enemy_ai_initialiser
 
 
-# The guest slots whose personal bases inject_prologue zeroes, so each fights at pure class
-# base. Named because it is the exception to ENEMY_BASE_SLOT: a unit on one of these slots does
-# NOT inherit the vanilla character's line, however much the deployment looks like it should.
-PROLOGUE_ZEROED_GUEST_SLOTS = (PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
+# The guest slots whose personal bases inject_prologue rewrites: Hlin and Scramsax onto their
+# `twin:`'s vanilla line (Eirika's, Seth's), Sephek to zero, a bare class base. Named because it
+# is the exception to ENEMY_BASE_SLOT: a unit on one of these slots does NOT inherit the vanilla
+# character's line, however much the deployment looks like it should.
+PROLOGUE_REWRITTEN_GUEST_SLOTS = (PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
 PROLOGUE_LAYOUT = ('Ch00PrologueMap', 'ch00-prologue')  # (asset label, maps/ source stem)
 PROLOGUE_CHAPTER_YAML = 'ch00-prologue-a-dagger-of-ice.yaml'
 
@@ -366,30 +367,34 @@ def inject_prologue(campaign, verbose=True, montage=False):
 
     # 4b. Give the guest slots a consistent character identity for their deployed class --
     #     just like patch_character_data does for the cast. Guests aren't in PORTRAIT_MAP, so
-    #     we align defaultClass + baseLevel + affinity, zero the personal base stats (so stats
-    #     == class base), and copy growths + weapon ranks from a class-matched vanilla donor so
-    #     each guest fights/levels like a real FE unit of its class and can wield its items.
+    #     we align defaultClass + baseLevel + affinity, write the personal base stats (each
+    #     guest's `twin:` line, so Hlin fights as Eirika and Scramsax as Seth whatever their
+    #     class; Sephek's are zeroed, a bare class base), and copy growths + weapon ranks from a
+    #     class-matched vanilla donor so each guest levels like a real FE unit of its class and
+    #     can wield its items.
     #     (Mirrors patch_character_data; keeps the cast and guests on equal footing.)
     _axe = ('PIRATE', 'WARRIOR', 'FIGHTER', 'BRIGAND', 'BERSERKER')
     _hlin_donor = 'CHARACTER_GARCIA' if any(c in hlin_class for c in _axe) else 'CHARACTER_GERIK'
     _scram_donor = 'CHARACTER_GARCIA' if any(c in scram_class for c in _axe) else 'CHARACTER_GERIK'
-    # (slot, class, level, donor, female) -- female None means "leave attributes alone"
+    # (slot, class, level, donor, female, line) -- female None means "leave attributes alone"
     # (the boss keeps CA_BOSS; _set_gender would clobber it). baseLevel comes from the same
     # YAML field the roster block does: these are two encodings of one number, and a literal
     # here would drift out of step with the roster the moment the chapter is rebalanced.
-    guest_patch = [(PROLOGUE_HLIN_SLOT, hlin_class, by_id['hlin-trollbane']['level'],
-                    _hlin_donor, True),
-                   (PROLOGUE_SCRAMSAX_SLOT, scram_class, by_id['scramsax']['level'],
-                    _scram_donor, False),
+    # `line` is the personal layer, from guest_personal_line, which difficulty also reads.
+    hlin, scram = by_id['hlin-trollbane'], by_id['scramsax']
+    guest_patch = [(PROLOGUE_HLIN_SLOT, hlin_class, hlin['level'], _hlin_donor, True,
+                    guest_personal_line(hlin, hlin_class)),
+                   (PROLOGUE_SCRAMSAX_SLOT, scram_class, scram['level'], _scram_donor, False,
+                    guest_personal_line(scram, scram_class)),
                    (PROLOGUE_SEPHEK_SLOT, 'CLASS_MYRMIDON', by_id['sephek-kaltro']['level'],
-                    'CHARACTER_JOSHUA', None)]
-    # The zeroing below is what disqualifies these slots from ENEMY_BASE_SLOT (a unit here does
+                    'CHARACTER_JOSHUA', None, {})]
+    # The rewrite below is what disqualifies these slots from ENEMY_BASE_SLOT (a unit here does
     # NOT inherit the vanilla character's personal line). Keep the two statements of that in step.
-    assert tuple(s for s, _c, _l, _d, _f in guest_patch) == PROLOGUE_ZEROED_GUEST_SLOTS, \
-        'guest_patch and PROLOGUE_ZEROED_GUEST_SLOTS disagree about which slots get zeroed'
+    assert tuple(g[0] for g in guest_patch) == PROLOGUE_REWRITTEN_GUEST_SLOTS, \
+        'guest_patch and PROLOGUE_REWRITTEN_GUEST_SLOTS disagree about which slots get rewritten'
     with open(CHARACTERS_C, encoding='utf-8') as f:
         chars = f.read()
-    for slot, cls, level, donor, female in guest_patch:
+    for slot, cls, level, donor, female, line in guest_patch:
         growths, ranks = donor_growths_and_ranks(chars, donor)  # donors are unpatched slots
         marker = '[CHARACTER_%s - 1]' % slot
         s, e = _find_brace_block(chars, marker, CHARACTERS_C)
@@ -401,7 +406,7 @@ def inject_prologue(campaign, verbose=True, montage=False):
             block = _set_gender(block, female)
         for bf in ('baseHP', 'basePow', 'baseSkl', 'baseSpd', 'baseDef',
                    'baseRes', 'baseLck', 'baseCon'):
-            block = _set_field(block, bf, 0, CHARACTERS_C, marker)
+            block = _set_field(block, bf, line.get(bf, 0), CHARACTERS_C, marker)
         for gf, gv in growths.items():
             block = _set_field(block, gf, gv, CHARACTERS_C, marker)
         block, n = re.subn(r'(\.baseRanks\s*=\s*)\{.*?\}',

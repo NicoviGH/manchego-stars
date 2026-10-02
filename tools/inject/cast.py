@@ -58,10 +58,11 @@ CLASS_MAP = {
 # authored in its chapter YAML *and* registered in RAW_PID_PERSONAL_SOURCES to reach the ROM.
 #
 # Riding a vanilla slot is NOT sufficient on its own -- the slot must also survive the build
-# unpatched. The prologue's guests do not: inject_prologue ZEROES their personal bases so their
-# stats read as pure class base, so Sephek is genuinely naked despite deploying on O'Neill's
-# slot, and belongs here no more than a raw pid does. PROLOGUE_ZEROED_GUEST_SLOTS is the
-# authoritative list of that exclusion and the two are asserted disjoint.
+# unpatched. The prologue's guests do not: inject_prologue REWRITES their personal bases (Hlin
+# and Scramsax onto their twins' lines, Sephek to zero), so Sephek is genuinely naked despite
+# deploying on O'Neill's slot, and belongs here no more than a raw pid does.
+# PROLOGUE_REWRITTEN_GUEST_SLOTS is the authoritative list of that exclusion and the two are
+# asserted disjoint.
 ENEMY_BASE_SLOT = {
     'goblin-chief':  'CHARACTER_%s' % CH01_BOSS_SLOT,
     'raider-captain': 'CHARACTER_%s' % CH02_BOSS_SLOT,

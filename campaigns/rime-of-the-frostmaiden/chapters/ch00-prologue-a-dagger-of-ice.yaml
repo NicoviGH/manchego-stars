@@ -131,6 +131,7 @@ player_units:
     required: true               # lose if she dies (our lord-death condition)
     death_quote: "Scramsax… finish the job. The towns need to know…"   # LOCKED 2026-06-10 — game-over line (EVFLAG_GAMEOVER)
     level: 3                     # low / frail — the weak lead (cf. Eirika Lv1)
+    twin: CHARACTER_EIRIKA       # fights on Eirika's vanilla line, on our Fighter class (#430)
     position: [8, 5]             # I6 — central & back (Eirika's vanilla spot)
     inventory:
       - id: hand-axe             # weak, throwable (range 1-2) so she can chip safely
@@ -147,6 +148,7 @@ player_units:
     is_npc: true                 # The Northlook's proprietor; the cold-open's "Jeigan"
     required: false              # defeat != game over (Seth precedent; see NOTE 3) — he retreats, alive for Ch1
     level: 1                     # promoted prepromote — high stats despite low internal level (cf. Seth)
+    twin: CHARACTER_SETH         # fights on Seth's vanilla line, on our Hero class (#430)
     # Retreat, not death — he tends The Northlook in ch01 regardless.
     defeat_quote: "Ngh… arm's done. You owe me three rounds now, Trollbane…"   # LOCKED 2026-06-10 (dialogue pass)
     position: [13, 9]            # N10 — forward, beside the enemies (Seth's vanilla spot)

@@ -43,7 +43,7 @@ UNIT = {
     'position': ANY, 'positions': ANY, 'boss_tile': ANY, 'camera_at': ANY,
     'is_boss': ANY, 'is_miniboss': ANY, 'hard_mode_only': ANY, 'required': ANY, 'is_npc': ANY,
     'convertible': ANY, 'inventory': ANY, 'inventory_by_class': Keyed(ANY), 'weapon': ANY,
-    'item_drop': ANY, 'gift': ANY, 'damage_type': ANY, 'personal': ANY, 'donor': ANY,
+    'item_drop': ANY, 'gift': ANY, 'damage_type': ANY, 'personal': ANY, 'donor': ANY, 'twin': ANY,
     'ai_pattern': ANY, 'ai_override': {'ai': ANY, 'why': ANY}, 'behavior': ANY,
     'arrives': {'turn': ANY}, 'arrives_turn': ANY, 'spawn_edge': ANY, 'spawn_turn': ANY,
     'trigger_turn': ANY, 'charge_from': ANY, 'charge_route': ANY, 'walks_to': ANY,
