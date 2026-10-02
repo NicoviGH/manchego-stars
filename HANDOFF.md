@@ -24,15 +24,20 @@ known for it: ch06's declared fuses (7 east, 8 west) against forecast medians of
 ch03's exp yield at x0.92; Marty's ch06 durability at 1.18 rounds on the median line.
 ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
 re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
+Then **step 4** (join levels) and **step 6** (locks), both DATA-DRIVEN, not Nicolas's call
+(2026-10-02: "data driven decisions, not my gut feel"):
+- **Founding party:** ch00's guests bank nothing, so the party runs 0.63-0.75 levels behind
+  vanilla's route through ch06 (ADR 0295 says the curves converge; the measurement says they
+  barely do -- rewrite it). Give the founding PCs the prologue's exp (~73), or L2 if that
+  needs an engine setter that costs too much.
+- **Recruits:** each joins where vanilla's equivalent joins against vanilla's party. Plus
+  #403's remainder: lupin and trex ride mid-game donor lines (Kyle L6, Colm L2) at level 1,
+  so they run HOT; ADR 0042 is the precedent (a different BASE donor).
+- **Locks:** a chapter locks when its re-measure holds parity. ch06's x1.00 is a checksum
+  on the donor pipeline (it copies 100% of FE8 Ch6), not a measurement.
 
 ## Owed by NICOLAS, not by the next session
 
-- **The locks** (#430 step 6, was #367 proposal 4, now closed into it): lock ch03-ch06, or
-  accept the gate is decorative for them. ⚠️ ch06 reads x1.00 because it reproduces 100% of
-  FE8 Ch6's force: a checksum on the donor pipeline, not a measurement. Ask; do not infer.
-- **#403's remainder** — lupin and trex inherit a mid-game donor's personal line (Kyle L6,
-  Colm L2) while declaring level 1, so those lines run HOT. ADR 0042 is the precedent (a
-  different BASE donor, not a different level).
 - **The boat crews have no voice.** No lore file names Tali or either crew, and Tali carries
   ch06's plot-critical hint.
 
