@@ -229,6 +229,14 @@ class TwinRoute(unittest.TestCase):
     def test_a_twin_behind_the_route_is_reported(self):
         self.assertEqual(1, len(ec.twin_route_findings([('a', 'FE8 Ch4'), ('b', 'FE8 Ch3')])))
 
+    def test_a_twin_the_route_cannot_place_is_reported(self):
+        found = ec.twin_route_findings([('a', 'FE8 Ch5'), ('b', 'FE8 Ch9 Eirika')])
+        self.assertEqual(1, len(found))
+        self.assertIn('cannot place', found[0])
+
+    def test_a_chapter_with_no_twin_is_skipped(self):
+        self.assertEqual([], ec.twin_route_findings([('a', 'FE8 Ch5'), ('b', None)]))
+
     def test_skipping_ahead_is_allowed(self):
         self.assertEqual([], ec.twin_route_findings(
             [('ch00', 'FE8 Prologue'), ('ch07', 'FE8 Ch7'), ('ch08', 'FE8 Ch13')]))
