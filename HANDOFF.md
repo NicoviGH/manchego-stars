@@ -88,9 +88,6 @@ Then, autonomously and data-driven:
 - **CI:** `build` (~2.5 min) is the PR's critical path; `tests` ~1 min and `checks` ~25s run
   beside it. The vanilla decomp build is cached (ADR 0299); `build.yml`'s `workflow_dispatch`
   with `no_cache` builds clean, and the `ROM checksum` step makes the two comparable.
-- **`gh pr checks --watch` returns at once if the push's runs have not registered yet** -- #443
-  merged before its CI ran (it then failed on a flake). Wait on the HEAD sha's runs instead:
-  `gh run list --branch B --json headSha,status` until both workflows are completed.
 - **A SUBAGENT is not woken by its own background task.** Tell it to run long commands in the
   FOREGROUND.
 

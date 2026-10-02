@@ -141,6 +141,9 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
 - A task = a GitHub issue → short-lived `feat/<n>-slug` branch off `main` → PR → CI + `/code-review`
   → squash-merge → delete the branch. A feature may span engine + content — ownership lives on the
   PR + issue, not a file glob.
+- **Merge only on CI for the PR's HEAD commit.** `gh pr checks --watch` returns at once when a
+  fresh push's runs have not registered yet, and #443 merged before its CI ran. Wait on
+  `gh run list --branch <b> --json headSha,status` until both workflows for the head sha complete.
 - **Review is `/code-review`, and the author is never the reviewer.** It is the default on every
   PR, not an optional extra, and a hand-rolled reviewer prompt is not a substitute — a skill
   reconstructed from memory runs last month's process. Use
