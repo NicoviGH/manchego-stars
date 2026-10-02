@@ -57,8 +57,8 @@ the whole roster split the prologue thirteen ways and understated its twin six-f
 **CA_BOSS is a question about the SLOT, and `ENEMY_BASE_SLOT` was the wrong table to ask.** The
 kill bonus pays +40 off `CA_BOSS`, which lives on CharacterData. `ENEMY_BASE_SLOT` maps our
 enemy ids to the vanilla slots whose **stat line** they inherit, and it deliberately excludes
-`inject_prologue`'s guests, whose personal bases are zeroed — but zeroing a stat line does not
-clear an attribute, and Sephek's DefeatBoss fires precisely because he keeps ONEILL's CA_BOSS.
+`inject_prologue`'s guests, whose personal bases it rewrites (Sephek's to zero, ADR 0319) — but
+rewriting a stat line does not clear an attribute, and Sephek's DefeatBoss fires precisely because he keeps ONEILL's CA_BOSS.
 Reading the boss question off the stat table underpaid the whole prologue by a 40-exp kill bonus
 and read ch00 at x0.76 against its twin. `build_campaign.ENEMY_CHARACTER_SLOT` is now the table
 for the attribute question, and it is derived from the stats one rather than repeating it.
