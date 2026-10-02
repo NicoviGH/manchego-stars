@@ -6,42 +6,25 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-02 (Claude), #430 step 2b landed (#439, #440); step 3's report is posted.
+Refreshed 2026-10-02 (Claude), #430 steps 3 and 4 landed (#441-#449); both reports are posted on #430.
 **What landed and why is in `git log` and the ADRs it cites** -- this file keeps no "recently
 landed" list.
 
 ## In flight
 
-**Nicolas wants this run AUTONOMOUSLY in a fresh instance: work the queue below end to end
-without checking in, except for a genuine design call (a move AWAY from vanilla).**
+**Waiting on NICOLAS: the no-Seth residual (#430's step-4 comment).** Two calls, both moves
+AWAY from vanilla or accepting a gap, so they are his:
+1. ch01-ch02 clear-load x1.41: vanilla's Seth one-rounds the boss; ours does not (ADR 0042).
+2. ch00 threat x1.98: Hlin's Hand Axe against Eirika's Rapier -- her kit, not her stats (ADR 0319).
 
-1. **#430 step 3 fixes, one PR each.** The picks are in #430's step-3 comment; each moves toward
-   vanilla, so they are mine (Nicolas, 2026-10-02: a parity correction is not a design
-   change). Re-measure with `make difficulty CH=chNN` (the split line: force vs party).
-   - **ch00 guests.** The prologue injector zeroes Scramsax's and Hlin's personal lines
-     (`inject/chapters/prologue.py`, guest_patch), so they fight at bare class base: party
-     effect x3.95 / x2.59. Write each guest's twin line instead (Seth's, Eirika's: effective
-     line minus our class base), and make `difficulty.fixed_roster_careers` read the same
-     source. ch00's scenarios run once.
-   - **ch01's goblin wave** `spawn_turn` 3 -> 2 (vanilla's turn).
-   - **ch05's eruption waves** 2/3/5 -> 2/6/8, same tiles.
-   - **ch02's front heats a phase early** with a 100% force copy. Our deploy front is y3-5
-     against vanilla's y1-3, several enemy tiles sit closer, and four vanilla pursuers never
-     reach the front. Check the vanilla terrain read before calling it a chapter fault.
-2. **Step 4 (#403), then step 5 (#135), then step 6 (locks)**, all DATA-DRIVEN, not Nicolas's call:
-   - **Founding party:** ch00's guests bank nothing, so the party runs 0.63-0.75 levels behind
-     vanilla's route through ch06 (rewrite ADR 0295's "the curves converge"). Give the founding
-     PCs the prologue's exp (~73), or L2 if that needs an engine setter that costs too much.
-   - **Recruits:** each joins where vanilla's equivalent joins against vanilla's party. Plus
-     #403's remainder: lupin and trex ride mid-game donor lines (Kyle L6, Colm L2) at level 1,
-     so they run HOT; ADR 0042 is the precedent (a different BASE donor).
-   - **After step 4, bring Nicolas the no-Seth residual with a pick.** ADR 0042 chose no
-     Seth-tier unit; whatever party effect remains is that choice's cost, and it is his call.
-   - **Locks:** ch00-ch02 were unlocked in #439. A chapter re-locks when its re-measure holds
-     parity on v2.
-   - ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
-     re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
-   - The Monte Carlo simulator stays parked in #430 with its trigger.
+Then, autonomously and data-driven:
+- **Step 5 (#135)** -- v0.1.0 playtester feedback, never triaged.
+- **Step 6 (locks)** -- a chapter re-locks when its re-measure holds parity on v2. Every FORCE
+  now sits x0.93-x1.11 of its twin; what is left is the party residual above, so the locks
+  wait on his call.
+- ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
+  re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
+- The Monte Carlo simulator stays parked in #430 with its trigger.
 
 ## Owed by NICOLAS, not by the next session
 
@@ -54,7 +37,6 @@ without checking in, except for a genuine design call (a move AWAY from vanilla)
   reskins, the boarding pass and nerra's art need no dialogue and can go first.
 - **#335** — the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).
-- **#135** — v0.1.0 playtester feedback, never triaged; the only open player-facing item.
 
 ## Traps a fresh session walks into
 
