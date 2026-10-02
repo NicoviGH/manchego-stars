@@ -122,6 +122,7 @@ CHAPTER = {
                    'penalty_if_killed': {'gold': ANY, 'reputation': ANY}}],
     'rescue_boats': [{'id': ANY, 'fe_name': ANY, 'class': ANY, 'donor': ANY, 'faction': ANY,
                       'size': ANY, 'tile': ANY, 'door': ANY, 'attackable_sides': ANY,
+                      'declared_fuse': ANY, 'personal': ANY,
                       'reached_on': Keyed(ANY), 'reached_on_contested': Keyed(ANY),
                       'talk': {'background': ANY, 'ea_file': ANY, 'text': ANY,
                                'reward': REWARD}}],

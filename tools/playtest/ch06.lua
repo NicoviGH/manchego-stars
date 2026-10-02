@@ -18,7 +18,7 @@ return {
     -- is a hit rate, not a turn number (see the scenario's header), so a single run is one
     -- sample of a distribution and an equality check on it would be a coin-flip verdict.
     BOATS = {
-        { id = "boat-east", pid = 0xbb, x = 17, y = 12, doorX = 17, doorY = 13, sinks_on = 7 },
+        { id = "boat-east", pid = 0xbb, x = 17, y = 12, doorX = 17, doorY = 13, sinks_on = 10 },
         { id = "boat-west", pid = 0xbc, x = 4,  y = 17, doorX = 4,  doorY = 18, sinks_on = 8 },
     },
 
