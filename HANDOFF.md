@@ -6,35 +6,50 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-02 (Claude), after #437. **What landed and why is in `git log` and the
+Refreshed 2026-10-02 (Claude), mid-#430 step 3. **What landed and why is in `git log` and the
 ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-**Nothing. No open PRs, no branches.** #430 steps 1 and 2 are DONE (#436 = ADR 0314, the
-2RN hit and crit in `fe_combat`; #437 = ADR 0315, the exp guard). #430's latest comment holds
-the numbers.
+**Nicolas wants this run AUTONOMOUSLY in a fresh instance: work the queue below end to end
+without checking in, except for a genuine design call (a move AWAY from vanilla).**
 
-**Next: #430 step 3**, re-measure ch00-ch06 with the fixed instrument and report each against
-its twin: what holds, what is off, by how much. **Fix every finding that restores measured
-vanilla parity as you go, locked chapters included** (Nicolas, 2026-10-02, said twice: a
-parity correction is not a design change; #436 retuned Sephek and the Grell that way). Only a
-move AWAY from vanilla, or a choice between vanilla-neutral options, goes to him. Already
-known for it: ch06's declared fuses (7 east, 8 west) against forecast medians of 10 and 6;
-ch03's exp yield at x0.92; Marty's ch06 durability at 1.18 rounds on the median line.
-ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
-re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
-Then **step 4** (join levels) and **step 6** (locks), both DATA-DRIVEN, not Nicolas's call
-(2026-10-02: "data driven decisions, not my gut feel"):
-- **Founding party:** ch00's guests bank nothing, so the party runs 0.63-0.75 levels behind
-  vanilla's route through ch06 (ADR 0295 says the curves converge; the measurement says they
-  barely do -- rewrite it). Give the founding PCs the prologue's exp (~73), or L2 if that
-  needs an engine setter that costs too much.
-- **Recruits:** each joins where vanilla's equivalent joins against vanilla's party. Plus
-  #403's remainder: lupin and trex ride mid-game donor lines (Kyle L6, Colm L2) at level 1,
-  so they run HOT; ADR 0042 is the precedent (a different BASE donor).
-- **Locks:** a chapter locks when its re-measure holds parity. ch06's x1.00 is a checksum
-  on the donor pipeline (it copies 100% of FE8 Ch6), not a measurement.
+1. **#438 -- ch04's bonewalker pack L2/L1/L1** (branch `ch04-bonewalker-pack-levels`). CI is
+   green. Owed: `/code-review` on the CHECKED-OUT branch (type the level, `medium`), fix the
+   findings, squash-merge, delete the branch.
+2. **#430 step 2b, instrument v2 -- two PRs, instrument-only.** The spec is #430's body (step
+   2b); the prototype numbers and code are its latest comment.
+   - **Layer 1, matchups:** the vanilla twin's arriving party replaces `YARDSTICK`, with
+     harmonic clear-load. Threat follows FE8's AI target score (port `AiComputeCombatScore`,
+     `fireemblem8u/src/cp_battle.c:572-780`). One headline ratio: ours vs our party / vanilla
+     vs vanilla's party. Go through the dice-averaged careers (ADR 0311), not the median line.
+     `YARDSTICK` stays only for a twin off `VANILLA_CHAIN` (ch08). ADR in the same PR.
+     Expect the `--check` gate and canaries to need care; ch00-ch02 are locked.
+   - **Layer 2, timeline:** from `danger_map`, each enemy's first-contact turn,
+     reinforcement and never-moving enemies, and peak threat per enemy phase at the
+     deploy front. Ours and the twin, turn by turn.
+   - **Not this round:** the Monte Carlo simulator. It is parked in #430 with a trigger;
+     do not start it.
+3. **#430 step 3 on v2:** re-measure ch00-ch06 and post the report on #430. **Fix every
+   finding that restores measured vanilla parity as you go, locked chapters included**
+   (Nicolas, 2026-10-02, said twice: a parity correction is not a design change; #436 and
+   #438 are the pattern). Only a move AWAY from vanilla, or a choice between vanilla-neutral
+   options, goes to him. Already known: ch01 has 0 reinforcements against vanilla's 3, and
+   ch03's exp yield is x0.92. ch04's x1.14 is the designed Mauthe Doog tax (its
+   difficulty_note), and the ch06 fuses hold (10/8 = forecast 10/8).
+   ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
+   re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
+4. **Step 5 (#135), then steps 4 and 6**, all DATA-DRIVEN, not Nicolas's call
+   (2026-10-02: "data driven decisions, not my gut feel"):
+   - **Founding party:** ch00's guests bank nothing, so the party runs 0.63-0.75 levels behind
+     vanilla's route through ch06 (ADR 0295 says the curves converge; the measurement says
+     they barely do -- rewrite it). Give the founding PCs the prologue's exp (~73), or L2 if
+     that needs an engine setter that costs too much.
+   - **Recruits:** each joins where vanilla's equivalent joins against vanilla's party. Plus
+     #403's remainder: lupin and trex ride mid-game donor lines (Kyle L6, Colm L2) at level
+     1, so they run HOT; ADR 0042 is the precedent (a different BASE donor).
+   - **Locks:** a chapter locks when its re-measure holds parity. ch02's and ch06's x1.00 are
+     checksums on the donor pipeline (they copy 100% of the twin), not measurements.
 
 ## Owed by NICOLAS, not by the next session
 
@@ -53,6 +68,10 @@ Then **step 4** (join levels) and **step 6** (locks), both DATA-DRIVEN, not Nico
 
 - **Our own scenes are named `MS_*`.** Any code that matches `EventScr_` must ask whether it
   also means `MS_` (#401 reported 26 of 40).
+- **`levels:` (per-body levels) is honoured only by ch02's and ch04's emitters.** ch01, ch03,
+  ch05 and ch06 read `level` alone and would silently emit one level for every body. A parity
+  fix that splits a pack's levels there must first route the emitter through
+  `inject.raw_pids.entry_body_levels` (#438 is the pattern: diff the emitted rows).
 - **A new `check_*` must ship a canary** in `tools/test_check_canaries.py` (ADR 0298;
   `check_every_gate_has_a_canary` enforces it). A canary doctors a real input at `open()` and
   names the fault; a file it doctors or reads to aim goes in `CANARY_FILES`.
