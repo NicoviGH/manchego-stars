@@ -389,11 +389,9 @@ class EnemyBodiesAndUnitsReachingReadEveryRosterKey(unittest.TestCase):
 
 
 class ArrivalTurnToIsSharedByBothDirections(unittest.TestCase):
-    """`reached_on` (MANY deploy cells -> ONE target) and `rescue_forecast.arrival_to_cells`
-    (ONE enemy -> MANY candidate firing cells) were mirror-image compositions of the exact
-    same two primitives, `foot_reach` then `arrival_turn`, glued together twice. One
-    function that takes both ends as lists covers either direction; `reached_on` and
-    `arrival_to_cells` are both thin callers of it now."""
+    """`arrival_turn_to` takes both ends as lists, so one Dijkstra-then-arrival-turn
+    composition covers MANY deploy cells -> ONE target (`reached_on`) and ONE source -> MANY
+    targets alike."""
 
     def test_many_sources_to_one_target_matches_reached_on(self):
         plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
@@ -402,7 +400,7 @@ class ArrivalTurnToIsSharedByBothDirections(unittest.TestCase):
                                  mov=3, targets=[(2, 0)])
         self.assertEqual(got, 1)          # (0,0) is 2 points away, one turn at mov 3
 
-    def test_one_source_to_many_targets_matches_arrival_to_cells(self):
+    def test_one_source_to_many_targets(self):
         plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
         terrain = [[plain] * 6]
         got = pp.arrival_turn_to(terrain, [(0, 0)], 'TerrainTable_MovCost_CommonT1Normal',
@@ -415,16 +413,6 @@ class ArrivalTurnToIsSharedByBothDirections(unittest.TestCase):
         got = pp.arrival_turn_to(terrain, [(0, 0)], 'TerrainTable_MovCost_CommonT1Normal',
                                  mov=3, targets=[])
         self.assertIsNone(got)
-
-    def test_rescue_forecasts_arrival_to_cells_delegates_to_the_shared_primitive(self):
-        import rescue_forecast as rf
-        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
-        terrain = [[plain] * 6]
-        via_wrapper = rf.arrival_to_cells(terrain, (0, 0),
-                                          'TerrainTable_MovCost_CommonT1Normal', 3, [(2, 0)])
-        via_shared = pp.arrival_turn_to(terrain, [(0, 0)],
-                                        'TerrainTable_MovCost_CommonT1Normal', 3, [(2, 0)])
-        self.assertEqual(via_wrapper, via_shared)
 
 
 class ReachedOnIsDerived(unittest.TestCase):

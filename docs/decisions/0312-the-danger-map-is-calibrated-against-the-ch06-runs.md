@@ -60,5 +60,13 @@ ch06 that ships, the distribution is the prediction.
 - `fe_combat`'s metrics, and with them every `make difficulty` reading and the parity ratio,
   use displayed hit and no crit. That undervalues accurate attacks and overvalues inaccurate
   ones.
-- `rescue_forecast` answers the hull question with the three errors above (red bodies
-  block, displayed hit, no poison). It is re-pointed at this module next.
+
+**`rescue_forecast` asks this model.** It answered the hull question with all three errors
+above: red bodies blocked, hit was displayed, and there was no poison. It now reads this
+module, one (pursuer, hull) pair at a time. Its arrival is the first phase the pursuer can
+strike the hull from where it can actually stand. Its sink turns are the 10th, 50th and 90th
+percentiles of simulated fights. ADR 0277's `arrival_to_cells`, `sink_band` (a Wald
+approximation built on displayed hit) and `concurrent_attacker_cap` are retired: this
+module's walk, `simulate_sink` and the matching in `attacks_on` replace them. ch06's rows
+move from turn 9 and 9 to 10 and 6, and the thrower's 2.76 dmg/phase becomes 2.62 once hit
+is rolled on 2RN.
