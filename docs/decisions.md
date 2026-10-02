@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-320 decisions. Read this index, then open the two or three you need — the whole
+321 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -186,6 +186,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0318` | [A zone-triggered wave arrives on the party's earliest entry into its zone](decisions/0318-a-zone-wave-arrives-on-the-partys-earliest-entry.md) | 2026-10-02 | #430 |
 | `0319` | [ch00's guests fight on their twins' lines](decisions/0319-ch00-s-guests-fight-on-their-twins-lines.md) | 2026-10-02 | #430 |
 | `0320` | [The founding party is handed the prologue's pay](decisions/0320-the-founding-party-is-handed-the-prologues-pay.md) | 2026-10-02 | #430 #403 |
+| `0321` | [trex and lupin join on lines that fit where they join](decisions/0321-trex-and-lupin-join-on-join-appropriate-lines.md) | 2026-10-02 | #403 #430 |
 
 ---
 

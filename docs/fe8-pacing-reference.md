@@ -222,14 +222,14 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
 | ch01 | FE8 Ch1 | 4 | 370 / 378 (x0.98) | L2 | **L2** | L3 | -- |
 | ch02 | FE8 Ch2 | 5 | 398 / 398 (x1.00) | L2 | **L3** | L5 | L1 |
 | ch03 | FE8 Ch3 | 9 | 382 / 415 (x0.92) | L2 | **L3** | L6 | L1 |
-| ch04 | FE8 Ch4 | 9 | 822 / 812 (x1.01) | L3 | **L4** | L8 | L1 |
-| ch05 | FE8 Ch5 | 9 | 961 / 899 (x1.07) | L3 | **L5** | L10 | L1 |
-| ch06 | FE8 Ch6 | 10 | 1074 / 1074 (x1.00) | L4 | **L6** | L12 | L1 |
+| ch04 | FE8 Ch4 | 9 | 818 / 808 (x1.01) | L3 | **L4** | L8 | L2 |
+| ch05 | FE8 Ch5 | 9 | 956 / 893 (x1.07) | L3 | **L5** | L10 | L1 |
+| ch06 | FE8 Ch6 | 10 | 1068 / 1068 (x1.00) | L4 | **L6** | L12 | L1 |
 
 **Entering ch07 the party is L6** -- L4 for a founding unit that rides the bench,
 L12 for one fed every kill, and **L1 for the lowest-level recruit on the field**.
 A recruit starts at the level its own chapter PLACES it at:
-L1 for trex, baxby, lupin and basil; L5 for sahnar.
+L1 for baxby, lupin and basil; L2 for trex; L5 for sahnar.
 
 The same cast fed each chapter's VANILLA twin instead of ours reaches **L6** over
 the same span: the party lands where FE8's party lands, which is what makes the

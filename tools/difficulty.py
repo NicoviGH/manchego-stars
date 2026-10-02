@@ -2242,7 +2242,7 @@ def unit_real_article(enemy_def, combatant):
     THREE places:
       * `personal:` on the chapter YAML, for a raw-pid enemy authored there (Ravisin);
       * BASE_DONOR, for a CAST member deployed hostile, whose donor's line is written into its
-        character slot by the build (Sahnar rides Joshua's, Lupin rides Kyle's);
+        character slot by the build (Sahnar rides Joshua's, Lupin rides Franz's);
       * ENEMY_BASE_SLOT, for an enemy deployed on a VANILLA character slot, which keeps that
         slot's own line because nothing patches it (ch02's Halvar rides Bazba's).
     Reading only the first is why ch05's red Myrmidon measured 6.2 against the 21.4 she

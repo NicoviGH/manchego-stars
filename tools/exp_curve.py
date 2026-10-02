@@ -780,7 +780,7 @@ def print_table(rows):
                  r['band_low'], r['level_after'], r['band_high'],
                  ('lowest recruit L%d' % r['lowest_recruit'])
                  if r['lowest_recruit'] is not None else '',
-                 '' if r['banks'] else '   (fixed roster -- the party banks none of it)'))
+                 '' if r['banks'] else '   (fixed roster -- handed to the founding party, ADR 0320)'))
 
 
 def main():

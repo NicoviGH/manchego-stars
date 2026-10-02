@@ -45,8 +45,10 @@ fe_stats:
   MOV: 7                    # Cavalier baseMov (mounted)
   CON: 9
 donor:
-  character: Kyle           # vanilla Cavalier — bases/growths reference (Franz is Baxby's ref)
-  why: fresh Cavalier = full growth runway; distinct donor from Baxby
+  character: Kyle           # vanilla Cavalier — GROWTHS + ranks reference (distinct from Baxby's)
+  base: Franz               # personal BASES: Kyle's are his L5 Ch8 line, hot on a level-1 body
+  why: fresh Cavalier = full growth runway on Kyle's curve, starting from Franz's L1 line
+    (ADR 0042's shaman precedent -- a join-appropriate base donor; #403, ADR 0321)
 
 # ── Growth Rates (% per level) — vanilla Cavalier growths from data_classes.c ─
 growth_rates:
