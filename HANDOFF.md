@@ -34,9 +34,13 @@ numbers and the findings for step 3.
 
 ## Owed by NICOLAS, not by the next session
 
-- **#367's proposal 4** — lock ch03–ch06, or accept the gate is decorative for them. ⚠️ Not the
-  mechanical yes it looks like: ch06 reads x1.00 because it reproduces 100% of FE8 Ch6's force —
-  a checksum on the donor pipeline, not a measurement. Ask; do not infer.
+- **ch06's boat fuses** (#26, unparked 2026-10-01: its condition, the model review, is met).
+  Measured: east median 10, west median 6, against the declared 7 and 8. My pick: restate
+  the fuses and wire Tali to the east boat (no stats change); the alternative is west hull
+  HP 28. The table is #26's latest comment.
+- **The locks** (#430 step 6, was #367 proposal 4, now closed into it): lock ch03-ch06, or
+  accept the gate is decorative for them. ⚠️ ch06 reads x1.00 because it reproduces 100% of
+  FE8 Ch6's force: a checksum on the donor pipeline, not a measurement. Ask; do not infer.
 - **#403's remainder** — lupin and trex inherit a mid-game donor's personal line (Kyle L6,
   Colm L2) while declaring level 1, so those lines run HOT. ADR 0042 is the precedent (a
   different BASE donor, not a different level).
