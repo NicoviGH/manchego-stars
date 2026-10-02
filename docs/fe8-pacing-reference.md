@@ -270,8 +270,9 @@ arrives (`exp_curve.entering`): only the units that have joined, each at its typ
 entering, grown to the median of simulated level-ups on its growth donor. FE8's own party is set beside
 it: every vanilla recruit so far, run through the same exp model on vanilla's own force from
 its own join level, and grown the same way. The cast tables, the fielded party, the lord sweep and the
-vanilla delta all read that party (ADR 0310). The parity ratio does not read a party at all. It
-compares two enemy forces against a fixed yardstick, so a level fed to it would change nothing.
+vanilla delta all read that party (ADR 0310), and so does the parity ratio: each force is
+measured against the party that meets it, ours against ours and the twin's against vanilla's,
+with the threat landing where FE8's AI would send it (ADR 0316).
 
 ⚠️ **The exp column is the only quantity in this repo that integrates across chapters**, which
 is why `tools/test_exp_curve.py` asserts every chapter within ±12% of its twin. A chapter that
