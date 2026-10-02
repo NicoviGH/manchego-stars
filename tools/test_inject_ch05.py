@@ -105,14 +105,14 @@ class Ch05EruptionWarning(unittest.TestCase):
         (#25, 2026-08-14) -- vanilla's own shape, where Joshua LOADs after the prep CALL. The
         eruption keeps its six reinforcements; a LOAD of her table here would put a second
         Sahnar on the board."""
-        for turn in (2, 3, 5):
+        for turn in (2, 6, 8):
             script = inject.chapters.ch05.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn)
             self.assertNotIn(inject.chapters.ch05.CH05_SAHNAR_TABLE, script)
 
     def test_later_waves_do_not_repeat_the_turn_two_warning(self):
         self.assertTrue(hasattr(inject.chapters.ch05, 'ch05_wave_script'),
                         'the wave script needs a testable owner for its ordering')
-        for turn in (3, 5):
+        for turn in (6, 8):
             script = inject.chapters.ch05.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn)
             self.assertNotIn('TEXTSHOW(', script)
             self.assertNotIn('CUMO_CHAR(', script)
@@ -233,7 +233,7 @@ class Ch05RavisinBattleTaunt(unittest.TestCase):
         would fire the taunt on a clock rather than on the fight."""
         rows = inject.chapters.ch05.ch05_ravisin_battle_quote()
         self.assertNotIn(inject.chapter_ids.CH05_MOOSE_PID, rows)
-        for turn in (2, 3, 5):
+        for turn in (2, 6, 8):
             self.assertNotIn('TEXTSHOW(0x%X)' % inject.chapter_ids.CH05_RAVISIN_TAUNT_MSG,
                              inject.chapters.ch05.ch05_wave_script(turn, 'MS_Ch05WaveT%d' % turn))
 

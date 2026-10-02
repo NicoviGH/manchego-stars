@@ -265,7 +265,7 @@ CH05_BEGINNING_SCRIPT = 'EventScr_Ch6_BeginningScene'
 CH05_ENDING_SCRIPT = 'EventScr_Ch6_EndingScene'
 # Dead host-slot scripts repurposed for our reinforcement waves. Unreachable once the event
 # lists above are stripped; each verified free by grep (the ch03/ch04 idiom).
-CH05_WAVE_SCRIPTS = {2: 'EventScr_089F2B74', 3: 'EventScr_089F2940', 5: 'EventScr_089F2A98'}
+CH05_WAVE_SCRIPTS = {2: 'EventScr_089F2B74', 6: 'EventScr_089F2940', 8: 'EventScr_089F2A98'}
 CH05_PREP_SCRIPT = 'EventScr_08591FD8'           # the shared CLEAN/PREP/CLEAN script (cf. ch03/ch04)
 
 # Our OWN roster tables (declare_unit_table). Named for the chapter whose units are in them.
@@ -275,9 +275,9 @@ CH05_LUPIN_PROOF_TABLE = 'MS_Ch05LupinProof'     # --ch05-lupin only: Lupin, LOA
                                                  # opening's CHECK_ALIVE so the ALIVE arm is
                                                  # reachable from a cold boot (see inject_ch05)
 CH05_LINE_TABLE = 'MS_Ch05Line'                  # the 16 turn-1 tomb-guardians
-CH05_SAHNAR_TABLE = 'MS_Ch05Sahnar'              # the turn-2 convertible (rises hostile)
+CH05_SAHNAR_TABLE = 'MS_Ch05Sahnar'              # the convertible, on the arena from turn 1
 CH05_BASIL_TABLE = 'MS_Ch05Basil'                # Basil, GREEN at the pocket mouth (see below)
-CH05_WAVE_TABLES = {2: 'MS_Ch05Wave2', 3: 'MS_Ch05Wave3', 5: 'MS_Ch05Wave5'}
+CH05_WAVE_TABLES = {2: 'MS_Ch05Wave2', 6: 'MS_Ch05Wave6', 8: 'MS_Ch05Wave8'}
 
 # ── The two-stage ch05 recruit (#25): Basil joins in the OPENING, then Talks Sahnar ──────
 # Vanilla Ch5's Character list is exactly ONE entry -- CHAR(EVFLAG_TMP(7), ..., NATASHA, JOSHUA)

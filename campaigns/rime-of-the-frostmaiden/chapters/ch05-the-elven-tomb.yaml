@@ -587,14 +587,14 @@ enemy_units:
   # (The Armor-Knight `frost-sentinel` pair was REMOVED 2026-07-23. They existed only as a
   #  distributed wall to compensate for a squishy caster boss; once Ravisin carries a real
   #  personal boss line she holds her own fight, and they were redundant scaffolding.)
-  # ── ERUPTION reinforcements (#177): the dead erupt over turns 2/3/5 and race the ─
+  # ── ERUPTION reinforcements (#177): the dead erupt over turns 2/6/8 and race the ─
   #    spread reliquary reward-sites (the Ch5 village-raid, in undead dress) ──────
   # SPAWN TILES are vanilla Ch5's own raider spawns — three pairs down the EAST edge, at
   # (14,16)(14,15) · (14,8)(14,6) · (13,0)(14,1). Vanilla sends Brigands in on turns 2/6/8 to
-  # burn the villages; we send the risen dead in on our own 2/3/5 to desecrate the reliquaries.
-  # The tiles carry the structure that makes the race work and the turns are ours: the first
-  # pair lands BEHIND the party's south pocket, so the eruption is a threat you must turn to
-  # answer rather than one you advance into.
+  # burn the villages; we send the risen dead in on the same turns to desecrate the reliquaries
+  # (#430: our 2/3/5 brought the last two waves a vanilla race's three and three turns early).
+  # The first pair lands BEHIND the party's south pocket, so the eruption is a threat you must
+  # turn to answer rather than one you advance into.
   - id: risen-spear-reinf
     name: "Risen Spear-Guard"
     count: 2
@@ -620,7 +620,7 @@ enemy_units:
     class: fighter
     level: 5
     autolevel: true
-    arrives_turn: 3
+    arrives_turn: 6
     positions: [[14, 8], [14, 6]]     # vanilla's mid-east pair — astride the eastern lane
     inventory:
       - id: rusted-greataxe
@@ -638,10 +638,10 @@ enemy_units:
     class: archer
     level: 5
     autolevel: true
-    arrives_turn: 5             # the last wave races the far reliquary reward-sites
+    arrives_turn: 8             # the last wave races the far reliquary reward-sites
     positions: [[13, 0], [14, 1]]     # vanilla's north-east pair — they spawn on the rim, a short
                                 # walk from reliquary-north (5,1), which is the site furthest from
-                                # the party's start and the last one still standing by turn 5
+                                # the party's start and the last one still standing by turn 8
     inventory:
       - id: elven-longbow
         fe_base: iron-bow
@@ -1302,7 +1302,7 @@ events:
       - tutorial: "If you lose, however, that unit [red]will not be able to fight in any future battles[/red]."
       - tutorial: "If your HP drops near zero in a fight, [red]press the B Button quickly[/red] to concede."
       - tutorial: "You'll lose your entry fee, but you'll save your unit to fight again."
-  - trigger: eruption_turn        # scripted turn (~2/3/5, the Ch5 wave cadence) — EARTHQUAKE/TILECHANGE
+  - trigger: eruption_turn        # scripted turns 2/6/8, the Ch5 wave cadence — EARTHQUAKE/TILECHANGE
     slot: "vanilla 0x9C5"        # anatomy/source only; ch05 writes this beat at host-owned 0x9E4
     type: scripted_event
     ea_file: events/ch05-eruption.ea
