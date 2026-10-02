@@ -197,7 +197,7 @@ class Board:
     def __init__(self, chapter, mode=None, terrain=None, targets=(), spared_by=(),
                  every_mode=False, fielded=None):
         """`fielded` is a ready list of `Body` for a board that is not one of our chapters
-        (the vanilla twin's, `timeline.vanilla_board`); `chapter` is then None and `terrain`
+        (the vanilla twin's, `timeline.vanilla_bodies`); `chapter` is then None and `terrain`
         is required."""
         self.chapter = chapter
         self.targets = tuple(tuple(t) for t in targets)

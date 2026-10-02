@@ -39,10 +39,10 @@ brigand-brute) moves as the `class:` it clones.
 `trigger_turn`, `spawn_turn` or `arrives: {turn:}`. `entry_is_turn1` read only the first, so
 ch01's `spawn_turn: 3` goblins stood on the opening board in every reader that asked: the
 parity groups, the placement preview and `danger_map`. That is where "ch01 has no
-reinforcements against vanilla's three" came from. It has three, on turn 3 against vanilla's
-turn 2. `inject.raw_pids.entry_arrival_turn` now reads all four.
+reinforcements against vanilla's three" came from. It has three, on turn 3, which is vanilla's
+turn (ADR 0318). `inject.raw_pids.entry_arrival_turn` now reads all four.
 
 **First reading**, for step 3. ch04 and ch06 track their twins closely. ch05's waves land on
-turns 3 and 5, where vanilla's land on 6 and 8. ch01's wave and its first contact both come a
-turn after vanilla's. ch02's front heats up a phase earlier than vanilla's (31 against 7 on
+turns 3 and 5, where vanilla's land on 6 and 8. ch01's wave and its first contact land on
+vanilla's turns. ch02's front heats up a phase earlier than vanilla's (31 against 7 on
 phase 3).

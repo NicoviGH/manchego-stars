@@ -42,9 +42,9 @@ lock twins carry none, so the lock is unchanged, but Ch2's Vulnerary / Ch3's key
 (2) **area/zone-triggered reinforcements** — `_vanilla_reinforcement_turns` matched only the `TurnEventPlayer`
 macro, so it missed Ch4 "Ancient Horrors"' waves: a turn-2 Bonewalker pack written as a raw
 `TURN(…, FACTION_BLUE)` and a Revenant pack behind a temp-flag-gated `TURN` that an `AREA(…)` trigger arms on
-zone-entry. It now also reads the raw-`TURN` expansion, treats any **flag-gated** turn event (and any `AREA`/
-`AFEV` script that LOADs a force) as a reinforcement, and models zone-entry arrivals as `_ZONE_ENTRY_TURN`
-(> 1, so they leave the turn-1 line) — Ch4 reads 16 line + 7 reinforcements, Ch5's 2/6/8 detection unchanged.
+zone-entry. It now also reads the raw-`TURN` expansion, treats any **flag-gated** turn event (and any
+`AREA` script that LOADs a force) as a reinforcement, arriving on the party's earliest entry into the zone
+(ADR 0318) — Ch4 reads 16 line + 7 reinforcements, Ch5's 2/6/8 detection unchanged.
 _Decided: 2026-07-16 (CLAUDE; TDD). Closes the v1 scope noted on #170/#171._
 Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (vanilla Ch2's village
 gifts) + a regular armory + one enemy consumable drop; **no boosters, no promos.** The three chwinga

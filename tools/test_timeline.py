@@ -9,6 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import danger_map as dm
+import difficulty as dif
 import fe_combat as fc
 import map_placement_preview as pp
 import timeline as tl
@@ -32,13 +33,13 @@ def body(source, shape='pursuer', arrives=1, mov=5, weapon='iron-lance', index=0
 
 class TheTwinsBoard(unittest.TestCase):
     def test_the_layout_comes_from_the_chapter_settings(self):
-        self.assertEqual(tl.vanilla_layout('FE8 Ch4'), 'Ch4Map')
-        self.assertEqual(tl.vanilla_layout('FE8 Prologue'), 'PrologueMap')
+        self.assertEqual(dif.vanilla_layout('FE8 Ch4'), 'Ch4Map')
+        self.assertEqual(dif.vanilla_layout('FE8 Prologue'), 'PrologueMap')
 
     def test_the_front_is_the_table_the_event_group_names(self):
         # ch05's deploy_slots are lifted 1:1 from vanilla Ch5's playerUnitsInNormal table.
         chapter = pp.load_chapter('ch05')
-        self.assertEqual(tl.vanilla_front('FE8 Ch5'), tl.our_front(chapter))
+        self.assertEqual(dif.vanilla_front('FE8 Ch5'), tl.our_front(chapter))
 
     def test_a_fixed_roster_front_is_its_player_units(self):
         chapter = pp.load_chapter('ch00')
