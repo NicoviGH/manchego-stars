@@ -36,6 +36,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import map_tileset_tool as mt                                        # noqa: E402
 import campaign_chapters                                             # noqa: E402
+import chapter_schema                                                # noqa: E402
 
 CAMPAIGN = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden')
 MAPS = os.path.join(CAMPAIGN, 'maps')
@@ -270,8 +271,7 @@ def enemy_bodies(chapter):
         for enemy in chapter.get(key) or ():
             if not isinstance(enemy, dict) or not inject.raw_pids.entry_is_turn1(key, enemy):
                 continue
-            for tile in enemy.get('positions') or ():
-                out.add(tuple(tile))
+            out.update(tuple(t) for t in chapter_schema.entry_tiles(enemy))
     return out
 
 
@@ -345,7 +345,7 @@ def units_reaching(chapter, terrain, targets):
         table, mov = class_movement(enemy.get('deploy_class') or enemy['class'])
         cost = mov_cost_row(table)
         fire = {cell for t in targets for cell in firing_cells(terrain, t, reach)}
-        for index, (x, y) in enumerate(enemy.get('positions') or ()):
+        for index, (x, y) in enumerate(chapter_schema.entry_tiles(enemy)):
             ai = difficulty.enemy_ai_bytes(chapter, enemy, index)
             dist = foot_reach(terrain, [(x, y)], cost=cost)
             # A STATUE cannot move at all, even to attack -- its reach is its weapon and
@@ -438,7 +438,7 @@ def placed_units(chapter, concept=None):
             if not isinstance(enemy, dict):
                 continue
             eid = enemy.get('id')
-            tiles = override.get(eid, enemy.get('positions') or [])
+            tiles = override.get(eid, chapter_schema.entry_tiles(enemy))
             for i, tile in enumerate(tiles):
                 ai = dif.enemy_ai_bytes(chapter, enemy, i)
                 # Derived from the WHOLE vector, never patched by role: `is_boss` was standing

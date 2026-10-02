@@ -40,6 +40,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import chapter_schema                                                # noqa: E402
 import chapter_status as cs                                          # noqa: E402
 import difficulty as dif                                             # noqa: E402
 import fe_combat as fc                                               # noqa: E402
@@ -136,7 +137,7 @@ def bodies(chapter, mode=None, every_mode=False):
                        inject.raw_pids.entry_arrival_turn(enemy))
             units = dif._entry_combatants(enemy, mode=mode, shifts=shifts, real_article=True,
                                           drop_staff=False)
-            for index, tile in enumerate(enemy.get('positions') or ()):
+            for index, tile in enumerate(chapter_schema.entry_tiles(enemy)):
                 ai = dif.enemy_ai_bytes(chapter, enemy, index)
                 table, mov = _movement(enemy, index)
                 out.append(Body(enemy.get('id'), index, tuple(tile), cs.ai_shape(ai), ai[0],
