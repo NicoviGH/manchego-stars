@@ -129,8 +129,8 @@ difficulty_note: >
   the whole line mirroring vanilla Ch4's own force 1:1. The difficulty model is
   "the wolves turn the tide": the raw, no-parley fight sits ABOVE vanilla (the
   tax), and the turn-2 wolf-pack reveal + Marty->Lupin parley discounts it back to
-  dead-on vanilla on the played path (verified: static ×1.15 threat / ×1.19
-  clear-load; parley-path clear-load 2.5 ≈ vanilla's 2.6). Not "lean generous" —
+  dead-on vanilla on the played path (measured 2026-10-02, #430: static ×1.14 threat /
+  ×1.15 clear-load; parley-path clear-load 2.2 against vanilla's 2.3). Not "lean generous" —
   the house target is measured vanilla parity; generosity lives in the recruit and
   the mercy, not in a softened fight.
 
@@ -291,7 +291,7 @@ enemy_units:
     count: 3
     positions: [[14,6],[13,5],[14,11]]
     class: bonewalker
-    level: 2                    # vanilla Bonewalker pack: L1/1/2 → L2 representative
+    levels: [2, 1, 1]           # vanilla 088B4C88 = L1, L1, L2; the L2 is the one REDA'd to (14,6)
     autolevel: true
     arrives_turn: 3
     inventory:
