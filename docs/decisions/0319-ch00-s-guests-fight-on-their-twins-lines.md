@@ -26,8 +26,5 @@ Con 11 equals the Hero's, so Scramsax is unaffected.
 
 **Sephek is still zeroed.** He is the force side, and his own parity holds (ADR 0314).
 
-**After:** ch00's party effect reads x1.98 / x1.13. The rest is Hlin's kit. Eirika's Rapier
-has weapon-triangle advantage over the Prologue's axe fighters; Hlin's Hand Axe is neutral
-against our axe guards and at a disadvantage against Sephek's sword. Closing that means
-changing her weapon or class, which is the character's design, so it goes to Nicolas with the
-no-Seth residual after step 4.
+**After:** ch00's party effect read x1.98 / x1.13. The rest was Hlin's kit against the
+weapon triangle, and ADR 0322 closes it without touching her line.

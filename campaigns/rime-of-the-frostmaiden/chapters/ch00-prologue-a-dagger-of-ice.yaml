@@ -126,7 +126,7 @@ player_units:
   - id: hlin-trollbane
     name: "Hlin Trollbane"
     fe_name: "Hlin"              # FE8 name buffer is 12 chars; "Hlin Trollbane" (14) overflows
-    class: fighter               # old dwarf bounty hunter, handaxe, past her prime — UNPROMOTED & frail (Eirika-analog lead; only Scramsax the "Jeigan" is a Seth-justified prepromote). Female Fighter map sprite (community repo) so she reads as a woman, distinct from the male Fighter guards
+    class: fighter               # old dwarf bounty hunter, handaxe, past her prime — UNPROMOTED & frail (Eirika-analog lead; only Scramsax the "Jeigan" is a Seth-justified prepromote). Female Fighter map sprite (community repo) so she reads as a woman
     is_npc: true                 # not one of the 7 PCs; a cold-open guest unit
     required: true               # lose if she dies (our lord-death condition)
     death_quote: "Scramsax… finish the job. The towns need to know…"   # LOCKED 2026-06-10 — game-over line (EVFLAG_GAMEOVER)
@@ -134,6 +134,8 @@ player_units:
     twin: CHARACTER_EIRIKA       # fights on Eirika's vanilla line, on our Fighter class (#430)
     position: [8, 5]             # I6 — central & back (Eirika's vanilla spot)
     inventory:
+      - id: killer-axe           # her old bounty-hunter's axe: Eirika's Rapier answered with a crit
+        damage_type: slashing    #   line (#430, ADR 0322) -- equipped first
       - id: hand-axe             # weak, throwable (range 1-2) so she can chip safely
         damage_type: slashing    # cosmetic flavor label
       - id: vulnerary
@@ -205,11 +207,11 @@ enemy_units:
     name: "Torg's Caravan Guard"
     count: 2                     # trivial practice mooks (Torrga Icevein's hirelings)
     positions: [[14, 7], [13, 7]]  # O8 / N8 — screening the boss (vanilla bandits' spots)
-    class: fighter
-    level: 2
+    class: soldier               # spear-carrying hirelings: Hlin's axe beats a lance the way
+    level: 2                     #   Eirika's sword beats the Prologue's axes (#430, ADR 0322)
     inventory:
-      - id: iron-axe
-        damage_type: slashing
+      - id: iron-lance
+        damage_type: piercing
     donor: [{at: [14, 7], level: 1}, {at: [14, 7], level: 2}]
     # one guard apiece: vanilla's L1 fighter runs the scripted AI_B_0A approach, its L2
     # charges on turn 2. Giving both the same donor lost one of the two behaviours.

@@ -218,7 +218,7 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
 
 | chapter | bar | field | exp ours/twin | benched | typical | fed | lowest |
 |---|---|---|---|---|---|---|---|
-| ch00 † | FE8 Prologue | 2 | 152 / 147 (x1.03) | L1 | **L1** | L1 | -- |
+| ch00 † | FE8 Prologue | 2 | 148 / 147 (x1.00) | L1 | **L1** | L1 | -- |
 | ch01 | FE8 Ch1 | 4 | 370 / 378 (x0.98) | L2 | **L2** | L3 | -- |
 | ch02 | FE8 Ch2 | 5 | 398 / 398 (x1.00) | L2 | **L3** | L5 | L1 |
 | ch03 | FE8 Ch3 | 9 | 382 / 415 (x0.92) | L2 | **L3** | L6 | L1 |
