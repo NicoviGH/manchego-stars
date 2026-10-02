@@ -221,13 +221,13 @@ twin — and the level curve falls out of the force the party eats. Regenerate w
 | ch00 † | FE8 Prologue | 2 | 152 / 147 (x1.03) | L1 | **L1** | L1 | -- |
 | ch01 | FE8 Ch1 | 4 | 370 / 378 (x0.98) | L1 | **L1** | L3 | -- |
 | ch02 | FE8 Ch2 | 5 | 417 / 417 (x1.00) | L1 | **L2** | L4 | L1 |
-| ch03 | FE8 Ch3 | 9 | 399 / 419 (x0.95) | L2 | **L3** | L5 | L1 |
+| ch03 | FE8 Ch3 | 9 | 386 / 419 (x0.92) | L2 | **L3** | L5 | L1 |
 | ch04 | FE8 Ch4 | 9 | 833 / 815 (x1.02) | L2 | **L4** | L7 | L1 |
 | ch05 | FE8 Ch5 | 9 | 964 / 902 (x1.07) | L3 | **L5** | L9 | L1 |
-| ch06 | FE8 Ch6 | 10 | 1078 / 1078 (x1.00) | L3 | **L6** | L12 | L1 |
+| ch06 | FE8 Ch6 | 10 | 1078 / 1078 (x1.00) | L3 | **L6** | L11 | L1 |
 
 **Entering ch07 the party is L6** -- L3 for a founding unit that rides the bench,
-L12 for one fed every kill, and **L1 for the lowest-level recruit on the field**.
+L11 for one fed every kill, and **L1 for the lowest-level recruit on the field**.
 A recruit starts at the level its own chapter PLACES it at:
 L1 for trex, baxby, lupin and basil; L5 for sahnar.
 

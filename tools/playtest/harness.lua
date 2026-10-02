@@ -1953,7 +1953,7 @@ local function winCh00()
     for t = 1, 6 do
         local scram = blue(CHAR_SCRAMSAX)
         if isDead(scram) then result("FAIL", "Scramsax died in the win run") return false end
-        -- adjacent tile next to the boss, then attack (steel sword, range 1)
+        -- adjacent tile next to the boss, then attack (range 1)
         local tx, ty = sephek.x, sephek.y + 1
         if tileOccupied(tx, ty) then tx, ty = sephek.x - 1, sephek.y end
         if not moveUnit(scram.x, scram.y, tx, ty) then

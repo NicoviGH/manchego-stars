@@ -66,12 +66,6 @@ def on(board, chap, tile, phase):
 
 class TheEnginesStrike(unittest.TestCase):
 
-    def test_hit_is_rolled_on_two_rns(self):
-        # ADR 0270: the crab's 47 displayed into the west hull's cover is 45% true.
-        self.assertAlmostEqual(dm.true_hit(47), 0.45, delta=0.01)
-        self.assertGreater(dm.true_hit(80), 0.90)
-        self.assertEqual((dm.true_hit(0), dm.true_hit(100)), (0.0, 1.0))
-
     def test_venin_weapons_poison_and_still_cut(self):
         self.assertTrue({'venin-claw', 'venin-axe'} <= dm.poison_weapons())
         chap = ch06()

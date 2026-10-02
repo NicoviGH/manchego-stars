@@ -154,10 +154,11 @@ enemy_units:
     count: 1
     positions: [[14, 1]]        # vanilla seize tile = the deep workings / grell lair
     class: mogall               # FE8 monster (floating eye-aberration) — the real creature, not a reskin
-    level: 12                   # mogall bases are frail; the level carries its OFFENCE (threat 7.6)
+    level: 8                    # mogall bases are frail; the level carries its OFFENCE: threat 6.8,
+                                # 1.10x Bazba's 6.1 on the 2RN hit (ADR 0314). L12 read 1.45x.
     autolevel: true
     personal:                   # FE8's OWN boss mechanism — a named boss is class base PLUS a
-      baseHP: 15                # personal line, and the level was never a substitute for one:
+      baseHP: 17                # personal line, and the level was never a substitute for one:
       baseDef: 5                # a naked L12 mogall folded in 1.1 rounds against a bar of 3.6
                                 # (#284). Modelled on the decomp's only DEFENSIVE monster boss,
                                 # Maelduin (data_characters.c [CHARACTER_MAELDUIN_CHUnk - 1]:
@@ -167,9 +168,10 @@ enemy_units:
                                 # their Pow lines put a ch03 magic boss (Evil Eye reads RES 4,
                                 # and FE8 Ch3 fields no magic at all) past the twin's own threat
                                 # ceiling of 6.8. Durability was the deficit; offence was not.
-                                # Lands at 3.6 rounds — Bazba's bar exactly, the same place ch02's
+                                # Lands at 3.5 rounds — Bazba's bar exactly, the same place ch02's
                                 # Halvar lands — at HP 36/Def 8, just inside Ravisin's 37/10 two
-                                # chapters later, so the boss curve stays monotonic.
+                                # chapters later, so the boss curve stays monotonic. The +2 HP
+                                # over Maelduin's line holds 36 HP at L8.
     inventory:
       - id: evil-eye            # the mogall's innate ranged magic gaze (hits RES); flavor = lightning tentacle
     donor: [14, 1]     # vanilla Bazba, the seize-tile boss -- GuardTileAI + the GuardTile bit

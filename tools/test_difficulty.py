@@ -32,12 +32,12 @@ def combatant(name='u', hp=20, pow_=0, skl=8, spd=0, dfc=0, res=0, lck=0, con=20
 
 class Durability(unittest.TestCase):
     def test_is_worst_case_rounds_to_be_downed(self):
-        # unit (20 HP) vs two attackers: A deals 8/round (-> 2.5 rounds to down),
-        # B deals 6/round (-> 3.33). Durability is the worst case: 2.5.
+        # unit (20 HP) vs two attackers, each 100% hit and crit 4% (Skl 8 / 2), so x 1.08:
+        # A deals 8 x 1.08/round, B 6 x 1.08. Durability is the worst case, A's.
         unit = combatant('unit', hp=20, weapon='iron-lance')
-        a = combatant('A', pow_=2, weapon='iron-bow')   # 2 + 6 mt, 100% hit -> 8/round
-        b = combatant('B', pow_=0, weapon='iron-bow')   # 0 + 6 mt -> 6/round
-        self.assertAlmostEqual(df.durability(unit, [a, b]), 2.5)
+        a = combatant('A', pow_=2, weapon='iron-bow')   # 2 + 6 mt
+        b = combatant('B', pow_=0, weapon='iron-bow')   # 0 + 6 mt
+        self.assertAlmostEqual(df.durability(unit, [a, b]), 20 / (8 * 1.08))
 
     def test_terrain_cover_raises_durability(self):
         unit = combatant('unit', hp=20, weapon='iron-lance')
@@ -51,8 +51,8 @@ class Throughput(unittest.TestCase):
     def test_party_throughput_sums_each_units_best_capped_kills(self):
         enemy = combatant('E', hp=20, weapon='iron-lance')
         one = combatant('one', pow_=20, weapon='iron-bow')   # 26 dmg >= 20 HP -> kpr 1.0
-        half = combatant('half', pow_=4, weapon='iron-bow')  # 10 dmg -> kpr 0.5
-        self.assertAlmostEqual(df.party_throughput([one, half], [enemy]), 1.5)
+        half = combatant('half', pow_=4, weapon='iron-bow')  # 10 dmg x 1.08 crit -> kpr 0.54
+        self.assertAlmostEqual(df.party_throughput([one, half], [enemy]), 1.54)
 
     def test_each_unit_counts_only_its_best_matchup(self):
         # A unit's contribution is its single best target, capped at 1.0 -- not summed
@@ -66,11 +66,11 @@ class Throughput(unittest.TestCase):
 class Carry(unittest.TestCase):
     def test_returns_best_unit_and_its_rounds_to_kill_the_boss(self):
         boss = combatant('boss', hp=40, dfc=10, weapon='iron-lance')
-        strong = combatant('strong', pow_=20, weapon='iron-bow')  # 16 dmg -> 2.5 rounds
+        strong = combatant('strong', pow_=20, weapon='iron-bow')  # 16 dmg x 1.08 crit
         weak = combatant('weak', pow_=4, weapon='iron-bow')       # can't pierce Def 10
         unit, rounds = df.carry(boss, [weak, strong])
         self.assertEqual(unit.name, 'strong')
-        self.assertAlmostEqual(rounds, 2.5)
+        self.assertAlmostEqual(rounds, 40 / (16 * 1.08))
 
 
 class EnemyPressure(unittest.TestCase):
@@ -86,15 +86,17 @@ class EnemyPressure(unittest.TestCase):
 
     def test_threat_and_clearload_per_slot_with_hand_oracle(self):
         yard = self._yard()
-        # e1 (iron-lance, +1 triangle vs yard's sword): dpr = (10+7+1)*1*(80+15)/100 = 17.1;
-        #   yard->e1 dmg = (5-1)=4 @ (90-15)% = 3.0/round -> 20/3.0 = 6.6667 rounds.
+        # Skl 0 and iron weapons on both sides: nobody crits, so each strike is damage x the
+        # 2RN true hit of its displayed rate.
+        # e1 (iron-lance, +1 triangle vs yard's sword): 10+7+1 = 18 @ 80+15 = 95 shown;
+        #   yard->e1 dmg = (5-1)=4 @ 90-15 = 75 shown.
         e1 = combatant('e1', hp=20, pow_=10, skl=0, spd=0, dfc=0, con=20, weapon='iron-lance')
-        # e2 (iron-sword, neutral): dpr = (4+5)*1*90/100 = 8.1;
-        #   yard->e2 dmg = 5 @ 90% = 4.5/round -> 20/4.5 = 4.4444 rounds.
+        # e2 (iron-sword, neutral): 4+5 = 9 @ 90 shown; yard->e2 dmg = 5 @ 90 shown.
         e2 = combatant('e2', hp=20, pow_=4, skl=0, spd=0, dfc=0, con=20, weapon='iron-sword')
         threat, clearload = df.enemy_pressure([e1, e2], deploy_cap=2, yardstick=yard)
-        self.assertAlmostEqual(threat, (17.1 + 8.1) / 2)
-        self.assertAlmostEqual(clearload, (20 / 3.0 + 20 / 4.5) / 2)
+        self.assertAlmostEqual(threat, (18 * fc.true_hit(95) + 9 * fc.true_hit(90)) / 2)
+        self.assertAlmostEqual(clearload, (20 / (4 * fc.true_hit(75))
+                                           + 20 / (5 * fc.true_hit(90))) / 2)
 
     def test_pressure_scales_inversely_with_deploy_cap(self):
         yard = self._yard()
@@ -1422,15 +1424,15 @@ class MetricsOverTheDice(unittest.TestCase):
 
     def test_marty_ch06_durability_averages_past_its_median_line(self):
         # ADR 0310's measurement: a minority of careers clear a doubling threshold, and they
-        # move the average. ~1.77 rounds over the dice, 1.25 on the median line. 1001
-        # careers carry a standard error of 0.017 rounds, so the seeded reading is 1.74.
+        # move the average. Read as the cartridge rolls (2RN hit, crit; ADR 0314): ~1.55
+        # rounds over the dice, 1.18 on the median line.
         chap, roster, line, bosses, _cap, _ = df.load_field(CAMPAIGN, 'ch06', leveled=True)
         marty = next(u for u in roster if u.name == 'marty')
-        self.assertAlmostEqual(df.durability(marty, line), 1.25, places=2)
+        self.assertAlmostEqual(df.durability(marty, line), 1.18, places=2)
         careers = df.arriving_careers(CAMPAIGN, 'ch06')['marty']
         avg, bad = df.spread(df.dice_profile(careers, line, bosses)['open'])
-        self.assertAlmostEqual(avg, 1.77, delta=0.05)
-        self.assertLessEqual(bad, 1.25)
+        self.assertAlmostEqual(avg, 1.55, delta=0.05)
+        self.assertLessEqual(bad, 1.18)
 
     def test_the_keyed_profile_matches_the_plain_metrics(self):
         # dice_profile scores each half of the fight once per distinct stat key; that is only
@@ -1501,12 +1503,12 @@ class EnemyStatResolution(unittest.TestCase):
 class LordTeamSweep(unittest.TestCase):
     def test_each_candidate_anchors_a_full_deploy_team_of_best_others(self):
         enemy = combatant('E', hp=20, weapon='iron-lance')
-        # Throughput ranking (best kpr vs E): big > mid > small > tiny.
+        # Throughput ranking (best kpr vs E): big > mid > small > tiny. Every bow hits 100
+        # and crits 4% (Skl 8 / 2), so x 1.08.
         big = combatant('big', pow_=20, weapon='iron-bow')    # one-rounds -> 1.0
-        mid = combatant('mid', pow_=14, weapon='iron-bow')    # 20 dmg -> 1.0 too; use 9
-        mid = combatant('mid', pow_=9, weapon='iron-bow')     # 15 dmg -> 0.75
-        small = combatant('small', pow_=4, weapon='iron-bow')  # 10 dmg -> 0.5
-        tiny = combatant('tiny', pow_=2, weapon='iron-bow')   # 8 dmg -> 0.4
+        mid = combatant('mid', pow_=9, weapon='iron-bow')     # 15 dmg -> 0.81
+        small = combatant('small', pow_=4, weapon='iron-bow')  # 10 dmg -> 0.54
+        tiny = combatant('tiny', pow_=2, weapon='iron-bow')   # 8 dmg -> 0.432
         roster = [tiny, small, mid, big]
         rows = df.lord_team_sweep(roster, [enemy], [], deploy_limit=2)
 
@@ -1516,10 +1518,10 @@ class LordTeamSweep(unittest.TestCase):
             self.assertEqual(len(r['team']), 2)
             self.assertIn(r['lord'], r['team'])
 
-        # 'tiny' as lord fills with the single best other ('big'): throughput 0.4 + 1.0.
+        # 'tiny' as lord fills with the single best other ('big'): throughput 0.432 + 1.0.
         tiny_row = next(r for r in rows if r['lord'].name == 'tiny')
         self.assertEqual({u.name for u in tiny_row['team']}, {'tiny', 'big'})
-        self.assertAlmostEqual(tiny_row['throughput'], 1.4)
+        self.assertAlmostEqual(tiny_row['throughput'], 1.432)
 
 
 class BulkDurability(unittest.TestCase):
@@ -1810,14 +1812,14 @@ class RoleCheck(unittest.TestCase):
         """A convertible is neutralized rather than ground down, so out-hitting the boss
         is a deliberate 'avoid me' hazard -- the ch05 white moose.
 
-        The outlier here must clear the twin's REAL ceiling (Joshua, 21.4 -> bar 26.7) rather
-        than its class-base one (6.3 -> bar 7.9). The old fixture (rotten-claw, 14.1) no longer
-        reads as an outlier at all, which is exactly the point of the ceiling fix: a unit that
-        merely out-hits the twin's GENERICS is not an outlier when the twin fields a 21.4
-        recruit of its own."""
+        The outlier here must clear the twin's REAL ceiling (Joshua, 38.9 -> bar 48.6) rather
+        than its class-base one. A level-12 Gwyllgi's Hell Fang (34.2) no longer reads as an
+        outlier at all, which is exactly the point of the ceiling fix: a unit that merely
+        out-hits the twin's GENERICS is not an outlier when the twin fields a 38.9 recruit of
+        its own. A level-20 Berserker's Killing Edge (61.5) is one."""
         chap = self._chap([
-            {'id': 'moose', 'class': 'gwyllgi', 'level': 12, 'convertible': True,
-             'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
+            {'id': 'moose', 'class': 'berserker', 'level': 20, 'convertible': True,
+             'inventory': [{'id': 'ke', 'fe_base': 'killing-edge'}]},
             {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
              'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
         ])
@@ -1863,21 +1865,23 @@ class RoleCheck(unittest.TestCase):
     def test_the_twins_ceiling_counts_its_own_named_units(self):
         """The outlier bar was the max CLASS-BASE threat (FE8 Ch5: 6.3), which excludes the
         twin's own named units -- so every named unit we field looked like an outlier against
-        a roster of generics. Vanilla Ch5's real ceiling is Joshua at 21.4."""
-        self.assertAlmostEqual(df.vanilla_threat_ceiling('FE8 Ch5'), 21.4, delta=0.2)
+        a roster of generics. Vanilla Ch5's real ceiling is Joshua at 38.9: his Killing Edge
+        crits a third of the hits that connect (ADR 0314)."""
+        self.assertAlmostEqual(df.vanilla_threat_ceiling('FE8 Ch5'), 38.9, delta=0.2)
 
     def test_a_cast_members_donor_line_counts_too(self):
         """The second half: a unit's personal line has TWO sources. A chapter enemy carries
         `personal:` in the YAML (Ravisin); a CAST member deployed hostile carries it via
         BASE_DONOR (Sahnar rides Joshua's). Reading only the first made ch05's red Myrmidon
-        measure 6.2 against the 21.4 she actually fights at."""
+        measure 6.2 against the 21.4 she actually fights at (38.9 once the Killing Edge's
+        crit and the 2RN hit are read, ADR 0314)."""
         chap = self._chap([
             {'id': 'sahnar', 'class': 'myrmidon', 'level': 5,
              'inventory': [{'id': 'ke', 'fe_base': 'killing-edge'}]},
         ])
         c = df.unit_real_article(chap['enemy_units'][0],
                                 df.enemy_combatants(chap['enemy_units'][0])[0])
-        self.assertAlmostEqual(fc.damage_per_round(c, df.YARDSTICK), 21.4, delta=0.2)
+        self.assertAlmostEqual(fc.damage_per_round(c, df.YARDSTICK), 38.9, delta=0.2)
 
     def test_names_a_single_unit_that_is_the_whole_overage(self):
         """ch05 measured "PARITY (within band)" at x1.20 while the white moose ALONE was the
@@ -1930,9 +1934,10 @@ class RoleCheck(unittest.TestCase):
         self.assertTrue(any('flagged is_boss' in f for f in df.role_findings(chap, self.REF)))
 
     def test_boss_on_a_throne_is_not_flagged_as_folding(self):
-        """Terrain is read from the declared tile: a Druid folds in 2.9 rounds on open
-        ground but survives 6.8 on a throne (+30 avo/+3 def), clearing the threshold."""
-        squishy = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+        """Terrain is read from the declared tile: a level-9 Druid folds in 2.8 rounds on
+        open ground but survives 5.9 on a throne (+30 avo/+3 def), clearing half of Saar's
+        11.3."""
+        squishy = {'id': 'boss', 'class': 'druid', 'level': 9, 'is_boss': True,
                    'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         self.assertTrue(any('rounds to kill' in f
                             for f in df.role_findings(self._chap([squishy]), self.REF)))
@@ -2403,7 +2408,7 @@ class RavisinHoldsSaarsBar(unittest.TestCase):
         ravisin = max(df.metric_rounds_to_kill(e) for e in ours)
         saar = self._rounds(lambda n: 'SAAR' in n.upper(),
                             df.vanilla_enemies('FE8 Ch5', mode='normal'))
-        self.assertGreater(saar, 20, 'Saar moved -- re-read the bar before trusting it')
+        self.assertGreater(saar, 19, 'Saar moved -- re-read the bar before trusting it')
         self.assertGreater(ravisin, saar * 0.85,
                            'Ravisin %.1f is under Saar %.1f -- ch05 loses its wall' 
                            % (ravisin, saar))

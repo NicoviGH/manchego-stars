@@ -24,7 +24,7 @@ player walking through the enemy line.
 damage and also poisons. The poison takes 1-3 HP at the start of each of the victim's next 5
 phases (`SetUnitStatus`, `MakePoisonDamageTargetList`). Without poison, run 2's west hull
 sinking on turn 5 was a sub-5% tail event. With it, 43% of simulated runs sink by turn 5.
-`fe_combat`'s metrics still read displayed hit and no crit (see "What this changes").
+`fe_combat` now reads the same strike for every metric (ADR 0314).
 
 **A firing cell holds one attacker.** The attackers that can all hold a cell at once form a
 transversal matroid, so taking them greedily by expected damage finds the heaviest set that
@@ -58,8 +58,8 @@ ch06 that ships, the distribution is the prediction.
 **What this changes.** No game data. Three findings for #430 step 3:
 - ch06's declared fuses are 7 (east) and 8 (west); the forecast medians are 10 and 6.
 - `fe_combat`'s metrics, and with them every `make difficulty` reading and the parity ratio,
-  use displayed hit and no crit. That undervalues accurate attacks and overvalues inaccurate
-  ones.
+  used displayed hit and no crit, which undervalued accurate attacks and overvalued
+  inaccurate ones. ADR 0314 fixes it.
 
 **`rescue_forecast` asks this model.** It answered the hull question with all three errors
 above: red bodies blocked, hit was displayed, and there was no poison. It now reads this

@@ -33,7 +33,7 @@ class RawPidBossBaseLevel(unittest.TestCase):
     is guarded rather than merely documented.
     """
 
-    RAW_BOSSES = {'0xb7': 12, '0xb6': 3, '0xb8': 7, '0xb9': 6}
+    RAW_BOSSES = {'0xb7': 8, '0xb6': 3, '0xb8': 7, '0xb9': 6}
 
     def test_every_raw_pid_boss_is_registered(self):
         missing = inject.raw_pids.unregistered_raw_pid_bosses('rime-of-the-frostmaiden')
