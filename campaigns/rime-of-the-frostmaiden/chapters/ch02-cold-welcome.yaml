@@ -290,8 +290,8 @@ reinforcements:
         damage_type: slashing
     trigger_turn: 3
     spawn_edge: opposite_boss        # flanks a party pushed toward the boss (FE8 pattern)
-    positions: [[0,9],[1,9]]         # on their donors' posts, the SW peaks behind a pushed party
-    donor: [[0, 9], [1, 9]]     # vanilla's southwest raider pair, beside the southern village
+    positions: [[1,9],[0,9]]         # on their donors' posts, the SW peaks behind a pushed party
+    donor: [[1, 9], [0, 9]]     # vanilla 088B4470 in its own order: the L2 at (1,9), the L3 at (0,9)
 
 # ── Rewards (no chest — vanilla Ch2 has none) ─────────────────────────────────────
 # Vanilla Ch2's loot = three VILLAGE GIFTS (Red Gem / Elixir / Pure Water) + one enemy
