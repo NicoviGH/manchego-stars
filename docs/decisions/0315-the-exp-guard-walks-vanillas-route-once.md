@@ -24,10 +24,10 @@ a chapter whose twin was already spent pays our party and not the twin's.
 - **The exp-to-date band**: our mean exp banked to date, over the founding careers, may not
   run more than 12% ahead of the twin party's.
 
-The band alone misses a single reuse. Our party starts a chapter behind, because ch00 banks
-nothing (its units are guests) while FE8's Prologue pays Eirika and Seth. Today it reads
-0.55x after ch01, rising to 0.89x after ch06. A canary that points ch06 at ch05's twin lands at
-1.08x, inside the band. The route rule is what catches a reuse. The band catches slow drift.
+The two catch different things. The band fails on accumulated drift; the route rule names the
+chapter that reused a twin. With the founding party handed the prologue's pay (ADR 0320), ours
+reads 0.98x-1.01x of the twin party from ch00 through ch06, and a canary that points ch06 at
+ch05's twin reads 1.22x, so today the band sees one reuse as well.
 
 **ch07** still names FE8 Ch6. It is planned, not hosted, so nothing fails today. Hosting it as
 written fails the route rule.

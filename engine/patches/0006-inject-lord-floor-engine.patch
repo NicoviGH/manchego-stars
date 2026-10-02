@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 6/14] lord floor (#45 3c): chosen lead's survivability top-up baked in once at ch start
+Subject: [PATCH 6/15] lord floor (#45 3c): chosen lead's survivability top-up baked in once at ch start
 
 Lord survivability floor (#45 3c), engine side: bake the player-chosen lead's
 base-level top-up into its stats ONCE, the first player phase it is fielded.

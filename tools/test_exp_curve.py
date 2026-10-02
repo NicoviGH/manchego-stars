@@ -368,7 +368,7 @@ class Simulation(unittest.TestCase):
 
     def test_the_party_never_runs_ahead_of_vanillas_curve(self):
         """#430 step 2: exp to date, ours against FE8's route walked once per twin, never
-        more than 12% ahead. Ours starts a chapter behind (ch00 banks nothing)."""
+        more than 12% ahead. ch00's twin pay is handed to the founding party (ADR 0320)."""
         ahead = ['%s %.2fx' % (r['id'], r['exp_to_date'] / r['twin_exp_to_date'])
                  for r in self.rows
                  if r['twin_exp_to_date'] and r['exp_to_date'] > r['twin_exp_to_date'] * 1.12]
@@ -415,12 +415,27 @@ class Entering(unittest.TestCase):
         ch07 = ec.entering('rime-of-the-frostmaiden', 7, 'FE8 Ch6')['vanilla']
         self.assertEqual(ch06, ch07)
 
-    def test_the_vanilla_party_banks_the_prologue_our_guests_do_not(self):
-        # Eirika and Seth fight FE8's Prologue and keep the exp; Hlin and Scramsax are guests.
-        # Both fight a Ch1 worth about one level; only Eirika also carries the Prologue's exp.
+    def test_the_founding_party_is_handed_the_prologues_pay(self):
+        # Eirika and Seth fight FE8's Prologue and keep the exp; Hlin and Scramsax are guests,
+        # so the founding party is handed what the twin pays (ADR 0320) and enters ch02 where
+        # Eirika does.
         into_ch2 = ec.entering('rime-of-the-frostmaiden', 2, 'FE8 Ch2')
         self.assertEqual(into_ch2['vanilla']['CHARACTER_EIRIKA'], 2)
-        self.assertEqual(into_ch2['party']['wolfram'], (1, 1))
+        self.assertEqual(into_ch2['party']['wolfram'], (1, 2))
+
+    def test_the_grant_is_the_twins_prologue_pay_under_a_level(self):
+        grant = ec.founding_grant()
+        founding = {uid for uid, _c, joins, _l in ec.party_classes('rime-of-the-frostmaiden')
+                    if joins == 0}
+        self.assertEqual(set(grant), founding)
+        self.assertTrue(all(0 < exp < ec.EXP_PER_LEVEL for exp in grant.values()))
+        ch00 = next(r for r in ec._simulated('rime-of-the-frostmaiden')
+                    if r['chapter_number'] == 0)
+        self.assertEqual(grant, ch00['grant'])
+        self.assertTrue(all(r['exp_to_date'] <= r['twin_exp_to_date'] * 1.12
+                            and r['exp_to_date'] >= r['twin_exp_to_date'] * 0.88
+                            for r in ec._simulated('rime-of-the-frostmaiden')
+                            if r['twin_exp_to_date']))
 
 
 class GeneratedBlock(unittest.TestCase):

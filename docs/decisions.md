@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-319 decisions. Read this index, then open the two or three you need — the whole
+320 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -174,7 +174,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0077` | [Every decomp file an engine hook patches must be registered in PATCHED_DECOMP_FILES.](decisions/0077-every-decomp-file-an-engine-hook-patches-must-be.md) | 2026-07-11 | — |
 | `0078` | [Seize-map legibility: the seize tile must read as a seize point and the boss sits on it — a level-design checkpoint](decisions/0078-seize-map-legibility-the-seize-tile-must-read-as.md) | 2026-06-19 | #56 #57 |
 | `0079` | [Title banner theme: "glacial blue", a pure PALETTE recolor (no pixel edits).](decisions/0079-title-banner-theme-glacial-blue-a-pure-palette-recolor.md) | 2026-06-09 | — |
-| `0295` | [The party-level band is DERIVED from the exp economy, and the prologue pays it nothing](decisions/0295-the-party-level-band-is-derived-from-the-exp-economy.md) | 2026-09-18 | #367 |
+| `0295` | [The party-level band is DERIVED from the exp economy](decisions/0295-the-party-level-band-is-derived-from-the-exp-economy.md) | 2026-09-18 | #367 |
 | `0310` | [The difficulty report fields the party that arrives, at the level it arrives at](decisions/0310-the-difficulty-report-fields-the-party-that-arrives.md) | 2026-10-01 | #430 #367 |
 | `0311` | [The difficulty report reads its absolute metrics over the dice](decisions/0311-the-difficulty-report-reads-its-metrics-over-the-dice.md) | 2026-10-01 | #430 |
 | `0312` | [The danger map reads what the cartridge rolls, and is calibrated against the ch06 runs](decisions/0312-the-danger-map-is-calibrated-against-the-ch06-runs.md) | 2026-10-01 | #430 #367 #26 |
@@ -185,6 +185,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0317` | [The timeline reads when each force reaches the deploy front](decisions/0317-the-timeline-reads-when-each-force-reaches-the-front.md) | 2026-10-02 | #430 |
 | `0318` | [A zone-triggered wave arrives on the party's earliest entry into its zone](decisions/0318-a-zone-wave-arrives-on-the-partys-earliest-entry.md) | 2026-10-02 | #430 |
 | `0319` | [ch00's guests fight on their twins' lines](decisions/0319-ch00-s-guests-fight-on-their-twins-lines.md) | 2026-10-02 | #430 |
+| `0320` | [The founding party is handed the prologue's pay](decisions/0320-the-founding-party-is-handed-the-prologues-pay.md) | 2026-10-02 | #430 #403 |
 
 ---
 

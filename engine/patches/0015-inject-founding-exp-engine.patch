@@ -1,0 +1,80 @@
+From: Manchego Stars engine
+Subject: [PATCH 15/15] founding exp (#430 step 4): the prologue's pay handed to the founding party once
+
+Founding exp (#430 step 4, ADR 0320), engine side: hand each founding party member the
+exp the prologue's vanilla twin pays it, once, at the first prep "Fight!".
+
+Consumes the build-generated gFoundingExpGrants[] table (inject_ch01, events_udefs.c):
+{ pid, exp } byte pairs, 0-terminated, written from tools/exp_curve.py's founding_grant.
+ch00 is fought by guests who never join, so nobody in the party banks its exp, while
+vanilla's Eirika and Seth keep theirs; without this the party enters ch01 a chapter
+behind the curve its twins describe.
+
+  1. FoundingExp_ApplyOnce (new, eventinfo.c, after 0006's LordFloor_ApplyOnce): for each
+     row, find the BLUE unit with that pid -- benched units included -- and raise its exp to
+     the grant if it is still level 1 and below it. A permanent flag (0xFB, beside 0006's
+     0xFA) makes it once-only, and is spent only when a row found its unit.
+
+  2. EndPrepScreen (prep_sallycursor.c): call it right after 0006's LordFloor_ApplyOnce,
+     the seam where the roster is final (ADR 0057 -- the phase-start seams fire too early).
+---
+diff --git a/src/eventinfo.c b/src/eventinfo.c
+index eef423182efce39027fba8df77b6d84ffd1a537a..3a70e8a9f33a8a734a24eb9225ac0f178b9d8723 100644
+--- a/src/eventinfo.c
++++ b/src/eventinfo.c
+@@ -2002,6 +2002,37 @@ void LordFloor_ApplyOnce(void)
+     SetFlag(0xFA);
+ }
+ 
++/* Founding exp (campaign engine, #430 step 4): once, at the first prep Fight!,
++   hand each founding party member the exp the prologue's twin pays it
++   (gFoundingExpGrants, events_udefs.c -- { pid, exp } byte pairs, 0-terminated).
++   The prologue is fought by guests who never join, so nobody in the party banks
++   it; vanilla's Eirika and Seth do. A unit already past its grant (more exp, or
++   above level 1) is left alone. The permanent flag 0xFB is spent only once a
++   row has found its unit, so a prep before the party exists cannot use it up. */
++void FoundingExp_ApplyOnce(void)
++{
++    extern const u8 gFoundingExpGrants[];
++    const u8 * row;
++    int found = 0;
++
++    if (CheckFlag(0xFB))
++        return;
++
++    for (row = gFoundingExpGrants; row[0] != 0; row += 2) {
++        struct Unit * unit = GetUnitFromCharIdAndFaction(row[0], FACTION_BLUE);
++
++        if (unit == NULL)
++            continue;
++
++        found = 1;
++        if (unit->level == 1 && unit->exp < row[1])
++            unit->exp = row[1];
++    }
++
++    if (found)
++        SetFlag(0xFB);
++}
++
+ //! FE8U = 0x08084800
+ bool IsCharacterForceDeployed_(u16 pid)
+ {
+diff --git a/src/prep_sallycursor.c b/src/prep_sallycursor.c
+index ce86d930761506de63b1da0f585653f25b767d48..4ffa72294f173c18192033a4edb3e6aef106f47e 100644
+--- a/src/prep_sallycursor.c
++++ b/src/prep_sallycursor.c
+@@ -1343,6 +1343,13 @@ void EndPrepScreen(void)
+         LordFloor_ApplyOnce();
+     }
+ 
++    /* Founding exp (campaign engine, #430 step 4): the party is on the roster
++       now; hand it the prologue's pay once. */
++    {
++        extern void FoundingExp_ApplyOnce(void);
++        FoundingExp_ApplyOnce();
++    }
++
+     Proc_EndEach(gProcScr_SALLYCURSOR);
+     gBmSt.gameStateBits &= ~BM_FLAG_PREPSCREEN;
+     gPlaySt.chapterStateBits &= ~PLAY_FLAG_PREPSCREEN;

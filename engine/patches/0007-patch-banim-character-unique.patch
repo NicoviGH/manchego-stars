@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 7/14] banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)
+Subject: [PATCH 7/15] banim (#65): combat anim lookup -> GetBattleAnimationId_WithUnique (per-character _u25)
 
 Route FE8 combat anim selection through the per-character unique table (#65 M-B).
 

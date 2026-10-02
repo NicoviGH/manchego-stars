@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 4/14] GetChapterTitleWM: no-world-map fallback = ROM chapTitleId (not a WM skirmish name)
+Subject: [PATCH 4/15] GetChapterTitleWM: no-world-map fallback = ROM chapTitleId (not a WM skirmish name)
 
 A story chapter's title banner is always its ROM chapTitleId card, never a
 world-map skirmish name.
