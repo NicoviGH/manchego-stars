@@ -287,10 +287,15 @@ def class_movement(class_token):
     block = re.search(r'\[%s - 1\] = \{(.*?)\n    \},' % enum, src, re.S)
     if not block:
         raise KeyError('no class row for %r' % enum)
-    table = re.search(r'\.pMovCostTable\s*=\s*(\w+)', block.group(1))
+    # `.pMovCostTable = { Normal, Rain, Snow }`: GetUnitMovementCost (bmunit.c) indexes it by
+    # the chapter's weather, and every chapter we read runs in fine weather -- entry 0. A
+    # pattern that wanted a bare name here matched no class at all, so every class silently
+    # walked the foot table (brigands on peaks, fliers over water) until #430 step 3.
+    table = re.search(r'\.pMovCostTable\s*=\s*\{\s*(\w+)', block.group(1))
     mov = re.search(r'\.baseMov\s*=\s*(\d+)', block.group(1))
-    return (table.group(1) if table else 'TerrainTable_MovCost_CommonT1Normal',
-            int(mov.group(1)))
+    if not table:
+        raise KeyError('no movement-cost table in the class row for %r' % enum)
+    return table.group(1), int(mov.group(1))
 
 
 def _classes_text():
