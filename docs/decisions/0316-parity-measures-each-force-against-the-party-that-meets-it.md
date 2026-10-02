@@ -49,6 +49,12 @@ Seth, and ADR 0042 chose no Seth-tier unit. Our party also runs behind vanilla's
 (ADR 0295). ch00 is a different case: Scramsax is our Seth by design (its difficulty_note),
 yet he fights at a bare Hero base (22 HP, 6 Pow, 8 Def) against Seth's 30/14/11.
 
+**The report splits the headline in two** by meeting the twin's force with OUR party. The
+force effect (our force against the twin's, both met by our party) is what authoring
+controls. The party effect (our party against vanilla's, both meeting the twin's force) is
+what the party brings. The two multiply to the headline. On this first reading every force
+sits within x0.87-x1.16 of its twin, so the gap in the table above is the party's.
+
 **ch00, ch01 and ch02 are no longer `balance_locked`.** A chapter locks when its re-measure
 holds parity (#430 step 6). Under this instrument none of the three does, and a lock on a
 chapter the gate reads as off-parity would only turn CI red.

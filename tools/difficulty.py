@@ -2018,10 +2018,17 @@ def _chapter_matchup(chap, campaign, mode):
         return None
     ours = party_matchup(fields['our_force'], fields['our_field'])
     van = party_matchup(fields['van_force'], fields['van_field'])
+    # The twin's force against OUR party splits the headline in two: the force effect is
+    # what authoring controls, the party effect is what the party brings (#430 step 3).
+    cross = party_matchup(fields['van_force'], fields['our_field'])
+
+    def ratio(a, b, key):
+        return a[key] / b[key] if b[key] else float('inf')
     return {'ours': ours, 'vanilla': van,
             'field': (list(fields['our_field']), list(fields['van_field'])),
-            'threat_ratio': ours['threat'] / van['threat'] if van['threat'] else float('inf'),
-            'load_ratio': ours['clear'] / van['clear'] if van['clear'] else float('inf')}
+            'threat_ratio': ratio(ours, van, 'threat'), 'load_ratio': ratio(ours, van, 'clear'),
+            'force': (ratio(ours, cross, 'threat'), ratio(ours, cross, 'clear')),
+            'party': (ratio(cross, van, 'threat'), ratio(cross, van, 'clear'))}
 
 
 def arriving_fields(chap, campaign, mode=None):
@@ -2118,6 +2125,9 @@ def _print_pressure(p):
               'clear-load %4.1f (x%.2f %s)'
               % ('', p['n_ours'], '/'.join(ours_field), ot, v['threat_ratio'], v['threat'],
                  ol, v['load_ratio'], v['load']))
+        print('  split: force x%.2f / x%.2f (our force vs the twin\'s, both against our party)'
+              ' · party x%.2f / x%.2f\n         (our party vs vanilla\'s, both against the '
+              'twin\'s force) -- threat / clear-load' % (mu['force'] + mu['party']))
         for tag, side in (('ours', mu['ours']), ('vanilla', mu['vanilla'])):
             print('  heaviest (%s): %s' % (tag, _heaviest(side)))
     else:
