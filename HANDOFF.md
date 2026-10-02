@@ -6,50 +6,42 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-02 (Claude), mid-#430 step 3. **What landed and why is in `git log` and the
-ADRs it cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-02 (Claude), #430 step 2b landed (#439, #440); step 3's report is posted.
+**What landed and why is in `git log` and the ADRs it cites** -- this file keeps no "recently
+landed" list.
 
 ## In flight
 
 **Nicolas wants this run AUTONOMOUSLY in a fresh instance: work the queue below end to end
 without checking in, except for a genuine design call (a move AWAY from vanilla).**
 
-1. **#438 -- ch04's bonewalker pack L2/L1/L1** (branch `ch04-bonewalker-pack-levels`). CI is
-   green. Owed: `/code-review` on the CHECKED-OUT branch (type the level, `medium`), fix the
-   findings, squash-merge, delete the branch.
-2. **#430 step 2b, instrument v2 -- two PRs, instrument-only.** The spec is #430's body (step
-   2b); the prototype numbers and code are its latest comment.
-   - **Layer 1, matchups:** the vanilla twin's arriving party replaces `YARDSTICK`, with
-     harmonic clear-load. Threat follows FE8's AI target score (port `AiComputeCombatScore`,
-     `fireemblem8u/src/cp_battle.c:572-780`). One headline ratio: ours vs our party / vanilla
-     vs vanilla's party. Go through the dice-averaged careers (ADR 0311), not the median line.
-     `YARDSTICK` stays only for a twin off `VANILLA_CHAIN` (ch08). ADR in the same PR.
-     Expect the `--check` gate and canaries to need care; ch00-ch02 are locked.
-   - **Layer 2, timeline:** from `danger_map`, each enemy's first-contact turn,
-     reinforcement and never-moving enemies, and peak threat per enemy phase at the
-     deploy front. Ours and the twin, turn by turn.
-   - **Not this round:** the Monte Carlo simulator. It is parked in #430 with a trigger;
-     do not start it.
-3. **#430 step 3 on v2:** re-measure ch00-ch06 and post the report on #430. **Fix every
-   finding that restores measured vanilla parity as you go, locked chapters included**
-   (Nicolas, 2026-10-02, said twice: a parity correction is not a design change; #436 and
-   #438 are the pattern). Only a move AWAY from vanilla, or a choice between vanilla-neutral
-   options, goes to him. Already known: ch01 has 0 reinforcements against vanilla's 3, and
-   ch03's exp yield is x0.92. ch04's x1.14 is the designed Mauthe Doog tax (its
-   difficulty_note), and the ch06 fuses hold (10/8 = forecast 10/8).
-   ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
-   re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
-4. **Step 5 (#135), then steps 4 and 6**, all DATA-DRIVEN, not Nicolas's call
-   (2026-10-02: "data driven decisions, not my gut feel"):
+1. **#430 step 3 fixes, one PR each.** The picks are in #430's step-3 comment; each moves toward
+   vanilla, so they are mine (Nicolas, 2026-10-02: a parity correction is not a design
+   change). Re-measure with `make difficulty CH=chNN` (the split line: force vs party).
+   - **ch00 guests.** The prologue injector zeroes Scramsax's and Hlin's personal lines
+     (`inject/chapters/prologue.py`, guest_patch), so they fight at bare class base: party
+     effect x3.95 / x2.59. Write each guest's twin line instead (Seth's, Eirika's: effective
+     line minus our class base), and make `difficulty.fixed_roster_careers` read the same
+     source. ch00's scenarios run once.
+   - **ch01's goblin wave** `spawn_turn` 3 -> 2 (vanilla's turn).
+   - **ch05's eruption waves** 2/3/5 -> 2/6/8, same tiles.
+   - **ch02's front heats a phase early** with a 100% force copy. Our deploy front is y3-5
+     against vanilla's y1-3, several enemy tiles sit closer, and four vanilla pursuers never
+     reach the front. Check the vanilla terrain read before calling it a chapter fault.
+2. **Step 4 (#403), then step 5 (#135), then step 6 (locks)**, all DATA-DRIVEN, not Nicolas's call:
    - **Founding party:** ch00's guests bank nothing, so the party runs 0.63-0.75 levels behind
-     vanilla's route through ch06 (ADR 0295 says the curves converge; the measurement says
-     they barely do -- rewrite it). Give the founding PCs the prologue's exp (~73), or L2 if
-     that needs an engine setter that costs too much.
+     vanilla's route through ch06 (rewrite ADR 0295's "the curves converge"). Give the founding
+     PCs the prologue's exp (~73), or L2 if that needs an engine setter that costs too much.
    - **Recruits:** each joins where vanilla's equivalent joins against vanilla's party. Plus
-     #403's remainder: lupin and trex ride mid-game donor lines (Kyle L6, Colm L2) at level
-     1, so they run HOT; ADR 0042 is the precedent (a different BASE donor).
-   - **Locks:** a chapter locks when its re-measure holds parity. ch02's and ch06's x1.00 are
-     checksums on the donor pipeline (they copy 100% of the twin), not measurements.
+     #403's remainder: lupin and trex ride mid-game donor lines (Kyle L6, Colm L2) at level 1,
+     so they run HOT; ADR 0042 is the precedent (a different BASE donor).
+   - **After step 4, bring Nicolas the no-Seth residual with a pick.** ADR 0042 chose no
+     Seth-tier unit; whatever party effect remains is that choice's cost, and it is his call.
+   - **Locks:** ch00-ch02 were unlocked in #439. A chapter re-locks when its re-measure holds
+     parity on v2.
+   - ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
+     re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
+   - The Monte Carlo simulator stays parked in #430 with its trigger.
 
 ## Owed by NICOLAS, not by the next session
 
@@ -68,6 +60,10 @@ without checking in, except for a genuine design call (a move AWAY from vanilla)
 
 - **Our own scenes are named `MS_*`.** Any code that matches `EventScr_` must ask whether it
   also means `MS_` (#401 reported 26 of 40).
+- **A wave's arrival turn has four spellings** (`arrives_turn`, `trigger_turn`, `spawn_turn`,
+  `arrives: {turn:}`). Read it through `inject.raw_pids.entry_arrival_turn`, never a field.
+- **`make difficulty --curve` takes ~25s** (instrument v2 runs over 1001 careers per unit);
+  `chapter_matchup` memoises on the chapter's CONTENT, so a doctored chapter dict still misses.
 - **`levels:` (per-body levels) is honoured only by ch02's and ch04's emitters.** ch01, ch03,
   ch05 and ch06 read `level` alone and would silently emit one level for every body. A parity
   fix that splits a pack's levels there must first route the emitter through
