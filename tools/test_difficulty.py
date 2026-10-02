@@ -12,11 +12,13 @@ import io
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fe_combat as fc
 import difficulty as df
 import inject.cast
+import inject.decomp
 import inject.chapter_settings
 import inject.chapters.prologue
 import inject.hosting
@@ -1747,6 +1749,31 @@ class BattlefieldDynamics(unittest.TestCase):
         self.assertEqual(df._flag_number('0xb'), 11)
         self.assertEqual(df._flag_number('EVFLAG_WIN'), 'EVFLAG_WIN')
         self.assertFalse(df._is_flag_gated('0x0'))       # Ch1's turn-2 ally event is a fixed turn
+
+    def test_only_an_opening_armed_flag_holds_a_wave_back(self):
+        # Ch3's TURN(EVFLAG_TMP(8), ..., 2, 2) carries a flag nobody sets at the start: it marks
+        # the event fired, so the event runs on turn 2 like any other.
+        info = inject.decomp.vanilla_decomp_text('src/events/ch3-eventinfo.h')
+        self.assertIn('TURN(EVFLAG_TMP(8), EventScr_Ch3_Turn2Player, 2, 2', info)
+        for stem in df.PARITY_REFERENCE_STEM.values():
+            self.assertTrue(all(t > 1 for t in df._vanilla_reinforcement_turns(stem).values()))
+
+    def test_a_dormant_wave_waits_for_its_own_start_turn(self):
+        # A zone the party enters on turn 1 cannot load a TURN(..., 5, 255) wave before turn 5;
+        # a dormant wave no modelled zone opens still arrives after turn 1.
+        info = ('TURN(EVFLAG_TMP(9), EventScr_W, 5, 255, FACTION_BLUE)\n'
+                'TURN(EVFLAG_TMP(10), EventScr_V, 1, 255, FACTION_BLUE)\n'
+                'AREA(EVFLAG_TMP(3), EventScr_A, 0, 0, 3, 3)\n'
+                '.beginningSceneEvents = EventScr_Open,')
+        script = ('CONST_DATA EventListScr EventScr_Open[] = {\n    ENUT(9)\n    ENUT(10)\n};\n'
+                  'CONST_DATA EventListScr EventScr_A[] = {\n    ENUF(9)\n};\n'
+                  'CONST_DATA EventListScr EventScr_W[] = {\n    LOAD1(1, UnitDef_W)\n};\n'
+                  'CONST_DATA EventListScr EventScr_V[] = {\n    LOAD1(1, UnitDef_V)\n};\n')
+        text = lambda rel: info if rel.endswith('eventinfo.h') else script
+        with mock.patch.object(inject.decomp, 'vanilla_decomp_text', text), \
+                mock.patch.object(df, '_zone_entry_turn', lambda *a: 1):
+            turns = df._vanilla_reinforcement_turns('ch1')
+        self.assertEqual(turns, {'UnitDef_W': 5, 'UnitDef_V': df._UNPLACED_TURN})
 
     def test_ch4_groups_split_the_seven_reinforcements(self):
         # 16 turn-1 line + (3 Bonewalkers + 4 Revenants) reinforcements = the full 23-monster force.

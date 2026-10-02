@@ -32,8 +32,15 @@ every other `foot_reach` reading.
 because the parity split only asked whether a unit arrives on turn 1. The timeline (ADR 0317)
 then read that placeholder as vanilla's real turn. That is how ch01's `spawn_turn: 3` came to
 read as a turn late. It is vanilla's turn, and ch01's wave and first contact now track the
-twin's. Reading the flag also stopped `0x0` counting as a flag, and an ending scene's cutscene
-loads (ch13a's, gated on `EVFLAG_WIN`) no longer read as a wave.
+twin's.
+
+**A flag holds a wave back only when the opening scene sets it.** Otherwise the flag just marks
+the event fired, as in Ch3, and the event runs on its own turns: ch13a's ending scene now reads
+as its turn 12, not a turn-2 wave. `0x0` is no flag at all. A dormant wave never loads before
+its own `TURN` start turn. A wave whose trigger the walk cannot place keeps the old reading,
+`_UNPLACED_TURN` (2): a zone nobody in the deploy table can set off, a flag an `AFEV` or `CHAR`
+script clears, or an `AFEV` script that loads it. It is late by an unknown amount, but it is
+never on the opening board.
 
 The twin's layout, terrain and deploy table moved from `timeline.py` into `difficulty.py`, so
 the arrival turn and the timeline read one source.

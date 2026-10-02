@@ -2765,6 +2765,7 @@ def vanilla_deploy_party(parity_ref):
 # same floor `foot_reach` reads everywhere else. #177 modelled it as a flat turn 2; #440's
 # timeline then read that placeholder as vanilla's turn and misfiled ch01's wave as late.
 _ZONE_HORIZON = 30          # turns walked before a zone counts as unreachable
+_UNPLACED_TURN = 2          # a wave whose trigger the walk cannot place: still not turn 1
 
 
 def _flag_number(token):
@@ -2843,39 +2844,50 @@ def _vanilla_reinforcement_turns(stem):
     player-phase turn events past turn 1 (Ch5's 2/6/8 waves), plus zone-triggered waves (Ch1's
     west wave, Ch4 "Ancient Horrors"' Revenants), which arrive on the party's earliest entry
     into their AREA (#177; see _zone_entry_turn). Turn-1 unconditional events (the initial
-    line force) contribute nothing."""
+    line force) contribute nothing.
+
+    A flagged turn event is DORMANT only when the opening scene sets its flag; otherwise the
+    flag just marks it fired (Ch3's) and it runs on its own turns. A wave whose trigger this
+    cannot place -- a zone nobody in the deploy table can set off, a flag an AFEV/CHAR script
+    clears, an AFEV script that loads it -- still arrives after turn 1, at _UNPLACED_TURN or
+    its own start turn: it is never on the opening board."""
     info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     ref = {v: k for k, v in PARITY_REFERENCE_STEM.items()}[stem]
-    areas = [(scr, box, _event_block(script, scr)) for scr, box in _area_events(info)]
+    areas = [(box, _event_block(script, scr)) for scr, box in _area_events(info)]
+    opening = re.search(r'\.beginningSceneEvents\s*=\s*(\w+)', info)
+    armed = {_flag_number(f) for f in re.findall(r'ENUT\(\s*([^)]*\)?)\s*\)',
+                                                    _event_block(script, opening.group(1))
+                                                    if opening else '')}
 
-    def entry(box, block, after):
-        turn = _zone_entry_turn(ref, box, _zone_trigger(block))
-        return None if turn is None else turn + after
+    def clears(block, flag):
+        return any(_flag_number(f) == flag
+                   for f in re.findall(r'ENUF\(\s*([^)]*\)?)\s*\)', block))
+
+    def entry(box, block):
+        return _zone_entry_turn(ref, box, _zone_trigger(block))
 
     out = {}
     for eid, scr, turn in _player_turn_events(info):
-        if _is_flag_gated(eid):
-            # gated on a flag an AREA clears: it loads the player phase after the entry
-            flag = _flag_number(eid)
-            turns = [entry(box, block, 1) for _, box, block in areas
-                     if any(_flag_number(f) == flag
-                            for f in re.findall(r'ENUF\(\s*([^)]*\)?)\s*\)', block))]
-            turns = [t for t in turns if t is not None]
-            if not turns:
-                continue                   # no reachable zone opens it: it never loads
-            arrival = min(turns)
+        flag = _flag_number(eid)
+        if _is_flag_gated(eid) and flag in armed:
+            # dormant until an AREA clears its flag: it loads the player phase after the entry
+            opens = [t + 1 for t in (entry(box, block) for box, block in areas
+                                     if clears(block, flag)) if t is not None]
+            arrival = max(turn, min(opens) if opens else _UNPLACED_TURN)
         elif turn > 1:
             arrival = turn
         else:
-            continue                       # unconditional turn-1 event = the initial line
+            continue                       # turn-1 event = the initial line
         for arr in re.findall(r'UnitDef_\w+', _event_block(script, scr)):
             out[arr] = arrival
-    for scr, box, block in areas:          # an AREA script that loads a force directly
+    for box, block in areas:               # an AREA script that loads a force directly
+        turn = entry(box, block)
         for arr in re.findall(r'UnitDef_\w+', block):
-            turn = entry(box, block, 0)
-            if turn is not None:
-                out.setdefault(arr, turn)
+            out.setdefault(arr, _UNPLACED_TURN if turn is None else turn)
+    for scr in re.findall(r'AFEV\(\s*[^,]+?\s*,\s*(\w+)', info):   # loaded on a flag
+        for arr in re.findall(r'UnitDef_\w+', _event_block(script, scr)):
+            out.setdefault(arr, _UNPLACED_TURN)
     return out
 
 
