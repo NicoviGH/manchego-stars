@@ -62,12 +62,19 @@ def _asset_names(dec):
 
 
 def _gbagfx(dec):
-    """Return the decomp converter, building that standalone host tool if absent."""
-    import subprocess
+    """Return the decomp converter, building that standalone host tool if absent.
+
+    Under a lock: `make test` runs files in parallel, and two that both find it missing used
+    to race -- one would exec the binary while the other's linker was still writing it
+    ("Permission denied" in CI). The lock lives in the temp dir so the submodule stays clean."""
+    import fcntl, hashlib, subprocess, tempfile
     tool_dir=os.path.join(dec,'tools/gbagfx')
     executable=os.path.join(tool_dir,'gbagfx')
-    if not os.path.exists(executable):
-        subprocess.run(['make','-C',tool_dir],check=True)
+    key=hashlib.sha1(os.path.abspath(tool_dir).encode()).hexdigest()[:12]
+    with open(os.path.join(tempfile.gettempdir(),'gbagfx-build-%s.lock'%key),'w') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        if not os.path.exists(executable):
+            subprocess.run(['make','-C',tool_dir],check=True)
     return executable
 
 

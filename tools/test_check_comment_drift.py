@@ -72,8 +72,9 @@ class HandwrittenSourceScan(unittest.TestCase):
     """check_no_dead_concepts must scan code comments, not just docs."""
 
     def _with_planted_file(self, contents, suffix='.py'):
-        tmp = tempfile.NamedTemporaryFile('w', suffix=suffix, delete=False,
-                                          dir=os.path.dirname(os.path.abspath(__file__)))
+        # Its own temp dir, never tools/: `make test` runs files in parallel, and every check
+        # that globs tools/**.py would open a plant another test is about to unlink.
+        tmp = tempfile.NamedTemporaryFile('w', suffix=suffix, delete=False)
         tmp.write(contents)
         tmp.close()
         return tmp.name
@@ -164,8 +165,7 @@ class HandwrittenSourceScan(unittest.TestCase):
 
 class DanglingRefs(unittest.TestCase):
     def _run_on(self, contents):
-        tmp = tempfile.NamedTemporaryFile('w', suffix='.py', delete=False,
-                                          dir=os.path.dirname(os.path.abspath(__file__)))
+        tmp = tempfile.NamedTemporaryFile('w', suffix='.py', delete=False)   # not tools/: see above
         tmp.write(contents)
         tmp.close()
         try:
