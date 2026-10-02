@@ -283,7 +283,7 @@ enemy_units:
     # (13,11) -> (13,13) was moved in #370 to uncork merfolk-thrower's javelin cells. That
     # cork was the old tool's, not the engine's: reds walk through reds (ADR 0312), and run 2
     # saw the thrower throw on phase 2 with this body still at (13,11). Either tile gives the
-    # same east clock, so the body stays where it is.
+    # same east clock, so the body stays at (13,13).
     positions: [[18, 14], [3, 14], [13, 13], [7, 15]]
     donor: [[14, 9], [15, 7], [20, 7], [19, 13]] # vanilla's four HOLDING L7 soldiers
     skin:
