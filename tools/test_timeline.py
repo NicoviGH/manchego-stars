@@ -79,6 +79,20 @@ class OurBodiesMove(unittest.TestCase):
         brute = {'class': 'brigand', 'deploy_class': 'brigand-brute'}
         self.assertEqual(dm._movement(brute, 0), pp.class_movement('brigand'))
 
+    def test_each_class_walks_its_own_table(self):
+        # `.pMovCostTable` is a { Normal, Rain, Snow } list; reading it as a bare name matched
+        # nothing, so every class walked the foot table and the two tests above held vacuously.
+        self.assertEqual(pp.class_movement('brigand')[0], 'TerrainTable_MovCost_BrigandNormal')
+        self.assertEqual(pp.class_movement('pegasus-knight'), ('TerrainTable_MovCost_FlyNormal', 7))
+        self.assertNotEqual(pp.class_movement('cavalier')[0], pp.class_movement('fighter')[0])
+
+    def test_vanilla_ch2s_brigands_cross_its_peaks(self):
+        # The turn-3 pair spawns on the peaks at (0,9)/(1,9); on the foot table it never moved.
+        board = dm.Board(None, terrain=dif.vanilla_terrain('FE8 Ch2'),
+                         fielded=tl.vanilla_bodies('FE8 Ch2'))
+        front = dif.vanilla_front('FE8 Ch2')
+        self.assertTrue(all(tl.first_contact(board, b, front) is not None for b in board.bodies))
+
 
 if __name__ == '__main__':
     unittest.main()
