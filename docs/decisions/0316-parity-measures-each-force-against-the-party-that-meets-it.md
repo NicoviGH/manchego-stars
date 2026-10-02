@@ -18,8 +18,8 @@ party),** threat and clear-load (`difficulty.chapter_matchup`). Each party is th
 model says arrives (`exp_curve.entering`), over the dice-averaged careers (ADR 0311). Each
 side fields its best `deploy_limit` units by `_best_field`'s rule and is normalised by its own
 field. Vanilla's prologue fields two units and ours fielded eight, so dividing both by one
-shared cap was wrong. A fixed-roster chapter fields its `player_units`: ch00's guests fight at
-bare class base, because the prologue injector zeroes their lines and emits no `.autolevel`.
+shared cap was wrong. A fixed-roster chapter fields its `player_units`: ch00's guests fight on
+their twins' lines (ADR 0319), as the prologue injector writes them, with no `.autolevel`.
 
 - **Threat** is each enemy's damage per round against the unit FE8's AI would attack, per
   unit fielded. `ai_target.py` ports `AiComputeCombatScore` (cp_battle.c) with its

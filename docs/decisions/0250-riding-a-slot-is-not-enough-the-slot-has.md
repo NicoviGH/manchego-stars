@@ -8,11 +8,12 @@ issues: [284]
 
 # Riding a slot is not enough — the slot has to survive the build, and one does not.
 
-`inject_prologue` deliberately zeroes its guests' personal bases so they read as pure class
-base, so Sephek is genuinely naked *despite* deploying on O'Neill's slot. Mapping him anyway
-inflated his threat to **2.9x the Prologue's ceiling** and reddened CH0 — caught by the very
-gate this issue added, on its first run. `PROLOGUE_ZEROED_GUEST_SLOTS` now names that exclusion
-and an assert keeps it in step with the injector.
+`inject_prologue` rewrites its guests' personal bases: Hlin and Scramsax onto their twins'
+lines (ADR 0319), and Sephek to zero, so Sephek is genuinely naked *despite* deploying on
+O'Neill's slot. Mapping him anyway inflated his threat to **2.9x the Prologue's ceiling** and
+reddened CH0 — caught by the very gate this issue added, on its first run.
+`PROLOGUE_REWRITTEN_GUEST_SLOTS` now names that exclusion and an assert keeps it in step with
+the injector.
 
 **ch03's grell is the one that was really wrong**, and for the opposite reason: it rides raw pid
 `0xb7`, and a CharacterData gap is all zeros. It goes from 1.1 to **3.6 rounds** on an authored

@@ -1979,13 +1979,17 @@ def _chapter_pressure(chap, band=0.25, mode=None, campaign='rime-of-the-frostmai
 
 def fixed_roster_careers(chap):
     """{unit: [Combatant]} for a fixed-roster chapter's `player_units` (ch00's guests), or {}
-    for a chapter the party deploys into. The prologue's injector zeroes each guest slot's
-    personal line and its UnitDefinition carries no `.autolevel` (`_prologue_roster_blocks`),
-    so a guest fights at its bare class base at any level: one career, no growth."""
+    for a chapter the party deploys into. The prologue's injector writes each guest slot's
+    personal line from its `twin:` (`inject.stats.guest_personal_line`), and its UnitDefinition
+    carries no `.autolevel` (`_prologue_roster_blocks`), so a guest fights at class base plus
+    that line at any level: one career, no growth."""
     out = {}
     for pu in chap.get('player_units') or []:
         class_enum = _enemy_class_enum(pu['class'])
-        out[pu['id']] = [_stats_to_combatant(pu['id'], _class_base(class_enum),
+        base = _class_base(class_enum)
+        line = inject.stats.guest_personal_line(pu, class_enum)
+        stats = {f: base.get(f, 0) + line.get(f, 0) for f in inject.stats.BASE_FIELDS}
+        out[pu['id']] = [_stats_to_combatant(pu['id'], stats,
                                              _weapon_for(pu.get('inventory')),
                                              CLASS_TAGS.get(class_enum, frozenset()))]
     return out

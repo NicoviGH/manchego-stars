@@ -2063,13 +2063,14 @@ class PersonalBossLine(unittest.TestCase):
         base = df.enemy_combatants(grell)[0]
         self.assertEqual(df.unit_real_article(grell, base).hp, base.hp)
 
-    def test_no_mapped_slot_is_one_the_build_zeroes(self):
+    def test_no_mapped_slot_is_one_the_build_rewrites(self):
         """Riding a vanilla slot only counts if the slot survives the build. inject_prologue
-        zeroes its guests' personal bases, so Sephek is a naked class base despite deploying
+        rewrites its guests' personal bases, so Sephek is a naked class base despite deploying
         on O'Neill's slot -- reading him off that line inflated his threat to 2.9x the
         Prologue's ceiling and tripped the gate, which is how this was caught."""
-        zeroed = {'CHARACTER_%s' % s for s in inject.chapters.prologue.PROLOGUE_ZEROED_GUEST_SLOTS}
-        self.assertEqual(zeroed & set(inject.cast.ENEMY_BASE_SLOT.values()), set())
+        rewritten = {'CHARACTER_%s' % s
+                     for s in inject.chapters.prologue.PROLOGUE_REWRITTEN_GUEST_SLOTS}
+        self.assertEqual(rewritten & set(inject.cast.ENEMY_BASE_SLOT.values()), set())
 
     def test_an_authored_line_wins_over_the_slot(self):
         """`personal:` is the explicit authored article; it must not be silently added to a
@@ -2385,14 +2386,16 @@ class PartyMatchup(unittest.TestCase):
         field = df.fielded_careers({'steady': steady, 'even': even}, [enemy], 1)
         self.assertEqual(list(field), ['steady'])
 
-    def test_the_prologue_fields_its_guests_at_class_base(self):
-        # ch00's injector zeroes the guest slots' lines and emits no `.autolevel`, so Hlin is
-        # a bare Fighter at any deploy level.
+    def test_the_prologue_fields_its_guests_on_their_twins_lines(self):
+        # ch00's injector writes each guest slot's `twin:` line and emits no `.autolevel`, so
+        # Hlin fights as Eirika and Scramsax as Seth (vanilla L1: 16/4/8/9/3/1/5 and
+        # 30/14/13/12/11/8/13), whatever our class base says.
         chap = df.load_field('rime-of-the-frostmaiden', 'ch00')[0]
         guests = df.fixed_roster_careers(chap)
         self.assertEqual(set(guests), {'hlin-trollbane', 'scramsax'})
-        base = df._class_base('CLASS_FIGHTER')
-        self.assertEqual(guests['hlin-trollbane'][0].hp, base['baseHP'])
+        line = lambda c: (c.hp, c.pow, c.skl, c.spd, c.df, c.res, c.lck)
+        self.assertEqual(line(guests['hlin-trollbane'][0]), (16, 4, 8, 9, 3, 1, 5))
+        self.assertEqual(line(guests['scramsax'][0]), (30, 14, 13, 12, 11, 8, 13))
         self.assertEqual(df.fixed_roster_careers(
             df.load_field('rime-of-the-frostmaiden', 'ch04')[0]), {})
 
