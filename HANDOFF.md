@@ -6,31 +6,28 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-03 (Claude): #430 steps 3-5 are done; **step 6 is next**.
+Refreshed 2026-10-03 (Claude): #430 step 6 is done; ch00-ch06 are all `balance_locked`.
 **What landed and why is in `git log` and the ADRs it cites** -- this file keeps no "recently
 landed" list.
 
 ## In flight
 
-**#430, balance parity. Step 6 is the next task, and the session's whole focus** (Nicolas,
-2026-10-03: no more feedback detours). The no-Seth residual is decided: ch01-ch02's x1.41
-clear-load is accepted (ADR 0042 stands); ch00 holds parity (ADR 0322).
+Nothing. #430's steps are done (ADRs 0324-0326). Next, pick from "Chapter work" below.
 
-- **Step 6 (locks)** -- a chapter re-locks (`balance_locked: true`, ADR 0316) when its
-  re-measure holds parity on instrument v2. Every FORCE sits x0.93-x1.11 of its twin; judge
-  ch01-ch02 on threat plus the accepted clear-load, not on the headline verdict alone.
-- ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
+- `make difficulty-gate` now enforces ch00-ch06. A change that moves a locked chapter's force
+  reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
+- ch01-ch02 lock through `accepted_residual` (party clear-load 1.41, ADR 0042), with x1.4078 /
+  x1.4081 measured, so a party-side regression there fails the gate too.
+- ch07 still names **FE8 Ch6**. ADR 0315's route rule fails it the moment it is hosted, so
   re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
 - The Monte Carlo simulator stays parked in #430 with its trigger.
-- Step 5 (#135) is closed out: its one live finding shipped (#451). The rest of that feedback
-  waits on #21; do not pick it up unless Nicolas asks.
 
 ## Owed by NICOLAS, not by the next session
 
 - **The boat crews have no voice.** No lore file names Tali or either crew, and Tali carries
   ch06's plot-critical hint.
 
-## Chapter work, after #430
+## Chapter work
 
 - **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). The
   reskins, the boarding pass and nerra's art need no dialogue and can go first.
