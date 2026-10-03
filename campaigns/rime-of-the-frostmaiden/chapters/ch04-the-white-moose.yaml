@@ -50,6 +50,7 @@ fog: 3
 # range-checked as bytes only; nothing here knows the map, so an on-byte-range tile
 # can still be off the map.
 traps: []
+balance_locked: true  # holds parity on instrument v2 (#430 step 6); ADR 0316
 
 # Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): concepts
 # making their FIRST campaign appearance here, and how WE deliver the vanilla heads-up.

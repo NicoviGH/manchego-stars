@@ -16,6 +16,7 @@ traps: []                      # DECLARED empty (#302/#306). ch06 fills `Ch7Even
                                # coordinates, on Ch7's map. Inheriting them would put siege engines
                                # on a frozen lake wherever those tiles happen to land. A lake has no
                                # ballista emplacement, so the field is cleared rather than re-sited.
+balance_locked: true  # holds parity on instrument v2 (#430 step 6); ADR 0316
 cadence: marquee_setpiece       # see docs/CHAPTERS.md — 🎬 (the Navarre/Joshua moment)
 # DONOR and BAR are SEPARATE, and deliberately different chapters (Nicolas, 2026-08-28).
 # The layout is Ephraim's Ch13; the enemy-pressure bar stays vanilla Ch6. Same split ch01

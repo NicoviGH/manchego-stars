@@ -872,7 +872,9 @@ class MirrorIsModeInvariant(unittest.TestCase):
         return out.getvalue()
 
     def _mirror_column(self, text):
-        return [l.split()[-2] for l in text.splitlines()
+        # The mirror is the one token ending in '%'. A fixed offset from the end lands on the
+        # verdict once a row carries a trailing flag (`!!role`, `[locked]`).
+        return [next(t for t in l.split() if t.endswith('%')) for l in text.splitlines()
                 if l.startswith('  CH') and '%' in l]
 
     def test_the_mode_banner_names_mirror_among_the_unshifted_figures(self):
