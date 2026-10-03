@@ -1129,6 +1129,29 @@ def vanilla_party_careers(parity_ref, levels=None):
             for char, class_enum, weapon in members}
 
 
+def accept_residual(verdict, matchup, residual, band=0.25):
+    """A clear-load the PARTY runs harder, accepted by decision (#430 step 6). ch01-ch02 carry
+    vanilla's Seth-less cost (ADR 0042): our party clears their force at x1.41 the twin's
+    rounds while the force itself copies its twin. `residual` is the chapter's
+    `accepted_residual: {party_clear_load: <ceiling>, adr: <decision>}`.
+
+    It excuses the party half of a harder clear-load, up to its ceiling, and nothing else.
+    Threat is never excused, and the force half (what authoring controls) still has to hold
+    the band, so a force that drifts fails the read as before. Returns `verdict` itself when
+    nothing is excused, else a copy marked OK that carries `accepted`."""
+    if not residual:
+        return verdict
+    if not isinstance(residual, dict) or 'adr' not in residual \
+            or not isinstance(residual.get('party_clear_load'), (int, float)):
+        raise ValueError('accepted_residual must name a numeric party_clear_load and the adr '
+                         'that accepted it, got %r' % (residual,))
+    if matchup is None or verdict['threat'] != 'OK' or verdict['load'] != 'harder':
+        return verdict
+    if abs(matchup['force'][1] - 1) > band or matchup['party'][1] > residual['party_clear_load']:
+        return verdict
+    return dict(verdict, verdict='OK', accepted=residual)
+
+
 def pressure_verdict(ours, vanilla, band=0.25):
     """Compare our (threat/slot, clear-load/slot) to the vanilla reference's. Each metric
     is tagged OK / harder / easier by whether its ratio sits inside ±band of parity; the
@@ -1973,7 +1996,8 @@ def _chapter_pressure(chap, band=0.25, mode=None, campaign='rime-of-the-frostmai
             out.update(instrument='party', matchup=matchup,
                        ours=(matchup['ours']['threat'], matchup['ours']['clear']),
                        vanilla=(matchup['vanilla']['threat'], matchup['vanilla']['clear']))
-        out['verdict'] = pressure_verdict(out['ours'], out['vanilla'], band)
+        out['verdict'] = accept_residual(pressure_verdict(out['ours'], out['vanilla'], band),
+                                         matchup, chap.get('accepted_residual'), band)
     return out
 
 
@@ -2159,8 +2183,15 @@ def _print_pressure(p):
                   p['instrument'] == 'party' else
                   '          -- at this share the verdict is largely a CHECKSUM on the donor '
                   'pipeline,\n             not evidence about the chapter.')
-    print('  verdict: %s' % ('PARITY (within band)' if v['verdict'] == 'OK'
-                             else 'OFF-PARITY -- threat %s, clear-load %s' % (v['threat'], v['load'])))
+    if v.get('accepted'):
+        print('  verdict: PARITY with an accepted residual -- party clear-load x%.2f within the '
+              'x%.2f ADR %04d accepted;\n           the force holds the band'
+              % (p['matchup']['party'][1], v['accepted']['party_clear_load'],
+                 int(v['accepted']['adr'])))
+    else:
+        print('  verdict: %s' % ('PARITY (within band)' if v['verdict'] == 'OK'
+                                 else 'OFF-PARITY -- threat %s, clear-load %s'
+                                 % (v['threat'], v['load'])))
     for line in p.get('solo') or []:
         print('  %s' % line)
 
@@ -3211,6 +3242,8 @@ def curve_report(campaign, band=0.25, mode=None):
         flag = '  !!boss dropped' if boss_drop else ''
         if locked:
             flag += '  [locked]'
+        if (p.get('verdict') or {}).get('accepted'):
+            flag += '  [accepted ADR %04d]' % int(p['verdict']['accepted']['adr'])
         has_ref = p['vanilla'] is not None
         verdict = p['verdict']['verdict'] if has_ref else None
         # The per-unit findings ride along so the gate can read them (#284) -- the aggregate

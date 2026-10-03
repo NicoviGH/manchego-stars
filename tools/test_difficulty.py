@@ -129,6 +129,50 @@ class PressureVerdict(unittest.TestCase):
         self.assertEqual(v['verdict'], 'OFF')
 
 
+class AcceptedResidual(unittest.TestCase):
+    """#430 step 6: a chapter may carry a party-side clear-load Nicolas accepted (ch01-ch02,
+    the no-Seth cost of ADR 0042). The accepted residual excuses the PARTY half only, up to
+    its ceiling. The force half, which authoring controls, still has to hold the band, so a
+    force that drifts reddens the gate as before."""
+
+    RESIDUAL = {'party_clear_load': 1.41, 'adr': 42}
+
+    def _read(self, force_load=0.97, party_load=1.408, threat='OK'):
+        verdict = {'threat': threat, 'load': 'harder', 'verdict': 'OFF',
+                   'threat_ratio': 1.06, 'load_ratio': force_load * party_load}
+        return verdict, {'force': (0.93, force_load), 'party': (1.14, party_load)}
+
+    def test_the_accepted_party_half_passes(self):
+        v = df.accept_residual(*self._read(), self.RESIDUAL)
+        self.assertEqual(v['verdict'], 'OK')
+        self.assertEqual(v['accepted'], self.RESIDUAL)
+
+    def test_a_party_half_past_the_ceiling_fails(self):
+        self.assertEqual(df.accept_residual(*self._read(party_load=1.43),
+                                            self.RESIDUAL)['verdict'], 'OFF')
+
+    def test_a_force_half_out_of_band_fails(self):
+        self.assertEqual(df.accept_residual(*self._read(force_load=1.30),
+                                            self.RESIDUAL)['verdict'], 'OFF')
+
+    def test_threat_is_never_excused(self):
+        self.assertEqual(df.accept_residual(*self._read(threat='harder'),
+                                            self.RESIDUAL)['verdict'], 'OFF')
+
+    def test_no_residual_changes_nothing(self):
+        verdict, matchup = self._read()
+        self.assertIs(df.accept_residual(verdict, matchup, None), verdict)
+
+    def test_a_residual_must_name_its_ceiling_and_decision(self):
+        with self.assertRaises(ValueError):
+            df.accept_residual(*self._read(), {'party_clear_load': 1.41})
+
+    def test_ch01_and_ch02_hold_parity_with_their_accepted_residual(self):
+        for chid in ('ch01', 'ch02'):
+            chap = df.load_field(CAMPAIGN, chid)[0]
+            self.assertEqual(df._chapter_pressure(chap)['verdict']['verdict'], 'OK', chid)
+
+
 class CurveGate(unittest.TestCase):
     """The --check gate (#48 (b)): PER-CHAPTER opt-in. We author chapters as we go, so the
     gate enforces a chapter only once content marks it balance-final with `balance_locked:
