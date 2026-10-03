@@ -78,7 +78,7 @@ PLAYTEST_CASE = {
 CHAPTER = {
     # identity and status
     'id': ANY, 'chapter_number': ANY, 'title': ANY, 'status': ANY, 'milestone': ANY,
-    'is_prologue': ANY, 'is_mvp_finale': ANY, 'balance_locked': ANY,
+    'is_prologue': ANY, 'is_mvp_finale': ANY, 'balance_locked': ANY, 'accepted_residual': ANY,
     # prose: the design record
     'narrative': ANY, 'design_notes': ANY, 'cadence': ANY, 'parity_reference': ANY,
     'difficulty_note': ANY, 'fe8_base_map': ANY, 'fe8_cadence_base': ANY,

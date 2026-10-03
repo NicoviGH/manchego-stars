@@ -51,7 +51,10 @@ fog: none
 # range-checked as bytes only; nothing here knows the map, so an on-byte-range tile
 # can still be off the map.
 traps: []
-balance_locked: false  # locks when instrument v2 holds parity (#430 step 6); ADR 0316
+balance_locked: true  # holds parity on instrument v2 (#430 step 6); ADR 0316
+accepted_residual:     # the party clears this force at x1.41 the twin's rounds: no Seth
+  party_clear_load: 1.41   # (ADR 0042 stands; Nicolas, #430). The force still holds the band.
+  adr: 42
 
 # ── Onboarding (what this chapter first teaches) ─────────────────────────────────
 introduces:
