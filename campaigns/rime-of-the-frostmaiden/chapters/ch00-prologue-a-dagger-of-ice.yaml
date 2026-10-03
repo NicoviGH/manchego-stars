@@ -46,7 +46,7 @@ fog: none
 # range-checked as bytes only; nothing here knows the map, so an on-byte-range tile
 # can still be off the map.
 traps: []
-balance_locked: false  # locks when instrument v2 holds parity (#430 step 6); ADR 0316
+balance_locked: true  # holds parity on instrument v2 (#430 step 6); ADR 0316
 is_prologue: true
 
 # Onboarding parity (see docs/ONBOARDING.md + the dialogue-pass parity step): the basics
