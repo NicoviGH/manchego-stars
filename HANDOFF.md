@@ -16,9 +16,9 @@ landed" list.
 accepted (ADR 0042 stands); ch00's Hlin gap closed by kit (ADR 0322, ch00 now PARITY).
 
 Then, autonomously and data-driven:
-- **Step 5 (#135)** -- triaged and closed 2026-09-02; its live work is #21's ch01 terrain-heal
-  boxes (the Guide-absence check, then the beat). ADR 0104 keeps tutorial mode off Normal, so
-  the beat's channel is Nicolas's call before it is built.
+- **Step 5 (#135)** -- its terrain-heal finding landed (#451, ADR 0323). #21 still holds three
+  of its boxes: other Guide entries per concept (campaign-wide), telegraphing the reinforcements,
+  fort legibility (art).
 - **Step 6 (locks)** -- a chapter re-locks when its re-measure holds parity on v2. Every FORCE
   sits x0.93-x1.11 of its twin; ch01-ch02's clear-load residual is ACCEPTED, so judge their
   locks on threat plus that acceptance, not on the headline verdict alone.
