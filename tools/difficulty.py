@@ -2033,7 +2033,8 @@ def _chapter_matchup(chap, campaign, mode):
             'threat_ratio': ratio(ours, van, 'threat'), 'load_ratio': ratio(ours, van, 'clear'),
             'force': (ratio(ours, cross, 'threat'), ratio(ours, cross, 'clear')),
             'party': (ratio(cross, van, 'threat'), ratio(cross, van, 'clear')),
-            'cross': cross}
+            'cross': cross,
+            'lines': {m: _median_combatant(c) for m, c in fields['our_field'].items()}}
 
 
 def arriving_fields(chap, campaign, mode=None):
@@ -2502,6 +2503,42 @@ def _boss_census(ids):
     return []
 
 
+def _boss_durability_vs_party(entries, parity_ref, lines):
+    """The durability arms on the party's median lines, in the yardstick's place. Read here
+    rather than off the matchup, whose clear-load floors an undentable body to a finite chip
+    read and stands every body on open ground: the throne and the wall are what these arms
+    exist to catch (#284)."""
+    import exp_curve                        # exp_curve imports this module
+    inf = float('inf')
+
+    def party_rounds(body, avoid=0):
+        rate = sum(1.0 / r for r in (fc.rounds_to_kill(u, body, avoid)
+                                     for u in lines if u.weapon is not None) if r != inf)
+        return 1.0 / rate if rate else inf
+    twin = [party_rounds(c) for n, c in vanilla_named_bosses(parity_ref, with_personal=True)
+            if 'CA_BOSS' in exp_curve.character_attributes('CHARACTER_' + n.upper())]
+    bar = max((r for r in twin if r != inf), default=0.0) or \
+        max((r for r in map(party_rounds, vanilla_enemies(parity_ref) or []) if r != inf),
+            default=0.0)
+    out = []
+    for ed in entries:
+        if not ed.get('is_boss'):
+            continue
+        tile = ed.get('tile_terrain')
+        where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
+        for c in _entry_combatants(ed, real_article=True, drop_staff=False, distinct=True):
+            body, avoid = on_terrain(c, tile)
+            rounds = party_rounds(body, avoid)
+            if rounds == inf:
+                out.append('boss %s%s cannot be damaged by the party that meets it'
+                           % (ed.get('id'), where))
+            elif bar and rounds < bar * 0.5:
+                out.append("boss %s takes %.2f party-rounds to kill%s; %s's boss takes %.2f "
+                           'against the same party -- the climax may fold too fast'
+                           % (ed.get('id'), rounds, where, parity_ref, bar))
+    return out
+
+
 def _role_findings_vs_party(chap, parity_ref, matchup):
     """The role check on instrument v2 (#430 step 6): our force and the twin's, BOTH met by our
     arriving party (the matchup's `cross` read), so each comparison isolates what authoring
@@ -2551,9 +2588,7 @@ def _role_findings_vs_party(chap, parity_ref, matchup):
     van_boss_t = max((t for t, _c in van_b.values()), default=0.0)
     van_line_t = max((t for t, _c in van_l.values()), default=0.0)
     van_ratio = van_line_t / van_boss_t if van_boss_t else 1.0
-    van_bar = max((c for _t, c in van_b.values()), default=0.0) or \
-        max((c for _n, _t, c, _w in matchup['cross']['per_enemy']), default=0.0)
-    for name, (threat, clear) in ours_b.items():
+    for name, (threat, _clear) in ours_b.items():
         if threat > 0:
             harder = sorted(((t, n) for n, (t, _c) in ours_l.items()
                              if t > threat and t / threat > van_ratio * band), reverse=True)
@@ -2563,12 +2598,7 @@ def _role_findings_vs_party(chap, parity_ref, matchup):
                            % (name, threat, len(harder),
                               ', '.join('%s (%.1f)' % (n, t) for t, n in harder[:4]),
                               harder[0][0] / threat, parity_ref, van_ratio))
-        if clear == float('inf'):
-            out.append('boss %s cannot be damaged by the party that meets it' % name)
-        elif van_bar and clear < van_bar * 0.5:
-            out.append('boss %s takes %.2f party-rounds to clear; %s\'s boss takes %.2f against '
-                       'the same party -- the climax may fold too fast'
-                       % (name, clear, parity_ref, van_bar))
+    out.extend(_boss_durability_vs_party(entries, parity_ref, list(matchup['lines'].values())))
     out.extend(_boss_census(e.get('id') for e in entries if e.get('is_boss')))
     return list(dict.fromkeys(out))
 

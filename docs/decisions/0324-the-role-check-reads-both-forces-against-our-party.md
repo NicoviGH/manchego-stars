@@ -24,7 +24,10 @@ hits ours for 31.3 and vanilla's, with Lute and Artur, for 19.6. That gap made n
   twin's own line-to-boss ratio x1.25. FE8 inverts too: vanilla Ch2's archer out-hits Bone, and
   Ch6's Horseslayer out-hits Novala. The twin's boss is the body whose CHARACTER carries
   `CA_BOSS`, where FE8 records it. Convertibles are left out on both sides.
-- **Durability:** our boss's party-rounds to clear it under half the twin boss's.
+- **Durability:** our boss, on its tile, takes under half the party-rounds of the twin's boss,
+  or the party cannot dent it. These arms read the party's median lines directly. The
+  matchup floors an undentable body to a finite chip read and stands every body on open
+  ground, which would hide the throne and the wall these arms exist to catch.
 - The `YARDSTICK` arms stay for a twin off `VANILLA_CHAIN` and for any call without a campaign.
 
 **Reading on ch00-ch06:** every chapter matches its twin's per-unit profile except ch03, where the

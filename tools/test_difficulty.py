@@ -2128,6 +2128,31 @@ class RoleCheckAgainstTheParty(unittest.TestCase):
         self.assertTrue(any('out-threatened' in f and 'kobold-slinger' in f for f in found),
                         found)
 
+    def _grell(self, chap, **fields):
+        chap = copy.deepcopy(chap)
+        for entry in chap['enemy_units']:
+            if entry.get('id') == 'grell':
+                entry.update(fields)
+        return chap
+
+    def test_a_boss_the_party_cannot_dent_is_flagged(self):
+        """The matchup floors an undentable body to a finite chip read; this arm must not."""
+        chap = self._grell(self._ch('ch03'), personal={'baseHP': 17, 'basePow': 5,
+                                                       'baseDef': 30, 'baseRes': 30})
+        found = df.role_findings(chap, chap['parity_reference'], CAMPAIGN)
+        self.assertTrue(any('cannot be damaged' in f for f in found), found)
+
+    def test_the_bosss_tile_counts_toward_its_durability(self):
+        """Def that the party can still dent on open ground, made undentable by a throne."""
+        bare = self._grell(self._ch('ch03'), personal={'baseHP': 17, 'basePow': 5,
+                                                       'baseDef': 12, 'baseRes': 30})
+        throned = self._grell(bare, tile_terrain='throne')
+        ref = bare['parity_reference']
+        self.assertFalse(any('cannot be damaged' in f
+                             for f in df.role_findings(bare, ref, CAMPAIGN)))
+        self.assertTrue(any('cannot be damaged' in f
+                            for f in df.role_findings(throned, ref, CAMPAIGN)))
+
     def test_grells_pow_line_puts_it_back_on_top(self):
         chap = self._ch('ch03')
         self.assertEqual(df.role_findings(chap, chap['parity_reference'], CAMPAIGN), [])
