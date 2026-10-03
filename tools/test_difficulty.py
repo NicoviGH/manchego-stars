@@ -2585,38 +2585,28 @@ class BossesAreImmuneToTheMalus(unittest.TestCase):
 
 
 class RavisinHoldsSaarsBar(unittest.TestCase):
-    """ch05's boss is measured against her twin's REAL durability, not a stale number.
+    """ch05's boss holds her twin's durability against the party that meets her (ADR 0316).
 
-    Her YAML note has read "~13 rounds to kill -- Saar's bar" since she was authored, and
-    she hit it exactly. But that bar was measured before #285 taught the model to apply a
-    personal line to BOTH sides: once vanilla's bosses stopped being read off naked class
-    base, Saar moved to 22.8 rounds and nobody re-checked her. She was holding a bar that
-    had moved out from under her, which is why ch05's clear-load sat under vanilla's in
-    every mode and fell out of band on Tutorial (x0.74), where the generics floor to class
-    base and the boss dominates the ratio.
+    Her line was barred twice on the fixed swordsman: to "~13 rounds", then to 23.4 against
+    Saar's 22.8 once #285 read personal lines on both sides. Against our arriving party Saar,
+    an Armor Knight, melts to magic and she does not, so that line took 1.56 party-rounds to
+    his 0.71 and was the whole of ch05's force clear-load excess (x1.16).
 
     Pinned as a RANGE against Saar rather than a constant, so the next change to either
     side's modelling fails here instead of silently re-opening the same gap. Whether ch05 as
-    a whole sits in band is the curve's verdict to give (#430 step 3), not a constant here.
+    a whole sits in band is the curve's verdict to give, not a constant here.
     """
 
-    def _rounds(self, name_match, force):
-        return max(df.metric_rounds_to_kill(e) for e in force
-                   if name_match(e.name))
-
-    def test_ravisin_is_within_reach_of_saars_measured_durability(self):
-        chap = df.load_field('rime-of-the-frostmaiden', 'ch05')[0]
-        shifts = inject.chapter_settings.chapter_difficulty_shifts(chap)
-        ours = df.chapter_enemy_force(chap, mode='normal', shifts=shifts)
-        ravisin = max(df.metric_rounds_to_kill(e) for e in ours)
-        saar = self._rounds(lambda n: 'SAAR' in n.upper(),
-                            df.vanilla_enemies('FE8 Ch5', mode='normal'))
-        self.assertGreater(saar, 19, 'Saar moved -- re-read the bar before trusting it')
+    def test_ravisin_is_within_reach_of_saars_party_rounds(self):
+        chap = df.load_field(CAMPAIGN, 'ch05')[0]
+        m = df.chapter_matchup(chap, CAMPAIGN)
+        ravisin = max(c for n, _t, c, _w in m['ours']['per_enemy'] if n == 'ravisin')
+        saar = max(c for n, _t, c, _w in m['cross']['per_enemy'] if 'CHARACTER_SAAR' in n)
         self.assertGreater(ravisin, saar * 0.85,
-                           'Ravisin %.1f is under Saar %.1f -- ch05 loses its wall' 
+                           'Ravisin %.2f is under Saar %.2f -- ch05 loses its wall'
                            % (ravisin, saar))
         self.assertLess(ravisin, saar * 1.30,
-                        'Ravisin %.1f overshoots Saar %.1f' % (ravisin, saar))
+                        'Ravisin %.2f overshoots Saar %.2f' % (ravisin, saar))
 
 
 class OurUnitsOnPlayableSlotsAreImmune(unittest.TestCase):

@@ -48,6 +48,7 @@ fog: none
 # range-checked as bytes only; nothing here knows the map, so an on-byte-range tile
 # can still be off the map.
 traps: []
+balance_locked: true  # holds parity on instrument v2 (#430 step 6); ADR 0316
                               # (first chapter at the FE8-Ch5 reward tier: stat-boosters + a promotion item unlock here)
 
 introduces:
@@ -149,8 +150,8 @@ win_condition: boss_defeated
 lose_condition: all_player_units_defeated
 
 difficulty_note: >
-  Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar — verdict
-  PARITY (within band): threat/slot 12.4 (x1.08) · clear-load/slot 4.8 (x0.84); ours reads
+  Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar; `make
+  difficulty CH=ch05` gives the live verdict against the party that meets it. Ours reads
   line 16 · reinf 6 · convertible 1 — the twin's structure exactly, with Sahnar the one true
   convertible (Basil's Talk). The force is RISEN
   ELVEN GUARDIANS on vanilla FE8 infantry classes, skinned undead — the ch01 "vanilla class,
@@ -163,12 +164,12 @@ difficulty_note: >
   the weapon triangle the player actually plays against, which the per-slot averages can't see.
   Ravisin is a vanilla FE8 Druid — heavy dark-magic (FE MAG vs RES) at 1-2 range — so
   squishy/low-RES units must respect her threat range; the pillars give cover to bait her out.
-  She carries a PERSONAL boss line (see her entry) putting her at ~13.4 rounds to kill, the
-  vanilla Saar bar. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
+  She carries a PERSONAL boss line (see her entry) that takes our party as many rounds to
+  clear as Saar does. Two Ch5 dynamics do the real work and pay the STATIC bar DOWN:
     - CONVERTIBLE Sahnar (the Joshua flip): a hostile crit-Myrmidon until Basil Talks
       her, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
     - REINFORCEMENT eruption: the dead arrive over turns (arrives_turn), not a turn-1 alpha —
-      so the turn-1 threat reads 9.9 (≈ vanilla's 9.0), below the static 12.7.
+      so the turn-1 field is lighter than the all-turn-1 bar, on both sides.
       SAHNAR IS NOT ONE OF THEM (2026-08-14, #25 — Ravisin summons her in scene 3), and the
       re-price this looked like it owed turns out to be ALREADY PAID: `difficulty.py`
       (`_split_force`) buckets a `convertible: true` enemy before it ever reads `arrives_turn`,
@@ -276,24 +277,19 @@ enemy_units:
     boss_tile: moon_dial        # she holds the moon dial at the centre — retiled as a dais
                                 # (flavour + AI anchor; NO terrain bonus, see below)
     personal:                   # FE8's OWN boss mechanism — a named boss is class base + a
-      baseHP: 21                # personal line. Vanilla Saar is an Armor Knight *plus*
-      baseDef: 6                # HP+13/Pow+6/Skl+5/Spd+3/Def+2/Res+3/Lck+4; that line is most
+      baseHP: 13                # personal line. Vanilla Saar is an Armor Knight *plus*
+      baseDef: 3                # HP+13/Pow+6/Skl+5/Spd+3/Def+2/Res+3/Lck+4; that line is most
       basePow: 4                # of why he reads as a wall. She stays a Druid with Flux and
       baseSkl: 3                # her existing art: zero art cost, no custom class, pure vanilla.
       baseRes: 3                #
-      baseLck: 3                # RE-BARRED 2026-08-22 (#303), HP 15->21 / Def 5->6. The old line
-                                # was authored to "~13 rounds — Saar's bar" and hit it exactly,
-                                # but that bar was measured BEFORE #285 taught the model to apply
-                                # a personal line to BOTH sides. Once Saar stopped being read off
-                                # naked class base he moved to 22.8 rounds and nobody re-checked
-                                # her, so ch05 sat under vanilla's clear-load in every mode and
-                                # fell OUT OF BAND on Tutorial (x0.74) — where the generics floor
-                                # to class base and the boss is most of the ratio.
-                                # She now measures 23.4 rounds against Saar's 22.8, and ch05 is
-                                # in band in all three modes (x0.92 / x1.02 / x1.04).
-                                # Def is a CLIFF here, not a dial: +1 moves her 13.4 -> 20.1
-                                # rounds and +2 overshoots to 40.2, because the yardstick's
-                                # damage approaches zero. The HP carries the rest.
+      baseLck: 3                # Barred against the party that meets her (ADR 0316): she takes
+                                # 0.74 party-rounds to clear, Saar 0.71 against the same party.
+                                # Saar's own HP+13; Def+3, because his +2 drops her under him.
+                                # The fixed swordsman barred her at HP+21/Def+6, and against
+                                # our party, whose magic melts an Armor Knight but not a Druid,
+                                # that line took 1.56 and was all of ch05's force clear-load
+                                # excess (x1.16). Def is a cliff, not a dial: +1 moves her
+                                # 0.74 -> 0.86 party-rounds. The HP carries the rest.
     # BOSS-ARCHETYPE NOTE (2026-07-23, decomp-verified — supersedes the throne/bodyguard fix):
     # FE8 has NO tanky mage class (best magic Def is 5: Sage/Mage-Knight/Gorgon, all 10% Def
     # growth), so swapping her class can't work. But the class was never the reason vanilla
