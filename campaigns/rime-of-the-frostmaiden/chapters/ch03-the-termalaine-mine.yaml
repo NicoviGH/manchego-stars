@@ -41,6 +41,7 @@ fog: none
 # range-checked as bytes only; nothing here knows the map, so an on-byte-range tile
 # can still be off the map.
 traps: []
+balance_locked: true  # holds parity on instrument v2 (#430 step 6); ADR 0316
 
 # ── Onboarding (what this chapter first teaches) ─────────────────────────────────
 # Cadence anchor = vanilla Ch3, which recruits Colm (the first thief) → the steal/chests/
@@ -108,11 +109,11 @@ win_condition: boss_defeated
 lose_condition: all_player_units_defeated         # FE8 lord rule
 
 difficulty_note: >
-  Enemy pressure mirrors vanilla FE8 Ch3 1:1 (10 slots; see enemy_units) — verified
-  on `make difficulty CH=ch03`: clear-load x0.99, threat x1.12 (within band). The
-  threat runs a touch hot because the Grell attacks with magic (Evil Eye) against
-  our melee cast's low RES — intentional: an eldritch horror should out-threaten a
-  bandit. The doors/chokepoints, not stat inflation, make the descent tense.
+  Enemy pressure mirrors vanilla FE8 Ch3 1:1 (10 slots; see enemy_units). `make
+  difficulty CH=ch03` reads it against the party that meets each force (ADR 0316). The
+  Grell hits that party as hard as Bazba does, through its magic (Evil Eye) against
+  our melee cast's low RES. The doors/chokepoints, not stat inflation, make the descent
+  tense.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -142,7 +143,7 @@ deployment:
 # pressure mirrors vanilla (tools/difficulty.py); the ONE deliberate deviation is the boss
 # slot: Bazba's Brigand becomes the GRELL (a real FE monster — CLASS_MOGALL — since a grell
 # IS a floating tentacled eye-aberration). A same-level mogall is far frailer than a Brigand,
-# so the grell carries a level bump to hold Bazba's pressure — verified on `make difficulty
+# so the grell carries a personal line to hold Bazba's pressure — verified on `make difficulty
 # CH=ch03`, not faked via the class. The kobolds are agitated victims (the grell preys on
 # them too), territorial toward intruders; Trex (their leader) defects to the party mid-map.
 enemy_units:
@@ -154,24 +155,17 @@ enemy_units:
     count: 1
     positions: [[14, 1]]        # vanilla seize tile = the deep workings / grell lair
     class: mogall               # FE8 monster (floating eye-aberration) — the real creature, not a reskin
-    level: 8                    # mogall bases are frail; the level carries its OFFENCE: threat 6.8,
-                                # 1.10x Bazba's 6.1 on the 2RN hit (ADR 0314). L12 read 1.45x.
+    level: 8
     autolevel: true
-    personal:                   # FE8's OWN boss mechanism — a named boss is class base PLUS a
-      baseHP: 17                # personal line, and the level was never a substitute for one:
-      baseDef: 5                # a naked L12 mogall folded in 1.1 rounds against a bar of 3.6
-                                # (#284). Modelled on the decomp's only DEFENSIVE monster boss,
-                                # Maelduin (data_characters.c [CHARACTER_MAELDUIN_CHUnk - 1]:
-                                # HP+15/Pow+6/Skl+6/Spd+2/Def+4/Res+8) — its defensive half taken
-                                # near-verbatim, its OFFENSIVE half deliberately dropped. Every
-                                # vanilla monster boss is a promoted late-game unit, so any of
-                                # their Pow lines put a ch03 magic boss (Evil Eye reads RES 4,
-                                # and FE8 Ch3 fields no magic at all) past the twin's own threat
-                                # ceiling of 6.8. Durability was the deficit; offence was not.
-                                # Lands at 3.5 rounds — Bazba's bar exactly, the same place ch02's
-                                # Halvar lands — at HP 36/Def 8, just inside Ravisin's 37/10 two
-                                # chapters later, so the boss curve stays monotonic. The +2 HP
-                                # over Maelduin's line holds 36 HP at L8.
+    personal:                   # FE8's OWN boss mechanism: a named boss is class base PLUS a
+      baseHP: 17                # personal line. Modelled on the decomp's only defensive monster
+      basePow: 5                # boss, Maelduin (data_characters.c [CHARACTER_MAELDUIN_CHUnk - 1]:
+      baseDef: 5                # HP+15/Pow+6/Def+4), and read against the party that meets it
+                                # (ADR 0316): Pow+5 hits that party for 14.1 a round, Bazba's 14.0,
+                                # where a bare line hit for 9.7 and the kobold slinger's 13.6 led
+                                # the force. HP+17/Def+5 keep 36 HP/Def 8 at L8, just inside
+                                # Ravisin's 37/10 two chapters later, so the boss curve stays
+                                # monotonic. A naked L12 mogall folded in 1.1 rounds (#284).
     inventory:
       - id: evil-eye            # the mogall's innate ranged magic gaze (hits RES); flavor = lightning tentacle
     donor: [14, 1]     # vanilla Bazba, the seize-tile boss -- GuardTileAI + the GuardTile bit

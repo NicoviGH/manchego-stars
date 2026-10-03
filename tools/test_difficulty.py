@@ -8,6 +8,7 @@ combatants and hand-computed oracles; the I/O layer is tested against real Ch1 d
     python3 tools/test_difficulty.py
 """
 import contextlib
+import copy
 import io
 import os
 import sys
@@ -2091,6 +2092,51 @@ class PersonalBossLine(unittest.TestCase):
                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         found = df.role_findings({'enemy_units': [boss]}, self.REF)
         self.assertTrue(any('cannot be damaged' in f for f in found), found)
+
+
+class RoleCheckAgainstTheParty(unittest.TestCase):
+    """#430 step 6: on a twin the party model reaches, the role check reads both forces against
+    the party that meets ours, the footing ADR 0316 gave the aggregate. The fixed swordsman
+    read the triangle from a sword's side only, so a lance line 'out-threatened' a sword boss
+    who hits the real party three times as hard (ch00's guards and Sephek)."""
+
+    def _ch(self, chid):
+        return df.load_field(CAMPAIGN, chid)[0]
+
+    def _without_pow(self, chap, uid):
+        chap = copy.deepcopy(chap)
+        for entry in chap['enemy_units']:
+            if entry.get('id') == uid:
+                entry['personal'].pop('basePow')
+        return chap
+
+    def test_a_lance_line_does_not_out_threaten_a_sword_boss_who_hits_harder(self):
+        chap = self._ch('ch00')
+        self.assertEqual(df.role_findings(chap, chap['parity_reference'], CAMPAIGN), [])
+
+    def test_an_inversion_the_twin_shares_is_not_flagged(self):
+        """ch02's archer out-hits its boss, and so does vanilla Ch2's out-hit Bone."""
+        chap = self._ch('ch02')
+        found = df.role_findings(chap, chap['parity_reference'], CAMPAIGN)
+        self.assertFalse(any('out-threatened' in f for f in found), found)
+
+    def test_an_inversion_the_twin_lacks_is_flagged(self):
+        """Without its Pow line, ch03's grell hits the party for 9.7 to the slinger's 13.6;
+        Bazba tops vanilla Ch3's line."""
+        chap = self._without_pow(self._ch('ch03'), 'grell')
+        found = df.role_findings(chap, chap['parity_reference'], CAMPAIGN)
+        self.assertTrue(any('out-threatened' in f and 'kobold-slinger' in f for f in found),
+                        found)
+
+    def test_grells_pow_line_puts_it_back_on_top(self):
+        chap = self._ch('ch03')
+        self.assertEqual(df.role_findings(chap, chap['parity_reference'], CAMPAIGN), [])
+
+    def test_a_magic_unit_is_not_an_outlier_for_hitting_the_party_it_was_built_for(self):
+        """nerra is Novala's class, level and tome. Against our party both hit for 31.3;
+        read against vanilla's high-Res party, Novala looked like a 20.7 ceiling."""
+        chap = self._ch('ch06')
+        self.assertEqual(df.role_findings(chap, chap['parity_reference'], CAMPAIGN), [])
 
 
 class MetricRoundsToKill(unittest.TestCase):

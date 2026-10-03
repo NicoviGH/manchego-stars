@@ -1929,7 +1929,7 @@ def report(campaign, ch, mode=None):
               % (num, ref))
 
     _print_pressure(_chapter_pressure(chap, campaign=campaign))
-    print_role_findings(chap, chap.get('parity_reference'))  # authored table; see banner
+    print_role_findings(chap, chap.get('parity_reference'), campaign)  # authored table
     _print_economy(chap)
     _print_dynamics(chap)
     import timeline                         # timeline imports this module (via danger_map)
@@ -2032,7 +2032,8 @@ def _chapter_matchup(chap, campaign, mode):
             'field': (list(fields['our_field']), list(fields['van_field'])),
             'threat_ratio': ratio(ours, van, 'threat'), 'load_ratio': ratio(ours, van, 'clear'),
             'force': (ratio(ours, cross, 'threat'), ratio(ours, cross, 'clear')),
-            'party': (ratio(cross, van, 'threat'), ratio(cross, van, 'clear'))}
+            'party': (ratio(cross, van, 'threat'), ratio(cross, van, 'clear')),
+            'cross': cross}
 
 
 def arriving_fields(chap, campaign, mode=None):
@@ -2411,9 +2412,17 @@ def ai_donor_findings(chap):
     return findings
 
 
-def role_findings(chap, parity_ref):
+def role_findings(chap, parity_ref, campaign=None):
     """Per-unit role warnings: outlier threat vs the twin's ceiling, and a boss that is not
-    the chapter's real centre of gravity. Returns a list of strings (empty == clean)."""
+    the chapter's real centre of gravity. Returns a list of strings (empty == clean).
+
+    With a `campaign` and a twin the party model reaches, every arm reads both forces against
+    the party that meets ours (`_role_findings_vs_party`). Otherwise it falls back to the fixed
+    YARDSTICK, as the aggregate does off VANILLA_CHAIN."""
+    if campaign and parity_ref in VANILLA_CHAIN:
+        matchup = chapter_matchup(chap, campaign)
+        if matchup is not None:
+            return _role_findings_vs_party(chap, parity_ref, matchup)
     van = vanilla_enemies(parity_ref)
     if not van:
         return []
@@ -2480,16 +2489,92 @@ def role_findings(chap, parity_ref):
     # declared level, and every row carries that entry's id -- so a boss authored
     # `levels: [19, 20]` would otherwise read as two bosses named the same thing. The
     # per-unit warnings above are deduped for the same reason.
-    boss_ids = list(dict.fromkeys(n for n, _c, _t in bosses))
-    if len(boss_ids) > 1:
-        out.append('%d units flagged is_boss (%s) -- only the objective target should be a boss; '
-                   'use a miniboss/convertible role for the others'
-                   % (len(boss_ids), ', '.join(boss_ids)))
+    out.extend(_boss_census(n for n, _c, _t in bosses))
     return list(dict.fromkeys(out))
 
 
-def print_role_findings(chap, parity_ref):
-    findings = role_findings(chap, parity_ref)
+def _boss_census(ids):
+    boss_ids = list(dict.fromkeys(ids))
+    if len(boss_ids) > 1:
+        return ['%d units flagged is_boss (%s) -- only the objective target should be a boss; '
+                'use a miniboss/convertible role for the others'
+                % (len(boss_ids), ', '.join(boss_ids))]
+    return []
+
+
+def _role_findings_vs_party(chap, parity_ref, matchup):
+    """The role check on instrument v2 (#430 step 6): our force and the twin's, BOTH met by our
+    arriving party (the matchup's `cross` read), so each comparison isolates what authoring
+    controls. Reading the twin against vanilla's own party would charge it for Lute's Res: the
+    same Shaman with the same Flux hits ours for 31.3 and vanilla's for 19.6.
+
+    Each arm asks the yardstick arm's question, relative to the twin rather than in absolute
+    terms. A line unit out-hitting the boss is common in FE8 itself (Ch2's archer out-hits
+    Bone), so an inversion is flagged only when ours runs past the twin's own by the band. The
+    twin's boss is the body whose CHARACTER carries CA_BOSS, which is where FE8 records it."""
+    import exp_curve                        # exp_curve imports this module
+    band = 1.25
+    entries = list(chapter_roster_entries(chap))
+    boss_ids = {e.get('id') for e in entries if e.get('is_boss')}
+    conv_ids = {e.get('id') for e in entries if e.get('convertible')}
+    stem = PARITY_REFERENCE_STEM.get(parity_ref)
+    van_conv = _vanilla_convertible_chars(stem) if stem else set()
+
+    def char(name):
+        return name[name.index('[') + 1:-1] if '[' in name else None
+
+    def by_unit(rows, is_boss, is_conv):
+        """{name: (max threat, min clear)} for the bosses and for the fought line."""
+        bosses, line = {}, {}
+        for name, threat, clear, _weapon in rows:
+            if is_conv(name) and not is_boss(name):
+                continue
+            side = bosses if is_boss(name) else line
+            t, c = side.get(name, (0.0, float('inf')))
+            side[name] = (max(t, threat), min(c, clear))
+        return bosses, line
+
+    ours_b, ours_l = by_unit(matchup['ours']['per_enemy'],
+                             lambda n: n in boss_ids, lambda n: n in conv_ids)
+    van_b, van_l = by_unit(matchup['cross']['per_enemy'],
+                           lambda n: 'CA_BOSS' in exp_curve.character_attributes(char(n)),
+                           lambda n: char(n) in van_conv)
+    out = []
+    ceiling = max(t for _n, t, _c, _w in matchup['cross']['per_enemy'])
+    for name, threat, _clear, _weapon in matchup['ours']['per_enemy']:
+        if ceiling > 0 and threat > ceiling * band:
+            out.append('%s threat %.1f is %.1fx the %s ceiling (%.1f) against the party that '
+                       'meets it%s' % (name, threat, threat / ceiling, parity_ref, ceiling,
+                                       ' -- convertible, so the player can neutralize it '
+                                       'without fighting' if name in conv_ids else
+                                       ' -- no vanilla unit hits that hard'))
+    van_boss_t = max((t for t, _c in van_b.values()), default=0.0)
+    van_line_t = max((t for t, _c in van_l.values()), default=0.0)
+    van_ratio = van_line_t / van_boss_t if van_boss_t else 1.0
+    van_bar = max((c for _t, c in van_b.values()), default=0.0) or \
+        max((c for _n, _t, c, _w in matchup['cross']['per_enemy']), default=0.0)
+    for name, (threat, clear) in ours_b.items():
+        if threat > 0:
+            harder = sorted(((t, n) for n, (t, _c) in ours_l.items()
+                             if t > threat and t / threat > van_ratio * band), reverse=True)
+            if harder:
+                out.append('boss %s (threat %.1f) is out-threatened by %d non-boss unit(s): %s '
+                           '-- %.2fx, where %s\'s line tops its boss at %.2fx'
+                           % (name, threat, len(harder),
+                              ', '.join('%s (%.1f)' % (n, t) for t, n in harder[:4]),
+                              harder[0][0] / threat, parity_ref, van_ratio))
+        if clear == float('inf'):
+            out.append('boss %s cannot be damaged by the party that meets it' % name)
+        elif van_bar and clear < van_bar * 0.5:
+            out.append('boss %s takes %.2f party-rounds to clear; %s\'s boss takes %.2f against '
+                       'the same party -- the climax may fold too fast'
+                       % (name, clear, parity_ref, van_bar))
+    out.extend(_boss_census(e.get('id') for e in entries if e.get('is_boss')))
+    return list(dict.fromkeys(out))
+
+
+def print_role_findings(chap, parity_ref, campaign=None):
+    findings = role_findings(chap, parity_ref, campaign)
     print('\n-- PER-UNIT ROLE CHECK (what the per-slot averages hide) ' + '-' * 12)
     if not findings:
         print('  clean -- no threat outliers, boss is the chapter\'s hardest hitter')
@@ -3100,7 +3185,7 @@ def curve_report(campaign, band=0.25, mode=None):
         verdict = p['verdict']['verdict'] if has_ref else None
         # The per-unit findings ride along so the gate can read them (#284) -- the aggregate
         # above cannot see a single soft unit, which is exactly how two paper bosses shipped.
-        role = role_findings(chap, p['reference']) if has_ref else []
+        role = role_findings(chap, p['reference'], campaign) if has_ref else []
         if role:
             flag += '  !!role'
         # ... and whether every enemy's AI is grounded in a vanilla donor (#335). Invisible
