@@ -6,25 +6,24 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-02 (Claude), #430 steps 3 and 4 landed (#441-#450); both reports are posted on #430.
+Refreshed 2026-10-03 (Claude): #430 steps 3-5 are done; **step 6 is next**.
 **What landed and why is in `git log` and the ADRs it cites** -- this file keeps no "recently
 landed" list.
 
 ## In flight
 
-**The no-Seth residual is decided** (Nicolas, 2026-10-02): ch01-ch02's x1.41 clear-load is
-accepted (ADR 0042 stands); ch00's Hlin gap closed by kit (ADR 0322, ch00 now PARITY).
+**#430, balance parity. Step 6 is the next task, and the session's whole focus** (Nicolas,
+2026-10-03: no more feedback detours). The no-Seth residual is decided: ch01-ch02's x1.41
+clear-load is accepted (ADR 0042 stands); ch00 holds parity (ADR 0322).
 
-Then, autonomously and data-driven:
-- **Step 5 (#135)** -- its terrain-heal finding landed (#451, ADR 0323). #21 still holds three
-  of its boxes: other Guide entries per concept (campaign-wide), telegraphing the reinforcements,
-  fort legibility (art).
-- **Step 6 (locks)** -- a chapter re-locks when its re-measure holds parity on v2. Every FORCE
-  sits x0.93-x1.11 of its twin; ch01-ch02's clear-load residual is ACCEPTED, so judge their
-  locks on threat plus that acceptance, not on the headline verdict alone.
+- **Step 6 (locks)** -- a chapter re-locks (`balance_locked: true`, ADR 0316) when its
+  re-measure holds parity on instrument v2. Every FORCE sits x0.93-x1.11 of its twin; judge
+  ch01-ch02 on threat plus the accepted clear-load, not on the headline verdict alone.
 - ch07 still names **FE8 Ch6**; ADR 0315's route rule fails it the moment it is hosted, so
   re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
 - The Monte Carlo simulator stays parked in #430 with its trigger.
+- Step 5 (#135) is closed out: its one live finding shipped (#451). The rest of that feedback
+  waits on #21; do not pick it up unless Nicolas asks.
 
 ## Owed by NICOLAS, not by the next session
 
