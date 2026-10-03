@@ -2243,6 +2243,35 @@ scenarios.ch01 = function()
         "ch01 entered: preps shown, guests gone, %d-unit party fields exactly 4", party))
 end
 
+-- ch01guide (#21, #135 finding 8): the turn-1 terrain-heal beat sets the Guide's "Fortresses &
+-- Castle Gates" flag (0xCE), and with it the Guide command (override id 0x74, menu_def.c) shows in
+-- the map menu. Before it, no Guide flag was ever set in ch01-ch04 and IsGuideLocked() hid the
+-- command outright -- so this asserts both the flag and the menu the player actually sees.
+scenarios.ch01guide = function()
+    if not reachCh01Map() then return end
+    if not awaitControllerState("player_map_idle", 900) then
+        return result("FAIL", "turn-1 events never handed control back")
+    end
+    if not eventFlag(0xCE) then
+        return result("FAIL", "turn 1 played but the Guide flag 0xCE is not set")
+    end
+    local tile = emptyTile()
+    if not tile or not cursorTo(tile.x, tile.y) then return result("FAIL", "no reachable empty map tile") end
+    if not guardedInput("open_map_menu", "A", "live map command menu opens", function(after)
+        return controllerState(after) == "map_command_menu"
+    end, 120) then return result("FAIL", "map menu never opened") end
+    local menu = observeController().menu
+    local ids = {}
+    for _, item in ipairs(menu and menu.items or {}) do ids[#ids + 1] = string.format("0x%02X", item.override_id) end
+    log("map menu override ids: " .. table.concat(ids, " "))
+    for _, item in ipairs(menu and menu.items or {}) do
+        if item.override_id == 0x74 then
+            return result("PASS", "Guide flag 0xCE set on turn 1; the Guide command is in the map menu")
+        end
+    end
+    return result("FAIL", "Guide flag is set but the map menu has no Guide command (0x74)")
+end
+
 -- smoke_ch01: extend the stability net to the first authored chapter (#21) -- reach the
 -- ch01 map via the prologue-clear lead-in, then idle-drive it to a clean terminal.
 scenarios.smoke_ch01 = function()

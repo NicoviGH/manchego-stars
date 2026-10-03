@@ -25,6 +25,8 @@ VANILLA_MESSAGE_COUNT = 0xD4C
 # {chapter: (message name, ...)}. Order within a chapter is the allocation order; the order of
 # the chapters here is not (they allocate in campaign order whatever this dict says).
 APPENDED_MESSAGES = {
+    # Wolfram's turn-1 call-out of the forts' and the gate's healing (#21, #135 finding 8).
+    'ch01': ('terrain-heal-warning',),
     # The moose's NAME (#25). A raw pid's stock nameTextId is the generic monster plate every
     # 0xB0-range gap shares, so it can never be retitled for one creature.
     'ch05': ('moose-name',),

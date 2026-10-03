@@ -482,9 +482,10 @@ class RavisinPortrait(unittest.TestCase):
         # Ravisin is the only DRESSED raw pid; the moose and ch06's two boats are named without
         # a bust, and the grell takes neither -- so exactly one name plate stays generic.
         self.assertEqual(1, patched.count('.portraitId'))
-        self.assertIn('.nameTextId = 0xD4C,', patched)
-        self.assertIn('.nameTextId = 0xD4D,', patched)   # the Burly Ram
-        self.assertIn('.nameTextId = 0xD4E,', patched)   # the Pronged Goat
+        boats = inject.chapter_ids.CH06_BOAT_NAME_MSGS
+        self.assertIn('.nameTextId = 0x%X,' % inject.chapter_ids.CH05_MOOSE_NAME_MSG, patched)
+        self.assertIn('.nameTextId = 0x%X,' % boats['boat-east'], patched)   # the Burly Ram
+        self.assertIn('.nameTextId = 0x%X,' % boats['boat-west'], patched)   # the Pronged Goat
         self.assertEqual(1, patched.count('.nameTextId = 0x255,'))
         # ...and every raw-pid boss leaves with a baseLevel matching its deploy level, so the
         # difficulty malus cannot reset its line (#303, RAW_PID_LEVEL_SOURCES).
