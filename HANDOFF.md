@@ -6,21 +6,20 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-03 (Claude): #430 step 6 is done; ch00-ch06 are all `balance_locked`.
+Refreshed 2026-10-03 (Claude): #430 is closed; ch00-ch06 are all `balance_locked`; #26 is next.
 **What landed and why is in `git log` and the ADRs it cites** -- this file keeps no "recently
 landed" list.
 
 ## In flight
 
-Nothing. #430's steps are done (ADRs 0324-0326). Next, pick from "Chapter work" below.
+Nothing. #430 is closed (ADRs 0316-0326). **Next: #26, ch06's body** -- its issue lists exactly
+what is left; `make chapter CH=ch06` is the live state.
 
 - `make difficulty-gate` now enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (party clear-load 1.41, ADR 0042), with x1.4078 /
   x1.4081 measured, so a party-side regression there fails the gate too.
-- ch07 still names **FE8 Ch6**. ADR 0315's route rule fails it the moment it is hosted, so
-  re-point it (FE8 Ch7 by sequence) when its slice is grounded. ch08 -> FE8 Ch13 is deliberate.
-- The Monte Carlo simulator stays parked in #430 with its trigger.
+- The Monte Carlo simulator is #456, parked behind its trigger. ch07's twin re-point is on #27.
 
 ## Owed by NICOLAS, not by the next session
 
