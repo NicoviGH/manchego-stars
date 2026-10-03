@@ -254,7 +254,8 @@ STEPS = [
     Step(_assert_declared_blocks_clear),
     Step(inject_ch01, title='chapter 1 (#21):', scope='chapter:ch01',
          call=lambda fn, a: fn(a.campaign, boot=a.ch01_boot), flags=('ch01_boot',),
-         needs=('reskin-classes', 'tileset-labels'), provides=('slot1-goal-copied',),
+         needs=('reskin-classes', 'tileset-labels', 'appended-messages'),
+         provides=('slot1-goal-copied',),
          writes=_host(2, 'Ch01IronTrailMap', 'include/eventcall.h')),
     # 'Ol Bitey over the tavern hearth (Beat 1 set dressing). Global: the fireplace is also
     # the backdrop of the dev placeholder scene the later chapters' endings play.

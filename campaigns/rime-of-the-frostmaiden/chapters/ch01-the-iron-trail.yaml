@@ -53,6 +53,13 @@ fog: none
 traps: []
 balance_locked: false  # locks when instrument v2 holds parity (#430 step 6); ADR 0316
 
+# ── Onboarding (what this chapter first teaches) ─────────────────────────────────
+introduces:
+  - concept: terrain-heal-tiles  # 12 forts + Izobai's gate — DEBUT (#135 finding 8, #21)
+    coverage: dialogue           # C-hybrid: in-voice call-out on every difficulty (ADR 0104 keeps tutorial mode off Normal)
+    where: "turn-1 Wolfram line after Izobai's taunt, cursor on her gate + two forts, then ENUT(206) unlocks the Guide entry"
+    status: active
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
   The party meets at The Northlook tavern in Bryn Shander. Three dwarves hire
@@ -408,6 +415,23 @@ events:
       sign, freshly gouged "— KEEP WALKING —"; and just past it, the smashed sled and its
       driver (a dwarf, in pieces — Hruna's kin), the iron gone, goblin tracks leading up.
       Faceless narration (msgs 0x955 + body 0x956), each in an opaque SOLOTEXTBOXSTART box.
+
+  # Terrain-heal call-out, right after Izobai's turn-1 taunt
+  - trigger: turn_start
+    turn: 1
+    type: dialogue
+    description: >
+      Tutorial-parity beat (terrain-heal-tiles DEBUT — see `introduces:`). The v0.1.0
+      playtester read the forts' and the gate's healing as a glitch (#135 finding 8): the only
+      line that explained it sat in an optional house. Vanilla's Ch1 tutorial names Breguet on
+      his gate; ours rides Izobai's taunt, but a PARTY member explains it, with an in-world
+      reason (shelter from the cold). Then the cursor flashes on her gate and the two forts in
+      front of the camp, and ENUT(206) unlocks the Guide's "Fortresses & Castle Gates" entry.
+      Plays on every difficulty, regardless of who is deployed (ch02's archer warning does the
+      same). LOCKED 2026-10-02 (dialogue pass, co-written with Nicolas).
+    flash_tiles: [[21, 7], [16, 7], [16, 9]]   # Izobai's gate, then the camp-front forts
+    script:                     # LOCKED 2026-10-02 (dialogue pass, co-written with Nicolas)
+      - wolfram: "Smell that? Woodsmoke. They've got fires going in those mounds, and behind that gate. Anyone resting there thaws out and heals. Pull them out."
 
   # Hint houses — vanilla Ch1 parity (two House visits, NO items; msgs 0x93B/0x93C
   # are pure tactical hints). Dialogue written in the dialogue pass.

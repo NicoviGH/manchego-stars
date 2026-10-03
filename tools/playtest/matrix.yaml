@@ -163,6 +163,7 @@ scenarios:
     rom: lordboot
     kind: record
   ch01lord: {}
+  ch01guide: {}
   scenesch01:
     kind: record
   recordch01:
@@ -340,6 +341,7 @@ suites:
     - ch01
     - ch01win
     - ch01lord
+    - ch01guide
     - lordfloor
     - clearprobe
     - titlecard

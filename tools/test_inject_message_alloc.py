@@ -52,12 +52,16 @@ class AllocationIsDerivedFromTheLedger(unittest.TestCase):
             alloc.appended_message_id('ch05', 'no-such-message')
         self.assertIn('APPENDED_MESSAGES', str(caught.exception))
 
-    def test_shipped_allocation_is_unchanged(self):
-        # The ROM-identical half of the done-when, pinned: these three name plates shipped at
-        # these ids before allocation existed.
-        self.assertEqual(inject.chapter_ids.CH05_MOOSE_NAME_MSG, 0xD4C)
-        self.assertEqual(inject.chapter_ids.CH06_BOAT_NAME_MSGS,
-                         {'boat-east': 0xD4D, 'boat-west': 0xD4E})
+    def test_the_shipped_ledger_is_one_contiguous_run_in_campaign_order(self):
+        # #411 pinned the three name plates' literal ids to prove the migration ROM-identical.
+        # The first earlier-chapter message (ch01's terrain-heal line, #21) renumbers them by
+        # design, so what stays pinned is the rule: from vanilla's count, no gaps, chNN order.
+        ids = alloc.allocated_message_ids()
+        ordered = [ids[(ch, name)] for ch in sorted(alloc.APPENDED_MESSAGES)
+                   for name in alloc.APPENDED_MESSAGES[ch]]
+        self.assertEqual(ordered, list(range(alloc.VANILLA_MESSAGE_COUNT,
+                                             alloc.VANILLA_MESSAGE_COUNT + len(ordered))))
+        self.assertEqual(inject.chapter_ids.CH06_BOAT_NAME_MSGS['boat-west'], ordered[-1])
 
 
 class AllocatedIdsAreClaimed(unittest.TestCase):

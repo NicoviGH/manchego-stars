@@ -10,6 +10,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.cast
 import inject.chapters.ch01
+import inject.message_alloc
 
 
 class LordFloorRows(unittest.TestCase):
@@ -89,6 +90,43 @@ class LordSelectPitches(unittest.TestCase):
         # blank card (the "no silent gaps" lock, Nicolas 2026-06-20).
         with self.assertRaises(SystemExit):
             inject.chapters.ch01.lord_select_pitches(self.CAMPAIGN, ['braulo', 'baxby'])
+
+
+class TerrainHealBeat(unittest.TestCase):
+    """#21 / #135 finding 8: the playtester read the forts' healing as a glitch. Turn 1 now
+    explains it in dialogue on every difficulty, shows the tiles, and unlocks the Guide."""
+
+    def setUp(self):
+        from inject.hosting import _load_chapter_yaml
+        chap = _load_chapter_yaml('rime-of-the-frostmaiden', inject.chapters.ch01.CH01_CHAPTER_YAML)
+        self.beat = next(e for e in chap['events']
+                         if e.get('trigger') == 'turn_start' and e.get('turn') == 1)
+        self.chief = next(e for e in chap['enemy_units'] if e.get('id') == 'goblin-chief')
+        self.script = inject.chapters.ch01.ch01_turn1_taunt_script(self.beat)
+
+    def test_the_line_follows_the_taunt_and_the_guide_unlocks_last(self):
+        s = self.script
+        taunt = s.index('TEXTSHOW(0x%X)' % inject.chapters.ch01.CH01_TAUNT_MSG)
+        line = s.index('TEXTSHOW(0x%X)' % inject.chapters.ch01.CH01_TERRAIN_HEAL_MSG)
+        guide = s.index('ENUT(0xCE)')   # vanilla Ch1's flag for "Fortresses & Castle Gates"
+        self.assertLess(taunt, line)
+        self.assertLess(line, guide)
+
+    def test_no_tutorial_mode_gate(self):
+        # ADR 0104 keeps tutorial mode off Normal; a gate here would hide the fix from the
+        # very player who reported it.
+        self.assertNotIn('CHECK_TUTORIAL', self.script)
+        self.assertNotIn('TUTORIALTEXTBOXSTART', self.script)
+
+    def test_the_first_flash_is_izobais_gate_and_every_tile_flashes(self):
+        tiles = self.beat['flash_tiles']
+        self.assertEqual(list(tiles[0]), list(self.chief['position']))
+        for x, y in tiles:
+            self.assertIn('CURSOR_FLASHING(%d, %d)' % (x, y), self.script)
+
+    def test_the_message_is_an_appended_id(self):
+        self.assertGreaterEqual(inject.chapters.ch01.CH01_TERRAIN_HEAL_MSG,
+                                inject.message_alloc.VANILLA_MESSAGE_COUNT)
 
 
 class TerminatorParity(unittest.TestCase):

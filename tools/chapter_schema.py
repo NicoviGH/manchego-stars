@@ -64,7 +64,7 @@ SCENE_VARIANT = {'boxes': ANY, 'reason': ANY, 'replaces': ANY, 'script': ANY}
 EVENT = {
     'type': ANY, 'trigger': ANY, 'turn': ANY, 'slot': ANY, 'status': ANY, 'description': ANY,
     'unit': ANY, 'target': ANY, 'tile': ANY, 'zone': ANY, 'recruits': ANY, 'ea_file': ANY,
-    'script': ANY, 'no_lupin_fallback': SCENE_VARIANT, 'no_sahnar_cut': SCENE_VARIANT,
+    'script': ANY, 'flash_tiles': ANY, 'no_lupin_fallback': SCENE_VARIANT, 'no_sahnar_cut': SCENE_VARIANT,
 }
 
 # What a playtest case declares (tools/playtest/declared.py reads it).

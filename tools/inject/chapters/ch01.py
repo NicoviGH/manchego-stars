@@ -18,10 +18,11 @@ from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH01_EVENT_GROUP, CH01_HOST_INDEX, CH02_HOST_INDEX
 from inject.maps import _register_chapter_map
+from inject.message_alloc import appended_message_id
 from inject.paths import CH2_EVENTINFO_H, CH2_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.scenes import (
     _emit_scene_beats, _make_fid, _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats,
-    _write_chapter_title_card)
+    _stage_beat, _write_chapter_title_card)
 from inject.text import (
     _fe_dialogue_text, _fid_tag, _script_to_message, _wrap_fe_lines, DEV_PLACEHOLDER_MSG,
     display_name, goal_window_body, name_message_body, set_message_body, vanilla_name_text_id)
@@ -83,6 +84,13 @@ CH01_ENDING_CARD_MSG = 0x94C
 CH01_ENDING_MSGS = (0x946, 0x947, 0x948, 0x949, 0x93D, 0x94A, 0x94B)
 CH01_BODY_MSG = 0x956    # the dismembered sled-driver (dead vanilla Ch2 slot-2 scene id)
 CH01_TAUNT_MSG = 0x960   # Izobai's turn-1 boss taunt (no vanilla event-script ref at all)
+# Wolfram's turn-1 line on the healing forts + gate, after the taunt (#21). Vanilla teaches the same
+# thing in Ch1 (EventScr_Ch1Tut_GuideTerrainHeal), but only in tutorial mode; ADR 0104 keeps tutorial
+# mode off Normal, so ours is party dialogue and plays on every difficulty.
+CH01_TERRAIN_HEAL_MSG = appended_message_id('ch01', 'terrain-heal-warning')
+# Guide "Fortresses & Castle Gates" (MSG_0627). Vanilla's beat ends on ENUT(0xCE); without SOME Guide
+# flag set, IsGuideLocked() hides the Guide command from the map menu entirely.
+CH01_GUIDE_FORTS_FLAG = 0xCE
 DEV_PLACEHOLDER_SPEAKER = 'prof-rbg'   # RBG, the company's over-engineer (Moulder slot)
 DEV_PLACEHOLDER_LINE = (
     "Ah -- mind the edge there, friends! That's as far as we've built the world. "
@@ -175,6 +183,31 @@ def lord_select_pitches(campaign, uids):
                      'candidate needs a qualitative blurb -- no silent gaps.' % uid)
         rows.append((uid, pitch))
     return rows
+
+
+def ch01_turn1_taunt_script(heal_beat):
+    """Izobai's taunt, Wolfram's terrain-heal line, then vanilla GuideTerrainHeal's tail (#21).
+
+    Vanilla's tail flashes the healing tiles and sets the Guide flag. The camera opens on the
+    first tile (Izobai's gate) so the flashes land on screen; ch05's arena beat does the same."""
+    tiles = heal_beat['flash_tiles']
+    flashes = ''.join('    CURSOR_FLASHING(%d, %d)\n' % tuple(t) for t in tiles)
+    return ('{\n'
+            '    TEXTSHOW(0x%X) /* Izobai turn-1 taunt */\n'
+            '    TEXTEND\n'
+            '    REMA\n'
+            '    TEXTSHOW(0x%X) /* Wolfram: the mounds and the gate heal them */\n'
+            '    TEXTEND\n'
+            '    REMA\n'
+            '    CAMERA(%d, %d)\n'
+            '%s'
+            '    STAL(60)\n'
+            '    CURE\n'
+            '    ENUT(0x%X) /* Guide: Fortresses & Castle Gates */\n'
+            '    EVBIT_T(7)\n'
+            '    ENDA\n}'
+            % (CH01_TAUNT_MSG, CH01_TERRAIN_HEAL_MSG, tiles[0][0], tiles[0][1], flashes,
+               CH01_GUIDE_FORTS_FLAG))
 
 
 def inject_ch01(campaign, verbose=True, boot=False):
@@ -409,6 +442,8 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # tile step), so the party always reads it. Presence-checked here; wired as the first
     # turn-1 TURN entry below (its script body is EventScr_Ch2_Talk_EirikaRoss, step 4).
     next(e for e in chap['events'] if e.get('trigger') == 'battle_start')
+    heal_beat = next(e for e in chap['events']
+                     if e.get('trigger') == 'turn_start' and e.get('turn') == 1)
     write_event_group('ch01', CH2_EVENTINFO_H, CH01_EVENT_GROUP, lists={
         'turnBasedEvents':
             '{\n    TURN(0x0, EventScr_Ch2_Talk_EirikaRoss, 1, 0, FACTION_ID_BLUE)'
@@ -697,11 +732,11 @@ def inject_ch01(campaign, verbose=True, boot=False):
         '    CALL(EventScr_LoadReinforce)\n'
         '    EVBIT_T(7)\n    ENDA\n}', CH2_EVENTSCRIPT_H)
     # Izobai's turn-1 taunt rides the spare vanilla Turn2Player slot (externed in
-    # eventcall.h; fired at turn 1 by the Turn list above), shown over the map.
-    script = _replace_brace_block(
-        script, 'EventScr_Ch2_Turn2Player[] =',
-        '{\n    TEXTSHOW(0x%X) /* Izobai turn-1 taunt */\n    TEXTEND\n    REMA\n'
-        '    EVBIT_T(7)\n    ENDA\n}' % CH01_TAUNT_MSG, CH2_EVENTSCRIPT_H)
+    # eventcall.h; fired at turn 1 by the Turn list above), shown over the map. Wolfram's
+    # terrain-heal line follows, then vanilla's GuideTerrainHeal tail: flash the healing
+    # tiles, unlock the Guide entry (#21).
+    script = _replace_brace_block(script, 'EventScr_Ch2_Turn2Player[] =',
+                                  ch01_turn1_taunt_script(heal_beat), CH2_EVENTSCRIPT_H)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_Village1[] =',
         '{\n    IGNORE_KEYS(0)\n    HouseEvent(0x93B, 0x0)\n}', CH2_EVENTSCRIPT_H)
@@ -791,6 +826,9 @@ def inject_ch01(campaign, verbose=True, boot=False):
     izobai_face = {'izobai': ('[OpenMidRight]', _fid_tag(CH01_BOSS_SLOT))}
     set_message_body(lines, CH01_TAUNT_MSG, _script_to_message(
         [{'izobai': chief['taunt']}], izobai_face, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
+    heal_fid = _make_fid({}, 'ch01 terrain-heal unknown speaker')
+    set_message_body(lines, CH01_TERRAIN_HEAL_MSG, _script_to_message(
+        heal_beat['script'], _stage_beat(heal_beat['script'], heal_fid, {})))
     set_message_body(lines, 0x961, _script_to_message(
         [{'izobai': chief['death_quote']}], izobai_face, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
     # Hint houses -- vanilla Ch1's own two house quotes (0x93B/0x93C) reskinned with the
