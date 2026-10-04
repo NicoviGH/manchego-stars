@@ -11,6 +11,7 @@ from inject.chapter_ids import (
     CH04_VILLAGE_SLOTS)
 from inject.decomp import _replace_brace_block, DECOMP, REPO
 from inject.chapter_frame import write_event_group
+from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH02_HOST_INDEX, CH04_EVENT_GROUP, CH04_HOST_INDEX
 from inject.maps import (
@@ -87,14 +88,7 @@ CH04_TURN3_SYMBOL = 'UnitDef_088B5914'
 CH04_BOOT_SEED_SYMBOL = 'UnitDef_088B5978'
 CH04_PREP_SCRIPT = 'EventScr_08591FD8'
 CH04_ENDING_SCRIPT = 'EventScr_Ch5_EndingScene'
-CH04_CLASS_IDS = {
-    'mauthedoog': 'CLASS_MAUTHEDOOG',
-    'revenant': 'CLASS_REVENANT',
-    'bonewalker': 'CLASS_BONEWALKER',
-    'bonewalker-bow': 'CLASS_BONEWALKER_BOW',
-    'mogall': 'CLASS_MOGALL',
-    'entoumbed': 'CLASS_ENTOUMBED',
-}
+CH04_CLASS_IDS = ChapterClassIds('ch04')
 CH04_ITEM_IDS = {
     'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
     'iron-sword': 'ITEM_SWORD_IRON',
@@ -311,7 +305,7 @@ def ch04_enemy_rows(chap, arrives_turn=None):
     for enemy in chap['enemy_units']:
         if enemy.get('arrives_turn') != arrives_turn:
             continue
-        cls = CH04_CLASS_IDS[enemy['class']]
+        cls = CH04_CLASS_IDS.for_entry(enemy)
         pid = CH04_MONSTER_PIDS[enemy['class']]
         inventory = []
         for item in enemy.get('inventory', []):
@@ -350,7 +344,7 @@ def _ch04_wave_pack_kit(chap, wave):
     The pack keeps this kit through the parley: CUSN changes a unit's FACTION, nothing else,
     so the converted wolves fight on with the same class, items and AI -- which is the point,
     since "the wolves turn the tide" is what the parley buys."""
-    cls = CH04_CLASS_IDS[wave['class']]
+    cls = CH04_CLASS_IDS.for_entry(wave)
     ai = enemy_ai_initialiser(chap, wave)
     items = [CH04_ITEM_IDS[i.get('fe_base') or i['id']] for i in wave.get('inventory', [])]
     return cls, ai, ', '.join(items) or '0'

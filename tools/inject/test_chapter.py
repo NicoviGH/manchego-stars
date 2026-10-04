@@ -165,7 +165,7 @@ def _sandbox_foe_roster(campaign):
             '        .redaCount = 0,\n'
             '        .items = { %s },\n'
             '        .ai = {0x3, 0x3, 0x9, 0x20},\n'       # attack in place, never move -> baitable
-            '    },' % (pid, CH05_CLASS_IDS[unit['class']], pid,
+            '    },' % (pid, CH05_CLASS_IDS.for_entry(unit), pid,
                         int(unit.get('level', 1)), x, y, ', '.join(items)))
     return '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
 

@@ -15,6 +15,7 @@ from inject.chapter_ids import (
 from inject.decomp import (
     _replace_brace_block, DECOMP, FOUNDING_EXP_FLAG, git_env, LORDSEL_FLAG_BASE, REPO)
 from inject.chapter_frame import write_event_group
+from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH01_EVENT_GROUP, CH01_HOST_INDEX, CH02_HOST_INDEX
 from inject.maps import _register_chapter_map
@@ -40,14 +41,9 @@ CH01_JOIN_POSITIONS = [(c, r) for r in (8, 9) for c in range(1, 6)]
 
 
 CH01_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON'}
-# ch01's grunts are goblins: they ride the CLONED goblin classes, whose own class entries
-# carry the Fire Imp map sprite (SMSId) and the goblin AnimConf. Name the SLOT here, the way
-# every other chapter does (ch05: 'soldier' -> CLASS_SOL_SKELEBERDIER) -- resolving a skin
-# from the vanilla base at build time is what shipped ch01 as ch05's skeletons (#347).
-# armor-knight is reskinned by nobody, so the chief stays a vanilla Knight.
-CH01_CLASS_IDS = {'soldier': 'CLASS_BLST_REGULAR_EMPTY',
-                  'fighter': 'CLASS_BLST_LONG_EMPTY',
-                  'armor-knight': 'CLASS_ARMOR_KNIGHT'}
+# ch01's grunts are goblins: campaign.yaml's goblin reskins `dress` ch01's soldier and fighter.
+# armor-knight is dressed by nobody, so the chief stays a vanilla Knight.
+CH01_CLASS_IDS = ChapterClassIds('ch01')
 LORDSEL_CONFIRM_MSGS = (0x959, 0x95A, 0x95B, 0x95C, 0x95D, 0x95E, 0x95F,
                         0x962, 0x963, 0x964)  # same dead pool, one per candidate
 LORDSEL_PITCH_MSGS = (0x967, 0x968, 0x969, 0x96A, 0x96B, 0x96C, 0x96D,
@@ -361,13 +357,13 @@ def inject_ch01(campaign, verbose=True, boot=False):
     enemies = []
     for index, (x, y) in enumerate(spear['positions']):
         enemies.append(_enemy_unit_entry(
-            '0x80', CH01_CLASS_IDS[spear['class']], spear['level'], True, x, y,
+            '0x80', CH01_CLASS_IDS.for_entry(spear), spear['level'], True, x, y,
             CH01_ITEM_IDS[spear['inventory'][0]['id']],
             enemy_ai_initialiser(chap, spear, index),
             ' /* goblin spear -- camp approach */'))
     for index, (x, y) in enumerate(axe['positions']):
         enemies.append(_enemy_unit_entry(
-            '0x80', CH01_CLASS_IDS[axe['class']], axe['level'], True, x, y,
+            '0x80', CH01_CLASS_IDS.for_entry(axe), axe['level'], True, x, y,
             CH01_ITEM_IDS[axe['inventory'][0]['id']],
             enemy_ai_initialiser(chap, axe, index),
             ' /* goblin raider -- mid-trail pursuer */'))
@@ -376,7 +372,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # recovery is told in the ending scene. The chief mirrors Breguet 1:1: his slot's
     # vanilla boss bases, no autolevel, lv4, his own borrowed AI, ON the seize tile.
     enemies.append(_enemy_unit_entry(
-        'CHARACTER_%s' % CH01_BOSS_SLOT, CH01_CLASS_IDS[chief['class']],
+        'CHARACTER_%s' % CH01_BOSS_SLOT, CH01_CLASS_IDS.for_entry(chief),
         chief['level'], False, cx, cy,
         CH01_ITEM_IDS[chief['inventory'][0]['id']], enemy_ai_initialiser(chap, chief),
         ' /* goblin chief -- boss, holds the seize tile */'))

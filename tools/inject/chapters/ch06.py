@@ -9,6 +9,7 @@ from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_CHAPTER_YAML, CH06_GOAL_STA
                                 CH06_GOAL_WINDOW_MSG)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
+from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
 from inject.maps import _register_chapter_map, _register_tileset, TILESET_STEMS
@@ -59,21 +60,9 @@ CH06_GOAL_DONOR = 17                             # a CLEAN untouched vanilla def
 CH06_BOSS_PID = ENEMY_BASE_SLOT['nerra']
 CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla Ch7's own generic,
 
-# Vanilla class ids. ch06's merfolk reskins are INTENT in the chapter YAML's `skin:` notes and
-# are not wired yet (nothing in campaign.yaml `enemy_class_reskins` names them), so every class
-# here is the plain vanilla one the parity bar measures. When the art pass lands, these rows
-# move to the cloned classes exactly as ch01's and ch03's did -- and #347 is why the SLOT is
-# named here rather than resolved from the vanilla base at build time.
-CH06_CLASS_IDS = {'soldier': 'CLASS_SOLDIER', 'fighter': 'CLASS_FIGHTER',
-                  'cavalier': 'CLASS_CAVALIER', 'mercenary': 'CLASS_MERCENARY',
-                  'armor-knight': 'CLASS_ARMOR_KNIGHT', 'shaman': 'CLASS_SHAMAN',
-                  'mage': 'CLASS_MAGE', 'priest': 'CLASS_PRIEST',
-                  'troubadour': 'CLASS_TROUBADOUR', 'archer': 'CLASS_ARCHER',
-                  'bael': 'CLASS_BAEL',
-                  # the rescue boats: vanilla's own ship, which ships a 32x32 map sprite
-                  # (SMSId 0x41) and a 19 HP / 5 Def hull, which a boat's `personal:`
-                  # line may raise (the west hull is 28)
-                  'fleet': 'CLASS_FLEET'}
+# The rescue boats deploy as `fleet`: vanilla's own ship, which ships a 32x32 map sprite (SMSId
+# 0x41) and a 19 HP / 5 Def hull, which a boat's `personal:` line may raise (the west hull is 28).
+CH06_CLASS_IDS = ChapterClassIds('ch06')
 CH06_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'javelin': 'ITEM_LANCE_JAVELIN',
                  'iron-sword': 'ITEM_SWORD_IRON', 'iron-blade': 'ITEM_BLADE_IRON',
                  'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
@@ -182,7 +171,7 @@ def ch06_enemy_rows(chap, arrives_turn=None):
     for enemy in chap['enemy_units']:
         if enemy.get('arrives_turn') != arrives_turn:
             continue
-        cls = CH06_CLASS_IDS[enemy.get('deploy_class') or enemy['class']]
+        cls = CH06_CLASS_IDS.for_entry(enemy)
         items = [CH06_ITEM_IDS[item.get('fe_base') or item['id']]
                  for item in enemy.get('inventory', [])]
         drop = enemy.get('item_drop')
@@ -224,7 +213,7 @@ def ch06_boat_rows(chap):
     for boat in chap['rescue_boats']:
         x, y = boat['tile']
         rows.append(_ally_unit_entry(
-            None, None, CH06_CLASS_IDS[boat['class']], 1, x, y, '0',
+            None, None, CH06_CLASS_IDS.for_entry(boat), 1, x, y, '0',
             ' /* %s -- marooned crew; killable, and the chapter\'s clock */' % boat['id'],
             allegiance='GREEN', char=CH06_BOAT_PIDS[boat['id']],
             ai=enemy_ai_initialiser(chap, boat)))

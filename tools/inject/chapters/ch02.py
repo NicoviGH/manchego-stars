@@ -16,6 +16,7 @@ from inject.chapter_ids import (
     CH02_TURN1_MSGS, CH02_VILLAGE_SLOTS)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
+from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter, recruit_chapter_number
 from inject.hosts import CH02_EVENT_GROUP, CH02_HOST_INDEX, CH03_HOST_INDEX
 from inject.maps import (
@@ -53,13 +54,11 @@ CH02_VELLYNNE_SLOT = 'ISMAIRE'
 CH02_FISHER_FID = '[FID_VillagerOldMan]'   # the brittle Targos fisher -- generic villager mug
 CH02_ENDING_BG = 'BG_MS_TARGOS_WINTER'     # Targos at nightfall -- vendored snow-town (inject_backgrounds)
 # Enemy AI byte vectors + class/item maps (FE8-valid, mirrored from ch01's proven set).
-CH02_CLASS_IDS = {'brigand': 'CLASS_BRIGAND', 'archer': 'CLASS_ARCHER',
-                  'pegasus_knight': 'CLASS_PEGASUS_KNIGHT',
-                  # the chwinga chassis: Mov 5 like Garcia, staff at D so they heal EACH
-                  # OTHER (a staff cannot target its own carrier -- cp_staff.c), and it
-                  # wears Sclorbo's greenified anim. They were Mov-7 fliers, which gave
-                  # the units that need rescuing the best escape in the chapter.
-                  'priest': 'CLASS_PRIEST'}
+# Every class is vanilla: the raiders are human. The chwingas ride `priest` -- Mov 5 like Garcia,
+# staff at D so they heal EACH OTHER (a staff cannot target its own carrier -- cp_staff.c), in
+# Sclorbo's greenified anim. They were Mov-7 fliers, which gave the units that need rescuing the
+# best escape in the chapter.
+CH02_CLASS_IDS = ChapterClassIds('ch02')
 CH02_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
                  'iron-bow': 'ITEM_BOW_IRON', 'vulnerary': 'ITEM_VULNERARY',
                  'slim-lance': 'ITEM_LANCE_SLIM', 'hand-axe': 'ITEM_AXE_HANDAXE',
@@ -424,7 +423,7 @@ def inject_ch02(campaign, verbose=True):
     # frail one carries Ross's Vulnerary alongside its Heal staff), and the AI comes from
     # the same donor machinery as everything else (#335).
     chwinga = [_ally_unit_entry(None, slot_by_uid[g['id']],
-                                CH02_CLASS_IDS[g['class']], g['level'],
+                                CH02_CLASS_IDS.for_entry(g), g['level'],
                                 g['position'][0], g['position'][1],
                                 ', '.join(CH02_ITEM_IDS[i] for i in g['inventory']),
                                 ' /* chwinga %s (gift: %s) */' % (g['id'], g['gift']),

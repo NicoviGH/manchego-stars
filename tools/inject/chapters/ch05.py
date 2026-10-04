@@ -920,7 +920,7 @@ def ch05_enemy_rows(chap, arrives_turn=None, exclude=()):
     for enemy in chap['enemy_units']:
         if enemy.get('arrives_turn') != arrives_turn or enemy['id'] in exclude:
             continue
-        cls = CH05_CLASS_IDS[enemy.get('deploy_class') or enemy['class']]
+        cls = CH05_CLASS_IDS.for_entry(enemy)
         items = [CH05_ITEM_IDS[item.get('fe_base') or item['id']]
                  for item in enemy.get('inventory', [])]
         drop = enemy.get('item_drop')

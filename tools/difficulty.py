@@ -28,6 +28,7 @@ import re
 
 import chapter_schema  # noqa: E402
 import inject.cast  # noqa: E402
+import inject.class_ids  # noqa: E402
 import inject.chapter_settings  # noqa: E402
 import inject.decomp  # noqa: E402
 import inject.hosting  # noqa: E402
@@ -344,9 +345,7 @@ def player_careers(campaign, uid, gained=0):
     return [_stats_to_combatant(uid, line, weapon, tags) for line in lines]
 
 
-def _enemy_class_enum(token):
-    """'armor-knight' -> 'CLASS_ARMOR_KNIGHT'."""
-    return 'CLASS_' + str(token).upper().replace('-', '_')
+_enemy_class_enum = inject.class_ids.vanilla_class_enum
 
 
 # A named boss is NOT just its class: FE8 layers a personal stat line on top (Saar is an

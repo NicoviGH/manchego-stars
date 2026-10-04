@@ -4831,20 +4831,8 @@ end
 -- slot as a foe; the money shot is the ATTACK swing, which a defender never plays, so a HARMLESS
 -- (pow 0) player attacks the chosen foe at melee -> it survives and COUNTER-attacks, and
 -- captureAttack shoots the whole battle. Needs `make TESTCH=1`. Pick the foe with PT_CHAR
--- (default kobold-grunt); the map keys the campaign.yaml enemy_class_reskins slot class ids.
-local RESKIN_ENEMY_CLASS = {
-    ["kobold-grunt"]   = 0x82,   -- CLASS_BRG_LIZARD_WILDLING
-    ["kobold-blade"]   = 0x80,   -- CLASS_MNC_LIZARDZERKER
-    ["kobold-brute"]   = 0x81,   -- CLASS_MNC_LIZARDZERKER_BRUTE
-    ["goblin-soldier"] = 0x6A,   -- CLASS_BLST_REGULAR_EMPTY (fire imp, lance)
-    ["goblin-fighter"] = 0x6B,   -- CLASS_BLST_LONG_EMPTY (fire imp, axe)
-    -- ch05's risen tomb-guard (#25). These are the ids campaign.yaml's `slot_id` claims, and
-    -- the bench grew a second ROW to seat them -- see SANDBOX_FOE_POSITIONS.
-    ["risen-spear"]    = 0x84,   -- CLASS_SOL_SKELEBERDIER (skeleton lance)
-    ["tomb-reaver"]    = 0x85,   -- CLASS_FGT_SKELEBERDIER (skeleton axe)
-    ["crypt-blade"]    = 0x86,   -- CLASS_MNC_BONEWALKER (one-armed skeleton sword)
-    ["bone-archer"]    = 0x87,   -- CLASS_ARC_WIGHT_SNIPER (skeleton bow)
-}
+-- (default kobold-grunt) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
+-- symbols.lua from the built classes.h) maps it to the class id it was built as.
 -- Named RAW-PID creatures are picked by CHARACTER, not by class (the table lives inside the
 -- scenario: this chunk is at the 200-local ceiling). Their anim binds through CharacterData
 -- `_u25`, so the class alone does not identify them: on the sandbox the white moose is the
@@ -4858,10 +4846,10 @@ scenarios.recordenemy = function()
     local wantPid = ({ ["white-moose"] = 0xb9,   -- ch05's cornered miniboss (#25)
                        ["ravisin"]     = 0xb8 }) -- ch05's frost-druid boss (#25)
                     [sel]
-    local want = (not wantPid) and (RESKIN_ENEMY_CLASS[sel] or tonumber(sel)) or nil
+    local want = (not wantPid) and (RESKIN_CLASS[sel] or tonumber(sel)) or nil
     if not want and not wantPid then
         local names = {}
-        for k in pairs(RESKIN_ENEMY_CLASS) do names[#names + 1] = k end
+        for k in pairs(RESKIN_CLASS) do names[#names + 1] = k end
         table.sort(names)
         -- Derived, not retyped: the hand-written list had gone stale and omitted the two
         -- goblin classes, which sent a reader looking for a raw class id for a foe the
