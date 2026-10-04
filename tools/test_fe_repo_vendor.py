@@ -53,6 +53,22 @@ class Normalise(unittest.TestCase):
         self.assertEqual([0, 1], list(out.getdata()))
         self.assertEqual(v.picture(src), v.picture(out))
 
+    def test_a_keyless_rgba_sheet_keeps_a_colour_that_matches_its_corner(self):
+        # Transparent background stored as BLACK, and a pure-black outline: alpha says which
+        # is which. Guessing the key from the corner pixel would erase the outline.
+        src = Image.new('RGBA', (3, 1))
+        src.putdata([(0, 0, 0, 0), (0, 0, 0, 255), (200, 10, 10, 255)])
+        self.assertEqual([None, (0, 0, 0), (200, 10, 10)], v.picture(src)[1])
+        out = v.normalise_sheet(src)
+        self.assertEqual(v.picture(src), v.picture(out))
+        self.assertEqual([0, 1, 2], list(out.getdata()))
+
+    def test_a_sheet_with_no_transparency_marker_is_refused(self):
+        src = Image.new('RGB', (2, 1))
+        src.putdata([(1, 1, 1), (2, 2, 2)])
+        with self.assertRaises(ValueError):
+            v.normalise_sheet(src)
+
     def test_more_colours_than_a_map_sprite_holds_is_refused(self):
         src = Image.new('RGB', (17, 1))
         src.putdata([KEY] + [(i, i, i) for i in range(16)])

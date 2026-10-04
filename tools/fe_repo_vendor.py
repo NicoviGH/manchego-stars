@@ -85,40 +85,49 @@ def anim_files(names, script=None):
     return [(script, mode + '.txt')] + [(n, n) for n in frames]
 
 
+def _pixels(im):
+    """A sheet as what it SHOWS: RGB per pixel, None where transparent.
+
+    Transparency is read from evidence, in this order, and never guessed from a pixel:
+      1. the green key (#80a080 and kin) -- community sheets ship on it, and it is never art;
+         judged by COLOUR, because a sheet may spend several indices on it (ch05's
+         Bonewalker Axe walk sheet spent 20 indices on 14 colours);
+      2. alpha 0, for a sheet that carries an alpha channel or a tRNS chunk;
+      3. palette index 0, the decomp's own convention for an indexed sheet.
+    A sheet with none of the three has no transparency marker at all and is refused: taking
+    the corner pixel's colour instead would erase every real pixel that shares it."""
+    rgba = list(im.convert('RGBA').getdata())
+    keys = {p[:3] for p in rgba} & set(mst.GREEN_KEYS)
+    if keys:
+        return [None if p[3] == 0 or p[:3] in keys else p[:3] for p in rgba]
+    if any(p[3] == 0 for p in rgba):
+        return [None if p[3] == 0 else p[:3] for p in rgba]
+    if im.mode == 'P':
+        return [None if i == 0 else p[:3] for i, p in zip(im.getdata(), rgba)]
+    raise ValueError('no transparency marker: no green key, no alpha, and not indexed')
+
+
 def normalise_sheet(im):
     """A community sheet re-encoded the way the build's guards want it: indexed, one index per
-    distinct colour, the green key (or, failing that, the top-left pixel) at index 0."""
-    rgba = im.convert('RGBA')
-    px = list(rgba.getdata())
-    keys = [c for c in {p[:3] for p in px} if c in mst.GREEN_KEYS]
-    key = keys[0] if keys else px[0][:3]
-    colours = [key]
-    for p in px:
-        c = key if p[3] == 0 else p[:3]
+    distinct colour, transparency on index 0 (painted the green key, which no art uses)."""
+    px = _pixels(im)
+    colours = [None]
+    for c in px:
         if c not in colours:
             colours.append(c)
     if len(colours) > mst.MAX_COLORS:
         raise ValueError('%d colours; a map sprite allows %d' % (len(colours), mst.MAX_COLORS))
     index = {c: i for i, c in enumerate(colours)}
-    out = Image.new('P', rgba.size)
-    out.putpalette([v for c in colours for v in c] + [0, 0, 0] * (16 - len(colours)))
-    out.putdata([index[key if p[3] == 0 else p[:3]] for p in px])
+    rgb = [mst.GREEN_KEYS[0]] + colours[1:]
+    out = Image.new('P', im.size)
+    out.putpalette([v for c in rgb for v in c] + [0, 0, 0] * (16 - len(rgb)))
+    out.putdata([index[c] for c in px])
     return out
 
 
 def picture(im):
-    """A sheet as what it SHOWS: RGB per pixel, transparency (key or alpha 0) as None."""
-    if im.mode == 'P':
-        # By COLOUR, not index: a community sheet may spend several indices on the one key
-        # (ch05's Bonewalker Axe walk sheet spent 20 indices on 14 colours).
-        pal = im.getpalette()
-        rgb = [tuple(pal[3 * i:3 * i + 3]) for i in range(len(pal) // 3)]
-        key = rgb[mst._transparent_index(im, pal)]
-        return im.size, [None if rgb[i] == key else rgb[i] for i in im.getdata()]
-    rgba = list(im.convert('RGBA').getdata())
-    keys = {p[:3] for p in rgba} & set(mst.GREEN_KEYS)
-    key = next(iter(keys)) if keys else rgba[0][:3]
-    return im.size, [None if p[3] == 0 or p[:3] == key else p[:3] for p in rgba]
+    """(size, pixels) -- what `verify` compares for a map sprite."""
+    return im.size, _pixels(im)
 
 
 def load_manifest(directory):
