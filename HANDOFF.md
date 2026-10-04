@@ -6,16 +6,19 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-03 (Claude): #430 is closed; ch00-ch06 are all `balance_locked`; #26 is next.
-**What landed and why is in `git log` and the ADRs it cites** -- this file keeps no "recently
-landed" list.
+Refreshed 2026-10-04 (Claude): #457 landed the shared reskin / harness-id / vendoring helpers
+(ADR 0327); ch06's merfolk reskins are next. **What landed and why is in `git log` and the ADRs
+it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-Nothing. #430 is closed (ADRs 0316-0326). **Next: #26, ch06's body** -- its issue lists exactly
-what is left; `make chapter CH=ch06` is the live state.
+Nothing on a branch. **Next: #26's merfolk reskins**, the first chapter built on #457:
+`fe_repo_vendor.py anim|sms` per asset (the sources are listed in `docs/fe-repo-scouting.md` →
+ch06), a `campaign.yaml` reskin per class with `dresses: {ch06: [...]}` and `slot_id` from 0x88.
+The **crab** is the one piece that needs Nicolas: the Spider Cavalier Rider is a literal spider and
+gets repainted, so render it and wait for his OK before committing (shark riders stay map-sprite only).
 
-- `make difficulty-gate` now enforces ch00-ch06. A change that moves a locked chapter's force
+- `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (party clear-load 1.41, ADR 0042), with x1.4078 /
   x1.4081 measured, so a party-side regression there fails the gate too.
@@ -29,7 +32,7 @@ what is left; `make chapter CH=ch06` is the live state.
 ## Chapter work
 
 - **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). The
-  reskins, the boarding pass and nerra's art need no dialogue and can go first.
+  reskins and nerra's art need no dialogue and go first; the boarding pass waits on the crews' voice.
 - **#335** — the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).
 
