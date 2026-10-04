@@ -623,7 +623,7 @@ def lua_local_headroom(path, probe_max=8):
 # quarter against 2 free slots (#327). Freezing the count redirects the next helper into a
 # module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
 # scale; thinning the tail only makes it comfortable.
-HARNESS_TOP_LEVEL_LOCALS = 198
+HARNESS_TOP_LEVEL_LOCALS = 175
 
 # `[ \t]`, never `\s`: `\s` matches a NEWLINE, so `local controllerFault` followed by
 # `local function log` merged into one match and the count came out one short. A counter

@@ -6,6 +6,7 @@ and ch04's texts -- and chapters read each other's in both directions. Kept in o
 `hosts.py`'s host slots, so no chapter module has to import another. A constant only its own
 chapter reads stays in `inject/chapters/`.
 """
+from inject.class_ids import ChapterClassIds
 from inject.message_alloc import appended_message_id
 
 
@@ -436,18 +437,12 @@ CH06_BOAT_PIDS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
 # Their NAMES, appended past vanilla's last message by the build (inject/message_alloc.py).
 CH06_BOAT_NAME_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-name'),
                        'boat-west': appended_message_id('ch06', 'boat-west-name')}
-# ch05's four INFANTRY classes deploy on their skeleton reskins (#25, campaign.yaml
-# `enemy_class_reskins`): every ch05 unit wearing one of them is a risen tomb-guardian, and
-# this dict is read for RED units only, so the repoint is wholesale rather than per-enemy.
-# The three that stay vanilla are not oversights: the DRUID is Ravisin, who carries her own
-# authored art; the GWYLLGI is the moose; and the MYRMIDON is Sahnar, whose Specter anim and
-# map sprite landed with her recruit (#251) and who turns BLUE mid-chapter.
-CH05_CLASS_IDS = {'druid': 'CLASS_DRUID', 'gwyllgi': 'CLASS_GWYLLGI',
-                  'soldier': 'CLASS_SOL_SKELEBERDIER',
-                  'fighter': 'CLASS_FGT_SKELEBERDIER',
-                  'mercenary': 'CLASS_MNC_BONEWALKER',
-                  'archer': 'CLASS_ARC_WIGHT_SNIPER',
-                  'myrmidon': 'CLASS_MYRMIDON'}
+# ch05's four INFANTRY classes are dressed as skeletons (#25, campaign.yaml `dresses: {ch05:}`):
+# every ch05 red unit wearing one is a risen tomb-guardian, so the repoint is wholesale rather
+# than per-enemy. The three that stay vanilla are not oversights: the DRUID is Ravisin, who
+# carries her own authored art; the GWYLLGI is the moose; and the MYRMIDON is Sahnar, whose
+# Specter anim and map sprite landed with her recruit (#251) and who turns BLUE mid-chapter.
+CH05_CLASS_IDS = ChapterClassIds('ch05')
 CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
                  # the GWYLLGI's own vanilla weapon (the moose deploys as one), kept
                  # under its vanilla NAME -- renaming the item would burn 'Hell Fang'

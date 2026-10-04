@@ -112,8 +112,8 @@ class TestTheCounterAgreesWithTheProber(ChunkCase):
             self.skipTest('no lua on PATH')
         path = os.path.join(check.REPO, 'tools/playtest/harness.lua')
         counted = check.lua_top_level_locals(path)
-        free = check.lua_local_headroom(path, probe_max=8)
-        self.assertLess(free, 8, 'probe capped out; this cross-check needs a real number')
+        free = check.lua_local_headroom(path, probe_max=40)
+        self.assertLess(free, 40, 'probe capped out; this cross-check needs a real number')
         self.assertEqual(counted + free, 200,
                          'the source counter and the compiler disagree about harness.lua')
 

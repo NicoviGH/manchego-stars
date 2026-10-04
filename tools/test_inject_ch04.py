@@ -162,9 +162,6 @@ class Ch04RuntimeHost(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(
                 inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'map_sprites',
                 rk['sprite'] + suffix)), 'missing map_sprites/%s%s' % (rk['sprite'], suffix))
-        # Appended class ids must stay unique (0x80/0x81/0x82 are ch03's).
-        ids = [r['slot_id'] for r in inject.reskins.enemy_class_reskins(self.CAMPAIGN) if r.get('slot_id')]
-        self.assertEqual(len(ids), len(set(ids)))
 
     def test_the_parley_converts_each_wolf_where_it_stands(self):
         # No DISA + LOAD1: clearing the pack and reloading its table put the wolves back on

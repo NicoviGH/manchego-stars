@@ -1,0 +1,39 @@
+# FE-Repo source of every vendored battle anim: name -> mode -> folder (+ script).
+# Written by tools/fe_repo_vendor.py; `verify` re-fetches each one byte for byte.
+bonewalker:
+  sword:
+    folder: Battle Animations/Monsters - Basic Types/[Skeleton-Base] [U] Bonewalker (one arm, sword) by Alexsplode/1. Sword
+    script: Sword with comments.txt
+  unarmed:
+    folder: Battle Animations/Monsters - Basic Types/[Skeleton-Base] [U] Bonewalker (one arm, sword) by Alexsplode/8. Unarmed
+goblin-spearman:
+  lance:
+    folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [M] Goblin Spearman by Battle of Wesnoth/2. Lance
+lizardzerker:
+  axe:
+    folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Berserker-Reskin] Lizardzerker - Coat Repal v2 [M] by Seliost1/3. Axe
+  handaxe:
+    folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Berserker-Reskin] Lizardzerker - Coat Repal v2 [M] by Seliost1/4. Handaxe
+  sword:
+    folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Berserker-Reskin] Lizardzerker - Coat Repal v2 [M] by Seliost1/1. Sword
+  unarmed:
+    folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Berserker-Reskin] Lizardzerker - Coat Repal v2 [M] by Seliost1/8. Unarmed
+skeleberdier:
+  axe:
+    folder: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] Halberdier Skeleberdier [U]/3. Axe (Swing)
+  handaxe:
+    folder: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] Halberdier Skeleberdier [U]/4. Handaxe
+  lance:
+    folder: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] Halberdier Skeleberdier [U]/2. Lance
+  unarmed:
+    folder: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] Halberdier Skeleberdier [U]/8. Unarmed
+wight-sniper:
+  bow:
+    folder: Battle Animations/Monsters - Basic Types/[Skeleton-Reskin] [U] Wight Sniper by DATonDemand/5. Bow
+wildling:
+  axe:
+    folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Brigand-Reskin] Lizard Brigand Wildling [U]/3. Axe
+  handaxe:
+    folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Brigand-Reskin] Lizard Brigand Wildling [U]/4. Handaxe
+  unarmed:
+    folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Brigand-Reskin] Lizard Brigand Wildling [U]/8. Unarmed

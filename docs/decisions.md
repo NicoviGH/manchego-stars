@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-326 decisions. Read this index, then open the two or three you need — the whole
+327 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -33,6 +33,7 @@ set is ~197,000 tokens and no session has ever needed all of it at once.
 | `0014` | [A vanilla layout's tileset is resolved, never inferred from asset-table position (#25).](decisions/0014-a-vanilla-layout-s-tileset-is-resolved-never-inferred.md) | 2026-08-07 | #25 |
 | `0015` | [A tileset's unused slots are declared by TERRAIN_NONE, not by a filler colour (#25).](decisions/0015-a-tileset-s-unused-slots-are-declared-by-terrainnone.md) | 2026-08-07 | #25 |
 | `0016` | [Tileset vendoring is a one-command import; Ch3's cave tileset is cave-interior (#40).](decisions/0016-tileset-vendoring-is-a-one-command-import-ch3-s.md) | 2026-07-02 | #40 |
+| `0327` | [A reskin says where it is worn, and the harness reads the injector's ids](decisions/0327-a-reskin-says-where-it-is-worn.md) | 2026-10-04 | #26 #347 |
 
 ---
 

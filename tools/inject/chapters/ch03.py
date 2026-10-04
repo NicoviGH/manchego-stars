@@ -13,6 +13,7 @@ from inject.chapter_ids import (
     CH03_OPENING_CARD_MSG, CH03_OPENING_MSGS, CH03_TREX_ENTRANCE_MSG, CH03_TREX_TALK_MSG)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
+from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH03_EVENT_GROUP, CH03_HOST_INDEX
 from inject.maps import (
@@ -68,17 +69,10 @@ CH03_GENERIC_PID = '0xaa'       # vanilla slot-4 generic-minion charIndex (autol
 # DefeatBoss ending script: repurpose the vanilla Ch4 ending EventScr_089F19F8 (defined in ch4-eventscript.h,
 # already extern-referenced by the vanilla Ch4 Misc's DefeatAll -> visible to ch4-eventinfo.h's Misc list).
 CH03_ENDING_SCRIPT = 'EventScr_089F19F8'
-# Brigand kobolds ride the Lizard-Wildling reskin slot (inject_enemy_class_reskins clones
-# CLASS_BRIGAND -> CLASS_BRG_LIZARD_WILDLING, an appended class id, with the lizard SMS;
-# combat stays brigand). Grell = vanilla Mogall; blade = Mercenary (Lizardzerker slot lands
-# next); archer/thief stay vanilla.
-CH03_CLASS_IDS = {'mogall': 'CLASS_MOGALL', 'brigand': 'CLASS_BRG_LIZARD_WILDLING',
-                  'mercenary': 'CLASS_MNC_LIZARDZERKER', 'archer': 'CLASS_ARCHER',
-                  'thief': 'CLASS_THIEF',
-                  # the steel brute: a Brigand (parity) that DEPLOYS on the Lizardzerker
-                  # sprite via a brigand-clone class (campaign.yaml kobold-brute). Reached
-                  # through an enemy's `deploy_class` override, not its `class`.
-                  'brigand-brute': 'CLASS_MNC_LIZARDZERKER_BRUTE'}
+# The kobolds are campaign.yaml's kobold reskins, which `dress` ch03's brigand and mercenary --
+# and `brigand-brute`, the steel brute's `deploy_class`: a Brigand for parity that deploys on
+# the Lizardzerker sprite. Grell = vanilla Mogall; archer/thief stay vanilla.
+CH03_CLASS_IDS = ChapterClassIds('ch03')
 CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
                  'steel-axe': 'ITEM_AXE_STEEL', 'iron-sword': 'ITEM_SWORD_IRON',
                  'iron-lance': 'ITEM_LANCE_IRON', 'javelin': 'ITEM_LANCE_JAVELIN',
@@ -278,7 +272,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
 
     enemies = []
     for e in chap['enemy_units']:
-        cls = CH03_CLASS_IDS[e.get('deploy_class') or e['class']]  # deploy_class = sprite-only override
+        cls = CH03_CLASS_IDS.for_entry(e)
         items = ', '.join(CH03_ITEM_IDS[i['id']] for i in e.get('inventory', []))
         drop = e.get('item_drop')
         if drop:

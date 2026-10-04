@@ -35,8 +35,9 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
 
 1. **Module constants** — add a `CHNN_*` block next to the others (host index, **event group
    symbol** (step 4), layout `(asset_label, maps_stem)` tuple, chapter YAML name, tileset, goal donor, boss/generic PIDs,
-   `CHNN_AI` byte-vectors, `CHNN_CLASS_IDS` / `CHNN_ITEM_IDS` dicts mapping our YAML ids → decomp
-   enums, spawn positions, and the `ChM_EVENTINFO_H` / `ChM_EVENTSCRIPT_H` path constants for the
+   `CHNN_AI` byte-vectors, `CHNN_CLASS_IDS = ChapterClassIds('chNN')` (a reskin is worn by
+   adding `chNN` to its `dresses:` in `campaign.yaml`, never by a dict here), a `CHNN_ITEM_IDS`
+   dict mapping our YAML item ids → decomp enums, spawn positions, and the `ChM_EVENTINFO_H` / `ChM_EVENTSCRIPT_H` path constants for the
    host slot's vanilla `M = N` symbols).
 
 2. **Register the tileset** (only if new) — `_register_tileset(campaign, '<tileset>', '<Stem>', comment)`.

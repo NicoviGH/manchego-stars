@@ -78,6 +78,12 @@ world_map:
 # (unreferenced by this campaign). `frame` (optional) overrides the idle frame size when
 # the sprite isn't the base class's size class -- the Fire Imp is a tall 16x32 sprite on
 # a 16x16-combat soldier/fighter, which the engine draws via the wait-row size flag.
+# `dresses: {chNN: [token, ...]}` is WHERE a reskin is worn: every enemy in chNN whose
+# `class` (or `deploy_class`) is that token deploys on this slot (inject.class_ids). Scoped
+# per chapter on purpose -- `base` is many-to-one, and resolving by it is #347. A reskin
+# with no `dresses` (the lycanroc pack) is built but worn by nobody.
+# `slot_id` (an appended class past vanilla's 0x7F) is DECLARED and never moves: a save stores
+# class ids. A new slot without one fails the build with the next free id (slot_id_violations).
 # Ch1 grunts (the "Foaming Mugs goblins") use these; the chief stays the vanilla Knight.
 # The Fire Imp {Alexsplode, FE-Repo} reads as a red imp under the enemy faction palette
 # (its body sits on the standard faction-colour ramp -> fully shaded red, glowing eyes).
@@ -89,6 +95,7 @@ enemy_class_reskins:
   - id: goblin-soldier
     base: CLASS_SOLDIER
     slot: CLASS_BLST_REGULAR_EMPTY
+    dresses: {ch01: [soldier]}
     sprite: fire-imp
     frame: 16x32
     battle_anim:
@@ -99,6 +106,7 @@ enemy_class_reskins:
   - id: goblin-fighter
     base: CLASS_FIGHTER
     slot: CLASS_BLST_LONG_EMPTY
+    dresses: {ch01: [fighter]}
     sprite: fire-imp
     frame: 16x32
     battle_anim:
@@ -118,6 +126,7 @@ enemy_class_reskins:
   - id: kobold-grunt
     base: CLASS_BRIGAND
     slot: CLASS_BRG_LIZARD_WILDLING
+    dresses: {ch03: [brigand]}
     slot_id: 0x82
     sprite: lizard-wildling
     frame: 16x32
@@ -146,6 +155,7 @@ enemy_class_reskins:
   - id: kobold-blade
     base: CLASS_MERCENARY
     slot: CLASS_MNC_LIZARDZERKER
+    dresses: {ch03: [mercenary]}
     slot_id: 0x80
     sprite: lizardzerker
     frame: 16x32
@@ -166,6 +176,7 @@ enemy_class_reskins:
   - id: kobold-brute
     base: CLASS_BRIGAND
     slot: CLASS_MNC_LIZARDZERKER_BRUTE
+    dresses: {ch03: [brigand-brute]}
     slot_id: 0x81
     sprite: lizardzerker
     frame: 16x32
@@ -236,6 +247,7 @@ enemy_class_reskins:
   - id: risen-spear
     base: CLASS_SOLDIER
     slot: CLASS_SOL_SKELEBERDIER
+    dresses: {ch05: [soldier]}
     slot_id: 0x84
     sprite: skel-lance
     battle_anim:
@@ -250,6 +262,7 @@ enemy_class_reskins:
   - id: tomb-reaver
     base: CLASS_FIGHTER
     slot: CLASS_FGT_SKELEBERDIER
+    dresses: {ch05: [fighter]}
     slot_id: 0x85
     sprite: skel-axe
     frame: 16x16
@@ -267,6 +280,7 @@ enemy_class_reskins:
   - id: crypt-blade
     base: CLASS_MERCENARY
     slot: CLASS_MNC_BONEWALKER
+    dresses: {ch05: [mercenary]}
     slot_id: 0x86
     sprite: skel-sword
     battle_anim:
@@ -280,6 +294,7 @@ enemy_class_reskins:
   - id: bone-archer
     base: CLASS_ARCHER
     slot: CLASS_ARC_WIGHT_SNIPER
+    dresses: {ch05: [archer]}
     slot_id: 0x87
     sprite: skel-bow
     battle_anim:
