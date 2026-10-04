@@ -303,6 +303,114 @@ enemy_class_reskins:
         - {dir: bow, txt: Bow.txt, abbr: barc_bw,
            wtypes: ["0x0100 | ITYPE_BOW", "0x0100 | ITYPE_ITEM"]}
 
+  # ── Ch6 (#26): the merfolk of Maer Dualdon. ─────────────────────────────────
+  # The art call is the ch06 YAML's (2026-08-29): Stephano's Mermaid carries lance, bow, staff
+  # and magic, so five line classes wear her; the axe block rides the Shark Rider map sprite;
+  # the Knights are the IronShell General; the Troubadour stays mounted on the Lamia, whose
+  # serpent body IS the mount. The mounted and sword blocks (Cavalier, Mercenary) are the
+  # crab riders, a repainted spider that waits on Nicolas's look.
+  #
+  # The Mermaid is vendored from her `(Bra)` modes. Five classes share one map sprite, `mermaid`,
+  # so the injector builds one sheet for all of them. Her `8. Unarmed` attacks (C03) without
+  # arming a hit, which feditor_to_banim refuses, so each class's weapon anim also takes
+  # ITYPE_ITEM, as bone-archer's bow does. Palettes stay NATIVE: her green skin and dark tail
+  # read as a sea creature on either side, as the skeletons' bone does in ch05.
+  - id: merfolk-spear
+    base: CLASS_SOLDIER
+    slot: CLASS_SOL_MERFOLK
+    dresses: {ch06: [soldier]}
+    slot_id: 0x88
+    sprite: mermaid
+    battle_anim:
+      source: mermaid
+      weapons:
+        - {dir: lance,   txt: Lance.txt,   abbr: mspr_ln,
+           wtypes: ["0x0100 | ITYPE_LANCE", "0x0100 | ITYPE_ITEM"]}
+  # No shark-rider battle anim exists anywhere in the FE-Repo, so the close-up stays the
+  # vanilla Fighter. `frame: 16x16` because the sheet is 16x16 on the Fighter's 16x32 row.
+  - id: shark-rider
+    base: CLASS_FIGHTER
+    slot: CLASS_FGT_SHARK_RIDER
+    dresses: {ch06: [fighter]}
+    slot_id: 0x89
+    sprite: shark-rider
+    frame: 16x16
+  # The one armour anim that carries a LANCE. `frame: 16x32` the other way round: a tall
+  # sheet on the Knight's 16x16 row.
+  - id: ironshell
+    base: CLASS_ARMOR_KNIGHT
+    slot: CLASS_ARM_IRONSHELL
+    dresses: {ch06: [armor-knight]}
+    slot_id: 0x8A
+    sprite: ironshell
+    frame: 16x32
+    battle_anim:
+      source: ironshell
+      weapons:
+        - {dir: lance,   txt: Lance.txt,   abbr: ishl_ln, wtypes: ["0x0100 | ITYPE_LANCE"]}
+        - {dir: unarmed, txt: Unarmed.txt, abbr: ishl_un, wtypes: ["0x0100 | ITYPE_ITEM"]}
+  # The tidecaller and Nerra. Every tome type points at the one cast, so a shaman handed a
+  # different tome still reads as a merfolk.
+  - id: merfolk-tidecaller
+    base: CLASS_SHAMAN
+    slot: CLASS_SHA_MERFOLK
+    dresses: {ch06: [shaman]}
+    slot_id: 0x8B
+    sprite: mermaid
+    battle_anim:
+      source: mermaid
+      weapons:
+        - {dir: dark, txt: Magic.txt, abbr: mshm_mg,
+           wtypes: ["0x0100 | ITYPE_DARK", "0x0100 | ITYPE_ANIMA", "0x0100 | ITYPE_LIGHT",
+                   "0x0100 | ITYPE_ITEM"]}
+  - id: merfolk-singer
+    base: CLASS_MAGE
+    slot: CLASS_MAG_MERFOLK
+    dresses: {ch06: [mage]}
+    slot_id: 0x8C
+    sprite: mermaid
+    battle_anim:
+      source: mermaid
+      weapons:
+        - {dir: anima, txt: Magic.txt, abbr: mmag_mg,
+           wtypes: ["0x0100 | ITYPE_ANIMA", "0x0100 | ITYPE_LIGHT", "0x0100 | ITYPE_DARK",
+                   "0x0100 | ITYPE_ITEM"]}
+  - id: merfolk-mender
+    base: CLASS_PRIEST
+    slot: CLASS_PRI_MERFOLK
+    dresses: {ch06: [priest]}
+    slot_id: 0x8D
+    sprite: mermaid
+    battle_anim:
+      source: mermaid
+      weapons:
+        - {dir: staff,   txt: Staff.txt,   abbr: mpri_st,
+           wtypes: ["0x0100 | ITYPE_STAFF", "0x0100 | ITYPE_ITEM"]}
+  - id: merfolk-bow
+    base: CLASS_ARCHER
+    slot: CLASS_ARC_MERFOLK
+    dresses: {ch06: [archer]}
+    slot_id: 0x8E
+    sprite: mermaid
+    battle_anim:
+      source: mermaid
+      weapons:
+        - {dir: bow,     txt: Bow.txt,     abbr: mbow_bw,
+           wtypes: ["0x0100 | ITYPE_BOW", "0x0100 | ITYPE_ITEM"]}
+  # Vanilla's healer rides with the cavalry, so she stays mounted; the serpent body is the
+  # mount, and the sheet is native 16x32 on the Troubadour's own row.
+  - id: lamia-mender
+    base: CLASS_TROUBADOUR
+    slot: CLASS_TRB_LAMIA
+    dresses: {ch06: [troubadour]}
+    slot_id: 0x8F
+    sprite: lamia
+    battle_anim:
+      source: lamia
+      weapons:
+        - {dir: staff,   txt: Staff.txt,   abbr: lamy_st, wtypes: ["0x0100 | ITYPE_STAFF"]}
+        - {dir: unarmed, txt: Unarmed.txt, abbr: lamy_un, wtypes: ["0x0100 | ITYPE_ITEM"]}
+
 # Item name overrides: rename a vanilla item's in-game text globally (build wiring =
 # inject.names.inject_item_names, which rewrites gItemData[].nameTextId's message).
 # FE8 stores ONE name per item id, so every copy reads the same -- the cast's per-unit
