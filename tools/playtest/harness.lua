@@ -91,7 +91,6 @@ local TUNE = {
     -- loop that used to time out saying nothing (#232 ch01, #236).
     stallFrames = 600,
 }
-local CHAR_HLIN, CHAR_SCRAMSAX, CHAR_SEPHEK = 0x0D, 0x11, 0x68 -- NATASHA/KYLE/ONEILL slots
 -- prologue/sandbox host on chapter slot 1; a chapter load-test (e.g. --ch03-boot on slot 4)
 -- overrides via PT_HOST_CHAPTER so bootToMap/inChapter recognize the right slot.
 local HOST_CHAPTER = PLAYTEST_HOST_CHAPTER or 1
@@ -125,9 +124,6 @@ end)()
 -- Lord select (#42): menu order = classed cast order (build_campaign PORTRAIT_MAP);
 -- the LAST candidate (pinky, NEIMI slot) is benched by default under the 4-slot
 -- deploy cap, so choosing them is the visible force-deploy differential.
-local LORD_CANDIDATES = 8
-local LORDSEL_FLAG_BASE = 0xF0
-local CHAR_PINKY, CHAR_CHIEF = 0x08, 0x46 -- NEIMI slot / BREGUET slot (ch01 boss)
 
 local logfile = io.open(PLAYTEST_LOG, "w")
 local controllerFault
@@ -1946,12 +1942,12 @@ local function winCh00()
     if not bootToMap(nil, PROLOGUE) then
         result("FAIL", "never reached the map") return false
     end
-    local sephek = red(CHAR_SEPHEK)
+    local sephek = red(CAMPAIGN.PROLOGUE.sephek)
     if not sephek then result("FAIL", "Sephek not found in red array") return false end
     pokeFrail(sephek)
     log(string.format("Sephek at (%d,%d) poked to 1 HP", sephek.x, sephek.y))
     for t = 1, 6 do
-        local scram = blue(CHAR_SCRAMSAX)
+        local scram = blue(CAMPAIGN.PROLOGUE.scramsax)
         if isDead(scram) then result("FAIL", "Scramsax died in the win run") return false end
         -- adjacent tile next to the boss, then attack (range 1)
         local tx, ty = sephek.x, sephek.y + 1
@@ -1966,12 +1962,12 @@ local function winCh00()
         -- US_UNSELECTABLE -- the win succeeds and the combat wait times out anyway
         -- (#232). chooseAttack takes stopWhen for exactly this case.
         if not chooseAttack(scram.addr, function()
-            return isDead(red(CHAR_SEPHEK)) or chapter() ~= PROLOGUE
+            return isDead(red(CAMPAIGN.PROLOGUE.sephek)) or chapter() ~= PROLOGUE
         end) then
             result("FAIL", "combat did not reach its verified postcondition")
             return false
         end
-        if not isDead(red(CHAR_SEPHEK)) then
+        if not isDead(red(CAMPAIGN.PROLOGUE.sephek)) then
             log("Sephek alive after turn " .. t .. " (miss?); ending turn and retrying")
             local phase = runEnemyPhase()
             if phase == "gameover" then
@@ -1983,7 +1979,7 @@ local function winCh00()
                 return false
             end
         end
-        if isDead(red(CHAR_SEPHEK)) then
+        if isDead(red(CAMPAIGN.PROLOGUE.sephek)) then
             log("Sephek dead; waiting for the chapter to end")
             shot("sephek-dead")
             local ended = waitFor(function() return chapter() ~= PROLOGUE end, 3600, true)
@@ -2016,7 +2012,7 @@ end
 -- highlighted Goodberry so the new name + blueberry icon can be eyeballed in-game.
 scenarios.goodberry = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    local hlin = blue(CHAR_HLIN)
+    local hlin = blue(CAMPAIGN.PROLOGUE.hlin)
     if not hlin then return result("FAIL", "Hlin not found in blue array") end
     log(string.format("Hlin at (%d,%d)", hlin.x, hlin.y))
     -- select Hlin and re-confirm her own tile -> action menu (no move).
@@ -2210,7 +2206,7 @@ local function reachCh01Map() return reachCh01() end
 -- the party (DISA), and the deployed count equals the 4-slot field-parity cap.
 scenarios.ch01 = function()
     if not reachCh01Map() then return end
-    if blue(CHAR_HLIN) or blue(CHAR_SCRAMSAX) then
+    if blue(CAMPAIGN.PROLOGUE.hlin) or blue(CAMPAIGN.PROLOGUE.scramsax) then
         return result("FAIL", "ch00 guests still in the party in ch01")
     end
     local party, deployed = 0, 0
@@ -2892,7 +2888,7 @@ scenarios.ch01win = function()
     -- classify now FAILS here instead of being papered over.
     if not reachCh01Map() then return end
     pokeFastConfig() -- 10-goblin enemy phases: map combat + fast speed
-    local chief = red(CHAR_CHIEF)
+    local chief = red(CAMPAIGN.CH01_CHIEF)
     if not chief then return result("FAIL", "chief not in the red array") end
     local goal = { x = chief.x, y = chief.y } -- chief holds the seize tile
     pokeFrail(chief)
@@ -2906,20 +2902,20 @@ scenarios.ch01win = function()
         local b0 = blue(0x01)
         log(string.format("loop %d: turn=%d faction=0x%02X braulo=(%d,%d) chiefdead=%s",
             t, turn(), faction(), b0 and b0.x or -1, b0 and b0.y or -1,
-            tostring(isDead(red(CHAR_CHIEF)))))
+            tostring(isDead(red(CAMPAIGN.CH01_CHIEF)))))
         -- every other goblin dies to the first counter (frail) and deals no
         -- damage (harmless): the escort can't kill anyone OR bodyblock the
         -- trail for long. This run asserts seize logic, not combat survival.
         for i = 0, 23 do
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and r.charId ~= CHAR_CHIEF and not isDead(r) then
+            if r and r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then
                 pokeFrail(r)
                 pokeHarmless(r)
             end
         end
         local braulo = blue(0x01)
         if isDead(braulo) then return result("FAIL", "Braulo died on the march") end
-        chief = red(CHAR_CHIEF)
+        chief = red(CAMPAIGN.CH01_CHIEF)
         if chief and not isDead(chief) then
             if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
                 -- adjacent: attack in place (move onto own tile opens the menu)
@@ -3000,7 +2996,7 @@ local function leavePrepAndGrindToSeize()
     end, 1200) then return false end
     wait(120)
     pokeFastConfig() -- speed through the goblin grind to the seize
-    local chief = red(CHAR_CHIEF)
+    local chief = red(CAMPAIGN.CH01_CHIEF)
     if not chief then return false end
     local goal = { x = chief.x, y = chief.y }
     pokeFrail(chief)
@@ -3009,11 +3005,11 @@ local function leavePrepAndGrindToSeize()
         wait(100)
         for i = 0, 23 do
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and r.charId ~= CHAR_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+            if r and r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         local braulo = blue(0x01)
         if isDead(braulo) then return false end
-        chief = red(CHAR_CHIEF)
+        chief = red(CAMPAIGN.CH01_CHIEF)
         if chief and not isDead(chief) then
             if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
                 if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then chooseAttack(braulo.addr) end
@@ -3088,8 +3084,8 @@ scenarios.lordfloor = function()
     shot("lordfloor-t1")
     -- DIAGNOSTIC (#45 3c debug): dump pick flags + marty stats + applied flag at t1.
     local pickset = "none"
-    for i = 0, LORD_CANDIDATES - 1 do
-        if eventFlag(LORDSEL_FLAG_BASE + i) then pickset = string.format("0x%X (idx %d)", LORDSEL_FLAG_BASE + i, i) end
+    for i = 0, CAMPAIGN.LORD_CANDIDATES - 1 do
+        if eventFlag(CAMPAIGN.LORDSEL_FLAG_BASE + i) then pickset = string.format("0x%X (idx %d)", CAMPAIGN.LORDSEL_FLAG_BASE + i, i) end
     end
     log(string.format("t%d: pick flag set=%s; marty maxHP=%d def=%d; applied(0xFA)=%s",
         turn(), pickset, hp1, df1, tostring(eventFlag(APPLIED))))
@@ -3162,7 +3158,6 @@ end
 -- then on the map have Pinky (the chosen lord) open the convoy via the Supply command --
 -- the cross-character behavioural proof that force-deploy + supply follow the chosen lead.
 local US_NOT_DEPLOYED = 0x08
-local CHAR_BRAULO, CHAR_PINKY_LORD = 0x01, 0x08
 local function isDeployedInPrep(charId)
     local u = blue(charId)
     return u and (u.state & US_NOT_DEPLOYED) == 0
@@ -3216,10 +3211,10 @@ scenarios.recordsupply = function()
     end
     if not pickStep("pick_right", "RIGHT", "onto the second column") then
         return result("FAIL", "could not step the deploy cursor onto Braulo's column") end
-    if isDeployedInPrep(CHAR_BRAULO) then
+    if isDeployedInPrep(CAMPAIGN.CAST.braulo) then
         local before = countDeployedPrep()
         if not guardedInput("toggle_deploy", "A", "Braulo leaves the deployed count", function()
-            return not isDeployedInPrep(CHAR_BRAULO) and countDeployedPrep() < before
+            return not isDeployedInPrep(CAMPAIGN.CAST.braulo) and countDeployedPrep() < before
         end, 120) then return result("FAIL", "could not bench Braulo") end
     end
     shot("supply")
@@ -3238,7 +3233,7 @@ scenarios.recordsupply = function()
         shot("supply")
     end
     log(string.format("prep: brauloDeployed=%s deployedCount=%d",
-        tostring(isDeployedInPrep(CHAR_BRAULO)), countDeployedPrep()))
+        tostring(isDeployedInPrep(CAMPAIGN.CAST.braulo)), countDeployedPrep()))
     -- Launch straight from Pick Units. START is a legal action here only because someone is
     -- deployed -- on an empty field FE8 just buzzes, and the old blind START could not tell
     -- that apart from a launch, so it went on to A-mash at a screen that had not moved.
@@ -3264,9 +3259,9 @@ scenarios.recordsupply = function()
     end
     wait(120); shot("supply")                             -- the deployed field
     -- Map-side assertions: Braulo benched (not on field), Pinky deployed, exactly 4 out.
-    local braulo = blue(CHAR_BRAULO)
+    local braulo = blue(CAMPAIGN.CAST.braulo)
     local braOnField = braulo and (braulo.state & 0x9) == 0 and braulo.onMap
-    local pinky = blue(CHAR_PINKY_LORD)
+    local pinky = blue(CAMPAIGN.CAST.pinky)
     local pinkyOnField = pinky and (pinky.state & 0x9) == 0 and pinky.onMap
     local onField = 0
     for i = 0, 50 do
@@ -3281,7 +3276,7 @@ scenarios.recordsupply = function()
     waitFor(function() return faction() == 0 and not menuOpen() end, 3000, true)
     wait(60)
     local usedSupply = false
-    pinky = blue(CHAR_PINKY_LORD)
+    pinky = blue(CAMPAIGN.CAST.pinky)
     if moveUnit(pinky.x, pinky.y, pinky.x, pinky.y) then
         wait(40); shot("supply")                          -- Pinky's menu: Rescue/Item/Trade/Supply/Wait
         -- Resolve the live Supply command. Three blind DOWNs used to walk to "row 3 (Rescue0
@@ -3318,11 +3313,11 @@ scenarios.recordsupply = function()
     -- first deployed non-lord turned out to spawn right next to Pinky, and the assertion
     -- caught the CLAIM rather than a defect (#238).
     waitFor(function() return faction() == 0 and not menuOpen() end, 1500, true)
-    pinky = blue(CHAR_PINKY_LORD)
+    pinky = blue(CAMPAIGN.CAST.pinky)
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
         local beside = pinky and u and math.abs(u.x - pinky.x) + math.abs(u.y - pinky.y) == 1
-        if u and u.charId ~= CHAR_PINKY_LORD and not beside
+        if u and u.charId ~= CAMPAIGN.CAST.pinky and not beside
             and (u.state & 0x9) == 0 and u.onMap then
             if moveUnit(u.x, u.y, u.x, u.y) then
                 wait(40); shot("supply")
@@ -3663,7 +3658,7 @@ scenarios.recordch01trail = function()
     -- so the typewriter + her face read in motion); A-tap slowly to advance it.
     for i = 1, 12 do recwait(24, "trail"); press(K.A, 4) end
     pokeFastConfig()
-    local chief = red(CHAR_CHIEF)
+    local chief = red(CAMPAIGN.CH01_CHIEF)
     if not chief then return result("FAIL", "chief not found") end
     local goal = { x = chief.x, y = chief.y }
     for t = 1, 18 do
@@ -3675,7 +3670,7 @@ scenarios.recordch01trail = function()
         end
         local braulo = blue(0x01)
         if isDead(braulo) then return result("FAIL", "Braulo died on the march") end
-        chief = red(CHAR_CHIEF)
+        chief = red(CAMPAIGN.CH01_CHIEF)
         if chief and not isDead(chief) then
             if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
                 if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then
@@ -3722,7 +3717,7 @@ scenarios.recordlord = function()
     end
     if not atMenu then return result("FAIL", "lord-select menu never opened") end
     recwait(90, "lord") -- linger on the freshly opened menu
-    for _ = 1, LORD_CANDIDATES - 1 do
+    for _ = 1, CAMPAIGN.LORD_CANDIDATES - 1 do
         press(K.DOWN, 4)
         recwait(20, "lord") -- visible cursor walk down the cast
     end
@@ -3764,7 +3759,7 @@ scenarios.recordlordfast = function()
     if not atPrep then shot("lordfast-noprep")
         return result("FAIL", "lord-select prep never opened on the fast-boot") end
     recwait(50, "lordfast")            -- settle on the first candidate
-    for _ = 1, LORD_CANDIDATES - 1 do
+    for _ = 1, CAMPAIGN.LORD_CANDIDATES - 1 do
         press(K.DOWN, 4)
         for f = 1, 24 do yield() end   -- let the bust gfx finish streaming in (no shots)
         recwait(26, "lordfast")        -- THEN capture the SETTLED card (no transitions)
@@ -3796,12 +3791,12 @@ scenarios.ch01lord = function()
     -- The permanent flag is indexed off the row the route REPORTS committing on, not off
     -- LORD_CANDIDATES: a constant that outlives a roster change asserts the wrong flag and
     -- the scenario's whole premise goes unchecked.
-    if not eventFlag(LORDSEL_FLAG_BASE + route.picked) then
+    if not eventFlag(CAMPAIGN.LORDSEL_FLAG_BASE + route.picked) then
         return result("FAIL", string.format(
             "lord-choice permanent flag 0x%X (row %d) not set after confirm",
-            LORDSEL_FLAG_BASE + route.picked, route.picked))
+            CAMPAIGN.LORDSEL_FLAG_BASE + route.picked, route.picked))
     end
-    local lord = blue(CHAR_PINKY)
+    local lord = blue(CAMPAIGN.CAST.pinky)
     if not lord or (lord.state & 0x9) ~= 0 or not lord.onMap then
         return result("FAIL", "chosen lord (char 0x08) is not force-deployed")
     end
@@ -3818,7 +3813,7 @@ scenarios.ch01lord = function()
         lord.x, lord.y, deployed))
     pokeFrail(lord)
     for t = 1, 8 do
-        lord = blue(CHAR_PINKY)
+        lord = blue(CAMPAIGN.CAST.pinky)
         if isDead(lord) or gameOverActive() then break end
         marchToward(lord, 14, 9) -- adjacent to the (14,8) hold-and-attack soldier
         shot("lord-march-turn" .. t)
@@ -3833,9 +3828,9 @@ scenarios.ch01lord = function()
     shot("ch01lord-no-gameover")
     log(string.format("debug: EVFLAG_GAMEOVER=%s lordflag=%s dead=%s",
         tostring(eventFlag(0x65)),
-        tostring(eventFlag(LORDSEL_FLAG_BASE + route.picked)),
-        tostring(isDead(blue(CHAR_PINKY)))))
-    if isDead(blue(CHAR_PINKY)) then
+        tostring(eventFlag(CAMPAIGN.LORDSEL_FLAG_BASE + route.picked)),
+        tostring(isDead(blue(CAMPAIGN.CAST.pinky)))))
+    if isDead(blue(CAMPAIGN.CAST.pinky)) then
         return result("FAIL", "chosen lord died but NO game over followed")
     end
     result("FAIL", "could not get the chosen lord killed in 8 turns")
@@ -3909,10 +3904,10 @@ scenarios.scenes = function()
     if not booted then return result("FAIL", "never reached the map (A-only boot)") end
     wait(120); press(K.B); press(K.B)
     shot("map-loaded")
-    local sephek = red(CHAR_SEPHEK)
+    local sephek = red(CAMPAIGN.PROLOGUE.sephek)
     if not sephek then return result("FAIL", "Sephek not found in red array") end
     pokeFrail(sephek)
-    local scram = blue(CHAR_SCRAMSAX)
+    local scram = blue(CAMPAIGN.PROLOGUE.scramsax)
     if not scram then return result("FAIL", "Scramsax not found") end
     local tx, ty = sephek.x, sephek.y + 1
     if tileOccupied(tx, ty) then tx, ty = sephek.x - 1, sephek.y end
@@ -3956,10 +3951,10 @@ scenarios.record = function()
     if not booted then return result("FAIL", "never reached the map (record)") end
     recwait(150, "op")
     press(K.B); press(K.B)
-    local sephek = red(CHAR_SEPHEK)
+    local sephek = red(CAMPAIGN.PROLOGUE.sephek)
     if not sephek then return result("FAIL", "Sephek not found in red array") end
     pokeFrail(sephek)
-    local scram = blue(CHAR_SCRAMSAX)
+    local scram = blue(CAMPAIGN.PROLOGUE.scramsax)
     if not scram then return result("FAIL", "Scramsax not found") end
     local tx, ty = sephek.x, sephek.y + 1
     if tileOccupied(tx, ty) then tx, ty = sephek.x - 1, sephek.y end
@@ -4181,14 +4176,14 @@ end
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.
 scenarios.gameover = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    local hlin = blue(CHAR_HLIN)
+    local hlin = blue(CAMPAIGN.PROLOGUE.hlin)
     if not hlin then return result("FAIL", "Hlin not found in blue array") end
     pokeFrail(hlin)
     log(string.format("Hlin at (%d,%d) poked frail; marching her at the enemy", hlin.x, hlin.y))
-    local sephek = red(CHAR_SEPHEK)
+    local sephek = red(CAMPAIGN.PROLOGUE.sephek)
     local tx, ty = sephek.x, sephek.y + 1 -- adjacent: he attacks in range
     for t = 1, 8 do
-        hlin = blue(CHAR_HLIN)
+        hlin = blue(CAMPAIGN.PROLOGUE.hlin)
         if isDead(hlin) or gameOverActive() then break end
         marchToward(hlin, tx, ty)
         shot("hlin-turn" .. t)
@@ -4202,7 +4197,7 @@ scenarios.gameover = function()
     shot("gameover-timeout")
     log(string.format("debug: EVFLAG_GAMEOVER(0x65)=%s EVFLAG_DEFEAT_BOSS(2)=%s chapter=%d faction=0x%02X",
         tostring(eventFlag(0x65)), tostring(eventFlag(2)), chapter(), faction()))
-    if isDead(blue(CHAR_HLIN)) then
+    if isDead(blue(CAMPAIGN.PROLOGUE.hlin)) then
         return result("FAIL", "Hlin died but NO game over followed")
     end
     result("FAIL", "could not get Hlin killed in 8 turns (no verdict on game over)")
@@ -4211,14 +4206,14 @@ end
 -- RETREAT: Scramsax dies -> flag-less quote -> battle CONTINUES (no game over).
 scenarios.retreat = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    local scram = blue(CHAR_SCRAMSAX)
+    local scram = blue(CAMPAIGN.PROLOGUE.scramsax)
     if not scram then return result("FAIL", "Scramsax not found in blue array") end
     pokeFrail(scram)
     pokeHarmless(scram) -- his counters must not kill the boss mid-test
-    local sephek = red(CHAR_SEPHEK)
+    local sephek = red(CAMPAIGN.PROLOGUE.sephek)
     log("Scramsax poked frail+harmless; parking him next to Sephek")
     for t = 1, 6 do
-        scram = blue(CHAR_SCRAMSAX)
+        scram = blue(CAMPAIGN.PROLOGUE.scramsax)
         if isDead(scram) then break end
         local tx, ty = sephek.x, sephek.y + 1
         if tileOccupied(tx, ty) then tx, ty = sephek.x - 1, sephek.y end
@@ -4230,7 +4225,7 @@ scenarios.retreat = function()
             return result("FAIL", "game over fired on Scramsax's death (must be Hlin-only)")
         end
     end
-    if not isDead(blue(CHAR_SCRAMSAX)) then
+    if not isDead(blue(CAMPAIGN.PROLOGUE.scramsax)) then
         shot("retreat-timeout")
         return result("FAIL", "could not get Scramsax killed in 6 turns (no verdict)")
     end
@@ -4312,30 +4307,11 @@ local function captureAttack(actorAddr, tag) -- like chooseAttack but shoot fram
     end
     return shootCombatFrames(tag, function() return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 end)
 end
-local RBG_PID = 0x05           -- CHARACTER_MOULDER (RBG's slot), lord-select menu index 4
 
 -- The deployable custom-art cast: friendly id -> the vanilla character slot it rides
 -- (CHARACTER_* pid), mirroring build_campaign's PORTRAIT_MAP. The `make TESTCH=1` sandbox
 -- deploys all of these, so `recordanim` (PT_CHAR=<id>) can capture ANY of them. Per-unit
 -- weapon reach + "is this a non-attacker" are READ from the game (below), not hard-coded.
-local CAST = {
-    braulo = 0x01, marty = 0x02, meesmickle = 0x03, wolfram = 0x04,
-    ['prof-rbg'] = 0x05, rootis = 0x06, sclorbo = 0x07, pinky = 0x08,
-    rbg = 0x05,  -- alias for prof-rbg (the #65 first mover)
-    -- The recruits ride vanilla slots further down the table: Lupin the beast-cavalier is
-    -- CHARACTER_DUESSEL. Read it off PORTRAIT_MAP, NOT off STAT_DONOR -- his stats come from
-    -- Kyle (0x11) and his SLOT from Duessel (0x1D), and taking the donor for the slot puts
-    -- `PT_CHAR=lupin` on a unit that is not on the map.
-    lupin = 0x1D,
-    -- Baxby the axe-beak: SLOT = Forde (0x10), stats from Franz (0x11's neighbour, CHARACTER_FRANZ)
-    -- -- the same slot-vs-donor trap, so again this is PORTRAIT_MAP's value, not STAT_DONOR's.
-    baxby = 0x10,
-    -- ch05's pair (#25), and the slot-vs-donor trap one more time: Basil's stats come from
-    -- Natasha and Sahnar's from Joshua, but their SLOTS are Artur and Marisa. Taking the
-    -- donor here would aim PT_CHAR at a unit that is not on the sandbox map.
-    basil = 0x13,   -- CHARACTER_ARTUR
-    sahnar = 0x16,  -- CHARACTER_MARISA
-}
 
 -- Shared lead-up for the RBG demo: win the prologue, lord-select RBG into ch01,
 -- stop on ch01 turn-1 player phase with RBG deployed. Returns (rbg unit) or (false, err).
@@ -4354,7 +4330,7 @@ local function reachRbgCh01()
     if route.picked ~= RBG_ROW then
         return false, string.format("lead committed on row %s, not RBG's row %d",
             tostring(route.picked), RBG_ROW) end
-    local rbg = blue(RBG_PID)
+    local rbg = blue(CAMPAIGN.CAST.rbg)
     if not rbg then return false, "RBG not on the field after lord-select" end
     return rbg
 end
@@ -4534,14 +4510,14 @@ end
 scenarios.ckpt_rbgch01 = function()
     local rbg, err = reachRbgCh01()
     if not rbg then shot("ckpt-rbgch01-fail"); return result("FAIL", err) end
-    if not positionForShot(RBG_PID) then shot("ckpt-rbgch01-noshot")
+    if not positionForShot(CAMPAIGN.CAST.rbg) then shot("ckpt-rbgch01-noshot")
         return result("FAIL", "RBG never got into firing position in 6 phases") end
     saveState("rbgch01")
     result("PASS", "rbgch01 checkpoint saved (RBG on firing tile, action menu open)")
 end
 
 scenarios.recordrbg = function()
-    local RBG = RBG_PID
+    local RBG = CAMPAIGN.CAST.rbg
     -- RBG deploys as its PLAIN vanilla class + a per-character _u25 anim (the clone-class
     -- path was retired in #65 M-B); this scenario just captures the shot, so class is logged
     -- for eyeballing, not asserted.
@@ -4650,7 +4626,7 @@ end
 -- them up per character). Staff-only units (no attack weapon) dispatch to captureHealerAnim
 -- instead (#191). The verdict is honest -- combat must actually start.
 local function captureCharAnim(name)
-    local pid = CAST[name]
+    local pid = CAMPAIGN.CAST[name]
     if not pid then
         return result("FAIL", "unknown cast id '" .. tostring(name) .. "' -- set PT_CHAR to one of: "
             .. "braulo marty meesmickle wolfram prof-rbg rootis sclorbo pinky lupin baxby") end
@@ -4752,7 +4728,7 @@ end
 scenarios.recordcast = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     local name = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "prof-rbg"
-    local pid = CAST[name]
+    local pid = CAMPAIGN.CAST[name]
     if not pid then return result("FAIL", "unknown PT_CHAR " .. tostring(name)) end
     local u = blue(pid)
     if not u then
@@ -5127,23 +5103,15 @@ end
 -- the decomp + the ch02 build (CH02_CHWINGA / CH02_ITEM_IDS in tools/build_campaign.py).
 -- The chwinga ON THE FIELD. Glimmerfrost (MANSEL, 0xC8) is not among them since 2026-08-30:
 -- she inhabits the (1,12) hut and hands her charm over on the visit, so she is never a unit.
-local CH02_CHWINGA_PIDS = { 0xCA, 0xC9 }         -- DARA/KLIMT = Mote/Rime (green)
-local CH02_CHARMS = { 0x28, 0x6D }               -- Hand Axe / Elixir, the two SURVIVOR charms.
-                                                 -- Pure Water (0x6E) is the hut's, proven by
-                                                 -- ch02visit (paid) and ch02raid (lost).
-local CLASS_ARCHER = 0x19                          -- the fliers-vs-bows debut enemy (CH02_CLASS_IDS)
-local CH02_CHAPTER = 3                             -- ch02 hosts on chapter slot 3 (ch01 -> MNC2(0x3))
-local CH03_CHAPTER = 4                             -- ch03 hosts on chapter slot 4 (ch02 ending -> MNC2(0x4))
 local CH02_PARK = { x = 0, y = 0 }                -- NW corner end-turn tile (15x15 map; deploy is row 3+)
 
 -- Directed ch01 seize (the generic clear-bot is too slow to seize ch01's 25x16 map reliably):
 -- march the lord onto the chief's throne, poking the chief + escort frail/harmless so the march
 -- can't be blocked or killed. Modeled on scenarios.ch01win; reachCh02Map only needs to REACH
 -- ch02, not fairly test ch01 balance. Returns "won" once ch01 hands off, else "timeout"/"gameover".
-local CH01_CHIEF, CH01_LORD = CHAR_CHIEF, 0x01   -- ch01 boss (BREGUET slot) + Braulo (default lord)
 local function seizeCh01ToCh02()
     pokeFastConfig()   -- 10-goblin enemy phases: map combat + fast speed
-    local chief = red(CH01_CHIEF)
+    local chief = red(CAMPAIGN.CH01_CHIEF)
     if not chief then return "noboss" end
     local goal = { x = chief.x, y = chief.y }   -- the chief holds the seize tile
     pokeFrail(chief)
@@ -5158,11 +5126,11 @@ local function seizeCh01ToCh02()
         wait(100)   -- let the player-phase banner finish (it eats key presses)
         for i = 0, 23 do   -- the escort dies to the first counter and deals no damage
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and r.charId ~= CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+            if r and r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
-        local lord = blue(CH01_LORD)
+        local lord = blue(CAMPAIGN.CAST.braulo)
         if not lord or isDead(lord) then return "gameover" end
-        chief = red(CH01_CHIEF)
+        chief = red(CAMPAIGN.CH01_CHIEF)
         if chief and not isDead(chief) then
             if math.abs(lord.x - chief.x) + math.abs(lord.y - chief.y) == 1 then
                 if not moveUnit(lord.x, lord.y, lord.x, lord.y) then return "controller" end
@@ -5217,7 +5185,7 @@ local function reachCh02Map()
         return false
     end
     for _ = 1, 16000 do
-        if chapter() == CH02_CHAPTER and faction() == 0 and turn() >= 1
+        if chapter() == CAMPAIGN.HOST.ch02 and faction() == 0 and turn() >= 1
             and unitAt(SYM.gUnitArrayRed, 0) ~= nil and partyDeployed()
             and not procActive(SYM.ProcScr_StdEventEngine) and not procActive(SYM.gProcScr_SALLYCURSOR)
             and not menuOpen() and controllerState() == "player_map_idle" then
@@ -5282,7 +5250,7 @@ end
 -- deterministically -- whether they survive UNDER REAL PLAY is a balance/pacing question for
 -- the human pass, not the wiring test.
 local function protectChwinga()
-    for _, pid in ipairs(CH02_CHWINGA_PIDS) do
+    for _, pid in ipairs(CAMPAIGN.CH02_CHWINGA_PIDS) do
         local g = findUnit(SYM.gUnitArrayGreen, 20, pid)
         if g and not isDead(g) then
             emu:write8(g.addr + 0x13, 60)   -- curHP
@@ -5913,7 +5881,7 @@ scenarios.ch02 = function()
     for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r then redids[#redids+1] = string.format("0x%02X", r.charId) end end
     log("blue=" .. table.concat(blueids, ",") .. " | red=" .. table.concat(redids, ","))
     local chwinga = 0
-    for _, pid in ipairs(CH02_CHWINGA_PIDS) do
+    for _, pid in ipairs(CAMPAIGN.CH02_CHWINGA_PIDS) do
         local g = findUnit(SYM.gUnitArrayGreen, 20, pid)
         if g and not isDead(g) then chwinga = chwinga + 1
             log(string.format("chwinga 0x%02X at (%d,%d) hp=%d", pid, g.x, g.y, g.hp)) end
@@ -5927,7 +5895,7 @@ scenarios.ch02 = function()
     for i = 0, 23 do
         local r = unitAt(SYM.gUnitArrayRed, i)
         if r and not isDead(r) then
-            if ru8(ru32(r.addr + 0x04) + 0x04) == CLASS_ARCHER then archer = true end
+            if ru8(ru32(r.addr + 0x04) + 0x04) == CAMPAIGN.CH02_ARCHER_CLASS then archer = true end
             if unitIsBoss(r) then boss = true end
         end
     end
@@ -5970,7 +5938,6 @@ end
 -- and (2) on the map in combat -- force-deploy him if the prep auto-pick benched him, then attack
 -- a foe and confirm damage landed. NB the roster is 9 deep (8 founding + Baxby), so we search
 -- past blue()'s 8-slot window. Run: tools/playtest/run.sh ch02baxby (needs a normal build).
-local BAXBY_PID = 0x10   -- CHARACTER_FORDE = baxby's cast slot (PORTRAIT_MAP; docs/CLASSES.md)
 scenarios.ch02baxby = function()
     wait(30)
     if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
@@ -5982,7 +5949,7 @@ scenarios.ch02baxby = function()
         local u = unitAt(SYM.gUnitArrayBlue, i)
         if u then
             log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X", i, u.charId, u.x, u.y, u.state))
-            if u.charId == BAXBY_PID then baxby, bidx = u, i end
+            if u.charId == CAMPAIGN.CAST.baxby then baxby, bidx = u, i end
         end
     end
     if not baxby then
@@ -6094,7 +6061,7 @@ scenarios.clear_ch02 = function()
     local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
     local best = {}
     local function snapCharms()
-        local d = CH02.deliveredCharms(collectedItems(), CH02_CHARMS)
+        local d = CH02.deliveredCharms(collectedItems(), CAMPAIGN.CH02_CHARMS)
         if #d > #best then best = d end
     end
     -- Deterministic rout: the generic clear-bot is unreliable on ch02 (fumbles into item menus),
@@ -6147,7 +6114,7 @@ scenarios.clear_ch02 = function()
     local watchEnding = INSPECT.watch("clear_ch02_ending")
     for _ = 1, TUNE.bootSteps do
         snapCharms()
-        if chapter() == CH03_CHAPTER then reachedCh03 = true; snapCharms(); break end
+        if chapter() == CAMPAIGN.HOST.ch03 then reachedCh03 = true; snapCharms(); break end
         if procActive(SYM.gProcScr_TitleScreen) then snapCharms(); break end  -- fallback: chain broken -> old landing
         -- Drive the ending on OBSERVED state rather than an A cadence (#238). The cadence
         -- pressed A every 10 frames whatever was on screen, so it could not tell "this page
@@ -6193,11 +6160,11 @@ scenarios.clear_ch02 = function()
     -- three through that rework, which no longer HAD a third to find -- an assertion no working
     -- build could satisfy.
     log(string.format("charms delivered: %d/%d; reached ch03=%s (chapter=%d)",
-        #best, #CH02_CHARMS, tostring(reachedCh03), chapter()))
-    if #best < #CH02_CHARMS then
+        #best, #CAMPAIGN.CH02_CHARMS, tostring(reachedCh03), chapter()))
+    if #best < #CAMPAIGN.CH02_CHARMS then
         return result("FAIL", string.format(
             "ch02 charm-gift broken: only %d/%d chwinga charms reached the leader/convoy",
-            #best, #CH02_CHARMS)) end
+            #best, #CAMPAIGN.CH02_CHARMS)) end
     if not reachedCh03 then
         return result("FAIL", "ch02->ch03 chain broken: ending did not MNC2 into ch03 (slot 4)") end
     result("PASS", "ch02 routed + chained into ch03; both SURVIVOR chwinga charms delivered (CHECK_ALIVE -> GIVEITEMTO)")
@@ -6266,7 +6233,7 @@ scenarios.ckpt_ch02intro = function()
     if not reachCh01Map() then return end
     local status = seizeCh01ToCh02()
     if status ~= "won" then return result("FAIL", "ch01 seize failed (" .. status .. ")") end
-    if not waitFor(function() return chapter() == CH02_CHAPTER end, 600) then
+    if not waitFor(function() return chapter() == CAMPAIGN.HOST.ch02 end, 600) then
         return result("FAIL", "ch02 never began") end
     -- Advance past the title-card transition into the first STABLE opening dialogue beat before
     -- saving -- a state grabbed mid-transition crashes on resume (mGBA exited early). Wait for the
@@ -6344,7 +6311,7 @@ end
 -- instant the moose exists; the terminal is the moose GONE, plus a tail so the flee isn't cut off.
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04moose (needs a CH04BOOT=1 ROM).
 scenarios.recordch04moose = function()
-    local MOOSE_PID = 0xce
+    local MOOSE_PID = CAMPAIGN.CH04_MOOSE_PID
     local function moose() return findUnit(SYM.gUnitArrayGreen, 12, MOOSE_PID) end
     local reachedIt, goneFor = false, 0
     return recordCutscene({
@@ -6383,7 +6350,7 @@ end
 -- ENDS, so a teleported unit would never trigger it and the test would pass vacuously.
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04moose (needs a CH04BOOT=1 ROM).
 scenarios.ch04moose = function()
-    local MOOSE_PID = 0xce
+    local MOOSE_PID = CAMPAIGN.CH04_MOOSE_PID
     local X1, Y1, X2, Y2 = 8, 2, 14, 7   -- CH04_MOOSE_AREA
     local function moose() return findUnit(SYM.gUnitArrayGreen, 12, MOOSE_PID) end
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
@@ -6523,10 +6490,8 @@ end
 --   opts.shots  -- frame-tag to screenshot into while the exchange plays; nil films nothing
 -- Returns false plus a reason string, or true plus (nil, pack) once Lupin is blue -- where
 -- `pack` is { before, after }: the wolves' tiles going into the Talk and coming out of it.
-local CH04_LUPIN_PID, CH04_MARTY_PID = 0x1D, 0x02   -- CHARACTER_DUESSEL / CHARACTER_SETH
 -- The five generic wolves, one pid each (build_campaign.CH04_PACK_PIDS -- #203). They used to
 -- share 0xb3, which is exactly why the parley could not convert them one at a time.
-local CH04_PACK_PIDS = { [0xb0] = true, [0xb1] = true, [0xb2] = true, [0xb4] = true, [0xb5] = true }
 
 -- Where the pack is standing, keyed by pid: { [pid] = {x, y} } over one faction array. One pid
 -- per wolf is what makes this readable at all, and it is how the parley's two claims are checked
@@ -6535,13 +6500,13 @@ local function ch04PackTiles(array, slots)
     local at = {}
     for i = 0, slots - 1 do
         local u = unitAt(array, i)
-        if u and not isDead(u) and CH04_PACK_PIDS[u.charId] then at[u.charId] = { u.x, u.y } end
+        if u and not isDead(u) and CAMPAIGN.CH04_PACK_PIDS[u.charId] then at[u.charId] = { u.x, u.y } end
     end
     return at
 end
 local function ch04Parley(opts)
     opts = opts or {}
-    local LUPIN, MARTY = CH04_LUPIN_PID, CH04_MARTY_PID
+    local LUPIN, MARTY = CAMPAIGN.CAST.lupin, CAMPAIGN.CAST.marty
     local function redLupin() return findUnit(SYM.gUnitArrayRed, 24, LUPIN) end
     local function blueLupin() return findUnit(SYM.gUnitArrayBlue, 20, LUPIN) end
     local function snap() if opts.shots then shot(opts.shots) end end
@@ -6676,7 +6641,7 @@ scenarios.ch04packmath = function()
     -- the counter alone found an empty field).
     if not endTurn() then return result("FAIL", "could not end turn 1") end
     if not waitFor(function()
-        return turn() >= 2 and findUnit(SYM.gUnitArrayRed, 24, CH04_LUPIN_PID) ~= nil
+        return turn() >= 2 and findUnit(SYM.gUnitArrayRed, 24, CAMPAIGN.CAST.lupin) ~= nil
     end, 5400) then
         return result("FAIL", "the wolf pack never arrived on turn 2")
     end
@@ -6686,21 +6651,21 @@ scenarios.ch04packmath = function()
         local r = unitAt(SYM.gUnitArrayRed, i)
         if r and not isDead(r) then
             log(string.format("  red[%02d] char=0x%02X at (%d,%d)%s", i, r.charId, r.x, r.y,
-                r.charId == CH04_LUPIN_PID and "   <- LUPIN" or ""))
+                r.charId == CAMPAIGN.CAST.lupin and "   <- LUPIN" or ""))
         end
     end
     local function packAlive()
         local n = 0
         for i = 0, 23 do
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and CH04_PACK_PIDS[r.charId] then n = n + 1 end
+            if r and not isDead(r) and CAMPAIGN.CH04_PACK_PIDS[r.charId] then n = n + 1 end
         end
         return n
     end
     local function firstWolf()
         for i = 0, 23 do
             local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and CH04_PACK_PIDS[r.charId] then return r end
+            if r and not isDead(r) and CAMPAIGN.CH04_PACK_PIDS[r.charId] then return r end
         end
         return nil
     end
@@ -6720,7 +6685,7 @@ scenarios.ch04packmath = function()
         wolf = firstWolf()
         for i = 0, 19 do
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 and u.charId ~= CH04_MARTY_PID then
+            if u and not isDead(u) and (u.state & 0x2) == 0 and u.charId ~= CAMPAIGN.CAST.marty then
                 local mn, mx = unitAttackRange(u)
                 if mn and mn <= 1 and teleportAdjacentTo(u, { wolf }) then
                     u = unitAt(SYM.gUnitArrayBlue, i)

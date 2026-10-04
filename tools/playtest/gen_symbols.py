@@ -8,7 +8,9 @@ Three outputs, one nm pass:
 
   symbols.lua   the named symbols the harness reads/scans (SYM), plus RESKIN_CLASS: each
                 campaign.yaml enemy reskin's id -> the class id it BUILT as, read off the
-                build tree's classes.h, so `recordenemy` never keeps a second copy of it
+                build tree's classes.h, so `recordenemy` never keeps a second copy of it,
+                and CAMPAIGN: the cast pids, host slots and chapter facts the scenarios
+                read, resolved from the injector's own constants (`campaign_ids`)
   procscr.lua   every proc-script address -> its exact symbol (PROCSCR), so a live
                 proc is identified by SCRIPT ADDRESS instead of by the PROC_NAME
                 string at proc+0x10. Those strings are not unique -- the decomp
@@ -33,7 +35,7 @@ from collections import namedtuple
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
 from inject.class_ids import DEFAULT_CAMPAIGN  # noqa: E402
-from inject.decomp import DECOMP  # noqa: E402  the build tree the ROM lands in (#408)
+from inject.decomp import DECOMP, vanilla_decomp_text  # noqa: E402  the build tree (#408)
 from yaml_loader import yaml_load  # noqa: E402
 ELF = os.path.join(DECOMP, 'fireemblem8.elf')
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -325,6 +327,82 @@ def reskin_classes(campaign=DEFAULT_CAMPAIGN):
     return {rk['id']: int(enums[rk['slot']], 0) for rk in reskins}
 
 
+def _enum_values(relpath, prefix):
+    """{ENUM: int} for one vanilla decomp header (HEAD, never the patched build tree)."""
+    text = vanilla_decomp_text(relpath)
+    return {k: int(v, 0) for k, v in
+            re.findall(r'(%s[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)' % prefix, text)}
+
+
+def campaign_ids(campaign=DEFAULT_CAMPAIGN):
+    """The campaign facts scenarios read, resolved from the injector's own constants.
+
+    Every value here used to be a hand-kept literal in harness.lua or a chapter chunk, each one
+    a second copy of a Python constant -- and each one a top-level local in a chunk that sits
+    at Lua's 200-local ceiling. The cast's pid is its PORTRAIT_MAP slot, never its STAT_DONOR:
+    the harness's own comments warned about that trap three times over."""
+    from inject.cast import _classed_cast, PORTRAIT_MAP
+    from inject.chapter_ids import (CH01_BOSS_SLOT, CH02_CHWINGA, CH04_MOOSE_PID, CH05_BOSS_PID,
+                                    CH05_MOOSE_PID, CH06_BOAT_PIDS, PROLOGUE_HLIN_SLOT,
+                                    PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
+    from inject.chapters.ch01 import CH01_CHAPTER_YAML
+    from inject.chapters.ch02 import CH02_CHAPTER_YAML, CH02_CLASS_IDS, CH02_ITEM_IDS
+    from inject.chapters.ch04 import CH04_PACK_PIDS
+    from inject.decomp import LORDSEL_FLAG_BASE
+    from inject.hosting import _load_chapter_yaml
+    import inject.hosts as hosts
+
+    chars = _enum_values('include/constants/characters.h', 'CHARACTER_')
+    items = _enum_values('include/constants/items.h', 'ITEM_')
+    classes = _enum_values('include/constants/classes.h', 'CLASS_')
+
+    def char(slot):
+        return chars['CHARACTER_' + slot.upper()]
+
+    cast = {uid: char(slot) for uid, slot in PORTRAIT_MAP.items()}
+    cast['rbg'] = cast['prof-rbg']                    # the #65 first mover's short name
+    ch01 = _load_chapter_yaml(campaign, CH01_CHAPTER_YAML)
+    lords, _ = _classed_cast(campaign, available_at=ch01['chapter_number'])
+    # The chwinga ON THE FIELD, in green_allies order, and the charm each survivor pays.
+    field = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)['deployment']['green_allies']
+    slot_of = dict(CH02_CHWINGA)
+    return {
+        'CAST': cast,
+        'LORD_CANDIDATES': len(lords),
+        'LORDSEL_FLAG_BASE': LORDSEL_FLAG_BASE,
+        'PROLOGUE': {'hlin': char(PROLOGUE_HLIN_SLOT), 'scramsax': char(PROLOGUE_SCRAMSAX_SLOT),
+                     'sephek': char(PROLOGUE_SEPHEK_SLOT)},
+        'CH01_CHIEF': char(CH01_BOSS_SLOT),
+        'HOST': {'ch%02d' % n: getattr(hosts, 'CH%02d_HOST_INDEX' % n)
+                 for n in range(1, 7)},
+        'CH02_CHWINGA_PIDS': [char(slot_of[g['id']]) for g in field],
+        'CH02_CHARMS': [items[CH02_ITEM_IDS[g['gift']]] for g in field],
+        'CH02_ARCHER_CLASS': classes[CH02_CLASS_IDS['archer']],
+        'CH04_PACK_PIDS': {int(p, 0): True for p in CH04_PACK_PIDS},   # a SET: indexed by charId
+        'CH04_MOOSE_PID': int(CH04_MOOSE_PID, 0),
+        'CH05_BOSS_PID': int(CH05_BOSS_PID, 0),
+        'CH05_MOOSE_PID': int(CH05_MOOSE_PID, 0),
+        'CH06_BOAT_PIDS': {k: int(v, 0) for k, v in CH06_BOAT_PIDS.items()},
+    }
+
+
+def lua_literal(value, indent=1):
+    """A Python dict/list/int/True as a Lua table constructor (keys sorted: a stable file)."""
+    pad = '    ' * indent
+    if value is True:
+        return 'true'
+    if isinstance(value, bool) or not isinstance(value, (dict, list, int)):
+        raise TypeError('no Lua literal for %r' % (value,))
+    if isinstance(value, int):
+        return '0x%02X' % value
+    if isinstance(value, list):
+        return '{ ' + ', '.join(lua_literal(v, indent + 1) for v in value) + ' }'
+    rows = ['%s[%s] = %s,' % (pad, '"%s"' % k if isinstance(k, str) else lua_literal(k),
+                              lua_literal(value[k], indent + 1))
+            for k in sorted(value)]
+    return '{\n' + '\n'.join(rows) + '\n' + '    ' * (indent - 1) + '}'
+
+
 def render_lua(varname, mapping):
     lines = ['-- generated by gen_symbols.py from fireemblem8.elf; do not edit',
              '%s = {' % varname]
@@ -360,6 +438,7 @@ def main():
     try:
         addrs = wanted_symbols(symbols, WANTED)
         reskins = reskin_classes()
+        facts = campaign_ids()
     except KeyError as missing:
         sys.exit('ERROR: %s' % missing.args[0])
     write_atomic(OUT, ''.join(
@@ -367,7 +446,7 @@ def main():
         + ['    %s = 0x%08X,\n' % (name, addrs[name]) for name in WANTED]
         + ['}\n', 'RESKIN_CLASS = {\n']
         + ['    ["%s"] = 0x%02X,\n' % (rid, reskins[rid]) for rid in sorted(reskins)]
-        + ['}\n']))
+        + ['}\n', 'CAMPAIGN = %s\n' % lua_literal(facts)]))
     print('wrote %s (%d symbols, %d reskin classes)' % (OUT, len(addrs), len(reskins)))
 
     scripts = proc_scripts(symbols)

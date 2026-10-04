@@ -23,13 +23,14 @@
 -- ids, item ids that are FE8's rather than ours) and anything a single scenario uses once.
 -- ch06 starts here by default rather than by exception.
 return {
-    -- Cast, by the vanilla character slot each unit occupies.
+    -- Cast, by the vanilla character slot each unit occupies (CAMPAIGN is generated into
+    -- symbols.lua from the injector's own constants).
     PID = {
-        BASIL   = 0x13,     -- CHARACTER_ARTUR
-        SAHNAR  = 0x16,     -- CHARACTER_MARISA
-        RAVISIN = 0xb8,     -- the chapter boss
-        MOOSE   = 0xb9,     -- the White Moose, ch04's payoff charging through scene 7
-        LUPIN   = 0x1D,     -- CHARACTER_DUESSEL, the slot ch05 gives the wolf
+        BASIL   = CAMPAIGN.CAST.basil,
+        SAHNAR  = CAMPAIGN.CAST.sahnar,
+        RAVISIN = CAMPAIGN.CH05_BOSS_PID,     -- the chapter boss
+        MOOSE   = CAMPAIGN.CH05_MOOSE_PID,    -- the White Moose, ch04's payoff charging through scene 7
+        LUPIN   = CAMPAIGN.CAST.lupin,
     },
 
     -- The four reliquary doors: where they are, what each hands over, and the event id its
