@@ -128,5 +128,41 @@ class AReskinIsResolvedByItsOwnSlot(unittest.TestCase):
                            'the many-to-one hazard is gone and this suite can relax')
 
 
+class AppendedSlotIds(unittest.TestCase):
+    """An appended class id is DECLARED (a save stores class ids, so one may never move), and
+    the build refuses ids that collide, overlap vanilla, or leave a gap."""
+    VANILLA = {'CLASS_SOLDIER': 0x0F, 'CLASS_PUPIL_T1': 0x7F}
+
+    def rk(self, rid, slot_id=None, slot=None):
+        out = {'id': rid, 'base': 'CLASS_SOLDIER', 'slot': slot or 'CLASS_' + rid.upper()}
+        if slot_id is not None:
+            out['slot_id'] = slot_id
+        return out
+
+    def test_the_live_campaign_is_clean(self):
+        self.assertEqual([], inject.reskins.slot_id_violations(
+            inject.reskins.enemy_class_reskins('rime-of-the-frostmaiden'),
+            inject.reskins.vanilla_class_values()))
+
+    def test_a_new_slot_without_an_id_is_told_the_next_free_one(self):
+        got = inject.reskins.slot_id_violations(
+            [self.rk('a', 0x80), self.rk('b', 0x81), self.rk('new')], self.VANILLA)
+        self.assertEqual(1, len(got))
+        self.assertIn('next free id is 0x82', got[0])
+
+    def test_a_vanilla_slot_needs_no_id(self):
+        self.assertEqual([], inject.reskins.slot_id_violations(
+            [self.rk('goblin', slot='CLASS_SOLDIER')], self.VANILLA))
+
+    def test_collision_overlap_and_gap_are_each_refused(self):
+        dup = inject.reskins.slot_id_violations([self.rk('a', 0x80), self.rk('b', 0x80)],
+                                                self.VANILLA)
+        self.assertTrue(any("'a' and 'b'" in m for m in dup), dup)
+        self.assertTrue(inject.reskins.slot_id_violations([self.rk('a', 0x7F)], self.VANILLA))
+        gap = inject.reskins.slot_id_violations([self.rk('a', 0x80), self.rk('b', 0x82)],
+                                                self.VANILLA)
+        self.assertTrue(any('without a gap' in m for m in gap), gap)
+
+
 if __name__ == '__main__':
     unittest.main()

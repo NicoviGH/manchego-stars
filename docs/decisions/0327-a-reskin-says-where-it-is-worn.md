@@ -18,6 +18,14 @@ The key is (chapter, token), never `base`. Base is many-to-one: goblin-soldier a
 both clone `CLASS_SOLDIER`, and resolving by base shipped ch01's goblins as ch05's skeletons
 (#347). A (chapter, token) that two reskins claim is a build error.
 
+**An appended class id is declared, never allocated.** A save stores each unit's class id.
+An id the build assigned on its own would stay unpinned until someone wrote it into the YAML,
+and inserting a reskin above it would renumber it and swap classes in playtesters' saves. So
+`slot_id` stays in `campaign.yaml`, and `inject.reskins.slot_id_violations` makes it cheap to get
+right. A new slot without an id fails the build, and the error names the next free id. Ids that
+collide, overlap vanilla's table (which ends at 0x7F), or leave a gap are refused. A gap would
+cost dead padding rows in the positional move table.
+
 **The playtest harness reads campaign ids from the build, never from literals.**
 `gen_symbols.py` already regenerates `symbols.lua` after every `make`. It now also writes:
 

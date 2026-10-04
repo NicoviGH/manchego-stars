@@ -10,7 +10,8 @@ import feditor_to_banim
 import map_sprite_tool
 from inject.battle_anims import (
     _class_field_symbol, banim_append_row, banim_clone_conf, banim_repoint_conf)
-from inject.decomp import _find_brace_block, _replace_brace_block, _table_close_line, REPO
+from inject.decomp import (
+    _find_brace_block, _replace_brace_block, _table_close_line, REPO, vanilla_decomp_text)
 from inject.paths import (
     BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_LINKER, BANIM_POINTER_H,
     BANIMCONF_C, CLASSES_C, CLASSES_H, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
@@ -54,6 +55,12 @@ def _parse_class_enum_values():
             if m:
                 out[m.group(1)] = int(m.group(2), 0)
     return out
+
+
+def vanilla_class_values():
+    """CLASS_X -> int for VANILLA FE8 only (submodule HEAD), so an appended slot never counts."""
+    return {k: int(v, 0) for k, v in re.findall(r'(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)',
+                                               vanilla_decomp_text('include/constants/classes.h'))}
 
 
 def _class_field(class_enum, field):
@@ -180,6 +187,37 @@ def classdata_append_clone(text, base_enum, new_enum):
     return text[:arr_e - 1] + entry + text[arr_e - 1:]
 
 
+def slot_id_violations(reskins, vanilla_values):
+    """What is wrong with the reskins' appended class ids, as messages (empty = fine).
+
+    An appended id is DECLARED, never allocated by the build: a save stores each unit's class
+    id, so an id that moved when someone inserted a reskin above it would swap classes in every
+    playtester's save. The build's job is to make declaring it trivial -- a new slot without one
+    is told the next free id -- and to refuse ids that collide, overlap vanilla's table, or
+    leave a gap (the move table is positional, so a gap is padded with dead rows)."""
+    first = max(vanilla_values.values()) + 1
+    declared = [(rk['id'], int(str(rk['slot_id']), 0)) for rk in reskins
+                if rk.get('slot_id') is not None]
+    ids = sorted(v for _, v in declared)
+    nxt = (ids[-1] + 1) if ids else first
+    out = []
+    for rk in reskins:
+        if rk.get('slot_id') is None and rk['slot'] not in vanilla_values:
+            out.append('reskin %r: %s is not a vanilla class, so it needs `slot_id:` -- the '
+                       'next free id is 0x%X' % (rk['id'], rk['slot'], nxt))
+    for rid, val in declared:
+        if val < first:
+            out.append('reskin %r: slot_id 0x%X is inside vanilla\'s class table (ends 0x%X)'
+                       % (rid, val, first - 1))
+    for val in sorted({v for v in ids if ids.count(v) > 1}):
+        out.append('slot_id 0x%X is declared by %s' % (
+            val, ' and '.join(repr(r) for r, v in declared if v == val)))
+    if ids and ids != list(range(first, first + len(ids))) and len(set(ids)) == len(ids):
+        out.append('appended slot_ids must run 0x%X.. without a gap; declared %s'
+                   % (first, ', '.join('0x%X' % v for v in ids)))
+    return out
+
+
 def _append_new_reskin_slots(reskins, verbose=True):
     """Append any reskin `slot`s declared with a `slot_id` (a fresh class id past 0x7F)
     that don't yet exist as classes -- extend the enum + clone the base into gClassData so
@@ -187,6 +225,9 @@ def _append_new_reskin_slots(reskins, verbose=True):
     three ballista-empties are used up). Idempotent (build restores classes.h/.c each run);
     a reskin whose `slot` is already a real class (vanilla ballista-empty) is left alone."""
     values = _parse_class_enum_values()
+    problems = slot_id_violations(reskins, vanilla_class_values())
+    if problems:
+        sys.exit('ERROR: campaign.yaml enemy_class_reskins:\n  ' + '\n  '.join(problems))
     header = cdata = None
     for rk in reskins:
         if rk.get('slot_id') is None or rk['slot'] in values:
