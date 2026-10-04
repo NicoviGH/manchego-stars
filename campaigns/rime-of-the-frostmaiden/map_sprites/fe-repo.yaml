@@ -1,0 +1,10 @@
+# FE-Repo source of every VENDORED map sprite: stem -> sheet path without -stand/-walk.png.
+# Derived cast recolours are not here. Written by tools/fe_repo_vendor.py; `verify` checks pixels.
+fire-imp: Map Sprites/Monsters - Dragons and Special/Fire Imp (U) {Alexsplode}
+hlin-trollbane: Map Sprites/Infantry - (Axe) Fighters and Warriors/Fighter (F) Axe {Alusq}
+lizard-wildling: Map Sprites/Infantry - (Axe) Brigs, Pirates, Zerkers/Brigand (U) Lizard Wildling {Tarantino500}
+lizardzerker: Map Sprites/Infantry - (Axe) Brigs, Pirates, Zerkers/Berserker (M) Lizardzerker Axe {Seliost1}
+skel-axe: Map Sprites/Monsters - Basic Types/Bonewalker (U) Axe {Snerdels}
+skel-bow: Map Sprites/Monsters - Basic Types/Bonewalker (U) Wight Bow {IS}
+skel-lance: Map Sprites/Monsters - Basic Types/Bonewalker (U) Lance {Epicer}
+skel-sword: Map Sprites/Monsters - Basic Types/Bonewalker (U) One Arm {IS}

@@ -15,6 +15,10 @@ silently drops categories) and READ the category listings -- the assets that mat
 `Squidsmith`, `IronShell-Tiny General` and `[Spider-Variant] Cavalier Rider`, and no keyword
 sweep will ever find them.
 
+**Taking an asset is one command** once it is chosen: `tools/fe_repo_vendor.py anim|sms`, which
+records its source in the `fe-repo.yaml` beside it; `fe_repo_vendor.py verify` re-proves every
+vendored asset against the FE-Repo. Its docstring says what a vendored anim and sheet ARE.
+
 Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (the public GBAFE graphics
 repo; FEUniverse mirror). Scanned 2026-07-23.
 
@@ -97,7 +101,9 @@ Lupin. Cut from ch05; parked on **issue #24** so the `feat/24-ch04-map` branch f
 `[Berserker-Variant] Yetizerker` (frost berserker) fits the book's ice trolls if we want real frost-brute
 art over a palette-swap.
 
-### ch06 — Messie the plesiosaur — GAP, flag early
-No off-the-shelf sea-monster / plesiosaur / serpent anim exists (only a `Mermaid`). Messie's art will
-need a custom sprite, a creative substitute (a wyvern/`Wild Fellbeast` reskin as a swimming beast), or a
-commission. Raise when ch06 reaches its slice.
+### ch06 — the merfolk (Bremen) — logged on issue #26
+Every asset ch06's `skin:` notes name exists: `[Monster-Custom] [F] Mermaid by Stephano` (Lance, Bow,
+Staff, Magic; map sprite `Mermaid (F) {N426}`), `Shark Rider (M) {N426}` (map sprite only),
+`[General-Variant] IronShell-Tiny General`, `[Monster-Custom] [U] Lamia by L95` and
+`[Spider-Variant] [M] Cavalier Rider by DATonDemand`, which is a literal spider and is repainted as
+the crab. Messie needs no anim: he is a cutscene actor, and his map sprite is painted (#363).

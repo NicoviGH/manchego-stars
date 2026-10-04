@@ -26,6 +26,13 @@ right. A new slot without an id fails the build, and the error names the next fr
 collide, overlap vanilla's table (which ends at 0x7F), or leave a gap are refused. A gap would
 cost dead padding rows in the positional move table.
 
+**A vendored FE-Repo asset records its source, and `fe_repo_vendor.py verify` re-proves it.**
+Measured over the tree on 2026-10-04: a battle anim is the mode folder's script plus its numbered
+frames, byte for byte (402 of 402 files). A map sprite is the source pair re-encoded, which makes
+it pixel-identical rather than byte-identical (8 of 8 pairs). The build re-maps every sheet onto
+its base class's palette, so the picture is what has to match. A cast recolour is derived, keeps
+its recipe in its unit YAML, and is not in the manifest.
+
 **The playtest harness reads campaign ids from the build, never from literals.**
 `gen_symbols.py` already regenerates `symbols.lua` after every `make`. It now also writes:
 
