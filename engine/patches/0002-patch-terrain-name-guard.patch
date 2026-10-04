@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 2/15] GetTerrainName: bounds-guarded against OOB terrain ids (defensive)
+Subject: [PATCH 2/16] GetTerrainName: bounds-guarded against OOB terrain ids (defensive)
 
 Bounds-guard GetTerrainName against out-of-range terrain ids.
 

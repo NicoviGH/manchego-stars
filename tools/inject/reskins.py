@@ -9,11 +9,12 @@ import banim_palette
 import feditor_to_banim
 import map_sprite_tool
 from inject.battle_anims import (
-    _class_field_symbol, banim_append_row, banim_clone_conf, banim_repoint_conf)
+    _class_field_symbol, append_banim_link_block, banim_append_row, banim_clone_conf,
+    banim_repoint_conf)
 from inject.decomp import (
     _find_brace_block, _replace_brace_block, _table_close_line, REPO, vanilla_decomp_text)
 from inject.paths import (
-    BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_LINKER, BANIM_POINTER_H,
+    BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_POINTER_H,
     BANIMCONF_C, CLASSES_C, CLASSES_H, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
     UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_C, UNIT_ICON_WAIT_S, WAIT_GFX_DIR)
 from inject.sms import _write_wait_row, claim_sms_id
@@ -398,9 +399,7 @@ def _write_imported_banim_assets(abbr, res, uid):
                 'data/banim/banim_%s_oam_r.bin.lz' % abbr,
                 'data/banim/banim_%s_motion.o|.data.script>lz' % abbr,
                 'data/banim/banim_%s_modes.bin' % abbr])
-    with open(BANIM_LINKER, 'a', encoding='utf-8') as f:
-        f.write('\n# Manchego Stars imported battle anim (#90): %s\n' % uid)
-        f.write('\n'.join(block) + '\n')
+    append_banim_link_block('imported battle anim (#90): %s' % uid, block)
 
     with open(BANIM_DATA_C, encoding='utf-8') as f:
         text = f.read()

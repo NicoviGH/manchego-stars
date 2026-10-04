@@ -17,7 +17,7 @@ from inject import step_cache
 import build_scopes
 import gen_subtitle_cards
 from inject.decomp import DECOMP, git_env, REPO
-from inject.paths import BUILD_STAMP, COMPILED_DIR, INJECT_CACHE_DIR, INJECTED_PATHS
+from inject.paths import BANIM_LINKER, BUILD_STAMP, COMPILED_DIR, INJECT_CACHE_DIR, INJECTED_PATHS
 
 
 # Decomp source files we patch in place. We git-restore them to vanilla at the start
@@ -37,6 +37,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/events/ch1-eventscript.h', 'src/events/prologue-wm.h',
                         'src/gamecontrol.c', 'src/bmio.c', 'src/bmunit.c', 'src/bmmap.c',
                         'src/bmcamadjust.c',
+                        # engine patch 0016: the ext battle-anim object's link rule + placement
+                        'Makefile', 'ldscript.txt',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c', 'src/prep_unitselect.c',
                         # #218: both roster screens that blank the purple OBJ bank
@@ -67,6 +69,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # efxbattle.h. The gMSChargeFlashes table rides data_banimconfunk.c
                         # (listed below); the struct/extern ride ekrbattle.h (listed above).
                         'src/banim-efxmisc.c', 'src/banim-main.c', 'include/efxbattle.h',
+                        # No step writes vanilla's banim script any more (patch 0016 moved ours to
+                        # BANIM_LINKER); restoring it cleans a tree built before that.
                         'linker_script_banim.txt',
                         # #65 M-B (character-unique anims, no class slot): the per-character
                         # config table gets the AnimConf appended; the combat-lookup engine
@@ -437,6 +441,9 @@ def _restore_compile_output(path, recorded):
 # (step_cache derives the real path list from what the step actually wrote). `src` and
 # `include` are in it because both steps also touch a handful of shared tables there.
 BANIM_ROOTS = ('data/banim', 'graphics/banim', 'src', 'include')
+# Write detection is the default scope plus the one root-level file both steps append to. Without
+# it a hit restored every anim row but no linker script, and the ROM linked against nothing.
+BANIM_SCOPE_ROOTS = step_cache.SCOPE_ROOTS + (os.path.relpath(BANIM_LINKER, DECOMP),)
 
 
 def _anim_step_cache(campaign, verbose=True):
@@ -464,7 +471,8 @@ def _anim_step_cache(campaign, verbose=True):
     h.update(b'decomp:' + head)
     build_scopes.fingerprint_paths(REPO, build_scopes.ROM_INPUT_PATHS, into=h)
     return step_cache.StepCache(DECOMP, INJECT_CACHE_DIR, h.hexdigest()[:32],
-                                roots=BANIM_ROOTS, verbose=verbose)
+                                roots=BANIM_ROOTS + (os.path.relpath(BANIM_LINKER, DECOMP),),
+                                scope_roots=BANIM_SCOPE_ROOTS, verbose=verbose)
 
 
 def _stamp_build_config(campaign, flags):
@@ -498,6 +506,10 @@ def restore_vanilla_sources():
     # always resets to the committed vanilla source.
     subprocess.run(['git', '-C', DECOMP, 'checkout', 'HEAD', '--'] + PATCHED_DECOMP_FILES, env=git_env(),
                    check=True)
+    # The ext battle-anim script is ours alone (vanilla has none), so restoring it means
+    # deleting it; the battle-anim steps append to it from empty.
+    if os.path.exists(BANIM_LINKER):
+        os.remove(BANIM_LINKER)
 
 
 def normalise_decomp_shebangs(verbose=False):

@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 15/15] founding exp (#430 step 4): the prologue's pay handed to the founding party once
+Subject: [PATCH 15/16] founding exp (#430 step 4): the prologue's pay handed to the founding party once
 
 Founding exp (#430 step 4, ADR 0320), engine side: hand each founding party member the
 exp the prologue's vanilla twin pays it, once, at the first prep "Fight!".

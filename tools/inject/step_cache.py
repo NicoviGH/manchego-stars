@@ -58,11 +58,15 @@ def snapshot(root, roots=SCOPE_ROOTS):
     """{abs path: mtime_ns} over the watched roots -- how a write is detected.
 
     Same mechanism as `build_scopes.BuildScopes`: `stat` is cheap enough to do this around
-    every step, and only files that actually moved are ever hashed.
+    every step, and only files that actually moved are ever hashed. A root may be one FILE
+    (the banim linker script sits at the decomp root, beside no directory it could ride).
     """
     seen = {}
     for rel in roots:
         base = os.path.join(root, rel)
+        if os.path.isfile(base):
+            seen[base] = os.stat(base).st_mtime_ns
+            continue
         for dirpath, dirnames, names in os.walk(base):
             dirnames[:] = [d for d in dirnames if not d.startswith('.')]
             for name in names:

@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 12/15] item icons (#23): DrawIcon routes gMSPal2IconIds from BG bank 4 to custom bank 15
+Subject: [PATCH 12/16] item icons (#23): DrawIcon routes gMSPal2IconIds from BG bank 4 to custom bank 15
 
 Append a custom item palette without repurposing the two vanilla icon palettes.
 

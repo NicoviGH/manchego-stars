@@ -20,8 +20,8 @@ Three of those ways were invisible to the first version, and each has a test her
     never restores one and a straight set difference would fail an unchanged tree.
 
 And the scope the manifest is taken over is DERIVED from `inject/paths.py`, not listed: the
-listed form dropped `linker_script_banim.txt`, which lives at the decomp root and which two
-injection steps append to.
+listed form dropped the banim linker script (`linker_script_banim_ext.txt`), which lives at
+the decomp root and which two injection steps append to.
 
 Plus the `-z` parse: a rename is two records, and slicing `[3:]` off both corrupts the second.
 
@@ -275,7 +275,7 @@ class TheScopeIsDerivedNotListed(unittest.TestCase):
 
     def test_the_root_level_banim_linker_is_in_scope(self):
         """The regression: it is not under src/data/include/graphics/texts, and IS injected."""
-        self.assertIn('linker_script_banim.txt', fp.INJECTED_SCOPE)
+        self.assertIn('linker_script_banim_ext.txt', fp.INJECTED_SCOPE)
 
     def test_every_decomp_path_constant_is_covered(self):
         from inject import paths

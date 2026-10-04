@@ -68,8 +68,9 @@ def _injected_scope():
     """The decomp pathspecs injection touches, DERIVED from `inject/paths.py`.
 
     A hand-kept list of directories gets this wrong the moment the injector learns a new file,
-    and it did: `linker_script_banim.txt` sits at the decomp ROOT -- two injection steps append
-    to it -- so `src data include graphics texts` silently dropped it out of the manifest.
+    and it did: the banim linker script (`linker_script_banim_ext.txt`) sits at the decomp
+    ROOT -- two injection steps append to it -- so `src data include graphics texts` silently
+    dropped it out of the manifest.
     `paths.py` is the one place that knows every decomp file we write, so the scope is read
     from there and a new constant extends this gate for free.
     """

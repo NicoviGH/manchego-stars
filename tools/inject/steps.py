@@ -120,7 +120,7 @@ UNIT_ICONS = ('graphics/unit_icon/move/*', 'graphics/unit_icon/wait/*',
               'include/unit_icon_pointer.h', 'src/unit_icon_move_data.c',
               'src/unit_icon_wait_data.c')
 BANIMS = ('graphics/banim/*', 'data/banim/*', 'include/banim_pointer.h', 'include/ekrbattle.h',
-          'linker_script_banim.txt', 'src/banim_data.c', 'src/data_banimconf.c')
+          'linker_script_banim_ext.txt', 'src/banim_data.c', 'src/data_banimconf.c')
 
 
 class Step(object):

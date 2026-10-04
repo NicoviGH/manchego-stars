@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 10/15] banim (#165): character/weapon spell palettes support campaign-declared tints
+Subject: [PATCH 10/16] banim (#165): character/weapon spell palettes support campaign-declared tints
 
 Add a data-driven, caster-scoped spell-palette tint seam.
 

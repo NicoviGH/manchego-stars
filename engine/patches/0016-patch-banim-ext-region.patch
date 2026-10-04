@@ -1,0 +1,79 @@
+From: Manchego Stars engine
+Subject: [PATCH 16/16] battle anims a build appends link past the 16MB image, in their own object
+
+Vanilla packs every battle animation into one compressed object, data_banim.o, linked at
+0xC02000 with battle terrain fixed at 0xEE0000 right behind it. Vanilla uses 0xC02000-0xE47180
+of that; anims a build imports land in the remainder, about 0.6MB. A campaign that dresses a
+chapter's whole enemy line in community anims fills it in a few chapters, and the overflow
+fails the link ("cannot move location counter backwards").
+
+So the imported anims get their own script, linker_script_banim_ext.txt, and their own object,
+data_banim_ext.o, linked at 0x1000000 (0x09000000), the first byte past vanilla's 16MB image.
+The GBA cartridge bus addresses 32MB, so that leaves 16MB of headroom. Vanilla's anims keep
+their addresses byte for byte, so nothing in the baserom incbins that might point into them
+moves.
+
+Each object's rule also depends on its own script: the rule lists the files a script names, so
+a script that DROPS files left a stale object behind, still holding them.
+
+The object exists only when the script does. A tree that never writes it builds exactly as
+before: the Makefile adds no object, and the ldscript's `. = 0x1000000` falls on the 0xFF
+padding objcopy writes there anyway.
+---
+diff --git a/Makefile b/Makefile
+index b45fd133..4ea3d2f2 100644
+--- a/Makefile
++++ b/Makefile
+@@ -82,9 +82,14 @@ SFILES_COMPILED := $(CFILES:.c=.s)
+ C_OBJECTS    := $(CFILES:.c=.o)
+ ASM_OBJECTS  := $(SFILES:.s=.o)
+ BANIM_OBJECT := data/banim/data_banim.o
++# Battle anims a build appends past vanilla's: their own object at the end of the 16MB image,
++# so they never compete with vanilla's 0xC02000-0xEE0000 region. Built only when the script
++# exists; a vanilla tree has none.
++BANIM_EXT_SCRIPT := linker_script_banim_ext.txt
++BANIM_EXT_OBJECT := $(if $(wildcard $(BANIM_EXT_SCRIPT)),data/banim/data_banim_ext.o)
+ MID_FILES    := $(wildcard $(MID_SUBDIR)/*.mid)
+ MID_OBJECTS  := $(MID_FILES:.mid=.o)
+-ALL_OBJECTS  := $(C_OBJECTS) $(ASM_OBJECTS) $(BANIM_OBJECT) $(MID_OBJECTS)
++ALL_OBJECTS  := $(C_OBJECTS) $(ASM_OBJECTS) $(BANIM_OBJECT) $(BANIM_EXT_OBJECT) $(MID_OBJECTS)
+ OBJECTS_LST  := objects.lst
+ DEPS_DIR     := .dep
+ 
+@@ -199,9 +204,14 @@ sound/%.bin: sound/%.aif ; $(AIF2PCM) $< $@
+ 
+ # Battle Animation Recipes
+ 
+-$(BANIM_OBJECT): $(shell ./scripts/arm_compressing_linker.py -t linker_script_banim.txt -m)
++$(BANIM_OBJECT): linker_script_banim.txt $(shell ./scripts/arm_compressing_linker.py -t linker_script_banim.txt -m)
+ 	./scripts/arm_compressing_linker.py -o $@ -t linker_script_banim.txt -b 0x8c02000 -l $(LD) --objcopy $(OBJCOPY) -c ./scripts/compressor.py
+ 
++ifneq (,$(BANIM_EXT_OBJECT))
++$(BANIM_EXT_OBJECT): $(BANIM_EXT_SCRIPT) $(shell ./scripts/arm_compressing_linker.py -t $(BANIM_EXT_SCRIPT) -m)
++	./scripts/arm_compressing_linker.py -o $@ -t $(BANIM_EXT_SCRIPT) -b 0x9000000 -l $(LD) --objcopy $(OBJCOPY) -c ./scripts/compressor.py
++endif
++
+ %_modes.bin: %_motion.o
+ 	$(OBJCOPY) -O binary -j .data.modes $< $@
+ 
+@@ -228,7 +238,7 @@ $(OBJECTS_LST): $(ALL_OBJECTS)
+ 	@echo $(ALL_OBJECTS) > $@
+ 
+ $(ELF): $(ALL_OBJECTS) $(OBJECTS_LST) $(LDSCRIPT) $(SYM_FILES)
+-	$(LD) -T $(LDSCRIPT) -Map $(MAP) @$(OBJECTS_LST) -R $(BANIM_OBJECT).sym.o -L tools/agbcc/lib -o $@ -lc -lgcc
++	$(LD) -T $(LDSCRIPT) -Map $(MAP) @$(OBJECTS_LST) -R $(BANIM_OBJECT).sym.o $(if $(BANIM_EXT_OBJECT),-R $(BANIM_EXT_OBJECT).sym.o) -L tools/agbcc/lib -o $@ -lc -lgcc
+ 	$(STRIP) -N .gcc2_compiled. $@
+ 
+ %.gba: %.elf
+diff --git a/ldscript.txt b/ldscript.txt
+index 9785bc49..6d0c7d8e 100644
+--- a/ldscript.txt
++++ b/ldscript.txt
+@@ -1210,6 +1210,7 @@ SECTIONS
+         FILL(0xFF);
+         . = 0xFE0000; data/data_FE0000.o(.data);
+         . = 0xFFF000; data/data_FFF000.o(.data);
++        . = 0x1000000; *data_banim_ext.o(.data);
+     } = 0
+ 
+   /* Stabs debugging sections.  */
