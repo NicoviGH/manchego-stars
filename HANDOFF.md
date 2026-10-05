@@ -6,16 +6,17 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-05 (Claude): Trex fights as the Dino Dread Fighter in his own colours
-(#461, PR #463). **What landed and why is in `git log` and the ADRs it cites** -- this file
-keeps no "recently landed" list.
+Refreshed 2026-10-05 (Claude): Trex fights as the Dino Dread Fighter (#461, PR #463) and
+Messie has both busts (PR #464). **What landed and why is in `git log` and the ADRs it
+cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
 Nothing on a branch. **Next, in order:**
 
-1. **#26 — the rest of ch06:** Messie's portrait (generated, static bust) and his `art.map_sprite`
-   wiring, then the three cutscenes. The boarding pass still waits on the crews' voice (below).
+1. **#26 — the rest of ch06:** Messie's `art.map_sprite` wiring (Nicolas's `messie.png` /
+   `messie-mayor.png`), then the three cutscenes. His busts are on the Syrene (no hat) and
+   Gheb (mayor) face slots. The boarding pass still waits on the crews' voice (below).
 2. **#459 — roster parity with vanilla, chapter by chapter** (Nicolas wants vanilla's count and
    diversity, replacing ADR 0047's 16-18 budget). Derive vanilla's join table from the decomp first.
 
@@ -78,8 +79,8 @@ Nothing on a branch. **Next, in order:**
 - **Two sandbox false negatives on this Mac:** `gh auth status` reports the token invalid (a
   restricted process cannot read the Keychain — run `gh` with escalation); an mGBA AppKit abort
   before the ROM runs is the sandbox, not the ROM.
-- **GitHub Actions runners were down on 2026-10-05**: #463 merged on local verification
-  (build, `make check`, recordanim) with no CI run. Check the next PR's CI actually ran.
+- **GitHub Actions runners were down on 2026-10-05**: #463 and #464 merged on local
+  verification with no CI run. Check the next PR's CI actually ran.
 - **Merging:** the auto-mode classifier blocks `gh pr merge` until Nicolas says "merge" for that
   PR (2026-09-30, again 2026-10-04 on #458). When it blocks, stop and tell him.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions; Codex leaves an
