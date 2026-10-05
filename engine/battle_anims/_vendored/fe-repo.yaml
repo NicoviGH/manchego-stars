@@ -6,6 +6,9 @@ bonewalker:
     script: Sword with comments.txt
   unarmed:
     folder: Battle Animations/Monsters - Basic Types/[Skeleton-Base] [U] Bonewalker (one arm, sword) by Alexsplode/8. Unarmed
+dino-dread-fighter:
+  sword:
+    folder: Battle Animations/Infantry - (Swd) Myrms and Swordmasters/[Sword FE16 Custom] Dino Dread Fighter [U]/1. Sword
 goblin-spearman:
   lance:
     folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [M] Goblin Spearman by Battle of Wesnoth/2. Lance

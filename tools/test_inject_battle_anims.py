@@ -535,6 +535,34 @@ class TestRawPidBattleAnim(unittest.TestCase):
                              [s.tobytes() for s in edited['sheets']])
             self.assertEqual(json.load(open(edit))['edited'], {'1': '#f80808'})
 
+    def test_vendored_import_reads_frames_from_the_vendored_tree(self):
+        # `vendored: <name>/<mode>` reads txt + frames from engine/battle_anims/_vendored, the
+        # way an enemy class reskin's `source:` does, so a cast member can wear a vendored anim
+        # without a second copy of its frames; `palette_edit` stays under the campaign dir
+        # (it is this unit's look, not the asset's). Trex wears the Dino Dread Fighter (#461).
+        anim_dir = os.path.join(inject.decomp.REPO, 'campaigns', 'rime-of-the-frostmaiden',
+                                'battle_anims')
+        native = inject.battle_anims.build_unit_battle_anim(
+            {'clone_from': 'thief',
+             'import': {'vendored': 'dino-dread-fighter/sword', 'txt': 'Sword.txt'}},
+            anim_dir, 'trex', 'melee', 'sword')
+        edited = inject.battle_anims.build_unit_battle_anim(
+            {'clone_from': 'thief',
+             'import': {'vendored': 'dino-dread-fighter/sword', 'txt': 'Sword.txt',
+                        'palette_edit': 'trex/palette.json'}},
+            anim_dir, 'trex', 'melee', 'sword')
+        self.assertIn('banim_trex_script', native['motion_s'])
+        self.assertNotEqual(native['pal'], edited['pal'])
+        self.assertEqual([s.tobytes() for s in native['sheets']],
+                         [s.tobytes() for s in edited['sheets']])
+
+    def test_thief_donor_repoints_both_of_its_slots(self):
+        # CLASS_THIEF's AnimConf is SWORD + ITEM (data_banimconf.c AnimConf_088AF0A0); ITEM is
+        # the unarmed entry a Thief reaches holding only keys, so leaving it vanilla draws Colm.
+        donor_class, wtypes, _motion, _cadence = inject.battle_anims.BANIM_DONORS['thief']
+        self.assertEqual(donor_class, 'CLASS_THIEF')
+        self.assertEqual(sorted(wtypes), ['0x0100 | ITYPE_ITEM', '0x0100 | ITYPE_SWORD'])
+
     def test_a_missing_palette_edit_fails_the_build(self):
         # A typo'd path must stop the build, not silently ship the native colours -- the
         # whole point of the edit is that native was WRONG for this unit.

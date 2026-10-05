@@ -9,8 +9,8 @@ import banim_palette
 import feditor_to_banim
 import map_sprite_tool
 from inject.battle_anims import (
-    _class_field_symbol, append_banim_link_block, banim_append_row, banim_clone_conf,
-    banim_repoint_conf)
+    VENDORED_ANIM_DIR, _class_field_symbol, append_banim_link_block, banim_append_row,
+    banim_clone_conf, banim_repoint_conf)
 from inject.decomp import (
     _find_brace_block, _replace_brace_block, _table_close_line, REPO, vanilla_decomp_text)
 from inject.paths import (
@@ -442,7 +442,7 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
         return
     os.makedirs(BANIM_DATA_DIR, exist_ok=True)
     os.makedirs(BANIM_GFX_DIR, exist_ok=True)
-    vendored = os.path.join(REPO, 'engine', 'battle_anims', '_vendored')
+    vendored = VENDORED_ANIM_DIR
     derived = os.path.join(REPO, 'campaigns', campaign, 'battle_anims')
 
     for rk in reskins:

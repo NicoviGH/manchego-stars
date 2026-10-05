@@ -55,7 +55,8 @@ UNIT = {
     'art': ART,
     'map_sprite': {'base': ANY, 'credit': ANY, 'palette': ANY, 'recipe': ANY, 'source': ANY},
     'battle_anim': {'abbr': ANY, 'clone_from': ANY, 'frames': ANY,
-                    'import': {'frames_dir': ANY, 'palette_edit': ANY, 'txt': ANY}},
+                    'import': {'frames_dir': ANY, 'palette_edit': ANY, 'txt': ANY,
+                               'vendored': ANY}},
 }
 
 # A scene's fallback cut: its `script:` is the scene preview's to read.
