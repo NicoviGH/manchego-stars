@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 5/15] lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead
+Subject: [PATCH 5/16] lord select (#42): GetPid + force-deploy/Seize/game-over keyed to the chosen lead
 
 Lord select (#42), engine side: make the player-chosen lead real.
 

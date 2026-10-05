@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 11/15] banim (#183): casters pulse their signature colour on the wind-up charge beat
+Subject: [PATCH 11/16] banim (#183): casters pulse their signature colour on the wind-up charge beat
 
 Per-caster charge flash (#183): the caster's OWN battle sprite pulses toward a signature
 colour on the wind-up beat, WITHOUT altering the donor-matched animation script.

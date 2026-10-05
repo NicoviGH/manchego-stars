@@ -87,6 +87,30 @@ class StepCacheTest(unittest.TestCase):
 
         self.assertTrue(os.path.isfile(os.path.join(self.tree, 'data', 'banim', 'rows.s')))
 
+    def test_a_created_file_at_the_tree_root_comes_back(self):
+        """A scope root may be one FILE. The banim linker script sits at the decomp root, and a
+        hit that restored the anim rows without it linked against symbols nothing defined."""
+        script = os.path.join(self.tree, 'linker_script.txt')
+
+        def step():
+            self.runs.append('ran')
+            write(os.path.join(self.tree, 'data', 'shared.c'), 'anims bound\n')
+            write(script, 'graphics/banim/x.lz\n')
+
+        def cache():
+            return sc.StepCache(self.tree, self.store, 'k1', roots=('data', 'linker_script.txt'),
+                                scope_roots=('data', 'linker_script.txt'))
+
+        cache().run(step)
+        os.remove(script)
+        write(os.path.join(self.tree, 'data', 'shared.c'), 'from an earlier step\n')
+
+        outcome = cache().run(step)
+
+        self.assertTrue(outcome.hit)
+        self.assertEqual(self.runs, ['ran'])
+        self.assertEqual(read(script), b'graphics/banim/x.lz\n')
+
     # -- what makes a hit unsound -------------------------------------------
 
     def test_a_different_key_does_not_hit(self):

@@ -36,7 +36,10 @@ BANIMCONFUNK_C = os.path.join(DECOMP, 'src', 'data_banimconfunk.c')  # gUnitSpec
 
 BANIM_EKRBATTLE_H = os.path.join(DECOMP, 'include', 'ekrbattle.h')
 
-BANIM_LINKER = os.path.join(DECOMP, 'linker_script_banim.txt')
+# The compressing-linker script every battle anim WE add goes in. Engine patch 0016 links it as
+# its own object past vanilla's 16MB image; vanilla's linker_script_banim.txt is never written,
+# because vanilla's region (0xC02000-0xEE0000) has ~0.6MB to spare and ch06 filled it.
+BANIM_LINKER = os.path.join(DECOMP, 'linker_script_banim_ext.txt')
 
 BANIM_DATA_DIR = os.path.join(DECOMP, 'data', 'banim')
 

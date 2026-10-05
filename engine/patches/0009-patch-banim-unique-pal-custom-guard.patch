@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 9/15] banim (#206): the per-CHARACTER palette no longer overwrites a custom banim's own
+Subject: [PATCH 9/16] banim (#206): the per-CHARACTER palette no longer overwrites a custom banim's own
 
 Keep a custom unit's OWN palette against the per-CHARACTER override (#206).
 

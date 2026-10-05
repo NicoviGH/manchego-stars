@@ -1,5 +1,5 @@
 From: Manchego Stars engine
-Subject: [PATCH 13/15] Arena (#265): ArenaUi_Init selects optional campaign palette + chapter face
+Subject: [PATCH 13/16] Arena (#265): ArenaUi_Init selects optional campaign palette + chapter face
 
 Install the campaign-agnostic Arena presentation seam at the real init call site.
 

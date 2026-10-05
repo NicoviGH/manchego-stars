@@ -15,6 +15,19 @@ from inject.paths import (
     BANIMCONF_C, BANIMCONFUNK_C, CHARACTERS_C, CLASSES_C)
 
 
+
+def append_banim_link_block(label, block):
+    """Append one anim's assets to the ext compressing-linker script (engine patch 0016),
+    starting the script with its format header if this build has not written it yet.
+    restore_vanilla_sources deletes it, so every build writes it whole."""
+    new = not os.path.exists(BANIM_LINKER)
+    with open(BANIM_LINKER, 'a', encoding='utf-8') as f:
+        if new:
+            f.write('# Battle anims Manchego Stars adds, linked past the 16MB image (patch 0016)\n'
+                    '# Format: file|section>compression\n')
+        f.write('\n# Manchego Stars %s\n' % label)
+        f.write('\n'.join(block) + '\n')
+
 # Give a unit a custom battle anim from 1-3 static frames + the engine's effects, with
 # NO hand-drawn motion. ref_to_battleframe generates the assets (sheets + agbpal + motion.s)
 # cloning a donor class's timing; this injects them ADDITIVELY: append a banim_data[] row
@@ -462,9 +475,7 @@ def inject_battle_anims(campaign, verbose=True):
                     'data/banim/banim_%s_oam_r.bin.lz' % abbr,
                     'data/banim/banim_%s_motion.o|.data.script>lz' % abbr,
                     'data/banim/banim_%s_modes.bin' % abbr])
-        with open(BANIM_LINKER, 'a', encoding='utf-8') as f:
-            f.write('\n# Manchego Stars faked battle anim (#65): %s\n' % uid)
-            f.write('\n'.join(block) + '\n')
+        append_banim_link_block('faked battle anim (#65): %s' % uid, block)
 
         # 3. banim_data[] row -> new animId, plus its pointer externs
         with open(BANIM_DATA_C, encoding='utf-8') as f:
