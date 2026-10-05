@@ -581,6 +581,14 @@ PARITY_REFERENCE_UDEFS = {
                   'UnitDef_088BAEC0', 'UnitDef_088BAF10']),
     'FE8 Ch6': ('src/events_udefs.c',
                 ['UnitDef_088B61A8', 'UnitDef_088B64F0']),
+    # Ch7 and Ch8 (our ch07 / ch08 -- the twin is the chapter NUMBER, whatever map a chapter
+    # borrows; #459). Same rule: every array chN-eventscript.h loads whose RED units are armed.
+    # The rule reproduces the hand-curated Ch6 entry above exactly.
+    'FE8 Ch7': ('src/events_udefs.c', ['UnitDef_088B6F54']),
+    'FE8 Ch8': ('src/events_udefs.c',
+                ['UnitDef_088B73C8', 'UnitDef_088B77C4', 'UnitDef_088B7648',
+                 'UnitDef_088B7698', 'UnitDef_088B7964', 'UnitDef_088B798C',
+                 'UnitDef_088B79F0', 'UnitDef_088B79C8', 'UnitDef_088B7A54']),
 }
 
 # The decomp's own AI vector macros, read from the header the decomp COMPILES
@@ -992,7 +1000,7 @@ def _ally_combatant(char_enum, class_enum, weapon, level=None):
 # Eirika's route up to the last twin a hosted chapter is graded against. The vanilla party at
 # any of these is everybody recruited so far, which the decomp states chapter by chapter.
 VANILLA_CHAIN = ('FE8 Prologue', 'FE8 Ch1', 'FE8 Ch2', 'FE8 Ch3', 'FE8 Ch4', 'FE8 Ch5',
-                 'FE8 Ch6')
+                 'FE8 Ch6', 'FE8 Ch7', 'FE8 Ch8')
 
 # include/constants/characters.h: Eirika (0x01) to Tana (0x22) are the playable characters.
 # From 0x23 up are cutscene and creature-campaign copies (LYON_CC ...) and bosses.
@@ -2023,7 +2031,7 @@ def chapter_matchup(chap, campaign, mode=None):
     """The headline parity ratio (#430 step 2b): (our force vs our arriving party) /
     (the twin's force vs the twin's arriving party), threat and clear-load.
 
-    None for a twin off VANILLA_CHAIN (ch08 -> FE8 Ch13: vanilla's party there is not
+    None for a twin off VANILLA_CHAIN (vanilla's party there is not
     simulated), or when the exp model refuses to price our party -- the caller falls back
     to the fixed YARDSTICK and says so."""
     ref = chap.get('parity_reference')
@@ -2656,7 +2664,8 @@ def print_role_findings(chap, parity_ref, campaign=None):
 # battlefield-dynamics #171 extractors -- both read that chapter's event data from HEAD).
 PARITY_REFERENCE_STEM = {
     'FE8 Prologue': 'prologue', 'FE8 Ch1': 'ch1', 'FE8 Ch2': 'ch2', 'FE8 Ch3': 'ch3',
-    'FE8 Ch4': 'ch4', 'FE8 Ch5': 'ch5', 'FE8 Ch6': 'ch6', 'FE8 Ch13': 'ch13a',
+    'FE8 Ch4': 'ch4', 'FE8 Ch5': 'ch5', 'FE8 Ch6': 'ch6', 'FE8 Ch7': 'ch7',
+    'FE8 Ch8': 'ch8', 'FE8 Ch13': 'ch13a',
 }
 
 _ITEM_VALUES = None
