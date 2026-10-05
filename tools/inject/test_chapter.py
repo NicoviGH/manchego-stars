@@ -45,6 +45,10 @@ CLASS_RESKIN_FOE_WEAPON = {
     'CLASS_SHAMAN':    ['ITEM_DARK_FLUX'],
     'CLASS_MAGE':      ['ITEM_ANIMA_FIRE'],
     'CLASS_BAEL':      ['ITEM_MONSTER_VENINCLW'],
+    # Healers bench too: they cannot counter, so `recordenemy` wounds a neighbour and films the
+    # heal on the enemy phase instead (every standard AI action tries AiTryDoStaff first).
+    'CLASS_PRIEST':    ['ITEM_STAFF_MEND'],
+    'CLASS_TROUBADOUR': ['ITEM_STAFF_MEND'],
 }
 # The TESTCH sandbox's bench row. A tile at x=16 is not a tile at all on a 15-wide map, and
 # it shipped as one anyway: the strip was extended a slot at a time as creatures joined, and

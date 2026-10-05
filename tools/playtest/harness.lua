@@ -4545,7 +4545,6 @@ local function captureHeal(actorAddr, tag)
     return captureAttack(actorAddr, tag)
 end
 
-local TESTCH_PARK_TILE = { x = 24, y = 15 } -- empty far corner of the TESTCH sandbox's ch1 map
                                              -- (same corner CH01_PARK reuses later for the real ch01 seize)
 
 -- Defend/dodge capture (#191): ride out the enemy phase watching gProc_ekrBattle, screenshotting
@@ -4554,7 +4553,10 @@ local TESTCH_PARK_TILE = { x = 24, y = 15 } -- empty far corner of the TESTCH sa
 -- played and finished, or once control returns to the player with nothing having happened. The
 -- caller decides whether a miss here is fatal (it isn't -- best-effort).
 local function captureDefend(tag)
-    if not endTurn(TESTCH_PARK_TILE) then return false end
+    -- endTurn's own emptyTile(), read off the live map. A hardcoded corner, (24,15), outlived
+    -- the sandbox's move to the 15x10 snowfield and sent the cursor off the map, so every
+    -- defend capture since has failed quietly as "best-effort".
+    if not endTurn() then return false end
     if not waitFor(function() return faction() ~= 0 end, 300) then return false end
     return shootCombatFrames(tag, function() return faction() == 0 end)
 end
@@ -4857,7 +4859,45 @@ scenarios.recordenemy = function()
     -- picker, not the class.
     local fmin, fmax = unitAttackRange(foe)
     if not fmin then
-        return result("FAIL", "the chosen foe carries no weapon, so it can never counter")
+        -- A HEALER cannot counter, so bait it with a patient instead: move another foe next to
+        -- it at 1 HP and let the enemy phase play the heal (every standard AI action tries
+        -- AiTryDoStaff before anything else). Filmed with captureDefend's enemy-phase loop.
+        local patient
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) and r.addr ~= foe.addr then patient = r; break end
+        end
+        if not patient then
+            return result("FAIL", "the chosen foe cannot counter and has no ally to heal") end
+        local mw, mh = mapSize()
+        local spot
+        for _, d in ipairs({ { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 } }) do
+            local tx, ty = foe.x + d[1], foe.y + d[2]
+            if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
+                spot = { tx, ty }; break
+            end
+        end
+        if not spot then return result("FAIL", "no free tile beside the healer for its patient") end
+        local grid = mapUnitAt(patient.x, patient.y)
+        setMapUnit(patient.x, patient.y, 0)
+        emu:write8(patient.addr + 0x10, spot[1]); emu:write8(patient.addr + 0x11, spot[2])
+        setMapUnit(spot[1], spot[2], grid)
+        emu:write8(patient.addr + 0x13, 1)             -- 1 HP: well under any heal threshold
+        -- The heal must be the ONLY thing the enemy phase can do: the capture stops after the
+        -- first battle, and the first ch06 run filmed the 1-HP patient javelining Trex instead.
+        -- So every other foe, patient included, loses its inventory (Unit.items at +0x1E).
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) and r.addr ~= foe.addr then
+                for s = 0, 4 do emu:write16(r.addr + 0x1E + s * 2, 0) end
+            end
+        end
+        log(string.format("healer %s at (%d,%d): patient moved to (%d,%d) at 1 HP",
+            sel, foe.x, foe.y, spot[1], spot[2]))
+        shot(sel .. "-deploy")
+        local healed = captureDefend(sel); shot(sel .. "-after")
+        if not healed then return result("FAIL", "the enemy phase never played a battle anim") end
+        return result("PASS", string.format("%s heal captured (class 0x%X)", sel, want or 0))
     end
     local pl, plmn, plmx, dist
     for i = 0, 15 do

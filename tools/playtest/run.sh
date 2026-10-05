@@ -114,7 +114,8 @@
 #                    The sandbox benches ONE chapter's creatures (BENCH=chNN, default the
 #                    newest): one hostile of each reskin that chapter dresses plus each
 #                    RAW_PID_BATTLE_ANIMS unit it owns, under its OWN pid; a harmless player
-#                    baits the chosen foe into a counter-attack. Pick with
+#                    baits the chosen foe into a counter-attack (a HEALER instead gets a
+#                    1-HP patient beside it and heals on the enemy phase). Pick with
 #                    PT_CHAR=<reskin id|classid>, a creature of the benched chapter, e.g.:
 #                      make TESTCH=1 && PT_CHAR=shark-rider tools/playtest/run.sh recordenemy
 #                      tools/playtest/make_gif.py recordenemy shark-rider --name shark-anim
