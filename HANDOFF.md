@@ -6,17 +6,20 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-04 (Claude): #457 landed the shared reskin / harness-id / vendoring helpers
-(ADR 0327); ch06's merfolk reskins are next. **What landed and why is in `git log` and the ADRs
-it cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-05 (Claude): ch06's enemies are dressed (#460, ADR 0329) and our battle anims
+now link past the 16MB image (#458, ADR 0328). **What landed and why is in `git log` and the
+ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-Nothing on a branch. **Next: #26's merfolk reskins**, the first chapter built on #457:
-`fe_repo_vendor.py anim|sms` per asset (the sources are listed in `docs/fe-repo-scouting.md` →
-ch06), a `campaign.yaml` reskin per class with `dresses: {ch06: [...]}` and `slot_id` from 0x88.
-The **crab** is the one piece that needs Nicolas: the Spider Cavalier Rider is a literal spider and
-gets repainted, so render it and wait for his OK before committing (shark riders stay map-sprite only).
+Nothing on a branch. **Next, in order:**
+
+1. **#461 — Trex's battle anim.** He still fights as vanilla Colm. The issue has the plan (the
+   Lizardzerker's sword mode, recoloured onto his cast palette); render and GIF for Nicolas first.
+2. **#26 — the rest of ch06:** Messie's portrait (generated, static bust) and his `art.map_sprite`
+   wiring, then the three cutscenes. The boarding pass still waits on the crews' voice (below).
+3. **#459 — roster parity with vanilla, chapter by chapter** (Nicolas wants vanilla's count and
+   diversity, replacing ADR 0047's 16-18 budget). Derive vanilla's join table from the decomp first.
 
 - `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
@@ -31,8 +34,9 @@ gets repainted, so render it and wait for his OK before committing (shark riders
 
 ## Chapter work
 
-- **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). The
-  reskins and nerra's art need no dialogue and go first; the boarding pass waits on the crews' voice.
+- **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). Every
+  enemy is dressed (#460); Messie's bust and wiring need no dialogue and go next; the boarding
+  pass waits on the crews' voice.
 - **#335** — the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).
 
@@ -48,6 +52,11 @@ gets repainted, so render it and wait for his OK before committing (shark riders
   ch05 and ch06 read `level` alone and would silently emit one level for every body. A parity
   fix that splits a pack's levels there must first route the emitter through
   `inject.raw_pids.entry_body_levels` (#438 is the pattern: diff the emitted rows).
+- **The TESTCH bench seats ONE chapter's creatures** (`make TESTCH=1 BENCH=chNN`, the newest by
+  default; it was full at 14 tiles). `recordenemy` with no `PT_CHAR` films the first creature on
+  it, and a staff-only foe gets a 1-HP patient and is filmed healing on the enemy phase.
+- **The FE-Repo is not the whole community.** Search FEUniverse too before calling an asset
+  missing (`docs/fe-repo-scouting.md` says how): ch06's shark-rider anim was only there.
 - **A new `check_*` must ship a canary** in `tools/test_check_canaries.py` (ADR 0298;
   `check_every_gate_has_a_canary` enforces it). A canary doctors a real input at `open()` and
   names the fault; a file it doctors or reads to aim goes in `CANARY_FILES`.
@@ -71,8 +80,8 @@ gets repainted, so render it and wait for his OK before committing (shark riders
 - **Two sandbox false negatives on this Mac:** `gh auth status` reports the token invalid (a
   restricted process cannot read the Keychain — run `gh` with escalation); an mGBA AppKit abort
   before the ROM runs is the sandbox, not the ROM.
-- **Merging:** the auto-mode classifier blocked `gh pr merge` once on 2026-09-30 until Nicolas
-  said "merge and carry on"; after that it went through. If it blocks again, stop and tell him.
+- **Merging:** the auto-mode classifier blocks `gh pr merge` until Nicolas says "merge" for that
+  PR (2026-09-30, again 2026-10-04 on #458). When it blocks, stop and tell him.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions; Codex leaves an
   explicit HANDOFF entry (what changed, branch/PR state, verification run, exact next step).
   **One task at a time = a plain BRANCH in this tree**; worktrees only for concurrent workers.
