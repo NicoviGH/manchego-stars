@@ -16,8 +16,10 @@
 # BBOX CENTRE): dx = w_pose/2 - w_idle/2 - advance, dy = (h_pose - h_idle)/2 + lift.
 #   windup_a  advance  8   the surge starts, the axe goes up
 #   windup_b  advance 30   same art, further across
-#   hit       advance 67   the blade (~18px in from the pose's front edge at this size) on x≈73,
-#                          the foe's near edge measured off Lupin and Pinky (see baxby/poses.yaml)
+#   hit       advance 51   the pose's FRONT edge (the splash and the shark's nose, which lead the
+#                          blade) on x≈70, between Baxby's hit (67) and Lupin's (74). Solving for the
+#                          blade on x≈73 instead put the front at 54, deep into the foe (Nicolas,
+#                          2026-10-05: "the hit is what's too far")
 #   dodge     advance -20  the idle art backed off
 #     python3 tools/poses_to_feditor.py campaigns/rime-of-the-frostmaiden/battle_anims/shark-rider
 
@@ -37,5 +39,5 @@ poses:
   - {name: idle,     src: .src/1_idle.png,   dx:   0,  dy:  0}
   - {name: windup_a, src: .src/2_windup.png, dx:  -7,  dy:  3}
   - {name: windup_b, src: .src/2_windup.png, dx: -29,  dy:  3}
-  - {name: hit,      src: .src/3_hit.png,    dx: -67,  dy: -1}
+  - {name: hit,      src: .src/3_hit.png,    dx: -51,  dy: -1}
   - {name: dodge,    src: .src/1_idle.png,   dx:  20,  dy:  0}
