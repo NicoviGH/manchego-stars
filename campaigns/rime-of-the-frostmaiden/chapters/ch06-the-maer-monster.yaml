@@ -218,8 +218,8 @@ deployment:
 #
 # ART (decided 2026-08-29, Nicolas): the merfolk carry lance/bow/staff/magic on Stephano's
 # Mermaid anim, which ships no sword and no axe -- so the axe block rides the Shark Rider
-# map sprite with a regular axe anim, the mounted and sword blocks ride a spider-rider
-# repainted as a crab, the Knights are the IronShell General (the one armour anim that
+# map sprite with our own posed shark anim (no shark anim exists to vendor), the mounted and
+# sword blocks ride a spider-rider repainted as a crab, the Knights are the IronShell General (the one armour anim that
 # carries a LANCE), and vanilla's Troubadour stays a Troubadour on the Lamia, whose serpent
 # body IS the mount. Sprite size is a declared field, not a constraint -- `frame:` in
 # `campaign.yaml` -> `enemy_class_reskins` sets the wait-row size flag, as ch01's 16x32 Fire
@@ -335,8 +335,8 @@ enemy_units:
     positions: [[7, 16]]
     donor: [16, 9]                  # vanilla L6 fighter
     skin:
-      look: "merfolk on a shark, boarding axe"
-      source: "FE-Repo: Map Sprites/Mounted - Dismounted, Monsters, Misc/Shark Rider (M) {N426}, 16x16 (stand+walk); NO battle anim exists -- vanilla Fighter frames, repalletted"
+      look: "a raider on a shark, boarding axe -- human-looking, as the map sprite draws him"
+      source: "FE-Repo: Map Sprites/Mounted - Dismounted, Monsters, Misc/Shark Rider (M) {N426}, 16x16 (stand+walk); battle anim is OURS (no shark anim exists in the FE-Repo): Gemini poses, battle_anims/shark-rider"
   - id: shark-rider-steel
     ai_override:
       ai: '{0x8, 0x3, 0x0, 0x0}'   # AI_A_08 ActionInRange_ExceptCivilian + AI_B_03 NeverMove
@@ -361,7 +361,7 @@ enemy_units:
     damage_type: slashing
     positions: [[16, 15]]
     donor: [15, 15]                 # vanilla L6 fighter
-    skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
+    skin: {look: "a raider on a shark", source: "as shark-rider-poison"}
   - id: shark-rider-halberd
     name: "Shark Rider"
     count: 1
@@ -378,7 +378,7 @@ enemy_units:
     damage_type: slashing
     positions: [[15, 16]]
     donor: [13, 6]                  # vanilla L5 fighter
-    skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
+    skin: {look: "a raider on a shark", source: "as shark-rider-poison"}
 
   # ── The mounted block (vanilla's 3 Cavaliers) → crab-riders ──────────────────
   - id: crab-rider-blade

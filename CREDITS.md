@@ -53,6 +53,10 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | `[Skeleton-Base] Bonewalker (one arm, sword)` battle animation | ch05's `crypt-blade` — VENDORED + WIRED (#25), in its native palette. Paired with the matching One Arm map sprite so the field and the close-up are the same body. Deliberately NOT the Specter, which is Sahnar's, so the named recruit does not read as one of the line | **IS** (vanilla skeleton); **Alexsplode** (one-arm edit) | F2U/F2E |
 | `[Skeleton-Reskin] Wight Sniper` battle animation (bow) | ch05's `bone-archer` — VENDORED + WIRED (#25), in its native palette. Ships no unarmed mode, so the bow anim takes the unarmed weapon-type as well; without that an archer holding nothing falls back to the vanilla LIVING archer | **DATonDemand** | F2U/F2E |
 | `Bonewalker (U)` map sprites — Lance, Axe, One Arm, Wight Bow (stand + walk) | ch05's four risen tomb-guard classes on the map (#25). Normalised to one palette index per distinct colour before vendoring: the Axe walk sheet spent 20 indices on 14 colours and the One Arm pair shipped RGBA, both of which the build's guards reject. Remapped onto each base class's SMS palette at build time, so the enemy faction palette colours them | **Epicer** (Lance); **Snerdels** (Axe); **IS** (One Arm, Wight Bow) | F2U/F2E |
+| `[Monster-Custom] [F] Mermaid` battle animation — the `(Bra)` modes: Lance, Bow, Staff, Magic (5 and 6) | ch06's five merfolk line classes (spear, archer, priest, mage, shaman, Nerra included) — VENDORED + WIRED (#26), native palette. Her own Unarmed mode attacks without arming a hit, which our import guard refuses, so each class's weapon anim also covers holding nothing | **Wayforward** (character design); **Stephano** (port) | — |
+| `[Monster-Custom] [U] Lamia` battle animation (staff, unarmed) | ch06's `lamia-mender` (Troubadour reskin) — VENDORED + WIRED (#26), native palette | **L95** (animation); **Zoramine Fae** (script) | F2U/F2E |
+| `[General-Variant] IronShell-Tiny General` battle animation (lance, unarmed) | ch06's `ironshell` Knights — VENDORED + WIRED (#26), native palette | **IS** (vanilla General); **Alexsplode** (IronShell anim + script) | F2U/F2E |
+| `Mermaid (F)`, `Shark Rider (M)`, `General (U) IronShell_Tiny`, `Lamia (F)` map sprites (stand + walk) | ch06's merfolk, shark riders, Knights and Lamia on the map (#26); remapped onto each base class's SMS palette, so the enemy faction palette colours them | **N426** (Mermaid, Shark Rider); **Alexsplode** (IronShell); **Dutch Introvert** (Lamia) | no tag in filename — recheck before distribution |
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
 ## Pokémon-sourced assets (adopted sprite art)
@@ -131,6 +135,10 @@ whose `RearUp`/`Attack`/`Charge` supply the three poses `inject_battle_anims` ne
   arranged into the pounce by `tools/poses_to_feditor.py`. **His spectacles are hand-painted by Nicolas at
   FE8 scale** (`tools/banim_paint.py`) — they are ~4x3 px after the shrink and no generated pass carries
   them. Disclose as AI-assisted.
+- **ch06 shark rider BATTLE ANIM** (`campaigns/.../battle_anims/shark-rider/`) — three poses (idle /
+  windup / action) generated with Google **Gemini** (prompt-run by Nicolas, 2026-10-05) from the
+  `Shark Rider (M) {N426}` map sprite and Baxby's pose sheet; background and ground shadows keyed out,
+  downscaled and arranged into the lunge by `tools/poses_to_feditor.py`. Disclose as AI-assisted.
 - **Tour drawn-map A** (`events/tour-map-a-dale.*`) is a Gemini repaint of the book's regional Icewind Dale map (Magvel-style restyle, prompt-run by Nicolas), then converted/re-lettered by `tools/gen_drawnmap.py`.
 
 ## Our work

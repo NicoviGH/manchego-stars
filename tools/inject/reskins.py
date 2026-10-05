@@ -422,6 +422,9 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
     campaign.yaml (on a reskin entry):
         battle_anim:
           source: wildling               # dir under engine/battle_anims/_vendored/
+          derived: false                 # true: dir under campaigns/<c>/battle_anims/ instead --
+                                         # an anim WE built (Gemini poses, poses_to_feditor), which
+                                         # fe_repo_vendor's manifest must never claim as vendored
           weapons:                        # one per weapon-mode the donor AnimConf keys
             - {dir: axe,     txt: Axe.txt,     abbr: kgru_ax, wtypes: ["0x0100 | ITYPE_AXE"]}
             - {dir: handaxe, txt: Handaxe.txt, abbr: kgru_ha,
@@ -440,10 +443,11 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
     os.makedirs(BANIM_DATA_DIR, exist_ok=True)
     os.makedirs(BANIM_GFX_DIR, exist_ok=True)
     vendored = os.path.join(REPO, 'engine', 'battle_anims', '_vendored')
+    derived = os.path.join(REPO, 'campaigns', campaign, 'battle_anims')
 
     for rk in reskins:
         ba = rk['battle_anim']
-        src_dir = os.path.join(vendored, ba['source'])
+        src_dir = os.path.join(derived if ba.get('derived') else vendored, ba['source'])
         weapons = ba['weapons']
         # Optional enemy-faction palette pass: a community anim ships its NATIVE (often
         # ally-blue) palette, but a reskin is always hostile, so recolour to the enemy ramp
