@@ -6,9 +6,7 @@
 # vanilla Thief CLASS data (data_classes.c [CLASS_THIEF - 1], verbatim) -- the same
 # class-generic-data-in-YAML / personal-donor-growths-at-build-time split every other cast
 # member uses (STAT_DONOR in build_campaign.py pulls Colm's actual personal growths at
-# injection time; this file is the pre-wiring design record, not the final in-ROM numbers).
-# NOT yet wired into build_campaign (inert until the recruit wiring lands: free slot + recruit
-# logic + portrait + map sprite + a STAT_DONOR entry).
+# injection time; the in-ROM numbers are Colm's, via STAT_DONOR).
 
 id: trex
 name: Trex
@@ -108,5 +106,27 @@ art:
     weapon: donor-axe          # the Lizard Wildling carries an axe; cosmetic only (Trex steals as a Thief)
     todo:                      # not yet applied (rides a later pass / pixel editor)
       - swept-back horns + small cosmetic wings (the "winged kobold" tell; distinguishes Trex from the grunts)
-    note: >                    # renders in-engine once Trex is a DEPLOYED unit (recruit wiring, #23) -- the
-      map-sprite override (inject_map_sprites) keys off his cast character slot, which lands with that wiring.
+  battle_anim:                # VENDORED 2026-10-05 (#461). Provenance only -- the `battle_anim:` block
+                              # at the bottom of this file is what the injector reads.
+    source: "[Sword FE16 Custom] Dino Dread Fighter [U] — FE-Repo Battle Animations/Infantry - (Swd) Myrms and Swordmasters/1. Sword"
+    vendored: engine/battle_anims/_vendored/dino-dread-fighter/sword/
+    why: >                    # Nicolas's pick over the Lizardzerker (a greatsword, wrong for a Thief)
+      and the Thief-reskin Goblin (right motion, a goblin's head): a red-scaled reptile with a
+      short curved blade, the only FE-Repo anim that already reads as Trex.
+    palette: battle_anims/trex/palette.json   # by hand (tools/banim_palette.py): the salmon scales
+                              # onto his bust's crimson, the gold armour onto his brown LEATHER
+                              # coat (indices 5-8 / 10,12,13). Steel, sash, crest and outline stay native.
+                              # His gold eye is not reachable: it is drawn in the outline index.
+    credit: "Nuramon (animation), Seliost1 (dino variant), FE-Repo, F2U/F2E; see CREDITS.md"
+
+# ── Battle anim (the block the injector reads) ───────────────────────────────
+# IMPORTED, not faked: a complete FE-native sword script, read straight out of the vendored tree
+# (`vendored:`), so the frames exist once. clone_from: thief gives the SWORD + ITEM slots bound
+# per-CHARACTER via _u25, so CLASS_THIEF and Colm stay byte-vanilla.
+battle_anim:
+  clone_from: thief
+  abbr: trex
+  import:
+    vendored: dino-dread-fighter/sword
+    txt: Sword.txt
+    palette_edit: trex/palette.json

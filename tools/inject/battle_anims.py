@@ -14,6 +14,8 @@ from inject.paths import (
     BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_LINKER, BANIM_POINTER_H,
     BANIMCONF_C, BANIMCONFUNK_C, CHARACTERS_C, CLASSES_C)
 
+VENDORED_ANIM_DIR = os.path.join(REPO, 'engine', 'battle_anims', '_vendored')
+
 
 
 def append_banim_link_block(label, block):
@@ -98,6 +100,11 @@ BANIM_DONORS = {
     # reachable the moment both her swords break and she is carrying only a Vulnerary. Left
     # vanilla it draws a HUMAN MYRMIDON instead of the revenant, which is the cavalier row's
     # #206 defect exactly. Caught on review, not in play (#25).
+    # Trex (#461) -- an IMPORTED Dino Dread Fighter sword script, so motion/cadence go unused
+    # for him, exactly as on the myrmidon row. CLASS_THIEF's AnimConf is SWORD + ITEM, and ITEM
+    # is the unarmed entry a Thief reaches holding only his keys: left vanilla it draws Colm.
+    'thief': ('CLASS_THIEF', ['0x0100 | ITYPE_SWORD', '0x0100 | ITYPE_ITEM'],
+              'melee', 'sword'),
     'myrmidon': ('CLASS_MYRMIDON', ['0x0100 | ITYPE_SWORD', '0x0100 | ITYPE_ITEM'],
                  'melee', 'sword'),
     # The white moose (#25) -- ch05's cornered miniboss, and the first BEAST to fight in a
@@ -132,13 +139,21 @@ def build_unit_battle_anim(cfg, anim_dir, abbr, motion, cadence):
       The class path's `recolor:` names a FUNCTION for that; a character's look is a by-eye
       call, so this names a FILE instead. Either way it recolours the agbpal ONLY -- the sheet
       indices are untouched, so an edit is reversible and never a re-import (#25).
+      Optional `vendored: <name>/<mode>` -- read txt + frames from
+      engine/battle_anims/_vendored (what tools/fe_repo_vendor.py writes) instead of the
+      campaign dir, so a cast member can wear a vendored anim without a second copy (#461).
     - else `frames: [...]` -> the faked 3-pose generator (ref_to_battleframe, #65), whose mode
       bodies are built from the donor's `motion`/`cadence`.
     """
     imp = cfg.get('import')
     if imp:
-        txt = os.path.join(anim_dir, imp['txt'])
-        frames_dir = os.path.join(anim_dir, imp.get('frames_dir')
+        # `vendored: <name>/<mode>` roots txt + frames in engine/battle_anims/_vendored, as an
+        # enemy class reskin's `source:` does -- a cast member wearing a vendored anim needs no
+        # second copy of its frames. `palette_edit` stays under anim_dir: it is the unit's look.
+        src_dir = (os.path.join(VENDORED_ANIM_DIR, imp['vendored']) if imp.get('vendored')
+                   else anim_dir)
+        txt = os.path.join(src_dir, imp['txt'])
+        frames_dir = os.path.join(src_dir, imp.get('frames_dir')
                                   or os.path.dirname(imp['txt']))
         recolor = (banim_palette.load_recolor(os.path.join(anim_dir, imp['palette_edit']))
                    if imp.get('palette_edit') else None)
