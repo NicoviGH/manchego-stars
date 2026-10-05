@@ -4803,11 +4803,11 @@ end
 
 -- RECORDENEMY (#90): capture a reskinned ENEMY class's battle anim on the SAME TESTCH sandbox
 -- the PC cast is captured on (`recordanim`) -- one bench for every battle animation, no
--- chapter-specific boot. inject_test_chapter deploys one hostile of each enemy_class_reskins
--- slot as a foe; the money shot is the ATTACK swing, which a defender never plays, so a HARMLESS
+-- chapter-specific boot. inject_test_chapter deploys one hostile of each reskin ONE chapter
+-- dresses (BENCH=chNN at build time, default the newest; the bench holds one chapter); the money shot is the ATTACK swing, which a defender never plays, so a HARMLESS
 -- (pow 0) player attacks the chosen foe at melee -> it survives and COUNTER-attacks, and
 -- captureAttack shoots the whole battle. Needs `make TESTCH=1`. Pick the foe with PT_CHAR
--- (default kobold-grunt) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
+-- (default kobold-grunt, which needs BENCH=ch03) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
 -- symbols.lua from the built classes.h) maps it to the class id it was built as.
 -- Named RAW-PID creatures are picked by CHARACTER, not by class (the table lives inside the
 -- scenario: this chunk is at the 200-local ceiling). Their anim binds through CharacterData
@@ -4846,7 +4846,7 @@ scenarios.recordenemy = function()
     end
     if not foe then
         return result("FAIL", string.format(
-            "no live foe %s in the sandbox (build with `make TESTCH=1`)",
+            "no live foe %s in the sandbox (build with `make TESTCH=1 BENCH=<its chapter>`)",
             wantPid and string.format("with pid 0x%X", wantPid)
                     or string.format("of class 0x%X", want))) end
     -- A bait whose reach OVERLAPS THE FOE'S, which is not always a melee one. A bow cannot
@@ -9468,7 +9468,7 @@ end
 --
 -- CONTENTION for the door -- two units wanting the same single tile -- does NOT exist on
 -- normal, where the only pursuers are these two and they want different hulls. It exists on
--- DIFFICULT, whose turn-4 crab-rider trio also pursues from the west edge. Declared cases
+-- DIFFICULT, whose turn-4 cavalry trio also pursues from the west edge. Declared cases
 -- run on normal, so that arm is not covered here and is not claimed to be.
 scenarios.ch06clock = function()
     local CH06 = dofile(PLAYTEST_DIR .. "/ch06.lua")     -- ch06's shared facts (#314)

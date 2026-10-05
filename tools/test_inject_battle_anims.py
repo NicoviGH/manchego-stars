@@ -265,7 +265,7 @@ class TestRawPidBattleAnim(unittest.TestCase):
         # moose's anim binds per-CHARACTER through _u25 -- so a Gwyllgi deployed under the
         # generic 0x80 monster charIndex plays the stock HOUND, and the bench would prove the
         # opposite of what it was run for. Its foe row must carry charIndex 0xb9.
-        body = inject.test_chapter._sandbox_foe_roster('rime-of-the-frostmaiden')
+        body = inject.test_chapter._sandbox_foe_roster('rime-of-the-frostmaiden', 'ch05')
         self.assertIn('.charIndex = 0xb9,', body)
         moose = [b for b in body.split('    {') if '0xb9' in b]
         self.assertEqual(len(moose), 1, 'expected exactly one moose foe row')
@@ -273,12 +273,22 @@ class TestRawPidBattleAnim(unittest.TestCase):
         self.assertIn('ITEM_MONSTER_FIREFANG', moose[0])    # the slot its anim repoints
         self.assertNotIn('.autolevel', moose[0])            # a named miniboss, not generic trash
 
-    def test_the_sandbox_still_benches_every_reskin_class(self):
+    def test_every_chapter_benches_every_reskin_it_dresses(self):
         # Regression: adding the moose must not push a reskin off the end of the position list.
-        body = inject.test_chapter._sandbox_foe_roster('rime-of-the-frostmaiden')
-        for reskin in inject.reskins.enemy_class_reskins('rime-of-the-frostmaiden'):
-            if inject.test_chapter.CLASS_RESKIN_FOE_WEAPON.get(reskin['base']):
-                self.assertIn(reskin['slot'], body)
+        # The bench seats one chapter at a time, so every chapter's bench is checked.
+        campaign = 'rime-of-the-frostmaiden'
+        for ch in inject.test_chapter.bench_chapters(campaign):
+            body = inject.test_chapter._sandbox_foe_roster(campaign, ch)
+            for reskin in inject.reskins.enemy_class_reskins(campaign):
+                if (ch in (reskin.get('dresses') or {})
+                        and inject.test_chapter.CLASS_RESKIN_FOE_WEAPON.get(reskin['base'])):
+                    self.assertIn(reskin['slot'], body, ch)
+
+    def test_the_default_bench_is_the_newest_chapter(self):
+        campaign = 'rime-of-the-frostmaiden'
+        newest = inject.test_chapter.bench_chapters(campaign)[-1]
+        self.assertEqual(inject.test_chapter._sandbox_foe_roster(campaign),
+                         inject.test_chapter._sandbox_foe_roster(campaign, newest))
 
     def test_every_bench_tile_is_actually_on_the_sandbox_map(self):
         # The strip shipped with a seventh tile at x=16 on a 15-wide map. `_next_sandbox_tile`
@@ -348,15 +358,19 @@ class TestRawPidBattleAnim(unittest.TestCase):
                              'bench seat %s is adjacent to a player spawn' % (f,))
 
     def test_the_bench_seats_every_creature_that_needs_one(self):
-        # The count that must not silently overflow: one tile per weapon-carrying reskin plus
-        # one per raw-pid creature. Ravisin taking the sixth is what pushed the moose off.
+        # The count that must not silently overflow, per chapter (the bench seats one): one
+        # tile per weapon-carrying reskin it dresses plus one per raw-pid creature it owns.
+        # Ravisin taking the sixth is what pushed the moose off.
         campaign = 'rime-of-the-frostmaiden'
-        reskins = sum(1 for r in inject.reskins.enemy_class_reskins(campaign)
-                      if inject.test_chapter.CLASS_RESKIN_FOE_WEAPON.get(r['base']))
-        raw = sum(1 for uid, (ch, pid) in inject.cast.RAW_PID_BATTLE_ANIMS.items()
-                  if inject.cast._chapter_unit(campaign, ch, uid).get('battle_anim'))
-        self.assertLessEqual(reskins + raw, len(inject.test_chapter.SANDBOX_FOE_POSITIONS),
-                             'the bench is over-subscribed; add a tile (on the map)')
+        for ch in inject.test_chapter.bench_chapters(campaign):
+            reskins = sum(1 for r in inject.reskins.enemy_class_reskins(campaign)
+                          if ch in (r.get('dresses') or {})
+                          and inject.test_chapter.CLASS_RESKIN_FOE_WEAPON.get(r['base']))
+            raw = sum(1 for uid, (yml, pid) in inject.cast.RAW_PID_BATTLE_ANIMS.items()
+                      if yml.startswith(ch + '-')
+                      and inject.cast._chapter_unit(campaign, yml, uid).get('battle_anim'))
+            self.assertLessEqual(reskins + raw, len(inject.test_chapter.SANDBOX_FOE_POSITIONS),
+                                 '%s over-subscribes the bench; add a tile (on the map)' % ch)
 
     def test_the_moose_name_spends_no_donor(self):
         # The kobolds' #90 rule, one namespace over: append your own id rather than burn a

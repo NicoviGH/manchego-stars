@@ -56,6 +56,7 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | `[Monster-Custom] [F] Mermaid` battle animation — the `(Bra)` modes: Lance, Bow, Staff, Magic (5 and 6) | ch06's five merfolk line classes (spear, archer, priest, mage, shaman, Nerra included) — VENDORED + WIRED (#26), native palette. Her own Unarmed mode attacks without arming a hit, which our import guard refuses, so each class's weapon anim also covers holding nothing | **Wayforward** (character design); **Stephano** (port) | — |
 | `[Monster-Custom] [U] Lamia` battle animation (staff, unarmed) | ch06's `lamia-mender` (Troubadour reskin) — VENDORED + WIRED (#26), native palette | **L95** (animation); **Zoramine Fae** (script) | F2U/F2E |
 | `[General-Variant] IronShell-Tiny General` battle animation (lance, unarmed) | ch06's `ironshell` Knights — VENDORED + WIRED (#26), native palette | **IS** (vanilla General); **Alexsplode** (IronShell anim + script) | F2U/F2E |
+| `Shark Rider` battle animation (trident, unarmed) — FEUniverse, not the FE-Repo ([t/6943 post 40](https://feuniverse.us/t/6943/40)) | ch06's cavalry `shark-rider` (Cavalier reskin) — VENDORED + WIRED (#26), native palette. Same artist as the map sprite, so the field and the close-up match. The trident plays for lances and swords alike | **N426** | F2U (thread: "all free to edit/use") |
 | `Mermaid (F)`, `Shark Rider (M)`, `General (U) IronShell_Tiny`, `Lamia (F)` map sprites (stand + walk) | ch06's merfolk, shark riders, Knights and Lamia on the map (#26); remapped onto each base class's SMS palette, so the enemy faction palette colours them | **N426** (Mermaid, Shark Rider); **Alexsplode** (IronShell); **Dutch Introvert** (Lamia) | no tag in filename — recheck before distribution |
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
@@ -135,10 +136,6 @@ whose `RearUp`/`Attack`/`Charge` supply the three poses `inject_battle_anims` ne
   arranged into the pounce by `tools/poses_to_feditor.py`. **His spectacles are hand-painted by Nicolas at
   FE8 scale** (`tools/banim_paint.py`) — they are ~4x3 px after the shrink and no generated pass carries
   them. Disclose as AI-assisted.
-- **ch06 shark rider BATTLE ANIM** (`campaigns/.../battle_anims/shark-rider/`) — three poses (idle /
-  windup / action) generated with Google **Gemini** (prompt-run by Nicolas, 2026-10-05) from the
-  `Shark Rider (M) {N426}` map sprite and Baxby's pose sheet; background and ground shadows keyed out,
-  downscaled and arranged into the lunge by `tools/poses_to_feditor.py`. Disclose as AI-assisted.
 - **Tour drawn-map A** (`events/tour-map-a-dale.*`) is a Gemini repaint of the book's regional Icewind Dale map (Magvel-style restyle, prompt-run by Nicolas), then converted/re-lettered by `tools/gen_drawnmap.py`.
 
 ## Our work

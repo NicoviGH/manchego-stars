@@ -46,9 +46,10 @@ class ItemDropIsCarriedOnce(unittest.TestCase):
 
     def test_every_dropper_matches_its_vanilla_donors_item_count(self):
         """The check that would have caught it: our row against the donor unit it is derived
-        from. Vanilla's three ch06 droppers carry 2 / 1 / 2 items."""
+        from. Vanilla's three ch06 droppers carry 2 / 1 / 2 items; ADR 0329's re-classed
+        Mercenary carries one more, the Steel Lance it now fights with, ahead of the drop."""
         chap = inject.hosting._load_chapter_yaml(self.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
-        expected = {'shark-rider-halberd': 2, 'merfolk-blade-drop': 1, 'lamia-mender': 2}
+        expected = {'shark-rider-halberd': 2, 'merfolk-trident-drop': 2, 'lamia-mender': 2}
         rows = inject.chapters.ch06.ch06_enemy_rows(chap)
         for enemy_id, count in expected.items():
             row = next(r for r in rows if '/* %s --' % enemy_id in r)

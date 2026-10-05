@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-328 decisions. Read this index, then open the two or three you need — the whole
+329 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -193,6 +193,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0324` | [The role check reads both forces against our party](decisions/0324-the-role-check-reads-both-forces-against-our-party.md) | 2026-10-03 | #430 |
 | `0325` | [Ravisin holds Saar's party-rounds](decisions/0325-ravisin-holds-saars-party-rounds.md) | 2026-10-03 | #430 |
 | `0326` | [A chapter may carry an accepted party residual](decisions/0326-a-chapter-may-carry-an-accepted-party-residual.md) | 2026-10-03 | #430 |
+| `0329` | [ch06's axe and sword blocks carry tridents](decisions/0329-ch06-s-axe-and-sword-blocks-carry-tridents.md) | 2026-10-05 | #26 |
 
 ---
 

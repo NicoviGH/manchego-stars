@@ -45,7 +45,7 @@ class RescueTargetsHaveOnlyTheirDeclaredClock(unittest.TestCase):
     def test_a_pursuer_that_is_not_declared_is_still_reported(self):
         """A pursuer walks to the hull over several turns, which is a clock -- but an
         UNdeclared one is a second clock nobody costed."""
-        found = run([('crab-rider-hard-lance', PURSUER)])
+        found = run([('shark-rider-hard-lance', PURSUER)])
         self.assertEqual(len(found), 1, found)
 
     def test_nothing_reaching_a_hull_is_clean(self):

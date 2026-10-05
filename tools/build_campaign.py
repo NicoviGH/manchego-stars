@@ -85,6 +85,9 @@ def parse_args(argv=None):
                          'Preparations, the join and Sahnar\'s monologue -- ~52 A-presses of '
                          'already-approved footage -- so iterating on a late beat costs a '
                          'BUILD and not a playthrough.')
+    ap.add_argument('--bench', default=None, metavar='chNN',
+                    help='with --test-chapter: the chapter whose creatures the sandbox benches '
+                         'for `recordenemy` (default: the newest). The bench seats one chapter.')
     ap.add_argument('--ch05-ending', choices=CH05_ENDING_ARMS, default=None,
                     help='DEBUG build (#25): with --ch05-boot, New Game lands straight on the '
                          'ENDING in the named roster state -- `full` (Basil alive, Sahnar '
@@ -121,7 +124,8 @@ def parse_args(argv=None):
                         'CH03BOOT': args.ch03_boot,
                         'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot,
                         'CH05LUPIN': args.ch05_lupin, 'CH05MOOSE': args.ch05_moose,
-                        'CH05ENDING': args.ch05_ending, 'CH06BOOT': args.ch06_boot}
+                        'CH05ENDING': args.ch05_ending, 'CH06BOOT': args.ch06_boot,
+                        'BENCH': args.bench}
     if args.lord_boot:
         args.test_chapter = True  # the fast-boot rides the sandbox
     # Each fast-boot repoints New Game at its own slot, so at most one may win. Named

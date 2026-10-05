@@ -873,10 +873,12 @@ class MirrorShareOnRealChapters(unittest.TestCase):
         chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.hosting.chapter_yaml_for(ch))
         return df.mirror_share(chap)
 
-    def test_ch06_reproduces_its_twin_exactly(self):
-        # ch06 IS vanilla Ch6's 27-unit force, re-sited. This is the number that makes its
-        # x1.00 legible as a copy (#367).
-        self.assertEqual(self._mirror('ch06')['pct'], 100.0)
+    def test_ch06_reproduces_its_twin_but_the_declared_reclass(self):
+        # ch06 is vanilla Ch6's 27-unit force, re-sited, less the five units ADR 0329
+        # re-classes onto tridents. This is the number that makes its parity legible as a
+        # near-copy (#367), and the five it is short are exactly the declared divergence.
+        m = self._mirror('ch06')
+        self.assertEqual((m['shared'], m['pct']), (22, 100.0 * 22 / 27))
 
     def test_a_composed_chapter_reads_well_under_a_copy(self):
         # ch01 fields ten units against a ten-unit twin and mirrors three of them.
@@ -890,7 +892,7 @@ class MirrorInTheCurveReport(unittest.TestCase):
                     for r in df.curve_report('rime-of-the-frostmaiden')}
 
     def test_every_row_carries_its_mirror_share(self):
-        self.assertEqual(self._rows()['CH6']['mirror']['pct'], 100.0)
+        self.assertAlmostEqual(self._rows()['CH6']['mirror']['pct'], 100.0 * 22 / 27)
 
     def test_the_curve_prints_mirror_beside_the_parity_ratio(self):
         out = io.StringIO()
@@ -899,7 +901,7 @@ class MirrorInTheCurveReport(unittest.TestCase):
         text = out.getvalue()
         self.assertIn('mirror', text)
         ch06_row = [l for l in text.splitlines() if 'ch06' in l][0]
-        self.assertIn('100%', ch06_row)
+        self.assertIn('81%', ch06_row)
 
 
 class MirrorIsModeInvariant(unittest.TestCase):
@@ -1473,15 +1475,16 @@ class MetricsOverTheDice(unittest.TestCase):
 
     def test_marty_ch06_durability_averages_past_its_median_line(self):
         # ADR 0310's measurement: a minority of careers clear a doubling threshold, and they
-        # move the average. Read as the cartridge rolls (2RN hit, crit; ADR 0314): ~1.55
-        # rounds over the dice, 1.18 on the median line.
+        # move the average. Read as the cartridge rolls (2RN hit, crit; ADR 0314): ~2.08
+        # rounds over the dice, 2.00 on the median line. (1.55 / 1.18 before ADR 0329 put
+        # tridents in the hands of vanilla's Fighters, the line's heaviest hitters on him.)
         chap, roster, line, bosses, _cap, _ = df.load_field(CAMPAIGN, 'ch06', leveled=True)
         marty = next(u for u in roster if u.name == 'marty')
-        self.assertAlmostEqual(df.durability(marty, line), 1.18, places=2)
+        self.assertAlmostEqual(df.durability(marty, line), 2.00, places=2)
         careers = df.arriving_careers(CAMPAIGN, 'ch06')['marty']
         avg, bad = df.spread(df.dice_profile(careers, line, bosses)['open'])
-        self.assertAlmostEqual(avg, 1.55, delta=0.05)
-        self.assertLessEqual(bad, 1.18)
+        self.assertAlmostEqual(avg, 2.08, delta=0.05)
+        self.assertLessEqual(bad, 2.00)
 
     def test_the_keyed_profile_matches_the_plain_metrics(self):
         # dice_profile scores each half of the fight once per distinct stat key; that is only

@@ -304,11 +304,11 @@ enemy_class_reskins:
            wtypes: ["0x0100 | ITYPE_BOW", "0x0100 | ITYPE_ITEM"]}
 
   # ── Ch6 (#26): the merfolk of Maer Dualdon. ─────────────────────────────────
-  # The art call is the ch06 YAML's (2026-08-29): Stephano's Mermaid carries lance, bow, staff
-  # and magic, so five line classes wear her; the axe block rides the Shark Rider map sprite;
-  # the Knights are the IronShell General; the Troubadour stays mounted on the Lamia, whose
-  # serpent body IS the mount. The mounted and sword blocks (Cavalier, Mercenary) are the
-  # crab riders, a repainted spider that waits on Nicolas's look.
+  # The art call is the ch06 YAML's: Stephano's Mermaid carries lance, bow, staff and magic, so
+  # the foot line and the casters wear her; the cavalry rides N426's Shark Rider; the Knights are
+  # the IronShell General; the Troubadour stays mounted on the Lamia, whose serpent body IS the
+  # mount. Vanilla's axe and sword blocks are re-classed onto those tridents (2026-10-05), so
+  # ch06 fields no Fighter and no Mercenary.
   #
   # The Mermaid is vendored from her `(Bra)` modes. Five classes share one map sprite, `mermaid`,
   # so the injector builds one sheet for all of them. Her `8. Unarmed` attacks (C03) without
@@ -326,23 +326,29 @@ enemy_class_reskins:
       weapons:
         - {dir: lance,   txt: Lance.txt,   abbr: mspr_ln,
            wtypes: ["0x0100 | ITYPE_LANCE", "0x0100 | ITYPE_ITEM"]}
-  # No shark-rider battle anim exists anywhere in the FE-Repo, so this one is OURS: Gemini poses
-  # through the cast's posed-anim path (battle_anims/shark-rider/poses.yaml has the recipe), hence
-  # `derived`. Thrown axes keep the vanilla Fighter's anim. `frame: 16x16` because the sheet is
-  # 16x16 on the Fighter's 16x32 row.
+  # The cavalry: vanilla's 3 Cavaliers, its Difficult-only 3, and its 3 Fighters re-classed onto
+  # them (ch06's YAML declares why). N426's Shark Rider from FEUniverse, not the FE-Repo -- the
+  # same artist as the map sprite, so the field and the close-up are one body. The trident takes
+  # the lance AND the sword (Wolfram's precedent: the drawn weapon is cosmetic, the class decides
+  # the mechanics); a javelin plays its ranged mode. `frame: 16x16` because the sheet is 16x16 on
+  # the Cavalier's 16x32 row. Its slot id stays 0x89: ids are declared, never moved.
   - id: shark-rider
-    base: CLASS_FIGHTER
-    slot: CLASS_FGT_SHARK_RIDER
-    dresses: {ch06: [fighter]}
+    base: CLASS_CAVALIER
+    slot: CLASS_CAV_SHARK_RIDER
+    dresses: {ch06: [cavalier]}
     slot_id: 0x89
     sprite: shark-rider
     frame: 16x16
     battle_anim:
-      source: shark-rider
-      derived: true
+      source: n426-shark-rider
+      palette_edit: enemy-red.json   # the rider's two blues onto enemy_red's own ramp, by hand:
+                                     # the generic rule also takes the shark's grey-blue and
+                                     # paints the whole animal red. Matches the map sprite,
+                                     # whose rider turns red under the enemy palette.
       weapons:
-        - {dir: ., txt: Sharkrider.txt, abbr: shrk_ax,
-           wtypes: ["0x0100 | ITYPE_AXE", "0x0100 | ITYPE_ITEM"]}
+        - {dir: trident, txt: trident.txt, abbr: shrk_tr,
+           wtypes: ["0x0100 | ITYPE_LANCE", "0x0100 | ITYPE_SWORD"]}
+        - {dir: unarmed, txt: unarmed.txt, abbr: shrk_un, wtypes: ["0x0100 | ITYPE_ITEM"]}
   # The one armour anim that carries a LANCE. `frame: 16x32` the other way round: a tall
   # sheet on the Knight's 16x16 row.
   - id: ironshell

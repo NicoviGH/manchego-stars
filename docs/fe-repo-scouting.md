@@ -102,8 +102,22 @@ Lupin. Cut from ch05; parked on **issue #24** so the `feat/24-ch04-map` branch f
 art over a palette-swap.
 
 ### ch06 — the merfolk (Bremen) — logged on issue #26
-Every asset ch06's `skin:` notes name exists: `[Monster-Custom] [F] Mermaid by Stephano` (Lance, Bow,
-Staff, Magic; map sprite `Mermaid (F) {N426}`), `Shark Rider (M) {N426}` (map sprite only),
-`[General-Variant] IronShell-Tiny General`, `[Monster-Custom] [U] Lamia by L95` and
-`[Spider-Variant] [M] Cavalier Rider by DATonDemand`, which is a literal spider and is repainted as
-the crab. Messie needs no anim: he is a cutscene actor, and his map sprite is painted (#363).
+Shipped: `[Monster-Custom] [F] Mermaid by Stephano` (its `(Bra)` modes; map sprite `Mermaid (F)
+{N426}`), `[General-Variant] IronShell-Tiny General`, `[Monster-Custom] [U] Lamia by L95`, and the
+`Shark Rider (M) {N426}` map sprite. Rejected: `[Spider-Variant] [M] Cavalier Rider` (a recolour only
+makes an ice SPIDER, and a crab is Braulo's identity) and `Squidsmith` (Nicolas: "meh, kinda weird").
+Messie needs no anim: he is a cutscene actor, and his map sprite is painted (#363).
+
+**THE FE-REPO IS NOT THE WHOLE COMMUNITY.** N426's Shark Rider has a full battle anim (Trident, Axe,
+Unarmed) that never reached the FE-Repo: it is in his FEUniverse thread
+(https://feuniverse.us/t/6943/40, files on the Dropbox linked there), and ch06's cavalry ships it.
+Before calling an asset missing, search FEUniverse too: it is Discourse, so
+`https://feuniverse.us/search.json?q=<term>` answers in JSON and `/raw/<topic>/<post>` returns a
+post's text. An artist's own thread is the place to look once the FE-Repo has their map sprite.
+
+**Water-themed sweep, 2026-10-05** (every name in Battle Animations / Map Sprites / Portraits): anims
+`Squidsmith` (axe, handaxe), `Snail Knight` (Cavalier: lance, magic), `Warrior Naga` (sword, magic;
+reads as an armoured human), `Naga` (monster), `Tortoise` (unarmed), the Lamias; map sprites
+`Kraken (U) Sea Monster {Xenith}`, `Fish (U)`, `Shark (U) {N426}`, `Shark Rider (F) {N426}`,
+`Tortoise (U)`. **PMD SpriteCollab** has complete sets for ~40 water/ice Pokémon (Tentacruel, Gyarados,
+Octillery, Cloyster, Golisopod...); ch06's Bael becomes Tentacruel from there.

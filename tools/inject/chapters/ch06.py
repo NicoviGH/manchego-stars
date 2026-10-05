@@ -41,7 +41,7 @@ CH06_PREP_SCRIPT = 'EventScr_08591FD8'           # the shared CLEAN/PREP/CLEAN s
 CH06_ALLY_TABLE = 'MS_Ch06DeployCap'             # the never-LOADed PREP cap template
 CH06_BOOT_SEED_TABLE = 'MS_Ch06BootSeed'         # --ch06-boot only: an armed party from a cold start
 CH06_LINE_TABLE = 'MS_Ch06Line'                  # the 24-strong merfolk line (#360's placement)
-CH06_HARD_WAVE_TABLE = 'MS_Ch06Wave4Hard'        # vanilla Ch6's Difficult-only crab-rider trio
+CH06_HARD_WAVE_TABLE = 'MS_Ch06Wave4Hard'        # vanilla Ch6's Difficult-only cavalry trio
 CH06_BOAT_TABLE = 'MS_Ch06Boats'                 # the two marooned boats, GREEN and killable
 
 CH06_LAYOUT = ('Ch06MaerMonsterMap', 'ch06-maer-monster')   # (asset label, maps/ stem)
@@ -65,14 +65,14 @@ CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla
 CH06_CLASS_IDS = ChapterClassIds('ch06')
 CH06_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'javelin': 'ITEM_LANCE_JAVELIN',
                  'iron-sword': 'ITEM_SWORD_IRON', 'iron-blade': 'ITEM_BLADE_IRON',
-                 'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
+                 'steel-lance': 'ITEM_LANCE_STEEL',
                  'halberd': 'ITEM_AXE_HALBERD', 'horseslayer': 'ITEM_LANCE_HORSESLAYER',
                  'iron-bow': 'ITEM_BOW_IRON', 'flux': 'ITEM_DARK_FLUX',
                  'thunder': 'ITEM_ANIMA_THUNDER', 'mend': 'ITEM_STAFF_MEND',
                  'elixir': 'ITEM_ELIXIR',
-                 # the two `fe_base:` redirects -- the YAML's flavour names for vanilla Ch6's
-                 # own Venin Axe and the Bael's Venin Claw
-                 'venin-axe': 'ITEM_AXE_VENIN', 'venin-claw': 'ITEM_MONSTER_VENINCLW',
+                 # the two `fe_base:` redirects -- the YAML's flavour names for the Venin Lance
+                 # (vanilla's Venin Axe, re-classed with its Fighter) and the Bael's Venin Claw
+                 'venin-lance': 'ITEM_LANCE_VENIN', 'venin-claw': 'ITEM_MONSTER_VENINCLW',
                  # the boats' rewards, owed to the boarding pass: the east hull's Antitoxin and
                  # the save-them-both Orion's Bolt vanilla Ch6 grants in its ending
                  'antitoxin': 'ITEM_ANTITOXIN', 'orions-bolt': 'ITEM_ORIONSBOLT'}
@@ -334,7 +334,7 @@ def inject_ch06(campaign, boot=False, verbose=True):
     #    drawn, and a load test that PASSes.
     write_event_group('ch06', CH06_EVENTINFO_H, CH06_EVENT_GROUP, lists={
         'turnBasedEvents':
-            '{\n    TurnEventPlayer(0, %s, %d) /* Difficult-only crab-rider wave: %d */\n'
+            '{\n    TurnEventPlayer(0, %s, %d) /* Difficult-only cavalry wave: %d */\n'
             '    END_MAIN\n}' % (CH06_HARD_WAVE_SCRIPT, CH06_HARD_WAVE_TURN, len(wave_rows)),
         # Misc = the win/lose machinery and nothing else. DefeatBoss is an AFEV on
         # EVFLAG_DEFEAT_BOSS, which Nerra's FLAGGED defeat quote sets on her death (step 5) --
