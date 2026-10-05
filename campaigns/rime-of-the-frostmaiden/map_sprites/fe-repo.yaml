@@ -2,8 +2,12 @@
 # Derived cast recolours are not here. Written by tools/fe_repo_vendor.py; `verify` checks pixels.
 fire-imp: Map Sprites/Monsters - Dragons and Special/Fire Imp (U) {Alexsplode}
 hlin-trollbane: Map Sprites/Infantry - (Axe) Fighters and Warriors/Fighter (F) Axe {Alusq}
+ironshell: Map Sprites/Infantry - Knights, Generals, Armors/General (U) IronShell_Tiny {Alexsplode}
+lamia: Map Sprites/Monsters - Basic Types/Lamia (F) {Dutch Introvert}
 lizard-wildling: Map Sprites/Infantry - (Axe) Brigs, Pirates, Zerkers/Brigand (U) Lizard Wildling {Tarantino500}
 lizardzerker: Map Sprites/Infantry - (Axe) Brigs, Pirates, Zerkers/Berserker (M) Lizardzerker Axe {Seliost1}
+mermaid: Map Sprites/Monsters - Dragons and Special/Mermaid (F) {N426}
+shark-rider: Map Sprites/Mounted - Dismounted, Monsters, Misc/Shark Rider (M) {N426}
 skel-axe: Map Sprites/Monsters - Basic Types/Bonewalker (U) Axe {Snerdels}
 skel-bow: Map Sprites/Monsters - Basic Types/Bonewalker (U) Wight Bow {IS}
 skel-lance: Map Sprites/Monsters - Basic Types/Bonewalker (U) Lance {Epicer}

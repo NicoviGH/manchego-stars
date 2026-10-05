@@ -105,10 +105,13 @@ class AReskinIsResolvedByItsOwnSlot(unittest.TestCase):
         self.assertEqual(self._slot_of('goblin-fighter'), inject.chapters.ch01.CH01_CLASS_IDS['fighter'])
 
     def test_the_chief_has_no_reskin_and_stays_a_vanilla_knight(self):
-        # armor-knight is claimed by no reskin, so naming the vanilla class is right here.
+        # No reskin dresses ch01's armor-knight, so naming the vanilla class is right here. Another
+        # chapter's Knight reskin (ch06's IronShell) must not reach him: the key is (chapter,
+        # token), never `base` (#347).
         self.assertEqual('CLASS_ARMOR_KNIGHT', inject.chapters.ch01.CH01_CLASS_IDS['armor-knight'])
-        bases = {r['base'] for r in inject.reskins.enemy_class_reskins(self.CAMPAIGN)}
-        self.assertNotIn('CLASS_ARMOR_KNIGHT', bases)
+        dressed = [r['id'] for r in inject.reskins.enemy_class_reskins(self.CAMPAIGN)
+                   if 'armor-knight' in (r.get('dresses') or {}).get('ch01', [])]
+        self.assertEqual([], dressed)
 
     def test_no_two_reskins_claim_the_same_slot(self):
         # THIS is the invariant, not "no two share a base" -- sharing a base is legitimate

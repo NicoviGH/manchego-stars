@@ -212,7 +212,7 @@ def entry_is_turn1(key, enemy_def):
 
     The KEY decides it, not `arrives_turn` alone: only `enemy_units` is the opening-board
     array, and even then only unconditionally -- an entry there may still declare its OWN
-    `arrives_turn > 1` (ch06's Difficult-only crab-rider wave stays inside `enemy_units` for
+    `arrives_turn > 1` (ch06's Difficult-only cavalry wave stays inside `enemy_units` for
     exactly this reason, so its own field is what excludes it). A `reinforcements:` or
     `enemy_reinforcements:` entry is never turn-1 regardless of what it carries, and that
     matters because those entries use a DIFFERENT field for their own timing --

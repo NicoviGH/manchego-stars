@@ -53,6 +53,11 @@ Source: **[Klokinator/FE-Repo](https://github.com/Klokinator/FE-Repo)** (communi
 | `[Skeleton-Base] Bonewalker (one arm, sword)` battle animation | ch05's `crypt-blade` — VENDORED + WIRED (#25), in its native palette. Paired with the matching One Arm map sprite so the field and the close-up are the same body. Deliberately NOT the Specter, which is Sahnar's, so the named recruit does not read as one of the line | **IS** (vanilla skeleton); **Alexsplode** (one-arm edit) | F2U/F2E |
 | `[Skeleton-Reskin] Wight Sniper` battle animation (bow) | ch05's `bone-archer` — VENDORED + WIRED (#25), in its native palette. Ships no unarmed mode, so the bow anim takes the unarmed weapon-type as well; without that an archer holding nothing falls back to the vanilla LIVING archer | **DATonDemand** | F2U/F2E |
 | `Bonewalker (U)` map sprites — Lance, Axe, One Arm, Wight Bow (stand + walk) | ch05's four risen tomb-guard classes on the map (#25). Normalised to one palette index per distinct colour before vendoring: the Axe walk sheet spent 20 indices on 14 colours and the One Arm pair shipped RGBA, both of which the build's guards reject. Remapped onto each base class's SMS palette at build time, so the enemy faction palette colours them | **Epicer** (Lance); **Snerdels** (Axe); **IS** (One Arm, Wight Bow) | F2U/F2E |
+| `[Monster-Custom] [F] Mermaid` battle animation — the `(Bra)` modes: Lance, Bow, Staff, Magic (5 and 6) | ch06's five merfolk line classes (spear, archer, priest, mage, shaman, Nerra included) — VENDORED + WIRED (#26), native palette. Her own Unarmed mode attacks without arming a hit, which our import guard refuses, so each class's weapon anim also covers holding nothing | **Wayforward** (character design); **Stephano** (port) | — |
+| `[Monster-Custom] [U] Lamia` battle animation (staff, unarmed) | ch06's `lamia-mender` (Troubadour reskin) — VENDORED + WIRED (#26), native palette | **L95** (animation); **Zoramine Fae** (script) | F2U/F2E |
+| `[General-Variant] IronShell-Tiny General` battle animation (lance, unarmed) | ch06's `ironshell` Knights — VENDORED + WIRED (#26), native palette | **IS** (vanilla General); **Alexsplode** (IronShell anim + script) | F2U/F2E |
+| `Shark Rider` battle animation (trident, unarmed) — FEUniverse, not the FE-Repo ([t/6943 post 40](https://feuniverse.us/t/6943/40)) | ch06's cavalry `shark-rider` (Cavalier reskin) — VENDORED + WIRED (#26), native palette. Same artist as the map sprite, so the field and the close-up match. The trident plays for lances and swords alike | **N426** | F2U (thread: "all free to edit/use") |
+| `Mermaid (F)`, `Shark Rider (M)`, `General (U) IronShell_Tiny`, `Lamia (F)` map sprites (stand + walk) | ch06's merfolk, shark riders, Knights and Lamia on the map (#26); remapped onto each base class's SMS palette, so the enemy faction palette colours them | **N426** (Mermaid, Shark Rider); **Alexsplode** (IronShell); **Dutch Introvert** (Lamia) | no tag in filename — recheck before distribution |
 (Each FE-Repo asset folder ships a `CREDITS.txt` — copy its exact line here when we lock the asset.)
 
 ## Pokémon-sourced assets (adopted sprite art)
@@ -65,6 +70,13 @@ same footing as the FE8 base game itself. Recheck before any wider distribution.
 |---|---|---|---|
 | PMD *Explorers of Sky* Oddish animation sheets (Idle/Walk/Charge/Shoot + Shadow) | Basil map sprites (`map_sprites/basil{,_mu}.png`, recoloured onto the cast palette) + battle-anim frames (`battle_anims/basil/`, 1.5x hqx) | © **Nintendo / Creatures / GAME FREAK / Spike Chunsoft** (official game rips, credited `CHUNSOFT` in the repo) | [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab) `sprite/0043` |
 | Oddish FireRed/LeafGreen battle sprite | Basil portrait (`portraits/basil.png`, hq2x + 16-colour fit; source vendored at `data/portraits/basil.png`) | © **Nintendo / Creatures / GAME FREAK** | [PokeAPI/sprites](https://github.com/PokeAPI/sprites) `generation-iii/firered-leafgreen/43.png` |
+
+**ch06's lake beast — Tentacruel (#26):**
+
+| Asset | Used for | Origin | Source |
+|---|---|---|---|
+| Tentacruel *Black/White* animated battle sprite (41 frames) | ch06's Bael reskin battle anim (`battle_anims/tentacruel/`, four of its frames posed into a lunge at native scale) | © **Nintendo / Creatures / GAME FREAK** | [PokeAPI/sprites](https://github.com/PokeAPI/sprites) `generation-v/black-white/animated/73.gif` |
+| PMD *Explorers of Sky* Tentacruel Idle/Walk sheets | ch06's Bael reskin map sprites (`map_sprites/tentacruel{,_mu}.png`, re-indexed onto the standard SMS palette) | © **Nintendo / Creatures / GAME FREAK / Spike Chunsoft** (official game rips, credited `CHUNSOFT` in the repo) | [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab) `sprite/0073` |
 
 (The PMD SpriteCollab fan-made emotion portraits were evaluated but NOT shipped — the shipped
 portrait derives from the official FRLG sprite only.)

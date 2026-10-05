@@ -9,6 +9,16 @@ bonewalker:
 goblin-spearman:
   lance:
     folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [M] Goblin Spearman by Battle of Wesnoth/2. Lance
+ironshell:
+  lance:
+    folder: Battle Animations/Infantry - Knights, Generals, Armors/[General-Variant] IronShell-Tiny General [U] by Alexsplode/2. Lance
+  unarmed:
+    folder: Battle Animations/Infantry - Knights, Generals, Armors/[General-Variant] IronShell-Tiny General [U] by Alexsplode/8. Unarmed
+lamia:
+  staff:
+    folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [U] Lamia by L95/7. Staff
+  unarmed:
+    folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [U] Lamia by L95/8. Unarmed
 lizardzerker:
   axe:
     folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Berserker-Reskin] Lizardzerker - Coat Repal v2 [M] by Seliost1/3. Axe
@@ -18,6 +28,17 @@ lizardzerker:
     folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Berserker-Reskin] Lizardzerker - Coat Repal v2 [M] by Seliost1/1. Sword
   unarmed:
     folder: Battle Animations/Infantry - (Axe) Brigs, Pirates, Zerkers/[Berserker-Reskin] Lizardzerker - Coat Repal v2 [M] by Seliost1/8. Unarmed
+mermaid:
+  anima:
+    folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [F] Mermaid by Stephano/5. Magic (Bra)
+  bow:
+    folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [F] Mermaid by Stephano/4. Bow (Bra)
+  dark:
+    folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [F] Mermaid by Stephano/6. Magic (Bra)
+  lance:
+    folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [F] Mermaid by Stephano/2. Lance (Bra)
+  staff:
+    folder: Battle Animations/Monsters - Dragons and Special/[Monster-Custom] [F] Mermaid by Stephano/7. Staff (Bra)
 skeleberdier:
   axe:
     folder: Battle Animations/Infantry - (Lnc) Soldiers, Halberdiers/[Custom Halb] Halberdier Skeleberdier [U]/3. Axe (Swing)

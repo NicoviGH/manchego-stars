@@ -23,13 +23,13 @@ MOB = (0x00, 0x03, 0, 0)       # plain ActionInRange -- steps out and swings
 PURSUER = (0x00, 0x00, 0, 0)
 
 
-def run(reachers, pursuers=('ice-crab',)):
+def run(reachers, pursuers=('tentacruel',)):
     return check._rescue_target_violations('ch06', reachers, set(pursuers))
 
 
 class RescueTargetsHaveOnlyTheirDeclaredClock(unittest.TestCase):
     def test_a_declared_pursuer_may_reach_a_hull(self):
-        self.assertEqual([], run([('ice-crab', PURSUER)]))
+        self.assertEqual([], run([('tentacruel', PURSUER)]))
 
     def test_a_unit_carrying_the_safe_ACTION_may_reach_a_hull(self):
         self.assertEqual([], run([('merfolk-bow', SAFE)]))
@@ -45,7 +45,7 @@ class RescueTargetsHaveOnlyTheirDeclaredClock(unittest.TestCase):
     def test_a_pursuer_that_is_not_declared_is_still_reported(self):
         """A pursuer walks to the hull over several turns, which is a clock -- but an
         UNdeclared one is a second clock nobody costed."""
-        found = run([('crab-rider-hard-lance', PURSUER)])
+        found = run([('shark-rider-hard-lance', PURSUER)])
         self.assertEqual(len(found), 1, found)
 
     def test_nothing_reaching_a_hull_is_clean(self):

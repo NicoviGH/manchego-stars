@@ -523,6 +523,7 @@ VANILLA_ONLY_ITEM_TO_WEAPON = {
     'ITEM_SWORD_ZANBATO':     'zanbato',
     'ITEM_BLADE_IRON':        'iron-blade',
     'ITEM_AXE_VENIN':         'venin-axe',
+    'ITEM_LANCE_VENIN':       'venin-lance',
     'ITEM_AXE_HALBERD':       'halberd',
     'ITEM_LANCE_HORSESLAYER': 'horseslayer',
     'ITEM_MONSTER_FETIDCLW':  'fetid-claw',

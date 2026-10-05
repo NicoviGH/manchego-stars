@@ -104,9 +104,9 @@ class PursuerForecast(unittest.TestCase):
         self.assertLessEqual(row.sink_low, 12)
         self.assertGreater(row.sink_high, 12)          # afloat at 12 is inside the band
 
-    def test_ice_crab_engages_boat_west_on_turn_2_and_sinks_on_its_declared_8(self):
+    def test_tentacruel_engages_boat_west_on_turn_2_and_sinks_on_its_declared_8(self):
         # The 28 HP hull (ADR 0313). Run 2's 19 HP hull is danger_map's calibration case.
-        row = self.rows[('ice-crab', 'boat-west')]
+        row = self.rows[('tentacruel', 'boat-west')]
         self.assertEqual(row.arrival_turn, 2)
         self.assertAlmostEqual(row.damage_per_phase, 2.73, places=2)
         self.assertEqual(row.sink_expected, 8)
@@ -114,22 +114,22 @@ class PursuerForecast(unittest.TestCase):
 
     def test_an_engaged_pursuer_never_reaches_the_other_hull(self):
         self.assertIsNone(self.rows[('merfolk-thrower', 'boat-west')].arrival_turn)
-        self.assertIsNone(self.rows[('ice-crab', 'boat-east')].arrival_turn)
+        self.assertIsNone(self.rows[('tentacruel', 'boat-east')].arrival_turn)
 
     def test_a_difficult_only_pursuer_is_still_forecast(self):
         import copy
         chap = copy.deepcopy(ch06())
-        crab = next(e for e in chap['enemy_units'] if e.get('id') == 'ice-crab')
+        crab = next(e for e in chap['enemy_units'] if e.get('id') == 'tentacruel')
         crab['hard_mode_only'] = True
-        rows = [r for r in rf.chapter_forecast(chap) if r.enemy_id == 'ice-crab']
+        rows = [r for r in rf.chapter_forecast(chap) if r.enemy_id == 'tentacruel']
         self.assertTrue(any(r.arrival_turn == 2 for r in rows))
 
     def test_a_civilian_sparing_pursuer_never_arrives(self):
         import copy
         chap = copy.deepcopy(ch06())
-        crab = next(e for e in chap['enemy_units'] if e.get('id') == 'ice-crab')
+        crab = next(e for e in chap['enemy_units'] if e.get('id') == 'tentacruel')
         crab['ai_override'] = {'ai': '{0x8, 0x0, 0x0, 0x0}', 'why': 'test'}
-        rows = [r for r in rf.chapter_forecast(chap) if r.enemy_id == 'ice-crab']
+        rows = [r for r in rf.chapter_forecast(chap) if r.enemy_id == 'tentacruel']
         self.assertTrue(rows and all(r.arrival_turn is None for r in rows))
 
 

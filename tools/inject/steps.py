@@ -324,8 +324,8 @@ STEPS = [
     # The slot 1 sandbox, in place of the prologue; it never montages.
     Step(inject_test_chapter, title='TEST CHAPTER (playtest: New Game -> Ch1 sandbox, cast '
                                     'deployed):',
-         call=lambda fn, a: fn(a.campaign, lord_boot=a.lord_boot),
-         flags=BOOT_FLAGS + ('test_chapter', 'lord_boot'),
+         call=lambda fn, a: fn(a.campaign, lord_boot=a.lord_boot, bench=a.bench),
+         flags=BOOT_FLAGS + ('test_chapter', 'lord_boot', 'bench'),
          when=lambda a: a.test_chapter and not _any_boot(a),
          needs=('reskin-classes',), writes=TEST_CHAPTER),
     Step(_configure_boot, call=_boot(TEST_CHAPTER_INDEX), flags=BOOT_FLAGS + ('test_chapter',),

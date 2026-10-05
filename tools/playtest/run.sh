@@ -111,16 +111,15 @@
 #                      tools/playtest/make_gif.py recordunitlist unitlist --name unit-list
 #   recordenemy   -- the ENEMY analogue of recordanim on the SAME TESTCH sandbox (#90): a
 #                    reskinned enemy CLASS's battle anim, or a named RAW-PID creature's (#25).
-#                    The sandbox deploys one hostile of each enemy_class_reskins slot plus one
-#                    of each RAW_PID_BATTLE_ANIMS unit under its OWN pid; a harmless player
-#                    baits the chosen foe into a counter-attack. Pick with
-#                    PT_CHAR=<name|classid> (default kobold-grunt):
-#                    kobold-grunt kobold-blade kobold-brute white-moose ravisin.
-#                    Build TESTCH=1 first, e.g.:
-#                      PT_CHAR=kobold-grunt tools/playtest/run.sh recordenemy
-#                      tools/playtest/make_gif.py recordenemy kobold-grunt --name kobold-anim
-#                      PT_CHAR=white-moose  tools/playtest/run.sh recordenemy
-#                      PT_CHAR=ravisin      tools/playtest/run.sh recordenemy
+#                    The sandbox benches ONE chapter's creatures (BENCH=chNN, default the
+#                    newest): one hostile of each reskin that chapter dresses plus each
+#                    RAW_PID_BATTLE_ANIMS unit it owns, under its OWN pid; a harmless player
+#                    baits the chosen foe into a counter-attack (a HEALER instead gets a
+#                    1-HP patient beside it and heals on the enemy phase). Pick with
+#                    PT_CHAR=<reskin id|classid>, a creature of the benched chapter, e.g.:
+#                      make TESTCH=1 && PT_CHAR=shark-rider tools/playtest/run.sh recordenemy
+#                      tools/playtest/make_gif.py recordenemy shark-rider --name shark-anim
+#                      make TESTCH=1 BENCH=ch05 && PT_CHAR=white-moose tools/playtest/run.sh recordenemy
 #   recordch01trail / recordlord / recordlordfast / recordch01 / recordopening /
 #   record / scenes / scenesch01 / bootobserve -- other scenes (no checkpoint: these
 #   replay their full lead-in at 60fps, so they are the slowest captures)

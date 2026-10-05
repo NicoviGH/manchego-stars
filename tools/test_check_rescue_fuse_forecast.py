@@ -141,7 +141,7 @@ class TheGuardIsAdvisoryAndReproducesCh06(unittest.TestCase):
         buf = io.StringIO()
         with redirect_stdout(buf):
             check.check_rescue_fuse_forecast([])
-        self.assertNotIn('ice-crab', buf.getvalue())
+        self.assertNotIn('tentacruel', buf.getvalue())
 
 
 if __name__ == '__main__':

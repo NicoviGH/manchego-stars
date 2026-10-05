@@ -4545,8 +4545,6 @@ local function captureHeal(actorAddr, tag)
     return captureAttack(actorAddr, tag)
 end
 
-local TESTCH_PARK_TILE = { x = 24, y = 15 } -- empty far corner of the TESTCH sandbox's ch1 map
-                                             -- (same corner CH01_PARK reuses later for the real ch01 seize)
 
 -- Defend/dodge capture (#191): ride out the enemy phase watching gProc_ekrBattle, screenshotting
 -- with the SAME shootCombatFrames loop as captureAttack/captureHeal -- but there is no menu to
@@ -4554,7 +4552,10 @@ local TESTCH_PARK_TILE = { x = 24, y = 15 } -- empty far corner of the TESTCH sa
 -- played and finished, or once control returns to the player with nothing having happened. The
 -- caller decides whether a miss here is fatal (it isn't -- best-effort).
 local function captureDefend(tag)
-    if not endTurn(TESTCH_PARK_TILE) then return false end
+    -- endTurn's own emptyTile(), read off the live map. A hardcoded corner, (24,15), outlived
+    -- the sandbox's move to the 15x10 snowfield and sent the cursor off the map, so every
+    -- defend capture since has failed quietly as "best-effort".
+    if not endTurn() then return false end
     if not waitFor(function() return faction() ~= 0 end, 300) then return false end
     return shootCombatFrames(tag, function() return faction() == 0 end)
 end
@@ -4803,11 +4804,11 @@ end
 
 -- RECORDENEMY (#90): capture a reskinned ENEMY class's battle anim on the SAME TESTCH sandbox
 -- the PC cast is captured on (`recordanim`) -- one bench for every battle animation, no
--- chapter-specific boot. inject_test_chapter deploys one hostile of each enemy_class_reskins
--- slot as a foe; the money shot is the ATTACK swing, which a defender never plays, so a HARMLESS
+-- chapter-specific boot. inject_test_chapter deploys one hostile of each reskin ONE chapter
+-- dresses (BENCH=chNN at build time, default the newest; the bench holds one chapter); the money shot is the ATTACK swing, which a defender never plays, so a HARMLESS
 -- (pow 0) player attacks the chosen foe at melee -> it survives and COUNTER-attacks, and
 -- captureAttack shoots the whole battle. Needs `make TESTCH=1`. Pick the foe with PT_CHAR
--- (default kobold-grunt) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
+-- (default: the first creature on the bench) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
 -- symbols.lua from the built classes.h) maps it to the class id it was built as.
 -- Named RAW-PID creatures are picked by CHARACTER, not by class (the table lives inside the
 -- scenario: this chunk is at the 200-local ceiling). Their anim binds through CharacterData
@@ -4817,7 +4818,20 @@ end
 scenarios.recordenemy = function()
     if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
     wait(60); pokeAnimsOn()
-    local sel = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "kobold-grunt"
+    local sel = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or nil
+    if not sel then
+        -- No PT_CHAR: the first creature actually on the bench. A fixed default names one
+        -- chapter's creature, and the bench now seats a single chapter (BENCH=chNN).
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then
+                local cls = ru8(ru32(r.addr + 0x04) + 0x04)
+                for name, id in pairs(RESKIN_CLASS) do if id == cls then sel = name end end
+                if sel then break end
+            end
+        end
+        if not sel then return result("FAIL", "no reskinned creature on the bench") end
+    end
     -- Raw-pid creatures the sandbox deploys under their OWN pid (RAW_PID_BATTLE_ANIMS).
     local wantPid = ({ ["white-moose"] = 0xb9,   -- ch05's cornered miniboss (#25)
                        ["ravisin"]     = 0xb8 }) -- ch05's frost-druid boss (#25)
@@ -4846,7 +4860,7 @@ scenarios.recordenemy = function()
     end
     if not foe then
         return result("FAIL", string.format(
-            "no live foe %s in the sandbox (build with `make TESTCH=1`)",
+            "no live foe %s in the sandbox (build with `make TESTCH=1 BENCH=<its chapter>`)",
             wantPid and string.format("with pid 0x%X", wantPid)
                     or string.format("of class 0x%X", want))) end
     -- A bait whose reach OVERLAPS THE FOE'S, which is not always a melee one. A bow cannot
@@ -4857,7 +4871,45 @@ scenarios.recordenemy = function()
     -- picker, not the class.
     local fmin, fmax = unitAttackRange(foe)
     if not fmin then
-        return result("FAIL", "the chosen foe carries no weapon, so it can never counter")
+        -- A HEALER cannot counter, so bait it with a patient instead: move another foe next to
+        -- it at 1 HP and let the enemy phase play the heal (every standard AI action tries
+        -- AiTryDoStaff before anything else). Filmed with captureDefend's enemy-phase loop.
+        local patient
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) and r.addr ~= foe.addr then patient = r; break end
+        end
+        if not patient then
+            return result("FAIL", "the chosen foe cannot counter and has no ally to heal") end
+        local mw, mh = mapSize()
+        local spot
+        for _, d in ipairs({ { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 } }) do
+            local tx, ty = foe.x + d[1], foe.y + d[2]
+            if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
+                spot = { tx, ty }; break
+            end
+        end
+        if not spot then return result("FAIL", "no free tile beside the healer for its patient") end
+        local grid = mapUnitAt(patient.x, patient.y)
+        setMapUnit(patient.x, patient.y, 0)
+        emu:write8(patient.addr + 0x10, spot[1]); emu:write8(patient.addr + 0x11, spot[2])
+        setMapUnit(spot[1], spot[2], grid)
+        emu:write8(patient.addr + 0x13, 1)             -- 1 HP: well under any heal threshold
+        -- The heal must be the ONLY thing the enemy phase can do: the capture stops after the
+        -- first battle, and the first ch06 run filmed the 1-HP patient javelining Trex instead.
+        -- So every other foe, patient included, loses its inventory (Unit.items at +0x1E).
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) and r.addr ~= foe.addr then
+                for s = 0, 4 do emu:write16(r.addr + 0x1E + s * 2, 0) end
+            end
+        end
+        log(string.format("healer %s at (%d,%d): patient moved to (%d,%d) at 1 HP",
+            sel, foe.x, foe.y, spot[1], spot[2]))
+        shot(sel .. "-deploy")
+        local healed = captureDefend(sel); shot(sel .. "-after")
+        if not healed then return result("FAIL", "the enemy phase never played a battle anim") end
+        return result("PASS", string.format("%s heal captured (class 0x%X)", sel, want or 0))
     end
     local pl, plmn, plmx, dist
     for i = 0, 15 do
@@ -9468,7 +9520,7 @@ end
 --
 -- CONTENTION for the door -- two units wanting the same single tile -- does NOT exist on
 -- normal, where the only pursuers are these two and they want different hulls. It exists on
--- DIFFICULT, whose turn-4 crab-rider trio also pursues from the west edge. Declared cases
+-- DIFFICULT, whose turn-4 cavalry trio also pursues from the west edge. Declared cases
 -- run on normal, so that arm is not covered here and is not claimed to be.
 scenarios.ch06clock = function()
     local CH06 = dofile(PLAYTEST_DIR .. "/ch06.lua")     -- ch06's shared facts (#314)

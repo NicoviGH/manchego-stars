@@ -77,6 +77,7 @@ W = {
                            effective=frozenset({'cav'})),
     'elfire':       Weapon('elfire',       10, 85, 0, 10, 'magic', rng=(1, 2)),
     'venin-axe':    Weapon('venin-axe',    4, 60,  0, 10, 'axe'),
+    'venin-lance':  Weapon('venin-lance',  4, 65,  0, 8,  'lance'),
     'halberd':      Weapon('halberd',      10, 60, 0, 15, 'axe',
                            effective=frozenset({'cav'})),
     'horseslayer':  Weapon('horseslayer',  7, 70,  0, 13, 'lance',

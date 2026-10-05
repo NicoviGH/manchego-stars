@@ -142,7 +142,7 @@ difficulty_note: >
                        ((15,12), (17,10), (17,13), (17,14)) and it starts SIX move points
                        from the nearest, so its first throw lands on enemy phase 2 and not
                        before. It has to be killed. The LONG fuse: median turn 10.
-    west / Pronged Goat ice-crab from (7,20), on the door from enemy phase 2. Venin claw is
+    west / Pronged Goat tentacruel from (7,20), on the door from enemy phase 2. Venin claw is
                        range 1, so it must occupy that one cell -- which also means the
                        player cannot BOARD until it is dead. The claw also POISONS, 1-3 a
                        phase for 5 phases. Median turn 8, on a 28 HP hull.
@@ -217,9 +217,10 @@ deployment:
 # vanilla's own 6.17 to the decimal.
 #
 # ART (decided 2026-08-29, Nicolas): the merfolk carry lance/bow/staff/magic on Stephano's
-# Mermaid anim, which ships no sword and no axe -- so the axe block rides the Shark Rider
-# map sprite with a regular axe anim, the mounted and sword blocks ride a spider-rider
-# repainted as a crab, the Knights are the IronShell General (the one armour anim that
+# Mermaid anim, which ships no sword and no axe. 2026-10-05: every block that is not a caster,
+# an archer or a Knight now carries a trident -- the mounted block and vanilla's axe block ride
+# N426's Shark Rider, the sword block joins the Mermaid's spear line (the re-class is declared
+# at the axe block below) -- the Knights are the IronShell General (the one armour anim that
 # carries a LANCE), and vanilla's Troubadour stays a Troubadour on the Lamia, whose serpent
 # body IS the mount. Sprite size is a declared field, not a constraint -- `frame:` in
 # `campaign.yaml` -> `enemy_class_reskins` sets the wait-row size flag, as ch01's 16x32 Fire
@@ -316,27 +317,30 @@ enemy_units:
     donor: [14, 11]                 # vanilla's L6 soldier
     skin: {look: "merfolk spear-guard", source: "as merfolk-trident"}
 
-  # ── The axe block (vanilla's 3 Fighters) → shark riders ──────────────────────
-  # No aquatic AXE anim exists that reads as one of these people (the FE-Repo's only
-  # candidate, Stephano's Squidsmith, is a Shantae-styled figure swinging a squid), so
-  # these ride the SHARK RIDER map sprite over a regular axe animation -- Nicolas's call,
-  # and the same trade ch03 makes where the archer and thief stay vanilla so the player
-  # can still read the class.
+  # ── The axe block (vanilla's 3 Fighters) → shark-rider CAVALRY ────────────────
+  # DECLARED DIVERGENCE (Nicolas, 2026-10-05): the merfolk line fights with tridents, so
+  # vanilla's axe and sword blocks are re-classed onto the two looks that carry one. These
+  # three Fighters become Cavaliers on the shark rider (a mounted look on a mounted unit);
+  # the two Mercenaries below become trident Soldiers. Same levels, same donors and AI, each
+  # weapon swapped for its nearest lance by might, drops kept. Measured on instrument v2:
+  # threat x1.02, clear-load x1.14, force x0.98 / x0.99 against the twin -- parity. Option A
+  # (all five on foot) measured x1.00 / x1.05 and lost to it on closeness to vanilla.
+  # decisions.md -> "ch06's axe and sword blocks carry tridents".
   - id: shark-rider-poison
     name: "Shark Rider"
     count: 1
-    class: fighter              # vanilla: 1x Lv6 Fighter, Poison Axe
+    class: cavalier             # vanilla: 1x Lv6 Fighter, Poison Axe -- re-classed, see above
     level: 6
     autolevel: true
     inventory:
-      - id: poison-axe
-        fe_base: venin-axe        # FE8's ITEM_AXE_VENIN, which the wiki prints as "Poison Axe"
-    damage_type: slashing
+      - id: poison-lance
+        fe_base: venin-lance      # FE8's ITEM_LANCE_VENIN, the Poison Axe's lance twin
+    damage_type: piercing
     positions: [[7, 16]]
     donor: [16, 9]                  # vanilla L6 fighter
     skin:
-      look: "merfolk on a shark, boarding axe"
-      source: "FE-Repo: Map Sprites/Mounted - Dismounted, Monsters, Misc/Shark Rider (M) {N426}, 16x16 (stand+walk); NO battle anim exists -- vanilla Fighter frames, repalletted"
+      look: "a raider riding a shark, trident -- human-looking, as the map sprite draws him"
+      source: "FE-Repo: Map Sprites/Mounted - Dismounted, Monsters, Misc/Shark Rider (M) {N426}, 16x16; battle anim N426's own Shark Rider (FEUniverse t/6943 post 40: Trident + Axe + Unarmed)"
   - id: shark-rider-steel
     ai_override:
       ai: '{0x8, 0x3, 0x0, 0x0}'   # AI_A_08 ActionInRange_ExceptCivilian + AI_B_03 NeverMove
@@ -353,35 +357,41 @@ enemy_units:
         ACTION".
     name: "Shark Rider"
     count: 1
-    class: fighter              # vanilla: 1x Lv6 Fighter, Steel Axe
+    class: cavalier             # vanilla: 1x Lv6 Fighter, Steel Axe -- re-classed
     level: 6
     autolevel: true
     inventory:
-      - id: steel-axe
-    damage_type: slashing
+      - id: steel-lance
+    damage_type: piercing
     positions: [[16, 15]]
     donor: [15, 15]                 # vanilla L6 fighter
-    skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
+    skin: {look: "a raider on a shark", source: "as shark-rider-poison"}
   - id: shark-rider-halberd
+    ai_override:
+      ai: '{0x8, 0x3, 0x0, 0x0}'   # AI_A_08 ExceptCivilian + the donor's NeverMove
+      why: >
+        As a Cavalier it reaches the east hull from (15,16), which as a Fighter it could not
+        (check_rescue_targets caught it on the re-class). Same licence as shark-rider-steel
+        beside it: only the ACTION half changes, and it fights the player as its donor does.
     name: "Shark Rider"
     count: 1
-    class: fighter              # vanilla: 1x Lv5 Fighter, Iron Axe + Halberd
+    class: cavalier             # vanilla: 1x Lv5 Fighter, Iron Axe + Halberd -- re-classed
     level: 5
     autolevel: true
     inventory:
-      - id: iron-axe
+      - id: iron-lance
       - id: halberd
-    item_drop: halberd          # SETTLED from events_udefs.c, not the wiki: this L5 Fighter is the
-                                # only Ch6 unit with `.itemDrop = 1` on an axe, carrying
-                                # {AXE_IRON, AXE_HALBERD}. FE8 drops the LAST item, so the Halberd
-                                # is the drop and the Iron Axe is what it swings.
-    damage_type: slashing
+    item_drop: halberd          # SETTLED from events_udefs.c, not the wiki: vanilla's L5 Fighter
+                                # carries {AXE_IRON, AXE_HALBERD} with `.itemDrop = 1`. FE8 drops
+                                # the LAST item, so the Halberd stays the drop; a Cavalier cannot
+                                # swing it, so it fights with the Iron Lance in front of it.
+    damage_type: piercing
     positions: [[15, 16]]
     donor: [13, 6]                  # vanilla L5 fighter
-    skin: {look: "merfolk on a shark", source: "as shark-rider-poison"}
+    skin: {look: "a raider on a shark", source: "as shark-rider-poison"}
 
-  # ── The mounted block (vanilla's 3 Cavaliers) → crab-riders ──────────────────
-  - id: crab-rider-blade
+  # ── The mounted block (vanilla's 3 Cavaliers) → shark riders ─────────────────
+  - id: shark-rider-blade
     ai_override:
       ai: '{0x8, 0x12, 0x0, 0x0}'  # AI_A_08 ExceptCivilian + the donor's charge-after-1
       why: >
@@ -390,7 +400,7 @@ enemy_units:
         chapter's clock is its two DECLARED pursuers (`rescue_pursuers`), not whatever else can
         reach a boat. Vanilla Ch6 keeps its rescue targets out of reach with terrain; our map
         cannot, so the licence is spent explicitly instead. `check_rescue_targets` is the guard.
-    name: "Crab Rider"
+    name: "Shark Rider"
     count: 1
     class: cavalier             # vanilla: 1x Lv7 Cavalier, Iron Blade
     level: 7
@@ -400,10 +410,8 @@ enemy_units:
     damage_type: slashing
     positions: [[19, 4]]
     donor: [8, 1]                   # vanilla L7 cavalier -- charge-after-one-turn
-    skin:
-      look: "merfolk astride a lake crab; the mount repainted from an arachnid to ice-blue shell"
-      source: "FE-Repo: Battle Animations/Mounted - Dismounted, Monsters, Misc/[Spider-Variant] [M] Cavalier Rider by DATonDemand -> 1. Sword + 2. Lance; map sprite Cavalier (M) Spider Rider Sword {Zoramine} or Elder Bael Sword {Metalocif}, 16x32"
-  - id: crab-rider-sword
+    skin: {look: "a raider riding a shark, trident", source: "as shark-rider-poison"}
+  - id: shark-rider-sword
     ai_override:
       ai: '{0x8, 0x12, 0x0, 0x0}'  # AI_A_08 ExceptCivilian + the donor's charge-after-1
       why: >
@@ -412,7 +420,7 @@ enemy_units:
         chapter's clock is its two DECLARED pursuers (`rescue_pursuers`), not whatever else can
         reach a boat. Vanilla Ch6 keeps its rescue targets out of reach with terrain; our map
         cannot, so the licence is spent explicitly instead. `check_rescue_targets` is the guard.
-    name: "Crab Rider"
+    name: "Shark Rider"
     count: 1
     class: cavalier             # vanilla: 1x Lv6 Cavalier, Iron Sword
     level: 6
@@ -422,8 +430,8 @@ enemy_units:
     damage_type: slashing
     positions: [[18, 4]]
     donor: [7, 1]                   # vanilla L6 cavalier
-    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
-  - id: crab-rider-lance
+    skin: {look: "a raider riding a shark, trident", source: "as shark-rider-poison"}
+  - id: shark-rider-lance
     ai_override:
       ai: '{0x8, 0x12, 0x0, 0x0}'  # AI_A_08 ExceptCivilian + the donor's charge-after-1
       why: >
@@ -432,7 +440,7 @@ enemy_units:
         chapter's clock is its two DECLARED pursuers (`rescue_pursuers`), not whatever else can
         reach a boat. Vanilla Ch6 keeps its rescue targets out of reach with terrain; our map
         cannot, so the licence is spent explicitly instead. `check_rescue_targets` is the guard.
-    name: "Crab Rider"
+    name: "Shark Rider"
     count: 1
     class: cavalier             # vanilla: 1x Lv6 Cavalier, Iron Lance
     level: 6
@@ -442,38 +450,38 @@ enemy_units:
     damage_type: piercing
     positions: [[19, 5]]
     donor: [11, 0]                  # vanilla L6 cavalier
-    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 2. Lance"}
+    skin: {look: "a raider riding a shark, trident", source: "as shark-rider-poison"}
 
-  # ── The sword block (vanilla's 2 Mercenaries) → crab-riders on foot-speed ────
-  - id: merfolk-blade
-    name: "Crab Rider"
+  # ── The sword block (vanilla's 2 Mercenaries) → trident Soldiers (re-classed) ─
+  - id: merfolk-trident-b
+    name: "Mermaid"
     count: 1
-    class: mercenary            # vanilla: 1x Lv6 Mercenary, Iron Sword
+    class: soldier              # vanilla: 1x Lv6 Mercenary, Iron Sword -- re-classed
     level: 6
     autolevel: true
     inventory:
-      - id: iron-sword
-    damage_type: slashing
+      - id: iron-lance
+    damage_type: piercing
     positions: [[6, 12]]
     donor: [14, 14]                 # vanilla L6 mercenary
-    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 1. Sword"}
-  - id: merfolk-blade-drop
-    name: "Crab Rider"
+    skin: {look: "merfolk spear-guard", source: "as merfolk-trident"}
+  - id: merfolk-trident-drop
+    name: "Mermaid"
     count: 1
-    class: mercenary            # vanilla: 1x Lv6 Mercenary, Iron Blade
+    class: soldier              # vanilla: 1x Lv6 Mercenary, Iron Blade -- re-classed
     level: 6
     autolevel: true
     inventory:
+      - id: steel-lance         # the Iron Blade's nearest lance by might (10 to its 9)
       - id: iron-blade
-    item_drop: iron-blade       # vanilla: "Iron Blade -- dropped by enemy Mercenary"
-    damage_type: slashing
+    item_drop: iron-blade       # vanilla: "Iron Blade -- dropped by enemy Mercenary"; still the last item
+    damage_type: piercing
     positions: [[9, 15]]
     donor: [15, 10]                 # vanilla L6 mercenary (the dropper)
-    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade -> 1. Sword"}
+    skin: {look: "merfolk spear-guard", source: "as merfolk-trident"}
 
   # ── The armour block (vanilla's 3 Knights) → IronShell ───────────────────────
-  # The Bael is NOT reused here: it is already the one Bael vanilla fields, and it is
-  # already the crab-riders' mount. IronShell is the only armour anim in the repo that
+  # The Bael is NOT reused here: it is already the one Bael vanilla fields. IronShell is the only armour anim in the repo that
   # carries a LANCE, so the Knights keep vanilla's weapon as well as its class.
   - id: ironshell-guard
     name: "Ironshell"
@@ -601,8 +609,8 @@ enemy_units:
     positions: [[20, 12]]
     donor: [12, 4]                  # vanilla L6 archer
     skin: {look: "merfolk with a harpoon-bow", source: "Mermaid by Stephano -> 4. Bow"}
-  - id: ice-crab
-    name: "Ice Crab"
+  - id: tentacruel
+    name: "Tentacruel"
     count: 1
     class: bael                 # vanilla: 1x Lv1 Bael, Poison Claw -- kept as itself
     level: 1
@@ -613,18 +621,20 @@ enemy_units:
     damage_type: poison
     positions: [[7, 20]]
     donor: [27, 4]                  # vanilla's lone Bael -- the one wandering pursuer
-    skin: {look: "a lake crab the size of a boat", source: "vanilla Bael art, 32x32 -- no reskin"}
+    skin:
+      look: "Tentacruel, a poison jellyfish the size of a boat (not a crab: that is Braulo's)"
+      source: "battle: Pokémon Black/White animated sprite (PokeAPI sprites, gen-v/black-white/animated/73.gif) via battle_anims/tentacruel; map: PMD SpriteCollab sprite/0073 (CHUNSOFT)"
 
   # ── The Hard wave (vanilla's Difficult-only Cavaliers) ───────────────────────
   # Vanilla Ch6 keeps three extra Cavaliers in a SEPARATE UnitDefinition array, loaded by a
   # turn-4 player-phase event and present only on Difficult -- the guide's "Hard-mode cavalry
   # spawning behind you", and the whole of its Normal->Difficult delta (24 -> 27; the wiki
-  # calls it "a UNIT change, not a level shift"). We field the same three, as crab-riders,
+  # calls it "a UNIT change, not a level shift"). We field the same three, as shark riders,
   # with vanilla's own levels and inventories. #48's static bar folds that array in on the
   # vanilla side unconditionally, so declaring ours is what makes the two sides count the
   # same force: with them, the comparison reads x1.00 on both metrics instead of x0.88/x0.82.
-  - id: crab-rider-hard-javelin
-    name: "Crab Rider"
+  - id: shark-rider-hard-javelin
+    name: "Shark Rider"
     count: 1
     class: cavalier             # vanilla (Difficult array): 1x Lv6 Cavalier, Javelin + Iron Lance
     level: 6
@@ -653,9 +663,9 @@ enemy_units:
         to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [3, 11]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
-    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
-  - id: crab-rider-hard-lance
-    name: "Crab Rider"
+    skin: {look: "a raider riding a shark, trident", source: "as shark-rider-poison"}
+  - id: shark-rider-hard-lance
+    name: "Shark Rider"
     count: 1
     class: cavalier             # vanilla (Difficult array): 1x Lv7 Cavalier, Iron Lance
     level: 7
@@ -679,9 +689,9 @@ enemy_units:
         to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [2, 9]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
-    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
-  - id: crab-rider-hard-sword
-    name: "Crab Rider"
+    skin: {look: "a raider riding a shark, trident", source: "as shark-rider-poison"}
+  - id: shark-rider-hard-sword
+    name: "Shark Rider"
     count: 1
     class: cavalier             # vanilla (Difficult array): 1x Lv6 Cavalier, Iron Sword + Javelin
     level: 6
@@ -706,7 +716,7 @@ enemy_units:
         to `check_rescue_targets` until it stopped skipping reinforcements (#366 review).
     donor: [2, 13]
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
-    skin: {look: "merfolk astride a lake crab", source: "as crab-rider-blade"}
+    skin: {look: "a raider riding a shark, trident", source: "as shark-rider-poison"}
 
   # ── The boss (vanilla's Novala) ──────────────────────────────────────────────
   # Novala's own line, from the wiki's boss table: Shaman Lv10, HP 28, Mag 10, Skl 8,
@@ -900,7 +910,7 @@ terrain_divergence:
 # in one turn, and its clock is pursuers only. Ours is the same shape, bought with the AI byte.
 rescue_pursuers:
 - id: merfolk-thrower           # east: JAVELIN, range 1-2, so the pocket door never stops it
-- id: ice-crab                  # west: range 1, so it must OCCUPY the door -- and it does
+- id: tentacruel                # west: range 1, so it must OCCUPY the door -- and it does
 
 rescue_boats:
 - id: boat-east

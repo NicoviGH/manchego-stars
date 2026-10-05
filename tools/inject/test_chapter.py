@@ -40,6 +40,15 @@ CLASS_RESKIN_FOE_WEAPON = {
     # (Nicolas, 2026-08-20). This entry was missing on the theory that archers could not be
     # benched at all, which was the picker's limitation wearing a class's name.
     'CLASS_ARCHER':    ['ITEM_BOW_IRON'],
+    'CLASS_CAVALIER':  ['ITEM_LANCE_IRON', 'ITEM_LANCE_JAVELIN'],
+    'CLASS_ARMOR_KNIGHT': ['ITEM_LANCE_IRON'],
+    'CLASS_SHAMAN':    ['ITEM_DARK_FLUX'],
+    'CLASS_MAGE':      ['ITEM_ANIMA_FIRE'],
+    'CLASS_BAEL':      ['ITEM_MONSTER_VENINCLW'],
+    # Healers bench too: they cannot counter, so `recordenemy` wounds a neighbour and films the
+    # heal on the enemy phase instead (every standard AI action tries AiTryDoStaff first).
+    'CLASS_PRIEST':    ['ITEM_STAFF_MEND'],
+    'CLASS_TROUBADOUR': ['ITEM_STAFF_MEND'],
 }
 # The TESTCH sandbox's bench row. A tile at x=16 is not a tile at all on a 15-wide map, and
 # it shipped as one anyway: the strip was extended a slot at a time as creatures joined, and
@@ -108,12 +117,34 @@ def _next_sandbox_tile(tiles, who):
                  'add a tile to SANDBOX_FOE_POSITIONS' % (len(SANDBOX_FOE_POSITIONS), who))
 
 
-def _sandbox_foe_roster(campaign):
-    """A UnitDefinition[] body deploying one hostile of each enemy_class_reskins slot, so the
-    TESTCH sandbox is the single battle-anim bench (`recordenemy` baits any of them). Generic
+def bench_chapters(campaign):
+    """Every chapter with a creature to bench, in order: the chapters reskins dress, plus
+    the chapters the raw-pid creatures come from."""
+    chs = {ch for rk in enemy_class_reskins(campaign) for ch in (rk.get('dresses') or {})}
+    chs |= {_chapter_of(yaml_name) for yaml_name, _pid in RAW_PID_BATTLE_ANIMS.values()}
+    return sorted(chs)
+
+
+def _chapter_of(chapter_yaml):
+    return chapter_yaml.split('-')[0]          # 'ch05-the-elven-tomb.yaml' -> 'ch05'
+
+
+def _sandbox_foe_roster(campaign, bench=None):
+    """A UnitDefinition[] body deploying one hostile of each creature ONE chapter adds, so
+    the TESTCH sandbox is the battle-anim bench (`recordenemy` baits any of them). Generic
     autolevel monsters (charIndex 0x80), FACTION_ID_RED, HOLD ai so they stay put to be baited,
     iron loadout by the reskin's BASE weapon type. A reskin whose base has no mapped weapon is
-    skipped (never a foe)."""
+    skipped (never a foe).
+
+    ONE CHAPTER AT A TIME (`make TESTCH=1 BENCH=chNN`; the newest by default). The bench is 14
+    tiles, because the party holds rows 3-7 and two foes may not stand adjacent. Benching every
+    chapter at once overflowed it when ch06 added six, and each later chapter adds about as many,
+    so a wider map would only move the wall. A chapter's own creatures always fit."""
+    chapters = bench_chapters(campaign)
+    bench = bench or chapters[-1]
+    if bench not in chapters:
+        sys.exit('ERROR: BENCH=%s has no creature to bench; pick one of %s'
+                 % (bench, ', '.join(chapters)))
     entries = []
     # ONE cursor over the tiles, advanced only when a row is actually emitted. `zip` here used
     # to burn a tile on every weapon-less reskin it skipped, so the raw-pid loop below (which
@@ -124,7 +155,7 @@ def _sandbox_foe_roster(campaign):
     tiles = iter(SANDBOX_FOE_POSITIONS)
     for rk in enemy_class_reskins(campaign):
         weapon = CLASS_RESKIN_FOE_WEAPON.get(rk['base'])
-        if not weapon:
+        if not weapon or bench not in (rk.get('dresses') or {}):
             continue
         x, y = _next_sandbox_tile(tiles, rk['slot'])
         entries.append(
@@ -148,6 +179,8 @@ def _sandbox_foe_roster(campaign):
     # proves the opposite of what it was run for. No autolevel: these are named units whose
     # level is the chapter's.
     for uid, (chapter_yaml, pid) in sorted(RAW_PID_BATTLE_ANIMS.items()):
+        if _chapter_of(chapter_yaml) != bench:
+            continue
         unit = _chapter_unit(campaign, chapter_yaml, uid)
         if not unit.get('battle_anim'):
             continue
@@ -170,7 +203,7 @@ def _sandbox_foe_roster(campaign):
     return '{\n' + '\n'.join(entries) + '\n    { 0 },\n}'
 
 
-def inject_test_chapter(campaign, verbose=True, lord_boot=False):
+def inject_test_chapter(campaign, verbose=True, lord_boot=False, bench=None):
     """Rewrite Ch1's ally roster to our classed cast and disable Ch1 tutorials."""
     # Build the cast roster in PORTRAIT_MAP order, skipping name-only units (no class).
     units = []
@@ -214,7 +247,7 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False):
     # Make the sandbox the single battle-anim bench: replace the Ch1 foe roster with one
     # hostile of every enemy_class_reskins slot (the begin scene already LOAD1s this symbol),
     # so `recordenemy` can capture any reskinned class's anim without a chapter-specific setup.
-    foes = _sandbox_foe_roster(campaign)
+    foes = _sandbox_foe_roster(campaign, bench)
     udefs = _replace_brace_block(
         udefs, 'UnitDef_Event_Ch1Enemy[] =', foes, CH1_UDEFS_H)
     with open(CH1_UDEFS_H, 'w', encoding='utf-8') as f:

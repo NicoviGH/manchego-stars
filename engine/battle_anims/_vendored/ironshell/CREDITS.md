@@ -1,0 +1,7 @@
+F2U/F2E
+
+Vanilla General and Pupil sprites by IS.
+
+IronShell animation by Alexsplode.
+
+Scripting by Alexsplode.
