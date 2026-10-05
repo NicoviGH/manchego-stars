@@ -483,7 +483,7 @@ def twin_route_findings(chapters):
     chapter already used, or one behind it, pays our party a chapter of exp the vanilla curve
     does not contain. The cumulative band sees one reuse today (a canary pointing ch06 at
     ch05's twin reads 1.22x), but a band only fails on the drift it has accumulated, and the
-    route rule names the chapter that broke it. Skipping ahead is allowed (ch08 -> FE8 Ch13): that only leaves the party behind. A
+    route rule names the chapter that broke it. Skipping ahead is allowed: that only leaves the party behind. A
     twin `_twin_rank` cannot place is reported too, so a new name (a route split) gets ranked
     rather than waved through. A chapter with no twin is skipped."""
     out, last = [], None

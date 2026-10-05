@@ -1324,14 +1324,16 @@ class VanillaParty(unittest.TestCase):
             ('Vanessa', 1, 'FE8 Ch2'), ('Ross', 1, 'FE8 Ch3'), ('Garcia', 4, 'FE8 Ch3'),
             ('Moulder', 3, 'FE8 Ch2'), ('Neimi', 1, 'FE8 Ch3'), ('Colm', 2, 'FE8 Ch4'),
             ('Artur', 2, 'FE8 Ch4'), ('Lute', 1, 'FE8 Ch4'), ('Natasha', 1, 'FE8 Ch5'),
-            ('Joshua', 5, 'FE8 Ch6')])
+            ('Joshua', 5, 'FE8 Ch6'),
+            # Ch8 reunites Ephraim's band -- their real join, not the Prologue cameo (#459).
+            ('Ephraim', 4, 'FE8 Ch8'), ('Forde', 6, 'FE8 Ch8'), ('Kyle', 5, 'FE8 Ch8')])
 
     def test_cutscene_loads_and_cameos_do_not_join(self):
         # The Prologue throne room stands Moulder/Vanessa up unarmed, and Ch4's armed green
         # Larachel/Dozla/Rennac have no talk recruit there.
-        chars = {r.char for r in df.vanilla_recruits()}
-        self.assertNotIn('CHARACTER_EPHRAIM', chars)
-        self.assertNotIn('CHARACTER_LARACHEL', chars)
+        joins = {r.char: df.VANILLA_CHAIN[r.fields_from] for r in df.vanilla_recruits()}
+        self.assertEqual(joins['CHARACTER_EPHRAIM'], 'FE8 Ch8')   # not the Prologue's unarmed load
+        self.assertNotIn('CHARACTER_LARACHEL', joins)
 
     def test_ch1_party_is_the_four_deploy_units(self):
         party = df.vanilla_party('FE8 Ch1')
