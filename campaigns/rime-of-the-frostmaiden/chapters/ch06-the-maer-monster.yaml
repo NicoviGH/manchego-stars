@@ -159,7 +159,7 @@ difficulty_note: >
   ACTION".
 
   Neither boat is answered by a body-block, and the #360 review is why that is written down:
-  the crab reaches the door on turn 2 and the player's earliest arrival anywhere near it is
+  Tentacruel reaches the door on turn 2 and the player's earliest arrival anywhere near it is
   Pinky on turn 3, so "race it to the door" was a lever that did not exist. What the west
   boat offers is a SOFTER kill -- a Level 1 Bael, the weakest unit on the map -- on the
   FASTER fuse, because its claw poisons. The east is a Level 7 soldier that throws from
@@ -209,9 +209,12 @@ deployment:
     - [10, 0]
   note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit. NOTHING is forced: Messie's scene is a cutscene, so Marty and Braulo are loaded as scene actors whether or not they were deployed (vanilla stages cutscene characters exactly this way -- ch04's moose sighting is ours). Braulo (Pirate, river cost 2) and Trex (Thief, cost 5 -- one channel cell per turn at mov 6) are the only PCs who cross the channels on foot; Pinky is the only flier. Positions set in Tiled."
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
-# DERIVED, not invented: every row below is one of vanilla Ch6's own 24 units -- same class,
-# same level, same inventory -- re-dressed as merfolk. Source is the Fire Emblem Wiki enemy
-# table for Victims of War (Normal), the same page `tools/fe8_guide_mine.py` mines; the
+# DERIVED, not invented: every row below is one of vanilla Ch6's own 24 units -- same level,
+# same donor and AI, and (but for five) the same class and inventory -- re-dressed as merfolk.
+# The five: vanilla's 3 Fighters fight as shark-rider Cavaliers and its 2 Mercenaries as trident
+# Soldiers, each weapon swapped for its nearest lance (ADR 0329, measured at parity). Source is
+# the Fire Emblem Wiki enemy table for Victims of War (Normal), the same page
+# `tools/fe8_guide_mine.py` mines; the
 # guide's digest prints only the top six classes, so the per-unit levels here come from the
 # cached page directly. Totals check: 24 units, levels summing to 148, average 6.17 --
 # vanilla's own 6.17 to the decimal.
@@ -1019,7 +1022,7 @@ playtest:
     # twenty-four enemies is several times the work a village case does.
     - name: ch06clock
       proves: >
-        both pursuers path to their hull without stalling, and the range-1 crab attacks the
+        both pursuers path to their hull without stalling, and the range-1 Tentacruel attacks the
         west boat only from its pocket door -- the single melee cell the pocket promises
       lua: ch06clock
       deadline: 900
