@@ -15,9 +15,10 @@ grid, sampled at cell centres, so JPEG noise never reaches the bust:
     10) and its pale belly on the cast light grey (idx 11), each at the art's own brightness, so
     the ramp survives. Gold goggles, black outline/hat and white eyes are not blue and stay.
   * no-hat -- the hat's cells are erased to background, and any erased cell touching exposed
-    skin or goggle is re-inked as outline. That left the head flat at the goggle strap, so
-    CROWN paints a rounded skull back in on the native grid (Nicolas, 2026-10-05: "fill his
-    head in a bit"), in the ramp's own slate shades; the goggles sit on its forehead.
+    skin or goggle is re-inked as outline. That left the back of the skull a flat diagonal,
+    so CROWN rounds the back out on the native grid, in the ramp's own slate shades, with ONE
+    row of crown peaking toward the back so the top is not flat either (Nicolas, 2026-10-05:
+    "just round out the back", then "the top looks flat").
   * bust -- ref_to_bust at ONE crop for both, the largest that leaves FE8's dead corners empty
     with the hat on (0 clipped px, portrait_tool.clipped_mask), flipped to face screen-left and
     matted black so the white background cannot halo the outline. Same crop = same scale: in
@@ -80,19 +81,16 @@ def remove_hat(img):
     return img
 
 
-# The skull the hat hid, painted on the native grid (cols from CROWN_X0; '_' leaves a cell as
-# is): '#' outline, 's' slate (cast idx 10), 'h' its highlight, 'd' its shade -- the three
-# shades the retinted ramp already uses on his snout.
-CROWN_INK = {'#': (0, 0, 0), 's': SKIN, 'h': (0x79, 0x8c, 0xb2), 'd': (0x43, 0x4e, 0x66)}
+# The back of the skull the hat hid, rounded out on the native grid (cols from CROWN_X0;
+# '_' leaves a cell as is, '.' erases it): '#' outline, 's' slate (cast idx 10), 'd' its
+# shade -- shades the retinted ramp already uses on his snout.
+CROWN_INK = {'#': (0, 0, 0), 's': SKIN, 'd': (0x43, 0x4e, 0x66), '.': (255, 255, 255)}
 CROWN_X0 = 23
 CROWN = [
-    (4, "______######______"),
-    (5, "____##hhhhhh##____"),
-    (6, "___#shhhhhhhhs#___"),
-    (7, "__#dshhhhhhhss#___"),
-    (8, "_#dssss_______s#__"),
-    (9, "_#dsss________#___"),
-    (10, "_#dsss_________#__"),
+    (7, "______#####_______"),
+    (8, "____##sssss##_____"),
+    (9, "__.#dss___________"),
+    (10, "_.#dss____________"),
     (11, "_#dss_____________"),
     (12, "_#dds_____________"),
 ]
