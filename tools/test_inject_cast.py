@@ -698,5 +698,21 @@ class Ch05RecruitIdentities(unittest.TestCase):
                             '%s.yaml needs a death_quote' % uid)
 
 
+class MessiePortraits(unittest.TestCase):
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_messie_dresses_two_collision_free_slots_one_per_look(self):
+        # ch06's Messie (no hat) and ch07's mayor (hat) are two faces, so two slots. Syrene
+        # (vanilla ch17) and Gheb (vanilla ch9b) never appear in our ch00-08 and nothing else
+        # in the repo names them; both must be dressed AND geometry-normalized (#26).
+        self.assertEqual('Syrene', inject.cast.GUEST_PORTRAIT_MAP['messie'])
+        self.assertEqual('Gheb', inject.cast.GUEST_PORTRAIT_MAP['messie-mayor'])
+        slots = list(inject.cast.PORTRAIT_MAP.values()) + list(inject.cast.GUEST_PORTRAIT_MAP.values())
+        self.assertEqual(len(slots), len(set(slots)), 'Messie collides with another portrait')
+        dressed = inject.portraits.dressed_portrait_slots(self.CAMPAIGN)
+        self.assertIn('Syrene', dressed)
+        self.assertIn('Gheb', dressed)
+
+
 if __name__ == '__main__':
     unittest.main()

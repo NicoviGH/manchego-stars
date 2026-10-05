@@ -177,6 +177,12 @@ GUEST_PORTRAIT_MAP = {
     # Riev -- a late-game Bishop absent from our ch00-08 and otherwise unused. The raw pid's
     # CharacterData portraitId is bound separately by RAW_PID_PORTRAITS below.
     'ravisin':        'Riev',
+    # Messie (ch06-the-maer-monster.yaml) has two faces, so two slots: no hat in ch06, the
+    # mayor's top hat from the end of ch07 (portraits/messie.py renders both). Syrene (vanilla
+    # ch17) and Gheb (vanilla ch9b) are absent from our ch00-08 and named nowhere else ->
+    # collision-free. Cutscene-only (no map unit).
+    'messie':         'Syrene',
+    'messie-mayor':   'Gheb',
 }
 
 

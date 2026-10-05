@@ -22,6 +22,8 @@ Usage:
                       headroom (clears FE8's dead top corners); default 1.0.
       --sharpen pct   optional UnsharpMask at target res (default 0 = off).
       --bg-thresh d   RGB distance from the border colour treated as background.
+      --matte rrggbb  paint the keyed background this colour (the outline's) before
+                      the downscale, so a light background cannot halo the edge.
       --preview big   also write a 3x nearest-neighbour preview.
 
 The --crop box is per-character framing; aim for ~96:80 (1.2) aspect.
@@ -138,7 +140,49 @@ def _pngquant_quantize(img, m, ncolors=16):
     return out, keep.reshape(-1).tolist()
 
 
-def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0):
+def sample_pixel_grid(img, cell, origin=0):
+    """A pixel-art ref saved large (and often as a JPEG) -> its NATIVE grid, one sample per
+    cell centre. Every later step then sees the artist's flat colours, never compression
+    noise; scale back up with NEAREST before convert(). `origin` is the grid's offset in the
+    ref (a cell boundary at x = origin + k*cell). Messie's ref is 41px cells at -1 (#26)."""
+    img = img.convert('RGB')
+    nw, nh = (img.width - origin) // cell, (img.height - origin) // cell
+    out = Image.new('RGB', (nw, nh), (255, 255, 255))
+    for j in range(nh):
+        for i in range(nw):
+            x, y = origin + i * cell + cell // 2, origin + j * cell + cell // 2
+            if 0 <= x < img.width and 0 <= y < img.height:
+                out.putpixel((i, j), img.getpixel((x, y)))
+    return out
+
+
+def _lum(a):
+    return 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
+
+
+def retint_ramp(img, dark, light, select, blend=None):
+    """Repaint one colour family onto two target colours, keeping the art's own shading.
+
+    `dark` and `light` are (source_rgb, target_rgb) anchors: a pixel as bright as an anchor's
+    source lands exactly on its target, brighter or darker ones scale with it, and pixels
+    inside `blend` (a (lo, hi) luminance window; default: the middle of the two anchors)
+    blend. `select(rgb_float_array) -> bool mask` picks the family
+    (e.g. "blue-ish"), so outline, metal and eyes outside it are untouched. Used to bring a ref
+    onto the cast palette its map sprite already wears (Messie: blue -> slate, #26)."""
+    a = np.asarray(img.convert('RGB')).astype(np.float32) / 255
+    f = lambda c: np.array(c, np.float32) / 255
+    L = _lum(a)
+    l0, l1 = _lum(f(dark[0])), _lum(f(light[0]))
+    lo, hi = blend or (l0 + (l1 - l0) * 0.35, l1 - (l1 - l0) * 0.2)
+    w = np.clip((L - lo) / max(hi - lo, 1e-6), 0, 1)[..., None]
+    new = np.clip(f(dark[1]) * (L / l0)[..., None] * (1 - w)
+                  + f(light[1]) * (L / l1)[..., None] * w, 0, 1)
+    m = select(a)
+    a[m] = new[m]
+    return Image.fromarray((a * 255).round().astype('uint8'))
+
+
+def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None):
     src = Image.open(ref_path).convert('RGB')
     src, crop_box = _zoom_out(src, crop_box, zoom)
     src, crop_box = _pad_to_box(src, crop_box)
@@ -179,6 +223,13 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0):
     # Area-average downscale to target (BOX to 2x then LANCZOS) -- keeps flat
     # colour zones and gradients clean at the ~20x reduction.
     hires = src.crop(crop_box)
+    if matte is not None:
+        # Paint the keyed background with the subject's OUTLINE colour before the downscale.
+        # Left as is, a light background averages into every edge pixel and quantizes into a
+        # light halo outside the outline (Messie's white-backed pixel art, #26); matted, the
+        # edge blends outline into outline and stays clean.
+        bgm = Image.fromarray((conn * 255).astype('uint8')).resize(hires.size, Image.NEAREST)
+        hires.paste(Image.new('RGB', hires.size, tuple(matte)), (0, 0), bgm)
     img = hires.resize((BUST_W * 2, BUST_H * 2), Image.BOX).resize((BUST_W, BUST_H), Image.LANCZOS)
     if sharpen:
         img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=sharpen, threshold=1))
@@ -221,10 +272,14 @@ def main():
     ap.add_argument('--flip-h', action='store_true',
                     help='mirror horizontally so the bust faces FE8-canonical screen-left '
                          '(use when the ref faces right); record as art.render.flip_h in YAML.')
+    ap.add_argument('--matte', help='hex colour (e.g. 000000) painted over the keyed background '
+                    'before the downscale -- the subject\'s outline colour; kills a light halo. '
+                    'Record as art.render.matte in YAML.')
     ap.add_argument('--preview', help='also write a 3x nearest-neighbour preview here')
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
-    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.zoom)
+    matte = tuple(int(a.matte[i:i + 2], 16) for i in (0, 2, 4)) if a.matte else None
+    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.zoom, matte)
     if a.flip_h:
         res = res.transpose(Image.FLIP_LEFT_RIGHT)
     res.save(a.out)
