@@ -799,13 +799,12 @@ messie:
   role: cutscene_actor
   appears_in: events/ch06-messie.ea
   art_note: >
-    32x32 is the ENGINE CEILING for a map sprite -- UNIT_ICON_SIZE_* has exactly three values
-    and bmudisp.c switches on them in five places -- so size has to come from FILLING the cell
-    corner to corner. He never moves and never fights, so he needs no walk sheet and NO battle
-    animation: a 3-frame idle is the whole ask. Design intent (2026-08-26): a breaching
-    head-and-neck as the sprite, with the REST of him painted into the tilemap, which has no
-    size limit and costs no engine work. "A large mass glides through the dark water below
-    you" is the book's own line (p.30).
+    Two busts, rendered by portraits/messie.py from one ref: messie.png (ch06, no hat) and
+    messie-mayor.png (the top hat, from the end of ch07), on the Syrene and Gheb face slots.
+    His map sprite is Nicolas's (map_sprites/messie.png, and messie-mayor.png with the hat),
+    the whole animal in one 32x32 cell -- the engine ceiling (UNIT_ICON_SIZE_* has three
+    values). He never moves or fights, so it needs no walk sheet and no battle animation;
+    it is not wired yet (an `art.map_sprite` block and an SMS id).
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
