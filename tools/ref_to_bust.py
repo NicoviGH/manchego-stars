@@ -146,10 +146,10 @@ def sample_pixel_grid(img, cell, origin=0):
     noise; scale back up with NEAREST before convert(). `origin` is the grid's offset in the
     ref (a cell boundary at x = origin + k*cell). Messie's ref is 41px cells at -1 (#26)."""
     img = img.convert('RGB')
-    n = (img.width - origin) // cell
-    out = Image.new('RGB', (n, n), (255, 255, 255))
-    for j in range(n):
-        for i in range(n):
+    nw, nh = (img.width - origin) // cell, (img.height - origin) // cell
+    out = Image.new('RGB', (nw, nh), (255, 255, 255))
+    for j in range(nh):
+        for i in range(nw):
             x, y = origin + i * cell + cell // 2, origin + j * cell + cell // 2
             if 0 <= x < img.width and 0 <= y < img.height:
                 out.putpixel((i, j), img.getpixel((x, y)))

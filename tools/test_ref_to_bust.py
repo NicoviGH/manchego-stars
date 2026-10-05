@@ -60,6 +60,10 @@ class PixelGridAndRetint(unittest.TestCase):
         self.assertTrue(all(abs(a - b) < 12 for a, b in zip(got.getpixel((1, 2)), (40, 140, 230))))
         self.assertTrue(min(got.getpixel((0, 0))) > 240)
 
+    def test_grid_sampling_keeps_a_non_square_ref_s_shape(self):
+        tall = Image.new('RGB', (2 * 41, 5 * 41), 'white')
+        self.assertEqual(rb.sample_pixel_grid(tall, 41).size, (2, 5))
+
     def test_retint_lands_each_anchor_exactly_and_leaves_unselected_pixels(self):
         dark_src, light_src, gold = (51, 148, 234), (212, 236, 241), (208, 160, 40)
         img = Image.new('RGB', (3, 1))
