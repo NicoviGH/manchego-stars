@@ -17,8 +17,12 @@ Nothing on a branch. **Next, in order:**
 1. **#26 — the rest of ch06:** Messie's `art.map_sprite` wiring (Nicolas's `messie.png` /
    `messie-mayor.png`), then the three cutscenes. His busts are on the Syrene (no hat) and
    Gheb (mayor) face slots. The boarding pass still waits on the crews' voice (below).
-2. **#459 — roster parity with vanilla, chapter by chapter** (Nicolas wants vanilla's count and
-   diversity, replacing ADR 0047's 16-18 budget). Derive vanilla's join table from the decomp first.
+2. **ch07/ch08 twins are wrong (Nicolas, 2026-10-05):** the twin is the chapter NUMBER even
+   when the map is borrowed. Repoint ch07 `FE8 Ch6`→`Ch7` and ch08 `FE8 Ch13`→`Ch8`, curate
+   both into the difficulty registry, extend `VANILLA_CHAIN`, ADR it. Detail on #459.
+3. **#459 — roster parity with vanilla, chapter by chapter** (Nicolas wants vanilla's count and
+   diversity, replacing ADR 0047's 16-18 budget). The decomp join table, deploy limits and
+   coverage audit are on the issue; Baxby-as-Seth is the open call there (reverses ADR 0042).
 
 - `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
