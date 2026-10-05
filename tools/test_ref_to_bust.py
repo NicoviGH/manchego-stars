@@ -48,5 +48,30 @@ class Matte(unittest.TestCase):
         self.assertEqual([c for c in _edge_colours(bust) if sum(c) > 3 * 90], [])
 
 
+class PixelGridAndRetint(unittest.TestCase):
+    def test_grid_sampling_recovers_the_native_art_through_jpeg_noise(self):
+        import io
+        art = Image.new('RGB', (4, 4), 'white')
+        art.putpixel((1, 2), (40, 140, 230))
+        big = art.resize((4 * 41, 4 * 41), Image.NEAREST)
+        buf = io.BytesIO(); big.save(buf, 'JPEG', quality=80); buf.seek(0)
+        got = rb.sample_pixel_grid(Image.open(buf), 41)
+        self.assertEqual(got.size, (4, 4))
+        self.assertTrue(all(abs(a - b) < 12 for a, b in zip(got.getpixel((1, 2)), (40, 140, 230))))
+        self.assertTrue(min(got.getpixel((0, 0))) > 240)
+
+    def test_retint_lands_each_anchor_exactly_and_leaves_unselected_pixels(self):
+        dark_src, light_src, gold = (51, 148, 234), (212, 236, 241), (208, 160, 40)
+        img = Image.new('RGB', (3, 1))
+        for i, c in enumerate((dark_src, light_src, gold)):
+            img.putpixel((i, 0), c)
+        blue = lambda a: a[..., 2] > a[..., 0] + 0.03
+        out = rb.retint_ramp(img, (dark_src, (95, 111, 144)), (light_src, (180, 184, 190)), blue)
+        near = lambda p, q: all(abs(x - y) <= 1 for x, y in zip(p, q))
+        self.assertTrue(near(out.getpixel((0, 0)), (95, 111, 144)))
+        self.assertTrue(near(out.getpixel((1, 0)), (180, 184, 190)))
+        self.assertEqual(out.getpixel((2, 0)), gold)
+
+
 if __name__ == '__main__':
     unittest.main()

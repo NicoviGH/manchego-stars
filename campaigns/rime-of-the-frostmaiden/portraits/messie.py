@@ -43,35 +43,16 @@ HAT_ROWS = 8                               # rows 0..8 are hat entirely
 HAT_BRIM = (9, 13, 28)                     # rows 9..13, columns <= 28: the brim behind the head
 
 
-def native(path=REF):
-    src = Image.open(path).convert('RGB')
-    n = (src.width - ORIGIN) // CELL
-    out = Image.new('RGB', (n, n), (255, 255, 255))
-    for j in range(n):
-        for i in range(n):
-            x, y = ORIGIN + i * CELL + CELL // 2, ORIGIN + j * CELL + CELL // 2
-            if 0 <= x < src.width and 0 <= y < src.height:
-                out.putpixel((i, j), src.getpixel((x, y)))
-    return out
-
-
-def _lum(a):
-    return 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
-
-
-def retint(img):
-    a = np.asarray(img).astype(np.float32) / 255
+def _blue(a):
     r, b = a[..., 0], a[..., 2]
     mx, mn = a.max(2), a.min(2)
-    sat = (mx - mn) / np.maximum(mx, 1e-6)
-    blue = (b >= r + 0.03) & (sat > 0.05)
-    L = _lum(a)
-    f = lambda c: np.array(c, np.float32) / 255
-    ls, lb = _lum(f(SKIN_FROM)), _lum(f(BELLY_FROM))
-    w = np.clip((L - 0.62) / 0.2, 0, 1)[..., None]          # 0 = skin ramp, 1 = belly ramp
-    new = np.clip(f(SKIN) * (L / ls)[..., None] * (1 - w) + f(BELLY) * (L / lb)[..., None] * w, 0, 1)
-    a[blue] = new[blue]
-    return Image.fromarray((a * 255).round().astype('uint8'))
+    return (b >= r + 0.03) & ((mx - mn) / np.maximum(mx, 1e-6) > 0.05)
+
+
+def grey_grid():
+    grid = ref_to_bust.sample_pixel_grid(Image.open(REF), CELL, ORIGIN)
+    return ref_to_bust.retint_ramp(grid, (SKIN_FROM, SKIN), (BELLY_FROM, BELLY), _blue,
+                                   blend=(0.62, 0.82))
 
 
 def _is_bg(c):
@@ -112,7 +93,7 @@ def bust(grid):
 
 
 def main():
-    grey = retint(native())
+    grey = grey_grid()
     for name, grid in (('messie-mayor', grey), ('messie', remove_hat(grey))):
         path = os.path.join(HERE, name + '.png')
         bust(grid).save(path)

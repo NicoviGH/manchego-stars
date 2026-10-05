@@ -140,6 +140,48 @@ def _pngquant_quantize(img, m, ncolors=16):
     return out, keep.reshape(-1).tolist()
 
 
+def sample_pixel_grid(img, cell, origin=0):
+    """A pixel-art ref saved large (and often as a JPEG) -> its NATIVE grid, one sample per
+    cell centre. Every later step then sees the artist's flat colours, never compression
+    noise; scale back up with NEAREST before convert(). `origin` is the grid's offset in the
+    ref (a cell boundary at x = origin + k*cell). Messie's ref is 41px cells at -1 (#26)."""
+    img = img.convert('RGB')
+    n = (img.width - origin) // cell
+    out = Image.new('RGB', (n, n), (255, 255, 255))
+    for j in range(n):
+        for i in range(n):
+            x, y = origin + i * cell + cell // 2, origin + j * cell + cell // 2
+            if 0 <= x < img.width and 0 <= y < img.height:
+                out.putpixel((i, j), img.getpixel((x, y)))
+    return out
+
+
+def _lum(a):
+    return 0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]
+
+
+def retint_ramp(img, dark, light, select, blend=None):
+    """Repaint one colour family onto two target colours, keeping the art's own shading.
+
+    `dark` and `light` are (source_rgb, target_rgb) anchors: a pixel as bright as an anchor's
+    source lands exactly on its target, brighter or darker ones scale with it, and pixels
+    inside `blend` (a (lo, hi) luminance window; default: the middle of the two anchors)
+    blend. `select(rgb_float_array) -> bool mask` picks the family
+    (e.g. "blue-ish"), so outline, metal and eyes outside it are untouched. Used to bring a ref
+    onto the cast palette its map sprite already wears (Messie: blue -> slate, #26)."""
+    a = np.asarray(img.convert('RGB')).astype(np.float32) / 255
+    f = lambda c: np.array(c, np.float32) / 255
+    L = _lum(a)
+    l0, l1 = _lum(f(dark[0])), _lum(f(light[0]))
+    lo, hi = blend or (l0 + (l1 - l0) * 0.35, l1 - (l1 - l0) * 0.2)
+    w = np.clip((L - lo) / max(hi - lo, 1e-6), 0, 1)[..., None]
+    new = np.clip(f(dark[1]) * (L / l0)[..., None] * (1 - w)
+                  + f(light[1]) * (L / l1)[..., None] * w, 0, 1)
+    m = select(a)
+    a[m] = new[m]
+    return Image.fromarray((a * 255).round().astype('uint8'))
+
+
 def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None):
     src = Image.open(ref_path).convert('RGB')
     src, crop_box = _zoom_out(src, crop_box, zoom)
