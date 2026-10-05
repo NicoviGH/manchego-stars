@@ -454,7 +454,7 @@ enemy_units:
 
   # ── The sword block (vanilla's 2 Mercenaries) → trident Soldiers (re-classed) ─
   - id: merfolk-trident-b
-    name: "Shark Rider"
+    name: "Mermaid"
     count: 1
     class: soldier              # vanilla: 1x Lv6 Mercenary, Iron Sword -- re-classed
     level: 6
@@ -466,7 +466,7 @@ enemy_units:
     donor: [14, 14]                 # vanilla L6 mercenary
     skin: {look: "merfolk spear-guard", source: "as merfolk-trident"}
   - id: merfolk-trident-drop
-    name: "Shark Rider"
+    name: "Mermaid"
     count: 1
     class: soldier              # vanilla: 1x Lv6 Mercenary, Iron Blade -- re-classed
     level: 6

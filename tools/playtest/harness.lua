@@ -4545,7 +4545,6 @@ local function captureHeal(actorAddr, tag)
     return captureAttack(actorAddr, tag)
 end
 
-                                             -- (same corner CH01_PARK reuses later for the real ch01 seize)
 
 -- Defend/dodge capture (#191): ride out the enemy phase watching gProc_ekrBattle, screenshotting
 -- with the SAME shootCombatFrames loop as captureAttack/captureHeal -- but there is no menu to
@@ -4809,7 +4808,7 @@ end
 -- dresses (BENCH=chNN at build time, default the newest; the bench holds one chapter); the money shot is the ATTACK swing, which a defender never plays, so a HARMLESS
 -- (pow 0) player attacks the chosen foe at melee -> it survives and COUNTER-attacks, and
 -- captureAttack shoots the whole battle. Needs `make TESTCH=1`. Pick the foe with PT_CHAR
--- (default kobold-grunt, which needs BENCH=ch03) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
+-- (default: the first creature on the bench) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
 -- symbols.lua from the built classes.h) maps it to the class id it was built as.
 -- Named RAW-PID creatures are picked by CHARACTER, not by class (the table lives inside the
 -- scenario: this chunk is at the 200-local ceiling). Their anim binds through CharacterData
@@ -4819,7 +4818,20 @@ end
 scenarios.recordenemy = function()
     if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
     wait(60); pokeAnimsOn()
-    local sel = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or "kobold-grunt"
+    local sel = (PLAYTEST_CHAR and PLAYTEST_CHAR ~= "") and PLAYTEST_CHAR or nil
+    if not sel then
+        -- No PT_CHAR: the first creature actually on the bench. A fixed default names one
+        -- chapter's creature, and the bench now seats a single chapter (BENCH=chNN).
+        for i = 0, 23 do
+            local r = unitAt(SYM.gUnitArrayRed, i)
+            if r and not isDead(r) then
+                local cls = ru8(ru32(r.addr + 0x04) + 0x04)
+                for name, id in pairs(RESKIN_CLASS) do if id == cls then sel = name end end
+                if sel then break end
+            end
+        end
+        if not sel then return result("FAIL", "no reskinned creature on the bench") end
+    end
     -- Raw-pid creatures the sandbox deploys under their OWN pid (RAW_PID_BATTLE_ANIMS).
     local wantPid = ({ ["white-moose"] = 0xb9,   -- ch05's cornered miniboss (#25)
                        ["ravisin"]     = 0xb8 }) -- ch05's frost-druid boss (#25)
