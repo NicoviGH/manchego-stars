@@ -22,14 +22,14 @@ import check                                            # noqa: E402
 DOC = {
     'rescue_boats': [{'id': 'boat-east', 'tile': [17, 12], 'door': [17, 13],
                       'declared_fuse': 7}],
-    'enemy_units': [{'id': 'ice-crab', 'positions': [[7, 20]]}],
+    'enemy_units': [{'id': 'tentacruel', 'positions': [[7, 20]]}],
 }
 CLEAN = '''return {
     BOATS = {
         { id = "boat-east", pid = 0xbb, x = 17, y = 12, doorX = 17, doorY = 13, sinks_on = 7 },
     },
     PURSUERS = {
-        { id = "ice-crab", boat = "boat-west", x = 7, y = 20, range = 1 },
+        { id = "tentacruel", boat = "boat-west", x = 7, y = 20, range = 1 },
     },
 }
 '''
@@ -76,10 +76,10 @@ class TestChapterLuaFacts(unittest.TestCase):
         # this coordinate is not decoration -- a stale one finds no unit and fails at boot.
         found = run(CLEAN.replace('x = 7, y = 20', 'x = 7, y = 19'))
         self.assertEqual(len(found), 1, found)
-        self.assertIn('ice-crab', found[0])
+        self.assertIn('tentacruel', found[0])
 
     def test_an_id_the_chapter_does_not_declare_is_reported(self):
-        found = run(CLEAN.replace('"ice-crab"', '"ice-krab"'))
+        found = run(CLEAN.replace('"tentacruel"', '"ice-krab"'))
         self.assertEqual(len(found), 1, found)
         self.assertIn('ice-krab', found[0])
 

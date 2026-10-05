@@ -1,0 +1,152 @@
+#######################################################
+# Tentacruel (ch06's Bael, CLASS_BAEL_TENTACRUEL) — posed lunge from its Black/White frames.
+# Frames: 000 idle · 001 rising · 002 raised · 003 hit (the lash on the foe) · 004 dodge.
+#
+# THE SHAPE IS VANILLA BAEL'S (banim_bae_at1), carried here through Baxby's charge, whose cadence
+# was read off it: approach in two beats, the blow on the foe's near edge, back home through the
+# same frames. The sounds are the Bael's own: C57 `sound_bael_2` on the strike, as the vanilla
+# Bael cries on its blow, and C21, its impact. No footfalls -- it floats.
+# Every mode keeps its C04 / C01 pairing (the #24 soft-lock guard checks it at import).
+# When importing to FEditorAdv delete # and after each line.
+#######################################################
+/// - Mode 1               #Melee Animation (the charge)
+C03                               #Start attack; needs 07 right after.
+C07                               #Start attack; needs 03 right before.
+1 p- Tentacruel_000.png                #idle / ready (ANCHOR frame — must appear first)
+4 p- Tentacruel_001.png                #it rises, tentacles lifting
+4 p- Tentacruel_002.png                #tentacles fully raised, most of the gap crossed
+C57                               #the Bael's own strike cry (sound_bael_2)
+C04                               #Prepare HP depletion (must precede the hit)
+4 p- Tentacruel_003.png                #the lash lands ON the foe — reads BEFORE the hit spark
+C21                               #impact SFX (Bael's, the ground charger's)
+C1A                               #Normal hit
+8 p- Tentacruel_003.png                #LINGER on the strike through + past the hit flash
+C01                               #wait_hp_deplete — hold until the damage resolves
+4 p- Tentacruel_002.png                #draw back and give ground...
+4 p- Tentacruel_001.png
+C06                               #Begin opponent's turn; next code 0D.
+5 p- Tentacruel_000.png                #settle home
+C0D                               #End of dodge animation (preceded by 06).
+~~~
+/// - Mode 3               #Melee Critical Animation
+C03
+C07
+1 p- Tentacruel_000.png
+4 p- Tentacruel_001.png
+9 p- Tentacruel_002.png                #HOLD committed-but-not-struck — the extra beat is the crit tell
+C57
+C04
+3 p- Tentacruel_003.png                #and then the lash arrives faster than on a normal hit
+C21
+C0A                               #Critical hit
+10 p- Tentacruel_003.png               #linger on the strike
+C01
+4 p- Tentacruel_002.png
+4 p- Tentacruel_001.png
+C06
+5 p- Tentacruel_000.png
+C0D
+~~~
+/// - Mode 5               #Ranged Animation
+# The Venin Claw has no range, so this mode should never play; an unarmed mode that armed nothing
+# would freeze the opponent's dodge, so it is the melee lunge, whole.
+C03
+C07
+1 p- Tentacruel_000.png
+4 p- Tentacruel_001.png
+4 p- Tentacruel_002.png
+C57
+C04
+4 p- Tentacruel_003.png
+C21
+C1A
+8 p- Tentacruel_003.png
+C01
+4 p- Tentacruel_002.png
+4 p- Tentacruel_001.png
+C06
+5 p- Tentacruel_000.png
+C0D
+~~~
+/// - Mode 6               #Ranged Critical Animation
+C03
+C07
+1 p- Tentacruel_000.png
+4 p- Tentacruel_001.png
+9 p- Tentacruel_002.png
+C57
+C04
+3 p- Tentacruel_003.png
+C21
+C0A
+10 p- Tentacruel_003.png
+C01
+4 p- Tentacruel_002.png
+4 p- Tentacruel_001.png
+C06
+5 p- Tentacruel_000.png
+C0D
+~~~
+/// - Mode 7               #Dodge Melee Attack (rock back, timed to the strike)
+# Tentacruel_004 = the IDLE art placed BACK. Timing is Pinky's, tuned in-engine (decisions.md): the
+# move goes AFTER wait_hp_deplete so it syncs to the MISS, not to start_dodge — frames before C01
+# fire early and read as a flinch at nothing. Held across the whole thrust: a beat to let the
+# weapon reach full extension, then hold back until it starts retracting.
+C02                               #dodge_to_back
+1 p- Tentacruel_000.png                #idle
+C0E                               #start_dodge
+1 p- Tentacruel_000.png                #STAY PUT at start_dodge (vanilla moves HERE = too early)
+C01                               #wait_hp_deplete — PAUSES until the hit resolves
+13 p- Tentacruel_000.png               #a beat until the weapon is FULLY extended
+18 p- Tentacruel_004.png               #ROCK BACK out of reach at full extension...
+18 p- Tentacruel_004.png               #...and STAY back while the weapon is held out...
+15 p- Tentacruel_004.png               #...until the foe starts pulling it back
+2 p- Tentacruel_000.png                #then drop to idle
+C0D                               #end_dodge
+~~~
+/// - Mode 8               #Dodge Ranged Attack (same shape as melee)
+C02
+1 p- Tentacruel_000.png
+C0E
+1 p- Tentacruel_000.png
+C01
+13 p- Tentacruel_000.png
+18 p- Tentacruel_004.png
+18 p- Tentacruel_004.png
+15 p- Tentacruel_004.png
+2 p- Tentacruel_000.png
+C0D
+~~~
+/// - Mode 9               #Equipped with Melee Weapon (stand)
+1 p- Tentacruel_000.png
+C01
+~~~
+/// - Mode 10               #Standing motions
+1 p- Tentacruel_000.png
+C01
+~~~
+/// - Mode 11               #Equipped with Ranged weapon (stand)
+1 p- Tentacruel_000.png
+C01
+~~~
+/// - Mode 12               #Attack Missed Animation (the charge, no contact)
+# Vanilla bae_at1's own attack_miss = its attack body with ONLY the hit code and impact SFX
+# dropped. C04 STAYS: the DEFENDER's dodge waits on C01 for the depletion this mode arms, and
+# C01 "freezes if no HP depletion is occurring/has occurred" (banim_code.inc). Its absence is
+# what soft-locked ch04 on turn 4 (#24).
+C03
+C07
+1 p- Tentacruel_000.png
+4 p- Tentacruel_001.png
+4 p- Tentacruel_002.png
+C57
+C04                               #prepare_hp_deplete — REQUIRED even though nothing connects
+4 p- Tentacruel_003.png                #the lash hits air
+C01
+4 p- Tentacruel_002.png
+4 p- Tentacruel_001.png
+C06
+5 p- Tentacruel_000.png
+C0D
+~~~
+/// - End of animation

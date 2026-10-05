@@ -30,6 +30,6 @@ return {
     -- door; the thrower is range 1-2, so the pocket never stops it and it has to be killed.
     PURSUERS = {
         { id = "merfolk-thrower", boat = "boat-east", x = 14, y = 9,  range = 2 },
-        { id = "ice-crab",        boat = "boat-west", x = 7,  y = 20, range = 1 },
+        { id = "tentacruel",      boat = "boat-west", x = 7,  y = 20, range = 1 },
     },
 }

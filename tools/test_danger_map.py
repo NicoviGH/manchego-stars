@@ -69,7 +69,7 @@ class TheEnginesStrike(unittest.TestCase):
     def test_venin_weapons_poison_and_still_cut(self):
         self.assertTrue({'venin-claw', 'venin-axe'} <= dm.poison_weapons())
         chap = ch06()
-        crab = next(a for a in on(hull_board(chap), chap, WEST, 2) if a.body.id == 'ice-crab')
+        crab = next(a for a in on(hull_board(chap), chap, WEST, 2) if a.body.id == 'tentacruel')
         self.assertTrue(crab.strike.poisons)
         self.assertGreater(crab.strike.damage, 0)
 
@@ -86,7 +86,7 @@ class WhoReachesTheHulls(unittest.TestCase):
             self.assertEqual(on(self.board, self.chap, tile, 1), [])
 
     def test_each_hull_is_its_declared_pursuers_from_phase_2(self):
-        for tile, pursuer in ((EAST, 'merfolk-thrower'), (WEST, 'ice-crab')):
+        for tile, pursuer in ((EAST, 'merfolk-thrower'), (WEST, 'tentacruel')):
             for phase in (2, 6, 12):
                 self.assertEqual([a.body.id for a in on(self.board, self.chap, tile, phase)],
                                  [pursuer])
@@ -102,7 +102,7 @@ class WhoReachesTheHulls(unittest.TestCase):
     def test_an_engaged_pursuer_does_not_also_cross_to_the_other_hull(self):
         # The crab works the west door to the end of run 2; the unconstrained danger zone
         # walks it on to the east hull as well.
-        crab_on_east = lambda board: any(a.body.id == 'ice-crab'
+        crab_on_east = lambda board: any(a.body.id == 'tentacruel'
                                          for a in on(board, self.chap, EAST, 12))
         self.assertFalse(crab_on_east(self.board))
         self.assertTrue(crab_on_east(dm.Board(self.chap)))

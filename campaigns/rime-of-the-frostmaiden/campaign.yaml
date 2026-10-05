@@ -424,6 +424,27 @@ enemy_class_reskins:
       weapons:
         - {dir: staff,   txt: Staff.txt,   abbr: lamy_st, wtypes: ["0x0100 | ITYPE_STAFF"]}
         - {dir: unarmed, txt: Unarmed.txt, abbr: lamy_un, wtypes: ["0x0100 | ITYPE_ITEM"]}
+  # Vanilla Ch6's one Bael, re-dressed as Tentacruel: a lake beast that is neither a spider nor a
+  # crab, which is Braulo's. Pokémon art (ADR 0144's non-FE sources). The battle anim is OURS,
+  # posed from the Black/White animated sprite (battle_anims/tentacruel/poses.yaml has the recipe),
+  # hence `derived`. Red in battle as on the map (Nicolas, 2026-10-05): `enemy-red.json` moves the
+  # body onto the enemy map palette's red ramp and the gems onto cream, yellow and amber. The
+  # map sheets are PMD SpriteCollab's, authored DIRECTLY in the standard SMS indices (the lycanroc
+  # recipe), so the remap is an identity: body on the faction ramp (red as an enemy), gems on
+  # cream/yellow/dark red so they still read against it, tentacles on the neutral tans.
+  - id: tentacruel
+    base: CLASS_BAEL
+    slot: CLASS_BAEL_TENTACRUEL
+    dresses: {ch06: [bael]}
+    slot_id: 0x90
+    sprite: tentacruel
+    battle_anim:
+      source: tentacruel
+      derived: true
+      palette_edit: enemy-red.json
+      weapons:
+        - {dir: ., txt: Tentacruel.txt, abbr: tent_cl,
+           wtypes: ["0x0100 | ITYPE_MONSTER", "0x0100 | ITYPE_ITEM"]}
 
 # Item name overrides: rename a vanilla item's in-game text globally (build wiring =
 # inject.names.inject_item_names, which rewrites gItemData[].nameTextId's message).

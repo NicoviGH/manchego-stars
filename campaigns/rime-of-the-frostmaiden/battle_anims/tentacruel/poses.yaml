@@ -1,0 +1,37 @@
+# tentacruel/poses.yaml — arc manifest for tools/poses_to_feditor.py (ch06's Bael, the lake beast).
+#
+# Vanilla Ch6's one Bael (Venin Claw) is re-dressed as Tentacruel: a poison/water lake monster in
+# place of a spider, and not a crab, which is Braulo's (Nicolas, 2026-10-05). Its class, level,
+# claw and AI stay vanilla's; only the look changes.
+#
+# SOURCE: Pokémon Black/White's animated battle sprite (PokeAPI sprites archive,
+# generation-v/black-white/animated/73.gif, 41 frames on an 83x85 canvas), the same archive
+# Basil's portrait comes from. Chosen over PMD SpriteCollab's Tentacruel, which is ~20 px tall:
+# a lake beast needs battle-scene size, and this one stands 63 px, a head over Braulo. PMD
+# supplies the MAP sprite instead (map_sprites/tentacruel*.png), where its size is native.
+#
+# FE8 battle sprites stand still between actions, so the sprite's float loop is not a stand mode.
+# Its frames become the attack's motion instead: tentacles rising through the surge, then the
+# lash. Frames are cut from ONE 83x85 frame of reference and each pose carries its own registration
+# offset (its alpha-box centre against bw_00's), added to the arc below, because the builder
+# places every pose by its own box centre and would otherwise erase the float's bob.
+#   surge_a  bw_10  advance  8   registration (-1, +12)
+#   surge_b  bw_20  advance 30   registration (+3, +18.5), the tentacles fully raised
+#   hit      bw_25  front edge on x≈74 (Lupin's mark, the shark rider's)   registration (0, +8.5)
+#   dodge    bw_00  advance -20
+# Rest: front edge on x≈128 (Baxby's), feet on the platform line y=141.
+#     python3 tools/poses_to_feditor.py campaigns/rime-of-the-frostmaiden/battle_anims/tentacruel
+
+canvas: [248, 160]
+flip: false                # the sprite already faces screen-left
+home: [164, 110]           # x: front edge 128 at this width (71); y = 141 - 63/2
+target_h: 63               # native: no resample
+outline: false             # native pixel art keeps its own outline
+sharpen: 0
+abbr: tentacruel
+poses:
+  - {name: idle,    src: .src/bw_00.png, dx:   0, dy:  0}
+  - {name: surge_a, src: .src/bw_10.png, dx:  -9, dy: 12}
+  - {name: surge_b, src: .src/bw_20.png, dx: -27, dy: 18}
+  - {name: hit,     src: .src/bw_25.png, dx: -52, dy:  8}
+  - {name: dodge,   src: .src/bw_00.png, dx:  20, dy:  0}

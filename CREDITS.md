@@ -71,6 +71,13 @@ same footing as the FE8 base game itself. Recheck before any wider distribution.
 | PMD *Explorers of Sky* Oddish animation sheets (Idle/Walk/Charge/Shoot + Shadow) | Basil map sprites (`map_sprites/basil{,_mu}.png`, recoloured onto the cast palette) + battle-anim frames (`battle_anims/basil/`, 1.5x hqx) | © **Nintendo / Creatures / GAME FREAK / Spike Chunsoft** (official game rips, credited `CHUNSOFT` in the repo) | [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab) `sprite/0043` |
 | Oddish FireRed/LeafGreen battle sprite | Basil portrait (`portraits/basil.png`, hq2x + 16-colour fit; source vendored at `data/portraits/basil.png`) | © **Nintendo / Creatures / GAME FREAK** | [PokeAPI/sprites](https://github.com/PokeAPI/sprites) `generation-iii/firered-leafgreen/43.png` |
 
+**ch06's lake beast — Tentacruel (#26):**
+
+| Asset | Used for | Origin | Source |
+|---|---|---|---|
+| Tentacruel *Black/White* animated battle sprite (41 frames) | ch06's Bael reskin battle anim (`battle_anims/tentacruel/`, four of its frames posed into a lunge at native scale) | © **Nintendo / Creatures / GAME FREAK** | [PokeAPI/sprites](https://github.com/PokeAPI/sprites) `generation-v/black-white/animated/73.gif` |
+| PMD *Explorers of Sky* Tentacruel Idle/Walk sheets | ch06's Bael reskin map sprites (`map_sprites/tentacruel{,_mu}.png`, re-indexed onto the standard SMS palette) | © **Nintendo / Creatures / GAME FREAK / Spike Chunsoft** (official game rips, credited `CHUNSOFT` in the repo) | [PMDCollab/SpriteCollab](https://github.com/PMDCollab/SpriteCollab) `sprite/0073` |
+
 (The PMD SpriteCollab fan-made emotion portraits were evaluated but NOT shipped — the shipped
 portrait derives from the official FRLG sprite only.)
 

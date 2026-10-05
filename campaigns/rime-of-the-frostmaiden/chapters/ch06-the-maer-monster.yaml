@@ -142,7 +142,7 @@ difficulty_note: >
                        ((15,12), (17,10), (17,13), (17,14)) and it starts SIX move points
                        from the nearest, so its first throw lands on enemy phase 2 and not
                        before. It has to be killed. The LONG fuse: median turn 10.
-    west / Pronged Goat ice-crab from (7,20), on the door from enemy phase 2. Venin claw is
+    west / Pronged Goat tentacruel from (7,20), on the door from enemy phase 2. Venin claw is
                        range 1, so it must occupy that one cell -- which also means the
                        player cannot BOARD until it is dead. The claw also POISONS, 1-3 a
                        phase for 5 phases. Median turn 8, on a 28 HP hull.
@@ -609,8 +609,8 @@ enemy_units:
     positions: [[20, 12]]
     donor: [12, 4]                  # vanilla L6 archer
     skin: {look: "merfolk with a harpoon-bow", source: "Mermaid by Stephano -> 4. Bow"}
-  - id: ice-crab
-    name: "Ice Crab"
+  - id: tentacruel
+    name: "Tentacruel"
     count: 1
     class: bael                 # vanilla: 1x Lv1 Bael, Poison Claw -- kept as itself
     level: 1
@@ -621,7 +621,9 @@ enemy_units:
     damage_type: poison
     positions: [[7, 20]]
     donor: [27, 4]                  # vanilla's lone Bael -- the one wandering pursuer
-    skin: {look: "a lake crab the size of a boat", source: "vanilla Bael art, 32x32 -- no reskin"}
+    skin:
+      look: "Tentacruel, a poison jellyfish the size of a boat (not a crab: that is Braulo's)"
+      source: "battle: Pokémon Black/White animated sprite (PokeAPI sprites, gen-v/black-white/animated/73.gif) via battle_anims/tentacruel; map: PMD SpriteCollab sprite/0073 (CHUNSOFT)"
 
   # ── The Hard wave (vanilla's Difficult-only Cavaliers) ───────────────────────
   # Vanilla Ch6 keeps three extra Cavaliers in a SEPARATE UnitDefinition array, loaded by a
@@ -908,7 +910,7 @@ terrain_divergence:
 # in one turn, and its clock is pursuers only. Ours is the same shape, bought with the AI byte.
 rescue_pursuers:
 - id: merfolk-thrower           # east: JAVELIN, range 1-2, so the pocket door never stops it
-- id: ice-crab                  # west: range 1, so it must OCCUPY the door -- and it does
+- id: tentacruel                # west: range 1, so it must OCCUPY the door -- and it does
 
 rescue_boats:
 - id: boat-east
