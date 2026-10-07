@@ -437,6 +437,9 @@ CH06_BOAT_PIDS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
 # Their NAMES, appended past vanilla's last message by the build (inject/message_alloc.py).
 CH06_BOAT_NAME_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-name'),
                        'boat-west': appended_message_id('ch06', 'boat-west-name')}
+# Messie, the boss-death cutscene's actor: 0xbd, the next unnamed 0x255 gap after the boats
+# (0xbe is Fomortiis). He is NAMED, so the pid is his alone (assert_named_raw_pids_are_exclusive).
+CH06_MESSIE_PID = '0xbd'
 # ch05's four INFANTRY classes are dressed as skeletons (#25, campaign.yaml `dresses: {ch05:}`):
 # every ch05 red unit wearing one is a risen tomb-guardian, so the repoint is wholesale rather
 # than per-enemy. The three that stay vanilla are not oversights: the DRUID is Ravisin, who

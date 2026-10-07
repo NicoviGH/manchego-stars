@@ -475,13 +475,24 @@ class RavisinPortrait(unittest.TestCase):
         .baseRes = 0,
         .baseLck = 0,
         .baseCon = 0,
+    }
+    [0xbd - 1] = {
+        .nameTextId = 0x255,
+        .descTextId = 0x2b1,
+        .number = 0xbd,
+        .defaultClass = CLASS_DRACO_ZOMBIE,
+        .miniPortrait = 0x1,
+        .baseLevel = 1,
     },'''
         patched = inject.raw_pids.raw_pid_portrait_data(source, self.CAMPAIGN)
         self.assertIn('.nameTextId = 0x246,', patched)
         self.assertIn('.portraitId = 0x48,', patched)
-        # Ravisin is the only DRESSED raw pid; the moose and ch06's two boats are named without
-        # a bust, and the grell takes neither -- so exactly one name plate stays generic.
-        self.assertEqual(1, patched.count('.portraitId'))
+        # Ravisin and Messie are the DRESSED raw pids (Riev's face, Syrene's); the moose and
+        # ch06's two boats are named without a bust, and the grell takes neither -- so exactly
+        # one name plate stays generic.
+        self.assertEqual(2, patched.count('.portraitId'))
+        self.assertIn('.nameTextId = 0x232,', patched)     # Syrene's name plate, retitled Messie
+        self.assertIn('.portraitId = 0x2B,', patched)      # Syrene's face, dressed with his bust
         boats = inject.chapter_ids.CH06_BOAT_NAME_MSGS
         self.assertIn('.nameTextId = 0x%X,' % inject.chapter_ids.CH05_MOOSE_NAME_MSG, patched)
         self.assertIn('.nameTextId = 0x%X,' % boats['boat-east'], patched)   # the Burly Ram

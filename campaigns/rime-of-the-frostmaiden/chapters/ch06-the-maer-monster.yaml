@@ -798,13 +798,17 @@ messie:
                                 # say "it"; an earlier draft of this file said "she" throughout.
   role: cutscene_actor
   appears_in: events/ch06-messie.ea
+  art:
+    portrait: portraits/messie.png      # Syrene's face slot; portraits/messie.py renders it
+    map_sprite:
+      wait: map_sprites/messie.png      # 32x96, Nicolas's (#363): the whole animal, 3 frames
+      base: Gwyllgi                     # 32x32 geometry donor -- the scene loads him as one
   art_note: >
-    Two busts, rendered by portraits/messie.py from one ref: messie.png (ch06, no hat) and
-    messie-mayor.png (the top hat, from the end of ch07), on the Syrene and Gheb face slots.
-    His map sprite is Nicolas's (map_sprites/messie.png, and messie-mayor.png with the hat),
-    the whole animal in one 32x32 cell -- the engine ceiling (UNIT_ICON_SIZE_* has three
-    values). He never moves or fights, so it needs no walk sheet and no battle animation;
-    it is not wired yet (an `art.map_sprite` block and an SMS id).
+    He is raw pid 0xbd (CH06_MESSIE_PID), named "Messie" on Syrene's name plate and wearing her
+    face slot, which carries his no-hat bust. 32x32 is the engine ceiling for a map sprite
+    (UNIT_ICON_SIZE_* has three values), so the whole animal fills one cell. He never fights, so
+    he has no battle animation; when the scene moves him he glides on his idle frame. The top-hat
+    bust and sheet (messie-mayor.png, the Gheb slot) are ch07's mayor beat.
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:

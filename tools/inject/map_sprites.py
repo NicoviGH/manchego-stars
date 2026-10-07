@@ -599,6 +599,11 @@ def declared_map_sprite_units(campaign):
             for unit in (chap.get(key) or []):
                 if ((unit.get('art') or {}).get('map_sprite')) and unit.get('id'):
                     declared[unit['id']] = 'chapters/%s (%s)' % (name, key)
+        # A cutscene actor is a top-level block of its own (ch06's `messie:`), keyed by its id.
+        for key, unit in chap.items():
+            if (isinstance(unit, dict) and unit.get('role') == 'cutscene_actor'
+                    and (unit.get('art') or {}).get('map_sprite')):
+                declared[unit.get('id') or key] = 'chapters/%s (%s)' % (name, key)
     return declared
 
 
@@ -657,9 +662,10 @@ def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbo
             continue
         mu_png = os.path.join(asset_dir, uid + '_mu.png')
         if not os.path.isfile(mu_png):
-            sys.exit('ERROR: scripted neutral %s needs a committed map_sprites/%s_mu.png '
-                     '(hover/walk sheet; neutrals have no synth path -- synth_mu_sheet reads '
-                     'the unit YAML, which a chapter-level neutral has none of)' % (uid, uid))
+            # No hand-drawn walk: glide on the idle, as the cast do. The donor is the row's own,
+            # so nothing here needs a unit YAML (Messie, #26).
+            mu_png = os.path.join(tempfile.mkdtemp(prefix='manchego_mu_'), uid + '_mu.png')
+            map_sprite_tool.synth_mu_sheet(idle_png, donor, mu_png, verbose=verbose)
         map_sprite_tool.validate_mu_sheet(mu_png)
         _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor)
         macro, _, _, _ = map_sprite_tool.sheet_info(idle_png, (dfw, dfh))
