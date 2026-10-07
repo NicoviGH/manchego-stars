@@ -6,17 +6,16 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-05 (Claude): Trex fights as the Dino Dread Fighter (#461, PR #463) and
-Messie has both busts (PR #464). **What landed and why is in `git log` and the ADRs it
-cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-07 (Claude): Messie's map sprite is wired (#466). **What landed and why is in
+`git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
 Nothing on a branch. **Next, in order:**
 
-1. **#26 — the rest of ch06:** Messie's `art.map_sprite` wiring (Nicolas's `messie.png` /
-   `messie-mayor.png`), then the three cutscenes. His busts are on the Syrene (no hat) and
-   Gheb (mayor) face slots. The boarding pass still waits on the crews' voice (below).
+1. **#26 — the rest of ch06:** the boarding pass (Grynsk on the Burly Ram, Tali on the Pronged
+   Goat; voiced from the book pp. 28-31 + vanilla Ch6's village MSG_9F3 / ending MSG_9F1),
+   then the three cutscenes. Messie is wired (#466): pid 0xbd, loaded as `CLASS_GWYLLGI`.
 2. **#459 — roster parity with vanilla, chapter by chapter** (Nicolas wants vanilla's count and
    diversity, replacing ADR 0047's 16-18 budget). The decomp join table, deploy limits and
    coverage audit are on the issue; Baxby-as-Seth is the open call there (reverses ADR 0042).
@@ -27,16 +26,11 @@ Nothing on a branch. **Next, in order:**
   x1.4081 measured, so a party-side regression there fails the gate too.
 - The Monte Carlo simulator is #456, parked behind its trigger. ch07's twin re-point is on #27.
 
-## Owed by NICOLAS, not by the next session
-
-- **The boat crews have no voice.** No lore file names Tali or either crew, and Tali carries
-  ch06's plot-critical hint.
-
 ## Chapter work
 
 - **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). Every
-  enemy is dressed (#460); Messie's bust and wiring need no dialogue and go next; the boarding
-  pass waits on the crews' voice.
+  enemy is dressed (#460) and Messie is wired (#466); the boarding pass and the three
+  cutscenes are what is left.
 - **#335** — the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).
 
@@ -80,8 +74,6 @@ Nothing on a branch. **Next, in order:**
 - **Two sandbox false negatives on this Mac:** `gh auth status` reports the token invalid (a
   restricted process cannot read the Keychain — run `gh` with escalation); an mGBA AppKit abort
   before the ROM runs is the sandbox, not the ROM.
-- **GitHub Actions runners were down on 2026-10-05**: #463 and #464 merged on local
-  verification with no CI run. Check the next PR's CI actually ran.
 - **Merging:** the auto-mode classifier blocks `gh pr merge` until Nicolas says "merge" for that
   PR (2026-09-30, again 2026-10-04 on #458). When it blocks, stop and tell him.
 - **Cross-agent continuity:** Nicolas uses Codex only between Claude sessions; Codex leaves an
