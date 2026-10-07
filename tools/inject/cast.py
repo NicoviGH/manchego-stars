@@ -13,6 +13,7 @@ from yaml_loader import yaml_load
 from inject.chapter_ids import (
     CH01_BOSS_SLOT, CH02_BOSS_SLOT, CH02_MINIBOSS_SLOT, CH04_MOOSE_PID, CH05_BOSS_PID,
     CH05_CHAPTER_YAML, CH05_MOOSE_NAME_MSG, CH05_MOOSE_PID, CH06_BOAT_NAME_MSGS, CH06_BOAT_PIDS,
+    CH06_MESSIE_PID,
     PROLOGUE_SEPHEK_SLOT)
 from inject.decomp import REPO
 from inject.hosting import _load_chapter_yaml, recruit_chapter_number
@@ -180,7 +181,7 @@ GUEST_PORTRAIT_MAP = {
     # Messie (ch06-the-maer-monster.yaml) has two faces, so two slots: no hat in ch06, the
     # mayor's top hat from the end of ch07 (portraits/messie.py renders both). Syrene (vanilla
     # ch17) and Gheb (vanilla ch9b) are absent from our ch00-08 and named nowhere else ->
-    # collision-free. Cutscene-only (no map unit).
+    # collision-free. His on-map pid (CH06_MESSIE_PID) is bound to Syrene by RAW_PID_PORTRAITS.
     'messie':         'Syrene',
     'messie-mayor':   'Gheb',
 }
@@ -421,6 +422,11 @@ SCRIPTED_NEUTRAL_SPRITES = (
     # sheets are 16x48. Frame count comes from the sheet HEIGHT, and the engine reads exactly
     # three (ApplyUnitSpriteImage16x16 loops i < 3), which map_sprite_tool now enforces.
     ('ravisin', (CH05_BOSS_PID,), 'Druid'),
+    # Messie (#26): ch06's cutscene actor, the whole plesiosaur in one 32x32 cell. The cast
+    # palette for the moose's reason -- he never changes faction. Gwyllgi is the 32x32 GEOMETRY
+    # donor (wait-row size, glide MU dimensions), so the scene must load him as CLASS_GWYLLGI.
+    # The top-hat sheet (messie-mayor.png) is ch07's and is wired there.
+    ('messie', (CH06_MESSIE_PID,), 'Gwyllgi'),
 )
 # Raw CharacterData identity binding. Riev contributes collision-free name/portrait slots:
 # MSG_246 is retitled Ravisin and portrait id 0x48 is dressed from ravisin.png.
@@ -439,6 +445,9 @@ RAW_PID_PORTRAITS = {
                                   'Fishing Boat'),
     CH06_BOAT_PIDS['boat-west']: ('boat-west', CH06_BOAT_NAME_MSGS['boat-west'], None,
                                   'Fishing Boat'),
+    # Messie rides Syrene for both name and face, as Ravisin rides Riev: his no-hat bust is
+    # dressed onto Syrene's slot (GUEST_PORTRAIT_MAP), so his unit points at that portraitId.
+    CH06_MESSIE_PID: ('messie', GUEST_PORTRAIT_MAP['messie'], 0x2B, 'Messie'),
 }
 
 

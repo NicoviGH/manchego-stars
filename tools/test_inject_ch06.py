@@ -9,7 +9,12 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import inject.cast
+import inject.chapter_ids
 import inject.chapters.ch06
+import inject.map_sprites
+import inject.recruit
+import inject.decomp
 import inject.hosting
 import inject.units
 from inject import source as injector  # the injector's source, every file of it (#389)
@@ -56,6 +61,42 @@ class ItemDropIsCarriedOnce(unittest.TestCase):
             items = re.search(r'\.items = \{ (.*?) \}', row).group(1).split(', ')
             self.assertEqual(len(items), count, '%s: %s' % (enemy_id, row))
             self.assertIn('.itemDrop = 1', row, enemy_id)
+
+
+class MessieWearsHisOwnArt(unittest.TestCase):
+    """Messie is a cutscene actor, not cast, so `classed_cast` never sees him. He rides the
+    scripted-neutral path the white moose does: a raw pid of his own, wearing his own sheet."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def test_his_pid_wears_his_map_sprite(self):
+        inject.recruit.assert_custom_art_pid_wired(inject.chapter_ids.CH06_MESSIE_PID, 'messie', 'test')
+
+    def test_his_pid_is_named_messie_and_wears_the_syrene_bust(self):
+        """Read Syrene's portraitId out of the decomp, never a literal: the bust the build
+        dresses is Syrene's slot, so his on-map unit must point at that same face."""
+        unit_id, slot, portrait_id, name = inject.cast.RAW_PID_PORTRAITS[
+            inject.chapter_ids.CH06_MESSIE_PID]
+        self.assertEqual(('messie', 'Messie'), (unit_id, name))
+        self.assertEqual(inject.cast.GUEST_PORTRAIT_MAP['messie'], slot)
+        src = open(os.path.join(inject.decomp.REPO, 'fireemblem8u', 'src', 'data_characters.c'),
+                   encoding='utf-8').read()
+        row = src[src.index('[CHARACTER_SYRENE - 1]'):]
+        row = row[:row.index('},')]
+        self.assertEqual(int(re.search(r'\.portraitId = (0x[0-9a-fA-F]+)', row).group(1), 16),
+                         portrait_id)
+
+    def test_the_build_guard_sees_his_declared_art(self):
+        """A cutscene actor's `art.map_sprite` block is in scope of the "declared art must be
+        wired" guard, or his sheet could fall out of the tables and nothing would say so."""
+        declared = inject.map_sprites.declared_map_sprite_units(self.CAMPAIGN)
+        self.assertIn('messie', declared)
+
+    def test_a_neutral_with_no_committed_walk_gets_the_glide(self):
+        """Messie hauls himself onto the ice, so he moves; a neutral with no hand-drawn walk
+        sheet glides on its idle the way the cast do, instead of failing the build."""
+        body = injector.def_source('_inject_scripted_neutral_sprites')
+        self.assertIn('synth_mu_sheet', body)
 
 
 if __name__ == '__main__':
