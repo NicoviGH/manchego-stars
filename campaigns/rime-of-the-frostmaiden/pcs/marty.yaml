@@ -140,16 +140,15 @@ signature_moment:
   chapter: ch06-the-maer-monster
   trigger: ch06_messie_scene    # matches the chapter YAML; was `marty_messie_talk`
   description: >
-    Marty speaks with Messie. REFRAMED 2026-08-29: Messie is not a boss and this is not a
-    hidden Talk — the fight on Maer Dualdon is against the merfolk, and when their elder
-    falls Messie hauls himself onto the ice. Marty speaks to him with beast-speech and the
-    answer comes back in Common, because Ravisin's awaken spell gave him language along
-    with a mind. He was told to spread fear among Bremen's fishers and has been ramming
-    their boats instead, to turn the crews back before they reached merfolk water; he fears
-    losing the mind he was given, and does not yet know Ravisin is dead. Braulo is the
-    second voice. The moment that "changed everything" in the real campaign (Ch 6 — see
-    docs/CHAPTERS.md), and now every player sees it rather than the few who would have
-    tried Talk on a boss.
+    Marty speaks with Messie (ADR 0263, ADR 0332). The party was hired to kill him and
+    fought the merfolk instead; when their elder falls, Messie hauls himself onto the ice.
+    Marty coughs his spores and speaks, and the answer comes back in Common, because
+    Ravisin's awaken spell gave him language along with a mind. Ravisin told him to terrorize
+    Bremen's boats, and he did, ramming them so the crews turned home before they reached
+    merfolk water. He fears losing the mind he was given, and Marty is the one who tells him
+    Ravisin is dead and the gift is his to keep. Braulo is the second voice. The moment that
+    "changed everything" in the real campaign (Ch 6 -- see docs/CHAPTERS.md), and every
+    player sees it.
   dialogue_trigger: marty_messie_talk
   # Sourced from the DM notes. (His earlier Lonelywood direwolf-taming,
   # Ch 4 area, is a secondary beat — see ch04 YAML.)

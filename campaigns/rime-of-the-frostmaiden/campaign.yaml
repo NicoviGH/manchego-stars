@@ -64,7 +64,7 @@ world_map:
   - id: bremen
     name: "Bremen"
     unlocks_after: ch06
-    shop: harbor    # water-themed items, potions — run by Messie after ch06
+    shop: harbor    # water-themed items, potions; Messie is Speaker from ch07
   - id: easthaven
     name: "Easthaven"
     unlocks_after: null  # never a friendly visit in MVP

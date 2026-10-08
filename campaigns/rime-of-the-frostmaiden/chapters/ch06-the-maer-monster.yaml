@@ -27,24 +27,27 @@ parity_reference: "FE8 Ch6"   # #48 enemy-pressure parity bar — Victims of War
                               # because this is >= FE8 Ch5 (decisions.md, reward ladder).
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
-# REFRAMED 2026-08-29 (Nicolas). Messie is NOT the antagonist and is NOT a fight: the
-# merfolk are. He sank Bremen's boats to keep their crews off water the merfolk control --
-# clumsy protection, which the town read as a monster. Canon supports this rather than
-# bending it (Rime pp. 28-31): the plesiosaurus "recognizes boats from Bremen but does not
-# attack indiscriminately", "prefers to dine on fish, not people", was told by Ravisin only
-# to SPREAD FEAR among the fishers, and its whole behaviour table is boat damage. Tali's own
-# deduction is that ONLY Bremen boats were attacked. The Pronged Goat "was found by fishers
-# the next day, drifting crewless" -- a marooned Bremen boat is the book's own image.
+# REFRAMED 2026-08-29 and 2026-10-08 (Nicolas); ADR 0332. Messie is the bounty and the
+# merfolk are the fight. Canon supports the frame (Rime pp. 28-31): the plesiosaur "recognizes
+# boats from Bremen but does not attack indiscriminately", "prefers to dine on fish, not
+# people", was told by Ravisin only to SPREAD FEAR among the fishers, and its whole behaviour
+# table is boat damage. The Pronged Goat "was found by fishers the next day, drifting
+# crewless" -- a marooned Bremen boat is the book's own image.
+# INVENTED (ADR 0332): the merfolk, their uneasy coexistence with Bremen's fishers, and
+# Auril's hand in emboldening them.
 narrative: >
-  Bremen sends the party onto the frozen mouth of Maer Dualdon to bring back two boats
-  that went out and never came home. The lake around the docks is frozen solid -- the
-  fishers pull their rowboats up onto the ice -- so the party walks out across it, into
-  water the merfolk consider theirs. The merfolk are what has been sinking Bremen's
-  crews. Messie, the awakened plesiosaur the town blames for it, has been ramming those
-  same boats to turn them back before they reached deep water. When the merfolk are
-  broken, he hauls himself up onto the ice, and Marty and Braulo find out what he is:
-  a creature Ravisin woke, ordered to frighten the fishers, and who has been quietly
-  disobeying her by protecting them instead.
+  Bremen's fishers have always shared Maer Dualdon with the merfolk: a dangerous, workable
+  coexistence that nobody ever signed. This winter the Frostmaiden emboldened the merfolk
+  to start killing, and Ravisin woke Messie, a plesiosaur, with orders to terrorize the
+  town's boats. Messie obeys in his own way. He rams the boats and frightens their crews
+  home before they reach merfolk water, and he has never killed anyone. Bremen sees only
+  the monster.
+
+  Speaker Dorbulgruf Shalescar puts a bounty on the beast and sends the party out onto the
+  frozen lake, where two boats went out and never came back. The party expects to hunt a
+  monster and meets the merfolk instead. When their elder falls, Messie hauls himself up
+  onto the ice, and Marty and Braulo learn what he is and what he has been doing. The
+  party leaves the lake with the idea that he should speak for Bremen.
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
@@ -747,44 +750,52 @@ enemy_units:
     # for nothing. The name is arbitrary and touches one string.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
-# THREE scenes, down from four (2026-08-29). The `unit_adjacent` Talk unlock is gone with
-# the boss fight: Messie is not on the field, so there is nothing to walk up to. The two
-# ending arms collapse to one, because "kill the creature that was protecting the town" is
-# not a choice this version offers.
+# THREE scenes (2026-08-29). Messie never stands on the field, so he has no Talk unlock and
+# no kill/spare arm. The ending's only branch is a boat that sank (see chapter_end).
 events:
   - trigger: chapter_start
     type: cutscene
     ea_file: events/ch06-opening.ea
     description: >
-      Bremen docks. Two boats went out and neither came back, and the town wants them
-      brought in before the ice closes. Grynsk Berylbore -- who sent those crews -- and
-      Tali, the half-elf researcher (they/them), are both out there. The party walks onto
-      the frozen lake. NOTE: the merfolk are not introduced here; the player meets them by
-      being attacked, and learns what they are from the two rescued crews.
+      Bremen. Speaker Dorbulgruf Shalescar hires the party to kill the monster the whole
+      town blames for its lost boats, and names the price on screen (ch07's refusal pays
+      this off). Two boats went out and never came back: Grynsk Berylbore's Burly Ram and
+      the Pronged Goat with Tali, the half-elf researcher (they/them), aboard. The party
+      walks out onto the frozen lake to find them and the beast. Vanilla's 0x9EA is the
+      model for the walk-out ("we have to save that girl" / "this is a trap").
+      THE PLAYER EXPECTS A MONSTER FIGHT (Nicolas, 2026-10-08). Nobody hints that Messie is
+      harmless and nobody names the merfolk: the player meets them by being attacked, and
+      the map delivers the twist.
+      Dorbulgruf needs a face here, a choice ch07 owed anyway.
   - trigger: boss_defeated
     unit: nerra
     type: cutscene
     ea_file: events/ch06-messie.ea
     description: >
-      THE CHAPTER. With the merfolk broken, the ice cracks and Messie hauls himself up onto
-      it -- the mass the whole town has been calling a monster, lying on the ice in front of
-      the people who came to kill it. Marty speaks to him (his beast-speech), and the answer
-      comes back in Common, because Ravisin's awaken spell gave him language along with a
-      mind (book p.28: Intelligence 10 and speech in Common; his own line on p.31 is
-      "I'm listening"). Braulo is the second voice -- lake fauna talking to lake fauna.
-      What comes out: Ravisin woke him and told him to spread fear among Bremen's fishers;
-      he has been ramming their boats instead, to turn them back before they reached
-      merfolk water. He fears losing the mind he was given. She is already dead -- the party
-      killed her at the tomb -- and an awaken spell is permanent. He is free and does not
-      know it yet.
+      THE CHAPTER, and it stays LOCAL to Bremen (Nicolas, 2026-10-08). With the merfolk
+      broken, the ice cracks and Messie hauls himself up onto it in front of the people who
+      came to kill him. His first words are the book's: "I'm listening." Marty coughs his
+      spores at him and speaks; the answers come back in Common, because Ravisin's awaken
+      spell gave him language along with a mind (book p.28). Braulo is the second voice.
+      What comes out, from the book's own lines (p.31): he used to just swim the lake and
+      eat fish; Ravisin woke him and told him to make Bremen suffer; he does not want to be
+      a stupid beast again. And what we add (ADR 0332): the merfolk grew bold this winter,
+      so he rammed the boats to turn them home before they reached merfolk water. Marty tells
+      him Ravisin is dead and the awakening is his to keep. The scene closes on the idea of
+      Messie as Bremen's Speaker, the one voice both the town and the lake could heed (the
+      DM notes' table moment).
+      The big-picture reveal is held for ch07's ending, once Bremen's own problem is settled.
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch06-ending.ea
     description: >
-      Back at Bremen with the rescued crews. Messie is not a monster and the town has to
-      swallow it; the Speaker seed for ch07 is planted here. If both boats survived, the
-      Orion's Bolt is handed over in this scene, exactly as vanilla Ch6 pays its own
-      save-them-all reward (CHECK_ALIVE on both).
+      Back at Bremen's docks with the rescued crews. Vanilla's MSG_9F1 is the model: the
+      rescued thank the party, and if both boats survived the Orion's Bolt is handed over,
+      exactly as vanilla Ch6 pays its own save-them-all reward (CHECK_ALIVE on both). Grynsk
+      can confirm in one line that the merfolk were never this bad before. Tali leaves with
+      the book's exit: "interesting... fascinating... remarkable", muttered in Elvish. The
+      party heads for the Speaker to collect, which is where ch07 opens.
+      A boat that sank takes its speaker's lines with it, as ch05's ending cuts Sahnar.
 
 # ── Messie (cutscene actor, NOT an enemy unit) ───────────────────────────────────
 # He has no class, no level and no AI: he is loaded by `events/ch06-messie.ea`, speaks, and
@@ -995,12 +1006,11 @@ economy:
 
 
 design_notes: >
-  The emotional centerpiece of the MVP and Marty's primary signature beat -- and as of
-  2026-08-29 it is a CUTSCENE, not a hidden Talk. The fight is the merfolk; Messie hauls
-  himself onto the ice once Nerra falls. There is no messie_spared flag and no second
-  ending: every player sees the beat, and nobody has to guess a command exists on a boss.
-  Keep the merfolk honest (they are vanilla Ch6's own 24) and keep the two marooned boats
-  killable -- that clock, not the boss, is where this chapter's difficulty lives.
+  The emotional centerpiece of the MVP and Marty's primary signature beat, delivered as a
+  cutscene that every player sees once Nerra falls. The party is hired to kill Messie and
+  fights the merfolk; the reveal belongs to the scene. Keep the merfolk honest (they are
+  vanilla Ch6's own 24) and keep the two marooned boats killable: the boats' clock is where
+  this chapter's difficulty lives.
 
 # ── Cutscene actors ──────────────────────────────────────────────────────────────
 # The eight PCs appear in cutscenes whether or not they are alive -- permadeath is a COMBAT
