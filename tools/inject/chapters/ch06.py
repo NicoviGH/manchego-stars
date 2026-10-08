@@ -5,23 +5,27 @@ import re
 import sys
 
 from inject.cast import _classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT
-from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
+from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_TALK_FLAGS, CH06_BOAT_TALK_MSGS,
+                                CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
                                 CH06_GOAL_WINDOW_MSG)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
+from inject.event_scripts import assert_event_scripts_defined, declare_event_script
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
 from inject.maps import _register_chapter_map, _register_tileset, TILESET_STEMS
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
+from inject.recruit import talk_recruit_char_entries, talk_recruiters
 from inject.scenes import _prepend_defeat_quote, _write_chapter_title_card, flag_defeat_quote
 from inject.text import (
-    dev_placeholder_scene, goal_window_body, name_message_body, set_message_body,
+    _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body, set_message_body,
     vanilla_name_text_id)
 from inject.units import (
     _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, _items_with_drop_last,
     chapter_label_constant, declare_unit_table, enemy_ai_initialiser, safe_ai_clients)
+from inject.villages import authored_boxes, save_all_bonus_script, village_script
 
 
 CH06_BEGINNING_SCRIPT = 'EventScr_Ch7_BeginningScene'
@@ -220,6 +224,41 @@ def ch06_boat_rows(chap):
     return rows
 
 
+BOARDING_SPEAKER = 'crew'
+
+
+def ch06_boarding_wiring(campaign, chap):
+    """The boarding pass (#26), vanilla Ch6's village in a hull: the Character list's Talk
+    entries, one scene per boat, and its message.
+
+    FE8's Talk is a NAMED PAIR -- `CHAR(flag, script, pid_a, pid_b)`, compared for exact equality
+    -- so "any party member may board" is one entry per (field PC x boat), every entry for a boat
+    sharing that boat's flag: the first boarding sets it and the rest are skipped. The roster is
+    generated (`talk_recruiters`), never hand-listed. A sunk hull is dead, so its Talk is gone,
+    exactly as a burned village stops offering Visit.
+
+    The scene is `village_script`: the crew's line over the boat backdrop, then the reward into
+    the boarder's hands. Returns (character list body, [(symbol, body, comment)],
+    [(message id, body)])."""
+    boarders = talk_recruiters(campaign, chap['chapter_number'])
+    entries, scripts, messages = '', [], []
+    for boat in chap['rescue_boats']:
+        bid, talk = boat['id'], boat['talk']
+        flag, symbol, msg = (CH06_BOAT_TALK_FLAGS[bid], CH06_BOAT_TALK_SCRIPTS[bid],
+                             CH06_BOAT_TALK_MSGS[bid])
+        entries += talk_recruit_char_entries(boarders, CH06_BOAT_PIDS[bid], flag, symbol)
+        reward = talk.get('reward') or []
+        item = CH06_ITEM_IDS[reward[0]['id']] if reward else None
+        scripts.append((symbol, village_script(msg, item, talk['background']),
+                        'ch06 boarding the %s -- the crew\'s line (0x%X)%s'
+                        % (bid, msg, ', then %s' % item if item else '')))
+        boxes = authored_boxes(bid, talk.get('text'), 'talk.text')
+        messages.append((msg, _script_to_message(
+            [{BOARDING_SPEAKER: line} for _who, line in boxes],
+            {BOARDING_SPEAKER: ('[OpenMidLeft]', '[%s]' % talk['face'])})))
+    return '{\n' + entries + '    END_MAIN\n}', scripts, messages
+
+
 def inject_ch06(campaign, boot=False, verbose=True):
     """Host Ch6 "The Maer Monster" (#26) on slot 7: the frozen mouth of Maer Dualdon retiled
     from Ch13 Ephraim, vanilla Ch6's own twenty-four re-dressed as merfolk on our placement,
@@ -230,18 +269,16 @@ def inject_ch06(campaign, boot=False, verbose=True):
     inventories, drops and every `.ai` byte, derived per unit), and the HOST is slot 7, which
     supplies storage and nothing else. The CH06_* constant block states that once.
 
-    NO DIALOGUE, on purpose. ch06's three scenes are declared in the chapter YAML with empty
-    text, and the two boarding scenes are waiting on voice bibles the boat crews do not have
-    yet (decisions.md: read every speaker's bible before a line is drafted). So the beginning
-    scene is the bare LOMA/LOAD/PREP spine, the ending plays the victory sting straight into
-    the dev-placeholder landing exactly as ch03's did until ch04 hosted, and Nerra's defeat
-    quote is FLAGGED but SILENT -- which is not a placeholder but the design: the merfolk do
-    not speak, and Messie does.
+    The boarding pass is wired (ch06_boarding_wiring): Grynsk's and Tali's scenes, the east
+    hull's Antitoxin, and the save-both Orion's Bolt in the ending. ch06's three cutscenes are
+    declared in the chapter YAML with empty text, so the beginning scene is the bare
+    LOMA/LOAD/PREP spine and the ending plays the victory sting, the payout, and the
+    dev-placeholder landing. Nerra's defeat quote is FLAGGED but SILENT by design: the merfolk
+    do not speak, and Messie does.
 
-    DEFERRED to follow-up passes: the boarding Talks and their rewards, Messie's boss-death
-    cutscene, the opening and ending scenes, the merfolk reskins (`skin:` in the YAML is
-    intent; the wiring lands in campaign.yaml), and the title-card art. ch06's ending parks on
-    the dev placeholder until ch07 hosts, exactly as ch05's did.
+    DEFERRED to follow-up passes: Messie's boss-death cutscene, the opening and ending scenes,
+    and the title-card art. ch06's ending parks on the dev placeholder until ch07 hosts,
+    exactly as ch05's did.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)
@@ -328,11 +365,13 @@ def inject_ch06(campaign, boot=False, verbose=True):
     #    list is a Seize plus two Houses, and ch06 has no village terrain anywhere on the map
     #    (the two former village bodies are the boat pockets, and their doors were repainted to
     #    FOREST precisely so no dead Visit prompt survives -- see the YAML's
-    #    `terrain_divergence`). The boarding Talks are CHARACTER events, not Location ones, and
-    #    they land with the boarding pass (#26). The roster is OUR table: pointing at vanilla
+    #    `terrain_divergence`). The boarding Talks are CHARACTER events, not Location ones
+    #    (ch06_boarding_wiring). The roster is OUR table: pointing at vanilla
     #    Ch7's would deploy the party on another map's coordinates, with PREP running, the map
     #    drawn, and a load test that PASSes.
+    board_events, board_scripts, board_messages = ch06_boarding_wiring(campaign, chap)
     write_event_group('ch06', CH06_EVENTINFO_H, CH06_EVENT_GROUP, lists={
+        'characterBasedEvents': board_events,
         'turnBasedEvents':
             '{\n    TurnEventPlayer(0, %s, %d) /* Difficult-only cavalry wave: %d */\n'
             '    END_MAIN\n}' % (CH06_HARD_WAVE_SCRIPT, CH06_HARD_WAVE_TURN, len(wave_rows)),
@@ -377,13 +416,22 @@ def inject_ch06(campaign, boot=False, verbose=True):
     # The ending: the victory sting, then the dev-placeholder landing. ch07 is not hosted, so
     # this parks exactly where ch05's did until ch06 hosted; the Messie scene and the ending
     # cutscene are the dialogue pass's, and neither is stubbed with placeholder prose here.
+    # The save-both payout is vanilla Ch6's own: CHECK_ALIVE on every civilian, the Orion's Bolt
+    # only on a clean sweep. Boarding is not required, only keeping both hulls afloat.
+    hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
-        '    FADI(16) /* fade the lake out into the dev-placeholder landing */\n'
+        + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
+                                check='CHECK_ALIVE')
+        + '    FADI(16) /* fade the lake out into the dev-placeholder landing */\n'
         + dev_placeholder_scene() + '    ENDA\n}', CH06_EVENTSCRIPT_H)
     with open(CH06_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
+    # The boarding scenes APPEND, so they follow the bulk rewrite above (ch05's ordering rule).
+    for symbol, body, comment in board_scripts:
+        declare_event_script(CH06_EVENTSCRIPT_H, symbol, body, comment)
+    assert_event_scripts_defined(CH06_EVENTSCRIPT_H, [s for s, _b, _c in board_scripts])
 
     # 5. Texts + the flagged defeat quote that IS the win trigger.
     with open(TEXTS_TXT, encoding='utf-8') as f:
@@ -397,6 +445,8 @@ def inject_ch06(campaign, boot=False, verbose=True):
     # unless it is rewritten -- the same rename ch01 and ch02 do for their borrowed boss slots.
     set_message_body(lines, vanilla_name_text_id(CH06_BOSS_PID.replace('CHARACTER_', '')),
                      name_message_body(boss.get('fe_name') or boss['name']))
+    for msg_id, body in board_messages:
+        set_message_body(lines, msg_id, body)
     # The boats' name plates are NOT written here: they are RAW_PID_PORTRAITS rows, and
     # inject_names writes every one of those off that registry (appending the ones whose donor
     # is an id we own). Writing them again here would make this injector a second owner of the

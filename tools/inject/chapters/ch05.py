@@ -4,7 +4,6 @@ import os
 import re
 import sys
 
-from inject import decomp as _decomp
 import fe8_talk_font
 import portrait_tool
 from inject.cast import (
@@ -27,8 +26,9 @@ from inject.maps import (
     _register_tileset, _snowy_metatile_for, TILESET_STEMS)
 from inject.messages import assert_message_ids_unique
 from inject.paths import (
-    CH05_EVENTINFO_H, CH05_EVENTSCRIPT_H, CH5_EVENTSCRIPT_H, CP_DATA_C, EVENTCALL_H, PORTRAIT_DIR,
+    CH05_EVENTINFO_H, CH05_EVENTSCRIPT_H, CH5_EVENTSCRIPT_H, CP_DATA_C, PORTRAIT_DIR,
     TEXTS_TXT)
+from inject.event_scripts import assert_event_scripts_defined, declare_event_script
 from inject.recruit import (
     assert_custom_art_pid_wired, on_map_talk_recruits, parley_recruiters, talk_recruit_wiring)
 from inject.scenes import (
@@ -42,12 +42,12 @@ from inject.text import (
     _fe_dialogue_text, _fid_tag, _script_box_count, _script_to_message, dev_placeholder_scene,
     goal_window_body, name_message_body, SCRIPT_DIRECTIVES, set_message_body)
 from inject.units import (
-    _ally_unit_entry, _assert_ms_symbol, _deploy_cap_entries, _enemy_unit_entry,
+    _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry,
     _items_with_drop_last, chapter_label_constant, declare_unit_table,
     enemy_ai_initialiser, safe_ai_clients)
 from inject.villages import (
     assert_village_gifts_match_vanilla, assert_village_tiles_visitable, DEFAULT_VILLAGE_SPEAKER,
-    location_events, village_boxes, village_reward_item, village_script)
+    location_events, save_all_bonus_script, village_boxes, village_reward_item, village_script)
 
 
 # The portrait podiums in SCREEN order, left to right (tag codes in tools/textencode/msg_list.txt:
@@ -195,72 +195,6 @@ def recruit_initial_faction(unit):
     return token
 
 
-def declare_event_script(path, symbol, body, comment):
-    """DEFINE a campaign-owned EventListScr in `path` (a chN-eventscript.h), and return its symbol.
-
-    The script twin of declare_unit_table, for the same reason and with the same payoff. A host
-    slot frees only the scripts its stripped cutscenes stop referencing -- slot 6 leaves five, and
-    ch05 needs three reinforcement waves plus one per village, which is more than it has. Naming
-    our own removes the budget entirely, and `MS_Ch05Village2` says what it runs where
-    `EventScr_089F2AE4` says nothing at all.
-    """
-    with open(path, encoding='utf-8') as f:
-        script = f.read()
-    if ('EventListScr %s[]' % symbol) in script:
-        sys.exit('ERROR: event script %s is already defined this build -- two injectors are '
-                 'claiming one symbol name' % symbol)
-    _assert_ms_symbol(symbol)
-    # The campaign's OWN scenes are defined here, not written through `_replace_brace_block`,
-    # so the #337 cutscene-actor check has to run on this path too -- it is the path ch05's
-    # talks and villages take, and the one ch06's Messie scene will (#337).
-    for validate in _decomp.scene_validators():
-        validate(body, symbol)
-    with open(path, 'a', encoding='utf-8') as f:
-        f.write('\n/* %s */\nCONST_DATA EventListScr %s[] = %s;\n' % (comment, symbol, body))
-    with open(EVENTCALL_H, encoding='utf-8') as f:
-        header = f.read()
-    with open(EVENTCALL_H, 'w', encoding='utf-8') as f:
-        f.write(event_script_extern(header, symbol, comment))
-    return symbol
-
-
-def assert_event_scripts_defined(path, symbols):
-    """Fail the BUILD if a declared event script is missing from `path`.
-
-    `declare_event_script` APPENDS, while the injectors' block-replacements rewrite the same file
-    wholesale from a copy read earlier -- so declaring before the bulk write silently discards
-    every appended script. The Location list still names them and the externs still exist, so the
-    only symptom is a link error pointing at the reference rather than at the loss. Cheap to
-    assert, and it pins the ordering against a future reshuffle of the injector.
-    """
-    with open(path, encoding='utf-8') as f:
-        script = f.read()
-    missing = [s for s in symbols if ('EventListScr %s[]' % s) not in script]
-    if missing:
-        sys.exit('ERROR: %s declared but not defined in %s -- declare_event_script APPENDS, so it '
-                 'must run AFTER the block-replacement pass rewrites the file, never before'
-                 % (', '.join(missing), os.path.basename(path)))
-
-
-# Anchored on the first EventListScr extern, like the UnitDefinition block above it.
-_SCRIPT_EXTERN_ANCHOR = 'extern CONST_DATA EventListScr EventScr_9EEA58[];'
-
-
-def event_script_extern(header, symbol, comment):
-    """Pure: `header` (eventcall.h) with an extern for event script `symbol`. Idempotent.
-
-    The Location list that names these lives in a DIFFERENT file from their definitions, so
-    without the declaration agbcc sees an implicit int and the build dies a long way from here.
-    """
-    _assert_ms_symbol(symbol)
-    decl = 'extern CONST_DATA EventListScr %s[];' % symbol
-    if decl in header:
-        return header
-    if _SCRIPT_EXTERN_ANCHOR not in header:
-        sys.exit('ERROR: eventcall.h has no EventListScr extern block to extend (looked for %r)'
-                 % _SCRIPT_EXTERN_ANCHOR)
-    return header.replace(_SCRIPT_EXTERN_ANCHOR,
-                          '%s\n%s /* %s */' % (_SCRIPT_EXTERN_ANCHOR, decl, comment), 1)
 CH05_BEGINNING_SCRIPT = 'EventScr_Ch6_BeginningScene'
 CH05_ENDING_SCRIPT = 'EventScr_Ch6_EndingScene'
 # Dead host-slot scripts repurposed for our reinforcement waves. Unreachable once the event
@@ -451,7 +385,7 @@ CH05_OPENING_PODIUM_OVERRIDES = {
 # could be talking from a tile nobody is standing on. Over a backdrop there is no anchor to want.
 CH05_ENDING_BG = 'BG_MS_ELVEN_TOMB'   # back to the tomb face the chapter opened on, which is
 # Two branches in one event list, so two label pairs -- and they start at 4 because
-# `save_all_bonus_script` already owns SAVE_ALL_SKIP_LABEL (0x2) further down the same script.
+# `save_all_bonus_script` (inject.villages) already owns SAVE_ALL_SKIP_LABEL (0x2) further down the same script.
 CH05_ENDING_BASIL_LABEL_BASE = 4           # Basil alive -> scene 16, else scene 17
 CH05_ENDING_SAHNAR_LABEL_BASE = 6          # inside 16: the full scene, or the cut one
 # BASIL holds mid-right for the whole scene and everyone else rotates through mid-left. She
@@ -514,29 +448,6 @@ def locked_and_variant(script, fallback, render, err_label, msgs):
     locked_msg, variant_msg = msgs
     return [(locked_msg, render(script)),
             (variant_msg, render(variant_beat(script, fallback, err_label)))]
-
-
-SAVE_ALL_SKIP_LABEL = '0x2'     # vanilla Ch5's own label for "a site was lost -- skip the gift"
-
-
-def save_all_bonus_script(flags, item):
-    """Vanilla's save-all-the-villages payout (`EventScr_Ch5_EndingScene`), as event lines.
-
-    One CHECK_EVENTID per site, each branching PAST the gift the moment its flag reads unset --
-    so the reward survives only a clean sweep, and any single lost site skips the lot. The
-    flags are the ones the Location list armed; a site that was raided never set its id, and
-    neither did one the player simply walked past.
-
-    CHAR_EVT_PLAYER_LEADER, not the village idiom's CHAR_EVT_ACTIVE_UNIT: nobody is standing on
-    a tile at the ending, so there is no active unit for the item to land on."""
-    lines = []
-    for flag in flags.values():
-        lines += ['    CHECK_EVENTID(%s)' % flag,
-                  '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0)' % SAVE_ALL_SKIP_LABEL]
-    lines += ['    SVAL(EVT_SLOT_3, %s)' % item,
-              '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)',
-              'LABEL(%s)' % SAVE_ALL_SKIP_LABEL]
-    return '\n'.join(lines) + '\n'
 
 
 CH05_ENDING_SLOT = 'vanilla 0x9C9'          # scene 16 -- Basil alive

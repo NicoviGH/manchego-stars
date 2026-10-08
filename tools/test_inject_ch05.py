@@ -22,6 +22,7 @@ import inject.chapter_ids
 import inject.chapters.ch04
 import inject.chapters.ch05
 import inject.decomp
+import inject.event_scripts
 import inject.hosting
 import inject.hosts
 import inject.maps
@@ -31,6 +32,7 @@ import inject.scenes
 import inject.terrain
 import inject.text
 import inject.units
+import inject.villages
 import inject.warm
 import yaml_loader
 import fe8_talk_font as font
@@ -2170,7 +2172,7 @@ class Ch05VillageRaidRace(unittest.TestCase):
     def test_the_bonus_is_withheld_unless_every_site_survived(self):
         """Vanilla's shape exactly: one CHECK_EVENTID per site, each branching PAST the gift the
         moment a flag is unset, so any single unset id skips the whole payout."""
-        body = inject.chapters.ch05.save_all_bonus_script({'a': 'EVFLAG_TMP(9)', 'b': 'EVFLAG_TMP(10)'},
+        body = inject.villages.save_all_bonus_script({'a': 'EVFLAG_TMP(9)', 'b': 'EVFLAG_TMP(10)'},
                                         'ITEM_GUIDINGRING')
         self.assertEqual(2, body.count('CHECK_EVENTID('))
         self.assertIn('CHECK_EVENTID(EVFLAG_TMP(9))', body)
@@ -2184,7 +2186,7 @@ class Ch05VillageRaidRace(unittest.TestCase):
     def test_the_bonus_goes_to_the_leader_not_the_last_unit_to_move(self):
         """CHAR_EVT_ACTIVE_UNIT is the village idiom -- the unit who walked in. There is no
         active unit at the ending, so the payout uses vanilla's CHAR_EVT_PLAYER_LEADER."""
-        body = inject.chapters.ch05.save_all_bonus_script({'a': 'EVFLAG_TMP(9)'}, 'ITEM_GUIDINGRING')
+        body = inject.villages.save_all_bonus_script({'a': 'EVFLAG_TMP(9)'}, 'ITEM_GUIDINGRING')
         self.assertIn('SVAL(EVT_SLOT_3, ITEM_GUIDINGRING)', body)
         self.assertIn('GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)', body)
 
@@ -2252,14 +2254,14 @@ class CampaignOwnedEventScripts(unittest.TestCase):
     HEADER = 'extern CONST_DATA EventListScr EventScr_9EEA58[];\n'
 
     def test_extern_is_added_once_and_is_idempotent(self):
-        once = inject.chapters.ch05.event_script_extern(self.HEADER, 'MS_Ch05VisitSouth', 'south reliquary')
-        twice = inject.chapters.ch05.event_script_extern(once, 'MS_Ch05VisitSouth', 'south reliquary')
+        once = inject.event_scripts.event_script_extern(self.HEADER, 'MS_Ch05VisitSouth', 'south reliquary')
+        twice = inject.event_scripts.event_script_extern(once, 'MS_Ch05VisitSouth', 'south reliquary')
         self.assertEqual(once, twice)
         self.assertEqual(twice.count('MS_Ch05VisitSouth[];'), 1)
 
     def test_an_unprefixed_symbol_is_refused(self):
         with self.assertRaises(SystemExit):
-            inject.chapters.ch05.event_script_extern(self.HEADER, 'EventScr_089F2AE4', 'squatting')
+            inject.event_scripts.event_script_extern(self.HEADER, 'EventScr_089F2AE4', 'squatting')
 
     def test_a_declared_but_undefined_script_fails_the_build(self):
         """declare_event_script APPENDS, while the injector rewrites the same file wholesale from
@@ -2270,9 +2272,9 @@ class CampaignOwnedEventScripts(unittest.TestCase):
             path = os.path.join(tmp, 'ch6-eventscript.h')
             with open(path, 'w') as f:
                 f.write('CONST_DATA EventListScr MS_Ch05VisitNorth[] = {\n    ENDA\n};\n')
-            inject.chapters.ch05.assert_event_scripts_defined(path, ['MS_Ch05VisitNorth'])   # present -> quiet
+            inject.event_scripts.assert_event_scripts_defined(path, ['MS_Ch05VisitNorth'])   # present -> quiet
             with self.assertRaises(SystemExit) as caught:
-                inject.chapters.ch05.assert_event_scripts_defined(
+                inject.event_scripts.assert_event_scripts_defined(
                     path, ['MS_Ch05VisitNorth', 'MS_Ch05VisitSouth'])
             self.assertIn('MS_Ch05VisitSouth', str(caught.exception))
             self.assertIn('AFTER', str(caught.exception), 'the error must name the ordering')

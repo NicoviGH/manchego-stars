@@ -61,7 +61,7 @@ class AllocationIsDerivedFromTheLedger(unittest.TestCase):
                    for name in alloc.APPENDED_MESSAGES[ch]]
         self.assertEqual(ordered, list(range(alloc.VANILLA_MESSAGE_COUNT,
                                              alloc.VANILLA_MESSAGE_COUNT + len(ordered))))
-        self.assertEqual(inject.chapter_ids.CH06_BOAT_NAME_MSGS['boat-west'], ordered[-1])
+        self.assertEqual(inject.chapter_ids.CH06_BOAT_TALK_MSGS['boat-west'], ordered[-1])
 
 
 class AllocatedIdsAreClaimed(unittest.TestCase):

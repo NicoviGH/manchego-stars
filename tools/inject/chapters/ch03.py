@@ -19,7 +19,7 @@ from inject.hosts import CH03_EVENT_GROUP, CH03_HOST_INDEX
 from inject.maps import (
     _inject_tile_changes, _layout_sidecar, _register_chapter_map, _register_tileset)
 from inject.paths import CH4_EVENTINFO_H, CH4_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
-from inject.recruit import on_map_talk_recruits, talk_recruit_wiring
+from inject.recruit import on_map_talk_recruits, talk_recruit_wiring, talk_recruiters
 from inject.scenes import (
     _emit_scene_beats, _make_fid, _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats,
     _stage_beat, _write_chapter_title_card, flag_defeat_quote)
@@ -41,16 +41,6 @@ def _beat_is_faceless(beat, fid):
     keys = [next(iter(e)) for e in beat
             if next(iter(e)) not in SCRIPT_DIRECTIVES]
     return bool(keys) and all(fid(k) is None for k in keys)
-
-
-def talk_recruiters(campaign, chapter_number):
-    """The candidate RECRUITERS for an on-map talk recruit in chapter N = every core party
-    member on the blue field roster (cast_available_at(N) = _classed_cast(available_at=N)),
-    as CHARACTER_ symbols. "Talker = ANY core party member" (Nicolas, 2026-07-08: the only
-    thief must be non-missable, and a static CHAR can't name the CHOSEN lord) -> one CHAR
-    entry per candidate, all -> the shared recruit script."""
-    cast, _ = _classed_cast(campaign, available_at=chapter_number)
-    return [char_symbol(slot) for _, slot, *_ in cast]
 
 
 def midmap_afev(guard_flag, script, watch_flag):

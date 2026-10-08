@@ -32,7 +32,9 @@ APPENDED_MESSAGES = {
     'ch05': ('moose-name',),
     # The two boats' name plates (#360), one each so the boarding pass can name the Burly Ram
     # and the Pronged Goat apart.
-    'ch06': ('boat-east-name', 'boat-west-name'),
+    'ch06': ('boat-east-name', 'boat-west-name',
+             # ...and their boarding scenes (#26): Grynsk aboard the east hull, Tali the west.
+             'boat-east-talk', 'boat-west-talk'),
 }
 
 

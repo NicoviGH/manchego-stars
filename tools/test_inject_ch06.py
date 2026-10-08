@@ -14,6 +14,7 @@ import inject.chapter_ids
 import inject.chapters.ch06
 import inject.map_sprites
 import inject.recruit
+import inject.villages
 import inject.decomp
 import inject.hosting
 import inject.units
@@ -79,8 +80,9 @@ class MessieWearsHisOwnArt(unittest.TestCase):
             inject.chapter_ids.CH06_MESSIE_PID]
         self.assertEqual(('messie', 'Messie'), (unit_id, name))
         self.assertEqual(inject.cast.GUEST_PORTRAIT_MAP['messie'], slot)
-        src = open(os.path.join(inject.decomp.REPO, 'fireemblem8u', 'src', 'data_characters.c'),
-                   encoding='utf-8').read()
+        with open(os.path.join(inject.decomp.REPO, 'fireemblem8u', 'src', 'data_characters.c'),
+                  encoding='utf-8') as f:
+            src = f.read()
         row = src[src.index('[CHARACTER_SYRENE - 1]'):]
         row = row[:row.index('},')]
         self.assertEqual(int(re.search(r'\.portraitId = (0x[0-9a-fA-F]+)', row).group(1), 16),
@@ -97,6 +99,54 @@ class MessieWearsHisOwnArt(unittest.TestCase):
         sheet glides on its idle the way the cast do, instead of failing the build."""
         body = injector.def_source('_inject_scripted_neutral_sprites')
         self.assertIn('synth_mu_sheet', body)
+
+
+class BoardingPass(unittest.TestCase):
+    """vanilla Ch6's village in a hull: any party member Talks a boat, the crew speaks, the
+    east hull pays the Antitoxin, and the ending pays the Orion's Bolt only if both float."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.chap = inject.hosting._load_chapter_yaml(cls.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
+        cls.events, cls.scripts, cls.messages = inject.chapters.ch06.ch06_boarding_wiring(
+            cls.CAMPAIGN, cls.chap)
+        cls.boarders = inject.recruit.talk_recruiters(cls.CAMPAIGN, cls.chap['chapter_number'])
+
+    def test_every_boarder_can_board_every_boat_and_a_boat_has_one_flag(self):
+        ids = inject.chapter_ids
+        for bid, pid in ids.CH06_BOAT_PIDS.items():
+            rows = re.findall(r'CHAR\(([^,]+), %s, (\w+), %s\)'
+                              % (ids.CH06_BOAT_TALK_SCRIPTS[bid], pid), self.events)
+            self.assertEqual(sorted(self.boarders), sorted(r[1] for r in rows), bid)
+            self.assertEqual({ids.CH06_BOAT_TALK_FLAGS[bid]}, {r[0] for r in rows}, bid)
+        self.assertNotEqual(*ids.CH06_BOAT_TALK_FLAGS.values())
+
+    def test_the_east_hull_gives_the_antitoxin_and_the_west_gives_its_line(self):
+        scripts = {s: b for s, b, _c in self.scripts}
+        ids = inject.chapter_ids
+        east, west = (scripts[ids.CH06_BOAT_TALK_SCRIPTS[b]] for b in ('boat-east', 'boat-west'))
+        self.assertIn('SVAL(EVT_SLOT_3, ITEM_ANTITOXIN)', east)
+        self.assertNotIn('GIVEITEMTO', west)
+        for body in (east, west):
+            self.assertIn('Text_BG(BG_SHIP,', body)
+
+    def test_each_authored_line_is_its_own_box_under_its_crews_face(self):
+        msgs = dict(self.messages)
+        for boat in self.chap['rescue_boats']:
+            body = msgs[inject.chapter_ids.CH06_BOAT_TALK_MSGS[boat['id']]]
+            self.assertIn('[%s]' % boat['talk']['face'], body)
+            self.assertEqual(len(boat['talk']['text']), body.count('[A]'), boat['id'])
+
+    def test_the_save_both_payout_asks_whether_each_hull_is_alive(self):
+        body = inject.villages.save_all_bonus_script(inject.chapter_ids.CH06_BOAT_PIDS,
+                                                     'ITEM_ORIONSBOLT', check='CHECK_ALIVE')
+        for pid in inject.chapter_ids.CH06_BOAT_PIDS.values():
+            self.assertIn('CHECK_ALIVE(%s)' % pid, body)
+        self.assertLess(body.rindex('BEQ('), body.index('ITEM_ORIONSBOLT'))
+        with self.assertRaises(SystemExit):
+            inject.villages.save_all_bonus_script({}, 'ITEM_ORIONSBOLT', check='CHECK_FLAG')
 
 
 if __name__ == '__main__':

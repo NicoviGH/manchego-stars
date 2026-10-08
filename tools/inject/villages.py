@@ -51,14 +51,45 @@ def village_reward_item(village, item_ids):
     return item_ids[reward] if reward else None
 
 
+SAVE_ALL_SKIP_LABEL = '0x2'     # vanilla Ch5's own label for "a site was lost -- skip the gift"
+
+
+def save_all_bonus_script(subjects, item, check='CHECK_EVENTID'):
+    """Vanilla's save-them-all payout, as event lines: one `check` per site, each branching PAST
+    the gift the moment it reads 0, so the reward survives only a clean sweep.
+
+    Vanilla spells it two ways and both read 0 for "lost": Ch5 (`EventScr_Ch5_EndingScene`) asks
+    CHECK_EVENTID of each village's visit flag -- a raided site never set it, and neither did one
+    the player walked past -- and Ch6 (`EventScr_Ch6_EndingScene`) asks CHECK_ALIVE of each
+    civilian pid. `subjects` is {site id: flag or pid}; ch05 passes flags, ch06 its hulls' pids.
+
+    CHAR_EVT_PLAYER_LEADER, not the village idiom's CHAR_EVT_ACTIVE_UNIT: nobody is standing on
+    a tile at the ending, so there is no active unit for the item to land on."""
+    if check not in ('CHECK_EVENTID', 'CHECK_ALIVE'):
+        sys.exit('ERROR: save_all_bonus_script check %r is neither vanilla spelling' % check)
+    lines = []
+    for subject in subjects.values():
+        lines += ['    %s(%s)' % (check, subject),
+                  '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0)' % SAVE_ALL_SKIP_LABEL]
+    lines += ['    SVAL(EVT_SLOT_3, %s)' % item,
+              '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)',
+              'LABEL(%s)' % SAVE_ALL_SKIP_LABEL]
+    return '\n'.join(lines) + '\n'
+
+
 # Whom a bare `visit_text` string belongs to. ch04/ch05 author flat lists with one voice;
 # ch02's south hut needs two, so a box may instead be `- who: "line"`.
 DEFAULT_VILLAGE_SPEAKER = 'resident'
 
 
 def village_boxes(village):
-    """A village's line, as the GBA boxes it was AUTHORED in -- one `visit_text` entry per
-    A-press.
+    """A village's `visit_text`, as `authored_boxes` reads it."""
+    return authored_boxes(village['id'], village.get('visit_text'), 'visit_text')
+
+
+def authored_boxes(site_id, text, field='text'):
+    """A site's line, as the GBA boxes it was AUTHORED in -- one `field` entry per A-press.
+    Villages (`visit_text`) and ch06's boarding scenes (`talk.text`) both read through here.
 
     Village text is dialogue, so its buttons belong on its beats. Flowed as a single scalar it
     reflows wherever the pixel budget runs out and buttons mid-sentence: the axe village's
@@ -67,19 +98,18 @@ def village_boxes(village):
     not on screen, which is not what 1:1 meant (Nicolas, 2026-08-02). A flowed scalar is
     therefore rejected outright rather than silently reflowed.
     """
-    text = village.get('visit_text')
     if isinstance(text, str) or not text:
-        sys.exit('ERROR: village %r must author `visit_text` as a LIST -- one entry per GBA '
-                 'box. A flowed scalar reflows at the wrap width and puts the A-press breaks '
-                 'mid-sentence.' % village['id'])
+        sys.exit('ERROR: %r must author `%s` as a LIST -- one entry per GBA box. A flowed '
+                 'scalar reflows at the wrap width and puts the A-press breaks mid-sentence.'
+                 % (site_id, field))
     boxes = []
     for box in text:
         if isinstance(box, dict):
             # `- who: "line"` -- the same form the chapter scene scripts use. Two keys in one
             # box would be two speakers sharing an A-press, which drops a line on the floor.
             if len(box) != 1:
-                sys.exit('ERROR: village %r has a visit_text box naming %d speakers; one box '
-                         'is one A-press by one person' % (village['id'], len(box)))
+                sys.exit('ERROR: %r has a %s box naming %d speakers; one box is one A-press '
+                         'by one person' % (site_id, field, len(box)))
             who, line = next(iter(box.items()))
         else:
             who, line = DEFAULT_VILLAGE_SPEAKER, box
