@@ -6,16 +6,16 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-07 (Claude): Messie's map sprite is wired (#466). **What landed and why is in
+Refreshed 2026-10-07 (Claude): Messie wired (#466), ch06 boarding pass merged (#467). **What landed and why is in
 `git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
 Nothing on a branch. **Next, in order:**
 
-1. **#26 — the rest of ch06:** the boarding pass (Grynsk on the Burly Ram, Tali on the Pronged
-   Goat; voiced from the book pp. 28-31 + vanilla Ch6's village MSG_9F3 / ending MSG_9F1),
-   then the three cutscenes. Messie is wired (#466): pid 0xbd, loaded as `CLASS_GWYLLGI`.
+1. **#26 — the rest of ch06:** the three cutscenes (`chapter_start`, `boss_defeated` = Messie
+   on the ice, `chapter_end`). Messie loads as pid 0xbd, `CLASS_GWYLLGI` (#466); the staging
+   scene calls `assert_custom_art_pid_wired`. The boarding pass is done (#467, ADR 0331).
 2. **#459 — roster parity with vanilla, chapter by chapter** (Nicolas wants vanilla's count and
    diversity, replacing ADR 0047's 16-18 budget). The decomp join table, deploy limits and
    coverage audit are on the issue; Baxby-as-Seth is the open call there (reverses ADR 0042).
@@ -29,7 +29,7 @@ Nothing on a branch. **Next, in order:**
 ## Chapter work
 
 - **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). Every
-  enemy is dressed (#460) and Messie is wired (#466); the boarding pass and the three
+  enemy is dressed (#460), Messie is wired (#466), the boarding pass is in (#467); the three
   cutscenes are what is left.
 - **#335** — the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).
