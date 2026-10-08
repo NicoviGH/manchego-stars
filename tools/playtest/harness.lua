@@ -7086,13 +7086,19 @@ end
 -- moment the location event starts. Split from the dialogue-advancing half so the RECORDER can
 -- own the filmed part: `openVillageVisit` is the unfilmed walk-in (a `pre`), the line itself is
 -- what the camera wants. Returns ok, reason.
-local function openVillageVisit(x, y)
+-- `choose` (optional) replaces the Visit command: the `talk` step passes a Talk, so a site that
+-- is a UNIT to talk to (ch06's hulls) shares the picking, parking and playing-out below.
+local function openVillageVisit(x, y, choose)
     local u
     for i = 0, 19 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and not isDead(c) and (c.state & 0x2) == 0 then u = c break end
+        -- Deployed and on the map, not merely alive: a capped chapter leaves party members
+        -- off the field at x = -1, and parking one of those writes outside the grid row.
+        if c and not isDead(c) and (c.state & 0x9) == 0 and c.onMap and (c.state & 0x2) == 0 then
+            u = c break
+        end
     end
-    if not u then return false, "no unexhausted blue unit to visit with" end
+    if not u then return false, "no unexhausted deployed blue unit to send" end
     -- setMapUnit keeps the engine's tile->unit grid in sync, so the Visit check reads the new
     -- position immediately (the ch03talk/parley trick).
     local grid = mapUnitAt(u.x, u.y)
@@ -7103,6 +7109,7 @@ local function openVillageVisit(x, y)
     if not moveUnit(x, y, x, y) then
         return false, "could not select the unit standing on the village"
     end
+    if choose then return choose() end
     if not selectSemantic("visit", "Visit starts the live location event", function(after)
         return after.menu == nil
     end, 600) then return false, "live command menu did not expose Visit" end
@@ -7118,8 +7125,8 @@ end
 -- the only moment the line and the speaker's face are both on screen. Review captures need it:
 -- a shot taken after the visit returns catches the map, because `done` fires when the ITEM
 -- lands and the box is long gone by then.
-local function visitVillage(x, y, done, onBox)
-    local ok, why = openVillageVisit(x, y)
+local function visitVillage(x, y, done, onBox, choose)
+    local ok, why = openVillageVisit(x, y, choose)
     if not ok then return false, why end
     local spoke = false
     for _ = 1, 3600 do
@@ -9769,40 +9776,17 @@ local co = coroutine.create(function()
                 return now ~= before
             end)
         end,
-        -- `talk`: park a fresh blue unit ON (x, y), Talk the neighbour, play the scene out.
+        -- `talk`: the visit path with Talk as the command; done once the scene has ended.
         -- A missing Talk command is the failure this catches (a CHAR naming the wrong pair).
         talkFrom = function(x, y)
-            local u
-            for i = 0, 19 do
-                local c = unitAt(SYM.gUnitArrayBlue, i)
-                if c and not isDead(c) and (c.state & 0x2) == 0 then u = c break end
-            end
-            if not u then return false, "no unexhausted blue unit to Talk with" end
-            local grid = mapUnitAt(u.x, u.y)
-            setMapUnit(u.x, u.y, 0)
-            emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
-            setMapUnit(x, y, grid)
-            if not cursorTo(x, y) then return false, "cursor could not reach the talker" end
-            if not moveUnit(x, y, x, y) then
-                return false, "could not open the command menu of the unit parked there"
-            end
-            if not chooseTalk() then
-                return false, "the command menu offered no Talk -- no CHAR entry pairs this "
-                    .. "unit with a neighbour"
-            end
-            -- chooseTalk returns AT the first box, so the scene has spoken; play it to the end.
-            for _ = 1, 3600 do
-                if controllerState() == "dialogue_wait" then
-                    if not guardedInput("advance_dialogue", "A", "dialogue input wait clears",
-                        function(after) return controllerState(after) ~= "dialogue_wait" end,
-                        120) then return false, "talk dialogue input did not advance" end
-                elseif not procActive(SYM.ProcScr_StdEventEngine) then
-                    return true, nil, true
-                else
-                    yield()
-                end
-            end
-            return false, "the Talk scene was still running after 3600 frames"
+            return visitVillage(x, y, function()
+                return controllerState() ~= "dialogue_wait"
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+            end, nil, function()
+                if chooseTalk() then return true end
+                return false, "the command menu offered no Talk -- no CHAR pairs this unit "
+                    .. "with a neighbour"
+            end)
         end,
     }
     return dofile(PLAYTEST_DIR .. "/cases.lua").run(dofile(path), api)
