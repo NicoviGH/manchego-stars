@@ -3,7 +3,7 @@
 import sys
 
 from inject.cast import (
-    char_symbol, class_enum_for, deploy_class_for, load_unit, PORTRAIT_MAP,
+    _classed_cast, char_symbol, class_enum_for, deploy_class_for, load_unit, PORTRAIT_MAP,
     SCRIPTED_NEUTRAL_SPRITES)
 from inject.hosting import recruit_chapter_number
 from inject.scenes import branch_on_check_alive
@@ -66,6 +66,16 @@ def on_map_talk_recruits(campaign, chapter_number):
         out.append((unit_id, slot, class_enum, deploy_class_for(unit),
                     int(unit.get('fe_stats', {}).get('level', 1))))
     return out
+
+
+def talk_recruiters(campaign, chapter_number):
+    """The candidate RECRUITERS for an on-map talk recruit in chapter N = every core party
+    member on the blue field roster (cast_available_at(N) = _classed_cast(available_at=N)),
+    as CHARACTER_ symbols. "Talker = ANY core party member" (Nicolas, 2026-07-08: the only
+    thief must be non-missable, and a static CHAR can't name the CHOSEN lord) -> one CHAR
+    entry per candidate, all -> the shared recruit script."""
+    cast, _ = _classed_cast(campaign, available_at=chapter_number)
+    return [char_symbol(slot) for _, slot, *_ in cast]
 
 
 def talk_recruit_char_entries(recruiters, target, flag, script):

@@ -186,7 +186,7 @@ class TalkRecruitWiring(unittest.TestCase):
     def test_recruiters_are_the_ch03_field_roster_minus_trex(self):
         """Talker = ANY core party member -> the ch03 blue field roster (cast_available_at(3)).
         Trex himself is never a recruiter (he is the green target, not on the prep roster)."""
-        recruiters = inject.chapters.ch03.talk_recruiters(self.CAMPAIGN, 3)
+        recruiters = inject.recruit.talk_recruiters(self.CAMPAIGN, 3)
         field = {inject.cast.char_symbol(slot) for _, slot, *_ in inject.cast._classed_cast(self.CAMPAIGN, available_at=3)[0]}
         self.assertEqual(set(recruiters), field)
         self.assertNotIn('CHARACTER_RENNAC', recruiters)   # the target isn't a recruiter

@@ -51,6 +51,32 @@ def village_reward_item(village, item_ids):
     return item_ids[reward] if reward else None
 
 
+SAVE_ALL_SKIP_LABEL = '0x2'     # vanilla Ch5's own label for "a site was lost -- skip the gift"
+
+
+def save_all_bonus_script(subjects, item, check='CHECK_EVENTID'):
+    """Vanilla's save-them-all payout, as event lines: one `check` per site, each branching PAST
+    the gift the moment it reads 0, so the reward survives only a clean sweep.
+
+    Vanilla spells it two ways and both read 0 for "lost": Ch5 (`EventScr_Ch5_EndingScene`) asks
+    CHECK_EVENTID of each village's visit flag -- a raided site never set it, and neither did one
+    the player walked past -- and Ch6 (`EventScr_Ch6_EndingScene`) asks CHECK_ALIVE of each
+    civilian pid. `subjects` is {site id: flag or pid}; ch05 passes flags, ch06 its hulls' pids.
+
+    CHAR_EVT_PLAYER_LEADER, not the village idiom's CHAR_EVT_ACTIVE_UNIT: nobody is standing on
+    a tile at the ending, so there is no active unit for the item to land on."""
+    if check not in ('CHECK_EVENTID', 'CHECK_ALIVE'):
+        sys.exit('ERROR: save_all_bonus_script check %r is neither vanilla spelling' % check)
+    lines = []
+    for subject in subjects.values():
+        lines += ['    %s(%s)' % (check, subject),
+                  '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0)' % SAVE_ALL_SKIP_LABEL]
+    lines += ['    SVAL(EVT_SLOT_3, %s)' % item,
+              '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)',
+              'LABEL(%s)' % SAVE_ALL_SKIP_LABEL]
+    return '\n'.join(lines) + '\n'
+
+
 # Whom a bare `visit_text` string belongs to. ch04/ch05 author flat lists with one voice;
 # ch02's south hut needs two, so a box may instead be `- who: "line"`.
 DEFAULT_VILLAGE_SPEAKER = 'resident'

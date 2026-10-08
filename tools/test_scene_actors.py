@@ -42,6 +42,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.chapters.ch05
+import inject.event_scripts
 import inject.scene_actors
 
 
@@ -166,7 +167,7 @@ class TheGuardRidesTheWriteItself(unittest.TestCase):
         scene will -- so hooking only the brace writer would have left the motivating case
         of this whole guard unchecked."""
         import inspect
-        src = inspect.getsource(inject.chapters.ch05.declare_event_script)
+        src = inspect.getsource(inject.event_scripts.declare_event_script)
         self.assertIn('scene_validators()', src)
 
     def test_an_MS_scene_name_is_not_filtered_out(self):
