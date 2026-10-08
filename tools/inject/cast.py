@@ -184,6 +184,10 @@ GUEST_PORTRAIT_MAP = {
     # collision-free. His on-map pid (CH06_MESSIE_PID) is bound to Syrene by RAW_PID_PORTRAITS.
     'messie':         'Syrene',
     'messie-mayor':   'Gheb',
+    # Speaker Dorbulgruf Shalescar hires the party in ch06's opening and is ch07's boss (ADR
+    # 0332). He rides Murray, vanilla Ch7's boss -- ch07's parity twin -- so the face is already
+    # where ch07's boss will look for it, the way Nerra rides Novala. Murray is named nowhere else.
+    'dorbulgruf':     'Murray',
 }
 
 
