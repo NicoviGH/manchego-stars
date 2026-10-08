@@ -47,45 +47,55 @@ end
 -- Steps. Each returns ok, why.
 M.WHEN = {}
 
--- `arg.gains` is an item id this door must hand over. It rides the STEP because the gift is
+-- `arg.gains` is an item id this site must hand over. It rides the STEP because the gift is
 -- per-tile: a whole-case "these ids arrived" list passes on four doors swapping each other's
 -- gifts, which is exactly the defect ch05reliquaries exists to catch. It is still not
--- positional -- the assertion lives INSIDE the step it belongs to, so inserting a door cannot
--- re-target another door's assertion.
-M.WHEN.visit = function(api, arg, state)
-    if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number" then
-        return false, "a `visit` step needs a table with numeric x and y"
-    end
-    -- Settle FIRST. A location event's tail (give-item, MapChange, EVBIT_T, ENDA) is still
-    -- running when the item lands, and walking to the next door while std_event holds the
-    -- controller is an illegal input that dies as "cursor could not reach" -- which reads
-    -- like a map problem and is an impatience problem.
-    if not api.settle(true) then
-        return false, string.format(
-            "the map never returned to player control before (%d,%d)", arg.x, arg.y)
-    end
-    local before = M.tally(api.collectedItems())
-    local ok, why, spoke = api.visitVillage(arg.x, arg.y)
-    if not ok then
-        return false, string.format("(%d,%d): %s", arg.x, arg.y, tostring(why))
-    end
-    api.shot("visit")
-    state.visits = state.visits + 1
-    if arg.gains ~= nil then
-        state.asserted = state.asserted + 1
-        local after = M.tally(api.collectedItems())
-        if (after[arg.gains] or 0) <= (before[arg.gains] or 0) then
-            return false, string.format(
-                "(%d,%d) was visited but did not hand over item 0x%02X -- this door's OWN "
-                .. "gift. Another door's gift arriving instead still fails here, on purpose",
-                arg.x, arg.y, arg.gains)
+-- positional -- the assertion lives INSIDE the step it belongs to, so inserting a site cannot
+-- re-target another site's assertion.
+--
+-- A SITE is anything the party walks up to and is paid for: a village door (`visit`, the unit
+-- stands ON x,y) or a unit it Talks to (`talk`, the unit stands on x,y and Talks its neighbour
+-- -- ch06's boarding pass, from a hull's door). Same step, same assertions; only the api call
+-- that opens the site differs.
+local function siteStep(verb, open)
+    return function(api, arg, state)
+        if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number" then
+            return false, string.format("a `%s` step needs a table with numeric x and y", verb)
         end
+        -- Settle FIRST. A site event's tail (give-item, MapChange, EVBIT_T, ENDA) is still
+        -- running when the item lands, and walking to the next site while std_event holds the
+        -- controller is an illegal input that dies as "cursor could not reach" -- which reads
+        -- like a map problem and is an impatience problem.
+        if not api.settle(true) then
+            return false, string.format(
+                "the map never returned to player control before (%d,%d)", arg.x, arg.y)
+        end
+        local before = M.tally(api.collectedItems())
+        local ok, why, spoke = api[open](arg.x, arg.y)
+        if not ok then
+            return false, string.format("(%d,%d): %s", arg.x, arg.y, tostring(why))
+        end
+        api.shot(verb)
+        state.visits = state.visits + 1
+        if arg.gains ~= nil then
+            state.asserted = state.asserted + 1
+            local after = M.tally(api.collectedItems())
+            if (after[arg.gains] or 0) <= (before[arg.gains] or 0) then
+                return false, string.format(
+                    "%s at (%d,%d) did not hand over item 0x%02X -- this site's OWN gift. "
+                    .. "Another site's gift arriving instead still fails here, on purpose",
+                    verb, arg.x, arg.y, arg.gains)
+            end
+        end
+        if not spoke then
+            state.silent[#state.silent + 1] = string.format("(%d,%d)", arg.x, arg.y)
+        end
+        return true
     end
-    if not spoke then
-        state.silent[#state.silent + 1] = string.format("(%d,%d)", arg.x, arg.y)
-    end
-    return true
 end
+
+M.WHEN.visit = siteStep("visit", "visitVillage")
+M.WHEN.talk = siteStep("talk", "talkFrom")
 
 -- ---------------------------------------------------------------- then
 -- Assertions. Each returns ok, why.
@@ -112,7 +122,7 @@ M.THEN.spoke = function(api, want, state)
         return true
     end
     if #state.silent > 0 then
-        return false, "these visits paid out in SILENCE (no text box): "
+        return false, "these sites paid out in SILENCE (no text box): "
             .. table.concat(state.silent, ", ")
     end
     return true

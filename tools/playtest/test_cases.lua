@@ -42,6 +42,12 @@ local function fakeApi(opts)
         if step.gives then items[#items + 1] = step.gives end
         return step.ok ~= false, step.why or "refused", step.spoke ~= false
     end
+    -- `talk` sites share the visit script, so a mixed case counts its steps in one sequence.
+    a.talkFrom = function(x, y)
+        local r = {a.visitVillage(x, y)}
+        a.visits[#a.visits].talk = true
+        return table.unpack(r)
+    end
     return a
 end
 
@@ -58,6 +64,32 @@ do
     check(#api.visits, 1, "one visit step ran")
     check(api.visits[1].x, 12, "the visit used the declared x")
     check(api.visits[1].y, 19, "the visit used the declared y")
+end
+
+-- `talk` is the same site step through talkFrom: ch06boarding's shape, one paying hull and one
+-- whose line is the reward.
+do
+    local api = fakeApi({visits = {{gives = 0x6F}, {}}})
+    C.run({name = "ch06boarding", given = {"on_map"},
+           ["when"] = {{talk = {x = 17, y = 13, gains = 0x6F}}, {talk = {x = 4, y = 18}}},
+           ["then"] = {{spoke = true}}}, api)
+    check(api.verdict, "PASS", "a boarding case PASSes")
+    check(api.visits[1].talk, true, "a `talk` step opens its site through talkFrom")
+    check(api.visits[2].y, 18, "the second talk used its declared y")
+end
+do
+    local api = fakeApi({visits = {{why = "the command menu offered no Talk", ok = false}}})
+    C.run({name = "ch06boarding", given = {"on_map"},
+           ["when"] = {{talk = {x = 17, y = 13, gains = 0x6F}}}}, api)
+    check(api.verdict, "FAIL", "a missing Talk command FAILs the case")
+    contains(api.reason, "no Talk", "the reason says the Talk was missing")
+end
+do
+    local api = fakeApi({visits = {{}}})
+    C.run({name = "ch06boarding", given = {"on_map"},
+           ["when"] = {{talk = {x = 17, y = 13, gains = 0x6F}}}}, api)
+    check(api.verdict, "FAIL", "a talk that pays nothing FAILs its own gains")
+    contains(api.reason, "0x6F", "the reason names the missing gift")
 end
 
 -- The item never arrives: the case must FAIL, and say which item.

@@ -2085,8 +2085,15 @@ def check_verdict_scenarios_are_guarded(fail):
                     % (name, count, where))
 
 
-def _declared_case_violations(cases, villages, harness_src):
-    """Pure half of the two declared-case guards (unit-tested in test_check_declared.py)."""
+# Each site step's tile must be one its chapter declares: `visit` stands ON a village, `talk`
+# stands on a rescue hull's door and Talks the hull (ch06's boarding pass).
+SITE_STEPS = {'visit': 'village', 'talk': 'rescue-boat door'}
+
+
+def _declared_case_violations(cases, sites, harness_src):
+    """Pure half of the two declared-case guards (unit-tested in test_check_declared.py).
+
+    `sites` is {chapter short id: {step verb: [declared [x, y] tiles]}}."""
     problems = []
     for short, case in cases:
         for i, entry in enumerate(case.get('when') or ()):
@@ -2095,19 +2102,19 @@ def _declared_case_violations(cases, villages, harness_src):
                                 % (short, case['name'], i))
                 continue
             key, arg = list(entry.items())[0]
-            if key != 'visit':
+            if key not in SITE_STEPS:
                 continue
             if not isinstance(arg, dict):
-                problems.append('%s case %s: `visit` takes a mapping with x and y, got %r'
-                                % (short, case['name'], arg))
+                problems.append('%s case %s: `%s` takes a mapping with x and y, got %r'
+                                % (short, case['name'], key, arg))
                 continue
             tile = [arg.get('x'), arg.get('y')]
-            if tile not in villages.get(short, []):
+            if tile not in sites.get(short, {}).get(key, []):
                 problems.append(
-                    '%s case %s visits (%s,%s), which %s declares no village at -- the '
+                    '%s case %s steps `%s` at (%s,%s), which %s declares no %s at -- the '
                     'chapter YAML owns that map data, and a case coordinate that drifts '
                     'from it asserts against a tile the chapter does not have'
-                    % (short, case['name'], tile[0], tile[1], short))
+                    % (short, case['name'], key, tile[0], tile[1], short, SITE_STEPS[key]))
         for i, entry in enumerate(case.get('then') or ()):
             if not isinstance(entry, dict) or len(entry) != 1:
                 problems.append(
@@ -2146,8 +2153,9 @@ def _declared_api_adapter(harness):
 def check_declared_cases(fail):
     """Chapter-declared playtest cases describe the chapter they live in (#314).
 
-    Two things nothing else can catch. A `visit` step carries a tile, and the chapter YAML
-    already declares its villages with their tiles -- so a coordinate typo produces a case
+    Two things nothing else can catch. A `visit` or `talk` step carries a tile, and the chapter
+    YAML already declares its villages and hull doors with their tiles -- so a coordinate typo
+    produces a case
     that runs, walks a unit to empty ground, and FAILs blaming the chapter. And cases.lua is
     the one body every declared case shares, so a raw press() in it would defeat the
     blind-press contract for every case at once rather than for one.
@@ -2159,10 +2167,12 @@ def check_declared_cases(fail):
     except Exception as exc:                      # noqa: BLE001 -- report, don't crash the lint
         fail.append('chapter-declared playtest cases do not load (%s)' % exc)
         return
-    villages = {}
+    sites = {}
     for rel, d in _chapters():
         short = str(d.get('id', '')).split('-')[0]
-        villages[short] = [list(v['tile']) for v in (d.get('villages') or []) if v.get('tile')]
+        sites[short] = {
+            'visit': [list(v['tile']) for v in (d.get('villages') or []) if v.get('tile')],
+            'talk': [list(b['door']) for b in (d.get('rescue_boats') or []) if b.get('door')]}
     with open(os.path.join(REPO, 'tools/playtest/cases.lua'), encoding='utf-8') as fh:
         sources = {'tools/playtest/cases.lua': fh.read()}
     with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
@@ -2172,7 +2182,7 @@ def check_declared_cases(fail):
                     'declared case drives the game through cannot be reviewed')
     else:
         sources["harness.lua's declared-case api adapter"] = adapter
-    fail.extend(_declared_case_violations(cases, villages, sources))
+    fail.extend(_declared_case_violations(cases, sites, sources))
 
 
 # GBA address space. 0x04-0x07 are ARCHITECTURAL (MMIO, palette, VRAM, OAM) -- fixed by the

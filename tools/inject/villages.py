@@ -83,8 +83,13 @@ DEFAULT_VILLAGE_SPEAKER = 'resident'
 
 
 def village_boxes(village):
-    """A village's line, as the GBA boxes it was AUTHORED in -- one `visit_text` entry per
-    A-press.
+    """A village's `visit_text`, as `authored_boxes` reads it."""
+    return authored_boxes(village['id'], village.get('visit_text'), 'visit_text')
+
+
+def authored_boxes(site_id, text, field='text'):
+    """A site's line, as the GBA boxes it was AUTHORED in -- one `field` entry per A-press.
+    Villages (`visit_text`) and ch06's boarding scenes (`talk.text`) both read through here.
 
     Village text is dialogue, so its buttons belong on its beats. Flowed as a single scalar it
     reflows wherever the pixel budget runs out and buttons mid-sentence: the axe village's
@@ -93,19 +98,18 @@ def village_boxes(village):
     not on screen, which is not what 1:1 meant (Nicolas, 2026-08-02). A flowed scalar is
     therefore rejected outright rather than silently reflowed.
     """
-    text = village.get('visit_text')
     if isinstance(text, str) or not text:
-        sys.exit('ERROR: village %r must author `visit_text` as a LIST -- one entry per GBA '
-                 'box. A flowed scalar reflows at the wrap width and puts the A-press breaks '
-                 'mid-sentence.' % village['id'])
+        sys.exit('ERROR: %r must author `%s` as a LIST -- one entry per GBA box. A flowed '
+                 'scalar reflows at the wrap width and puts the A-press breaks mid-sentence.'
+                 % (site_id, field))
     boxes = []
     for box in text:
         if isinstance(box, dict):
             # `- who: "line"` -- the same form the chapter scene scripts use. Two keys in one
             # box would be two speakers sharing an A-press, which drops a line on the floor.
             if len(box) != 1:
-                sys.exit('ERROR: village %r has a visit_text box naming %d speakers; one box '
-                         'is one A-press by one person' % (village['id'], len(box)))
+                sys.exit('ERROR: %r has a %s box naming %d speakers; one box is one A-press '
+                         'by one person' % (site_id, field, len(box)))
             who, line = next(iter(box.items()))
         else:
             who, line = DEFAULT_VILLAGE_SPEAKER, box

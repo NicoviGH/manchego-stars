@@ -18,7 +18,8 @@ import check                                            # noqa: E402
 CLEAN = {'tools/playtest/cases.lua':
          'local M = {}\nM.WHEN.visit = function(api, arg) return api.visitVillage(arg.x) end\n',
          "harness.lua's declared-case api adapter": 'local api = {shot = shot}\n'}
-VILLAGES = {'ch05': [[5, 1], [5, 6], [12, 10], [12, 19]]}
+VILLAGES = {'ch05': {'visit': [[5, 1], [5, 6], [12, 10], [12, 19]]},
+            'ch06': {'talk': [[17, 13], [4, 18]]}}
 
 
 def case(**over):
@@ -60,6 +61,18 @@ class TestVisitTilesMatchTheChapter(unittest.TestCase):
         found = check._declared_case_violations(case(when=[{'visit': 'south'}]), VILLAGES, CLEAN)
         self.assertEqual(len(found), 1, found)
         self.assertIn('mapping with x and y', found[0])
+
+    def test_a_talk_step_must_stand_on_a_declared_hull_door(self):
+        ok = [('ch06', {'name': 'ch06boarding', 'when': [{'talk': {'x': 17, 'y': 13}}]})]
+        self.assertEqual(check._declared_case_violations(ok, VILLAGES, CLEAN), [])
+        bad = [('ch06', {'name': 'ch06boarding', 'when': [{'talk': {'x': 17, 'y': 12}}]})]
+        found = check._declared_case_violations(bad, VILLAGES, CLEAN)   # the hull, not its door
+        self.assertEqual(len(found), 1, found)
+        self.assertIn('rescue-boat door', found[0])
+
+    def test_a_visit_is_not_satisfied_by_a_door_nor_a_talk_by_a_village(self):
+        bad = [('ch06', {'name': 'x', 'when': [{'visit': {'x': 17, 'y': 13}}]})]
+        self.assertEqual(len(check._declared_case_violations(bad, VILLAGES, CLEAN)), 1)
 
     def test_a_malformed_then_entry_is_reported(self):
         # `- spoke` instead of `- spoke: true` linted clean and then died inside mGBA.

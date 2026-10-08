@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-330 decisions. Read this index, then open the two or three you need — the whole
+331 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -328,6 +328,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0168` | [Vanilla's "if the escort died" cutscene is the same scene's BACK HALF — so our branch is cheap](decisions/0168-vanilla-s-if-the-escort-died-cutscene-is-the.md) | 2026-07-30 | — |
 | `0169` | [A recruit-gated scene block goes MID-scene, never on the button](decisions/0169-a-recruit-gated-scene-block-goes-mid-scene-never.md) | 2026-07-30 | — |
 | `0323` | [ch01 teaches terrain healing in dialogue, and unlocks the Guide on every difficulty](decisions/0323-ch01-teaches-terrain-heal-in-dialogue-and-unlocks-the-guide.md) | 2026-10-02 | #21 #135 |
+| `0331` | [A minor NPC speaks the twin's village line, in the book's voice](decisions/0331-a-minor-npc-speaks-the-twin-s-village-line.md) | 2026-10-07 | #26 |
 
 ---
 

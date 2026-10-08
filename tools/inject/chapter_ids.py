@@ -437,6 +437,14 @@ CH06_BOAT_PIDS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
 # Their NAMES, appended past vanilla's last message by the build (inject/message_alloc.py).
 CH06_BOAT_NAME_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-name'),
                        'boat-west': appended_message_id('ch06', 'boat-west-name')}
+# The boarding pass (#26): any party member Talks a hull, one Talk entry per (PC x boat) and every
+# entry for a boat sharing that boat's ONE flag, so the first boarding shuts the rest. Flags 9/10:
+# slot 7's lists are all ours, and the Turn list's wave rides flag 0. The scenes are our own `MS_`
+# scripts and their messages are appended (inject/message_alloc.py).
+CH06_BOAT_TALK_FLAGS = {'boat-east': 'EVFLAG_TMP(9)', 'boat-west': 'EVFLAG_TMP(10)'}
+CH06_BOAT_TALK_SCRIPTS = {'boat-east': 'MS_Ch06BoardEast', 'boat-west': 'MS_Ch06BoardWest'}
+CH06_BOAT_TALK_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-talk'),
+                       'boat-west': appended_message_id('ch06', 'boat-west-talk')}
 # Messie, the boss-death cutscene's actor: 0xbd, the next unnamed 0x255 gap after the boats
 # (0xbe is Fomortiis). He is NAMED, so the pid is his alone (assert_named_raw_pids_are_exclusive).
 CH06_MESSIE_PID = '0xbd'

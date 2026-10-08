@@ -72,7 +72,8 @@ EVENT = {
 PLAYTEST_CASE = {
     'name': ANY, 'kind': ANY, 'boot': ANY, 'checkpoint': ANY, 'deadline': ANY, 'headless': ANY,
     'lua': ANY, 'proves': ANY, 'given': ANY,
-    'when': [{'visit': {'x': ANY, 'y': ANY, 'gains': ANY}}],
+    'when': [{'visit': {'x': ANY, 'y': ANY, 'gains': ANY},
+              'talk': {'x': ANY, 'y': ANY, 'gains': ANY}}],
     'then': [{'spoke': ANY}],
 }
 
@@ -125,7 +126,7 @@ CHAPTER = {
                       'size': ANY, 'tile': ANY, 'door': ANY, 'attackable_sides': ANY,
                       'declared_fuse': ANY, 'personal': ANY,
                       'reached_on': Keyed(ANY), 'reached_on_contested': Keyed(ANY),
-                      'talk': {'background': ANY, 'ea_file': ANY, 'text': ANY,
+                      'talk': {'background': ANY, 'face': ANY, 'text': ANY,
                                'reward': REWARD}}],
     'rescue_pursuers': [{'id': ANY}],
     'cutscene_actors': ANY,

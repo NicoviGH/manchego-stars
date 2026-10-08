@@ -941,15 +941,20 @@ rescue_boats:
   # what the chapter's clock was designed against, and it is not what a player walks.
   reached_on_contested: {foot: null, cavalry: null, flier: 3, braulo: 6, trex: null}
   talk:
-    background: bg_Boat         # vendored from FE-Repo; the boarding CG
-    ea_file: events/ch06-boat-east.ea
+    background: BG_SHIP         # vanilla FE8's own boat CG (Ch11B's Text_BG backdrop)
     reward:
     - id: antitoxin             # vanilla Ch6's own village gift, same tier -- confirmed
       amount: 1                 # against the decomp: Ch6's village at (11,18) gives
                                 # ITEM_ANTITOXIN (0x6F), and its ending gives
                                 # ITEM_ORIONSBOLT (0x66) gated on three CHECK_ALIVEs
-    text: []                    # TODO: boarding scene. Seed the snow-pile line here
-                                # ("get in the drifts") so the cover mechanic is taught.
+    # Grynsk Berylbore, who owns both boats (Rime p.28). Vanilla Ch6's village line (MSG_9F3)
+    # is the baseline -- warn of the poison, hand over the antitoxin -- in his voice.
+    face: FID_VillagerMan3        # the mustached elder (ch04's logger wears it too; never re-dressed)
+    text:                       # one entry per box
+    - "Bloody ice... Oi! Heard there's some creature on the west floe."
+    - "Poisonous, they say. So I stocked up on antitoxin..."
+    - "Strong stuff. One swig and the poison's gone. Tastes like boot, mind."
+    - "Go on, take one. It might still eat you, but at least it won't poison you!"
 - id: boat-west
   fe_name: "Fishing Boat"
   class: fleet
@@ -969,10 +974,15 @@ rescue_boats:
   # body takes foot from turn 11 back to the declared 6.
   reached_on_contested: {foot: 6, cavalry: 5, flier: 3, braulo: 5, trex: 5}
   talk:
-    background: bg_Boat
-    ea_file: events/ch06-boat-west.ea
+    background: BG_SHIP
     reward: []                  # the line is the reward; the prize is keeping both alive
-    text: []                    # TODO
+    # Tali, the half-elf researcher (they/them, Rime p.29), on the bitten boat. Teaches the
+    # snow drifts' cover (+20 avoid), and asks to hear what the party learns, as in the book.
+    face: FID_VillagerGirlBlackHair   # pale, hooded; VillagerYoungMan is ch05's skeleton
+    text:
+    - "Oh, thank goodness. I'm Tali. I study the wildlife of the lake."
+    - "I usually study them from the safety of the snowdrift piles. They provide some cover."
+    - "I can't offer you much but my gratitude. If you see it, please tell me everything you can."
 
 economy:
   reward_sites:
@@ -983,11 +993,6 @@ economy:
   save_all_bonus: orions-bolt
   save_all_gate: "CHECK_ALIVE on both rescue_boats, in the ending scene"
 
-# ── Events declared but unwritten ───────────────────────────────────────────────
-# Registered here so `make chapter CH=ch06` counts them as owed rather than missing.
-# Both boarding scenes need a voice pass before a line is drafted (decisions.md: read
-# every speaker's bible first) -- the boat crews have no bible yet, so the text is TODO
-# on purpose rather than placeholder prose.
 
 design_notes: >
   The emotional centerpiece of the MVP and Marty's primary signature beat -- and as of
@@ -1011,11 +1016,10 @@ cutscene_actors: [marty, braulo]
 # rows from this block (#314) -- the ROM from `boot:`, PT_HOST_CHAPTER from the host-slot
 # registry. Nothing about them is written a second time in `matrix.yaml`.
 #
-# There is one case, and it is the one #360 could not run because ch06 had no debug boot when
-# it landed: the pockets are a claim about the ENGINE'S pathing, and `mapshot` photographs
-# turn 1 while the question needs several enemy phases. Everything else ch06 owes is a
-# DIALOGUE or ART dependency (the three cutscenes, the boarding pass, Messie's bust, the
-# merfolk reskins) and there is nothing to assert about a scene that has no text yet.
+# ch06clock is the case #360 could not run because ch06 had no debug boot when it landed: the
+# pockets are a claim about the ENGINE'S pathing, and `mapshot` photographs turn 1 while the
+# question needs several enemy phases. ch06boarding proves the boarding pass. The three
+# cutscenes have no text yet, so there is nothing to assert about them.
 playtest:
   boot: ch06boot                  # CH06BOOT=1; host slot 7 comes from inject/hosts.py
   cases:
@@ -1029,3 +1033,15 @@ playtest:
         west boat only from its pocket door -- the single melee cell the pocket promises
       lua: ch06clock
       deadline: 900
+
+    # The boarding pass, from each hull's DOOR -- the one ground cell next to it -- which is the
+    # open question #360 left: whether Talk fires from there at all.
+    - name: ch06boarding
+      proves: a party member boards both hulls from their doors, both crews speak, and the east
+        hull hands over its Antitoxin
+      given: [on_map]
+      when:
+        - talk: {x: 17, y: 13, gains: 0x6F}   # boat-east's door -> Grynsk, ITEM_ANTITOXIN
+        - talk: {x: 4,  y: 18}                # boat-west's door -> Tali, the line is the reward
+      then:
+        - spoke: true

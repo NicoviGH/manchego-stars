@@ -9769,6 +9769,41 @@ local co = coroutine.create(function()
                 return now ~= before
             end)
         end,
+        -- `talk`: park a fresh blue unit ON (x, y), Talk the neighbour, play the scene out.
+        -- A missing Talk command is the failure this catches (a CHAR naming the wrong pair).
+        talkFrom = function(x, y)
+            local u
+            for i = 0, 19 do
+                local c = unitAt(SYM.gUnitArrayBlue, i)
+                if c and not isDead(c) and (c.state & 0x2) == 0 then u = c break end
+            end
+            if not u then return false, "no unexhausted blue unit to Talk with" end
+            local grid = mapUnitAt(u.x, u.y)
+            setMapUnit(u.x, u.y, 0)
+            emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+            setMapUnit(x, y, grid)
+            if not cursorTo(x, y) then return false, "cursor could not reach the talker" end
+            if not moveUnit(x, y, x, y) then
+                return false, "could not open the command menu of the unit parked there"
+            end
+            if not chooseTalk() then
+                return false, "the command menu offered no Talk -- no CHAR entry pairs this "
+                    .. "unit with a neighbour"
+            end
+            -- chooseTalk returns AT the first box, so the scene has spoken; play it to the end.
+            for _ = 1, 3600 do
+                if controllerState() == "dialogue_wait" then
+                    if not guardedInput("advance_dialogue", "A", "dialogue input wait clears",
+                        function(after) return controllerState(after) ~= "dialogue_wait" end,
+                        120) then return false, "talk dialogue input did not advance" end
+                elseif not procActive(SYM.ProcScr_StdEventEngine) then
+                    return true, nil, true
+                else
+                    yield()
+                end
+            end
+            return false, "the Talk scene was still running after 3600 frames"
+        end,
     }
     return dofile(PLAYTEST_DIR .. "/cases.lua").run(dofile(path), api)
   end
