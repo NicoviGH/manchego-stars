@@ -362,8 +362,8 @@ STEPS = [
     Step(apply_chapter_difficulty, title='difficulty modes (#303):',
          call=lambda fn, a: fn(a.campaign, verbose=True),
          writes=('src/data/chapter_settings.json',)),
-    # And music: a hosted chapter plays its vanilla TWIN's, not its host slot's (the next
-    # chapter's). Same total pass, same reason.
+    # And music: a hosted chapter plays its vanilla TWIN's, not its host slot's (ch04 sits on
+    # Ch5x's). Same total pass, same reason.
     Step(apply_chapter_music, title='music:', call=lambda fn, a: fn(a.campaign, verbose=True),
          writes=('src/data/chapter_settings.json',)),
     # Same pass, same reason: `.traps` is a ChapterEventGroup field our injectors fill but

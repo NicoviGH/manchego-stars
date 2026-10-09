@@ -188,9 +188,9 @@ class ChapterFog(unittest.TestCase):
 
 
 class ChapterMusic(unittest.TestCase):
-    """A chapter plays its vanilla TWIN's music (Nicolas, 2026-10-09). Hosted one slot up, it
-    played the NEXT vanilla chapter's: ch04 and ch05 had their map themes swapped, and ch06
-    played Ch7's whole set."""
+    """A chapter plays its vanilla TWIN's music (Nicolas, 2026-10-09). Hosted on another slot,
+    it played that slot's: ch04 sits on Ch5x's and played Follow Me, and the prologue's green
+    phase was Ch1's."""
 
     CAMPAIGN = 'rime-of-the-frostmaiden'
 
@@ -213,14 +213,27 @@ class ChapterMusic(unittest.TestCase):
             self.assertEqual(vanilla['chapters'][twin]['bgm'],
                              written['chapters'][chapter.host_index]['bgm'], chapter.name)
 
-    def test_ch05_plays_follow_me_and_ch04_does_not(self):
-        """The swap that made this visible, pinned as vanilla's own two songs."""
-        songs = inject.decomp.vanilla_decomp_text('include/constants/songs.h')
-        follow_me = int(re.search(r'SONG_FOLLOW_ME = (0x[0-9A-F]+)', songs).group(1), 16)
-        bgm = lambda ch: inject.chapter_settings.chapter_bgm(inject.hosting._load_chapter_yaml(
-            self.CAMPAIGN, inject.hosting.chapter_yaml_for(ch)))['bluePhase']
-        self.assertEqual(follow_me, bgm('ch05'))
-        self.assertNotEqual(follow_me, bgm('ch04'))
+    def test_each_twin_is_vanillas_own_row_by_name(self):
+        """Vanilla row 5 is Ch5x, so from Ch5 on chapter N is row N+1 -- a number guess put
+        ch05 on Ch5x's music. Pinned to the rows' own internal names (L00..L06)."""
+        from inject import hosts
+        rows = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
+        for chapter in hosts.hosted_chapters():
+            chap = inject.hosting._load_chapter_yaml(
+                self.CAMPAIGN, inject.hosting.chapter_yaml_for(chapter.name))
+            n = re.match(r'FE8 (?:Prologue|Ch(\d+))$', chap['parity_reference']).group(1)
+            row = rows['chapters'][inject.chapter_settings.twin_settings_index(chap)]
+            self.assertEqual('L%02d' % int(n or 0), row['internalName'], chapter.name)
+
+    def test_ch04_stops_playing_ch5xs_follow_me(self):
+        """The founding case: ch04 is hosted on Ch5x's slot, whose player phase is Follow Me."""
+        rows = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
+        from inject import hosts
+        host = next(c.host_index for c in hosts.hosted_chapters() if c.name == 'ch04')
+        self.assertEqual('I05', rows['chapters'][host]['internalName'])
+        chap = inject.hosting._load_chapter_yaml(self.CAMPAIGN, inject.hosting.chapter_yaml_for('ch04'))
+        self.assertNotEqual(rows['chapters'][host]['bgm']['bluePhase'],
+                            inject.chapter_settings.chapter_bgm(chap)['bluePhase'])
 
     def test_the_pass_writes_every_bgm_leaf_the_census_says_it_owns(self):
         import inject.chapter_data as cd

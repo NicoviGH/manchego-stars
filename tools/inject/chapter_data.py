@@ -10,7 +10,7 @@ going wrong:
     the difficulty triple           #303   ch04's Normal sat outside the parity band
     `.traps`                        #302   nearly shipped ch06 vanilla Ch7's ballistae
     `initialFogLevel`               #365   ch06 hosts on slot 7, a fogged vanilla slot
-    `bgm`                           #26    every chapter played the NEXT vanilla chapter's music
+    `bgm`                           #26    ch04 played Ch5x's Follow Me, its host slot's
 
 The row is now FRAMED from blank (`chapter_frame.write_settings_row`, #412), and the tables
 below are what the frame reads -- the same shape `event_group.py` gives `ChapterEventGroup`. The
@@ -142,7 +142,7 @@ OWNED_BY_PASS = dict(
      ('difficultModeLevelBonus', 'apply_chapter_difficulty'),
      ('battleTileSet', 'inject_battle_platforms')] +
     # The fourth total pass: a chapter plays its vanilla TWIN's music, the whole block copied
-    # (ADR 0336). Inherited, it was the host slot's -- the NEXT vanilla chapter's.
+    # (ADR 0336). Inherited, it was the host slot's: ch04's host is Ch5x.
     [('bgm.' + f, 'apply_chapter_music') for f in
      ('bluePhase', 'redPhase', 'greenPhase', 'blueGreenPhaseAlt', 'redPhaseAlt',
       'bluePhaseInHectorStory', 'redPhaseInHectorStory', 'greenPhaseInHectorStory',

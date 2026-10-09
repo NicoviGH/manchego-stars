@@ -145,21 +145,35 @@ def apply_chapter_difficulty(campaign, verbose=False):
     return applied
 
 
-# Before the route split, a vanilla chapter's chapter_settings row IS its number: Prologue 0,
-# Ch1 1 ... Ch8 8. Past it the rows interleave Eirika's and Ephraim's routes, so a later twin
-# needs a name -> row table rather than a guess.
-_TWIN_RE = re.compile(r'^FE8 (?:Prologue|Ch([1-8]))$')
+# A twin's chapter_settings row, read off the decomp's own chapter enum rather than its number:
+# vanilla puts Ch5x (Unbroken Heart) at row 5, so from Ch5 on chapter N is row N+1. Only the
+# shared-route `CHAPTER_L_*` rows are named here; past the split the routes interleave, and a
+# twin there has to say which route it means.
+_ENUM_RE = re.compile(r'CHAPTER_L_(PROLOGUE|\d+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)')
+
+
+def _twin_rows():
+    return {('FE8 Prologue' if n == 'PROLOGUE' else 'FE8 Ch%d' % int(n)): int(v, 0)
+            for n, v in _ENUM_RE.findall(vanilla_decomp_text('include/constants/chapters.h'))}
 
 
 def twin_settings_index(chap):
     """The vanilla chapter_settings row of a chapter's `parity_reference` twin."""
     ref = chap.get('parity_reference', '')
-    m = _TWIN_RE.match(ref)
-    if not m:
-        sys.exit('ERROR: %s: parity_reference %r names no pre-split vanilla chapter, so its '
-                 'music has no twin to follow -- extend _TWIN_RE with that route\'s rows'
+    rows = _twin_rows()
+    if ref not in rows:
+        sys.exit('ERROR: %s: parity_reference %r names no shared-route vanilla chapter, so its '
+                 'music has no twin row to follow -- name the route\'s row explicitly'
                  % (chap.get('id'), ref))
-    return int(m.group(1) or 0)
+    return rows[ref]
+
+
+def chapter_bgm(chap):
+    """The twin's whole `bgm` block, read from the vanilla decomp (Nicolas, 2026-10-09: a
+    chapter plays its vanilla twin's music). A hosted chapter otherwise plays its HOST slot's,
+    which for ch04 was Ch5x's (Follow Me where vanilla Ch4 plays Distant Roads)."""
+    rows = json.loads(vanilla_decomp_text('src/data/chapter_settings.json'))['chapters']
+    return dict(rows[twin_settings_index(chap)]['bgm'])
 
 
 # Every leaf of a chapter's `bgm` block, written one by one so the census can see each claim
@@ -168,14 +182,6 @@ def twin_settings_index(chap):
 BGM_FIELDS = ('bluePhase', 'redPhase', 'greenPhase', 'blueGreenPhaseAlt', 'redPhaseAlt',
               'bluePhaseInHectorStory', 'redPhaseInHectorStory', 'greenPhaseInHectorStory',
               'prologueInLynStory', 'prologue', 'prologueInHectorStory')
-
-
-def chapter_bgm(chap):
-    """The twin's whole `bgm` block, read from the vanilla decomp (Nicolas, 2026-10-09: a
-    chapter plays its vanilla twin's music). A hosted chapter otherwise plays its HOST slot's,
-    which is the NEXT vanilla chapter's -- ch04 and ch05 had their map themes swapped."""
-    rows = json.loads(vanilla_decomp_text('src/data/chapter_settings.json'))['chapters']
-    return dict(rows[twin_settings_index(chap)]['bgm'])
 
 
 def apply_chapter_music(campaign, verbose=False):

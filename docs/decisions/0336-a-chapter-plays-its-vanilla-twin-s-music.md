@@ -15,10 +15,12 @@ chapter its force is measured against.
 **Map music** is the twin's whole `bgm` block (player, enemy and green phase, plus the
 alternates), written by `apply_chapter_music`: a total pass beside fog and difficulty, read from
 the vanilla decomp. Before it, no pass wrote the field, so every hosted chapter played its HOST
-slot's music. Each chapter sits one slot after its twin, so that was the NEXT vanilla chapter's:
-ch04 and ch05 had Distant Roads and Follow Me swapped, ch06 played Ch7's whole set, and the
-prologue's green phase was Ch1's. `chapter_bgm(chap)` is the one lookup; anything that names
-"the chapter's theme" (ch06's Messie scene) reads it.
+slot's music. That was right by accident for ch05 and ch06, which sit on their twins' own rows,
+and wrong for ch04 (on Ch5x's row: Follow Me where vanilla Ch4 plays Distant Roads) and the
+prologue's green phase (Ch1's). The twin's row comes from the decomp's chapter enum, never from
+its number: row 5 is Ch5x, so from Ch5 on chapter N is row N+1, and a number guess put ch05 on
+Ch5x's music in this change's first draft. `chapter_bgm(chap)` is the one lookup; anything that
+names "the chapter's theme" (ch06's Messie scene) reads it.
 
 **Scene music** follows the twin's cues beat for beat where our beat has a vanilla
 counterpart: the same song for the same kind of moment (the opening backdrop scene, the enemy's
