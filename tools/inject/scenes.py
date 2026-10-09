@@ -130,8 +130,17 @@ def _stage_beat(beat, fid, home, overrides=None):
 
 def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
                       preloads=None, width=None, trailings=None):
-    """Write one message per scenic beat (staging via _stage_beat, body via
-    _script_to_message). width=None picks per beat: faceless-narration beats ride
+    """Write one message per scenic beat into texts.txt `lines` (see scene_beat_bodies)."""
+    for msg_id, body in scene_beat_bodies(msg_ids, beats, fid, home, overrides=overrides,
+                                          preloads=preloads, width=width, trailings=trailings):
+        set_message_body(lines, msg_id, body)
+
+
+def scene_beat_bodies(msg_ids, beats, fid, home, overrides=None,
+                      preloads=None, width=None, trailings=None):
+    """[(msg_id, body)], one message per scenic beat (staging via _stage_beat, body via
+    _script_to_message) -- PURE, so `tools/scene_preview.py` reads the very bodies the
+    injector writes. width=None picks per beat: faceless-narration beats ride
     the opaque, auto-centered SOLOTEXTBOXSTART box (#58) at SOLO_BOX_BUDGET_PX (helpbox.c
     clamps that box to 0xC0 while its text draws unclamped); faced beats take the talk
     bubble's TALK_BUDGET_PX. A fixed width overrides for scenes with no narration beats.
@@ -144,6 +153,7 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
         sys.exit('ERROR: scene staging lists out of step with its %d beats '
                  '(%d overrides, %d preloads, %d trailings) for msgs %s' %
                  (len(beats), len(overrides), len(preloads), len(trailings), msg_ids))
+    out = []
     for msg_id, beat, override, preload, trailing in zip(
             msg_ids, beats, overrides, preloads, trailings):
         # Faced scene beats render via _scenic_beat_calls -> Text() -> a TALK BUBBLE (PutTalkBubble),
@@ -157,9 +167,10 @@ def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,
         w = width if width is not None else (
             fe8_talk_font.SOLO_BOX_BUDGET_PX if _beat_is_narration(beat)
             else fe8_talk_font.TALK_BUDGET_PX)
-        set_message_body(lines, msg_id, _script_to_message(
+        out.append((msg_id, _script_to_message(
             beat, _stage_beat(beat, fid, home, override), width=w, preload=preload,
-            trailing=trailing))
+            trailing=trailing)))
+    return out
 
 
 def midmap_minibosses(chap):

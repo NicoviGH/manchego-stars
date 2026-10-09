@@ -831,19 +831,36 @@ events:
     type: cutscene
     ea_file: events/ch06-messie.ea
     description: >
-      THE CHAPTER, and it stays LOCAL to Bremen (Nicolas, 2026-10-08). With the merfolk
-      broken, the ice cracks and Messie hauls himself up onto it in front of the people who
-      came to kill him. His first words are the book's: "I'm listening." Marty coughs his
-      spores at him and speaks; the answers come back in Common, because Ravisin's awaken
-      spell gave him language along with a mind (book p.28). Braulo is the second voice.
-      What comes out, from the book's own lines (p.31): he used to just swim the lake and
-      eat fish; Ravisin woke him and told him to make Bremen suffer; he does not want to be
-      a stupid beast again. And what we add (ADR 0332): the merfolk grew bold this winter,
-      so he rammed the boats to turn them home before they reached merfolk water. Marty tells
-      him Ravisin is dead and the awakening is his to keep. The scene closes on the idea of
-      Messie as Bremen's Speaker, the one voice both the town and the lake could heed (the
-      DM notes' table moment).
-      The big-picture reveal is held for ch07's ending, once Bremen's own problem is settled.
+      THE CHAPTER, and it stays LOCAL to Bremen (Nicolas, 2026-10-08). Beats LOCKED 2026-10-09
+      (dialogue-pass, with Nicolas), ~27 boxes on the map:
+      A. He surfaces, staged on Kyogre's Cave of Origin awakening (pokeruby
+         CaveOfOrigin_B4F): the ice cracks, the screen shakes, Messie slides slowly toward the
+         party, a held beat, his cry. Braulo, RBG and Wolfram raise their weapons, still in
+         fight mode: the player is braced for the boss.
+      B. Marty coughs his spores and casts speak with animals, assuming a beast. Messie answers
+         in Common, "I'm listening." (book p.31); the awaken spell gave him language (p.28).
+         The fighters are stunned, Braulo most of all.
+      C. The book's own lines (p.31), the Frostmaiden named as written: he used to just swim
+         the lake and eat fish; Ravisin woke him to make Bremen suffer for the Frostmaiden.
+         Braulo: you sank our boats. Messie: he rams them to turn the crews home before they
+         reach merfolk water, and has drowned no one; Grynsk and Tali got past him. Braulo's
+         respect for the old beast grows.
+      D. "I don't want to be a stupid beast again." Marty tells him Ravisin is dead and the
+         gift is his to keep; he promises to leave the fishers be.
+      E. Braulo: we took Bremen's coin for your head. He decides the head is not theirs to
+         take, because the job was ending the sinkings. Marty asks Messie to come back to
+         Bremen and make peace; the scene ends on Messie agreeing.
+      Held for ch07: why the merfolk turned bold and what the Frostmaiden asked of them
+      (Messie's farewell), and the Speaker idea (the argument with Dorbulgruf).
+    script:                           # DRAFTING (dialogue-pass, with Nicolas); beat A LOCKED 2026-10-09
+      # ── A: he surfaces ──
+      # (Kyogre's Cave of Origin order: the ice cracks under a quake and a screen shake; Messie
+      #  surfaces two tiles out and slides two tiles toward the party, slowly; a one-second hold;
+      #  his cry. No line before the cry.)
+      - braulo: "There it is. It's magnificent."
+      - prof-rbg: "Pinky, stand behind me. This one's a rather big cheese."
+      - wolfram: "(sniffs) No iron on it. Just teeth. A lot of teeth."
+      - braulo: "Steady. Let it come to us."
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch06-ending.ea
@@ -853,7 +870,7 @@ events:
       exactly as vanilla Ch6 pays its own save-them-all reward (CHECK_ALIVE on both). Grynsk
       can confirm in one line that the merfolk were never this bad before. Tali leaves with
       the book's exit: "interesting... fascinating... remarkable", muttered in Elvish. The
-      party heads for the Speaker to collect, which is where ch07 opens.
+      party heads for the Speaker with Messie to broker peace, which is where ch07 opens.
       A boat that sank takes its speaker's lines with it, as ch05's ending cuts Sahnar.
 
 # ── Messie (cutscene actor, NOT an enemy unit) ───────────────────────────────────

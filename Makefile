@@ -111,8 +111,10 @@ difficulty-gate:
 # build and no emulator (#311). The authoring loop; a scene still gets one real run before
 # it ships.
 #   make scene SCENE=ch05/1     # one scene
-#   make scene SCENE=ch05       # the whole chapter
+#   make scene SCENE=ch05       # the whole chapter, drafts included
 #   make scene                  # every scene the preview knows
+# A `script:` no builder wires yet previews as a DRAFT (chNN/draft-<trigger>), so a dialogue
+# pass reads its lines boxed in any chapter before they are wired.
 # The committed book under docs/scenes/ is regenerated with --write and diffed by
 # tools/test_scene_preview.py, so a wrap or staging regression fails in `make check`.
 scene:

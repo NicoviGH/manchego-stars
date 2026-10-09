@@ -15,12 +15,13 @@ parity_reference: "FE8 Ch7"   # the twin is the chapter NUMBER, whatever map it 
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  The party reports back to Speaker Dorbulgruf Shalescar, an old shield-dwarf who hired them
-  to kill the lake monster. They tell him the monster was protecting his fishers and the
+  The party brings Messie back to Speaker Dorbulgruf Shalescar, an old shield-dwarf who hired
+  them to kill the lake monster, hoping to broker peace. They tell him the monster was protecting his fishers and the
   merfolk were the killers. He has spent the winter watching that monster smash Bremen's
   boats, and he is too old and too stubborn to believe them: the beast lives, so he owes
-  them nothing. Braulo swings first. Mid-fight, Wolfram bites a chunk clean out of the
-  Speaker's steel axe in open defiance, and the old dwarf keeps swinging the ruined haft.
+  them nothing. In the argument the party proposes Messie for Speaker. Braulo swings first.
+  Mid-fight, Wolfram bites a chunk clean out of the Speaker's steel axe in open defiance,
+  and the old dwarf keeps swinging the ruined haft.
   After a bloody battle through the Town Hall, the party installs Messie as the new
   Speaker of Bremen. His first decree is a fish tax, which leaves the party wondering what
   they have done; it is also how he means to keep the merfolk fed and calm without a
@@ -106,11 +107,12 @@ events:
     type: cutscene
     ea_file: events/ch07-opening.ea
     description: >
-      The party reports to Dorbulgruf, who hired them in ch06's opening (ADR 0332). They
-      tell him Messie was protecting the boats and the merfolk were sinking them. He does
+      The party brings Messie to Dorbulgruf, who hired them in ch06's opening (ADR 0332),
+      hoping to broker peace. They tell him Messie was protecting the boats and the merfolk were sinking them. He does
       not believe a word of it: he has watched the beast ram his town's boats all winter,
       and the beast still lives. No carcass, no coin. Braulo answers in his own terms (we
-      did the work; that was the deal) and swings first (braulo_first_swing). Both sides
+      did the work; that was the deal). The argument is where the party proposes Messie for
+      Speaker. Braulo swings first (braulo_first_swing). Both sides
       have a fair claim, which is what keeps the chapter gray.
   - trigger: unit_engages_boss
     unit: wolfram
@@ -130,8 +132,8 @@ events:
       the merfolk in fish and keep the peace without a war.
       Then his farewell carries the campaign's first big-picture reveal, in the seat vanilla
       Ch7's ending gives Orson (an insider hands the heroes information and a direction).
-      As Speaker he has talked to the merfolk, and they told him what the Frostmaiden asked
-      of them: keep the fishers afraid until Bremen prays to her and makes its offerings.
+      He has talked with the merfolk all along, and he tells the party what they told him
+      the Frostmaiden asked of them: keep the fishers afraid until Bremen prays to her and makes its offerings.
       RBG lays that beside what the party has seen (the sacrifice lotteries, Ravisin's
       wolves and moose): Auril's servants are turning the Dale against its own towns to
       make them worship her. Her weakness (the Rime drains her, Rime p.274) stays secret;

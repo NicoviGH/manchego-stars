@@ -35,3 +35,12 @@ two lines, and each page is its own [A]. Measured across ch05's opening —
 The generalisation came from ONE scene whose every box happened to fit in two lines at 203px
 (the Talk recruit, still 16 and 17). **A press count is a fact about the wrap, not about the
 script** — so it can only be read where the wrap has happened, which is the body.
+
+**A scene being written previews too, in every chapter.** A dialogue pass is spent before a
+scene has a message id or a builder, which is exactly when reading it boxed matters, so any
+`script:` on an event no builder wires renders as a DRAFT (`chNN/draft-<trigger>`): the YAML
+script through the same `scene_beat_bodies` → `_script_to_message` path a builder calls, with
+default seats in order of first appearance. A wired event is never drafted, so one scene never
+has two renders. Drafts stay out of `docs/scenes/`, which holds shipping bodies only. ch06's
+scenes are registered off pure builders like ch05's (Nicolas, 2026-10-09: "is the format a
+shared tool now for all chapters going forward?").

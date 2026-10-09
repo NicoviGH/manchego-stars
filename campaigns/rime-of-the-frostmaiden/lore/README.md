@@ -42,6 +42,7 @@ flavor isn't lost to git history. **None of them drive gameplay** — every lore
   [`sephek-kaltro.md`](sephek-kaltro.md) — prologue guests/boss, each with a **§Voice**
   (diction rules, calibration lines, banned list) consumed by the `dialogue-pass` skill.
 - [`dorbulgruf.md`](dorbulgruf.md) — Speaker of Bremen (ch06 quest-giver, ch07 boss).
+- [`messie.md`](messie.md) — the maer monster (ch06 cutscene actor, ch07's new Speaker).
 - [`izobai.md`](izobai.md) — ch01 goblin boss; [`duvessa-shane.md`](duvessa-shane.md),
   [`vellynne-harpell.md`](vellynne-harpell.md) — recurring named NPCs;
   [`npc-bench.md`](npc-bench.md) — the minor-NPC bench.

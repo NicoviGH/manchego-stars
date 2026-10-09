@@ -148,7 +148,9 @@ class LooseEnds(unittest.TestCase):
     def test_a_planned_chapter_reports_its_unwritten_scenes_and_missing_art(self):
         ends = cs.loose_ends('ch06')
         self.assertTrue(any('no script yet' in e for e in ends))
-        self.assertTrue(any('art' in e for e in ends))
+        # The art line reads "<unit> (<role>) has no <kinds>". A bare `'art' in e` passed off
+        # "chapter_start" in the unpreviewable-scene line, and went silent when ch06 got a preview.
+        self.assertTrue(any(') has no ' in e for e in ends), ends)
 
     def test_a_finished_chapter_has_fewer_loose_ends_than_a_planned_one(self):
         self.assertLess(len(cs.loose_ends('ch05')), len(cs.loose_ends('ch06')))

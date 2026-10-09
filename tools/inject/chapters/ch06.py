@@ -21,7 +21,7 @@ from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
-from inject.scenes import (_emit_scene_beats, _make_fid, _prepend_defeat_quote, _split_event_beats,
+from inject.scenes import (_make_fid, scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
                            _write_chapter_title_card, flag_defeat_quote, split_on_stage_cut)
 from inject.text import (
     _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body, set_message_body,
@@ -365,6 +365,18 @@ def ch06_opening_beats(chap):
     return card, [beats[0], ice, quip]
 
 
+def ch06_opening_messages(chap):
+    """[(msg_id, body)] for the opening's three talk messages: the hall, the ice, the quip.
+
+    Pure, so `tools/scene_preview.py` renders exactly what the injector writes."""
+    _card, beats = ch06_opening_beats(chap)
+    return scene_beat_bodies(CH06_OPENING_MSGS + (CH06_OPENING_QUIP_MSG,), beats,
+                             _make_fid({}, 'ch06 opening: unknown cutscene speaker',
+                                       fallback=GUEST_PORTRAIT_MAP),
+                             CH06_OPENING_HOME,
+                             overrides=[None, CH06_OPENING_ICE_SEATS, CH06_OPENING_ICE_SEATS])
+
+
 def ch06_opening_head(hall_label):
     """The event-script head before LOMA: the town under its card, then the hall's dialogue.
 
@@ -444,7 +456,7 @@ def inject_ch06(campaign, boot=False, verbose=True):
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)
-    op_card, op_beats = ch06_opening_beats(chap)
+    op_card, _beats = ch06_opening_beats(chap)
 
     # 1. Map: register the snowy-bern-ice tileset (ch06 is its only user, so it self-registers
     #    -- the Cave/inject_ch03 idiom) and the painted layout, then point slot 7 at them and
@@ -621,11 +633,8 @@ def inject_ch06(campaign, boot=False, verbose=True):
         set_message_body(lines, msg_id, body)
     # The opening's card and its two beats. The Speaker's face rides GUEST_PORTRAIT_MAP (Murray).
     set_message_body(lines, CH06_OPENING_CARD_MSG, name_message_body(op_card))
-    _emit_scene_beats(lines, CH06_OPENING_MSGS + (CH06_OPENING_QUIP_MSG,), op_beats,
-                      _make_fid({}, 'ch06 opening: unknown cutscene speaker',
-                                fallback=GUEST_PORTRAIT_MAP),
-                      CH06_OPENING_HOME,
-                      overrides=[None, CH06_OPENING_ICE_SEATS, CH06_OPENING_ICE_SEATS])
+    for msg_id, body in ch06_opening_messages(chap):
+        set_message_body(lines, msg_id, body)
     # The boats' name plates are NOT written here: they are RAW_PID_PORTRAITS rows, and
     # inject_names writes every one of those off that registry (appending the ones whose donor
     # is an id we own). Writing them again here would make this injector a second owner of the

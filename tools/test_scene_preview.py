@@ -197,6 +197,71 @@ class Formatting(unittest.TestCase):
             self.assertNotIn('OVER', sp.format_scene(sp.preview(key)), key)
 
 
+class Ch06(unittest.TestCase):
+    """ch06 is registered off its own pure builders, so its scenes read the shipping bodies."""
+
+    def test_the_opening_hall_reads_back_as_the_locked_script(self):
+        first = sp.preview('ch06/opening-hall').boxes[0]
+        self.assertEqual('prof-rbg', first.speaker)
+        self.assertTrue(first.lines[0].startswith('Speaker Shalescar!'), first.lines)
+
+    def test_the_merfolk_quip_is_its_own_message(self):
+        """The stage_cut splits beat B: the camera pans, then Meesmickle answers in a new one."""
+        quip = sp.preview('ch06/opening-quip').boxes
+        self.assertEqual(['meesmickle'], [b.speaker for b in quip])
+
+
+def _chap(*events):
+    return {'events': list(events)}
+
+
+class Drafts(unittest.TestCase):
+    """A scene being WRITTEN has no message id and no builder yet. A dialogue pass is spent in
+    that state, so the preview renders the YAML script with the same wrap code the builders
+    use -- and keeps it out of the golden book, which only ever holds shipping bodies."""
+
+    SCRIPT = [{'braulo': 'There it is.'}, {'stage_cut': 'the camera pans'},
+              {'messie': "I'm listening."}]
+
+    def test_a_scripted_event_nothing_wires_renders_as_a_draft(self):
+        scenes = sp.draft_scenes('ch99', _chap({'trigger': 'boss_defeated',
+                                                'script': self.SCRIPT}), set())
+        self.assertEqual(['ch99/draft-boss_defeated-1', 'ch99/draft-boss_defeated-2'],
+                         [s.key for s in scenes])
+        self.assertEqual([None, None], [s.msg_id for s in scenes])
+        self.assertEqual(['braulo'], [b.speaker for b in scenes[0].boxes])
+        self.assertEqual(['messie'], [b.speaker for b in scenes[1].boxes])
+
+    def test_an_event_a_builder_already_wires_is_not_drafted(self):
+        """Two renders of one scene could disagree, and the draft's would be the wrong one."""
+        self.assertEqual([], sp.draft_scenes('ch99', _chap({'trigger': 'chapter_start',
+                                                            'script': self.SCRIPT}),
+                                             {'chapter_start'}))
+
+    def test_draft_speakers_take_distinct_seats(self):
+        """One podium for everyone would show every turn as the same face swapping in place."""
+        script = [{'braulo': 'a'}, {'wolfram': 'b'}, {'braulo': 'c'}]
+        scene, = sp.draft_scenes('ch99', _chap({'trigger': 'x', 'script': script}), set())
+        seats = [b.podium for b in scene.boxes]
+        self.assertNotEqual(seats[0], seats[1])
+        self.assertEqual(seats[0], seats[2])
+
+    def test_a_speaker_with_no_face_still_drafts(self):
+        """A draft may name a cast member before their portrait is wired."""
+        scene, = sp.draft_scenes('ch99', _chap({'trigger': 'x',
+                                                'script': [{'nobody-yet': 'hello'}]}), set())
+        self.assertEqual('nobody-yet', scene.boxes[0].speaker)
+
+    def test_a_draft_says_it_is_one(self):
+        scene, = sp.draft_scenes('ch99', _chap({'trigger': 'x',
+                                                'script': [{'braulo': 'a'}]}), set())
+        self.assertIn('DRAFT', sp.format_scene(scene))
+
+    def test_drafts_stay_out_of_the_golden_book(self):
+        for chapter in sorted({k.split('/')[0] for k in sp.registry()}):
+            self.assertNotIn('DRAFT', sp.generate(chapter))
+
+
 class TheGoldenMaster(unittest.TestCase):
     """Box rendering is deterministic, so a scene approved once stays verified for free
     (Feathers/Falco). The generated book IS the golden: `check_generated_indexes_fresh` already
