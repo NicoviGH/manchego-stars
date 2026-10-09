@@ -110,13 +110,13 @@ class Ch03TileChanges(unittest.TestCase):
     def test_reads_the_painted_metatile_at_a_cell(self):
         # The retile paints the FF5 navy chest (metatile 17) at (6,3); the .mar stores
         # metatile<<5, so the reader must decode 17 back out.
-        self.assertEqual(inject.chapters.ch03._read_map_metatile(self.MAPS, self.STEM, 6, 3), 17)
+        self.assertEqual(inject.maps._read_map_metatile(self.MAPS, self.STEM, 6, 3), 17)
 
     def test_door_open_tile_is_the_metatile_directly_below(self):
         # Vanilla Ch3 doors sit at (6,10)/(10,5)/(2,3); the open tile = the cell one row down
         # on the COMMITTED (hand-painted) map -- road tiles (572/492) + the stairs down (626),
         # all passable, so the opened door lets the party through.
-        below = [inject.chapters.ch03._read_map_metatile(self.MAPS, self.STEM, x, y + 1)
+        below = [inject.maps._read_map_metatile(self.MAPS, self.STEM, x, y + 1)
                  for (x, y) in [(6, 10), (10, 5), (2, 3)]]
         self.assertEqual(below, [572, 626, 492])
 

@@ -48,6 +48,35 @@ class Matte(unittest.TestCase):
         self.assertEqual([c for c in _edge_colours(bust) if sum(c) > 3 * 90], [])
 
 
+class Cel(unittest.TestCase):
+    """The flat cel-art path (Messie, 2026-10-09: "make the descale as clean as possible")."""
+
+    def setUp(self):
+        # A disc whose RIGHT edge is rim-lit pale instead of outlined -- Messie's snout.
+        im = Image.new('RGB', (1000, 833), (55, 95, 87))
+        d = ImageDraw.Draw(im)
+        d.ellipse((200, 150, 800, 760), fill=(40, 140, 230), outline=(20, 20, 40), width=12)
+        d.rectangle((700, 300, 820, 600), fill=(55, 95, 87))
+        d.ellipse((200, 150, 800, 760), fill=None, outline=(20, 20, 40), width=12)
+        d.arc((200, 150, 800, 760), -60, 60, fill=(200, 230, 250), width=14)
+        self.tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
+        im.save(self.tmp.name)
+
+    def tearDown(self):
+        os.unlink(self.tmp.name)
+
+    def test_every_silhouette_edge_is_inked_even_where_the_ref_rim_lights_it(self):
+        bust = rb.convert(self.tmp.name, (0, 0, 1000, 833), matte=(20, 20, 40), cel=True)
+        self.assertEqual([c for c in _edge_colours(bust) if sum(c) > 3 * 90], [])
+
+    def test_the_flat_fill_is_one_colour_with_no_dither(self):
+        """A flat field must come out as ONE palette index, not a speckle of near-neighbours."""
+        bust = rb.convert(self.tmp.name, (0, 0, 1000, 833), matte=(20, 20, 40), cel=True)
+        px = bust.load()
+        inner = {px[x, y] for x in range(36, 52) for y in range(30, 50)}
+        self.assertEqual(1, len(inner))
+
+
 class PixelGridAndRetint(unittest.TestCase):
     def test_grid_sampling_recovers_the_native_art_through_jpeg_noise(self):
         import io

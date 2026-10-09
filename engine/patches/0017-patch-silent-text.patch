@@ -1,0 +1,59 @@
+From: Manchego Stars engine
+Subject: [PATCH 17/17] silent text: no typing sound in talk, CG text or help boxes
+
+Nicolas, 2026-10-09: the per-character typing blip is "super annoying" and serves no
+purpose here, everywhere. Removes every typing-sound call and nothing else:
+
+  * scene.c (talk bubbles): SONG_6E, and SONG_7A on the TALK_FLAG_7 variant
+  * cgtext.c (backdrop-scene text): SONG_6E
+  * helpbox.c (help boxes): SONG_6E, and SONG_2E5 on dialogue-box config 0x10
+
+The branches, flags and print delays around each call stay exactly as they were, so text
+speed and skipping behave as before -- only the sound is gone.
+---
+diff --git a/src/cgtext.c b/src/cgtext.c
+index 360596b..58747db 100644
+--- a/src/cgtext.c
++++ b/src/cgtext.c
+@@ -1205,7 +1205,6 @@ void CgTextInterpreter_Loop_Main(struct CgTextInterpreterProc * proc)
+ 
+         if ((GetTextDisplaySpeed() != 1) && !(GetCgTextFlags() & CG_TEXT_FLAG_4))
+         {
+-            PlaySoundEffect(SONG_6E);
+         }
+     }
+ 
+diff --git a/src/helpbox.c b/src/helpbox.c
+index 5c6c219..e755e59 100644
+--- a/src/helpbox.c
++++ b/src/helpbox.c
+@@ -1815,9 +1815,7 @@ void BoxDialogueInterpreter_Main(struct ProcBoxDialogueDrawTextExt* proc) {
+         if (GetTextDisplaySpeed() != 1 || (GetGameClock() & 1) != 0) {
+ 
+             if (GetDialogueBoxConfig() & 0x10) {
+-                PlaySoundEffect(SONG_2E5);
+             } else {
+-                PlaySoundEffect(SONG_6E);
+             }
+         }
+     }
+diff --git a/src/scene.c b/src/scene.c
+index 173256b..5259353 100644
+--- a/src/scene.c
++++ b/src/scene.c
+@@ -595,7 +595,6 @@ void Talk_OnIdle(ProcPtr proc) {
+ 
+                 if (!CheckTalkFlag(TALK_FLAG_SILENT)) {
+                     if (CheckTalkFlag(TALK_FLAG_7)) {
+-                        PlaySoundEffect(SONG_7A);
+                     } else {
+                         if ((GetTextDisplaySpeed() == 1) && !(GetGameClock() & 1)) {
+                             break;
+@@ -606,7 +605,6 @@ void Talk_OnIdle(ProcPtr proc) {
+                         }
+ 
+                         sTalkState->unk82 = 1;
+-                        PlaySoundEffect(SONG_6E);
+                     }
+                 }
+         }

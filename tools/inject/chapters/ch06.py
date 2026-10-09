@@ -5,23 +5,26 @@ import os
 import re
 import sys
 
-from inject.cast import _classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
+from inject.cast import (_classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP,
+                         PORTRAIT_MAP)
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_TALK_FLAGS, CH06_BOAT_TALK_MSGS,
                                 CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
-                                CH06_GOAL_WINDOW_MSG, CH06_OPENING_CARD_MSG, CH06_OPENING_MSGS,
-                                CH06_OPENING_QUIP_MSG)
+                                CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
+                                CH06_OPENING_CARD_MSG, CH06_OPENING_MSGS, CH06_OPENING_QUIP_MSG)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
 from inject.event_scripts import assert_event_scripts_defined, declare_event_script
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
-from inject.maps import _register_chapter_map, _register_tileset, TILESET_STEMS
+from inject.maps import (_inject_tile_changes, _map_changes_tileset, _read_map_metatile,
+                         _register_chapter_map, _register_tileset, TILESET_STEMS)
 from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
-from inject.scenes import (_emit_scene_beats, _make_fid, _prepend_defeat_quote, _split_event_beats,
+from inject.scenes import (_branch_on_slot_c, _make_fid, _prepend_battle_quote, battle_quote_pair,
+                           scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
                            _write_chapter_title_card, flag_defeat_quote, split_on_stage_cut)
 from inject.text import (
     _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body, set_message_body,
@@ -51,6 +54,12 @@ CH06_BOOT_SEED_TABLE = 'MS_Ch06BootSeed'         # --ch06-boot only: an armed pa
 CH06_LINE_TABLE = 'MS_Ch06Line'                  # the 24-strong merfolk line (#360's placement)
 CH06_HARD_WAVE_TABLE = 'MS_Ch06Wave4Hard'        # vanilla Ch6's Difficult-only cavalry trio
 CH06_BOAT_TABLE = 'MS_Ch06Boats'                 # the two marooned boats, GREEN and killable
+CH06_MESSIE_TABLE = 'MS_Ch06Messie'               # Messie, loaded by the boss_defeated scene
+CH06_MESSIE_AUDIENCE = 'MS_Ch06Audience%02d'      # ...and the cast around him, one table each
+CH06_MESSIE_LABEL_BASE = 0x40                     # the audience's CHECK_EXISTS branches
+# The spare must sit well clear of every tile the scene clears: MOVE_CLOSEST drops whoever is in
+# the way on the free cell NEAREST it, and a spare beside the ring refilled it (review, #470).
+CH06_MESSIE_SPARE_CLEARANCE = 6
 
 CH06_LAYOUT = ('Ch06MaerMonsterMap', 'ch06-maer-monster')   # (asset label, maps/ stem)
 CH06_TILESET = 'snowy-bern-ice'                  # stem 'SnowIce' (TILESET_STEMS); ch06 is its
@@ -169,6 +178,8 @@ def assert_boat_safe_ai_is_single_chapter(owner):
 # balance gate, the danger map and the boats' fuses are untouched -- and a skipped scene loads
 # them silently, straight onto those tiles.
 TERRAIN_RIVER = 0x10
+TERRAIN_BRIDGE = 0x13       # TERRAIN_BRIDGE_REGULAR: the centre island's two links to the shore
+TERRAIN_TILE_2E = 0x2E      # the outcrops nobody stands on
 SURFACE_MIN_WALK = 2      # tiles of movement cost: a one-step hop out of the water does not read
 
 
@@ -365,6 +376,18 @@ def ch06_opening_beats(chap):
     return card, [beats[0], ice, quip]
 
 
+def ch06_opening_messages(chap):
+    """[(msg_id, body)] for the opening's three talk messages: the hall, the ice, the quip.
+
+    Pure, so `tools/scene_preview.py` renders exactly what the injector writes."""
+    _card, beats = ch06_opening_beats(chap)
+    return scene_beat_bodies(CH06_OPENING_MSGS + (CH06_OPENING_QUIP_MSG,), beats,
+                             _make_fid({}, 'ch06 opening: unknown cutscene speaker',
+                                       fallback=GUEST_PORTRAIT_MAP),
+                             CH06_OPENING_HOME,
+                             overrides=[None, CH06_OPENING_ICE_SEATS, CH06_OPENING_ICE_SEATS])
+
+
 def ch06_opening_head(hall_label):
     """The event-script head before LOMA: the town under its card, then the hall's dialogue.
 
@@ -401,13 +424,241 @@ def ch06_opening_ice_block(camera_tile, lake_tile):
             '    STAL(60)\n'
             '    CURE\n'
             '    Text(0x%X) /* B -- on the ice: Wolfram reads the boats, the shadows multiply */\n'
-            '    CAMERA(%d, %d) /* PAN to the middle of the lake, where the shadows were */\n'
+            '    CAMERA2(%d, %d) /* PAN to the middle of the lake, CENTRED on where the shadows were */\n'
             '    STAL(30)\n'
             '    LOAD1(0x1, %s) /* the merfolk break through the water */\n'
             '    ENUN\n'
             '    STAL(30)\n'
             '    Text(0x%X) /* ...and Meesmickle answers */\n'
             % (x, y, x, y, CH06_OPENING_MSGS[1], lx, ly, CH06_LINE_TABLE, CH06_OPENING_QUIP_MSG))
+
+
+# ── Messie on the ice (#26) ─────────────────────────────────────────────────────────────
+# The party holds the left: Braulo leads mid-left, Marty and RBG share far-left (RBG speaks only
+# in beats A and B, Marty from B on). Messie faces them from mid-right, and Wolfram stands apart
+# at far-right, the side he sniffs the beast from.
+CH06_MESSIE_SEATS = {'braulo': '[OpenMidLeft]', 'marty': '[OpenFarLeft]',
+                     'prof-rbg': '[OpenFarLeft]', 'wolfram': '[OpenFarRight]',
+                     'messie': '[OpenMidRight]'}
+CH06_MESSIE_CRY = 'SONG_MS_KYOGRE_CRY'   # inject/sounds.py; Kyogre's cry, as Sapphire stages it
+CH06_MESSIE_STEP_SPEED = 0x10                     # a normal walk: one tile, then the shake
+CH06_MESSIE_MAP_CHANGES = 'MS_Ch06MapChanges'
+CH06_MESSIE_BREAK_ID = 0                          # the bay breaking open: MapChange id 0
+# MOVE_1STEP's direction codes (eventscr.c EVSUBCMD_MOVE_1STEP): 0 west, 1 east, 2 south, 3 north.
+_STEP_DIRECTION = {(-1, 0): 0, (1, 0): 1, (0, 1): 2, (0, -1): 3}
+# He walks as the Gwyllgi he is built on, so the route is checked against that class's own row.
+CH06_MESSIE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'
+
+
+def ch06_messie_messages(chap):
+    """[(msg_id, body)] for the boss_defeated scene: one message, 33 presses."""
+    _card, beats = _split_event_beats(chap, 'boss_defeated', 'ch06 Messie scene',
+                                      (CH06_MESSIE_MSG,), card_required=False)
+    return scene_beat_bodies((CH06_MESSIE_MSG,), beats,
+                             _make_fid({}, 'ch06 Messie scene: unknown cutscene speaker',
+                                       fallback=GUEST_PORTRAIT_MAP),
+                             CH06_MESSIE_SEATS)
+
+
+def ch06_messie_route(chap, terrain):
+    """(emergence tile, walk-to tile): he emerges in the bay where the ice breaks, then walks a
+    straight line toward the cast.
+
+    He wears Gwyllgi geometry, and an unwalkable event MOVE hangs the chapter (ch04's bridge
+    note) -- so the emergence must be a bay cell (water once it breaks) and every cell after it
+    must be walkable by the Gwyllgi's own cost row."""
+    sx, sy = chap['messie']['surfaces']
+    tx, ty = chap['messie']['walks_to']
+    bay = {(x, y) for x, y, _m in chap['messie']['bay']}
+    if (sx, sy) not in bay:
+        sys.exit('ERROR: ch06 Messie emerges on (%d, %d), which is not in the bay that breaks '
+                 'open -- he has to appear right where the ice broke' % (sx, sy))
+    if sx != tx and sy != ty:
+        sys.exit('ERROR: ch06 Messie\'s walk (%d, %d) -> (%d, %d) is not a straight line'
+                 % (sx, sy, tx, ty))
+    costs = _class_terrain_move_costs(CH06_MESSIE_MOV_TABLE)
+    dx, dy = (tx > sx) - (tx < sx), (ty > sy) - (ty < sy)
+    x, y = sx, sy
+    while (x, y) != (tx, ty):
+        x, y = x + dx, y + dy
+        if (x, y) not in bay and costs[terrain[y][x]] <= 0:
+            sys.exit('ERROR: ch06 Messie\'s walk crosses (%d, %d), which he cannot walk' % (x, y))
+    return (sx, sy), (tx, ty)
+
+
+def ch06_center_island(terrain, tile):
+    """The dry cells reachable from `tile` without crossing water or a bridge: the shelf Nerra
+    holds, which Messie takes alone."""
+    island, todo = {tuple(tile)}, [tuple(tile)]
+    while todo:
+        x, y = todo.pop()
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if (0 <= ny < len(terrain) and 0 <= nx < len(terrain[0]) and (nx, ny) not in island
+                    and terrain[ny][nx] not in (TERRAIN_RIVER, TERRAIN_BRIDGE)):
+                island.add((nx, ny))
+                todo.append((nx, ny))
+    return island
+
+
+def ch06_messie_gather(chap, terrain):
+    """(event text, {uid: tile}): the fade-out gather that puts the whole cast on the shores
+    around the centre island before Messie surfaces onto it alone (Nicolas, 2026-10-09).
+
+    The cast is LOADed onto its tiles, never MOVEd: ADR 0292, a scene LOADs the PCs it stages.
+    An event LOAD of a unit already on the map finds it and moves it, stats and inventory
+    untouched (LoadUnit_800F704), and one who was benched or fell still resolves. But a LOAD of
+    someone NOT in the army creates them, so each member is LOADed only if CHECK_EXISTS finds
+    them: a Sahnar never turned, or a Baxby never bought, must not join here (review, #470).
+    One table per member, because the branch is per member. Every cell the
+    scene needs -- the island, his route, the cast's tiles -- is cleared first through
+    CHAR_EVT_POSITION_AT_SLOTB, because the fight can end with anyone standing anywhere (Nerra's
+    killer beside her, Pinky hovering over the water) and a LOAD onto a held cell stacks two
+    units on it. All of it happens behind the FADI."""
+    (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
+    gather = {uid: tuple(xy) for uid, xy in chap['messie']['gather'].items()}
+    spare = gather.pop('spare')
+    route = [(sx + i * ((tx > sx) - (tx < sx)), sy + i * ((ty > sy) - (ty < sy)))
+             for i in range(abs(tx - sx) + abs(ty - sy) + 1)]
+    island = ch06_center_island(terrain, (tx, ty))
+    if len(set(gather.values())) != len(gather):
+        sys.exit('ERROR: ch06 Messie: two of the cast gather onto one tile')
+    for uid, (x, y) in sorted(gather.items()):
+        if (x, y) in island or (x, y) in route:
+            sys.exit('ERROR: ch06 Messie: %s gathers onto his island or route at (%d, %d) -- '
+                     'he takes the island alone' % (uid, x, y))
+        if terrain[y][x] in (TERRAIN_RIVER, TERRAIN_TILE_2E):
+            sys.exit('ERROR: ch06 Messie: %s gathers onto (%d, %d), which nobody stands on'
+                     % (uid, x, y))
+    clear = sorted(set(route) | island) + sorted(gather.values())
+    near = [(x, y) for x, y in clear
+            if abs(x - spare[0]) + abs(y - spare[1]) < CH06_MESSIE_SPARE_CLEARANCE]
+    if near:
+        sys.exit('ERROR: ch06 Messie: the spare tile %s is within %d of the scene at %s -- '
+                 'whoever is moved there could land back on a cleared cell'
+                 % (tuple(spare), CH06_MESSIE_SPARE_CLEARANCE, near[0]))
+    out = ('    FADI(16) /* the fight is over: gather the cast out of sight */\n'
+           '    CLEE /* ...and the merfolk scatter with their elder dead (Nicolas, 2026-10-09) */\n')
+    for x, y in clear:
+        out += ('    SVAL(EVT_SLOT_B, _EvtParams2(%d, %d)) /* whoever stands here, out of the way */\n'
+                '    MOVE_CLOSEST(0xffff, CHAR_EVT_POSITION_AT_SLOTB, %d, %d)\n'
+                % (x, y, spare[0], spare[1]))
+    for n, (uid, _xy) in enumerate(sorted(gather.items())):
+        out += _branch_on_slot_c(
+            'CHECK_EXISTS(CHARACTER_%s)' % PORTRAIT_MAP[uid].upper(),
+            '    LOAD1(0x1, %s) /* %s, on the shore */\n    ENUN\n' % (CH06_MESSIE_AUDIENCE % n, uid),
+            '', CH06_MESSIE_LABEL_BASE + 2 * n, 'not in the army')
+    return out + '    FADU(16)\n', gather
+
+
+def ch06_messie_bay(chap, maps_dir):
+    """The MapChange that breaks the island's ice open in front of Messie (Nicolas, 2026-10-09:
+    the crack has to be SEEN). One region, the bay's bounding box: bay cells take their declared
+    metatiles, every other cell keeps the one it has, so the change touches nothing but the bay.
+    Each bay metatile must be RIVER in the map's own tileset, or the water would be ice to the
+    engine."""
+    bay = {(x, y): m for x, y, m in chap['messie']['bay']}
+    tileset = _map_changes_tileset(maps_dir, CH06_LAYOUT)
+    for (x, y), m in sorted(bay.items()):
+        if tileset.terrain(m) != TERRAIN_RIVER:
+            sys.exit('ERROR: ch06 Messie: bay metatile %d at (%d, %d) is not water in the '
+                     'map\'s tileset' % (m, x, y))
+    xs, ys = [x for x, _y in bay], [y for _x, y in bay]
+    x0, y0 = min(xs), min(ys)
+    w, h = max(xs) - x0 + 1, max(ys) - y0 + 1
+    tiles = [bay.get((x, y)) if (x, y) in bay else _read_map_metatile(maps_dir, CH06_LAYOUT[1], x, y)
+             for y in range(y0, y0 + h) for x in range(x0, x0 + w)]
+    return [(x0, y0, w, h, tiles, 'ch06: the island ice breaks open in front of Messie (#26)')]
+
+
+def ch06_messie_shot(chap, terrain):
+    """The tile to centre on: the middle of every tile the scene uses -- the bay, his walk and
+    the cast's places. CAMERA2, because plain CAMERA (EnsureCameraOntoPosition) only scrolls a
+    tile onto the screen and left the scene off-centre (Nicolas, 2026-10-09)."""
+    (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
+    gather = {k: v for k, v in chap['messie']['gather'].items() if k != 'spare'}
+    tiles = ([(x, y) for x, y, _m in chap['messie']['bay']] + [(sx, sy), (tx, ty)]
+             + [tuple(v) for v in gather.values()])
+    xs, ys = [x for x, _y in tiles], [y for _x, y in tiles]
+    return (min(xs) + max(xs) + 1) // 2, (min(ys) + max(ys) + 1) // 2
+
+
+def ch06_messie_block(chap, terrain, theme):
+    """The ending's head: Kyogre's Cave of Origin awakening, then the scene.
+
+    Sapphire's order (pokeruby CaveOfOrigin_B4F): the field goes still, the beast steps toward
+    the player in DISCRETE steps that shake the screen, a held second, its cry -- and the battle.
+    Here the ice rumbles, breaks open into the bay (TILECHANGE) and Messie is in it on the SAME
+    beat -- he appears right where it broke (Nicolas, 2026-10-09) -- then walks toward the cast
+    one tile at a time, the map shaking under each step; then the held second, the cry, and
+    where the battle would start the fighters raise their weapons instead. Each rumble ends
+    before the next sound: EARTHQUAKE_END fades the SE channel (Sound_FadeOutSE), and the moose
+    (ch05) showed that a rumble and a cry cannot overlap.
+    """
+    (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
+    dx, dy = (tx > sx) - (tx < sx), (ty > sy) - (ty < sy)
+    cx, cy = ch06_messie_shot(chap, terrain)
+    out = ('    MUSCMID(SONG_SILENT) /* the music fades out: the entrance plays in silence */\n'
+           '    CAMERA2(%d, %d) /* CENTRED on the whole scene: bay, walk and cast */\n'
+           '    STAL(30)\n'
+           '    EARTHQUAKE_START(0, 1) /* something under the ice... */\n'
+           '    STAL(60)\n'
+           '    TILECHANGE(%d) /* ...the ice breaks open... */\n'
+           '    LOAD1(0x1, %s) /* ...and he is in it, on the same beat */\n'
+           '    ENUN\n'
+           '    STAL(30)\n'
+           '    EARTHQUAKE_END\n'
+           '    STAL(40)\n' % (cx, cy, CH06_MESSIE_BREAK_ID, CH06_MESSIE_TABLE))
+    x, y = sx, sy
+    while (x, y) != (tx, ty):
+        out += ('    MOVE_1STEP(0x%X, %s, %d) /* one step toward them */\n'
+                '    ENUN\n'
+                '    EARTHQUAKE_START(0, 1) /* ...and the map shakes under it */\n'
+                '    STAL(12)\n'
+                '    EARTHQUAKE_END\n'
+                '    STAL(24)\n'
+                % (CH06_MESSIE_STEP_SPEED, CH06_MESSIE_PID, _STEP_DIRECTION[(dx, dy)]))
+        x, y = x + dx, y + dy
+    # The scene's ONE stage_break sits before his first line: the talk pauses (LockTalk, the
+    # bubble and faces stay up), the chapter's own theme fades back in, and TEXTCONT resumes
+    # the same message -- vanilla Ch5's music-under-a-break idiom (Nicolas, 2026-10-09).
+    ev = next(e for e in chap['events'] if e.get('trigger') == 'boss_defeated')
+    if sum(1 for e in ev['script'] if 'stage_break' in e) != 1:
+        sys.exit('ERROR: ch06 Messie scene needs exactly one stage_break (the music cue)')
+    return out + ('    STAL(60) /* Kyogre\'s held second */\n'
+                  '    SOUN(%s) /* his cry */\n'
+                  '    STAL(110) /* the 1.68s sample plays out */\n'
+                  '    TEXTSTART\n'
+                  '    TEXTSHOW(0x%X) /* Messie on the ice, beats A-E */\n'
+                  '    TEXTEND /* ...paused at the break, before "I\'m listening." */\n'
+                  '    MUSCMID(0x%X) /* the chapter\'s own theme comes back as he speaks */\n'
+                  '    TEXTCONT\n'
+                  '    TEXTEND\n'
+                  '    REMA\n'
+                  % (CH06_MESSIE_CRY, CH06_MESSIE_MSG, theme))
+
+
+def ch06_ending_debug_script(seed_load):
+    """`--ch06-ending`: New Game straight onto the ending -- Messie on the ice, the payout, the
+    landing. ch05's ending boot, for the same reason (decisions.md -> "Playtest runs are the most
+    expensive thing in this repo", rule 3): reaching it honestly is the opening, Preparations and
+    a kill on the far side of the lake.
+
+    Keeps what the ending reads: the map, the two hulls (the payout's CHECK_ALIVE asks about
+    both, so both alive is the full arm), and the boot seed, because the Orion's Bolt goes to
+    the party leader. No merfolk line: Nerra's tile is empty, which is where the real path
+    leaves it."""
+    if not seed_load:
+        sys.exit('ERROR: --ch06-ending needs --ch06-boot -- the boot seed is the only party on '
+                 'the map, and the ending hands its reward to the party LEADER')
+    return ('{\n'
+            '    SVAL(EVT_SLOT_B, 0x0)\n'
+            '    LOMA(0x%X) /* --ch06-ending: the lake, no merfolk */\n'
+            '    LOAD1(0x1, %s) /* both hulls afloat: the full payout arm */\n'
+            '    ENUN\n' % (CH06_HOST_INDEX, CH06_BOAT_TABLE)
+            + seed_load +
+            '    FADU(16)\n'
+            '    CALL(%s) /* the ending, exactly as DefeatBoss runs it */\n'
+            '    ENDA\n}' % CH06_ENDING_SCRIPT)
 
 
 def ch06_lake_camera_tile(chap):
@@ -421,7 +672,7 @@ def ch06_party_camera_tile(chap):
     return tuple(chap['deployment']['deploy_slots'][0])
 
 
-def inject_ch06(campaign, boot=False, verbose=True):
+def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     """Host Ch6 "The Maer Monster" (#26) on slot 7: the frozen mouth of Maer Dualdon retiled
     from Ch13 Ephraim, vanilla Ch6's own twenty-four re-dressed as merfolk on our placement,
     the two marooned boats as killable GREEN units, the real PREP deploy, and DefeatBoss(Nerra).
@@ -444,7 +695,7 @@ def inject_ch06(campaign, boot=False, verbose=True):
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)
-    op_card, op_beats = ch06_opening_beats(chap)
+    op_card, _beats = ch06_opening_beats(chap)
 
     # 1. Map: register the snowy-bern-ice tileset (ch06 is its only user, so it self-registers
     #    -- the Cave/inject_ch03 idiom) and the painted layout, then point slot 7 at them and
@@ -459,6 +710,9 @@ def inject_ch06(campaign, boot=False, verbose=True):
         'ERROR: slot %d goal is not the vanilla defeat_boss template (ch06 DefeatBoss donor)'
         % CH06_GOAL_DONOR, indices, chap['chapter_number'], CH06_EVENT_GROUP,
         (CH06_GOAL_WINDOW_MSG, CH06_GOAL_STATUS_MSG))
+    # Messie's bay (#26): the island ice that breaks open in front of him, as MapChange id 0.
+    # After the retarget, which zeroes changeLayerId.
+    _inject_tile_changes(CH06_MESSIE_MAP_CHANGES, ch06_messie_bay(chap, maps_dir), CH06_HOST_INDEX)
 
     # Fog is not written here any more either -- `apply_chapter_fog` writes ch06's declared
     # `fog: none` along with every other hosted chapter's (#365). This block is what the
@@ -486,6 +740,20 @@ def inject_ch06(campaign, boot=False, verbose=True):
                  for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     declare_unit_table(CH06_BOOT_SEED_TABLE, seed_rows,
                        'ch06 --ch06-boot armed party seed (cold-start PREP fodder)')
+    # Messie's audience: the speakers, LOADed onto the ice around Nerra's tile (ADR 0292).
+    by_uid = {row[0]: row for row in cast}
+    messie_gather, gather_tiles = ch06_messie_gather(
+        chap, _map_terrain_grid(maps_dir, CH06_LAYOUT[1])[2])
+    if set(gather_tiles) != set(by_uid):
+        sys.exit('ERROR: ch06 Messie: the gather must place exactly the ch06 roster (Nicolas: '
+                 'the whole cast stands around the island); missing %s, extra %s'
+                 % (sorted(set(by_uid) - set(gather_tiles)), sorted(set(gather_tiles) - set(by_uid))))
+    for n, (uid, (x, y)) in enumerate(sorted(gather_tiles.items())):
+        declare_unit_table(CH06_MESSIE_AUDIENCE % n, [
+            _ally_unit_entry(leader, by_uid[uid][1], by_uid[uid][3], by_uid[uid][4], x, y,
+                             ', '.join(CLASS_LOADOUT[by_uid[uid][2]]),
+                             ' /* %s -- on the shore when Messie surfaces */' % uid)],
+            'ch06 %s around the centre island, for Messie on the ice (#26)' % uid)
 
     # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
     spawns = ch06_line_spawns(chap, maps_dir)
@@ -520,6 +788,13 @@ def inject_ch06(campaign, boot=False, verbose=True):
     # separately. LOADed by the beginning scene beside the line -- they are on the field from
     # turn 1, because the clock starts when the chapter does.
     boat_rows = ch06_boat_rows(chap)
+    terrain = _map_terrain_grid(maps_dir, CH06_LAYOUT[1])[2]
+    messie_surface, messie_target = ch06_messie_route(chap, terrain)
+    declare_unit_table(CH06_MESSIE_TABLE, [_ally_unit_entry(
+        None, None, 'CLASS_GWYLLGI', 1, messie_surface[0], messie_surface[1], '0',
+        ' /* Messie -- a cutscene actor: no class of his own, no AI, never fights */',
+        allegiance='GREEN', char=CH06_MESSIE_PID)],
+        'ch06 Messie, who surfaces when the merfolk elder falls (#26)')
     declare_unit_table(CH06_BOAT_TABLE, boat_rows,
                        'ch06 the Burly Ram and the Pronged Goat: green hulls in their pockets, '
                        'and the chapter\'s real difficulty (#26)')
@@ -575,6 +850,8 @@ def inject_ch06(campaign, boot=False, verbose=True):
                  % (CH06_PREP_SCRIPT, chap['deployment']['deploy_limit'])
                  + ch06_opening_ice_block(ch06_party_camera_tile(chap), ch06_lake_camera_tile(chap))
                  + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
+    if ending:
+        beginning = ch06_ending_debug_script(seed_load)
     script = _replace_brace_block(script, CH06_BEGINNING_SCRIPT + '[] =', beginning,
                                   CH06_EVENTSCRIPT_H)
     # The wave, through FE8's OWN Difficult-mode predicate: EventScr_LoadReinforceHardMode
@@ -593,7 +870,8 @@ def inject_ch06(campaign, boot=False, verbose=True):
     hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
-        '{\n    MUSC(SONG_VICTORY)\n'
+        '{\n' + messie_gather + ch06_messie_block(chap, terrain, host['bgm']['bluePhase'])
+        + '    MUSC(SONG_VICTORY)\n'
         + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')
         + '    FADI(16) /* fade the lake out into the dev-placeholder landing */\n'
@@ -621,11 +899,8 @@ def inject_ch06(campaign, boot=False, verbose=True):
         set_message_body(lines, msg_id, body)
     # The opening's card and its two beats. The Speaker's face rides GUEST_PORTRAIT_MAP (Murray).
     set_message_body(lines, CH06_OPENING_CARD_MSG, name_message_body(op_card))
-    _emit_scene_beats(lines, CH06_OPENING_MSGS + (CH06_OPENING_QUIP_MSG,), op_beats,
-                      _make_fid({}, 'ch06 opening: unknown cutscene speaker',
-                                fallback=GUEST_PORTRAIT_MAP),
-                      CH06_OPENING_HOME,
-                      overrides=[None, CH06_OPENING_ICE_SEATS, CH06_OPENING_ICE_SEATS])
+    for msg_id, body in ch06_opening_messages(chap) + ch06_messie_messages(chap):
+        set_message_body(lines, msg_id, body)
     # The boats' name plates are NOT written here: they are RAW_PID_PORTRAITS rows, and
     # inject_names writes every one of those off that registry (appending the ones whose donor
     # is an id we own). Writing them again here would make this injector a second owner of the
@@ -641,6 +916,13 @@ def inject_ch06(campaign, boot=False, verbose=True):
     _prepend_defeat_quote(flag_defeat_quote(
         CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX), 'EVFLAG_DEFEAT_BOSS',
         'Nerra (ch06 boss): silent defeat -> DefeatBoss WIN flag'))
+    # ...and SILENT when engaged. She wears Novala's slot in Novala's own chapter, so vanilla's
+    # two Novala battle-quote rows match her, and both name MSG_9EF -- which ch05 has rewritten
+    # as Basil's "Oh! Tourists." line. Engaging Nerra played Basil (Nicolas, 2026-10-09). A
+    # msg-0, event-0 pair at the head of the list shadows both and plays nothing.
+    _prepend_battle_quote(battle_quote_pair(
+        CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX), 0,
+        'Nerra: the merfolk do not speak (shadows vanilla Novala, MSG_9EF)'))
 
     if verbose:
         print('  ch06 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss '

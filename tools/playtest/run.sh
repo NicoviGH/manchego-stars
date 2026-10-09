@@ -307,6 +307,10 @@ EOF
     # 240fps the audio is a screech. `PT_SOUND=1` unmutes for the runs where the SOUND is the
     # thing under review (ch05's moose bellow was the first, 2026-08-15) -- and it pins
     # audioSync on with it, because sound played against a free-running video clock stutters.
+    # It still is NOT the place to judge a sound: the harness's per-frame Lua holds a headed run
+    # at 57-59fps against 60, and the audio-synced buffer underruns on a steady beat -- a pulsing
+    # buzz under music and silence alike, which no change to the ROM touches. Proven 2026-10-09
+    # (#26): gone in plain mGBA, present in every harness run. Judge audio in plain mGBA.
     local mute=1 async=0
     if [ -n "${PT_SOUND:-}" ] && [ "${PT_SOUND}" != "0" ]; then mute=0; async=1; fi
     # -l 0: mgba-headless logs every BIOS SWI and DMA otherwise -- 5.4MB in 6s, which is

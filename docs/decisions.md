@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-332 decisions. Read this index, then open the two or three you need — the whole
+334 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -289,6 +289,8 @@ fresh. Don't leave it in chat or agent memory only.
 | `0143` | [Tilesets stay coherent; Snowy Bern may borrow only Super Fields' complete Snag family.](decisions/0143-tilesets-stay-coherent-snowy-bern-may-borrow-only-super.md) | 2026-07-20 | #24 |
 | `0144` | [Adopting non-FE sprite sources (Basil/Oddish)](decisions/0144-adopting-non-fe-sprite-sources.md) | 2026-07-16 | — |
 | `0145` | [Adopting sprites, part 2 — Lupin (Lycanroc) + Sahnar (spectral skeleton)](decisions/0145-adopting-sprites-part-2-lupin-sahnar.md) | 2026-07-17 | — |
+| `0333` | [Custom sound effects append to gSongTable, and ch06's Messie cries with Kyogre's voice](decisions/0333-custom-sound-effects-append-to-gsongtable.md) | 2026-10-09 | #26 |
+| `0334` | [Text types out silently: no typing sound anywhere](decisions/0334-text-types-out-silently.md) | 2026-10-09 | #26 |
 
 ---
 

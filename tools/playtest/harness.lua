@@ -387,12 +387,13 @@ local function recordCutscene(o)
     elseif o.until_ == "chapter" then doneFn = function() return chapter() ~= startCh end
     else doneFn = function() return false end end
     local maxFrames = o.maxFrames or 6000
-    local shotEvery = o.shotEvery or 4
+    -- PT_SHOTEVERY overrides any scenario's cadence; 0 films nothing.
+    local shotEvery = tonumber(PLAYTEST_SHOTEVERY or "") or o.shotEvery or 4
     local autoAdvanceDialogue = ((o.pressEvery ~= nil) and o.pressEvery or 60) > 0
     local reached, fr = false, 0
     while fr < maxFrames do
         fr = fr + 1
-        if fr % shotEvery == 0 then shot(tag) end
+        if shotEvery > 0 and fr % shotEvery == 0 then shot(tag) end
         -- Let a function terminal observe the frame before the recorder consumes an
         -- input state.  #260's turn-event proof remembers that dialogue_wait occurred;
         -- checking only after the guarded A press made a good four-box scene time out.
@@ -8381,6 +8382,150 @@ scenarios.recordch06ice = function()
     })
 end
 
+-- recordch06nerradeath (#26): the TRANSITION from the fight into Messie's scene, on the plain
+-- ch06boot ROM -- the honest path, so DefeatBoss(Nerra) is what starts the ending. Setup is
+-- recordch05ravisindeath's: park a one-hit Nerra beside a live melee attacker and drive the
+-- game's own Attack path. Her defeat quote is SILENT (the merfolk do not speak), so the strike
+-- is done when she is dead rather than at a death box; the film starts there and runs the
+-- gather, the break, the walk, the cry and the scene to the title.
+-- Run: tools/playtest/run.sh recordch06nerradeath (CH06BOOT=1 ROM).
+scenarios.recordch06nerradeath = function()
+    local NERRA, boxes, waiting = 0x4B, 0, false     -- CHARACTER_NOVALA, her slot (ENEMY_BASE_SLOT)
+    return recordCutscene({
+        tag = "ch06nerradeath", speed = "normal", maxFrames = 18000, shotEvery = 4,
+        pressEvery = 90,
+        pre = function()
+            pokeFastConfig()
+            if not bootToMap(true) or controllerState() ~= "prep_main" then
+                return false, "never reached ch06's Preparations"
+            end
+            if not driveThroughPrep() then return false, "Preparations never exited via Fight!" end
+            if not waitFor(function()
+                return faction() == 0 and not menuOpen()
+                    and not procActive(SYM.ProcScr_StdEventEngine)
+            end, 6000, true) then
+                return false, "ch06 map never became idle"
+            end
+            local boss = red(NERRA)
+            if not boss then return false, "Nerra (CHARACTER_NOVALA, 0x4B) is not in the red array" end
+            local hero, hmin, hmax
+            for i = 0, 23 do
+                local u = unitAt(SYM.gUnitArrayBlue, i)
+                if u and not isDead(u) and (u.state & 0x3) == 0
+                    and mapUnitAt(u.x, u.y) ~= 0 then
+                    local mn, mx = unitAttackRange(u)
+                    if mn and mn <= 1 and mx >= 1 then
+                        hero, hmin, hmax = u, mn, mx
+                        break
+                    end
+                end
+            end
+            if not hero then return false, "no selectable blue melee attacker" end
+            pokeFrail(boss)
+            pokeHarmless(boss)
+            emu:write8(hero.addr + 0x14, 30) -- deterministic might for the proof strike
+            emu:write8(hero.addr + 0x15, 30) -- deterministic hit for the proof strike
+            boss = red(NERRA)
+            local bossGrid = mapUnitAt(boss.x, boss.y)
+            local mapw, maph = mapSize()
+            local parked = false
+            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+                local tx, ty = hero.x + d[1], hero.y + d[2]
+                if tx >= 0 and tx < mapw and ty >= 0 and ty < maph
+                    and mapUnitAt(tx, ty) == 0 then
+                    setMapUnit(boss.x, boss.y, 0)
+                    emu:write8(boss.addr + 0x10, tx); emu:write8(boss.addr + 0x11, ty)
+                    setMapUnit(tx, ty, bossGrid)
+                    parked = true
+                    break
+                end
+            end
+            if not parked then return false, "no free tile beside the melee attacker" end
+            hero = blue(hero.charId) or hero
+            if not canAttackFromHere(hero, hmin, hmax) then
+                return false, "parked Nerra is not in the attacker's live range"
+            end
+            if not moveUnit(hero.x, hero.y, hero.x, hero.y) then
+                return false, "could not open the attacker's command menu"
+            end
+            pokeNormalConfig()             -- the strike itself plays at normal speed: it is filmed
+            if not chooseAttack(hero.addr, function() return isDead(red(NERRA)) end) then
+                return false, "the proof strike did not resolve"
+            end
+            return true
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            local now = controllerState() == "dialogue_wait"
+            if now and not waiting then boxes = boxes + 1 end
+            waiting = now
+            return procActive(SYM.gProcScr_TitleScreen) and boxes >= 37
+        end,
+    })
+end
+
+-- recordch06messie (#26): the MOTION proof for ch06's boss_defeated scene -- Kyogre's Cave of
+-- Origin awakening (the ice cracks under a shake, Messie surfaces and hauls himself two tiles
+-- onto Nerra's tile, a held second, his cry) and then the 33-box scene, the payout and the
+-- landing. Films on the ch06endingboot DEBUG ROM (CH06ENDING=1), whose beginning script LOMAs,
+-- loads both hulls and the boot party and CALLs the ending straight off New Game:
+-- recordch05ending's shape, for its reason.
+-- What only a run can answer: whether the haul across the ice runs at all (an unwalkable event
+-- MOVE hangs the chapter -- the build guards the route, the film proves it), whether the rumble
+-- and the cry both sound, and whether the shake lands on the map.
+-- The terminal is the TITLE screen (the ending lands on the dev placeholder, which ends on MNTS),
+-- refused below 37 boxes: Messie's 33 plus the placeholder's 4.
+-- Run: tools/playtest/run.sh recordch06messie (needs CH06BOOT=1 CH06ENDING=1).
+scenarios.recordch06messie = function()
+    local BOXES = 37
+    local boxes, waiting, blamed, playedMsg = 0, false, false, nil
+    return recordCutscene({
+        tag = "ch06messie", speed = "normal", maxFrames = 16000, shotEvery = 4, pressEvery = 90,
+        pre = function()
+            -- Stop at the chapter intro: on THIS ROM the beginning script IS the ending, and
+            -- bootToMap() would mash A through it (recordch05ending's trap).
+            pokeFastConfig()
+            for _ = 1, TUNE.bootSteps do
+                local obs = observeController()
+                local st = controllerState(obs)
+                if st == "dialogue_wait" then return true end
+                if st == "chapter_intro_input" then
+                    advanceBootState(obs, st)
+                    return true
+                end
+                if advanceBootState(obs, st) ~= true then
+                    return false, "boot stalled at " .. tostring(st) .. " before the ending"
+                end
+                yield()
+            end
+            return false, "boot cap expired before ch06's ending"
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            local now = controllerState() == "dialogue_wait"
+            if now and not waiting then
+                boxes = boxes + 1
+                playedMsg = playedMsg or INSPECT.activeMsg()
+            end
+            waiting = now
+            if procActive(SYM.gProcScr_TitleScreen) then
+                if boxes < BOXES then
+                    if not blamed then
+                        blamed = true
+                        log(string.format("ch06messie: the title arrived after %d boxes, not "
+                            .. "%d -- the scene was SHORTER than Messie's 33 plus the "
+                            .. "placeholder's 4 (first message 0x%X)", boxes, BOXES, playedMsg or 0))
+                    end
+                    return false
+                end
+                log(string.format("ch06messie: %d boxes, first message 0x%X", boxes, playedMsg or 0))
+                return true
+            end
+            return false
+        end,
+    })
+end
+
 -- recordch05openinglupin (#25): the SAME film against the ch05lupinboot ROM, which carries a
 -- live Lupin, so scene 4's CHECK_ALIVE takes its ALIVE arm and box 1 is Lupin's "The trail
 -- leads here" instead of Pinky's "The tracks stop here". One routine, two ROMs: the scenario
@@ -8896,7 +9041,11 @@ end
 -- changeLayerId zeroed. So this asserts the payoff by TERRAIN, which is what actually decides
 -- whether a unit can cross: (4,9) is impassable river before, and a crossing after.
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh ch04snag (needs a CH04BOOT=1 ROM).
-scenarios.ch04snag = function()
+-- `opts` (recordch04snag): {tag, pid = the swinger, fast = false}; the verdict run passes none
+-- and swings with the first armed unit at fast speed.
+scenarios.ch04snag = function(opts)
+    opts = opts or {}
+    local tag = opts.tag or "ch04snag"
     local SNAG_X, SNAG_Y = 4, 8
     local CROSS_X, CROSS_Y = 4, 9        -- the river row the trunk falls across
     -- TERRAIN_BRIDGE_SNAG (constants/terrains.h). snowy-bern now paints this native terrain with
@@ -8904,10 +9053,10 @@ scenarios.ch04snag = function()
     -- workaround (#24).
     local T_CROSSING = 0x34
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
-    pokeFastConfig()
+    if opts.fast == false then pokeNormalConfig() else pokeFastConfig() end
     waitFor(function() return faction() == 0 and not menuOpen()
         and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
-    log(string.format("ch04snag: before -- snag(%d,%d) terrain=0x%02X  crossing(%d,%d) terrain=0x%02X",
+    log(string.format(tag .. ": before -- snag(%d,%d) terrain=0x%02X  crossing(%d,%d) terrain=0x%02X",
         SNAG_X, SNAG_Y, terrainAt(SNAG_X, SNAG_Y), CROSS_X, CROSS_Y, terrainAt(CROSS_X, CROSS_Y)))
     if terrainAt(CROSS_X, CROSS_Y) == T_CROSSING then
         return result("FAIL", "the crossing is already a bridge before the snag was touched")
@@ -8917,7 +9066,8 @@ scenarios.ch04snag = function()
     local u
     for i = 0, 19 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and not isDead(c) and (c.state & 0x2) == 0 and unitAttackRange(c) then u = c break end
+        if c and not isDead(c) and (c.state & 0x2) == 0 and unitAttackRange(c)
+            and (opts.pid == nil or c.charId == opts.pid) then u = c break end
     end
     if not u then return result("FAIL", "no armed blue unit to swing at the snag") end
     -- Park adjacent to the snag and hit it until the obstacle dies. Its HP is the trap's `extra`,
@@ -8945,9 +9095,9 @@ scenarios.ch04snag = function()
         end
         log(string.format("  swing %d: crossing terrain=0x%02X", swing, terrainAt(CROSS_X, CROSS_Y)))
     end
-    shot("ch04snag")
+    shot(tag)
     local after = terrainAt(CROSS_X, CROSS_Y)
-    log(string.format("ch04snag: after -- snag(%d,%d) terrain=0x%02X  crossing(%d,%d) terrain=0x%02X",
+    log(string.format(tag .. ": after -- snag(%d,%d) terrain=0x%02X  crossing(%d,%d) terrain=0x%02X",
         SNAG_X, SNAG_Y, terrainAt(SNAG_X, SNAG_Y), CROSS_X, CROSS_Y, after))
     if after ~= T_CROSSING then
         return result("FAIL", string.format(
@@ -8958,6 +9108,13 @@ scenarios.ch04snag = function()
         "the snag fell: (%d,%d) is now a bridge -- the river is crossable", CROSS_X, CROSS_Y))
 end
 
+
+-- recordch04snag: the same felling, WATCHED -- Braulo (CHARACTER_EIRIKA, 0x01) swings at normal
+-- speed in a headed window, so the trunk is seen to fall into a bridge (Nicolas, 2026-10-09).
+-- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04snag (needs a CH04BOOT=1 ROM).
+scenarios.recordch04snag = function()
+    return scenarios.ch04snag({ tag = "recordch04snag", pid = 0x01, fast = false })
+end
 -- attackprobe (#204): regression diagnostic for the retired blind-Attack failure. When the engine
 -- saw no target, row 0 was Item and the old bot used a vulnerary at full HP forever. This stages ONE
 -- unit's attack on the CURRENT host chapter and dumps the DATA that decides that row -- the live

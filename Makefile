@@ -40,7 +40,7 @@ all: fireemblem8.gba
 # MONTAGE=1 wires the #43 opening montage (lore crawl on New Game) in place of
 # the dev straight-to-map boot cut. Distribution builds (#37) must set it.
 fireemblem8.gba:
-	python3 tools/build_campaign.py --campaign $(CAMPAIGN) $(if $(MONTAGE),--montage) $(if $(TESTCH),--test-chapter) $(if $(LORDBOOT),--lord-boot) $(if $(CH01BOOT),--ch01-boot) $(if $(CH03BOOT),--ch03-boot) $(if $(CH04BOOT),--ch04-boot) $(if $(CH05BOOT),--ch05-boot) $(if $(CH05LUPIN),--ch05-lupin) $(if $(CH05MOOSE),--ch05-moose) $(if $(CH05ENDING),--ch05-ending=$(CH05ENDING)) $(if $(CH06BOOT),--ch06-boot) $(if $(BENCH),--bench=$(BENCH))
+	python3 tools/build_campaign.py --campaign $(CAMPAIGN) $(if $(MONTAGE),--montage) $(if $(TESTCH),--test-chapter) $(if $(LORDBOOT),--lord-boot) $(if $(CH01BOOT),--ch01-boot) $(if $(CH03BOOT),--ch03-boot) $(if $(CH04BOOT),--ch04-boot) $(if $(CH05BOOT),--ch05-boot) $(if $(CH05LUPIN),--ch05-lupin) $(if $(CH05MOOSE),--ch05-moose) $(if $(CH05ENDING),--ch05-ending=$(CH05ENDING)) $(if $(CH06BOOT),--ch06-boot) $(if $(CH06ENDING),--ch06-ending) $(if $(BENCH),--bench=$(BENCH))
 	python3 tools/compiled_manifest.py forget
 	$(MAKE) -C $(BUILD_TREE) fireemblem8.gba -j$(NPROC)
 	python3 tools/compiled_manifest.py record
@@ -111,8 +111,10 @@ difficulty-gate:
 # build and no emulator (#311). The authoring loop; a scene still gets one real run before
 # it ships.
 #   make scene SCENE=ch05/1     # one scene
-#   make scene SCENE=ch05       # the whole chapter
+#   make scene SCENE=ch05       # the whole chapter, drafts included
 #   make scene                  # every scene the preview knows
+# A `script:` no builder wires yet previews as a DRAFT (chNN/draft-<trigger>), so a dialogue
+# pass reads its lines boxed in any chapter before they are wired.
 # The committed book under docs/scenes/ is regenerated with --write and diffed by
 # tools/test_scene_preview.py, so a wrap or staging regression fails in `make check`.
 scene:

@@ -89,6 +89,11 @@ rom_configs:
     CH05ENDING: basil-died
   ch06boot:
     CH06BOOT: 1
+  # DEBUG boot for ch06's ENDING (#26): New Game straight onto Messie on the ice, both hulls
+  # afloat. ch05endingboot's reason: the honest path is the opening, prep and a boss kill.
+  ch06endingboot:
+    CH06BOOT: 1
+    CH06ENDING: 1
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:

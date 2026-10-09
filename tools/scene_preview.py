@@ -9,6 +9,9 @@ It reads the SHIPPING body. The chapter's own message builders (`ch05_opening_me
 friends) are pure `chap -> [(msg_id, body)]` functions, so the preview calls them and reads
 their output back rather than re-implementing the wrap. A preview that renders a scene its own
 way is a preview that can disagree with the ROM, which would make it worse than nothing.
+
+A script no builder wires yet renders as a DRAFT through the same body code, with default seats
+(see `draft_scenes`), and never enters the golden book.
 """
 import collections
 import os
@@ -19,7 +22,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.cast
 import inject.chapter_ids
 import inject.chapters.ch05
+import inject.chapters.ch06
 import inject.hosting
+import inject.scenes
 import inject.text
 import fe8_talk_font
 
@@ -198,11 +203,37 @@ def _ch05_registry():
     return reg
 
 
-# Which chapter YAML a scene key reads from. ch05 only, and deliberately: ch01-ch04 render
-# their scenes INLINE inside their injectors rather than through pure builders, so covering
-# them means extracting those call sites first (`decisions.md` -> "A scene is readable without
-# a ROM"). ch06 is a row here plus its registry rows.
-CHAPTER_YAML = {'ch05': inject.chapter_ids.CH05_CHAPTER_YAML}
+def _ch06_registry():
+    ids = inject.chapter_ids
+    opening = inject.chapters.ch06.ch06_opening_messages
+    reg = collections.OrderedDict()
+    _claim(reg, 'ch06/opening-hall', 'Bremen: Dorbulgruf hires the party',
+           ids.CH06_OPENING_MSGS[0], opening, TALK, Event('chapter_start', None))
+    _claim(reg, 'ch06/opening-ice', 'on the ice: the boats, the shadows',
+           ids.CH06_OPENING_MSGS[1], opening, TALK, Event('chapter_start', None))
+    _claim(reg, 'ch06/opening-quip', 'the merfolk surface; Meesmickle answers',
+           ids.CH06_OPENING_QUIP_MSG, opening, TALK, Event('chapter_start', None))
+    _claim(reg, 'ch06/messie', 'Messie on the ice', ids.CH06_MESSIE_MSG,
+           inject.chapters.ch06.ch06_messie_messages, TALK, Event('boss_defeated', None))
+    boarding = lambda chap: inject.chapters.ch06.ch06_boarding_wiring(CAMPAIGN, chap)[2]
+    _claim(reg, 'ch06/board-east', "boarding Grynsk's boat: the Antitoxin",
+           ids.CH06_BOAT_TALK_MSGS['boat-east'], boarding, TALK, None)
+    _claim(reg, 'ch06/board-west', "boarding Tali's boat",
+           ids.CH06_BOAT_TALK_MSGS['boat-west'], boarding, TALK, None)
+    return reg
+
+
+# Generic villager faces a chapter borrows for a named NPC, captioned per CHAPTER because the
+# same slot is somebody else elsewhere (ch04's logger also wears VillagerMan3).
+FACE_CAPTIONS = {'ch06': {'VillagerMan3': 'grynsk', 'VillagerGirlBlackHair': 'tali'}}
+
+
+# Which chapter YAML a WIRED scene key reads from. ch01-ch04 render their scenes INLINE inside
+# their injectors rather than through pure builders, so covering them means extracting those
+# call sites first (`decisions.md` -> "A scene is readable without a ROM"). Until then their
+# scripts still preview as DRAFTS (below), which is every chapter's authoring path anyway.
+CHAPTER_YAML = {'ch05': inject.chapter_ids.CH05_CHAPTER_YAML,
+                'ch06': inject.chapter_ids.CH06_CHAPTER_YAML}
 
 _REGISTRY = None
 
@@ -211,7 +242,107 @@ def registry():
     global _REGISTRY
     if _REGISTRY is None:
         _REGISTRY = _ch05_registry()
+        for key, entry in _ch06_registry().items():
+            _claim(_REGISTRY, key, entry.title, entry.msg_id, entry.builder, entry.width,
+                   entry.event)
     return _REGISTRY
+
+
+# ── Drafts: a scene being WRITTEN ─────────────────────────────────────────────────────────
+# A dialogue pass is spent before a scene has a message id or a builder, which is exactly when
+# reading it boxed matters most. So any `script:` on an event no builder wires renders through
+# the SAME code a builder uses (scene_beat_bodies -> _script_to_message), with default seats.
+# Drafts never enter the golden book: that holds shipping bodies only, so what it approves is
+# what the ROM says.
+
+# Seats in order of first appearance: party on the left, the other side on the right.
+DRAFT_SEATS = ('[OpenMidLeft]', '[OpenMidRight]', '[OpenFarLeft]', '[OpenFarRight]',
+               '[OpenLeft]', '[OpenRight]')
+
+
+def _draft_fid(spk):
+    if spk == 'narration':
+        return None
+    for faces in (inject.cast.PORTRAIT_MAP, inject.cast.GUEST_PORTRAIT_MAP):
+        if spk in faces:
+            return inject.text._fid_tag(faces[spk].upper())
+    return '[FID_%s]' % _faceless_tag(spk)   # no face wired yet
+
+
+def _faceless_tag(spk):
+    """A stand-in face tag for a speaker with no portrait yet. The reader's tag grammar has
+    no `-`, so `nobody-yet` is spelled with underscores and captioned back by draft_scenes."""
+    return 'DRAFT_' + spk.replace('-', '_')
+
+
+def _draft_seats(script):
+    seats = {}
+    for entry in script:
+        for key, value in entry.items():
+            # `present:` stages a character who never speaks, and the staging refuses one
+            # with no podium -- so the silent are seated too, by the name they are given.
+            spk = value if key == 'present' else key
+            if spk not in inject.text.SCRIPT_DIRECTIVES and spk != 'narration':
+                seats.setdefault(spk, DRAFT_SEATS[len(seats) % len(DRAFT_SEATS)])
+    return seats
+
+
+def draft_scenes(chapter, chap, wired):
+    """[Scene] for every scripted event in `chap` whose trigger is not in `wired`.
+
+    One scene per message the script will become: a `beat_break` or a `stage_cut` starts a
+    new one, as it does in every builder."""
+    out, names = [], _speakers()
+    events = [ev for ev in chap.get('events') or []
+              if ev.get('script') and ev.get('trigger') not in wired]
+    triggers = collections.Counter(ev.get('trigger') for ev in events)
+    seen = collections.Counter()
+    for ev in events:
+        trigger = ev.get('trigger')
+        seen[trigger] += 1
+        # A trigger can fire more than one scripted event (ch02's two `turn_start`s), and a
+        # key built from the trigger alone let the second silently replace the first.
+        stem = trigger if triggers[trigger] == 1 else '%s.%d' % (trigger, seen[trigger])
+        seats = _draft_seats(ev['script'])
+        names.update({_faceless_tag(spk): spk for spk in seats})
+        _card, beats = inject.scenes._split_script_beats(ev['script'], card_required=False)
+        pieces = []
+        for beat in beats:
+            while any('stage_cut' in e for e in beat):
+                i = next(i for i, e in enumerate(beat) if 'stage_cut' in e)
+                pieces.append(beat[:i])
+                beat = beat[i + 1:]
+            pieces.append(beat)
+        pieces = [p for p in pieces if p]
+        bodies = inject.scenes.scene_beat_bodies(list(range(len(pieces))), pieces, _draft_fid,
+                                                 seats)
+        for n, (_i, body) in enumerate(bodies, 1):
+            key = '%s/draft-%s%s' % (chapter, stem, '-%d' % n if len(pieces) > 1 else '')
+            steps = [s._replace(speaker=names.get(s.face, s.face)) for s in read_scene(body)]
+            width = (fe8_talk_font.SOLO_BOX_BUDGET_PX
+                     if inject.scenes._beat_is_narration(pieces[n - 1]) else TALK)
+            out.append(Scene(key, 'DRAFT of the %s event' % trigger, None, width, steps,
+                             [s for s in steps if s.kind == 'box']))
+    return out
+
+
+def _chapter_files(campaign):
+    d = os.path.join(REPO, 'campaigns', campaign, 'chapters')
+    return {f.split('-')[0]: f for f in sorted(os.listdir(d)) if f.endswith('.yaml')}
+
+
+def drafts(campaign=CAMPAIGN):
+    """key -> Scene for every unwired scripted event in every chapter."""
+    wired = collections.defaultdict(set)
+    for key, entry in registry().items():
+        if entry.event is not None:
+            wired[key.split('/')[0]].add(entry.event.trigger)
+    out = collections.OrderedDict()
+    for chapter, fname in _chapter_files(campaign).items():
+        chap = inject.hosting._load_chapter_yaml(campaign, fname)
+        for scene in draft_scenes(chapter, chap, wired[chapter]):
+            out[scene.key] = scene
+    return out
 
 
 SEAT = {'OpenFarLeft': 'far left', 'OpenMidLeft': 'mid left', 'OpenLeft': 'left',
@@ -230,8 +361,9 @@ def format_scene(scene):
     """
     presses = sum(1 for s in scene.steps if s.kind == 'box')
     out = ['%s  %s' % (scene.key, scene.title),
-           'MSG_%03X  %d A-press%s  %s, %dpx'
-           % (scene.msg_id, presses, '' if presses == 1 else 'es',
+           '%s  %d A-press%s  %s, %dpx'
+           % ('DRAFT (default seats)' if scene.msg_id is None else 'MSG_%03X' % scene.msg_id,
+              presses, '' if presses == 1 else 'es',
               CHANNEL.get(scene.width, 'channel'), scene.width),
            '']
     n = 0
@@ -256,6 +388,10 @@ def format_scene(scene):
 def preview(key, campaign=CAMPAIGN):
     """Render one scene from the chapter YAML: no build, no ROM, no emulator."""
     reg = registry()
+    if key not in reg and '/draft-' in key:
+        found = drafts(campaign)
+        if key in found:
+            return found[key]
     if key not in reg:
         raise KeyError('no such scene %r (have: %s)' % (key, ', '.join(reg)))
     entry = reg[key]
@@ -271,7 +407,7 @@ def preview(key, campaign=CAMPAIGN):
     bodies = {msg_id: built} if isinstance(built, str) else dict(built)
     if msg_id not in bodies:
         raise KeyError('%s builds no MSG_%03X -- the scene moved id' % (key, msg_id))
-    names = _speakers()
+    names = dict(_speakers(), **FACE_CAPTIONS.get(chapter, {}))
     steps = [s._replace(speaker=names.get(s.face, s.face)) for s in read_scene(bodies[msg_id])]
     return Scene(key, title, msg_id, width, steps,
                  [s for s in steps if s.kind == 'box'])
@@ -325,7 +461,9 @@ def main():
     args = ap.parse_args()
     if args.list:
         for key, entry in registry().items():
-            print('%-28s MSG_%03X  %s' % (key, entry.msg_id, entry.title))
+            print('%-34s MSG_%03X  %s' % (key, entry.msg_id, entry.title))
+        for key, scene in drafts(args.campaign).items():
+            print('%-34s DRAFT     %s' % (key, scene.title))
         return 0
     if args.write:
         for chapter in sorted({k.split('/')[0] for k in registry()}):
@@ -341,6 +479,7 @@ def main():
         print(format_scene(preview(args.scene, args.campaign)), end='')
         return 0
     keys = [k for k in registry() if k.split('/')[0] == args.scene]
+    keys += [k for k in drafts(args.campaign) if k.split('/')[0] == args.scene]
     if not keys:
         # Silence and exit 0 is the wrong answer to a typo: `make scene SCENE=ch04` would
         # read as "that chapter has no scenes" rather than "the preview does not know it".

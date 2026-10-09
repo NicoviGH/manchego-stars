@@ -13,11 +13,13 @@ import inject.cast
 import inject.chapter_ids
 import inject.chapters.ch06
 import inject.map_sprites
+import inject.maps
 import inject.recruit
 import inject.text
 import inject.villages
 import inject.decomp
 import inject.hosting
+import inject.terrain
 import inject.units
 from inject import source as injector  # the injector's source, every file of it (#389)
 
@@ -132,8 +134,8 @@ class Opening(unittest.TestCase):
         line = 'LOAD1(0x1, %s)' % inject.chapters.ch06.CH06_LINE_TABLE
         ice = 'Text(0x%X)' % inject.chapter_ids.CH06_OPENING_MSGS[1]
         quip = 'Text(0x%X)' % inject.chapter_ids.CH06_OPENING_QUIP_MSG
-        self.assertLess(block.index(ice), block.index('CAMERA(10, 12)'))
-        self.assertLess(block.index('CAMERA(10, 12)'), block.index(line))
+        self.assertLess(block.index(ice), block.index('CAMERA2(10, 12)'))
+        self.assertLess(block.index('CAMERA2(10, 12)'), block.index(line))
         self.assertLess(block.index(line), block.index(quip))
         with open(inject.chapters.ch06.__file__, encoding='utf-8') as f:
             src = f.read()
@@ -144,6 +146,134 @@ class Opening(unittest.TestCase):
 
     def test_the_lake_shot_is_the_boss_tile(self):
         self.assertEqual(inject.chapters.ch06.ch06_lake_camera_tile(self.chap), (10, 12))
+
+
+class MessieOnTheIce(unittest.TestCase):
+    """The boss_defeated scene (#26): Kyogre's awakening, then the locked script."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.chap = inject.hosting._load_chapter_yaml(cls.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
+        cls.terrain = inject.terrain._map_terrain_grid(
+            os.path.join(inject.decomp.REPO, 'campaigns', cls.CAMPAIGN, 'maps'),
+            inject.chapters.ch06.CH06_LAYOUT[1])[2]
+
+    def test_he_emerges_in_the_bay_and_walks_south_toward_the_cast(self):
+        """Nicolas, 2026-10-09: he appears right where the ice broke, then walks toward the cast
+        lined along the south shore."""
+        surface, target = inject.chapters.ch06.ch06_messie_route(self.chap, self.terrain)
+        bay = {(x, y) for x, y, _m in self.chap['messie']['bay']}
+        self.assertIn(surface, bay)
+        self.assertEqual(surface[0], target[0])
+        self.assertGreater(target[1], surface[1], 'he walks south')
+        _block, tiles = inject.chapters.ch06.ch06_messie_gather(self.chap, self.terrain)
+        self.assertTrue(all(y > target[1] for _x, y in tiles.values()),
+                        'the whole cast stands south of where he stops')
+
+    def test_a_route_he_cannot_walk_is_refused(self):
+        """An unwalkable event MOVE hangs the chapter, so the build refuses it first. Judged by
+        the Gwyllgi's own cost row: it wades a river (cost 5) but not an outcrop (TILE_2E)."""
+        (sx, sy), (tx, ty) = inject.chapters.ch06.ch06_messie_route(self.chap, self.terrain)
+        blocked = [row[:] for row in self.terrain]
+        blocked[sy + (ty > sy) - (ty < sy)][sx + (tx > sx) - (tx < sx)] = 0x2E   # his first step
+        with self.assertRaises(SystemExit):
+            inject.chapters.ch06.ch06_messie_route(self.chap, blocked)
+
+    def test_a_surface_on_dry_ice_is_refused(self):
+        chap = dict(self.chap, messie=dict(self.chap['messie'], surfaces=[9, 12]))
+        with self.assertRaises(SystemExit):
+            inject.chapters.ch06.ch06_messie_route(chap, self.terrain)
+
+    def test_he_appears_on_the_break_then_steps_and_every_step_shakes(self):
+        """The break and his emergence are one beat: nothing between TILECHANGE and his LOAD.
+        Then Kyogre's discrete steps, each shaking the map, and every rumble ends before the cry
+        (EARTHQUAKE_END fades the SE channel)."""
+        block = inject.chapters.ch06.ch06_messie_block(self.chap, self.terrain, 0x11)
+        surface, target = inject.chapters.ch06.ch06_messie_route(self.chap, self.terrain)
+        brk = block.index('TILECHANGE(%d)' % inject.chapters.ch06.CH06_MESSIE_BREAK_ID)
+        load = block.index('LOAD1(0x1, %s)' % inject.chapters.ch06.CH06_MESSIE_TABLE)
+        self.assertEqual(block[brk:load].count('\n'), 1, 'his LOAD follows the break directly')
+        steps = block.count('MOVE_1STEP(')
+        self.assertEqual(target[1] - surface[1], steps)
+        self.assertEqual(steps + 1, block.count('EARTHQUAKE_START'))   # the break + each step
+        self.assertLess(load, block.index('MOVE_1STEP('))
+        self.assertNotIn('MOVE_CLOSEST(', block)                       # no slow slide
+        self.assertLess(block.rindex('EARTHQUAKE_END'), block.index('SOUN(SONG_MS_KYOGRE_CRY)'))
+        self.assertLess(block.index('SOUN('), block.index('TEXTSHOW(0x%X)' % inject.chapter_ids.CH06_MESSIE_MSG))
+
+    def test_the_entrance_is_silent_and_the_theme_returns_on_his_first_words(self):
+        block = inject.chapters.ch06.ch06_messie_block(self.chap, self.terrain, 0x11)
+        self.assertLess(block.index('MUSCMID(SONG_SILENT)'), block.index('EARTHQUAKE_START'))
+        show = block.index('TEXTSHOW(')
+        self.assertLess(show, block.index('MUSCMID(0x11)'))
+        self.assertLess(block.index('MUSCMID(0x11)'), block.index('TEXTCONT'))
+        (msg, body), = inject.chapters.ch06.ch06_messie_messages(self.chap)
+        self.assertLess(body.index('[BreakTalk]'), body.index("I'm listening."))
+
+    def test_the_bay_is_water_and_changes_nothing_else(self):
+        maps = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+        (x0, y0, w, h, tiles, _why), = inject.chapters.ch06.ch06_messie_bay(self.chap, maps)
+        bay = {(x, y): m for x, y, m in self.chap['messie']['bay']}
+        for i, m in enumerate(tiles):
+            x, y = x0 + i % w, y0 + i // w
+            want = bay.get((x, y), inject.maps._read_map_metatile(maps, inject.chapters.ch06.CH06_LAYOUT[1], x, y))
+            self.assertEqual(want, m, (x, y))
+        island = inject.chapters.ch06.ch06_center_island(self.terrain, (10, 12))
+        self.assertTrue({xy for xy in bay if xy in island}, 'the bay cuts into the island')
+
+    def test_the_scene_is_one_message_with_every_speaker_seated(self):
+        (msg, body), = inject.chapters.ch06.ch06_messie_messages(self.chap)
+        self.assertEqual(inject.chapter_ids.CH06_MESSIE_MSG, msg)
+        ev = next(e for e in self.chap['events'] if e['trigger'] == 'boss_defeated')
+        speakers = {k for e in ev['script'] for k in e if k not in inject.text.SCRIPT_DIRECTIVES}
+        self.assertLessEqual(speakers, set(inject.chapters.ch06.CH06_MESSIE_SEATS))
+
+    def test_he_takes_the_centre_island_alone_and_the_whole_cast_rings_it(self):
+        """Nicolas, 2026-10-09: Messie alone on the centre island, every PC around it."""
+        block, tiles = inject.chapters.ch06.ch06_messie_gather(self.chap, self.terrain)
+        island = inject.chapters.ch06.ch06_center_island(self.terrain, (10, 12))
+        self.assertEqual({(9, 11), (10, 11), (11, 11), (9, 12), (10, 12), (10, 13)}, island)
+        self.assertFalse(set(tiles.values()) & island)
+        cast, _ = inject.cast._classed_cast(self.CAMPAIGN, available_at=6)
+        self.assertEqual({row[0] for row in cast}, set(tiles))
+        self.assertNotRegex(block, r'MOVE\w*\(\w+, CHARACTER_')   # LOADed, never MOVEd (ADR 0292)
+        first_load = block.index('LOAD1(')
+        for x, y in island:
+            self.assertIn('_EvtParams2(%d, %d)' % (x, y), block[:first_load])
+
+    def test_nobody_outside_the_army_is_loaded_into_it(self):
+        """A LOAD of someone not in the army CREATES them (review, #470): every member is
+        LOADed behind its own CHECK_EXISTS, so a Sahnar never turned stays away."""
+        block, tiles = inject.chapters.ch06.ch06_messie_gather(self.chap, self.terrain)
+        self.assertEqual(len(tiles), block.count('CHECK_EXISTS('))
+        self.assertEqual(len(tiles), block.count('LOAD1('))
+        for uid in tiles:
+            check = 'CHECK_EXISTS(CHARACTER_%s)' % inject.cast.PORTRAIT_MAP[uid].upper()
+            self.assertIn(check, block, uid)
+
+    def test_a_spare_beside_the_scene_is_refused(self):
+        """MOVE_CLOSEST drops the cleared on the free cell nearest the spare (review, #470)."""
+        gather = dict(self.chap['messie']['gather'], spare=[6, 12])
+        chap = dict(self.chap, messie=dict(self.chap['messie'], gather=gather))
+        with self.assertRaises(SystemExit):
+            inject.chapters.ch06.ch06_messie_gather(chap, self.terrain)
+
+    def test_the_merfolk_are_gone_before_the_screen_returns(self):
+        block, _tiles = inject.chapters.ch06.ch06_messie_gather(self.chap, self.terrain)
+        self.assertLess(block.index('CLEE'), block.index('FADU'))
+
+    def test_a_cast_member_on_his_island_is_refused(self):
+        gather = dict(self.chap['messie']['gather'], braulo=[10, 11])
+        chap = dict(self.chap, messie=dict(self.chap['messie'], gather=gather))
+        with self.assertRaises(SystemExit):
+            inject.chapters.ch06.ch06_messie_gather(chap, self.terrain)
+
+    def test_the_scene_plays_before_the_victory_sting(self):
+        with open(inject.chapters.ch06.__file__, encoding='utf-8') as f:
+            src = f.read()
+        self.assertLess(src.index('ch06_messie_block(chap, terrain,'), src.index("MUSC(SONG_VICTORY)"))
 
 
 class MerfolkSurface(unittest.TestCase):

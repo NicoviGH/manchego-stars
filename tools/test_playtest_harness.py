@@ -400,7 +400,7 @@ class TestPlaytestHarness(unittest.TestCase):
 
     def test_ch04snag_accepts_the_native_fallen_snag_crossing(self):
         harness = _read_harness()
-        body = _block(harness, 'scenarios.ch04snag = function()', '\n-- attackprobe')
+        body = _block(harness, 'scenarios.ch04snag = function(opts)', '\n-- recordch04snag')
         self.assertIn('local T_CROSSING = 0x34', body,
                       'the painted center metatile uses TERRAIN_BRIDGE_SNAG; the playtest '
                       'must not retain the old generic-bridge workaround')

@@ -91,6 +91,12 @@ BACKGROUNDS_H = os.path.join(DECOMP, 'include', 'constants', 'backgrounds.h')
 
 BG_GFX_DIR = os.path.join(DECOMP, 'graphics', 'bg')
 
+# Campaign sound effects (tools/inject/sounds.py).
+SONG_TABLE_S = os.path.join(DECOMP, 'sound', 'song_table.s')
+DIRECT_SOUND_DATA_S = os.path.join(DECOMP, 'sound', 'direct_sound_data.s')
+SONGS_H = os.path.join(DECOMP, 'include', 'constants', 'songs.h')
+SOUND_SAMPLE_DIR = os.path.join(DECOMP, 'sound', 'direct_sound_samples')
+
 # World-map tour (#43): the two Icewind Dale drawn maps ride the WM_SHOWDRAWNMAP
 # slot (worldmap_rm.c GmapRm_StartUpdateDirect).
 WORLDMAP_RM_C = os.path.join(DECOMP, 'src', 'worldmap_rm.c')

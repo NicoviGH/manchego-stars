@@ -485,6 +485,43 @@ def terrain_impact(maps_root, tileset, metatiles):
     return out
 
 
+_QUARTERS = {'TL': 0, 'TR': 1, 'BL': 2, 'BR': 3}
+
+
+def compose_metatile(tileset_dir, metatile, quarters, terrain):
+    """Build metatile `metatile` out of other metatiles' QUARTERS, each optionally flipped.
+
+    `quarters` is four specs in TL, TR, BL, BR order, each `<source>:<quarter>[:h][:v]` --
+    `596:BL:v` is metatile 596's bottom-left 8x8 tile, flipped vertically. No pixel is painted
+    and no tile id is claimed: a composed metatile only re-points at the artist's own tiles,
+    which is how a shape the tileset lacks (a river that opens north where every dead end
+    opens south) is made out of its own edges. Writes the terrain byte too, and refuses a
+    slot already in use, so a composition can never restyle a metatile a map relies on.
+    """
+    if len(quarters) != 4:
+        raise ValueError('a metatile is four quarters (TL, TR, BL, BR), got %d' % len(quarters))
+    name = os.path.basename(tileset_dir.rstrip('/'))
+    path = os.path.join(tileset_dir, name + '.bin')
+    with open(path, 'rb') as f:
+        blob = bytearray(f.read())
+    if blob[8192 + metatile]:      # unused is TERRAIN_NONE (tilesets_are_compatible_variants)
+        raise ValueError('metatile %d is in use; compose into an empty slot' % metatile)
+    entries = []
+    for spec in quarters:
+        parts = spec.split(':')
+        source, quarter, flags = int(parts[0]), _QUARTERS[parts[1]], set(parts[2:])
+        if flags - {'h', 'v'}:
+            raise ValueError('unknown flip in %r (h, v)' % spec)
+        entry = struct.unpack_from('<H', blob, source * 8 + quarter * 2)[0]
+        entry ^= (0x400 if 'h' in flags else 0) | (0x800 if 'v' in flags else 0)
+        entries.append(entry)
+    struct.pack_into('<4H', blob, metatile * 8, *entries)
+    blob[8192 + metatile] = terrain
+    with open(path, 'wb') as f:
+        f.write(blob)
+    return entries
+
+
 def paint_metatile(tileset_dir, metatile, png_path, bank, terrain=None,
                    write_bank=False):
     """Paint one 16x16 PNG into a vendored tileset without touching shared tiles.
@@ -660,6 +697,12 @@ if __name__ == '__main__':
     p.add_argument('--bank', type=int, required=True)
     p.add_argument('--terrain', type=lambda value: int(value, 0))
     p.add_argument('--write-bank', action='store_true')
+    k = sub.add_parser('compose-metatile', help='build an empty metatile slot out of other '
+                       'metatiles\' quarters, flipped as given (no new art)')
+    k.add_argument('tileset_dir')
+    k.add_argument('metatile', type=int)
+    k.add_argument('quarters', nargs=4, help='TL TR BL BR, each <source>:<TL|TR|BL|BR>[:h][:v]')
+    k.add_argument('--terrain', type=lambda value: int(value, 0), required=True)
     t = sub.add_parser('set-terrain', help='change only the TERRAIN byte of metatiles '
                        '(art untouched); prints the blast radius first')
     t.add_argument('tileset_dir')
@@ -692,6 +735,8 @@ if __name__ == '__main__':
                 print('  WROTE %4d: 0x%02X -> 0x%02X' % (metatile, before, after))
         else:
             print('  (report only -- pass --apply to write)')
+    elif args.cmd == 'compose-metatile':
+        print(compose_metatile(args.tileset_dir, args.metatile, args.quarters, args.terrain))
     elif args.cmd == 'paint-metatile':
         print(paint_metatile(args.tileset_dir, args.metatile, args.png,
                              bank=args.bank, terrain=args.terrain,

@@ -95,6 +95,11 @@ def parse_args(argv=None):
                          '(scene 17). Reaching the ending honestly is the whole opening, '
                          'Preparations and a boss kill, and there are three of these to look '
                          'at.')
+    ap.add_argument('--ch06-ending', action='store_true',
+                    help='DEBUG build (#26): with --ch06-boot, New Game lands straight on the '
+                         'ENDING -- Messie on the ice, then the payout -- with both hulls '
+                         'afloat. Reaching it honestly is the opening, Preparations and a boss '
+                         'kill across the lake.')
     ap.add_argument('--ch05-lupin', action='store_true',
                     help='PLAYTEST build (#25): with --ch05-boot, LOAD Lupin onto the roster '
                          'before ch05\'s opening so scene 4\'s CHECK_ALIVE branch takes its '
@@ -114,6 +119,10 @@ def parse_args(argv=None):
     if args.ch05_ending and args.ch05_moose:
         sys.exit('ERROR: --ch05-ending and --ch05-moose both REPLACE ch05\'s beginning script, '
                  'so only one can win. Pick the beat you mean to look at.')
+    if args.ch06_ending and not args.ch06_boot:
+        sys.exit('ERROR: --ch06-ending only means anything with --ch06-boot: it SKIPS '
+                 'Preparations, so the boot seed is the only thing left that puts a party on '
+                 'the map -- and the ending hands its reward to the party LEADER.')
     if args.ch05_lupin and not args.ch05_boot:
         sys.exit('ERROR: --ch05-lupin only means anything with --ch05-boot: it exists to make '
                  'the opening branch\'s ALIVE arm reachable from a COLD boot.')
@@ -125,6 +134,7 @@ def parse_args(argv=None):
                         'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot,
                         'CH05LUPIN': args.ch05_lupin, 'CH05MOOSE': args.ch05_moose,
                         'CH05ENDING': args.ch05_ending, 'CH06BOOT': args.ch06_boot,
+                        'CH06ENDING': args.ch06_ending,
                         'BENCH': args.bench}
     if args.lord_boot:
         args.test_chapter = True  # the fast-boot rides the sandbox

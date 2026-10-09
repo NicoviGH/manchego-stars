@@ -639,6 +639,7 @@ playtest:
     - {name: ch04moose,          proves: the White Moose reaches its pen and the hunt fires, lua: ch04moose}
     - {name: ch04packmath,       proves: the wolf pack's converted count matches the roster, lua: ch04packmath}
     - {name: ch04snag,           proves: felling the snag turns the river row into a crossing, lua: ch04snag}
+    - {name: recordch04snag,     proves: "Braulo fells the snag on film, and the trunk becomes the bridge", lua: recordch04snag, kind: record}
     - {name: clear_ch04_parley,  proves: the parley route clears the chapter, lua: clear_ch04_parley}
     - {name: smoke_ch04,         proves: ch04 boots and survives a long soak, lua: smoke_ch04}
     - {name: clear_ch04,         proves: ch04 routs via real combat, lua: clear_ch04}
