@@ -40,7 +40,7 @@ all: fireemblem8.gba
 # MONTAGE=1 wires the #43 opening montage (lore crawl on New Game) in place of
 # the dev straight-to-map boot cut. Distribution builds (#37) must set it.
 fireemblem8.gba:
-	python3 tools/build_campaign.py --campaign $(CAMPAIGN) $(if $(MONTAGE),--montage) $(if $(TESTCH),--test-chapter) $(if $(LORDBOOT),--lord-boot) $(if $(CH01BOOT),--ch01-boot) $(if $(CH03BOOT),--ch03-boot) $(if $(CH04BOOT),--ch04-boot) $(if $(CH05BOOT),--ch05-boot) $(if $(CH05LUPIN),--ch05-lupin) $(if $(CH05MOOSE),--ch05-moose) $(if $(CH05ENDING),--ch05-ending=$(CH05ENDING)) $(if $(CH06BOOT),--ch06-boot) $(if $(CH06ENDING),--ch06-ending) $(if $(BENCH),--bench=$(BENCH))
+	python3 tools/build_campaign.py --campaign $(CAMPAIGN) $(if $(MONTAGE),--montage) $(if $(TESTCH),--test-chapter) $(if $(LORDBOOT),--lord-boot) $(if $(CH01BOOT),--ch01-boot) $(if $(CH03BOOT),--ch03-boot) $(if $(CH04BOOT),--ch04-boot) $(if $(CH05BOOT),--ch05-boot) $(if $(CH05LUPIN),--ch05-lupin) $(if $(CH05MOOSE),--ch05-moose) $(if $(CH05ENDING),--ch05-ending=$(CH05ENDING)) $(if $(CH06BOOT),--ch06-boot) $(if $(CH06ENDING),--ch06-ending) $(if $(SOUNDROOM),--sound-room-audition) $(if $(BENCH),--bench=$(BENCH))
 	python3 tools/compiled_manifest.py forget
 	$(MAKE) -C $(BUILD_TREE) fireemblem8.gba -j$(NPROC)
 	python3 tools/compiled_manifest.py record

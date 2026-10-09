@@ -82,6 +82,9 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # battle_terrain_table + the terrain->ground remap (snow chapters)
                         'src/banim_terrain_data.c', 'data/data_banim_terrain.s',
                         'src/data_terrains.c', 'src/banim-battleparse.c', 'include/variables.h',
+                        # the Sound Room audition patch (SOUNDROOM=1, a debug build): restored
+                        # so it can never leak into the next shipping build
+                        'src/soundroom.c',
                         # nat-20 crit flourish (#11): efx proc hook + asset incbins
                         'src/banim-efxhit.c', 'data/data_banim.s',
                         # Goodberry (#21): vulnerary icon swapped by inject_item_icons
