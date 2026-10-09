@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regenerate the ch00 guest vendor busts from the vendored FE-Repo sheets.
+"""Regenerate the guest vendor busts from the vendored FE-Repo sheets.
 
   python3 campaigns/rime-of-the-frostmaiden/portraits/guest_vendor_busts.py
 
@@ -18,6 +18,11 @@ Both community mugs keep their original art; the transforms are mechanical:
       quest-giver; book p.34 Foaming Mugs). Sympathetic "please help us" read
       picked over the canon scarf-wrapped look on 2026-06-16 (Nicolas's call for
       a one-chapter NPC); auburn hair reads as a dwarf. Cynon's mug is [F2E].
+* dorbulgruf <- vendor/Fargus (FE8 Colours) {Eldritch Abomination} [F2E].png
+    - 96x80 main-mug crop
+    - royal-purple coat -> muted plum (Nicolas's pick of four, 2026-10-08). Speaker
+      Dorbulgruf Shalescar of Bremen, an old shield-dwarf: the grey beard is what
+      reads as a dwarf at bust size. Hires the party in ch06, ch07's boss.
 
 Output format is the bust-pipeline contract: 96x80 indexed PNG, <=16 colors,
 index 0 = the transparent background.
@@ -36,6 +41,12 @@ HRUNA_RECOLOR = {
     (80, 88, 144):   (88, 106, 66),
     (56, 64, 80):    (54, 68, 44),
     (40, 80, 104):   (54, 68, 44),   # merge teal accent into the deep coat shadow
+}
+
+DORBULGRUF_RECOLOR = {
+    # royal-purple coat -> muted plum; the purple-black outline is kept
+    (132, 82, 173): (122, 98, 140),
+    (99, 41, 148):  (88, 64, 108),
 }
 
 HLIN_RECOLOR = {
@@ -91,6 +102,15 @@ def main():
         mug[(mug == src).all(axis=-1)] = dst
     out = os.path.join(HERE, 'hruna.png')
     to_indexed(Image.fromarray(mug), (160, 192, 144)).save(out)
+    print('-> %s' % out)
+
+    sheet = Image.open(os.path.join(
+        VENDOR, 'Fargus (FE8 Colours) {Eldritch Abomination} [F2E].png')).convert('RGB')
+    mug = np.array(sheet.crop((0, 0, 96, 80)))
+    for src, dst in DORBULGRUF_RECOLOR.items():
+        mug[(mug == src).all(axis=-1)] = dst
+    out = os.path.join(HERE, 'dorbulgruf.png')
+    to_indexed(Image.fromarray(mug), (160, 200, 152)).save(out)
     print('-> %s' % out)
 
 

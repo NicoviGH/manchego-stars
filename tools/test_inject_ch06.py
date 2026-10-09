@@ -14,6 +14,7 @@ import inject.chapter_ids
 import inject.chapters.ch06
 import inject.map_sprites
 import inject.recruit
+import inject.text
 import inject.villages
 import inject.decomp
 import inject.hosting
@@ -99,6 +100,99 @@ class MessieWearsHisOwnArt(unittest.TestCase):
         sheet glides on its idle the way the cast do, instead of failing the build."""
         body = injector.def_source('_inject_scripted_neutral_sprites')
         self.assertIn('synth_mu_sheet', body)
+
+
+class Opening(unittest.TestCase):
+    """The locked chapter_start script, wired: beat A over backdrops, beat B on the ice (#26)."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.chap = inject.hosting._load_chapter_yaml(cls.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
+
+    def test_the_script_splits_into_hall_ice_and_quip(self):
+        card, beats = inject.chapters.ch06.ch06_opening_beats(self.chap)
+        self.assertEqual(card, 'Bremen')
+        self.assertEqual([inject.text._script_box_count(b) for b in beats], [24, 7, 1])
+        self.assertEqual(list(beats[2][0]), ['meesmickle'])
+
+    def test_every_speaker_has_a_seat(self):
+        _card, (hall, ice, quip) = inject.chapters.ch06.ch06_opening_beats(self.chap)
+        speakers = lambda beat: {k for e in beat for k in e
+                                 if k not in inject.text.SCRIPT_DIRECTIVES}
+        self.assertLessEqual(speakers(hall), set(inject.chapters.ch06.CH06_OPENING_HOME))
+        self.assertLessEqual(speakers(ice) | speakers(quip),
+                             set(inject.chapters.ch06.CH06_OPENING_ICE_SEATS))
+
+    def test_the_merfolk_load_in_beat_B_after_the_pan(self):
+        """They surface on screen, so they cannot be on the map at prep, and they must arrive
+        between the two halves of beat B -- after the camera reaches the lake, before the quip."""
+        block = inject.chapters.ch06.ch06_opening_ice_block((7, 1), (10, 12))
+        line = 'LOAD1(0x1, %s)' % inject.chapters.ch06.CH06_LINE_TABLE
+        ice = 'Text(0x%X)' % inject.chapter_ids.CH06_OPENING_MSGS[1]
+        quip = 'Text(0x%X)' % inject.chapter_ids.CH06_OPENING_QUIP_MSG
+        self.assertLess(block.index(ice), block.index('CAMERA(10, 12)'))
+        self.assertLess(block.index('CAMERA(10, 12)'), block.index(line))
+        self.assertLess(block.index(line), block.index(quip))
+        with open(inject.chapters.ch06.__file__, encoding='utf-8') as f:
+            src = f.read()
+        beginning = src[src.index("beginning = ('{"):]
+        before_prep = beginning[:beginning.index('CALL(%s)')]
+        self.assertNotIn('CH06_LINE_TABLE', before_prep,
+                         'the merfolk line is LOADed before prep again')
+
+    def test_the_lake_shot_is_the_boss_tile(self):
+        self.assertEqual(inject.chapters.ch06.ch06_lake_camera_tile(self.chap), (10, 12))
+
+
+class MerfolkSurface(unittest.TestCase):
+    """Beat B: the line LOADs on the channels and walks to its YAML posts (#26)."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+    W, L = 0x10, 0x01   # TERRAIN_RIVER, TERRAIN_PLAINS
+    COSTS = {0x10: -1, 0x01: 1}
+
+    def costs(self):
+        row = [-1] * 0x40
+        for terrain, cost in self.COSTS.items():
+            row[terrain] = cost
+        return row
+
+    def test_the_nearest_water_at_least_two_steps_out_wins(self):
+        W, L = self.W, self.L
+        terrain = [[W, L, L, L],
+                   [L, L, L, W]]
+        out = inject.chapters.ch06.surface_spawns(terrain, [('a', (2, 0), self.costs())])
+        # Both waters are two steps out ((0,0) via (1,0); (3,1) via (3,0)). Ties break on the
+        # tile, so the pick is deterministic.
+        self.assertEqual(out['a'], (0, 0))
+
+    def test_a_spawn_is_never_shared(self):
+        W, L = self.W, self.L
+        terrain = [[W, L, L, L, L]]
+        out = inject.chapters.ch06.surface_spawns(
+            terrain, [('a', (2, 0), self.costs()), ('b', (3, 0), self.costs())])
+        self.assertEqual(out['a'], (0, 0))
+        self.assertIsNone(out['b'])     # the only water is taken: b appears where it stands
+
+    def test_water_is_never_walked_THROUGH(self):
+        W, L = self.W, self.L
+        terrain = [[L, W, W, L]]        # (0,0) is cut off from (3,0) by two channel tiles
+        out = inject.chapters.ch06.surface_spawns(terrain, [('a', (3, 0), self.costs())])
+        self.assertEqual(out['a'], (2, 0))
+
+    def test_every_line_unit_surfaces_and_walks_to_its_post(self):
+        chap = inject.hosting._load_chapter_yaml(self.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
+        maps = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+        spawns = inject.chapters.ch06.ch06_line_spawns(chap, maps)
+        self.assertTrue(spawns)
+        self.assertEqual([k for k, v in spawns.items() if v is None], [])
+        rows = inject.chapters.ch06.ch06_enemy_rows(chap, spawns=spawns)
+        self.assertTrue(all('.redaCount = 1,' in r for r in rows))
+        # ...and the Difficult wave is untouched: it arrives on turn 4, by its own road.
+        wave = inject.chapters.ch06.ch06_enemy_rows(chap, arrives_turn=4)
+        self.assertTrue(all('.redaCount = 0,' in r for r in wave))
 
 
 class BoardingPass(unittest.TestCase):

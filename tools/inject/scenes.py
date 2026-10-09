@@ -78,6 +78,23 @@ def _split_event_beats(chap, trigger, err_label, msg_ids=None, card_required=Tru
     return card, beats
 
 
+def split_on_stage_cut(script, where):
+    """Split a cutscene script at its `stage_cut:` into (before, direction, after).
+
+    One directive, two messages, and the second id is what a SCENE CHANGE costs. See
+    SCRIPT_DIRECTIVES for why a `stage_break` cannot do this job.
+    """
+    cuts = [i for i, e in enumerate(script) if 'stage_cut' in e]
+    if len(cuts) != 1:
+        sys.exit('ERROR: %s needs exactly ONE `stage_cut:`; found %d' % (where, len(cuts)))
+    i = cuts[0]
+    before, after = script[:i], script[i + 1:]
+    if not before or not after:
+        sys.exit('ERROR: %s has a `stage_cut:` with nothing on one side of it -- a cut between '
+                 'a beat and nothing is just the end of the beat' % where)
+    return before, script[i]['stage_cut'], after
+
+
 def _cutscene_fid(spk, special, err_label, fallback=None):
     """Speaker id -> face tag for a chapter cutscene: the chapter's `special` speakers
     first (guest slots, faceless `narration` -> None), then the PC PORTRAIT_MAP, then
