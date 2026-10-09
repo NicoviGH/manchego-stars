@@ -148,6 +148,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # sample data + song, and the SONG_MS_* names
                         'sound/song_table.s', 'sound/direct_sound_data.s',
                         'include/constants/songs.h',
+                        # engine patch 0017 (silent text): the three typing-sound call sites
+                        'src/scene.c', 'src/cgtext.c', 'src/helpbox.c',
                         # world-map tour (#43): drawn-map selector patched in by
                         # inject_world_tour on MONTAGE=1 builds
                         'src/worldmap_rm.c',

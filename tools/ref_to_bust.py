@@ -140,6 +140,67 @@ def _pngquant_quantize(img, m, ncolors=16):
     return out, keep.reshape(-1).tolist()
 
 
+# Cel mode: the ink lines of a clean cel-shaded ref, as a fraction of each target pixel's area,
+# above which that pixel is drawn as ink. Low enough that a source line thinner than one target
+# pixel still lands as a continuous 1px line instead of breaking into dots.
+CEL_INK_COVERAGE = 0.22
+CEL_INK_LUMA = 200          # summed RGB below which a source pixel is ink
+CEL_FG_COVERAGE = 0.45      # fraction of a target pixel that must be subject to keep it
+
+
+def _cel_downscale(hires, fgh):
+    """96x80 indexed bust for a flat cel-shaded ref, as cleanly as the downscale allows.
+
+    The default path resamples twice with Lanczos and lets pngquant dither: right for painted
+    refs, wrong for flat ones, where Lanczos rings at every hard edge and the dither scatters
+    speckle across flat colour. Here instead: ONE area-average to target (no ringing); a palette
+    chosen at 4x target, where the art's flat colours outnumber the anti-aliased edge blends
+    that would otherwise spend palette slots; every pixel snapped to it with no dither; and the
+    ink lines rebuilt from the source's own dark pixels by area coverage, so a thin line stays
+    one continuous pixel wide (Nicolas, 2026-10-09: "make the descale as clean as possible").
+    """
+    a = np.asarray(hires.convert('RGB')).astype(int)
+    ink = (a.sum(2) < CEL_INK_LUMA) & fgh
+
+    def cover(mask, size):
+        return np.asarray(Image.fromarray((mask * 255).astype('uint8')).resize(size, Image.BOX)) / 255.0
+
+    ink_cover = cover(ink, (BUST_W, BUST_H))
+    # A pixel the outline crosses is subject even where the line is thinner than half a pixel:
+    # keyed on fg coverage alone, the outer outline vanished wherever it was thinnest (Messie's
+    # nose, 2026-10-09).
+    m = (cover(fgh, (BUST_W, BUST_H)) >= CEL_FG_COVERAGE) | (ink_cover >= CEL_INK_COVERAGE)
+    small = np.asarray(hires.resize((BUST_W, BUST_H), Image.BOX).convert('RGB')).astype(int)
+    mid = hires.resize((BUST_W * 4, BUST_H * 4), Image.BOX)
+    m4 = cover(fgh, mid.size) >= 0.99
+    rgba = np.dstack([np.asarray(mid.convert('RGB')), np.where(m4, 255, 0).astype('uint8')])
+    with tempfile.NamedTemporaryFile(suffix='.png') as fi, \
+         tempfile.NamedTemporaryFile(suffix='.png') as fo:
+        Image.fromarray(rgba).save(fi.name)
+        subprocess.run(['pngquant', '16', '--nofs', '--force', '--output', fo.name, fi.name],
+                       check=True)
+        q = np.asarray(Image.open(fo.name).convert('RGBA'))
+    cols = q[..., :3][q[..., 3] >= 128]
+    uniq, counts = np.unique(cols, axis=0, return_counts=True)
+    pal = uniq[np.argsort(counts)[::-1][:15]].astype(int)
+    out = np.zeros((BUST_H, BUST_W), int)
+    d = ((small[m][:, None, :] - pal[None]) ** 2).sum(2)
+    out[m] = d.argmin(1) + 1
+    inked = (ink_cover >= CEL_INK_COVERAGE) & m
+    # The silhouette is always inked, FE-portrait style: a ref may rim-light an edge instead of
+    # outlining it (Messie's snout), and a pale rim reads as no edge at 96x80. Off-frame counts
+    # as subject, so a neck cut by the frame gets no line across the cut.
+    pad = np.pad(m, 1, constant_values=True)
+    edge = m & ~(pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:])
+    inked |= edge
+    out[inked] = int(pal.sum(1).argmin()) + 1
+    res = Image.new('P', (BUST_W, BUST_H))
+    flat = pal.reshape(-1).tolist()
+    res.putpalette([0, 255, 0] + flat + [0] * (768 - 3 - len(flat)))
+    res.putdata(out.flatten().tolist())
+    return res
+
+
 def sample_pixel_grid(img, cell, origin=0):
     """A pixel-art ref saved large (and often as a JPEG) -> its NATIVE grid, one sample per
     cell centre. Every later step then sees the artist's flat colours, never compression
@@ -182,7 +243,7 @@ def retint_ramp(img, dark, light, select, blend=None):
     return Image.fromarray((a * 255).round().astype('uint8'))
 
 
-def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None):
+def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None, cel=False):
     src = Image.open(ref_path).convert('RGB')
     src, crop_box = _zoom_out(src, crop_box, zoom)
     src, crop_box = _pad_to_box(src, crop_box)
@@ -230,6 +291,9 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None)
         # edge blends outline into outline and stays clean.
         bgm = Image.fromarray((conn * 255).astype('uint8')).resize(hires.size, Image.NEAREST)
         hires.paste(Image.new('RGB', hires.size, tuple(matte)), (0, 0), bgm)
+    if cel:
+        fgh = np.asarray(Image.fromarray((fg * 255).astype('uint8')).resize(hires.size, Image.NEAREST)) > 127
+        return _cel_downscale(hires, fgh)
     img = hires.resize((BUST_W * 2, BUST_H * 2), Image.BOX).resize((BUST_W, BUST_H), Image.LANCZOS)
     if sharpen:
         img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=sharpen, threshold=1))

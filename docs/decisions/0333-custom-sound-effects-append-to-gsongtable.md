@@ -26,12 +26,25 @@ linker script already lists, so no new object needs placing. The voice sits at b
 the song plays Cn3, so the sample sounds at its recorded rate. It plays on player 6, where
 vanilla's monster cries sit, so it neither stops the chapter's music nor gets cut by a menu blip.
 
-**Staging** (`ch06_messie_block`), in Sapphire's order (pokeruby `CaveOfOrigin_B4F`): the music
-ducks, the ice cracks under a map shake with its rumble, the rumble ENDS (EARTHQUAKE_END fades
-the SE channel, and ch05's moose showed a rumble and a cry cannot overlap), Messie surfaces in
-open water and hauls himself two tiles onto Nerra's tile at a quarter of walking speed, a held
-second, the cry, then the scene. His route is checked against the Gwyllgi's own movement-cost
-row at build time, because an unwalkable event MOVE hangs the chapter.
+**Staging** (`ch06_messie_gather`, `ch06_messie_block`), in Sapphire's order (pokeruby
+`CaveOfOrigin_B4F`), reworked with Nicolas on film (2026-10-09):
+- Nerra falls and the screen fades. The merfolk scatter (`CLEE`), and the whole roster is
+  LOADed onto the centre island's south shore, facing north. Only the members actually in the
+  army are LOADed, each behind `CHECK_EXISTS`, because a LOAD of an absent character creates
+  one.
+- The music ducks and the camera centres on the whole scene (`CAMERA2`; plain `CAMERA` only
+  scrolls a tile on screen).
+- The ice rumbles, then breaks open into a bay cut into the island's north shoulder (a
+  MapChange, `TILECHANGE`). Messie appears in it on the same beat.
+- He walks south toward the cast in discrete steps, the map shaking under each one.
+- A held second, then the cry, then the scene.
+
+The bay is built only from the tileset's own river art. Curve and junction tiles are flipped or
+mirrored into free slots with `map_tileset_tool.py compose-metatile`, and the bay's metatiles
+are declared in the chapter YAML. Each rumble ends before the next sound, because
+`EARTHQUAKE_END` fades the SE channel, and ch05's moose showed that a rumble and a cry cannot
+overlap. His route is checked against the Gwyllgi's own movement-cost row at build time,
+because an unwalkable event MOVE hangs the chapter.
 
 | Element | Source |
 |---|---|

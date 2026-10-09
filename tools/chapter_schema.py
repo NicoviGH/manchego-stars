@@ -88,7 +88,8 @@ CHAPTER = {
     'signature_moments': [{'pc': ANY, 'trigger': ANY}],
     'introduces': [{'concept': ANY, 'coverage': ANY, 'status': ANY, 'where': ANY}],
     'messie': {'appears_in': ANY, 'art': ANY, 'art_note': ANY, 'name': ANY, 'pronouns': ANY, 'role': ANY,
-               'surfaces': ANY, 'gather': ANY, 'bay': ANY},
+               'surfaces': ANY, 'gather': ANY, 'bay': ANY,
+               'walks_to': ANY},
     'soft_penalty_on_chwinga_loss': {'description': ANY},
     'charm_gifts': {'note': ANY},
     # the map

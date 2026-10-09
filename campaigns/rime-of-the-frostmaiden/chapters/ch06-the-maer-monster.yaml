@@ -834,10 +834,9 @@ events:
       THE CHAPTER, and it stays LOCAL to Bremen (Nicolas, 2026-10-08). Beats LOCKED 2026-10-09
       (dialogue-pass, with Nicolas), ~27 boxes on the map:
       A. He surfaces, staged on Kyogre's Cave of Origin awakening (pokeruby
-         CaveOfOrigin_B4F): the whole cast on the shores around the centre island; Messie rises
-         in the north channel and comes south in discrete steps that shake the map; the
-         island's ice breaks open into a bay and he crawls out onto Nerra's tile; a held beat,
-         his cry. Braulo, RBG and Wolfram raise their weapons, still in fight mode: the player
+         CaveOfOrigin_B4F): the whole cast lined along the centre island's south shore; the
+         island's ice breaks open into a bay and Messie emerges in it on the same beat; he walks
+         south toward them in discrete steps that shake the map; a held beat, his cry. Braulo, RBG and Wolfram raise their weapons, still in fight mode: the player
          is braced for the boss.
       B. Marty coughs his spores and casts speak with animals, assuming a beast. Messie answers
          in Common, "I'm listening." (book p.31); the awaken spell gave him language (p.28).
@@ -863,11 +862,16 @@ events:
       - braulo: "There it is. It's magnificent."
       - prof-rbg: "Pinky, stand behind me. This one's a rather big cheese."
       - wolfram: "(sniffs) No iron on it. Just teeth. A lot of teeth."
+      # (Wolfram's face fades out: he shares the right side with Messie, who has it to himself
+      #  from his first line (Nicolas, 2026-10-09).)
+      - exits: wolfram
       - braulo: "Steady. Let it come to us."
       # ── B: Marty's spell ──
       # (Marty steps forward, coughs his spores and casts speak with animals: he expects a beast.
       #  The answer comes back in Common, and the fighters' awe starts here (Nicolas, 2026-10-09).)
       - marty: "We mean you no harm, old one. May we speak? I have goodberries, if you're hungry."
+      # (The entrance plays in silence; the chapter's theme comes back on his first words.)
+      - stage_break: "the music returns as Messie speaks"
       - messie: "I'm listening."
       - prof-rbg: "Good gouda. It's intelligent."
       - braulo: "Intelligent... It ruled these waters before the first keel touched them."
@@ -927,11 +931,11 @@ messie:
                                 # say "it"; an earlier draft of this file said "she" throughout.
   role: cutscene_actor
   appears_in: events/ch06-messie.ea
-  # Where he comes up: the north channel, in line with Nerra's tile, so he comes at the centre
-  # head-on and the cast flanks his path (Nicolas, 2026-10-09: "more dramatic and symmetric").
-  # He walks Kyogre's discrete steps south, the map shaking under each; the island's ice breaks
-  # open in front of him (`bay`), he rises into it and crawls out onto her tile.
-  surfaces: [10, 8]
+  # Where he comes up and where he walks (Nicolas, 2026-10-09). He EMERGES where the ice breaks
+  # -- the bay below opens and he is in it on the same beat -- then walks south toward the
+  # cast in Kyogre's discrete steps, the map shaking under each, and stops facing them.
+  surfaces: [10, 11]                # inside the bay: water once it breaks
+  walks_to: [10, 13]                # the island's south tip, face to face with Braulo
   # The ice he breaks: a two-cell bay cut into the island's north shoulder ("he's a beast after
   # all"), as one MapChange. Every tile is the tileset's own river art: 62 and 63 are the curve
   # tiles 596/597 flipped to open north, 68 is the T-junction 635 with its top half mirrored
@@ -944,24 +948,24 @@ messie:
   - [10, 11, 63]
   # Where the cast stands when he comes up (Nicolas, 2026-10-09): Messie alone on the centre
   # island -- the six cells of Nerra's shelf, cut off by water and two bridges -- and the WHOLE
-  # roster on the shores around it, or he is alone on the ice. The fight can end with anyone
+  # roster lined along its south shore, so he walks toward them. The fight can end with anyone
   # anywhere, so the ending fades out, clears the island, his route and these tiles, and LOADs
   # everyone onto them (ch06_messie_gather). Every ch06 roster member needs a tile; the speakers
   # take the near ones. `spare` is where anyone found in the way is put first.
   gather:
-    braulo: [8, 11]                 # the west bridge, nearest him: he leads
-    prof-rbg: [7, 11]               # behind Braulo...
-    pinky: [7, 12]                  # ...and Pinky behind his father (beat A: "stand behind me")
-    marty: [10, 14]                 # the south bridge, the other near tile: he does the talking
-    wolfram: [13, 12]               # apart, on the east shore: he sniffs the beast from there
-    meesmickle: [9, 9]              # the north shore
-    rootis: [8, 9]
-    sclorbo: [11, 9]
-    baxby: [12, 9]
-    trex: [13, 11]                  # the east shore
-    lupin: [13, 13]
-    basil: [10, 15]                 # the south shore
-    sahnar: [9, 15]
+    braulo: [10, 14]                # the south bridge, nose to nose with him: he leads
+    prof-rbg: [9, 15]               # the front row of the south shore...
+    marty: [11, 15]
+    sclorbo: [10, 15]
+    meesmickle: [8, 15]
+    rootis: [12, 15]
+    wolfram: [13, 15]               # apart, at the row's end: he sniffs the beast from there
+    baxby: [7, 15]
+    pinky: [9, 16]                  # behind his father (beat A: "stand behind me")
+    trex: [8, 16]                   # ...and the second row
+    basil: [10, 16]
+    lupin: [11, 16]
+    sahnar: [7, 16]
     spare: [0, 0]                   # the far corner, clear of the whole scene
   art:
     portrait: portraits/messie.png      # Syrene's face slot; portraits/messie.py renders it
@@ -1203,6 +1207,7 @@ playtest:
     # open question #360 left: whether Talk fires from there at all.
     - {name: recordch06opening, proves: "the opening's beat A in motion: card, cut, the hall", lua: recordch06opening, kind: record, deadline: 900}
     - {name: recordch06ice, proves: "beat B on the ice, and the merfolk surfacing at its stage_cut", lua: recordch06ice, kind: record, deadline: 900}
+    - {name: recordch06nerradeath, proves: "the honest path: Nerra falls, DefeatBoss runs, and the transition into Messie's scene", lua: recordch06nerradeath, kind: record, deadline: 900}
     - {name: recordch06messie, proves: "Messie surfaces, hauls onto the ice and cries, then his 33-box scene", lua: recordch06messie, kind: record, deadline: 900, boot: ch06endingboot}
     - name: ch06boarding
       proves: a party member boards both hulls from their doors, both crews speak, and the east

@@ -23,7 +23,8 @@ from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
-from inject.scenes import (_branch_on_slot_c, _make_fid, scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
+from inject.scenes import (_branch_on_slot_c, _make_fid, _prepend_battle_quote, battle_quote_pair,
+                           scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
                            _write_chapter_title_card, flag_defeat_quote, split_on_stage_cut)
 from inject.text import (
     _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body, set_message_body,
@@ -423,7 +424,7 @@ def ch06_opening_ice_block(camera_tile, lake_tile):
             '    STAL(60)\n'
             '    CURE\n'
             '    Text(0x%X) /* B -- on the ice: Wolfram reads the boats, the shadows multiply */\n'
-            '    CAMERA(%d, %d) /* PAN to the middle of the lake, where the shadows were */\n'
+            '    CAMERA2(%d, %d) /* PAN to the middle of the lake, CENTRED on where the shadows were */\n'
             '    STAL(30)\n'
             '    LOAD1(0x1, %s) /* the merfolk break through the water */\n'
             '    ENUN\n'
@@ -460,26 +461,29 @@ def ch06_messie_messages(chap):
 
 
 def ch06_messie_route(chap, terrain):
-    """(surface tile, haul-to tile): open water, then a straight walk onto Nerra's tile.
+    """(emergence tile, walk-to tile): he emerges in the bay where the ice breaks, then walks a
+    straight line toward the cast.
 
-    He wears Gwyllgi geometry, which cannot cross water, and an unwalkable event MOVE hangs
-    the chapter (ch04's bridge note) -- so every cell after the first must be dry."""
+    He wears Gwyllgi geometry, and an unwalkable event MOVE hangs the chapter (ch04's bridge
+    note) -- so the emergence must be a bay cell (water once it breaks) and every cell after it
+    must be walkable by the Gwyllgi's own cost row."""
     sx, sy = chap['messie']['surfaces']
-    tx, ty = ch06_lake_camera_tile(chap)
-    if terrain[sy][sx] != TERRAIN_RIVER:
-        sys.exit('ERROR: ch06 Messie surfaces on (%d, %d), which is not water' % (sx, sy))
+    tx, ty = chap['messie']['walks_to']
+    bay = {(x, y) for x, y, _m in chap['messie']['bay']}
+    if (sx, sy) not in bay:
+        sys.exit('ERROR: ch06 Messie emerges on (%d, %d), which is not in the bay that breaks '
+                 'open -- he has to appear right where the ice broke' % (sx, sy))
     if sx != tx and sy != ty:
-        sys.exit('ERROR: ch06 Messie\'s haul (%d, %d) -> (%d, %d) is not a straight line'
+        sys.exit('ERROR: ch06 Messie\'s walk (%d, %d) -> (%d, %d) is not a straight line'
                  % (sx, sy, tx, ty))
     costs = _class_terrain_move_costs(CH06_MESSIE_MOV_TABLE)
     dx, dy = (tx > sx) - (tx < sx), (ty > sy) - (ty < sy)
-    x, y = sx + dx, sy + dy
-    while True:
-        if costs[terrain[y][x]] <= 0:
-            sys.exit('ERROR: ch06 Messie\'s haul crosses (%d, %d), which he cannot walk' % (x, y))
-        if (x, y) == (tx, ty):
-            return (sx, sy), (tx, ty)
+    x, y = sx, sy
+    while (x, y) != (tx, ty):
         x, y = x + dx, y + dy
+        if (x, y) not in bay and costs[terrain[y][x]] <= 0:
+            sys.exit('ERROR: ch06 Messie\'s walk crosses (%d, %d), which he cannot walk' % (x, y))
+    return (sx, sy), (tx, ty)
 
 
 def ch06_center_island(terrain, tile):
@@ -532,7 +536,8 @@ def ch06_messie_gather(chap, terrain):
         sys.exit('ERROR: ch06 Messie: the spare tile %s is within %d of the scene at %s -- '
                  'whoever is moved there could land back on a cleared cell'
                  % (tuple(spare), CH06_MESSIE_SPARE_CLEARANCE, near[0]))
-    out = '    FADI(16) /* the fight is over: gather the cast out of sight */\n'
+    out = ('    FADI(16) /* the fight is over: gather the cast out of sight */\n'
+           '    CLEE /* ...and the merfolk scatter with their elder dead (Nicolas, 2026-10-09) */\n')
     for x, y in clear:
         out += ('    SVAL(EVT_SLOT_B, _EvtParams2(%d, %d)) /* whoever stands here, out of the way */\n'
                 '    MOVE_CLOSEST(0xffff, CHAR_EVT_POSITION_AT_SLOTB, %d, %d)\n'
@@ -565,53 +570,71 @@ def ch06_messie_bay(chap, maps_dir):
     return [(x0, y0, w, h, tiles, 'ch06: the island ice breaks open in front of Messie (#26)')]
 
 
-def ch06_messie_block(chap, terrain):
+def ch06_messie_shot(chap, terrain):
+    """The tile to centre on: the middle of every tile the scene uses -- the bay, his walk and
+    the cast's places. CAMERA2, because plain CAMERA (EnsureCameraOntoPosition) only scrolls a
+    tile onto the screen and left the scene off-centre (Nicolas, 2026-10-09)."""
+    (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
+    gather = {k: v for k, v in chap['messie']['gather'].items() if k != 'spare'}
+    tiles = ([(x, y) for x, y, _m in chap['messie']['bay']] + [(sx, sy), (tx, ty)]
+             + [tuple(v) for v in gather.values()])
+    xs, ys = [x for x, _y in tiles], [y for _x, y in tiles]
+    return (min(xs) + max(xs) + 1) // 2, (min(ys) + max(ys) + 1) // 2
+
+
+def ch06_messie_block(chap, terrain, theme):
     """The ending's head: Kyogre's Cave of Origin awakening, then the scene.
 
     Sapphire's order (pokeruby CaveOfOrigin_B4F): the field goes still, the beast steps toward
     the player in DISCRETE steps that shake the screen, a held second, its cry -- and the battle.
-    Here Messie rises in the north channel and comes south one tile at a time, the map shaking
-    under each step; before the first step onto the island its ice breaks open into the bay
-    (TILECHANGE), he rises into it and crawls out onto Nerra's tile; then the held second, the
-    cry, and where the battle would start the fighters raise their weapons instead. A step's
-    rumble ends before the next sound: EARTHQUAKE_END fades the SE channel (Sound_FadeOutSE),
-    and the moose (ch05) showed that a rumble and a cry cannot overlap.
+    Here the ice rumbles, breaks open into the bay (TILECHANGE) and Messie is in it on the SAME
+    beat -- he appears right where it broke (Nicolas, 2026-10-09) -- then walks toward the cast
+    one tile at a time, the map shaking under each step; then the held second, the cry, and
+    where the battle would start the fighters raise their weapons instead. Each rumble ends
+    before the next sound: EARTHQUAKE_END fades the SE channel (Sound_FadeOutSE), and the moose
+    (ch05) showed that a rumble and a cry cannot overlap.
     """
     (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
-    bay = {(x, y) for x, y, _m in chap['messie']['bay']}
     dx, dy = (tx > sx) - (tx < sx), (ty > sy) - (ty < sy)
-    out = ('    MUSI /* duck the music: the lake goes still */\n'
-           '    CAMERA(%d, %d) /* the centre, the lake shot */\n'
+    cx, cy = ch06_messie_shot(chap, terrain)
+    out = ('    MUSCMID(SONG_SILENT) /* the music fades out: the entrance plays in silence */\n'
+           '    CAMERA2(%d, %d) /* CENTRED on the whole scene: bay, walk and cast */\n'
            '    STAL(30)\n'
-           '    LOAD1(0x1, %s) /* he rises in the north channel */\n'
+           '    EARTHQUAKE_START(0, 1) /* something under the ice... */\n'
+           '    STAL(60)\n'
+           '    TILECHANGE(%d) /* ...the ice breaks open... */\n'
+           '    LOAD1(0x1, %s) /* ...and he is in it, on the same beat */\n'
            '    ENUN\n'
-           '    STAL(40)\n' % (tx, ty, CH06_MESSIE_TABLE))
-    x, y, broken = sx, sy, False
+           '    STAL(30)\n'
+           '    EARTHQUAKE_END\n'
+           '    STAL(40)\n' % (cx, cy, CH06_MESSIE_BREAK_ID, CH06_MESSIE_TABLE))
+    x, y = sx, sy
     while (x, y) != (tx, ty):
-        ahead = (x + dx, y + dy)
-        if not broken and ahead in bay and terrain[ahead[1]][ahead[0]] != TERRAIN_RIVER:
-            out += ('    EARTHQUAKE_START(0, 1) /* he reaches the island... */\n'
-                    '    STAL(20)\n'
-                    '    TILECHANGE(%d) /* ...and its ice breaks open */\n'
-                    '    STAL(40)\n'
-                    '    EARTHQUAKE_END\n'
-                    '    STAL(20)\n' % CH06_MESSIE_BREAK_ID)
-            broken = True
-        out += ('    MOVE_1STEP(0x%X, %s, %d) /* one step */\n'
+        out += ('    MOVE_1STEP(0x%X, %s, %d) /* one step toward them */\n'
                 '    ENUN\n'
                 '    EARTHQUAKE_START(0, 1) /* ...and the map shakes under it */\n'
                 '    STAL(12)\n'
                 '    EARTHQUAKE_END\n'
                 '    STAL(24)\n'
                 % (CH06_MESSIE_STEP_SPEED, CH06_MESSIE_PID, _STEP_DIRECTION[(dx, dy)]))
-        x, y = ahead
-    if not broken:
-        sys.exit('ERROR: ch06 Messie never steps onto the bay, so its ice never breaks')
+        x, y = x + dx, y + dy
+    # The scene's ONE stage_break sits before his first line: the talk pauses (LockTalk, the
+    # bubble and faces stay up), the chapter's own theme fades back in, and TEXTCONT resumes
+    # the same message -- vanilla Ch5's music-under-a-break idiom (Nicolas, 2026-10-09).
+    ev = next(e for e in chap['events'] if e.get('trigger') == 'boss_defeated')
+    if sum(1 for e in ev['script'] if 'stage_break' in e) != 1:
+        sys.exit('ERROR: ch06 Messie scene needs exactly one stage_break (the music cue)')
     return out + ('    STAL(60) /* Kyogre\'s held second */\n'
                   '    SOUN(%s) /* his cry */\n'
                   '    STAL(110) /* the 1.68s sample plays out */\n'
-                  '    Text(0x%X) /* Messie on the ice, beats A-E */\n'
-                  % (CH06_MESSIE_CRY, CH06_MESSIE_MSG))
+                  '    TEXTSTART\n'
+                  '    TEXTSHOW(0x%X) /* Messie on the ice, beats A-E */\n'
+                  '    TEXTEND /* ...paused at the break, before "I\'m listening." */\n'
+                  '    MUSCMID(0x%X) /* the chapter\'s own theme comes back as he speaks */\n'
+                  '    TEXTCONT\n'
+                  '    TEXTEND\n'
+                  '    REMA\n'
+                  % (CH06_MESSIE_CRY, CH06_MESSIE_MSG, theme))
 
 
 def ch06_ending_debug_script(seed_load):
@@ -847,8 +870,8 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
-        '{\n' + messie_gather + ch06_messie_block(chap, terrain)
-        + '    MUNO\n    MUSC(SONG_VICTORY)\n'
+        '{\n' + messie_gather + ch06_messie_block(chap, terrain, host['bgm']['bluePhase'])
+        + '    MUSC(SONG_VICTORY)\n'
         + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')
         + '    FADI(16) /* fade the lake out into the dev-placeholder landing */\n'
@@ -893,6 +916,13 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     _prepend_defeat_quote(flag_defeat_quote(
         CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX), 'EVFLAG_DEFEAT_BOSS',
         'Nerra (ch06 boss): silent defeat -> DefeatBoss WIN flag'))
+    # ...and SILENT when engaged. She wears Novala's slot in Novala's own chapter, so vanilla's
+    # two Novala battle-quote rows match her, and both name MSG_9EF -- which ch05 has rewritten
+    # as Basil's "Oh! Tourists." line. Engaging Nerra played Basil (Nicolas, 2026-10-09). A
+    # msg-0, event-0 pair at the head of the list shadows both and plays nothing.
+    _prepend_battle_quote(battle_quote_pair(
+        CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX), 0,
+        'Nerra: the merfolk do not speak (shadows vanilla Novala, MSG_9EF)'))
 
     if verbose:
         print('  ch06 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss '
