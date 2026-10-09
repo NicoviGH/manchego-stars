@@ -36,10 +36,10 @@ class Scenes(unittest.TestCase):
         self.assertEqual(19, row.boxes)
 
     def test_a_planned_chapter_declares_events_with_no_script_yet(self):
-        """ch06's four events are seeds -- named beats with nothing written. That IS the
+        """ch07's events are seeds -- named beats with nothing written. That IS the
         status, and reporting it is the point: 'declared but unbuilt' is the row a human
         used to keep in HANDOFF by hand."""
-        rows = cs.scenes('ch06')
+        rows = cs.scenes('ch07')
         self.assertTrue(rows)
         self.assertFalse(any(r.declared for r in rows))
         self.assertTrue(all(r.boxes == 0 for r in rows))

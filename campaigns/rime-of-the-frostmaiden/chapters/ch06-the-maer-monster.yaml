@@ -766,7 +766,65 @@ events:
       THE PLAYER EXPECTS A MONSTER FIGHT (Nicolas, 2026-10-08). Nobody hints that Messie is
       harmless and nobody names the merfolk: the player meets them by being attacked, and
       the map delivers the twist.
-      Dorbulgruf needs a face here, a choice ch07 owed anyway.
+      Dorbulgruf wears the Murray slot (portraits/dorbulgruf.png, ADR 0332). Voice:
+      lore/dorbulgruf.md. LOCKED 2026-10-09 (dialogue-pass, co-written with Nicolas), 32 boxes.
+      Beat B plays ON THE MAP AFTER PREP (Nicolas, 2026-10-09), in ch05 0x9C2's after-prep
+      shape: the camera on the party standing on the real ice. The merfolk are NOT loaded
+      before prep; they surface mid-scene, on the tiles the balance gate measures, so the
+      player deploys without seeing them -- vanilla Ch6's fog gives its player the same.
+    script:                           # LOCKED 2026-10-09 (dialogue-pass, co-written with Nicolas)
+      # ── A: Bremen's town hall ──
+      # (The party arrives on the rumour from ch05's ending. Nobody sent for them.)
+      - prof-rbg: "Speaker Shalescar! Professor R.B. Geenius. Cheesed to meet you."
+      - dorbulgruf: "Who let this band of misfits into my hall?"
+      - prof-rbg: "Um, actually-- we're the Manchego Stars."
+      # (Marty steps up and politely coughs a puff of spores in his face: his new-person gag,
+      #  never explained (lore/marty.md). Marty has no line, so the sneeze cuts Dorbulgruf off.)
+      - dorbulgruf: "Manchego Stars? Never heard of-- did that mushroom just SNEEZE on me?!"
+      # (Braulo leads, and he wants the MONSTER (Nicolas): ch05 closed on "Aye, it is time we meet
+      #  this beastie.")
+      - braulo: "We heard you have a monster."
+      - dorbulgruf: "Heard, did you? Then you heard it took two boats!"
+      - dorbulgruf: "Two days, and not a sign of them!"
+      - pinky: "Whose boats?"
+      - dorbulgruf: "Grynsk's! My best fisher. Him and the half-elf with the notebook went after it."
+      - dorbulgruf: "The fools. Nobody's seen either one since."
+      - braulo: "What does it look like?"
+      # (The witnesses' wildly different accounts are the book's, Rime p.29.)
+      - dorbulgruf: "Depends who you ask! Big as an ox. Big as a house."
+      - dorbulgruf: "A whale with a neck like a mast! A lizard with scales like shields!"
+      # (The fear shows where he breaks off. He covers it.)
+      - dorbulgruf: "Whatever it is, it wants Bremen at the bottom of the lake! Seventy years I've--"
+      - dorbulgruf: "...Bah."
+      - braulo: "A neck like a mast... Aye. I want to meet this beastie."
+      # (RBG leans on him for a bounty. There was none until this moment: Dorbulgruf makes it up
+      #  under pressure, which is what lets ch07 claim nothing was ever promised.)
+      - prof-rbg: "Surely a town in such a pickle has posted a bounty, Speaker?"
+      - prof-rbg: "A modest one would do. Something to make it worth our whey."
+      - dorbulgruf: "Bounty?! I've got two boats missing and you want--"
+      - dorbulgruf: "...Fine! Three hundred gold. For its head!"
+      # ("For its head" is the term ch07 turns on: the beast comes back alive.)
+      - braulo: "Done. We'll bring you its head."
+      # (THE SLIP. "Her" is Auril: privately he is close to starting the sacrifices. Asked by a
+      #  child, so it lands; he shouts over it at once.)
+      - pinky: "Um... and if it's too big for us, sir?"
+      - dorbulgruf: "...Then Bremen will have to find a different way to pay her..."
+      - dorbulgruf: "Go on! Get out of my hall!"
+      - beat_break: B           # cut to the lake, on the map after prep
+      # ── B: on the ice ──
+      # (Wolfram smells the metal before he sees anything (lore/wolfram.md), then reads the
+      #  hulls' construction: the boats' clock, stated in his own trade.)
+      - wolfram: "(sniffs) Wait. Iron... cheap iron, gone to rust. There! The boats!"
+      - wolfram: "Pine planks, bog-iron nails. The cold's already splitting them."
+      - wolfram: "They won't take many more hits."
+      # (The DM notes' "huge shadow moving beneath the icy waters". The player should expect
+      #  the monster; Braulo knows lake animals and knows better.)
+      - pinky: "Father! Something moved under the ice! Something big!"
+      - braulo: "That's not our beastie..."
+      - rootis: "Oh! There's another shadow. And another..."
+      - rootis: "Maybe the beastie brought friends?"
+      # (The merfolk break through the water, silent, all across the lake: they are LOADED here.)
+      - meesmickle: "Friends. With tridents. Delightful."
   - trigger: boss_defeated
     unit: nerra
     type: cutscene
