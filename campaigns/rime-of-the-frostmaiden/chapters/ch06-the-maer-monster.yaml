@@ -928,17 +928,26 @@ messie:
   # shot, empty once she falls), and his Gwyllgi geometry cannot cross water, so this is open
   # water with nothing but ice between it and her tile (ch06_messie_route guards both).
   surfaces: [8, 12]
-  # Where the party stands when he comes up (Nicolas, 2026-10-09: "otherwise Messie is alone").
-  # The fight can end with anyone anywhere, so the ending fades out after Nerra falls and
-  # gathers the scene's speakers on the ice around her tile, then fades back in. A speaker who
-  # was not deployed, or fell, is skipped by the engine. Anyone standing on his route is moved
-  # to `spare` first, because a blocked haul stops short.
+  # Where the cast stands when he comes up (Nicolas, 2026-10-09): Messie alone on the centre
+  # island -- the six cells of Nerra's shelf, cut off by water and two bridges -- and the WHOLE
+  # roster on the shores around it, or he is alone on the ice. The fight can end with anyone
+  # anywhere, so the ending fades out, clears the island, his route and these tiles, and LOADs
+  # everyone onto them (ch06_messie_gather). Every ch06 roster member needs a tile; the speakers
+  # take the near ones. `spare` is where anyone found in the way is put first.
   gather:
-    braulo: [10, 11]                # the leader, straight ahead of him
-    prof-rbg: [9, 11]
-    marty: [11, 11]
-    wolfram: [10, 13]               # apart, on the far side: he sniffs the beast from there
-    pinky: [7, 11]                  # behind his father (beat A: "stand behind me")
+    braulo: [8, 11]                 # the west bridge, nearest him: he leads
+    prof-rbg: [7, 11]               # behind Braulo...
+    pinky: [7, 12]                  # ...and Pinky behind his father (beat A: "stand behind me")
+    marty: [10, 14]                 # the south bridge, the other near tile: he does the talking
+    wolfram: [13, 12]               # apart, on the east shore: he sniffs the beast from there
+    meesmickle: [9, 9]              # the north shore
+    rootis: [8, 9]
+    sclorbo: [11, 9]
+    baxby: [12, 9]
+    trex: [13, 11]                  # the east shore
+    lupin: [13, 13]
+    basil: [10, 15]                 # the south shore
+    sahnar: [9, 15]
     spare: [6, 12]
   art:
     portrait: portraits/messie.png      # Syrene's face slot; portraits/messie.py renders it

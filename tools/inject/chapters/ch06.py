@@ -172,6 +172,8 @@ def assert_boat_safe_ai_is_single_chapter(owner):
 # balance gate, the danger map and the boats' fuses are untouched -- and a skipped scene loads
 # them silently, straight onto those tiles.
 TERRAIN_RIVER = 0x10
+TERRAIN_BRIDGE = 0x13       # TERRAIN_BRIDGE_REGULAR: the centre island's two links to the shore
+TERRAIN_TILE_2E = 0x2E      # the outcrops nobody stands on
 SURFACE_MIN_WALK = 2      # tiles of movement cost: a one-step hop out of the water does not read
 
 
@@ -473,36 +475,56 @@ def ch06_messie_route(chap, terrain):
         x, y = x + dx, y + dy
 
 
-def ch06_messie_gather(chap, terrain):
-    """(event text, party tiles): the fade-out gather that stands the party around Nerra's tile
-    before Messie surfaces (Nicolas, 2026-10-09: "otherwise Messie is alone").
+def ch06_center_island(terrain, tile):
+    """The dry cells reachable from `tile` without crossing water or a bridge: the shelf Nerra
+    holds, which Messie takes alone."""
+    island, todo = {tuple(tile)}, [tuple(tile)]
+    while todo:
+        x, y = todo.pop()
+        for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+            if (0 <= ny < len(terrain) and 0 <= nx < len(terrain[0]) and (nx, ny) not in island
+                    and terrain[ny][nx] not in (TERRAIN_RIVER, TERRAIN_BRIDGE)):
+                island.add((nx, ny))
+                todo.append((nx, ny))
+    return island
 
-    The speakers are LOADed onto their tiles, never MOVEd: ADR 0292, a scene LOADs the PCs it
-    stages. An event LOAD of a PC who is already on the map finds that unit and moves it, stats
-    and inventory untouched (LoadUnit_800F704), and one who was benched or fell still resolves.
-    Every tile the scene needs -- his route and the party's spots -- is cleared first through
+
+def ch06_messie_gather(chap, terrain):
+    """(event text, {uid: tile}): the fade-out gather that puts the whole cast on the shores
+    around the centre island before Messie surfaces onto it alone (Nicolas, 2026-10-09).
+
+    The cast is LOADed onto its tiles, never MOVEd: ADR 0292, a scene LOADs the PCs it stages.
+    An event LOAD of a unit already on the map finds it and moves it, stats and inventory
+    untouched (LoadUnit_800F704), and one who was benched or fell still resolves. Every cell the
+    scene needs -- the island, his route, the cast's tiles -- is cleared first through
     CHAR_EVT_POSITION_AT_SLOTB, because the fight can end with anyone standing anywhere (Nerra's
-    killer beside her tile, Pinky hovering over the water) and a LOAD onto a held tile stacks two
-    units on one cell. All of it happens behind the FADI."""
+    killer beside her, Pinky hovering over the water) and a LOAD onto a held cell stacks two
+    units on it. All of it happens behind the FADI."""
     (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
-    gather = dict(chap['messie']['gather'])
+    gather = {uid: tuple(xy) for uid, xy in chap['messie']['gather'].items()}
     spare = gather.pop('spare')
     route = [(sx + i * ((tx > sx) - (tx < sx)), sy + i * ((ty > sy) - (ty < sy)))
              for i in range(abs(tx - sx) + abs(ty - sy) + 1)]
+    island = ch06_center_island(terrain, (tx, ty))
+    if len(set(gather.values())) != len(gather):
+        sys.exit('ERROR: ch06 Messie: two of the cast gather onto one tile')
     for uid, (x, y) in sorted(gather.items()):
-        if (x, y) in route:
-            sys.exit('ERROR: ch06 Messie: %s gathers onto his route at (%d, %d)' % (uid, x, y))
-        if uid not in PORTRAIT_MAP:
-            sys.exit('ERROR: ch06 Messie: %r gathers but is not a cast member' % uid)
-    out = '    FADI(16) /* the fight is over: gather the party out of sight */\n'
-    for x, y in route + [tuple(v) for _u, v in sorted(gather.items())]:
+        if (x, y) in island or (x, y) in route:
+            sys.exit('ERROR: ch06 Messie: %s gathers onto his island or route at (%d, %d) -- '
+                     'he takes the island alone' % (uid, x, y))
+        if terrain[y][x] in (TERRAIN_RIVER, TERRAIN_TILE_2E):
+            sys.exit('ERROR: ch06 Messie: %s gathers onto (%d, %d), which nobody stands on'
+                     % (uid, x, y))
+    clear = sorted(set(route) | island) + sorted(gather.values())
+    out = '    FADI(16) /* the fight is over: gather the cast out of sight */\n'
+    for x, y in clear:
         out += ('    SVAL(EVT_SLOT_B, _EvtParams2(%d, %d)) /* whoever stands here, out of the way */\n'
                 '    MOVE_CLOSEST(0xffff, CHAR_EVT_POSITION_AT_SLOTB, %d, %d)\n'
                 % (x, y, spare[0], spare[1]))
-    out += ('    LOAD1(0x1, %s) /* the speakers, on the ice around her tile */\n'
+    out += ('    LOAD1(0x1, %s) /* the cast, on the shores around the island */\n'
             '    ENUN\n'
             '    FADU(16)\n' % CH06_MESSIE_PARTY_TABLE)
-    return out, {uid: tuple(xy) for uid, xy in gather.items()}
+    return out, gather
 
 
 def ch06_messie_block(surface, target):
@@ -638,15 +660,16 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     by_uid = {row[0]: row for row in cast}
     messie_gather, gather_tiles = ch06_messie_gather(
         chap, _map_terrain_grid(maps_dir, CH06_LAYOUT[1])[2])
-    missing = sorted(set(gather_tiles) - set(by_uid))
-    if missing:
-        sys.exit('ERROR: ch06 Messie gathers %s, who is not on the ch06 roster' % ', '.join(missing))
+    if set(gather_tiles) != set(by_uid):
+        sys.exit('ERROR: ch06 Messie: the gather must place exactly the ch06 roster (Nicolas: '
+                 'the whole cast stands around the island); missing %s, extra %s'
+                 % (sorted(set(by_uid) - set(gather_tiles)), sorted(set(gather_tiles) - set(by_uid))))
     declare_unit_table(CH06_MESSIE_PARTY_TABLE, [
         _ally_unit_entry(leader, by_uid[uid][1], by_uid[uid][3], by_uid[uid][4], x, y,
                          ', '.join(CLASS_LOADOUT[by_uid[uid][2]]),
-                         ' /* %s -- stands with the party when Messie surfaces */' % uid)
+                         ' /* %s -- on the shore when Messie surfaces */' % uid)
         for uid, (x, y) in sorted(gather_tiles.items())],
-        'ch06 the party around Nerra\'s tile, for Messie on the ice (#26)')
+        'ch06 the whole cast around the centre island, for Messie on the ice (#26)')
 
     # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
     spawns = ch06_line_spawns(chap, maps_dir)

@@ -192,18 +192,21 @@ class MessieOnTheIce(unittest.TestCase):
         speakers = {k for e in ev['script'] for k in e if k not in inject.text.SCRIPT_DIRECTIVES}
         self.assertLessEqual(speakers, set(inject.chapters.ch06.CH06_MESSIE_SEATS))
 
-    def test_the_party_gathers_around_him_and_off_his_route(self):
-        """Nicolas, 2026-10-09: the party stands with him, or he is alone on the ice. They are
-        LOADed, never MOVEd (ADR 0292), after every tile the scene needs is cleared."""
+    def test_he_takes_the_centre_island_alone_and_the_whole_cast_rings_it(self):
+        """Nicolas, 2026-10-09: Messie alone on the centre island, every PC around it."""
         block, tiles = inject.chapters.ch06.ch06_messie_gather(self.chap, self.terrain)
-        self.assertLessEqual({'braulo', 'marty', 'prof-rbg', 'wolfram'}, set(tiles))
-        self.assertNotIn('CHARACTER_', block)
+        island = inject.chapters.ch06.ch06_center_island(self.terrain, (10, 12))
+        self.assertEqual({(9, 11), (10, 11), (11, 11), (9, 12), (10, 12), (10, 13)}, island)
+        self.assertFalse(set(tiles.values()) & island)
+        cast, _ = inject.cast._classed_cast(self.CAMPAIGN, available_at=6)
+        self.assertEqual({row[0] for row in cast}, set(tiles))
+        self.assertNotIn('CHARACTER_', block)   # LOADed, never MOVEd (ADR 0292)
         load = 'LOAD1(0x1, %s)' % inject.chapters.ch06.CH06_MESSIE_PARTY_TABLE
-        self.assertLess(block.rindex('CHAR_EVT_POSITION_AT_SLOTB'), block.index(load))
-        self.assertTrue(block.startswith('    FADI') and block.rstrip().endswith('FADU(16)'))
+        for x, y in island:
+            self.assertIn('_EvtParams2(%d, %d)' % (x, y), block[:block.index(load)])
 
-    def test_a_gather_tile_on_his_route_is_refused(self):
-        gather = dict(self.chap['messie']['gather'], braulo=[9, 12])
+    def test_a_cast_member_on_his_island_is_refused(self):
+        gather = dict(self.chap['messie']['gather'], braulo=[10, 11])
         chap = dict(self.chap, messie=dict(self.chap['messie'], gather=gather))
         with self.assertRaises(SystemExit):
             inject.chapters.ch06.ch06_messie_gather(chap, self.terrain)
