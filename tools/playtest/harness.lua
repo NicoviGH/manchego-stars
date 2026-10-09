@@ -8347,6 +8347,7 @@ end
 -- red units would mean the LOAD never ran.
 -- Run: tools/playtest/run.sh recordch06ice (needs a CH06BOOT=1 ROM).
 scenarios.recordch06ice = function()
+    local warned = false
     return recordCutscene({
         tag = "ch06ice", speed = "normal", maxFrames = 6000, shotEvery = 4, pressEvery = 90,
         pre = function()
@@ -8367,7 +8368,13 @@ scenarios.recordch06ice = function()
                 if u and u.onMap and (u.state & US_DEAD) == 0 then reds = reds + 1 end
             end
             if reds == 0 then
-                return false, "turn 1 is live with NO red units: the merfolk never loaded"
+                -- recordCutscene reads only the first return, so a second one would be lost and
+                -- the run would time out naming nothing. Say it once, then keep failing.
+                if not warned then
+                    log("ch06ice: turn 1 is live with NO red units -- the merfolk never loaded")
+                    warned = true
+                end
+                return false
             end
             return true
         end,
