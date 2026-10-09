@@ -71,6 +71,24 @@ in). Reserve is conveyed by **brevity and plainness**, never by trailing dots.
   3-box / 5-line aside (observation → wry regret → shrug into his next errand) is the pattern;
   ch05's 9BB matches it beat for beat.
 
+## What Nicolas cut from ch06's opening (2026-10-09)
+
+Five more faults, each caught on a draft that already passed the four above.
+
+- **The briefing.** A quest-giver who delivers the plot as one tidy fact per box is a narrator.
+  Write a conversation: questions, interruptions, a line answered before it is finished.
+- **Knowledge the speaker cannot have.** "You're late" from a man who never sent for them.
+  Check who knows what at this moment in the story before writing a line.
+- **Over-explaining.** Braulo explaining HOW he knew the shadow was not the beast, Wolfram listing
+  every material. Give the conclusion and stop; "That's not our beastie..." is the whole line.
+- **Spoiling the twist.** Marty asking whether anyone has tried talking to the monster tipped
+  the chapter's reveal. A line that points at the twist goes.
+- **Mechanical haggling.** Number-for-number counter-offers read as a game system. Let the
+  character's own want lead (Braulo wanted to MEET the beast) and the money follow.
+
+Stage directions carry what needs no words: Marty's spore cough is unvoiced, and Dorbulgruf's
+"did that mushroom just SNEEZE on me?!" lands it.
+
 ## Also see
 
 - `fe8-register.md` — the villain register + archetype table.

@@ -6,19 +6,26 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-07 (Claude): Messie wired (#466), ch06 boarding pass merged (#467). **What landed and why is in
-`git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-09 (Claude): the ch06 story frame (#468, ADR 0332) and ch06's opening with
+Speaker Dorbulgruf (#469) merged. **What landed and why is in `git log` and the ADRs it cites**
+-- this file keeps no "recently landed" list.
 
 ## In flight
 
 Nothing on a branch. **Next, in order:**
 
-1. **#26 — the rest of ch06:** the three cutscenes (`chapter_start`, `boss_defeated` = Messie
-   on the ice, `chapter_end`). Messie loads as pid 0xbd, `CLASS_GWYLLGI` (#466); the staging
-   scene calls `assert_custom_art_pid_wired`. The boarding pass is done (#467, ADR 0331).
-2. **#459 — roster parity with vanilla, chapter by chapter** (Nicolas wants vanilla's count and
-   diversity, replacing ADR 0047's 16-18 budget). The decomp join table, deploy limits and
-   coverage audit are on the issue; Baxby-as-Seth is the open call there (reverses ADR 0042).
+1. **#26 -- `boss_defeated`, Messie on the ice: dialogue pass.** Settle BEATS with Nicolas
+   before any line (the dialogue-pass skill). The frame is ADR 0332 and the event's YAML
+   description: local to Bremen only (the Frostmaiden reveal is ch07's ending), Marty and
+   Braulo carry it, the book's own Messie lines (Rime p.31), and it closes on Messie-for-Speaker.
+   Messie is pid 0xbd on the Syrene face slot.
+2. **#26 -- `chapter_end`: dialogue pass.** Open call to bring with a pick: ch06 pays 400 gold
+   at chapter end while Dorbulgruf's bounty (300, "for its head") is never paid. Pick: the
+   rescued crews pay the 400.
+3. **#26 -- claim `status-effects` and `terrain-bonuses`** in ch06's `introduces:` ledger
+   (Grynsk's Antitoxin, Tali's snow drifts), then `python3 tools/gen_onboarding_index.py`.
+4. **#459 -- roster parity with vanilla**, chapter by chapter (unchanged; Baxby-as-Seth is the
+   open call there).
 
 - `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
@@ -28,10 +35,12 @@ Nothing on a branch. **Next, in order:**
 
 ## Chapter work
 
-- **#26 — ch06's own body.** `make chapter CH=ch06` is its state (HOSTED, not FINISHED). Every
-  enemy is dressed (#460), Messie is wired (#466), the boarding pass is in (#467); the three
-  cutscenes are what is left.
-- **#335** — the AI audit (behavioural drift is invisible to every gate; proposes an
+- **#26 -- ch06's own body.** `make chapter CH=ch06` is its state. The opening is written,
+  wired and filmed (`recordch06opening`, `recordch06ice`); `boss_defeated` and `chapter_end`
+  are what is left.
+- **#27 -- ch07** is reframed by ADR 0332 (Dorbulgruf refuses out of disbelief; Messie's fish
+  tax; his farewell carries the Frostmaiden's orders to the merfolk). Still `status: planned`.
+- **#335** -- the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).
 
 ## Traps a fresh session walks into
