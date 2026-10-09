@@ -223,6 +223,26 @@ class MessieOnTheIce(unittest.TestCase):
         island = inject.chapters.ch06.ch06_center_island(self.terrain, (10, 12))
         self.assertTrue({xy for xy in bay if xy in island}, 'the bay cuts into the island')
 
+    def test_the_donor_snag_stands_and_falls_into_a_crossing(self):
+        """Nicolas, 2026-10-09: vanilla Ch13's snag is real, so ours is. It is painted standing
+        over the river and falls as MapChange id 1 (the bay is id 0), across the river below,
+        on the same three painted tiles ch04's fall writes."""
+        ch06 = inject.chapters.ch06
+        maps = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+        ids = inject.maps.terrain_ids()
+        x, y = ch06.CH06_SNAG_POS
+        self.assertEqual(ids['TERRAIN_SNAG'], self.terrain[y][x])
+        self.assertEqual(ids['TERRAIN_RIVER'], self.terrain[y + 1][x])
+        changes = ch06.ch06_map_changes(self.chap, maps)
+        self.assertEqual(ch06.CH06_SNAG_ID, len(changes) - 1)
+        sx, sy, w, h, tiles, _why = changes[ch06.CH06_SNAG_ID]
+        self.assertEqual((x, y, 1, 3), (sx, sy, w, h))
+        tileset = inject.maps._map_changes_tileset(maps, ch06.CH06_LAYOUT)
+        self.assertEqual([ids[t] for t in inject.maps.SNAG_FALL_TERRAIN],
+                         [tileset.terrain(m) for m in tiles])
+        for m in tiles:
+            self.assertFalse(inject.maps._is_blank_metatile(tileset, m), m)
+
     def test_the_scene_is_one_message_with_every_speaker_seated(self):
         (msg, body), = inject.chapters.ch06.ch06_messie_messages(self.chap)
         self.assertEqual(inject.chapter_ids.CH06_MESSIE_MSG, msg)

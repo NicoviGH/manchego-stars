@@ -1009,6 +1009,27 @@ class TestDeclaredDivergenceLookup(unittest.TestCase):
                              'cell (%d, %d) declares from: %s but vanilla is %s'
                              % (x, y, row['from'], got))
 
+    def test_the_committed_map_diverges_exactly_where_declared(self):
+        """The import validator only runs when a map is IMPORTED, so a later edit to the
+        committed .mar -- ch06's snag repainted standing, 2026-10-09 -- could drift from the
+        allowlist either way: an undeclared change, or an entry describing a cell that now
+        matches vanilla again."""
+        import inject.maps
+        maps = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+        layout = ('Ch06MaerMonsterMap', 'ch06-maer-monster')
+        tileset = inject.maps._map_changes_tileset(maps, layout)
+        _, _, cells, vanilla = mt.vanilla_layout_data(
+            os.path.join(REPO, 'fireemblem8u'), 'Ch13EphraimMap')
+        declared = self.iml._declared_divergence(layout[1])
+        for y in range(22):
+            for x in range(22):
+                ours = tileset.terrain(inject.maps._read_map_metatile(maps, layout[1], x, y))
+                want = declared.get((x, y), vanilla[cells[y * 22 + x]])
+                self.assertEqual(want, ours, 'cell (%d, %d)' % (x, y))
+        for (x, y), to in declared.items():
+            self.assertNotEqual(vanilla[cells[y * 22 + x]], to,
+                                'cell (%d, %d) is declared but matches vanilla' % (x, y))
+
 class SetMetatileTerrain(unittest.TestCase):
     """Terrain is separate from art, and shared across every map on the tileset (#26).
 

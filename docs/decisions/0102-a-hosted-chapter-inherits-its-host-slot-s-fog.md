@@ -8,7 +8,7 @@ issues: [26]
 
 # Hosting ch06 on a FOGGED slot is what found the fifth inheritable field
 
-ch06 declares `fog: none` and means it: 40% of its map is concentric water with eight crossings,
+ch06 declares `fog: none` and means it: 40% of its map is concentric water with seven crossings and a snag,
 so the route IS the puzzle and it is one the player has to be able to see. **Slot 7 ships
 `initialFogLevel: 3`** — vanilla Ch7 is a fogged chapter — so hosting ch06 there without writing
 the field would have handed the chapter three-tile vision and hidden its entire design.

@@ -64,7 +64,7 @@ def chapter_fog_level(chap):
     Declared in the chapter YAML for the same reason the difficulty triple is: the
     alternative is inheritance. A hosted chapter keeps whatever `initialFogLevel` its
     squatted host slot shipped, and vanilla carries fog on five slots -- one of them slot 7,
-    which hosts ch06. ch06 is a route puzzle across concentric water with eight crossings,
+    which hosts ch06. ch06 is a route puzzle across concentric water with seven crossings and a snag,
     so three-tile vision would have hidden the entire design while failing nothing.
 
     ch04 is why this reads from the YAML rather than only guarding inheritance: it WANTS

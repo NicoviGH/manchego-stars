@@ -8,23 +8,28 @@ issues: [26]
 
 # ch06 departs from its donor's terrain in 21 declared cells, and replaces forest composition wholesale
 
-> **Superseded in part (2026-09-03, #360):** the count is now **7**, not 21 — the boats became
-> pockets that KEEP the donor's own impassable cells. See *"ch06's boats sit in POCKETS…"*. The
-> reasoning below stands; only the number moved.
+> **The count is now 5.** The boats became pockets that KEEP the donor's own impassable cells
+> (#360, 2026-09-03; see *"ch06's boats sit in POCKETS…"*), and the donor's snag stands again
+> on vanilla's own tiles (2026-10-09, below). The reasoning about the rest stands.
 
 ch06 paints FE8 Ch13 (Ephraim) as a frozen lake. The departures from the donor's terrain are
 deliberate, and all of them are DECLARED rather than tolerated.
 
-**21 cells diverge, listed in the chapter YAML under `terrain_divergence`**, and
-`validate_terrain_matches_vanilla` rejects any drift not on that list. The breakdown:
+**21 cells diverged at first, listed in the chapter YAML under `terrain_divergence`**, and
+`validate_terrain_matches_vanilla` rejects any drift not on that list. The breakdown, without the snag's two (below):
 
 | cells | change | why |
 |---|---|---|
 | 16 | `TILE_2E` -> `FOREST` | the two village footprints, repainted as ice outcrops that are WALKABLE underneath (cliff art, forest terrain) |
 | 2 | `VILLAGE_REGULAR` -> `FOREST` | the door tiles inside those footprints; there is no village terrain left on the map |
 | 1 | `SEA` -> `CLIFF` | seals the dead south-west corner |
-| 1 | `SNAG` -> `PLAINS` | the map-change pair, after the crossing opens |
-| 1 | `RIVER` -> `BRIDGE_SNAG` | the other half of that pair |
+
+Two of the 21 were the snag at (10,17), painted ALREADY FELLED: the crossing open from turn 1
+and nothing to chop. Vanilla Ch13 has it standing, with its fall as `Ch13EphraimMapChanges` id
+4, so ch06 now paints the donor's own `35 / 570 / 14` and the fall is MapChange id 1, through
+the same `snag_fall_change` ch04 uses. Measured after: foot reaches 290 cells, both doors'
+arrival turns and both hulls' sink forecasts are unchanged, and the difficulty gate holds.
+_(Nicolas, 2026-10-09: "vanilla's map has it, so we do".)_
 
 The allowlist is per-coordinate on purpose. A blanket per-chapter opt-out would have re-opened
 the ch05 fence->wall accident, where eleven cells changed role while looking right and would

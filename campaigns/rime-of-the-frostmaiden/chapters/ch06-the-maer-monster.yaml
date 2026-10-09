@@ -73,7 +73,7 @@ map:
     channels: TERRAIN_RIVER       # 0x10 -- 136 cells; impassable to our foot/armour/horse
                                   #         classes, cost 2 to Braulo (Pirate) and 5 to Trex
                                   #         (Thief), 1 to Pinky. The party's three answers.
-    crossings: TERRAIN_BRIDGE_REGULAR  # 0x13 -- 7 bridges + one BRIDGE_SNAG = 8 crossings
+    crossings: TERRAIN_BRIDGE_REGULAR  # 0x13 -- 7 bridges; the snag at (10,17) chops into an 8th
     snow_drifts: TERRAIN_FOREST   # 0x0C -- 27 cells, +20 avoid / +1 Def, cost 2. Two of them
                                   #         are each boat's own cell and its door; (7,11)
                                   #         covers the west door onto the centre shelf.
@@ -85,9 +85,10 @@ map:
     ice_walls: TERRAIN_PEAK       # 0x12 -- permanent ridges. NOT glacier: TERRAIN_GLACIER
                                   #         costs 1 for EVERY class, so it shapes nothing.
   terrain_note: >
-    Measured off the painted .mar, after the pockets: foot reaches 292 of 484 cells and they
-    form ONE connected component -- the eight crossings wire the whole lake together, so the
-    channels shape the route without ever stranding anyone. The pockets SYMMETRISE the two
+    Measured off the painted .mar, after the pockets and the standing snag: foot reaches 290
+    of 484 cells and they form ONE connected component -- seven crossings wire the whole lake
+    together, so the channels shape the route without ever stranding anyone, and chopping the
+    snag at (10,17) opens an eighth (MapChange id 1) that changes no door's arrival turn. The pockets SYMMETRISE the two
     rescues, which the open outcrops did not: every class now reaches both doors on the same
     turn -- Pinky 3, Braulo/Baxby/Lupin/Trex 5, foot 6. (Braulo is a PIRATE, CLASS_PIRATE
     baseMov 5 -- not the 6 an earlier draft assumed; both doors are 24 move points away.)
@@ -125,9 +126,9 @@ difficulty:
 
 # NO FOG. Vanilla Ch6 runs initialFogLevel 3 because its map is an open field where
 # fog is the only difficulty. Our donor puts 40% of the map in concentric water with
-# only 8 crossings, so the route IS the puzzle and it is one the player can see and
-# solve. Measured: foot reaches all 288 passable cells; the split-party runs land the
-# right village turn 6 and the left turn 10, which is the race fog was buying.
+# seven crossings and a snag, so the route IS the puzzle and it is one the player can see
+# and solve. Measured: foot reaches all 290 passable cells (terrain_note), which is the race
+# fog was buying.
 fog: none
 
 difficulty_note: >
@@ -1014,8 +1015,9 @@ forest_composition: replaced
 # (validate_terrain_matches_vanilla) rejects any drift NOT listed, so this block is the
 # whole allowlist -- cell by cell, so the ch05 fence->wall class of accident still fails.
 #
-# SEVEN divergences, down from twenty-one (2026-09-03). The two village footprints are no
-# longer repainted walkable: SEVEN cells of each keep the donor's own impassable TILE_2E
+# FIVE divergences. The donor's snag at (10,17) is NOT one of them: it stands on vanilla's
+# own tiles and falls into a crossing when chopped, as vanilla's does (MapChange id 1,
+# Nicolas 2026-10-09). The two village footprints are not repainted walkable: SEVEN cells of each keep the donor's own impassable TILE_2E
 # (fourteen in all -- the eighth cell of each footprint is the DOOR, which stays walkable),
 # so each boat sits in a POCKET whose only ground entrance is that door, directly south. That is what a
 # village IS in FE8 -- a body you cannot walk into and a door you visit it from -- and
@@ -1025,7 +1027,7 @@ forest_composition: replaced
 # (and therefore ch04) never sees the change.
 #
 # TILE_2E costs 1 to a FLIER and is impassable to every ground class, which is vanilla's
-# own rule and the reason Pinky keeps a privilege the rest of the party does not: she can
+# own rule and the reason Pinky keeps a privilege the rest of the party does not: he can
 # work the boat from four cells where everyone else has one. Blocking her would have been
 # STRICTER than FE8, not more faithful to it.
 #
@@ -1050,14 +1052,6 @@ terrain_divergence:
   from: VILLAGE_REGULAR
   to: '0x0C'
   why: the west door -- as (17,13). Not left as VILLAGE_REGULAR, because there is no village event on this map and a dead Visit prompt is worse than none
-- tile: [10, 17]                 # K18
-  from: SNAG
-  to: '0x01'
-  why: map-change pair; SNAG is impassable to EVERY class, fliers included
-- tile: [10, 18]                 # K19
-  from: RIVER
-  to: '0x34'
-  why: map-change pair; the crossing the player opens
 - tile: [3, 21]                  # D22
   from: SEA
   to: '0x26'

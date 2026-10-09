@@ -605,7 +605,7 @@ def render(chapter, stem, out_png, concept=None, shade=None, zoom=3):
            'orange hatch = PROPOSED wall (the donor\'s own TILE_2E: impassable to every '
            'ground class, cost 1 to a flier)', fill=(255, 170, 60), font=f_small)
     d.text((pad, ly + 78),
-           'board:  blue = deploy block     white = the 8 crossings     '
+           'board:  blue = deploy block     white = crossings     '
            'green = a marooned boat (CLASS_FLEET, Res 0, in a +20-avoid drift)',
            fill=(210, 210, 216), font=f_small)
 

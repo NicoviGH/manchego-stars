@@ -110,7 +110,7 @@ class ChapterFog(unittest.TestCase):
     Two chapters wrote it inline and the other five inherited whatever their squatted host
     slot shipped. That is survivable right up until it isn't: vanilla carries fog on five
     slots, one of which is SLOT 7 -- ch06's host -- and ch06's whole design is a route
-    puzzle across concentric water with eight crossings. Inheriting three-tile vision
+    puzzle across concentric water with seven crossings and a snag. Inheriting three-tile vision
     would have hidden the map, failed nothing, and shipped.
 
     ch04 is the other half of the argument. It wanted fog and got it from a literal `3`
