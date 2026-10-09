@@ -192,6 +192,22 @@ class MessieOnTheIce(unittest.TestCase):
         speakers = {k for e in ev['script'] for k in e if k not in inject.text.SCRIPT_DIRECTIVES}
         self.assertLessEqual(speakers, set(inject.chapters.ch06.CH06_MESSIE_SEATS))
 
+    def test_the_party_gathers_around_him_and_off_his_route(self):
+        """Nicolas, 2026-10-09: the party stands with him, or he is alone on the ice. They are
+        LOADed, never MOVEd (ADR 0292), after every tile the scene needs is cleared."""
+        block, tiles = inject.chapters.ch06.ch06_messie_gather(self.chap, self.terrain)
+        self.assertLessEqual({'braulo', 'marty', 'prof-rbg', 'wolfram'}, set(tiles))
+        self.assertNotIn('CHARACTER_', block)
+        load = 'LOAD1(0x1, %s)' % inject.chapters.ch06.CH06_MESSIE_PARTY_TABLE
+        self.assertLess(block.rindex('CHAR_EVT_POSITION_AT_SLOTB'), block.index(load))
+        self.assertTrue(block.startswith('    FADI') and block.rstrip().endswith('FADU(16)'))
+
+    def test_a_gather_tile_on_his_route_is_refused(self):
+        gather = dict(self.chap['messie']['gather'], braulo=[9, 12])
+        chap = dict(self.chap, messie=dict(self.chap['messie'], gather=gather))
+        with self.assertRaises(SystemExit):
+            inject.chapters.ch06.ch06_messie_gather(chap, self.terrain)
+
     def test_the_scene_plays_before_the_victory_sting(self):
         with open(inject.chapters.ch06.__file__, encoding='utf-8') as f:
             src = f.read()

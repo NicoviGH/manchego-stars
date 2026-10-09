@@ -5,7 +5,8 @@ import os
 import re
 import sys
 
-from inject.cast import _classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
+from inject.cast import (_classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP,
+                         PORTRAIT_MAP)
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_TALK_FLAGS, CH06_BOAT_TALK_MSGS,
                                 CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
                                 CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
@@ -52,6 +53,7 @@ CH06_LINE_TABLE = 'MS_Ch06Line'                  # the 24-strong merfolk line (#
 CH06_HARD_WAVE_TABLE = 'MS_Ch06Wave4Hard'        # vanilla Ch6's Difficult-only cavalry trio
 CH06_BOAT_TABLE = 'MS_Ch06Boats'                 # the two marooned boats, GREEN and killable
 CH06_MESSIE_TABLE = 'MS_Ch06Messie'               # Messie, loaded by the boss_defeated scene
+CH06_MESSIE_PARTY_TABLE = 'MS_Ch06MessieParty'    # ...and the speakers he surfaces in front of
 
 CH06_LAYOUT = ('Ch06MaerMonsterMap', 'ch06-maer-monster')   # (asset label, maps/ stem)
 CH06_TILESET = 'snowy-bern-ice'                  # stem 'SnowIce' (TILESET_STEMS); ch06 is its
@@ -471,6 +473,38 @@ def ch06_messie_route(chap, terrain):
         x, y = x + dx, y + dy
 
 
+def ch06_messie_gather(chap, terrain):
+    """(event text, party tiles): the fade-out gather that stands the party around Nerra's tile
+    before Messie surfaces (Nicolas, 2026-10-09: "otherwise Messie is alone").
+
+    The speakers are LOADed onto their tiles, never MOVEd: ADR 0292, a scene LOADs the PCs it
+    stages. An event LOAD of a PC who is already on the map finds that unit and moves it, stats
+    and inventory untouched (LoadUnit_800F704), and one who was benched or fell still resolves.
+    Every tile the scene needs -- his route and the party's spots -- is cleared first through
+    CHAR_EVT_POSITION_AT_SLOTB, because the fight can end with anyone standing anywhere (Nerra's
+    killer beside her tile, Pinky hovering over the water) and a LOAD onto a held tile stacks two
+    units on one cell. All of it happens behind the FADI."""
+    (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
+    gather = dict(chap['messie']['gather'])
+    spare = gather.pop('spare')
+    route = [(sx + i * ((tx > sx) - (tx < sx)), sy + i * ((ty > sy) - (ty < sy)))
+             for i in range(abs(tx - sx) + abs(ty - sy) + 1)]
+    for uid, (x, y) in sorted(gather.items()):
+        if (x, y) in route:
+            sys.exit('ERROR: ch06 Messie: %s gathers onto his route at (%d, %d)' % (uid, x, y))
+        if uid not in PORTRAIT_MAP:
+            sys.exit('ERROR: ch06 Messie: %r gathers but is not a cast member' % uid)
+    out = '    FADI(16) /* the fight is over: gather the party out of sight */\n'
+    for x, y in route + [tuple(v) for _u, v in sorted(gather.items())]:
+        out += ('    SVAL(EVT_SLOT_B, _EvtParams2(%d, %d)) /* whoever stands here, out of the way */\n'
+                '    MOVE_CLOSEST(0xffff, CHAR_EVT_POSITION_AT_SLOTB, %d, %d)\n'
+                % (x, y, spare[0], spare[1]))
+    out += ('    LOAD1(0x1, %s) /* the speakers, on the ice around her tile */\n'
+            '    ENUN\n'
+            '    FADU(16)\n' % CH06_MESSIE_PARTY_TABLE)
+    return out, {uid: tuple(xy) for uid, xy in gather.items()}
+
+
 def ch06_messie_block(surface, target):
     """The ending's head: Kyogre's Cave of Origin awakening, then the scene.
 
@@ -600,6 +634,19 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
                  for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     declare_unit_table(CH06_BOOT_SEED_TABLE, seed_rows,
                        'ch06 --ch06-boot armed party seed (cold-start PREP fodder)')
+    # Messie's audience: the speakers, LOADed onto the ice around Nerra's tile (ADR 0292).
+    by_uid = {row[0]: row for row in cast}
+    messie_gather, gather_tiles = ch06_messie_gather(
+        chap, _map_terrain_grid(maps_dir, CH06_LAYOUT[1])[2])
+    missing = sorted(set(gather_tiles) - set(by_uid))
+    if missing:
+        sys.exit('ERROR: ch06 Messie gathers %s, who is not on the ch06 roster' % ', '.join(missing))
+    declare_unit_table(CH06_MESSIE_PARTY_TABLE, [
+        _ally_unit_entry(leader, by_uid[uid][1], by_uid[uid][3], by_uid[uid][4], x, y,
+                         ', '.join(CLASS_LOADOUT[by_uid[uid][2]]),
+                         ' /* %s -- stands with the party when Messie surfaces */' % uid)
+        for uid, (x, y) in sorted(gather_tiles.items())],
+        'ch06 the party around Nerra\'s tile, for Messie on the ice (#26)')
 
     # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
     spawns = ch06_line_spawns(chap, maps_dir)
@@ -716,7 +763,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
-        '{\n' + ch06_messie_block(messie_surface, messie_target)
+        '{\n' + messie_gather + ch06_messie_block(messie_surface, messie_target)
         + '    MUNO\n    MUSC(SONG_VICTORY)\n'
         + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')

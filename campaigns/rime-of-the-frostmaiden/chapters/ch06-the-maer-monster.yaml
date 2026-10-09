@@ -928,6 +928,18 @@ messie:
   # shot, empty once she falls), and his Gwyllgi geometry cannot cross water, so this is open
   # water with nothing but ice between it and her tile (ch06_messie_route guards both).
   surfaces: [8, 12]
+  # Where the party stands when he comes up (Nicolas, 2026-10-09: "otherwise Messie is alone").
+  # The fight can end with anyone anywhere, so the ending fades out after Nerra falls and
+  # gathers the scene's speakers on the ice around her tile, then fades back in. A speaker who
+  # was not deployed, or fell, is skipped by the engine. Anyone standing on his route is moved
+  # to `spare` first, because a blocked haul stops short.
+  gather:
+    braulo: [10, 11]                # the leader, straight ahead of him
+    prof-rbg: [9, 11]
+    marty: [11, 11]
+    wolfram: [10, 13]               # apart, on the far side: he sniffs the beast from there
+    pinky: [7, 11]                  # behind his father (beat A: "stand behind me")
+    spare: [6, 12]
   art:
     portrait: portraits/messie.png      # Syrene's face slot; portraits/messie.py renders it
     map_sprite:
