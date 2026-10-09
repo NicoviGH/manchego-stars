@@ -60,7 +60,8 @@ map:
   size: "22×22"                 # Ch13EphraimMap; 137 TERRAIN_RIVER in concentric channels
   description: >
     The frozen mouth of Maer Dualdon, 22x22. Concentric channels of cracked-open water ring
-    the map, crossed at eight points; everything else is walkable lake ice. Two marooned
+    the map, crossed at seven points, and an eighth once the snag at (10,17) is chopped;
+    everything else is walkable lake ice. Two marooned
     fishing boats sit in ice outcrops at opposite corners -- the Burly Ram east (17,12),
     the Pronged Goat west (4,17). Each outcrop is a POCKET: the eight cells around the hull
     keep the donor's impassable TILE_2E, so the only ground entrance is the door directly
