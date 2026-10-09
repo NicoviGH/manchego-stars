@@ -17,7 +17,8 @@ from inject.event_scripts import assert_event_scripts_defined, declare_event_scr
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
-from inject.maps import _register_chapter_map, _register_tileset, TILESET_STEMS
+from inject.maps import (_inject_tile_changes, _map_changes_tileset, _read_map_metatile,
+                         _register_chapter_map, _register_tileset, TILESET_STEMS)
 from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
@@ -439,9 +440,11 @@ CH06_MESSIE_SEATS = {'braulo': '[OpenMidLeft]', 'marty': '[OpenFarLeft]',
                      'prof-rbg': '[OpenFarLeft]', 'wolfram': '[OpenFarRight]',
                      'messie': '[OpenMidRight]'}
 CH06_MESSIE_CRY = 'SONG_MS_KYOGRE_CRY'   # inject/sounds.py; Kyogre's cry, as Sapphire stages it
-# Speed 4 is a quarter pixel a frame (GetMuQ4MovementSpeed): one tile per 64 frames, against a
-# normal walk's 16. Kyogre's two steps in the Cave of Origin are the model.
-CH06_MESSIE_HAUL_SPEED = 4
+CH06_MESSIE_STEP_SPEED = 0x10                     # a normal walk: one tile, then the shake
+CH06_MESSIE_MAP_CHANGES = 'MS_Ch06MapChanges'
+CH06_MESSIE_BREAK_ID = 0                          # the bay breaking open: MapChange id 0
+# MOVE_1STEP's direction codes (eventscr.c EVSUBCMD_MOVE_1STEP): 0 west, 1 east, 2 south, 3 north.
+_STEP_DIRECTION = {(-1, 0): 0, (1, 0): 1, (0, 1): 2, (0, -1): 3}
 # He walks as the Gwyllgi he is built on, so the route is checked against that class's own row.
 CH06_MESSIE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'
 
@@ -542,33 +545,73 @@ def ch06_messie_gather(chap, terrain):
     return out + '    FADU(16)\n', gather
 
 
-def ch06_messie_block(surface, target):
+def ch06_messie_bay(chap, maps_dir):
+    """The MapChange that breaks the island's ice open in front of Messie (Nicolas, 2026-10-09:
+    the crack has to be SEEN). One region, the bay's bounding box: bay cells take their declared
+    metatiles, every other cell keeps the one it has, so the change touches nothing but the bay.
+    Each bay metatile must be RIVER in the map's own tileset, or the water would be ice to the
+    engine."""
+    bay = {(x, y): m for x, y, m in chap['messie']['bay']}
+    tileset = _map_changes_tileset(maps_dir, CH06_LAYOUT)
+    for (x, y), m in sorted(bay.items()):
+        if tileset.terrain(m) != TERRAIN_RIVER:
+            sys.exit('ERROR: ch06 Messie: bay metatile %d at (%d, %d) is not water in the '
+                     'map\'s tileset' % (m, x, y))
+    xs, ys = [x for x, _y in bay], [y for _x, y in bay]
+    x0, y0 = min(xs), min(ys)
+    w, h = max(xs) - x0 + 1, max(ys) - y0 + 1
+    tiles = [bay.get((x, y)) if (x, y) in bay else _read_map_metatile(maps_dir, CH06_LAYOUT[1], x, y)
+             for y in range(y0, y0 + h) for x in range(x0, x0 + w)]
+    return [(x0, y0, w, h, tiles, 'ch06: the island ice breaks open in front of Messie (#26)')]
+
+
+def ch06_messie_block(chap, terrain):
     """The ending's head: Kyogre's Cave of Origin awakening, then the scene.
 
-    Sapphire's order (pokeruby CaveOfOrigin_B4F): the field goes still, something stirs, the
-    beast takes two slow steps toward the player, a held second, its cry -- and the battle. Here
-    the ice cracks under a shake, Messie surfaces and hauls himself two tiles toward the party,
-    the second is held, he cries, and where the battle would start the fighters raise their
-    weapons instead. The rumble ends BEFORE the cry: EARTHQUAKE_END fades the SE channel
-    (Sound_FadeOutSE), and the moose (ch05) showed that the two cannot overlap.
+    Sapphire's order (pokeruby CaveOfOrigin_B4F): the field goes still, the beast steps toward
+    the player in DISCRETE steps that shake the screen, a held second, its cry -- and the battle.
+    Here Messie rises in the north channel and comes south one tile at a time, the map shaking
+    under each step; before the first step onto the island its ice breaks open into the bay
+    (TILECHANGE), he rises into it and crawls out onto Nerra's tile; then the held second, the
+    cry, and where the battle would start the fighters raise their weapons instead. A step's
+    rumble ends before the next sound: EARTHQUAKE_END fades the SE channel (Sound_FadeOutSE),
+    and the moose (ch05) showed that a rumble and a cry cannot overlap.
     """
-    (sx, sy), (tx, ty) = surface, target
-    return ('    MUSI /* duck the music: the lake goes still */\n'
-            '    CAMERA(%d, %d) /* Nerra\'s tile, the lake shot */\n'
-            '    STAL(30)\n'
-            '    EARTHQUAKE_START(0, 1) /* the ice cracks: a map shake, with its rumble */\n'
-            '    STAL(60)\n'
-            '    EARTHQUAKE_END\n'
-            '    LOAD1(0x1, %s) /* he surfaces in open water */\n'
-            '    ENUN\n'
-            '    MOVE_CLOSEST(%d, %s, %d, %d) /* ...and hauls himself up, slowly */\n'
-            '    ENUN\n'
-            '    STAL(60) /* Kyogre\'s held second */\n'
-            '    SOUN(%s) /* his cry */\n'
-            '    STAL(110) /* the 1.68s sample plays out */\n'
-            '    Text(0x%X) /* Messie on the ice, beats A-E */\n'
-            % (tx, ty, CH06_MESSIE_TABLE, CH06_MESSIE_HAUL_SPEED, CH06_MESSIE_PID, tx, ty,
-               CH06_MESSIE_CRY, CH06_MESSIE_MSG))
+    (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
+    bay = {(x, y) for x, y, _m in chap['messie']['bay']}
+    dx, dy = (tx > sx) - (tx < sx), (ty > sy) - (ty < sy)
+    out = ('    MUSI /* duck the music: the lake goes still */\n'
+           '    CAMERA(%d, %d) /* the centre, the lake shot */\n'
+           '    STAL(30)\n'
+           '    LOAD1(0x1, %s) /* he rises in the north channel */\n'
+           '    ENUN\n'
+           '    STAL(40)\n' % (tx, ty, CH06_MESSIE_TABLE))
+    x, y, broken = sx, sy, False
+    while (x, y) != (tx, ty):
+        ahead = (x + dx, y + dy)
+        if not broken and ahead in bay and terrain[ahead[1]][ahead[0]] != TERRAIN_RIVER:
+            out += ('    EARTHQUAKE_START(0, 1) /* he reaches the island... */\n'
+                    '    STAL(20)\n'
+                    '    TILECHANGE(%d) /* ...and its ice breaks open */\n'
+                    '    STAL(40)\n'
+                    '    EARTHQUAKE_END\n'
+                    '    STAL(20)\n' % CH06_MESSIE_BREAK_ID)
+            broken = True
+        out += ('    MOVE_1STEP(0x%X, %s, %d) /* one step */\n'
+                '    ENUN\n'
+                '    EARTHQUAKE_START(0, 1) /* ...and the map shakes under it */\n'
+                '    STAL(12)\n'
+                '    EARTHQUAKE_END\n'
+                '    STAL(24)\n'
+                % (CH06_MESSIE_STEP_SPEED, CH06_MESSIE_PID, _STEP_DIRECTION[(dx, dy)]))
+        x, y = ahead
+    if not broken:
+        sys.exit('ERROR: ch06 Messie never steps onto the bay, so its ice never breaks')
+    return out + ('    STAL(60) /* Kyogre\'s held second */\n'
+                  '    SOUN(%s) /* his cry */\n'
+                  '    STAL(110) /* the 1.68s sample plays out */\n'
+                  '    Text(0x%X) /* Messie on the ice, beats A-E */\n'
+                  % (CH06_MESSIE_CRY, CH06_MESSIE_MSG))
 
 
 def ch06_ending_debug_script(seed_load):
@@ -644,6 +687,9 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
         'ERROR: slot %d goal is not the vanilla defeat_boss template (ch06 DefeatBoss donor)'
         % CH06_GOAL_DONOR, indices, chap['chapter_number'], CH06_EVENT_GROUP,
         (CH06_GOAL_WINDOW_MSG, CH06_GOAL_STATUS_MSG))
+    # Messie's bay (#26): the island ice that breaks open in front of him, as MapChange id 0.
+    # After the retarget, which zeroes changeLayerId.
+    _inject_tile_changes(CH06_MESSIE_MAP_CHANGES, ch06_messie_bay(chap, maps_dir), CH06_HOST_INDEX)
 
     # Fog is not written here any more either -- `apply_chapter_fog` writes ch06's declared
     # `fog: none` along with every other hosted chapter's (#365). This block is what the
@@ -801,7 +847,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
-        '{\n' + messie_gather + ch06_messie_block(messie_surface, messie_target)
+        '{\n' + messie_gather + ch06_messie_block(chap, terrain)
         + '    MUNO\n    MUSC(SONG_VICTORY)\n'
         + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')

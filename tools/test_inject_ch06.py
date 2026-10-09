@@ -13,6 +13,7 @@ import inject.cast
 import inject.chapter_ids
 import inject.chapters.ch06
 import inject.map_sprites
+import inject.maps
 import inject.recruit
 import inject.text
 import inject.villages
@@ -167,9 +168,9 @@ class MessieOnTheIce(unittest.TestCase):
     def test_a_route_he_cannot_walk_is_refused(self):
         """An unwalkable event MOVE hangs the chapter, so the build refuses it first. Judged by
         the Gwyllgi's own cost row: it wades a river (cost 5) but not an outcrop (TILE_2E)."""
-        surface, _target = inject.chapters.ch06.ch06_messie_route(self.chap, self.terrain)
+        (sx, sy), (tx, ty) = inject.chapters.ch06.ch06_messie_route(self.chap, self.terrain)
         blocked = [row[:] for row in self.terrain]
-        blocked[surface[1]][surface[0] + 1] = 0x2E
+        blocked[sy + (ty > sy) - (ty < sy)][sx + (tx > sx) - (tx < sx)] = 0x2E   # his first step
         with self.assertRaises(SystemExit):
             inject.chapters.ch06.ch06_messie_route(self.chap, blocked)
 
@@ -178,12 +179,34 @@ class MessieOnTheIce(unittest.TestCase):
         with self.assertRaises(SystemExit):
             inject.chapters.ch06.ch06_messie_route(chap, self.terrain)
 
-    def test_the_cry_follows_the_haul_and_the_rumble_ends_first(self):
-        """Sapphire's order. EARTHQUAKE_END fades the SE channel, so it must precede the cry."""
-        block = inject.chapters.ch06.ch06_messie_block((8, 12), (10, 12))
-        order = ['EARTHQUAKE_START', 'EARTHQUAKE_END', 'LOAD1', 'MOVE_CLOSEST', 'SOUN(SONG_MS_KYOGRE_CRY)',
-                 'Text(0x%X)' % inject.chapter_ids.CH06_MESSIE_MSG]
-        self.assertEqual(order, sorted(order, key=block.index))
+    def test_he_comes_from_the_north_in_steps_that_shake_and_breaks_the_ice_first(self):
+        """Kyogre's discrete steps, each shaking the map (Nicolas, 2026-10-09), and the bay
+        breaks before he steps onto it. Every rumble ends before the cry: EARTHQUAKE_END fades
+        the SE channel."""
+        block = inject.chapters.ch06.ch06_messie_block(self.chap, self.terrain)
+        surface, target = inject.chapters.ch06.ch06_messie_route(self.chap, self.terrain)
+        self.assertEqual(surface[0], target[0])
+        self.assertLess(surface[1], target[1], 'he comes from the north')
+        steps = block.count('MOVE_1STEP(')
+        self.assertEqual(target[1] - surface[1], steps)
+        self.assertEqual(steps + 1, block.count('EARTHQUAKE_START'))   # each step + the break
+        self.assertNotIn('MOVE_CLOSEST(', block)                       # no slow slide
+        moves = [i for i in range(len(block)) if block.startswith('MOVE_1STEP(', i)]
+        brk = block.index('TILECHANGE(%d)' % inject.chapters.ch06.CH06_MESSIE_BREAK_ID)
+        self.assertTrue(any(m < brk for m in moves) and any(m > brk for m in moves))
+        self.assertLess(block.rindex('EARTHQUAKE_END'), block.index('SOUN(SONG_MS_KYOGRE_CRY)'))
+        self.assertLess(block.index('SOUN('), block.index('Text(0x%X)' % inject.chapter_ids.CH06_MESSIE_MSG))
+
+    def test_the_bay_is_water_and_changes_nothing_else(self):
+        maps = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+        (x0, y0, w, h, tiles, _why), = inject.chapters.ch06.ch06_messie_bay(self.chap, maps)
+        bay = {(x, y): m for x, y, m in self.chap['messie']['bay']}
+        for i, m in enumerate(tiles):
+            x, y = x0 + i % w, y0 + i // w
+            want = bay.get((x, y), inject.maps._read_map_metatile(maps, inject.chapters.ch06.CH06_LAYOUT[1], x, y))
+            self.assertEqual(want, m, (x, y))
+        island = inject.chapters.ch06.ch06_center_island(self.terrain, (10, 12))
+        self.assertTrue({xy for xy in bay if xy in island}, 'the bay cuts into the island')
 
     def test_the_scene_is_one_message_with_every_speaker_seated(self):
         (msg, body), = inject.chapters.ch06.ch06_messie_messages(self.chap)
@@ -231,7 +254,7 @@ class MessieOnTheIce(unittest.TestCase):
     def test_the_scene_plays_before_the_victory_sting(self):
         with open(inject.chapters.ch06.__file__, encoding='utf-8') as f:
             src = f.read()
-        self.assertLess(src.index('ch06_messie_block(messie_surface'), src.index("MUSC(SONG_VICTORY)"))
+        self.assertLess(src.index('ch06_messie_block(chap, terrain)'), src.index("MUSC(SONG_VICTORY)"))
 
 
 class MerfolkSurface(unittest.TestCase):

@@ -1,8 +1,6 @@
 """Chapter 3 (#23): its injector and everything only it reads.
 """
-import json
 import os
-import struct
 import sys
 
 import fe8_talk_font
@@ -17,7 +15,7 @@ from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH03_EVENT_GROUP, CH03_HOST_INDEX
 from inject.maps import (
-    _inject_tile_changes, _layout_sidecar, _register_chapter_map, _register_tileset)
+    _inject_tile_changes, _read_map_metatile, _register_chapter_map, _register_tileset)
 from inject.paths import CH4_EVENTINFO_H, CH4_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.recruit import on_map_talk_recruits, talk_recruit_wiring, talk_recruiters
 from inject.scenes import (
@@ -121,18 +119,6 @@ CH03_BRUTE_DEFEAT_FLAG = 'EVFLAG_TMP(10)'  # set by the Brute's silent gDefeatTa
 CH03_MIDMAP_GUARD_FLAG = 'EVFLAG_TMP(11)'  # AFEV ent-flag: guards the one-shot (set after the beat fires)
 CH03_MIDMAP_SCRIPT = 'EventScr_089F1BD8'   # dead vanilla Ch4 script (defined-only; its list ref dropped by the host)
 CH03_CRIER_FID = '[FID_VillagerYoungBoy]'   # the boy crying the bounty on his crate (book p.95; generic mug)
-
-
-def _read_map_metatile(maps_dir, stem, x, y):
-    """Return the metatile index painted at (x, y) on a compiled .mar layout. compile_layout
-    stores each cell as metatile<<5 with no header (map_tileset_tool), row-major over the
-    width from the paired .json -- so reading the door's OPEN tile off the map itself tracks
-    any re-retile (no hand-copied tile numbers to drift)."""
-    with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
-        w = json.load(f)['width']
-    with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
-        mar = f.read()
-    return struct.unpack_from('<H', mar, (y * w + x) * 2)[0] >> 5
 
 
 def _inject_ch03_tile_changes(chap, maps_dir, host_index):

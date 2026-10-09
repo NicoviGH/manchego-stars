@@ -340,6 +340,18 @@ def terrain_ids():
         vanilla_decomp_text('include/constants/terrains.h'))}
 
 
+def _read_map_metatile(maps_dir, stem, x, y):
+    """Return the metatile index painted at (x, y) on a compiled .mar layout. compile_layout
+    stores each cell as metatile<<5 with no header (map_tileset_tool), row-major over the
+    width from the paired .json -- so reading the door's OPEN tile off the map itself tracks
+    any re-retile (no hand-copied tile numbers to drift)."""
+    with open(_layout_sidecar(maps_dir, stem), encoding='utf-8') as f:
+        w = json.load(f)['width']
+    with open(os.path.join(maps_dir, stem + '.mar'), 'rb') as f:
+        mar = f.read()
+    return struct.unpack_from('<H', mar, (y * w + x) * 2)[0] >> 5
+
+
 def map_changes_asm(symbol, changes):
     """The per-chapter MapChange array, for any chapter that flips tiles (#23 ch03 chests/doors,
     #214 ch04's snag + visited village).
