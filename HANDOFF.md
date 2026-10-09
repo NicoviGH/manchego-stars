@@ -6,26 +6,34 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-09 (Claude): the ch06 story frame (#468, ADR 0332) and ch06's opening with
-Speaker Dorbulgruf (#469) merged. **What landed and why is in `git log` and the ADRs it cites**
+Refreshed 2026-10-09 (Claude), end of session: Messie on the ice is wired and filmed on PR
+#470, not merged; Nicolas's four open calls are recorded on #26 and #471. **What landed and why is in `git log` and the ADRs it cites**
 -- this file keeps no "recently landed" list.
 
 ## In flight
 
-Nothing on a branch. **Next, in order:**
+**PR #470** (branch `ch06-messie-on-the-ice`, head 3809067): ch06's `boss_defeated` scene, Kyogre's
+cry, the new Messie bust pipeline, engine patch 0017 (silent text). Open, CI not re-checked since
+the last push, NOT merged -- merging needs Nicolas's "merge". Its review GIF (`docs/demo/`) is from
+before the last round (south shore, silent entrance, new bust); re-film with `recordch06messie`
+before merge, then drop the GIF. The whole list of decisions and open work is the #26 comment of
+2026-10-09.
 
-1. **#26 -- `boss_defeated`, Messie on the ice: dialogue pass.** Settle BEATS with Nicolas
-   before any line (the dialogue-pass skill). The frame is ADR 0332 and the event's YAML
-   description: local to Bremen only (the Frostmaiden reveal is ch07's ending), Marty and
-   Braulo carry it, the book's own Messie lines (Rime p.31), and it closes on Messie-for-Speaker.
-   Messie is pid 0xbd on the Syrene face slot.
-2. **#26 -- `chapter_end`: dialogue pass.** Open call to bring with a pick: ch06 pays 400 gold
-   at chapter end while Dorbulgruf's bounty (300, "for its head") is never paid. Pick: the
-   rescued crews pay the 400.
-3. **#26 -- claim `status-effects` and `terrain-bonuses`** in ch06's `introduces:` ledger
-   (Grynsk's Antitoxin, Tali's snow drifts), then `python3 tools/gen_onboarding_index.py`.
-4. **#459 -- roster parity with vanilla**, chapter by chapter (unchanged; Baxby-as-Seth is the
-   open call there).
+**Next, in order** (finish on the #470 branch, then merge):
+
+1. **#26 -- ch06's snag becomes real** (Nicolas: vanilla's map has it, so we do). Repaint (10,17) as
+   SNAG and (10,18) as RIVER, add MapChange id 1 to `MS_Ch06MapChanges` (ch04's pattern), correct
+   ADR 0217 and the YAML comment, then re-run `make difficulty-gate` and re-measure the boats'
+   clocks -- "I don't care if you have to rerun the numbers."
+2. **#26 -- Nerra speaks:** her voice section, then a taunt and a defeat line via the
+   dialogue-pass skill, and a bust found on the FE-Repo. Replace the silent battle-quote pair.
+3. **#26 -- Speaker's hall music:** Nicolas must HEAR the candidates first (Laughter, Lights in
+   the Dark, Bonds, Comrades, Distant Roads). `sfx_preview` cannot render music; build a way to
+   play a song id in plain mGBA (the harness buzzes, `run.sh` beside PT_SOUND).
+4. **#471 -- corner engine patch** (approved), then Messie's mayor bust and a PC-rescale pass.
+5. **#26 -- `chapter_end` dialogue pass** (pick to bring: the rescued crews pay the 400), then the
+   `introduces:` ledger claims (Grynsk's Antitoxin, Tali's snow drifts).
+6. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
 
 - `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
@@ -35,9 +43,9 @@ Nothing on a branch. **Next, in order:**
 
 ## Chapter work
 
-- **#26 -- ch06's own body.** `make chapter CH=ch06` is its state. The opening is written,
-  wired and filmed (`recordch06opening`, `recordch06ice`); `boss_defeated` and `chapter_end`
-  are what is left.
+- **#26 -- ch06's own body.** `make chapter CH=ch06` is its state. The opening and
+  `boss_defeated` are written, wired and filmed (on #470); `chapter_end` is the scene left.
+  Debug boots: `CH06BOOT=1` (the map) and `CH06BOOT=1 CH06ENDING=1` (straight into Messie).
 - **#27 -- ch07** is reframed by ADR 0332 (Dorbulgruf refuses out of disbelief; Messie's fish
   tax; his farewell carries the Frostmaiden's orders to the merfolk). Still `status: planned`.
 - **#335** -- the AI audit (behavioural drift is invisible to every gate; proposes an
