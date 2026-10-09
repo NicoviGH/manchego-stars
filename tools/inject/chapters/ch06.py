@@ -18,7 +18,8 @@ from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
 from inject.maps import (_inject_tile_changes, _map_changes_tileset, _read_map_metatile,
-                         _register_chapter_map, _register_tileset, TILESET_STEMS)
+                         _register_chapter_map, _register_tileset, snag_fall_change, terrain_ids,
+                         TILESET_STEMS)
 from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
@@ -442,8 +443,12 @@ CH06_MESSIE_SEATS = {'braulo': '[OpenMidLeft]', 'marty': '[OpenFarLeft]',
                      'messie': '[OpenMidRight]'}
 CH06_MESSIE_CRY = 'SONG_MS_KYOGRE_CRY'   # inject/sounds.py; Kyogre's cry, as Sapphire stages it
 CH06_MESSIE_STEP_SPEED = 0x10                     # a normal walk: one tile, then the shake
-CH06_MESSIE_MAP_CHANGES = 'MS_Ch06MapChanges'
+CH06_MAP_CHANGES = 'MS_Ch06MapChanges'
 CH06_MESSIE_BREAK_ID = 0                          # the bay breaking open: MapChange id 0
+# The donor's snag (Ch13EphraimMapChanges id 4): chopped, it falls across the river below it.
+# Painted standing on vanilla's own tiles, as vanilla has it (Nicolas, 2026-10-09).
+CH06_SNAG_POS = (10, 17)
+CH06_SNAG_ID = 1
 # MOVE_1STEP's direction codes (eventscr.c EVSUBCMD_MOVE_1STEP): 0 west, 1 east, 2 south, 3 north.
 _STEP_DIRECTION = {(-1, 0): 0, (1, 0): 1, (0, 1): 2, (0, -1): 3}
 # He walks as the Gwyllgi he is built on, so the route is checked against that class's own row.
@@ -568,6 +573,19 @@ def ch06_messie_bay(chap, maps_dir):
     tiles = [bay.get((x, y)) if (x, y) in bay else _read_map_metatile(maps_dir, CH06_LAYOUT[1], x, y)
              for y in range(y0, y0 + h) for x in range(x0, x0 + w)]
     return [(x0, y0, w, h, tiles, 'ch06: the island ice breaks open in front of Messie (#26)')]
+
+
+def ch06_map_changes(chap, maps_dir):
+    """ch06's tile flips, in id order: Messie's bay (id 0, scripted by his scene) and the
+    donor's snag falling into a crossing (id 1, applied by the engine when it is chopped)."""
+    tileset = _map_changes_tileset(maps_dir, CH06_LAYOUT)
+    m = _read_map_metatile(maps_dir, CH06_LAYOUT[1], *CH06_SNAG_POS)
+    if tileset.terrain(m) != terrain_ids()['TERRAIN_SNAG']:
+        sys.exit('ERROR: ch06: (%d, %d) is metatile %d, not a snag -- the fall would open a '
+                 'crossing with nothing to chop' % (CH06_SNAG_POS + (m,)))
+    changes = ch06_messie_bay(chap, maps_dir) + [snag_fall_change(tileset, CH06_SNAG_POS)]
+    assert len(changes) == CH06_SNAG_ID + 1
+    return changes
 
 
 def ch06_messie_shot(chap, terrain):
@@ -710,15 +728,14 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
         'ERROR: slot %d goal is not the vanilla defeat_boss template (ch06 DefeatBoss donor)'
         % CH06_GOAL_DONOR, indices, chap['chapter_number'], CH06_EVENT_GROUP,
         (CH06_GOAL_WINDOW_MSG, CH06_GOAL_STATUS_MSG))
-    # Messie's bay (#26): the island ice that breaks open in front of him, as MapChange id 0.
     # After the retarget, which zeroes changeLayerId.
-    _inject_tile_changes(CH06_MESSIE_MAP_CHANGES, ch06_messie_bay(chap, maps_dir), CH06_HOST_INDEX)
+    _inject_tile_changes(CH06_MAP_CHANGES, ch06_map_changes(chap, maps_dir), CH06_HOST_INDEX)
 
     # Fog is not written here any more either -- `apply_chapter_fog` writes ch06's declared
     # `fog: none` along with every other hosted chapter's (#365). This block is what the
     # generalisation was built from: slot 7 SHIPS `initialFogLevel: 3` (vanilla Ch7 is fogged),
-    # and ch06's donor puts 40% of the map in concentric water with eight crossings, so the
-    # route is the puzzle and one the player is meant to see and solve. Inheriting three-tile
+    # and ch06's donor puts 40% of the map in concentric water with seven crossings and a
+    # snag, so the route is the puzzle and one the player is meant to see and solve. Inheriting three-tile
     # vision would have hidden the entire design and failed nothing.
 
     # 2. Rosters. The cap template is NEVER LOADed -- PREP reads its entry count (the cap) and

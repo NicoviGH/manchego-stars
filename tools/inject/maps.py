@@ -313,6 +313,28 @@ def _is_blank_metatile(tileset, metatile):
     return len(set(tileset.metatile_image(metatile).convert('RGB').getdata())) <= 1
 
 
+# A felled snag, as vanilla writes it (Ch4MapChanges id 1, Ch13EphraimMapChanges id 4): a 1x3
+# column from the snag down -- plains / crossing / plains -- so the trunk lies across the river
+# cell below it. snowy-bern paints vanilla Ch4's downed-log composition into slots 7 / 36 / 11
+# (the trunk fragments, the trunk over water, the far bank); each is still checked against its
+# TERRAIN, since the art names the slot and the terrain is the mechanical contract.
+SNAG_FALL_TERRAIN = ('TERRAIN_PLAINS', 'TERRAIN_BRIDGE_SNAG', 'TERRAIN_PLAINS')
+SNAG_FALL_TILES = (7, 36, 11)
+
+
+def snag_fall_change(tileset, snag):
+    """The MapChange that turns a chopped snag into a crossing, for `map_changes_asm`.
+
+    Snags are natively attackable (bmtrick.c adds a 20 HP TRAP_OBSTACLE on every TERRAIN_SNAG
+    tile); what a chapter authors is the change UpdateObstacleFromBattle applies when one
+    breaks, which FE8 finds by POSITION -- so the region must start on the snag itself."""
+    x, y = snag
+    return (x, y, 1, len(SNAG_FALL_TERRAIN),
+            [_snowy_metatile_for(tileset, terrain, prefer=metatile)
+             for terrain, metatile in zip(SNAG_FALL_TERRAIN, SNAG_FALL_TILES)],
+            'the snag falls -> a crossing at (%d, %d)' % (x, y + 1))
+
+
 def _snowy_metatile_for(tileset, terrain_name, prefer=None):
     """The lowest PAINTED metatile carrying `terrain_name` (or `prefer` if it qualifies).
 

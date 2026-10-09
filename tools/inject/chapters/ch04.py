@@ -15,7 +15,8 @@ from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH02_HOST_INDEX, CH04_EVENT_GROUP, CH04_HOST_INDEX
 from inject.maps import (
-    _inject_tile_changes, _map_changes_tileset, _register_chapter_map, _snowy_metatile_for)
+    _inject_tile_changes, _map_changes_tileset, _register_chapter_map, _snowy_metatile_for,
+    snag_fall_change)
 from inject.paths import (
     CH4_EVENTSCRIPT_H, CH5_EVENTINFO_H, CH5_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT)
 from inject.raw_pids import entry_body_levels
@@ -164,19 +165,9 @@ CH04_MOOSE_POS = (11, 4)
 CH04_MOOSE_AREA = (9, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the clearing it watches from.
 # The snag (#214) -- the Iron Axe's whole purpose. Vanilla Ch4's item village hands the axe over
 # to chop this into a bridge, and the retile kept the geometry: (4,8) is the snag, (4,9) the river
-# it falls across, (4,10) the far bank. Snags are natively attackable (bmtrick.c auto-adds a 20 HP
-# TRAP_OBSTACLE on every TERRAIN_SNAG tile); what needs authoring is the MapChange that
-# UpdateObstacleFromBattle applies when it breaks. Region + tile ROLES copied from vanilla's own
-# Ch4MapChanges id 1 -- plains / BRIDGE_SNAG / plains -- resolved to snowy-bern metatiles at build
-# time so a re-retile cannot leave a stale tile number here.
+# it falls across, (4,10) the far bank. The fall itself is `snag_fall_change`, vanilla Ch4's own
+# Ch4MapChanges id 1, shared with ch06.
 CH04_SNAG_POS = (4, 8)
-CH04_SNAG_SIZE = (1, 3)
-# snowy-bern now paints vanilla Ch4's complete 7 / 4 / 11 downed-log composition into its
-# matching free slots 7 / 36 / 11: snowy plains with trunk fragments, the felled trunk over
-# river water, then snowy plains again. Each preference is still validated against its TERRAIN
-# before use -- the art names the slot; the terrain remains the mechanical contract.
-CH04_SNAG_TERRAIN = ('TERRAIN_PLAINS', 'TERRAIN_BRIDGE_SNAG', 'TERRAIN_PLAINS')
-CH04_SNAG_TILES = (7, 36, 11)
 
 
 def branch_on_flag(flag, if_set, if_clear, label_base=0):
@@ -230,12 +221,7 @@ def ch04_map_changes(chap, maps_dir):
     terrain. Without the village entry a visited village stays looking un-visited, which vanilla
     never does."""
     tileset = _map_changes_tileset(maps_dir, CH04_LAYOUT)
-    x, y = CH04_SNAG_POS
-    w, h = CH04_SNAG_SIZE
-    changes = [(x, y, w, h,
-                [_snowy_metatile_for(tileset, terrain, prefer=metatile)
-                 for terrain, metatile in zip(CH04_SNAG_TERRAIN, CH04_SNAG_TILES)],
-                'the snag falls -> a crossing at (%d, %d)' % (x, y + 1))]
+    changes = [snag_fall_change(tileset, CH04_SNAG_POS)]
     changes += [(v['tile'][0], v['tile'][1], 1, 1,
                  [_snowy_metatile_for(tileset, 'TERRAIN_VILLAGE_CLOSED')],
                  '%s visited' % v['id'])
