@@ -948,7 +948,7 @@ messie:
     lupin: [13, 13]
     basil: [10, 15]                 # the south shore
     sahnar: [9, 15]
-    spare: [6, 12]
+    spare: [0, 0]                   # the far corner, clear of the whole scene
   art:
     portrait: portraits/messie.png      # Syrene's face slot; portraits/messie.py renders it
     map_sprite:

@@ -200,10 +200,27 @@ class MessieOnTheIce(unittest.TestCase):
         self.assertFalse(set(tiles.values()) & island)
         cast, _ = inject.cast._classed_cast(self.CAMPAIGN, available_at=6)
         self.assertEqual({row[0] for row in cast}, set(tiles))
-        self.assertNotIn('CHARACTER_', block)   # LOADed, never MOVEd (ADR 0292)
-        load = 'LOAD1(0x1, %s)' % inject.chapters.ch06.CH06_MESSIE_PARTY_TABLE
+        self.assertNotRegex(block, r'MOVE\w*\(\w+, CHARACTER_')   # LOADed, never MOVEd (ADR 0292)
+        first_load = block.index('LOAD1(')
         for x, y in island:
-            self.assertIn('_EvtParams2(%d, %d)' % (x, y), block[:block.index(load)])
+            self.assertIn('_EvtParams2(%d, %d)' % (x, y), block[:first_load])
+
+    def test_nobody_outside_the_army_is_loaded_into_it(self):
+        """A LOAD of someone not in the army CREATES them (review, #470): every member is
+        LOADed behind its own CHECK_EXISTS, so a Sahnar never turned stays away."""
+        block, tiles = inject.chapters.ch06.ch06_messie_gather(self.chap, self.terrain)
+        self.assertEqual(len(tiles), block.count('CHECK_EXISTS('))
+        self.assertEqual(len(tiles), block.count('LOAD1('))
+        for uid in tiles:
+            check = 'CHECK_EXISTS(CHARACTER_%s)' % inject.cast.PORTRAIT_MAP[uid].upper()
+            self.assertIn(check, block, uid)
+
+    def test_a_spare_beside_the_scene_is_refused(self):
+        """MOVE_CLOSEST drops the cleared on the free cell nearest the spare (review, #470)."""
+        gather = dict(self.chap['messie']['gather'], spare=[6, 12])
+        chap = dict(self.chap, messie=dict(self.chap['messie'], gather=gather))
+        with self.assertRaises(SystemExit):
+            inject.chapters.ch06.ch06_messie_gather(chap, self.terrain)
 
     def test_a_cast_member_on_his_island_is_refused(self):
         gather = dict(self.chap['messie']['gather'], braulo=[10, 11])

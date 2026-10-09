@@ -22,7 +22,7 @@ from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
-from inject.scenes import (_make_fid, scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
+from inject.scenes import (_branch_on_slot_c, _make_fid, scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
                            _write_chapter_title_card, flag_defeat_quote, split_on_stage_cut)
 from inject.text import (
     _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body, set_message_body,
@@ -53,7 +53,11 @@ CH06_LINE_TABLE = 'MS_Ch06Line'                  # the 24-strong merfolk line (#
 CH06_HARD_WAVE_TABLE = 'MS_Ch06Wave4Hard'        # vanilla Ch6's Difficult-only cavalry trio
 CH06_BOAT_TABLE = 'MS_Ch06Boats'                 # the two marooned boats, GREEN and killable
 CH06_MESSIE_TABLE = 'MS_Ch06Messie'               # Messie, loaded by the boss_defeated scene
-CH06_MESSIE_PARTY_TABLE = 'MS_Ch06MessieParty'    # ...and the speakers he surfaces in front of
+CH06_MESSIE_AUDIENCE = 'MS_Ch06Audience%02d'      # ...and the cast around him, one table each
+CH06_MESSIE_LABEL_BASE = 0x40                     # the audience's CHECK_EXISTS branches
+# The spare must sit well clear of every tile the scene clears: MOVE_CLOSEST drops whoever is in
+# the way on the free cell NEAREST it, and a spare beside the ring refilled it (review, #470).
+CH06_MESSIE_SPARE_CLEARANCE = 6
 
 CH06_LAYOUT = ('Ch06MaerMonsterMap', 'ch06-maer-monster')   # (asset label, maps/ stem)
 CH06_TILESET = 'snowy-bern-ice'                  # stem 'SnowIce' (TILESET_STEMS); ch06 is its
@@ -495,7 +499,10 @@ def ch06_messie_gather(chap, terrain):
 
     The cast is LOADed onto its tiles, never MOVEd: ADR 0292, a scene LOADs the PCs it stages.
     An event LOAD of a unit already on the map finds it and moves it, stats and inventory
-    untouched (LoadUnit_800F704), and one who was benched or fell still resolves. Every cell the
+    untouched (LoadUnit_800F704), and one who was benched or fell still resolves. But a LOAD of
+    someone NOT in the army creates them, so each member is LOADed only if CHECK_EXISTS finds
+    them: a Sahnar never turned, or a Baxby never bought, must not join here (review, #470).
+    One table per member, because the branch is per member. Every cell the
     scene needs -- the island, his route, the cast's tiles -- is cleared first through
     CHAR_EVT_POSITION_AT_SLOTB, because the fight can end with anyone standing anywhere (Nerra's
     killer beside her, Pinky hovering over the water) and a LOAD onto a held cell stacks two
@@ -516,15 +523,23 @@ def ch06_messie_gather(chap, terrain):
             sys.exit('ERROR: ch06 Messie: %s gathers onto (%d, %d), which nobody stands on'
                      % (uid, x, y))
     clear = sorted(set(route) | island) + sorted(gather.values())
+    near = [(x, y) for x, y in clear
+            if abs(x - spare[0]) + abs(y - spare[1]) < CH06_MESSIE_SPARE_CLEARANCE]
+    if near:
+        sys.exit('ERROR: ch06 Messie: the spare tile %s is within %d of the scene at %s -- '
+                 'whoever is moved there could land back on a cleared cell'
+                 % (tuple(spare), CH06_MESSIE_SPARE_CLEARANCE, near[0]))
     out = '    FADI(16) /* the fight is over: gather the cast out of sight */\n'
     for x, y in clear:
         out += ('    SVAL(EVT_SLOT_B, _EvtParams2(%d, %d)) /* whoever stands here, out of the way */\n'
                 '    MOVE_CLOSEST(0xffff, CHAR_EVT_POSITION_AT_SLOTB, %d, %d)\n'
                 % (x, y, spare[0], spare[1]))
-    out += ('    LOAD1(0x1, %s) /* the cast, on the shores around the island */\n'
-            '    ENUN\n'
-            '    FADU(16)\n' % CH06_MESSIE_PARTY_TABLE)
-    return out, gather
+    for n, (uid, _xy) in enumerate(sorted(gather.items())):
+        out += _branch_on_slot_c(
+            'CHECK_EXISTS(CHARACTER_%s)' % PORTRAIT_MAP[uid].upper(),
+            '    LOAD1(0x1, %s) /* %s, on the shore */\n    ENUN\n' % (CH06_MESSIE_AUDIENCE % n, uid),
+            '', CH06_MESSIE_LABEL_BASE + 2 * n, 'not in the army')
+    return out + '    FADU(16)\n', gather
 
 
 def ch06_messie_block(surface, target):
@@ -664,12 +679,12 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
         sys.exit('ERROR: ch06 Messie: the gather must place exactly the ch06 roster (Nicolas: '
                  'the whole cast stands around the island); missing %s, extra %s'
                  % (sorted(set(by_uid) - set(gather_tiles)), sorted(set(gather_tiles) - set(by_uid))))
-    declare_unit_table(CH06_MESSIE_PARTY_TABLE, [
-        _ally_unit_entry(leader, by_uid[uid][1], by_uid[uid][3], by_uid[uid][4], x, y,
-                         ', '.join(CLASS_LOADOUT[by_uid[uid][2]]),
-                         ' /* %s -- on the shore when Messie surfaces */' % uid)
-        for uid, (x, y) in sorted(gather_tiles.items())],
-        'ch06 the whole cast around the centre island, for Messie on the ice (#26)')
+    for n, (uid, (x, y)) in enumerate(sorted(gather_tiles.items())):
+        declare_unit_table(CH06_MESSIE_AUDIENCE % n, [
+            _ally_unit_entry(leader, by_uid[uid][1], by_uid[uid][3], by_uid[uid][4], x, y,
+                             ', '.join(CLASS_LOADOUT[by_uid[uid][2]]),
+                             ' /* %s -- on the shore when Messie surfaces */' % uid)],
+            'ch06 %s around the centre island, for Messie on the ice (#26)' % uid)
 
     # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
     spawns = ch06_line_spawns(chap, maps_dir)
