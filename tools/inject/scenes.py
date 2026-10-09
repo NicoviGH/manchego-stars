@@ -124,8 +124,11 @@ def _stage_beat(beat, fid, home, overrides=None):
     ov = overrides or {}
     # Directives are stage business, not speakers: `fid('exits')` would die in _cutscene_fid as
     # an "unknown cutscene speaker" the first time a non-ch05 scene used one (review, 2026-08-14).
-    return {k: (ov.get(k, home.get(k, '[OpenMidLeft]')), fid(k))
-            for e in beat for k in e if k not in SCRIPT_DIRECTIVES}
+    # But the character a `present:`/`exits:` NAMES is staged like a speaker, and
+    # _script_to_message refuses one with no podium -- so they are seated too.
+    staged = [k for e in beat for k in e if k not in SCRIPT_DIRECTIVES]
+    staged += [v for e in beat for k, v in e.items() if k in ('present', 'exits')]
+    return {k: (ov.get(k, home.get(k, '[OpenMidLeft]')), fid(k)) for k in staged}
 
 
 def _emit_scene_beats(lines, msg_ids, beats, fid, home, overrides=None,

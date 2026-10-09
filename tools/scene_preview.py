@@ -278,7 +278,10 @@ def _faceless_tag(spk):
 def _draft_seats(script):
     seats = {}
     for entry in script:
-        for spk in entry:
+        for key, value in entry.items():
+            # `present:` stages a character who never speaks, and the staging refuses one
+            # with no podium -- so the silent are seated too, by the name they are given.
+            spk = value if key == 'present' else key
             if spk not in inject.text.SCRIPT_DIRECTIVES and spk != 'narration':
                 seats.setdefault(spk, DRAFT_SEATS[len(seats) % len(DRAFT_SEATS)])
     return seats
@@ -290,10 +293,16 @@ def draft_scenes(chapter, chap, wired):
     One scene per message the script will become: a `beat_break` or a `stage_cut` starts a
     new one, as it does in every builder."""
     out, names = [], _speakers()
-    for ev in chap.get('events') or []:
+    events = [ev for ev in chap.get('events') or []
+              if ev.get('script') and ev.get('trigger') not in wired]
+    triggers = collections.Counter(ev.get('trigger') for ev in events)
+    seen = collections.Counter()
+    for ev in events:
         trigger = ev.get('trigger')
-        if not ev.get('script') or trigger in wired:
-            continue
+        seen[trigger] += 1
+        # A trigger can fire more than one scripted event (ch02's two `turn_start`s), and a
+        # key built from the trigger alone let the second silently replace the first.
+        stem = trigger if triggers[trigger] == 1 else '%s.%d' % (trigger, seen[trigger])
         seats = _draft_seats(ev['script'])
         names.update({_faceless_tag(spk): spk for spk in seats})
         _card, beats = inject.scenes._split_script_beats(ev['script'], card_required=False)
@@ -308,7 +317,7 @@ def draft_scenes(chapter, chap, wired):
         bodies = inject.scenes.scene_beat_bodies(list(range(len(pieces))), pieces, _draft_fid,
                                                  seats)
         for n, (_i, body) in enumerate(bodies, 1):
-            key = '%s/draft-%s%s' % (chapter, trigger, '-%d' % n if len(pieces) > 1 else '')
+            key = '%s/draft-%s%s' % (chapter, stem, '-%d' % n if len(pieces) > 1 else '')
             steps = [s._replace(speaker=names.get(s.face, s.face)) for s in read_scene(body)]
             width = (fe8_talk_font.SOLO_BOX_BUDGET_PX
                      if inject.scenes._beat_is_narration(pieces[n - 1]) else TALK)

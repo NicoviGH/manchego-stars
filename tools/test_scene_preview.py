@@ -252,6 +252,23 @@ class Drafts(unittest.TestCase):
                                                 'script': [{'nobody-yet': 'hello'}]}), set())
         self.assertEqual('nobody-yet', scene.boxes[0].speaker)
 
+    def test_two_events_on_one_trigger_both_draft(self):
+        """ch02 scripts two `turn_start` events; keyed by trigger alone, the second replaced
+        the first in drafts() and nothing said so."""
+        scenes = sp.draft_scenes('ch99', _chap({'trigger': 'turn_start',
+                                                'script': [{'braulo': 'a'}]},
+                                               {'trigger': 'turn_start',
+                                                'script': [{'wolfram': 'b'}]}), set())
+        keys = [s.key for s in scenes]
+        self.assertEqual(2, len(set(keys)), keys)
+
+    def test_a_silent_presence_gets_a_seat(self):
+        """`present:` names a character who never speaks; a draft seated speakers only, so the
+        staging hard-exited and took every chapter's preview down with it."""
+        scene, = sp.draft_scenes('ch99', _chap({'trigger': 'x', 'script': [
+            {'present': 'sahnar'}, {'braulo': 'a'}]}), set())
+        self.assertEqual(['braulo'], [b.speaker for b in scene.boxes])
+
     def test_a_draft_says_it_is_one(self):
         scene, = sp.draft_scenes('ch99', _chap({'trigger': 'x',
                                                 'script': [{'braulo': 'a'}]}), set())
