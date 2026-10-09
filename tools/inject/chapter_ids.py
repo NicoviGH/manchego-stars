@@ -447,6 +447,12 @@ CH06_BOAT_TALK_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-talk'
                        'boat-west': appended_message_id('ch06', 'boat-west-talk')}
 # Messie, the boss-death cutscene's actor: 0xbd, the next unnamed 0x255 gap after the boats
 # (0xbe is Fomortiis). He is NAMED, so the pid is his alone (assert_named_raw_pids_are_exclusive).
+# The opening (#26): the location card, then one message per beat. Appended, never block ids.
+CH06_OPENING_CARD_MSG = appended_message_id('ch06', 'opening-card')
+CH06_OPENING_MSGS = (appended_message_id('ch06', 'opening-hall'),
+                     appended_message_id('ch06', 'opening-ice'))
+# ...and beat B's far side of its stage_cut: Meesmickle, over the merfolk surfacing.
+CH06_OPENING_QUIP_MSG = appended_message_id('ch06', 'opening-ice-quip')
 CH06_MESSIE_PID = '0xbd'
 # ch05's four INFANTRY classes are dressed as skeletons (#25, campaign.yaml `dresses: {ch05:}`):
 # every ch05 red unit wearing one is a risen tomb-guardian, so the repoint is wholesale rather

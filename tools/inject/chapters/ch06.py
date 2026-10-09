@@ -4,10 +4,11 @@ import os
 import re
 import sys
 
-from inject.cast import _classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT
+from inject.cast import _classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_TALK_FLAGS, CH06_BOAT_TALK_MSGS,
                                 CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
-                                CH06_GOAL_WINDOW_MSG)
+                                CH06_GOAL_WINDOW_MSG, CH06_OPENING_CARD_MSG, CH06_OPENING_MSGS,
+                                CH06_OPENING_QUIP_MSG)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
 from inject.event_scripts import assert_event_scripts_defined, declare_event_script
@@ -18,7 +19,8 @@ from inject.maps import _register_chapter_map, _register_tileset, TILESET_STEMS
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
-from inject.scenes import _prepend_defeat_quote, _write_chapter_title_card, flag_defeat_quote
+from inject.scenes import (_emit_scene_beats, _make_fid, _prepend_defeat_quote, _split_event_beats,
+                           _write_chapter_title_card, flag_defeat_quote, split_on_stage_cut)
 from inject.text import (
     _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body, set_message_body,
     vanilla_name_text_id)
@@ -259,6 +261,91 @@ def ch06_boarding_wiring(campaign, chap):
     return '{\n' + entries + '    END_MAIN\n}', scripts, messages
 
 
+# ── The opening (#26) ─────────────────────────────────────────────────────────────────────
+# Beat A plays over backdrops before the map exists: the Bremen town CG under the location card
+# (vanilla's Serafew-village establishing shot), then a cut to a plain stone hall for the
+# dialogue. Beat B plays ON THE MAP after prep, on the party -- ch05 0x9C2's after-prep shape.
+CH06_OPENING_TOWN_BG = 'BG_MS_BREMEN_WINTER'     # Fenriel's lakeside town, vendored for Bremen
+CH06_OPENING_HALL_BG = 'BG_CASTLE_BRIGHT'        # vanilla's plainest stone hall
+# Three seats. The Speaker holds mid-right alone; Braulo leads the party from mid-left; RBG and
+# Pinky SHARE far-left, father and son trading the seat on Pinky's two lines. Pinky's first cut sat
+# far-right, and on film it put him off the screen's edge behind Dorbulgruf (2026-10-09).
+CH06_OPENING_HOME = {'braulo': '[OpenMidLeft]', 'prof-rbg': '[OpenFarLeft]',
+                     'dorbulgruf': '[OpenMidRight]', 'pinky': '[OpenFarLeft]'}
+# Beat B's five speakers: Meesmickle takes Wolfram's seat, the one used longest ago.
+CH06_OPENING_ICE_SEATS = {'wolfram': '[OpenMidLeft]', 'pinky': '[OpenFarLeft]',
+                          'braulo': '[OpenMidRight]', 'rootis': '[OpenFarRight]',
+                          'meesmickle': '[OpenMidLeft]'}
+
+
+def ch06_opening_beats(chap):
+    """(location card, [hall, ice, quip]) off the locked chapter_start script.
+
+    Beat B is cut in two at its one `stage_cut` (split_on_stage_cut refuses zero or two): the
+    camera has to leave the party to show the merfolk surfacing, and a paused talk cannot survive
+    a camera move under its bubble, so Meesmickle's answer is a message of its own.
+    """
+    card, beats = _split_event_beats(chap, 'chapter_start', 'ch06 opening', CH06_OPENING_MSGS)
+    ice, _direction, quip = split_on_stage_cut(beats[1], 'ch06 opening beat B')
+    return card, [beats[0], ice, quip]
+
+
+def ch06_opening_head(hall_label):
+    """The event-script head before LOMA: the town under its card, then the hall's dialogue.
+
+    The second BACG needs its load mode re-armed (REMOVEPORTRAITS) -- the card and the fades
+    leave `activeTextType` where a bare BACG is a no-op (the ch03/ch04 stale-BG fix).
+    """
+    return ('    REMOVEPORTRAITS\n'
+            '    BACG(%s) /* Bremen from the lake: the establishing shot */\n'
+            '    FADU(16)\n'
+            '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bremen" location card */\n'
+            '    FADI(16)\n'
+            '    REMOVEPORTRAITS /* re-arm BACG BG-load mode before the cut */\n'
+            '    BACG(%s) /* CUT inside: the Speaker\'s hall */\n'
+            '    FADU(16)\n' % (CH06_OPENING_TOWN_BG, CH06_OPENING_CARD_MSG, CH06_OPENING_HALL_BG)
+            + '    Text(0x%X) /* A -- %s */\n' % (CH06_OPENING_MSGS[0], hall_label)
+            + '    REMA\n'
+              '    FADI(16) /* fade the hall out; LOMA builds the lake next */\n')
+
+
+def ch06_opening_ice_block(camera_tile, lake_tile):
+    """Beat B, AFTER the prep CALL: the map fades up on the party, then cuts to the lake.
+
+    The camera is set before each message and never inside one: a camera move under an open
+    bubble scrolls the map out from beneath it (ch05's moose note). So the shadows are talked
+    about on the party, the talk ENDS, the camera pans to the middle of the lake, the line LOADs
+    in shot, and Meesmickle answers over it. CUMO_AT takes a tile, never a unit -- any speaker
+    here may be benched at prep.
+    """
+    x, y = camera_tile
+    lx, ly = lake_tile
+    return ('    FADU(16) /* the prep prologue left the screen black */\n'
+            '    CAMERA(%d, %d) /* the SCROLL -- CUMO alone only draws a cursor */\n'
+            '    CUMO_AT(%d, %d) /* on the party, standing on the ice */\n'
+            '    STAL(60)\n'
+            '    CURE\n'
+            '    Text(0x%X) /* B -- on the ice: Wolfram reads the boats, the shadows multiply */\n'
+            '    CAMERA(%d, %d) /* PAN to the middle of the lake, where the shadows were */\n'
+            '    STAL(30)\n'
+            '    LOAD1(0x1, %s) /* the merfolk break through the water */\n'
+            '    ENUN\n'
+            '    STAL(30)\n'
+            '    Text(0x%X) /* ...and Meesmickle answers */\n'
+            % (x, y, x, y, CH06_OPENING_MSGS[1], lx, ly, CH06_LINE_TABLE, CH06_OPENING_QUIP_MSG))
+
+
+def ch06_lake_camera_tile(chap):
+    """Where the camera pans for the merfolk: the boss's own tile, the centre shelf."""
+    boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
+    return tuple(boss['positions'][0])
+
+
+def ch06_party_camera_tile(chap):
+    """The first deploy slot: the lord's, and the lord is force-deployed, so it is never empty."""
+    return tuple(chap['deployment']['deploy_slots'][0])
+
+
 def inject_ch06(campaign, boot=False, verbose=True):
     """Host Ch6 "The Maer Monster" (#26) on slot 7: the frozen mouth of Maer Dualdon retiled
     from Ch13 Ephraim, vanilla Ch6's own twenty-four re-dressed as merfolk on our placement,
@@ -270,18 +357,19 @@ def inject_ch06(campaign, boot=False, verbose=True):
     supplies storage and nothing else. The CH06_* constant block states that once.
 
     The boarding pass is wired (ch06_boarding_wiring): Grynsk's and Tali's scenes, the east
-    hull's Antitoxin, and the save-both Orion's Bolt in the ending. ch06's three cutscenes are
-    declared in the chapter YAML with empty text, so the beginning scene is the bare
-    LOMA/LOAD/PREP spine and the ending plays the victory sting, the payout, and the
-    dev-placeholder landing. Nerra's defeat quote is FLAGGED but SILENT by design: the merfolk
-    do not speak, and Messie does.
+    hull's Antitoxin, and the save-both Orion's Bolt in the ending. The OPENING is wired: beat A
+    in Bremen's hall over backdrops, then LOMA and prep, then beat B on the ice, which cuts to the
+    lake where the merfolk line LOADs in shot (it is NOT on the map during prep). The ending plays the
+    victory sting, the payout, and the dev-placeholder landing. Nerra's defeat quote is FLAGGED
+    but SILENT by design: the merfolk do not speak, and Messie does.
 
-    DEFERRED to follow-up passes: Messie's boss-death cutscene, the opening and ending scenes,
-    and the title-card art. ch06's ending parks on the dev placeholder until ch07 hosts,
-    exactly as ch05's did.
+    DEFERRED to follow-up passes: Messie's boss-death cutscene, the ending scene, and the
+    title-card art. ch06's ending parks on the dev placeholder until ch07 hosts, exactly as
+    ch05's did.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)
+    op_card, op_beats = ch06_opening_beats(chap)
 
     # 1. Map: register the snowy-bern-ice tileset (ch06 is its only user, so it self-registers
     #    -- the Cave/inject_ch03 idiom) and the painted layout, then point slot 7 at them and
@@ -382,26 +470,28 @@ def inject_ch06(campaign, boot=False, verbose=True):
                            % CH06_ENDING_SCRIPT,
     }, roster=CH06_ALLY_TABLE, scenes=(CH06_BEGINNING_SCRIPT, CH06_ENDING_SCRIPT))
 
-    # 4. The beginning scene, the Hard wave script and the ending. The beginning is the bare
-    #    spine: LOMA rebuilds the battle map fresh, the line and both hulls LOAD, then CALL
-    #    Preparations (which reads the never-LOADed cap template). No FADU before the prep
-    #    CALL -- the shared prep prologue fades to black itself, so revealing the freshly
-    #    LOMA'd map here only flashes it (the ch03/ch04/ch05 note, same reason).
+    # 4. The beginning scene, the Hard wave script and the ending. The beginning: beat A over
+    #    backdrops, LOMA rebuilds the battle map fresh, both hulls LOAD, then CALL Preparations
+    #    (which reads the never-LOADed cap template), then beat B on the ice, which cuts to
+    #    the lake and LOADs the merfolk line in shot. No FADU before the prep CALL -- the shared prep
+    #    prologue fades to black itself, so revealing the freshly LOMA'd map here only flashes
+    #    it (the ch03/ch04/ch05 note, same reason).
     with open(CH06_EVENTSCRIPT_H, encoding='utf-8') as f:
         script = f.read()
     seed_load = ('    LOAD1(0x1, %s) /* --ch06-boot: found an armed party */\n'
                  '    ENUN\n' % CH06_BOOT_SEED_TABLE) if boot else ''
     beginning = ('{\n'
                  '    MUSC(SONG_TENSION)\n'
+                 + ch06_opening_head('Bremen\'s hall: Dorbulgruf, the beast, the bounty') +
                  '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
                  '    LOMA(0x%X) /* RestartBattleMap -- build the ch06 map fresh */\n'
                  % CH06_HOST_INDEX
-                 + '    LOAD1(0x1, %s) /* the merfolk line */\n    ENUN\n' % CH06_LINE_TABLE
                  + '    LOAD1(0x1, %s) /* the two marooned boats, green in their pockets */\n'
                    '    ENUN\n' % CH06_BOAT_TABLE
                  + seed_load
                  + '    CALL(%s) /* preparations: pick %d; lord force-deployed */\n'
                  % (CH06_PREP_SCRIPT, chap['deployment']['deploy_limit'])
+                 + ch06_opening_ice_block(ch06_party_camera_tile(chap), ch06_lake_camera_tile(chap))
                  + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
     script = _replace_brace_block(script, CH06_BEGINNING_SCRIPT + '[] =', beginning,
                                   CH06_EVENTSCRIPT_H)
@@ -447,6 +537,13 @@ def inject_ch06(campaign, boot=False, verbose=True):
                      name_message_body(boss.get('fe_name') or boss['name']))
     for msg_id, body in board_messages:
         set_message_body(lines, msg_id, body)
+    # The opening's card and its two beats. The Speaker's face rides GUEST_PORTRAIT_MAP (Murray).
+    set_message_body(lines, CH06_OPENING_CARD_MSG, name_message_body(op_card))
+    _emit_scene_beats(lines, CH06_OPENING_MSGS + (CH06_OPENING_QUIP_MSG,), op_beats,
+                      _make_fid({}, 'ch06 opening: unknown cutscene speaker',
+                                fallback=GUEST_PORTRAIT_MAP),
+                      CH06_OPENING_HOME,
+                      overrides=[None, CH06_OPENING_ICE_SEATS, CH06_OPENING_ICE_SEATS])
     # The boats' name plates are NOT written here: they are RAW_PID_PORTRAITS rows, and
     # inject_names writes every one of those off that registry (appending the ones whose donor
     # is an id we own). Writing them again here would make this injector a second owner of the

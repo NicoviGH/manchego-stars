@@ -34,7 +34,7 @@ from inject.recruit import (
 from inject.scenes import (
     _make_fid, _prepend_battle_quote, _prepend_defeat_quote, _split_event_beats, _stage_beat,
     _write_chapter_title_card, battle_quote_pair, branch_on_check_alive, flag_defeat_quote,
-    variant_beat)
+    split_on_stage_cut, variant_beat)
 from inject.terrain import (
     _class_terrain_move_costs, _map_terrain_grid, assert_scripted_move_reachable, reachable_tiles,
     reda_route_move)
@@ -115,23 +115,6 @@ def _script_staged_names(script):
     names |= {text for entry in script for k, text in entry.items()
               if k in ('present', 'exits')}
     return names
-
-
-def split_on_stage_cut(script, where):
-    """Split a cutscene script at its `stage_cut:` into (before, direction, after).
-
-    One directive, two messages, and the second id is what a SCENE CHANGE costs. See
-    SCRIPT_DIRECTIVES for why a `stage_break` cannot do this job.
-    """
-    cuts = [i for i, e in enumerate(script) if 'stage_cut' in e]
-    if len(cuts) != 1:
-        sys.exit('ERROR: %s needs exactly ONE `stage_cut:`; found %d' % (where, len(cuts)))
-    i = cuts[0]
-    before, after = script[:i], script[i + 1:]
-    if not before or not after:
-        sys.exit('ERROR: %s has a `stage_cut:` with nothing on one side of it -- a cut between '
-                 'a beat and nothing is just the end of the beat' % where)
-    return before, script[i]['stage_cut'], after
 
 
 def inject_ch05_visit_faces(campaign, verbose=True):

@@ -773,6 +773,7 @@ events:
       before prep; they surface mid-scene, on the tiles the balance gate measures, so the
       player deploys without seeing them -- vanilla Ch6's fog gives its player the same.
     script:                           # LOCKED 2026-10-09 (dialogue-pass, co-written with Nicolas)
+      - location_card: "Bremen"
       # ── A: Bremen's town hall ──
       # (The party arrives on the rumour from ch05's ending. Nobody sent for them.)
       - prof-rbg: "Speaker Shalescar! Professor R.B. Geenius. Cheesed to meet you."
@@ -823,7 +824,7 @@ events:
       - braulo: "That's not our beastie..."
       - rootis: "Oh! There's another shadow. And another..."
       - rootis: "Maybe the beastie brought friends?"
-      # (The merfolk break through the water, silent, all across the lake: they are LOADED here.)
+      - stage_cut: the camera pans to the lake, and the merfolk break through the water, silent (LOADED here)
       - meesmickle: "Friends. With tridents. Delightful."
   - trigger: boss_defeated
     unit: nerra
@@ -1086,8 +1087,9 @@ cutscene_actors: [marty, braulo]
 #
 # ch06clock is the case #360 could not run because ch06 had no debug boot when it landed: the
 # pockets are a claim about the ENGINE'S pathing, and `mapshot` photographs turn 1 while the
-# question needs several enemy phases. ch06boarding proves the boarding pass. The three
-# cutscenes have no text yet, so there is nothing to assert about them.
+# question needs several enemy phases. ch06boarding proves the boarding pass. The opening is
+# filmed in two halves on either side of Preparations, ch05's split: recordch06opening (beat A,
+# to the prep screen) and recordch06ice (beat B, to a live turn 1 with the merfolk on the map).
 playtest:
   boot: ch06boot                  # CH06BOOT=1; host slot 7 comes from inject/hosts.py
   cases:
@@ -1104,6 +1106,8 @@ playtest:
 
     # The boarding pass, from each hull's DOOR -- the one ground cell next to it -- which is the
     # open question #360 left: whether Talk fires from there at all.
+    - {name: recordch06opening, proves: "the opening's beat A in motion: card, cut, the hall", lua: recordch06opening, kind: record, deadline: 900}
+    - {name: recordch06ice, proves: "beat B on the ice, and the merfolk surfacing at its stage_cut", lua: recordch06ice, kind: record, deadline: 900}
     - name: ch06boarding
       proves: a party member boards both hulls from their doors, both crews speak, and the east
         hull hands over its Antitoxin

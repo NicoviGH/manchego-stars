@@ -8308,6 +8308,72 @@ scenarios.recordch05opening = function()
     })
 end
 
+-- recordch06opening (#26): the MOTION proof for beat A of ch06's opening -- the "Bremen" card
+-- over the lakeside town, the cut inside to the Speaker's hall, and Dorbulgruf's 24 boxes. What
+-- only a run can answer: whether the second BACG actually replaces the first after the card
+-- (REMOVEPORTRAITS re-arms the loader -- a decomp READING), and whether Dorbulgruf comes up
+-- wearing the dressed Murray slot. recordch05opening's shape exactly: boot unfilmed, stop the
+-- moment the event engine goes live, film to the PREP screen the opening runs into.
+-- Run: tools/playtest/run.sh recordch06opening (needs a CH06BOOT=1 ROM).
+scenarios.recordch06opening = function()
+    return recordCutscene({
+        tag = "ch06opening", speed = "normal", maxFrames = 12000, shotEvery = 4,
+        pressEvery = 90,
+        pre = function()
+            pokeFastConfig()
+            for _ = 1, TUNE.bootSteps do
+                -- The event engine, never inChapter(): see recordch05opening.
+                if procActive(SYM.ProcScr_StdEventEngine) then return true end
+                local observation = observeController()
+                local state = controllerState(observation)
+                if state == "dialogue_wait" then return true end
+                if advanceBootState(observation, state) == false then
+                    return false, "boot stalled before ch06's opening: " .. tostring(state)
+                end
+                yield()
+            end
+            return false, "never reached ch06's opening event"
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = "prep",
+    })
+end
+
+-- recordch06ice (#26): beat B, AFTER Preparations -- the map fades up on the party, Wolfram reads
+-- the boats, the camera pans to the lake at the beat's stage_cut, the merfolk line LOADs in shot,
+-- and Meesmickle answers over it. What only a run can answer: whether the pan frames the line as
+-- it arrives (a first cut paused the talk instead, and the merfolk loaded off-screen). The
+-- terminal is the live player phase with the line ON the map: a film that reached turn 1 with no
+-- red units would mean the LOAD never ran.
+-- Run: tools/playtest/run.sh recordch06ice (needs a CH06BOOT=1 ROM).
+scenarios.recordch06ice = function()
+    return recordCutscene({
+        tag = "ch06ice", speed = "normal", maxFrames = 6000, shotEvery = 4, pressEvery = 90,
+        pre = function()
+            -- Fast BEFORE the boot: beat A's 24 boxes play ahead of prep (recordch05join's trap).
+            pokeFastConfig()
+            if not bootToMap(true) or controllerState() ~= "prep_main" then
+                return false, "never reached ch06's Preparations"
+            end
+            if not driveThroughPrep() then return false, "Preparations never exited via Fight!" end
+            return true
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            if controllerState() ~= "player_map_idle" then return false end
+            local reds = 0
+            for i = 0, 49 do
+                local u = unitAt(SYM.gUnitArrayRed, i)
+                if u and u.onMap and (u.state & US_DEAD) == 0 then reds = reds + 1 end
+            end
+            if reds == 0 then
+                return false, "turn 1 is live with NO red units: the merfolk never loaded"
+            end
+            return true
+        end,
+    })
+end
+
 -- recordch05openinglupin (#25): the SAME film against the ch05lupinboot ROM, which carries a
 -- live Lupin, so scene 4's CHECK_ALIVE takes its ALIVE arm and box 1 is Lupin's "The trail
 -- leads here" instead of Pinky's "The tracks stop here". One routine, two ROMs: the scenario
