@@ -213,6 +213,8 @@ def _ch06_registry():
            ids.CH06_OPENING_MSGS[1], opening, TALK, Event('chapter_start', None))
     _claim(reg, 'ch06/opening-quip', 'the merfolk surface; Meesmickle answers',
            ids.CH06_OPENING_QUIP_MSG, opening, TALK, Event('chapter_start', None))
+    _claim(reg, 'ch06/messie', 'Messie on the ice', ids.CH06_MESSIE_MSG,
+           inject.chapters.ch06.ch06_messie_messages, TALK, Event('boss_defeated', None))
     boarding = lambda chap: inject.chapters.ch06.ch06_boarding_wiring(CAMPAIGN, chap)[2]
     _claim(reg, 'ch06/board-east', "boarding Grynsk's boat: the Antitoxin",
            ids.CH06_BOAT_TALK_MSGS['boat-east'], boarding, TALK, None)

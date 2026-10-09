@@ -144,6 +144,10 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         # enum id + extern decls + incbin symbols per vendored backdrop
                         'data/data_bg.s', 'src/eventscr2.c',
                         'include/constants/backgrounds.h', 'include/bg.h',
+                        # campaign sound effects (inject/sounds.py): appended table rows,
+                        # sample data + song, and the SONG_MS_* names
+                        'sound/song_table.s', 'sound/direct_sound_data.s',
+                        'include/constants/songs.h',
                         # world-map tour (#43): drawn-map selector patched in by
                         # inject_world_tour on MONTAGE=1 builds
                         'src/worldmap_rm.c',

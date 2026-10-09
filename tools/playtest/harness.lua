@@ -8381,6 +8381,68 @@ scenarios.recordch06ice = function()
     })
 end
 
+-- recordch06messie (#26): the MOTION proof for ch06's boss_defeated scene -- Kyogre's Cave of
+-- Origin awakening (the ice cracks under a shake, Messie surfaces and hauls himself two tiles
+-- onto Nerra's tile, a held second, his cry) and then the 33-box scene, the payout and the
+-- landing. Films on the ch06endingboot DEBUG ROM (CH06ENDING=1), whose beginning script LOMAs,
+-- loads both hulls and the boot party and CALLs the ending straight off New Game:
+-- recordch05ending's shape, for its reason.
+-- What only a run can answer: whether the haul across the ice runs at all (an unwalkable event
+-- MOVE hangs the chapter -- the build guards the route, the film proves it), whether the rumble
+-- and the cry both sound, and whether the shake lands on the map.
+-- The terminal is the TITLE screen (the ending lands on the dev placeholder, which ends on MNTS),
+-- refused below 37 boxes: Messie's 33 plus the placeholder's 4.
+-- Run: tools/playtest/run.sh recordch06messie (needs CH06BOOT=1 CH06ENDING=1).
+scenarios.recordch06messie = function()
+    local BOXES = 37
+    local boxes, waiting, blamed, playedMsg = 0, false, false, nil
+    return recordCutscene({
+        tag = "ch06messie", speed = "normal", maxFrames = 16000, shotEvery = 4, pressEvery = 90,
+        pre = function()
+            -- Stop at the chapter intro: on THIS ROM the beginning script IS the ending, and
+            -- bootToMap() would mash A through it (recordch05ending's trap).
+            pokeFastConfig()
+            for _ = 1, TUNE.bootSteps do
+                local obs = observeController()
+                local st = controllerState(obs)
+                if st == "dialogue_wait" then return true end
+                if st == "chapter_intro_input" then
+                    advanceBootState(obs, st)
+                    return true
+                end
+                if advanceBootState(obs, st) ~= true then
+                    return false, "boot stalled at " .. tostring(st) .. " before the ending"
+                end
+                yield()
+            end
+            return false, "boot cap expired before ch06's ending"
+        end,
+        afterPre = pokeNormalConfig,
+        until_ = function()
+            local now = controllerState() == "dialogue_wait"
+            if now and not waiting then
+                boxes = boxes + 1
+                playedMsg = playedMsg or INSPECT.activeMsg()
+            end
+            waiting = now
+            if procActive(SYM.gProcScr_TitleScreen) then
+                if boxes < BOXES then
+                    if not blamed then
+                        blamed = true
+                        log(string.format("ch06messie: the title arrived after %d boxes, not "
+                            .. "%d -- the scene was SHORTER than Messie's 33 plus the "
+                            .. "placeholder's 4 (first message 0x%X)", boxes, BOXES, playedMsg or 0))
+                    end
+                    return false
+                end
+                log(string.format("ch06messie: %d boxes, first message 0x%X", boxes, playedMsg or 0))
+                return true
+            end
+            return false
+        end,
+    })
+end
+
 -- recordch05openinglupin (#25): the SAME film against the ch05lupinboot ROM, which carries a
 -- live Lupin, so scene 4's CHECK_ALIVE takes its ALIVE arm and box 1 is Lupin's "The trail
 -- leads here" instead of Pinky's "The tracks stop here". One routine, two ROMs: the scenario

@@ -924,6 +924,10 @@ messie:
                                 # say "it"; an earlier draft of this file said "she" throughout.
   role: cutscene_actor
   appears_in: events/ch06-messie.ea
+  # Where he comes up. He hauls himself in a straight line onto Nerra's own tile (the lake
+  # shot, empty once she falls), and his Gwyllgi geometry cannot cross water, so this is open
+  # water with nothing but ice between it and her tile (ch06_messie_route guards both).
+  surfaces: [8, 12]
   art:
     portrait: portraits/messie.png      # Syrene's face slot; portraits/messie.py renders it
     map_sprite:
@@ -1164,6 +1168,7 @@ playtest:
     # open question #360 left: whether Talk fires from there at all.
     - {name: recordch06opening, proves: "the opening's beat A in motion: card, cut, the hall", lua: recordch06opening, kind: record, deadline: 900}
     - {name: recordch06ice, proves: "beat B on the ice, and the merfolk surfacing at its stage_cut", lua: recordch06ice, kind: record, deadline: 900}
+    - {name: recordch06messie, proves: "Messie surfaces, hauls onto the ice and cries, then his 33-box scene", lua: recordch06messie, kind: record, deadline: 900, boot: ch06endingboot}
     - name: ch06boarding
       proves: a party member boards both hulls from their doors, both crews speak, and the east
         hull hands over its Antitoxin

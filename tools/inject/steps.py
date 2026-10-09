@@ -33,6 +33,7 @@ import sys
 
 from inject.arena import inject_arena_attendant_portraits, inject_arena_presentation
 from inject.backgrounds import inject_backgrounds
+from inject.sounds import inject_sounds
 from inject.battle_anims import inject_battle_anims
 from inject.boot import _configure_boot, TEST_CHAPTER_INDEX
 from inject.chapter_settings import apply_chapter_difficulty, apply_chapter_fog
@@ -244,6 +245,10 @@ STEPS = [
     Step(inject_backgrounds, title='event backgrounds (#22):',
          writes=('graphics/bg/*', 'data/data_bg.s', 'include/bg.h',
                  'include/constants/backgrounds.h', 'src/eventscr2.c')),
+    # Vendored one-shot samples -> new gSongTable rows (SONG_MS_*).
+    Step(inject_sounds, title='campaign sounds:',
+         writes=('sound/direct_sound_samples/*', 'sound/song_table.s',
+                 'sound/direct_sound_data.s', 'include/constants/songs.h')),
     # Ownership gate (#198 review): fail the build BEFORE any injector writes text if two
     # hosted chapters claim one message id -- a double-claim is otherwise silent, since
     # verify_text checks runaway text, not who owns a slot.
@@ -291,7 +296,8 @@ STEPS = [
     Step(chain_ch04_to_ch05, needs=('ch04-landing', 'ch05-hosted'),
          writes=('src/events/ch5-eventscript.h',)),
     Step(inject_ch06, title='chapter 6 (#26):', scope='chapter:ch06',
-         call=lambda fn, a: fn(a.campaign, boot=a.ch06_boot), flags=('ch06_boot',),
+         call=lambda fn, a: fn(a.campaign, boot=a.ch06_boot, ending=a.ch06_ending),
+         flags=('ch06_boot', 'ch06_ending'),
          needs=('reskin-classes', 'tileset-labels', 'ch05-hosted'),
          provides=('ch06-hosted',),
          writes=_host(7, 'Ch06MaerMonsterMap', 'include/eventcall.h', 'src/cp_data.c',

@@ -37,7 +37,9 @@ APPENDED_MESSAGES = {
              'boat-east-talk', 'boat-west-talk',
              # ...and the opening (#26): the "Bremen" card, beat A in the town hall, and beat B
              # on the ice, cut in two where the camera pans to the merfolk surfacing.
-             'opening-card', 'opening-hall', 'opening-ice', 'opening-ice-quip'),
+             'opening-card', 'opening-hall', 'opening-ice', 'opening-ice-quip',
+             # ...and Messie on the ice (#26), the boss_defeated scene: one message.
+             'messie-ice'),
 }
 
 

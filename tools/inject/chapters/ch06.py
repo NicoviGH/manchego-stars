@@ -8,8 +8,8 @@ import sys
 from inject.cast import _classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_TALK_FLAGS, CH06_BOAT_TALK_MSGS,
                                 CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
-                                CH06_GOAL_WINDOW_MSG, CH06_OPENING_CARD_MSG, CH06_OPENING_MSGS,
-                                CH06_OPENING_QUIP_MSG)
+                                CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
+                                CH06_OPENING_CARD_MSG, CH06_OPENING_MSGS, CH06_OPENING_QUIP_MSG)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
 from inject.event_scripts import assert_event_scripts_defined, declare_event_script
@@ -51,6 +51,7 @@ CH06_BOOT_SEED_TABLE = 'MS_Ch06BootSeed'         # --ch06-boot only: an armed pa
 CH06_LINE_TABLE = 'MS_Ch06Line'                  # the 24-strong merfolk line (#360's placement)
 CH06_HARD_WAVE_TABLE = 'MS_Ch06Wave4Hard'        # vanilla Ch6's Difficult-only cavalry trio
 CH06_BOAT_TABLE = 'MS_Ch06Boats'                 # the two marooned boats, GREEN and killable
+CH06_MESSIE_TABLE = 'MS_Ch06Messie'               # Messie, loaded by the boss_defeated scene
 
 CH06_LAYOUT = ('Ch06MaerMonsterMap', 'ch06-maer-monster')   # (asset label, maps/ stem)
 CH06_TILESET = 'snowy-bern-ice'                  # stem 'SnowIce' (TILESET_STEMS); ch06 is its
@@ -422,6 +423,107 @@ def ch06_opening_ice_block(camera_tile, lake_tile):
             % (x, y, x, y, CH06_OPENING_MSGS[1], lx, ly, CH06_LINE_TABLE, CH06_OPENING_QUIP_MSG))
 
 
+# ── Messie on the ice (#26) ─────────────────────────────────────────────────────────────
+# The party holds the left: Braulo leads mid-left, Marty and RBG share far-left (RBG speaks only
+# in beats A and B, Marty from B on). Messie faces them from mid-right, and Wolfram stands apart
+# at far-right, the side he sniffs the beast from.
+CH06_MESSIE_SEATS = {'braulo': '[OpenMidLeft]', 'marty': '[OpenFarLeft]',
+                     'prof-rbg': '[OpenFarLeft]', 'wolfram': '[OpenFarRight]',
+                     'messie': '[OpenMidRight]'}
+CH06_MESSIE_CRY = 'SONG_MS_KYOGRE_CRY'   # inject/sounds.py; Kyogre's cry, as Sapphire stages it
+# Speed 4 is a quarter pixel a frame (GetMuQ4MovementSpeed): one tile per 64 frames, against a
+# normal walk's 16. Kyogre's two steps in the Cave of Origin are the model.
+CH06_MESSIE_HAUL_SPEED = 4
+# He walks as the Gwyllgi he is built on, so the route is checked against that class's own row.
+CH06_MESSIE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'
+
+
+def ch06_messie_messages(chap):
+    """[(msg_id, body)] for the boss_defeated scene: one message, 33 presses."""
+    _card, beats = _split_event_beats(chap, 'boss_defeated', 'ch06 Messie scene',
+                                      (CH06_MESSIE_MSG,), card_required=False)
+    return scene_beat_bodies((CH06_MESSIE_MSG,), beats,
+                             _make_fid({}, 'ch06 Messie scene: unknown cutscene speaker',
+                                       fallback=GUEST_PORTRAIT_MAP),
+                             CH06_MESSIE_SEATS)
+
+
+def ch06_messie_route(chap, terrain):
+    """(surface tile, haul-to tile): open water, then a straight walk onto Nerra's tile.
+
+    He wears Gwyllgi geometry, which cannot cross water, and an unwalkable event MOVE hangs
+    the chapter (ch04's bridge note) -- so every cell after the first must be dry."""
+    sx, sy = chap['messie']['surfaces']
+    tx, ty = ch06_lake_camera_tile(chap)
+    if terrain[sy][sx] != TERRAIN_RIVER:
+        sys.exit('ERROR: ch06 Messie surfaces on (%d, %d), which is not water' % (sx, sy))
+    if sx != tx and sy != ty:
+        sys.exit('ERROR: ch06 Messie\'s haul (%d, %d) -> (%d, %d) is not a straight line'
+                 % (sx, sy, tx, ty))
+    costs = _class_terrain_move_costs(CH06_MESSIE_MOV_TABLE)
+    dx, dy = (tx > sx) - (tx < sx), (ty > sy) - (ty < sy)
+    x, y = sx + dx, sy + dy
+    while True:
+        if costs[terrain[y][x]] <= 0:
+            sys.exit('ERROR: ch06 Messie\'s haul crosses (%d, %d), which he cannot walk' % (x, y))
+        if (x, y) == (tx, ty):
+            return (sx, sy), (tx, ty)
+        x, y = x + dx, y + dy
+
+
+def ch06_messie_block(surface, target):
+    """The ending's head: Kyogre's Cave of Origin awakening, then the scene.
+
+    Sapphire's order (pokeruby CaveOfOrigin_B4F): the field goes still, something stirs, the
+    beast takes two slow steps toward the player, a held second, its cry -- and the battle. Here
+    the ice cracks under a shake, Messie surfaces and hauls himself two tiles toward the party,
+    the second is held, he cries, and where the battle would start the fighters raise their
+    weapons instead. The rumble ends BEFORE the cry: EARTHQUAKE_END fades the SE channel
+    (Sound_FadeOutSE), and the moose (ch05) showed that the two cannot overlap.
+    """
+    (sx, sy), (tx, ty) = surface, target
+    return ('    MUSI /* duck the music: the lake goes still */\n'
+            '    CAMERA(%d, %d) /* Nerra\'s tile, the lake shot */\n'
+            '    STAL(30)\n'
+            '    EARTHQUAKE_START(0, 1) /* the ice cracks: a map shake, with its rumble */\n'
+            '    STAL(60)\n'
+            '    EARTHQUAKE_END\n'
+            '    LOAD1(0x1, %s) /* he surfaces in open water */\n'
+            '    ENUN\n'
+            '    MOVE_CLOSEST(%d, %s, %d, %d) /* ...and hauls himself up, slowly */\n'
+            '    ENUN\n'
+            '    STAL(60) /* Kyogre\'s held second */\n'
+            '    SOUN(%s) /* his cry */\n'
+            '    STAL(110) /* the 1.68s sample plays out */\n'
+            '    Text(0x%X) /* Messie on the ice, beats A-E */\n'
+            % (tx, ty, CH06_MESSIE_TABLE, CH06_MESSIE_HAUL_SPEED, CH06_MESSIE_PID, tx, ty,
+               CH06_MESSIE_CRY, CH06_MESSIE_MSG))
+
+
+def ch06_ending_debug_script(seed_load):
+    """`--ch06-ending`: New Game straight onto the ending -- Messie on the ice, the payout, the
+    landing. ch05's ending boot, for the same reason (decisions.md -> "Playtest runs are the most
+    expensive thing in this repo", rule 3): reaching it honestly is the opening, Preparations and
+    a kill on the far side of the lake.
+
+    Keeps what the ending reads: the map, the two hulls (the payout's CHECK_ALIVE asks about
+    both, so both alive is the full arm), and the boot seed, because the Orion's Bolt goes to
+    the party leader. No merfolk line: Nerra's tile is empty, which is where the real path
+    leaves it."""
+    if not seed_load:
+        sys.exit('ERROR: --ch06-ending needs --ch06-boot -- the boot seed is the only party on '
+                 'the map, and the ending hands its reward to the party LEADER')
+    return ('{\n'
+            '    SVAL(EVT_SLOT_B, 0x0)\n'
+            '    LOMA(0x%X) /* --ch06-ending: the lake, no merfolk */\n'
+            '    LOAD1(0x1, %s) /* both hulls afloat: the full payout arm */\n'
+            '    ENUN\n' % (CH06_HOST_INDEX, CH06_BOAT_TABLE)
+            + seed_load +
+            '    FADU(16)\n'
+            '    CALL(%s) /* the ending, exactly as DefeatBoss runs it */\n'
+            '    ENDA\n}' % CH06_ENDING_SCRIPT)
+
+
 def ch06_lake_camera_tile(chap):
     """Where the camera pans for the merfolk: the boss's own tile, the centre shelf."""
     boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
@@ -433,7 +535,7 @@ def ch06_party_camera_tile(chap):
     return tuple(chap['deployment']['deploy_slots'][0])
 
 
-def inject_ch06(campaign, boot=False, verbose=True):
+def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     """Host Ch6 "The Maer Monster" (#26) on slot 7: the frozen mouth of Maer Dualdon retiled
     from Ch13 Ephraim, vanilla Ch6's own twenty-four re-dressed as merfolk on our placement,
     the two marooned boats as killable GREEN units, the real PREP deploy, and DefeatBoss(Nerra).
@@ -532,6 +634,13 @@ def inject_ch06(campaign, boot=False, verbose=True):
     # separately. LOADed by the beginning scene beside the line -- they are on the field from
     # turn 1, because the clock starts when the chapter does.
     boat_rows = ch06_boat_rows(chap)
+    terrain = _map_terrain_grid(maps_dir, CH06_LAYOUT[1])[2]
+    messie_surface, messie_target = ch06_messie_route(chap, terrain)
+    declare_unit_table(CH06_MESSIE_TABLE, [_ally_unit_entry(
+        None, None, 'CLASS_GWYLLGI', 1, messie_surface[0], messie_surface[1], '0',
+        ' /* Messie -- a cutscene actor: no class of his own, no AI, never fights */',
+        allegiance='GREEN', char=CH06_MESSIE_PID)],
+        'ch06 Messie, who surfaces when the merfolk elder falls (#26)')
     declare_unit_table(CH06_BOAT_TABLE, boat_rows,
                        'ch06 the Burly Ram and the Pronged Goat: green hulls in their pockets, '
                        'and the chapter\'s real difficulty (#26)')
@@ -587,6 +696,8 @@ def inject_ch06(campaign, boot=False, verbose=True):
                  % (CH06_PREP_SCRIPT, chap['deployment']['deploy_limit'])
                  + ch06_opening_ice_block(ch06_party_camera_tile(chap), ch06_lake_camera_tile(chap))
                  + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
+    if ending:
+        beginning = ch06_ending_debug_script(seed_load)
     script = _replace_brace_block(script, CH06_BEGINNING_SCRIPT + '[] =', beginning,
                                   CH06_EVENTSCRIPT_H)
     # The wave, through FE8's OWN Difficult-mode predicate: EventScr_LoadReinforceHardMode
@@ -605,7 +716,8 @@ def inject_ch06(campaign, boot=False, verbose=True):
     hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
-        '{\n    MUSC(SONG_VICTORY)\n'
+        '{\n' + ch06_messie_block(messie_surface, messie_target)
+        + '    MUNO\n    MUSC(SONG_VICTORY)\n'
         + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')
         + '    FADI(16) /* fade the lake out into the dev-placeholder landing */\n'
@@ -633,7 +745,7 @@ def inject_ch06(campaign, boot=False, verbose=True):
         set_message_body(lines, msg_id, body)
     # The opening's card and its two beats. The Speaker's face rides GUEST_PORTRAIT_MAP (Murray).
     set_message_body(lines, CH06_OPENING_CARD_MSG, name_message_body(op_card))
-    for msg_id, body in ch06_opening_messages(chap):
+    for msg_id, body in ch06_opening_messages(chap) + ch06_messie_messages(chap):
         set_message_body(lines, msg_id, body)
     # The boats' name plates are NOT written here: they are RAW_PID_PORTRAITS rows, and
     # inject_names writes every one of those off that registry (appending the ones whose donor

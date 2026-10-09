@@ -18,6 +18,7 @@ import inject.text
 import inject.villages
 import inject.decomp
 import inject.hosting
+import inject.terrain
 import inject.units
 from inject import source as injector  # the injector's source, every file of it (#389)
 
@@ -144,6 +145,57 @@ class Opening(unittest.TestCase):
 
     def test_the_lake_shot_is_the_boss_tile(self):
         self.assertEqual(inject.chapters.ch06.ch06_lake_camera_tile(self.chap), (10, 12))
+
+
+class MessieOnTheIce(unittest.TestCase):
+    """The boss_defeated scene (#26): Kyogre's awakening, then the locked script."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    @classmethod
+    def setUpClass(cls):
+        cls.chap = inject.hosting._load_chapter_yaml(cls.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
+        cls.terrain = inject.terrain._map_terrain_grid(
+            os.path.join(inject.decomp.REPO, 'campaigns', cls.CAMPAIGN, 'maps'),
+            inject.chapters.ch06.CH06_LAYOUT[1])[2]
+
+    def test_he_surfaces_in_water_and_hauls_onto_nerras_tile(self):
+        surface, target = inject.chapters.ch06.ch06_messie_route(self.chap, self.terrain)
+        self.assertEqual(target, inject.chapters.ch06.ch06_lake_camera_tile(self.chap))
+        self.assertEqual(inject.chapters.ch06.TERRAIN_RIVER, self.terrain[surface[1]][surface[0]])
+
+    def test_a_route_he_cannot_walk_is_refused(self):
+        """An unwalkable event MOVE hangs the chapter, so the build refuses it first. Judged by
+        the Gwyllgi's own cost row: it wades a river (cost 5) but not an outcrop (TILE_2E)."""
+        surface, _target = inject.chapters.ch06.ch06_messie_route(self.chap, self.terrain)
+        blocked = [row[:] for row in self.terrain]
+        blocked[surface[1]][surface[0] + 1] = 0x2E
+        with self.assertRaises(SystemExit):
+            inject.chapters.ch06.ch06_messie_route(self.chap, blocked)
+
+    def test_a_surface_on_dry_ice_is_refused(self):
+        chap = dict(self.chap, messie=dict(self.chap['messie'], surfaces=[9, 12]))
+        with self.assertRaises(SystemExit):
+            inject.chapters.ch06.ch06_messie_route(chap, self.terrain)
+
+    def test_the_cry_follows_the_haul_and_the_rumble_ends_first(self):
+        """Sapphire's order. EARTHQUAKE_END fades the SE channel, so it must precede the cry."""
+        block = inject.chapters.ch06.ch06_messie_block((8, 12), (10, 12))
+        order = ['EARTHQUAKE_START', 'EARTHQUAKE_END', 'LOAD1', 'MOVE_CLOSEST', 'SOUN(SONG_MS_KYOGRE_CRY)',
+                 'Text(0x%X)' % inject.chapter_ids.CH06_MESSIE_MSG]
+        self.assertEqual(order, sorted(order, key=block.index))
+
+    def test_the_scene_is_one_message_with_every_speaker_seated(self):
+        (msg, body), = inject.chapters.ch06.ch06_messie_messages(self.chap)
+        self.assertEqual(inject.chapter_ids.CH06_MESSIE_MSG, msg)
+        ev = next(e for e in self.chap['events'] if e['trigger'] == 'boss_defeated')
+        speakers = {k for e in ev['script'] for k in e if k not in inject.text.SCRIPT_DIRECTIVES}
+        self.assertLessEqual(speakers, set(inject.chapters.ch06.CH06_MESSIE_SEATS))
+
+    def test_the_scene_plays_before_the_victory_sting(self):
+        with open(inject.chapters.ch06.__file__, encoding='utf-8') as f:
+            src = f.read()
+        self.assertLess(src.index('ch06_messie_block(messie_surface'), src.index("MUSC(SONG_VICTORY)"))
 
 
 class MerfolkSurface(unittest.TestCase):
