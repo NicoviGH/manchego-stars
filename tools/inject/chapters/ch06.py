@@ -1,5 +1,6 @@
 """Chapter 6 (#26): its injector and everything only it reads.
 """
+import heapq
 import os
 import re
 import sys
@@ -16,6 +17,7 @@ from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
 from inject.maps import _register_chapter_map, _register_tileset, TILESET_STEMS
+from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
 from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
@@ -160,7 +162,76 @@ def assert_boat_safe_ai_is_single_chapter(owner):
                  % (BOAT_SAFE_AI_LIST, owner, ', '.join(strays), owner))
 
 
-def ch06_enemy_rows(chap, arrives_turn=None):
+# ── The merfolk surface (#26) ─────────────────────────────────────────────────────────────
+# In beat B the line breaks through the water and WALKS to its turn-1 tiles (Nicolas,
+# 2026-10-09): each unit LOADs on a channel tile and a one-step REDA walks it to its YAML
+# position, vanilla's own reinforcement entrance. The YAML tile stays the fighting tile, so the
+# balance gate, the danger map and the boats' fuses are untouched -- and a skipped scene loads
+# them silently, straight onto those tiles.
+TERRAIN_RIVER = 0x10
+SURFACE_MIN_WALK = 2      # tiles of movement cost: a one-step hop out of the water does not read
+
+
+def surface_spawns(terrain, units, water=TERRAIN_RIVER, min_walk=SURFACE_MIN_WALK):
+    """{key: spawn tile or None} -- the water tile each unit surfaces from.
+
+    `units` is [(key, dest, costs)], in YAML order. A spawn is a `water` tile from which the
+    unit's OWN class can walk to `dest` (the REDA path is GenerateBestMovementScript over the
+    class cost row, and the tile it stands on is never charged); the nearest such tile at least
+    `min_walk` away wins, the nearest of any distance otherwise. Spawns are never shared. A unit
+    with no water tile that reaches its post gets None and simply appears where it stands.
+    """
+    height, width = len(terrain), len(terrain[0])
+    taken = {dest for _key, dest, _costs in units}
+    out = {}
+    for key, dest, costs in units:
+        # Reverse Dijkstra from the post: dist[t] = movement spent walking t -> dest, not
+        # counting t itself. Water tiles are scored as start points and never walked through.
+        dist, heap, scored = {dest: 0}, [(0, dest)], []
+        while heap:
+            d, (x, y) = heapq.heappop(heap)
+            if d > dist.get((x, y), 1 << 30):
+                continue
+            step = costs[terrain[y][x]]       # walking OFF (x, y) means having entered it
+            for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if not (0 <= nx < width and 0 <= ny < height):
+                    continue
+                nd = d + step
+                if terrain[ny][nx] == water:
+                    if (nx, ny) not in taken:
+                        scored.append((nd, (nx, ny)))
+                    continue
+                if costs[terrain[ny][nx]] > 0 and nd < dist.get((nx, ny), 1 << 30):
+                    dist[(nx, ny)] = nd
+                    heapq.heappush(heap, (nd, (nx, ny)))
+        scored = sorted(set(scored))
+        far = [c for c in scored if c[0] >= min_walk]
+        pick = (far or scored or [None])[0]
+        out[key] = pick[1] if pick else None
+        if pick:
+            taken.add(pick[1])
+    return out
+
+
+def ch06_line_spawns(chap, maps_dir):
+    """surface_spawns for ch06's turn-1 line, keyed (enemy id, body index)."""
+    from map_placement_preview import class_movement   # local: it imports the injector stack
+    _w, _h, terrain = _map_terrain_grid(maps_dir, CH06_LAYOUT[1])
+    units = []
+    for enemy in chap['enemy_units']:
+        if enemy.get('arrives_turn') is not None:
+            continue
+        costs = _class_terrain_move_costs(class_movement(enemy['class'])[0])
+        for index, pos in enumerate(enemy['positions']):
+            units.append(((enemy['id'], index), tuple(pos), costs))
+    return surface_spawns(terrain, units)
+
+
+def ch06_reda_symbol(enemy_id, index):
+    return 'MS_Ch06Surface_%s_%d' % (re.sub(r'[^A-Za-z0-9]', '_', enemy_id), index)
+
+
+def ch06_enemy_rows(chap, arrives_turn=None, spawns=None):
     """One UnitDefinition row per authored position for a ch06 deployment wave.
 
     `arrives_turn=None` selects the turn-1 line; a number selects that reinforcement wave (ch06
@@ -190,10 +261,14 @@ def ch06_enemy_rows(chap, arrives_turn=None):
             dropper = bool(drop) and index == 0
             if dropper:
                 carried = _items_with_drop_last(carried, CH06_ITEM_IDS[drop])
+            # `spawns` (the turn-1 line only): LOAD on the water tile, walk to the post.
+            spawn = (spawns or {}).get((enemy['id'], index))
+            sx, sy = spawn if spawn else (x, y)
             rows.append(_enemy_unit_entry(
-                pid, cls, int(enemy['level']), bool(enemy.get('autolevel')), x, y,
+                pid, cls, int(enemy['level']), bool(enemy.get('autolevel')), sx, sy,
                 ', '.join(carried) or '0', enemy_ai_initialiser(chap, enemy, index),
-                ' /* %s -- %s */' % (enemy['id'], enemy['name']), itemdrop=dropper))
+                ' /* %s -- %s */' % (enemy['id'], enemy['name']), itemdrop=dropper,
+                reda=ch06_reda_symbol(enemy['id'], index) if spawn else None))
     return rows
 
 
@@ -412,9 +487,16 @@ def inject_ch06(campaign, boot=False, verbose=True):
     declare_unit_table(CH06_BOOT_SEED_TABLE, seed_rows,
                        'ch06 --ch06-boot armed party seed (cold-start PREP fodder)')
 
-    line_rows = ch06_enemy_rows(chap)
+    # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
+    spawns = ch06_line_spawns(chap, maps_dir)
+    line_rows = ch06_enemy_rows(chap, spawns=spawns)
+    redas = [(ch06_reda_symbol(eid, i), x, y)
+             for e in chap['enemy_units'] if e.get('arrives_turn') is None
+             for i, (x, y) in enumerate(e['positions']) for eid in [e['id']]
+             if spawns.get((eid, i))]
     declare_unit_table(CH06_LINE_TABLE, line_rows,
-                       'ch06 turn-1 line: the merfolk of Maer Dualdon, on our placement (#360)')
+                       'ch06 turn-1 line: the merfolk of Maer Dualdon, on our placement (#360), '
+                       'surfacing from the channels', redas=redas)
     wave_rows = ch06_enemy_rows(chap, arrives_turn=CH06_HARD_WAVE_TURN)
     if not wave_rows:
         sys.exit('ERROR: ch06 declares no enemies arriving on turn %d, but a wave table and a '

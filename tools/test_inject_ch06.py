@@ -146,6 +146,55 @@ class Opening(unittest.TestCase):
         self.assertEqual(inject.chapters.ch06.ch06_lake_camera_tile(self.chap), (10, 12))
 
 
+class MerfolkSurface(unittest.TestCase):
+    """Beat B: the line LOADs on the channels and walks to its YAML posts (#26)."""
+
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+    W, L = 0x10, 0x01   # TERRAIN_RIVER, TERRAIN_PLAINS
+    COSTS = {0x10: -1, 0x01: 1}
+
+    def costs(self):
+        row = [-1] * 0x40
+        for terrain, cost in self.COSTS.items():
+            row[terrain] = cost
+        return row
+
+    def test_the_nearest_water_at_least_two_steps_out_wins(self):
+        W, L = self.W, self.L
+        terrain = [[W, L, L, L],
+                   [L, L, L, W]]
+        out = inject.chapters.ch06.surface_spawns(terrain, [('a', (2, 0), self.costs())])
+        # Both waters are two steps out ((0,0) via (1,0); (3,1) via (3,0)). Ties break on the
+        # tile, so the pick is deterministic.
+        self.assertEqual(out['a'], (0, 0))
+
+    def test_a_spawn_is_never_shared(self):
+        W, L = self.W, self.L
+        terrain = [[W, L, L, L, L]]
+        out = inject.chapters.ch06.surface_spawns(
+            terrain, [('a', (2, 0), self.costs()), ('b', (3, 0), self.costs())])
+        self.assertEqual(out['a'], (0, 0))
+        self.assertIsNone(out['b'])     # the only water is taken: b appears where it stands
+
+    def test_water_is_never_walked_THROUGH(self):
+        W, L = self.W, self.L
+        terrain = [[L, W, W, L]]        # (0,0) is cut off from (3,0) by two channel tiles
+        out = inject.chapters.ch06.surface_spawns(terrain, [('a', (3, 0), self.costs())])
+        self.assertEqual(out['a'], (2, 0))
+
+    def test_every_line_unit_surfaces_and_walks_to_its_post(self):
+        chap = inject.hosting._load_chapter_yaml(self.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
+        maps = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
+        spawns = inject.chapters.ch06.ch06_line_spawns(chap, maps)
+        self.assertTrue(spawns)
+        self.assertEqual([k for k, v in spawns.items() if v is None], [])
+        rows = inject.chapters.ch06.ch06_enemy_rows(chap, spawns=spawns)
+        self.assertTrue(all('.redaCount = 1,' in r for r in rows))
+        # ...and the Difficult wave is untouched: it arrives on turn 4, by its own road.
+        wave = inject.chapters.ch06.ch06_enemy_rows(chap, arrives_turn=4)
+        self.assertTrue(all('.redaCount = 0,' in r for r in wave))
+
+
 class BoardingPass(unittest.TestCase):
     """vanilla Ch6's village in a hull: any party member Talks a boat, the crew speaks, the
     east hull pays the Antitoxin, and the ending pays the Orion's Bolt only if both float."""

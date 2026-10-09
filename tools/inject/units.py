@@ -95,8 +95,14 @@ def _items_with_drop_last(items, drop_enum):
 
 
 def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comment,
-                      itemdrop=False):
-    """One enemy UnitDefinition row; autolevel/itemdrop toggle their optional fields."""
+                      itemdrop=False, reda=None):
+    """One enemy UnitDefinition row; autolevel/itemdrop toggle their optional fields.
+
+    `reda` names a one-entry REDA array (declare_unit_table's `redas`): LOAD then places the
+    unit on (x, y) and WALKS it to the REDA's tile, vanilla's own reinforcement entrance. A
+    skipped or faded-out LOAD drops it straight onto the REDA tile instead (EventLoadUnitSliently),
+    so the REDA tile -- not (x, y) -- is where the unit fights from.
+    """
     return ('    {\n'
             '        .charIndex = %s,%s\n'
             '        .classIndex = %s,\n'
@@ -105,15 +111,25 @@ def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comme
             '        .level = %d,\n'
             '        .xPosition = %d,\n'
             '        .yPosition = %d,\n'
-            '        .redaCount = 0,\n'
+            '%s'
             '%s'
             '        .items = { %s },\n'
             '        .ai = %s,\n'
             '    },' % (char, comment, class_enum,
                        '        .autolevel = 1,\n' if autolevel else '',
                        level, x, y,
+                       ('        .redaCount = 1,\n        .redas = %s,\n' % reda) if reda
+                       else '        .redaCount = 0,\n',
                        '        .itemDrop = 1,\n' if itemdrop else '',
                        items, ai))
+
+
+def reda_definition(symbol, x, y):
+    """One single-step REDA array: walk to (x, y). `.b = 0xffff` is vanilla's own value for an
+    unconditional step (events_udefs.c REDA_088B4244 and every sibling)."""
+    _assert_ms_symbol(symbol)
+    return ('CONST_DATA struct REDA %s[] = {\n    { .x = %d, .y = %d, .b = 0xffff },\n};\n'
+            % (symbol, x, y))
 
 
 
@@ -122,7 +138,7 @@ def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comme
 MS_TABLE_PREFIX = 'MS_'
 
 
-def declare_unit_table(symbol, rows, comment):
+def declare_unit_table(symbol, rows, comment, redas=()):
     """DEFINE a campaign-owned UnitDefinition table, and return its symbol.
 
     Our chapter rosters used to be written by block-overwriting a vanilla table that the
@@ -151,6 +167,7 @@ def declare_unit_table(symbol, rows, comment):
     covered by this and cannot be: chapter_settings.json points at them structurally. Those
     stay vanilla-named, named once in a per-chapter constant block, and nowhere else.
     """
+    # `redas` is [(symbol, x, y)] for rows built with `_enemy_unit_entry(..., reda=symbol)`.
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
     # The decomp files are restored from HEAD each build, so a symbol already present means
@@ -159,6 +176,8 @@ def declare_unit_table(symbol, rows, comment):
     if ('struct UnitDefinition %s[]' % symbol) in udefs:
         sys.exit('ERROR: unit table %s is already defined this build -- two injectors are '
                  'claiming one symbol name' % symbol)
+    # REDA arrays a row walks by are defined first: agbcc needs them declared before the table.
+    udefs += ''.join(reda_definition(*r) for r in redas)
     with open(EVENTS_UDEFS_C, 'w', encoding='utf-8') as f:
         f.write(unit_table_definition(udefs, symbol, rows, comment))
     with open(EVENTCALL_H, encoding='utf-8') as f:
