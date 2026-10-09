@@ -212,6 +212,20 @@ class MessieOnTheIce(unittest.TestCase):
         (msg, body), = inject.chapters.ch06.ch06_messie_messages(self.chap)
         self.assertLess(body.index('[BreakTalk]'), body.index("I'm listening."))
 
+    def test_the_opening_plays_vanilla_ch6s_own_music(self):
+        """Nicolas, 2026-10-09: a chapter plays its twin's music. Vanilla Ch6's backdrop scene
+        is Solve the Riddle, fading to silence; Raid! comes in as the enemy shows on the map."""
+        ch06 = inject.chapters.ch06
+        self.assertEqual('SONG_SOLVE_THE_RIDDLE', ch06.CH06_HALL_SONG)
+        head = ch06.ch06_opening_head('hall')
+        self.assertLess(head.index('REMA'), head.index('MUSCSLOW(SONG_SILENT)'))
+        ice = ch06.ch06_opening_ice_block((5, 1), (10, 12))
+        self.assertLess(ice.index('MUSC(SONG_RAID)'), ice.index('LOAD1(0x1, %s)'
+                                                                % ch06.CH06_LINE_TABLE))
+        vanilla = inject.decomp.vanilla_decomp_text('src/events/ch6-eventscript.h')
+        for song in ('SONG_SOLVE_THE_RIDDLE', 'SONG_RAID'):
+            self.assertIn('MUSC(%s)' % song, vanilla)
+
     def test_the_bay_is_water_and_changes_nothing_else(self):
         maps = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
         (x0, y0, w, h, tiles, _why), = inject.chapters.ch06.ch06_messie_bay(self.chap, maps)

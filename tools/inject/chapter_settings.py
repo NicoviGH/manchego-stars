@@ -1,8 +1,10 @@
-"""Chapter settings passes: fog (#365) and difficulty modes (#303), total over every host.
+"""Chapter settings passes: fog (#365), difficulty modes (#303) and music, total over every host.
 """
 import json
+import re
 import sys
 
+from inject.decomp import vanilla_decomp_text
 from inject.hosting import _load_chapter_yaml, chapter_yaml_for
 from inject.paths import CHAPTER_SETTINGS_JSON
 
@@ -140,4 +142,56 @@ def apply_chapter_difficulty(campaign, verbose=False):
         print('  difficulty (tutorial/normal/difficult): %s' % ', '.join(
             '%s %d/%d/%d' % (n, s['tutorial'], s['normal'], s['difficult'])
             for n, s in applied))
+    return applied
+
+
+# Before the route split, a vanilla chapter's chapter_settings row IS its number: Prologue 0,
+# Ch1 1 ... Ch8 8. Past it the rows interleave Eirika's and Ephraim's routes, so a later twin
+# needs a name -> row table rather than a guess.
+_TWIN_RE = re.compile(r'^FE8 (?:Prologue|Ch([1-8]))$')
+
+
+def twin_settings_index(chap):
+    """The vanilla chapter_settings row of a chapter's `parity_reference` twin."""
+    ref = chap.get('parity_reference', '')
+    m = _TWIN_RE.match(ref)
+    if not m:
+        sys.exit('ERROR: %s: parity_reference %r names no pre-split vanilla chapter, so its '
+                 'music has no twin to follow -- extend _TWIN_RE with that route\'s rows'
+                 % (chap.get('id'), ref))
+    return int(m.group(1) or 0)
+
+
+# Every leaf of a chapter's `bgm` block, written one by one so the census can see each claim
+# (`chapter_data.OWNED_BY_PASS`). The FE7 Hector/Lyn leaves are dead in FE8; copying them keeps
+# the twin's block whole rather than half the host's.
+BGM_FIELDS = ('bluePhase', 'redPhase', 'greenPhase', 'blueGreenPhaseAlt', 'redPhaseAlt',
+              'bluePhaseInHectorStory', 'redPhaseInHectorStory', 'greenPhaseInHectorStory',
+              'prologueInLynStory', 'prologue', 'prologueInHectorStory')
+
+
+def chapter_bgm(chap):
+    """The twin's whole `bgm` block, read from the vanilla decomp (Nicolas, 2026-10-09: a
+    chapter plays its vanilla twin's music). A hosted chapter otherwise plays its HOST slot's,
+    which is the NEXT vanilla chapter's -- ch04 and ch05 had their map themes swapped."""
+    rows = json.loads(vanilla_decomp_text('src/data/chapter_settings.json'))['chapters']
+    return dict(rows[twin_settings_index(chap)]['bgm'])
+
+
+def apply_chapter_music(campaign, verbose=False):
+    """Write every hosted chapter's twin `bgm` block into its own host slot. Total, like fog."""
+    from inject.hosts import hosted_chapters
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    applied = []
+    for chapter in hosted_chapters():
+        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
+        twin, slot = chapter_bgm(chap), settings['chapters'][chapter.host_index]['bgm']
+        for field in BGM_FIELDS:
+            slot[field] = twin[field]
+        applied.append((chapter.name, chap['parity_reference']))
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+    if verbose:
+        print('  music: %s' % ', '.join('%s=%s' % (n, r) for n, r in applied))
     return applied

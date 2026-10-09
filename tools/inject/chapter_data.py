@@ -10,6 +10,7 @@ going wrong:
     the difficulty triple           #303   ch04's Normal sat outside the parity band
     `.traps`                        #302   nearly shipped ch06 vanilla Ch7's ballistae
     `initialFogLevel`               #365   ch06 hosts on slot 7, a fogged vanilla slot
+    `bgm`                           #26    every chapter played the NEXT vanilla chapter's music
 
 The row is now FRAMED from blank (`chapter_frame.write_settings_row`, #412), and the tables
 below are what the frame reads -- the same shape `event_group.py` gives `ChapterEventGroup`. The
@@ -133,13 +134,19 @@ OWNED_BY_PASS = dict(
      ('goal.statusObjectiveTextId', '_retarget_host_chapter')] +
     [('goal.' + f, '_retarget_host_chapter') for f in
      ('windowDataType', 'destPosX', 'destPosY', 'protectCharacterIndex', 'windowEndTurnNumber')] +
-    [# The three TOTAL passes: each mentions every hosted chapter, which is what makes
+    [# The TOTAL passes: each mentions every hosted chapter, which is what makes
      # "nobody wrote a line for this chapter" unreachable.
      ('initialFogLevel', 'apply_chapter_fog'),
      ('easyModeLevelMalus', 'apply_chapter_difficulty'),
      ('normalModeLevelMalus', 'apply_chapter_difficulty'),
      ('difficultModeLevelBonus', 'apply_chapter_difficulty'),
-     ('battleTileSet', 'inject_battle_platforms')])
+     ('battleTileSet', 'inject_battle_platforms')] +
+    # The fourth total pass: a chapter plays its vanilla TWIN's music, the whole block copied
+    # (ADR 0336). Inherited, it was the host slot's -- the NEXT vanilla chapter's.
+    [('bgm.' + f, 'apply_chapter_music') for f in
+     ('bluePhase', 'redPhase', 'greenPhase', 'blueGreenPhaseAlt', 'redPhaseAlt',
+      'bluePhaseInHectorStory', 'redPhaseInHectorStory', 'greenPhaseInHectorStory',
+      'prologueInLynStory', 'prologue', 'prologueInHectorStory')])
 
 # The prologue is the exception: it does NOT retarget its host slot (inject/hosts.py) -- it runs
 # on the slot it was given and frames the row itself. It writes the map, the goal, the fade and
@@ -261,23 +268,6 @@ DECLARED_INHERITED.update(dict.fromkeys((
     'rank.funds.HectorStory.Normal', 'rank.funds.HectorStory.Hard',
     'unk3D', 'unk5E', 'unk91', 'unk92', 'unk93',
 ), _FE7))
-
-# The eleven phase tracks. Inherited DELIBERATELY: `decisions.md` -> "Audio: vanilla FE8
-# soundtrack for MVP", so a hosted chapter plays its host slot's own vanilla music, which is
-# the soundtrack the campaign ships. The six `*InHectorStory` / prologue entries are FE7
-# leftovers on top of that. A chapter that wants a different track writes this field; custom
-# tracks are a post-ship stretch goal on that same record.
-_BGM = ('a phase track, inherited on purpose: `decisions.md` -> "Audio: vanilla FE8 '
-        'soundtrack for MVP", so the chapter plays its host slot\'s own vanilla music')
-DECLARED_INHERITED.update(dict.fromkeys((
-    'bgm.bluePhase', 'bgm.redPhase', 'bgm.greenPhase', 'bgm.blueGreenPhaseAlt',
-    'bgm.redPhaseAlt',
-), _BGM))
-DECLARED_INHERITED.update(dict.fromkeys((
-    'bgm.bluePhaseInHectorStory', 'bgm.redPhaseInHectorStory', 'bgm.greenPhaseInHectorStory',
-    'bgm.prologueInLynStory', 'bgm.prologue', 'bgm.prologueInHectorStory',
-), _FE7))
-
 
 def reason_for(chapter, field):
     """The declared reason a chapter may inherit a field, or None if nobody has ruled."""
