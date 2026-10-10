@@ -69,6 +69,13 @@ def apply_optional(name):
                  % (name, DECOMP, run.stderr.strip()))
 
 
+def apply_sound_room_audition():
+    """DEBUG build (SOUNDROOM=1): the Sound Room lists every song, so a chapter's music can be
+    chosen by ear in plain mGBA on a fresh ROM (the harness buzzes under audio sync)."""
+    apply_optional('sound-room-audition')
+    print('  sound room: every song listed (audition build -- never ship this ROM)')
+
+
 def apply_engine_patches(verbose=True):
     """Apply the series onto the (restored, vanilla) build tree."""
     series = patches()

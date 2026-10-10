@@ -136,13 +136,13 @@ CASES = [
 
 # -- machinery --------------------------------------------------------------
 
-# make-flag -> the build_campaign.py switch that sets it (Makefile line 39).
+# make-flag -> the build_campaign.py switch that sets it (the Makefile's build_campaign line).
 FLAG_ARGS = {'TESTCH': '--test-chapter', 'LORDBOOT': '--lord-boot', 'MONTAGE': '--montage',
              'CH01BOOT': '--ch01-boot',
              'CH03BOOT': '--ch03-boot', 'CH04BOOT': '--ch04-boot', 'CH05BOOT': '--ch05-boot',
              'CH05LUPIN': '--ch05-lupin', 'CH05MOOSE': '--ch05-moose',
              'CH05ENDING': '--ch05-ending', 'CH06BOOT': '--ch06-boot',
-             'CH06ENDING': '--ch06-ending'}
+             'CH06ENDING': '--ch06-ending', 'SOUNDROOM': '--sound-room-audition'}
 
 # Switches that take a VALUE rather than being a bare on/off flag. `--ch05-ending` without its
 # arm is an argparse error 2, surfacing as an opaque CalledProcessError three frames away.

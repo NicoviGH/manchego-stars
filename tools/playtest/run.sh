@@ -310,7 +310,8 @@ EOF
     # It still is NOT the place to judge a sound: the harness's per-frame Lua holds a headed run
     # at 57-59fps against 60, and the audio-synced buffer underruns on a steady beat -- a pulsing
     # buzz under music and silence alike, which no change to the ROM touches. Proven 2026-10-09
-    # (#26): gone in plain mGBA, present in every harness run. Judge audio in plain mGBA.
+    # (#26): gone in plain mGBA, present in every harness run. Judge audio in plain mGBA; to
+    # audition MUSIC, build SOUNDROOM=1 and use Extras -> Sound Room (ADR 0335).
     local mute=1 async=0
     if [ -n "${PT_SOUND:-}" ] && [ "${PT_SOUND}" != "0" ]; then mute=0; async=1; fi
     # -l 0: mgba-headless logs every BIOS SWI and DMA otherwise -- 5.4MB in 6s, which is

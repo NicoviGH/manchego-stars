@@ -1,0 +1,47 @@
+From: Manchego Stars engine
+Subject: [PATCH] sound room audition: every song is listed
+
+A DEBUG build's patch, never the shipping ROM's. The Sound Room (Extras,
+always enabled) lists only songs the save has heard, and lists nothing
+without a verified save. Choosing a chapter's music means hearing the
+candidates first, and the playtest harness buzzes under audio sync, so
+the listening has to happen in plain mGBA on a fresh ROM. This lists every
+entry, secret ones included, whatever the save says.
+---
+diff --git a/src/soundroom.c b/src/soundroom.c
+index 241253d4..3820e2a5 100644
+--- a/src/soundroom.c
++++ b/src/soundroom.c
+@@ -178,7 +178,8 @@ void InitSoundRoomSongData(struct SoundRoomProc * proc)
+ 
+     proc->playableSongs = 0;
+ 
+-    if (LoadAndVerifySoundRoomData(&soundRoomData))
++    /* Audition build: every song is listed, heard or not, save or no save. */
++    LoadAndVerifySoundRoomData(&soundRoomData);
+     {
+         int i;
+         for (i = 0; gSoundRoomTable[i].bgmId > -1; i++)
+@@ -188,7 +189,6 @@ void InitSoundRoomSongData(struct SoundRoomProc * proc)
+                 continue;
+             }
+ 
+-            if ((soundRoomData.flags[gSoundRoomTable[i].bgmId >> 5] >> (gSoundRoomTable[i].bgmId & 0x1f)) & 1)
+             {
+                 *(proc->flags + (i >> 5)) |= 1 << (i & 0x1f);
+                 proc->playableSongs++;
+@@ -204,14 +204,6 @@ void InitSoundRoomSongData(struct SoundRoomProc * proc)
+                 continue;
+             }
+ 
+-            if (!((soundRoomData.flags[gSoundRoomTable[i].bgmId >> 5] >> (gSoundRoomTable[i].bgmId & 0x1f)) & 1))
+-            {
+-                if (!gSoundRoomTable[i].displayCondFunc(proc))
+-                {
+-                    continue;
+-                }
+-            }
+-
+             *(proc->flags + (i >> 5)) |= 1 << (i & 0x1f);
+             proc->playableSongs++;
+             proc->unk_2e = 1;

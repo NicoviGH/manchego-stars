@@ -47,7 +47,8 @@ from inject.chapters.prologue import inject_prologue
 from inject.crit_flourish import inject_crit_flourish
 from inject.death_quotes import inject_pc_death_quotes
 from inject.decomp import DECOMP
-from inject.engine_patches import apply_engine_patches, patched_files
+from inject.engine_patches import (apply_engine_patches, apply_sound_room_audition,
+                                   patched_files)
 from inject.hosts import (
     CH01_HOST_INDEX, CH03_HOST_INDEX, CH04_HOST_INDEX, CH05_HOST_INDEX, CH06_HOST_INDEX,
     PROLOGUE_HOST_INDEX)
@@ -304,6 +305,9 @@ STEPS = [
                       *_tileset('SnowIce'))),
     Step(chain_ch05_to_ch06, needs=('ch05-landing', 'ch06-hosted'),
          writes=('src/events/ch6-eventscript.h',)),
+    # A debug build that is not a chapter boot.
+    Step(apply_sound_room_audition, needs=('engine-patches',), flags=('sound_room_audition',),
+         when=lambda a: a.sound_room_audition, writes=('src/soundroom.c',)),
     # New Game's target: exactly one of these runs.
     Step(_configure_boot, title='CH06 BOOT (playtest: New Game -> Maer Dualdon, party + merfolk '
                                 '+ boats):',

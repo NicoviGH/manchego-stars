@@ -24,6 +24,11 @@ class TheSeries(unittest.TestCase):
         self.assertIn('MsD20CritShow', engine_patches.patched_text(
             'src/banim-efxhit.c', optional=('crit-d20-flourish',)))
 
+    def test_the_sound_room_audition_lists_every_song(self):
+        text = engine_patches.patched_text('src/soundroom.c', optional=('sound-room-audition',))
+        self.assertNotIn('if (LoadAndVerifySoundRoomData', text)
+        self.assertNotIn('displayCondFunc(proc)', text)
+
     def test_it_is_numbered_densely_and_each_patch_says_what_it_is_for(self):
         series = engine_patches.patches()
         self.assertEqual([int(os.path.basename(p)[:4]) for p in series],
@@ -34,8 +39,9 @@ class TheSeries(unittest.TestCase):
     def test_every_file_it_changes_is_restored_before_each_build(self):
         # `git apply` needs the vanilla text under it, and restore_vanilla_sources is what
         # puts it back after the last build's injection.
-        crit = os.path.join(engine_patches.OPTIONAL_DIR, 'crit-d20-flourish.patch')
-        files = engine_patches.patched_files(engine_patches.patches() + [crit])
+        optional = [os.path.join(engine_patches.OPTIONAL_DIR, name)
+                    for name in sorted(os.listdir(engine_patches.OPTIONAL_DIR))]
+        files = engine_patches.patched_files(engine_patches.patches() + optional)
         self.assertEqual([f for f in files if f not in PATCHED_DECOMP_FILES], [])
 
 
