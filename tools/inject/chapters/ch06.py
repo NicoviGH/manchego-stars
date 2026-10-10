@@ -75,9 +75,8 @@ CH06_GOAL_DONOR = 17                             # a CLEAN untouched vanilla def
 # Nerra rides a real vanilla CHARACTER slot rather than a raw pid (ENEMY_BASE_SLOT): her
 # chapter's parity_reference IS FE8 Ch6, so the boss the bar measures against and the slot she
 # deploys on are the same character and she inherits his real line (#284/#334). Her defeat
-# quote is FLAGGED and SILENT -- .msg = 0 -- because the merfolk do not speak, which is the
-# contrast Messie's scene is built on; SetPidDefeatedFlag still raises EVFLAG_DEFEAT_BOSS, and
-# that flag is what fires the win (CA_BOSS alone fires nothing). Same idiom as ch03's grell.
+# quote is her FLAGGED retreat line (ADR 0337): SetPidDefeatedFlag raises EVFLAG_DEFEAT_BOSS,
+# and that flag is what fires the win (CA_BOSS alone fires nothing).
 CH06_BOSS_PID = ENEMY_BASE_SLOT['nerra']
 CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla Ch7's own generic,
 
@@ -727,11 +726,10 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     hull's Antitoxin, and the save-both Orion's Bolt in the ending. The OPENING is wired: beat A
     in Bremen's hall over backdrops, then LOMA and prep, then beat B on the ice, which cuts to the
     lake where the merfolk line LOADs in shot (it is NOT on the map during prep). The ending plays the
-    victory sting, the payout, and the dev-placeholder landing. Nerra's defeat quote is FLAGGED
-    but SILENT by design: the merfolk do not speak, and Messie does.
+    victory sting, the payout, and the dev-placeholder landing. Nerra has a taunt and a FLAGGED
+    retreat line (ADR 0337); Messie's boss-death scene is wired (ch06_messie_messages).
 
-    DEFERRED to follow-up passes: Messie's boss-death cutscene, the ending scene, and the
-    title-card art. ch06's ending parks on the dev placeholder until ch07 hosts, exactly as
+    DEFERRED to follow-up passes: the ending scene and the title-card art. ch06's ending parks on the dev placeholder until ch07 hosts, exactly as
     ch05's did.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
