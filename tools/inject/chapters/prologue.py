@@ -262,17 +262,20 @@ def inject_prologue(campaign, verbose=True, montage=False):
     # vanilla 0x910's convention -- FE8 ships no snow background, and a green BG_PLAIN_*
     # reads wrong in a two-year winter, so the snowy map IS the backdrop), THEN deploy the
     # enemies -- Sephek "steps out" exactly when his interrupt lands in the text -- and
-    # flash him to mark the boss before handing over control.
+    # flash him to mark the boss before handing over control. The music is ducked under the
+    # allies' talk and turns to Shadow of the Enemy as he steps out, vanilla's O'Neill cue
+    # (EventScr_Prologue_ONeillSpawn; ADR 0336).
     begin = ('{\n    LOAD1(1, UnitDef_Event_Ch1Ally)\n    ENUN\n'
              '    BROWNBOXTEXT(0x664, 8, 8)\n'
              '    STAL(30)\n'
              '    FlashCursor(CHARACTER_%s, 60)\n'
              '    MUSI\n'
              '    Text(0x90D)\n'
+             '    MUNO\n'
              '    LOAD1(1, UnitDef_Event_Ch1Enemy)\n    ENUN\n'
              '    FlashCursor(CHARACTER_%s, 60)\n'
+             '    MUSC(SONG_SHADOW_OF_THE_ENEMY) /* as vanilla\'s O\'Neill steps out (ADR 0336) */\n'
              '    Text(0x90E)\n'
-             '    MUNO\n'
              '    NoFade\n    ENDA\n}' % (hlin_slot, sephek_slot))
     script = _replace_brace_block(
         script, 'EventScr_Ch1_BeginningScene[] =', begin, CH1_EVENTSCRIPT_H)

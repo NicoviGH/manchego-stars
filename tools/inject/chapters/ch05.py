@@ -1391,16 +1391,23 @@ def ch05_opening_backdrop_block():
         if i:
             # Fade THROUGH black between moments. The BACG stays in VRAM, so the pair needs no
             # second BACG -- and re-issuing one here would be a no-op anyway (see the docstring).
-            scenes.append('    FADI(16)\n    FADU(16) /* a separate moment, same place */\n')
+            # Scene 2 is Sephek's orders, vanilla's Glen->Saar: its plotters' Solve the Riddle
+            # starts there and carries scene 3 (ADR 0336).
+            riddle = ('    MUSC(SONG_SOLVE_THE_RIDDLE) /* the plotters, as vanilla Ch5\'s */\n'
+                      if i == 1 else '')
+            scenes.append('    FADI(16)\n' + riddle
+                          + '    FADU(16) /* a separate moment, same place */\n')
         scenes.append('    Text(0x%X) /* %d -- %s */\n' % (msg, i + 1, what))
     _slot, arrival_msg, _boxes, arrival_what = CH05_ARRIVAL_SLOT
     return ('    REMOVEPORTRAITS\n'
             '    BACG(%s) /* the elven tomb, before the party arrives */\n'
             '    FADU(16)\n' % CH05_OPENING_BG
             + ''.join(scenes)
-            + '    FADI(16) /* fade the tomb out; the party arrives elsewhere */\n'
+            + '    MUSCMID(SONG_SILENT) /* the plotters\' music ends with the tomb */\n'
+              '    FADI(16) /* fade the tomb out; the party arrives elsewhere */\n'
               '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() reset it to TEXTSTART) */\n'
               '    BACG(%s) /* CUT to the ridge above the hollow */\n'
+              '    MUSC(SONG_ADVANCE) /* the party arrives: vanilla Ch5\'s march */\n'
               '    FADU(16)\n' % CH05_ARRIVAL_BG
             + branch_on_check_alive(
                 CH05_LUPIN_CHARACTER,
@@ -1467,7 +1474,7 @@ def ch05_moose_debug_script(chap, seed_load):
         sys.exit('ERROR: --ch05-moose needs --ch05-boot -- it skips Preparations, so the boot '
                  'seed is the only thing that puts a party on the map')
     return ('{\n'
-            '    MUSC(SONG_TENSION)\n'
+            '    MUSC(SONG_DISTANT_ROADS) /* scene 7\'s cue, so the boot hears what ships */\n'
             '    SVAL(EVT_SLOT_B, 0x0)\n'
             '    LOMA(0x%X) /* build the ch05 map fresh */\n' % CH05_HOST_INDEX
             + '    LOAD1(0x1, %s) /* the 16 risen tomb-guard -- the MOOSE is one of them */\n'
@@ -1592,15 +1599,22 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
             # moment the CUSA lands, on top of the nine the player chose, which is what the chapter
             # is priced for; a CUSA before the CALL would hand PREP a blue unit it never listed.
             # And the party she is talking TO does not exist on the field until prep places it.
+            # Scene music follows vanilla Ch5's after-prep run (ADR 0336): the party's talk under
+            # a lowered Advance (its 0x9BF), silence, Shadow of the Enemy for the one who will be
+            # fought (Joshua's 0x9C3, Sahnar's scene 6), Distant Roads as the map begins (0x9C4).
+            + '    MUSC(SONG_ADVANCE)\n    MUSI /* lowered under the party\'s talk */\n'
             + ch05_basil_join_block(basil_char)
             + '    CUSA(%s) /* green -> blue: she asked on box 3, and this is the answer */\n'
             % basil_char
+            + '    MUNO\n    MUSCMID(SONG_SILENT)\n'
+              '    MUSC(SONG_SHADOW_OF_THE_ENEMY) /* Sahnar, a person before she is a foe */\n'
             # Scene 6, LAST and on the map: the arena tile, the duelist standing on it, her own
             # scene before the player ever fights her. Vanilla's Joshua LOADs at this exact point
             # in its own beginning scene -- after the prep CALL -- which is what makes Sahnar a
             # turn-1 unit rather than a turn-2 riser (#25, Nicolas 2026-08-14).
             + ch05_sahnar_alone_block(sahnar_table, sahnar_char, None,
                                       ch05_sahnar_station(chap))
+            + '    MUSC(SONG_DISTANT_ROADS) /* the map begins, as vanilla Ch5\'s 0x9C4 */\n'
             # Scene 7, and the map begins on its last word. The moose has been standing in the
             # turn-1 line since before prep, so this beat only has to look at it.
             + ch05_moose_charge_block(CH05_MOOSE_PID, ch05_moose_station(chap),

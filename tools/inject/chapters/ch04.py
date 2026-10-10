@@ -642,6 +642,11 @@ def inject_ch04(campaign, boot=False, verbose=True):
                  # first -- the vanilla multi-BG idiom, and exactly the ch03 opening's fix.
                  '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() reset it to TEXTSTART) */\n'
                  '    BACG(%s) /* CUT to the forest edge, fog hanging between the trees */\n'
+                 # Vanilla Ch4 opens on its forest-ambience loop (SONG_52, song082_y_mori_3 in
+                 # sound/song_table.s) and closes on Distant Roads (ADR 0336). Ours has one beat
+                 # here and Preparations before the map, so the ambience carries the beat and
+                 # Distant Roads arrives as the map theme itself (chapter_bgm).
+                 '    MUSC(SONG_52) /* forest ambience, as vanilla Ch4 opens */\n'
                  '    FADU(16)\n' % CH04_OPENING_FOREST_BG
                  + op_calls_b +
                  '    FADI(16) /* fade the forest edge out */\n'
@@ -710,6 +715,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
               + end_scene
               + branch_on_flag(
                   CH04_LUPIN_TALK_FLAG,
+                  '    MUSC(SONG_LAUGHTER) /* Lupin joins: vanilla Ch4\'s cue as Lute joins (ADR 0336) */\n'
                   '    Text(0x%X) /* parleyed: Lupin reads the trail + the Ravisin seed */\n'
                   % CH04_ENDING_MSG,
                   '    Text(0x%X) /* no parley: Pinky reads the trail, Meesmickle takes the dread */\n'

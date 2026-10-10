@@ -185,10 +185,15 @@ def ch01_turn1_taunt_script(heal_beat):
     """Izobai's taunt, Wolfram's terrain-heal line, then vanilla GuideTerrainHeal's tail (#21).
 
     Vanilla's tail flashes the healing tiles and sets the Guide flag. The camera opens on the
-    first tile (Izobai's gate) so the flashes land on screen; ch05's arena beat does the same."""
+    first tile (Izobai's gate) so the flashes land on screen; ch05's arena beat does the same.
+
+    The taunt plays Shadow of the Enemy, vanilla Ch1's cue for Breguet's turn-1 line (ADR
+    0336). A turn event runs before the phase banner, which starts the phase's own song when
+    it ends (ProcScr_PhaseIntro -> StartMapSongBgm), so the cue lasts only the scene."""
     tiles = heal_beat['flash_tiles']
     flashes = ''.join('    CURSOR_FLASHING(%d, %d)\n' % tuple(t) for t in tiles)
     return ('{\n'
+            '    MUSC(SONG_SHADOW_OF_THE_ENEMY) /* vanilla Breguet\'s turn-1 cue (ADR 0336) */\n'
             '    TEXTSHOW(0x%X) /* Izobai turn-1 taunt */\n'
             '    TEXTEND\n'
             '    REMA\n'
@@ -696,6 +701,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
         script = _replace_brace_block(
         script, 'EventScr_Ch2_BeginningScene[] =',
         '{\n'
+        '    MUSC(SONG_TENSION) /* vanilla Ch1\'s opening cue (ADR 0336) */\n'
         + beat1_scene +
         '    /* Lord select (#42) on its OWN scenic BG -- a "choose your leader" screen,\n'
         '       NOT the battle map (Nicolas, 2026-06-16). The menu window draws on BG0/1\n'
