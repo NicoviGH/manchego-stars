@@ -8,7 +8,6 @@ import sys
 from inject.asset_table import _asm_table_word_index
 from inject.chapter_frame import write_settings_row, write_event_group
 from inject.hosting import _load_chapter_yaml, GOAL_TEMPLATE, map_writes
-import fe8_talk_font
 from inject.chapter_ids import PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT
 from inject.decomp import _find_brace_block, _replace_brace_block, fe_item_enum, REPO
 from inject.hosts import PROLOGUE_CHAPTER_INDEX, PROLOGUE_EVENT_GROUP, PROLOGUE_HOST_INDEX
@@ -18,7 +17,8 @@ from inject.paths import (
     ASSET_TABLE_S, CH1_EVENTINFO_H, CH1_EVENTSCRIPT_H, CH1_UDEFS_H, CHAPTER_SETTINGS_JSON, CHARACTERS_C,
     GAMECONTROL_C, TEXTS_TXT)
 from inject.scenes import (
-    _prepend_battle_quote, _prepend_defeat_quote, _write_chapter_title_card, battle_quote_pair)
+    _prepend_battle_quote, _prepend_defeat_quote, _write_chapter_title_card, battle_quote_body,
+    battle_quote_pair, defeat_quote_row)
 from inject.stats import _set_field, _set_gender, donor_growths_and_ranks, guest_personal_line
 from inject.text import (
     _fid_tag, _script_to_message, display_name, name_message_body, set_message_body,
@@ -368,12 +368,14 @@ def inject_prologue(campaign, verbose=True, montage=False):
         events['boss_battle']['script'], opening_staging))
     set_message_body(lines, 0x918, _script_to_message(
         events['chapter_end']['script'], ending_staging))
-    set_message_body(lines, 0x936, _script_to_message(
-        [{'sephek': by_id['sephek-kaltro']['death_quote']}], opening_staging, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
-    set_message_body(lines, 0x917, _script_to_message(
-        [{'hlin': by_id['hlin-trollbane']['death_quote']}], ending_staging, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
-    set_message_body(lines, 0xC25, _script_to_message(
-        [{'scramsax': by_id['scramsax']['defeat_quote']}], ending_staging))
+    set_message_body(lines, 0x936, battle_quote_body(
+        'sephek', [by_id['sephek-kaltro']['death_quote']], opening_staging['sephek']))
+    set_message_body(lines, 0x917, battle_quote_body(
+        'hlin', [by_id['hlin-trollbane']['death_quote']], ending_staging['hlin']))
+    # A defeat quote rides the 143px battle bubble like the two above; at the talk window's
+    # 203px its first line ran 193px, off the bubble.
+    set_message_body(lines, 0xC25, battle_quote_body(
+        'scramsax', [by_id['scramsax']['defeat_quote']], ending_staging['scramsax']))
 
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
@@ -443,27 +445,15 @@ def inject_prologue(campaign, verbose=True, montage=False):
     #    - Scramsax: FLAG-LESS quote (vanilla Seth precedent): quote plays, battle
     #      continues, framed as a retreat -- he's alive for Ch1.
     #    msg bodies are written from the chapter YAML in step 4c; #42 generalizes the lord.
-    quotes = [(
-        '    {\n'
-        '        .pid     = CHARACTER_%s, /* Sephek -- boss kill sets the DefeatBoss flag */\n'
-        '        .route   = CHAPTER_MODE_ANY,\n'
-        '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
-        '        .flag    = EVFLAG_DEFEAT_BOSS,\n'
-        '        .msg     = 0x0936, /* Sephek death quote (YAML death_quote, step 4c) */\n'
-        '    },' % sephek_slot), (
-        '    {\n'
-        '        .pid     = CHARACTER_%s, /* Hlin -- lord-death = game over */\n'
-        '        .route   = CHAPTER_MODE_ANY,\n'
-        '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
-        '        .flag    = EVFLAG_GAMEOVER,\n'
-        '        .msg     = 0x0917, /* Hlin death quote (YAML death_quote, step 4c) */\n'
-        '    },' % hlin_slot), (
-        '    {\n'
-        '        .pid     = CHARACTER_%s, /* Scramsax -- defeat quote only, NO game over */\n'
-        '        .route   = CHAPTER_MODE_ANY,\n'
-        '        .chapter = CHAPTER_L_1, /* prologue is hosted on chapter slot 1 */\n'
-        '        .msg     = 0x0C25, /* Scramsax retreat quote (YAML defeat_quote, step 4c) */\n'
-        '    },' % scram_slot)]
+    # The prologue is hosted on chapter slot 1, hence CHAPTER_L_1.
+    quotes = [
+        defeat_quote_row('CHARACTER_%s' % sephek_slot, 'CHAPTER_L_1',
+                         'Sephek -- boss kill sets the DefeatBoss flag', msg=0x936,
+                         flag='EVFLAG_DEFEAT_BOSS'),
+        defeat_quote_row('CHARACTER_%s' % hlin_slot, 'CHAPTER_L_1',
+                         'Hlin -- lord-death = game over', msg=0x917, flag='EVFLAG_GAMEOVER'),
+        defeat_quote_row('CHARACTER_%s' % scram_slot, 'CHAPTER_L_1',
+                         'Scramsax -- retreat quote only, NO game over', msg=0xC25)]
     #    The entries must land at the HEAD of the list: GetDefeatTalkEntry (eventinfo.c)
     #    returns the FIRST match, and vanilla gives every playable slot a generic
     #    chapter=0xFF death quote further down -- NATASHA's/KYLE's would shadow our

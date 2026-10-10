@@ -744,12 +744,11 @@ enemy_units:
     damage_type: necrotic
     positions: [[10, 12]]
     donor: [20, 5]                  # vanilla Ch6's boss (Novala) -- GuardTileAI, Ch6's own tail
-    skin: {look: "the largest of the merfolk", source: "Mermaid by Stephano -> 6. Magic; no portrait -- see below"}
-    # NO death quote and NO portrait, deliberately (Nicolas, 2026-08-29): the merfolk do not
-    # speak. Messie does, and that contrast is the chapter. The FE-Repo has no merfolk
-    # portrait at all -- 17,341 files searched; the nearest is a HUMAN knight in a fin-crested
-    # helm ("Shark Knight" {Sphealnuke}) -- so a speaking boss would have cost authored art
-    # for nothing. The name is arbitrary and touches one string.
+    skin: {look: "the largest of the merfolk", source: "Mermaid by Stephano -> 6. Magic"}
+    # She SPEAKS: a taunt and a retreat line (Nicolas, 2026-10-09/10; the events below). Her
+    # bust is Freefall's Goth Serra repainted in the merfolk's own battle-anim colours, twin
+    # tails and all (portraits/guest_vendor_busts.py): no merfolk mug exists on the FE-Repo or
+    # FEUniverse. Her voice is lore/nerra.md. She RETREATS rather than dies, so she can return.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 # THREE scenes (2026-08-29). Messie never stands on the field, so he has no Talk unlock and
@@ -828,6 +827,32 @@ events:
       - rootis: "Maybe the beastie brought friends?"
       - stage_cut: the camera pans to the lake, and the merfolk break through the water, silent (LOADED here)
       - meesmickle: "Friends. With tridents. Delightful."
+  # ── 0x9EF -- BOSS TAUNT. Two boxes, as Novala's. ─────────────────────────────
+  - trigger: boss_battle
+    slot: "vanilla 0x9EF"          # data_battlequotes.c, EVFLAG_BATTLE_QUOTES (Novala's pair)
+    type: quote
+    description: >
+      Nerra's battle quote when a player unit engages her. TWIN = Novala's 0x9EF, two boxes of
+      a boss put out that the job reached him. Hers is dark irony in the FE8 villain register:
+      she was promised the fishermen and Bremen sent hunters. "She" is never named: the
+      Frostmaiden's plan stays held for Messie's farewell in ch07 (ADR 0332), and a patron
+      felt but unnamed is what this chapter can afford. The wording is Nicolas's.
+      LOCKED 2026-10-10 (dialogue-pass, co-written with Nicolas). 2 boxes.
+    script:                           # LOCKED 2026-10-10 (dialogue-pass, co-written with Nicolas)
+      - nerra: "She said the fishermen were ours to take."
+      - nerra: "Instead, Bremen sends this diverse bunch. How generous."
+  # ── 0x9F0 -- BOSS DEFEAT. One box. A retreat, not a death. ─────────────────────
+  - trigger: boss_death
+    slot: "vanilla 0x9F0"          # data_battlequotes.c, EVFLAG_DEFEAT_BOSS
+    type: quote
+    description: >
+      A RETREAT line, not a death (Nicolas, 2026-10-10): she dives and lives, so she can come
+      back. She speaks for herself only. Mechanically it is still FE8's defeat quote, and the
+      DefeatBoss win fires on it as before. Model: FE8's own fall-back lines (Forde's "I have
+      to fall back"). Messie's scene never says she died, so it reads true either way.
+      LOCKED 2026-10-10 (dialogue-pass, co-written with Nicolas). 1 box.
+    script:                           # LOCKED 2026-10-10 (dialogue-pass, co-written with Nicolas)
+      - nerra: "Ngh... Not today. The lake will have you another time..."
   - trigger: boss_defeated
     unit: nerra
     type: cutscene

@@ -5,7 +5,6 @@ import sys
 
 from PIL import Image
 
-import fe8_talk_font
 import portrait_tool
 from inject.cast import (
     _bust_dir, _classed_cast, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit,
@@ -27,7 +26,7 @@ from inject.paths import (
 from inject.recruit import ON_MAP_RECRUIT_VIA
 from inject.scenes import (
     _emit_scene_beats, _make_fid, _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats,
-    _stage_beat, _write_chapter_title_card)
+    _stage_beat, _write_chapter_title_card, battle_quote_body, defeat_quote_row)
 from inject.text import (
     _fid_tag, _script_to_message, display_name, goal_window_body, name_message_body,
     set_message_body, vanilla_name_text_id)
@@ -603,13 +602,9 @@ def inject_ch02(campaign, verbose=True):
 
     # 5. Halvar's defeat quote -> head of gDefeatTalkList (same shadowing rule as ch01:
     #    a head entry wins the first-match scan, shadowing any vanilla Bazba entry).
-    quote = ('    {\n'
-             '        .pid     = CHARACTER_%s, /* Halvar death quote (ch02) */\n'
-             '        .route   = CHAPTER_MODE_ANY,\n'
-             '        .chapter = CHAPTER_L_3, /* ch02 is hosted on chapter slot 3 */\n'
-             '        .msg     = 0x%X,\n'
-             '    },' % (CH02_BOSS_SLOT, CH02_BOSS_DEATH_MSG))
-    _prepend_defeat_quote(quote)
+    #    ch02 is hosted on chapter slot 3, hence CHAPTER_L_3.
+    _prepend_defeat_quote(defeat_quote_row('CHARACTER_%s' % CH02_BOSS_SLOT, 'CHAPTER_L_3',
+                                           'Halvar death quote (ch02)', msg=CH02_BOSS_DEATH_MSG))
 
     # 6. Texts. Overwritten ids are dead vanilla Ch3 scene/talk/turn messages (the vanilla
     #    Ch3 scenes are gone); 0x993/0x994 are LIVE battle quotes and are NOT in the pool.
@@ -662,9 +657,8 @@ def inject_ch02(campaign, verbose=True):
         bark, {'wolfram': ('[OpenMidLeft]', _fid_tag(PORTRAIT_MAP['wolfram'].upper()))}))
     set_message_body(lines, CH02_ENDING_CARD_MSG, name_message_body(end_card))
     _emit_scene_beats(lines, CH02_ENDING_MSGS, end_beats, cut_fid, {})
-    set_message_body(lines, CH02_BOSS_DEATH_MSG, _script_to_message(
-        [{'halvar': halvar['death_quote']}],
-        {'halvar': ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))}, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
+    set_message_body(lines, CH02_BOSS_DEATH_MSG, battle_quote_body(
+        'halvar', [halvar['death_quote']], ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 

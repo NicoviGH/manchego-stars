@@ -20,7 +20,7 @@ from inject.paths import CH4_EVENTINFO_H, CH4_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEX
 from inject.recruit import on_map_talk_recruits, talk_recruit_wiring, talk_recruiters
 from inject.scenes import (
     _emit_scene_beats, _make_fid, _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats,
-    _stage_beat, _write_chapter_title_card, flag_defeat_quote)
+    _stage_beat, _write_chapter_title_card, defeat_quote_row)
 from inject.text import (
     _fid_tag, _script_to_message, dev_placeholder_scene, name_message_body, SCRIPT_DIRECTIVES,
     set_message_body)
@@ -533,12 +533,13 @@ def inject_ch03(campaign, boot=False, verbose=True):
     #    The Brute miniboss rides the SAME silent-quote idiom: its flagged death sets the tmp flag
     #    CH03_BRUTE_DEFEAT_FLAG that the mid-map RBG-execution AFEV watches (step 3). Different pids
     #    -> both entries coexist at the head; the first-match pid scan keys each to its own unit.
-    _prepend_defeat_quote(flag_defeat_quote(
-        CH03_BOSS_PID, 'CHAPTER_L_4', 'EVFLAG_DEFEAT_BOSS',
-        'grell (ch03 boss): silent defeat -> DefeatBoss WIN flag'))
-    _prepend_defeat_quote(flag_defeat_quote(
-        CH03_BRUTE_MINIBOSS_PID, 'CHAPTER_L_4', CH03_BRUTE_DEFEAT_FLAG,
-        'Icewind Brute (ch03 miniboss): silent defeat -> mid-map RBG-execution AFEV'))
+    _prepend_defeat_quote(defeat_quote_row(
+        CH03_BOSS_PID, 'CHAPTER_L_4', 'grell (ch03 boss): silent defeat -> DefeatBoss WIN flag',
+        flag='EVFLAG_DEFEAT_BOSS'))
+    _prepend_defeat_quote(defeat_quote_row(
+        CH03_BRUTE_MINIBOSS_PID, 'CHAPTER_L_4',
+        'Icewind Brute (ch03 miniboss): silent defeat -> mid-map RBG-execution AFEV',
+        flag=CH03_BRUTE_DEFEAT_FLAG))
 
     if verbose:
         print('  ch03 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss goal + '

@@ -39,7 +39,9 @@ APPENDED_MESSAGES = {
              # on the ice, cut in two where the camera pans to the merfolk surfacing.
              'opening-card', 'opening-hall', 'opening-ice', 'opening-ice-quip',
              # ...and Messie on the ice (#26), the boss_defeated scene: one message.
-             'messie-ice'),
+             'messie-ice',
+             # ...and Nerra's two battle quotes (#26): her taunt and her retreat line.
+             'nerra-taunt', 'nerra-retreat'),
 }
 
 

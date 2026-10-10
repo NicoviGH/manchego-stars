@@ -8385,8 +8385,8 @@ end
 -- recordch06nerradeath (#26): the TRANSITION from the fight into Messie's scene, on the plain
 -- ch06boot ROM -- the honest path, so DefeatBoss(Nerra) is what starts the ending. Setup is
 -- recordch05ravisindeath's: park a one-hit Nerra beside a live melee attacker and drive the
--- game's own Attack path. Her defeat quote is SILENT (the merfolk do not speak), so the strike
--- is done when she is dead rather than at a death box; the film starts there and runs the
+-- game's own Attack path. The strike plays her taunt and her retreat line (ADR 0337), and is
+-- done when she is gone rather than at a box count; the film starts there and runs the
 -- gather, the break, the walk, the cry and the scene to the title.
 -- Run: tools/playtest/run.sh recordch06nerradeath (CH06BOOT=1 ROM).
 scenarios.recordch06nerradeath = function()

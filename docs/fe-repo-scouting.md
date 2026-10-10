@@ -115,6 +115,16 @@ Before calling an asset missing, search FEUniverse too: it is Discourse, so
 `https://feuniverse.us/search.json?q=<term>` answers in JSON and `/raw/<topic>/<post>` returns a
 post's text. An artist's own thread is the place to look once the FE-Repo has their map sprite.
 
+**Merfolk bust sweep, 2026-10-10** (Nerra, ADR 0337): no merfolk or mermaid PORTRAIT exists on the
+FE-Repo or FEUniverse. Stephano, who made the Mermaid we ship, has mermaid and siren ANIMS only
+(`Angler Fish Siren`, `Coral Siren`; FEUniverse t/30728) and says in that thread he still needs
+portraits. Twin-tail busts, which the merfolk wear: the Serra family in `FE06, 07 Mugs` (vanilla
+F2E, `Serra (Goth)` {Freefall}, `Serra (Heroes)`). Near-misses for other sea faces: `Gorgon`
+{SaintRubenio} F2E (coiled sea-green hair), `Slime Girl` {CristianX1} (teal), `Lisa the Painful,
+Fishman`. **When a race already has a battle anim, take a bust's colours from the anim's palette,
+never from its map sprite:** the map sprite is drawn in the faction palette, so its own colours
+never show in game.
+
 **Water-themed sweep, 2026-10-05** (every name in Battle Animations / Map Sprites / Portraits): anims
 `Squidsmith` (axe, handaxe), `Snail Knight` (Cavalier: lance, magic), `Warrior Naga` (sword, magic;
 reads as an armoured human), `Naga` (monster), `Tortoise` (unarmed), the Lamias; map sprites

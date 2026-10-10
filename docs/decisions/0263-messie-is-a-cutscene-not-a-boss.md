@@ -40,5 +40,5 @@ that was protecting the town" is not a choice this version offers.
 **The boss slot goes to the merfolk elder**, who rides `CHARACTER_NOVALA` via `ENEMY_BASE_SLOT` --
 ch06's `parity_reference` IS FE8 Ch6, so the boss we measure against and the slot we deploy on are
 the same character, and she inherits his real line (HP 28 / Mag 10 / Def 5) instead of an invented
-`personal:` block with no route into the ROM (#284). She has no portrait, no death quote and no
-dialogue, and that is the point: the merfolk do not speak. Messie does.
+`personal:` block with no route into the ROM (#284). She speaks only in battle, a taunt and a
+retreat line (ADR 0337); the chapter's words belong to Messie.

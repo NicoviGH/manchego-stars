@@ -456,6 +456,8 @@ CH06_OPENING_QUIP_MSG = appended_message_id('ch06', 'opening-ice-quip')
 CH06_MESSIE_PID = '0xbd'
 # His scene (#26): the boss_defeated script, one message.
 CH06_MESSIE_MSG = appended_message_id('ch06', 'messie-ice')
+CH06_NERRA_TAUNT_MSG = appended_message_id('ch06', 'nerra-taunt')       # first-engagement taunt
+CH06_NERRA_RETREAT_MSG = appended_message_id('ch06', 'nerra-retreat')   # her defeat line
 # ch05's four INFANTRY classes are dressed as skeletons (#25, campaign.yaml `dresses: {ch05:}`):
 # every ch05 red unit wearing one is a risen tomb-guardian, so the repoint is wholesale rather
 # than per-enemy. The three that stay vanilla are not oversights: the DRUID is Ravisin, who

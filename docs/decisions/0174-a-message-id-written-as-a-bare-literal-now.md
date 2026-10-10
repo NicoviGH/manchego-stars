@@ -360,7 +360,7 @@ of the lesson directly above. The build-time half is pinned by a test reading
   `a` is set and marks itself done with the **ent-flag `b`** (set AFTER the script's `ENDA`), so it fires
   **exactly once** (an ent-flag of `0` would re-fire every turn once `a` is set). The vanilla ch1 idiom
   (`AFEV(EVFLAG_TMP(7), …, EVFLAG_DEFEAT_BOSS)`). Data-driven via a per-enemy `is_miniboss:` YAML flag +
-  `build_campaign.midmap_minibosses`/`flag_defeat_quote`/`midmap_afev`. Verified in-engine (`ch03midmap`:
+  `build_campaign.midmap_minibosses`/`defeat_quote_row`/`midmap_afev`. Verified in-engine (`ch03midmap`:
   kill the Brute → `EVFLAG_TMP(10)` → the AFEV runs the 3 on-map beats → `EVFLAG_TMP(11)` → chapter continues).
 - **Don't reuse a playtest checkpoint across an injection/build change** — only across pure graphics-byte
   swaps. Checkpoints are ROM-hash-stamped in `tools/playtest/states/` (gitignored); delete `.ss`/`.romhash`
