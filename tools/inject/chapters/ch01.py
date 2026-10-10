@@ -188,16 +188,15 @@ def ch01_turn1_taunt_script(heal_beat):
     first tile (Izobai's gate) so the flashes land on screen; ch05's arena beat does the same.
 
     The taunt plays Shadow of the Enemy, vanilla Ch1's cue for Breguet's turn-1 line (ADR
-    0336). Vanilla's fires on the ENEMY phase and lasts only that phase; ours fires on the
-    player's, so MUSS/MURE scope it to the taunt instead of the player's whole first turn."""
+    0336). A turn event runs before the phase banner, which starts the phase's own song when
+    it ends (ProcScr_PhaseIntro -> StartMapSongBgm), so the cue lasts only the scene."""
     tiles = heal_beat['flash_tiles']
     flashes = ''.join('    CURSOR_FLASHING(%d, %d)\n' % tuple(t) for t in tiles)
     return ('{\n'
-            '    MUSS(SONG_SHADOW_OF_THE_ENEMY) /* vanilla Breguet\'s turn-1 cue (ADR 0336) */\n'
+            '    MUSC(SONG_SHADOW_OF_THE_ENEMY) /* vanilla Breguet\'s turn-1 cue (ADR 0336) */\n'
             '    TEXTSHOW(0x%X) /* Izobai turn-1 taunt */\n'
             '    TEXTEND\n'
             '    REMA\n'
-            '    MURE(0x2) /* the player phase\'s own music back for the rest of the turn */\n'
             '    TEXTSHOW(0x%X) /* Wolfram: the mounds and the gate heal them */\n'
             '    TEXTEND\n'
             '    REMA\n'

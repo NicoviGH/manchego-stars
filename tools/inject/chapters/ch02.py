@@ -488,16 +488,13 @@ def inject_ch02(campaign, verbose=True):
     tut_beats = [[ln] for ln in tutorial]
     # Vanilla Ch2 plays Defense as the threatened village appears, then Tension under Bazba's
     # MSG_957 -- which Halvar speaks verbatim here (ADR 0336). Our map comes up behind the prep
-    # screen, so the pair rides this turn-1 scene; it is the PLAYER phase, so each cue is a
-    # MUSS/MURE pair scoped to its lines (two MUSS in a row would save the first cue as the
-    # song MURE restores, soundwrapper.c OverrideBgm).
+    # screen, so the pair rides this turn-1 scene. The phase banner after it starts the player
+    # phase's own song (ProcScr_PhaseIntro -> StartMapSongBgm).
     tut_text_calls = (
-        '    MUSS(SONG_DEFENSE)\n'
+        '    MUSC(SONG_DEFENSE)\n'
         + _scenic_beat_calls(CH02_TURN1_MSGS[:2], tut_beats[:2], tut_labels[:2])
-        + '    MURE(0x2)\n'
-        '    MUSS(SONG_TENSION)\n'
-        + _scenic_beat_calls(CH02_TURN1_MSGS[2:], tut_beats[2:], tut_labels[2:])
-        + '    MURE(0x2) /* the player phase\'s own music back for the rest of the turn */\n')
+        + '    MUSC(SONG_TENSION)\n'
+        + _scenic_beat_calls(CH02_TURN1_MSGS[2:], tut_beats[2:], tut_labels[2:]))
     end_labels = ['A -- the Targos fisher warns them off the frozen body',
                   'B -- Rootis clocks the dagger-of-ice kill (Sephek breadcrumb)',
                   'C -- nightfall narration over the camp (#58 opaque box)',

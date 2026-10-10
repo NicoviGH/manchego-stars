@@ -31,10 +31,11 @@ with no vanilla counterpart keeps the staging Nicolas set for it (Messie's silen
 ch00-ch05 follow it beat for beat (#26); the twin's cue sits beside each beat in the
 injectors, tagged ADR 0336. Two placement rules came out of that pass:
 
-- **A cue on a player-phase event is scoped with `MUSS`/`MURE(0x2)`.** Vanilla's turn-1 cues
-  mostly fire on the enemy or green phase, where `MUSC` lasts only that phase; on ours it
-  would play through the player's whole turn. Two cues in one event take two pairs: a second
-  `MUSS` saves the first cue as the song `MURE` restores (`OverrideBgm`, soundwrapper.c).
+- **A turn-event cue is a plain `MUSC`, whatever the phase.** Turn events run in
+  `BmMain_ChangePhase`, before the phase banner, and the banner ends by starting the phase's
+  own song (`ProcScr_PhaseIntro` -> `StartMapSongBgm`), so the cue lasts only the scene.
+  `MUSS`/`MURE` is for a cue inside a phase (vanilla's talk scenes); `MURE` restores only a
+  song `MUSS` saved, and two `MUSS` in a row save the first cue instead of the map's.
 - **A beat that happens behind Preparations moves to the nearest beat the player hears.**
   Our enemies LOAD on a black screen before prep, so ch02's Defense rides its turn-1 scene and
   ch03's Shadow of the Enemy rides the cut to the mine. Vanilla's closing Distant Roads in Ch4
