@@ -6,27 +6,20 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-09 (Claude), end of the second session: #470, #472, #473 and #474 merged. Where
-Nicolas's watch-notes stand is the #26 comment of 2026-10-09 (the latest one). **What landed and
+Refreshed 2026-10-10 (Claude): #475 (scene music, ch00-ch05) and #476 (Nerra speaks and
+retreats; one boss-quote path for every chapter) merged. Where Nicolas's watch-notes stand is the
+latest #26 comments. **What landed and
 why is in `git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
 Nothing on a branch. **Next, in order:**
 
-1. **#26 -- the scene-music pass, ch00-ch05 (ADR 0336: a chapter plays its twin's music).** Map
-   is done; the scenes are not. Map each of our beats to the twin's cue for the same kind of
-   moment and bring Nicolas the table per chapter before wiring. Our scenes reuse vanilla's
-   script names in the host slot's file (ch00 is in `ch1-eventscript.h`); the twin's cues are in
-   `fireemblem8u/src/events/<twin>-eventscript.h`. Row != chapter number from Ch5 on (Ch5x is
-   row 5): always go through `chapter_settings.twin_settings_index`.
-2. **#26 -- Nerra speaks:** her voice section, then a taunt and a defeat line via the
-   dialogue-pass skill, and a bust found on the FE-Repo. Replace the silent battle-quote pair.
-3. **#471 -- corner engine patch** (approved), then Messie's mayor bust and a PC-rescale pass.
-4. **#26 -- `chapter_end` dialogue pass** (pick to bring: the rescued crews pay the 400; music is
+1. **#471 -- corner engine patch** (approved), then Messie's mayor bust and a PC-rescale pass.
+2. **#26 -- `chapter_end` dialogue pass** (pick to bring: the rescued crews pay the 400; music is
    vanilla Ch6's ending: Victory -> Legacy -> Into the Shadow of Victory), then the
    `introduces:` ledger claims (Grynsk's Antitoxin, Tali's snow drifts).
-5. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
+3. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
 
 - `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
@@ -37,7 +30,8 @@ Nothing on a branch. **Next, in order:**
 ## Chapter work
 
 - **#26 -- ch06's own body.** `make chapter CH=ch06` is its state. The opening and
-  `boss_defeated` are written, wired and filmed (on #470); `chapter_end` is the scene left.
+  `boss_defeated` are written, wired and filmed (on #470), and Nerra has her taunt and retreat
+  line (#476); `chapter_end` is the scene left.
   Debug boots: `CH06BOOT=1` (the map) and `CH06BOOT=1 CH06ENDING=1` (straight into Messie).
 - **#27 -- ch07** is reframed by ADR 0332 (Dorbulgruf refuses out of disbelief; Messie's fish
   tax; his farewell carries the Frostmaiden's orders to the merfolk). Still `status: planned`.
