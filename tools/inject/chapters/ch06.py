@@ -15,6 +15,7 @@ from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
 from inject.event_scripts import assert_event_scripts_defined, declare_event_script
 from inject.class_ids import ChapterClassIds
+from inject.chapter_settings import chapter_bgm
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
 from inject.maps import (_inject_tile_changes, _map_changes_tileset, _read_map_metatile,
@@ -389,6 +390,13 @@ def ch06_opening_messages(chap):
                              overrides=[None, CH06_OPENING_ICE_SEATS, CH06_OPENING_ICE_SEATS])
 
 
+# The opening's music is vanilla Ch6's own (EventScr_Ch6_BeginningScene; Nicolas, 2026-10-09:
+# a chapter plays its twin's music). Its backdrop scene plays Solve the Riddle and fades to
+# silence as it ends; Raid! comes in as the enemy shows itself on the map.
+CH06_HALL_SONG = 'SONG_SOLVE_THE_RIDDLE'
+CH06_SURFACE_SONG = 'SONG_RAID'
+
+
 def ch06_opening_head(hall_label):
     """The event-script head before LOMA: the town under its card, then the hall's dialogue.
 
@@ -405,6 +413,7 @@ def ch06_opening_head(hall_label):
             '    FADU(16)\n' % (CH06_OPENING_TOWN_BG, CH06_OPENING_CARD_MSG, CH06_OPENING_HALL_BG)
             + '    Text(0x%X) /* A -- %s */\n' % (CH06_OPENING_MSGS[0], hall_label)
             + '    REMA\n'
+              '    MUSCSLOW(SONG_SILENT) /* as vanilla Ch6\'s backdrop scene ends */\n'
               '    FADI(16) /* fade the hall out; LOMA builds the lake next */\n')
 
 
@@ -427,11 +436,13 @@ def ch06_opening_ice_block(camera_tile, lake_tile):
             '    Text(0x%X) /* B -- on the ice: Wolfram reads the boats, the shadows multiply */\n'
             '    CAMERA2(%d, %d) /* PAN to the middle of the lake, CENTRED on where the shadows were */\n'
             '    STAL(30)\n'
+            '    MUSC(%s) /* vanilla Ch6\'s on-map ambush theme */\n'
             '    LOAD1(0x1, %s) /* the merfolk break through the water */\n'
             '    ENUN\n'
             '    STAL(30)\n'
             '    Text(0x%X) /* ...and Meesmickle answers */\n'
-            % (x, y, x, y, CH06_OPENING_MSGS[1], lx, ly, CH06_LINE_TABLE, CH06_OPENING_QUIP_MSG))
+            % (x, y, x, y, CH06_OPENING_MSGS[1], lx, ly, CH06_SURFACE_SONG, CH06_LINE_TABLE,
+               CH06_OPENING_QUIP_MSG))
 
 
 # ── Messie on the ice (#26) ─────────────────────────────────────────────────────────────
@@ -855,7 +866,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     seed_load = ('    LOAD1(0x1, %s) /* --ch06-boot: found an armed party */\n'
                  '    ENUN\n' % CH06_BOOT_SEED_TABLE) if boot else ''
     beginning = ('{\n'
-                 '    MUSC(SONG_TENSION)\n'
+                 '    MUSC(%s)\n' % CH06_HALL_SONG
                  + ch06_opening_head('Bremen\'s hall: Dorbulgruf, the beast, the bounty') +
                  '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
                  '    LOMA(0x%X) /* RestartBattleMap -- build the ch06 map fresh */\n'
@@ -887,7 +898,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
-        '{\n' + messie_gather + ch06_messie_block(chap, terrain, host['bgm']['bluePhase'])
+        '{\n' + messie_gather + ch06_messie_block(chap, terrain, chapter_bgm(chap)['bluePhase'])
         + '    MUSC(SONG_VICTORY)\n'
         + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')

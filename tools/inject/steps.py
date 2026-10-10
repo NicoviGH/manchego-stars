@@ -36,7 +36,8 @@ from inject.backgrounds import inject_backgrounds
 from inject.sounds import inject_sounds
 from inject.battle_anims import inject_battle_anims
 from inject.boot import _configure_boot, TEST_CHAPTER_INDEX
-from inject.chapter_settings import apply_chapter_difficulty, apply_chapter_fog
+from inject.chapter_settings import (apply_chapter_difficulty, apply_chapter_fog,
+                                     apply_chapter_music)
 from inject.chapters.ch01 import inject_ch01, inject_northlook_bitey
 from inject.chapters.ch02 import inject_ch02, inject_ch02_chwinga_faces
 from inject.chapters.ch03 import inject_ch03
@@ -360,6 +361,10 @@ STEPS = [
          writes=('src/data/chapter_settings.json',)),
     Step(apply_chapter_difficulty, title='difficulty modes (#303):',
          call=lambda fn, a: fn(a.campaign, verbose=True),
+         writes=('src/data/chapter_settings.json',)),
+    # And music: a hosted chapter plays its vanilla TWIN's, not its host slot's (ch04 sits on
+    # Ch5x's). Same total pass, same reason.
+    Step(apply_chapter_music, title='music:', call=lambda fn, a: fn(a.campaign, verbose=True),
          writes=('src/data/chapter_settings.json',)),
     # Same pass, same reason: `.traps` is a ChapterEventGroup field our injectors fill but
     # never wrote, so a chapter kept its donor's. ch06 fills Ch7EventData, and vanilla Ch7
