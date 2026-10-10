@@ -10,6 +10,7 @@ from inject.cast import (_classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PO
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_TALK_FLAGS, CH06_BOAT_TALK_MSGS,
                                 CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
                                 CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
+                                CH06_NERRA_RETREAT_MSG, CH06_NERRA_TAUNT_MSG,
                                 CH06_OPENING_CARD_MSG, CH06_OPENING_MSGS, CH06_OPENING_QUIP_MSG)
 from inject.decomp import _replace_brace_block, REPO
 from inject.chapter_frame import write_event_group
@@ -26,11 +27,12 @@ from inject.paths import (
     CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
 from inject.scenes import (_branch_on_slot_c, _make_fid, _prepend_battle_quote, battle_quote_pair,
+                           boss_quote_message,
                            scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
                            _write_chapter_title_card, flag_defeat_quote, split_on_stage_cut)
 from inject.text import (
-    _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body, set_message_body,
-    vanilla_name_text_id)
+    _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body,
+    set_message_body, vanilla_name_text_id)
 from inject.units import (
     _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, _items_with_drop_last,
     chapter_label_constant, declare_unit_table, enemy_ai_initialiser, safe_ai_clients)
@@ -474,6 +476,16 @@ def ch06_messie_messages(chap):
                              _make_fid({}, 'ch06 Messie scene: unknown cutscene speaker',
                                        fallback=GUEST_PORTRAIT_MAP),
                              CH06_MESSIE_SEATS)
+
+
+def ch06_nerra_quote_messages(chap):
+    """[(msg_id, body)] for Nerra's two locked battle quotes. Vanilla seats Novala at
+    [OpenMidLeft] for 0x9EF and 0x9F0 alike, and the helper's default is that seat."""
+    face = GUEST_PORTRAIT_MAP['nerra']
+    return [(CH06_NERRA_TAUNT_MSG, boss_quote_message(chap, 'boss_battle', 'nerra', face,
+                                                      CH06_NERRA_TAUNT_MSG, 2)),
+            (CH06_NERRA_RETREAT_MSG, boss_quote_message(chap, 'boss_death', 'nerra', face,
+                                                        CH06_NERRA_RETREAT_MSG, 1))]
 
 
 def ch06_messie_route(chap, terrain):
@@ -927,7 +939,8 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
         set_message_body(lines, msg_id, body)
     # The opening's card and its two beats. The Speaker's face rides GUEST_PORTRAIT_MAP (Murray).
     set_message_body(lines, CH06_OPENING_CARD_MSG, name_message_body(op_card))
-    for msg_id, body in ch06_opening_messages(chap) + ch06_messie_messages(chap):
+    for msg_id, body in (ch06_opening_messages(chap) + ch06_messie_messages(chap)
+                         + ch06_nerra_quote_messages(chap)):
         set_message_body(lines, msg_id, body)
     # The boats' name plates are NOT written here: they are RAW_PID_PORTRAITS rows, and
     # inject_names writes every one of those off that registry (appending the ones whose donor
@@ -936,21 +949,18 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     _write_chapter_title_card(host, 'Ch.6: ' + chap['title'])
-    # SILENT and FLAGGED (msg = 0). DisplayDefeatTalkForPid only draws a box when .msg is
-    # nonzero, while SetPidDefeatedFlag raises the flag either way (eventinfo.c) -- so the
-    # merfolk elder dies without a line and the DefeatBoss AFEV still fires. That is the
-    # design and not a deferral: the merfolk do not speak, which is what makes Messie's
-    # answer land (Nicolas, 2026-08-29). Same idiom as ch03's grell.
+    # Her retreat line, FLAGGED: SetPidDefeatedFlag raises EVFLAG_DEFEAT_BOSS whatever the
+    # message says (eventinfo.c), so the DefeatBoss AFEV fires on a line in which she lives.
     _prepend_defeat_quote(flag_defeat_quote(
         CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX), 'EVFLAG_DEFEAT_BOSS',
-        'Nerra (ch06 boss): silent defeat -> DefeatBoss WIN flag'))
-    # ...and SILENT when engaged. She wears Novala's slot in Novala's own chapter, so vanilla's
-    # two Novala battle-quote rows match her, and both name MSG_9EF -- which ch05 has rewritten
-    # as Basil's "Oh! Tourists." line. Engaging Nerra played Basil (Nicolas, 2026-10-09). A
-    # msg-0, event-0 pair at the head of the list shadows both and plays nothing.
+        'Nerra (ch06 boss): locked retreat line -> DefeatBoss WIN flag',
+        msg=CH06_NERRA_RETREAT_MSG))
+    # ...and her taunt on first engagement. She wears Novala's slot in Novala's own chapter, so
+    # vanilla's two Novala battle-quote rows match her, and both name MSG_9EF -- which ch05 has
+    # rewritten as Basil's "Oh! Tourists." line. A pair at the head of the list shadows both.
     _prepend_battle_quote(battle_quote_pair(
-        CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX), 0,
-        'Nerra: the merfolk do not speak (shadows vanilla Novala, MSG_9EF)'))
+        CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX), CH06_NERRA_TAUNT_MSG,
+        'Nerra (ch06 boss): locked first-engagement taunt (shadows vanilla Novala, MSG_9EF)'))
 
     if verbose:
         print('  ch06 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; defeat_boss '

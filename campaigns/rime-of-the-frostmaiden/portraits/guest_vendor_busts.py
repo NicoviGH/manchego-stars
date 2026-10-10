@@ -23,6 +23,15 @@ Both community mugs keep their original art; the transforms are mechanical:
     - royal-purple coat -> muted plum (Nicolas's pick of four, 2026-10-08). Speaker
       Dorbulgruf Shalescar of Bremen, an old shield-dwarf: the grey beard is what
       reads as a dwarf at bust size. Hires the party in ch06, ch07's boss.
+* nerra <- vendor/Serra (Goth) {Freefall}.png
+    - 96x80 main-mug crop
+    - repainted in the merfolk's own battle-anim palette (vendored mermaid, `dark/Magic_000`):
+      rust hair, pale green skin, gold eyes, and the top in the pink of the band they wear at
+      the waist (Nicolas's pick, 2026-10-10: twin tails, as the merfolk wear them). Hair and
+      top share the sheet's three greys, so the recolour is by REGION: the top is the rows from
+      65 between the pigtails, and the face shading that borrows the hair greys goes to skin.
+      Eight skin tones fold into the anim's five, which keeps the bust at 16 colours. Freefall's
+      mugs are F2U and F2E with credit (FEUniverse t/19163, post 1).
 
 Output format is the bust-pipeline contract: 96x80 indexed PNG, <=16 colors,
 index 0 = the transparent background.
@@ -48,6 +57,45 @@ DORBULGRUF_RECOLOR = {
     (132, 82, 173): (122, 98, 140),
     (99, 41, 148):  (88, 64, 108),
 }
+
+NERRA_SKIN = {
+    (246, 246, 223): (232, 244, 184), (247, 216, 160): (208, 232, 152),
+    (246, 199, 137): (208, 232, 152), (231, 168, 96): (176, 192, 112),
+    (226, 139, 81): (176, 192, 112), (199, 120, 56): (120, 168, 104),
+    (156, 112, 73): (88, 128, 80), (112, 87, 86): (88, 128, 80),
+}
+NERRA_HAIR = {(79, 77, 80): (192, 112, 16), (73, 73, 73): (136, 64, 8), (66, 65, 66): (96, 24, 0)}
+NERRA_TOP = {(79, 77, 80): (240, 176, 184), (73, 73, 73): (208, 128, 144),
+             (66, 65, 66): (160, 80, 104)}
+NERRA_LACE = (88, 80, 135)          # the top's mesh highlights; elsewhere the eye/clasp purple
+NERRA_EYE_LIGHT = {(144, 168, 192): (232, 200, 80)}
+NERRA_OUTLINE = (56, 32, 63)
+
+
+def nerra_recolor(mug):
+    """Serra (Goth) -> Nerra, by region (see the module docstring)."""
+    out = mug.copy()
+    for y in range(80):
+        for x in range(96):
+            c = tuple(int(v) for v in mug[y, x])
+            top = y >= 65 and 30 <= x <= 65
+            if c in NERRA_SKIN:
+                new = NERRA_SKIN[c]
+            elif c in NERRA_HAIR:
+                new = (NERRA_TOP[c] if top
+                       else (88, 128, 80) if 46 <= y < 65 and 34 <= x <= 62   # face shading
+                       else NERRA_HAIR[c])
+            elif c == NERRA_LACE:
+                new = (240, 176, 184) if top else (160, 104, 8)
+            elif c in NERRA_EYE_LIGHT:
+                new = NERRA_EYE_LIGHT[c]
+            elif c == NERRA_OUTLINE and 66 <= y <= 71 and 31 <= x <= 58:
+                new = (160, 80, 104)                                       # the dark lace
+            else:
+                continue
+            out[y, x] = new
+    return out
+
 
 HLIN_RECOLOR = {
     # merges (color budget 18 -> 16)
@@ -111,6 +159,13 @@ def main():
         mug[(mug == src).all(axis=-1)] = dst
     out = os.path.join(HERE, 'dorbulgruf.png')
     to_indexed(Image.fromarray(mug), (160, 200, 152)).save(out)
+    print('-> %s' % out)
+
+    sheet = Image.open(os.path.join(VENDOR, 'Serra (Goth) {Freefall}.png')).convert('RGB')
+    mug = np.array(sheet.crop((0, 0, 96, 80)))
+    bg = tuple(int(v) for v in mug[0, 0])
+    out = os.path.join(HERE, 'nerra.png')
+    to_indexed(Image.fromarray(nerra_recolor(mug)), bg).save(out)
     print('-> %s' % out)
 
 

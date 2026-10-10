@@ -200,6 +200,24 @@ def flag_defeat_quote(pid, chapter_const, flag, comment, msg=0):
             '    },' % (pid, comment, chapter_const, flag, msg_value))
 
 
+def boss_quote_message(chap, trigger, speaker, face, msg_id, boxes, seat='[OpenMidLeft]'):
+    """One locked boss quote -- the first-engagement taunt (`boss_battle`) or the defeat line
+    (`boss_death`) -- rendered from the chapter's event at the battle bubble's 143px budget.
+
+    `boxes` is the locked box count and a different count is a hard error: these ids are
+    written straight into the boss's own rows (battle_quote_pair, flag_defeat_quote), so an
+    extra box would silently lengthen a line Nicolas signed off on. `seat` is the twin's own
+    (vanilla's bosses mostly hold [OpenMidLeft] for both quotes)."""
+    _card, beats = _split_event_beats(chap, trigger, '%s %s' % (chap['id'], trigger), (msg_id,),
+                                      card_required=False)
+    beat = beats[0]
+    if len(beat) != boxes or any(next(iter(entry)) != speaker for entry in beat):
+        sys.exit('ERROR: %s %s must remain %d locked %s box(es)'
+                 % (chap['id'], trigger, boxes, speaker))
+    return _script_to_message(beat, {speaker: (seat, _fid_tag(face))},
+                              fe8_talk_font.BATTLE_QUOTE_BUDGET_PX)
+
+
 def battle_quote_pair(pid, chapter_const, msg, comment, flag='EVFLAG_BATTLE_QUOTES'):
     """The two gBattleTalkList rows that give `pid` a first-engagement line in `chapter_const`.
 

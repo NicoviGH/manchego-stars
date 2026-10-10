@@ -33,8 +33,8 @@ from inject.recruit import (
     assert_custom_art_pid_wired, on_map_talk_recruits, parley_recruiters, talk_recruit_wiring)
 from inject.scenes import (
     _make_fid, _prepend_battle_quote, _prepend_defeat_quote, _split_event_beats, _stage_beat,
-    _write_chapter_title_card, battle_quote_pair, branch_on_check_alive, flag_defeat_quote,
-    split_on_stage_cut, variant_beat)
+    _write_chapter_title_card, battle_quote_pair, boss_quote_message, branch_on_check_alive,
+    flag_defeat_quote, split_on_stage_cut, variant_beat)
 from inject.terrain import (
     _class_terrain_move_costs, _map_terrain_grid, assert_scripted_move_reachable, reachable_tiles,
     reda_route_move)
@@ -855,40 +855,26 @@ def ch05_eruption_message(chap):
 
 
 def ch05_ravisin_taunt_message(chap):
-    """Render Ravisin's one locked battle taunt -- the line she says when the fight starts.
+    """Ravisin's one locked battle taunt -- the line she says when the fight starts.
 
     The ``vanilla 0x9C7`` label cites Saar's own taunt, which ours is the twin of with one word
-    swapped (empire -> Frostmaiden); ch05 writes the body into its own Ch6 host block. Seat:
-    vanilla puts Saar on [OpenMidLeft] for BOTH 9C7 and 9C8, and a battle quote draws over the
-    combat screen with nobody opposite her, so the mined seat carries over unchanged.
+    swapped (empire -> Frostmaiden); ch05 writes the body into its own Ch6 host block. Vanilla
+    seats Saar on [OpenMidLeft] for 9C7, and a battle quote draws over the combat screen with
+    nobody opposite her, so the mined seat carries over unchanged.
     """
-    _card, beats = _split_event_beats(
-        chap, 'boss_battle', 'ch05 Ravisin battle taunt', (CH05_RAVISIN_TAUNT_MSG,),
-        card_required=False)
-    beat = beats[0]
-    if len(beat) != 1 or next(iter(beat[0])) != 'ravisin':
-        sys.exit('ERROR: ch05 Ravisin battle taunt must remain one locked Ravisin box')
-    return _script_to_message(
-        beat,
-        {'ravisin': ('[OpenMidLeft]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))}, fe8_talk_font.BATTLE_QUOTE_BUDGET_PX)
+    return boss_quote_message(chap, 'boss_battle', 'ravisin', GUEST_PORTRAIT_MAP['ravisin'],
+                              CH05_RAVISIN_TAUNT_MSG, 1)
 
 
 def ch05_ravisin_death_message(chap):
-    """Render Ravisin's one locked death box from the chapter event source of truth.
+    """Ravisin's one locked death box, from the chapter event source of truth.
 
     The event's ``vanilla 0x9C8`` label cites the donor scene; ch05 writes the body to its
     own Ch6 host block. The separate enemy ``death_quote`` field predates the locked dialogue
     pass and is deliberately not consulted here.
     """
-    _card, beats = _split_event_beats(
-        chap, 'boss_death', 'ch05 Ravisin death quote', (CH05_RAVISIN_DEATH_MSG,),
-        card_required=False)
-    beat = beats[0]
-    if len(beat) != 1 or next(iter(beat[0])) != 'ravisin':
-        sys.exit('ERROR: ch05 Ravisin death quote must remain one locked Ravisin box')
-    return _script_to_message(
-        beat,
-        {'ravisin': ('[OpenMidRight]', _fid_tag(GUEST_PORTRAIT_MAP['ravisin']))}, fe8_talk_font.BATTLE_QUOTE_BUDGET_PX)
+    return boss_quote_message(chap, 'boss_death', 'ravisin', GUEST_PORTRAIT_MAP['ravisin'],
+                              CH05_RAVISIN_DEATH_MSG, 1, seat='[OpenMidRight]')
 
 
 def ch05_sahnar_talk_messages(chap):

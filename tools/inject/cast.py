@@ -188,6 +188,9 @@ GUEST_PORTRAIT_MAP = {
     # 0332). He rides Murray, vanilla Ch7's boss -- ch07's parity twin -- so the face is already
     # where ch07's boss will look for it, the way Nerra rides Novala. Murray is named nowhere else.
     'dorbulgruf':     'Murray',
+    # Nerra, ch06's merfolk elder, already RIDES NOVALA (ENEMY_BASE_SLOT above), so his face slot
+    # is the one her unit and her two quotes point at. Novala is named nowhere else.
+    'nerra':          'Novala',
 }
 
 
