@@ -372,8 +372,10 @@ def inject_prologue(campaign, verbose=True, montage=False):
         'sephek', [by_id['sephek-kaltro']['death_quote']], opening_staging['sephek']))
     set_message_body(lines, 0x917, battle_quote_body(
         'hlin', [by_id['hlin-trollbane']['death_quote']], ending_staging['hlin']))
-    set_message_body(lines, 0xC25, _script_to_message(
-        [{'scramsax': by_id['scramsax']['defeat_quote']}], ending_staging))
+    # A defeat quote rides the 143px battle bubble like the two above; at the talk window's
+    # 203px its first line ran 193px, off the bubble.
+    set_message_body(lines, 0xC25, battle_quote_body(
+        'scramsax', [by_id['scramsax']['defeat_quote']], ending_staging['scramsax']))
 
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
