@@ -14,9 +14,9 @@ THE CH06 BUST comes from References/NPCs/Messie/MessieLongThick.jpeg (Gemini, Ni
     to the top of his snout, in his own blue and outline. Hat pixels inside the curve become
     head, outside it background, and the band the brim shadowed is repainted, the eye spared.
   * bust -- the head centred and as HIGH as the frame allows ("raise him as high as possible"),
-    the neck running off the bottom: the largest framing that leaves FE8's dead corners empty
-    (portrait_tool.clipped_mask). Downscaled with ref_to_bust's cel mode, flipped to face
-    screen-left.
+    the neck running off the bottom. Framed while FE8 still dropped the bust's top corners
+    (engine patch 0018 draws them now, #471). Downscaled with ref_to_bust's cel mode, flipped
+    to face screen-left.
   * retint -- AFTER the downscale, on the finished palette: his blues onto his map sprite's
     slate (cast idx 10) and his belly onto the cast light grey (idx 11), each at its own
     brightness. Done to the source instead, the darker slates come close enough to the teal
@@ -35,7 +35,6 @@ from PIL import Image, ImageDraw
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
-import portrait_tool  # noqa: E402
 import ref_to_bust  # noqa: E402
 
 REFS = os.path.join(REPO, 'references', 'References', 'NPCs', 'Messie')
@@ -126,11 +125,7 @@ def bust_ch06():
         out = ref_to_bust.convert(tmp, CH06_CROP, matte=MATTE, cel=True)
     finally:
         os.unlink(tmp)
-    out = retint_palette(out.transpose(Image.FLIP_LEFT_RIGHT))
-    clipped = sum(portrait_tool.clipped_mask(out))
-    if clipped:
-        sys.exit('messie: %d px fall in FE8\'s dead corners -- re-fit CH06_CROP' % clipped)
-    return out
+    return retint_palette(out.transpose(Image.FLIP_LEFT_RIGHT))
 
 
 # ── ch07: the mayor, from the earlier pixel-art ref ────────────────────────────────────────
@@ -156,13 +151,9 @@ def bust_mayor():
     tmp = os.path.join(HERE, '.messie-ref.png')
     big.save(tmp)
     try:
-        out = ref_to_bust.convert(tmp, MAYOR_CROP, matte=MATTE).transpose(Image.FLIP_LEFT_RIGHT)
+        return ref_to_bust.convert(tmp, MAYOR_CROP, matte=MATTE).transpose(Image.FLIP_LEFT_RIGHT)
     finally:
         os.unlink(tmp)
-    clipped = sum(portrait_tool.clipped_mask(out))
-    if clipped:
-        sys.exit('messie-mayor: %d px fall in FE8\'s dead corners -- re-fit MAYOR_CROP' % clipped)
-    return out
 
 
 def main():

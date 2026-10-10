@@ -19,7 +19,7 @@ just averages into mush.
 Usage:
     ref_to_bust.py <ref.png> <out_bust.png> --crop x0,y0,x1,y1 [options]
       --zoom z        shrink the subject to fraction z of the frame for top
-                      headroom (clears FE8's dead top corners); default 1.0.
+                      headroom; default 1.0.
       --sharpen pct   optional UnsharpMask at target res (default 0 = off).
       --bg-thresh d   RGB distance from the border colour treated as background.
       --matte rrggbb  paint the keyed background this colour (the outline's) before
@@ -64,8 +64,7 @@ def _zoom_out(src, crop_box, zoom):
 
     The extra width is split evenly (horizontal centering); the extra height is
     added entirely at the TOP (the shoulders stay pinned to the bottom edge, as in
-    vanilla FE8 busts -- headroom appears above the head, where FE8's dead corners
-    sit). Where the larger box runs off the ref, pad the ref with its border-median
+    vanilla FE8 busts -- headroom appears above the head). Where the larger box runs off the ref, pad the ref with its border-median
     color so the new margin reads as flat background and gets keyed transparent.
     Returns (possibly padded) src and the new crop_box. No-op at zoom == 1.0.
     """
@@ -326,8 +325,8 @@ def main():
     ap.add_argument('out')
     ap.add_argument('--crop', required=True, help='x0,y0,x1,y1 in ref pixels (~1.2 aspect)')
     ap.add_argument('--zoom', type=float, default=1.0,
-                    help='shrink the subject to this fraction of the frame for top headroom '
-                         '(clears FE8 dead corners); default 1.0 = unchanged.')
+                    help='shrink the subject to this fraction of the frame for top headroom; '
+                         'default 1.0 = unchanged.')
     ap.add_argument('--sharpen', type=int, default=0,
                     help='UnsharpMask percent at target res (default 0 = off). A taste dial; '
                          'the clean-ref + pngquant path is already crisp.')

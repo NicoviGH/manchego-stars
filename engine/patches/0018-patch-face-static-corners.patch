@@ -1,0 +1,161 @@
+From: Manchego Stars engine
+Subject: [PATCH 18/18] still faces draw the top corner strips vanilla's 96x96 face leaves out
+
+gSprite_Face96x96 covers a 96x80 bust with six sprite pieces, and the two 16x48 strips at its
+top corners (x -48..-32 and +32..+48 above y 48) fall outside all of them. Vanilla's art never
+paints there, but a custom bust that is wide or tall up top (a hat, a snout) loses those pixels.
+
+A face whose FaceData says FACE_BLINK_STATIC (a new blink kind, 7) is a still: its sheet holds
+no eye frames. For those faces only:
+
+  * Face_OnIdle draws gSprite_Face96x96_Corners (or _Flipped) in place of the 96x96 layout:
+    the vanilla six pieces plus a 16x32 and a 16x16 per corner, from sheet tiles 0x18-0x1B /
+    0x58-0x5B (the eye frames' tiles) and 0x5C-0x5F (read by nothing). The choice is made at
+    draw time, so a face swapped in mid-scene picks it up too.
+  * the eye overlay (sub_8006134) draws nothing, so a blink or a close-eyes command never
+    paints corner tiles over the eyes, and the blink timer never fires (INT32_MAX, as kind 5).
+
+  * PutFace80x72_Core (the stat, support and world-map screens' BG face, bust x 8..87) fills
+    its edge columns above y 48 from the corner strips' inner tile columns. Vanilla blanks
+    rows 0-4 there and leaves tile 0x07 (bust x 72..79, y 0..7) in row 5. Raised faces keep
+    vanilla's path.
+
+Every other face, and the other OBJ layouts (64x96, 80x72, 96x72), are untouched. The mouth
+overlay still reads 0x1C-0x1F / 0x3C-0x3F, outside the corner tiles.
+---
+diff --git a/include/types.h b/include/types.h
+index 03a180d..397a9ee 100644
+--- a/include/types.h
++++ b/include/types.h
+@@ -406,6 +406,9 @@ enum
+ {
+     FACE_BLINK_NORMAL = 1,
+     FACE_BLINK_CLOSED = 6,
++    // A still face: no eye frames in its sheet, so it never blinks and the sheet tiles the
++    // eye frames would use carry the two top corner strips instead (gSprite_Face96x96_Corners).
++    FACE_BLINK_STATIC = 7,
+ };
+ 
+ struct FaceData
+diff --git a/src/face.c b/src/face.c
+index 0077d46..36e8967 100644
+--- a/src/face.c
++++ b/src/face.c
+@@ -85,6 +85,40 @@ u16 CONST_DATA gSprite_Face96x96_Flipped[] =
+     OAM0_SHAPE_16x32 + OAM0_Y(48), OAM1_SIZE_16x32 + OAM1_HFLIP + OAM1_X(+32), OAM2_CHR(0x14),
+ };
+ 
++// full face (96x96) with the top corner strips (x -48..-32 and +32..+48, y 0..47) the layout
++// above leaves undrawn, for FACE_BLINK_STATIC faces: the strips live in the tiles the eye
++// frames would use (0x18-0x1B, 0x58-0x5B) and in 0x5C-0x5F, which nothing else reads
++u16 CONST_DATA gSprite_Face96x96_Corners[] =
++{
++    10,
++    OAM0_SHAPE_64x32,              OAM1_SIZE_64x32 + OAM1_X(-32), OAM2_CHR(0x00),
++    OAM0_SHAPE_64x32 + OAM0_Y(32), OAM1_SIZE_64x32 + OAM1_X(-32), OAM2_CHR(0x08),
++    OAM0_SHAPE_32x16 + OAM0_Y(64), OAM1_SIZE_32x16 + OAM1_X(-32), OAM2_CHR(0x10),
++    OAM0_SHAPE_32x16 + OAM0_Y(64), OAM1_SIZE_32x16,               OAM2_CHR(0x50),
++    OAM0_SHAPE_16x32 + OAM0_Y(48), OAM1_SIZE_16x32 + OAM1_X(-48), OAM2_CHR(0x14),
++    OAM0_SHAPE_16x32 + OAM0_Y(48), OAM1_SIZE_16x32 + OAM1_X(+32), OAM2_CHR(0x16),
++    OAM0_SHAPE_16x32,              OAM1_SIZE_16x32 + OAM1_X(-48), OAM2_CHR(0x18),
++    OAM0_SHAPE_16x16 + OAM0_Y(32), OAM1_SIZE_16x16 + OAM1_X(-48), OAM2_CHR(0x5C),
++    OAM0_SHAPE_16x32,              OAM1_SIZE_16x32 + OAM1_X(+32), OAM2_CHR(0x1A),
++    OAM0_SHAPE_16x16 + OAM0_Y(32), OAM1_SIZE_16x16 + OAM1_X(+32), OAM2_CHR(0x5E),
++};
++
++// full face (96x96) with the top corner strips, flipped
++u16 CONST_DATA gSprite_Face96x96_Corners_Flipped[] =
++{
++    10,
++    OAM0_SHAPE_64x32,              OAM1_SIZE_64x32 + OAM1_HFLIP + OAM1_X(-32), OAM2_CHR(0x00),
++    OAM0_SHAPE_64x32 + OAM0_Y(32), OAM1_SIZE_64x32 + OAM1_HFLIP + OAM1_X(-32), OAM2_CHR(0x08),
++    OAM0_SHAPE_32x16 + OAM0_Y(64), OAM1_SIZE_32x16 + OAM1_HFLIP + OAM1_X(-32), OAM2_CHR(0x50),
++    OAM0_SHAPE_32x16 + OAM0_Y(64), OAM1_SIZE_32x16 + OAM1_HFLIP,               OAM2_CHR(0x10),
++    OAM0_SHAPE_16x32 + OAM0_Y(48), OAM1_SIZE_16x32 + OAM1_HFLIP + OAM1_X(-48), OAM2_CHR(0x16),
++    OAM0_SHAPE_16x32 + OAM0_Y(48), OAM1_SIZE_16x32 + OAM1_HFLIP + OAM1_X(+32), OAM2_CHR(0x14),
++    OAM0_SHAPE_16x32,              OAM1_SIZE_16x32 + OAM1_HFLIP + OAM1_X(-48), OAM2_CHR(0x1A),
++    OAM0_SHAPE_16x16 + OAM0_Y(32), OAM1_SIZE_16x16 + OAM1_HFLIP + OAM1_X(-48), OAM2_CHR(0x5E),
++    OAM0_SHAPE_16x32,              OAM1_SIZE_16x32 + OAM1_HFLIP + OAM1_X(+32), OAM2_CHR(0x18),
++    OAM0_SHAPE_16x16 + OAM0_Y(32), OAM1_SIZE_16x16 + OAM1_HFLIP + OAM1_X(+32), OAM2_CHR(0x5C),
++};
++
+ // smaller face (80x72)
+ u16 CONST_DATA gSprite_Face80x72[] =
+ {
+@@ -333,6 +367,7 @@ void Face_OnInit(struct FaceProc* proc) {
+ //! FE8U = 0x080055BC
+ void Face_OnIdle(struct FaceProc* proc) {
+     int oam0;
++    const u16 * sprite = proc->sprite;
+ 
+     if (GetFaceDisplayBits(proc) & FACE_DISP_HIDDEN) {
+         return;
+@@ -346,11 +381,21 @@ void Face_OnIdle(struct FaceProc* proc) {
+ 
+     oam0 += OAM0_Y(proc->yPos);
+ 
++    // chosen here, not in FaceRefreshSprite, so a face swapped in mid-scene (sub_8006650)
++    // gets its corners too
++    if (proc->pFaceInfo->blinkKind == FACE_BLINK_STATIC) {
++        if (sprite == gSprite_Face96x96) {
++            sprite = gSprite_Face96x96_Corners;
++        } else if (sprite == gSprite_Face96x96_Flipped) {
++            sprite = gSprite_Face96x96_Corners_Flipped;
++        }
++    }
++
+     PutSpriteExt(
+         proc->spriteLayer,
+         0x1FF & proc->xPos,
+         oam0,
+-        proc->sprite,
++        sprite,
+         proc->oam2
+     );
+ 
+@@ -736,9 +781,23 @@ void PutFace80x72_Core(u16 * tm, int fid, int chr, int pal) {
+             PutFace80x72_Standard(tm, (pal << 12) + (0x3FF & chr), info);
+         }
+ 
+-        for (i = 0; i < 5; i++) {
+-            tm[i * 0x20 + 0] = 0;
+-            tm[i * 0x20 + 9] = 0;
++        if (info->blinkKind == FACE_BLINK_STATIC && !ShouldFaceBeRaised(fid)) {
++            // the edge columns (bust x 8..15 and 80..87) above y 48 come from the corner
++            // strips' inner tile columns, where vanilla blanks them (and leaves tile 0x07 in
++            // the sixth row)
++            static const u8 cornerL[6] = { 0x19, 0x39, 0x59, 0x79, 0x5D, 0x7D };
++            static const u8 cornerR[6] = { 0x1A, 0x3A, 0x5A, 0x7A, 0x5E, 0x7E };
++            int tileref = (pal << 12) + (0x3FF & chr);
++
++            for (i = 0; i < 6; i++) {
++                tm[i * 0x20 + 0] = tileref + cornerL[i];
++                tm[i * 0x20 + 9] = tileref + cornerR[i];
++            }
++        } else {
++            for (i = 0; i < 5; i++) {
++                tm[i * 0x20 + 0] = 0;
++                tm[i * 0x20 + 9] = 0;
++            }
+         }
+ 
+     } else {
+@@ -1025,6 +1084,10 @@ void sub_8006134(struct FaceBlinkProc* proc, int unk) {
+ 
+     s8 flag = 0;
+ 
++    if (proc->pFaceProc->pFaceInfo->blinkKind == FACE_BLINK_STATIC) {
++        return;
++    }
++
+     switch (unk) {
+         case 0:
+             unk = 88;
+@@ -1300,6 +1363,7 @@ int FaceBlinkProc_GenBlinkInterval(struct FaceBlinkProc* proc) {
+             return 1;
+ 
+         case 5:
++        case FACE_BLINK_STATIC:
+             return INT32_MAX;
+     }
+ }

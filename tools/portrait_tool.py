@@ -13,12 +13,13 @@ gbagfx + the build expect.
 
   decode   sheet.png  -> bust 96x80              (for inspecting vanilla art)
   encode   bust.png   -> sheet 256x32            (for inserting custom art)
+           --corners   the top corner strips too (a static bust's sheet; CORNER_OBJECTS)
   generate bust.png <base>                       (produce all 4 decomp assets)
            --xmouth N  tile-column mouth offset  (default 2, range 0-6)
            --ymouth N  tile-row mouth offset     (default 6, range 0-9)
 
 generate produces:
-  <base>_tileset.png    256x32 tile sheet (mouth region blanked)
+  <base>_tileset.png    256x32 tile sheet (static: whole face + top corner strips)
   <base>_mouth.png      32x96 mouth animation (6 identical static frames)
   <base>_chibi.png      32x32 map/UI thumbnail (face region scaled down)
   <base>_palette.agbpal 32-byte GBA RGB555 palette (direct .incbin target)
@@ -53,6 +54,15 @@ OBJECTS = [
     (16, 32, -48, 48, 0x14),
     (16, 32,  32, 48, 0x16),
 ]
+# The top corner strips (x 0..15 and 80..95, y 0..47) OBJECTS leave out. Engine patch 0018
+# draws them for a FACE_BLINK_STATIC face -- every bust we ship -- from the sheet tiles the
+# eye frames would use (0x18-0x1B, 0x58-0x5B) plus 0x5C-0x5F.
+CORNER_OBJECTS = [
+    (16, 32, -48,  0, 0x18),
+    (16, 16, -48, 32, 0x5C),
+    (16, 32,  32,  0, 0x1A),
+    (16, 16,  32, 32, 0x5E),
+]
 X_ORIGIN = 48          # normalize screen x so leftmost object lands at bust x=0
 SHEET_W, SHEET_H = 256, 32
 BUST_W, BUST_H = 96, 80
@@ -71,88 +81,34 @@ def _iter_tiles(w, h, chr_idx):
             yield i, j, (col0 + i) * 8, (row0 + j) * 8
 
 
-def decode(sheet):
-    """32-wide tile sheet -> 96x80 bust (palette preserved)."""
+def _objects(corners):
+    return OBJECTS + CORNER_OBJECTS if corners else OBJECTS
+
+
+def decode(sheet, corners=False):
+    """32-wide tile sheet -> 96x80 bust (palette preserved). corners: read the corner strips
+    too (a static bust's sheet; a vanilla sheet holds eye frames there)."""
     bust = Image.new('P', (BUST_W, BUST_H), 0)
     if sheet.palette:
         bust.putpalette(sheet.getpalette())
-    for w, h, x, y, chr_idx in OBJECTS:
+    for w, h, x, y, chr_idx in _objects(corners):
         for i, j, sx, sy in _iter_tiles(w, h, chr_idx):
             tile = sheet.crop((sx, sy, sx + 8, sy + 8))
             bust.paste(tile, (x + X_ORIGIN + i * 8, y + j * 8))
     return bust
 
 
-def encode(bust):
+def encode(bust, corners=False):
     """96x80 bust -> 32-wide tile sheet (inverse of decode)."""
     sheet = Image.new('P', (SHEET_W, SHEET_H), 0)
     if bust.palette:
         sheet.putpalette(bust.getpalette())
-    for w, h, x, y, chr_idx in OBJECTS:
+    for w, h, x, y, chr_idx in _objects(corners):
         for i, j, sx, sy in _iter_tiles(w, h, chr_idx):
             bx, by = x + X_ORIGIN + i * 8, y + j * 8
             tile = bust.crop((bx, by, bx + 8, by + 8))
             sheet.paste(tile, (sx, sy))
     return sheet
-
-
-def what_ships(bust):
-    """Return the bust as FE8 ACTUALLY draws it.
-
-    The 6 OAM objects of gSprite_Face96x96 cover a face-shaped envelope; the
-    top-left and top-right 16px strips above y=48 fall outside every object and
-    are never drawn (the "dead corners"). encode() copies only the object
-    rectangles into the sheet and decode() reads them back, so the round-trip
-    drops exactly the undrawn pixels -- making decode(encode(bust)) a pixel-exact
-    model of the on-screen result.
-    """
-    return decode(encode(bust))
-
-
-def clipped_mask(bust, ships=None):
-    """Bool list (row-major, len 96*80): True where the bust paints but FE8 drops it."""
-    if ships is None:
-        ships = what_ships(bust)
-    b, s = list(bust.getdata()), list(ships.getdata())
-    return [bi != 0 and si == 0 for bi, si in zip(b, s)]
-
-
-def _render_panel(im, clipped=None, bg=(64, 64, 64), tint=(255, 0, 255)):
-    """96x80 indexed bust -> RGB panel. index-0 -> bg; clipped px -> tint if given."""
-    rgb = im.convert('RGB')
-    px = list(rgb.getdata())
-    idx = list(im.getdata())
-    out = []
-    for i, (p, k) in enumerate(zip(px, idx)):
-        if clipped is not None and clipped[i]:
-            out.append(tint)
-        elif k == 0:
-            out.append(bg)
-        else:
-            out.append(p)
-    rgb.putdata(out)
-    return rgb
-
-
-def preview(bust, scale=4):
-    """Build a 3-panel RGB comparison: [authored | what-ships | clipped-overlay].
-
-    Returns (composite_rgb, ships_indexed, clipped_count).
-    """
-    ships = what_ships(bust)
-    clipped = clipped_mask(bust, ships)
-    count = sum(clipped)
-
-    authored = _render_panel(bust)
-    drawn = _render_panel(ships)
-    overlay = _render_panel(bust, clipped=clipped)
-
-    gap = 6
-    pw, ph = BUST_W * scale, BUST_H * scale
-    comp = Image.new('RGB', (pw * 3 + gap * 2, ph), (20, 20, 20))
-    for n, panel in enumerate((authored, drawn, overlay)):
-        comp.paste(panel.resize((pw, ph), Image.NEAREST), ((pw + gap) * n, 0))
-    return comp, ships, count
 
 
 def _palette_to_agbpal(pal_rgb):
@@ -204,14 +160,18 @@ def generate(bust, xmouth=2, ymouth=6, static_portrait=False):
       palette_bytes — 32-byte GBA RGB555 blob (.agbpal)
 
     static_portrait (default for custom art): make a NON-ANIMATED bust. FE8 always
-    runs a talking-mouth proc AND a periodic eye-blink proc, both reading frames
-    from imgMouth (see src/face.c sub_8005FE0). Authoring aligned mouth/eye frames
-    by hand is infeasible for custom art, so instead we defeat the animation:
+    runs a talking-mouth proc, painting frames from imgMouth (src/face.c
+    sub_8005FE0), and an eye-blink proc, painting frames from the sheet's tiles
+    0x18/0x58. Authoring aligned mouth/eye frames by hand is infeasible for custom
+    art, so instead we defeat the animation:
       * bake the WHOLE neutral face (eyes + mouth) into the tileset — do NOT blank
         the mouth window the way animated vanilla portraits do;
-      * fill every mouth/blink frame slot with the NEUTRAL mouth/eye crop (opaque --
-        NOT transparent), so each overlay frame the engine paints repaints the same
-        neutral pixels that are already there.
+      * fill every mouth frame slot with the NEUTRAL mouth crop (opaque -- NOT
+        transparent), so each overlay frame the engine paints repaints the same
+        neutral pixels that are already there;
+      * the slot's FaceData says FACE_BLINK_STATIC (inject.portraits), so the blink
+        proc paints nothing and the eye frames' tiles carry the top corner strips
+        (engine patch 0018).
     Net effect: the engine "animates", but nothing ever moves — a locked still.
     """
     mouth_bx = (xmouth - 4) * 8 + 32   # bust x of the 32x16 mouth window
@@ -250,11 +210,12 @@ def generate(bust, xmouth=2, ymouth=6, static_portrait=False):
         for i in range(MOUTH_FRAMES):
             mouth_png.paste(mouth_frame, (0, i * MOUTH_H))
 
-    # --- tileset: encode the (possibly unmodified) bust ---
-    tileset_png = encode(mod_bust)
+    # --- tileset: encode the (possibly unmodified) bust; a static one carries its corner
+    # strips where the eye frames would sit (it has none -- engine patch 0018) ---
+    tileset_png = encode(mod_bust, corners=static_portrait)
 
     if static_portrait:
-        # encode()'s OBJECTS never cover sheet tiles 0x1C-0x1F / 0x3C-0x3F (columns
+        # encode()'s objects never cover sheet tiles 0x1C-0x1F / 0x3C-0x3F (columns
         # 28-31), but the status-screen face reader (face.c PutFace80x72_Standard)
         # draws the 32x16 mouth window from exactly those tiles. Left blank they render
         # as a transparent hole over the mouth -- the "mouth cutout". Paste the neutral
@@ -279,42 +240,29 @@ def _check_indexed(im, path):
 
 def main():
     import argparse
-    if len(sys.argv) < 2 or sys.argv[1] not in ('decode', 'encode', 'generate', 'preview'):
+    if len(sys.argv) < 2 or sys.argv[1] not in ('decode', 'encode', 'generate'):
         sys.exit('usage:\n'
-                 '  portrait_tool.py decode   <sheet.png>  <bust.png>\n'
-                 '  portrait_tool.py encode   <bust.png>   <sheet.png>\n'
-                 '  portrait_tool.py generate <bust.png>   <out_base> [--xmouth N] [--ymouth N]\n'
-                 '  portrait_tool.py preview  <bust.png>   <out.png>   (what-FE8-draws + clipped overlay)')
+                 '  portrait_tool.py decode   <sheet.png>  <bust.png>  [--corners]\n'
+                 '  portrait_tool.py encode   <bust.png>   <sheet.png> [--corners]\n'
+                 '  portrait_tool.py generate <bust.png>   <out_base> [--xmouth N] [--ymouth N]')
 
     op = sys.argv[1]
 
-    if op == 'preview':
-        if len(sys.argv) != 4:
-            sys.exit('usage: portrait_tool.py preview <bust.png> <out.png>')
-        inp, outp = sys.argv[2], sys.argv[3]
-        im = Image.open(inp)
-        _check_indexed(im, inp)
-        if im.size != (BUST_W, BUST_H):
-            sys.exit('ERROR: preview expects a %dx%d bust, got %s' % (BUST_W, BUST_H, im.size))
-        comp, _ships, count = preview(im)
-        comp.save(outp)
-        verdict = 'clean (nothing clipped)' if count == 0 else '%d px fall in the dead zone' % count
-        print('%s -> %s  [%s]' % (inp, outp, verdict))
-
-    elif op in ('decode', 'encode'):
-        if len(sys.argv) != 4:
-            sys.exit('usage: portrait_tool.py %s <in.png> <out.png>' % op)
+    if op in ('decode', 'encode'):
+        corners = sys.argv[4:] == ['--corners']
+        if len(sys.argv) != 4 + corners:
+            sys.exit('usage: portrait_tool.py %s <in.png> <out.png> [--corners]' % op)
         inp, outp = sys.argv[2], sys.argv[3]
         im = Image.open(inp)
         _check_indexed(im, inp)
         if op == 'decode':
             if im.size != (SHEET_W, SHEET_H):
                 sys.exit('ERROR: decode expects a %dx%d sheet, got %s' % (SHEET_W, SHEET_H, im.size))
-            out = decode(im)
+            out = decode(im, corners)
         else:
             if im.size != (BUST_W, BUST_H):
                 sys.exit('ERROR: encode expects a %dx%d bust, got %s' % (BUST_W, BUST_H, im.size))
-            out = encode(im)
+            out = encode(im, corners)
         out.save(outp)
         print('%s -> %s (%s)' % (inp, outp, op))
 

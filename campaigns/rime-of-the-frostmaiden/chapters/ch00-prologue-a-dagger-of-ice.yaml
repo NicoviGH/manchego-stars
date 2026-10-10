@@ -202,7 +202,7 @@ enemy_units:
         crop: [260, 610, 1280, 1460]   # wide enough left/down to keep the white shirt sleeve
         zoom: 0.94                     # 0 px clipped; shoulder + dagger pinned to the bottom corners
         bg_thresh: 25                  # flat gray bg sits close to the cream sleeve; keep the threshold tight
-        hand_pass: "portraits/sephek-kaltro_dagger_trim.py — dead-corner clear + dagger glow-halo trim"
+        hand_pass: "portraits/sephek-kaltro_dagger_trim.py — dagger glow-halo trim"
   - id: caravan-guard
     name: "Torg's Caravan Guard"
     count: 2                     # trivial practice mooks (Torrga Icevein's hirelings)
