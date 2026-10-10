@@ -18,8 +18,9 @@ art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/WolframFLAT.png"   # flat ref (downscales crisper)
-    crop: [360, 80, 1960, 1413]    # ref pixels, ~1.2 aspect — tight head+shoulders for max face detail
-    zoom: 0.83                     # pushed right up to the dead zone (0px clipped); bigger face, lowered
+    crop: [280, 80, 1880, 1413]    # ref pixels, ~1.2 aspect — tight head+shoulders, centred so both shoulders leave the frame at the bottom corners
+    zoom: 0.89                     # as big as the shoulders allow without a flat chop at the sides (Nicolas, 2026-10-10)
+    flatten: 9                     # painted ref: flat tones instead of speckle
     hand_pass: null
   approach: custom
   fidelity: faithful

@@ -18,7 +18,7 @@ art:
     flip_h: true               # bust faces right; flip to FE8's canonical screen-left facing
     ref: "References/PCs/Pinky Art.png"
     crop: [380, 100, 1675, 1179]   # ref pixels, ~1.2 aspect
-    zoom: 0.65                     # full-body pose; headroom so both tall ears clear FE8's dead corners (0 px clipped)
+    zoom: 0.65                     # headroom kept by choice at the 2026-10-10 rescale review
     # No hand pass: pngquant renders the blue eye + ruby nose natively (they no longer need rescuing).
   approach: custom
   fidelity: faithful

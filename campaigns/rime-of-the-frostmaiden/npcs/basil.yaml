@@ -113,7 +113,6 @@ art:
   portrait:                   # campaigns/.../portraits/basil.png (+_preview) — APPROVED 2026-07-16
     source: data/portraits/basil.png          # gen3 FRLG 64x64 battle sprite (leaves fully rendered)
     chain: quantize-15 -> ffmpeg hqx=2 -> place scale 1.0 (no resize) -> palette-lock, 16-entry palette
-    deadzone: verified clean (portrait_tool.py preview; top 48 rows only draw x=16..80)
     static: true              # no mouth flap / blink, like the other custom busts
   map_sprite:                 # SHIPPED (map_sprites/basil{,_mu}.png); palette applied by Nicolas
     base: Cyclops             # geometry donor ONLY: {3 frames, UNIT_ICON_SIZE_16x32} wait-table row

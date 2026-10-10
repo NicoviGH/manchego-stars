@@ -18,7 +18,7 @@ art:
     flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/Rootis Bust 1.png"
     crop: [216, 100, 1704, 1340]   # ref pixels, ~1.2 aspect — shifted +90 right (subject left) to centre the head
-    zoom: 0.94                     # headroom so the head clears FE8's dead top corners (0px clipped)
+    zoom: 0.94                     # headroom kept by choice at the 2026-10-10 rescale review
     hand_pass: null                # pngquant renders the carrot/coal/outline clean; old hand pass obsolete
   approach: custom
   fidelity: faithful

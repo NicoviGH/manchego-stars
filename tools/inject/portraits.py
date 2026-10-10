@@ -22,6 +22,11 @@ from inject.paths import PORTRAIT_DATA_C, PORTRAIT_DIR
 # the mouth window one tile off -> a second, offset mouth. Normalize every dressed slot.
 PORTRAIT_GEOMETRY = '2, 6, 3, 4'   # xMouth, yMouth, xEyes, yEyes
 
+# Every dressed slot holds a static bust (portrait_tool.generate(static_portrait=True)): no eye
+# frames, and its top corner strips sit in the sheet tiles the eye frames would use. This blink
+# kind is how engine patch 0018 knows -- it draws the corners and never paints an eye frame.
+PORTRAIT_BLINK = 'FACE_BLINK_STATIC'
+
 # Ravisin is a chapter boss, not a recruit, so she uses the guest portrait path rather than
 # PORTRAIT_MAP's cast-identity machinery. Her approved portrait is Garytop's F2E Aversa mug
 # with a strict seven-entry palette substitution: silver hair -> chestnut and warm skin ->
@@ -103,10 +108,11 @@ def inject_portraits(campaign, verbose=True):
             print('  %-10s -> portrait_%s (tileset/mouth/chibi/palette)' % (unit, vanilla))
 
 
-def patch_portrait_geometry(campaign, verbose=True):
-    """Normalize the mouth/eye window coords of every dressed portrait slot to our
-    bust framing, so the engine's mouth-window overwrite lands on our baked mouth
-    (not one tile off, which doubles it). See PORTRAIT_GEOMETRY.
+def patch_portrait_face_data(campaign, verbose=True):
+    """Rewrite every dressed portrait slot's FaceData tail for our busts: the mouth/eye
+    window coords to our bust framing, so the engine's mouth-window overwrite lands on our
+    baked mouth (not one tile off, which doubles it; PORTRAIT_GEOMETRY), and the blink kind
+    to PORTRAIT_BLINK, so the engine draws the bust's corners and never an eye frame.
 
     The slot list MUST be `dressed_portrait_slots` -- every slot we overwrite, not just the
     cast. Missing one is silent: the build is green, the scenario passes, and the face is
@@ -116,17 +122,18 @@ def patch_portrait_geometry(campaign, verbose=True):
         lines = f.read().split('\n')
     # FaceData tail: `, 0, xMouth, yMouth, xEyes, yEyes, FACE_BLINK_*`. The `, 0,`
     # constant anchors the four geometry fields uniquely on each entry line.
-    geom = re.compile(r'(,\s*0,\s*)\d+,\s*\d+,\s*\d+,\s*\d+(,\s*FACE_BLINK)')
+    tail = re.compile(r'(,\s*0,\s*)\d+,\s*\d+,\s*\d+,\s*\d+(,\s*)FACE_BLINK_\w+')
     n = 0
     for i, line in enumerate(lines):
         if any('portrait_%s_tileset' % s in line for s in slots):
-            new = geom.sub(r'\g<1>%s\2' % PORTRAIT_GEOMETRY, line)
+            new = tail.sub(r'\g<1>%s\g<2>%s' % (PORTRAIT_GEOMETRY, PORTRAIT_BLINK), line)
             if new != line:
                 lines[i] = new
                 n += 1
     if n == 0:
-        sys.exit('ERROR: no portrait_data.c entries matched for geometry patch')
+        sys.exit('ERROR: no portrait_data.c entries matched for the FaceData patch')
     with open(PORTRAIT_DATA_C, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     if verbose:
-        print('  normalized %d slot entries to mouth/eye (%s)' % (n, PORTRAIT_GEOMETRY))
+        print('  normalized %d slot entries to mouth/eye (%s), %s'
+              % (n, PORTRAIT_GEOMETRY, PORTRAIT_BLINK))

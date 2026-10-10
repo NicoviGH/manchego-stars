@@ -41,6 +41,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'Makefile', 'ldscript.txt',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',
                         'src/bmudisp.c', 'src/prep_unitselect.c',
+                        # engine patch 0018: still faces' corner strips + FACE_BLINK_STATIC
+                        'src/face.c', 'include/types.h',
                         # #218: both roster screens that blank the purple OBJ bank
                         # (PURPLE_BANK_BLANKERS); prep_unitselect.c is listed above
                         'src/unitlistscreen.c',

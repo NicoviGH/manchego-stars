@@ -61,7 +61,7 @@ from inject.messages import (
     assert_named_raw_pids_are_exclusive, live_ids_in_declared_blocks)
 from inject.names import inject_item_names, inject_names
 from inject.platforms import inject_battle_platforms
-from inject.portraits import inject_portraits, patch_portrait_geometry
+from inject.portraits import inject_portraits, patch_portrait_face_data
 from inject.raw_pids import patch_raw_pid_portraits
 from inject.reskins import inject_enemy_class_battle_anims, inject_enemy_class_reskins
 from inject.sms import sms_alloc_report, sms_alloc_reset
@@ -209,7 +209,7 @@ STEPS = [
          writes=('graphics/item_icon/*', 'data/const_data_chapter_maps.s')),
     Step(patch_character_data, title='characters:', writes=('src/data_characters.c',)),
     Step(patch_raw_pid_portraits, writes=('src/data_characters.c',)),
-    Step(patch_portrait_geometry, title='portrait geometry:', writes=('src/portrait_data.c',)),
+    Step(patch_portrait_face_data, title='portrait face data:', writes=('src/portrait_data.c',)),
     Step(sms_alloc_reset, title='map sprites:', call=lambda fn, a: fn(a.campaign, verbose=True),
          provides=('sms-pool',)),
     Step(inject_map_sprites, needs=('sms-pool',), provides=('map-sprite-sms-ids',),

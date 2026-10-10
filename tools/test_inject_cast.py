@@ -36,7 +36,6 @@ import inject.text
 import inject.test_chapter
 import inject.units
 import inject.villages
-import portrait_tool
 from inject import source as injector  # the injector's source, every file of it (#389)
 
 
@@ -393,8 +392,6 @@ class RavisinPortrait(unittest.TestCase):
         ]
         self.assertEqual(expected, list(got.convert('RGB').getdata()),
                          'Ravisin must be an exact palette substitution, never redrawn pixels')
-        self.assertEqual(0, sum(portrait_tool.clipped_mask(got)),
-                         'the approved crown/mantle must clear FE8\'s portrait dead zone')
 
     def test_ravisin_dresses_collision_free_riev_and_normalizes_its_geometry(self):
         self.assertEqual('Riev', inject.cast.GUEST_PORTRAIT_MAP['ravisin'])

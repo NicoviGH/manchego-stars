@@ -78,7 +78,7 @@ art:
     ref: "campaigns/rime-of-the-frostmaiden/portraits/vendor/Hipster Wolf Head With Glasses {TotalityDesigns}.png"
                                       # original vendored in-repo (Redbubble listing, Nicolas 2026-07-03)
     crop: [-206, 0, 1033, 1032]       # out-of-bounds x pads as background: full head+mane at 1.2 aspect
-    zoom: 1.0                         # full frame; the wide crop already clears the dead corners (0 px clipped)
+    zoom: 1.0                         # full frame; the wide crop sets the scale
     hand_pass: lupin_darken.py        # ref ink is warm charcoal; deepen outline/eyes/glasses to true black
     credit: "TotalityDesigns (Redbubble) — see CREDITS.md"
   # ── Map sprite (SHIPPED 2026-07-16) — adopted Lycanroc, Nicolas's direction ──

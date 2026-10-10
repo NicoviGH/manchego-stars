@@ -18,7 +18,7 @@ art:
     flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/RBG3:4_Flat.png"   # flat 3/4 ref (downscales crisper)
     crop: [60, 40, 2240, 1856]     # ref pixels, ~1.2 aspect — whole top hat + coat
-    zoom: 0.88                     # headroom so the top hat clears FE8's dead corners (0px clipped)
+    zoom: 0.88                     # headroom kept by choice at the 2026-10-10 rescale review
     hand_pass: null
   approach: custom
   fidelity: faithful

@@ -32,19 +32,21 @@ Authored FE8 talking-portrait busts, one `<unit>.png` per cast/recruit/guest.
 3. The sheet + palette + mouth/chibi go into `fireemblem8u/graphics/portrait/`, then `gbagfx` → ROM
    (wiring a portrait onto a unit is the build-campaign pipeline, issues #13–15).
 
-## FE8 dead-zone constraint
+## What FE8 draws of a bust
 
-FE8's talking-portrait OAM never draws the top-left & top-right 16×48 corners (~20% of the
-frame). Check any bust and reframe until those corners are clear:
+The talk-scene face draws the whole 96×80. Vanilla's layout leaves out the top-left and
+top-right 16×48 corners; engine patch 0018 draws them for our static busts (#471). The stat,
+support and world-map screens show the 80×72 window at x 8..87, y 0..71, so keep a must-keep
+feature off the outer 8 px columns and the bottom 8 rows.
 
-```
-tools/portrait_tool.py preview <unit>.png <out>.png   # [authored | what-FE8-draws | clip overlay] + clip count
-```
+The framing lever is `--zoom`, shoulders pinned to the bottom: below 1 it adds top headroom,
+above 1 it tightens the crop. The scale rule (ADR 0338): grow a bust until its top reaches
+the frame edge, the way vanilla heads do, and stop before a shoulder is chopped flat at the
+sides. **Descale, never crop a must-keep feature.**
 
-The lever is `--zoom z<1`: it shrinks the subject and adds top headroom (shoulders pinned to
-the bottom), pulling tall/wide features (caps, ears, fuses, barrels) down out of the dead
-corners. **Descale, never crop a must-keep feature.** Every shipped bust here is at or near
-0 px clipped.
+For a painted ref, `--flatten 9` (median on the source, one area-average, no dither) gives
+flat tones instead of speckle. For a flat cel ref, `cel` mode; its `accents` keep a tiny colour
+(an eye) that would otherwise lose its palette slot.
 
 ## Hand passes
 
