@@ -34,7 +34,7 @@ from inject.recruit import (
 from inject.scenes import (
     _make_fid, _prepend_battle_quote, _prepend_defeat_quote, _split_event_beats, _stage_beat,
     _write_chapter_title_card, battle_quote_pair, boss_quote_message, branch_on_check_alive,
-    flag_defeat_quote, split_on_stage_cut, variant_beat)
+    defeat_quote_row, split_on_stage_cut, variant_beat)
 from inject.terrain import (
     _class_terrain_move_costs, _map_terrain_grid, assert_scripted_move_reachable, reachable_tiles,
     reda_route_move)
@@ -1653,10 +1653,10 @@ def ch05_arena_messages(chap):
 
 def ch05_ravisin_defeat_quote():
     """The displayed quote and unchanged flag that together drive ch05's boss win."""
-    return flag_defeat_quote(
-        CH05_BOSS_PID, chapter_label_constant(CH05_HOST_INDEX), 'EVFLAG_DEFEAT_BOSS',
+    return defeat_quote_row(
+        CH05_BOSS_PID, chapter_label_constant(CH05_HOST_INDEX),
         'Ravisin (ch05 boss): locked death quote -> DefeatBoss WIN flag',
-        msg=CH05_RAVISIN_DEATH_MSG)
+        msg=CH05_RAVISIN_DEATH_MSG, flag='EVFLAG_DEFEAT_BOSS')
 
 
 def ch05_ravisin_battle_quote():

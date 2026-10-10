@@ -184,20 +184,33 @@ def midmap_minibosses(chap):
     return [e for e in chap.get('enemy_units', []) if e.get('is_miniboss')]
 
 
-def flag_defeat_quote(pid, chapter_const, flag, comment, msg=0):
-    """A gDefeatTalkList entry keying `pid`'s death in `chapter_const` to `flag`.
-    SetPidDefeatedFlag sets the flag on ANY matching pid's death (no CA_BOSS gate, eventinfo.c),
-    while DisplayDefeatTalkForPid shows `msg` when nonzero or suppresses it when zero. The silent
-    form lets a faceless unit set an event flag without rendering a boxless, unreadable line;
-    the faced form lets the same flag path carry its authored quote."""
+def defeat_quote_row(pid, chapter_const, comment, msg=0, flag=None):
+    """One gDefeatTalkList entry: `pid` falling in `chapter_const` shows `msg` and raises `flag`.
+
+    SetPidDefeatedFlag raises the flag on ANY matching pid's death (no CA_BOSS gate,
+    eventinfo.c) and DisplayDefeatTalkForPid shows `msg` only when nonzero, so the three shapes
+    every chapter uses are one row: a silent flag (msg 0) lets a faceless unit drive an AFEV, a
+    flagged quote is a boss line that also wins the chapter, and a flag-less quote is a line
+    with no consequence -- the retreat of a unit who lives (vanilla's Seth precedent).
+    `.chapter` is the HOST index, and the row must reach the HEAD of the list
+    (`_prepend_defeat_quote`): the scan returns the first match."""
     msg_value = '0' if msg == 0 else '0x%X' % msg
+    flag_line = '' if flag is None else '        .flag    = %s,\n' % flag
     return ('    {\n'
             '        .pid     = %s, /* %s */\n'
             '        .route   = CHAPTER_MODE_ANY,\n'
             '        .chapter = %s,\n'
-            '        .flag    = %s,\n'
+            '%s'
             '        .msg     = %s,\n'
-            '    },' % (pid, comment, chapter_const, flag, msg_value))
+            '    },' % (pid, comment, chapter_const, flag_line, msg_value))
+
+
+def battle_quote_body(speaker, lines, seating):
+    """A one-speaker quote held to FE8's battle bubble (143px): every boss taunt and defeat
+    line, and the death quotes that ride the same bubble. `lines` is one string per box and
+    `seating` is the speaker's (seat, face tag) pair."""
+    return _script_to_message([{speaker: line} for line in lines], {speaker: seating},
+                              fe8_talk_font.BATTLE_QUOTE_BUDGET_PX)
 
 
 def boss_quote_message(chap, trigger, speaker, face, msg_id, boxes, seat='[OpenMidLeft]'):
@@ -205,7 +218,7 @@ def boss_quote_message(chap, trigger, speaker, face, msg_id, boxes, seat='[OpenM
     (`boss_death`) -- rendered from the chapter's event at the battle bubble's 143px budget.
 
     `boxes` is the locked box count and a different count is a hard error: these ids are
-    written straight into the boss's own rows (battle_quote_pair, flag_defeat_quote), so an
+    written straight into the boss's own rows (battle_quote_pair, defeat_quote_row), so an
     extra box would silently lengthen a line Nicolas signed off on. `seat` is the twin's own
     (vanilla's bosses mostly hold [OpenMidLeft] for both quotes)."""
     _card, beats = _split_event_beats(chap, trigger, '%s %s' % (chap['id'], trigger), (msg_id,),
@@ -214,8 +227,7 @@ def boss_quote_message(chap, trigger, speaker, face, msg_id, boxes, seat='[OpenM
     if len(beat) != boxes or any(next(iter(entry)) != speaker for entry in beat):
         sys.exit('ERROR: %s %s must remain %d locked %s box(es)'
                  % (chap['id'], trigger, boxes, speaker))
-    return _script_to_message(beat, {speaker: (seat, _fid_tag(face))},
-                              fe8_talk_font.BATTLE_QUOTE_BUDGET_PX)
+    return battle_quote_body(speaker, [entry[speaker] for entry in beat], (seat, _fid_tag(face)))
 
 
 def battle_quote_pair(pid, chapter_const, msg, comment, flag='EVFLAG_BATTLE_QUOTES'):

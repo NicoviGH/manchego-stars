@@ -23,7 +23,7 @@ from inject.message_alloc import appended_message_id
 from inject.paths import CH2_EVENTINFO_H, CH2_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.scenes import (
     _emit_scene_beats, _make_fid, _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats,
-    _stage_beat, _write_chapter_title_card)
+    _stage_beat, _write_chapter_title_card, battle_quote_body, defeat_quote_row)
 from inject.text import (
     _fe_dialogue_text, _fid_tag, _script_to_message, _wrap_fe_lines, DEV_PLACEHOLDER_MSG,
     display_name, goal_window_body, name_message_body, set_message_body, vanilla_name_text_id)
@@ -799,13 +799,9 @@ def inject_ch01(campaign, verbose=True, boot=False):
 
     # 5. The chief's defeat quote: head of gDefeatTalkList (same shadowing rule as the
     #    prologue entries). No flag -- the win is the Seize, not the boss kill.
-    quote = ('    {\n'
-             '        .pid     = CHARACTER_%s, /* goblin chief death quote (ch01) */\n'
-             '        .route   = CHAPTER_MODE_ANY,\n'
-             '        .chapter = CHAPTER_L_2, /* ch01 is hosted on chapter slot 2 */\n'
-             '        .msg     = 0x0961, /* body rewritten from the chapter YAML */\n'
-             '    },' % CH01_BOSS_SLOT)
-    _prepend_defeat_quote(quote)
+    #    ch01 is hosted on chapter slot 2, hence CHAPTER_L_2.
+    _prepend_defeat_quote(defeat_quote_row('CHARACTER_%s' % CH01_BOSS_SLOT, 'CHAPTER_L_2',
+                                           'goblin chief death quote (ch01)', msg=0x961))
 
     # 6. Texts. Overwritten ids are vanilla slot-2 messages our build can never show
     #    (the vanilla Ch2 scenes are gone) plus vanilla Ch1's own house hints, which
@@ -825,14 +821,14 @@ def inject_ch01(campaign, verbose=True, boot=False):
     chief.setdefault('id', 'goblin-chief')
     # Izobai (boss, her custom bust on the Breguet slot): turn-1 taunt + death quote,
     # both from the chapter YAML (lore/izobai.md voice). She/her throughout.
-    izobai_face = {'izobai': ('[OpenMidRight]', _fid_tag(CH01_BOSS_SLOT))}
-    set_message_body(lines, CH01_TAUNT_MSG, _script_to_message(
-        [{'izobai': chief['taunt']}], izobai_face, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
+    izobai_seat = ('[OpenMidRight]', _fid_tag(CH01_BOSS_SLOT))
+    set_message_body(lines, CH01_TAUNT_MSG, battle_quote_body('izobai', [chief['taunt']],
+                                                              izobai_seat))
     heal_fid = _make_fid({}, 'ch01 terrain-heal unknown speaker')
     set_message_body(lines, CH01_TERRAIN_HEAL_MSG, _script_to_message(
         heal_beat['script'], _stage_beat(heal_beat['script'], heal_fid, {})))
-    set_message_body(lines, 0x961, _script_to_message(
-        [{'izobai': chief['death_quote']}], izobai_face, width=fe8_talk_font.BATTLE_QUOTE_BUDGET_PX))
+    set_message_body(lines, 0x961, battle_quote_body('izobai', [chief['death_quote']],
+                                                     izobai_seat))
     # Hint houses -- vanilla Ch1's own two house quotes (0x93B/0x93C) reskinned with the
     # goblin nouns (dialogue pass, 2026-06-17). Two different villager faces, like vanilla.
     set_message_body(lines, 0x93B, _script_to_message([{'villager': (

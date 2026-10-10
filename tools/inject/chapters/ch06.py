@@ -29,7 +29,7 @@ from inject.recruit import talk_recruit_char_entries, talk_recruiters
 from inject.scenes import (_branch_on_slot_c, _make_fid, _prepend_battle_quote, battle_quote_pair,
                            boss_quote_message,
                            scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
-                           _write_chapter_title_card, flag_defeat_quote, split_on_stage_cut)
+                           _write_chapter_title_card, defeat_quote_row, split_on_stage_cut)
 from inject.text import (
     _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body,
     set_message_body, vanilla_name_text_id)
@@ -951,10 +951,10 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     _write_chapter_title_card(host, 'Ch.6: ' + chap['title'])
     # Her retreat line, FLAGGED: SetPidDefeatedFlag raises EVFLAG_DEFEAT_BOSS whatever the
     # message says (eventinfo.c), so the DefeatBoss AFEV fires on a line in which she lives.
-    _prepend_defeat_quote(flag_defeat_quote(
-        CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX), 'EVFLAG_DEFEAT_BOSS',
+    _prepend_defeat_quote(defeat_quote_row(
+        CH06_BOSS_PID, chapter_label_constant(CH06_HOST_INDEX),
         'Nerra (ch06 boss): locked retreat line -> DefeatBoss WIN flag',
-        msg=CH06_NERRA_RETREAT_MSG))
+        msg=CH06_NERRA_RETREAT_MSG, flag='EVFLAG_DEFEAT_BOSS'))
     # ...and her taunt on first engagement. She wears Novala's slot in Novala's own chapter, so
     # vanilla's two Novala battle-quote rows match her, and both name MSG_9EF -- which ch05 has
     # rewritten as Basil's "Oh! Tourists." line. A pair at the head of the list shadows both.

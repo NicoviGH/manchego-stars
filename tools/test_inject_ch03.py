@@ -56,11 +56,11 @@ class Ch03MidmapExecution(unittest.TestCase):
         self.assertEqual(len(flags), 3)
 
     def test_silent_defeat_quote_sets_the_flag_without_a_portrait(self):
-        """flag_defeat_quote = a msg=0 gDefeatTalkList entry: SetPidDefeatedFlag still sets the
+        """defeat_quote_row with msg 0 = a silent gDefeatTalkList entry: SetPidDefeatedFlag still sets the
         flag on death (no CA_BOSS gate), but the faceless quote is suppressed (the cutscene is
         the separate AFEV script). Shared by the grell WIN and the Brute midmap trigger."""
-        q = inject.scenes.flag_defeat_quote(inject.chapter_ids.CH03_BRUTE_MINIBOSS_PID, 'CHAPTER_L_4',
-                                 inject.chapters.ch03.CH03_BRUTE_DEFEAT_FLAG, 'brute')
+        q = inject.scenes.defeat_quote_row(inject.chapter_ids.CH03_BRUTE_MINIBOSS_PID, 'CHAPTER_L_4',
+                                           'brute', flag=inject.chapters.ch03.CH03_BRUTE_DEFEAT_FLAG)
         self.assertIn('.pid     = %s' % inject.chapter_ids.CH03_BRUTE_MINIBOSS_PID, q)
         self.assertIn('.chapter = CHAPTER_L_4', q)
         self.assertIn('.flag    = %s' % inject.chapters.ch03.CH03_BRUTE_DEFEAT_FLAG, q)
