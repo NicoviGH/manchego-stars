@@ -194,7 +194,11 @@ def _cel_downscale(hires, fgh, accents=()):
     raw = np.asarray(mid.convert('RGB')).astype(int)[m4]
     for i, accent in enumerate(accents):
         shade = raw[((raw - np.array(accent)) ** 2).sum(1).argmin()]
-        if not (pal == shade).all(1).any():
+        if (pal == shade).all(1).any():
+            continue
+        if len(pal) < 15:
+            pal = np.vstack([pal, shade])
+        else:
             pal[-1 - i] = shade
     out = np.zeros((BUST_H, BUST_W), int)
     d = ((small[m][:, None, :] - pal[None]) ** 2).sum(2)
