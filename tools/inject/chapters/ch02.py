@@ -480,19 +480,37 @@ def inject_ch02(campaign, verbose=True):
         ['A -- Vellynne stops them; RBG haggles the orb job',
          'B -- Meesmickle & Braulo react to the corpse-sled',
          'C -- Sclorbo meets his chwinga kin; Marty offers a Chagaccino'])
-    tut_text_calls = _scenic_beat_calls(
-        CH02_TURN1_MSGS, [[ln] for ln in tutorial],
-        ['RBG warns flier Pinky off the archer (fliers-vs-bows debut)',
-         'Pinky takes it to heart',
-         "Halvar sends the band at the huts (vanilla MSG_957 verbatim)",
-         'Halvar: cut down anyone in the way',
-         'Halvar takes the far hut himself'])
-    end_text_calls = _scenic_beat_calls(
-        CH02_ENDING_MSGS, end_beats,
-        ['A -- the Targos fisher warns them off the frozen body',
-         'B -- Rootis clocks the dagger-of-ice kill (Sephek breadcrumb)',
-         'C -- nightfall narration over the camp (#58 opaque box)',
-         'D -- RBG sets the road north (lets the Bremen bounty keep)'])
+    tut_labels = ['RBG warns flier Pinky off the archer (fliers-vs-bows debut)',
+                  'Pinky takes it to heart',
+                  "Halvar sends the band at the huts (vanilla MSG_957 verbatim)",
+                  'Halvar: cut down anyone in the way',
+                  'Halvar takes the far hut himself']
+    tut_beats = [[ln] for ln in tutorial]
+    # Vanilla Ch2 plays Defense as the threatened village appears, then Tension under Bazba's
+    # MSG_957 -- which Halvar speaks verbatim here (ADR 0336). Our map comes up behind the prep
+    # screen, so the pair rides this turn-1 scene; it is the PLAYER phase, so each cue is a
+    # MUSS/MURE pair scoped to its lines (two MUSS in a row would save the first cue as the
+    # song MURE restores, soundwrapper.c OverrideBgm).
+    tut_text_calls = (
+        '    MUSS(SONG_DEFENSE)\n'
+        + _scenic_beat_calls(CH02_TURN1_MSGS[:2], tut_beats[:2], tut_labels[:2])
+        + '    MURE(0x2)\n'
+        '    MUSS(SONG_TENSION)\n'
+        + _scenic_beat_calls(CH02_TURN1_MSGS[2:], tut_beats[2:], tut_labels[2:])
+        + '    MURE(0x2) /* the player phase\'s own music back for the rest of the turn */\n')
+    end_labels = ['A -- the Targos fisher warns them off the frozen body',
+                  'B -- Rootis clocks the dagger-of-ice kill (Sephek breadcrumb)',
+                  'C -- nightfall narration over the camp (#58 opaque box)',
+                  'D -- RBG sets the road north (lets the Bremen bounty keep)']
+    # Vanilla Ch2's ending, cue for cue (ADR 0336): Victory, a slow fade to silence as the
+    # scene turns grave, then the night-ambience loop (SONG_4A, song074_y_yoru_3 in
+    # sound/song_table.s) faded in at nightfall.
+    end_text_calls = (
+        _scenic_beat_calls(CH02_ENDING_MSGS[:1], end_beats[:1], end_labels[:1])
+        + '    MUSCSLOW(SONG_SILENT) /* Rootis knows that wound */\n'
+        + _scenic_beat_calls(CH02_ENDING_MSGS[1:2], end_beats[1:2], end_labels[1:2])
+        + '    MUSCSSLOW(SONG_4A) /* night ambience, as vanilla Ch2\'s camp */\n'
+        + _scenic_beat_calls(CH02_ENDING_MSGS[2:], end_beats[2:], end_labels[2:]))
     # Off-map recruit join-LOAD line: emitted only when a cutscene/market recruit becomes
     # available this chapter (Baxby, ch02) -> he enters the persistent party right before PREP,
     # so Pick Units lists him. Empty (no LOAD1) for a chapter with no such recruit.
@@ -504,14 +522,15 @@ def inject_ch02(campaign, verbose=True):
     script = _replace_brace_block(
         script, 'EventScr_Ch3_BeginningScene[] =',
         '{\n'
-        '    MUSC(SONG_TENSION)\n'
+        '    MUSC(SONG_ADVANCE) /* the company rolls out: vanilla Ch2\'s march (ADR 0336) */\n'
         '    REMOVEPORTRAITS\n'
         '    BACG(%s) /* Bryn Shander west gate (placeholder BG; #22 polish) */\n'
         '    FADU(16)\n'
         '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bryn Shander -- West Gate" card */\n'
         % (CH02_OPENING_BG, CH02_OPENING_CARD_MSG)
         + op_text_calls +
-        ('    FADI(16) /* fade the scenic BG out */\n'
+        ('    MUSCMID(SONG_SILENT) /* the march fades with the gate, as vanilla Ch2\'s */\n'
+         '    FADI(16) /* fade the scenic BG out */\n'
          '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin */\n'
          '    LOMA(0x%X) /* RestartBattleMap -- build the ch02 map fresh (cf. inject_ch01) */\n'
          '    LOAD1(0x1, UnitDef_088B463C) /* the RED raider band */\n'

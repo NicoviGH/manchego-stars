@@ -370,6 +370,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
              # BACG rides a REMOVEPORTRAITS-mode scene). Faded to black, so no visible pop.
              '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() beats reset it to TEXTSTART) */\n'
              '    BACG(%s) /* CUT to the mine interior -- empty, no PCs */\n'
+             '    MUSC(SONG_SHADOW_OF_THE_ENEMY) /* the kobolds\' mine: vanilla Ch3\'s enemy cue (ADR 0336) */\n'
              '    FADU(16)\n'
              % CH03_OPENING_MINE_BG
              + sign_call            # the KOBOLDS ONLY sign over the empty cave (#58 opaque box)
@@ -419,10 +420,15 @@ def inject_ch03(campaign, boot=False, verbose=True):
     # Trex's LIGHT entrance beat (Colm's turn-1 green-NPC pattern): a dead Ch4 Village script,
     # rewritten to show Pinky's telegraph ("He waved at me!") + RBG's warm "little dragon" over
     # the map. Fired by the turn-1 TURN entry (step 3). All of Trex's substance rides the TALK.
+    # Binding Vow is vanilla Ch3's cue for its green newcomer (EventScr_Ch3_Turn1Npc). Vanilla's
+    # fires on the green phase; ours fires on the player's, so MUSS/MURE scope it to the beat.
     script = _replace_brace_block(
         script, CH03_TREX_ENTRANCE_SCRIPT + '[] =',
-        '{\n    TEXTSHOW(0x%X) /* Trex entrance: Pinky telegraph + RBG "little dragon" */\n'
-        '    TEXTEND\n    REMA\n    EVBIT_T(7)\n    ENDA\n}' % CH03_TREX_ENTRANCE_MSG,
+        '{\n    MUSS(SONG_BINDING_VOW) /* vanilla Ch3\'s green newcomer cue (ADR 0336) */\n'
+        '    TEXTSHOW(0x%X) /* Trex entrance: Pinky telegraph + RBG "little dragon" */\n'
+        '    TEXTEND\n    REMA\n'
+        '    MURE(0x2) /* the player phase\'s own music back for the rest of the turn */\n'
+        '    EVBIT_T(7)\n    ENDA\n}' % CH03_TREX_ENTRANCE_MSG,
         CH4_EVENTSCRIPT_H)
     # Trex talk-recruit script (#23 item 2): repurpose the dead Ch4 Turn-2 green script symbol
     # -> show Trex's migrated talk line then CUSA green Trex to blue. Every CHAR entry (step 3)

@@ -28,6 +28,23 @@ first appearance on the map, the victory sting, the closing reflection). ch06's 
 first: Solve the Riddle over the hall, silence as it ends, Raid! as the merfolk surface. A beat
 with no vanilla counterpart keeps the staging Nicolas set for it (Messie's silent entrance).
 
+ch00-ch05 follow it beat for beat (#26); the twin's cue sits beside each beat in the
+injectors, tagged ADR 0336. Two placement rules came out of that pass:
+
+- **A cue on a player-phase event is scoped with `MUSS`/`MURE(0x2)`.** Vanilla's turn-1 cues
+  mostly fire on the enemy or green phase, where `MUSC` lasts only that phase; on ours it
+  would play through the player's whole turn. Two cues in one event take two pairs: a second
+  `MUSS` saves the first cue as the song `MURE` restores (`OverrideBgm`, soundwrapper.c).
+- **A beat that happens behind Preparations moves to the nearest beat the player hears.**
+  Our enemies LOAD on a black screen before prep, so ch02's Defense rides its turn-1 scene and
+  ch03's Shadow of the Enemy rides the cut to the mine. Vanilla's closing Distant Roads in Ch4
+  and Ch5 needs no cue where the map theme is already Distant Roads.
+
+Ch4's mid-map Laughter has a beat of ours (Lupin's pack bursting from the fog) and Nicolas
+kept Tension there: a menace reveal outranks the twin's song. The unnamed ids the twins use
+are named in `sound/song_table.s`: 0x4A is night ambience (`y_yoru_3`), 0x52 forest ambience
+(`y_mori_3`), 0x54 a second Comrades. None of the three is in the Sound Room.
+
 A twin past the route split has no row yet: `twin_settings_index` refuses it, so the first
 such chapter has to name its row and does not inherit a guess.
 _Decided: 2026-10-09 (Nicolas)._

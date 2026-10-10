@@ -1614,7 +1614,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         self.assertIn('MUSI', beat, 'the music ducks under the cry')
         self.assertIn('MUNO', beat, 'a duck with no un-duck is silence for the rest of the map')
         self.assertLess(beat.index('MUSI'), beat.index('MUNO'))
-        self.assertNotIn('SONG_SILENT', script,
+        self.assertNotIn('SONG_SILENT', beat,
                          'that is a replacement, not a duck, and it has no way back')
 
     def test_the_opening_never_ENDS_on_silence(self):
@@ -1624,6 +1624,10 @@ class Ch05TheMooseCharges(unittest.TestCase):
         ducks = script.count('MUSI')
         self.assertEqual(ducks, script.count('MUNO'), 'every duck is paired')
         self.assertIn('MUSC(', script, 'something starts a song')
+        # The scene cues fade to silence between moments, as vanilla Ch5's do (ADR 0336); each
+        # is answered by a real song, so the LAST change the map inherits is never silence.
+        changes = re.findall(r'\bMUSC\w*\((SONG_\w+)\)', script)
+        self.assertNotEqual(changes[-1], 'SONG_SILENT', 'the map would inherit silence')
 
     def test_the_bellow_carries_no_text_but_DOES_cost_the_last_spare_id(self):
         """The image itself is wordless. What costs an id is that a scene change tears the talk
