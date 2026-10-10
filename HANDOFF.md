@@ -6,8 +6,8 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-10 (Claude): #475 (scene music, ch00-ch05) and #476 (Nerra speaks and
-retreats; one boss-quote path for every chapter) merged. Where Nicolas's watch-notes stand is the
+Refreshed 2026-10-10 (Claude): #477 merged (closes #471) -- our busts draw FE8's top corners
+(engine patch 0018), five busts rescaled, Messie's mayor rebuilt with the hat (ADR 0338). Where Nicolas's watch-notes stand is the
 latest #26 comments. **What landed and
 why is in `git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
 
@@ -15,12 +15,13 @@ why is in `git log` and the ADRs it cites** -- this file keeps no "recently land
 
 Nothing on a branch. **Next, in order:**
 
-1. **#471 -- corner engine patch** (approved), then Messie's mayor bust and a PC-rescale pass.
-2. **#26 -- `chapter_end` dialogue pass** (pick to bring: the rescued crews pay the 400; music is
+1. **#26 -- `chapter_end` dialogue pass** (pick to bring: the rescued crews pay the 400; music is
    vanilla Ch6's ending: Victory -> Legacy -> Into the Shadow of Victory), then the
    `introduces:` ledger claims (Grynsk's Antitoxin, Tali's snow drifts).
-3. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
+2. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
 
+- **Owed from #477:** nobody has looked at the stat screen's 80x72 face since patch 0018 filled
+  its edge columns. Glance at Braulo's or Wolfram's status page in the next playtest.
 - `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (party clear-load 1.41, ADR 0042), with x1.4078 /
