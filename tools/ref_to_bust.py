@@ -18,9 +18,11 @@ just averages into mush.
 
 Usage:
     ref_to_bust.py <ref.png> <out_bust.png> --crop x0,y0,x1,y1 [options]
-      --zoom z        shrink the subject to fraction z of the frame for top
-                      headroom; default 1.0.
+      --zoom z        scale the subject to z of its crop, bottom pinned: <1 adds
+                      top headroom, >1 tightens toward the frame edge; default 1.0.
       --sharpen pct   optional UnsharpMask at target res (default 0 = off).
+      --flatten n     median n (odd, source px) for a painted ref, then one area-
+                      average and no dither: flat tones instead of speckle.
       --bg-thresh d   RGB distance from the border colour treated as background.
       --matte rrggbb  paint the keyed background this colour (the outline's) before
                       the downscale, so a light background cannot halo the edge.
@@ -60,15 +62,18 @@ def _label(mask):
 
 
 def _zoom_out(src, crop_box, zoom):
-    """Expand crop_box so the current subject occupies `zoom` of the frame.
+    """Resize crop_box so the current subject occupies `zoom` of the frame.
 
-    The extra width is split evenly (horizontal centering); the extra height is
-    added entirely at the TOP (the shoulders stay pinned to the bottom edge, as in
-    vanilla FE8 busts -- headroom appears above the head). Where the larger box runs off the ref, pad the ref with its border-median
-    color so the new margin reads as flat background and gets keyed transparent.
+    Below 1.0 the box grows: the extra width is split evenly (horizontal centering)
+    and the extra height goes entirely on TOP (the shoulders stay pinned to the
+    bottom edge, as in vanilla FE8 busts -- headroom appears above the head). Above
+    1.0 the same arithmetic shrinks it, bottom still pinned: the subject grows and
+    its top runs toward the frame edge, the way vanilla heads fill it. Where a larger
+    box runs off the ref, pad the ref with its border-median color so the new margin
+    reads as flat background and gets keyed transparent.
     Returns (possibly padded) src and the new crop_box. No-op at zoom == 1.0.
     """
-    if zoom >= 1.0:
+    if zoom == 1.0:
         return src, crop_box
     x0, y0, x1, y1 = crop_box
     w, h = x1 - x0, y1 - y0
@@ -109,7 +114,7 @@ def _pad_to_box(src, box):
     return padded, (x0 + pl, y0 + pt, x1 + pl, y1 + pt)
 
 
-def _pngquant_quantize(img, m, ncolors=16):
+def _pngquant_quantize(img, m, ncolors=16, dither=True):
     """Quantize the 96x80 RGB `img` to <=16 colors with pngquant, keeping only the
     masked subject. Background (~m) becomes index 0 (transparent); the subject's
     colours land in indices 1.. . Returns (index_array, flat_palette_1..N).
@@ -123,8 +128,8 @@ def _pngquant_quantize(img, m, ncolors=16):
     with tempfile.NamedTemporaryFile(suffix='.png') as fi, \
          tempfile.NamedTemporaryFile(suffix='.png') as fo:
         Image.fromarray(rgba).save(fi.name)
-        subprocess.run(['pngquant', str(ncolors), '--force', '--output', fo.name, fi.name],
-                       check=True)
+        subprocess.run(['pngquant', str(ncolors), '--force'] + ([] if dither else ['--nofs'])
+                       + ['--output', fo.name, fi.name], check=True)
         q = np.asarray(Image.open(fo.name).convert('RGBA'))
 
     out = np.zeros(m.shape, int)
@@ -147,7 +152,7 @@ CEL_INK_LUMA = 200          # summed RGB below which a source pixel is ink
 CEL_FG_COVERAGE = 0.45      # fraction of a target pixel that must be subject to keep it
 
 
-def _cel_downscale(hires, fgh):
+def _cel_downscale(hires, fgh, accents=()):
     """96x80 indexed bust for a flat cel-shaded ref, as cleanly as the downscale allows.
 
     The default path resamples twice with Lanczos and lets pngquant dither: right for painted
@@ -181,7 +186,16 @@ def _cel_downscale(hires, fgh):
         q = np.asarray(Image.open(fo.name).convert('RGBA'))
     cols = q[..., :3][q[..., 3] >= 128]
     uniq, counts = np.unique(cols, axis=0, return_counts=True)
-    pal = uniq[np.argsort(counts)[::-1][:15]].astype(int)
+    order = np.argsort(counts)[::-1]
+    pal = uniq[order[:15]].astype(int)
+    # An accent too small to win a slot on count (an eye under a hat that spends three greys,
+    # #471) takes the least-used slot instead, as the ref's own nearest shade at 4x -- read
+    # before pngquant, which has already folded it away.
+    raw = np.asarray(mid.convert('RGB')).astype(int)[m4]
+    for i, accent in enumerate(accents):
+        shade = raw[((raw - np.array(accent)) ** 2).sum(1).argmin()]
+        if not (pal == shade).all(1).any():
+            pal[-1 - i] = shade
     out = np.zeros((BUST_H, BUST_W), int)
     d = ((small[m][:, None, :] - pal[None]) ** 2).sum(2)
     out[m] = d.argmin(1) + 1
@@ -198,22 +212,6 @@ def _cel_downscale(hires, fgh):
     res.putpalette([0, 255, 0] + flat + [0] * (768 - 3 - len(flat)))
     res.putdata(out.flatten().tolist())
     return res
-
-
-def sample_pixel_grid(img, cell, origin=0):
-    """A pixel-art ref saved large (and often as a JPEG) -> its NATIVE grid, one sample per
-    cell centre. Every later step then sees the artist's flat colours, never compression
-    noise; scale back up with NEAREST before convert(). `origin` is the grid's offset in the
-    ref (a cell boundary at x = origin + k*cell). Messie's ref is 41px cells at -1 (#26)."""
-    img = img.convert('RGB')
-    nw, nh = (img.width - origin) // cell, (img.height - origin) // cell
-    out = Image.new('RGB', (nw, nh), (255, 255, 255))
-    for j in range(nh):
-        for i in range(nw):
-            x, y = origin + i * cell + cell // 2, origin + j * cell + cell // 2
-            if 0 <= x < img.width and 0 <= y < img.height:
-                out.putpixel((i, j), img.getpixel((x, y)))
-    return out
 
 
 def _lum(a):
@@ -242,7 +240,8 @@ def retint_ramp(img, dark, light, select, blend=None):
     return Image.fromarray((a * 255).round().astype('uint8'))
 
 
-def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None, cel=False):
+def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None, cel=False,
+            accents=(), flatten=0):
     src = Image.open(ref_path).convert('RGB')
     src, crop_box = _zoom_out(src, crop_box, zoom)
     src, crop_box = _pad_to_box(src, crop_box)
@@ -292,8 +291,17 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None,
         hires.paste(Image.new('RGB', hires.size, tuple(matte)), (0, 0), bgm)
     if cel:
         fgh = np.asarray(Image.fromarray((fg * 255).astype('uint8')).resize(hires.size, Image.NEAREST)) > 127
-        return _cel_downscale(hires, fgh)
-    img = hires.resize((BUST_W * 2, BUST_H * 2), Image.BOX).resize((BUST_W, BUST_H), Image.LANCZOS)
+        return _cel_downscale(hires, fgh, accents)
+    if flatten:
+        # A painted ref's brushwork shrinks to single-pixel noise, and pngquant's dither adds
+        # more. A median the size of a fraction of a target pixel flattens the texture while
+        # edges stay put; then one area-average and no dither, so each material lands as a few
+        # flat tones like a vanilla face (Wolfram and Braulo, #471).
+        hires = hires.filter(ImageFilter.MedianFilter(flatten))
+        img = hires.resize((BUST_W, BUST_H), Image.BOX)
+    else:
+        img = hires.resize((BUST_W * 2, BUST_H * 2), Image.BOX).resize((BUST_W, BUST_H),
+                                                                         Image.LANCZOS)
     if sharpen:
         img = img.filter(ImageFilter.UnsharpMask(radius=1, percent=sharpen, threshold=1))
     m = np.asarray(Image.fromarray((fg * 255).astype('uint8')).resize((BUST_W, BUST_H), Image.LANCZOS)) > 120
@@ -311,7 +319,7 @@ def convert(ref_path, crop_box, bg_thresh=45.0, sharpen=0, zoom=1.0, matte=None,
         if comp.sum() < 30 and not touches_edge:
             m[comp] = True
 
-    out, pal = _pngquant_quantize(img, m)
+    out, pal = _pngquant_quantize(img, m, dither=not flatten)
 
     res = Image.new('P', (BUST_W, BUST_H))
     res.putpalette([0, 255, 0] + pal + [0] * (768 - 3 - len(pal)))
@@ -325,11 +333,14 @@ def main():
     ap.add_argument('out')
     ap.add_argument('--crop', required=True, help='x0,y0,x1,y1 in ref pixels (~1.2 aspect)')
     ap.add_argument('--zoom', type=float, default=1.0,
-                    help='shrink the subject to this fraction of the frame for top headroom; '
-                         'default 1.0 = unchanged.')
+                    help='scale the subject to this fraction of its crop, bottom pinned: <1 adds '
+                         'top headroom, >1 tightens toward the frame edge; default 1.0 = unchanged.')
     ap.add_argument('--sharpen', type=int, default=0,
                     help='UnsharpMask percent at target res (default 0 = off). A taste dial; '
                          'the clean-ref + pngquant path is already crisp.')
+    ap.add_argument('--flatten', type=int, default=0,
+                    help='odd median size (source px) for a painted ref: flatten its texture, then '
+                         'one area-average and no dither. Record as art.render.flatten in YAML.')
     ap.add_argument('--bg-thresh', type=float, default=45.0,
                     help='RGB distance from the sampled border colour to treat as background (default 45).')
     ap.add_argument('--flip-h', action='store_true',
@@ -342,7 +353,7 @@ def main():
     a = ap.parse_args()
     box = tuple(int(v) for v in a.crop.split(','))
     matte = tuple(int(a.matte[i:i + 2], 16) for i in (0, 2, 4)) if a.matte else None
-    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.zoom, matte)
+    res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.zoom, matte, flatten=a.flatten)
     if a.flip_h:
         res = res.transpose(Image.FLIP_LEFT_RIGHT)
     res.save(a.out)

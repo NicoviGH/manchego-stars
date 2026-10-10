@@ -29,3 +29,18 @@ bust, hat plus snout).
 **What it retires.** The dead-corner guards: `portrait_tool.what_ships` / `clipped_mask` /
 `preview`, Messie's re-fit checks, and Sephek's corner-clear pass. Busts framed to dodge the
 corners keep their framing until each one is reviewed for a larger scale.
+
+**The rescale review (Nicolas, 2026-10-10).** With the corners drawn, each bust's framing was
+measured against vanilla faces, whose tops reach the frame edge. The rule is the same for
+every bust: grow it until its top reaches the edge, and stop before a shoulder is chopped
+flat at the sides (a bottom-corner exit, as vanilla shoulders make, is fine).
+- Rescaled: Baxby, Brie, Pepperjack (the top reaches the edge), Braulo and Wolfram (stopped by
+  the shoulders; Wolfram's crop re-centred). The rest keep their framing by choice.
+- `ref_to_bust` `zoom` above 1.0 tightens the crop, bottom still pinned.
+- `flatten: N` (Braulo, Wolfram) is for a painted ref: an N px median on the source, one
+  area-average and no dither. A vanilla face is flat clusters of a few tones per material,
+  and the default path's dither turned brushwork into single-pixel speckle.
+- Messie's mayor is the ch06 ref with the hat kept (zoom 0.81, the crown at the top edge).
+  Two fixes made it: `accents` keeps a colour too small to win a palette slot (his eye,
+  outbid by the hat's greys), and a tighter background key stops the flood eating the black
+  hat where it meets the frame edge.

@@ -80,7 +80,7 @@ art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/TrexBust.png"   # winged-kobold bust ref (supplied by Nicolas, 2026-07-07)
     crop: [54, 95, 894, 795]       # ref pixels, ~1.2 aspect — head + shoulders (framing A, Nicolas's pick 2026-07-07)
-    zoom: 0.85                     # top headroom so the swept-back horns clear FE8's dead corners (0 px clipped)
+    zoom: 0.85                     # headroom kept by choice at the 2026-10-10 rescale review
     flip_h: false                  # ref already faces FE8-canonical screen-left
     sharpen: 0                     # off (clean ref + pngquant is already crisp)
     hand_pass: null

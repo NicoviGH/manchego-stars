@@ -39,8 +39,14 @@ top-right 16×48 corners; engine patch 0018 draws them for our static busts (#47
 support and world-map screens show the 80×72 window at x 8..87, y 0..71, so keep a must-keep
 feature off the outer 8 px columns and the bottom 8 rows.
 
-The framing lever is `--zoom z<1`: it shrinks the subject and adds top headroom (shoulders
-pinned to the bottom). **Descale, never crop a must-keep feature.**
+The framing lever is `--zoom`, shoulders pinned to the bottom: below 1 it adds top headroom,
+above 1 it tightens the crop. The scale rule (ADR 0338): grow a bust until its top reaches
+the frame edge, the way vanilla heads do, and stop before a shoulder is chopped flat at the
+sides. **Descale, never crop a must-keep feature.**
+
+For a painted ref, `--flatten 9` (median on the source, one area-average, no dither) gives
+flat tones instead of speckle. For a flat cel ref, `cel` mode; its `accents` keep a tiny colour
+(an eye) that would otherwise lose its palette slot.
 
 ## Hand passes
 

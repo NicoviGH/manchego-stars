@@ -21,7 +21,7 @@ art:
     flip_h: true               # bust faces right (mirror of Pepperjack); flip to FE8's canonical screen-left facing
     ref: "References/PCs/Pixel Brie.png"
     crop: [20, 40, 2150, 1800]     # ref pixels, ~1.2 aspect — whole-cannon framing (mirrors Pepperjack)
-    zoom: 0.72                     # mirrors Pepperjack; fuse + barrel bore mostly clear FE8's dead corners (30 px residual)
+    zoom: 1.0                      # vanilla face scale: the top just reaches the frame edge (Nicolas, 2026-10-10)
     # No hand pass: pngquant renders the cyan star + glam eye (blue shadow/purple iris) natively.
   approach: custom
   fidelity: faithful

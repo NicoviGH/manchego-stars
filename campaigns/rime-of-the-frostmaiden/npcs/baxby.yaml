@@ -111,7 +111,7 @@ art:
     ref: "References/PCs/Baxby.png"   # axe-beak art from the Frostmaiden book, Gemini-modified (Nicolas)
     crop: [780, 18, 1920, 940]
     flip_h: true                      # face FE8-canonical screen-left
-    zoom: 0.88                        # max size with the whole beak clear of the dead corners
+    zoom: 1.05                        # vanilla face scale: the top just reaches the frame edge (Nicolas, 2026-10-10)
     hand_pass: null
     credit: "WotC book art (axe-beak) + Google Gemini; see CREDITS.md"
   map_sprite:                         # map_sprites/baxby.png — hand-painted by Nicolas (cast palette)

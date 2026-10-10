@@ -22,8 +22,7 @@ THE CH06 BUST comes from References/NPCs/Messie/MessieLongThick.jpeg (Gemini, Ni
     brightness. Done to the source instead, the darker slates come close enough to the teal
     background that the keyer eats them.
 
-THE CH07 MAYOR BUST still comes from the earlier pixel-art ref (2DMessieMayor.jpeg) on the
-native-grid path below; it moves to the new ref when ch07's scenes are written.
+THE CH07 MAYOR BUST is the same ref with the hat kept, zoomed out until it fits (#471).
 """
 import os
 import sys
@@ -128,13 +127,15 @@ def bust_ch06():
     return retint_palette(out.transpose(Image.FLIP_LEFT_RIGHT))
 
 
-# ── ch07: the mayor, from the earlier pixel-art ref ────────────────────────────────────────
-# Pixel art saved as a 2048px JPEG: a 49x49 grid of 41px cells, sampled at cell centres so JPEG
-# noise never reaches the bust; blue retinted to slate on the native grid.
-REF_MAYOR = os.path.join(REFS, '2DMessieMayor.jpeg')
-CELL, ORIGIN = 41, -1                      # the art's pixel size and grid offset in the JPEG
-MAYOR_CROP = (656, -29, 2146, 1212)        # in upscaled-native pixels (JPEG crop + 1)
-SKIN_FROM, BELLY_FROM = (0x33, 0x94, 0xea), (0xd4, 0xec, 0xf1)   # the ref's own anchors
+# ── ch07: the mayor, the same ref with his hat on ─────────────────────────────────────────
+# The ch06 crop zoomed out until the hat fits, and a touch past it so the crown meets the top
+# edge the way Joshua's cap does (Nicolas's pick, 2026-10-10). Engine patch 0018 draws the
+# corners the brim reaches into (#471).
+MAYOR_ZOOM = 0.81
+# The black hat sits within the default key distance of the teal backdrop, so where the crown
+# meets the frame edge the background flood ate its inside; the backdrop's own noise is under 8.
+MAYOR_BG_THRESH = 20
+EYE_YELLOW = (235, 200, 40)                # the hat's greys outbid his tiny eye for a slot
 
 
 def _blue(a):
@@ -144,16 +145,9 @@ def _blue(a):
 
 
 def bust_mayor():
-    grid = ref_to_bust.sample_pixel_grid(Image.open(REF_MAYOR), CELL, ORIGIN)
-    grid = ref_to_bust.retint_ramp(grid, (SKIN_FROM, SKIN), (BELLY_FROM, BELLY), _blue,
-                                   blend=(0.62, 0.82))
-    big = grid.resize((grid.width * CELL, grid.height * CELL), Image.NEAREST)
-    tmp = os.path.join(HERE, '.messie-ref.png')
-    big.save(tmp)
-    try:
-        return ref_to_bust.convert(tmp, MAYOR_CROP, matte=MATTE).transpose(Image.FLIP_LEFT_RIGHT)
-    finally:
-        os.unlink(tmp)
+    out = ref_to_bust.convert(REF_CH06, CH06_CROP, bg_thresh=MAYOR_BG_THRESH, zoom=MAYOR_ZOOM,
+                              matte=MATTE, cel=True, accents=[EYE_YELLOW])
+    return retint_palette(out.transpose(Image.FLIP_LEFT_RIGHT))
 
 
 def main():

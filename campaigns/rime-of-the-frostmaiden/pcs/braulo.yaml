@@ -18,7 +18,8 @@ art:
     flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/BrauloFLAT.png"   # flat ref (downscales crisper)
     crop: [20, 120, 2028, 1793]    # ref pixels, ~1.2 aspect — whole subject
-    zoom: 0.80                     # headroom so conch shell + basket-hat tops clear FE8's dead corners (0px clipped)
+    zoom: 0.95                     # as big as the shoulders allow without a flat chop at the sides (Nicolas, 2026-10-10)
+    flatten: 9                     # painted ref: flat tones instead of speckle
     hand_pass: null
   approach: custom            # not recolor; follow concept art to best ability
   fidelity: faithful          # keep the crab anatomy, don't humanize
