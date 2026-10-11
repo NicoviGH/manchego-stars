@@ -34,6 +34,8 @@ map:
   # winter, as ch02/ch04/ch05 reuse their twins. The keep is the Town Hall on a rocky point; the
   # moat is Bremen's harbour inlet, where Messie and the surviving boats sit as green units; the
   # two bridges are its piers. Ch7 has no shoreline, so "docks" is this reading of the moat.
+  file: maps/ch07-blood-in-bremen.mar  # compiled by import_map_layout from the Ch7Map reskin
+  tileset: snowy-bern           # + the castle ported from snowy-fields and LAKE water (ADR 0341)
   size: "20×22"
   description: >
     From Bremen's docks up to the Town Hall. The party lands in the south-west and fights

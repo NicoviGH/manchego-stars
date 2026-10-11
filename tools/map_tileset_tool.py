@@ -522,6 +522,205 @@ def compose_metatile(tileset_dir, metatile, quarters, terrain):
     return entries
 
 
+def _unreferenced_tiles(cfg, skip=()):
+    """Tile ids no metatile points at, ignoring the metatiles in ``skip`` (being rewritten)."""
+    referenced = set()
+    for entry in range(NUM_METATILES * 4):
+        if entry // 4 in skip:
+            continue
+        referenced.add(struct.unpack_from('<H', cfg, entry * 2)[0] & 0x3FF)
+    return [tile for tile in range(1024) if tile not in referenced]
+
+
+def _claim_tile(gfx, free, raw):
+    """Reuse a byte-identical 8x8 tile, else write ``raw`` into the first free id."""
+    for tile in range(1024):
+        if gfx[tile * 32:(tile + 1) * 32] == raw:
+            if tile in free:
+                free.remove(tile)
+            return tile
+    if not free:
+        raise ValueError('tileset has no unreferenced 8x8 tile for new art')
+    tile = free.pop(0)
+    gfx[tile * 32:(tile + 1) * 32] = raw
+    return tile
+
+
+def _pack_tile(indices, ox, oy, stride=16):
+    """Pack an 8x8 window of 4-bit palette indices into one 4bpp tile (low nibble = left)."""
+    raw = bytearray()
+    for y in range(8):
+        for x in range(0, 8, 2):
+            at = (oy + y) * stride + ox + x
+            raw.append(indices[at] | (indices[at + 1] << 4))
+    return bytes(raw)
+
+
+def _flip_tile(raw, hflip, vflip):
+    rows = [raw[r * 4:r * 4 + 4] for r in range(8)]
+    if hflip:
+        rows = [bytes(((b & 0xF) << 4) | (b >> 4) for b in reversed(row)) for row in rows]
+    if vflip:
+        rows = rows[::-1]
+    return b''.join(rows)
+
+
+def _read_shared_tilesets(tileset_dirs):
+    """Load a base tileset and its variants, which must share one ``.4bpp`` byte for byte."""
+    pieces = []
+    for d in tileset_dirs:
+        name = os.path.basename(d.rstrip('/'))
+        with open(os.path.join(d, name + '.4bpp'), 'rb') as f:
+            gfx = f.read()
+        with open(os.path.join(d, name + '.bin'), 'rb') as f:
+            cfg = bytearray(f.read())
+        pieces.append((d, name, gfx, cfg))
+    if len({gfx for _, _, gfx, _ in pieces}) != 1:
+        raise ValueError('%s do not share one .4bpp; edit a base with its variants only'
+                         % ', '.join(name for _, name, _, _ in pieces))
+    return pieces
+
+
+def _write_shared_tilesets(pieces, gfx):
+    for d, name, _, cfg in pieces:
+        with open(os.path.join(d, name + '.4bpp'), 'wb') as f:
+            f.write(gfx)
+        with open(os.path.join(d, name + '.bin'), 'wb') as f:
+            f.write(cfg)
+
+
+def dedupe_tiles(tileset_dirs):
+    """Merge duplicate 8x8 tiles (exact or mirrored) across a base and its variants.
+
+    A map's tile sheet is a hardware ceiling, not a file size: obj1 and obj2 both decompress
+    into BG VRAM 0x8000-0xFFFF (`bmmap.c` UnpackChapterMapGraphics), exactly the 1024 ids a
+    TSA entry's 10-bit index can name. Repointing a duplicate at its first twin, with the
+    flip bits that make them equal, is the only room to reclaim. The lowest id of each group
+    survives, so pinned tile ids do not move. Every metatile of every tileset must render
+    pixel-identically afterwards, or nothing is written. Returns the freed tile ids.
+    """
+    pieces = _read_shared_tilesets(tileset_dirs)
+    gfx = bytearray(pieces[0][2])
+    before = [[_tileset_from_dir(d).metatile_image(m).tobytes() for m in range(NUM_METATILES)]
+              for d, _, _, _ in pieces]
+    referenced = sorted({struct.unpack_from('<H', cfg, e * 2)[0] & 0x3FF
+                         for _, _, _, cfg in pieces for e in range(NUM_METATILES * 4)})
+    canon, remap = {}, {}
+    for tile in referenced:
+        raw = bytes(gfx[tile * 32:(tile + 1) * 32])
+        for hflip in (False, True):
+            for vflip in (False, True):
+                twin = canon.get(_flip_tile(raw, hflip, vflip))
+                if twin is not None and tile not in remap:
+                    remap[tile] = (twin, hflip, vflip)
+        if tile not in remap:
+            canon[raw] = tile
+    for _, _, _, cfg in pieces:
+        for e in range(NUM_METATILES * 4):
+            v = struct.unpack_from('<H', cfg, e * 2)[0]
+            if v & 0x3FF in remap:
+                twin, hflip, vflip = remap[v & 0x3FF]
+                v = (v & ~0x3FF) | twin
+                v ^= (0x400 if hflip else 0) | (0x800 if vflip else 0)
+                struct.pack_into('<H', cfg, e * 2, v)
+    for tile in remap:
+        gfx[tile * 32:(tile + 1) * 32] = bytes(32)
+    after_ts = [Tileset.__new__(Tileset) for _ in pieces]
+    for ts, (d, name, _, cfg) in zip(after_ts, pieces):
+        ts.gfx, ts.cfg = bytes(gfx), bytes(cfg)
+        ts.palettes = _tileset_from_dir(d).palettes
+    after = [[ts.metatile_image(m).tobytes() for m in range(NUM_METATILES)] for ts in after_ts]
+    if after != before:
+        raise ValueError('dedupe would change a metatile\'s pixels; nothing written')
+    _write_shared_tilesets(pieces, gfx)
+    return sorted(remap)
+
+
+def port_structure(tileset_dirs, source_dir, source_grid, slot_grid, bank, terrains,
+                   ground, backdrop):
+    """Port a multi-metatile building from another tileset into empty slots.
+
+    One map loads one tileset, so a building another tileset has (snowy-fields' castle) is
+    carried INTO ours: each source pixel is recoloured to its nearest colour in our lit
+    ``bank``, and the source's own ground -- the ``ground`` colours reachable from the
+    structure's outer edge -- is replaced by our ``backdrop`` metatile, so the building
+    stands on the same snow as the map around it. A quarter that is all ground reuses the
+    backdrop's own TSA entry (its bank, its tile), so the seam is pixel-exact. Written to a
+    base and its variants together, into slots every one of them declares unused, which
+    keeps the variants compatible (`tilesets_are_compatible_variants`).
+    """
+    if not 0 <= bank < LIT_PALETTE_BANKS:
+        raise ValueError('lit palette bank must be in 0..%d' % (LIT_PALETTE_BANKS - 1))
+    pieces = _read_shared_tilesets(tileset_dirs)
+    for _, name, _, cfg in pieces:
+        for row in slot_grid:
+            for slot in row:
+                if cfg[8192 + slot]:
+                    raise ValueError('metatile %d is in use in %s; port into an empty slot'
+                                     % (slot, name))
+    source = _tileset_from_dir(source_dir)
+    base = _tileset_from_dir(pieces[0][0])
+    rows, cols = len(source_grid), len(source_grid[0])
+    width, height = cols * 16, rows * 16
+    from PIL import Image
+    composite = Image.new('RGB', (width, height))
+    for y, row in enumerate(source_grid):
+        for x, m in enumerate(row):
+            composite.paste(source.metatile_image(m).convert('RGB'), (x * 16, y * 16))
+    pixels = list(composite.getdata())
+    is_ground = [False] * len(pixels)
+    stack = [i for i in range(len(pixels))
+             if (i % width in (0, width - 1) or i // width in (0, height - 1))]
+    while stack:
+        i = stack.pop()
+        if is_ground[i] or pixels[i] not in ground:
+            continue
+        is_ground[i] = True
+        x, y = i % width, i // width
+        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+            if 0 <= nx < width and 0 <= ny < height:
+                stack.append(ny * width + nx)
+    backdrop_px = list(base.metatile_image(backdrop).convert('RGB').getdata())
+    backdrop_entries = struct.unpack_from('<4H', base.cfg, backdrop * 8)
+    palette = base.palettes[bank]
+
+    def nearest(color):
+        return min(range(1, 16), key=lambda k: sum((color[c] - palette[k][c]) ** 2
+                                                   for c in range(3)))
+    indices = []
+    for i, color in enumerate(pixels):
+        if is_ground[i]:
+            x, y = i % width, i // width
+            color = backdrop_px[(y % 16) * 16 + x % 16]
+        indices.append(nearest(color))
+
+    gfx = bytearray(pieces[0][2])
+    skip = {slot for row in slot_grid for slot in row}
+    # Free means free in EVERY tileset: a variant's own slot may point at a tile its base
+    # never draws, and the shared .4bpp is written to all of them.
+    unused = [set(_unreferenced_tiles(cfg, skip=skip)) for _, _, _, cfg in pieces]
+    free = sorted(set.intersection(*unused))
+    entries = {}
+    for y, row in enumerate(slot_grid):
+        for x, slot in enumerate(row):
+            quarters = []
+            for q in range(4):
+                ox, oy = x * 16 + (q % 2) * 8, y * 16 + (q // 2) * 8
+                window = [(oy + dy) * width + ox + dx for dy in range(8) for dx in range(8)]
+                if all(is_ground[i] for i in window):
+                    quarters.append(backdrop_entries[q])
+                else:
+                    raw = _pack_tile(indices, ox, oy, stride=width)
+                    quarters.append(_claim_tile(gfx, free, raw) | (bank << 12))
+            entries[slot] = (quarters, terrains[y][x])
+    for _, _, _, cfg in pieces:
+        for slot, (quarters, terrain) in entries.items():
+            struct.pack_into('<4H', cfg, slot * 8, *quarters)
+            cfg[8192 + slot] = terrain
+    _write_shared_tilesets(pieces, bytes(gfx))
+    return entries
+
+
 def paint_metatile(tileset_dir, metatile, png_path, bank, terrain=None,
                    write_bank=False):
     """Paint one 16x16 PNG into a vendored tileset without touching shared tiles.
@@ -592,27 +791,8 @@ def paint_metatile(tileset_dir, metatile, png_path, bank, terrain=None,
 
     cfg = bytearray(ts.cfg)
     gfx = bytearray(ts.gfx)
-    referenced = set()
-    for entry in range(NUM_METATILES * 4):
-        if metatile * 4 <= entry < metatile * 4 + 4:
-            continue
-        referenced.add(struct.unpack_from('<H', cfg, entry * 2)[0] & 0x3FF)
-    free = [tile for tile in range(1024) if tile not in referenced]
-
-    tile_ids = []
-    for raw in painted:
-        matches = [tile for tile in range(1024)
-                   if gfx[tile * 32:(tile + 1) * 32] == raw]
-        if matches:
-            tile = matches[0]
-            if tile in free:
-                free.remove(tile)
-        else:
-            if not free:
-                raise ValueError('tileset has no unreferenced 8x8 tile for new art')
-            tile = free.pop(0)
-            gfx[tile * 32:(tile + 1) * 32] = raw
-        tile_ids.append(tile)
+    free = _unreferenced_tiles(cfg, skip={metatile})
+    tile_ids = [_claim_tile(gfx, free, raw) for raw in painted]
 
     for sub, tile in enumerate(tile_ids):
         struct.pack_into('<H', cfg, metatile * 8 + sub * 2,
