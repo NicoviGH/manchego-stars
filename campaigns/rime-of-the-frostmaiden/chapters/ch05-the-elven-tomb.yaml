@@ -1919,7 +1919,6 @@ villages:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 350
   available_shops: [elven-reliquary]   # the in-tomb elven store (Armory + Vendor); see economy block
   units_available_to_recruit:
     - id: sahnar                         # Myrmidon (sword duelist); see npcs/sahnar.yaml

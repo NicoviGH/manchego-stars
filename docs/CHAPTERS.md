@@ -21,5 +21,5 @@ rules) lives in `docs/decisions.md` and `docs/fe8-pacing-reference.md`.
 | 4 | The White Moose | 🟨 monster debut (fog) | DefeatAll — Rout the forest's hostile beasts and spirits | lupin +npc: lupin-pack | Ch 5 |
 | 5 | The Elven Tomb | 🟥 first boss | DefeatBoss — Defeat Ravisin, the frost druid (her guardians and the moose needn't all fall) | sahnar, basil | Ch 6 |
 | 6 | The Maer Monster | 🎬 marquee set-piece | DefeatBoss — Defeat Nerra, the merfolk elder | — | Ch 7 |
-| 7 | Blood in Bremen | 🟥 big battle (gray) | DefeatBoss — Defeat Dorbulgruf (his guards needn't all fall) | — | Ch 8 |
+| 7 | Blood in Bremen | 🟥 big battle (gray) | Seize — Seize the Town Hall (Dorbulgruf holds the door) | — | Ch 8 |
 | 8 | The Eastway Ambush | 🎬 scripted defeat | Survive — Survive 8–10 turns — the outcome is scripted (unwinnable by design) | — | Ch 9 (post-MVP) |

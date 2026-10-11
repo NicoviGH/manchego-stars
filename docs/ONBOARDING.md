@@ -28,10 +28,10 @@ the tutorial never sees it) · `dialogue` = mandatory story line, shown to every
 | magical-resistance — RES reduces magic damage; casters resist magic | tutorial | — *(pending)* |
 | criticals — Critical hits deal triple damage; chance scales with skill/weapon | tutorial | — *(pending)* |
 | healing — Restore HP with vulneraries/elixirs (self) and staves (allies) | tutorial | — *(pending)* |
-| terrain-bonuses — Terrain (forests, etc.) grants avoid/defense | both | — *(pending)* |
+| terrain-bonuses — Terrain (forests, etc.) grants avoid/defense | both | Ch 4 — dialogue (planned) |
 | terrain-heal-tiles — Forts/gates/thrones auto-heal a unit that ends its turn there | tutorial | Ch 1 — dialogue (active) |
 | rescue — Rescue carries a unit; mounted units can move after rescuing | tutorial | — *(pending)* |
-| status-effects — Abnormal states (sleep, poison, etc.) disable/erode a unit | tutorial | — *(pending)* |
+| status-effects — Abnormal states (sleep, poison, etc.) disable/erode a unit | tutorial | Ch 6 — dialogue (active) |
 | monsters — Monster enemies are a distinct foe type; some weapons are effective vs them | both | Ch 3 — dialogue (active) |
 | fog-of-war — Fog of war hides enemies outside vision range | tutorial | Ch 4 — dialogue (planned) |
 | stealing-thieves — Thieves steal items; protect valuables / loot enemies | both | Ch 3 — both (active) |
@@ -53,9 +53,7 @@ authored, the dialogue-pass parity step should claim the ones debuting there
 - **magical-resistance** — RES reduces magic damage; casters resist magic _(vanilla: tutorial; MSG_618)_
 - **criticals** — Critical hits deal triple damage; chance scales with skill/weapon _(vanilla: tutorial; MSG_616)_
 - **healing** — Restore HP with vulneraries/elixirs (self) and staves (allies) _(vanilla: tutorial; MSG_619)_
-- **terrain-bonuses** — Terrain (forests, etc.) grants avoid/defense _(vanilla: both; MSG_9B9 (story reinforcement: MSG_~11616, Tirado on Ephraim))_
 - **rescue** — Rescue carries a unit; mounted units can move after rescuing _(vanilla: tutorial; MSG_970-977)_
-- **status-effects** — Abnormal states (sleep, poison, etc.) disable/erode a unit _(vanilla: tutorial; MSG_61A)_
 - **ballista-siege** — Siege/ballista emplacements fire from long range; a unit mans them _(vanilla: tutorial; MSG_~5288 (siege); decomp sweep TBD)_
 - **promotion-master-seal** — Master Seal promotes a unit to its advanced class (player picks the branch) _(vanilla: tutorial; decomp sweep TBD)_
 - **supports** — Support conversations build bonuses between paired units _(vanilla: dialogue; decomp sweep TBD)_

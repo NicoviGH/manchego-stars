@@ -224,16 +224,39 @@ def named_units(chapter):
     return out
 
 
+def _class_ids_module():
+    """`inject.class_ids`, or None where it cannot be imported (see `_try_import`)."""
+    return _try_import('inject.class_ids')
+
+
+def _dressed_units(chapter, campaign):
+    """Enemy ids whose class a campaign class reskin wears in this chapter. Such a unit draws
+    the reskin's map sprite and battle anim (Nerra, the merfolk Shaman), so it has both even
+    with no per-unit file. Empty where the reskin registry cannot be read."""
+    class_ids = _class_ids_module()
+    if class_ids is None:
+        return frozenset()
+    claims = class_ids.reskin_claims(campaign)
+    short = campaign_chapters.short_id(chapter)
+    return frozenset(
+        u['id'] for u in chapter.get('enemy_units') or ()
+        if isinstance(u, dict) and u.get('id')
+        and any((short, u.get(k)) in claims for k in ('class', 'deploy_class')))
+
+
 def art(name, campaign=campaign_chapters.CAMPAIGN):
     """Which art each named unit has, and what it is still missing."""
     chapter = load(name, campaign)
     root = os.path.join(REPO, 'campaigns', campaign)
+    dressed = _dressed_units(chapter, campaign)
     rows = []
     for unit, role in named_units(chapter).items():
         have = {}
         for piece, pattern in _ART:
             path = os.path.join(root, pattern % unit)
             have[piece] = os.path.isdir(path) if '%s.png' not in pattern else os.path.isfile(path)
+        if unit in dressed:
+            have['map_sprite'] = have['battle_anim'] = True
         rows.append(ArtRow(unit, role, have['portrait'], have['map_sprite'],
                            have['battle_anim'],
                            sorted(p for p, ok in have.items() if not ok)))

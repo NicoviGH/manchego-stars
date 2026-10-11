@@ -114,7 +114,6 @@ signature_moments:
 
 # ── Post-Chapter (MVP boundary) ──────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 0                # captured — no reward
   promotion_seam:               # see docs/decisions.md — the promotion seam (Ch 8→9)
     note: >
       The locked 'crest of cold iron' (dropped by Ravisin, the ch05 frost druid)

@@ -10,7 +10,7 @@ status: planned                # brainstorm SEED, NOT authoritative: enemy roste
                                # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: big_battle_gray        # see docs/CHAPTERS.md — 🟥 (morally gray)
-fe8_base_map: "FE8 Ch6 — Victims of War"            # DefeatBoss base
+fe8_base_map: "FE8 Ch7 — Waterside Renvall (its own layout, reskinned)"   # ADR 0339
 parity_reference: "FE8 Ch7"   # the twin is the chapter NUMBER, whatever map it borrows (#459)
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
@@ -30,25 +30,25 @@ narrative: >
 
 # ── Map ────────────────────────────────────────────────────────────────────────
 map:
-  file: maps/ch07-blood-in-bremen.tmx
-  tileset: town-interior        # Speaker's hall + streets
-  size: "22×18"
+  # ADR 0339 (Nicolas, 2026-10-10): vanilla Ch7's own layout (Ch7Map, 20x22), reskinned to
+  # winter, as ch02/ch04/ch05 reuse their twins. The keep is the Town Hall on a rocky point; the
+  # moat is Bremen's harbour inlet, where Messie and the surviving boats sit as green units; the
+  # two bridges are its piers. Ch7 has no shoreline, so "docks" is this reading of the moat.
+  size: "20×22"
   description: >
-    Bremen's Town Hall and the surrounding Five-Tavern Center — five taverns in a
-    semicircle around a central yard (book layout, Bremen p.27). The party fights up
-    through the tavern yard to the Town Hall dais where Dorbulgruf holds court.
-    Civilian NPC units mill in the streets and hall; guards defend the dais. Tavern
-    doorways, fences, and furniture as cover.
+    From Bremen's docks up to the Town Hall. The party lands in the south-west and fights
+    across open ground and over the two piers to the hall's door, which the Speaker holds.
+    Vanilla Ch7's two ballistae are Bremen's harpoon launchers, bolted on to kill Messie.
 
 # ── Objective ──────────────────────────────────────────────────────────────────
 objective:
-  type: defeat_boss                      # mirrors FE8 Ch6 "Victims of War" = DefeatBoss
-  description: "Defeat Dorbulgruf (his guards needn't all fall)"
+  type: seize                            # vanilla Ch7: Seize (9,4), the hall's door (ADR 0339)
+  description: "Seize the Town Hall (Dorbulgruf holds the door)"
   constraint:
     type: protect_civilians
     description: "Civilians are 'don't-kill' NPC units — killing them incurs a penalty (gold/reputation)"
 
-win_condition: boss_defeated
+win_condition: seize
 lose_condition: all_player_units_defeated
 
 difficulty_note: >
@@ -143,7 +143,6 @@ events:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 450
   available_shops: [bremen]
   units_available_to_recruit: []
   unlocks_chapter: ch08-the-eastway-ambush

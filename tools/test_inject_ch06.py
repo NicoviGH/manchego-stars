@@ -304,10 +304,42 @@ class MessieOnTheIce(unittest.TestCase):
         with self.assertRaises(SystemExit):
             inject.chapters.ch06.ch06_messie_gather(chap, self.terrain)
 
-    def test_the_scene_plays_before_the_victory_sting(self):
+    def test_the_chapter_closes_on_messie_then_the_fade(self):
+        """No crew scene follows him (Nicolas, 2026-10-10): his block, the flags, the Bolt,
+        then vanilla Ch6's closing cue -- and no Victory sting anywhere in the ending."""
         with open(inject.chapters.ch06.__file__, encoding='utf-8') as f:
             src = f.read()
-        self.assertLess(src.index('ch06_messie_block(chap, terrain,'), src.index("MUSC(SONG_VICTORY)"))
+        order = [src.index('ch06_messie_block(chap, terrain,'),
+                 src.index('ch06_boat_survived_flags(hulls)'),
+                 src.index('save_all_bonus_script(hulls,'),
+                 src.index('MUSCSLOW(SONG_INTO_THE_SHADOW_OF_VICTORY)')]
+        self.assertEqual(order, sorted(order))
+        self.assertNotIn('SONG_VICTORY)', src.replace('SHADOW_OF_VICTORY)', ''))
+
+
+class BoatSurvivedFlags(unittest.TestCase):
+    """ch07's docks opening forks on which hull came home (Nicolas, 2026-10-10)."""
+
+    HULLS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
+
+    def test_each_hull_sets_its_own_permanent_flag_only_when_alive(self):
+        out = inject.chapters.ch06.ch06_boat_survived_flags(self.HULLS)
+        flags = inject.chapter_ids.CH06_BOAT_SURVIVED_FLAGS
+        for bid, pid in self.HULLS.items():
+            check = out.index('CHECK_ALIVE(%s)' % pid)
+            self.assertLess(check, out.index('ENUT(%s)' % flags[bid]))
+        # permanent flags are ids above 100 (SetPermanentFlag), and the two differ
+        self.assertTrue(all(int(f, 16) > 100 for f in flags.values()))
+        self.assertEqual(len(set(flags.values())), 2)
+
+    def test_a_sunk_hull_skips_only_its_own_flag(self):
+        out = inject.chapters.ch06.ch06_boat_survived_flags(self.HULLS)
+        labels = inject.chapters.ch06.CH06_BOAT_SURVIVED_LABELS
+        self.assertEqual(len(set(labels.values())), 2)
+        self.assertNotIn(inject.villages.SAVE_ALL_SKIP_LABEL, labels.values())
+        for label in labels.values():
+            self.assertEqual(out.count('BEQ(%s,' % label), 1)
+            self.assertEqual(out.count('LABEL(%s)' % label), 1)
 
 
 class MerfolkSurface(unittest.TestCase):
