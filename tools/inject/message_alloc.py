@@ -42,6 +42,8 @@ APPENDED_MESSAGES = {
              'messie-ice',
              # ...and Nerra's two battle quotes (#26): her taunt and her retreat line.
              'nerra-taunt', 'nerra-retreat'),
+    # ch07's goal pair (#27): the Status screen's objective and the goal window's banner.
+    'ch07': ('goal-window', 'goal-status'),
 }
 
 

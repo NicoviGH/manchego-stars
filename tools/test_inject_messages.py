@@ -75,8 +75,10 @@ class MessageBlockGuardHasNoBlindSpots(unittest.TestCase):
         # Every chapter's objective window/status string lives below 0x300, which an
         # undocumented lower bound silently excluded -- from the claims fold too, so
         # registering them did not help. A block there garbles the objective on every chapter.
+        # Only vanilla-range ids: an APPENDED goal id (ch07's, #411) sits past vanilla's table,
+        # where no declared block can reach it, so the guard rightly never folds it in.
         goals = [v for v in injector_constants('(GOAL_WINDOW_MSG|GOAL_STATUS_MSG)$').values()
-                 if isinstance(v, int)]
+                 if isinstance(v, int) and v < inject.messages.VANILLA_MESSAGE_COUNT]
         self.assertTrue(goals)
         spent = self._spent()
         self.assertEqual([], [hex(i) for i in goals if i not in spent])
@@ -161,10 +163,10 @@ class NamedRawPidsAreExclusive(unittest.TestCase):
         inject.messages.assert_named_raw_pids_are_exclusive()
 
     def test_a_generic_pid_may_still_be_shared(self):
-        """ch05 and ch06 both spend 0x80 on autolevelled trash, and that is fine -- a generic pid
+        """ch05, ch06 and ch07 all spend 0x80 on autolevelled trash, and that is fine -- a generic pid
         is never named, so nothing global is written for it. The guard must not over-reach."""
         claims = inject.messages.raw_pid_claims()
-        self.assertEqual(claims.get('0x80'), {'CH05', 'CH06'})
+        self.assertEqual(claims.get('0x80'), {'CH05', 'CH06', 'CH07'})
         self.assertNotIn('0x80', inject.cast.RAW_PID_PORTRAITS)
 
     def test_discovery_reads_strings_tuples_and_dicts(self):

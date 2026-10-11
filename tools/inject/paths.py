@@ -244,6 +244,14 @@ CH06_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch7-eventinfo.h')
 
 CH06_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch7-eventscript.h')
 
+# --- Chapter 7 (#27): "Blood in Bremen" ---------------------------------------------
+# Hosted on slot 8, filling `Ch8EventData` (inject/hosts.py). Here the donor and the bar are
+# the SAME chapter -- vanilla Ch7's own layout and its own force (ADR 0339) -- and slot 8 is
+# vanilla Ch7's slot, so its files are named for chapter 8 by FE8's Ch5X offset.
+CH07_EVENTINFO_H = os.path.join(DECOMP, 'src', 'events', 'ch8-eventinfo.h')
+
+CH07_EVENTSCRIPT_H = os.path.join(DECOMP, 'src', 'events', 'ch8-eventscript.h')
+
 # --- Battle ground platforms (#65): vendored snow/ice grounds + terrain remap -------
 # FE8's battle platform (the ground combatants stand on) is terrain-driven
 # (gBanimFloorfx -> battle_terrain_table[idx]); vanilla has no snow ground (the pale

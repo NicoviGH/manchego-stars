@@ -45,7 +45,12 @@ class CampaignIds(unittest.TestCase):
         self.assertEqual([0x28, 0x6D], self.ids['CH02_CHARMS'])   # Hand Axe, Elixir
 
     def test_hosts_follow_the_host_slots(self):
-        self.assertEqual({'ch%02d' % n: n + 1 for n in range(1, 7)}, self.ids['HOST'])
+        # Every hosted chapter, so a film can name the slot a chain lands on; from ch01 on each
+        # chapter N sits on slot N + 1.
+        from inject import hosts
+        hosted = [c.name for c in hosts.hosted_chapters() if c.name != 'prologue']
+        self.assertIn('ch07', hosted)
+        self.assertEqual({name: int(name[2:]) + 1 for name in hosted}, self.ids['HOST'])
 
     @unittest.skipUnless(shutil.which('lua'), 'no lua interpreter (brew install lua)')
     def test_the_rendered_table_is_lua_the_harness_can_read(self):

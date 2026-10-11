@@ -32,7 +32,8 @@ def _moved(registry, name, before):
 def _args(**flags):
     base = dict(campaign='c', montage=False, test_chapter=False, lord_boot=False,
                 ch01_boot=False, ch03_boot=False, ch04_boot=False, ch05_boot=False,
-                ch05_lupin=False, ch05_moose=False, ch05_ending=None, ch06_boot=False)
+                ch05_lupin=False, ch05_moose=False, ch05_ending=None, ch06_boot=False,
+                ch07_boot=False)
     base.update(flags)
     return argparse.Namespace(**base)
 
@@ -89,7 +90,8 @@ class TheRegistry(unittest.TestCase):
         for flags in ({}, {'montage': True}, {'test_chapter': True},
                       {'test_chapter': True, 'lord_boot': True}, {'ch01_boot': True},
                       {'ch03_boot': True}, {'ch04_boot': True}, {'ch05_boot': True},
-                      {'ch06_boot': True}, {'ch05_boot': True, 'test_chapter': True}):
+                      {'ch06_boot': True}, {'ch07_boot': True},
+                      {'ch05_boot': True, 'test_chapter': True}):
             args = _args(**flags)
             hits = [s.title or s.name for s in boots if s.when(FlagView(args, s))]
             self.assertEqual(len(hits), 1, '%s -> %s' % (flags, hits))

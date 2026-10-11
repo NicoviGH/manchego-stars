@@ -373,8 +373,9 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
         'PROLOGUE': {'hlin': char(PROLOGUE_HLIN_SLOT), 'scramsax': char(PROLOGUE_SCRAMSAX_SLOT),
                      'sephek': char(PROLOGUE_SEPHEK_SLOT)},
         'CH01_CHIEF': char(CH01_BOSS_SLOT),
-        'HOST': {'ch%02d' % n: getattr(hosts, 'CH%02d_HOST_INDEX' % n)
-                 for n in range(1, 7)},
+        # Every hosted chapter, read off the registry: a range here went stale the day ch07 was
+        # hosted and a film needed its slot.
+        'HOST': {c.name: c.host_index for c in hosts.hosted_chapters() if c.name != 'prologue'},
         'CH02_CHWINGA_PIDS': [char(slot_of[g['id']]) for g in field],
         'CH02_CHARMS': [items[CH02_ITEM_IDS[g['gift']]] for g in field],
         'CH02_ARCHER_CLASS': classes[CH02_CLASS_IDS['archer']],

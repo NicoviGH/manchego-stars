@@ -33,7 +33,8 @@ class HostedChapterEnumeration(unittest.TestCase):
         self.assertEqual(got, {'prologue': inject.hosts.PROLOGUE_HOST_INDEX,
                                'ch01': inject.hosts.CH01_HOST_INDEX, 'ch02': inject.hosts.CH02_HOST_INDEX,
                                'ch03': inject.hosts.CH03_HOST_INDEX, 'ch04': inject.hosts.CH04_HOST_INDEX,
-                               'ch05': inject.hosts.CH05_HOST_INDEX, 'ch06': inject.hosts.CH06_HOST_INDEX})
+                               'ch05': inject.hosts.CH05_HOST_INDEX, 'ch06': inject.hosts.CH06_HOST_INDEX,
+                               'ch07': inject.hosts.CH07_HOST_INDEX})
 
     def test_each_entry_carries_the_event_group_its_injector_fills(self):
         groups = {c.name: c.event_group for c in inject.hosts.hosted_chapters()}
@@ -45,7 +46,7 @@ class HostedChapterEnumeration(unittest.TestCase):
         """Not by name -- 'ch01' sorts before 'prologue', and a name sort against a
         sorted() scan is a test that cannot fail."""
         self.assertEqual([c.name for c in inject.hosts.hosted_chapters()],
-                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06'])
+                         ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06', 'ch07'])
 
     def test_every_injector_in_this_module_is_enrolled(self):
         """Discovery only covers a chapter that spells its constants right. An

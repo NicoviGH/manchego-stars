@@ -463,8 +463,13 @@ class RealManifest(unittest.TestCase):
             self.assertIn(scenario, self.m.scenarios)
             member_of = [s for s, members in self.m.suites.items() if scenario in members]
             self.assertTrue(member_of, '%s is in no suite, so nothing runs it' % scenario)
-        self.assertIn('ch05lupinbenched', self.m.suites['gate'],
-                      'the gate must walk the arm ch05recruit cannot reach')
+        # Wherever ch05recruit runs, the other arm runs beside it: the gate while ch05 was in
+        # its window, the ch05 suite since ch07's hosting aged it out.
+        for suite, members in self.m.suites.items():
+            if 'ch05recruit' in members:
+                self.assertIn('ch05lupinbenched', members,
+                              'suite %s walks ch05recruit but not the arm it cannot reach'
+                              % suite)
 
     def test_every_manifest_row_still_exists_in_harness(self):
         """Every row still names something runnable -- a harness function, or a chapter-

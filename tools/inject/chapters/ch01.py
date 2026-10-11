@@ -29,6 +29,7 @@ from inject.text import (
     set_message_body, vanilla_name_text_id, _wrap_fe_lines, write_nameplate)
 from inject.units import (
     _ally_unit_entry, _deploy_cap_entries, enemy_rows)
+from inject.villages import chapter_location_events
 
 
 CH01_LAYOUT = ('Ch01IronTrailMap', 'ch01-the-iron-trail')  # (asset label, maps/ stem)
@@ -420,8 +421,6 @@ def inject_ch01(campaign, verbose=True, boot=False):
     #    battle start (turn 1, #5) + Izobai's taunt + reinforcements. Misc:
     #    CauseGameOverIfLordDies (fires on EVFLAG_GAMEOVER, raised by the UnitKill
     #    hook when the chosen lead falls -- _inject_lord_select_engine, #42).
-    sx, sy = chap['objective']['seize_tile']
-    houses = [e for e in chap['events'] if e.get('type') == 'house']
     # The road-sign + body narration (#5): fires at BATTLE START as a turn-1 event (not a
     # tile step), so the party always reads it. Presence-checked here; wired as the first
     # turn-1 TURN entry below (its script body is EventScr_Ch2_Talk_EirikaRoss, step 4).
@@ -437,12 +436,9 @@ def inject_ch01(campaign, verbose=True, boot=False):
             '    TURN(0x0, EventScr_Ch2_Turn1Player, %d, 0, FACTION_ID_BLUE)'
             ' /* west reinforcements */\n'
             '    END_MAIN\n}' % reinf['arrives_turn'],
-        'locationBasedEvents':
-            '{\n    House(0x0, EventScr_Ch2_Village1, %d, %d)\n'
-            '    House(0x0, EventScr_Ch2_Village2, %d, %d)\n'
-            '    Seize(%d, %d)\n    END_MAIN\n}'
-            % (houses[0]['tile'][0], houses[0]['tile'][1],
-               houses[1]['tile'][0], houses[1]['tile'][1], sx, sy),
+        'locationBasedEvents': chapter_location_events(
+            chap, {}, house_scripts=('EventScr_Ch2_Village1', 'EventScr_Ch2_Village2'),
+            seize=True),
         'miscBasedEvents': '{\n    CauseGameOverIfLordDies\n    END_MAIN\n}',
     }, roster='UnitDef_Event_Ch2Ally',
         scenes=('EventScr_Ch2_BeginningScene', 'EventScr_Ch2_EndingScene'))

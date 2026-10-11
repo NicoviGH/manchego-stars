@@ -515,3 +515,9 @@ CH01_LITERAL_MSGS = (0x93B, 0x93C, 0x955, 0x961)
 # NOT here -- `--ch05-lupin` already exists and composes with each of these, so the six films are
 # three arms x two flags rather than six flags.
 CH05_ENDING_ARMS = ('full', 'no-sahnar', 'basil-died')
+
+# --- ch07 (#27): "Blood in Bremen" ---------------------------------------------------
+CH07_CHAPTER_YAML = 'ch07-blood-in-bremen.yaml'
+# The goal pair takes appended ids (#411): ch07 claims no block of vanilla's dead ids.
+CH07_GOAL_WINDOW_MSG = appended_message_id('ch07', 'goal-window')
+CH07_GOAL_STATUS_MSG = appended_message_id('ch07', 'goal-status')

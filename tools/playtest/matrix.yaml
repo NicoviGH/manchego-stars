@@ -94,6 +94,8 @@ rom_configs:
   ch06endingboot:
     CH06BOOT: 1
     CH06ENDING: 1
+  ch07boot:
+    CH07BOOT: 1
 
 # Ported verbatim from run.sh's two timing `case` statements.
 classes:
@@ -313,7 +315,7 @@ suites:
   # before a playtest build. Two chapters rather than one because the CHAIN is where the
   # coupling lives (chain_ch04_to_ch05 rewrites ch04's landing; chapters share donor slots,
   # one SMS id pool and one message-id space). `check.py check_gate_chapter_window` derives
-  # the window from the host registry, so HOSTING ch06 is what ages ch04 out.
+  # the window from the host registry, so HOSTING ch07 is what ages ch05 out.
   gate:
     - controller_turn
     - win
@@ -323,20 +325,12 @@ suites:
     - ch01win
     - lordfloor
     - recordunitlist
-    # ch04's six aged OUT of the window when ch06 was hosted (check_gate_chapter_window
+    # ch05's seven aged OUT of the window when ch07 was hosted (check_gate_chapter_window
     # derives it from the host registry: the spine plus the last two hosted chapters, now
-    # ch05 + ch06). Nothing is lost -- the derived `ch04` suite still carries all six, and
+    # ch06 + ch07). Nothing is lost -- the derived `ch05` suite still carries all seven, and
     # the --all sweep still runs them.
-    - ch05village
-    - ch05reliquaries
-    - ch05arena
-    - ch05recruit
-    # ch05recruit alone only ever walks the no-Lupin arm (the gate ROM has no wolf), so an
-    # inverted BEQ or a swapped pair of message ids would pass it. This is the run that
-    # walks the OTHER arm, and it is the only one that does.
-    - ch05lupinbenched
-    - ch05raid
-    - ch05crest
+    - ch06clock
+    - ch06boarding
 
   ch01:
     - controller_turn

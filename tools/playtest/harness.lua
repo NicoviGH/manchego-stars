@@ -4173,6 +4173,11 @@ scenarios.titlecard = function()
         result("FAIL", "Status screen proc never appeared")
     end
 end
+-- The same capture on a chapter's own boot ROM: `titlecard` is pinned to the canonical ROM, and
+-- a chapter whose card is new needs it drawn by the build that hosts it (ch07's YAML case).
+scenarios.ch07titlecard = function()
+    return scenarios.titlecard()
+end
 
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.
 scenarios.gameover = function()
@@ -8387,7 +8392,7 @@ end
 -- recordch05ravisindeath's: park a one-hit Nerra beside a live melee attacker and drive the
 -- game's own Attack path. The strike plays her taunt and her retreat line (ADR 0337), and is
 -- done when she is gone rather than at a box count; the film starts there and runs the
--- gather, the break, the walk, the cry and the scene to the title.
+-- gather, the break, the walk, the cry and the scene, to ch07's slot (chain_ch06_to_ch07).
 -- Run: tools/playtest/run.sh recordch06nerradeath (CH06BOOT=1 ROM).
 scenarios.recordch06nerradeath = function()
     local NERRA, boxes, waiting = 0x4B, 0, false     -- CHARACTER_NOVALA, her slot (ENEMY_BASE_SLOT)
@@ -8459,7 +8464,7 @@ scenarios.recordch06nerradeath = function()
             local now = controllerState() == "dialogue_wait"
             if now and not waiting then boxes = boxes + 1 end
             waiting = now
-            return procActive(SYM.gProcScr_TitleScreen) and boxes >= 37
+            return chapter() == CAMPAIGN.HOST.ch07 and boxes >= 33   -- Messie's 33, then ch07
         end,
     })
 end
@@ -8473,11 +8478,11 @@ end
 -- What only a run can answer: whether the haul across the ice runs at all (an unwalkable event
 -- MOVE hangs the chapter -- the build guards the route, the film proves it), whether the rumble
 -- and the cry both sound, and whether the shake lands on the map.
--- The terminal is the TITLE screen (the ending lands on the dev placeholder, which ends on MNTS),
--- refused below 37 boxes: Messie's 33 plus the placeholder's 4.
+-- The terminal is ch07's slot (the ending's MNC2, chain_ch06_to_ch07), refused below Messie's
+-- 33 boxes.
 -- Run: tools/playtest/run.sh recordch06messie (needs CH06BOOT=1 CH06ENDING=1).
 scenarios.recordch06messie = function()
-    local BOXES = 37
+    local BOXES = 33
     local boxes, waiting, blamed, playedMsg = 0, false, false, nil
     return recordCutscene({
         tag = "ch06messie", speed = "normal", maxFrames = 16000, shotEvery = 4, pressEvery = 90,
@@ -8508,13 +8513,13 @@ scenarios.recordch06messie = function()
                 playedMsg = playedMsg or INSPECT.activeMsg()
             end
             waiting = now
-            if procActive(SYM.gProcScr_TitleScreen) then
+            if chapter() == CAMPAIGN.HOST.ch07 then
                 if boxes < BOXES then
                     if not blamed then
                         blamed = true
-                        log(string.format("ch06messie: the title arrived after %d boxes, not "
-                            .. "%d -- the scene was SHORTER than Messie's 33 plus the "
-                            .. "placeholder's 4 (first message 0x%X)", boxes, BOXES, playedMsg or 0))
+                        log(string.format("ch06messie: ch07 arrived after %d boxes, not %d -- "
+                            .. "the scene was SHORTER than Messie's 33 (first message 0x%X)",
+                            boxes, BOXES, playedMsg or 0))
                     end
                     return false
                 end
@@ -8779,21 +8784,19 @@ end
 -- boxes apart, so a length can say "at least this long" and never "this scene". The count
 -- still guards LENGTH: 19 boxes is scene 16 with the berry beat IN (7 + 6 + 6), so a Sahnar
 -- gate that regressed to always-skip drops to 13 and fails here rather than looking like a
--- shorter film. Every arm then adds the dev placeholder's own FOUR boxes.
+-- shorter film. The film ends where the ending's MNC2 lands: ch06's slot (chain_ch05_to_ch06).
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05ending (needs CH05BOOT=1 CH05ENDING=full).
 scenarios.recordch05ending = function(opts)
     -- `opts.boxes` is the arm's own length and `opts.arm` the message that must produce it.
     -- Each arm is a WHOLE message rather than a spliced beat, so its A-press count is its
-    -- authored box count plus the RBG-campfire placeholder that follows every one of them:
-    --   full        0x9C9  19 + 4 = 23
-    --   berry cut   0x9CA  13 + 4 = 17   (Sahnar was never recruited)
-    --   Basil died  0x9F3  10 + 4 = 14
-    -- The placeholder is FOUR boxes. This said "+1" and priced `full` at 20 -- wrong, and it
-    -- never showed, because the count is a FLOOR (a short arm withholds the terminal rather
-    -- than failing) so 23 >= 20 passed for months. Measured 2026-08-21 while filming the other
-    -- two arms; the ARM is what actually gates now, and the floor only guards length.
+    -- authored box count:
+    --   full        0x9C9  19
+    --   berry cut   0x9CA  13   (Sahnar was never recruited)
+    --   Basil died  0x9F3  10
+    -- The count is a FLOOR (a short arm withholds the terminal rather than failing); the ARM
+    -- is what gates, and the floor only guards length.
     opts = opts or {}
-    local BOXES = opts.boxes or 23
+    local BOXES = opts.boxes or 19
     local ARM = opts.arm or 0x9C9        -- which ENDING message this ROM must actually play
     local boxes, waiting, blamed, playedMsg = 0, false, false, nil
     return recordCutscene({
@@ -8822,8 +8825,7 @@ scenarios.recordch05ending = function(opts)
             return false, "boot cap expired before ch05's ending"
         end,
         afterPre = pokeNormalConfig,
-        -- Terminal is the TITLE screen, because the ending lands on the dev placeholder and
-        -- that ends on MNTS -- ch06 is not hosted yet, and that is by design.
+        -- Terminal is ch06's slot: the ending's MNC2 lands there (chain_ch05_to_ch06).
         until_ = function()
             local now = controllerState() == "dialogue_wait"
             if now and not waiting then
@@ -8836,7 +8838,7 @@ scenarios.recordch05ending = function(opts)
                 playedMsg = playedMsg or INSPECT.activeMsg()
             end
             waiting = now
-            if procActive(SYM.gProcScr_TitleScreen) then
+            if chapter() == CAMPAIGN.HOST.ch06 then
                 if playedMsg ~= ARM then
                     if not blamed then
                         blamed = true
@@ -8854,10 +8856,10 @@ scenarios.recordch05ending = function(opts)
                     -- The log is what names it -- the verdict line only says "never reached".
                     if not blamed then
                         blamed = true
-                        log(string.format("ch05ending: the title arrived after %d boxes, not "
+                        log(string.format("ch05ending: ch06 arrived after %d boxes, not "
                             .. "the %d this arm (message 0x%X) runs to -- the scene was SHORTER "
-                            .. "than it should be. Arm lengths, placeholder included: 23 full, "
-                            .. "17 berry-beat cut, 14 Basil's death variant.",
+                            .. "than it should be. Arm lengths: 19 full, 13 berry-beat cut, "
+                            .. "10 Basil's death variant.",
                             boxes, BOXES, ARM))
                     end
                     return false
@@ -8877,7 +8879,7 @@ end
 -- as a hole where a scene was.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05endingnosahnar (CH05ENDING=no-sahnar).
 scenarios.recordch05endingnosahnar = function()
-    return scenarios.recordch05ending({ boxes = 17, arm = 0x9CA })
+    return scenarios.recordch05ending({ boxes = 13, arm = 0x9CA })
 end
 
 -- recordch05endingbasildied (#25): scene 17, the ending played over Basil's body. ONE arm and no
@@ -8885,7 +8887,7 @@ end
 -- note) -- so this is the whole variant in ten boxes. The last of ch05's unfilmed scenes.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05endingbasildied (CH05ENDING=basil-died).
 scenarios.recordch05endingbasildied = function()
-    return scenarios.recordch05ending({ boxes = 14, arm = 0x9F3 })
+    return scenarios.recordch05ending({ boxes = 10, arm = 0x9F3 })
 end
 
 -- recordch05recruit (#25): the MOTION proof for the locked Basil->Sahnar Talk at 0x9E8 -- the

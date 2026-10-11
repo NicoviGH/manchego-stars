@@ -79,6 +79,10 @@ def parse_args(argv=None):
                     help='PLAYTEST build (#26): New Game boots straight into Ch6 "The Maer '
                          'Monster" on slot 7 with an armed party, the merfolk line on its '
                          'authored placement, and both marooned boats green in their pockets.')
+    ap.add_argument('--ch07-boot', action='store_true',
+                    help='PLAYTEST build (#27): New Game boots straight into Ch7 "Blood in '
+                         'Bremen" on slot 8 with an armed party, Prep, and vanilla Ch7\'s '
+                         'nineteen as Bremen\'s militia.')
     ap.add_argument('--ch05-moose', action='store_true',
                     help='DEBUG build (#25): with --ch05-boot, New Game lands straight on '
                          'scene 7 (the moose charge). Skips the four backdrop scenes, '
@@ -137,7 +141,7 @@ def parse_args(argv=None):
                         'CH04BOOT': args.ch04_boot, 'CH05BOOT': args.ch05_boot,
                         'CH05LUPIN': args.ch05_lupin, 'CH05MOOSE': args.ch05_moose,
                         'CH05ENDING': args.ch05_ending, 'CH06BOOT': args.ch06_boot,
-                        'CH06ENDING': args.ch06_ending,
+                        'CH06ENDING': args.ch06_ending, 'CH07BOOT': args.ch07_boot,
                         'SOUNDROOM': args.sound_room_audition,
                         'BENCH': args.bench}
     if args.lord_boot:
@@ -148,7 +152,8 @@ def parse_args(argv=None):
                                     ('--ch03-boot', args.ch03_boot),
                                     ('--ch04-boot', args.ch04_boot),
                                     ('--ch05-boot', args.ch05_boot),
-                                    ('--ch06-boot', args.ch06_boot)) if on]
+                                    ('--ch06-boot', args.ch06_boot),
+                                    ('--ch07-boot', args.ch07_boot)) if on]
     if len(_boots) > 1:
         sys.exit('ERROR: %s are mutually exclusive -- each repoints New Game at its own '
                  'chapter slot' % ' and '.join(_boots))
