@@ -293,7 +293,7 @@ def _ch04_wave_pack_kit(chap, wave):
 def ch04_turn2_reveal_rows(chap, lupin):
     """The turn-2 wolf-pack reveal wave: the convertible Mauthe Doog pack with its LEADER tile
     reassigned to Lupin (red, his CHARACTER_ slot pid, Cavalier under the hood). 5 generic
-    Mauthe Doogs + Lupin = 6 -- holds the turn-2 parity count (ch04_enemy_rows still reports 6
+    Mauthe Doogs + Lupin = 6 -- holds the turn-2 parity count (enemy_rows still reports 6
     for the difficulty read; the split is injector-side only). Marty's parley CUSNs the surviving
     generics green in place, then CUSAs Lupin blue. `lupin` = an on_map_talk_recruits row.
     Lupin is placed at his YAML level, NOT autolevelled -- his stats persist through the CUSA, so
@@ -338,7 +338,7 @@ def assert_pack_pids_addressable(chap, pack_pids):
                  'second wolf on a shared pid can never be converted. Give each its own.'
                  % ', '.join(dupes))
     # Every OTHER pid ch04 puts on the map. The reveal wave is skipped: its class pid feeds the
-    # difficulty read only (ch04_enemy_rows), because the pack itself is placed by
+    # difficulty read only (enemy_rows), because the pack itself is placed by
     # ch04_turn2_reveal_rows on these very pack_pids.
     wave = _ch04_reveal_wave(chap)
     elsewhere = {CH04_MOOSE_PID: 'the white moose'}
@@ -469,7 +469,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     turn3_rows = enemy_rows(chap, CH04_CLASS_IDS, CH04_ITEM_IDS, ch04_enemy_pid, arrives_turn=3)
     # Stage 2b -- the turn-2 wolf-pack reveal: the convertible Mauthe Doog wave with its leader
     # tile reassigned to Lupin (red, CHARACTER_DUESSEL). 5 generic Mauthe Doogs + Lupin = 6, so
-    # ch04_enemy_rows still reports 6 for the difficulty read (parity held); the split is here.
+    # enemy_rows still reports 6 for the difficulty read (parity held); the split is here.
     lupin = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
                  if r[0] == 'lupin')
     turn2_rows = ch04_turn2_reveal_rows(chap, lupin)
