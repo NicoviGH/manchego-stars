@@ -41,13 +41,13 @@ from inject.chapter_settings import (apply_chapter_difficulty, apply_chapter_fog
 from inject.chapters.ch01 import inject_ch01, inject_northlook_bitey
 from inject.chapters.ch02 import inject_ch02, inject_ch02_chwinga_faces
 from inject.chapters.ch03 import inject_ch03
-from inject.chapters.ch04 import chain_ch03_to_ch04, inject_ch04
-from inject.chapters.ch05 import chain_ch04_to_ch05, inject_ch05, inject_ch05_visit_faces
-from inject.chapters.ch06 import chain_ch05_to_ch06, inject_ch06
+from inject.chapters.ch04 import inject_ch04
+from inject.chapters.ch05 import inject_ch05, inject_ch05_visit_faces
+from inject.chapters.ch06 import inject_ch06
 from inject.chapters.prologue import inject_prologue
 from inject.crit_flourish import inject_crit_flourish
 from inject.death_quotes import inject_pc_death_quotes
-from inject.decomp import DECOMP
+from inject.hosting import chain
 from inject.engine_patches import (apply_engine_patches, apply_sound_room_audition,
                                    patched_files)
 from inject.hosts import (
@@ -283,7 +283,7 @@ STEPS = [
                 'ch03-hosted'),
          provides=('ch04-hosted', 'ch04-landing'),
          writes=_host(5, 'Ch04LonelywoodForestMap', 'src/data_event_trigger.c')),
-    Step(chain_ch03_to_ch04, needs=('ch03-landing', 'ch04-hosted'),
+    Step(chain('ch03', 'ch04'), needs=('ch03-landing', 'ch04-hosted'),
          writes=('src/events/ch4-eventscript.h',)),
     Step(inject_ch05, title='chapter 5 (#25):', scope='chapter:ch05',
          call=lambda fn, a: fn(a.campaign, boot=a.ch05_boot, lupin_proof=a.ch05_lupin,
@@ -295,7 +295,7 @@ STEPS = [
                       *_tileset('PortTown'))),
     # The four reliquary residents' skeleton busts.
     Step(inject_ch05_visit_faces, scope='chapter:ch05', writes=PORTRAIT),
-    Step(chain_ch04_to_ch05, needs=('ch04-landing', 'ch05-hosted'),
+    Step(chain('ch04', 'ch05'), needs=('ch04-landing', 'ch05-hosted'),
          writes=('src/events/ch5-eventscript.h',)),
     Step(inject_ch06, title='chapter 6 (#26):', scope='chapter:ch06',
          call=lambda fn, a: fn(a.campaign, boot=a.ch06_boot, ending=a.ch06_ending),
@@ -304,7 +304,7 @@ STEPS = [
          provides=('ch06-hosted',),
          writes=_host(7, 'Ch06MaerMonsterMap', 'include/eventcall.h', 'src/cp_data.c',
                       *_tileset('SnowIce'))),
-    Step(chain_ch05_to_ch06, needs=('ch05-landing', 'ch06-hosted'),
+    Step(chain('ch05', 'ch06'), needs=('ch05-landing', 'ch06-hosted'),
          writes=('src/events/ch6-eventscript.h',)),
     # A debug build that is not a chapter boot.
     Step(apply_sound_room_audition, needs=('engine-patches',), flags=('sound_room_audition',),

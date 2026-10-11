@@ -31,7 +31,26 @@ The **map** and the **host slot** are decoupled: you register the painted map as
 entries, then point the host slot's `map` block at them. The map can repaint *any* vanilla
 geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" but hosts on slot 4).
 
-## Recipe (mirror `inject_ch03`)
+## Recipe (mirror `inject_ch06`)
+
+**Write no chapter copy of a shared job** (#479, ADR 0340). Every job below has one shared
+helper, and the chapter passes its facts as parameters. `check_no_chapter_copies_of_shared_jobs`
+fails the build on a `chNN_<job>` that restates a shared `<job>`; a chapter keeps a real
+difference by naming it (`ch06_messie_gather` calls `gather_cast`).
+
+| Job | Shared helper |
+|---|---|
+| Enemy rows per wave | `inject.units.enemy_rows(chap, CHNN_CLASS_IDS, CHNN_ITEM_IDS, pid_for, ...)` |
+| Villages and shops (Location list) | `inject.villages.chapter_location_events(chap, CHNN_VILLAGE_SLOTS, shops, flags)` |
+| Title, goal texts, title card | `inject.scenes.write_frame_texts(lines, host, chap, status, window)` |
+| A borrowed slot's nameplate | `inject.text.write_nameplate(lines, slot, unit)` |
+| A backdrop (+ location card) | `inject.scenes.backdrop(bg, what, card=, rearm=, cue=)` |
+| Late-beat debug boot (`--chNN-ending`) | `inject.scenes.debug_boot_script(...)` + `ending_call(...)` |
+| Gather the cast for a closing scene | `inject.scenes.gather_cast(...)` |
+| Record who survived, for the next chapter | `inject.scenes.record_alive_flags(...)`, read with `branch_on_flag` |
+| Branch on a flag / the roster / the army | `branch_on_flag`, `branch_on_check_alive`, `branch_on_check_exists` |
+| Frame the party | `inject.scenes.party_camera_tile(chap, tile)` |
+| Chain the previous ending onward | `Step(chain('chMM', 'chNN'), ...)` in `inject/steps.py` |
 
 1. **Module constants** — add a `CHNN_*` block next to the others (host index, **event group
    symbol** (step 4), layout `(asset_label, maps_stem)` tuple, chapter YAML name, tileset, goal donor, boss/generic PIDs,
@@ -112,9 +131,10 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
      same roster ARMED from `CLASS_LOADOUT` — and `LOAD1`s it so PREP has a party from a cold New
      Game. (`deploy_slots` is not optional: `_deploy_cap_entries` sys.exits without it.)
    - Enemies → `MS_ChNNLine`, `LOAD1`ed by the beginning scene, plus one `MS_ChNNWave<turn>` per
-     reinforcement wave (each needs its own table — one table cannot serve two turns). Boss and any
-     named unit take a UNIQUE pid so their flagged `gDefeatTalkList` entries key to them alone; the
-     rest share the slot's generic autolevelled PID. Positions/levels/items/AI from the YAML.
+     reinforcement wave (each needs its own table — one table cannot serve two turns). Rows come
+     from `enemy_rows`; the chapter's `chNN_enemy_pid(entry)` gives boss and any named unit a
+     UNIQUE pid so their flagged `gDefeatTalkList` entries key to them alone, and the rest the
+     slot's generic autolevelled PID. Positions/levels/items/AI from the YAML.
    - A convertible/recruitable enemy gets its OWN table and pid even before its Talk is wired — a
      shared pid is unaddressable, which is what #203 cost ch04's wolf pack.
 
@@ -156,14 +176,13 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    that already hold the host-chapter's village lines and do NOT write them — the ROM keeps
    vanilla's prose, the ids stay unclaimed, and the dialogue pass later writes our body at the same
    id. The give-item half is real wiring, not a placeholder, and shops need no script or text at
-   all. Build with `location_events(villages, slots, shops)` + `village_script`, and declare one
+   all. Build with `chapter_location_events(chap, slots, shops)` + `village_script`, and declare one
    `MS_ChNNVisit*` per site with `declare_event_script` — **after** the block-replacement pass, or
    the appends are discarded (`assert_event_scripts_defined` pins it).
 
-8. **Title + names** — `set_message_body(lines, host['chapTitleTextId'], name_message_body(title))`;
-   rename any vanilla boss slot's nameplate (`vanilla_name_text_id`) so it doesn't leak; compose the
-   title-card image with `_write_chapter_title_card` (add `graphics/chap_title/chap_title_N.png` to
-   `PATCHED_DECOMP_FILES`).
+8. **Title + names** — `write_frame_texts(lines, host, chap, status, window)` writes the title,
+   the goal's status and window texts in vanilla's wording, and the "Ch.N: <title>" card;
+   `write_nameplate` renames any vanilla boss slot's nameplate so it doesn't leak.
    **Any other message the chapter writes** (a scene, a name plate, a goal string) takes no
    hand-picked id: name it in `inject/message_alloc.py` `APPENDED_MESSAGES` and read the id back
    with `appended_message_id(chapter, name)` (ADR 0306).
@@ -175,11 +194,11 @@ geometry regardless of which slot hosts it (ch03 repaints vanilla Ch3 "Borgo" bu
    are already listed). Block-replacements are idempotent, but list them anyway (convention +
    clean restore each build).
 
-10. **Wire into `main()`** — call `inject_chNN(campaign)` after the previous chapter's inject
-    (order pins live in `check.py INJECTION_ORDER`; a self-registered tileset carries no cross-injector
-    tileset dependency). For a **fast-boot load-test**, add a `--chNN-boot` flag + a `main()` branch
-    that calls the injector and `_configure_boot(CHNN_HOST_INDEX)` (New Game reroutes 0 → N), plus a
-    `Makefile` `$(if $(CHNNBOOT),--chNN-boot)`.
+10. **Wire into `inject/steps.py`** — a `Step(inject_chNN, ...)` after the previous chapter's,
+    declaring what it writes, needs and provides (ADR 0304), then `Step(chain('chMM', 'chNN'),
+    ...)` so the previous ending lands here instead of on the dev placeholder. For a **fast-boot
+    load-test**, add a `--chNN-boot` flag and a `_configure_boot` step for `CHNN_HOST_INDEX` (New
+    Game reroutes 0 → N), plus a `Makefile` `$(if $(CHNNBOOT),--chNN-boot)`.
 
 11. **Declare the new ROM configuration in `tools/playtest/matrix.yaml`** — add `chNNboot:
     {CHNNBOOT: 1}` to `rom_configs`. Every scenario you then write for the chapter gets a row
@@ -276,11 +295,6 @@ Three traps this replaces, all of which cost real sessions:
 - [ ] Win/lose wired (goal banner + event macro + flagged boss quote if defeat-boss)
 - [ ] Real PREP deploy (`deploy_slots` authored) — replaces the static fast-boot spawn
 - [ ] Cutscenes (dialogue-pass on the locked beats), recruit wiring, chests/doors, reinforcements
-- [ ] Title card art; boss/enemy portrait + map-sprite art
-- [ ] Chained: previous chapter's ending `MNC2(0xN)` targets this slot (drop the dev placeholder)
+- [ ] Boss/enemy portrait + map-sprite art
+- [ ] Chained: `Step(chain('chMM', 'chNN'))` turns the previous ending's dev placeholder into `MNC2(0xN)`
 - [ ] Load-test scenarios (`chNN` / `smoke_chNN` / `clear_chNN`) + parity (`make difficulty CH=chNN`)
-
-> **Future refactor (noted):** `inject_ch01/02/03` still duplicate the host skeleton. A config-driven
-> `inject_chapter(N)` reading a per-chapter descriptor could collapse them; the shared helpers
-> (`_register_chapter_map`, `_retarget_host_chapter`, `_classed_cast`, `_enemy_unit_entry`, …) are
-> already the seams. Worth doing once 4–5 chapters exist and the variation is fully mapped.

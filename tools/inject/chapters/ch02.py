@@ -25,15 +25,16 @@ from inject.paths import (
     CH3_EVENTINFO_H, CH3_EVENTSCRIPT_H, EVENTS_UDEFS_C, PORTRAIT_DIR, TEXTS_TXT)
 from inject.recruit import ON_MAP_RECRUIT_VIA
 from inject.scenes import (
-    _emit_scene_beats, _make_fid, _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats,
-    _stage_beat, _write_chapter_title_card, battle_quote_body, defeat_quote_row)
+    backdrop, battle_quote_body, defeat_quote_row, _emit_scene_beats, _make_fid,
+    _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats, _stage_beat, write_frame_texts)
 from inject.text import (
-    _fid_tag, _script_to_message, display_name, goal_window_body, name_message_body,
-    set_message_body, vanilla_name_text_id)
+    display_name, _fid_tag, name_message_body, _script_to_message, set_message_body,
+    write_nameplate)
 from inject.units import (
     _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, enemy_ai_initialiser)
 from inject.villages import (
-    DEFAULT_VILLAGE_SPEAKER, location_events, village_boxes, village_reward_item, village_script)
+    chapter_location_events, DEFAULT_VILLAGE_SPEAKER, village_boxes, village_reward_item,
+    village_script)
 
 
 CH02_LAYOUT = ('Ch02ColdWelcomeMap', 'ch02-cold-welcome')  # (asset label, maps/ stem)
@@ -118,13 +119,6 @@ def ch02_map_changes(chap, maps_dir):
     return changes
 
 
-def ch02_location_events(chap):
-    """ch02's Location list: the two Targos huts. Empty until 2026-08-30, which is why the
-    map drew huts that backed nothing and why six pillaging raiders had nowhere to go but
-    the protected chwinga."""
-    return location_events(chap.get('villages', []),
-                           {vid: slot[0] for vid, slot in CH02_VILLAGE_SLOTS.items()},
-                           flags=CH02_VILLAGE_FLAGS)
 # blue glow ramp -> spirit-green, keyed by SOURCE RGB (robust to palette reordering); the
 # same ramp as the map sprite. Everything else (fur collar, tan robe, red tassels) untouched.
 CH02_CHWINGA_GLOW_RECOLOR = {
@@ -197,8 +191,7 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     for uid, slot in CH02_CHWINGA:
-        set_message_body(lines, vanilla_name_text_id(slot),
-                         name_message_body(display_name(by_id[uid])))
+        write_nameplate(lines, slot, by_id[uid])
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     if verbose:
@@ -354,9 +347,8 @@ def inject_ch02(campaign, verbose=True):
     grukk, halvar = by_eid['raider-bruiser'], by_eid['raider-captain']
     reinf = chap['reinforcements'][0]
     brig, arch = CH02_CLASS_IDS['brigand'], CH02_CLASS_IDS['archer']
-    axe, steel, bow, vuln, lance = (CH02_ITEM_IDS['iron-axe'], CH02_ITEM_IDS['steel-axe'],
-                                    CH02_ITEM_IDS['iron-bow'], CH02_ITEM_IDS['vulnerary'],
-                                    CH02_ITEM_IDS['slim-lance'])
+    axe, steel, bow, vuln = (CH02_ITEM_IDS['iron-axe'], CH02_ITEM_IDS['steel-axe'],
+                             CH02_ITEM_IDS['iron-bow'], CH02_ITEM_IDS['vulnerary'])
 
     # 2a. RED raider band (088B463C) -- vanilla Ch2 parity, reflavored chardalyn berserkers.
     enemies = []
@@ -464,7 +456,8 @@ def inject_ch02(campaign, verbose=True):
             '    TURN(0x0, EventScr_Ch3_Turn1Npc, %d, 0, FACTION_ID_BLUE)'
             ' /* turn-%d rear raiders + Wolfram bark */\n    END_MAIN\n}'
             % (reinf['trigger_turn'], reinf['trigger_turn']),
-        'locationBasedEvents': ch02_location_events(chap),
+        'locationBasedEvents': chapter_location_events(chap, CH02_VILLAGE_SLOTS,
+                                                       flags=CH02_VILLAGE_FLAGS),
         'miscBasedEvents': '{\n    CauseGameOverIfLordDies\n    END_MAIN\n}',
     }, roster='UnitDef_Event_Ch3Ally',
         scenes=('EventScr_Ch3_BeginningScene', 'EventScr_Ch3_EndingScene'))
@@ -519,11 +512,8 @@ def inject_ch02(campaign, verbose=True):
         script, 'EventScr_Ch3_BeginningScene[] =',
         '{\n'
         '    MUSC(SONG_ADVANCE) /* the company rolls out: vanilla Ch2\'s march (ADR 0336) */\n'
-        '    REMOVEPORTRAITS\n'
-        '    BACG(%s) /* Bryn Shander west gate (placeholder BG; #22 polish) */\n'
-        '    FADU(16)\n'
-        '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bryn Shander -- West Gate" card */\n'
-        % (CH02_OPENING_BG, CH02_OPENING_CARD_MSG)
+        + backdrop(CH02_OPENING_BG, 'Bryn Shander west gate (placeholder BG; #22 polish)',
+                   card=(CH02_OPENING_CARD_MSG, 'Bryn Shander -- West Gate'))
         + op_text_calls +
         ('    MUSCMID(SONG_SILENT) /* the march fades with the gate, as vanilla Ch2\'s */\n'
          '    FADI(16) /* fade the scenic BG out */\n'
@@ -587,12 +577,9 @@ def inject_ch02(campaign, verbose=True):
     script = _replace_brace_block(
         script, 'EventScr_Ch3_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
-        + chwinga_gifts +               # per-survivor charm-gifts (read while units are loaded)
-        '    REMOVEPORTRAITS\n'
-        '    BACG(%s) /* Targos square (placeholder BG; #22 polish) */\n'
-        '    FADU(16)\n'
-        '    BROWNBOXTEXT(0x%X, 8, 8) /* "Targos" card */\n'
-        % (CH02_ENDING_BG, CH02_ENDING_CARD_MSG)
+        + chwinga_gifts               # per-survivor charm-gifts (read while units are loaded)
+        + backdrop(CH02_ENDING_BG, 'Targos square (placeholder BG; #22 polish)',
+                   card=(CH02_ENDING_CARD_MSG, 'Targos'))
         + end_text_calls +
         '    FADI(16) /* fade the town out */\n'
         '    MNC2(0x%X) /* -> ch03 "The Termalaine Mine", hosted on chapter slot 4 (inject_ch03) */\n'
@@ -610,7 +597,6 @@ def inject_ch02(campaign, verbose=True):
     #    Ch3 scenes are gone); 0x993/0x994 are LIVE battle quotes and are NOT in the pool.
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
     # The two Targos hut visits. One `visit_text` entry per BOX (ch04's lesson: a flowed
     # scalar reflows at the pixel budget and buttons mid-sentence), each over BG_NORMAL_VILLAGE.
     # Glimmerfrost speaks with the green chwinga bust; the east hut takes a villager mug.
@@ -631,20 +617,15 @@ def inject_ch02(campaign, verbose=True):
     # Boss/miniboss ride vanilla slots (Bazba/Bone) -- rename their name plates to ours,
     # or the vanilla "Bazba"/"Bone" leaks on the unit window + death quote (cf. inject_ch01,
     # which renames its Breguet boss slot). display_name uses the YAML fe_name (<=12).
-    set_message_body(lines, vanilla_name_text_id(CH02_BOSS_SLOT),
-                     name_message_body(display_name(halvar)))
-    set_message_body(lines, vanilla_name_text_id(CH02_MINIBOSS_SLOT),
-                     name_message_body(display_name(grukk)))
+    write_nameplate(lines, CH02_BOSS_SLOT, halvar)
+    write_nameplate(lines, CH02_MINIBOSS_SLOT, grukk)
     # VANILLA'S OWN WORDING, restored 2026-07-31 (Nicolas: "it should never have been altered
     # in the first place"). FE8 never prints "rout" as an objective -- its whole objective
     # vocabulary is Defeat enemy / Defeat boss / Defeat all monsters / Seize gate / Seize throne
     # / Survive, and the game's only uses of the word are "Route +/-" on the world map and
     # "en route" in prose. "Rout" is FE *community* vocabulary, and importing it also overran a
     # window vanilla had sized for its own words.
-    set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat all monsters'))
-    set_message_body(lines, host['goal']['windowTextId'],
-                     goal_window_body('Defeat enemy'))
+    write_frame_texts(lines, host, chap, 'Defeat all monsters', 'Defeat enemy')
     set_message_body(lines, CH02_OPENING_CARD_MSG, name_message_body(op_card))
     _emit_scene_beats(lines, CH02_OPENING_MSGS, op_beats, cut_fid, op_home)
     # The turn-1 scene: one portrait box per line -- RBG, Pinky, then Halvar's three-box bark.
@@ -661,12 +642,6 @@ def inject_ch02(campaign, verbose=True):
         'halvar', [halvar['death_quote']], ('[OpenMidRight]', _fid_tag(CH02_BOSS_SLOT))))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-
-    # 6a. Title card image (the intro/status banner is a 4bpp image, not text) -- "Ch.2:
-    #     <title>" composed from vanilla glyphs (gen_chapter_title reads the source cards
-    #     from HEAD, so inject_ch01 overwriting chap_title_2.png first doesn't disturb the
-    #     "Ch.2:" cut).
-    _write_chapter_title_card(host, 'Ch.2: ' + chap['title'])
 
     if verbose:
         print('  ch02 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '

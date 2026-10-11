@@ -49,6 +49,7 @@ MAP_SPRITES = 'tools/inject/map_sprites.py'   # PURPLE_BANK_BLANKERS
 HARNESS = 'tools/playtest/harness.lua'
 # A guarded tool (tools/**, not a test, not the injector) to plant a bad line in.
 TOOL = 'tools/map_donor.py'
+CH06_INJECTOR = 'tools/inject/chapters/ch06.py'
 ENGINE_PATCH = 'engine/patches/0001-patch-player-start-cursor-guard.patch'
 # Every file a canary doctors OR reads to aim its fault, spelled out: check.py reads it with
 # literal_eval to decide when the pre-commit hook must run the canaries, since an edit here
@@ -64,7 +65,7 @@ CANARY_FILES = (
     'docs/decisions/0297-the-injector-is-every-file-of-it-and-has-one-source-reader.md',
     'fireemblem8u/include/bmsave.h', 'tools/build_campaign.py',
     'engine/patches/0001-patch-player-start-cursor-guard.patch',
-    'tools/inject/map_sprites.py',
+    'tools/inject/chapters/ch06.py', 'tools/inject/map_sprites.py',
     'tools/map_donor.py', 'tools/map_placement_preview.py', 'tools/playtest/ch06.lua',
     'tools/playtest/controller.lua', 'tools/playtest/harness.lua',
     'tools/playtest/matrix.yaml',                # READ by c_rom_configs to pick its env
@@ -298,6 +299,12 @@ def c_decomp_git_env():
         return run(check.check_decomp_git_calls_strip_the_env)
 
 
+def c_chapter_job_copies():
+    # a chapter re-declaring the shared enemy-row emitter under its own prefix
+    with doctored({CH06_INJECTOR: append('\n\ndef ch06_enemy_rows(chap):\n    return []\n')}):
+        return run(check.check_no_chapter_copies_of_shared_jobs)
+
+
 def c_shadowed_definitions():
     with doctored({TOOL: append('\n\ndef our_layout_labels():\n    pass\n')}):
         return run(check.check_no_shadowed_definitions)
@@ -479,6 +486,7 @@ CANARIES = {
     'check_rescue_fuse_forecast': (c_rescue_fuse_forecast, 'declared_fuse 99', 'decomp'),
     'check_decomp_git_calls_strip_the_env': (c_decomp_git_env, 'map_donor.py', None),
     'check_no_shadowed_definitions': (c_shadowed_definitions, 'our_layout_labels', None),
+    'check_no_chapter_copies_of_shared_jobs': (c_chapter_job_copies, 'ch06_enemy_rows', None),
     'check_rom_configs_reach_the_build': (c_rom_configs, 'Makefile', None),
     'check_playtest_matrix': (c_playtest_matrix, 'canary_unlisted', None),
     'check_verdict_scenarios_are_guarded': (c_verdict_guarded, 'press', None),

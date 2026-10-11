@@ -53,6 +53,20 @@ def _ch05_ending(chap):
     return inject.chapters.ch05.ch05_ending_script(chap, 'CHARACTER_ARTUR', 'CHARACTER_MARISA')
 
 
+def location_events(chap):
+    """ch05's Location list, through the shared builder with ch05's slots, shops and flags."""
+    m = inject.chapters.ch05
+    return inject.villages.chapter_location_events(chap, m.CH05_VILLAGE_SLOTS, m.CH05_SHOPS,
+                                                   flags=m.CH05_VILLAGE_FLAGS)
+
+
+def enemy_rows(chap, **kwargs):
+    """ch05's enemy rows, through the shared emitter with ch05's own ids and pid rule."""
+    m = inject.chapters.ch05
+    return inject.units.enemy_rows(chap, m.CH05_CLASS_IDS, m.CH05_ITEM_IDS, m.ch05_enemy_pid,
+                                   **kwargs)
+
+
 class Ch05EruptionWarning(unittest.TestCase):
     """The turn-2 race warning belongs to ch05's HOST block, not its vanilla-Ch5 twin.
 
@@ -852,7 +866,7 @@ class Ch05ArrivalSceneAndTheNoLupinBranch(unittest.TestCase):
         the two must be the same code; if they ever diverge, one of them is a second mechanism."""
         strip = lambda c: [re.sub(r'/\*.*?\*/', '', l).rstrip() for l in c.split('\n')
                            if 'CHECK_ALIVE' not in l and 'CHECK_EVENTID' not in l]
-        self.assertEqual(strip(inject.chapters.ch04.branch_on_flag('EVFLAG_TMP(9)', '    A\n', '    B\n')),
+        self.assertEqual(strip(inject.scenes.branch_on_flag('EVFLAG_TMP(9)', '    A\n', '    B\n')),
                          strip(inject.scenes.branch_on_check_alive('CHARACTER_X', '    A\n', '    B\n')))
 
     def test_the_beginning_script_picks_the_arm_around_the_arrival_text(self):
@@ -1546,7 +1560,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         do not fit it, while a BACG owns all 240x160 and has no envelope at all."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                           inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
+                                           inject.chapters.ch05.CH05_PARTY_CAMERA)
         self.assertIn('BACG(%s)' % inject.chapters.ch05.CH05_MOOSE_BELLOW_BG, block)
         self.assertIn((inject.chapters.ch05.CH05_MOOSE_BELLOW_BG, 'bg_WhiteMoose', '{Nicolas}'), inject.backgrounds.CAMPAIGN_BGS)
         # REMOVEPORTRAITS does double duty: it re-arms the BACG load mode (without it the BG
@@ -1575,7 +1589,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         the chapter, so the ordering here is load-bearing rather than tidy."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                           inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
+                                           inject.chapters.ch05.CH05_PARTY_CAMERA)
         # The ANIMAL first, then the weight under it. Vanilla names almost none of its ~340
         # SFX, so the cry was found by asking what a CREATURE plays rather than by reading the
         # song table: `banim_code_sound_mauthedoog_roar` is 0x75, commented "low cry", and the
@@ -1635,7 +1649,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         0x9D2, ch05's one spare. The block is now exactly spent; do not assume slack."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                           inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
+                                           inject.chapters.ch05.CH05_PARTY_CAMERA)
         bellow = block[block.index('REMOVEPORTRAITS'):block.index('MOVE_DEFINED')]
         for texty in ('Text_BG', 'TEXTSHOW', 'TEXTSTART'):
             self.assertNotIn(texty, bellow, 'the IMAGE itself carries no text')
@@ -1645,7 +1659,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         *moose runs* -> meesmickle quip"."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                           inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
+                                           inject.chapters.ch05.CH05_PARTY_CAMERA)
         self.assertLess(block.index('TEXTSHOW('), block.index('BACG('), 'question, then bellow')
         self.assertLess(block.index('BACG('), block.index('MOVE_DEFINED'), 'bellow, then run')
         self.assertLess(block.index('MOVE_DEFINED'), block.index('TEXTSHOW(0x%X)' % inject.chapter_ids.CH05_MOOSE_QUIP_MSG), 'run, then quip')
@@ -1784,7 +1798,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         neither is ever on screen."""
         script = self._script()
         pen, start, _route = inject.chapters.ch05.ch05_moose_station(self._chap())
-        party = inject.chapters.ch05.ch05_party_camera_tile(self._chap())
+        party = inject.chapters.ch05.CH05_PARTY_CAMERA
         put = script.index('MOVE(0xffff, %s, %d, %d)' % (inject.chapter_ids.CH05_MOOSE_PID, *start))
         back = script.index('MOVE(0xffff, %s, %d, %d)' % (inject.chapter_ids.CH05_MOOSE_PID, *pen))
         self.assertLess(put, script.index('CAMERA(%d, %d)' % start),
@@ -1793,7 +1807,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         # the snap back at the end. That is what keeps it off screen.
         beat = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                           inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                          inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
+                                          inject.chapters.ch05.CH05_PARTY_CAMERA)
         self.assertEqual(1, beat.count('MOVE(0xffff'), 'only the snap back lives in the beat')
         self.assertIn('MOVE(0xffff, %s, %d, %d)' % (inject.chapter_ids.CH05_MOOSE_PID, *pen), beat)
         self.assertLess(script.index('REMA', script.index('TEXTSHOW(0x%X)' % inject.chapter_ids.CH05_MOOSE_QUIP_MSG)), back,
@@ -1827,7 +1841,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         `StartTalkOpen` anchors it to the speaking FACE SLOT."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                           inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
+                                           inject.chapters.ch05.CH05_PARTY_CAMERA)
         self.assertNotIn('CUMO_CHAR', block)
         self.assertIn('CUMO_AT', block)
 
@@ -1838,9 +1852,9 @@ class Ch05TheMooseCharges(unittest.TestCase):
         was whatever `LOMA` left behind. Vanilla pairs the two ahead of its own 0x9C4."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                           inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
+                                           inject.chapters.ch05.CH05_PARTY_CAMERA)
         _pen, start, _route = inject.chapters.ch05.ch05_moose_station(self._chap())
-        party = inject.chapters.ch05.ch05_party_camera_tile(self._chap())
+        party = inject.chapters.ch05.CH05_PARTY_CAMERA
         for tile in (start, party):
             self.assertIn('CAMERA(%d, %d)' % tile, block)
             self.assertLess(block.index('CAMERA(%d, %d)' % tile),
@@ -1853,8 +1867,8 @@ class Ch05TheMooseCharges(unittest.TestCase):
         hides the snap back: the moose's pen is off the bottom of that view."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                           inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
-        party = inject.chapters.ch05.ch05_party_camera_tile(self._chap())
+                                           inject.chapters.ch05.CH05_PARTY_CAMERA)
+        party = inject.chapters.ch05.CH05_PARTY_CAMERA
         self.assertLess(block.index('REMA'), block.index('CAMERA(%d, %d)' % party),
                         'the bubble is down before the cut')
 
@@ -1864,7 +1878,7 @@ class Ch05TheMooseCharges(unittest.TestCase):
         open bubble. The frame goes where the LINE is about, and stays there until REMA."""
         block = inject.chapters.ch05.ch05_moose_charge_block(inject.chapter_ids.CH05_MOOSE_PID,
                                            inject.chapters.ch05.ch05_moose_station(self._chap()),
-                                           inject.chapters.ch05.ch05_party_camera_tile(self._chap()))
+                                           inject.chapters.ch05.CH05_PARTY_CAMERA)
         _pen, start, _route = inject.chapters.ch05.ch05_moose_station(self._chap())
         head = block[:block.index('REMA')]
         self.assertEqual(1, head.count('CUMO_AT'))
@@ -1875,11 +1889,12 @@ class Ch05TheMooseCharges(unittest.TestCase):
         nine start tiles 1:1. A re-paint that moved the pocket would leave the last shot before
         turn 1 holding on an empty corner, silently."""
         chap = self._chap()
-        self.assertEqual((5, 18), inject.chapters.ch05.ch05_party_camera_tile(chap))
+        frame = inject.chapters.ch05.CH05_PARTY_CAMERA
+        self.assertEqual((5, 18), inject.scenes.party_camera_tile(chap, frame))
         self.assertIn([5, 18], chap['deployment']['deploy_slots'])
         chap['deployment']['deploy_slots'] = [[0, 0]]
         with self.assertRaises(SystemExit):
-            inject.chapters.ch05.ch05_party_camera_tile(chap)
+            inject.scenes.party_camera_tile(chap, frame)
 
     # ── placement in the beginning script ──────────────────────────────────────
     def test_the_debug_boot_lands_ON_the_beat_and_skips_the_approved_footage(self):
@@ -1999,7 +2014,7 @@ class Ch05ArenaTutorial(unittest.TestCase):
 
     def test_the_misc_list_fires_once_on_exactly_the_arena_tile(self):
         self.assertEqual('EVFLAG_TMP(13)', inject.chapters.ch05.CH05_ARENA_TUTORIAL_FLAG)
-        location = inject.chapters.ch05.ch05_location_events(self._chap())
+        location = location_events(self._chap())
         misc = inject.chapters.ch05.ch05_misc_events()
         area = ('AREA(%s, %s, 12, 6, 12, 6)'
                 % (inject.chapters.ch05.CH05_ARENA_TUTORIAL_FLAG, inject.chapters.ch05.CH05_ARENA_TRIGGER_SCRIPT))
@@ -2046,7 +2061,7 @@ class PerPositionAiReachesTheEmittedRows(unittest.TestCase):
 
     def test_ch05_tomb_reavers_emit_three_distinct_behaviours(self):
         chap = self._chap('ch05')
-        rows = '\n'.join(inject.chapters.ch05.ch05_enemy_rows(chap, exclude=('sahnar',)))
+        rows = '\n'.join(enemy_rows(chap, exclude=('sahnar',)))
         reaver_ais = re.findall(r'tomb-reaver -- .*?\n(?:.*?\n)*?\s*\.ai = (\{[^}]*\})',
                                 rows)
         self.assertEqual(8, len(reaver_ais), 'expected eight tomb-reavers')
@@ -2095,7 +2110,7 @@ class Ch05VillageRaidRace(unittest.TestCase):
     def test_the_location_list_arms_every_reliquary_with_its_flag(self):
         """Declaring the flags is not wiring them. The Location list is the only place the
         engine reads them, and it shipped `Village(0, ..)` for all four."""
-        body = inject.chapters.ch05.ch05_location_events(self._chap())
+        body = location_events(self._chap())
         for vid, flag in inject.chapters.ch05.CH05_VILLAGE_FLAGS.items():
             self.assertIn('Village(%s, %s,' % (flag, inject.chapter_ids.CH05_VILLAGE_SLOTS[vid][0]), body)
         self.assertNotIn('Village(0,', body, 'an unflagged site cannot be raided or counted')
@@ -2169,7 +2184,7 @@ class Ch05VillageRaidRace(unittest.TestCase):
                              'what its donor carries' % wave['id'])
 
     def test_a_raider_row_carries_the_pillage_ai_into_the_table(self):
-        rows = '\n'.join(inject.chapters.ch05.ch05_enemy_rows(self._chap(), arrives_turn=2, exclude=('sahnar',)))
+        rows = '\n'.join(enemy_rows(self._chap(), arrives_turn=2, exclude=('sahnar',)))
         self.assertIn('.ai = {0x0, 0x4, 0x9, 0x0},', rows)
 
     # -- the payout: vanilla's Guiding-Ring-on-all-four, which is why the flags exist ---------

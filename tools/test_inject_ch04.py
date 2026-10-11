@@ -25,6 +25,7 @@ import inject.reskins
 import inject.scenes
 import inject.terrain
 import inject.text
+import inject.units
 import inject.villages
 import inject.warm
 import gen_chapter_title
@@ -34,6 +35,13 @@ from inject import source as injector  # the injector's source, every file of it
 # Read the COMMITTED decomp, not the working tree -- the build overwrites donor portrait
 # slots (Gilliam/Neimi/Moulder/Vanessa), so a working-tree read would be non-hermetic.
 VANILLA = inject.decomp.vanilla_decomp_text('src/data_characters.c')
+
+
+def enemy_rows(chap, **kwargs):
+    """ch04's enemy rows, through the shared emitter with ch04's own ids and pid rule."""
+    m = inject.chapters.ch04
+    return inject.units.enemy_rows(chap, m.CH04_CLASS_IDS, m.CH04_ITEM_IDS, m.ch04_enemy_pid,
+                                   **kwargs)
 
 
 class Ch04RuntimeHost(unittest.TestCase):
@@ -89,9 +97,9 @@ class Ch04RuntimeHost(unittest.TestCase):
         # Realigned 2026-07-21 to the vanilla-Ch4 twin: 10 monsters-only line, the turn-2
         # wolf-pack reveal (6), and two turn-3 reinforcement packs (revenant 4 + bonewalker 3).
         chap = self._chap()
-        self.assertEqual(len(inject.chapters.ch04.ch04_enemy_rows(chap)), 10)
-        self.assertEqual(len(inject.chapters.ch04.ch04_enemy_rows(chap, arrives_turn=2)), 6)
-        self.assertEqual(len(inject.chapters.ch04.ch04_enemy_rows(chap, arrives_turn=3)), 7)
+        self.assertEqual(len(enemy_rows(chap)), 10)
+        self.assertEqual(len(enemy_rows(chap, arrives_turn=2)), 6)
+        self.assertEqual(len(enemy_rows(chap, arrives_turn=3)), 7)
 
     # -- Stage 2b: the turn-2 wolf-pack reveal + the Marty->Lupin parley (in-place) ---------
     def _lupin(self):
@@ -117,7 +125,7 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_turn2_reveal_holds_the_difficulty_parity_count(self):
         # The YAML wave stays 6 for the difficulty read (make difficulty CH=ch04); the
         # 5-generics-plus-Lupin split is injector-side only, so parity is unchanged.
-        self.assertEqual(len(inject.chapters.ch04.ch04_enemy_rows(self._chap(), arrives_turn=2)), 6)
+        self.assertEqual(len(enemy_rows(self._chap(), arrives_turn=2)), 6)
         self.assertEqual(len(inject.chapters.ch04.ch04_turn2_reveal_rows(self._chap(), self._lupin())), 6)
 
     def test_each_generic_wolf_gets_its_own_pid(self):
@@ -213,7 +221,8 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_ch04_wires_its_village_where_vanilla_ch4_did(self):
         # vanilla Ch4: Village(0, EventScr_089F1BD8, 8, 2) -- the ITEM village (the other, at
         # (1,11), is vanilla's recruit village, whose role the Lupin parley took over).
-        body = inject.chapters.ch04.ch04_location_events(self._chap())
+        body = inject.villages.chapter_location_events(
+            self._chap(), inject.chapters.ch04.CH04_VILLAGE_SLOTS)
         self.assertIn('Village(0, %s, 8, 2)' % inject.chapter_ids.CH04_VILLAGE_SCRIPT, body)
         self.assertTrue(body.rstrip().endswith('END_MAIN\n}'))
 
@@ -334,7 +343,8 @@ class Ch04RuntimeHost(unittest.TestCase):
         Village(0, .., 1, 11) -- and we shipped only the axe one. The cottage at (1,11) stood
         on visitable terrain with no Location entry, so FE8 offered no Visit at all: the player
         saw a house they could not enter."""
-        body = inject.chapters.ch04.ch04_location_events(self._chap())
+        body = inject.villages.chapter_location_events(
+            self._chap(), inject.chapters.ch04.CH04_VILLAGE_SLOTS)
         self.assertIn('Village(0, %s, 8, 2)' % inject.chapter_ids.CH04_VILLAGE_SCRIPT, body)
         self.assertIn('Village(0, %s, 1, 11)' % inject.chapter_ids.CH04_COTTAGE_SCRIPT, body)
         self.assertTrue(body.rstrip().endswith('END_MAIN\n}'))
@@ -446,9 +456,9 @@ class Ch04RuntimeHost(unittest.TestCase):
         self.assertIn('{CHARACTER_SETH, 0xFF, %d}' % inject.hosts.CH04_HOST_INDEX, entries)
 
     def test_roster_uses_the_vanilla_monster_classes_and_weapons(self):
-        rows = '\n'.join(inject.chapters.ch04.ch04_enemy_rows(self._chap()) +
-                         inject.chapters.ch04.ch04_enemy_rows(self._chap(), arrives_turn=2) +
-                         inject.chapters.ch04.ch04_enemy_rows(self._chap(), arrives_turn=3))
+        rows = '\n'.join(enemy_rows(self._chap()) +
+                         enemy_rows(self._chap(), arrives_turn=2) +
+                         enemy_rows(self._chap(), arrives_turn=3))
         # The twin's own classes/weapons: Mogall (evil eye), melee Revenant (rotten claw),
         # melee Bonewalker (iron sword line / iron lance pack), Entombed (fetid claw), plus
         # the Mauthe Doog fiction swap. NOT the drifted bow-skeleton "phantom arrows".
@@ -463,7 +473,7 @@ class Ch04RuntimeHost(unittest.TestCase):
 
     def test_reinforcement_vulnerary_has_exactly_one_dropper(self):
         # The dropping Revenant is the turn-3 area wave (mirrors vanilla Ch4's dropping revenant).
-        rows = '\n'.join(inject.chapters.ch04.ch04_enemy_rows(self._chap(), arrives_turn=3))
+        rows = '\n'.join(enemy_rows(self._chap(), arrives_turn=3))
         self.assertEqual(rows.count('.itemDrop = 1'), 1)
         self.assertEqual(rows.count('ITEM_VULNERARY'), 1)
 
@@ -525,14 +535,14 @@ class Ch04Stage4Scenes(unittest.TestCase):
     def test_the_branch_emits_both_arms_and_converges(self):
         """branch_on_flag is the vanilla ch19a idiom: CHECK_EVENTID -> BEQ to the fallback
         arm, the set-arm GOTOs past it, and both converge on a shared LABEL."""
-        c = inject.chapters.ch04.branch_on_flag('EVFLAG_TMP(9)', '    SET\n', '    CLEAR\n')
+        c = inject.scenes.branch_on_flag('EVFLAG_TMP(9)', '    SET\n', '    CLEAR\n')
         self.assertIn('CHECK_EVENTID(EVFLAG_TMP(9))', c)
         self.assertIn('BEQ(0x0, EVT_SLOT_C, EVT_SLOT_0)', c)
         self.assertLess(c.index('SET'), c.index('LABEL(0x0)'))
         self.assertLess(c.index('LABEL(0x0)'), c.index('CLEAR'))
         self.assertLess(c.index('CLEAR'), c.index('LABEL(0x1)'))
         # label_base keeps concurrent branches from colliding
-        self.assertIn('LABEL(0x4)', inject.chapters.ch04.branch_on_flag('F', '', '', label_base=4))
+        self.assertIn('LABEL(0x4)', inject.scenes.branch_on_flag('F', '', '', label_base=4))
 
     # ── #198 review guards ─────────────────────────────────────────────────────
     def test_every_hosted_chapter_declares_its_own_goal_ids(self):

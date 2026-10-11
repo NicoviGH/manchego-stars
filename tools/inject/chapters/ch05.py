@@ -25,29 +25,28 @@ from inject.maps import (
     _drawn_block, _inject_tile_changes, _map_changes_tileset, _register_chapter_map,
     _register_tileset, _snowy_metatile_for, TILESET_STEMS)
 from inject.messages import assert_message_ids_unique
-from inject.paths import (
-    CH05_EVENTINFO_H, CH05_EVENTSCRIPT_H, CH5_EVENTSCRIPT_H, CP_DATA_C, PORTRAIT_DIR,
-    TEXTS_TXT)
+from inject.paths import CH05_EVENTINFO_H, CH05_EVENTSCRIPT_H, CP_DATA_C, PORTRAIT_DIR, TEXTS_TXT
 from inject.event_scripts import assert_event_scripts_defined, declare_event_script
 from inject.recruit import (
     assert_custom_art_pid_wired, on_map_talk_recruits, parley_recruiters, talk_recruit_wiring)
 from inject.scenes import (
     _make_fid, _prepend_battle_quote, _prepend_defeat_quote, _split_event_beats, _stage_beat,
-    _write_chapter_title_card, battle_quote_pair, boss_quote_message, branch_on_check_alive,
-    defeat_quote_row, split_on_stage_cut, variant_beat)
+    backdrop, battle_quote_pair, boss_quote_message, branch_on_check_alive, debug_boot_script,
+    defeat_boss_goal, defeat_quote_row, ending_call, party_camera_tile, split_on_stage_cut,
+    variant_beat, write_frame_texts)
 from inject.terrain import (
     _class_terrain_move_costs, _map_terrain_grid, assert_scripted_move_reachable, reachable_tiles,
     reda_route_move)
 from inject.text import (
-    _fe_dialogue_text, _fid_tag, _script_box_count, _script_to_message, dev_placeholder_scene,
-    goal_window_body, name_message_body, SCRIPT_DIRECTIVES, set_message_body)
+    dev_placeholder_scene, _fe_dialogue_text, _fid_tag, _script_box_count, SCRIPT_DIRECTIVES,
+    _script_to_message, set_message_body)
 from inject.units import (
-    _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry,
-    _items_with_drop_last, chapter_label_constant, declare_unit_table,
-    enemy_ai_initialiser, safe_ai_clients)
+    _ally_unit_entry, chapter_label_constant, declare_unit_table, _deploy_cap_entries,
+    enemy_ai_initialiser, enemy_rows, safe_ai_clients)
 from inject.villages import (
-    assert_village_gifts_match_vanilla, assert_village_tiles_visitable, DEFAULT_VILLAGE_SPEAKER,
-    location_events, save_all_bonus_script, village_boxes, village_reward_item, village_script)
+    assert_village_gifts_match_vanilla, assert_village_tiles_visitable, chapter_location_events,
+    DEFAULT_VILLAGE_SPEAKER, save_all_bonus_script, village_boxes, village_reward_item,
+    village_script)
 
 
 # The portrait podiums in SCREEN order, left to right (tag codes in tools/textencode/msg_list.txt:
@@ -559,9 +558,7 @@ def ch05_ending_script(chap, basil_char, sahnar_char):
             % CH05_ENDING_LOST_MSG)
     return ('{\n'
             '    FADI(16) /* fade the hollow out */\n'
-            '    REMOVEPORTRAITS\n'
-            '    BACG(%s) /* the tomb face, the backdrop the chapter opened on */\n'
-            '    FADU(16)\n' % CH05_ENDING_BG
+            + backdrop(CH05_ENDING_BG, 'the tomb face, the backdrop the chapter opened on')
             + branch_on_check_alive(basil_char, alive, lost,
                                     label_base=CH05_ENDING_BASIL_LABEL_BASE)
             + save_all_bonus_script(flags, CH05_ITEM_IDS[chap['economy']['save_all_bonus']])
@@ -598,13 +595,6 @@ def ch05_map_changes(chap, maps_dir):
                  '%s visited' % v['id'])
                 for v in villages]
     return changes
-
-
-def ch05_location_events(chap):
-    """ch05's Location list: the four reliquaries and the elven store."""
-    return location_events(chap.get('villages', []),
-                           {vid: slot[0] for vid, slot in CH05_VILLAGE_SLOTS.items()},
-                           CH05_SHOPS, flags=CH05_VILLAGE_FLAGS)
 
 
 def ch05_misc_events():
@@ -802,36 +792,12 @@ def assert_escort_safe_ai_has_one_client(ai_bytes):
 
 
 
-def ch05_enemy_rows(chap, arrives_turn=None, exclude=()):
-    """One UnitDefinition row per authored position for a ch05 deployment wave.
-
-    `arrives_turn=None` selects the turn-1 line; a number selects that reinforcement wave.
-    `exclude` drops enemies by id (Sahnar rides turn 2 but LOADs from her own table, so the
-    wake beat can address her alone). The boss and the moose each take a unique pid so their
-    gDefeatTalkList entries key to them and nothing else; everything else is generic trash.
-    """
-    rows = []
-    for enemy in chap['enemy_units']:
-        if enemy.get('arrives_turn') != arrives_turn or enemy['id'] in exclude:
-            continue
-        cls = CH05_CLASS_IDS.for_entry(enemy)
-        items = [CH05_ITEM_IDS[item.get('fe_base') or item['id']]
-                 for item in enemy.get('inventory', [])]
-        drop = enemy.get('item_drop')
-        pid = (CH05_BOSS_PID if enemy.get('is_boss')
-               else CH05_MOOSE_PID if enemy.get('is_miniboss')
-               else CH05_GENERIC_PID)
-        for index, (x, y) in enumerate(enemy['positions']):
-            ai = enemy_ai_initialiser(chap, enemy, index)
-            carried = list(items)
-            dropper = bool(drop) and index == 0
-            if dropper:
-                carried = _items_with_drop_last(carried, CH05_ITEM_IDS[drop])
-            rows.append(_enemy_unit_entry(
-                pid, cls, int(enemy['level']), bool(enemy.get('autolevel')), x, y,
-                ', '.join(carried) or '0', ai,
-                ' /* %s -- %s */' % (enemy['id'], enemy['name']), itemdrop=dropper))
-    return rows
+def ch05_enemy_pid(enemy):
+    """The boss and the moose each take a unique pid so their gDefeatTalkList entries key to
+    them and nothing else; everything else is generic trash."""
+    return (CH05_BOSS_PID if enemy.get('is_boss')
+            else CH05_MOOSE_PID if enemy.get('is_miniboss')
+            else CH05_GENERIC_PID)
 
 
 def ch05_eruption_message(chap):
@@ -1116,21 +1082,10 @@ def ch05_moose_station(chap):
     return pen, tuple(moose['charge_from']), route
 
 
-def ch05_party_camera_tile(chap):
-    """The tile scene 7 cuts back to: vanilla's own `CAMERA(5, 18)` for this same beat.
-
-    Asserted against our `deploy_slots` rather than trusted, because the retile is what makes
-    vanilla's number ours: ch05 lifts Ch5's nine player start tiles 1:1, so (5,18) is a tile the
-    party is standing on -- but a future re-paint that moved the pocket would leave this framing
-    an empty corner, silently, with nothing else complaining.
-    """
-    tile = (5, 18)
-    slots = {tuple(s) for s in chap['deployment']['deploy_slots']}
-    if tile not in slots:
-        sys.exit('ERROR: ch05 scene 7 frames the party at %r, which is no longer one of the '
-                 'chapter\'s deploy_slots %s -- the last shot before turn 1 would hold on an '
-                 'empty tile' % (tile, sorted(slots)))
-    return tile
+# The tile scene 7 cuts back to: vanilla's own `CAMERA(5, 18)` for this same beat. ch05 lifts
+# Ch5's nine player start tiles 1:1, so (5,18) is a tile the party stands on; party_camera_tile
+# asserts it still is.
+CH05_PARTY_CAMERA = (5, 18)
 
 
 def ch05_sahnar_station(chap):
@@ -1385,16 +1340,12 @@ def ch05_opening_backdrop_block():
                           + '    FADU(16) /* a separate moment, same place */\n')
         scenes.append('    Text(0x%X) /* %d -- %s */\n' % (msg, i + 1, what))
     _slot, arrival_msg, _boxes, arrival_what = CH05_ARRIVAL_SLOT
-    return ('    REMOVEPORTRAITS\n'
-            '    BACG(%s) /* the elven tomb, before the party arrives */\n'
-            '    FADU(16)\n' % CH05_OPENING_BG
+    return (backdrop(CH05_OPENING_BG, 'the elven tomb, before the party arrives')
             + ''.join(scenes)
             + '    MUSCMID(SONG_SILENT) /* the plotters\' music ends with the tomb */\n'
               '    FADI(16) /* fade the tomb out; the party arrives elsewhere */\n'
-              '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() reset it to TEXTSTART) */\n'
-              '    BACG(%s) /* CUT to the ridge above the hollow */\n'
-              '    MUSC(SONG_ADVANCE) /* the party arrives: vanilla Ch5\'s march */\n'
-              '    FADU(16)\n' % CH05_ARRIVAL_BG
+            + backdrop(CH05_ARRIVAL_BG, 'CUT to the ridge above the hollow', rearm=True,
+                       cue='    MUSC(SONG_ADVANCE) /* the party arrives: vanilla Ch5\'s march */\n')
             + branch_on_check_alive(
                 CH05_LUPIN_CHARACTER,
                 '    Text(0x%X) /* 4 -- %s */\n' % (arrival_msg, arrival_what),
@@ -1456,22 +1407,17 @@ def ch05_moose_debug_script(chap, seed_load):
     `--ch05-boot` is a prerequisite and not a nicety: without its seed there is no party, and
     without prep nothing else would place one.
     """
-    if not seed_load:
-        sys.exit('ERROR: --ch05-moose needs --ch05-boot -- it skips Preparations, so the boot '
-                 'seed is the only thing that puts a party on the map')
-    return ('{\n'
-            '    MUSC(SONG_DISTANT_ROADS) /* scene 7\'s cue, so the boot hears what ships */\n'
-            '    SVAL(EVT_SLOT_B, 0x0)\n'
-            '    LOMA(0x%X) /* build the ch05 map fresh */\n' % CH05_HOST_INDEX
-            + '    LOAD1(0x1, %s) /* the 16 risen tomb-guard -- the MOOSE is one of them */\n'
-              '    ENUN\n' % CH05_LINE_TABLE
-            + seed_load
-            + ch05_moose_to_corner(CH05_MOOSE_PID, ch05_moose_station(chap)[1])
-            + '    FADU(16) /* no prep prologue to inherit a fade from -- and it comes AFTER\n'
-              '                the reposition above, so that is never on screen */\n'
-            + ch05_moose_charge_block(CH05_MOOSE_PID, ch05_moose_station(chap),
-                                      ch05_party_camera_tile(chap))
-            + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
+    return debug_boot_script(
+        '--ch05-moose', CH05_HOST_INDEX, seed_load, 'build the ch05 map fresh',
+        music='    MUSC(SONG_DISTANT_ROADS) /* scene 7\'s cue, so the boot hears what ships */\n',
+        before_seed='    LOAD1(0x1, %s) /* the 16 risen tomb-guard -- the MOOSE is one of them */\n'
+                    '    ENUN\n' % CH05_LINE_TABLE,
+        body=ch05_moose_to_corner(CH05_MOOSE_PID, ch05_moose_station(chap)[1])
+        + '    FADU(16) /* no prep prologue to inherit a fade from -- and it comes AFTER\n'
+          '                the reposition above, so that is never on screen */\n'
+        + ch05_moose_charge_block(CH05_MOOSE_PID, ch05_moose_station(chap),
+                                  party_camera_tile(chap, CH05_PARTY_CAMERA, 'ch05 scene 7'))
+        + '    ENUT(8)\n    EVBIT_T(7)\n')
 
 
 def ch05_ending_debug_script(chap, seed_load, arm, basil_char, sahnar_table, sahnar_char):
@@ -1501,10 +1447,6 @@ def ch05_ending_debug_script(chap, seed_load, arm, basil_char, sahnar_table, sah
     operates it blind. `ch05crest` already proves the gating itself, so nothing is lost by not
     exercising the un-paid path here.
     """
-    if not seed_load:
-        sys.exit('ERROR: --ch05-ending needs --ch05-boot -- it skips Preparations, so the boot '
-                 'seed is the only thing left that puts a party on the map, and the ending '
-                 'hands its reward to the party LEADER')
     if arm not in CH05_ENDING_ARMS:
         sys.exit('ERROR: --ch05-ending arm %r is not one of %s'
                  % (arm, ', '.join(CH05_ENDING_ARMS)))
@@ -1522,20 +1464,15 @@ def ch05_ending_debug_script(chap, seed_load, arm, basil_char, sahnar_table, sah
     payout = ''.join('    ENUT(%s) /* %s saved */\n'
                      % (CH05_VILLAGE_FLAGS[v['id']], v['id'])
                      for v in chap.get('villages', []))
-    return ('{\n'
-            '    MUSC(SONG_TENSION)\n'
-            '    SVAL(EVT_SLOT_B, 0x0)\n'
-            '    LOMA(0x%X) /* build the ch05 map fresh */\n' % CH05_HOST_INDEX
-            + seed_load
-            # No Lupin load, and that is not an omission: neither ending branches on him any
-            # more (see CH05_ENDING_MSGS). It DID need one while they did -- he is not in the
-            # boot seed, so a CH05LUPIN=1 ROM would have answered CHECK_ALIVE with 0 and filmed
-            # the no-Lupin arm under the other name. That trap died with the branch.
-            + stage
-            + payout
-            + '    FADU(16) /* the ending opens on a FADI; give it the map to take down */\n'
-              '    CALL(%s) /* ...and it ends on MNTS, so nothing follows */\n'
-              '    ENDA\n}' % CH05_ENDING_SCRIPT)
+    # No Lupin load, and that is not an omission: neither ending branches on him any more (see
+    # CH05_ENDING_MSGS). It DID need one while they did -- he is not in the boot seed, so a
+    # CH05LUPIN=1 ROM would have answered CHECK_ALIVE with 0 and filmed the no-Lupin arm under
+    # the other name. That trap died with the branch.
+    return debug_boot_script(
+        '--ch05-ending', CH05_HOST_INDEX, seed_load, 'build the ch05 map fresh',
+        music='    MUSC(SONG_TENSION)\n',
+        body=stage + payout
+        + ending_call(CH05_ENDING_SCRIPT, '...and it ends on MNTS, so nothing follows'))
 
 
 def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
@@ -1604,7 +1541,7 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
             # Scene 7, and the map begins on its last word. The moose has been standing in the
             # turn-1 line since before prep, so this beat only has to look at it.
             + ch05_moose_charge_block(CH05_MOOSE_PID, ch05_moose_station(chap),
-                                      ch05_party_camera_tile(chap))
+                                      party_camera_tile(chap, CH05_PARTY_CAMERA, 'ch05 scene 7'))
             + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
 
 
@@ -1720,10 +1657,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     seven, so squatting would have meant borrowing Ch6's world-map ENCOUNTER rosters -- and
     the name would have lied either way.
 
-    DEFERRED to follow-up passes: Basil's Talk-recruit prose, the opening/ending cutscenes
-    (dialogue LOCKED in PR #196), and the title-card art. The four reliquary visits and arena
-    tutorial are live. ch05's ending parks on the dev placeholder until ch06 hosts, exactly as
-    ch04's did.
+    The ending lands on the dev placeholder, which `chain('ch05', 'ch06')` turns into the MNC2
+    onward.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH05_CHAPTER_YAML)
@@ -1794,12 +1729,13 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # Sahnar is a turn-1 unit now (#25), so she matches the `arrives_turn: None` selector the
     # line table uses -- but she must stay OUT of it, because she LOADs from her own table at
     # her own beat and the line goes down in one LOAD1 before prep.
-    line_rows = ch05_enemy_rows(chap, exclude=('sahnar',))
+    line_rows = enemy_rows(chap, CH05_CLASS_IDS, CH05_ITEM_IDS, ch05_enemy_pid, exclude=('sahnar',))
     declare_unit_table(CH05_LINE_TABLE, line_rows,
                        'ch05 turn-1 line: the risen tomb-guard, on vanilla Ch5 fighting tiles')
     wave_counts = {}
     for turn in sorted(CH05_WAVE_TABLES):
-        rows = ch05_enemy_rows(chap, arrives_turn=turn, exclude=('sahnar',))
+        rows = enemy_rows(chap, CH05_CLASS_IDS, CH05_ITEM_IDS, ch05_enemy_pid,
+                          arrives_turn=turn, exclude=('sahnar',))
         if not rows:
             sys.exit('ERROR: ch05 declares no enemies arriving on turn %d, but a wave table '
                      'and TurnEventPlayer are wired for it' % turn)
@@ -1810,7 +1746,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # pid is unaddressable, which is exactly what #203 cost ch04's wolf pack. She selects on the
     # turn-1 `arrives_turn: None` now, not the eruption's 2: Ravisin summons her ON SCREEN in
     # scene 3 and she LOADs after the prep CALL, where vanilla LOADs Joshua (#25).
-    sahnar_rows = ch05_enemy_rows(chap, exclude=frozenset(
+    sahnar_rows = enemy_rows(chap, CH05_CLASS_IDS, CH05_ITEM_IDS, ch05_enemy_pid, exclude=frozenset(
         e['id'] for e in chap['enemy_units'] if e['id'] != 'sahnar'))
     if len(sahnar_rows) != 1:
         sys.exit('ERROR: ch05 expects exactly one Sahnar on the turn-1 board, got %d -- she is '
@@ -1917,7 +1853,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         # Location = the four reliquary visits + the elven store. The shops are wired for good (a
         # shop needs no script and no text); the visits own their rewards, and each carries its
         # CH05_VILLAGE_FLAGS event id -- the race (#25).
-        'locationBasedEvents': ch05_location_events(chap),
+        'locationBasedEvents': chapter_location_events(chap, CH05_VILLAGE_SLOTS, CH05_SHOPS,
+                                                       flags=CH05_VILLAGE_FLAGS),
         'characterBasedEvents': sahnar_char_events,
     }, roster=CH05_ALLY_TABLE, scenes=(CH05_BEGINNING_SCRIPT, CH05_ENDING_SCRIPT))
 
@@ -1986,11 +1923,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # 5. Texts + the flagged defeat quote that IS the win trigger.
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
-    set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat ' + (boss.get('fe_name') or boss['name'])))
-    set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
+    write_frame_texts(lines, host, chap, defeat_boss_goal(chap), 'Defeat boss')
     set_message_body(lines, CH05_ERUPTION_MSG, ch05_eruption_message(chap))
     set_message_body(lines, CH05_RAVISIN_DEATH_MSG, ch05_ravisin_death_message(chap))
     set_message_body(lines, CH05_RAVISIN_TAUNT_MSG, ch05_ravisin_taunt_message(chap))
@@ -2015,7 +1948,6 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
             {DEFAULT_VILLAGE_SPEAKER: ('[OpenMidLeft]', fid)}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    _write_chapter_title_card(host, 'Ch.5: ' + chap['title'])
     # Keep the already-proven flag path and make its quote visible now that Ravisin's portrait
     # and host-owned message both exist. SetPidDefeatedFlag still fires EVFLAG_DEFEAT_BOSS;
     # DisplayDefeatTalkForPid now shows the one locked box before the ending AFEV runs.
@@ -2031,19 +1963,3 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH05_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else '', len(line_rows),
                  '/'.join('t%d:%d' % (t, wave_counts[t]) for t in sorted(wave_counts))))
-
-
-
-def chain_ch04_to_ch05():
-    """Advance ch04's authored ending from the dev landing to the now-hosted ch05."""
-    with open(CH5_EVENTSCRIPT_H, encoding='utf-8') as f:
-        script = f.read()
-    landing = dev_placeholder_scene()
-    if script.count(landing) != 1:
-        sys.exit('ERROR: expected exactly one ch04 dev-placeholder landing before ch05 chain')
-    script = script.replace(
-        landing,
-        '    MNC2(0x%X) /* -> ch05 "The Elven Tomb", hosted on slot %d */\n'
-        % (CH05_HOST_INDEX, CH05_HOST_INDEX), 1)
-    with open(CH5_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
-        f.write(script)
