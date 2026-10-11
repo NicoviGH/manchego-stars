@@ -6,36 +6,32 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-10 (Claude): #477 merged (closes #471) -- our busts draw FE8's top corners
-(engine patch 0018), five busts rescaled, Messie's mayor rebuilt with the hat (ADR 0338). Where Nicolas's watch-notes stand is the
-latest #26 comments. **What landed and
-why is in `git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-10 (Claude): #478 merged (closes #26) -- ch06 ends on Messie, the per-chapter
+gold field retired, ch07 takes vanilla Ch7's own layout and Ch8's 10,000-gold gift (ADR 0339). **What landed
+and why is in `git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
 Nothing on a branch. **Next, in order:**
 
-1. **#26 -- `chapter_end` dialogue pass** (pick to bring: the rescued crews pay the 400; music is
-   vanilla Ch6's ending: Victory -> Legacy -> Into the Shadow of Victory), then the
-   `introduces:` ledger claims (Grynsk's Antitoxin, Tali's snow drifts).
-2. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
+1. **#479 -- lift ch04-ch06's copied jobs into shared helpers, BEFORE any ch07 code** (Nicolas:
+   ch07 writes no custom or copied code). One PR, ROM byte-identical; the audit table is the issue.
+2. **#27 -- ch07.** Decisions so far are its 2026-10-10 comments: Ch7Map reskinned, the moat as
+   the harbour, Seize, docks opening forking on flags 0xFC/0xFD, the 10,000 gold in the ending.
+3. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
 
-- **Owed from #477:** nobody has looked at the stat screen's 80x72 face since patch 0018 filled
-  its edge columns. Glance at Braulo's or Wolfram's status page in the next playtest.
+- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
 - `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (party clear-load 1.41, ADR 0042), with x1.4078 /
   x1.4081 measured, so a party-side regression there fails the gate too.
-- The Monte Carlo simulator is #456, parked behind its trigger. ch07's twin re-point is on #27.
+- The Monte Carlo simulator is #456, parked behind its trigger.
 
 ## Chapter work
 
-- **#26 -- ch06's own body.** `make chapter CH=ch06` is its state. The opening and
-  `boss_defeated` are written, wired and filmed (on #470), and Nerra has her taunt and retreat
-  line (#476); `chapter_end` is the scene left.
-  Debug boots: `CH06BOOT=1` (the map) and `CH06BOOT=1 CH06ENDING=1` (straight into Messie).
-- **#27 -- ch07** is reframed by ADR 0332 (Dorbulgruf refuses out of disbelief; Messie's fish
-  tax; his farewell carries the Frostmaiden's orders to the merfolk). Still `status: planned`.
+- **#27 -- ch07** is reframed by ADR 0332 and placed by ADR 0339. Still `status: planned`.
+  `make chapter CH=ch07` is its state.
+- **#24 -- ch04 owes the terrain-bonus lesson** (vanilla Ch4's "stay in the woods"), a dialogue pass.
 - **#335** -- the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).
 
