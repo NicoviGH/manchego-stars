@@ -44,6 +44,7 @@ from inject.chapters.ch03 import inject_ch03
 from inject.chapters.ch04 import inject_ch04
 from inject.chapters.ch05 import inject_ch05, inject_ch05_visit_faces
 from inject.chapters.ch06 import inject_ch06
+from inject.chapters.ch07 import inject_ch07
 from inject.chapters.prologue import inject_prologue
 from inject.crit_flourish import inject_crit_flourish
 from inject.death_quotes import inject_pc_death_quotes
@@ -52,7 +53,7 @@ from inject.engine_patches import (apply_engine_patches, apply_sound_room_auditi
                                    patched_files)
 from inject.hosts import (
     CH01_HOST_INDEX, CH03_HOST_INDEX, CH04_HOST_INDEX, CH05_HOST_INDEX, CH06_HOST_INDEX,
-    PROLOGUE_HOST_INDEX)
+    CH07_HOST_INDEX, PROLOGUE_HOST_INDEX)
 from inject.item_icons import inject_item_icon_pal2, inject_item_icons
 from inject.map_sprites import inject_map_sprites
 from inject.maps import inject_winter_tileset
@@ -97,6 +98,8 @@ FACTS = {
     'appended-messages': 'a message id past vanilla\'s last exists only once its header is '
                          'reserved (inject/message_alloc.py)',
     'ch06-hosted': 'a chain into ch06 points at the slot inject_ch06 hosts',
+    'ch06-landing': "chain_ch06_to_ch07 rewrites the dev-placeholder landing inject_ch06 wrote",
+    'ch07-hosted': 'a chain into ch07 points at the slot inject_ch07 hosts',
 }
 
 
@@ -170,7 +173,7 @@ def _boot(index, **kwargs):
 
 
 BOOT = ('src/bmio.c', 'src/gamecontrol.c', 'src/events/prologue-wm.h')
-BOOT_FLAGS = ('ch01_boot', 'ch03_boot', 'ch04_boot', 'ch05_boot', 'ch06_boot')
+BOOT_FLAGS = ('ch01_boot', 'ch03_boot', 'ch04_boot', 'ch05_boot', 'ch06_boot', 'ch07_boot')
 # The slot 1 sandbox, written over the prologue's event files.
 TEST_CHAPTER = ('src/events/ch1-*',)
 # The #43 opening montage: the lore crawl's subtitle cards, its mural and the drawn world maps.
@@ -301,15 +304,26 @@ STEPS = [
          call=lambda fn, a: fn(a.campaign, boot=a.ch06_boot, ending=a.ch06_ending),
          flags=('ch06_boot', 'ch06_ending'),
          needs=('reskin-classes', 'tileset-labels', 'ch05-hosted'),
-         provides=('ch06-hosted',),
+         provides=('ch06-hosted', 'ch06-landing'),
          writes=_host(7, 'Ch06MaerMonsterMap', 'include/eventcall.h', 'src/cp_data.c',
                       *_tileset('SnowIce'))),
     Step(chain('ch05', 'ch06'), needs=('ch05-landing', 'ch06-hosted'),
          writes=('src/events/ch6-eventscript.h',)),
+    Step(inject_ch07, title='chapter 7 (#27):', scope='chapter:ch07',
+         call=lambda fn, a: fn(a.campaign, boot=a.ch07_boot),
+         flags=('ch07_boot',),
+         needs=('reskin-classes', 'tileset-labels', 'ch06-hosted'),
+         provides=('ch07-hosted',),
+         writes=_host(8, 'Ch07BremenMap', 'include/eventcall.h')),
+    Step(chain('ch06', 'ch07'), needs=('ch06-landing', 'ch07-hosted'),
+         writes=('src/events/ch7-eventscript.h',)),
     # A debug build that is not a chapter boot.
     Step(apply_sound_room_audition, needs=('engine-patches',), flags=('sound_room_audition',),
          when=lambda a: a.sound_room_audition, writes=('src/soundroom.c',)),
     # New Game's target: exactly one of these runs.
+    Step(_configure_boot, title='CH07 BOOT (playtest: New Game -> Bremen, party + militia):',
+         call=_boot(CH07_HOST_INDEX), flags=('ch07_boot',), when=lambda a: a.ch07_boot,
+         writes=BOOT),
     Step(_configure_boot, title='CH06 BOOT (playtest: New Game -> Maer Dualdon, party + merfolk '
                                 '+ boats):',
          call=_boot(CH06_HOST_INDEX), flags=('ch06_boot',), when=lambda a: a.ch06_boot,

@@ -7,7 +7,7 @@ import sys
 from inject.decomp import REPO
 from inject.hosts import (
     CH01_HOST_INDEX, CH02_HOST_INDEX, CH03_HOST_INDEX, CH04_HOST_INDEX, CH05_HOST_INDEX,
-    CH06_HOST_INDEX, hosted_chapters, PROLOGUE_HOST_INDEX)
+    CH06_HOST_INDEX, CH07_HOST_INDEX, hosted_chapters, PROLOGUE_HOST_INDEX)
 from inject.paths import (
     BANIM_BATTLEPARSE_C, BANIM_POINTER_H_TERR, BANIM_TERRAIN_DATA_C, BANIM_TERRAIN_GFX,
     BANIM_TERRAIN_INCBIN_S, CHAPTER_SETTINGS_JSON_PLAT, DATA_TERRAINS_C, VARIABLES_H)
@@ -47,6 +47,7 @@ CHAPTER_BATTLE_TILESETS = {
                                  # lake ice, the prologue's own read. Nothing on this map is
                                  # snow-over-ROCK -- the flat ground IS the frozen lake -- and
                                  # its water fights already take the ice ground by terrain.
+    CH07_HOST_INDEX:     0x15,   # Bremen: snowy-bern again, snow over rock under the peaks
 }
 _PLAT_ICE = {'RIVER', 'SEA', 'LAKE', 'WATER', 'GLACIER', 'SNAG', 'DEEPS', 'SHIP_FLAT',
              'SHIP_WRECK'}

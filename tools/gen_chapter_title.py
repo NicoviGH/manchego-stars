@@ -46,16 +46,20 @@ WORDS = {
     # source either way, exactly as ch05's prefix is (the LETTERS atlas already cuts its
     # 'm' and 'W' out of this card).
     'Ch.6:':     (7, 31, 65),   # "Ch.6: Victims of War" -- vanilla's own chapter prefix
+    # img8 is "Ch.7: Waterside Renvall" -- vanilla Ch7's card, ch07's twin AND the card our
+    # host slot (8) overwrites.
+    'Ch.7:':     (8, 26, 61),   # "Ch.7: Waterside Renvall" -- vanilla's own chapter prefix
     'The':       (0, 74, 96),
 }
 
 # Single letters. Sources: img0 "Prologue: The Fall of Renais",
 # img1 "Ch.1: Escape!", img4 "Ch.4: Ancient Horrors", img7 "Ch.6: Victims of War",
 # img9 "Ch.7: It's a Trap!" (lone 'a' word), img10 "Ch.9: Distant Blade",
-# img87 "Creature Campaign", img6 "Ch.5: The Empire's Reach",
+# img87 "Creature Campaign", img6 "Ch.5: The Empire's Reach", img10 "Ch.9: Distant Blade",
 # img11 "Ch.11: Revolt at Carcino", img16 "Ch.16: Ruled by Madness".
 LETTERS = {
     'A': (4, 71, 80),
+    'B': (10, 125, 134),        # "Blade" -- word-initial B; its last column is shared with the l
     'C': (87, 42, 51),          # "Creature" -- leading C (clean, no left neighbor)
     'D': (10, 78, 87),
     'E': (6, 82, 91),           # "Empire's" -- word-initial E (clean left edge)
@@ -85,6 +89,7 @@ LETTERS = {
 # word: char -> list of (row_slice, col_slice) to zero out.
 SCRUBS = {
     'r': [(slice(0, 4), slice(0, 2)), (slice(4, 5), slice(0, 1))],  # P's shadow
+    'B': [(slice(1, 3), slice(8, 9)), (slice(11, 13), slice(8, 9))],  # the l's serifs
 }
 
 # Vanilla cards center their drawn extent on x ~= 99, not 128 (measured on

@@ -38,7 +38,7 @@ import check
 BUILD_SRC = check._injector().injector_source()
 PREVIEW_SRC = open(os.path.join(check.REPO, 'tools', 'map_placement_preview.py'),
                    encoding='utf-8').read()
-HOSTED = ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06']
+HOSTED = ['prologue', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06', 'ch07']
 
 
 def _rows(text=None, chapters=None, preview=None, hosted=None):
@@ -73,7 +73,7 @@ class TheThreeRoutesAgree(unittest.TestCase):
     def test_every_hosted_chapter_is_actually_compared_on_all_three_routes(self):
         """A guard that compares nothing passes too, so the covered set is asserted."""
         compared = [r['short'] for r in _rows() if len(r['routes']) == 3]
-        self.assertEqual(compared, ['ch00', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06'])
+        self.assertEqual(compared, ['ch00', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05', 'ch06', 'ch07'])
 
     def test_a_build_registering_another_chapters_layout_is_caught(self):
         """The divergence itself: the build loads one map, the gate grades another."""

@@ -5,10 +5,11 @@
 id: ch07-blood-in-bremen
 title: "Blood in Bremen"
 chapter_number: 7
-status: planned                # brainstorm SEED, NOT authoritative: enemy roster/levels/beats are
-                               # re-grounded against vanilla + party data when the slice is reached
-                               # (brainstorming skill digests this). Exempt from the parity gate until then.
+status: active                 # the slice is reached: the force is vanilla Ch7's own, re-dressed
 milestone: M3
+traps:                          # vanilla Ch7's two ballistae, on its own tiles: Bremen's harpoon
+  - {type: ballista, x: 17, y: 8, item: ITEM_BALLISTA_REGULAR}    # launchers (ADR 0339). The
+  - {type: ballista, x: 2, y: 10, item: ITEM_BALLISTA_REGULAR}    # east one is manned (an archer).
 cadence: big_battle_gray        # see docs/CHAPTERS.md — 🟥 (morally gray)
 fe8_base_map: "FE8 Ch7 — Waterside Renvall (its own layout, reskinned)"   # ADR 0339
 parity_reference: "FE8 Ch7"   # the twin is the chapter NUMBER, whatever map it borrows (#459)
@@ -46,62 +47,199 @@ map:
 objective:
   type: seize                            # vanilla Ch7: Seize (9,4), the hall's door (ADR 0339)
   description: "Seize the Town Hall (Dorbulgruf holds the door)"
-  constraint:
-    type: protect_civilians
-    description: "Civilians are 'don't-kill' NPC units — killing them incurs a penalty (gold/reputation)"
+  seize_tile: [9, 4]
 
 win_condition: seize
 lose_condition: all_player_units_defeated
 
+# Vanilla Ch7's own numbers (chapter_settings L07), and its open map: no fog.
+difficulty:
+  tutorial: 4
+  normal: 2
+  difficult: 3
+fog: none
+
 difficulty_note: >
-  Morally gray chapter — the party is the aggressor. The civilian no-kill
-  constraint adds spatial care to an otherwise straightforward fight. Dorbulgruf
-  is a sturdy Warrior-class boss but not a puzzle. Dialogue should sit in the
-  ambiguity, not celebrate.
+  Morally gray chapter -- the party is the aggressor. The fight is vanilla Ch7's: a militia
+  spread over open ground and both piers, two harpoon launchers, and the Speaker on the door.
+  Dialogue should sit in the ambiguity, not celebrate.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
-  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit (TBD). Only the pack direwolves stay non-combat dressing. Positions set in Tiled."
+  deploy_limit: 10              # = vanilla FE8 Ch7's ten (UnitDef_Event_Ch7Ally)
+  start_area: "the west edge, x0-5 y16-19, where vanilla Ch7's party walks in"
+  deploy_slots:                 # vanilla Ch7's own ten: the eight REDA destinations its party walks
+                                # to (REDA_088B6E28..60) in table order, then Franz's and Artur's
+                                # tiles, who stay where they load. The first is Eirika's: the lord tile.
+    - [2, 17]                   # lord tile (vanilla Eirika's)
+    - [5, 16]
+    - [4, 17]
+    - [3, 16]
+    - [3, 18]
+    - [2, 16]
+    - [2, 19]
+    - [1, 18]
+    - [0, 17]
+    - [0, 19]
+  note: "Deployable pool: 7 PCs + Pinky + Baxby (Cav) + Trex (Thief) + Lupin (beast-Cav) + Sahnar (Myr) + Basil (Cleric), capped by deploy_limit. Only the pack direwolves stay non-combat dressing."
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
-# Grounding: Bremen "can muster up to 25 soldiers (tribal warrior stat block) and 2
-# veterans" (book, Bremen p.27). FE-scaled: the 6 guards are that militia; the 2 Hall
-# Knights are the book's 2 veterans.
+# DERIVED, not invented: every row is one of vanilla Ch7's own 19 units (UnitDef_088B6F54) --
+# same tile, level, class, inventory, drop and donor AI -- re-dressed as Bremen's militia. The
+# book's muster ("up to 25 soldiers ... and 2 veterans", Rime p.27) is the flavour; the count
+# and shape are the twin's (ADR 0044).
 enemy_units:
-  - id: bremen-guard
-    name: "Bremen Guard"        # the town militia (book: tribal warriors, FE-scaled from 25)
-    count: 6
-    class: soldier
+  - id: bremen-fisher
+    name: "Fisher"              # the axe block: fishers with gaffs and hatchets
+    count: 3
+    class: fighter              # vanilla: 3x Lv7 Fighter, Steel Axe
     level: 7
-    weapon: iron-lance
-    damage_type: piercing       # flavor label only
-    ai_pattern: defensive
-  - id: bremen-knight
-    name: "Hall Knight"         # the book's 2 Bremen veterans — the real threat besides the boss
+    autolevel: true
+    inventory:
+      - id: steel-axe
+    damage_type: slashing
+    positions: [[17, 6], [16, 19], [18, 19]]
+    donor: [[17, 6], [16, 19], [18, 19]]
+  - id: bremen-fisher-holding
+    name: "Fisher"
     count: 2
-    class: armor-knight         # CLASS_ARMOR_KNIGHT (no plain CLASS_KNIGHT in FE8)
-    level: 8
-    weapon: steel-lance
+    class: fighter              # vanilla: 2x Lv7 Fighter, Iron Axe, holding (AI_B 0)
+    level: 7
+    autolevel: true
+    inventory:
+      - id: iron-axe
+    damage_type: slashing
+    positions: [[1, 8], [19, 8]]
+    donor: [[1, 8], [19, 8]]
+  - id: bremen-guard
+    name: "Bremen Guard"        # the town watch
+    count: 2
+    class: soldier              # vanilla: 2x Lv7 Soldier, Iron Lance
+    level: 7
+    autolevel: true
+    inventory:
+      - id: iron-lance
     damage_type: piercing
-    ai_pattern: hold_position
+    positions: [[8, 11], [10, 17]]
+    donor: [[8, 11], [10, 17]]
+  - id: bremen-guard-slim
+    name: "Bremen Guard"
+    count: 1
+    class: soldier              # vanilla: 1x Lv7 Soldier, Slim Lance
+    level: 7
+    autolevel: true
+    inventory:
+      - id: slim-lance
+    damage_type: piercing
+    positions: [[9, 11]]
+    donor: [9, 11]
+  - id: bremen-veteran
+    name: "Veteran"             # the book's veterans
+    count: 1
+    class: soldier              # vanilla: 1x Lv8 Soldier, Steel Lance
+    level: 8
+    autolevel: true
+    inventory:
+      - id: steel-lance
+    damage_type: piercing
+    positions: [[12, 18]]
+    donor: [12, 18]
+  - id: bremen-sellsword
+    name: "Sellsword"
+    count: 1
+    class: mercenary            # vanilla: 1x Lv8 Mercenary, Iron Sword
+    level: 8
+    autolevel: true
+    inventory:
+      - id: iron-sword
+    damage_type: slashing
+    positions: [[13, 13]]
+    donor: [13, 13]
+  - id: bremen-sellsword-young
+    name: "Sellsword"
+    count: 1
+    class: mercenary            # vanilla: 1x Lv7 Mercenary, Iron Sword
+    level: 7
+    autolevel: true
+    inventory:
+      - id: iron-sword
+    damage_type: slashing
+    positions: [[12, 14]]
+    donor: [12, 14]
+  - id: bremen-mage-fire
+    name: "Mage"
+    count: 1
+    class: mage                 # vanilla: 1x Lv7 Mage, Fire, holding
+    level: 7
+    autolevel: true
+    inventory:
+      - id: fire
+    damage_type: fire
+    positions: [[15, 14]]
+    donor: [15, 14]
+  - id: bremen-mage-ring
+    name: "Mage"
+    count: 1
+    class: mage                 # vanilla: 1x Lv7 Mage, Thunder + Energy Ring (not dropped)
+    level: 7
+    autolevel: true
+    inventory:
+      - id: thunder
+      - id: energy-ring
+    damage_type: lightning
+    positions: [[11, 13]]
+    donor: [11, 13]
+  - id: bremen-mage-west
+    name: "Mage"
+    count: 1
+    class: mage                 # vanilla: 1x Lv7 Mage, Thunder + Pure Water, holding
+    level: 7
+    autolevel: true
+    inventory:
+      - id: thunder
+      - id: pure-water
+    item_drop: pure-water       # vanilla `.itemDrop = 1`: the last item drops
+    damage_type: lightning
+    positions: [[1, 7]]
+    donor: [1, 7]
+  - id: bremen-harpooner
+    name: "Harpooner"           # mans the east harpoon launcher (vanilla's Lv5 ballista archer)
+    count: 1
+    class: archer               # vanilla: 1x Lv5 Archer, Iron Bow, on the (17,8) ballista
+    level: 5
+    autolevel: true
+    inventory:
+      - id: iron-bow
+    damage_type: piercing
+    positions: [[17, 8]]
+    donor: [17, 8]
+  - id: bremen-archer
+    name: "Archer"
+    count: 3
+    class: archer               # vanilla: 3x Lv7 Archer, Iron Bow; two walk out of the hall
+    level: 7
+    autolevel: true
+    inventory:
+      - id: iron-bow
+    damage_type: piercing
+    positions: [[17, 20], [8, 5], [10, 5]]
+    donor: [[17, 20], [8, 5], [10, 5]]
   - id: dorbulgruf
     name: "Dorbulgruf Shalescar"
+    fe_name: "Dorbulgruf"
     is_boss: true
     count: 1
-    class: warrior              # a non-combatant commoner in the book, but his old strength
-    level: 9                    # outlasted his mind — still a formidable axe-Warrior boss.
-    weapon: steel-axe
+    class: cavalier             # vanilla: Murray, Lv12 Cavalier, on the door (9,4)
+    level: 12
+    inventory:
+      - id: steel-sword
+      - id: javelin
+      - id: knight-crest
+    item_drop: knight-crest     # vanilla `.itemDrop = 1`
     damage_type: slashing
-    ai_pattern: hold_position
+    positions: [[9, 4]]
+    donor: [9, 4]
     death_quote: "A monster... for Speaker... You've doomed us all..."   # SEED; his disbelief, to the last
-
-# ── Civilian NPCs (don't-kill) ────────────────────────────────────────────────────
-npc_units:
-  - id: bremen-civilian
-    count: 4
-    behavior: flee_from_combat
-    must_not_be_killed: true
-    penalty_if_killed: { gold: -100, reputation: -1 }
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
@@ -142,6 +280,19 @@ events:
       the merfolk were never told it (ADR 0332).
       The party leaves in a trail of blood to a mixed reception. A town crier mentions that
       Easthaven has heard about Bremen, which seeds ch08's ambush.
+
+  - trigger: visit
+    tile: [1, 15]               # vanilla Ch7's west house: `House(0, EventScr_089F2E6C, 1, 15)`
+    type: house
+    description: >
+      Vanilla Ch7's own house line (MSG 0xA06) until the dialogue pass writes a Bremen
+      villager's.
+  - trigger: visit
+    tile: [17, 21]              # vanilla Ch7's south-east house: `House(0, EventScr_089F2E94, 17, 21)`
+    type: house
+    description: >
+      Vanilla Ch7's own house line (MSG 0xA07) until the dialogue pass writes a Bremen
+      villager's.
 
 # ── Economy ──────────────────────────────────────────────────────────────────────
 # ch07 carries vanilla CH8'S scripted gift: Hayden's 10,000 gold war funds at Ch8's ending,

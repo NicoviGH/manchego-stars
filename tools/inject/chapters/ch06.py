@@ -659,8 +659,8 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     (ch06_messie_messages): the chapter closes on his last line, then records the hulls that came
     home, pays the save-both Bolt and fades on Into the Shadow of Victory (ADR 0339).
 
-    ch06's ending parks on the dev placeholder until ch07 hosts and `chain('ch06', 'ch07')`
-    turns it into the MNC2 onward.
+    ch06's ending writes the dev placeholder, and `chain('ch06', 'ch07')` turns it into the
+    MNC2 onward to ch07.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)
@@ -836,7 +836,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     # docks and the rescued crews open ch07, so after his last line the script only records
     # which hulls came home (ch07's opening forks on it), pays vanilla Ch6's save-both Orion's
     # Bolt with no ceremony (CHECK_ALIVE on both, the popup alone), and fades out on vanilla
-    # Ch6's own last cue. ch07 is not hosted, so it then parks on the dev placeholder.
+    # Ch6's own last cue, onto the dev placeholder that chain('ch06', 'ch07') makes the MNC2.
     hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',

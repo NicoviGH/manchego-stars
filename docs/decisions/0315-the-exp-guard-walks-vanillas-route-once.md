@@ -29,5 +29,4 @@ chapter that reused a twin. With the founding party handed the prologue's pay (A
 reads 0.98x-1.01x of the twin party from ch00 through ch06, and a canary that points ch06 at
 ch05's twin reads 1.22x, so today the band sees one reuse as well.
 
-**ch07** still names FE8 Ch6. It is planned, not hosted, so nothing fails today. Hosting it as
-written fails the route rule.
+**ch07** names FE8 Ch7, its number, and passes the route rule as hosted (x1.00 EXP, #27).

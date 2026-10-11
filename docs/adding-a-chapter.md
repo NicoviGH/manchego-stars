@@ -20,6 +20,8 @@ chapter on the *next* slot so the previous chapter's ending `MNC2(0xN)` chains o
 | ch03 | 4 | `Ch4*` (`UnitDef_Event_Ch4Ally`, `EventListScr_Ch4_*`, `EventScr_Ch4_BeginningScene`) | `CH03_HOST_INDEX` |
 | ch04 | 5 | `Ch5*` (slot 5 ships `Ch5XEvents` — retargeted to `Ch5EventData`) | `CH04_HOST_INDEX` |
 | ch05 | 6 | `Ch6*` event lists only; rosters are `MS_Ch05*` | `CH05_HOST_INDEX` |
+| ch06 | 7 | `Ch7*` event lists only; rosters are `MS_Ch06*` | `CH06_HOST_INDEX` |
+| ch07 | 8 | `Ch8*` event lists only; rosters are `MS_Ch07*` | `CH07_HOST_INDEX` |
 
 **From slot 6 on, the slot index and the vanilla symbol name disagree in the BASE GAME** (FE8
 inserted Ch5x at slot 5): slot 6 ships `Ch5EventData`, slot 7 ships `Ch6Events`. So slot N carries
@@ -41,7 +43,7 @@ difference by naming it (`ch06_messie_gather` calls `gather_cast`).
 | Job | Shared helper |
 |---|---|
 | Enemy rows per wave | `inject.units.enemy_rows(chap, CHNN_CLASS_IDS, CHNN_ITEM_IDS, pid_for, ...)` |
-| Villages and shops (Location list) | `inject.villages.chapter_location_events(chap, CHNN_VILLAGE_SLOTS, shops, flags)` |
+| Villages, shops, houses, Seize (Location list) | `inject.villages.chapter_location_events(chap, CHNN_VILLAGE_SLOTS, shops, flags, house_scripts=, seize=)` |
 | Title, goal texts, title card | `inject.scenes.write_frame_texts(lines, host, chap, status, window)` |
 | A borrowed slot's nameplate | `inject.text.write_nameplate(lines, slot, unit)` |
 | A backdrop (+ location card) | `inject.scenes.backdrop(bg, what, card=, rearm=, cue=)` |

@@ -70,6 +70,12 @@ CH06_HOST_INDEX = 7
 # it sits on keeps shipping chapter N-1's -- the pattern every chapter from ch04 follows.
 CH06_EVENT_GROUP = 'Ch7EventData'
 
+CH07_HOST_INDEX = 8
+# Slot 8 SHIPS pointing at Ch7EventData -- ch06's group, one slot along again. ch07 takes the
+# group named for chapter 8 (gChapterDataAssetTable[42] is Ch8EventData), which slot 9 ships
+# and nothing of ours hosts.
+CH07_EVENT_GROUP = 'Ch8EventData'
+
 # --- discovery -------------------------------------------------------------------------
 
 HostedChapter = collections.namedtuple(

@@ -117,7 +117,7 @@ def authored_boxes(site_id, text, field='text'):
     return boxes
 
 
-def location_events(villages, village_slots, shops=(), flags=None):
+def location_events(villages, village_slots, shops=(), flags=None, houses=(), seize=None):
     """The host slot's Location list: everything the player can VISIT.
 
     One `Village` per authored village, at the tile the chapter YAML names, each running its OWN
@@ -138,6 +138,9 @@ def location_events(villages, village_slots, shops=(), flags=None):
     `shops` are `(macro, shoplist_symbol, x, y)` -- `Armory`/`Vendor` take their stock DIRECTLY
     and run no script and show no text, so a shop is fully wired the moment its tile is listed.
 
+    `houses` are `(script, x, y)`: a talk-only `House`, which never shuts and cannot be raided
+    (vanilla Ch1 and Ch7). `seize` is the `(x, y)` a lord Seizes to raise EVFLAG_WIN.
+
     **An empty Location list makes every reward on the map unobtainable while the map still draws
     it.** That is how ch04 shipped an unreachable Iron Axe (#205), and it is why this returns a
     list built from the YAML rather than something a chapter has to remember to fill in.
@@ -149,18 +152,31 @@ def location_events(villages, village_slots, shops=(), flags=None):
            v['id'], village_reward_id(v) or 'the line is the reward')
         for v in villages)
     rows += ''.join('    %s(%s, %d, %d)\n' % shop for shop in shops)
+    rows += ''.join('    House(0x0, %s, %d, %d)\n' % house for house in houses)
+    if seize is not None:
+        rows += '    Seize(%d, %d)\n' % tuple(seize)
     return '{\n' + rows + '    END_MAIN\n}'
 
 
 
-def chapter_location_events(chap, village_slots, shops=(), flags=None):
+def chapter_location_events(chap, village_slots, shops=(), flags=None, house_scripts=(),
+                            seize=False):
     """A chapter's Location list off its own `villages:` (#479: was one wrapper per chapter).
 
     `village_slots` is the chapter's {village id: (script symbol, msg, ...)} table; each visit
-    runs the slot's script. `shops` and `flags` as in `location_events`."""
+    runs the slot's script. `shops` and `flags` as in `location_events`. `house_scripts` are
+    the scripts for the YAML's `type: house` events, in YAML order, one each. `seize` adds the
+    objective's `seize_tile`."""
+    houses = [e for e in chap.get('events', []) if e.get('type') == 'house']
+    if len(houses) != len(house_scripts):
+        sys.exit('ERROR: %s declares %d house(s) but wires %d script(s)'
+                 % (chap.get('id', '?'), len(houses), len(house_scripts)))
     return location_events(chap.get('villages', []),
                            {vid: slot[0] for vid, slot in village_slots.items()},
-                           shops, flags=flags)
+                           shops, flags=flags,
+                           houses=[(script, h['tile'][0], h['tile'][1])
+                                   for script, h in zip(house_scripts, houses)],
+                           seize=chap['objective']['seize_tile'] if seize else None)
 
 def assert_village_tiles_visitable(chap, maps_dir, stem):
     """Guard (#205): a village the YAML declares must stand on terrain FE8 will let a unit visit.
