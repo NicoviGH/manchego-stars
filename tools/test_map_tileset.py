@@ -527,7 +527,7 @@ class TestVendoredSnowyFields(unittest.TestCase):
 
 
 class TestSnowyBernBorrowedSnags(unittest.TestCase):
-    """The only cross-tileset exception: Super Fields' complete snag family."""
+    """Ch4's cross-tileset art: Super Fields' complete snag family."""
 
     def test_empty_matching_slots_hold_pixel_exact_snag_variants(self):
         bern = mt._tileset_from_dir(SNOWY_BERN)
@@ -1104,6 +1104,132 @@ class SetMetatileTerrain(unittest.TestCase):
             with open(os.path.join(root, stem + '.json')) as fh:
                 self.assertNotIn('tileset', json.load(fh), stem)   # the premise
         self.assertIn('ch01-the-iron-trail', seen)
+
+
+def _copy_tilesets(tmp, names):
+    """Copy vendored tilesets into ``tmp/tilesets/<name>/`` and return their dirs."""
+    import shutil
+    dirs = []
+    for name in names:
+        src = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps/tilesets', name)
+        dst = os.path.join(tmp, 'tilesets', name)
+        shutil.copytree(src, dst)
+        dirs.append(dst)
+    return dirs
+
+
+def _all_metatile_pixels(tileset_dir):
+    ts = mt._tileset_from_dir(tileset_dir)
+    return [ts.metatile_image(m).convert('RGB').tobytes() for m in range(1024)]
+
+
+class DedupeTiles(unittest.TestCase):
+    """Merging duplicate 8x8 tiles frees graphics room without changing a single pixel.
+
+    A tileset's 1024 tiles are a hardware ceiling (obj1 + obj2 share VRAM 0x8000-0xFFFF,
+    `bmmap.c` UnpackChapterMapGraphics), so a duplicate is the only room there is to reclaim.
+    """
+
+    @staticmethod
+    def _plant_duplicates(dirs):
+        """Copy metatile 99's first tile into two free ids -- once exact, once mirrored -- and
+        point 99's quarters at them (with the flip that undoes the mirror) in every tileset."""
+        name = lambda d: os.path.basename(d)
+        cfgs = [bytearray(open(os.path.join(d, name(d) + '.bin'), 'rb').read()) for d in dirs]
+        gfx = bytearray(open(os.path.join(dirs[0], name(dirs[0]) + '.4bpp'), 'rb').read())
+        entry = struct.unpack_from('<H', cfgs[0], 99 * 8)[0]
+        raw = bytes(gfx[(entry & 0x3FF) * 32:((entry & 0x3FF) + 1) * 32])
+        exact, mirror = mt._unreferenced_tiles(cfgs[0])[:2]
+        gfx[exact * 32:(exact + 1) * 32] = raw
+        gfx[mirror * 32:(mirror + 1) * 32] = mt._flip_tile(raw, True, False)
+        for d, cfg in zip(dirs, cfgs):
+            struct.pack_into('<H', cfg, 99 * 8 + 2, (entry & ~0x3FF) | exact)
+            struct.pack_into('<H', cfg, 99 * 8 + 4, ((entry & ~0x3FF) | mirror) ^ 0x400)
+            open(os.path.join(d, name(d) + '.bin'), 'wb').write(cfg)
+            open(os.path.join(d, name(d) + '.4bpp'), 'wb').write(gfx)
+        return sorted([exact, mirror])
+
+    def test_every_metatile_renders_identically_and_tiles_are_freed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, ice = _copy_tilesets(tmp, ['snowy-bern', 'snowy-bern-ice'])
+            planted = self._plant_duplicates([base, ice])
+            before = [_all_metatile_pixels(d) for d in (base, ice)]
+            freed = mt.dedupe_tiles([base, ice])
+            self.assertEqual(planted, freed)
+            self.assertEqual(before, [_all_metatile_pixels(d) for d in (base, ice)])
+            self.assertTrue(mt.tilesets_are_compatible_variants(tmp, 'snowy-bern',
+                                                                'snowy-bern-ice'))
+
+    def test_refuses_tilesets_that_do_not_share_art(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, cave = _copy_tilesets(tmp, ['snowy-bern', 'cave-interior'])
+            with self.assertRaises(ValueError):
+                mt.dedupe_tiles([base, cave])
+
+
+class PortStructure(unittest.TestCase):
+    """A building ported from another tileset lands in empty slots, in one bank, on our ground."""
+
+    CASTLE = [[857, 858, 859], [889, 890, 891], [921, 922, 923]]
+
+    def _port(self, tmp):
+        base, ice = _copy_tilesets(tmp, ['snowy-bern', 'snowy-bern-ice'])
+        mt.dedupe_tiles([base, ice])
+        bern = mt._tileset_from_dir(base)
+        slots = [m for m in range(1, 1024) if bern.terrain(m) == 0
+                 and mt._tileset_from_dir(ice).terrain(m) == 0][:9]
+        grid = [slots[0:3], slots[3:6], slots[6:9]]
+        terrains = [[0x2C, 0x2C, 0x2C], [0x2C, 0x2C, 0x2C], [0x2C, 0x0B, 0x2C]]
+        mt.port_structure([base, ice], SNOWY_FIELDS, self.CASTLE, grid, bank=4,
+                          terrains=terrains, ground={(232, 232, 232), (240, 248, 240)},
+                          backdrop=99)
+        return base, ice, grid, terrains
+
+    def test_slots_take_the_terrain_and_the_variant_stays_compatible(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, ice, grid, terrains = self._port(tmp)
+            for d in (base, ice):
+                ts = mt._tileset_from_dir(d)
+                for row, trow in zip(grid, terrains):
+                    for slot, terrain in zip(row, trow):
+                        self.assertEqual(terrain, ts.terrain(slot))
+            self.assertTrue(mt.tilesets_are_compatible_variants(tmp, 'snowy-bern',
+                                                                'snowy-bern-ice'))
+
+    def test_pure_ground_quarters_reuse_the_backdrops_own_tile(self):
+        # The real castle fills its footprint, so name every colour of one source metatile
+        # as ground: then each of its quarters is open ground and must take the backdrop's
+        # own entry -- bank and tile -- rather than a recoloured copy of it.
+        with tempfile.TemporaryDirectory() as tmp:
+            base, ice = _copy_tilesets(tmp, ['snowy-bern', 'snowy-bern-ice'])
+            source = mt._tileset_from_dir(SNOWY_FIELDS)
+            colours = set(source.metatile_image(857).convert('RGB').getdata())
+            slot = next(m for m in range(1, 1024)
+                        if mt._tileset_from_dir(base).terrain(m) == 0
+                        and mt._tileset_from_dir(ice).terrain(m) == 0)
+            mt.port_structure([base, ice], SNOWY_FIELDS, [[857]], [[slot]], bank=4,
+                              terrains=[[0x2C]], ground=colours, backdrop=99)
+            ts = mt._tileset_from_dir(base)
+            self.assertEqual(struct.unpack_from('<4H', ts.cfg, 99 * 8),
+                             struct.unpack_from('<4H', ts.cfg, slot * 8))
+
+    def test_painted_quarters_use_only_the_named_bank(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, _, grid, _ = self._port(tmp)
+            ts = mt._tileset_from_dir(base)
+            backdrop = set(struct.unpack_from('<4H', ts.cfg, 99 * 8))
+            for row in grid:
+                for slot in row:
+                    for entry in struct.unpack_from('<4H', ts.cfg, slot * 8):
+                        if entry not in backdrop:
+                            self.assertEqual(4, entry >> 12)
+
+    def test_refuses_a_slot_in_use(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base, ice = _copy_tilesets(tmp, ['snowy-bern', 'snowy-bern-ice'])
+            with self.assertRaises(ValueError):
+                mt.port_structure([base, ice], SNOWY_FIELDS, [[857]], [[99]], bank=4,
+                                  terrains=[[0x2C]], ground=set(), backdrop=99)
 
 
 if __name__ == '__main__':

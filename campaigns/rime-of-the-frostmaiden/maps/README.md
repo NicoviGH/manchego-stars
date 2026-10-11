@@ -44,14 +44,21 @@ so it dropped in with no grit / Map Hacking Suite recompile:
 - `SnowyBern.mapchip_config` → `snowy-bern.bin` (raw, as-is)
 - `SnowyBernObj.bin` (GBA-LZ 4bpp) → decompressed to `snowy-bern.4bpp`
 
-Ch4 adds one deliberate cross-tileset exception: Super Fields' **Snag** family is adapted
+Two chapters carry art in from other tilesets. Ch4 adapts Super Fields' **Snag** family
 into Snowy Bern's matching empty metatile slots. The intact variants occupy **8** and **35**
 (terrain `0x33`); the felled `7 / 4 / 11` composition occupies **7 / 36 / 11** with snowy
 banks around the trunk-over-water center. The new graphics use unreferenced tile slots and
 render entirely through Snowy Bern's native palette bank **4**, producing the approved muted
 wood without altering the shared palette or any existing metatile. Banks 5–9 are the derived
-fog half, not spare palettes, so the authoring tool rejects them. No other Super Fields art is
-mixed into Snowy Bern.
+fog half, not spare palettes, so the authoring tool rejects them.
+
+Ch7 (ADR 0341) ports **snowy-fields' castle** into empty slots 69/83/94/95/96/97/101/115/120,
+recoloured into bank 4 with its ground redrawn from Snowy Bern's own snow
+(`map_tileset_tool.port_structure`), and adds slot 121, water stamped `LAKE`, since Snowy Bern
+had no lake metatile. The room came from `dedupe_tiles`, which merged 35 duplicate 8x8 tiles
+without changing a pixel. The sheet's 1024 tiles are a hardware ceiling, so merging duplicates
+is the only way to make space. Both tools write a base and its variants together, so
+`snowy-bern-ice` keeps the same `.4bpp`.
 
 `inject.maps.inject_winter_tileset()` registers it as asset-table entries
 `ObjectTypeSnow` / `MapPaletteSnow` / `TileConfigurationSnow` and repoints the **test chapter**
@@ -62,7 +69,7 @@ mixed into Snowy Bern.
 `tilesets/snowy-fields/` is **N426's Snow variant of Fields + Customs**, vendored intact
 from FE-Repo. It provides a second coherent winter visual language with native Snag /
 Bridge Snag terrain, expanded forests, and Fields-style buildings. It is an on-hand
-alternative, not a replacement for `snowy-bern`, and is deliberately not registered in
+alternative, not a replacement for `snowy-bern` (ch07's castle is ported from it), and is not registered in
 the injector until a chapter selects the complete tileset.
 
 - `Fields + Customs - Tileset.mapchip_config` → `snowy-fields.bin`
