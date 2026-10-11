@@ -173,12 +173,14 @@ def raw_pid_base_levels(campaign):
     return out
 
 
-# The keys a chapter YAML may hold enemy entries under. ONE definition, because every
-# reader of "what units does this chapter field" must agree: the parity metric, the AI-donor
-# guard, the personal-line routes and the raw-pid boss registry all key off it, and ch02
-# spent four chapters with its `reinforcements:` wave counted by some of them and not others
-# (decisions.md -> "A parity ratio does not say how much of the twin it COPIED").
-ENEMY_ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
+# The key a chapter YAML holds its enemy entries under, waves included (an entry's own
+# `arrives_turn` says when it lands). ONE definition, because every reader of "what units does
+# this chapter field" must agree: the parity metric, the AI-donor guard, the personal-line
+# routes and the raw-pid boss registry all key off it. There used to be three keys, and ch02
+# spent four chapters with its `reinforcements:` wave counted by some readers and not others
+# (decisions.md -> "A parity ratio does not say how much of the twin it COPIED"); #479 folded
+# every wave into `enemy_units`, and the schema refuses the old keys.
+ENEMY_ROSTER_KEYS = ('enemy_units',)
 
 
 # Every roster key that PLACES a body on the map, enemy or not. `ENEMY_ROSTER_KEYS` is the
@@ -210,37 +212,21 @@ def chapter_roster_entries(chap):
 def entry_is_turn1(key, enemy_def):
     """Is this entry's body standing on the board at TURN 1, before the player's first move?
 
-    The KEY decides it, not `arrives_turn` alone: only `enemy_units` is the opening-board
-    array, and even then only unconditionally -- an entry there may still declare its OWN
-    `arrives_turn > 1` (ch06's Difficult-only cavalry wave stays inside `enemy_units` for
-    exactly this reason, so its own field is what excludes it). A `reinforcements:` or
-    `enemy_reinforcements:` entry is never turn-1 regardless of what it carries, and that
-    matters because those entries use a DIFFERENT field for their own timing --
-    `trigger_turn`, not `arrives_turn` (ch02's `rear-raiders`). Two readers tested
-    `arrives_turn` alone against every key and both read a `trigger_turn` wave as turn-1,
-    which is backwards: a reinforcement key is the one shape definitely not on the opening
-    board (`difficulty.chapter_enemy_groups`'s dynamics split, and
-    `map_placement_preview.enemy_bodies`'s Dijkstra blockers, #367)."""
+    Only an `enemy_units` entry that declares no later `arrives_turn` is. `key` is the roster
+    key the entry came from; a reader that walks PLACED_ROSTER_KEYS (neutrals, green allies)
+    gets False for those, which are not part of the enemy force
+    (`difficulty.chapter_enemy_groups`'s dynamics split, `map_placement_preview.enemy_bodies`'s
+    Dijkstra blockers, #367)."""
     return key == 'enemy_units' and entry_arrival_turn(enemy_def) <= 1
 
 
-ARRIVAL_TURN_FIELDS = ('arrives_turn', 'trigger_turn', 'spawn_turn')
-
-
 def entry_arrival_turn(enemy_def):
-    """The turn this entry's bodies reach the board: 1 unless it declares otherwise.
+    """The turn this entry's bodies reach the board: its `arrives_turn`, else 1.
 
-    Our chapters spell it four ways -- `arrives_turn` (ch04-ch06), `trigger_turn` (ch02's
-    `reinforcements:` wave), `spawn_turn` (ch01's goblins, which its injector loads on turn
-    3) and `arrives: {turn: N}` (ch08's seed) -- and a reader that knew only the first put
-    ch01's wave on the opening board in every metric that asked (#440 review)."""
-    for field in ARRIVAL_TURN_FIELDS:
-        if enemy_def.get(field):
-            return int(enemy_def[field])
-    arrives = enemy_def.get('arrives')
-    if isinstance(arrives, dict) and arrives.get('turn'):
-        return int(arrives['turn'])
-    return 1
+    `arrives_turn` is the one spelling. Chapters used to spell it four ways, and a reader that
+    knew only one put ch01's wave on the opening board in every metric that asked (#440
+    review); #479 retired the other three and the schema refuses them."""
+    return int(enemy_def.get('arrives_turn') or 1)
 
 
 def entry_body_levels(enemy_def):

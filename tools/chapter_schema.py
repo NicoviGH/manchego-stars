@@ -36,7 +36,7 @@ REWARD = [{'id': ANY, 'amount': ANY}]
 
 # One shape for every unit a chapter places, whatever roster key holds it: the readers treat
 # them interchangeably (`raw_pids.PLACED_ROSTER_KEYS`, `check.ROSTER_KEYS`, map_placement_preview,
-# difficulty), so a field legal on an enemy is legal on a reinforcement, a guest or an ally.
+# difficulty), so a field legal on an enemy is legal on a guest or an ally. ENEMY narrows it.
 UNIT = {
     'id': ANY, 'name': ANY, 'fe_name': ANY, 'class': ANY, 'deploy_class': ANY, 'level': ANY,
     'levels': ANY, 'autolevel': ANY, 'count': ANY, 'composition': ANY,
@@ -45,8 +45,8 @@ UNIT = {
     'convertible': ANY, 'inventory': ANY, 'inventory_by_class': Keyed(ANY), 'weapon': ANY,
     'item_drop': ANY, 'gift': ANY, 'damage_type': ANY, 'personal': ANY, 'donor': ANY, 'twin': ANY,
     'ai_pattern': ANY, 'ai_override': {'ai': ANY, 'why': ANY}, 'behavior': ANY,
-    'arrives': {'turn': ANY}, 'arrives_turn': ANY, 'spawn_edge': ANY, 'spawn_turn': ANY,
-    'trigger_turn': ANY, 'charge_from': ANY, 'charge_route': ANY, 'walks_to': ANY,
+    'arrives_turn': ANY, 'spawn_edge': ANY,
+    'charge_from': ANY, 'charge_route': ANY, 'walks_to': ANY,
     'flee_route': ANY, 'flees_to': ANY,
     'death_quote': ANY, 'defeat_quote': ANY, 'taunt': ANY, 'flavor': ANY, 'flavor_traits': ANY,
     'fe_mechanic': ANY, 'note': ANY,
@@ -58,6 +58,11 @@ UNIT = {
                     'import': {'frames_dir': ANY, 'palette_edit': ANY, 'txt': ANY,
                                'vendored': ANY}},
 }
+
+# An enemy entry places its bodies with `positions:` only, a one-body boss included, and says
+# when a wave lands with `arrives_turn` (#479: `inject.units.enemy_rows` reads exactly this).
+# Guests and allies still stand on one `position:`.
+ENEMY = {k: v for k, v in UNIT.items() if k != 'position'}
 
 # A scene's fallback cut: its `script:` is the scene preview's to read.
 SCENE_VARIANT = {'boxes': ANY, 'reason': ANY, 'replaces': ANY, 'script': ANY}
@@ -117,9 +122,7 @@ CHAPTER = {
     'deployment': {'deploy_limit': ANY, 'deploy_slots': ANY, 'note': ANY, 'prep_screen': ANY,
                    'start_area': ANY, 'green_allies': [UNIT]},
     'player_units': [UNIT],
-    'enemy_units': [UNIT],
-    'reinforcements': [UNIT],
-    'enemy_reinforcements': [UNIT],
+    'enemy_units': [ENEMY],
     'neutral_units': [UNIT],
     'green_units': [UNIT],
     'npc_units': [{'id': ANY, 'count': ANY, 'behavior': ANY, 'must_not_be_killed': ANY,
@@ -151,9 +154,10 @@ CHAPTER = {
 
 def entry_tiles(enemy_def):
     """The tiles one roster entry places its bodies on, in order: `positions:`, or a lone
-    `position:` -- the shape every boss and single unit is written in (ch01's Izobai, ch02's
-    captain). Reading `positions` alone dropped those bodies off every board (#430). The
-    pairs come back as written, so a shape guard can still see a malformed one."""
+    `position:`. Enemy entries carry `positions:` only (ENEMY, #479); a guest, green ally or
+    neutral still stands on one `position:`, and reading `positions` alone once dropped bodies
+    off every board (#430). The pairs come back as written, so a shape guard can still see a
+    malformed one."""
     if enemy_def.get('positions'):
         return list(enemy_def['positions'])
     return [enemy_def['position']] if enemy_def.get('position') else []

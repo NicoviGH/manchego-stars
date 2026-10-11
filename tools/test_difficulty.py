@@ -393,9 +393,8 @@ class AiDonorFindings(unittest.TestCase):
         self.assertTrue(any('disagree' in f.lower() for f in findings), findings)
 
     def test_reinforcement_waves_are_checked_too(self):
-        # ch02 declares two of its nine reds under `reinforcements:`.
-        chap = self._chap([{'id': 'a', 'donor': [7, 2]}])
-        chap['reinforcements'] = [{'id': 'late'}]
+        # ch02 fields two of its nine reds as a turn-3 wave.
+        chap = self._chap([{'id': 'a', 'donor': [7, 2]}, {'id': 'late', 'arrives_turn': 3}])
         findings = df.ai_donor_findings(chap)
         self.assertTrue(any('late' in f for f in findings), findings)
 
@@ -577,8 +576,8 @@ class MirrorShare(unittest.TestCase):
         self.assertEqual(m['pct'], 100.0)
 
     def test_reinforcement_waves_count_as_part_of_our_force(self):
-        chap = self._chap([{'id': 'a', 'class': 'fighter', 'level': 4}])
-        chap['reinforcements'] = [{'id': 'late', 'class': 'fighter', 'level': 1}]
+        chap = self._chap([{'id': 'a', 'class': 'fighter', 'level': 4},
+                           {'id': 'late', 'class': 'fighter', 'level': 1, 'arrives_turn': 3}])
         self.assertEqual(df.mirror_share(chap)['shared'], 2)
 
     def test_a_staff_only_unit_still_counts_as_a_body(self):
@@ -639,9 +638,7 @@ class EveryRosterKeyIsAForce(unittest.TestCase):
 class ReinforcementsAreOurForce(unittest.TestCase):
     """The twin's curated arrays fold its reinforcement waves in unconditionally, so a
     force builder that reads only our opening board compares 7 bodies against 9 and calls
-    the missing two divergence. ch06 already discovered this and worked around it by
-    declaring its turn-4 wave inside `enemy_units`; ch02 used the `reinforcements:` key
-    and was never counted.
+    the missing two divergence. ch02's turn-3 wave is the case that was once never counted.
     """
 
     def _ch02(self):
@@ -681,19 +678,16 @@ class OneForceEveryReader(unittest.TestCase):
         self.assertEqual(sum(len(v) for v in g.values()),
                          df._chapter_pressure(self._ch02())['n_ours'])
 
-    def test_an_entry_under_a_reinforcement_key_is_a_reinforcement_by_the_KEY(self):
-        # ch02's wave carries `trigger_turn`, not `arrives_turn`: the key it is declared
-        # under is what makes it a reinforcement, and an arrives_turn test alone read it
-        # as turn-1 line.
-        chap = {'reinforcements': [{'id': 'w', 'class': 'brigand', 'level': 2,
-                                    'inventory': [{'id': 'iron-axe'}]}]}
+    def test_a_wave_is_a_reinforcement_not_the_line(self):
+        chap = {'enemy_units': [{'id': 'w', 'class': 'brigand', 'level': 2, 'arrives_turn': 3,
+                                 'inventory': [{'id': 'iron-axe'}]}]}
         g = df.chapter_enemy_groups(chap)
         self.assertEqual(len(g['reinforcements']), 1)
         self.assertEqual(g['line'], [])
 
     def test_a_staff_only_wave_is_reported_as_unmodeled(self):
-        chap = {'reinforcements': [{'id': 'healer', 'class': 'priest', 'level': 3,
-                                    'is_boss': True, 'inventory': [{'id': 'heal'}]}]}
+        chap = {'enemy_units': [{'id': 'healer', 'class': 'priest', 'level': 3, 'arrives_turn': 3,
+                                 'is_boss': True, 'inventory': [{'id': 'heal'}]}]}
         self.assertEqual([d['id'] for d in df.unmodeled_enemies(chap)], ['healer'])
 
     def test_the_cast_tables_grade_the_same_force_as_the_verdict(self):
@@ -702,13 +696,13 @@ class OneForceEveryReader(unittest.TestCase):
         self.assertEqual(len(line) + len(bosses),
                          df._chapter_pressure(chap)['n_ours'])
 
-    def test_role_findings_grade_a_unit_declared_under_a_reinforcement_key(self):
-        # a monstrous boss hidden under `reinforcements:` was invisible to the per-unit
-        # gate arm while contributing its threat to the aggregate.
+    def test_role_findings_grade_a_unit_arriving_in_a_wave(self):
+        # a monstrous boss arriving in a wave was once invisible to the per-unit gate arm
+        # while contributing its threat to the aggregate.
         chap = {'parity_reference': 'FE8 Prologue',
-                'reinforcements': [{'id': 'sleeper', 'class': 'general', 'level': 20,
-                                    'is_boss': True,
-                                    'inventory': [{'id': 'silver-lance'}]}]}
+                'enemy_units': [{'id': 'sleeper', 'class': 'general', 'level': 20,
+                                 'is_boss': True, 'arrives_turn': 3,
+                                 'inventory': [{'id': 'silver-lance'}]}]}
         self.assertTrue(any('sleeper' in f for f in df.role_findings(chap, 'FE8 Prologue')))
 
 
@@ -797,19 +791,19 @@ class RoleFindingsGradeTypesNotBodies(unittest.TestCase):
 
 
 class GuardsSeeTheWholeRoster(unittest.TestCase):
-    def test_the_boss_malus_guard_reads_every_roster_key_and_declared_level(self):
+    def test_the_boss_malus_guard_reads_waves_and_declared_levels(self):
         # `_our_base_level` treats every boss as malus-immune; this guard is what makes that
-        # true. A boss declared under `reinforcements:`, or one whose level comes from
-        # `levels:`, was invisible to it while still riding the assumption.
+        # true. A boss arriving in a wave, or one whose level comes from `levels:`, was once
+        # invisible to it while still riding the assumption.
         donor = sorted(inject.cast.ENEMY_BASE_SLOT.items())[0]
         uid, slot = donor
         over = df._character_base_level(slot) + 5
-        chap = {'reinforcements': [{'id': uid, 'is_boss': True, 'levels': [over],
-                                    'class': 'general'}]}
+        chap = {'enemy_units': [{'id': uid, 'is_boss': True, 'levels': [over],
+                                 'class': 'general', 'arrives_turn': 3}]}
         self.assertEqual(df._boss_entries_over_donor_base_level(chap), [uid])
 
     def test_a_drop_on_a_reinforcement_wave_is_part_of_the_economy(self):
-        chap = {'reinforcements': [{'id': 'w', 'item_drop': 'elixir'}]}
+        chap = {'enemy_units': [{'id': 'w', 'item_drop': 'elixir', 'arrives_turn': 3}]}
         self.assertEqual(df.chapter_economy(chap)['drops'], ['elixir'])
 
     def test_a_bag_NEVER_takes_a_personal_line(self):

@@ -185,13 +185,12 @@ class TestPersonalLineRoutes(unittest.TestCase):
         self.assertEqual(len(msgs), 1, msgs)
         self.assertIn('RAW_PID_PERSONAL_SOURCES', msgs[0])
 
-    def test_a_line_under_a_reinforcement_key_is_routed_too(self):
-        # the parity metric folds `personal:` from EVERY roster key into the verdict, so a
-        # boss parked under `reinforcements:` measures fixed and plays naked with no gate.
-        for key in ('reinforcements', 'enemy_reinforcements'):
-            msgs = self.routes(self._chap({'id': 'newboss', 'personal': {'baseHP': 9}},
-                                          key=key))
-            self.assertEqual(len(msgs), 1, (key, msgs))
+    def test_a_line_on_a_wave_is_routed_too(self):
+        # the parity metric folds `personal:` from every enemy entry into the verdict, so a
+        # boss arriving in a later wave measures fixed and plays naked with no gate.
+        msgs = self.routes(self._chap({'id': 'newboss', 'personal': {'baseHP': 9},
+                                       'arrives_turn': 3}))
+        self.assertEqual(len(msgs), 1, msgs)
 
     def test_a_rescue_hulls_line_is_routed_too(self):
         # A `rescue_boats:` entry is a raw-pid unit like a boss, and its `personal:` line is

@@ -15,6 +15,7 @@ import inject.chapters.ch06
 import inject.map_sprites
 import inject.maps
 import inject.recruit
+import inject.scenes
 import inject.text
 import inject.villages
 import inject.decomp
@@ -22,6 +23,14 @@ import inject.hosting
 import inject.terrain
 import inject.units
 from inject import source as injector  # the injector's source, every file of it (#389)
+
+
+def enemy_rows(chap, **kwargs):
+    """ch06's enemy rows, through the shared emitter with ch06's own ids and pid rule."""
+    m = inject.chapters.ch06
+    return inject.units.enemy_rows(chap, m.CH06_CLASS_IDS, m.CH06_ITEM_IDS, m.ch06_enemy_pid,
+                                   reda_symbol=m.ch06_reda_symbol,
+                                   **kwargs)
 
 
 class ItemDropIsCarriedOnce(unittest.TestCase):
@@ -46,7 +55,7 @@ class ItemDropIsCarriedOnce(unittest.TestCase):
 
     def test_no_ch06_enemy_carries_a_duplicate(self):
         chap = inject.hosting._load_chapter_yaml(self.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
-        rows = inject.chapters.ch06.ch06_enemy_rows(chap) + inject.chapters.ch06.ch06_enemy_rows(
+        rows = enemy_rows(chap) + enemy_rows(
             chap, arrives_turn=inject.chapters.ch06.CH06_HARD_WAVE_TURN)
         for row in rows:
             items = re.search(r'\.items = \{ (.*?) \}', row).group(1).split(', ')
@@ -59,7 +68,7 @@ class ItemDropIsCarriedOnce(unittest.TestCase):
         Mercenary carries one more, the Steel Lance it now fights with, ahead of the drop."""
         chap = inject.hosting._load_chapter_yaml(self.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
         expected = {'shark-rider-halberd': 2, 'merfolk-trident-drop': 2, 'lamia-mender': 2}
-        rows = inject.chapters.ch06.ch06_enemy_rows(chap)
+        rows = enemy_rows(chap)
         for enemy_id, count in expected.items():
             row = next(r for r in rows if '/* %s --' % enemy_id in r)
             items = re.search(r'\.items = \{ (.*?) \}', row).group(1).split(', ')
@@ -310,7 +319,7 @@ class MessieOnTheIce(unittest.TestCase):
         with open(inject.chapters.ch06.__file__, encoding='utf-8') as f:
             src = f.read()
         order = [src.index('ch06_messie_block(chap, terrain,'),
-                 src.index('ch06_boat_survived_flags(hulls)'),
+                 src.index('record_alive_flags('),
                  src.index('save_all_bonus_script(hulls,'),
                  src.index('MUSCSLOW(SONG_INTO_THE_SHADOW_OF_VICTORY)')]
         self.assertEqual(order, sorted(order))
@@ -322,8 +331,16 @@ class BoatSurvivedFlags(unittest.TestCase):
 
     HULLS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
 
+    def _record(self):
+        """ch06's ending call: one guarded ENUT per hull, through the shared emitter."""
+        flags = inject.chapter_ids.CH06_BOAT_SURVIVED_FLAGS
+        labels = inject.chapters.ch06.CH06_BOAT_SURVIVED_LABELS
+        return inject.scenes.record_alive_flags(
+            [(bid, pid, flags[bid], labels[bid]) for bid, pid in self.HULLS.items()],
+            'came home: ch07 opens on its crew')
+
     def test_each_hull_sets_its_own_permanent_flag_only_when_alive(self):
-        out = inject.chapters.ch06.ch06_boat_survived_flags(self.HULLS)
+        out = self._record()
         flags = inject.chapter_ids.CH06_BOAT_SURVIVED_FLAGS
         for bid, pid in self.HULLS.items():
             check = out.index('CHECK_ALIVE(%s)' % pid)
@@ -333,7 +350,7 @@ class BoatSurvivedFlags(unittest.TestCase):
         self.assertEqual(len(set(flags.values())), 2)
 
     def test_a_sunk_hull_skips_only_its_own_flag(self):
-        out = inject.chapters.ch06.ch06_boat_survived_flags(self.HULLS)
+        out = self._record()
         labels = inject.chapters.ch06.CH06_BOAT_SURVIVED_LABELS
         self.assertEqual(len(set(labels.values())), 2)
         self.assertNotIn(inject.villages.SAVE_ALL_SKIP_LABEL, labels.values())
@@ -384,10 +401,10 @@ class MerfolkSurface(unittest.TestCase):
         spawns = inject.chapters.ch06.ch06_line_spawns(chap, maps)
         self.assertTrue(spawns)
         self.assertEqual([k for k, v in spawns.items() if v is None], [])
-        rows = inject.chapters.ch06.ch06_enemy_rows(chap, spawns=spawns)
+        rows = enemy_rows(chap, spawns=spawns)
         self.assertTrue(all('.redaCount = 1,' in r for r in rows))
         # ...and the Difficult wave is untouched: it arrives on turn 4, by its own road.
-        wave = inject.chapters.ch06.ch06_enemy_rows(chap, arrives_turn=4)
+        wave = enemy_rows(chap, arrives_turn=4)
         self.assertTrue(all('.redaCount = 0,' in r for r in wave))
 
 

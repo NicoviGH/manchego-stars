@@ -61,8 +61,8 @@ class RescueTargetsHaveOnlyTheirDeclaredClock(unittest.TestCase):
 
 class TheGateSurvivesAnUngroundedRosterEntry(unittest.TestCase):
     """`check_rescue_targets` now reaches `units_reaching`, which -- since #369 widened it to
-    every roster key -- calls `difficulty.enemy_ai_bytes` on `reinforcements:` and
-    `enemy_reinforcements:` entries too, and that call RAISES on an entry with neither
+    every wave -- calls `difficulty.enemy_ai_bytes` on later-arriving entries too, and that
+    call RAISES on an entry with neither
     `donor:` nor `ai_override:` (a normal mid-draft state while a chapter is being
     authored). No live chapter combines `rescue_boats` with such an entry today, so this is
     one YAML edit -- not a refactor -- away from an unrelated future chapter taking this gate
@@ -73,8 +73,9 @@ class TheGateSurvivesAnUngroundedRosterEntry(unittest.TestCase):
         import check as chk
         chap = copy.deepcopy(next(d for rel, d in chk._chapters()
                                   if d.get('id', '').startswith('ch06')))
-        chap['reinforcements'] = [{'id': 'draft-stub', 'class': 'fighter', 'level': 1,
-                                   'positions': [[0, 0]], 'inventory': [{'id': 'iron-sword'}]}]
+        chap['enemy_units'].append({'id': 'draft-stub', 'class': 'fighter', 'level': 1,
+                                    'arrives_turn': 3, 'positions': [[0, 0]],
+                                    'inventory': [{'id': 'iron-sword'}]})
         return chap
 
     def test_an_unreadable_TILESET_is_reported_not_silently_skipped(self):

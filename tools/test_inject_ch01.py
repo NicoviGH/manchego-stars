@@ -120,7 +120,7 @@ class TerrainHealBeat(unittest.TestCase):
 
     def test_the_first_flash_is_izobais_gate_and_every_tile_flashes(self):
         tiles = self.beat['flash_tiles']
-        self.assertEqual(list(tiles[0]), list(self.chief['position']))
+        self.assertEqual(list(tiles[0]), list(self.chief['positions'][0]))
         for x, y in tiles:
             self.assertIn('CURSOR_FLASHING(%d, %d)' % (x, y), self.script)
 

@@ -2364,9 +2364,7 @@ def solo_contributors(chap, parity_ref, deploy_cap, floor=1.0, share=0.10):
             % (uid, 100 * t / total, without, full)]
 
 
-# Where a chapter's red force is authored. ch02 puts two of its nine under
-# `reinforcements:`, and a guard reading only `enemy_units:` would grade a chapter that
-# does not ship.
+# Where a chapter's red force is authored (inject.raw_pids.ENEMY_ROSTER_KEYS), waves included.
 AI_ROSTER_KEYS = inject.raw_pids.ENEMY_ROSTER_KEYS   # the AI guard was this roster's first reader
 
 
@@ -3062,11 +3060,9 @@ def chapter_enemy_groups(chap):
             if ed.get('convertible'):
                 g['convertibles'].extend(units)
             elif not inject.raw_pids.entry_is_turn1(key, ed):
-                # the KEY makes ch02's `reinforcements:` wave one, and the declared turn
-                # makes ch01's `enemy_units` wave one, under whichever of its four
-                # spellings it uses. `entry_is_turn1` is the one place that knows both
-                # (#367, #440) -- `map_placement_preview.enemy_bodies` and `danger_map`
-                # share it.
+                # a declared `arrives_turn` makes it a wave. `entry_is_turn1` is the one
+                # place that decides (#367, #440) -- `map_placement_preview.enemy_bodies`
+                # and `danger_map` share it.
                 g['reinforcements'].extend(units)
             else:
                 g['line'].extend(units)

@@ -15,7 +15,7 @@ The data is the doc — facts live in exactly one place, and indexes are generat
 | Generic 5e→FE engine conversion | `docs/rules-mapping.md` |
 | Adding a unit's art / battle anim / platform | the **`inject_battle_anims` / `inject_battle_platforms` docstrings** (how) + `decisions.md` Art & Audio (why) + the **`custom_unit` issue template** (checklist) |
 | Borrowable enemy reskin art (what the FE-Repo has) | **`docs/fe-repo-scouting.md`** (scouting log) + per-unit `skin:` fields in chapter YAML + `campaign.yaml` `enemy_class_reskins` |
-| Hosting a new chapter (map → slot → deploy → win → boot) | **`docs/adding-a-chapter.md`** (the repeatable runbook) + `inject_ch03` (lean reference impl) |
+| Hosting a new chapter (map → slot → deploy → win → boot) | **`docs/adding-a-chapter.md`** (the repeatable runbook; its shared-helper table is the recipe, ADR 0340) |
 | What a playtest scenario needs (ROM flag, host chapter, checkpoint, timing) | A hosted chapter's scenarios are DECLARED in its own YAML under `playtest:` and their rows + chapter suite are derived (`tools/playtest/declared.py`, #314). Everything a chapter does not own — the spine, chapter-generic probes, checkpoint builders, ROM configs, timing classes, `gate` — stays in **`tools/playtest/matrix.yaml`**. A name in both RAISES. |
 | Prep screen / deploy cap / force-deployment | `decisions.md` → "How the deploy cap + prep screen are actually wired" + `inject_ch01`'s docstring. **Prep from ch01 on is standing protocol — the CAP is the parity, Pick Units only chooses which PCs fill it. Never re-derive this from the decomp, and never from `hasPrepScreen` (dead FE7 leftover, false everywhere).** |
 | FE8 cadence/reward grounding | `docs/fe8-pacing-reference.md` |

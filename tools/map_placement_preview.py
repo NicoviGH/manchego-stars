@@ -255,16 +255,9 @@ def arrival_turn_to(terrain, sources, cost_table, mov, targets, blocked=()):
 
 
 def enemy_bodies(chapter):
-    """Every turn-1 enemy tile, across every roster key a body may be declared under.
-
-    Reinforcements are excluded -- they are not on the board yet -- but "reinforcement" is
-    not simply "an `enemy_units` entry with a truthy `arrives_turn`": a `reinforcements:` or
-    `enemy_reinforcements:` entry carries `trigger_turn` instead (ch02's `rear-raiders`), so
-    testing `arrives_turn` alone against a bare `chapter.get('enemy_units')` loop both missed
-    those entries' bodies AND, on a naive widen-the-loop fix, would have read them as turn-1
-    (`arrives_turn` absent reads as falsy) -- exactly backwards, since a reinforcement KEY is
-    the one shape definitely not on the opening board. `inject.raw_pids.entry_is_turn1` is the
-    one place that now decides this, shared with `difficulty.chapter_enemy_groups` (#367)."""
+    """Every turn-1 enemy tile. Waves are excluded -- they are not on the board yet -- and
+    `inject.raw_pids.entry_is_turn1` is the one place that decides which entries those are,
+    shared with `difficulty.chapter_enemy_groups` (#367)."""
     import inject.raw_pids
     out = set()
     for key in inject.raw_pids.ENEMY_ROSTER_KEYS:
@@ -306,15 +299,13 @@ def _classes_text():
 def units_reaching(chapter, terrain, targets):
     """[(enemy id, ai bytes)] for every unit that can ATTACK one of `targets`.
 
-    REINFORCEMENTS ARE INCLUDED, across every roster key (`inject.raw_pids.chapter_roster_entries`)
-    -- not just `enemy_units`. They are not on the opening board, but a hull's fuse is costed
+    WAVES ARE INCLUDED (`inject.raw_pids.chapter_roster_entries`), not just the turn-1 line.
+    They are not on the opening board, but a hull's fuse is costed
     against the units a chapter DECLARES as its clock, and an undeclared unit that reaches a
     hull on turn 5 sinks it exactly as surely as one that reaches it on turn 1 -- it just does
     it out of sight of a gate that only ever looked at turn 1. Skipping them hid ch06's three
-    Difficult-only turn-4 crab riders, which spawn on the west edge and do reach the west hull;
-    this docstring's claim was only ever TRUE of ch06, because ch06 happens to keep that wave
-    inside `enemy_units` -- a chapter whose wave lives under `reinforcements:` or
-    `enemy_reinforcements:` (ch02's own `rear-raiders`) was invisible here until now (#367).
+    Difficult-only turn-4 crab riders, which spawn on the west edge and do reach the west hull
+    (#367).
 
     The two shapes reach differently, and conflating them is what made the first cut of this
     analysis wrong by three units:
@@ -422,12 +413,10 @@ def placed_units(chapter, concept=None):
     chapter's own AI resolution either way, so a concept cannot drift from what the
     build would emit.
 
-    Reads every roster key (#367/#369) -- was `enemy_units` alone, the THIRD copy of the
-    same bug `enemy_bodies` and `units_reaching` were fixed for: a `reinforcements:`/
-    `enemy_reinforcements:` wave was simply absent from the picture. `late` (drawn as a
-    hollow ring) is `inject.raw_pids.entry_is_turn1`'s KEY-aware answer OR'd with
-    `hard_mode_only` -- a separate, MODE-gated axis `entry_is_turn1` does not model, since
-    ch06's Difficult-only crab riders declare it while staying inside `enemy_units`."""
+    Waves are drawn too (#367/#369). `late` (drawn as a hollow ring) is
+    `inject.raw_pids.entry_is_turn1`'s answer OR'd with `hard_mode_only` -- a separate,
+    MODE-gated axis `entry_is_turn1` does not model: a Difficult-only entry can stand on the
+    turn-1 board and still be absent on Normal."""
     import inject.raw_pids
     import difficulty as dif
     import chapter_status as cs

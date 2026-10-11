@@ -29,7 +29,9 @@ class PrologueRosterFromYaml(unittest.TestCase):
         units = {
             'hlin-trollbane': {'level': 3, 'position': [8, 5]},
             'scramsax': {'level': 1, 'position': [13, 9]},
-            'sephek-kaltro': {'level': 5, 'position': [14, 8],
+            'sephek-kaltro': {'id': 'sephek-kaltro', 'name': 'Sephek Kaltro',
+                              'class': 'myrmidon', 'is_boss': True, 'level': 5,
+                              'positions': [[14, 8]],
                               # #335: the boss holds his tile by declared override, because
                               # O'Neill's own DoNothing depends on a tutorial event-script
                               # we do not run.
@@ -37,7 +39,8 @@ class PrologueRosterFromYaml(unittest.TestCase):
                                               'why': 'see the ch00 YAML'},
                               'inventory': [{'id': 'ice-longsword',
                                              'fe_base': 'steel-sword'}]},
-            'caravan-guard': {'class': 'soldier', 'level': 2, 'count': 2,
+            'caravan-guard': {'id': 'caravan-guard', 'name': 'Caravan Guard',
+                              'class': 'soldier', 'level': 2, 'count': 2,
                               'positions': [[14, 7], [13, 7]],
                               'donor': {'at': [14, 7], 'level': 2},
                               'inventory': [{'id': 'iron-lance'}]},
@@ -71,7 +74,7 @@ class PrologueRosterFromYaml(unittest.TestCase):
         self.assertIn('.level = 6,', self.blocks(sephek_kaltro={'level': 6})[1])
 
     def test_boss_position_tracks_the_yaml(self):
-        enemy = self.blocks(sephek_kaltro={'position': [3, 4]})[1]
+        enemy = self.blocks(sephek_kaltro={'positions': [[3, 4]]})[1]
         self.assertIn('.xPosition = 3,', enemy)
         self.assertIn('.yPosition = 4,', enemy)
 

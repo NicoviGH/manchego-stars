@@ -50,10 +50,24 @@ class BadKeysFail(unittest.TestCase):
         # with a personal line is as legal in a wave as on the opening board (#426 review).
         boss = {'id': 'b', 'class': 'druid', 'level': 7, 'is_boss': True,
                 'personal': {'baseHP': 3}, 'weapon': 'flux', 'art': {'portrait': 'b.png'}}
-        for key in ('enemy_units', 'reinforcements', 'enemy_reinforcements', 'neutral_units',
-                    'green_units', 'player_units'):
+        for key in ('enemy_units', 'neutral_units', 'green_units', 'player_units'):
             self.assertEqual([], schema.violations('chNN', {key: [dict(boss)]}), key)
         self.assertEqual([], schema.violations('chNN', {'deployment': {'green_allies': [boss]}}))
+        wave = dict(boss, arrives_turn=3, positions=[[1, 1]])
+        self.assertEqual([], schema.violations('chNN', {'enemy_units': [wave]}))
+
+    def test_an_enemy_wave_has_one_key_and_one_spelling(self):
+        # #479: every wave lives in `enemy_units` and lands by `arrives_turn`; an enemy places
+        # its bodies with `positions:` (inject.units.enemy_rows reads exactly that).
+        unit = {'id': 'b', 'class': 'brigand', 'level': 1}
+        for key in ('reinforcements', 'enemy_reinforcements'):
+            self.assertTrue(schema.violations('chNN', {key: [dict(unit)]}), key)
+        for field, value in (('trigger_turn', 3), ('spawn_turn', 3), ('arrives', {'turn': 3}),
+                             ('position', [1, 1])):
+            doc = {'enemy_units': [dict(unit, **{field: value})]}
+            self.assertTrue(schema.violations('chNN', doc), field)
+        guest = {'player_units': [dict(unit, position=[1, 1])]}
+        self.assertEqual([], schema.violations('chNN', guest))
 
     def test_free_keyed_mappings_accept_any_key(self):
         doc = {'rescue_boats': [{'id': 'b', 'reached_on': {'anything-goes': 3}}]}

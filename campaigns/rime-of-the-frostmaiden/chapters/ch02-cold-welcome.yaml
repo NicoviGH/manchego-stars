@@ -246,7 +246,7 @@ enemy_units:
     fe_name: "Grukk"            # ≤12 — overrides the vanilla "Bone" slot name plate
     is_miniboss: true
     count: 1
-    position: [13, 7]           # on its donor's post, beside the captain
+    positions: [[13, 7]]        # on its donor's post, beside the captain
     fe_mechanic: axe-brigand    # named mid-tier, guards near the boss (FE8 "Bone" slot)
     flavor: "the captain's right hand, half-gone to the cold"
     class: brigand
@@ -261,7 +261,7 @@ enemy_units:
     fe_name: "Halvar"          # ≤12 — overrides the vanilla "Bazba" slot name plate
     is_boss: true
     count: 1
-    position: [11, 7]           # on Bazba's post: vanilla's boss raids from mid-map
+    positions: [[11, 7]]        # on Bazba's post: vanilla's boss raids from mid-map
     fe_mechanic: steel-axe-brigand   # the one real threat = FE8's Steel-Axe Bazba mirror
     flavor: "leads the band the chardalyn drove mad — the last to fully turn"
     class: brigand
@@ -280,7 +280,6 @@ enemy_units:
     donor: [11, 7]              # Bazba -- and vanilla's boss RAIDS; he is not a throne-sitter
     death_quote: "Should've… paid the toll…"
 
-reinforcements:
   - id: rear-raiders
     name: "Chardalyn Berserker"
     count: 2                          # vanilla reinforcement UnitDef_088B4470 (L2 + L3)
@@ -291,7 +290,7 @@ reinforcements:
     inventory:
       - id: iron-axe
         damage_type: slashing
-    trigger_turn: 3
+    arrives_turn: 3                   # the turn-3 wave (vanilla 088B4470's turn)
     spawn_edge: opposite_boss        # flanks a party pushed toward the boss (FE8 pattern)
     positions: [[1,9],[0,9]]         # on their donors' posts, the SW peaks behind a pushed party
     donor: [[1, 9], [0, 9]]     # vanilla 088B4470 in its own order: the L2 at (1,9), the L3 at (0,9)

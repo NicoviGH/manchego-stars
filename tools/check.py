@@ -85,6 +85,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #479: a wave lands by `arrives_turn` inside `enemy_units`, the one spelling
+    r'trigger_turn', r'spawn_turn', r'enemy_reinforcements', r'ARRIVAL_TURN_FIELDS',
     # retired 2026-10-10: gold comes from in-map sources only, never a clear stipend (ADR 0092)
     r'gold_reward',
     # retired by #430: rescue_forecast asks danger_map's calibrated model (ADR 0312)
@@ -827,7 +829,7 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
 # Mirrors inject.raw_pids.ENEMY_ROSTER_KEYS. Named here rather than imported because this
 # module's `checks` CI job runs on a bare interpreter with no Pillow and no submodule, so it
 # must stay import-free; the schema tests fail if the two ever diverge.
-ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
+ROSTER_KEYS = ('enemy_units',)
 
 
 def _roster_entries(d):
@@ -1603,8 +1605,8 @@ def check_rescue_targets(fail):
             reachers = pp.units_reaching(doc, terrain, hulls)
         except Exception as exc:    # noqa: BLE001 -- an ungrounded roster entry (no donor/
             # ai_override, a normal mid-draft state -- #369 widened `units_reaching` to every
-            # roster key, so a `reinforcements:`/`enemy_reinforcements:` entry authored ahead
-            # of its AI can reach here) is #335's business, not this gate's.
+            # enemy entry, so a wave authored ahead of its AI can reach here) is #335's
+            # business, not this gate's.
             print('check_rescue_targets: skipping %s (%s)' % (short, exc))
             continue
         fail.extend(_rescue_target_violations(short, reachers, pursuers))
@@ -1812,6 +1814,64 @@ def check_no_shadowed_definitions(fail, sources=None):
                     'silently discarded. Delete the stale one.'
                     % (rel, node.name, seen[node.name], node.lineno))
             seen[node.name] = node.lineno
+    return fail
+
+
+_CHAPTER_JOB_RE = re.compile(r'^_?(?:prologue|ch\d+)_(\w+)$')
+_CHAIN_COPY_RE = re.compile(r'^chain_(?:prologue|ch\d+)_to_ch\d+$')
+
+
+def check_no_chapter_copies_of_shared_jobs(fail):
+    """Guard: a chapter injector never re-declares a job the shared modules own (#479, ADR 0340).
+
+    ch04-ch06 each wrote the same jobs under a chapter prefix -- `chNN_enemy_rows`,
+    `chNN_location_events`, `chain_chNN_to_chMM` -- because copying the last chapter was the
+    shortest path to the next one. The copies drift (ch04's emitter honoured per-body `levels:`
+    and ch05's and ch06's silently did not), and each new chapter adds one more. So a name
+    `chNN_<job>` (or `_chNN_<job>`) defined or bound at the top of `tools/inject/chapters/*.py`
+    fails when a shared `tools/inject/*.py` module defines a public `<job>`, and so does any
+    `chain_chNN_to_chMM`, which `inject.hosting.chain` makes. A chapter keeps a real difference
+    by NAMING it (`ch06_messie_gather` calls `gather_cast`), not by restating the job.
+
+    AST only, so it runs on the lean `checks` job.
+    """
+    inject_dir = os.path.join(REPO, 'tools', 'inject')
+
+    def top_level(path):
+        with open(path, encoding='utf-8') as fh:
+            tree = ast.parse(fh.read(), path)
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                yield node.name, node.lineno
+            elif isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name):
+                        yield target.id, node.lineno
+
+    shared = {}
+    for name in sorted(os.listdir(inject_dir)):
+        if name.endswith('.py'):
+            path = os.path.join(inject_dir, name)
+            with open(path, encoding='utf-8') as fh:
+                tree = ast.parse(fh.read(), path)
+            for node in tree.body:
+                if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                        and not node.name.startswith('_')):
+                    shared.setdefault(node.name, name)
+    chapters = os.path.join(inject_dir, 'chapters')
+    for name in sorted(os.listdir(chapters)):
+        if not name.endswith('.py'):
+            continue
+        rel = 'tools/inject/chapters/' + name
+        for symbol, line in top_level(os.path.join(chapters, name)):
+            job = _CHAPTER_JOB_RE.match(symbol)
+            if job and job.group(1) in shared:
+                fail.append('%s:%d defines %s, a chapter copy of the shared %s (inject/%s) -- '
+                            'call the shared one with this chapter\'s facts as parameters'
+                            % (rel, line, symbol, job.group(1), shared[job.group(1)]))
+            elif _CHAIN_COPY_RE.match(symbol):
+                fail.append('%s:%d defines %s -- chain steps come from inject.hosting.chain(src, '
+                            'dst) in inject/steps.py' % (rel, line, symbol))
     return fail
 
 
@@ -3316,8 +3376,9 @@ CHECKS = (
     check_injector_source_has_one_reader,
     check_tile_changes_outlive_the_retarget, check_playtest_matrix,
     check_rom_configs_reach_the_build, check_decomp_git_calls_strip_the_env,
-    check_no_shadowed_definitions, check_gate_chapter_window, check_declared_cases,
-    check_chapter_lua_facts, check_rescue_targets, check_rescue_fuse_forecast,
+    check_no_shadowed_definitions, check_no_chapter_copies_of_shared_jobs,
+    check_gate_chapter_window, check_declared_cases, check_chapter_lua_facts,
+    check_rescue_targets, check_rescue_fuse_forecast,
     check_documented_tileset, check_harness_local_ratchet, check_verdict_scenarios_are_guarded,
     check_no_hardcoded_symbol_addresses, check_tool_refs_exist, check_no_dead_concepts,
     check_campaign_declares_no_chapter_list, check_skip_claims_name_a_live_test,

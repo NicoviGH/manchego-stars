@@ -9,7 +9,9 @@ from inject.asset_table import _asm_table_word_index
 from inject.chapter_frame import write_settings_row, write_event_group
 from inject.hosting import _load_chapter_yaml, GOAL_TEMPLATE, map_writes
 from inject.chapter_ids import PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT
-from inject.decomp import _find_brace_block, _replace_brace_block, fe_item_enum, REPO
+from inject.class_ids import ChapterClassIds
+from inject.decomp import (
+    _find_brace_block, _replace_brace_block, fe_item_enum, REPO, WEAPON_ITEM_ENUM)
 from inject.hosts import PROLOGUE_CHAPTER_INDEX, PROLOGUE_EVENT_GROUP, PROLOGUE_HOST_INDEX
 from inject.maps import _register_chapter_map
 from inject.montage import inject_opening_montage, inject_world_tour
@@ -17,13 +19,13 @@ from inject.paths import (
     ASSET_TABLE_S, CH1_EVENTINFO_H, CH1_EVENTSCRIPT_H, CH1_UDEFS_H, CHAPTER_SETTINGS_JSON, CHARACTERS_C,
     GAMECONTROL_C, TEXTS_TXT)
 from inject.scenes import (
-    _prepend_battle_quote, _prepend_defeat_quote, _write_chapter_title_card, battle_quote_body,
-    battle_quote_pair, defeat_quote_row)
+    battle_quote_body, battle_quote_pair, defeat_quote_row, _prepend_battle_quote,
+    _prepend_defeat_quote, write_frame_texts)
 from inject.stats import _set_field, _set_gender, donor_growths_and_ranks, guest_personal_line
 from inject.text import (
-    _fid_tag, _script_to_message, display_name, name_message_body, set_message_body,
-    vanilla_name_text_id)
-from inject.units import enemy_ai_initialiser
+    display_name, _fid_tag, name_message_body, _script_to_message, set_message_body,
+    write_nameplate)
+from inject.units import enemy_rows
 
 
 # The guest slots whose personal bases inject_prologue rewrites: Hlin and Scramsax onto their
@@ -85,7 +87,7 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
     hlin_class, scram_class = classes
     hlin_items, scram_items = guest_items
     hlin, scram = by_id['hlin-trollbane'], by_id['scramsax']
-    sephek, guard = by_id['sephek-kaltro'], by_id['caravan-guard']
+    guard = by_id['caravan-guard']
 
     ally = (
         '{\n'
@@ -119,12 +121,10 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
                'scram_items': scram_items, 'scram_level': scram['level'],
                'scram_x': scram['position'][0], 'scram_y': scram['position'][1]})
 
-    # The guards ride two spare non-cast character slots. `count`/`positions` decide how
-    # many are emitted and where; a disagreement between them would silently ship a roster
-    # nobody authored, so it fails the build instead.
+    # The guards ride two spare non-cast character slots, one per body. `count`/`positions`
+    # decide how many are emitted and where; a disagreement between them would silently ship
+    # a roster nobody authored, so it fails the build instead.
     guard_slots = (0x80, 0x82)
-    import difficulty
-    guard_class = difficulty._enemy_class_enum(guard['class'])
     if len(guard['positions']) != guard['count']:
         sys.exit('ERROR: ch00 caravan-guard has count=%d but %d position(s)'
                  % (guard['count'], len(guard['positions'])))
@@ -132,40 +132,15 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
         sys.exit('ERROR: ch00 caravan-guard count=%d exceeds the %d spare character slot(s); '
                  'add one to guard_slots in _prologue_roster_blocks'
                  % (guard['count'], len(guard_slots)))
-    guards = ''.join(
-        '    {\n'
-        '        .charIndex = 0x%02x, /* Torg\'s caravan guard */\n'
-        '        .classIndex = %s,\n'
-        '        .allegiance = FACTION_ID_RED,\n'
-        '        .level = %d,\n'
-        '        .xPosition = %d,\n'
-        '        .yPosition = %d,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { %s },\n'
-        '        .ai = %s,\n'
-        '    },\n' % (slot, guard_class, guard['level'], pos[0], pos[1],
-                      fe_item_enum(guard['inventory'][0]),
-                      enemy_ai_initialiser(chap, guard, index))
-        for index, (slot, pos) in enumerate(zip(guard_slots, guard['positions'])))
 
-    enemy = (
-        '{\n'
-        '    {\n'
-        '        .charIndex = CHARACTER_%s, /* Sephek -- boss; escapes in the ending */\n'
-        '        .classIndex = CLASS_MYRMIDON,\n'
-        '        .allegiance = FACTION_ID_RED,\n'
-        '        .level = %d,\n'
-        '        .xPosition = %d,\n'
-        '        .yPosition = %d,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { %s },\n'
-        '        .ai = %s,\n'
-        '    },\n'
-        '%s'
-        '    { 0 },\n'
-        '}' % (sephek_slot, sephek['level'], sephek['position'][0], sephek['position'][1],
-               fe_item_enum(sephek['inventory'][0]),
-               enemy_ai_initialiser(chap, sephek), guards))
+    def pid(entry, index):
+        # Sephek (boss) rides his own slot and escapes in the ending.
+        if entry.get('is_boss'):
+            return 'CHARACTER_%s' % sephek_slot
+        return '0x%02x' % guard_slots[index]
+
+    rows = enemy_rows(chap, ChapterClassIds('prologue'), WEAPON_ITEM_ENUM, pid)
+    enemy = '{\n' + '\n'.join(rows) + '\n    { 0 },\n}'
     return ally, enemy
 
 
@@ -303,30 +278,18 @@ def inject_prologue(campaign, verbose=True, montage=False):
     for slot, uid in name_slots:
         unit = by_id[uid]
         unit.setdefault('id', uid)
-        set_message_body(lines, vanilla_name_text_id(slot),
-                         name_message_body(display_name(unit)))
-    # 4a. Chapter title, both places FE8 keeps it: the intro/status banner is a 4bpp
-    #     IMAGE (chap_title_data[chapTitleId], not text) -- recompose it from vanilla
-    #     glyphs in the YAML's title (gen_chapter_title) and overwrite the host slot's
-    #     card; the save-select/status TEXT rides chapTitleTextId. Stale .4bpp/.lz
-    #     intermediates are removed so make re-converts the new PNG.
-    set_message_body(lines, host['chapTitleTextId'],
-                     name_message_body(chap['title']))
+        write_nameplate(lines, slot, unit)
+    # 4a. The frame texts and the title card (write_frame_texts). The copied goal block still
+    #     points its Status-screen objective at vanilla's "Defeat O'Neill" -- it becomes
+    #     "Defeat <boss fe_name>" (vanilla keeps this short; the YAML's full
+    #     objective.description is for docs/banners).
+    write_frame_texts(lines, host, chap, 'Defeat ' + display_name(by_id['sephek-kaltro']))
     # The New Game save-slot select shows the VANILLA prologue slot's title text
     # ("Prologue: <title>" with the prefix screen-composed) -- it reads chapter 0,
     # not the host, so retitle that slot's text too.
     set_message_body(lines,
                      settings['chapters'][PROLOGUE_CHAPTER_INDEX]['chapTitleTextId'],
                      name_message_body(chap['title']))
-    # The copied goal block still points its Status-screen objective at vanilla's
-    # "Defeat O'Neill" -- rewrite it as "Defeat <boss fe_name>" (vanilla keeps this
-    # short; the YAML's full objective.description is for docs/banners).
-    set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat ' + display_name(by_id['sephek-kaltro'])))
-    # Was an inline copy of _write_chapter_title_card, carrying the same delete-and-hope bug
-    # (#245): make does not re-derive a deleted .4bpp.lz, so the prologue's card either broke
-    # the build or silently never landed. One helper now, which owns the conversion.
-    _write_chapter_title_card(host, 'Prologue: ' + chap['title'])
 
     # 4c. Dialogue (ch00 dialogue pass, 2026-06-10): message bodies are GENERATED from
     #     the chapter YAML's locked `script:` blocks + quote fields -- the YAML stays

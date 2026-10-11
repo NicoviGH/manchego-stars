@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-339 decisions. Read this index, then open the two or three you need — the whole
+340 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -479,6 +479,7 @@ session state. `HANDOFF.md` points here._
 | `0307` | [The chapter YAML has a schema, checked when the file is loaded](decisions/0307-the-chapter-yaml-has-a-schema-checked-at-load.md) | 2026-10-01 | #411 |
 | `0308` | [A hosted chapter's frame starts blank; keeping a donor field is declared](decisions/0308-a-hosted-chapters-frame-starts-blank.md) | 2026-10-01 | #412 #302 |
 | `0309` | [The fingerprint gate runs the configurations a change reaches](decisions/0309-the-fingerprint-gate-runs-the-configurations-a-change-reaches.md) | 2026-10-01 | #424 |
+| `0340` | [A chapter injector writes no copy of a shared job](decisions/0340-a-chapter-injector-writes-no-copy-of-a-shared-job.md) | 2026-10-10 | #479 #302 #27 |
 
 ---
 

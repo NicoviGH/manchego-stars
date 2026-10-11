@@ -77,7 +77,7 @@ enemy_units:
     # Monster class (cyclops): its effective counters are monster-effective weapons
     # (sacred/rare), which the pre-promotion party lacks — see difficulty_note.
     ai_pattern: aggressive
-    arrives: { turn: 4 }
+    arrives_turn: 4
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
