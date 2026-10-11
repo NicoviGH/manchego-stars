@@ -742,12 +742,13 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     The boarding pass is wired (ch06_boarding_wiring): Grynsk's and Tali's scenes, the east
     hull's Antitoxin, and the save-both Orion's Bolt in the ending. The OPENING is wired: beat A
     in Bremen's hall over backdrops, then LOMA and prep, then beat B on the ice, which cuts to the
-    lake where the merfolk line LOADs in shot (it is NOT on the map during prep). The ending plays the
-    victory sting, the payout, and the dev-placeholder landing. Nerra has a taunt and a FLAGGED
-    retreat line (ADR 0337); Messie's boss-death scene is wired (ch06_messie_messages).
+    lake where the merfolk line LOADs in shot (it is NOT on the map during prep). Nerra has a
+    taunt and a FLAGGED retreat line (ADR 0337). The ending IS Messie's boss-death scene
+    (ch06_messie_messages): the chapter closes on his last line, then records the hulls that came
+    home, pays the save-both Bolt and fades on Into the Shadow of Victory (ADR 0339).
 
-    DEFERRED to follow-up passes: the ending scene and the title-card art. ch06's ending parks on the dev placeholder until ch07 hosts, exactly as
-    ch05's did.
+    DEFERRED to a follow-up pass: the title-card art. ch06's ending parks on the dev placeholder
+    until ch07 hosts, exactly as ch05's did.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)
