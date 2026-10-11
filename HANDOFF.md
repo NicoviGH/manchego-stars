@@ -6,20 +6,22 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-11 (Claude): #480 merged (closes #479) -- every chapter's copied jobs are shared
-helpers now, and every enemy entry has one YAML shape (ADR 0340). **What landed and why is in
-`git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-11 (Claude): ch07 is hosted and plays (#481 map, ADR 0341; #482 hosting).
+**What landed and why is in `git log`, the ADRs it cites, and #27's 2026-10-11 comment** -- this
+file keeps no "recently landed" list.
 
 ## In flight
 
 Nothing on a branch. **Next, in order:**
 
-1. **#27 -- ch07.** Write NO custom or copied code (Nicolas): `docs/adding-a-chapter.md` opens
-   with the shared-helper table, and `check_no_chapter_copies_of_shared_jobs` fails a
-   `ch07_<job>` that restates one. Decisions so far are #27's 2026-10-10 comments: Ch7Map
-   reskinned, the moat as the harbour, Seize, docks opening forking on flags 0xFC/0xFD
-   (`branch_on_flag`; ch06 sets them with `record_alive_flags`), the 10,000 gold in the ending.
-   Hosting ch07 adds `Step(chain('ch06', 'ch07'))` in `inject/steps.py`.
+1. **#27 -- ch07 scenes pass**, after Nicolas answers the open call on #27 (Dorbulgruf twin-exact
+   Cavalier vs Fighter with an axe; my pick: the Fighter, which keeps the axe-bite beat). The
+   scene list is #27's 2026-10-11 comment: docks opening forking on 0xFC/0xFD, the ballista
+   heads-up the onboarding check owes, the two houses (vanilla 0xA06/0xA07 still), Murray's
+   vanilla quotes 0xA02/0xA03 still playing under Dorbulgruf's name, Wolfram's axe bite, and the
+   ending (fish tax, the reveal, 10,000 gold; the economy readout needs its scene-gold field).
+   Still write NO custom or copied code: `docs/adding-a-chapter.md`'s shared-helper table.
+   `make CH07BOOT=1` + `tools/playtest/run.sh ch07titlecard` / `PT_HOST_CHAPTER=8 ... mapshot`.
 2. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
@@ -31,8 +33,8 @@ Nothing on a branch. **Next, in order:**
 
 ## Chapter work
 
-- **#27 -- ch07** is reframed by ADR 0332 and placed by ADR 0339. Still `status: planned`.
-  `make chapter CH=ch07` is its state.
+- **#27 -- ch07** is hosted on slot 8 (`status: active`, not `balance_locked` until the boss
+  call lands). `make chapter CH=ch07` is its state.
 - **#24 -- ch04 owes the terrain-bonus lesson** (vanilla Ch4's "stay in the woods"), a dialogue pass.
 - **#335** -- the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).

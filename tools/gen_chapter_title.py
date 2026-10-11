@@ -10,7 +10,14 @@ match the runtime palette exactly.
 
 The atlas below only covers glyphs verified by eye so far (cut columns read
 off ASCII pixel dumps of the source words). Extend it per new chapter title;
-unknown glyphs are a hard error, never a silent fallback.
+unknown glyphs are a hard error, never a silent fallback. A glyph cut from a kerned word
+must stop at its OWN shadow: one column too far carries the neighbour's outline (the 'd' cut
+from "Blade" did, and showed in "Cold" and "Blood" until ch07).
+
+The PNG's embedded palette is NOT what the player sees: the card holds indices, and the game
+colours them per screen (chapter_title.c picks a row of gPal_08A07AD8/C58 by context; the
+Status screen draws white on blue). Judge a card in the ROM -- a chapter's `<chNN>titlecard`
+case, or `titlecard` on the canonical build -- never from this file's preview.
 
 Usage: gen_chapter_title.py "Prologue: A Dagger of Ice" out.png [preview4x.png]
 """
