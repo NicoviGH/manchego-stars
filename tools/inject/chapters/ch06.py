@@ -7,8 +7,8 @@ import sys
 
 from inject.cast import (_classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP,
                          PORTRAIT_MAP)
-from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_TALK_FLAGS, CH06_BOAT_TALK_MSGS,
-                                CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
+from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_SURVIVED_FLAGS, CH06_BOAT_TALK_FLAGS,
+                                CH06_BOAT_TALK_MSGS, CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
                                 CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
                                 CH06_NERRA_RETREAT_MSG, CH06_NERRA_TAUNT_MSG,
                                 CH06_OPENING_CARD_MSG, CH06_OPENING_MSGS, CH06_OPENING_QUIP_MSG)
@@ -677,6 +677,23 @@ def ch06_messie_block(chap, terrain, theme):
                   % (CH06_MESSIE_CRY, CH06_MESSIE_MSG, theme))
 
 
+# One label per hull, clear of SAVE_ALL_SKIP_LABEL (0x2), which the Bolt's gate spends next.
+CH06_BOAT_SURVIVED_LABELS = {'boat-east': '0x3', 'boat-west': '0x4'}
+
+
+def ch06_boat_survived_flags(hulls):
+    """Set a hull's PERMANENT survived flag when it is still afloat, for ch07's docks opening.
+    `hulls` is {boat id: pid}. Each check branches past its own ENUT, so either can fail alone."""
+    out = ''
+    for bid, pid in hulls.items():
+        label = CH06_BOAT_SURVIVED_LABELS[bid]
+        out += ('    CHECK_ALIVE(%s)\n'
+                '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0)\n'
+                '    ENUT(%s) /* %s came home: ch07 opens on its crew */\n'
+                'LABEL(%s)\n' % (pid, label, CH06_BOAT_SURVIVED_FLAGS[bid], bid, label))
+    return out
+
+
 def ch06_ending_debug_script(seed_load):
     """`--ch06-ending`: New Game straight onto the ending -- Messie on the ice, the payout, the
     landing. ch05's ending boot, for the same reason (decisions.md -> "Playtest runs are the most
@@ -725,12 +742,13 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     The boarding pass is wired (ch06_boarding_wiring): Grynsk's and Tali's scenes, the east
     hull's Antitoxin, and the save-both Orion's Bolt in the ending. The OPENING is wired: beat A
     in Bremen's hall over backdrops, then LOMA and prep, then beat B on the ice, which cuts to the
-    lake where the merfolk line LOADs in shot (it is NOT on the map during prep). The ending plays the
-    victory sting, the payout, and the dev-placeholder landing. Nerra has a taunt and a FLAGGED
-    retreat line (ADR 0337); Messie's boss-death scene is wired (ch06_messie_messages).
+    lake where the merfolk line LOADs in shot (it is NOT on the map during prep). Nerra has a
+    taunt and a FLAGGED retreat line (ADR 0337). The ending IS Messie's boss-death scene
+    (ch06_messie_messages): the chapter closes on his last line, then records the hulls that came
+    home, pays the save-both Bolt and fades on Into the Shadow of Victory (ADR 0339).
 
-    DEFERRED to follow-up passes: the ending scene and the title-card art. ch06's ending parks on the dev placeholder until ch07 hosts, exactly as
-    ch05's did.
+    DEFERRED to a follow-up pass: the title-card art. ch06's ending parks on the dev placeholder
+    until ch07 hosts, exactly as ch05's did.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)
@@ -900,18 +918,20 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
         '{\n    SVAL(EVT_SLOT_2, %s)\n'
         '    CALL(EventScr_LoadReinforceHardMode) /* Difficult only -- FE8\'s own predicate */\n'
         '    EVBIT_T(7)\n    ENDA\n}' % CH06_HARD_WAVE_TABLE, CH06_EVENTSCRIPT_H)
-    # The ending: the victory sting, then the dev-placeholder landing. ch07 is not hosted, so
-    # this parks exactly where ch05's did until ch06 hosted; the Messie scene and the ending
-    # cutscene are the dialogue pass's, and neither is stubbed with placeholder prose here.
-    # The save-both payout is vanilla Ch6's own: CHECK_ALIVE on every civilian, the Orion's Bolt
-    # only on a clean sweep. Boarding is not required, only keeping both hulls afloat.
+    # The ending: the chapter CLOSES on Messie's "Then I will come." (Nicolas, 2026-10-10). The
+    # docks and the rescued crews open ch07, so after his last line the script only records
+    # which hulls came home (ch07's opening forks on it), pays vanilla Ch6's save-both Orion's
+    # Bolt with no ceremony (CHECK_ALIVE on both, the popup alone), and fades out on vanilla
+    # Ch6's own last cue. ch07 is not hosted, so it then parks on the dev placeholder.
     hulls = {b['id']: CH06_BOAT_PIDS[b['id']] for b in chap['rescue_boats']}
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
         '{\n' + messie_gather + ch06_messie_block(chap, terrain, chapter_bgm(chap)['bluePhase'])
-        + '    MUSC(SONG_VICTORY)\n'
+        + ch06_boat_survived_flags(hulls)
         + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')
+        + '    MUSCSLOW(SONG_INTO_THE_SHADOW_OF_VICTORY) /* vanilla Ch6\'s closing cue */\n'
+        + '    STAL(60)\n'
         + '    FADI(16) /* fade the lake out into the dev-placeholder landing */\n'
         + dev_placeholder_scene() + '    ENDA\n}', CH06_EVENTSCRIPT_H)
     with open(CH06_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:

@@ -2820,7 +2820,6 @@ def chapter_economy(chap):
         if ed.get('item_drop'):
             drops.append(ed['item_drop'])
     pc = chap.get('post_chapter') or {}
-    gold += int(pc.get('gold_reward') or 0)
     shops = list(pc.get('available_shops') or chap.get('available_shops') or [])
     return {'gold': gold, 'gifts': gifts, 'chests': chests, 'drops': drops, 'shops': shops}
 

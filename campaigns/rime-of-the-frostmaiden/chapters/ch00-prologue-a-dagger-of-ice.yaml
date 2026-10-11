@@ -292,7 +292,6 @@ events:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 0                 # standalone cold-open; rewards begin in ch01
   unlocks_chapter: ch01-the-iron-trail
   hooks:
     - "Sephek escaped — a recurring threat. His reckoning is left for the story to place; the book's Torrga Icevein dogsled caravan (book p.24) is the natural payoff, held in reserve."

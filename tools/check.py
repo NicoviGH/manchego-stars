@@ -85,6 +85,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired 2026-10-10: gold comes from in-map sources only, never a clear stipend (ADR 0092)
+    r'gold_reward',
     # retired by #430: rescue_forecast asks danger_map's calibrated model (ADR 0312)
     r'sink_band', r'concurrent_attacker_cap', r'arrival_to_cells',
     # retired by #430: the vanilla party is derived along the chain, not curated per twin

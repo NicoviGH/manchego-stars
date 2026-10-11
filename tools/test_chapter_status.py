@@ -110,11 +110,17 @@ class Art(unittest.TestCase):
         self.assertEqual([], row.missing)
 
     def test_a_unit_with_no_art_at_all_lists_what_is_missing(self):
-        """ch06's monster is named and unbuilt, which is the row that tells you what the next
-        chapter still owes."""
-        rows = cs.art('ch06')
-        self.assertTrue(rows)
-        self.assertTrue(any(r.missing for r in rows))
+        """ch07's Speaker is named and has only his bust, which is the row that tells you what
+        the next chapter still owes."""
+        row = next(r for r in cs.art('ch07') if r.unit == 'dorbulgruf')
+        self.assertEqual(['battle_anim', 'map_sprite'], row.missing)
+
+    def test_a_boss_wearing_a_class_reskin_has_its_sprite_and_anim(self):
+        """Nerra is a Shaman, and ch06 dresses every Shaman as the merfolk tidecaller: she draws
+        that map sprite and battle anim with no per-unit file (2026-10-10)."""
+        row = next(r for r in cs.art('ch06') if r.unit == 'nerra')
+        self.assertEqual((True, True, True), (row.portrait, row.map_sprite, row.battle_anim))
+        self.assertEqual([], row.missing)
 
 
 class Scenarios(unittest.TestCase):
@@ -146,14 +152,16 @@ class LooseEnds(unittest.TestCase):
             self.assertFalse(any('message' in e for e in cs.loose_ends('ch06')))
 
     def test_a_planned_chapter_reports_its_unwritten_scenes_and_missing_art(self):
-        ends = cs.loose_ends('ch06')
+        ends = cs.loose_ends('ch07')
         self.assertTrue(any('no script yet' in e for e in ends))
         # The art line reads "<unit> (<role>) has no <kinds>". A bare `'art' in e` passed off
         # "chapter_start" in the unpreviewable-scene line, and went silent when ch06 got a preview.
+        # ch06 itself reports none since its ending closed on Messie (2026-10-10), so ch07 is the
+        # planned chapter now.
         self.assertTrue(any(') has no ' in e for e in ends), ends)
 
     def test_a_finished_chapter_has_fewer_loose_ends_than_a_planned_one(self):
-        self.assertLess(len(cs.loose_ends('ch05')), len(cs.loose_ends('ch06')))
+        self.assertLess(len(cs.loose_ends('ch05')), len(cs.loose_ends('ch07')))
 
     def test_ch06s_rescue_clock_is_clean_after_the_east_pursuer_fix(self):
         """Was the confirmed #26/#367 finding (the east pursuer corked by its own line,

@@ -62,6 +62,11 @@ introduces:
     coverage: dialogue
     where: "forest-edge fog exchange — Pinky flags the limited sight (script locked; wiring pending)"
     status: planned
+  - concept: terrain-bonuses      # forest cover (avoid/defense) -- DEBUT owed here, vanilla's timing
+    coverage: dialogue           # vanilla Ch4 does both: Artur/Seth "stay in the woods" (MSG_9AA/9AB)
+                                 # + the tutorial box MSG_9B9. Our ch04 carries neither yet (found 2026-10-10)
+    where: "OWED: an in-voice 'stay in the trees' beat on the forest hunt (dialogue pass with Nicolas, #24)"
+    status: planned
 
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
@@ -589,7 +594,6 @@ events:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 200
   available_shops: [lonelywood]
   units_available_to_recruit:            # Lupin = playable recruit (LOCKED 2026-06-20)
     - id: lupin                          # Cavalier under the hood, wolf sprite on top

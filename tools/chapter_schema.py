@@ -138,7 +138,7 @@ CHAPTER = {
     'economy': {'elven_store': {'armory': ANY, 'vendor': ANY},
                 'reward_sites': [{'gift': ANY}],
                 'save_all_bonus': ANY, 'save_all_gate': ANY},
-    'post_chapter': {'available_shops': ANY, 'ends_mvp': ANY, 'gold_reward': ANY,
+    'post_chapter': {'available_shops': ANY, 'ends_mvp': ANY,
                      'net_gold': ANY, 'hooks': ANY, 'unlocks_chapter': ANY,
                      'promotion_seam': {'note': ANY},
                      'caravan_npcs_added': [{'id': ANY, 'description': ANY}],

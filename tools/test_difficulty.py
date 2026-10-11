@@ -1717,10 +1717,10 @@ class ItemEconomy(unittest.TestCase):
                                            {'id': 'vulnerary'}]}],
             'chests': [{'contents': [{'id': 'red-gem'}]}],
             'enemy_units': [{'id': 'k', 'item_drop': 'chest-key'}],
-            'post_chapter': {'gold_reward': 200, 'available_shops': ['termalaine']},
+            'post_chapter': {'available_shops': ['termalaine']},
         }
         ours = df.chapter_economy(chap)
-        self.assertEqual(ours['gold'], 350)               # 150 village + 200 post
+        self.assertEqual(ours['gold'], 150)               # village gold only: no clear stipend (ADR 0092)
         self.assertEqual(ours['gifts'], ['vulnerary'])
         self.assertEqual(ours['chests'], ['red-gem'])
         self.assertEqual(ours['drops'], ['chest-key'])

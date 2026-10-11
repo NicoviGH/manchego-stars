@@ -26,6 +26,16 @@ parity_reference: "FE8 Ch6"   # #48 enemy-pressure parity bar — Victims of War
                               # Also sets the REWARD TIER: the economy block below is legal only
                               # because this is >= FE8 Ch5 (decisions.md, reward ladder).
 
+# ── Onboarding (what this chapter first teaches) ─────────────────────────────────
+# Poison is new here: the venin claw (shark-rider-poison) is the campaign's first status
+# effect. Tali's snow-drift line (boat-west) is NOT a debut: forests grant cover from ch01, and
+# vanilla teaches terrain bonuses in Ch4, so that debut is owed by ch04 (its `introduces:`).
+introduces:
+  - concept: status-effects      # poison -- DEBUT (the venin claw)
+    coverage: dialogue           # C-hybrid: in-voice threat call-out, as vanilla Ch6's village (MSG_9F3)
+    where: "boarding the east boat: Grynsk warns of the poisonous creature and hands over an Antitoxin"
+    status: active
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 # REFRAMED 2026-08-29 and 2026-10-08 (Nicolas); ADR 0332. Messie is the bounty and the
 # merfolk are the fight. Canon supports the frame (Rime pp. 28-31): the plesiosaur "recognizes
@@ -751,8 +761,9 @@ enemy_units:
     # FEUniverse. Her voice is lore/nerra.md. She RETREATS rather than dies, so she can return.
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
-# THREE scenes (2026-08-29). Messie never stands on the field, so he has no Talk unlock and
-# no kill/spare arm. The ending's only branch is a boat that sank (see chapter_end).
+# Messie never stands on the field, so he has no Talk unlock and no kill/spare arm. The
+# chapter ENDS on his scene (boss_defeated): the docks and the rescued crews open ch07, which
+# forks on the hulls ch06's ending records as come home (Nicolas, 2026-10-10).
 events:
   - trigger: chapter_start
     type: cutscene
@@ -881,6 +892,9 @@ events:
          up with the Speaker; the scene ends on Messie agreeing to come.
       Held for ch07: why the merfolk turned bold and what the Frostmaiden asked of them
       (Messie's farewell), and the Speaker idea (the argument with Dorbulgruf).
+      THE CHAPTER ENDS HERE, on "Then I will come." (Nicolas, 2026-10-10: the cliffhanger).
+      After his last line the ending records which hulls came home, pays the save-both Orion's
+      Bolt with no ceremony, and fades out on Into the Shadow of Victory, vanilla Ch6's last cue.
     script:                           # LOCKED 2026-10-09 (dialogue-pass, co-written with Nicolas)
       # ── A: he surfaces ──
       # (Kyogre's Cave of Origin order: the ice cracks under a quake and a screen shake; Messie
@@ -934,17 +948,6 @@ events:
       - braulo: "The Speaker didn't know what he was paying for. We'll take that up with him."
       - messie: "......"
       - messie: "Then I will come."
-  - trigger: chapter_end
-    type: cutscene
-    ea_file: events/ch06-ending.ea
-    description: >
-      Back at Bremen's docks with the rescued crews. Vanilla's MSG_9F1 is the model: the
-      rescued thank the party, and if both boats survived the Orion's Bolt is handed over,
-      exactly as vanilla Ch6 pays its own save-them-all reward (CHECK_ALIVE on both). Grynsk
-      can confirm in one line that the merfolk were never this bad before. Tali leaves with
-      the book's exit: "interesting... fascinating... remarkable", muttered in Elvish. The
-      party heads for the Speaker with Messie to broker peace, which is where ch07 opens.
-      A boat that sank takes its speaker's lines with it, as ch05's ending cuts Sahnar.
 
 # ── Messie (cutscene actor, NOT an enemy unit) ───────────────────────────────────
 # He has no class, no level and no AI: he is loaded by `events/ch06-messie.ea`, speaks, and
@@ -1008,7 +1011,6 @@ messie:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 400
   available_shops: [bremen]
   units_available_to_recruit: []   # Messie is an NPC, not a playable unit
   unlocks_chapter: ch07-blood-in-bremen

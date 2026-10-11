@@ -442,6 +442,10 @@ CH06_BOAT_NAME_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-name'
 # slot 7's lists are all ours, and the Turn list's wave rides flag 0. The scenes are our own `MS_`
 # scripts and their messages are appended (inject/message_alloc.py).
 CH06_BOAT_TALK_FLAGS = {'boat-east': 'EVFLAG_TMP(9)', 'boat-west': 'EVFLAG_TMP(10)'}
+# Which hull came home, set by the ending for ch07's docks opening to fork on (Grynsk, Tali,
+# both or neither). PERMANENT flags (ids >= 101 ride the save across the chapter break), next to
+# the 0xF0-0xFB block inject.decomp already holds; vanilla's highest permanent flag is 235.
+CH06_BOAT_SURVIVED_FLAGS = {'boat-east': '0xFC', 'boat-west': '0xFD'}
 CH06_BOAT_TALK_SCRIPTS = {'boat-east': 'MS_Ch06BoardEast', 'boat-west': 'MS_Ch06BoardWest'}
 CH06_BOAT_TALK_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-talk'),
                        'boat-west': appended_message_id('ch06', 'boat-west-talk')}

@@ -572,7 +572,6 @@ events:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  gold_reward: 0                   # vanilla Ch2 gives no gold (decisions.md §Gold); the chwinga charms ARE the reward
   available_shops: [targos]
   units_available_to_recruit: []   # Baxby is ch01; no new recruit here
   unlocks_chapter: ch03-the-termalaine-mine
