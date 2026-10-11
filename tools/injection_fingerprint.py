@@ -33,6 +33,20 @@ So the manifest is the union of three things, and the third is what makes the se
     wrote it -- which cannot pick up a `make` artifact, because nothing built one meanwhile;
   * a `DELETED` marker for every ignored/untracked path that existed before the run and does
     not after, so dropping a stale-artifact removal is a difference too.
+
+RUNNING IT (lessons from #479, which ran it over all 15 configurations):
+  * Record the baseline from the base commit's code, then let every run finish. Killing this
+    process orphans its `build_campaign` child, which keeps injecting while the next run starts,
+    and both corrupt the tree; it also leaves `*.fingerprint-bak` at the repo root, which the
+    next run refuses to start over (move them back first). Never edit the injector mid-run.
+  * A run leaves the tree injected in ITS configuration. Re-inject canonical before `make
+    check` or a commit: `test_scene_actors` reads the injected tree, and a boot config's tree
+    fails it for reasons that have nothing to do with your change.
+  * A change to `inject/steps.py` reaches every configuration (`fingerprint_reach.py`).
+  * A refactor that only rewords a generated comment reads CHANGED here. Prove it is comment-only
+    by copying `src/events`, `src/events_udefs.c` and `texts/texts.txt` after each run and diffing
+    them with C comments and whitespace stripped (texts.txt must stay byte-identical), then build
+    the canonical ROM on both sides and compare the sha256.
 """
 import argparse
 import hashlib

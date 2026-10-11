@@ -6,20 +6,21 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-10 (Claude): #478 merged (closes #26) -- ch06 ends on Messie, the per-chapter
-gold field retired, ch07 takes vanilla Ch7's own layout and Ch8's 10,000-gold gift (ADR 0339). **What landed
-and why is in `git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
+Refreshed 2026-10-11 (Claude): #480 merged (closes #479) -- every chapter's copied jobs are shared
+helpers now, and every enemy entry has one YAML shape (ADR 0340). **What landed and why is in
+`git log` and the ADRs it cites** -- this file keeps no "recently landed" list.
 
 ## In flight
 
-**PR #480 (#479), in review, branch `refactor/479-shared-chapter-helpers`:** every chapter's
-copied jobs are lifted into shared helpers (ADR 0340), ch00-ch02's enemy YAML takes the one
-entry shape, ROM byte-identical over all 15 configs. Merges on Nicolas's "merge". **Then, in order:**
+Nothing on a branch. **Next, in order:**
 
-1. **#479 lands with #480** -- delete the two traps below that it retires.
-2. **#27 -- ch07.** Decisions so far are its 2026-10-10 comments: Ch7Map reskinned, the moat as
-   the harbour, Seize, docks opening forking on flags 0xFC/0xFD, the 10,000 gold in the ending.
-3. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
+1. **#27 -- ch07.** Write NO custom or copied code (Nicolas): `docs/adding-a-chapter.md` opens
+   with the shared-helper table, and `check_no_chapter_copies_of_shared_jobs` fails a
+   `ch07_<job>` that restates one. Decisions so far are #27's 2026-10-10 comments: Ch7Map
+   reskinned, the moat as the harbour, Seize, docks opening forking on flags 0xFC/0xFD
+   (`branch_on_flag`; ch06 sets them with `record_alive_flags`), the 10,000 gold in the ending.
+   Hosting ch07 adds `Step(chain('ch06', 'ch07'))` in `inject/steps.py`.
+2. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
 - `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
@@ -40,12 +41,8 @@ entry shape, ROM byte-identical over all 15 configs. Merges on Nicolas's "merge"
 
 - **Our own scenes are named `MS_*`.** Any code that matches `EventScr_` must ask whether it
   also means `MS_` (#401 reported 26 of 40).
-- **Until #480 merges, a wave's arrival turn has several spellings.** Read it through
-  `inject.raw_pids.entry_arrival_turn`, never a field. #480 makes `arrives_turn` the only one.
 - **`make difficulty --curve` takes ~25s** (instrument v2 runs over 1001 careers per unit);
   `chapter_matchup` memoises on the chapter's CONTENT, so a doctored chapter dict still misses.
-- **Until #480 merges, `levels:` (per-body levels) is honoured only by ch02's wave and ch04.**
-  #480 routes every chapter's enemy rows through `inject.units.enemy_rows`, which honours it.
 - **The TESTCH bench seats ONE chapter's creatures** (`make TESTCH=1 BENCH=chNN`, the newest by
   default; it was full at 14 tiles). `recordenemy` with no `PT_CHAR` films the first creature on
   it, and a staff-only foe gets a 1-HP patient and is filmed healing on the enemy phase.
