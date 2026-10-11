@@ -12,10 +12,11 @@ and why is in `git log` and the ADRs it cites** -- this file keeps no "recently 
 
 ## In flight
 
-Nothing on a branch. **Next, in order:**
+**PR #480 (#479), in review, branch `refactor/479-shared-chapter-helpers`:** every chapter's
+copied jobs are lifted into shared helpers (ADR 0340), ch00-ch02's enemy YAML takes the one
+entry shape, ROM byte-identical over all 15 configs. Merges on Nicolas's "merge". **Then, in order:**
 
-1. **#479 -- lift ch04-ch06's copied jobs into shared helpers, BEFORE any ch07 code** (Nicolas:
-   ch07 writes no custom or copied code). One PR, ROM byte-identical; the audit table is the issue.
+1. **#479 lands with #480** -- delete the two traps below that it retires.
 2. **#27 -- ch07.** Decisions so far are its 2026-10-10 comments: Ch7Map reskinned, the moat as
    the harbour, Seize, docks opening forking on flags 0xFC/0xFD, the 10,000 gold in the ending.
 3. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
@@ -39,14 +40,12 @@ Nothing on a branch. **Next, in order:**
 
 - **Our own scenes are named `MS_*`.** Any code that matches `EventScr_` must ask whether it
   also means `MS_` (#401 reported 26 of 40).
-- **A wave's arrival turn has four spellings** (`arrives_turn`, `trigger_turn`, `spawn_turn`,
-  `arrives: {turn:}`). Read it through `inject.raw_pids.entry_arrival_turn`, never a field.
+- **Until #480 merges, a wave's arrival turn has several spellings.** Read it through
+  `inject.raw_pids.entry_arrival_turn`, never a field. #480 makes `arrives_turn` the only one.
 - **`make difficulty --curve` takes ~25s** (instrument v2 runs over 1001 careers per unit);
   `chapter_matchup` memoises on the chapter's CONTENT, so a doctored chapter dict still misses.
-- **`levels:` (per-body levels) is honoured only by ch02's and ch04's emitters.** ch01, ch03,
-  ch05 and ch06 read `level` alone and would silently emit one level for every body. A parity
-  fix that splits a pack's levels there must first route the emitter through
-  `inject.raw_pids.entry_body_levels` (#438 is the pattern: diff the emitted rows).
+- **Until #480 merges, `levels:` (per-body levels) is honoured only by ch02's wave and ch04.**
+  #480 routes every chapter's enemy rows through `inject.units.enemy_rows`, which honours it.
 - **The TESTCH bench seats ONE chapter's creatures** (`make TESTCH=1 BENCH=chNN`, the newest by
   default; it was full at 14 tiles). `recordenemy` with no `PT_CHAR` films the first creature on
   it, and a staff-only foe gets a 1-HP patient and is filmed healing on the enemy phase.
