@@ -8,6 +8,7 @@ import sys
 import chapter_schema
 from inject.decomp import REPO, vanilla_decomp_text
 from inject.paths import EVENTCALL_H, EVENTS_UDEFS_C
+from inject.raw_pids import entry_body_levels
 
 
 # Enemy AI byte vectors, mirrored from vanilla Ch1's own unit definitions
@@ -122,6 +123,46 @@ def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comme
                        else '        .redaCount = 0,\n',
                        '        .itemDrop = 1,\n' if itemdrop else '',
                        items, ai))
+
+
+def enemy_rows(chap, class_ids, item_ids, pid_for, arrives_turn=None, exclude=(), spawns=None,
+               reda_symbol=None):
+    """One enemy UnitDefinition row per authored BODY of a deployment wave (#479).
+
+    `arrives_turn=None` selects the turn-1 line; a number selects that reinforcement wave.
+    `pid_for(entry)` is the chapter's fact: the CHARACTER an entry rides (a boss's own slot so
+    its flagged quote keys to it alone, a shared autolevelled generic for the rest, or ch04's
+    per-class monster pids). `exclude` drops entries by id (ch05's Sahnar LOADs from her own
+    table). `spawns` {(id, index): (x, y)} LOADs that body on another tile and walks it to its
+    post through the REDA `reda_symbol(id, index)` names (ch06's merfolk surfacing).
+
+    Levels are per body (`entry_body_levels`, so `levels:` is honoured everywhere), and a
+    group-level `item_drop` goes to the FIRST body only, carried last (`_items_with_drop_last`).
+    The `.ai` bytes are the donor's, through `enemy_ai_initialiser`.
+    """
+    rows = []
+    for enemy in chap['enemy_units']:
+        if enemy.get('arrives_turn') != arrives_turn or enemy['id'] in exclude:
+            continue
+        cls = class_ids.for_entry(enemy)
+        items = [item_ids[item.get('fe_base') or item['id']]
+                 for item in enemy.get('inventory', [])]
+        drop = enemy.get('item_drop')
+        pid = pid_for(enemy)
+        levels = entry_body_levels(enemy)
+        for index, (x, y) in enumerate(enemy['positions']):
+            carried = list(items)
+            dropper = bool(drop) and index == 0
+            if dropper:
+                carried = _items_with_drop_last(carried, item_ids[drop])
+            spawn = (spawns or {}).get((enemy['id'], index))
+            sx, sy = spawn if spawn else (x, y)
+            rows.append(_enemy_unit_entry(
+                pid, cls, levels[index], bool(enemy.get('autolevel')), sx, sy,
+                ', '.join(carried) or '0', enemy_ai_initialiser(chap, enemy, index),
+                ' /* %s -- %s */' % (enemy['id'], enemy['name']), itemdrop=dropper,
+                reda=reda_symbol(enemy['id'], index) if spawn else None))
+    return rows
 
 
 def reda_definition(symbol, x, y):

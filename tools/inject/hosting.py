@@ -10,9 +10,10 @@ from yaml_loader import yaml_load
 from inject.namespace import injector_constants
 from inject.asset_table import _asm_table_word_index
 from inject.chapter_frame import write_settings_row
-from inject.decomp import REPO
+from inject.decomp import DECOMP, REPO
 from inject.hosts import hosted_chapters
 from inject.paths import ASSET_TABLE_S, CHAPTER_SETTINGS_JSON
+from inject.text import dev_placeholder_scene
 
 
 _CHAPTER_YAML_CACHE = {}
@@ -123,3 +124,37 @@ def recruit_chapter_number(campaign, unit):
     if not rec:
         return None
     return _load_chapter_yaml(campaign, rec + '.yaml')['chapter_number']
+
+
+def event_script_path(host_index):
+    """The event-script header slot `host_index`'s chapter writes its scenes into."""
+    return os.path.join(DECOMP, 'src', 'events', 'ch%d-eventscript.h' % host_index)
+
+
+def chain(src, dst):
+    """The step that advances `src`'s ending from the dev landing to `dst`, once `dst` is hosted.
+
+    Until a chapter is hosted, the one before it ends on `dev_placeholder_scene()` (ADR 0114).
+    Hosting the next one swaps that landing for `MNC2(<dst's slot>)`. The step keeps the name
+    `chain_<src>_to_<dst>`, which `inject/steps.py`'s ordering facts and tests address.
+    """
+    def step(campaign):
+        hosts = {h.name: h for h in hosted_chapters()}
+        path = event_script_path(hosts[src].host_index)
+        with open(path, encoding='utf-8') as f:
+            script = f.read()
+        landing = dev_placeholder_scene()
+        if script.count(landing) != 1:
+            sys.exit('ERROR: expected exactly one %s dev-placeholder landing before %s chain'
+                     % (src, dst))
+        title = _load_chapter_yaml(campaign, chapter_yaml_for(dst))['title']
+        script = script.replace(
+            landing,
+            '    MNC2(0x%X) /* -> %s "%s", hosted on slot %d */\n'
+            % (hosts[dst].host_index, dst, title, hosts[dst].host_index), 1)
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(script)
+    step.__name__ = step.__qualname__ = 'chain_%s_to_%s' % (src, dst)
+    step.__doc__ = ("Advance %s's authored ending from the dev landing to the now-hosted %s."
+                    % (src, dst))
+    return step

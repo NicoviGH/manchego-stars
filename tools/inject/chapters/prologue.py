@@ -17,12 +17,12 @@ from inject.paths import (
     ASSET_TABLE_S, CH1_EVENTINFO_H, CH1_EVENTSCRIPT_H, CH1_UDEFS_H, CHAPTER_SETTINGS_JSON, CHARACTERS_C,
     GAMECONTROL_C, TEXTS_TXT)
 from inject.scenes import (
-    _prepend_battle_quote, _prepend_defeat_quote, _write_chapter_title_card, battle_quote_body,
-    battle_quote_pair, defeat_quote_row)
+    battle_quote_body, battle_quote_pair, defeat_quote_row, _prepend_battle_quote,
+    _prepend_defeat_quote, write_frame_texts)
 from inject.stats import _set_field, _set_gender, donor_growths_and_ranks, guest_personal_line
 from inject.text import (
-    _fid_tag, _script_to_message, display_name, name_message_body, set_message_body,
-    vanilla_name_text_id)
+    display_name, _fid_tag, name_message_body, _script_to_message, set_message_body,
+    write_nameplate)
 from inject.units import enemy_ai_initialiser
 
 
@@ -303,30 +303,18 @@ def inject_prologue(campaign, verbose=True, montage=False):
     for slot, uid in name_slots:
         unit = by_id[uid]
         unit.setdefault('id', uid)
-        set_message_body(lines, vanilla_name_text_id(slot),
-                         name_message_body(display_name(unit)))
-    # 4a. Chapter title, both places FE8 keeps it: the intro/status banner is a 4bpp
-    #     IMAGE (chap_title_data[chapTitleId], not text) -- recompose it from vanilla
-    #     glyphs in the YAML's title (gen_chapter_title) and overwrite the host slot's
-    #     card; the save-select/status TEXT rides chapTitleTextId. Stale .4bpp/.lz
-    #     intermediates are removed so make re-converts the new PNG.
-    set_message_body(lines, host['chapTitleTextId'],
-                     name_message_body(chap['title']))
+        write_nameplate(lines, slot, unit)
+    # 4a. The frame texts and the title card (write_frame_texts). The copied goal block still
+    #     points its Status-screen objective at vanilla's "Defeat O'Neill" -- it becomes
+    #     "Defeat <boss fe_name>" (vanilla keeps this short; the YAML's full
+    #     objective.description is for docs/banners).
+    write_frame_texts(lines, host, chap, 'Defeat ' + display_name(by_id['sephek-kaltro']))
     # The New Game save-slot select shows the VANILLA prologue slot's title text
     # ("Prologue: <title>" with the prefix screen-composed) -- it reads chapter 0,
     # not the host, so retitle that slot's text too.
     set_message_body(lines,
                      settings['chapters'][PROLOGUE_CHAPTER_INDEX]['chapTitleTextId'],
                      name_message_body(chap['title']))
-    # The copied goal block still points its Status-screen objective at vanilla's
-    # "Defeat O'Neill" -- rewrite it as "Defeat <boss fe_name>" (vanilla keeps this
-    # short; the YAML's full objective.description is for docs/banners).
-    set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat ' + display_name(by_id['sephek-kaltro'])))
-    # Was an inline copy of _write_chapter_title_card, carrying the same delete-and-hope bug
-    # (#245): make does not re-derive a deleted .4bpp.lz, so the prologue's card either broke
-    # the build or silently never landed. One helper now, which owns the conversion.
-    _write_chapter_title_card(host, 'Prologue: ' + chap['title'])
 
     # 4c. Dialogue (ch00 dialogue pass, 2026-06-10): message bodies are GENERATED from
     #     the chapter YAML's locked `script:` blocks + quote fields -- the YAML stays

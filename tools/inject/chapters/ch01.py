@@ -22,11 +22,11 @@ from inject.maps import _register_chapter_map
 from inject.message_alloc import appended_message_id
 from inject.paths import CH2_EVENTINFO_H, CH2_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.scenes import (
-    _emit_scene_beats, _make_fid, _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats,
-    _stage_beat, _write_chapter_title_card, battle_quote_body, defeat_quote_row)
+    backdrop, battle_quote_body, defeat_quote_row, _emit_scene_beats, _make_fid,
+    _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats, _stage_beat, write_frame_texts)
 from inject.text import (
-    _fe_dialogue_text, _fid_tag, _script_to_message, _wrap_fe_lines, DEV_PLACEHOLDER_MSG,
-    display_name, goal_window_body, name_message_body, set_message_body, vanilla_name_text_id)
+    DEV_PLACEHOLDER_MSG, _fe_dialogue_text, _fid_tag, name_message_body, _script_to_message,
+    set_message_body, vanilla_name_text_id, _wrap_fe_lines, write_nameplate)
 from inject.units import (
     _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, enemy_ai_initialiser)
 
@@ -664,11 +664,8 @@ def inject_ch01(campaign, verbose=True, boot=False):
         '       outer ones so no one talks to an empty room). The brown-box card\n'
         '       auto-dismisses (blocks ~100 frames then fades). Beat E ends on Hlin\'s\n'
         '       "who leads?" -- still at the Northlook. */\n'
-        '    REMOVEPORTRAITS\n'
-        '    BACG(BG_FIREPLACE)\n'
-        '    FADU(16) /* chapter loads come up black; reveal the tavern BG */\n'
-        '    BROWNBOXTEXT(0x%X, 8, 8) /* "The Northlook" location card */\n'
-        % CH01_BEAT1_CARD_MSG
+        + backdrop('BG_FIREPLACE', 'chapter loads come up black; reveal the tavern',
+                   card=(CH01_BEAT1_CARD_MSG, 'The Northlook'))
         + beat1_text_calls +
         '    FADI(16) /* fade the Northlook out */\n')
     if boot:
@@ -784,11 +781,8 @@ def inject_ch01(campaign, verbose=True, boot=False):
     script = _replace_brace_block(
         script, 'EventScr_Ch2_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
-        '    REMOVEPORTRAITS\n'
-        '    BACG(BG_MS_BRYN_SHANDER_WINTER) /* Bryn Shander -- vendored winter CG (#21) */\n'
-        '    FADU(16) /* chapter ending comes up black; reveal the town BG */\n'
-        '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bryn Shander" location card */\n'
-        % CH01_ENDING_CARD_MSG
+        + backdrop('BG_MS_BRYN_SHANDER_WINTER', 'Bryn Shander -- vendored winter CG (#21)',
+                   card=(CH01_ENDING_CARD_MSG, 'Bryn Shander'))
         + end_text_calls +
         '    FADI(16) /* fade the town out */\n'
         '    MNC2(0x%X) /* -> ch02 "Cold Welcome", hosted on chapter slot 3 (inject_ch02) */\n'
@@ -810,14 +804,8 @@ def inject_ch01(campaign, verbose=True, boot=False):
     #    dialogue pass owns the real words.
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    set_message_body(lines, vanilla_name_text_id(CH01_BOSS_SLOT),
-                     name_message_body(display_name(chief)))
-    set_message_body(lines, host['chapTitleTextId'],
-                     name_message_body(chap['title']))
-    set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Seize camp'))
-    set_message_body(lines, host['goal']['windowTextId'],
-                     goal_window_body('Seize camp'))
+    write_nameplate(lines, CH01_BOSS_SLOT, chief)
+    write_frame_texts(lines, host, chap, 'Seize camp', 'Seize camp')
     chief.setdefault('id', 'goblin-chief')
     # Izobai (boss, her custom bust on the Breguet slot): turn-1 taunt + death quote,
     # both from the chapter YAML (lore/izobai.md voice). She/her throughout.
@@ -905,9 +893,6 @@ def inject_ch01(campaign, verbose=True, boot=False):
     set_message_body(lines, LORDSEL_HEADER_MSG, _term_pad('Choose your lead[X]'))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-
-    # 6a. Title card image (the intro/status banner is a 4bpp image, not text).
-    _write_chapter_title_card(host, 'Ch.1: ' + chap['title'])
 
     if verbose:
         print('  ch01 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '

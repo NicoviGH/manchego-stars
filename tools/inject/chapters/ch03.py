@@ -19,13 +19,13 @@ from inject.maps import (
 from inject.paths import CH4_EVENTINFO_H, CH4_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.recruit import on_map_talk_recruits, talk_recruit_wiring, talk_recruiters
 from inject.scenes import (
-    _emit_scene_beats, _make_fid, _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats,
-    _stage_beat, _write_chapter_title_card, defeat_quote_row)
+    backdrop, defeat_boss_goal, defeat_quote_row, _emit_scene_beats, _make_fid,
+    _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats, _stage_beat, write_frame_texts)
 from inject.text import (
     _fid_tag, _script_to_message, dev_placeholder_scene, name_message_body, SCRIPT_DIRECTIVES,
     set_message_body)
 from inject.units import (
-    _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, enemy_ai_initialiser)
+    _ally_unit_entry, _deploy_cap_entries, enemy_rows)
 
 
 def _beat_is_faceless(beat, fid):
@@ -141,6 +141,15 @@ def _inject_ch03_tile_changes(chap, maps_dir, host_index):
     return _inject_tile_changes('MS_Ch03MapChanges', changes, host_index)
 
 
+
+def ch03_enemy_pid(enemy):
+    """The boss (grell) and the mid-map miniboss (Brute) each ride a UNIQUE raw pid so their
+    flagged gDefeatTalkList entries key their death events (WIN / midmap AFEV) to them alone;
+    every other enemy shares the generic autolevelled-trash pid."""
+    return (CH03_BOSS_PID if enemy.get('is_boss')
+            else CH03_BRUTE_MINIBOSS_PID if enemy.get('is_miniboss')
+            else CH03_GENERIC_PID)
+
 def inject_ch03(campaign, boot=False, verbose=True):
     """Host for Ch3 "The Termalaine Mine" (#23) on chapter slot 4: register the cave-interior
     tileset + the painted layout, wire the real PREP deploy of the classed party + the 10
@@ -163,9 +172,8 @@ def inject_ch03(campaign, boot=False, verbose=True):
     turn-1 ENTRANCE (Colm pattern, on-map), and the ENDING (chapter_end, over the BG -> the
     dev-placeholder landing) cutscenes are wired here, as is the mid-map RBG-EXECUTION beat: the
     Icewind Brute rides a unique miniboss pid + a silent flagged defeat quote, and a Misc AFEV fires
-    the on-map execution cutscene once on its death (the mirror of the boss WIN). DEFERRED (follow-up
-    passes): chests/doors; title-card art; enemy/boss art; ch03's own ending still parks on the
-    dev-placeholder until ch04 hosts (then it MNC2s onward like this chapter's ch02->ch03 chain)."""
+    the on-map execution cutscene once on its death (the mirror of the boss WIN). The ending lands
+    on the dev placeholder, which `chain('ch03', 'ch04')` turns into the MNC2 onward."""
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH03_CHAPTER_YAML)
 
@@ -246,24 +254,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
         talk_recruiters(campaign, chap['chapter_number']), trex_char,
         CH03_TREX_TALK_FLAG, CH03_TREX_TALK_SCRIPT, CH03_TREX_TALK_MSG)
 
-    enemies = []
-    for e in chap['enemy_units']:
-        cls = CH03_CLASS_IDS.for_entry(e)
-        items = ', '.join(CH03_ITEM_IDS[i['id']] for i in e.get('inventory', []))
-        drop = e.get('item_drop')
-        if drop:
-            items = '%s, %s' % (items, CH03_ITEM_IDS[drop]) if items else CH03_ITEM_IDS[drop]
-        # The boss (grell) + the mid-map miniboss (Brute) each ride a UNIQUE raw pid so their
-        # flagged gDefeatTalkList entries key their death events (WIN / midmap AFEV) to them
-        # alone; every other enemy shares the generic autolevelled-trash pid.
-        char = (CH03_BOSS_PID if e.get('is_boss')
-                else CH03_BRUTE_MINIBOSS_PID if e.get('is_miniboss')
-                else CH03_GENERIC_PID)
-        for index, (x, y) in enumerate(e['positions']):
-            enemies.append(_enemy_unit_entry(
-                char, cls, e['level'], bool(e.get('autolevel')), x, y, items,
-                enemy_ai_initialiser(chap, e, index),
-                ' /* %s */' % e['id'], itemdrop=bool(drop)))
+    enemies = enemy_rows(chap, CH03_CLASS_IDS, CH03_ITEM_IDS, ch03_enemy_pid)
     enemy = '{\n' + '\n'.join(enemies) + '\n    { 0 },\n}'
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
@@ -354,25 +345,17 @@ def inject_ch03(campaign, boot=False, verbose=True):
                  '    ENUN\n' % CH03_BOOT_SEED_SYMBOL) if boot else ''
     begin = ('{\n'
              '    MUSC(SONG_TENSION)\n'
-             '    REMOVEPORTRAITS\n'
-             '    BACG(%s) /* Termalaine street (town BG) */\n'
-             '    FADU(16)\n'
-             '    BROWNBOXTEXT(0x%X, 8, 8) /* "Termalaine" location card */\n'
-             % (CH03_OPENING_TOWN_BG, CH03_OPENING_CARD_MSG)
+             + backdrop(CH03_OPENING_TOWN_BG, 'Termalaine street (town BG)',
+                        card=(CH03_OPENING_CARD_MSG, 'Termalaine'))
              + town_calls +
              '    REMA /* clear the town portraits before the cut */\n'
              '    FADI(16) /* fade the street out */\n'
-             # BACG (EventShowTextBgDirect) only DECOMPRESSES a new BG when activeTextType is
-             # REMOVEPORTRAITS/_1A22 (eventscr.c:1316) -- every other mode returns EVC_ERROR and
-             # loads nothing. The town Text() beats above expand to TEXTSTART, which left
-             # activeTextType == TEXTSTART, so a bare 2nd BACG was a no-op (stale town BG stayed
-             # in VRAM). Re-arm the load mode first -- the vanilla multi-BG idiom (ch17a: every
-             # BACG rides a REMOVEPORTRAITS-mode scene). Faded to black, so no visible pop.
-             '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() beats reset it to TEXTSTART) */\n'
-             '    BACG(%s) /* CUT to the mine interior -- empty, no PCs */\n'
-             '    MUSC(SONG_SHADOW_OF_THE_ENEMY) /* the kobolds\' mine: vanilla Ch3\'s enemy cue (ADR 0336) */\n'
-             '    FADU(16)\n'
-             % CH03_OPENING_MINE_BG
+             # The second backdrop re-arms BACG's load mode (eventscr.c:1316; vanilla ch17a rides
+             # every BACG on a REMOVEPORTRAITS-mode scene). Faded to black, so no visible pop.
+             + backdrop(CH03_OPENING_MINE_BG, 'CUT to the mine interior -- empty, no PCs',
+                        rearm=True,
+                        cue='    MUSC(SONG_SHADOW_OF_THE_ENEMY) /* the kobolds\' mine: vanilla '
+                            'Ch3\'s enemy cue (ADR 0336) */\n')
              + sign_call            # the KOBOLDS ONLY sign over the empty cave (#58 opaque box)
              + scout_raw +          # Pinky scouts: "I'll look ahead" / RBG / "Straight back!" (RAW, no REMA)
              '    STAL(90) /* over-long tension pause -- Pinky winged off, RBG holds at the mouth */\n'
@@ -407,11 +390,8 @@ def inject_ch03(campaign, boot=False, verbose=True):
          'C -- Meesmickle deadpan button (his one line of the chapter)'])
     ending = ('{\n    MUSC(SONG_VICTORY)\n'
               '    FADI(16) /* fade the mine out */\n'
-              '    REMOVEPORTRAITS\n'
-              '    BACG(%s) /* Termalaine square (reused Targos-winter BG) */\n'
-              '    FADU(16)\n'
-              '    BROWNBOXTEXT(0x%X, 8, 8) /* "Termalaine" location card */\n'
-              % (CH03_ENDING_BG, CH03_ENDING_CARD_MSG)
+              + backdrop(CH03_ENDING_BG, 'Termalaine square (reused Targos-winter BG)',
+                         card=(CH03_ENDING_CARD_MSG, 'Termalaine'))
               + end_text_calls +
               '    FADI(16) /* fade the square out into the dev-placeholder landing */\n'
               + dev_placeholder_scene() +
@@ -468,13 +448,10 @@ def inject_ch03(campaign, boot=False, verbose=True):
     #    fires silently off the grell's flagged gDefeatTalkList entry (step 5, .msg = 0).
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    # The borrowed slot-6 defeat_boss goal block still points its Status-screen objective at
-    # vanilla's "Defeat Saar" -- rewrite it as "Defeat <boss fe_name>" (the prologue precedent;
-    # the goal WINDOW banner is a static "Defeat boss" by goal type, so only this text leaks).
-    ch03_boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
-    set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat ' + (ch03_boss.get('fe_name') or ch03_boss['name'])))
+    # The borrowed slot-6 defeat_boss goal block's Status-screen objective reads vanilla's
+    # "Defeat Saar"; the goal WINDOW banner is a static "Defeat boss" by goal type, so only the
+    # objective is rewritten.
+    write_frame_texts(lines, host, chap, defeat_boss_goal(chap))
     # Trex talk-recruit body (#23 item 2): his migrated pitch (chapter YAML talk_recruit event,
     # single source of truth), faced on the Rennac slot. One speaker -> one [OpenX] block with
     # page breaks; the recruit script (EventScr_089F199C) TEXTSHOWs it before the CUSA.
@@ -519,11 +496,6 @@ def inject_ch03(campaign, boot=False, verbose=True):
         trex_entr, _stage_beat(trex_entr, cut_fid, op_home)))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    # 4a. Title card image (the intro/status banner is a 4bpp image, not text) -- "Ch.3:
-    #     <title>" composed from vanilla glyphs, overwriting the host slot's vanilla card
-    #     (chapTitleId 4 = the "Ch.4: Ancient Horrors" card). gen_chapter_title reads the
-    #     source cards from HEAD, so overwriting chap_title_4.png here doesn't disturb any cut.
-    _write_chapter_title_card(host, 'Ch.3: ' + chap['title'])
 
     # 5. The grell's flagged gDefeatTalkList entry keys the DefeatBoss win to its raw pid (first-match
     #    scan wins; no vanilla 0xb7 entry to shadow). .flag = EVFLAG_DEFEAT_BOSS is what fires the win.

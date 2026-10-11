@@ -48,5 +48,66 @@ class BattleQuotePair(unittest.TestCase):
         self.assertEqual(1, len(flags))
 
 
+class SharedEventShapes(unittest.TestCase):
+    """The event-script shapes every chapter calls instead of copying (#479, ADR 0340)."""
+
+    def test_a_second_backdrop_rearms_the_load_mode_and_plays_its_cue_before_the_fade(self):
+        first = inject.scenes.backdrop('BG_A', 'the town', card=(0x9A0, 'Bremen'))
+        self.assertEqual(first, '    REMOVEPORTRAITS\n    BACG(BG_A) /* the town */\n'
+                                '    FADU(16)\n'
+                                '    BROWNBOXTEXT(0x9A0, 8, 8) /* "Bremen" location card */\n')
+        second = inject.scenes.backdrop('BG_B', 'the hall', rearm=True, cue='    MUSC(X)\n')
+        self.assertTrue(second.startswith('    REMOVEPORTRAITS /* re-arm BACG BG-load mode'))
+        self.assertLess(second.index('BACG(BG_B)'), second.index('MUSC(X)'))
+        self.assertLess(second.index('MUSC(X)'), second.index('FADU(16)'))
+
+    def test_the_exists_branch_asks_the_army_not_the_field(self):
+        out = inject.scenes.branch_on_check_exists('CHARACTER_X', '    A\n', '    B\n', 4)
+        self.assertTrue(out.startswith('    CHECK_EXISTS(CHARACTER_X)\n    BEQ(0x4,'))
+        self.assertIn('LABEL(0x5)', out)
+
+    def test_alive_flags_branch_past_their_own_enut(self):
+        out = inject.scenes.record_alive_flags(
+            [('a', '0x1', '0xFC', '0x3'), ('b', '0x2', '0xFD', '0x4')], 'lived')
+        for pid, flag, label in (('0x1', '0xFC', '0x3'), ('0x2', '0xFD', '0x4')):
+            self.assertLess(out.index('CHECK_ALIVE(%s)' % pid), out.index('ENUT(%s)' % flag))
+            self.assertLess(out.index('BEQ(%s,' % label), out.index('ENUT(%s)' % flag))
+            self.assertLess(out.index('ENUT(%s)' % flag), out.index('LABEL(%s)' % label))
+
+    def test_a_debug_boot_without_the_chapter_seed_is_refused(self):
+        with self.assertRaises(SystemExit):
+            inject.scenes.debug_boot_script('--chNN-ending', 7, '', 'map', 'body\n')
+        out = inject.scenes.debug_boot_script(
+            '--chNN-ending', 7, '    SEED\n', 'the map', '    BODY\n',
+            music='    MUSC(M)\n', before_seed='    BEFORE\n')
+        order = [out.index(x) for x in ('MUSC(M)', 'LOMA(0x7) /* the map */', 'BEFORE', 'SEED',
+                                        'BODY', 'ENDA')]
+        self.assertEqual(order, sorted(order))
+
+    def test_the_party_frame_defaults_to_the_lord_and_refuses_an_empty_tile(self):
+        chap = {'deployment': {'deploy_slots': [[3, 4], [5, 6]]}}
+        self.assertEqual((3, 4), inject.scenes.party_camera_tile(chap))
+        self.assertEqual((5, 6), inject.scenes.party_camera_tile(chap, (5, 6)))
+        with self.assertRaises(SystemExit):
+            inject.scenes.party_camera_tile(chap, (9, 9))
+
+    def test_the_gather_refuses_two_on_a_tile_and_a_spare_too_close(self):
+        loads = lambda n: 'MS_T%02d' % n  # noqa: E731
+        members = {'marty': (1, 1), 'pinky': (2, 1)}
+        with self.assertRaises(SystemExit):
+            inject.scenes.gather_cast({'marty': (1, 1), 'pinky': (1, 1)}, [(1, 1)], (20, 20),
+                                      loads, 0x40, 6, 'test')
+        with self.assertRaises(SystemExit):
+            inject.scenes.gather_cast(members, [(1, 1), (2, 1)], (3, 1), loads, 0x40, 6, 'test')
+        out = inject.scenes.gather_cast(members, [(1, 1), (2, 1)], (20, 20), loads, 0x40, 6,
+                                        'test', scatter='    CLEE\n')
+        self.assertTrue(out.startswith('    FADI(16)'))
+        self.assertLess(out.index('CLEE'), out.index('MOVE_CLOSEST'))
+        # every member is LOADed only if the army has them, never conjured
+        self.assertEqual(2, out.count('CHECK_EXISTS('))
+        self.assertLess(out.rindex('MOVE_CLOSEST'), out.index('LOAD1(0x1, MS_T00)'))
+        self.assertTrue(out.endswith('    FADU(16)\n'))
+
+
 if __name__ == '__main__':
     unittest.main()

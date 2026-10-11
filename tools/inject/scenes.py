@@ -1,7 +1,9 @@
 """Cutscene beats: splitting a chapter's scripts into beats and emitting their events.
 
-Also the scene-level branches (`variant_beat`, `branch_on_check_alive`), battle and defeat
-quotes, and the chapter title card.
+Also the scene-level branches (`variant_beat`, `branch_on_flag`, `branch_on_check_alive`,
+`branch_on_check_exists`), battle and defeat quotes, and the event-script shapes every chapter
+shares (#479): the backdrop, the frame texts and title card, the cast gather, the alive ->
+permanent-flag record, and the debug boot that jumps New Game to a late beat.
 """
 import os
 import subprocess
@@ -12,7 +14,8 @@ import gen_chapter_title
 from inject.cast import PORTRAIT_MAP
 from inject.decomp import BATTLEQUOTES_C, DECOMP
 from inject.text import (
-    _fe_dialogue_text, _fid_tag, _script_to_message, SCRIPT_DIRECTIVES, set_message_body)
+    _fe_dialogue_text, _fid_tag, _script_to_message, display_name, goal_window_body,
+    name_message_body, SCRIPT_DIRECTIVES, set_message_body)
 
 
 def _beat_is_narration(beat):
@@ -438,3 +441,174 @@ def branch_on_check_alive(character, if_alive, if_absent, label_base=0):
     """
     return _branch_on_slot_c('CHECK_ALIVE(%s)' % character, if_alive, if_absent,
                              label_base, 'not on the roster, or dead')
+
+
+def branch_on_flag(flag, if_set, if_clear, label_base=0):
+    """A vanilla-shaped event branch: run `if_set` when `flag` is set, else `if_clear`.
+
+    The FE8 idiom (cf. ch19a's ending, which picks its text by CHECK_EVENTID + CHECK_ALIVE):
+    CHECK_EVENTID leaves the flag in slot C. ch04's ending picks its no-Lupin variant this way,
+    and a later chapter reads a permanent flag an earlier one set (`record_alive_flags`).
+    """
+    return _branch_on_slot_c('CHECK_EVENTID(%s)' % flag, if_set, if_clear,
+                             label_base, 'flag clear')
+
+
+def branch_on_check_exists(character, if_present, if_absent, label_base=0):
+    """The same branch, asking whether `character` is in the army at all, dead or alive.
+
+    For a scene that LOADs a party member: an event LOAD of someone NOT in the army creates
+    them, so a member never recruited must be skipped, not conjured (ch06's gather, #470)."""
+    return _branch_on_slot_c('CHECK_EXISTS(%s)' % character, if_present, if_absent,
+                             label_base, 'not in the army')
+
+
+# --- event-script shapes every chapter shares (#479) -----------------------------------
+
+def backdrop(bg, what=None, card=None, rearm=False, cue=''):
+    """Bring a full-screen backdrop up from black: REMOVEPORTRAITS, BACG, FADU.
+
+    `rearm` is for a SECOND backdrop in one scene. `EventShowTextBgDirect` only decompresses
+    while `activeTextType` is REMOVEPORTRAITS/_1A22, and every `Text()` leaves it at TEXTSTART,
+    so a bare second BACG is a no-op that leaves the first backdrop on screen (the ch03/ch04
+    stale-BG bug). The REMOVEPORTRAITS re-arms it; on a first backdrop it clears the faces.
+    `cue` is a music line played between the BACG and the fade-up. `card` is (msg id, place):
+    the brown-box location card shown over it.
+    """
+    out = ('    REMOVEPORTRAITS%s\n'
+           % (' /* re-arm BACG BG-load mode (Text() reset it to TEXTSTART) */' if rearm else '')
+           + '    BACG(%s)%s\n' % (bg, ' /* %s */' % what if what else '')
+           + cue
+           + '    FADU(16)\n')
+    if card:
+        out += '    BROWNBOXTEXT(0x%X, 8, 8) /* "%s" location card */\n' % card
+    return out
+
+
+def chapter_boss(chap):
+    """The chapter's `is_boss` enemy entry."""
+    return next(e for e in chap['enemy_units'] if e.get('is_boss'))
+
+
+def defeat_boss_goal(chap):
+    """The Status-screen objective a defeat_boss chapter shows: "Defeat <boss>"."""
+    return 'Defeat ' + display_name(chapter_boss(chap))
+
+
+def write_frame_texts(lines, host, chap, status, window=None):
+    """The texts every hosted chapter owns in its frame, plus its title card (#207, #479).
+
+    The title rides `chapTitleTextId` (save select, status screen); `status` is the Status
+    screen's objective and `window` the goal window's banner. Both are VANILLA'S vocabulary
+    (Defeat enemy / Defeat boss / Defeat all monsters / Seize gate / Seize throne / Survive),
+    never "rout". A chapter that leaves `window` None keeps the host slot's, which is right only
+    when it already reads the chapter's goal.
+
+    The card is "Ch.N: <title>" ("Prologue: " at 0), composed from vanilla glyphs over the host
+    slot's card. gen_chapter_title cuts its glyphs from the cards at HEAD, so a chapter
+    overwriting a card an earlier one also cuts from (ch01 writes chap_title_2.png) disturbs
+    nothing.
+    """
+    set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
+    set_message_body(lines, host['goal']['statusObjectiveTextId'], name_message_body(status))
+    if window is not None:
+        set_message_body(lines, host['goal']['windowTextId'], goal_window_body(window))
+    number = chap['chapter_number']
+    _write_chapter_title_card(host, ('Ch.%d: ' % number if number else 'Prologue: ')
+                              + chap['title'])
+
+
+def party_camera_tile(chap, tile=None, beat='the scene'):
+    """Where a scene frames the party: `tile`, asserted to be one of the chapter's deploy
+    slots, or by default the FIRST slot -- the lord's, force-deployed, so never empty.
+
+    Asserted rather than trusted: a re-paint that moved the start tiles would leave the shot
+    on an empty corner, silently, with nothing else complaining."""
+    slots = [tuple(s) for s in chap['deployment']['deploy_slots']]
+    if tile is None:
+        return slots[0]
+    if tuple(tile) not in slots:
+        sys.exit('ERROR: %s frames the party at %r, which is no longer one of the chapter\'s '
+                 'deploy_slots %s -- the shot would hold on an empty tile'
+                 % (beat, tuple(tile), sorted(slots)))
+    return tuple(tile)
+
+
+def gather_cast(members, clear, spare, table_for, label_base, clearance, who,
+                scatter=''):
+    """The fade-out gather that puts the cast on their tiles for a closing scene (ch06's
+    Messie, Nicolas 2026-10-09). Returns the event text, FADI to FADU.
+
+    `members` is {uid: tile}; `table_for(n)` names the one-unit table member n (sorted by uid)
+    LOADs from (`declare_gather_tables`). The cast is LOADed, never MOVEd (ADR 0292): an event
+    LOAD of a unit already on the map finds and moves it, stats and inventory untouched
+    (LoadUnit_800F704), and a benched or fallen member still resolves. Each LOAD is guarded by
+    CHECK_EXISTS, because a LOAD of someone not in the army creates them (review, #470).
+
+    `clear` is every cell the scene needs, member tiles included: whoever stands there is moved
+    to the nearest free cell around `spare` first, because the fight can end with anyone
+    anywhere and a LOAD onto a held cell stacks two units. `spare` must sit at least
+    `clearance` from every cleared cell, or the move could land back on one. `scatter` is
+    anything to run once the screen is black (ch06 clears the merfolk).
+    """
+    if len(set(members.values())) != len(members):
+        sys.exit('ERROR: %s: two of the cast gather onto one tile' % who)
+    near = [(x, y) for x, y in clear if abs(x - spare[0]) + abs(y - spare[1]) < clearance]
+    if near:
+        sys.exit('ERROR: %s: the spare tile %s is within %d of the scene at %s -- whoever is '
+                 'moved there could land back on a cleared cell'
+                 % (who, tuple(spare), clearance, near[0]))
+    out = '    FADI(16) /* the fight is over: gather the cast out of sight */\n' + scatter
+    for x, y in clear:
+        out += ('    SVAL(EVT_SLOT_B, _EvtParams2(%d, %d))'
+                ' /* whoever stands here, out of the way */\n'
+                '    MOVE_CLOSEST(0xffff, CHAR_EVT_POSITION_AT_SLOTB, %d, %d)\n'
+                % (x, y, spare[0], spare[1]))
+    for n, uid in enumerate(sorted(members)):
+        out += branch_on_check_exists(
+            'CHARACTER_%s' % PORTRAIT_MAP[uid].upper(),
+            '    LOAD1(0x1, %s) /* %s, on the shore */\n    ENUN\n' % (table_for(n), uid),
+            '', label_base + 2 * n)
+    return out + '    FADU(16)\n'
+
+
+def record_alive_flags(units, why):
+    """Set a PERMANENT flag for each unit still alive, for a later chapter to read.
+
+    `units` is [(name, pid, flag, label)]. Each check branches past its own ENUT, so any one
+    can fail alone; the later chapter forks on the flags with `branch_on_flag` (ch06's hulls
+    -> ch07's docks)."""
+    return ''.join('    CHECK_ALIVE(%s)\n'
+                   '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0)\n'
+                   '    ENUT(%s) /* %s %s */\n'
+                   'LABEL(%s)\n' % (pid, label, flag, name, why, label)
+                   for name, pid, flag, label in units)
+
+
+def ending_call(ending, note):
+    """A debug boot's tail: fade the map up so the ending's own FADI has something to take
+    down, exactly as on the real path, then run the ending event list itself."""
+    return ('    FADU(16) /* the ending opens on a FADI; give it the map to take down */\n'
+            '    CALL(%s) /* %s */\n' % (ending, note))
+
+
+def debug_boot_script(flag, host_index, seed_load, loma_note, body, music='',
+                      before_seed=''):
+    """`--chNN-<beat>`: New Game straight into a late beat, with only what the beat reads.
+
+    THE STANDING RULE (decisions.md -> "Playtest runs are the most expensive thing in this
+    repo", rule 3): reaching a late beat honestly replays every approved scene before it, so
+    iteration on it must be compile-time only. `LOMA` builds the map, `before_seed` and the
+    boot seed load what the beat needs, and `body` plays it.
+
+    The chapter's boot flag is a prerequisite: these boots skip Preparations, so its seed is
+    the only thing that puts a party on the map (and an ending's reward goes to the LEADER).
+    """
+    if not seed_load:
+        sys.exit('ERROR: %s needs the chapter boot -- it skips Preparations, so the boot seed '
+                 'is the only thing that puts a party on the map' % flag)
+    return ('{\n' + music
+            + '    SVAL(EVT_SLOT_B, 0x0)\n'
+              '    LOMA(0x%X) /* %s */\n' % (host_index, loma_note)
+            + before_seed + seed_load + body
+            + '    ENDA\n}')

@@ -152,6 +152,16 @@ def location_events(villages, village_slots, shops=(), flags=None):
     return '{\n' + rows + '    END_MAIN\n}'
 
 
+
+def chapter_location_events(chap, village_slots, shops=(), flags=None):
+    """A chapter's Location list off its own `villages:` (#479: was one wrapper per chapter).
+
+    `village_slots` is the chapter's {village id: (script symbol, msg, ...)} table; each visit
+    runs the slot's script. `shops` and `flags` as in `location_events`."""
+    return location_events(chap.get('villages', []),
+                           {vid: slot[0] for vid, slot in village_slots.items()},
+                           shops, flags=flags)
+
 def assert_village_tiles_visitable(chap, maps_dir, stem):
     """Guard (#205): a village the YAML declares must stand on terrain FE8 will let a unit visit.
 

@@ -17,23 +17,20 @@ from inject.hosts import CH02_HOST_INDEX, CH04_EVENT_GROUP, CH04_HOST_INDEX
 from inject.maps import (
     _inject_tile_changes, _map_changes_tileset, _register_chapter_map, _snowy_metatile_for,
     snag_fall_change)
-from inject.paths import (
-    CH4_EVENTSCRIPT_H, CH5_EVENTINFO_H, CH5_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT)
-from inject.raw_pids import entry_body_levels
+from inject.paths import CH5_EVENTINFO_H, CH5_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.recruit import (
     assert_custom_art_pid_wired, on_map_talk_recruits, parley_recruiters, talk_recruit_wiring)
 from inject.scenes import (
-    _branch_on_slot_c, _emit_scene_beats, _make_fid, _scenic_beat_calls, _split_event_beats,
-    _write_chapter_title_card, variant_beat)
+    _emit_scene_beats, _make_fid, _scenic_beat_calls, _split_event_beats, backdrop,
+    branch_on_flag, variant_beat, write_frame_texts)
 from inject.terrain import assert_scripted_move_reachable, reda_route_move
 from inject.text import (
-    _fid_tag, _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body,
-    set_message_body)
+    dev_placeholder_scene, _fid_tag, name_message_body, _script_to_message, set_message_body)
 from inject.units import (
-    _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, enemy_ai_initialiser)
+    _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, enemy_ai_initialiser, enemy_rows)
 from inject.villages import (
-    assert_village_gifts_match_vanilla, assert_village_tiles_visitable, DEFAULT_VILLAGE_SPEAKER,
-    location_events, village_boxes, village_reward_item, village_script)
+    assert_village_gifts_match_vanilla, assert_village_tiles_visitable, chapter_location_events,
+    DEFAULT_VILLAGE_SPEAKER, village_boxes, village_reward_item, village_script)
 
 
 # The cleared gForceDeploymentList terminator (engine/patches/0005, lord select). Campaign
@@ -170,16 +167,6 @@ CH04_MOOSE_AREA = (9, 2, 14, 7)                 # AREA(x1, y1, x2, y2) -- the cl
 CH04_SNAG_POS = (4, 8)
 
 
-def branch_on_flag(flag, if_set, if_clear, label_base=0):
-    """A vanilla-shaped event branch: run `if_set` when `flag` is set, else `if_clear`.
-
-    The FE8 idiom (cf. ch19a's ending, which picks its text by CHECK_EVENTID + CHECK_ALIVE):
-    CHECK_EVENTID leaves the flag in slot C. ch04's ending picks its no-Lupin variant this way.
-    """
-    return _branch_on_slot_c('CHECK_EVENTID(%s)' % flag, if_set, if_clear,
-                             label_base, 'flag clear')
-
-
 def convert_survivors_green(pids, label_base, what):
     """Flip each named unit GREEN where it stands, skipping any that is already dead.
 
@@ -204,12 +191,6 @@ def convert_survivors_green(pids, label_base, what):
         'LABEL(0x%X)\n'
         % (pid, label_base + i, what, i + 1, len(pids), pid, label_base + i)
         for i, pid in enumerate(pids))
-
-
-def ch04_location_events(chap):
-    """ch04's Location list. Vanilla Ch4 wires two villages and so do we (#24); no shops."""
-    return location_events(chap.get('villages', []),
-                           {vid: slot[0] for vid, slot in CH04_VILLAGE_SLOTS.items()})
 
 
 def ch04_map_changes(chap, maps_dir):
@@ -281,36 +262,9 @@ def ch04_moose_script(unit_symbol, pid, msg, camera_at, flee_route):
             % (unit_symbol, cx, cy, pid, msg, '\n'.join(move), pid))
 
 
-def ch04_enemy_rows(chap, arrives_turn=None):
-    """Build one Ch04 UnitDefinition row per authored position for a deployment wave.
-
-    `arrives_turn=None` selects the turn-1 line; numbered values select that reinforcement
-    wave. A group-level `item_drop` denotes one dropper, not one copy per position.
-    """
-    rows = []
-    for enemy in chap['enemy_units']:
-        if enemy.get('arrives_turn') != arrives_turn:
-            continue
-        cls = CH04_CLASS_IDS.for_entry(enemy)
-        pid = CH04_MONSTER_PIDS[enemy['class']]
-        inventory = []
-        for item in enemy.get('inventory', []):
-            key = item.get('fe_base') or item['id']
-            inventory.append(CH04_ITEM_IDS[key])
-        drop = enemy.get('item_drop')
-        levels = entry_body_levels(enemy)
-        for index, (x, y) in enumerate(enemy['positions']):
-            ai = enemy_ai_initialiser(chap, enemy, index)
-            items = list(inventory)
-            is_dropper = bool(drop) and index == 0
-            if is_dropper:
-                items.append(CH04_ITEM_IDS[drop])
-            rows.append(_enemy_unit_entry(
-                pid, cls, levels[index], bool(enemy.get('autolevel')),
-                x, y, ', '.join(items) or '0', ai,
-                ' /* %s -- %s */' % (enemy['id'], enemy['name']),
-                itemdrop=is_dropper))
-    return rows
+def ch04_enemy_pid(enemy):
+    """ch04's enemies ride one monster pid per CLASS (CH04_MONSTER_PIDS)."""
+    return CH04_MONSTER_PIDS[enemy['class']]
 
 
 def _ch04_reveal_wave(chap):
@@ -511,16 +465,16 @@ def inject_ch04(campaign, boot=False, verbose=True):
         for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     seed = '{\n' + '\n'.join(seed_rows) + '\n    { 0 },\n}'
 
-    initial_rows = ch04_enemy_rows(chap)
-    turn3_rows = ch04_enemy_rows(chap, arrives_turn=3)
+    initial_rows = enemy_rows(chap, CH04_CLASS_IDS, CH04_ITEM_IDS, ch04_enemy_pid)
+    turn3_rows = enemy_rows(chap, CH04_CLASS_IDS, CH04_ITEM_IDS, ch04_enemy_pid, arrives_turn=3)
     # Stage 2b -- the turn-2 wolf-pack reveal: the convertible Mauthe Doog wave with its leader
     # tile reassigned to Lupin (red, CHARACTER_DUESSEL). 5 generic Mauthe Doogs + Lupin = 6, so
     # ch04_enemy_rows still reports 6 for the difficulty read (parity held); the split is here.
     lupin = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
                  if r[0] == 'lupin')
     turn2_rows = ch04_turn2_reveal_rows(chap, lupin)
-    if [len(initial_rows), len(ch04_enemy_rows(chap, arrives_turn=2)),
-            len(turn3_rows)] != [10, 6, 7]:
+    turn2_wave = enemy_rows(chap, CH04_CLASS_IDS, CH04_ITEM_IDS, ch04_enemy_pid, arrives_turn=2)
+    if [len(initial_rows), len(turn2_wave), len(turn3_rows)] != [10, 6, 7]:
         sys.exit('ERROR: ch04 realigned roster must stay 10 line + 6 turn-2 reveal + 7 turn-3')
 
     def table(rows):
@@ -607,7 +561,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     write_event_group('ch04', CH5_EVENTINFO_H, CH04_EVENT_GROUP, lists={
         'turnBasedEvents': turn_events,
         'characterBasedEvents': lupin_char_events,
-        'locationBasedEvents': ch04_location_events(chap),
+        'locationBasedEvents': chapter_location_events(chap, CH04_VILLAGE_SLOTS),
         'miscBasedEvents': misc_events,
     }, roster='UnitDef_Event_Ch5Ally', scenes=('EventScr_Ch5_BeginningScene', CH04_ENDING_SCRIPT))
 
@@ -628,26 +582,19 @@ def inject_ch04(campaign, boot=False, verbose=True):
                                      '(introduces: fog-of-war)'])
     beginning = ('{\n'
                  '    MUSC(SONG_TENSION)\n'
-                 '    REMOVEPORTRAITS\n'
-                 '    BACG(%s) /* Nimsy Huddle\'s cottage -- vanilla House1 hearth interior */\n'
-                 '    FADU(16)\n'
-                 '    BROWNBOXTEXT(0x%X, 8, 8) /* "Lonelywood" location card */\n'
-                 % (CH04_OPENING_COTTAGE_BG, CH04_OPENING_CARD_MSG)
+                 + backdrop(CH04_OPENING_COTTAGE_BG,
+                            'Nimsy Huddle\'s cottage -- vanilla House1 hearth interior',
+                            card=(CH04_OPENING_CARD_MSG, 'Lonelywood'))
                  + op_calls_a +
                  '    REMA /* clear the cottage portraits before the cut */\n'
                  '    FADI(16)\n'
-                 # BACG only decompresses a new BG while activeTextType is REMOVEPORTRAITS/_1A22
-                 # (eventscr.c:1316); the Text() beats above left it at TEXTSTART, so a bare second
-                 # BACG would be a no-op and the cottage would stay in VRAM. Re-arm the load mode
-                 # first -- the vanilla multi-BG idiom, and exactly the ch03 opening's fix.
-                 '    REMOVEPORTRAITS /* re-arm BACG BG-load mode (Text() reset it to TEXTSTART) */\n'
-                 '    BACG(%s) /* CUT to the forest edge, fog hanging between the trees */\n'
                  # Vanilla Ch4 opens on its forest-ambience loop (SONG_52, song082_y_mori_3 in
                  # sound/song_table.s) and closes on Distant Roads (ADR 0336). Ours has one beat
                  # here and Preparations before the map, so the ambience carries the beat and
                  # Distant Roads arrives as the map theme itself (chapter_bgm).
-                 '    MUSC(SONG_52) /* forest ambience, as vanilla Ch4 opens */\n'
-                 '    FADU(16)\n' % CH04_OPENING_FOREST_BG
+                 + backdrop(CH04_OPENING_FOREST_BG,
+                            'CUT to the forest edge, fog hanging between the trees', rearm=True,
+                            cue='    MUSC(SONG_52) /* forest ambience, as vanilla Ch4 opens */\n')
                  + op_calls_b +
                  '    FADI(16) /* fade the forest edge out */\n'
                  '    SVAL(EVT_SLOT_B, 0x0) /* map camera origin for the reload */\n'
@@ -706,10 +653,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # than on-map ON PURPOSE: a faced on-map beat rides a talk bubble anchored to a speaking UNIT,
     # and with deploy 9-of-10 the fallback's speakers (Pinky, Meesmickle) can be benched -- over a
     # BG the full-screen window needs no anchor.
-    end_scene = (
-        '    REMOVEPORTRAITS\n'
-        '    BACG(%s) /* dusk at the treeline; the sled at the ridge */\n'
-        '    FADU(16)\n' % CH04_ENDING_BG)
+    end_scene = backdrop(CH04_ENDING_BG, 'dusk at the treeline; the sled at the ridge')
     ending = ('{\n    MUSC(SONG_VICTORY)\n'
               '    FADI(16) /* fade the forest out */\n'
               + end_scene
@@ -730,14 +674,9 @@ def inject_ch04(campaign, boot=False, verbose=True):
 
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    # Vanilla's own wording (see the ch02 note): FE8 prints "Defeat", never "rout". ch04 owns
-    # both strings now (#207) -- it used to write only the status line and inherit ch02's window,
-    # which is precisely the sharing that made the two chapters overwrite each other.
-    set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat all monsters'))
-    set_message_body(lines, host['goal']['windowTextId'],
-                     goal_window_body('Defeat enemy'))
+    # ch04 owns both goal strings (#207) -- it used to write only the status line and inherit
+    # ch02's window, which is precisely the sharing that made the two chapters overwrite each other.
+    write_frame_texts(lines, host, chap, 'Defeat all monsters', 'Defeat enemy')
     # Stage 4 -- the FULL locked parley (was a one-line stub of its closing beat). Five turns,
     # Lupin/Marty alternating: the count-off, Marty's spore-puff opener, the BIRD retort, the
     # goodberry pack-math, and Lupin doing the arithmetic out loud. Marty sits mid-left (party
@@ -786,7 +725,6 @@ def inject_ch04(campaign, boot=False, verbose=True):
             {DEFAULT_VILLAGE_SPEAKER: ('[OpenMidLeft]', fid)}))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    _write_chapter_title_card(host, 'Ch.4: ' + chap['title'])
 
     if verbose:
         print('  ch04 map (obj1=%d pal=%d cfg=%d layout=%d) hosted on chapter %d; '
@@ -798,18 +736,3 @@ def inject_ch04(campaign, boot=False, verbose=True):
               '(AREA %d,%d..%d,%d) + ending (%d boxes, branched: Lupin / no-parley)'
               % (len(op_beats[0]), len(op_beats[1]), len(talk), mx1, my1, mx2, my2,
                  len(end_beats[0])))
-
-
-def chain_ch03_to_ch04():
-    """Advance ch03's authored ending from the dev landing to the now-hosted ch04."""
-    with open(CH4_EVENTSCRIPT_H, encoding='utf-8') as f:
-        script = f.read()
-    landing = dev_placeholder_scene()
-    if script.count(landing) != 1:
-        sys.exit('ERROR: expected exactly one ch03 dev-placeholder landing before ch04 chain')
-    script = script.replace(
-        landing,
-        '    MNC2(0x%X) /* -> ch04 "The White Moose", hosted on slot %d */\n'
-        % (CH04_HOST_INDEX, CH04_HOST_INDEX), 1)
-    with open(CH4_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
-        f.write(script)
