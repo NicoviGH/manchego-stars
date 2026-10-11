@@ -171,7 +171,7 @@ enemy_units:
     fe_name: "Sephek"           # FE8 name buffer is 12 chars; "Sephek Kaltro" (13) overflows
     is_boss: true
     count: 1
-    position: [14, 8]            # O9 — cornered against the SE peaks (O'Neill's vanilla spot)
+    positions: [[14, 8]]         # O9 — cornered against the SE peaks (O'Neill's vanilla spot)
     class: myrmidon              # lithe ice-swordsman (book: Ice Longsword)
     level: 5
     inventory:

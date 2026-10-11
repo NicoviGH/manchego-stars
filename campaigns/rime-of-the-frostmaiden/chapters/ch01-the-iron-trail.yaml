@@ -163,7 +163,7 @@ enemy_units:
                                   # the Breguet slot (GUEST_PORTRAIT_MAP izobai->Breguet).
     is_boss: true
     count: 1
-    position: [21, 7]           # ON the seize tile (castle-gate, metatile 938) — full Breguet
+    positions: [[21, 7]]        # ON the seize tile (castle-gate, metatile 938) — full Breguet
                                 #   mirror, incl. the gate's +20avo/+3def (kill boss -> the gate
                                 #   tile is the obvious empty Seize square; #57 criterion b)
     class: armor-knight         # Breguet's class; magic (def→res) is our "rapier"
@@ -184,7 +184,7 @@ enemy_units:
     composition: [fighter, fighter, soldier]
     level: 1
     autolevel: true
-    spawn_turn: 3
+    arrives_turn: 3
     spawn_edge: west            # behind the party, same side as vanilla
     positions: [[0,8],[0,9],[0,10]]   # (0,7) is the painted compound wall
     inventory_by_class:

@@ -142,7 +142,7 @@ def _inject_ch03_tile_changes(chap, maps_dir, host_index):
 
 
 
-def ch03_enemy_pid(enemy):
+def ch03_enemy_pid(enemy, _index=0):
     """The boss (grell) and the mid-map miniboss (Brute) each ride a UNIQUE raw pid so their
     flagged gDefeatTalkList entries key their death events (WIN / midmap AFEV) to them alone;
     every other enemy shares the generic autolevelled-trash pid."""

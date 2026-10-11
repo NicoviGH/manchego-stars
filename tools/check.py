@@ -85,6 +85,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #479: a wave lands by `arrives_turn` inside `enemy_units`, the one spelling
+    r'trigger_turn', r'spawn_turn', r'enemy_reinforcements', r'ARRIVAL_TURN_FIELDS',
     # retired 2026-10-10: gold comes from in-map sources only, never a clear stipend (ADR 0092)
     r'gold_reward',
     # retired by #430: rescue_forecast asks danger_map's calibrated model (ADR 0312)
@@ -827,7 +829,7 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
 # Mirrors inject.raw_pids.ENEMY_ROSTER_KEYS. Named here rather than imported because this
 # module's `checks` CI job runs on a bare interpreter with no Pillow and no submodule, so it
 # must stay import-free; the schema tests fail if the two ever diverge.
-ROSTER_KEYS = ('enemy_units', 'reinforcements', 'enemy_reinforcements')
+ROSTER_KEYS = ('enemy_units',)
 
 
 def _roster_entries(d):
@@ -1603,8 +1605,8 @@ def check_rescue_targets(fail):
             reachers = pp.units_reaching(doc, terrain, hulls)
         except Exception as exc:    # noqa: BLE001 -- an ungrounded roster entry (no donor/
             # ai_override, a normal mid-draft state -- #369 widened `units_reaching` to every
-            # roster key, so a `reinforcements:`/`enemy_reinforcements:` entry authored ahead
-            # of its AI can reach here) is #335's business, not this gate's.
+            # enemy entry, so a wave authored ahead of its AI can reach here) is #335's
+            # business, not this gate's.
             print('check_rescue_targets: skipping %s (%s)' % (short, exc))
             continue
         fail.extend(_rescue_target_violations(short, reachers, pursuers))

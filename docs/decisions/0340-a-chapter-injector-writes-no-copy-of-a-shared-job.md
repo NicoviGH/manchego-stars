@@ -19,11 +19,11 @@ honoured per-body `levels:`, but ch05's and ch06's read `level` alone.
 
 - **Chaining:** `inject.hosting.chain(src, dst)` makes the chain step. Each step keeps its
   `chain_<src>_to_<dst>` name, which the step facts and tests address.
-- **Rosters:** `inject.units.enemy_rows(chap, class_ids, item_ids, pid_for, ...)`, for ch03
-  to ch06. Each chapter's rule for which CHARACTER an entry rides is a small `chNN_enemy_pid`,
-  and all four now honour per-body `levels:`. ch01 and ch02 still hand-build their rosters
-  entry by entry (bespoke comments, `composition:` packs), so a `levels:` split there still
-  needs those emitters touched.
+- **Rosters:** `inject.units.enemy_rows(chap, class_ids, item_ids, pid_for, ...)`, for every
+  chapter from the prologue to ch06. Each chapter's rule for which CHARACTER a body rides is a
+  small `chNN_enemy_pid(entry, index)` (the prologue's guards take one slot per body). Every
+  chapter now honours per-body `levels:`. A mixed pack stays one entry (`composition:` with
+  `inventory_by_class:`), and an `is_key_item` is story, never an emitted item.
 - **Locations:** `inject.villages.chapter_location_events`.
 - **Frame texts:** `inject.scenes.write_frame_texts` writes the title, both goal texts and the
   title card, for the prologue and ch01-ch06. `inject.text.write_nameplate` renames a borrowed
@@ -36,6 +36,20 @@ honoured per-body `levels:`, but ch05's and ch06's read `level` alone.
   - `record_alive_flags`, for a survivor flag a later chapter reads;
   - `branch_on_flag` and `branch_on_check_exists`, beside `branch_on_check_alive`;
   - `party_camera_tile`.
+
+**An enemy entry has one shape, which `enemy_rows` reads** (Nicolas, 2026-10-10: do ch01 and
+ch02 here too). ch01 and ch02 hand-built their rosters because their YAML was written in older
+spellings, so they are reshaped instead of the emitter learning those spellings:
+
+- **Placement:** an enemy places its bodies with `positions:`, a one-body boss included.
+  Guests and allies keep a single `position:`.
+- **Waves:** every wave lives in `enemy_units`, and lands on its `arrives_turn`.
+- **Retired:** the `reinforcements:` and `enemy_reinforcements:` keys, and the `trigger_turn`,
+  `spawn_turn` and `arrives: {turn:}` spellings. The schema refuses them, and `check.py`
+  lists them in `DEAD_CONCEPTS`.
+
+The difficulty readout for every chapter is unchanged by the reshape, and so is the parity
+gate.
 
 A chapter keeps a real difference by naming it. `ch06_messie_gather` validates Messie's island
 and route, then calls `gather_cast`.

@@ -40,11 +40,12 @@ class RawPidBossBaseLevel(unittest.TestCase):
         self.assertEqual(missing, [],
                          'raw-pid boss(es) with no RAW_PID_LEVEL_SOURCES row: %s' % missing)
 
-    def test_the_registry_READER_sees_every_roster_key_too(self):
-        # otherwise the guard has no reachable green state: a raw-pid boss under
-        # `reinforcements:` is flagged as unregistered, and adding the row that silences it
-        # makes the reader sys.exit("does not exist") and kills the build.
-        chap = {'reinforcements': [{'id': 'stowaway', 'is_boss': True, 'level': 9}]}
+    def test_the_registry_READER_sees_a_wave_boss_too(self):
+        # otherwise the guard has no reachable green state: a raw-pid boss arriving in a wave
+        # is flagged as unregistered, and adding the row that silences it makes the reader
+        # sys.exit("does not exist") and kills the build.
+        chap = {'enemy_units': [{'id': 'stowaway', 'is_boss': True, 'level': 9,
+                                 'arrives_turn': 3}]}
         self.assertEqual(inject.raw_pids._entry_base_level_in(chap, 'stowaway'), 9)
 
     def test_the_registry_reads_a_DECLARED_body_level(self):
@@ -85,12 +86,8 @@ class RawPidBossBaseLevel(unittest.TestCase):
 
 class EntryIsTurn1(unittest.TestCase):
     """`entry_is_turn1` is the one predicate `difficulty.chapter_enemy_groups` and
-    `map_placement_preview.enemy_bodies` must now share (#367): both readers ask "is this
-    body on the opening board", and both got it wrong by testing `arrives_turn` alone --
-    which is absent, and therefore falsy, on a `reinforcements:`/`enemy_reinforcements:`
-    entry that carries `trigger_turn` instead. The KEY is what makes an entry a
-    reinforcement; `arrives_turn` only refines `enemy_units` itself (ch06's Difficult-only
-    wave stays inside `enemy_units` for exactly this reason)."""
+    `map_placement_preview.enemy_bodies` share (#367): "is this body on the opening board".
+    Every wave lives in `enemy_units` and lands by `arrives_turn` (#479)."""
 
     def test_an_enemy_units_entry_with_no_arrives_turn_is_turn1(self):
         self.assertTrue(inject.raw_pids.entry_is_turn1('enemy_units', {'id': 'a'}))
@@ -98,27 +95,13 @@ class EntryIsTurn1(unittest.TestCase):
     def test_an_enemy_units_entry_with_arrives_turn_1_is_turn1(self):
         self.assertTrue(inject.raw_pids.entry_is_turn1('enemy_units', {'id': 'a', 'arrives_turn': 1}))
 
-    def test_every_spelling_of_the_arrival_turn_counts(self):
-        # ch01's goblins sit in `enemy_units` with `spawn_turn: 3`; reading `arrives_turn`
-        # alone put them on the opening board (#440 review).
-        for spelling in ({'spawn_turn': 3}, {'trigger_turn': 3}, {'arrives_turn': 3},
-                         {'arrives': {'turn': 3}}):
-            entry = dict({'id': 'a'}, **spelling)
-            self.assertEqual(inject.raw_pids.entry_arrival_turn(entry), 3, spelling)
-            self.assertFalse(inject.raw_pids.entry_is_turn1('enemy_units', entry), spelling)
+    def test_a_wave_is_not(self):
+        entry = {'id': 'a', 'arrives_turn': 3}
+        self.assertEqual(inject.raw_pids.entry_arrival_turn(entry), 3)
+        self.assertFalse(inject.raw_pids.entry_is_turn1('enemy_units', entry))
 
-    def test_an_enemy_units_entry_with_arrives_turn_above_1_is_not(self):
-        self.assertFalse(inject.raw_pids.entry_is_turn1('enemy_units', {'id': 'a', 'arrives_turn': 4}))
-
-    def test_a_reinforcements_key_entry_is_never_turn1_even_with_no_arrives_turn(self):
-        # The exact shape of the bug: ch02's `rear-raiders` carries `trigger_turn`, not
-        # `arrives_turn`, so `entry.get('arrives_turn')` alone reads it as turn-1.
-        self.assertFalse(inject.raw_pids.entry_is_turn1('reinforcements',
-                                           {'id': 'rear-raiders', 'trigger_turn': 3}))
-
-    def test_an_enemy_reinforcements_key_entry_is_never_turn1_either(self):
-        self.assertFalse(inject.raw_pids.entry_is_turn1('enemy_reinforcements', {'id': 'w'}))
-
+    def test_a_placed_non_enemy_entry_is_not_part_of_the_turn1_force(self):
+        self.assertFalse(inject.raw_pids.entry_is_turn1('green_allies', {'id': 'g'}))
 
 if __name__ == '__main__':
     unittest.main()

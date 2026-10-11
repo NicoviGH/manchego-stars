@@ -792,7 +792,7 @@ def assert_escort_safe_ai_has_one_client(ai_bytes):
 
 
 
-def ch05_enemy_pid(enemy):
+def ch05_enemy_pid(enemy, _index=0):
     """The boss and the moose each take a unique pid so their gDefeatTalkList entries key to
     them and nothing else; everything else is generic trash."""
     return (CH05_BOSS_PID if enemy.get('is_boss')

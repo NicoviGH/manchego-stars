@@ -244,7 +244,7 @@ def ch06_reda_symbol(enemy_id, index):
     return 'MS_Ch06Surface_%s_%d' % (re.sub(r'[^A-Za-z0-9]', '_', enemy_id), index)
 
 
-def ch06_enemy_pid(enemy):
+def ch06_enemy_pid(enemy, _index=0):
     """The BOSS takes her own vanilla CHARACTER slot so her flagged defeat quote keys to her and
     nothing else; everything else shares the slot's autolevelled generic, exactly as vanilla Ch6
     and Ch7 both do."""

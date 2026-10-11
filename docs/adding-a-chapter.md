@@ -131,7 +131,8 @@ difference by naming it (`ch06_messie_gather` calls `gather_cast`).
      same roster ARMED from `CLASS_LOADOUT` — and `LOAD1`s it so PREP has a party from a cold New
      Game. (`deploy_slots` is not optional: `_deploy_cap_entries` sys.exits without it.)
    - Enemies → `MS_ChNNLine`, `LOAD1`ed by the beginning scene, plus one `MS_ChNNWave<turn>` per
-     reinforcement wave (each needs its own table — one table cannot serve two turns). Rows come
+     reinforcement wave (each needs its own table — one table cannot serve two turns). Every
+     entry lives in `enemy_units` with `positions:`, and a wave says `arrives_turn:`. Rows come
      from `enemy_rows`; the chapter's `chNN_enemy_pid(entry)` gives boss and any named unit a
      UNIQUE pid so their flagged `gDefeatTalkList` entries key to them alone, and the rest the
      slot's generic autolevelled PID. Positions/levels/items/AI from the YAML.

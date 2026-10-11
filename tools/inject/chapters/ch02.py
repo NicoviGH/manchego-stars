@@ -31,7 +31,7 @@ from inject.text import (
     display_name, _fid_tag, name_message_body, _script_to_message, set_message_body,
     write_nameplate)
 from inject.units import (
-    _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, enemy_ai_initialiser)
+    _ally_unit_entry, _deploy_cap_entries, enemy_ai_initialiser, enemy_rows)
 from inject.villages import (
     chapter_location_events, DEFAULT_VILLAGE_SPEAKER, village_boxes, village_reward_item,
     village_script)
@@ -228,6 +228,16 @@ def offmap_join_recruits(campaign, chapter_number):
     return out
 
 
+
+def ch02_enemy_pid(enemy, _index=0):
+    """Grukk rides Bone's slot and Halvar Bazba's, so their nameplates and quotes are theirs;
+    every other raider is the autolevelled generic."""
+    if enemy.get('is_boss'):
+        return 'CHARACTER_%s' % CH02_BOSS_SLOT
+    if enemy.get('is_miniboss'):
+        return 'CHARACTER_%s' % CH02_MINIBOSS_SLOT
+    return CH02_GENERIC_PID
+
 def inject_ch02(campaign, verbose=True):
     """Wire Ch2 "Cold Welcome" (#22) onto chapter slot 3 (ch01's MNC2(0x3) target).
 
@@ -339,50 +349,13 @@ def inject_ch02(campaign, verbose=True):
                                      ' /* %s -- off-map recruit joins the party (#23) */' % uid)
                     for uid, slot, ce, dce, lv in join_recruits]
 
+    # 2a. RED raider band (088B463C) -- vanilla Ch2 parity, reflavored chardalyn berserkers:
+    #     2x L3 brigand (vanilla #1 + #5), the L3 vulnerary dropper (#4), an L2 (#6), the lone
+    #     L1 archer (#2), Grukk on Bone's slot and Halvar on Bazba's.
     by_eid = {e['id']: e for e in chap['enemy_units']}
-    raider = by_eid['chardalyn-raider']            # 2x L3 generic brigand (vanilla #1 + #5)
-    scavenger = by_eid['chardalyn-scavenger']      # 1x L3, the vulnerary dropper (vanilla #4)
-    skirmisher = by_eid['chardalyn-skirmisher']    # 1x L2 generic brigand (vanilla #6)
-    archer = by_eid['frost-archer']                # 1x L1 archer (vanilla #2)
     grukk, halvar = by_eid['raider-bruiser'], by_eid['raider-captain']
-    reinf = chap['reinforcements'][0]
-    brig, arch = CH02_CLASS_IDS['brigand'], CH02_CLASS_IDS['archer']
-    axe, steel, bow, vuln = (CH02_ITEM_IDS['iron-axe'], CH02_ITEM_IDS['steel-axe'],
-                             CH02_ITEM_IDS['iron-bow'], CH02_ITEM_IDS['vulnerary'])
-
-    # 2a. RED raider band (088B463C) -- vanilla Ch2 parity, reflavored chardalyn berserkers.
-    enemies = []
-    for index, (x, y) in enumerate(raider['positions']):
-        enemies.append(_enemy_unit_entry(
-            CH02_GENERIC_PID, brig, raider['level'], True, x, y,
-            axe, enemy_ai_initialiser(chap, raider, index),
-            ' /* chardalyn berserker */'))
-    for index, (x, y) in enumerate(scavenger['positions']):
-        enemies.append(_enemy_unit_entry(
-            CH02_GENERIC_PID, brig, scavenger['level'], True, x, y,
-            '%s, %s' % (axe, vuln), enemy_ai_initialiser(chap, scavenger, index),
-            ' /* chardalyn scavenger -- drops the vulnerary */',
-            itemdrop=True))
-    for index, (x, y) in enumerate(skirmisher['positions']):
-        enemies.append(_enemy_unit_entry(
-            CH02_GENERIC_PID, brig, skirmisher['level'], True, x, y,
-            axe, enemy_ai_initialiser(chap, skirmisher, index),
-            ' /* chardalyn skirmisher (L2) */'))
-    for index, (x, y) in enumerate(archer['positions']):
-        enemies.append(_enemy_unit_entry(
-            CH02_GENERIC_PID, arch, archer['level'], True, x, y,
-            bow, enemy_ai_initialiser(chap, archer, index),
-            ' /* chardalyn hunter -- vanilla\'s lone archer, charges on turn 2 */'))
-    gx, gy = grukk['position']
-    enemies.append(_enemy_unit_entry(
-        'CHARACTER_%s' % CH02_MINIBOSS_SLOT, brig, grukk['level'],
-        False, gx, gy, axe, enemy_ai_initialiser(chap, grukk),
-        ' /* Grukk the Bruiser -- miniboss, fixed bases (Bone slot) */'))
-    hx, hy = halvar['position']
-    enemies.append(_enemy_unit_entry(
-        'CHARACTER_%s' % CH02_BOSS_SLOT, brig, halvar['level'],
-        True, hx, hy, steel, enemy_ai_initialiser(chap, halvar),
-        ' /* Halvar the Raider Captain -- boss, steel axe (Bazba slot) */'))
+    reinf = by_eid['rear-raiders']
+    enemies = enemy_rows(chap, CH02_CLASS_IDS, CH02_ITEM_IDS, ch02_enemy_pid)
 
     # 2b. GREEN chwinga (088B4718) -- the protect layer; class + level + positions +
     #     per-survivor gift come from the YAML deployment.green_allies (id order
@@ -423,12 +396,8 @@ def inject_ch02(campaign, verbose=True):
                for g in chap['deployment']['green_allies']]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
-    reinforce = [_enemy_unit_entry(CH02_GENERIC_PID, brig, lv, True, x, y, axe,
-                                   enemy_ai_initialiser(chap, reinf, index),
-                                   ' /* rear raider L%d, turn %d */'
-                                   % (lv, reinf['trigger_turn']))
-                 for index, ((x, y), lv)
-                 in enumerate(zip(reinf['positions'], reinf['levels']))]
+    reinforce = enemy_rows(chap, CH02_CLASS_IDS, CH02_ITEM_IDS, ch02_enemy_pid,
+                           arrives_turn=reinf['arrives_turn'])
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
@@ -455,7 +424,7 @@ def inject_ch02(campaign, verbose=True):
             ' /* turn-1 fliers-vs-bows: RBG warns flier Pinky off the archer */\n'
             '    TURN(0x0, EventScr_Ch3_Turn1Npc, %d, 0, FACTION_ID_BLUE)'
             ' /* turn-%d rear raiders + Wolfram bark */\n    END_MAIN\n}'
-            % (reinf['trigger_turn'], reinf['trigger_turn']),
+            % (reinf['arrives_turn'], reinf['arrives_turn']),
         'locationBasedEvents': chapter_location_events(chap, CH02_VILLAGE_SLOTS,
                                                        flags=CH02_VILLAGE_FLAGS),
         'miscBasedEvents': '{\n    CauseGameOverIfLordDies\n    END_MAIN\n}',
@@ -651,5 +620,6 @@ def inject_ch02(campaign, verbose=True):
         print('  rosters: party persists + off-map recruit join-LOAD [%s], %d chardalyn '
               'raiders (Grukk@%s Halvar@%s) + %d rear raiders turn %d; %d GREEN chwinga '
               '(per-survivor charm-gifts)'
-              % (joined, len(enemies), (gx, gy), (hx, hy), len(reinforce),
-                 reinf['trigger_turn'], len(chwinga)))
+              % (joined, len(enemies), tuple(grukk['positions'][0]),
+                 tuple(halvar['positions'][0]), len(reinforce), reinf['arrives_turn'],
+                 len(chwinga)))

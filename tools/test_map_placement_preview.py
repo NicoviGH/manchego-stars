@@ -306,65 +306,35 @@ class FiringCellsLivesHereNotInRescueForecast(unittest.TestCase):
         self.assertNotIn('out-of-range', found)   # |5-2| = 3, past range
 
 
-class EnemyBodiesAndUnitsReachingReadEveryRosterKey(unittest.TestCase):
-    """`enemy_bodies` and `units_reaching` both docstring-claimed to cover reinforcements and
-    both did not: `enemy_bodies` never looked past `enemy_units:`, and a naive fix that just
-    widened the loop without the KEY test would have flipped the bug rather than fixed it,
-    since a `reinforcements:`/`enemy_reinforcements:` entry carries `trigger_turn`, not
-    `arrives_turn` -- ch02's real `rear-raiders` wave (#367).
-    """
+class EnemyBodiesAndUnitsReachingSeeWaves(unittest.TestCase):
+    """`enemy_bodies` blocks only the turn-1 line; `units_reaching` and `placed_units` see
+    every wave too (#367). A wave is an `enemy_units` entry with a later `arrives_turn`."""
 
-    def test_a_reinforcements_key_entry_is_not_a_turn1_blocking_body(self):
-        chap = {'reinforcements': [{'id': 'w', 'trigger_turn': 3, 'positions': [[2, 0]]}]}
-        self.assertEqual(pp.enemy_bodies(chap), set())
-
-    def test_an_enemy_reinforcements_key_entry_is_not_a_turn1_body_either(self):
-        chap = {'enemy_reinforcements': [{'id': 'w', 'trigger_turn': 3,
-                                          'positions': [[2, 0]]}]}
+    def test_a_wave_is_not_a_turn1_blocking_body(self):
+        chap = {'enemy_units': [{'id': 'w', 'arrives_turn': 3, 'positions': [[2, 0]]}]}
         self.assertEqual(pp.enemy_bodies(chap), set())
 
     def test_an_enemy_units_entry_is_still_a_turn1_blocking_body(self):
         chap = {'enemy_units': [{'id': 'a', 'positions': [[1, 0]]}]}
         self.assertEqual(pp.enemy_bodies(chap), {(1, 0)})
 
-    def test_an_enemy_units_wave_past_turn_1_is_still_excluded(self):
-        chap = {'enemy_units': [{'id': 'a', 'arrives_turn': 4, 'positions': [[1, 0]]}]}
-        self.assertEqual(pp.enemy_bodies(chap), set())
-
-    def test_units_reaching_finds_a_unit_declared_under_reinforcements(self):
-        """The docstring has always claimed this ("REINFORCEMENTS ARE INCLUDED"); it was
-        only ever true of ch06 because ch06 happens to keep its wave inside `enemy_units`."""
-        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
-        terrain = [[plain] * 5]
-        chap = {'reinforcements': [{
-            'id': 'w', 'class': 'soldier', 'level': 1, 'trigger_turn': 3,
-            'inventory': [{'id': 'iron-lance'}], 'positions': [[0, 0]],
-            'ai_override': {'ai': '{0x0, 0x0, 0x0, 0x0}', 'why': 'test pursuer'},
-        }]}
-        found = pp.units_reaching(chap, terrain, [(4, 0)])
-        self.assertEqual([f[0] for f in found], ['w'])
-
-    def _reinforcement_entry(self, eid='w'):
-        return {'id': eid, 'class': 'soldier', 'level': 1, 'trigger_turn': 3,
+    def _wave_entry(self, eid='w'):
+        return {'id': eid, 'class': 'soldier', 'level': 1, 'arrives_turn': 3,
                 'inventory': [{'id': 'iron-lance'}], 'positions': [[0, 0]],
                 'ai_override': {'ai': '{0x0, 0x0, 0x0, 0x0}', 'why': 'test pursuer'}}
 
-    def test_placed_units_draws_a_reinforcements_key_wave_too(self):
-        """`placed_units` -- the tool's own PNG render, not a value any gate consumes --
-        was the THIRD copy of this exact bug: it still read `chapter.get('enemy_units')`
-        alone, so a `reinforcements:`/`enemy_reinforcements:` wave was simply absent from
-        the picture, even after `enemy_bodies` and `units_reaching` were fixed to see it."""
-        chap = {'reinforcements': [self._reinforcement_entry()]}
-        units = pp.placed_units(chap)
-        self.assertEqual([eid for _tile, _code, _beh, eid, _late in units], ['w'])
+    def test_units_reaching_finds_a_unit_arriving_in_a_wave(self):
+        plain = [t for t, c in pp.FOOT_COST.items() if c == 1][0]
+        terrain = [[plain] * 5]
+        chap = {'enemy_units': [self._wave_entry()]}
+        found = pp.units_reaching(chap, terrain, [(4, 0)])
+        self.assertEqual([f[0] for f in found], ['w'])
 
-    def test_placed_units_marks_a_reinforcements_key_wave_as_LATE(self):
-        """The render draws a late body as a hollow ring -- 'not here at turn 1'. A
-        reinforcement-key entry is never turn-1 regardless of its own fields, per
-        `inject.raw_pids.entry_is_turn1`."""
-        chap = {'reinforcements': [self._reinforcement_entry()]}
-        _tile, _code, _beh, _eid, late = pp.placed_units(chap)[0]
-        self.assertTrue(late)
+    def test_placed_units_draws_a_wave_as_LATE(self):
+        """The render draws a late body as a hollow ring -- 'not here at turn 1'."""
+        units = pp.placed_units({'enemy_units': [self._wave_entry()]})
+        self.assertEqual([eid for _tile, _code, _beh, eid, _late in units], ['w'])
+        self.assertTrue(units[0][4])
 
     def test_placed_units_still_marks_a_hard_mode_only_enemy_units_entry_as_LATE(self):
         """`hard_mode_only` is a MODE gate, not a turn-arrival one -- `entry_is_turn1` does

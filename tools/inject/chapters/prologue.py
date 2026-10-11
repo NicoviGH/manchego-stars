@@ -9,7 +9,9 @@ from inject.asset_table import _asm_table_word_index
 from inject.chapter_frame import write_settings_row, write_event_group
 from inject.hosting import _load_chapter_yaml, GOAL_TEMPLATE, map_writes
 from inject.chapter_ids import PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT
-from inject.decomp import _find_brace_block, _replace_brace_block, fe_item_enum, REPO
+from inject.class_ids import ChapterClassIds
+from inject.decomp import (
+    _find_brace_block, _replace_brace_block, fe_item_enum, REPO, WEAPON_ITEM_ENUM)
 from inject.hosts import PROLOGUE_CHAPTER_INDEX, PROLOGUE_EVENT_GROUP, PROLOGUE_HOST_INDEX
 from inject.maps import _register_chapter_map
 from inject.montage import inject_opening_montage, inject_world_tour
@@ -23,7 +25,7 @@ from inject.stats import _set_field, _set_gender, donor_growths_and_ranks, guest
 from inject.text import (
     display_name, _fid_tag, name_message_body, _script_to_message, set_message_body,
     write_nameplate)
-from inject.units import enemy_ai_initialiser
+from inject.units import enemy_rows
 
 
 # The guest slots whose personal bases inject_prologue rewrites: Hlin and Scramsax onto their
@@ -85,7 +87,7 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
     hlin_class, scram_class = classes
     hlin_items, scram_items = guest_items
     hlin, scram = by_id['hlin-trollbane'], by_id['scramsax']
-    sephek, guard = by_id['sephek-kaltro'], by_id['caravan-guard']
+    guard = by_id['caravan-guard']
 
     ally = (
         '{\n'
@@ -119,12 +121,10 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
                'scram_items': scram_items, 'scram_level': scram['level'],
                'scram_x': scram['position'][0], 'scram_y': scram['position'][1]})
 
-    # The guards ride two spare non-cast character slots. `count`/`positions` decide how
-    # many are emitted and where; a disagreement between them would silently ship a roster
-    # nobody authored, so it fails the build instead.
+    # The guards ride two spare non-cast character slots, one per body. `count`/`positions`
+    # decide how many are emitted and where; a disagreement between them would silently ship
+    # a roster nobody authored, so it fails the build instead.
     guard_slots = (0x80, 0x82)
-    import difficulty
-    guard_class = difficulty._enemy_class_enum(guard['class'])
     if len(guard['positions']) != guard['count']:
         sys.exit('ERROR: ch00 caravan-guard has count=%d but %d position(s)'
                  % (guard['count'], len(guard['positions'])))
@@ -132,40 +132,15 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
         sys.exit('ERROR: ch00 caravan-guard count=%d exceeds the %d spare character slot(s); '
                  'add one to guard_slots in _prologue_roster_blocks'
                  % (guard['count'], len(guard_slots)))
-    guards = ''.join(
-        '    {\n'
-        '        .charIndex = 0x%02x, /* Torg\'s caravan guard */\n'
-        '        .classIndex = %s,\n'
-        '        .allegiance = FACTION_ID_RED,\n'
-        '        .level = %d,\n'
-        '        .xPosition = %d,\n'
-        '        .yPosition = %d,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { %s },\n'
-        '        .ai = %s,\n'
-        '    },\n' % (slot, guard_class, guard['level'], pos[0], pos[1],
-                      fe_item_enum(guard['inventory'][0]),
-                      enemy_ai_initialiser(chap, guard, index))
-        for index, (slot, pos) in enumerate(zip(guard_slots, guard['positions'])))
 
-    enemy = (
-        '{\n'
-        '    {\n'
-        '        .charIndex = CHARACTER_%s, /* Sephek -- boss; escapes in the ending */\n'
-        '        .classIndex = CLASS_MYRMIDON,\n'
-        '        .allegiance = FACTION_ID_RED,\n'
-        '        .level = %d,\n'
-        '        .xPosition = %d,\n'
-        '        .yPosition = %d,\n'
-        '        .redaCount = 0,\n'
-        '        .items = { %s },\n'
-        '        .ai = %s,\n'
-        '    },\n'
-        '%s'
-        '    { 0 },\n'
-        '}' % (sephek_slot, sephek['level'], sephek['position'][0], sephek['position'][1],
-               fe_item_enum(sephek['inventory'][0]),
-               enemy_ai_initialiser(chap, sephek), guards))
+    def pid(entry, index):
+        # Sephek (boss) rides his own slot and escapes in the ending.
+        if entry.get('is_boss'):
+            return 'CHARACTER_%s' % sephek_slot
+        return '0x%02x' % guard_slots[index]
+
+    rows = enemy_rows(chap, ChapterClassIds('prologue'), WEAPON_ITEM_ENUM, pid)
+    enemy = '{\n' + '\n'.join(rows) + '\n    { 0 },\n}'
     return ally, enemy
 
 

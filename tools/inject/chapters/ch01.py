@@ -28,7 +28,7 @@ from inject.text import (
     DEV_PLACEHOLDER_MSG, _fe_dialogue_text, _fid_tag, name_message_body, _script_to_message,
     set_message_body, vanilla_name_text_id, _wrap_fe_lines, write_nameplate)
 from inject.units import (
-    _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, enemy_ai_initialiser)
+    _ally_unit_entry, _deploy_cap_entries, enemy_rows)
 
 
 CH01_LAYOUT = ('Ch01IronTrailMap', 'ch01-the-iron-trail')  # (asset label, maps/ stem)
@@ -211,6 +211,13 @@ def ch01_turn1_taunt_script(heal_beat):
                CH01_GUIDE_FORTS_FLAG))
 
 
+
+def ch01_enemy_pid(enemy, _index=0):
+    """The chief rides Breguet's slot so his flagged quote keys to him alone; every goblin
+    shares the autolevelled generic 0x80."""
+    return 'CHARACTER_%s' % CH01_BOSS_SLOT if enemy.get('is_boss') else '0x80'
+
+
 def inject_ch01(campaign, verbose=True, boot=False):
     """Wire Ch1 "The Iron Trail" (#21) onto chapter slot 2 (ch00's MNC2(0x2) target).
 
@@ -355,39 +362,15 @@ def inject_ch01(campaign, verbose=True, boot=False):
             for (uid, slot, ce, dce, lv), (x, y) in zip(cast, CH01_JOIN_POSITIONS)]
     deploy = _deploy_cap_entries(chap, cast, leader, 'ch01')
 
+    # The chief mirrors Breguet 1:1: his slot's vanilla boss bases, no autolevel, lv4, his own
+    # borrowed AI, ON the seize tile. The iron-ingots MacGuffin stays narrative (`is_key_item`:
+    # no FE8 item exists for it); recovery is told in the ending scene.
     by_eid = {e['id']: e for e in chap['enemy_units']}
-    spear, axe = by_eid['goblin-spear'], by_eid['goblin-axe']
     chief, reinf = by_eid['goblin-chief'], by_eid['goblin-reinforcements']
-
-    enemies = []
-    for index, (x, y) in enumerate(spear['positions']):
-        enemies.append(_enemy_unit_entry(
-            '0x80', CH01_CLASS_IDS.for_entry(spear), spear['level'], True, x, y,
-            CH01_ITEM_IDS[spear['inventory'][0]['id']],
-            enemy_ai_initialiser(chap, spear, index),
-            ' /* goblin spear -- camp approach */'))
-    for index, (x, y) in enumerate(axe['positions']):
-        enemies.append(_enemy_unit_entry(
-            '0x80', CH01_CLASS_IDS.for_entry(axe), axe['level'], True, x, y,
-            CH01_ITEM_IDS[axe['inventory'][0]['id']],
-            enemy_ai_initialiser(chap, axe, index),
-            ' /* goblin raider -- mid-trail pursuer */'))
-    cx, cy = chief['position']
-    # The iron-ingots MacGuffin stays narrative (no FE8 item exists for it yet);
-    # recovery is told in the ending scene. The chief mirrors Breguet 1:1: his slot's
-    # vanilla boss bases, no autolevel, lv4, his own borrowed AI, ON the seize tile.
-    enemies.append(_enemy_unit_entry(
-        'CHARACTER_%s' % CH01_BOSS_SLOT, CH01_CLASS_IDS.for_entry(chief),
-        chief['level'], False, cx, cy,
-        CH01_ITEM_IDS[chief['inventory'][0]['id']], enemy_ai_initialiser(chap, chief),
-        ' /* goblin chief -- boss, holds the seize tile */'))
-    reinforce = []
-    for index, (cls, (x, y)) in enumerate(zip(reinf['composition'], reinf['positions'])):
-        reinforce.append(_enemy_unit_entry(
-            '0x80', CH01_CLASS_IDS[cls], reinf['level'], True, x, y,
-            CH01_ITEM_IDS[reinf['inventory_by_class'][cls][0]],
-            enemy_ai_initialiser(chap, reinf, index), ' /* west reinforcement, turn %d */'
-            % reinf['spawn_turn']))
+    cx, cy = chief['positions'][0]
+    enemies = enemy_rows(chap, CH01_CLASS_IDS, CH01_ITEM_IDS, ch01_enemy_pid)
+    reinforce = enemy_rows(chap, CH01_CLASS_IDS, CH01_ITEM_IDS, ch01_enemy_pid,
+                           arrives_turn=reinf['arrives_turn'])
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()
@@ -453,7 +436,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
             ' /* Izobai turn-1 taunt */\n'
             '    TURN(0x0, EventScr_Ch2_Turn1Player, %d, 0, FACTION_ID_BLUE)'
             ' /* west reinforcements */\n'
-            '    END_MAIN\n}' % reinf['spawn_turn'],
+            '    END_MAIN\n}' % reinf['arrives_turn'],
         'locationBasedEvents':
             '{\n    House(0x0, EventScr_Ch2_Village1, %d, %d)\n'
             '    House(0x0, EventScr_Ch2_Village2, %d, %d)\n'
@@ -901,7 +884,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
         print('  rosters: %d cast join, %d goblins + chief on (%d,%d) [Seize], '
               '%d west reinforcements turn %d'
               % (len(cast), len(enemies) - 1, cx, cy, len(reinforce),
-                 reinf['spawn_turn']))
+                 reinf['arrives_turn']))
 
 
 def inject_northlook_bitey(verbose=True):

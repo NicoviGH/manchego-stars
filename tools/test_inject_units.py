@@ -112,7 +112,7 @@ class SharedEnemyRows(unittest.TestCase):
         chap = {'enemy_units': entries}
         with mock.patch.object(inject.units, 'enemy_ai_initialiser', lambda *a: '{ 0 }'):
             return inject.units.enemy_rows(chap, self._Classes(), self.ITEMS,
-                                           lambda e: 'PID_' + e['id'], **kwargs)
+                                           lambda e, _i: 'PID_' + e['id'], **kwargs)
 
     def test_per_body_levels_reach_the_rows(self):
         rows = self._rows([{'id': 'pack', 'name': 'Pack', 'class': 'wolf', 'levels': [2, 3],

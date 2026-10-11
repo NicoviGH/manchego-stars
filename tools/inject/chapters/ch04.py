@@ -262,7 +262,7 @@ def ch04_moose_script(unit_symbol, pid, msg, camera_at, flee_route):
             % (unit_symbol, cx, cy, pid, msg, '\n'.join(move), pid))
 
 
-def ch04_enemy_pid(enemy):
+def ch04_enemy_pid(enemy, _index=0):
     """ch04's enemies ride one monster pid per CLASS (CH04_MONSTER_PIDS)."""
     return CH04_MONSTER_PIDS[enemy['class']]
 
