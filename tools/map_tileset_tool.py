@@ -696,7 +696,10 @@ def port_structure(tileset_dirs, source_dir, source_grid, slot_grid, bank, terra
 
     gfx = bytearray(pieces[0][2])
     skip = {slot for row in slot_grid for slot in row}
-    free = _unreferenced_tiles(pieces[0][3], skip=skip)
+    # Free means free in EVERY tileset: a variant's own slot may point at a tile its base
+    # never draws, and the shared .4bpp is written to all of them.
+    unused = [set(_unreferenced_tiles(cfg, skip=skip)) for _, _, _, cfg in pieces]
+    free = sorted(set.intersection(*unused))
     entries = {}
     for y, row in enumerate(slot_grid):
         for x, slot in enumerate(row):

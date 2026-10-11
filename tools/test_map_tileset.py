@@ -1224,6 +1224,29 @@ class PortStructure(unittest.TestCase):
                         if entry not in backdrop:
                             self.assertEqual(4, entry >> 12)
 
+    def test_a_tile_only_a_variant_uses_is_never_reclaimed(self):
+        # A variant may draw new art in a slot the base leaves unused; the tile it points at
+        # is unreferenced in the base but NOT free. Porting must leave its pixels alone.
+        with tempfile.TemporaryDirectory() as tmp:
+            base, ice = _copy_tilesets(tmp, ['snowy-bern', 'snowy-bern-ice'])
+            cfg = bytearray(open(os.path.join(ice, 'snowy-bern-ice.bin'), 'rb').read())
+            free = mt._unreferenced_tiles(cfg)
+            slot = next(m for m in range(1, 1024) if cfg[8192 + m] == 0)
+            struct.pack_into('<4H', cfg, slot * 8, *([free[0] | (4 << 12)] * 4))
+            cfg[8192 + slot] = 0x01
+            open(os.path.join(ice, 'snowy-bern-ice.bin'), 'wb').write(cfg)
+            gfx = bytearray(open(os.path.join(ice, 'snowy-bern-ice.4bpp'), 'rb').read())
+            gfx[free[0] * 32:(free[0] + 1) * 32] = bytes(range(32))
+            for d, n in ((base, 'snowy-bern'), (ice, 'snowy-bern-ice')):
+                open(os.path.join(d, n + '.4bpp'), 'wb').write(gfx)
+            bern = mt._tileset_from_dir(base)
+            port = next(m for m in range(1, 1024) if bern.terrain(m) == 0
+                        and mt._tileset_from_dir(ice).terrain(m) == 0)
+            mt.port_structure([base, ice], SNOWY_FIELDS, [[857]], [[port]], bank=4,
+                              terrains=[[0x2C]], ground={(232, 232, 232)}, backdrop=99)
+            after = open(os.path.join(ice, 'snowy-bern-ice.4bpp'), 'rb').read()
+            self.assertEqual(bytes(range(32)), after[free[0] * 32:(free[0] + 1) * 32])
+
     def test_refuses_a_slot_in_use(self):
         with tempfile.TemporaryDirectory() as tmp:
             base, ice = _copy_tilesets(tmp, ['snowy-bern', 'snowy-bern-ice'])
