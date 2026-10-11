@@ -322,3 +322,11 @@ design_notes: >
   Each side has a case, and the party still cuts down a stubborn old man in his own hall.
   Don't resolve who was right. Civilian no-kill constraint is the design hook. ONE ending.
   The town crier's Easthaven line seeds the ch08 ambush (word of Bremen traveled).
+
+# ── Playtest ─────────────────────────────────────────────────────────────────────
+playtest:
+  boot: ch07boot                  # CH07BOOT=1; host slot 8 comes from inject/hosts.py
+  cases:
+    # The chapter-generic Status-screen capture, on this chapter's own boot: the title card
+    # as the ROM draws it, which is the only colour that counts (the card file holds indices).
+    - {name: ch07titlecard, proves: "the Status screen draws ch07's title card, in the ROM's own colours", lua: ch07titlecard, kind: record}

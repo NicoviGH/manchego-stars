@@ -4173,6 +4173,11 @@ scenarios.titlecard = function()
         result("FAIL", "Status screen proc never appeared")
     end
 end
+-- The same capture on a chapter's own boot ROM: `titlecard` is pinned to the canonical ROM, and
+-- a chapter whose card is new needs it drawn by the build that hosts it (ch07's YAML case).
+scenarios.ch07titlecard = function()
+    return scenarios.titlecard()
+end
 
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.
 scenarios.gameover = function()
