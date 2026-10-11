@@ -70,7 +70,7 @@ LETTERS = {
     'a': (9, 110, 117),
     'b': (16, 103, 110),        # "by" -- word-initial b (clean left edge)
     'c': (4, 88, 93),
-    'd': (10, 144, 152),        # "Blade" -- the d (d+e kern in source; cut before 'e')
+    'd': (10, 144, 151),        # "Blade" -- the d, ending at its shadow; column 151 is the e's
     'e': (0, 58, 64),
     'g': (0, 44, 52),
     'h': (0, 83, 90),          # "The" -- isolated middle glyph
