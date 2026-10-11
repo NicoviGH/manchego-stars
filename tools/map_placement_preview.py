@@ -415,8 +415,8 @@ def placed_units(chapter, concept=None):
 
     Waves are drawn too (#367/#369). `late` (drawn as a hollow ring) is
     `inject.raw_pids.entry_is_turn1`'s answer OR'd with `hard_mode_only` -- a separate,
-    MODE-gated axis `entry_is_turn1` does not model, since ch06's Difficult-only crab riders
-    declare it while arriving on turn 1."""
+    MODE-gated axis `entry_is_turn1` does not model: a Difficult-only entry can stand on the
+    turn-1 board and still be absent on Normal."""
     import inject.raw_pids
     import difficulty as dif
     import chapter_status as cs
