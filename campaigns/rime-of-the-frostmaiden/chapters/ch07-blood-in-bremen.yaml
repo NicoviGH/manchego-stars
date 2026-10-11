@@ -308,7 +308,13 @@ economy:
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
   available_shops: [bremen]
-  units_available_to_recruit: []
+  units_available_to_recruit:   # ADR 0342: both join in the ending, never mid-battle (vanilla Ch7
+    - id: halvar                # adds no one). Halvar Berylbore, Grynsk's son: Fighter, Ross's
+      via: story                #   role. One neutral line, "you found my father".
+      joins: ch08-the-eastway-ambush
+    - id: meriwa                # the merfolk Messie has been talking to: Monk, Artur's role.
+      via: story                #   Messie sends her as proof of the truce.
+      joins: ch08-the-eastway-ambush
   unlocks_chapter: ch08-the-eastway-ambush
 
 # ── Signature Moment anchored here ───────────────────────────────────────────────

@@ -72,34 +72,30 @@
 ## Recruit cadence (by role) 🧩
 
 > **Method (Nicolas, 2026-06-20):** class is the *chassis* (move/weapon/stat shape); the
-> character is custom art on top ("custom art is the lever"). The whole cast meets by Ch1; each
-> chapter **fields a vanilla-sized force** via `deploy_limit` (= vanilla chapter N's deploy slots),
-> and Pick-Units chooses who takes it. So we recruit to fill **roles**, skinning canon characters
-> onto whatever chassis the army needs. Per-unit detail lives in `campaigns/.../npcs/*.yaml` (the
-> source of truth); this is the schedule overview.
+> character is custom art on top ("custom art is the lever"). Each chapter **fields a vanilla-sized
+> force** via `deploy_limit`, and Pick Units chooses who takes it.
 >
-> **Budget:** see `decisions.md` §"Recruit budget" — the *roster* tracks vanilla's field-growth
-> curve to a **~16–18 pool** (peak field ~12 + bench), so it **keeps growing past Ch5**; the
-> by-role table below is the *which*, the budget is the *how many*.
+> **How many, and when (ADR 0342, #459):** the roster keeps **vanilla's recruit cadence** on
+> Eirika's route: the same number of bodies by the same chapter, each filling the role of a vanilla
+> recruit we are missing, at a level fit for the chapter it joins. No Jagen (ADR 0042). Per-unit
+> detail lives in `campaigns/.../{pcs,npcs}/*.yaml`; this is the schedule overview.
 
-**Locked recruits (class + role settled; full bases/growths authored at wiring):**
-
-| Joins | Character | Chassis (FE class) | Role filled | Skin |
+| Joins | Character | Chassis (FE class) | Vanilla role it fills | Skin |
 |---|---|---|---|---|
-| Ch1 | 8 PCs | — | core triangle/magic/heal/flier/armor | — |
-| Ch1 | **Baxby** | Cavalier | sword access + cavalry | axe-beak (done) |
-| Ch3 | **Trex** | Thief | **utility** (steal/chests/doors) | winged kobold |
-| Ch4→5 | **Lupin** | Cavalier | 2nd cavalry / mobile melee | direwolf (the wolf *is* the mount; pairs w/ Baxby as "beast-cavalry") |
-| Ch5 | **Sahnar** | Myrmidon | **sword duelist** (crit) | moon-elf mummy |
-| Ch5 | **Basil** | Cleric | **2nd healer** | goodberry shrub (heals = handing out berries) |
+| ch01 | 8 PCs | — | the core: Garcia, Gilliam, Neimi, Lute, Moulder, Vanessa + two Knolls | — |
+| ch02 | **Baxby** | Cavalier | Franz | axe-beak |
+| ch03 | **Trex** | Thief | Colm | winged kobold |
+| ch05 | **Lupin** | Cavalier | Kyle (early) | direwolf (the wolf *is* the mount) |
+| ch05 | **Sahnar** | Myrmidon | Joshua | moon-elf mummy |
+| ch05 | **Basil** | Cleric | Natasha | goodberry shrub |
+| ch07 end | **Halvar Berylbore** | Fighter | Ross (second axe) | dwarf fisher, Grynsk's son |
+| ch07 end | **Meriwa** | Monk | Artur (light magic) | merfolk (Stephano's Mermaid) |
+| ch08 start | **The White Moose** | Cavalier | Forde | the ch04–05 moose, freed when Ravisin dies |
+| ch09 | a griffon rider *(direction)* | Pegasus Knight | Tana | griffon (Skytower Shelter, *Rime* pp.163, 198) |
 
-By **Ch5** every core FE *role* is covered with zero magic redundancy (we're already deep on
-casters: Marty/Mees dark, Rootis anima, Sclorbo/Basil staff) — but the **roster is not done growing**.
-That's 13 units (8 PCs + 5), which only barely fills the Ch9→endgame field cap of 11–12 (≈1 bench).
-Per `decisions.md` §"Recruit budget", we keep recruiting toward a **~16–18 pool** (**~3–5 more
-permanent recruits across Ch6–21**) so Pick-Units stays a real choice and permadeath has slack — added
-as the DM notes supply bodies (which/where below stays DM-notes-gated). The back half also rides
-promotions + gear (the reward curve above), but those are *on top of* the growing roster, not instead.
+That is 16 fielded in ch08 against vanilla's 17; the one short is Ephraim, who leaves after Ch8 on
+Eirika's route. From ch09–10, vanilla's talk-recruit cluster (Amelia; Gerik, Innes, Marisa, Tethys)
+sets the next bodies, decided chapter by chapter.
 
 **RBG's ballistae (Pepperjack & Brie) — NOT roster recruits.** They are vanilla FE8 **map
 ballistae** (siege emplacements the party mans), flavored as RBG's cannon-constructs — we don't
@@ -108,15 +104,10 @@ ballista era: FE8 Ch10 "Revolt at Carcino" → our ~Ch10 onward**. No recruit sl
 cost. (`npcs/pepperjack.yaml`, `npcs/brie.yaml`.)
 
 **Open items on the recruit plan:**
-- **Vellynne Harpell → stays an NPC.** Her only honest class is a 4th caster (we're saturated);
-  recurring self-interested ally / quest + shop, not a roster unit.
-- **Lupin needs custom beast art** (direwolf map sprite + battle anim over the Cavalier chassis) —
-  art spend, #38/#39.
-- **deploy_limit for ch03–08** still unset — set to vanilla parity when each chapter is authored
-  (the deployment notes now list the full deployable pool).
-- **Back half (Ch9–21) recruits beyond the above are unknowable until the DM notes arrive** — only
-  Vellynne (NPC) + the RBG map-ballistae are firm; the other Arcane Brotherhood wizards (Nass,
-  Avarice, Dzaan) are currently rivals, possible redeemed-late recruits if the real story goes there.
+- **Vellynne Harpell → stays an NPC.** Recurring self-interested ally / quest + shop, not a roster unit.
+- **Back half (ch10–21)** recruits follow vanilla's cadence table on #459; who fills each body is
+  decided per chapter. The Arcane Brotherhood wizards (Nass, Avarice, Dzaan) are rivals and possible
+  redeemed-late recruits; the goliath imprisoned in Sunblight (*Rime* p.12) is a ready-made rescue.
 
 ## Open questions for Nicolas (post-MVP / story)
 

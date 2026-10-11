@@ -85,6 +85,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #459: the roster keeps vanilla's recruit cadence, not a fixed pool (ADR 0342)
+    r'16–18 (?:pool|roster|units)',
     # retired by #479: a wave lands by `arrives_turn` inside `enemy_units`, the one spelling
     r'trigger_turn', r'spawn_turn', r'enemy_reinforcements', r'ARRIVAL_TURN_FIELDS',
     # retired 2026-10-10: gold comes from in-map sources only, never a clear stipend (ADR 0092)

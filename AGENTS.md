@@ -91,6 +91,7 @@ enters it early"*; the rules that follow from them:
 |---|---|
 | Base ROM | `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Fire Emblem - The Sacred Stones (USA, Australia).gba` |
 | Reference PDFs (Tasha's, Metallurgist, etc.) | `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/` (PDFs + frostmaiden-resources.md live here in the source folder; frostmaiden-resources.md is also copied to `docs/`) |
+| *Rime of the Frostmaiden*, searchable | `rime-of-the-frostmaiden-ocr.txt` in that References folder: the book PDF is an image-only scan, and this is its OCR text (macOS Vision, 2026-10-11), one `===== PDF page N (printed p.N-1) =====` header per page. grep it; open the page image only to see art or a map. |
 | PC D&D Beyond JSON sheets | `data/pc-sheets/*.json` |
 | PC portrait URLs | `data/pc-sheets/portraits.json` |
 | FE8 decomp | `fireemblem8u/` (git submodule) |

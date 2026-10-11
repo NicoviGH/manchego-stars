@@ -351,9 +351,10 @@ neutral_units:
         #   blood   -> 6 (#cf2026); a few dipped tines + a smear UNDER the muzzle
       portrait: portraits/white-moose.png       # 96x80, full-creature framing (Nicolas's pick
                                                 # of 3; 0 px in the 96x96->96x80 dead zone)
-      # WHY THE CAST PALETTE, NOT THE STANDARD SMS ONE: the moose NEVER changes faction (a
-      # scripted neutral here, a plain enemy in ch05), so it has no reason to be faction-tinted
-      # — and the standard palette actively breaks it. Verified against
+      # WHY THE CAST PALETTE, NOT THE STANDARD SMS ONE: the moose wears one look in every
+      # faction it passes through (a scripted neutral here, an enemy in ch05, a recruit from
+      # ch08 -- ADR 0342), so it has no reason to be faction-tinted — and the standard palette
+      # actively breaks it. Verified against
       # graphics/unit_icon/palette/*.agbpal: only indices 0 and 13 are constant across the
       # faction palettes, index 3 goes pale-GREEN under `npc`, and index 11 (the only red) is
       # GREEN under `enemy` / BLUE under `npc`. So a standard-palette moose would be a

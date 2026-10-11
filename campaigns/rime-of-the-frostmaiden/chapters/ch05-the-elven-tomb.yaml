@@ -432,9 +432,12 @@ enemy_units:
     convertible: false          # #171 — a difficulty-model flag. `difficulty.py` reads it to
                                 # exempt a unit from the role-inversion check and to apply
                                 # CONVERT_CLEAR_DISCOUNT (0.5) to clear-load, and BOTH would be
-                                # lies here: the moose is not recruitable, never changes faction,
-                                # and is only "avoidable" in the sense that a player COULD walk
-                                # past it. THE PREVIOUS CHAPTER IS NAMED AFTER THIS ANIMAL
+                                # lies here: the moose never changes faction on THIS map, and is
+                                # only "avoidable" in the sense that a player COULD walk past it.
+                                # Defeated, it RETREATS rather than dies (as Nerra does, ADR 0337),
+                                # and joins the party at ch08's start (ADR 0342) -- a fight the
+                                # player still has to win, so its clear-load is unchanged. OWED: the
+                                # retreat event (#25). THE PREVIOUS CHAPTER IS NAMED AFTER THIS ANIMAL
                                 # (Nicolas, 2026-08-15) — a party that has just spent a whole map
                                 # hunting it is going to fight it, so pricing it at half
                                 # clear-load models a game nobody plays.

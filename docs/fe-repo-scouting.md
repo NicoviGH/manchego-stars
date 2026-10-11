@@ -131,3 +131,17 @@ reads as an armoured human), `Naga` (monster), `Tortoise` (unarmed), the Lamias;
 `Kraken (U) Sea Monster {Xenith}`, `Fish (U)`, `Shark (U) {N426}`, `Shark Rider (F) {N426}`,
 `Tortoise (U)`. **PMD SpriteCollab** has complete sets for ~40 water/ice Pokémon (Tentacruel, Gyarados,
 Octillery, Cloyster, Golisopod...); ch06's Bael becomes Tentacruel from there.
+
+**Mount sweep, 2026-10-11** (#459, ADR 0342; every folder under `Mounted - *`, anims and map sprites).
+Weapon modes are each anim's own README table. Non-horse mounts with BOTH halves:
+`[Cavalry-Custom] Grand Mahout` {Orihara_Saki} (elephant: sword, lance, bow, tusk/trunk; recolours to a
+mammoth), `Wolf Knight` M/F {DatonDemand; map JaidynReiman et al.} (knife, sword, axe, staff -- no lance),
+`[Wolf-Variant] Berserker Rider` {Zoramine} (sword, lance, axe -- every Cavalier and promotion weapon),
+`Brigand Rider` (sword, axe), `Hog Rider` {ReanuKeeves7716} (axe), `[Spider-Variant] Cavalier Rider`
+(sword), `Snail Knight` (lance, magic), `Brigand Drake Rider` (sword, axe), `Birdfolk` cavalier (axe).
+Anim only: `[Cavalier-Variant] [F] Fox` {UltraFenix} (a rider on a big fox: axe, handaxe), `Kitsune`
+(knife, sword, axe), `Salamander Rider`, `Tamed Drake`. Fliers with a lance: `Griffon Sky Knight`
+{SkidMarc25}, `Wicked Flier` {Blue Druid}, `Harrier` {Ayr}, the `Sky and Wrench` bird rider {Stephano};
+the other griffons (Blue Druid, Ayr's v2, Valkyr) carry no lance. The horse folders are rider reskins,
+named-character reskins and class variants on the vanilla horse. **FEUniverse has no mammoth, elk, deer,
+reindeer, bear or goat mount** (search.json, same date).
