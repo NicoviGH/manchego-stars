@@ -45,3 +45,9 @@ readout. It is gone from every chapter, the schema and that readout, and
 `check.py DEAD_CONCEPTS` lists it. ch06's open question ("400 gold vs the unpaid 300 bounty")
 dissolves: the crews pay in kind (the Antitoxin and the Bolt), and the Speaker's 300 stays
 unpaid, which is ch07's argument.
+
+**ch07 pays vanilla Ch8's war funds, 10,000 gold, in its ending** (Nicolas, 2026-10-10).
+Vanilla's first scripted cash gift is Hayden's, at Ch8's ending. Our ch08 is the party's
+capture, which has no patron to hand it over, so it moves up a chapter to the town the party
+just took. Who hands it over is the ch07 dialogue pass's call. The pick is Messie, the new
+Speaker, in Hayden's seat: a ruler funding the heroes.

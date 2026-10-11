@@ -141,6 +141,17 @@ events:
       The party leaves in a trail of blood to a mixed reception. A town crier mentions that
       Easthaven has heard about Bremen, which seeds ch08's ambush.
 
+# ── Economy ──────────────────────────────────────────────────────────────────────
+# ch07 carries vanilla CH8'S scripted gift: Hayden's 10,000 gold war funds at Ch8's ending,
+# moved up a chapter because our ch08 is the capture (Nicolas, 2026-10-10; ADR 0339). It is a
+# scene gift (`SVAL(EVT_SLOT_3, 0x2710)` + `GIVEITEMTOMAIN(leader)`, vanilla's own lines),
+# handed over in the ending. Giver = the dialogue pass's call (pick: Messie, the new Speaker).
+# NOT YET WIRED: `difficulty.chapter_economy` has no field for a scene's gold, and grows one
+# when this chapter is built.
+economy:
+  reward_sites:
+  - gift: gold                  # 10,000, in the ending scene
+
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
   available_shops: [bremen]
