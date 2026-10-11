@@ -5,8 +5,7 @@ import os
 import re
 import sys
 
-from inject.cast import (_classed_cast, CLASS_LOADOUT, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP,
-                         PORTRAIT_MAP)
+from inject.cast import CLASS_LOADOUT, _classed_cast, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_SURVIVED_FLAGS, CH06_BOAT_TALK_FLAGS,
                                 CH06_BOAT_TALK_MSGS, CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
                                 CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
@@ -23,19 +22,19 @@ from inject.maps import (_inject_tile_changes, _map_changes_tileset, _read_map_m
                          _register_chapter_map, _register_tileset, snag_fall_change, terrain_ids,
                          TILESET_STEMS)
 from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
-from inject.paths import (
-    CH05_EVENTSCRIPT_H, CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT)
+from inject.paths import CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
-from inject.scenes import (_branch_on_slot_c, _make_fid, _prepend_battle_quote, battle_quote_pair,
-                           boss_quote_message,
-                           scene_beat_bodies, _prepend_defeat_quote, _split_event_beats,
-                           _write_chapter_title_card, defeat_quote_row, split_on_stage_cut)
+from inject.scenes import (
+    _make_fid, _prepend_battle_quote, _prepend_defeat_quote, _split_event_beats, backdrop,
+    battle_quote_pair, boss_quote_message, chapter_boss, debug_boot_script, defeat_boss_goal,
+    defeat_quote_row, ending_call, gather_cast, party_camera_tile, record_alive_flags,
+    scene_beat_bodies, split_on_stage_cut, write_frame_texts)
 from inject.text import (
-    _script_to_message, dev_placeholder_scene, goal_window_body, name_message_body,
-    set_message_body, vanilla_name_text_id)
+    dev_placeholder_scene, name_message_body, _script_to_message, set_message_body,
+    write_nameplate)
 from inject.units import (
-    _ally_unit_entry, _deploy_cap_entries, _enemy_unit_entry, _items_with_drop_last,
-    chapter_label_constant, declare_unit_table, enemy_ai_initialiser, safe_ai_clients)
+    _ally_unit_entry, chapter_label_constant, declare_unit_table, _deploy_cap_entries,
+    enemy_ai_initialiser, enemy_rows, safe_ai_clients)
 from inject.villages import authored_boxes, save_all_bonus_script, village_script
 
 
@@ -245,45 +244,11 @@ def ch06_reda_symbol(enemy_id, index):
     return 'MS_Ch06Surface_%s_%d' % (re.sub(r'[^A-Za-z0-9]', '_', enemy_id), index)
 
 
-def ch06_enemy_rows(chap, arrives_turn=None, spawns=None):
-    """One UnitDefinition row per authored position for a ch06 deployment wave.
-
-    `arrives_turn=None` selects the turn-1 line; a number selects that reinforcement wave (ch06
-    has exactly one, vanilla Ch6's Difficult-only turn-4 trio). The BOSS takes her own vanilla
-    CHARACTER slot so her flagged defeat quote keys to her and nothing else; everything else
-    shares the slot's autolevelled generic, exactly as vanilla Ch6 and Ch7 both do.
-
-    Positions, levels, inventories and drops are the chapter YAML's (#360); the `.ai` bytes are
-    the DONOR's, resolved through `enemy_ai_initialiser` rather than authored here -- ch06 is
-    the chapter #335 was written for, whose first draft measured at parity while fielding
-    thirteen pursuers against a twin that fields two.
-    """
-    rows = []
-    for enemy in chap['enemy_units']:
-        if enemy.get('arrives_turn') != arrives_turn:
-            continue
-        cls = CH06_CLASS_IDS.for_entry(enemy)
-        items = [CH06_ITEM_IDS[item.get('fe_base') or item['id']]
-                 for item in enemy.get('inventory', [])]
-        drop = enemy.get('item_drop')
-        pid = CH06_BOSS_PID if enemy.get('is_boss') else CH06_GENERIC_PID
-        for index, (x, y) in enumerate(enemy['positions']):
-            carried = list(items)
-            # FE8 drops the LAST item, and the YAML names the drop rather than relying on
-            # inventory order -- so it is appended, and only to the first body of a `count:`
-            # group (vanilla gives exactly one Fighter the axe drop, not all three).
-            dropper = bool(drop) and index == 0
-            if dropper:
-                carried = _items_with_drop_last(carried, CH06_ITEM_IDS[drop])
-            # `spawns` (the turn-1 line only): LOAD on the water tile, walk to the post.
-            spawn = (spawns or {}).get((enemy['id'], index))
-            sx, sy = spawn if spawn else (x, y)
-            rows.append(_enemy_unit_entry(
-                pid, cls, int(enemy['level']), bool(enemy.get('autolevel')), sx, sy,
-                ', '.join(carried) or '0', enemy_ai_initialiser(chap, enemy, index),
-                ' /* %s -- %s */' % (enemy['id'], enemy['name']), itemdrop=dropper,
-                reda=ch06_reda_symbol(enemy['id'], index) if spawn else None))
-    return rows
+def ch06_enemy_pid(enemy):
+    """The BOSS takes her own vanilla CHARACTER slot so her flagged defeat quote keys to her and
+    nothing else; everything else shares the slot's autolevelled generic, exactly as vanilla Ch6
+    and Ch7 both do."""
+    return CH06_BOSS_PID if enemy.get('is_boss') else CH06_GENERIC_PID
 
 
 def ch06_boat_rows(chap):
@@ -404,14 +369,10 @@ def ch06_opening_head(hall_label):
     The second BACG needs its load mode re-armed (REMOVEPORTRAITS) -- the card and the fades
     leave `activeTextType` where a bare BACG is a no-op (the ch03/ch04 stale-BG fix).
     """
-    return ('    REMOVEPORTRAITS\n'
-            '    BACG(%s) /* Bremen from the lake: the establishing shot */\n'
-            '    FADU(16)\n'
-            '    BROWNBOXTEXT(0x%X, 8, 8) /* "Bremen" location card */\n'
-            '    FADI(16)\n'
-            '    REMOVEPORTRAITS /* re-arm BACG BG-load mode before the cut */\n'
-            '    BACG(%s) /* CUT inside: the Speaker\'s hall */\n'
-            '    FADU(16)\n' % (CH06_OPENING_TOWN_BG, CH06_OPENING_CARD_MSG, CH06_OPENING_HALL_BG)
+    return (backdrop(CH06_OPENING_TOWN_BG, 'Bremen from the lake: the establishing shot',
+                     card=(CH06_OPENING_CARD_MSG, 'Bremen'))
+            + '    FADI(16)\n'
+            + backdrop(CH06_OPENING_HALL_BG, 'CUT inside: the Speaker\'s hall', rearm=True)
             + '    Text(0x%X) /* A -- %s */\n' % (CH06_OPENING_MSGS[0], hall_label)
             + '    REMA\n'
               '    MUSCSLOW(SONG_SILENT) /* as vanilla Ch6\'s backdrop scene ends */\n'
@@ -531,24 +492,14 @@ def ch06_messie_gather(chap, terrain):
     """(event text, {uid: tile}): the fade-out gather that puts the whole cast on the shores
     around the centre island before Messie surfaces onto it alone (Nicolas, 2026-10-09).
 
-    The cast is LOADed onto its tiles, never MOVEd: ADR 0292, a scene LOADs the PCs it stages.
-    An event LOAD of a unit already on the map finds it and moves it, stats and inventory
-    untouched (LoadUnit_800F704), and one who was benched or fell still resolves. But a LOAD of
-    someone NOT in the army creates them, so each member is LOADed only if CHECK_EXISTS finds
-    them: a Sahnar never turned, or a Baxby never bought, must not join here (review, #470).
-    One table per member, because the branch is per member. Every cell the
-    scene needs -- the island, his route, the cast's tiles -- is cleared first through
-    CHAR_EVT_POSITION_AT_SLOTB, because the fight can end with anyone standing anywhere (Nerra's
-    killer beside her, Pinky hovering over the water) and a LOAD onto a held cell stacks two
-    units on it. All of it happens behind the FADI."""
+    The gather itself is `gather_cast`. What is ch06's own: the cells it clears are his route
+    and the island he takes alone, and nobody may gather onto either, or onto water."""
     (sx, sy), (tx, ty) = ch06_messie_route(chap, terrain)
     gather = {uid: tuple(xy) for uid, xy in chap['messie']['gather'].items()}
     spare = gather.pop('spare')
     route = [(sx + i * ((tx > sx) - (tx < sx)), sy + i * ((ty > sy) - (ty < sy)))
              for i in range(abs(tx - sx) + abs(ty - sy) + 1)]
     island = ch06_center_island(terrain, (tx, ty))
-    if len(set(gather.values())) != len(gather):
-        sys.exit('ERROR: ch06 Messie: two of the cast gather onto one tile')
     for uid, (x, y) in sorted(gather.items()):
         if (x, y) in island or (x, y) in route:
             sys.exit('ERROR: ch06 Messie: %s gathers onto his island or route at (%d, %d) -- '
@@ -557,24 +508,11 @@ def ch06_messie_gather(chap, terrain):
             sys.exit('ERROR: ch06 Messie: %s gathers onto (%d, %d), which nobody stands on'
                      % (uid, x, y))
     clear = sorted(set(route) | island) + sorted(gather.values())
-    near = [(x, y) for x, y in clear
-            if abs(x - spare[0]) + abs(y - spare[1]) < CH06_MESSIE_SPARE_CLEARANCE]
-    if near:
-        sys.exit('ERROR: ch06 Messie: the spare tile %s is within %d of the scene at %s -- '
-                 'whoever is moved there could land back on a cleared cell'
-                 % (tuple(spare), CH06_MESSIE_SPARE_CLEARANCE, near[0]))
-    out = ('    FADI(16) /* the fight is over: gather the cast out of sight */\n'
-           '    CLEE /* ...and the merfolk scatter with their elder dead (Nicolas, 2026-10-09) */\n')
-    for x, y in clear:
-        out += ('    SVAL(EVT_SLOT_B, _EvtParams2(%d, %d)) /* whoever stands here, out of the way */\n'
-                '    MOVE_CLOSEST(0xffff, CHAR_EVT_POSITION_AT_SLOTB, %d, %d)\n'
-                % (x, y, spare[0], spare[1]))
-    for n, (uid, _xy) in enumerate(sorted(gather.items())):
-        out += _branch_on_slot_c(
-            'CHECK_EXISTS(CHARACTER_%s)' % PORTRAIT_MAP[uid].upper(),
-            '    LOAD1(0x1, %s) /* %s, on the shore */\n    ENUN\n' % (CH06_MESSIE_AUDIENCE % n, uid),
-            '', CH06_MESSIE_LABEL_BASE + 2 * n, 'not in the army')
-    return out + '    FADU(16)\n', gather
+    return gather_cast(
+        gather, clear, spare, lambda n: CH06_MESSIE_AUDIENCE % n, CH06_MESSIE_LABEL_BASE,
+        CH06_MESSIE_SPARE_CLEARANCE, 'ch06 Messie',
+        scatter='    CLEE /* ...and the merfolk scatter with their elder dead (Nicolas, '
+                '2026-10-09) */\n'), gather
 
 
 def ch06_messie_bay(chap, maps_dir):
@@ -681,19 +619,6 @@ def ch06_messie_block(chap, terrain, theme):
 CH06_BOAT_SURVIVED_LABELS = {'boat-east': '0x3', 'boat-west': '0x4'}
 
 
-def ch06_boat_survived_flags(hulls):
-    """Set a hull's PERMANENT survived flag when it is still afloat, for ch07's docks opening.
-    `hulls` is {boat id: pid}. Each check branches past its own ENUT, so either can fail alone."""
-    out = ''
-    for bid, pid in hulls.items():
-        label = CH06_BOAT_SURVIVED_LABELS[bid]
-        out += ('    CHECK_ALIVE(%s)\n'
-                '    BEQ(%s, EVT_SLOT_C, EVT_SLOT_0)\n'
-                '    ENUT(%s) /* %s came home: ch07 opens on its crew */\n'
-                'LABEL(%s)\n' % (pid, label, CH06_BOAT_SURVIVED_FLAGS[bid], bid, label))
-    return out
-
-
 def ch06_ending_debug_script(seed_load):
     """`--ch06-ending`: New Game straight onto the ending -- Messie on the ice, the payout, the
     landing. ch05's ending boot, for the same reason (decisions.md -> "Playtest runs are the most
@@ -704,29 +629,16 @@ def ch06_ending_debug_script(seed_load):
     both, so both alive is the full arm), and the boot seed, because the Orion's Bolt goes to
     the party leader. No merfolk line: Nerra's tile is empty, which is where the real path
     leaves it."""
-    if not seed_load:
-        sys.exit('ERROR: --ch06-ending needs --ch06-boot -- the boot seed is the only party on '
-                 'the map, and the ending hands its reward to the party LEADER')
-    return ('{\n'
-            '    SVAL(EVT_SLOT_B, 0x0)\n'
-            '    LOMA(0x%X) /* --ch06-ending: the lake, no merfolk */\n'
-            '    LOAD1(0x1, %s) /* both hulls afloat: the full payout arm */\n'
-            '    ENUN\n' % (CH06_HOST_INDEX, CH06_BOAT_TABLE)
-            + seed_load +
-            '    FADU(16)\n'
-            '    CALL(%s) /* the ending, exactly as DefeatBoss runs it */\n'
-            '    ENDA\n}' % CH06_ENDING_SCRIPT)
+    return debug_boot_script(
+        '--ch06-ending', CH06_HOST_INDEX, seed_load, '--ch06-ending: the lake, no merfolk',
+        before_seed='    LOAD1(0x1, %s) /* both hulls afloat: the full payout arm */\n'
+                    '    ENUN\n' % CH06_BOAT_TABLE,
+        body=ending_call(CH06_ENDING_SCRIPT, 'the ending, exactly as DefeatBoss runs it'))
 
 
 def ch06_lake_camera_tile(chap):
     """Where the camera pans for the merfolk: the boss's own tile, the centre shelf."""
-    boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
-    return tuple(boss['positions'][0])
-
-
-def ch06_party_camera_tile(chap):
-    """The first deploy slot: the lord's, and the lord is force-deployed, so it is never empty."""
-    return tuple(chap['deployment']['deploy_slots'][0])
+    return tuple(chapter_boss(chap)['positions'][0])
 
 
 def inject_ch06(campaign, boot=False, ending=False, verbose=True):
@@ -747,8 +659,8 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     (ch06_messie_messages): the chapter closes on his last line, then records the hulls that came
     home, pays the save-both Bolt and fades on Into the Shadow of Victory (ADR 0339).
 
-    DEFERRED to a follow-up pass: the title-card art. ch06's ending parks on the dev placeholder
-    until ch07 hosts, exactly as ch05's did.
+    ch06's ending parks on the dev placeholder until ch07 hosts and `chain('ch06', 'ch07')`
+    turns it into the MNC2 onward.
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)
@@ -813,7 +725,8 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
 
     # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
     spawns = ch06_line_spawns(chap, maps_dir)
-    line_rows = ch06_enemy_rows(chap, spawns=spawns)
+    line_rows = enemy_rows(chap, CH06_CLASS_IDS, CH06_ITEM_IDS, ch06_enemy_pid, spawns=spawns,
+                           reda_symbol=ch06_reda_symbol)
     redas = [(ch06_reda_symbol(eid, i), x, y)
              for e in chap['enemy_units'] if e.get('arrives_turn') is None
              for i, (x, y) in enumerate(e['positions']) for eid in [e['id']]
@@ -821,7 +734,8 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     declare_unit_table(CH06_LINE_TABLE, line_rows,
                        'ch06 turn-1 line: the merfolk of Maer Dualdon, on our placement (#360), '
                        'surfacing from the channels', redas=redas)
-    wave_rows = ch06_enemy_rows(chap, arrives_turn=CH06_HARD_WAVE_TURN)
+    wave_rows = enemy_rows(chap, CH06_CLASS_IDS, CH06_ITEM_IDS, ch06_enemy_pid,
+                           arrives_turn=CH06_HARD_WAVE_TURN)
     if not wave_rows:
         sys.exit('ERROR: ch06 declares no enemies arriving on turn %d, but a wave table and a '
                  'TurnEventPlayer are wired for it' % CH06_HARD_WAVE_TURN)
@@ -904,7 +818,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
                  + seed_load
                  + '    CALL(%s) /* preparations: pick %d; lord force-deployed */\n'
                  % (CH06_PREP_SCRIPT, chap['deployment']['deploy_limit'])
-                 + ch06_opening_ice_block(ch06_party_camera_tile(chap), ch06_lake_camera_tile(chap))
+                 + ch06_opening_ice_block(party_camera_tile(chap), ch06_lake_camera_tile(chap))
                  + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
     if ending:
         beginning = ch06_ending_debug_script(seed_load)
@@ -927,7 +841,9 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     script = _replace_brace_block(
         script, CH06_ENDING_SCRIPT + '[] =',
         '{\n' + messie_gather + ch06_messie_block(chap, terrain, chapter_bgm(chap)['bluePhase'])
-        + ch06_boat_survived_flags(hulls)
+        + record_alive_flags([(bid, pid, CH06_BOAT_SURVIVED_FLAGS[bid],
+                               CH06_BOAT_SURVIVED_LABELS[bid]) for bid, pid in hulls.items()],
+                             'came home: ch07 opens on its crew')
         + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')
         + '    MUSCSLOW(SONG_INTO_THE_SHADOW_OF_VICTORY) /* vanilla Ch6\'s closing cue */\n'
@@ -944,15 +860,11 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     # 5. Texts + the flagged defeat quote that IS the win trigger.
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
-    set_message_body(lines, host['chapTitleTextId'], name_message_body(chap['title']))
-    boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
-    set_message_body(lines, host['goal']['statusObjectiveTextId'],
-                     name_message_body('Defeat ' + (boss.get('fe_name') or boss['name'])))
-    set_message_body(lines, host['goal']['windowTextId'], goal_window_body('Defeat boss'))
+    write_frame_texts(lines, host, chap, defeat_boss_goal(chap), 'Defeat boss')
+    boss = chapter_boss(chap)
     # Nerra rides CHARACTER_NOVALA, so his nameplate leaks onto her unit window and her death
     # unless it is rewritten -- the same rename ch01 and ch02 do for their borrowed boss slots.
-    set_message_body(lines, vanilla_name_text_id(CH06_BOSS_PID.replace('CHARACTER_', '')),
-                     name_message_body(boss.get('fe_name') or boss['name']))
+    write_nameplate(lines, CH06_BOSS_PID.replace('CHARACTER_', ''), boss)
     for msg_id, body in board_messages:
         set_message_body(lines, msg_id, body)
     # The opening's card and its two beats. The Speaker's face rides GUEST_PORTRAIT_MAP (Murray).
@@ -966,7 +878,6 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     # same decision, and the two copies would drift.
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
-    _write_chapter_title_card(host, 'Ch.6: ' + chap['title'])
     # Her retreat line, FLAGGED: SetPidDefeatedFlag raises EVFLAG_DEFEAT_BOSS whatever the
     # message says (eventinfo.c), so the DefeatBoss AFEV fires on a line in which she lives.
     _prepend_defeat_quote(defeat_quote_row(
@@ -987,18 +898,3 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
               % (obj_idx, pal_idx, cfg_idx, layout_idx, CH06_HOST_INDEX, len(cap_rows),
                  ' (boot-seeded party)' if boot else '', len(line_rows),
                  CH06_HARD_WAVE_TURN, len(wave_rows), len(boat_rows)))
-
-
-def chain_ch05_to_ch06():
-    """Advance ch05's authored ending from the dev landing to the now-hosted ch06."""
-    with open(CH05_EVENTSCRIPT_H, encoding='utf-8') as f:
-        script = f.read()
-    landing = dev_placeholder_scene()
-    if script.count(landing) != 1:
-        sys.exit('ERROR: expected exactly one ch05 dev-placeholder landing before ch06 chain')
-    script = script.replace(
-        landing,
-        '    MNC2(0x%X) /* -> ch06 "The Maer Monster", hosted on slot %d */\n'
-        % (CH06_HOST_INDEX, CH06_HOST_INDEX), 1)
-    with open(CH05_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
-        f.write(script)

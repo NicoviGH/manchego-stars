@@ -50,6 +50,13 @@ def vanilla_name_text_id(slot):
     sys.exit('ERROR: could not find nameTextId for %s in %s' % (marker, CHARACTERS_C))
 
 
+
+def write_nameplate(lines, slot, unit):
+    """Rename vanilla character `slot`'s nameplate to `unit`'s display name. A boss riding a
+    borrowed slot (Breguet, Bazba, Novala) otherwise shows the vanilla name on its unit window
+    and its death."""
+    set_message_body(lines, vanilla_name_text_id(slot), name_message_body(display_name(unit)))
+
 GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'
 
 

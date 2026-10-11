@@ -8,6 +8,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from inject.namespace import stubbed
@@ -99,6 +100,33 @@ class HostChapterEventGroup(unittest.TestCase):
         self.assertNotEqual(vanilla['chapters'][inject.hosts.CH04_HOST_INDEX]['mapEventDataId'],
                             self._vanilla_index(inject.hosts.CH04_EVENT_GROUP),
                             'ch04 is the one slot the repoint actually changes')
+
+
+class ChainStep(unittest.TestCase):
+    """`chain(src, dst)` is the one chain step (#479): it keeps the step name the ordering
+    facts address, and rewrites exactly one dev landing in src's script."""
+
+    def test_the_step_is_named_for_its_seam(self):
+        self.assertEqual('chain_ch05_to_ch06', inject.hosting.chain('ch05', 'ch06').__name__)
+
+    def test_it_swaps_the_landing_for_the_mnc2(self):
+        hosts = {h.name: h for h in inject.hosts.hosted_chapters()}
+        landing = inject.hosting.dev_placeholder_scene()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'script.h')
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write('{\n' + landing + '    ENDA\n}')
+            with mock.patch.object(inject.hosting, 'event_script_path', lambda _i: path):
+                inject.hosting.chain('ch05', 'ch06')('rime-of-the-frostmaiden')
+            with open(path, encoding='utf-8') as f:
+                out = f.read()
+            self.assertNotIn(landing, out)
+            self.assertIn('MNC2(0x%X) /* -> ch06 "The Maer Monster"' % hosts['ch06'].host_index,
+                          out)
+            # a second run finds no landing: the chain refuses rather than guessing
+            with mock.patch.object(inject.hosting, 'event_script_path', lambda _i: path):
+                with self.assertRaises(SystemExit):
+                    inject.hosting.chain('ch05', 'ch06')('rime-of-the-frostmaiden')
 
 
 if __name__ == '__main__':

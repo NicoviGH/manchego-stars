@@ -6,6 +6,7 @@ Run:  python3 tools/test_inject_units.py
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.decomp
@@ -96,6 +97,48 @@ class ChapterLabelConstants(unittest.TestCase):
         # Guards the parse against a chapters.h reformat, and pins the live ch05 answer.
         self.assertEqual(inject.units.chapter_label_constant(inject.hosts.CH05_HOST_INDEX), 'CHAPTER_L_5')
         self.assertEqual(inject.units.chapter_label_constant(inject.hosts.CH03_HOST_INDEX), 'CHAPTER_L_4')
+
+
+class SharedEnemyRows(unittest.TestCase):
+    """`enemy_rows` is every chapter's roster emitter (#479): one row per BODY."""
+
+    class _Classes(object):
+        def for_entry(self, entry):
+            return 'CLASS_' + entry['class'].upper()
+
+    ITEMS = {'axe': 'ITEM_AXE', 'key': 'ITEM_KEY'}
+
+    def _rows(self, entries, **kwargs):
+        chap = {'enemy_units': entries}
+        with mock.patch.object(inject.units, 'enemy_ai_initialiser', lambda *a: '{ 0 }'):
+            return inject.units.enemy_rows(chap, self._Classes(), self.ITEMS,
+                                           lambda e: 'PID_' + e['id'], **kwargs)
+
+    def test_per_body_levels_reach_the_rows(self):
+        rows = self._rows([{'id': 'pack', 'name': 'Pack', 'class': 'wolf', 'levels': [2, 3],
+                            'positions': [[1, 1], [2, 2]], 'inventory': [{'id': 'axe'}]}])
+        self.assertEqual(['.level = 2,' in rows[0], '.level = 3,' in rows[1]], [True, True])
+
+    def test_the_drop_goes_to_the_first_body_last_and_once(self):
+        rows = self._rows([{'id': 'k', 'name': 'K', 'class': 'kobold', 'level': 1,
+                            'positions': [[1, 1], [2, 2]], 'item_drop': 'key',
+                            'inventory': [{'id': 'key'}, {'id': 'axe'}]}])
+        self.assertIn('.items = { ITEM_AXE, ITEM_KEY },', rows[0])
+        self.assertIn('.itemDrop = 1,', rows[0])
+        self.assertNotIn('.itemDrop', rows[1])
+
+    def test_waves_exclusions_and_surfacing_spawns(self):
+        entries = [{'id': 'a', 'name': 'A', 'class': 'x', 'level': 1, 'positions': [[1, 1]]},
+                   {'id': 'b', 'name': 'B', 'class': 'x', 'level': 1, 'positions': [[2, 2]]},
+                   {'id': 'c', 'name': 'C', 'class': 'x', 'level': 1, 'positions': [[3, 3]],
+                    'arrives_turn': 4}]
+        self.assertEqual(1, len(self._rows(entries, exclude=('b',))))
+        self.assertEqual(1, len(self._rows(entries, arrives_turn=4)))
+        rows = self._rows(entries, spawns={('a', 0): (9, 9)},
+                          reda_symbol=lambda eid, i: 'REDA_%s_%d' % (eid, i))
+        self.assertIn('.xPosition = 9,', rows[0])
+        self.assertIn('.redas = REDA_a_0,', rows[0])
+        self.assertIn('.redaCount = 0,', rows[1])
 
 
 if __name__ == '__main__':
