@@ -17,9 +17,9 @@ rules) lives in `docs/decisions.md` and `docs/fe8-pacing-reference.md`.
 | P | A Dagger of Ice | 🟦 tutorial | DefeatBoss — Defeat Sephek Kaltro | — | Ch 1 |
 | 1 | The Iron Trail | 🟦 full-party intro | Seize — Seize the goblin camp — the chief holds it and the ingots are there | baxby | Ch 2 |
 | 2 | Cold Welcome | 🟦 breather / defend | DefeatAll — Defeat the raider band; keep the chwinga alive to claim their charms | — | Ch 3 |
-| 3 | The Termalaine Mine | 🟥 big battle (seize) | DefeatBoss — Fight down through the kobold-held rooms to the deep workings — the grell's lair at the bottom of the central shaft (14,1) — and kill the grell. DEVIATION from vanilla Ch3 (which is Seize the boss tile): our win is Defeat Boss (slay the aberration), which reads truer for a monster kill than capturing a throne (Nicolas, 2026-07-06; decisions.md). The grell is visible from turn 1. | — | Ch 4 |
+| 3 | The Termalaine Mine | 🟥 big battle (seize) | DefeatBoss — Fight down through the kobold-held rooms to the deep workings — the grell's lair at the bottom of the central shaft (14,1) — and kill the grell. DEVIATION from vanilla Ch3 (which is Seize the boss tile): our win is Defeat Boss (slay the aberration), which reads truer for a monster kill than capturing a throne (Nicolas, 2026-07-06; decisions.md). The grell is visible from turn 1. | trex | Ch 4 |
 | 4 | The White Moose | 🟨 monster debut (fog) | DefeatAll — Rout the forest's hostile beasts and spirits | lupin +npc: lupin-pack | Ch 5 |
 | 5 | The Elven Tomb | 🟥 first boss | DefeatBoss — Defeat Ravisin, the frost druid (her guardians and the moose needn't all fall) | sahnar, basil | Ch 6 |
 | 6 | The Maer Monster | 🎬 marquee set-piece | DefeatBoss — Defeat Nerra, the merfolk elder | — | Ch 7 |
 | 7 | Blood in Bremen | 🟥 big battle (gray) | Seize — Seize the Town Hall (Dorbulgruf holds the door) | meriwa, esio-trot | Ch 8 |
-| 8 | The Eastway Ambush | 🎬 scripted defeat | Survive — Survive 8–10 turns — the outcome is scripted (unwinnable by design) | — | Ch 9 (post-MVP) |
+| 8 | The Eastway Ambush | 🎬 scripted defeat | Survive — Survive 8–10 turns — the outcome is scripted (unwinnable by design) | white-moose | Ch 9 (post-MVP) |

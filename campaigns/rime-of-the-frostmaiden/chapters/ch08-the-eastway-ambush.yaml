@@ -119,6 +119,9 @@ post_chapter:
       The locked 'crest of cold iron' (dropped by Ravisin, the ch05 frost druid)
       and the FIRST Master-Seal-equivalent pay off in the post-MVP prison-break
       chapter (ch09, not yet authored — pending DM notes). Promotions go live ch10–12.
+  units_recruited_in_chapter:
+    - id: white-moose
+      where: "opening: freed when Ravisin died (it retreated from ch05), Marty talks to it -- ADR 0342"
   unlocks_chapter: ch09-revels-end   # POST-MVP — not yet authored (see docs/roadmap.md — Act II)
   ends_mvp: true
 
