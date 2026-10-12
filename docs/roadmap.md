@@ -88,8 +88,8 @@
 | ch05 | **Lupin** | Cavalier | Kyle (early) | direwolf (the wolf *is* the mount) |
 | ch05 | **Sahnar** | Myrmidon | Joshua | moon-elf mummy |
 | ch05 | **Basil** | Cleric | Natasha | goodberry shrub |
-| ch07 end | **Halvar Berylbore** | Fighter | Ross (second axe) | dwarf fisher, Grynsk's son |
 | ch07 end | **Meriwa** | Monk | Artur (light magic) | merfolk (Stephano's Mermaid) |
+| ch07 end | **Esio Trot** | Fighter | Ross (second axe) | tortle in a pope's mitre, with an axe |
 | ch08 start | **The White Moose** | Cavalier | Forde | the ch04–05 moose, freed when Ravisin dies |
 | ch09 | a griffon rider *(direction)* | Pegasus Knight | Tana | griffon (Skytower Shelter, *Rime* pp.163, 198) |
 

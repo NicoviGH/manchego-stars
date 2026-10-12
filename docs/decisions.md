@@ -195,7 +195,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0326` | [A chapter may carry an accepted party residual](decisions/0326-a-chapter-may-carry-an-accepted-party-residual.md) | 2026-10-03 | #430 |
 | `0329` | [ch06's axe and sword blocks carry tridents](decisions/0329-ch06-s-axe-and-sword-blocks-carry-tridents.md) | 2026-10-05 | #26 |
 | `0330` | [The twin is the chapter number, whatever map the chapter borrows](decisions/0330-the-twin-is-the-chapter-number.md) | 2026-10-05 | #459 |
-| `0342` | [The roster keeps vanilla's recruit cadence; ch07 and ch08 add Halvar, Meriwa and the White Moose](decisions/0342-the-roster-keeps-vanilla-s-recruit-cadence.md) | 2026-10-11 | #459 #27 #25 #28 |
+| `0342` | [The roster keeps vanilla's recruit cadence; ch07 and ch08 add Esio Trot, Meriwa and the White Moose](decisions/0342-the-roster-keeps-vanilla-s-recruit-cadence.md) | 2026-10-11 | #459 #27 #25 #28 |
 
 ---
 
