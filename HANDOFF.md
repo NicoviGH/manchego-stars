@@ -6,26 +6,33 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-11 (Claude): ch07 is hosted and plays (#481 map, ADR 0341; #482 hosting).
-**What landed and why is in `git log`, the ADRs it cites, and #27's 2026-10-11 comment** -- this
+Refreshed 2026-10-11 (Claude): the roster plan (#483, ADR 0342) and ch07's boss (#484, ADR 0343)
+are merged; ch07 is `balance_locked`. **What landed and why is in `git log` and those ADRs** -- this
 file keeps no "recently landed" list.
 
 ## In flight
 
 Nothing on a branch. **Next, in order:**
 
-1. **#27 -- ch07 scenes pass**, after Nicolas answers the open call on #27 (Dorbulgruf twin-exact
-   Cavalier vs Fighter with an axe; my pick: the Fighter, which keeps the axe-bite beat). The
-   scene list is #27's 2026-10-11 comment: docks opening forking on 0xFC/0xFD, the ballista
-   heads-up the onboarding check owes, the two houses (vanilla 0xA06/0xA07 still), Murray's
-   vanilla quotes 0xA02/0xA03 still playing under Dorbulgruf's name, Wolfram's axe bite, and the
-   ending (fish tax, the reveal, 10,000 gold; the economy readout needs its scene-gold field).
+1. **#27 -- ch07 scenes pass.** The scene list is #27's 2026-10-11 comments: docks opening
+   forking on 0xFC/0xFD, the ballista heads-up the onboarding check owes, the two houses
+   (vanilla 0xA06/0xA07 still), Dorbulgruf's battle/defeat quotes (Murray's vanilla 0xA02/0xA03
+   still play), Wolfram's axe bite, and the ending: fish tax, the reveal, 10,000 gold (the
+   economy readout needs its scene-gold field), and **Meriwa + Esio Trot joining** (ADR 0342).
+   Their art is owed in the same pass, shown to Nicolas before committing:
+   - **Esio Trot:** Nicolas's Gemini poses are in `references/References/Recruits/esio-trot/`
+     (ready/windup/peak + portrait). The map sprite is the FE-Repo `Tortoise (U)` {Dutch
+     Introvert} with a mitre added.
+   - **Meriwa:** the ch06 Mermaid, plus a portrait.
    Still write NO custom or copied code: `docs/adding-a-chapter.md`'s shared-helper table.
    `make CH07BOOT=1` + `tools/playtest/run.sh ch07titlecard` / `PT_HOST_CHAPTER=8 ... mapshot`.
-2. **#459 -- roster parity with vanilla** (Baxby-as-Seth is the open call).
+2. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337), and
+   loses its blood (cast palette index 6). It joins at ch08's start (#28).
+3. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
+   count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
-- `make difficulty-gate` enforces ch00-ch06. A change that moves a locked chapter's force
+- `make difficulty-gate` enforces ch00-ch07. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (party clear-load 1.41, ADR 0042), with x1.4078 /
   x1.4081 measured, so a party-side regression there fails the gate too.
@@ -33,14 +40,16 @@ Nothing on a branch. **Next, in order:**
 
 ## Chapter work
 
-- **#27 -- ch07** is hosted on slot 8 (`status: active`, not `balance_locked` until the boss
-  call lands). `make chapter CH=ch07` is its state.
+- **#27 -- ch07** is hosted on slot 8 and locked at x0.95 / x1.09. `make chapter CH=ch07` is its
+  state.
 - **#24 -- ch04 owes the terrain-bonus lesson** (vanilla Ch4's "stay in the woods"), a dialogue pass.
 - **#335** -- the AI audit (behavioural drift is invisible to every gate; proposes an
   `ai_divergence:` allowlist).
 
 ## Traps a fresh session walks into
 
+- **Grep the campaign before proposing a name.** "Halvar", offered for a recruit, was already
+  ch02's raider captain (`npc-bench.md`'s name bank is not a list of free names).
 - **Our own scenes are named `MS_*`.** Any code that matches `EventScr_` must ask whether it
   also means `MS_` (#401 reported 26 of 40).
 - **`make difficulty --curve` takes ~25s** (instrument v2 runs over 1001 careers per unit);
