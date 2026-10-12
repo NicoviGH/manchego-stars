@@ -79,7 +79,8 @@ def objective_label(obj):
 def recruits_label(post):
     if not post:
         return '—'
-    playable = [u['id'] for u in (post.get('units_available_to_recruit') or [])]
+    playable = [u['id'] for u in (post.get('units_available_to_recruit') or [])
+                + (post.get('units_recruited_in_chapter') or [])]
     npcs = [u['id'] for u in (post.get('caravan_npcs_added') or [])]
     parts = []
     if playable:

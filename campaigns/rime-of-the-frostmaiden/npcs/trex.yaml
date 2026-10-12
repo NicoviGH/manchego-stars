@@ -100,9 +100,9 @@ art:
     base: Thief               # geometry token only; Trex IS a Thief mechanically (16x16 idle / 32x32 MU)
     footprint: 16x16
     source: "Brigand (U) Lizard Wildling {Tarantino500}"  # FE-Repo reptile sprite (CREDITS.md); shared w/ the ch3 kobold grunts
-    recolour: >                # RGB-mapped onto cast_palette.png (red body, tan belly, dark outline), then
-      hand-tuned in tools/map_sprite_swapper.py. The donor's eye colour (#e81018) maps to the cast GOLD
-      (index 12, #cb9d02) so the eyes read distinct against the red -- the "glowing eyes" pop (Nicolas).
+    recolour: >                # NOT the cast palette: remapped onto the Thief's standard SMS role layout, so
+      it tints by faction like the ch03 kobold grunts -- green while he stands as an NPC, blue once the
+      talk recruit flips him (`FACTION_TINTED_CAST`, inject/map_sprites.py; the green-Trex fix, #152).
     weapon: donor-axe          # the Lizard Wildling carries an axe; cosmetic only (Trex steals as a Thief)
     todo:                      # not yet applied (rides a later pass / pixel editor)
       - swept-back horns + small cosmetic wings (the "winged kobold" tell; distinguishes Trex from the grunts)

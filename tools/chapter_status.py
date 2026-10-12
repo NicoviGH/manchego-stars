@@ -215,7 +215,8 @@ def named_units(chapter):
         elif unit.get('is_miniboss'):
             out.setdefault(unit['id'], 'miniboss')
     post = chapter.get('post_chapter') or {}
-    for unit in post.get('units_available_to_recruit') or ():
+    for unit in ((post.get('units_available_to_recruit') or [])
+                 + (post.get('units_recruited_in_chapter') or [])):
         if isinstance(unit, dict) and unit.get('id'):
             out.setdefault(unit['id'], 'recruit')
     for unit in post.get('caravan_npcs_added') or ():

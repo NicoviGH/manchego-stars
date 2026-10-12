@@ -104,6 +104,12 @@ class Art(unittest.TestCase):
         self.assertLessEqual({'ravisin', 'white-moose', 'sahnar', 'basil'}, named)
         self.assertNotIn('tomb-reaver', named)
 
+    def test_a_unit_recruited_IN_the_chapter_is_named_too(self):
+        """`units_recruited_in_chapter` (Trex in ch03) is a recruit like
+        `units_available_to_recruit`; reading only the latter left Trex off the art report."""
+        self.assertEqual({'trex': 'recruit'}, dict(cs.named_units(
+            {'post_chapter': {'units_recruited_in_chapter': [{'id': 'trex'}]}})))
+
     def test_a_finished_unit_reports_all_three_pieces(self):
         row = next(r for r in cs.art('ch05') if r.unit == 'ravisin')
         self.assertEqual((True, True, True), (row.portrait, row.map_sprite, row.battle_anim))
