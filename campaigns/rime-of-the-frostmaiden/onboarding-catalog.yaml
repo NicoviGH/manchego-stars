@@ -137,9 +137,9 @@ concepts:
   - id: ballista-siege
     concept: "Siege/ballista emplacements fire from long range; a unit mans them"
     vanilla_channel: tutorial
-    vanilla_when: "Vanilla ballista era (~Ch10); our RBG ballistae (Pepperjack/Brie)"
-    vanilla_text: "(siege weapons fire missiles from long range)"
-    citation: "MSG_~5288 (siege); decomp sweep TBD"
+    vanilla_when: "Ch7 (Renvall's two ballistae), at the end of the opening, before prep"
+    vanilla_text: "They can shoot much farther than any bowman, and they're extremely powerful."
+    citation: "MSG_A00/MSG_A01 (EventScr_089F2EBC via EventScr_CallOnTutorialMode, ch7-eventscript.h); A01 adds Neimi's offer to man one when she is deployed"
 
   - id: promotion-master-seal
     concept: "Master Seal promotes a unit to its advanced class (player picks the branch)"

@@ -35,7 +35,7 @@ the tutorial never sees it) · `dialogue` = mandatory story line, shown to every
 | monsters — Monster enemies are a distinct foe type; some weapons are effective vs them | both | Ch 3 — dialogue (active) |
 | fog-of-war — Fog of war hides enemies outside vision range | tutorial | Ch 4 — dialogue (planned) |
 | stealing-thieves — Thieves steal items; protect valuables / loot enemies | both | Ch 3 — both (active) |
-| ballista-siege — Siege/ballista emplacements fire from long range; a unit mans them | tutorial | — *(pending)* |
+| ballista-siege — Siege/ballista emplacements fire from long range; a unit mans them | tutorial | Ch 7 — dialogue (active) |
 | promotion-master-seal — Master Seal promotes a unit to its advanced class (player picks the branch) | tutorial | — *(pending)* |
 | supports — Support conversations build bonuses between paired units | dialogue | — *(pending)* |
 | arena-wager — Arena: wager gold on one-on-one combat; win doubles the fee, a loss is permanent | tutorial | Ch 5 — both (active) |
@@ -54,6 +54,5 @@ authored, the dialogue-pass parity step should claim the ones debuting there
 - **criticals** — Critical hits deal triple damage; chance scales with skill/weapon _(vanilla: tutorial; MSG_616)_
 - **healing** — Restore HP with vulneraries/elixirs (self) and staves (allies) _(vanilla: tutorial; MSG_619)_
 - **rescue** — Rescue carries a unit; mounted units can move after rescuing _(vanilla: tutorial; MSG_970-977)_
-- **ballista-siege** — Siege/ballista emplacements fire from long range; a unit mans them _(vanilla: tutorial; MSG_~5288 (siege); decomp sweep TBD)_
 - **promotion-master-seal** — Master Seal promotes a unit to its advanced class (player picks the branch) _(vanilla: tutorial; decomp sweep TBD)_
 - **supports** — Support conversations build bonuses between paired units _(vanilla: dialogue; decomp sweep TBD)_
