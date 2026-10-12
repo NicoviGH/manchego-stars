@@ -6,29 +6,38 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-11 (Claude): the roster plan (#483, ADR 0342) and ch07's boss (#484, ADR 0343)
-are merged; ch07 is `balance_locked`. **What landed and why is in `git log` and those ADRs** -- this
+Refreshed 2026-10-12 (Claude): ch07's scenes pass is half done on draft PR #485, and paused for
+a campaign-arc plan (#486). **What landed and why is in `git log`, the PR and its issue** -- this
 file keeps no "recently landed" list.
 
 ## In flight
 
-Nothing on a branch. **Next, in order:**
+**Draft PR #485 (`feat/27-ch07-scenes`), text only, ROM byte-identical.** Locked in the ch07 YAML
+with Nicolas: the opening (docks fork on 0xFC/0xFD, the argument, the axe bite, then the harpoon
+heads-up before prep), the boss quotes 0xA02/0xA03, and both houses. Nothing is wired yet. The
+PR body lists what it still owes. **Next, in order:**
 
-1. **#27 -- ch07 scenes pass.** The scene list is #27's 2026-10-11 comments: docks opening
-   forking on 0xFC/0xFD, the ballista heads-up the onboarding check owes, the two houses
-   (vanilla 0xA06/0xA07 still), Dorbulgruf's battle/defeat quotes (Murray's vanilla 0xA02/0xA03
-   still play), Wolfram's axe bite, and the ending: fish tax, the reveal, 10,000 gold (the
-   economy readout needs its scene-gold field), and **Meriwa + Esio Trot joining** (ADR 0342).
-   Their art is owed in the same pass, shown to Nicolas before committing:
+1. **#486 -- plan the rest of the campaign** against the DM notes, the book AND vanilla FE8's
+   story, chapter by chapter WITH Nicolas (his call, 2026-10-12: without FE8 alignment our
+   chapters drift from twins we can borrow). The issue holds the inputs and every seed from the
+   ch07 session. Output: `docs/roadmap.md` rows + an ADR, no spec doc. Start by laying vanilla's
+   post-Ch8 shape (the route split, the two routes, the merge) beside the book's spines.
+2. **#27 -- ch07's ending**, once #486 settles its exit hook: why the party heads for Easthaven,
+   profound enough to bring them back there after Revel's End (rejected so far: Easthaven's
+   missing fishers, and Messie having overheard Dzaan; Nicolas's direction is the merfolk telling
+   Messie something after the peace, which he relays). The rest of the ending is known: Messie in
+   the top hat, the fish tax, his farewell reveal, the 10,000 gold, **Meriwa + Esio Trot join**
+   (ADR 0342), and the town crier. Ask Nicolas for his flow first, as he gave one for the opening.
+   Then wire every scene on #485, and do the recruits' art, shown to Nicolas before committing:
    - **Esio Trot:** Nicolas's Gemini poses are in `references/References/Recruits/esio-trot/`
-     (ready/windup/peak + portrait). The map sprite is the FE-Repo `Tortoise (U)` {Dutch
-     Introvert} with a mitre added.
+     (ready/windup/peak + portrait, a mitred pope-tortle). The map sprite is the FE-Repo
+     `Tortoise (U)` {Dutch Introvert} with a mitre added.
    - **Meriwa:** the ch06 Mermaid, plus a portrait.
    Still write NO custom or copied code: `docs/adding-a-chapter.md`'s shared-helper table.
    `make CH07BOOT=1` + `tools/playtest/run.sh ch07titlecard` / `PT_HOST_CHAPTER=8 ... mapshot`.
-2. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337), and
+3. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337), and
    loses its blood (cast palette index 6). It joins at ch08's start (#28).
-3. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
+4. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
    count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.

@@ -79,9 +79,12 @@ silently strip it. So, before locking beats:
    for a two-hander find the *relationship* twin among FE8's ~217 two-character scenes — the
    supports. ch05's 9BB burned a dozen drafts writing from instinct; two Ewan/Saleh supports
    fixed it in one pass. Skipping this step is what produces stilted dialogue, every time.
-1. Bring **2–3 variant lines** per beat. Label what each variant trades off
+1. **Show the vanilla twin beside every draft**: its text boxed, and what the beat DOES (a
+   house's gift, a gate, a trigger). Nicolas asked for it twice on ch07's houses before it was
+   shown, and matching the twin's box count and cadence was his own fix (2026-10-12).
+2. Bring **2–3 variant lines** per beat. Label what each variant trades off
    (e.g. "menace vs. brevity"). Nicolas picks or mixes; he owns voice.
-2. **Draft BOXED, never as prose** (2026-07-23 learning — prose-length lines read as
+3. **Draft BOXED, never as prose** (2026-07-23 learning — prose-length lines read as
    wordy and hide the real A-press pacing). Write every line as GBA boxes from the first
    pass: **2 lines per box**, measured in PIXELS not characters (#298 — 203px talk bubble,
    192px helpbox, 143px battle bubble; `tools/fe8_talk_font.py` owns the three budgets and
@@ -89,8 +92,8 @@ silently strip it. So, before locking beats:
    to Nicolas, not as paragraphs. Stay inside the budget: boss taunt ≤ 4 lines / 1 screen;
    opening exchange ≤ ~8 boxes; ending beat ≤ ~10 lines; narration card 2–5 lines ≤ ~25
    words; quote msgs 1–2 lines. Cut before adding.
-3. Check every line against the speaker's banned list and calibration samples.
-4. Lock a beat before moving to the next; record locked text in the chapter YAML
+4. Check every line against the speaker's banned list and calibration samples.
+5. Lock a beat before moving to the next; record locked text in the chapter YAML
    (or issue #43 for montage slots that lack wiring). **Then update the chapter's GitHub
    tracker in the same breath** — the issue comment that lists which beats are written and
    what's next, plus the PR description if it has drifted. Do not wait to be asked: a stale
