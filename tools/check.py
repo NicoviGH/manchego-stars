@@ -868,8 +868,10 @@ def check_personal_line_injection_routes(fail):
     except SKIP_IMPORT_ERRORS as exc:
         _skip_covered_elsewhere('check_personal_line_injection_routes', exc)
         return
-    injected_ids = {uid for _yaml, uid in (list(inject.raw_pids.RAW_PID_PERSONAL_SOURCES.values())
-                                           + list(inject.raw_pids.SLOT_PERSONAL_SOURCES.values()))}
+    route_tables = (('RAW_PID_PERSONAL_SOURCES', inject.raw_pids.RAW_PID_PERSONAL_SOURCES),
+                    ('SLOT_PERSONAL_SOURCES', inject.raw_pids.SLOT_PERSONAL_SOURCES))
+    routed = {uid: name for name, table in route_tables for _yaml, uid in table.values()}
+    injected_ids = set(routed)
     slot_ids = set(inject.cast.ENEMY_BASE_SLOT)
     seen = set()
     for rel, d in _chapters():
@@ -879,7 +881,7 @@ def check_personal_line_injection_routes(fail):
         fail.append('ENEMY_BASE_SLOT maps %r, which no chapter fields -- a stale key silently '
                     'drops that boss back to a naked-class-base measurement (#284)' % uid)
     for uid in sorted(injected_ids - seen):
-        fail.append('RAW_PID_PERSONAL_SOURCES names enemy %r, which no chapter fields' % uid)
+        fail.append('%s names enemy %r, which no chapter fields' % (routed[uid], uid))
 
 
 def _chapters():
