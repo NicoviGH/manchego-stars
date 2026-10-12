@@ -14,6 +14,30 @@ import inject.paths
 import inject.raw_pids
 
 
+class SlotRiderPersonalLine(unittest.TestCase):
+    """A boss on a vanilla CHARACTER slot inherits that character's line, which was tuned for
+    the character's own class. ch07's Speaker fights as a Fighter on Murray's Cavalier slot, so
+    his authored line has to replace Murray's in the ROM, or the Fighter swap leaves him 4 Def
+    and an attack speed short of the boss he stands in for."""
+
+    def test_every_slot_source_rides_the_slot_it_writes(self):
+        for slot, (_yaml, uid) in inject.raw_pids.SLOT_PERSONAL_SOURCES.items():
+            self.assertEqual(inject.raw_pids.ENEMY_BASE_SLOT.get(uid), slot, uid)
+
+    def test_the_patch_writes_the_yaml_line_onto_the_slot(self):
+        text = inject.decomp.vanilla_decomp_text('src/data_characters.c')
+        out = inject.raw_pids.slot_personal_data(text, 'rime-of-the-frostmaiden')
+        for slot, (chapter_yaml, uid) in inject.raw_pids.SLOT_PERSONAL_SOURCES.items():
+            chap = inject.raw_pids._load_chapter_yaml('rime-of-the-frostmaiden', chapter_yaml)
+            unit = next(e for e in inject.raw_pids.personal_bearers(chap) if e.get('id') == uid)
+            marker = '[%s - 1]' % slot
+            start, end = inject.decomp._find_brace_block(out, marker, inject.paths.CHARACTERS_C)
+            for field in inject.raw_pids.BASE_FIELDS:
+                found = re.search(r'\.%s\s*=\s*(-?\d+)' % field, out[start:end])
+                got = int(found.group(1)) if found else 0
+                self.assertEqual(got, int(unit['personal'].get(field, 0)), (uid, field))
+
+
 class RawPidBossBaseLevel(unittest.TestCase):
     """A raw-pid boss must declare `baseLevel`, or the difficulty malus wipes its line.
 

@@ -74,8 +74,10 @@ ENEMY_BASE_SLOT = {
     # needing an invented `personal:` block and a RAW_PID_PERSONAL_SOURCES route. Both
     # sides of the comparison then read the same article.
     'nerra': 'CHARACTER_NOVALA',
-    # ch07's Speaker rides MURRAY on the same terms: FE8 Ch7 is his chapter's parity_reference,
-    # and Murray is the boss it fields on the same door (ADR 0332's face slot is Murray too).
+    # ch07's Speaker rides MURRAY: FE8 Ch7 is his chapter's parity_reference, and Murray is the
+    # boss it fields on the same door (ADR 0332's face slot is Murray too). He fights as a
+    # Fighter, not Murray's Cavalier, so his YAML line REPLACES Murray's on the slot
+    # (raw_pids.SLOT_PERSONAL_SOURCES, ADR 0343).
     'dorbulgruf': 'CHARACTER_MURRAY',
 }
 
