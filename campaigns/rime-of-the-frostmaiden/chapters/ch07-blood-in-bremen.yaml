@@ -6,7 +6,7 @@ id: ch07-blood-in-bremen
 title: "Blood in Bremen"
 chapter_number: 7
 status: active                 # the slice is reached: the force is vanilla Ch7's own, re-dressed
-balance_locked: true  # holds parity on instrument v2 with the Fighter boss (x1.00 / x1.10); ADR 0343
+balance_locked: true  # holds parity on instrument v2 with the Fighter boss on Gheb's line; ADR 0343
 milestone: M3
 traps:                          # vanilla Ch7's two ballistae, on its own tiles: Bremen's harpoon
   - {type: ballista, x: 17, y: 8, item: ITEM_BALLISTA_REGULAR}    # launchers (ADR 0339). The
@@ -240,16 +240,16 @@ enemy_units:
       - id: hand-axe
       - id: hero-crest
     item_drop: hero-crest       # vanilla `.itemDrop = 1`
-    personal:                   # Murray's own line (data_characters.c [CHARACTER_MURRAY - 1]),
-      baseHP: 12                # written over his slot by SLOT_PERSONAL_SOURCES, plus what the
-      basePow: 3                # Fighter swap costs him. On Fighter bases Murray's line is Def 3
-      baseSkl: 7                # (Cavalier 6, Fighter 2), and the Steel Axe's 15 weight on Con 11
-      baseSpd: 5                # drops his attack speed from 12 to 8, so he never doubles. Def+3
-      baseDef: 4                # and Con+4 (a stocky dwarf, an axe he can swing) put him back on
-      baseRes: 6                # Murray, measured on the arriving party: 0.75 party-rounds to
-      baseLck: 7                # kill (Murray 0.74), 4 of 10 units dropped in one round (Murray
-      baseCon: 4                # 4). He hits harder per blow (1.22 rounds to drop a unit, Murray
-                                # 1.51): the axe's trade for the sword's hit rate.
+    personal:                   # GHEB's line, verbatim (data_characters.c [CHARACTER_GHEB - 1];
+      baseHP: 17                # vanilla's promoted Warrior boss), written over Murray's slot by
+      basePow: 10               # SLOT_PERSONAL_SOURCES (ADR 0343). Murray's own line was tuned for
+      baseSkl: 3                # Cavalier bases: on a Fighter it is Def 3 and too slow to double,
+      baseSpd: 0                # and he folded in 0.41 party-rounds against Murray's 0.74.
+      baseDef: 8                # No unpromoted axe boss sits at Murray's tier (Bone, Bazba and
+      baseRes: 5                # O'Neill fold in 0.15-0.23); Gheb's line, unchanged, lands on him:
+      baseLck: 1                # 0.69 party-rounds to kill, 1.50 rounds to drop a unit (Murray
+      baseCon: 3                # 1.51), 4 of 10 units dropped in one round (Murray 4). A slow,
+                                # armoured heavy hitter, where Murray doubles. Nicolas's pick.
     damage_type: slashing
     positions: [[9, 4]]
     donor: [9, 4]

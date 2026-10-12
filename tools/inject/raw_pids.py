@@ -139,7 +139,7 @@ RAW_PID_PERSONAL_SOURCES = {
 # A boss on a vanilla CHARACTER slot keeps that character's line (ENEMY_BASE_SLOT) unless it
 # fights as a different class, where the line no longer fits: ch07's Speaker is a Fighter on
 # Murray's Cavalier slot, and Murray's line on Fighter bases leaves him Def 3 and too slow to
-# double. A row here writes the chapter YAML's `personal:` line over the slot's own -- the
+# double (he takes Gheb's line instead, ADR 0343). A row here writes the chapter YAML's `personal:` line over the slot's own -- the
 # whole line, so the YAML states every field the boss carries. Slot -> (chapter YAML, unit id).
 SLOT_PERSONAL_SOURCES = {
     'CHARACTER_MURRAY': (CH07_CHAPTER_YAML, 'dorbulgruf'),
