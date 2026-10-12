@@ -27,6 +27,14 @@
 
 ---
 
+> **The DM's guidance for the back half (Nicolas, 2026-10-12):** after the prison break the
+> campaign follows the published book closely. Ch 9 is the Revel's End break-out, Ch 10 the
+> return journey and its ice dragon, Ch 11 the party's arrival back in Easthaven, and from
+> there the book's story carries on. So where the DM notes run out, **the book is the source**,
+> not a gap. Hooks the book plants in Act I are live: the table played them, even where the
+> notes stop short (e.g. Bremen's Huarwar Mulphoon and the Knights of the Black Sword in
+> Caer-Dineval, *Rime* pp.27-28, 38-39, seeded by ch07's inn house).
+
 > ## ⚠️ ACT II+ IS A STRUCTURAL PLACEHOLDER (Ch 9–21)
 >
 > The chapters below lay down a **proposed FE8 cadence + reward schedule** over the
@@ -40,7 +48,7 @@
 |---|---|---|---|---|
 | 9 | Revel's End | 🎬 prison break | Wake in the most secure prison in Faerûn; break out — each PC plays a part. **Meesmickle's signature beat** (recalled, real): a fake "toe bean" looses a bound giant orc to spark a covering riot (scripted event-summon; seeds his Summoner promotion — see `pcs/meesmickle.yaml`). | **First Master Seal** looted here (the promotion seam pays off — see `decisions.md`). |
 | 10 | The Frozen Wreck | 🎬 escort → Seize (recalled, real) | Heading back toward the city they were bound for when captured, the party finds a **frozen shipwreck** — treasure aboard and a **sleeping frozen dragon**. (Book basis: Ch 5 *Sea of Moving Ice* — Revel's End has "easy access" to it (p.197) and area I2 *Shipwrecks* are sunken galleons full of loot (p.200). The dragon = the white **Arveiaturace**, "the White Wyrm" (ancient white dragon, Reghed Glacier; Ch 2 p.105) — half-blind with age, found sleeping/snowbound. Canon framing fits: you never kill her, you flee. The frozen-ship setting is the homebrew add.) **RBG's signature beat** (recalled, real): his artificer infusion (rope of climbing) manifests as a semi-sentient rope, **String Cheese** — a Pepperjack-style construct (see `pcs/prof-rbg.yaml`). String Cheese joins as a **one-chapter green ally** (modeled like an FE8 house-visit recruit, but NOT a permanent PC); RBG must **escort it to the dragon**, then **String Cheese ties the dragon down and sacrifices itself** so the party escapes (the dragon is left **bound, not killed**) → **Seize** (reach the dragon's tile to deploy String Cheese). | Braulo loots the ship's **anchor** → his named **Killer Axe "Ole Shipwrecker"** (his prf weapon; = the D&D "Nu' Shipwrecker", same weapon — see `magic-items.md` / `lore/braulo.md`). Plus wreck treasure (book: the galleon wrecks hold a sea chest + a *+2 trident*). **Promotions go live** / resupply seam (was the Ch 10 placeholder). |
-| 11 | The Long Climb | 🟨 terrain/escort | Approach to the duergar threat; mountain/ice terrain gimmick. | Stat boosters; better (Steel→Silver) weapons appear. |
+| 11 | Back to Easthaven | 🟨 terrain/escort | The party makes it back to Easthaven (the DM's guidance, above), and the book's story picks up from there. | Stat boosters; better (Steel→Silver) weapons appear. |
 | 12 | Sunblight | 🟥 boss (Xardorok) | Assault the duergar fortress; chardalyn forge. | Boss drop + Knight/Guiding crest flavor finds. |
 
 ## ACT III — Destruction's Light 🧩 Ch 13–14 (the Chardalyn Dragon)

@@ -15,15 +15,24 @@ cadence: big_battle_gray        # see docs/CHAPTERS.md — 🟥 (morally gray)
 fe8_base_map: "FE8 Ch7 — Waterside Renvall (its own layout, reskinned)"   # ADR 0339
 parity_reference: "FE8 Ch7"   # the twin is the chapter NUMBER, whatever map it borrows (#459)
 
+# Tutorial parity (dialogue-pass): ballistae debut here, as in vanilla Ch7. Vanilla gates its talk
+# on tutorial mode; ours plays in every mode, as ch05's arena warning does.
+introduces:
+  - concept: ballista-siege      # DEBUT -- Bremen's two harpoon launchers
+    coverage: dialogue           # in-voice: Dorbulgruf orders them manned, Wolfram and RBG explain
+    where: "end of the opening, before prep: range, power, limited bolts, and RBG offers to man one"
+    status: active
+
 # ── Narrative ──────────────────────────────────────────────────────────────────
 narrative: >
-  The party brings Messie back to Speaker Dorbulgruf Shalescar, an old shield-dwarf who hired
-  them to kill the lake monster, hoping to broker peace. They tell him the monster was protecting his fishers and the
-  merfolk were the killers. He has spent the winter watching that monster smash Bremen's
-  boats, and he is too old and too stubborn to believe them: the beast lives, so he owes
-  them nothing. In the argument the party proposes Messie for Speaker. Braulo swings first.
-  Mid-fight, Wolfram bites a chunk clean out of the Speaker's steel axe in open defiance,
-  and the old dwarf keeps swinging the ruined haft.
+  The party brings Messie back up the inlet to Bremen's docks, with whichever crews they saved.
+  Speaker Dorbulgruf Shalescar, an old shield-dwarf who hired them to kill the lake monster,
+  comes down ready to praise them until he sees the beast alive in his harbour. He has spent
+  the winter watching it smash Bremen's boats: the party broke the agreement and brought a
+  killer into town, and he owes them nothing. Braulo takes the insults to Messie personally;
+  even Marty says fear has put Dorbulgruf past talking. Braulo says Bremen will get a Speaker
+  who is reasonable, Dorbulgruf threatens them with his axe, and Wolfram bites a chunk out of
+  it. The Speaker retreats to his hall and orders the harpoon launchers manned.
   After a bloody battle through the Town Hall, the party installs Messie as the new
   Speaker of Bremen. His first decree is a fish tax, which leaves the party wondering what
   they have done; it is also how he means to keep the merfolk fed and calm without a
@@ -253,7 +262,7 @@ enemy_units:
     damage_type: slashing
     positions: [[9, 4]]
     donor: [9, 4]
-    death_quote: "A monster... for Speaker... You've doomed us all..."   # SEED; his disbelief, to the last
+    death_quote: "A monster... for Speaker... You've doomed us all..."   # LOCKED 2026-10-12 (0xA03 above)
 
 # ── Events (pacing / cutscene placement) ─────────────────────────────────────────
 events:
@@ -261,22 +270,86 @@ events:
     type: cutscene
     ea_file: events/ch07-opening.ea
     description: >
-      The party brings Messie to Dorbulgruf, who hired them in ch06's opening (ADR 0332),
-      hoping to broker peace. They tell him Messie was protecting the boats and the merfolk were sinking them. He does
-      not believe a word of it: he has watched the beast ram his town's boats all winter,
-      and the beast still lives. No carcass, no coin. Braulo answers in his own terms (we
-      did the work; that was the deal). The argument is where the party proposes Messie for
-      Speaker. Braulo swings first (braulo_first_swing). Both sides
-      have a fair claim, which is what keeps the chapter gray.
-  - trigger: unit_engages_boss
-    unit: wolfram
-    target: dorbulgruf
-    type: battle_quote
-    ea_file: events/ch07-wolfram-axe-bite.ea
-    description: >
-      Wolfram's secondary signature beat: when he engages Dorbulgruf, he bites a chunk
-      out of the Speaker's steel axe in defiance (he eats ore and metal — see his Ch3
-      primary). Defiant flavor; the formidable old dwarf keeps swinging the ruined haft.
+      On the map (Nicolas, 2026-10-12). The surviving boat(s) and Messie come up the inlet to
+      the first bridge, the docks. ch06's ending forks it on 0xFC (Grynsk) and 0xFD (Tali): each
+      crew's lines play only if that hull came home, and neither line leans on the other, so
+      any of the four cases reads whole. Lost crews get no acknowledgement (Nicolas).
+      Dorbulgruf comes down from the hall, about to praise the party until he sees Messie. He
+      accuses them of breaking the agreement and bringing a killer into Bremen. Braulo takes the
+      insults to Messie personally; Wolfram readies for a fight. Meesmickle, Sclorbo and Rootis
+      (who abstained at the table) appeal to Marty, who says this time talk won't reach him.
+      Braulo snaps: Bremen will get a reasonable Speaker. Dorbulgruf threatens his axe, Wolfram
+      bites a chunk out of it (his secondary signature beat, moved here from a battle quote),
+      and the Speaker retreats to the hall. Both sides keep a fair claim, so the chapter stays
+      gray. Grynsk and Tali wear their ch06 boarding faces.
+    script:                           # LOCKED 2026-10-12 (dialogue-pass, Nicolas's revision)
+      # ── A: the docks (on the map) ──
+      # (The camera follows the surviving boat(s) and Messie up the inlet to the first bridge:
+      #  the docks. One boat, two, or Messie alone, per ch06's 0xFC/0xFD.)
+      # ── A1: only if Grynsk's boat came home (0xFC) ──
+      - grynsk: "Solid planks under my boots. Never thought I'd miss these docks."
+      - grynsk: "Forty years I've fished this lake."
+      - grynsk: "They caused us trouble, sure, and we took out some of theirs as well."
+      - grynsk: "But this winter they came at the crews like sharks. Never seen them like that."
+      # ── A2: only if Tali's boat came home (0xFD) ──
+      - tali: "I... I don't even know where to start."
+      - tali: "I went out for a few sketches. Maybe some notes on how it feeds."
+      - tali: "But you brought it HOME. Alive. And it turns out it's intelligent?!"
+      - tali: "I have SO MANY QUESTIONS."
+      - messie: "We can speak later, little one."
+      - tali: "(muttering in Elvish) Interesting... fascinating... remarkable..."
+      # ── B: the Speaker comes down ──
+      # (Dorbulgruf comes out of the hall and walks down to the docks. Messie is out of his
+      #  line of sight until the cut.)
+      - dorbulgruf: "You! You came BACK?"
+      - dorbulgruf: "Ha! I had you lot down for fish food!"
+      - dorbulgruf: "Well, I'll be. Maybe I was wrong about you. You're a formidable--"
+      - stage_cut: he sees Messie
+      - dorbulgruf: "......"
+      - dorbulgruf: "What is that THING doing in my harbour?!"
+      - braulo: "He is an ancient creature of this lake, and he is to be respected."
+      - braulo: "He's been protecting your boats from the merfolk."
+      - dorbulgruf: "Protecting-- It's been smashing them all winter!"
+      - dorbulgruf: "You led it to my town, alive!"
+      - dorbulgruf: "You broke the agreement! Not one copper, you hear me?"
+      - dorbulgruf: "You've brought a killer into Bremen! It'll drown us all in our beds!"
+      - messie: "I don't want to drown anyone."
+      - dorbulgruf: "It TALKS?! ...Bah! The ability to speak does not make you intelligent!"
+      - braulo: "He's done far more for Bremen this winter than you have."
+      - dorbulgruf: "How dare you! Do you know how much I've sacrificed?!"
+      # ── C: the abstainers appeal to Marty ──
+      - rootis: "Please, everyone. Let's calm down. We can talk through this."
+      - meesmickle: "Marty. You talk to monsters. Talk to this one."
+      - sclorbo: "(Sclorbo turns to Marty, pleading.)"
+      - marty: "......"
+      - marty: "...Not this time..."
+      - marty: "His heart's been poisoned by fear. This was always going to end in a fight."
+      - meesmickle: "...Wonderful."
+      # ── D: Braulo snaps ──
+      - braulo: "Enough. If you won't be reasonable, Bremen will get a Speaker who is."
+      - dorbulgruf: "You want my chair? Seventy years I've held it!"
+      - dorbulgruf: "Come and take it, then! You'll taste the cold steel of my axe first!"
+      # ── E: the bite ──
+      - stage_cut: Wolfram smiles, steps forward, and takes a big chomp out of the axe (crunch SFX)
+      - wolfram: "(crunch) ...Mmm... Dwarf-forged steel. Good stuff."
+      - dorbulgruf: "My AXE! You-- you ATE my--"
+      - dorbulgruf: "Guards! GUARDS! Bremen, to arms! Hold the hall!"
+      # ── F: the harpoon launchers (vanilla Ch7's ballista talk, MSG_A00/A01) ──
+      # (He backs off, runs up to the hall and takes the door, and orders the launchers manned.
+      #  This replaces Murray's turn-1 rally (0x9FF) and sits where vanilla plays its ballista
+      #  talk: at the END of the opening, before prep, so RBG's suggestion can still be acted on.
+      #  Vanilla gates Neimi's offer on her being deployed; RBG is a PC who always speaks, so his
+      #  box is a suggestion to deploy him instead (Nicolas, 2026-10-12). Every mode: vanilla
+      #  calls it through EventScr_CallOnTutorialMode, which we drop, as ch05's arena does.)
+      - dorbulgruf: "Man the harpoons! Put a bolt through that beast, and anyone who stands with it!"
+      # (Camera flashes each launcher: (2,10), then (17,8). Then back to the party.)
+      - wolfram: "(sniffs) Spring steel and tarred rope. Harpoon launchers."
+      - wolfram: "They bolted those on to kill Messie. They'll go through us just as easy."
+      - prof-rbg: "Um, actually-- they're ballistae, modified for harbour work."
+      - prof-rbg: "They outrange any bow, and they'll punch through armour like cheesecloth."
+      - prof-rbg: "But they only carry so many bolts. Keep to cover and let them run dry."
+      - prof-rbg: "Better still, bring me along. Clear one of its crew, and I'll turn it on them."
+      # (Prep, then battle.)
   - trigger: chapter_end
     type: cutscene
     ea_file: events/ch07-ending.ea
@@ -295,18 +368,58 @@ events:
       The party leaves in a trail of blood to a mixed reception. A town crier mentions that
       Easthaven has heard about Bremen, which seeds ch08's ambush.
 
+  # ── 0xA02 -- BOSS TAUNT. One box, in Murray's seat. ─────────────────────────
+  - trigger: boss_battle
+    slot: "vanilla 0xA02"          # data_battlequotes.c (Murray's pair)
+    type: quote
+    description: >
+      Dorbulgruf's battle quote when a player unit engages him on the door. "Half an axe" calls
+      back Wolfram's bite in the opening. LOCKED 2026-10-12 (dialogue-pass, Nicolas). 1 box.
+    script:                           # LOCKED 2026-10-12 (dialogue-pass, Nicolas)
+      - dorbulgruf: "You'll not have my hall! Not while I've half an axe left!"
+  # ── 0xA03 -- BOSS DEATH. One box. ─────────────────────────────────────────────
+  - trigger: boss_death
+    slot: "vanilla 0xA03"          # data_battlequotes.c (Murray's pair)
+    type: quote
+    description: >
+      His disbelief, to the last: a monster for Speaker. LOCKED 2026-10-12 (dialogue-pass,
+      Nicolas). 1 box.
+    script:                           # LOCKED 2026-10-12 (dialogue-pass, Nicolas)
+      - dorbulgruf: "A monster... for Speaker... You've doomed us all..."
+
+  # The houses give nothing, as vanilla Ch7's (`Text_BG(BG_HOUSE, ...)` only), and each keeps its
+  # vanilla seat's job. Measured against the 192px helpbox.
   - trigger: visit
     tile: [1, 15]               # vanilla Ch7's west house: `House(0, EventScr_089F2E6C, 1, 15)`
     type: house
     description: >
-      Vanilla Ch7's own house line (MSG 0xA06) until the dialogue pass writes a Bremen
-      villager's.
+      Vanilla's MSG_A06 seat: gossip about the power behind the boss (Tirado plotting behind
+      Valter). Here a fisher's wife: the Speaker means to start Bremen's sacrifice, putting the
+      fires out for the Frostmaiden (warmth is Bremen's offering, Rime pp.21, 27). It keeps the
+      fight gray. Cut to vanilla's own shape: two facts, a hedged rumour ("Who knows,
+      though..."), a short piece of advice. LOCKED 2026-10-12 (Nicolas's revision). 4 boxes.
+    script:                           # LOCKED 2026-10-12 (dialogue-pass, Nicolas's revision)
+      - fisher-wife: "Dorbulgruf has been the Speaker for over seventy years."
+      - fisher-wife: "He's supposed to look after Bremen... Who knows, though..."
+      - fisher-wife: "He projects strength, but rumours say he's ready to bend to the Frostmaiden."
+      - fisher-wife: "Start the sacrifices, snuff out our fires. I'd keep a blanket handy, if I were you."
   - trigger: visit
     tile: [17, 21]              # vanilla Ch7's south-east house: `House(0, EventScr_089F2E94, 17, 21)`
     type: house
     description: >
-      Vanilla Ch7's own house line (MSG 0xA07) until the dialogue pass writes a Bremen
-      villager's.
+      Vanilla's MSG_A07 seat: a missing person and a half-seen commotion (Ephraim). Here Cora
+      Mulphoon, innkeeper of Buried Treasures (Rime pp.27-28), who apologises at the slightest
+      thing. Her son Huarwar came home with a chardalyn dagger and left with two tieflings
+      wearing the Knights of the Black Sword's chardalyn sword amulets, for "their castle":
+      Caer-Dineval. A live hook: the table played it, and the book carries it (pp.38-39;
+      docs/roadmap.md). Vanilla's shape: rambling, trailing off, a sad button.
+      LOCKED 2026-10-12 (Nicolas's revision). 5 boxes.
+    script:                           # LOCKED 2026-10-12 (dialogue-pass, Nicolas's revision)
+      - cora: "Oh! Travellers! Sorry, the inn's a mess... It's been hard since my Huarwar left..."
+      - cora: "He came home from a blizzard with a dagger of black ice..."
+      - cora: "Then two tieflings came, wearing necklaces like little black swords..."
+      - cora: "I heard them say they were going to Caer-Dineval..."
+      - cora: "If you're ever out that way, would you look for him?"
 
 # ── Economy ──────────────────────────────────────────────────────────────────────
 # ch07 carries vanilla CH8'S scripted gift: Hayden's 10,000 gold war funds at Ch8's ending,
@@ -334,7 +447,7 @@ post_chapter:
 # ── Signature Moment anchored here ───────────────────────────────────────────────
 signature_moments:
   - pc: wolfram
-    trigger: wolfram_axe_bite       # SECONDARY — see pcs/wolfram.yaml (primary = ch03 ore-snacking)
+    trigger: wolfram_axe_bite       # SECONDARY, in the opening (beat E) — see pcs/wolfram.yaml
 
 design_notes: >
   The party's darkest MVP choice. Lean the dialogue into the dispute: Dorbulgruf hired them

@@ -772,7 +772,7 @@ events:
       Bremen. Speaker Dorbulgruf Shalescar hires the party to kill the monster the whole
       town blames for its lost boats, and names the price on screen (ch07's refusal pays
       this off). Two boats went out and never came back: Grynsk Berylbore's Burly Ram and
-      the Pronged Goat with Tali, the half-elf researcher (they/them), aboard. The party
+      the Pronged Goat with Tali, the half-elf researcher (she/her, Nicolas 2026-10-12), aboard. The party
       walks out onto the frozen lake to find them and the beast. Vanilla's 0x9EA is the
       model for the walk-out ("we have to save that girl" / "this is a trap").
       THE PLAYER EXPECTS A MONSTER FIGHT (Nicolas, 2026-10-08). Nobody hints that Messie is
@@ -1167,7 +1167,7 @@ rescue_boats:
   talk:
     background: BG_SHIP
     reward: []                  # the line is the reward; the prize is keeping both alive
-    # Tali, the half-elf researcher (they/them, Rime p.29), on the bitten boat. Teaches the
+    # Tali, the half-elf researcher (she/her, Nicolas 2026-10-12; Rime p.29), on the bitten boat. Teaches the
     # snow drifts' cover (+20 avoid), and asks to hear what the party learns, as in the book.
     face: FID_VillagerGirlBlackHair   # pale, hooded; VillagerYoungMan is ch05's skeleton
     text:
