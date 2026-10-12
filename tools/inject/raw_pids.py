@@ -9,7 +9,7 @@ import sys
 from inject.cast import ENEMY_BASE_SLOT, RAW_PID_PORTRAITS
 from inject.chapter_ids import (
     CH03_BOSS_PID, CH03_BRUTE_MINIBOSS_PID, CH03_CHAPTER_YAML, CH05_BOSS_PID, CH05_CHAPTER_YAML,
-    CH05_MOOSE_PID, CH06_BOAT_PIDS, CH06_CHAPTER_YAML)
+    CH05_MOOSE_PID, CH06_BOAT_PIDS, CH06_CHAPTER_YAML, CH07_CHAPTER_YAML)
 from inject.decomp import _find_brace_block
 from inject.hosting import _load_chapter_yaml, chapter_yaml_for
 from inject.hosts import hosted_chapters
@@ -67,19 +67,8 @@ def raw_pid_portrait_data(text, campaign):
         text = text[:start] + block + text[end:]
 
     for pid, (chapter_yaml, unit_id) in sorted(RAW_PID_PERSONAL_SOURCES.items()):
-        marker = '[%s - 1]' % pid.lower()
-        start, end = _find_brace_block(text, marker, CHARACTERS_C)
-        block = text[start:end]
-        chapter = _load_chapter_yaml(campaign, chapter_yaml)
-        unit = next((entry for entry in personal_bearers(chapter)
-                     if entry.get('id') == unit_id), None)
-        if unit is None or 'personal' not in unit:
-            sys.exit('ERROR: raw pid %s personal source %s/%s is missing'
-                     % (pid, chapter_yaml, unit_id))
-        for field in BASE_FIELDS:
-            block = _set_field(block, field, int(unit['personal'].get(field, 0)),
-                               CHARACTERS_C, marker)
-        text = text[:start] + block + text[end:]
+        text = _write_personal_line(text, '[%s - 1]' % pid.lower(), campaign, chapter_yaml,
+                                    unit_id)
 
     # baseLevel LAST and on its own table: a raw-pid boss needs this whether or not it has a
     # `personal:` line (the moose and the kobold brute have none), and without it the
@@ -90,6 +79,28 @@ def raw_pid_portrait_data(text, campaign):
         block = _set_field(text[start:end], 'baseLevel', level, CHARACTERS_C, marker)
         text = text[:start] + block + text[end:]
     return text
+
+
+def slot_personal_data(text, campaign):
+    """Write each SLOT_PERSONAL_SOURCES boss's authored line over its vanilla slot's own."""
+    for slot, (chapter_yaml, unit_id) in sorted(SLOT_PERSONAL_SOURCES.items()):
+        text = _write_personal_line(text, '[%s - 1]' % slot, campaign, chapter_yaml, unit_id)
+    return text
+
+
+def _write_personal_line(text, marker, campaign, chapter_yaml, unit_id):
+    """Write a unit's YAML `personal:` line over one gCharacterData row's base fields."""
+    start, end = _find_brace_block(text, marker, CHARACTERS_C)
+    block = text[start:end]
+    chapter = _load_chapter_yaml(campaign, chapter_yaml)
+    unit = next((entry for entry in personal_bearers(chapter)
+                 if entry.get('id') == unit_id), None)
+    if unit is None or 'personal' not in unit:
+        sys.exit('ERROR: %s personal source %s/%s is missing' % (marker, chapter_yaml, unit_id))
+    for field in BASE_FIELDS:
+        block = _set_field(block, field, int(unit['personal'].get(field, 0)),
+                           CHARACTERS_C, marker)
+    return text[:start] + block + text[end:]
 
 
 def patch_raw_pid_portraits(campaign, verbose=True):
@@ -104,6 +115,7 @@ def patch_raw_pid_portraits(campaign, verbose=True):
     with open(CHARACTERS_C, encoding='utf-8') as f:
         text = f.read()
     text = raw_pid_portrait_data(text, campaign)
+    text = slot_personal_data(text, campaign)
     with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
         f.write(text)
     if verbose:
@@ -121,6 +133,16 @@ RAW_PID_PERSONAL_SOURCES = {
     # what the clock is measured on: CLASS_FLEET's 19 HP + 9 = 28 restores vanilla Ch6's
     # foot slack (the chapter YAML says why).
     CH06_BOAT_PIDS['boat-west']: (CH06_CHAPTER_YAML, 'boat-west'),
+}
+
+
+# A boss on a vanilla CHARACTER slot keeps that character's line (ENEMY_BASE_SLOT) unless it
+# fights as a different class, where the line no longer fits: ch07's Speaker is a Fighter on
+# Murray's Cavalier slot, and Murray's line on Fighter bases leaves him Def 3 and too slow to
+# double. A row here writes the chapter YAML's `personal:` line over the slot's own -- the
+# whole line, so the YAML states every field the boss carries. Slot -> (chapter YAML, unit id).
+SLOT_PERSONAL_SOURCES = {
+    'CHARACTER_MURRAY': (CH07_CHAPTER_YAML, 'dorbulgruf'),
 }
 
 

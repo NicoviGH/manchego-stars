@@ -6,6 +6,7 @@ id: ch07-blood-in-bremen
 title: "Blood in Bremen"
 chapter_number: 7
 status: active                 # the slice is reached: the force is vanilla Ch7's own, re-dressed
+balance_locked: true  # holds parity on instrument v2 with the Fighter boss (x1.00 / x1.10); ADR 0343
 milestone: M3
 traps:                          # vanilla Ch7's two ballistae, on its own tiles: Bremen's harpoon
   - {type: ballista, x: 17, y: 8, item: ITEM_BALLISTA_REGULAR}    # launchers (ADR 0339). The
@@ -229,13 +230,26 @@ enemy_units:
     fe_name: "Dorbulgruf"
     is_boss: true
     count: 1
-    class: cavalier             # vanilla: Murray, Lv12 Cavalier, on the door (9,4)
-    level: 12
+    class: fighter              # vanilla: Murray, Lv12 Cavalier, on the door (9,4). A FIGHTER
+    level: 12                   # (Nicolas, 2026-10-11): the axe-bite beat needs an axe, which a
+                                # Cavalier cannot hold, and the dwarf stays off a horse. Murray's
+                                # Steel Sword + Javelin become their axe pair, his Knight Crest the
+                                # Fighter's own promotion item.
     inventory:
-      - id: steel-sword
-      - id: javelin
-      - id: knight-crest
-    item_drop: knight-crest     # vanilla `.itemDrop = 1`
+      - id: steel-axe
+      - id: hand-axe
+      - id: hero-crest
+    item_drop: hero-crest       # vanilla `.itemDrop = 1`
+    personal:                   # Murray's own line (data_characters.c [CHARACTER_MURRAY - 1]),
+      baseHP: 12                # written over his slot by SLOT_PERSONAL_SOURCES, plus what the
+      basePow: 3                # Fighter swap costs him. On Fighter bases Murray's line is Def 3
+      baseSkl: 7                # (Cavalier 6, Fighter 2), and the Steel Axe's 15 weight on Con 11
+      baseSpd: 5                # drops his attack speed from 12 to 8, so he never doubles. Def+3
+      baseDef: 4                # and Con+4 (a stocky dwarf, an axe he can swing) put him back on
+      baseRes: 6                # Murray, measured on the arriving party: 0.75 party-rounds to
+      baseLck: 7                # kill (Murray 0.74), 4 of 10 units dropped in one round (Murray
+      baseCon: 4                # 4). He hits harder per blow (1.22 rounds to drop a unit, Murray
+                                # 1.51): the axe's trade for the sword's hit rate.
     damage_type: slashing
     positions: [[9, 4]]
     donor: [9, 4]

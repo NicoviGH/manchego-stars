@@ -206,6 +206,13 @@ class TestPersonalLineRoutes(unittest.TestCase):
         self.assertEqual(len(msgs), 1, msgs)
         self.assertIn('already carries', msgs[0])
 
+    def test_a_slot_riders_line_WITH_a_slot_route_is_fine(self):
+        # SLOT_PERSONAL_SOURCES writes the YAML line over the slot's own (ch07's Speaker on
+        # Murray's), so the line reaches the ROM and the metric reads what the game fights.
+        self.assertEqual(self.routes(
+            self._chap({'id': 'raider-captain', 'personal': {'baseHP': 1}}),
+            injected=('grell', 'raider-captain')), [])
+
 
 class TestDocumentedTileset(unittest.TestCase):
     """`map.tileset` in a chapter YAML is DOCUMENTATION -- the build resolves the real

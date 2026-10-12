@@ -802,7 +802,9 @@ def check_chapter_status(fail):
 def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
     """A declared `personal:` line must have exactly ONE route into the built ROM.
 
-    Two ways to get this wrong, both silent before #284:
+    A route is RAW_PID_PERSONAL_SOURCES (a raw pid's empty row) or SLOT_PERSONAL_SOURCES (a
+    vanilla slot whose own line the authored one replaces). Two ways to get this wrong, both
+    silent before #284:
       * declared and never injected -- `RAW_PID_PERSONAL_SOURCES` is what carries a line into
         gCharacterData, and a raw pid missing from it keeps its all-zero gap. The chapter then
         MEASURES fixed and PLAYS naked, which is exactly how ch03's grell shipped;
@@ -816,12 +818,15 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
         if not unit.get('personal'):
             continue
         uid = unit.get('id')
+        if uid in injected_ids:
+            continue
         if uid in slot_ids:
             out.append('%s: enemy %r declares `personal:` but deploys on a vanilla character '
                        'slot that already carries its own line (ENEMY_BASE_SLOT) -- the block '
                        'never reaches the ROM and hides the real line from the metric; delete '
-                       'it' % (rel, uid))
-        elif uid not in injected_ids:
+                       'it, or add the slot to SLOT_PERSONAL_SOURCES to write it over the '
+                       "slot's line" % (rel, uid))
+        else:
             out.append('%s: enemy %r declares `personal:` with no way into the ROM -- add it to '
                        'RAW_PID_PERSONAL_SOURCES, or the boss will measure '
                        'fixed and play as a naked class base' % (rel, uid))
@@ -863,7 +868,8 @@ def check_personal_line_injection_routes(fail):
     except SKIP_IMPORT_ERRORS as exc:
         _skip_covered_elsewhere('check_personal_line_injection_routes', exc)
         return
-    injected_ids = {uid for _yaml, uid in inject.raw_pids.RAW_PID_PERSONAL_SOURCES.values()}
+    injected_ids = {uid for _yaml, uid in (list(inject.raw_pids.RAW_PID_PERSONAL_SOURCES.values())
+                                           + list(inject.raw_pids.SLOT_PERSONAL_SOURCES.values()))}
     slot_ids = set(inject.cast.ENEMY_BASE_SLOT)
     seen = set()
     for rel, d in _chapters():
