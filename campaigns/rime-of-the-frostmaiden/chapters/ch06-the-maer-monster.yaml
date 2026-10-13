@@ -1240,3 +1240,8 @@ playtest:
         - talk: {x: 4,  y: 18}                # boat-west's door -> Tali, the line is the reward
       then:
         - spoke: true
+
+# Open questions (#486). tools/gen_wiki.py lists them; settling one removes it here.
+open_questions:
+  - q: "Nerra retreated so ch07 might bring her back (ADR 0337), and ch07 didn't. Close the thread?"
+    pick: "Close it: her shipped retreat line stays as bluster; drop 'she means to come back' from her lore"

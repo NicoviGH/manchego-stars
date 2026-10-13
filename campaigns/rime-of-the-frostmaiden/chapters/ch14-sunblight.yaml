@@ -1,0 +1,44 @@
+# ch14 — Sunblight. PLANNED (#486): a seed, not authoritative.
+id: ch14-sunblight
+title: "Sunblight"
+chapter_number: 14
+status: planned
+milestone: M4
+cadence: big_battle_seize
+fe8_base_map: "FE8 Ch14 — Queen of White Dunes (layout only)"
+parity_reference: "FE8 Ch14"   # Queen of White Dunes's force (#459)
+narrative: >
+  The party storms Xardorok's fortress and frees the captured myconid sovereign, a pale, sad
+  mushroom the duergar were using. They take the hall, but the chardalyn dragon launches anyway.
+map: {}
+objective:
+  type: seize
+  description: "Seize Xardorok's throne (planned)"
+win_condition: "Seize the throne (planned)"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch14 (Queen of White Dunes) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch14) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  Queen of White Dunes holds doorways against cavalry reinforcements with no time pressure.
+  Its ending (the stone smashed, the palace burning, a forced retreat) is the dragon escaping.
+plan:
+  location: "Sunblight, Xardorok's fortress"
+  story: >
+    The win that turns into a loss: the fortress falls and the dragon flies.
+  sources:
+    - "Table: the party freed the myconid sovereign (Nicolas, 2026-10-12)"
+    - "Rime ch.3-4: Sunblight, area X19 (the sovereign), the dragon's launch"
+  joins_roles: []
+  payload_notes: >
+    Owes vanilla Ch14: two legendary weapons at the end (Audhulma, Excalibur), the Energy
+    Ring, Dragonspear, Hammerne, a 10,000G chest, Guiding Ring and Hero Crest. Rennac and the
+    Member Card moved to ch11. The legendaries come from the per-PC plan (Nicolas, 2026-10-13):
+    hand out the ones that fit, filling the role vanilla gives these two.
+open_questions:
+  - q: "Which two of our legendary weapons stand in for Audhulma and Excalibur?"
+    pick: "Decide in the legendary-weapons pass"

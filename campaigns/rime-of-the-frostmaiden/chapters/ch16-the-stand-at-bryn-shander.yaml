@@ -1,0 +1,51 @@
+# ch16 — The Stand at Bryn Shander. PLANNED (#486): a seed, not authoritative.
+id: ch16-the-stand-at-bryn-shander
+title: "The Stand at Bryn Shander"
+chapter_number: 16
+status: planned
+milestone: M4
+cadence: defend_town
+fe8_base_map: "FE8 Ch10 Ephraim — Turning Traitor (layout only)"
+parity_reference: "FE8 Ch16"   # Ruled by Madness's force (#459)
+narrative: >
+  The last stand at the party's home base. Hlin and Scramsax fight beside them to protect
+  Speaker Duvessa Shane, and the chardalyn dragon falls. Duvessa clears their names. Vellynne
+  Harpell hands them Professor Skant, the orb she asked them to find long ago, and it points
+  the way to Auril.
+map: {}
+objective:
+  type: survive
+  description: "Protect Duvessa for N turns or bring down the dragon (planned)"
+win_condition: "Protect Duvessa / defeat the dragon (planned)"
+lose_condition: "The lord or Duvessa dies"
+difficulty_note: "Planned. Force = vanilla Ch16 (Ruled by Madness) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch16) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  An outdoor siege: Turning Traitor's "reach the green units first", a mounted wave from behind
+  on turn 6, and a reward if every NPC lives. Last Hope is the inside of a castle, so it was
+  set aside here (Nicolas).
+plan:
+  location: "Bryn Shander"
+  story: >
+    The homecoming: the town that hired them in ch01 is where their names are cleared, and the
+    Act IV goal starts as Skant is handed over, right where FE8 hands out its heirloom weapons.
+  sources:
+    - "Table: the party was given the professor orb after the dragon, and it led them to Auril (Nicolas, 2026-10-12)"
+    - "Rime p.195: after the dragon, Vellynne asks for the Codicil and Skant"
+    - "ADR 0062: the player-chosen lord"
+  joins_roles:
+    - "Myrrh (the dragon girl)"
+  payload_notes: >
+    Owes vanilla Ch16: the lord's legendary pair (Sieglinde, Siegmund) and the Lunar and Solar
+    Braces, going to whichever PC the player crowned (ADR 0062), plus Tomahawk, Knight Crest,
+    Talisman, Hero Crest, Physic and 5,000G.
+  introduces:
+    - {concept: story-promotion, where: "the chosen lord's promotion and legendary pair"}
+open_questions:
+  - q: "Who hands over Professor Skant?"
+    pick: "Vellynne: it is her heirloom, and handing it over is how she enlists them"

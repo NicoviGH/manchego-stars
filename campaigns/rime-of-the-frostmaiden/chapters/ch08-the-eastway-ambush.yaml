@@ -131,3 +131,16 @@ design_notes: >
   The ice trolls are monsters whose only real counters are the monster-effective weapons
   the party first earns post-MVP — so the wall holds by vanilla-FE logic alone.
   Everything after this chapter is gated on the rest of the DM notes.
+
+# Vanilla Ch8 items this scripted defeat cannot hand out; ch09 carries them (#486).
+payload_deviations:
+  - item: ITEM_BOOSTER_HP
+    why: "deferred to ch09: a scripted defeat has no chests to open"
+  - item: ITEM_SWORD_SILVER
+    why: "deferred to ch09: a scripted defeat has no chests to open"
+  - item: ITEM_ELYSIANWHIP
+    why: "deferred to ch09: a scripted defeat has no chests to open"
+  - item: ITEM_LOCKPICK
+    why: "deferred to ch09: a scripted defeat has no chests to open"
+  - item: ITEM_DOORKEY
+    why: "deferred to ch09: a scripted defeat has no chests to open"

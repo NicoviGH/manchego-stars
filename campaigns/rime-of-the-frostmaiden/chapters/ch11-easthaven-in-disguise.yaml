@@ -1,0 +1,51 @@
+# ch11 — Easthaven in Disguise. PLANNED (#486): a seed, not authoritative.
+id: ch11-easthaven-in-disguise
+title: "Easthaven in Disguise"
+chapter_number: 11
+status: planned
+milestone: M4
+cadence: breather_defend
+fe8_base_map: "FE8 Ch12 Ephraim — Landing at Taizel (layout only)"
+parity_reference: "FE8 Ch11"   # Creeping Darkness's force (#459)
+narrative: >
+  The party slips back into Easthaven, the town that condemned them, in disguise. RBG visits a
+  magic shop and walks out with the Luck E. Cheese. Duergar hiding invisibly on the frozen ferry
+  attack, and their leader, Durth Sunblight, escapes with a map that marks Sunblight.
+map: {}
+objective:
+  type: defeat_all
+  description: "Defeat the duergar (planned)"
+win_condition: "Defeat all enemies (planned)"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch11 (Creeping Darkness) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch11) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  Taizel is a breather by design: no pressure to advance, the boss doesn't move, hold the docks
+  while the enemy comes to you. The commander leaving on turn 1 is Durth fleeing (Rime p.60).
+plan:
+  location: "Easthaven and its frozen harbour"
+  story: >
+    The return in disguise is the table's. The magic shop where RBG gets the Luck E. Cheese
+    plays as a village on the map (the comedy is the house scene). The duergar on the ferry and
+    Durth's flight are the book's (Rime p.58-60), and they open Act III.
+  sources:
+    - "Table: the party returns to Easthaven in disguise; RBG buys the Luck E. Cheese"
+    - "Rime p.58-60: Easthaven, the ferry, Durth Sunblight"
+  joins_roles:
+    - "L'Arachel and Dozla (a fragile green pair to protect: a mounted healer and an axe berserker)"
+    - "Rennac (rogue, carries the Member Card): moved here from ch14 (Nicolas, 2026-10-12)"
+  payload_notes: >
+    Owes vanilla Ch11: the pair, plus Secret Book, Short Spear and Restore (chests) and chest
+    keys. The secret shop opens here, as the magic shop, with the Member Card from the rogue.
+    Easthaven was founded by thieves and allows pickpocketing (Rime p.58).
+  how_it_plays: >
+    Taizel's calm, with Creeping Darkness's fog (the duergar are invisible) and a fragile pair
+    to protect for tension.
+open_questions:
+  - q: "The disguise: blow the cover as the battle starts (no new art), or fight in disguise?"
+    pick: "Blow the cover at the battle start; the disguise lives in the opening scene"

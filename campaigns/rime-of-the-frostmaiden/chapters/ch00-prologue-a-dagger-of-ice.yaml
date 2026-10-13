@@ -310,3 +310,8 @@ design_notes: >
   Sephek's cold/fire motif is pure narrative colour, echoed later by the Ch8 ice trolls.
   From Ch1 the must-survive lead becomes PLAYER-CHOSEN (their D&D character). Keep it tiny
   — this is the front porch, not a room.
+
+# A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
+payload_deviations:
+  - item: ITEM_SWORD_RAPIER
+    why: "Eirika's personal sword, and we have no Eirika; Hlin carries a killer axe in its place"
