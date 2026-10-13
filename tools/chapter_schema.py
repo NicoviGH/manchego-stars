@@ -92,6 +92,14 @@ CHAPTER = {
     'forest_composition': ANY, 'win_condition': ANY, 'lose_condition': ANY,
     'signature_moments': [{'pc': ANY, 'trigger': ANY}],
     'introduces': [{'concept': ANY, 'coverage': ANY, 'status': ANY, 'where': ANY}],
+    # the campaign plan (#486): what a planned chapter is for, and every question still open on
+    # a chapter. tools/gen_wiki.py renders both; settling a question removes it from the list.
+    'plan': {'location': ANY, 'story': ANY, 'sources': ANY, 'joins_roles': ANY,
+             'payload_notes': ANY, 'how_it_plays': ANY, 'objective': ANY, 'boss': ANY,
+             'introduces': [{'concept': ANY, 'where': ANY}]},
+    'open_questions': [{'q': ANY, 'pick': ANY}],
+    # a vanilla-twin item this chapter deliberately does not hand out, and why (gen_wiki marks it)
+    'payload_deviations': [{'item': ANY, 'why': ANY}],
     'messie': {'appears_in': ANY, 'art': ANY, 'art_note': ANY, 'name': ANY, 'pronouns': ANY, 'role': ANY,
                'surfaces': ANY, 'gather': ANY, 'bay': ANY,
                'walks_to': ANY},

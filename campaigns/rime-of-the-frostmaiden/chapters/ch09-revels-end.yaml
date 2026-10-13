@@ -1,0 +1,66 @@
+# ch09 — Revel's End. PLANNED (#486): a seed, not authoritative. Combat data is the twin's
+# until the chapter is authored; the plan block is what the 2026-10-12/13 planning pass agreed.
+id: ch09-revels-end
+title: "Revel's End"
+chapter_number: 9
+status: planned
+milestone: M4
+cadence: breakout
+fe8_base_map: "FE8 Ch9 Ephraim — Fort Rigwald (layout only, played in reverse)"
+parity_reference: "FE8 Ch9"   # the twin is the chapter NUMBER (#459): Distant Blade's force
+narrative: >
+  The party wakes in Revel's End, the most secure prison in Faerûn, sentenced for the Bremen
+  coup by the Council of Speakers. Marty breaks off a piece of himself to feed Braulo's isopod,
+  and the isopod comes back with the guard's keys. Meesmickle starts a riot that covers the
+  escape. Vaelish Gant sits in another cell for trying to topple a Speaker, the same crime the
+  party is jailed for.
+map: {}
+objective:
+  type: seize
+  description: "Fight out of the prison and seize its gate (planned)"
+win_condition: "Seize the gate (planned)"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch9 (Distant Blade) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch9) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  Fort Rigwald played in reverse: the party starts where Rigwald's enemies start, deep in the
+  keep by the cells, and fights out toward the edge vanilla's army enters from. Other indoor
+  maps (It's a Trap!, Father and Son) stay options until the chapter is drafted.
+plan:
+  location: "Revel's End, the prison on the Sea of Moving Ice coast"
+  story: >
+    The low point, then the climb back. The escape starts with Marty and Braulo's isopod
+    (lore/marty.md) and the riot is Meesmickle's signature beat (roadmap). Gant's cell is the
+    coup mirror (Rime p.160).
+  sources:
+    - "DM notes: the party wakes on the way to Revel's End"
+    - "Table: Marty feeds the isopod, it steals the keys; Meesmickle's riot (lore/marty.md, roadmap)"
+    - "Rime p.160-161: Prisoner 237, Vaelish Gant"
+  joins_roles:
+    - "Tana (flier; starts recruited in a cell, as Rigwald does it): the griffon rider, a fellow prisoner"
+    - "Amelia (trainee, talk recruit): a Revel's End guard who defects"
+  payload_notes: >
+    Owes vanilla Ch9 (Ocean Seal, Killing Edge, Axereaver, Elfire, Speedwing; Dragonshield,
+    Rapier and Angelic Robe through villages), vanilla Ch8's undelivered chests (Angelic Robe,
+    Silver Sword, Elysian Whip; a Lockpick to steal; a Door Key), the 5,000G route-split gift
+    (lordsplit-eventscript.h:33), and the first Master Seal (ADR 0155). Vehicles: the warden's
+    confiscation vault (chests) and fellow prisoners' cells (visits). The Rapier is Eirika's
+    personal weapon: its stand-in comes from the legendary-weapons plan for the chosen lord.
+  how_it_plays: >
+    Rigwald has no time pressure: every reinforcement is triggered by where you go, and it is
+    the first map with an enemy sleep staff. A methodical, cell-by-cell breakout.
+  introduces:
+    - {concept: promotion-master-seal, where: "the first seal, looted in the breakout"}
+    - {concept: trainee-classes, where: "the defecting guard (Amelia's role)"}
+open_questions:
+  - q: "Which indoor map: Fort Rigwald in reverse, It's a Trap!, or another?"
+    pick: "Fort Rigwald in reverse; decide when drafting"
+  - q: "Village items in a prison: the warden's vault plus prisoners' cells?"
+    pick: "Yes"
+  - q: "Tower of Valni opens after vanilla Ch8. Do we build an arctic equivalent?"
+    pick: "Park it until ch09 is built"

@@ -1,0 +1,52 @@
+# ch13 — Sunblight's Gate. PLANNED (#486): a seed, not authoritative.
+id: ch13-sunblights-gate
+title: "Sunblight's Gate"
+chapter_number: 13
+status: planned
+milestone: M4
+cadence: survive_or_boss
+fe8_base_map: "FE8 Ch7 — Waterside Renvall (layout only; freed by ch07's move to Distant Blade)"
+parity_reference: "FE8 Ch13"   # Hamill Canyon's force (#459)
+narrative: >
+  The party climbs the Spine of the World to Sunblight. Durth, who fled Easthaven, holds the
+  outer gate. Xardorok's madness has turned his own court against him, and one of Grandolpha
+  Muzgardt's plotters defects when the party tells him the truth. He warns that the dragon is
+  nearly finished.
+map: {}
+objective:
+  type: survive_or_defeat_boss
+  description: "Survive the turns or defeat Durth (planned)"
+win_condition: "Survive N turns or defeat Durth (planned)"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch13 (Hamill Canyon) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch13) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  Vanilla 13 is the fight outside Jehanna before 14 storms the hall; ours is the fight at
+  Sunblight's gate before ch14 storms the fortress. Renvall alone plays as a straight push to
+  seize; ch13 keeps Hamill's objective on Renvall's map: Durth holds the castle while patrols
+  close in from behind. A map built with ballistae, so Pepperjack and Brie debut here.
+plan:
+  location: "The approach to Sunblight, in the Spine of the World"
+  story: >
+    Pays off ch11 (the son who fled comes back) and puts a clock on ch14 (the dragon is nearly
+    ready).
+  sources:
+    - "Rime p.172: Xardorok's paranoia and the Muzgardt conspiracy"
+    - "Rime p.60: Durth flees to his father's fortress"
+  joins_roles:
+    - "Cormag (wyvern rider who defects when told the truth): a Muzgardt plotter"
+    - "Amelia's second chance, if she was missed in ch09"
+  payload_notes: >
+    Owes vanilla Ch13: the Knight Crest (the boss retreats on turn 11), Zanbato, Body Ring,
+    Swordslayer, Red Gem, the Elysian Whip (Cormag's), and 5,000G at the end.
+  introduces:
+    - {concept: ballista-siege, where: "Renvall's ballistae; Pepperjack and Brie debut"}
+    - {concept: survive-or-boss, where: "the objective"}
+open_questions:
+  - q: "Durth holds the gate and a Muzgardt warrior defects?"
+    pick: "Yes"

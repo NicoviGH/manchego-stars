@@ -350,3 +350,15 @@ playtest:
     # The chapter-generic Status-screen capture, on this chapter's own boot: the title card
     # as the ROM draws it, which is the only colour that counts (the card file holds indices).
     - {name: ch07titlecard, proves: "the Status screen draws ch07's title card, in the ROM's own colours", lua: ch07titlecard, kind: record}
+
+# Open questions (#486). tools/gen_wiki.py lists them; settling one removes it here.
+open_questions:
+  - q: "Move ch07 onto Distant Blade's map (Nicolas, 2026-10-12), keeping vanilla Ch7 as the curve twin and Ch7's own payload. Where does the Seize of the Town Hall sit on the new map?"
+    pick: "A Town Hall building on Distant Blade's town; scope the redo on #27 before #485's scenes are wired"
+  - q: "No ballistae on Distant Blade (they belong on a map built for them, now ch13). The locked 'harpoon heads-up before prep' beat in the opening needs rework."
+    pick: "Rework it on #485 when the map moves"
+
+# A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
+payload_deviations:
+  - item: ITEM_KNIGHTCREST
+    why: "Dorbulgruf fights as a Fighter, so he carries a Hero Crest, the Fighter's own promotion item (Nicolas, 2026-10-11)"

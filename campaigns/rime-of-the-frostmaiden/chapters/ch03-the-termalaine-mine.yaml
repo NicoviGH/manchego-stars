@@ -583,3 +583,8 @@ design_notes: >
   (5) The vanilla enemy-thief slot is a SVIRFNEBLIN SKULK (deep-gnome gem-looter, Underdark tie
   to the grell), not a giant rat (RBG & Pinky are the party's rats). Dialogue-pass scope = the
   opening beat + the RBG-execution/Trex-recruit beat; grounds in trex.md + the book.
+
+# A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
+payload_deviations:
+  - item: ITEM_AXE_HANDAXE
+    why: "moved to ch02 in the ch02/ch03 swap (ADR 0052); its chest holds ch02's Red Gem"

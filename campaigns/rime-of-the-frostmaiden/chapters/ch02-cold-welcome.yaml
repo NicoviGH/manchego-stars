@@ -605,3 +605,8 @@ design_notes: >
   Auril-maddened humans — real axes/bow, zero reskin stretch, so balance is exactly vanilla
   Ch2's; the variety is sprite + flavor, with the single bow-user adding a ranged threat
   exactly as FE8 Ch2 does.
+
+# A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
+payload_deviations:
+  - item: ITEM_REDGEM
+    why: "moved to ch03's gem-mine chest in the ch02/ch03 swap (ADR 0052); ch02 hands out ch03's Hand Axe instead"
