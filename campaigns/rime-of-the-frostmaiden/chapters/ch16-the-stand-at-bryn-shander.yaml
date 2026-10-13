@@ -1,6 +1,7 @@
 # ch16 — The Stand at Bryn Shander. PLANNED (#486): a seed, not authoritative.
 id: ch16-the-stand-at-bryn-shander
 title: "The Stand at Bryn Shander"
+location: "Bryn Shander"
 chapter_number: 16
 status: planned
 milestone: M4
@@ -30,7 +31,6 @@ design_notes: >
   on turn 6, and a reward if every NPC lives. Last Hope is the inside of a castle, so it was
   set aside here (Nicolas).
 plan:
-  location: "Bryn Shander"
   story: >
     The homecoming: the town that hired them in ch01 is where their names are cleared, and the
     Act IV goal starts as Skant is handed over, right where FE8 hands out its heirloom weapons.

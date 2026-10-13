@@ -624,12 +624,16 @@ class Ch05RecruitIdentities(unittest.TestCase):
         self.assertEqual(table['CLASS_PRIEST']['promotion'], 'CLASS_SAGE',
                          'Priest still defaults into anima -- the reason Basil left it')
         self.assertEqual(table['CLASS_CLERIC']['promotion'], 'CLASS_BISHOP_F')
-        # ...and the YAML's authored branch is the decomp's branch, not a wish.
-        display = {'CLASS_BISHOP_F': 'Bishop', 'CLASS_VALKYRIE': 'Valkyrie'}
+        # ...and the YAML's authored branch is the decomp's branch, not a wish. The YAML writes
+        # vanilla class tokens; a token names the class, and the gendered variant (BISHOP_F)
+        # is the same class, so compare with the `_F` dropped.
+        from inject.class_ids import vanilla_class_enum
+        base = lambda enum: enum[:-2] if enum.endswith('_F') else enum
         branches = inject.sms._promotion_branches()['CLASS_CLERIC']
         promo = inject.cast.load_unit(self.CAMPAIGN, 'basil')['promotion']
-        self.assertEqual(sorted(promo['branch']), sorted(display[c] for c in branches))
-        self.assertEqual(promo['default'], 'Bishop')
+        self.assertEqual(sorted(vanilla_class_enum(t) for t in promo['branch']),
+                         sorted(base(c) for c in branches))
+        self.assertEqual(vanilla_class_enum(promo['default']), base('CLASS_BISHOP_F'))
 
     def test_basil_bases_are_vanilla_cleric_class_data_verbatim(self):
         # basil.yaml claims its stat block is class data "verbatim"; that claim is only worth

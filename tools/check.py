@@ -85,6 +85,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #486: a unit's class is a vanilla token resolved like an enemy's, no display map
+    r'CLASS_MAP',
     # retired by #459: the roster keeps vanilla's recruit cadence, not a fixed pool (ADR 0342)
     r'16–18 (?:pool|roster|units)',
     # retired by #479: a wave lands by `arrives_turn` inside `enemy_units`, the one spelling
@@ -982,6 +984,63 @@ def _chapter_deployment_violations(rel, d):
     msgs.extend(_unit_entry_violations(rel, 'deployment.green_allies',
                                        dep.get('green_allies')))
     return msgs
+
+
+def check_chapter_location(fail):
+    """Every chapter names where it happens (`location:`). The wiki's infobox and the plan read
+    it; without it a chapter's place lived only in prose, and every built chapter showed blank
+    (#486)."""
+    for rel, d in _chapters():
+        if not str(d.get('location') or '').strip():
+            fail.append('%s: missing `location:` (where the chapter happens)' % rel)
+
+
+def check_recruits_have_unit_files(fail):
+    """Every unit a chapter recruits has a unit file under pcs/ or npcs/. A recruit named only
+    in `post_chapter` is a unit nothing else can describe (#486: Meriwa, Esio Trot and the White
+    Moose joined in ch07-ch08 with no file, so every reader fell back to a raw id)."""
+    for rel, d in _chapters():
+        camp = os.path.join(REPO, *rel.split('/')[:2])
+        pc = d.get('post_chapter') or {}
+        for key in ('units_available_to_recruit', 'units_recruited_in_chapter'):
+            for r in pc.get(key) or []:
+                uid = r.get('id') if isinstance(r, dict) else r
+                if uid and not any(os.path.isfile(os.path.join(camp, sub, uid + '.yaml'))
+                                   for sub in ('pcs', 'npcs')):
+                    fail.append('%s: recruits %r, which has no pcs/ or npcs/ file' % (rel, uid))
+
+
+def _slot_tables(camp):
+    import yaml
+    for path in _campaign_yamls():
+        if os.path.dirname(path) == camp:
+            with open(path, encoding='utf-8') as f:
+                d = yaml.safe_load(f) or {}
+            return dict(d.get('cast_slots') or {}), dict(d.get('guest_slots') or {})
+    return {}, {}
+
+
+def check_unit_faces_bound(fail):
+    """A unit's `face:` names a bust the build dresses (campaign.yaml `cast_slots` or
+    `guest_slots`, with its PNG), and a unit whose id IS such a bust declares it. The face used
+    to be knowable only from cast.py's tables, so ch01's boss (`goblin-chief`, wearing izobai.png)
+    had no face any reader could find (#486)."""
+    for rel, d in _chapters():
+        camp = os.path.join(REPO, *rel.split('/')[:2])
+        cast, guests = _slot_tables(camp)
+        bound = set(cast) | set(guests)
+        for key in ('enemy_units', 'player_units', 'neutral_units', 'green_units'):
+            for u in d.get(key) or []:
+                face, uid = u.get('face'), u.get('id')
+                if face and face not in bound:
+                    fail.append('%s: %s wears face %r, which no slot table dresses'
+                                % (rel, uid, face))
+                elif face and not os.path.isfile(os.path.join(camp, 'portraits', face + '.png')):
+                    fail.append('%s: %s wears face %r, which has no portraits/%s.png'
+                                % (rel, uid, face, face))
+                if uid in bound and face != uid:
+                    fail.append('%s: %s has a bust of its own (%s.png) but declares face %r'
+                                % (rel, uid, uid, face))
 
 
 def check_chapter_deployment_schema(fail):
@@ -3383,6 +3442,7 @@ def check_decision_citations_resolve(fail):
 CHECKS = (
     check_python_compiles, check_lua_chunks_load, check_lua_local_headroom,
     check_hosted_chapters_declared, check_tests_pass, check_yaml_parses, check_chapter_status,
+    check_chapter_location, check_recruits_have_unit_files, check_unit_faces_bound,
     check_chapter_deployment_schema, check_chapter_yaml_schema,
     check_personal_line_injection_routes,
     check_injector_source_has_one_reader,

@@ -82,7 +82,7 @@ dnd:
 # NOT a custom class — it is Pepperjack, a separately RECRUITABLE unit (flavor: RBG built it).
 # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
 fe_stats:
-  class: Archer              # FE base class
+  class: archer              # FE base class
   level: 1
   HP: 18
   STR: 4                     # FE Pow (Archer basePow) — bows compute damage off Pow
@@ -96,8 +96,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [Sniper, Ranger]   # vanilla Archer branch (classchg-data.c [CLASS_ARCHER])
-  default: Sniper            # thematic lean; player may pick either.
+  branch: [sniper, ranger]   # vanilla Archer branch (classchg-data.c [CLASS_ARCHER])
+  default: sniper            # thematic lean; player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Archer growths from data_classes.c ──────
 growth_rates:

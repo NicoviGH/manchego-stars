@@ -1,6 +1,7 @@
 # ch14 — Sunblight. PLANNED (#486): a seed, not authoritative.
 id: ch14-sunblight
 title: "Sunblight"
+location: "Sunblight, Xardorok's fortress"
 chapter_number: 14
 status: planned
 milestone: M4
@@ -27,7 +28,6 @@ design_notes: >
   Queen of White Dunes holds doorways against cavalry reinforcements with no time pressure.
   Its ending (the stone smashed, the palace burning, a forced retreat) is the dragon escaping.
 plan:
-  location: "Sunblight, Xardorok's fortress"
   story: >
     The win that turns into a loss: the fortress falls and the dragon flies.
   sources:

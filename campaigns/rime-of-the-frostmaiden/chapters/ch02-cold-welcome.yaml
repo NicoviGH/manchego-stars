@@ -4,6 +4,7 @@
 
 id: ch02-cold-welcome
 title: "Cold Welcome"
+location: "The road into Targos"
 chapter_number: 2
 status: active                 # built / in-progress slice; combat data is grounded + authoritative
 milestone: M3

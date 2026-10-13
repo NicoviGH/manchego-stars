@@ -1,6 +1,7 @@
 # ch19 — The Race to the Glacier. PLANNED (#486): a seed, not authoritative.
 id: ch19-the-race-to-the-glacier
 title: "The Race to the Glacier"
+location: "The tundra and the foot of the Reghed Glacier"
 chapter_number: 19
 status: planned
 milestone: M4
@@ -28,7 +29,6 @@ design_notes: >
   Replaces Darkling Woods' gauntlet (Nicolas, 2026-10-12). The Caves of Hunger become the
   descent into the finale, and the vampire Tekeli-li is cut.
 plan:
-  location: "The tundra and the foot of the Reghed Glacier"
   story: >
     The last road before the end, and the glacier opened by what the party took from Auril.
   sources:

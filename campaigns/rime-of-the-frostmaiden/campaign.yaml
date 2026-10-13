@@ -557,3 +557,109 @@ arena_presentation:
 # hue-mapped into the same ice family by build_campaign.py:inject_title_theme.
 title_theme:
   letter_colors: ["#F0FAFF", "#BEE4FA", "#8CC4EC", "#5494D0", "#285CA0", "#0C2048"]
+
+# ── Who wears which vanilla slot (read by tools/inject/cast.py) ──────────────────────────
+# Moved here from cast.py's PORTRAIT_MAP / GUEST_PORTRAIT_MAP (#486): a character name is
+# campaign data, so it lives in YAML (AGENTS.md, Engine/Content Boundary). ORDER IS MEANINGFUL:
+# the injector walks these maps in the order written, so reordering changes the build.
+# our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
+# Slots are FE8's earliest-available cast so one early chapter shows many faces.
+# (Started as the portrait mapping; it is now the general character-slot key --
+# names, class/stats/growths/gender, death quotes, and map sprites all ride it.)
+cast_slots:
+  braulo: Eirika    # the prologue lord -- first face the player sees
+  marty: Seth
+  wolfram: Franz
+  meesmickle: Gilliam
+  prof-rbg: Moulder
+  rootis: Vanessa
+  sclorbo: Ross
+  pinky: Neimi
+  pepperjack: Garcia
+  brie: Colm
+  # ch01 recruit Baxby the axe-beak (npcs/baxby.yaml) -- a classed Cavalier (mount), so a
+  # full cast member. Rides the vanilla Forde slot (a Cavalier absent from our ch00-08 ->
+  # collision-free); the same slot already carried his ch01-ending CUTSCENE face (he speaks
+  # there -- Marty wins him over), and now also his unit/stats/map sprite/death quote. He is
+  # recruited by that ENDING cutscene, so he simply rides the ch02+ prep roster (no on-map
+  # recruit) -- cast_available_at() handles that from his recruit.chapter (ch01).
+  baxby: Forde
+  # ch03 recruit Trex (npcs/trex.yaml) -- a classed Thief, so unlike the two name-only
+  # NPCs above he IS a full cast member: he rides the vanilla Rennac slot (a Rogue absent
+  # from our ch00-08, referenced nowhere else in the build -> collision-free), which carries
+  # his name / class+stats / bust / map sprite / death quote just like every PC. His mid-map
+  # green->blue JOIN trigger is wired separately (pairs with the #23 mid-map cutscene); here
+  # he is a real deployable unit so his vendored custom sprite renders in his cast colours.
+  trex: Rennac
+  # ch04 recruit Lupin (npcs/lupin.yaml) -- a classed Cavalier (the wolf IS the mount), so a
+  # full cast member like Trex. Unlike Trex he starts RED (the hostile pack's leader) and is
+  # won by Marty's Talk -> CUSA red->blue (the vanilla Joshua pattern), see recruit.initial_faction.
+  # Rides the vanilla Duessel slot (a Great Knight absent from our ch00-08, referenced nowhere
+  # else -> collision-free); his stat line references Kyle (STAT_DONOR), his identity is Duessel.
+  lupin: Duessel
+  # The ch05 recruits (#25). Both shipped their art in #179/#181 and then sat INERT for two
+  # months, because art without a slot is art nothing can address: no name, no bust, no stat
+  # line, no map sprite, no death quote -- and, the thing that actually blocked the chapter,
+  # no pid for a Talk to name. These two lines are that identity.
+  # Basil the goodberry shrub (npcs/basil.yaml) rides ARTUR -- a Monk absent from our ch00-08
+  # and referenced nowhere else, so dressing it is collision-free. His stat line references
+  # Natasha (STAT_DONOR) and his class is hers too (Cleric, 2026-08-08). The slot's own gender
+  # does not have to match his: `gender:` in the YAML rewrites .attributes on whatever slot the
+  # unit wears (_set_gender), and promotion is keyed by CLASS in gPromoJidLut, never by the
+  # character -- so a female Cleric on the male Artur slot promotes Bishop/Valkyrie correctly.
+  basil: Artur
+  # Sahnar (npcs/sahnar.yaml) rides MARISA -- vanilla's OTHER red-to-blue Myrmidon parley,
+  # absent from our ch00-08 and referenced nowhere else. Exact class match, unlike Trex's and
+  # Lupin's slots; her stat line references Joshua (STAT_DONOR), her identity is Marisa.
+  sahnar: Marisa
+
+# Prologue cold-open guests ride vanilla character slots outside PORTRAIT_MAP
+# (PROLOGUE_*_SLOT below); these are the portrait files those slots display.
+# Guest busts are OPTIONAL: a missing PNG keeps the vanilla face, so this wiring
+# works before (and independent of) the art landing.
+guest_slots:
+  hlin-trollbane: Natasha
+  scramsax: Kyle
+  sephek-kaltro: O_Neill
+  # ch01 boss Izobai rides the Breguet slot (CH01_BOSS_SLOT); her death-quote FID
+  # is FID_Breguet, so dressing that slot with izobai.png shows her green-goblin bust.
+  izobai: Breguet
+  # ch01 Foaming Mugs quest-giver Hruna rides the generic Villager_Woman face slot
+  # (FID tag [FID_VillagerWoman] = 0x60) -- a throwaway NPC mug used nowhere else,
+  # so dressing it with hruna.png is collision-free. Cutscene-only (no map unit).
+  hruna: Villager_Woman
+  # ch01-ending patron Duvessa Shane (Speaker of Bryn Shander) rides the Selena slot:
+  # her bust is a palette recolor of vanilla Selena (portraits/duvessa.py), and Selena
+  # is a late-game Grado boss absent from our MVP chapters (ch00-08), so dressing
+  # FID_Selena with duvessa.png is collision-free. Recurring cutscene NPC (no map unit).
+  duvessa: Selena
+  # ch02 quest-giver Vellynne Harpell (recurring Arcane Brotherhood necromancer) rides
+  # the vanilla Ismaire slot (CH02_VELLYNNE_SLOT) -- a regal woman absent from our ch00-08,
+  # collision-free. Her bust is the FE-Repo Sonya (Witch) mug with a snow-white hair recolor
+  # (portraits/vellynne.py); cutscene-only (no map unit).
+  vellynne: Ismaire
+  # ch03 mid-map RBG-execution beat: the Icewind Brute's snarl now has a mug (Nicolas supplied the
+  # ref, 2026-07-11). It rides the vanilla Caellach slot -- a brutish Grado general absent from our
+  # ch00-08, referenced nowhere else -> collision-free. Bust = ref_to_bust of the HD kobold-brute
+  # ref (flipped to FE8 screen-left, crop 20,90,1970,1710, --zoom 0.70, no sharpen). The zoom
+  # pulled the snout tip out of the top-left corner FE8 did not draw until engine patch 0018
+  # (#471); at 1.0 it lost the whole nose. Cutscene-only (the Brute
+  # is a raw-pid enemy 0xb6; its death quote is silent, so FID_Caellach appears ONLY in the midmap line).
+  kobold-brute: Caellach
+  # ch05 boss Ravisin is the raw on-map pid 0xb8, but her cutscene/death-quote face dresses
+  # Riev -- a late-game Bishop absent from our ch00-08 and otherwise unused. The raw pid's
+  # CharacterData portraitId is bound separately by RAW_PID_PORTRAITS below.
+  ravisin: Riev
+  # Messie (ch06-the-maer-monster.yaml) has two faces, so two slots: no hat in ch06, the
+  # mayor's top hat from the end of ch07 (portraits/messie.py renders both). Syrene (vanilla
+  # ch17) and Gheb (vanilla ch9b) are absent from our ch00-08 and named nowhere else ->
+  # collision-free. His on-map pid (CH06_MESSIE_PID) is bound to Syrene by RAW_PID_PORTRAITS.
+  messie: Syrene
+  messie-mayor: Gheb
+  # Speaker Dorbulgruf Shalescar hires the party in ch06's opening and is ch07's boss (ADR
+  # 0332). He rides Murray, vanilla Ch7's boss -- ch07's parity twin -- so the face is already
+  # where ch07's boss will look for it, the way Nerra rides Novala. Murray is named nowhere else.
+  dorbulgruf: Murray
+  # Nerra, ch06's merfolk elder, already RIDES NOVALA (ENEMY_BASE_SLOT above), so his face slot
+  # is the one her unit and her two quotes point at. Novala is named nowhere else.
+  nerra: Novala

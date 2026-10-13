@@ -27,7 +27,7 @@ dnd:
 # no other thief. Cleverness fits; Assassin promotion also adds a sword. The "cosmetic
 # wings" are exactly that — cosmetic art, NOT a flier (Thief is a foot unit).
 fe_stats:
-  class: Thief
+  class: thief
   level: 2                  # Colm's baseLevel: his personal line IS his L2 line, and he joins
                             # vanilla Ch3 at L2 -- the chapter trex joins in (#403, ADR 0321)
   # Vanilla FE8 Thief stats, verbatim from data_classes.c [CLASS_THIEF - 1].
@@ -55,8 +55,8 @@ growth_rates:
   LCK: 40
 
 promotion:
-  branch: [Rogue, Assassin]  # vanilla FE8 Thief branch (classchg-data.c [CLASS_THIEF])
-  default: Rogue
+  branch: [rogue, assassin]  # vanilla FE8 Thief branch (classchg-data.c [CLASS_THIEF])
+  default: rogue
 
 # ── Inventory — the FIGHTING kit (an iron sword: a Thief fights, weakly, like vanilla Colm).
 #    This is what difficulty.py reads (_weapon_for) to model him as a combatant; without it he

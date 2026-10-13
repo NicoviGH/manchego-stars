@@ -1,0 +1,14 @@
+# npcs/esio-trot.yaml — Esio Trot, a tortle of the lake in a pope's mitre (ch07 recruit)
+# STATUS: planned stub (#486). Class and role are the roster's (docs/roadmap.md recruit cadence,
+# ADR 0342); stats, growths, art and wiring come when the recruit is built (#27). Art inputs:
+# references/References/Recruits/esio-trot/ (Nicolas's poses); map sprite: FE-Repo Tortoise (U).
+id: esio-trot
+name: Esio Trot
+
+fe_stats:
+  class: fighter             # Ross's role: a second axe
+
+recruited_via: "story — joins in ch07's ending with Meriwa (ADR 0342)"
+recruit:
+  chapter: ch07-blood-in-bremen
+  via: story

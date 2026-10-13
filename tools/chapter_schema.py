@@ -38,7 +38,7 @@ REWARD = [{'id': ANY, 'amount': ANY}]
 # them interchangeably (`raw_pids.PLACED_ROSTER_KEYS`, `check.ROSTER_KEYS`, map_placement_preview,
 # difficulty), so a field legal on an enemy is legal on a guest or an ally. ENEMY narrows it.
 UNIT = {
-    'id': ANY, 'name': ANY, 'fe_name': ANY, 'class': ANY, 'deploy_class': ANY, 'level': ANY,
+    'id': ANY, 'name': ANY, 'face': ANY, 'fe_name': ANY, 'class': ANY, 'deploy_class': ANY, 'level': ANY,
     'levels': ANY, 'autolevel': ANY, 'count': ANY, 'composition': ANY,
     'position': ANY, 'positions': ANY, 'boss_tile': ANY, 'camera_at': ANY,
     'is_boss': ANY, 'is_miniboss': ANY, 'hard_mode_only': ANY, 'required': ANY, 'is_npc': ANY,
@@ -84,7 +84,7 @@ PLAYTEST_CASE = {
 
 CHAPTER = {
     # identity and status
-    'id': ANY, 'chapter_number': ANY, 'title': ANY, 'status': ANY, 'milestone': ANY,
+    'id': ANY, 'chapter_number': ANY, 'title': ANY, 'location': ANY, 'status': ANY, 'milestone': ANY,
     'is_prologue': ANY, 'is_mvp_finale': ANY, 'balance_locked': ANY, 'accepted_residual': ANY,
     # prose: the design record
     'narrative': ANY, 'design_notes': ANY, 'cadence': ANY, 'parity_reference': ANY,
@@ -94,7 +94,7 @@ CHAPTER = {
     'introduces': [{'concept': ANY, 'coverage': ANY, 'status': ANY, 'where': ANY}],
     # the campaign plan (#486): what a planned chapter is for, and every question still open on
     # a chapter. tools/gen_wiki.py renders both; settling a question removes it from the list.
-    'plan': {'location': ANY, 'story': ANY, 'sources': ANY, 'joins_roles': ANY,
+    'plan': {'story': ANY, 'sources': ANY, 'joins_roles': ANY,
              'payload_notes': ANY, 'how_it_plays': ANY, 'objective': ANY, 'boss': ANY,
              'introduces': [{'concept': ANY, 'where': ANY}]},
     'open_questions': [{'q': ANY, 'pick': ANY}],

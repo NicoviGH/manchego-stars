@@ -143,6 +143,14 @@ def item_name(enum):
     return ' '.join(p.capitalize() for p in parts)
 
 
+def class_label(token):
+    """A class token as the game spells it ('armor-knight' -> 'Armor Knight'); the same rule
+    as gen_class_index, since both sides now write vanilla's tokens."""
+    if not token:
+        return '?'
+    return ' '.join(w.capitalize() for w in str(token).replace('_', '-').split('-'))
+
+
 def pretty_enum(e, prefix):
     return ' '.join(w.capitalize() for w in str(e).replace(prefix, '').split('_'))
 
@@ -581,7 +589,7 @@ def unit_card(uid, unit, joins_how):
             '<tr><td style="width:35%%"><b>Level</b><br>%s</td><td rowspan="2"><b>Inventory'
             '</b><br>%s</td></tr><tr><td><b>HP</b><br>%s</td></tr><tr><td colspan="2"><b>Joins'
             '</b><br>%s</td></tr></tbody></table></td></tr></tbody></table></td>'
-            % (esc(name), face, esc(fs.get('class', '?')), esc(fs.get('level', '?')), inv,
+            % (esc(name), face, esc(class_label(fs.get('class'))), esc(fs.get('level', '?')), inv,
                esc(fs.get('HP', '?')), esc(joins_how)))
 
 
@@ -620,7 +628,7 @@ def chapter_page(chap, prev, nxt, units, opens):
         ('Curve twin', twin_label(curve)),
         ('Map donor', twin_label(donor)),
         ('Objective', esc(obj_text) if obj_text else esc(plan.get('objective', ''))),
-        ('Location', esc(plan.get('location', ''))),
+        ('Location', esc(chap.get('location', ''))),
         ('New units', ', '.join('<a href="#unit-%s">%s</a>' % (esc(r), esc(unit_name(r, units)))
                                 for r in recs)
          or esc(', '.join(plan.get('joins_roles') or []))),
@@ -712,7 +720,7 @@ def chapter_page(chap, prev, nxt, units, opens):
     erows = []
     for e in enemy_list(chap):
         inv = ', '.join(our_item(i)[0] for i in e.get('inventory') or [])
-        erows.append((esc(e.get('name') or e.get('id')), esc(e.get('class', '')),
+        erows.append((esc(e.get('name') or e.get('id')), esc(class_label(e.get('class'))),
                       esc(e.get('level', '')), esc(e.get('count', 1)), esc(inv),
                       esc(our_item(e['item_drop'])[0] if e.get('item_drop') else ''),
                       esc(e.get('arrives_turn', '') or ''),
@@ -738,11 +746,10 @@ def chapter_page(chap, prev, nxt, units, opens):
             p = b.get('personal') or {}
             stats = ', '.join('%s %s' % (k.replace('base', ''), v) for k, v in p.items()
                               if k.startswith('base'))
-            face = portrait(b.get('id') or '') or portrait(((b.get('art') or {}).get('portrait')
-                                                             or '').replace('.png', ''))
+            face = portrait(b['face']) if b.get('face') else None
             brows.append(('<img src="%s" width="96" height="80" alt="" style="image-rendering:'
                           'pixelated"><br>%s' % (face, esc(b.get('name'))) if face
-                          else esc(b.get('name')), esc(b.get('class')), esc(b.get('level')),
+                          else esc(b.get('name')), esc(class_label(b.get('class'))), esc(b.get('level')),
                           esc(stats or '—'), esc(b.get('death_quote', ''))))
         parts.append(wikitable(['Boss', 'Class', 'Lv', 'Personal stats', 'Death quote'], brows))
     # Lessons
@@ -798,7 +805,7 @@ def roster_page(chs, units):
             if r in (c.get('_founding') or []):
                 continue
             rows.append(('<span id="unit-%s"></span>%s' % (esc(r), face), esc(unit_name(r, units)),
-                         esc((u.get('fe_stats') or {}).get('class', '?')),
+                         esc(class_label((u.get('fe_stats') or {}).get('class'))),
                          '<a href="#%s">%s</a>' % (c['_slug'], esc(c['_slug']))))
         for role in (c.get('plan') or {}).get('joins_roles') or []:
             rows.append(('', '<i>open</i>', esc(role), '<a href="#%s">%s</a>'
@@ -806,7 +813,7 @@ def roster_page(chs, units):
     first = next((c for c in chs if c.get('_founding')), None)
     pcs = [('<span id="unit-%s"></span>%s' % (esc(k), ('<img src="%s" width="48" height="40" '
             'alt="">' % portrait(k)) if portrait(k) else ''), esc(u.get('name', k)),
-            esc((u.get('fe_stats') or {}).get('class', '?')),
+            esc(class_label((u.get('fe_stats') or {}).get('class'))),
             '<a href="#%s">%s</a>' % (first['_slug'], first['_slug']) if first else '')
            for k, u in sorted(units.items()) if u['_kind'] == 'pcs']
     return ('<section class="page" id="roster" data-title="Roster">%s%s%s%s</section>'

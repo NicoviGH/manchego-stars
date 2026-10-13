@@ -1,6 +1,7 @@
 # ch11 — Easthaven in Disguise. PLANNED (#486): a seed, not authoritative.
 id: ch11-easthaven-in-disguise
 title: "Easthaven in Disguise"
+location: "Easthaven and its frozen harbour"
 chapter_number: 11
 status: planned
 milestone: M4
@@ -28,7 +29,6 @@ design_notes: >
   Taizel is a breather by design: no pressure to advance, the boss doesn't move, hold the docks
   while the enemy comes to you. The commander leaving on turn 1 is Durth fleeing (Rime p.60).
 plan:
-  location: "Easthaven and its frozen harbour"
   story: >
     The return in disguise is the table's. The magic shop where RBG gets the Luck E. Cheese
     plays as a village on the map (the comedy is the house scene). The duergar on the ferry and

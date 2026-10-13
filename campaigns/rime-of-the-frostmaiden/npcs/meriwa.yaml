@@ -1,0 +1,13 @@
+# npcs/meriwa.yaml — Meriwa, the merfolk Messie sends as proof of the truce (ch07 recruit)
+# STATUS: planned stub (#486). Class and role are the roster's (docs/roadmap.md recruit cadence,
+# ADR 0342); stats, growths, art and wiring come when the recruit is built (#27).
+id: meriwa
+name: Meriwa
+
+fe_stats:
+  class: monk                # Artur's role: light magic
+
+recruited_via: "story — joins in ch07's ending with Esio Trot (ADR 0342)"
+recruit:
+  chapter: ch07-blood-in-bremen
+  via: story

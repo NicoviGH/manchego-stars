@@ -4,6 +4,7 @@
 
 id: ch07-blood-in-bremen
 title: "Blood in Bremen"
+location: "Bremen, from the docks to the Town Hall"
 chapter_number: 7
 status: active                 # the slice is reached: the force is vanilla Ch7's own, re-dressed
 balance_locked: true  # holds parity on instrument v2 with the Fighter boss on Gheb's line; ADR 0343
@@ -226,6 +227,7 @@ enemy_units:
     positions: [[17, 20], [8, 5], [10, 5]]
     donor: [[17, 20], [8, 5], [10, 5]]
   - id: dorbulgruf
+    face: dorbulgruf                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Dorbulgruf Shalescar"
     fe_name: "Dorbulgruf"
     is_boss: true

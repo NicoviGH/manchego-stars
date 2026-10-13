@@ -2,6 +2,7 @@
 # until the chapter is authored; the plan block is what the 2026-10-12/13 planning pass agreed.
 id: ch09-revels-end
 title: "Revel's End"
+location: "Revel's End, the prison on the Sea of Moving Ice coast"
 chapter_number: 9
 status: planned
 milestone: M4
@@ -32,7 +33,6 @@ design_notes: >
   keep by the cells, and fights out toward the edge vanilla's army enters from. Other indoor
   maps (It's a Trap!, Father and Son) stay options until the chapter is drafted.
 plan:
-  location: "Revel's End, the prison on the Sea of Moving Ice coast"
   story: >
     The low point, then the climb back. The escape starts with Marty and Braulo's isopod
     (lore/marty.md) and the riot is Meesmickle's signature beat (roadmap). Gant's cell is the

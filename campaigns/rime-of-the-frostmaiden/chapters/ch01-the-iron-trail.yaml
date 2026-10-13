@@ -9,6 +9,7 @@
 
 id: ch01-the-iron-trail
 title: "The Iron Trail"
+location: "The trail out of Bryn Shander to the goblin camp"
 chapter_number: 1
 status: active                 # built / in-progress slice; combat data is grounded + authoritative
 milestone: M3
@@ -158,6 +159,7 @@ enemy_units:
     # the vanilla units that FIGHT on these tiles (their REDA destinations, not spawns)
 
   - id: goblin-chief
+    face: izobai                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Izobai"               # the Foaming Mugs goblin boss (book canon); a female
                                   # Karkolohk warlord. Custom green-goblin bust dresses
                                   # the Breguet slot (GUEST_PORTRAIT_MAP izobai->Breguet).

@@ -49,7 +49,7 @@ dnd:
 #       a shrub. Cleric's own bases lean the same way Natasha does (-2 HP, -1 Def, +1 Res/Skl
 #       against Priest), so class and donor now push together instead of against each other.
 fe_stats:
-  class: Cleric
+  class: cleric
   level: 1
   # Vanilla FE8 Cleric stats, verbatim from data_classes.c [CLASS_CLERIC - 1].
   HP: 16
@@ -86,10 +86,10 @@ growth_rates:
   LCK: 45
 
 promotion:
-  branch: [Bishop, Valkyrie]  # vanilla FE8 Cleric branch, gPromoJidLut (classchg-data.c):
+  branch: [bishop, valkyrie]  # vanilla FE8 Cleric branch, gPromoJidLut (classchg-data.c):
                               # {CLASS_BISHOP_F, CLASS_VALKYRIE}. Bishop_F shares Bishop's
                               # nameTextId (0x2d4), so the game shows both as "Bishop".
-  default: Bishop             # ClassData.promotion for CLASS_CLERIC — and it is LIGHT, which is
+  default: bishop             # ClassData.promotion for CLASS_CLERIC — and it is LIGHT, which is
                               # what `battle_anim.spell_palette_tint` below already assumes.
                               # Priest's default was CLASS_SAGE (anima); that mismatch is why
                               # the class changed. Guarded by the decomp-pinned test.

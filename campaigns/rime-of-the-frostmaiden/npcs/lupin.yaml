@@ -32,7 +32,7 @@ dnd:
 # Baxby (axe-beak Cavalier) as the "beast-cavalry" sled team — on-theme with the campaign's
 # befriend-the-creatures motif. Custom map sprite + battle anim required (#38/#39).
 fe_stats:
-  class: Cavalier
+  class: cavalier
   level: 1
   # Vanilla FE8 Cavalier stats, verbatim from data_classes.c [CLASS_CAVALIER - 1].
   HP: 20
@@ -61,8 +61,8 @@ growth_rates:
   LCK: 30
 
 promotion:
-  branch: [Paladin, "Great Knight"]   # vanilla FE8 Cavalier branch (classchg-data.c [CLASS_CAVALIER])
-  default: Paladin
+  branch: [paladin, great-knight]   # vanilla FE8 Cavalier branch (classchg-data.c [CLASS_CAVALIER])
+  default: paladin
 
 recruited_via: "story — Marty talks the direwolf pack into the sled team (Ch4)"
 recruit:
