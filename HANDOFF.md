@@ -6,38 +6,42 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-12 (Claude): ch07's scenes pass is half done on draft PR #485, and paused for
-a campaign-arc plan (#486). **What landed and why is in `git log`, the PR and its issue** -- this
-file keeps no "recently landed" list.
+Refreshed 2026-10-13 (Claude): the campaign-arc planning pass (#486) is half done. The plan for
+ch09-ch20 now lives in `status: planned` chapter YAMLs, read through a generated wiki, on draft PR
+#487. **What landed and why is in `git log`, the PRs and #486** -- this file keeps no
+"recently landed" list.
 
 ## In flight
 
-**Draft PR #485 (`feat/27-ch07-scenes`), text only, ROM byte-identical.** Locked in the ch07 YAML
-with Nicolas: the opening (docks fork on 0xFC/0xFD, the argument, the axe bite, then the harpoon
-heads-up before prep), the boss quotes 0xA02/0xA03, and both houses. Nothing is wired yet. The
-PR body lists what it still owes. **Next, in order:**
+- **Draft PR #487 (`feat/486-chapter-wiki`), ROM byte-identical** (injection fingerprint, all 16
+  configs). It holds the chapter wiki generator (on that branch until it merges; published privately at
+  https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate and republish to the same file
+  after any chapter edit), the ch09-ch20 planned stubs, and the data standardization
+  (faces in campaign.yaml, one class-token vocabulary, `location:`, three recruit stubs, keyed
+  busts). Not yet `/code-review`ed; do that before asking Nicolas to merge.
+- **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
+  locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
+  locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
 
-1. **#486 -- plan the rest of the campaign** against the DM notes, the book AND vanilla FE8's
-   story, chapter by chapter WITH Nicolas (his call, 2026-10-12: without FE8 alignment our
-   chapters drift from twins we can borrow). The issue holds the inputs and every seed from the
-   ch07 session. Output: `docs/roadmap.md` rows + an ADR, no spec doc. Start by laying vanilla's
-   post-Ch8 shape (the route split, the two routes, the merge) beside the book's spines.
-2. **#27 -- ch07's ending**, once #486 settles its exit hook: why the party heads for Easthaven,
-   profound enough to bring them back there after Revel's End (rejected so far: Easthaven's
-   missing fishers, and Messie having overheard Dzaan; Nicolas's direction is the merfolk telling
-   Messie something after the peace, which he relays). The rest of the ending is known: Messie in
-   the top hat, the fish tax, his farewell reveal, the 10,000 gold, **Meriwa + Esio Trot join**
-   (ADR 0342), and the town crier. Ask Nicolas for his flow first, as he gave one for the opening.
-   Then wire every scene on #485, and do the recruits' art, shown to Nicolas before committing:
-   - **Esio Trot:** Nicolas's Gemini poses are in `references/References/Recruits/esio-trot/`
-     (ready/windup/peak + portrait, a mitred pope-tortle). The map sprite is the FE-Repo
-     `Tortoise (U)` {Dutch Introvert} with a mitre added.
-   - **Meriwa:** the ch06 Mermaid, plus a portrait.
-   Still write NO custom or copied code: `docs/adding-a-chapter.md`'s shared-helper table.
-   `make CH07BOOT=1` + `tools/playtest/run.sh ch07titlecard` / `PT_HOST_CHAPTER=8 ... mapshot`.
-3. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337), and
+**Next, in order** (the full state, every decision and every open pick: #486, latest comments):
+
+1. **Queued, approved work:** (a) recruit level and kit get one home (the build ignores a unit
+   file's `inventory:`, `difficulty.py` reads it first; plan on #486), proved by fingerprint plus
+   `make difficulty-gate`; (b) re-render the 15 ref-pipeline busts with `matte` to clear the edge
+   halo, before/after shown to Nicolas before any commit.
+2. **#486 planning, continue WITH Nicolas:** the open picks on the wiki's Open decisions page; then
+   Act IV beats (ch17 beat and map, ch18 map); the recruit pass (who fills each vanilla role
+   ch09-ch17); the legendary-weapon pass (one per PC); the back-half onboarding catalog; then the
+   arc ADR, and close the ledger.
+3. **#27 -- ch07's ending** once its exit hook is settled (pick pending on #486), and the move to
+   Distant Blade. The rest of the ending is known: Messie in the top hat, the fish tax, his
+   farewell reveal, the 10,000 gold, **Meriwa + Esio Trot join** (ADR 0342), the town crier. Ask
+   Nicolas for his flow first. Recruit art inputs: `references/References/Recruits/esio-trot/`;
+   Meriwa is the ch06 Mermaid plus a portrait. Still write NO custom or copied code
+   (`docs/adding-a-chapter.md`). `make CH07BOOT=1`.
+4. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337), and
    loses its blood (cast palette index 6). It joins at ch08's start (#28).
-4. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
+5. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
    count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
