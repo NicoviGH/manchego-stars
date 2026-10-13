@@ -16,6 +16,7 @@ page reads like the reference it borrows from; the branding is ours.
 import base64
 import glob
 import html
+import io
 import os
 import re
 import sys
@@ -301,11 +302,87 @@ def portrait(uid):
     if uid in _PORTRAITS:
         return _PORTRAITS[uid]
     path = os.path.join(CAMP, 'portraits', '%s.png' % uid)
-    uri = None
-    if os.path.exists(path):
-        uri = 'data:image/png;base64,' + base64.b64encode(open(path, 'rb').read()).decode()
-    _PORTRAITS[uid] = uri
-    return uri
+    _PORTRAITS[uid] = png_uri(path, key_index0=True) if os.path.exists(path) else None
+    return _PORTRAITS[uid]
+
+
+def png_uri(path_or_image, key_index0=False):
+    """A PNG as a data URI. FE8 busts are indexed and keep palette index 0 as the transparent
+    colour (the green backdrop); the game never draws it, so neither do we."""
+    from PIL import Image
+    img = path_or_image if hasattr(path_or_image, 'save') else Image.open(path_or_image)
+    if key_index0 and img.mode == 'P':
+        img = img.copy()
+        img.info['transparency'] = 0
+    buf = io.BytesIO()
+    img.save(buf, format='PNG', optimize=True)
+    return 'data:image/png;base64,' + base64.b64encode(buf.getvalue()).decode()
+
+
+# Vanilla layout per VANILLA key, for a planned chapter's donor map.
+def vanilla_layout(key):
+    m = re.match(r'FE8 (Prologue|Final|Ch(\d+)(x?))( Ephraim)?$', key or '')
+    if not m:
+        return None
+    if m.group(1) == 'Prologue':
+        return 'PrologueMap'
+    if m.group(1) == 'Final':
+        return 'FinalChapterMap1'
+    n = int(m.group(2))
+    if m.group(3):
+        return 'Ch5XMap'
+    if 9 <= n <= 14:
+        if m.group(4):
+            return 'Ch9EphMap' if n == 9 else 'Ch%dEphraimMap' % n
+        return 'Ch%dEirikaMap' % n
+    return 'Ch%dMap' % n
+
+
+_MAPS = {}
+
+
+def map_image(chap):
+    """(data URI, caption) for the chapter's map: our compiled map when it exists, else the
+    map donor's vanilla layout in vanilla's own art (what we will reskin). Rendered with the
+    same metatile code the map tools use; the vanilla art comes from the build tree, so the
+    decomp submodule is never written to."""
+    slug = chap['_slug']
+    if slug in _MAPS:
+        return _MAPS[slug]
+    out = (None, '')
+    from PIL import Image
+    mf = (chap.get('map') or {}).get('file') if isinstance(chap.get('map'), dict) else None
+    stem = os.path.splitext(os.path.basename(mf))[0] if mf else None
+    try:
+        if stem and os.path.exists(os.path.join(CAMP, 'maps', stem + '.mar')):
+            import map_placement_preview as mpp
+            grid, _, ts = mpp.load_map(stem)
+            img = Image.new('RGB', (len(grid[0]) * 16, len(grid) * 16))
+            for y, row in enumerate(grid):
+                for x, m in enumerate(row):
+                    img.paste(ts.metatile_image(m), (x * 16, y * 16))
+            out = (png_uri(img), 'Our map (%dx%d)' % (len(grid[0]), len(grid)))
+        else:
+            key = twin_key(chap.get('fe8_base_map'))
+            layout = vanilla_layout(key)
+            if layout:
+                from map_tileset_tool import (Tileset, vanilla_layout_data,
+                                              vanilla_layout_tileset_assets)
+                sub, bld = inject.decomp.SUBMODULE, os.path.join(ROOT, 'build', 'fireemblem8u')
+                obj, pal, cfg = vanilla_layout_tileset_assets(sub, layout)
+                g = os.path.join(bld, 'graphics', 'map')
+                ts = Tileset(os.path.join(g, obj + '.4bpp'), os.path.join(g, pal + '.gbapal'),
+                             os.path.join(sub, 'graphics', 'map', cfg + '.bin'))
+                w, h, cells, _ = vanilla_layout_data(sub, layout)
+                img = Image.new('RGB', (w * 16, h * 16))
+                for j, m in enumerate(cells):
+                    img.paste(ts.metatile_image(m), ((j % w) * 16, (j // w) * 16))
+                out = (png_uri(img), 'Donor map, vanilla art: %s (%dx%d)'
+                       % (VANILLA[key][1], w, h))
+    except Exception as ex:                            # a missing build tree, a new layout
+        out = (None, 'map not rendered (%s)' % ex.__class__.__name__)
+    _MAPS[slug] = out
+    return out
 
 
 _ENUM_BY_KEY = None
@@ -355,15 +432,26 @@ def enemy_list(chap):
         return list(chap.get('enemy_units') or [])
 
 
+_NAMES = {}
+
+
 def recruits_of(chap):
+    """Unit ids that join here, in order. The PCs are the founding party: they join in the
+    campaign's first playable (non-prologue) chapter, which `build` marks as `_founding`."""
     pc = chap.get('post_chapter') or {}
-    ids = []
+    ids = list(chap.get('_founding') or [])
     for k in ('units_available_to_recruit', 'units_recruited_in_chapter'):
         for r in pc.get(k) or []:
             rid = r.get('id') if isinstance(r, dict) else r
+            if isinstance(r, dict) and r.get('name'):
+                _NAMES.setdefault(rid, r['name'])
             if rid and rid not in ids:
                 ids.append(rid)
     return ids
+
+
+def unit_name(uid, units):
+    return (units.get(uid) or {}).get('name') or _NAMES.get(uid) or uid.replace('-', ' ').title()
 
 
 def bosses_of(chap):
@@ -450,11 +538,14 @@ def script_of(slug, chap):
 
 # ── HTML pieces, in the wiki's own markup ──────────────────────────────────────
 
-def infobox(title, rows):
+def infobox(title, rows, image=None, caption=''):
     body = ''.join('<tr><th>%s</th><td><p>%s</p></td></tr>' % (esc(k), v) for k, v in rows if v)
+    pic = ('<tr><th><p><img src="%s" width="200" alt="%s map" style="image-rendering:pixelated;'
+           'height:auto"><br><span style="font-size:77%%">%s</span></p></th></tr>'
+           % (image, esc(title), esc(caption))) if image else ''
     return ('<table class="infobox"><tbody><tr><td><table style="width:100%%"><tbody>'
-            '<tr><th>%s</th></tr></tbody></table></td></tr><tr><td><table style="width:100%%">'
-            '<tbody>%s</tbody></table></td></tr></tbody></table>' % (esc(title), body))
+            '<tr><th>%s</th></tr>%s</tbody></table></td></tr><tr><td><table style="width:100%%">'
+            '<tbody>%s</tbody></table></td></tr></tbody></table>' % (esc(title), pic, body))
 
 
 def h2(text, anchor):
@@ -480,7 +571,7 @@ def unit_card(uid, unit, joins_how):
     face = ('<img src="%s" width="96" height="80" alt="%s" style="image-rendering:pixelated">'
             % (img, esc(uid)) if img else '<i>no bust yet</i>')
     inv = '<br>'.join(esc(our_item(i)[0]) for i in (unit or {}).get('inventory') or []) or '—'
-    name = (unit or {}).get('name') or uid
+    name = (unit or {}).get('name') or _NAMES.get(uid) or uid.replace('-', ' ').title()
     return ('<td><table style="border-radius:14px;border:2px solid var(--color2);background:'
             'var(--color3);padding:4px;text-align:center;margin:auto;max-width:350px"><tbody>'
             '<tr><th style="border-radius:14px;border:1px solid var(--color2);padding:2px;'
@@ -522,16 +613,16 @@ def chapter_page(chap, prev, nxt, units, opens):
     plan = chap.get('plan') or {}
     status_txt = ('Planned' if status == 'planned' else
                   'Locked' if chap.get('balance_locked') else 'Active')
+    img, cap = map_image(chap)
     box = infobox(title, [
         ('Chapter', esc('Prologue' if chap.get('is_prologue') else 'Chapter %s' % num)),
         ('Status', esc(status_txt)),
         ('Curve twin', twin_label(curve)),
         ('Map donor', twin_label(donor)),
         ('Objective', esc(obj_text) if obj_text else esc(plan.get('objective', ''))),
-        ('Location', esc(plan.get('location') or (chap.get('map') or {}).get('name', '')
-                         if isinstance(chap.get('map'), dict) else plan.get('location', ''))),
-        ('New units', ', '.join('<a href="#unit-%s">%s</a>' % (esc(r), esc((units.get(r) or {})
-                                .get('name', r))) for r in recs)
+        ('Location', esc(plan.get('location', ''))),
+        ('New units', ', '.join('<a href="#unit-%s">%s</a>' % (esc(r), esc(unit_name(r, units)))
+                                for r in recs)
          or esc(', '.join(plan.get('joins_roles') or []))),
         ('Boss(es)', esc(', '.join(b.get('name', '?') for b in bosses_of(chap))
                          or plan.get('boss', ''))),
@@ -539,7 +630,7 @@ def chapter_page(chap, prev, nxt, units, opens):
          if prev else ''),
         ('Next chapter', '<a href="#%s">%s</a>' % (nxt['_slug'], esc(nxt.get('title')))
          if nxt else ''),
-    ])
+    ], img, cap)
     parts = [box]
     parts.append('<p><b>%s</b> is %s of <i>Manchego Stars</i>. Its curve twin is %s; its map '
                  'comes from %s.</p>' % (esc(title), 'the prologue' if chap.get('is_prologue')
@@ -565,7 +656,8 @@ def chapter_page(chap, prev, nxt, units, opens):
     cards = []
     for r in recs:
         u = units.get(r) or {}
-        cards.append(unit_card(r, u, 'This chapter'))
+        cards.append(unit_card(r, u, 'Founding party' if r in (chap.get('_founding') or [])
+                               else 'This chapter'))
     if not cards and plan.get('joins_roles'):
         parts.append(wikitable(['Vanilla role to fill', 'Who (recruit pass)'],
                                [(esc(x), '<i>open</i>') for x in plan['joins_roles']]))
@@ -646,7 +738,11 @@ def chapter_page(chap, prev, nxt, units, opens):
             p = b.get('personal') or {}
             stats = ', '.join('%s %s' % (k.replace('base', ''), v) for k, v in p.items()
                               if k.startswith('base'))
-            brows.append((esc(b.get('name')), esc(b.get('class')), esc(b.get('level')),
+            face = portrait(b.get('id') or '') or portrait(((b.get('art') or {}).get('portrait')
+                                                             or '').replace('.png', ''))
+            brows.append(('<img src="%s" width="96" height="80" alt="" style="image-rendering:'
+                          'pixelated"><br>%s' % (face, esc(b.get('name'))) if face
+                          else esc(b.get('name')), esc(b.get('class')), esc(b.get('level')),
                           esc(stats or '—'), esc(b.get('death_quote', ''))))
         parts.append(wikitable(['Boss', 'Class', 'Lv', 'Personal stats', 'Death quote'], brows))
     # Lessons
@@ -699,14 +795,19 @@ def roster_page(chs, units):
             u = units.get(r) or {}
             img = portrait(r)
             face = '<img src="%s" width="48" height="40" alt="">' % img if img else ''
-            rows.append(('<span id="unit-%s"></span>%s' % (esc(r), face), esc(u.get('name', r)),
+            if r in (c.get('_founding') or []):
+                continue
+            rows.append(('<span id="unit-%s"></span>%s' % (esc(r), face), esc(unit_name(r, units)),
                          esc((u.get('fe_stats') or {}).get('class', '?')),
                          '<a href="#%s">%s</a>' % (c['_slug'], esc(c['_slug']))))
         for role in (c.get('plan') or {}).get('joins_roles') or []:
             rows.append(('', '<i>open</i>', esc(role), '<a href="#%s">%s</a>'
                          % (c['_slug'], esc(c['_slug']))))
-    pcs = [(('<img src="%s" width="48" height="40" alt="">' % portrait(k)) if portrait(k) else '',
-            esc(u.get('name', k)), esc((u.get('fe_stats') or {}).get('class', '?')), 'ch01')
+    first = next((c for c in chs if c.get('_founding')), None)
+    pcs = [('<span id="unit-%s"></span>%s' % (esc(k), ('<img src="%s" width="48" height="40" '
+            'alt="">' % portrait(k)) if portrait(k) else ''), esc(u.get('name', k)),
+            esc((u.get('fe_stats') or {}).get('class', '?')),
+            '<a href="#%s">%s</a>' % (first['_slug'], first['_slug']) if first else '')
            for k, u in sorted(units.items()) if u['_kind'] == 'pcs']
     return ('<section class="page" id="roster" data-title="Roster">%s%s%s%s</section>'
             % (h2('Founding party', 'pcs'), wikitable(['', 'Name', 'Class', 'Joins'], pcs),
@@ -782,6 +883,9 @@ def open_questions(chs):
 def build():
     chs = chapters()
     units = units_index()
+    first = next((c for c in chs if not c.get('is_prologue')), None)
+    if first is not None:
+        first['_founding'] = sorted(k for k, u in units.items() if u['_kind'] == 'pcs')
     opens = open_questions(chs)
     pages = [index_page(chs), roster_page(chs, units), decisions_page(chs, opens)]
     for i, c in enumerate(chs):
