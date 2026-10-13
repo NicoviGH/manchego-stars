@@ -727,8 +727,14 @@ def decisions_page(chs, opens):
 
 
 def css():
-    return '\n'.join(open(os.path.join(ASSETS, f), encoding='utf-8').read()
+    """The wiki's own stylesheets, minus what they fetch from the wiki's servers (skin icons,
+    a webfont): the artifact viewer blocks every outside load, so those are dropped here and
+    the page falls back to the system font and plain bullets."""
+    text = '\n'.join(open(os.path.join(ASSETS, f), encoding='utf-8').read()
                      for f in ('skin.css', 'site.css'))
+    text = re.sub(r'@font-face\s*\{[^}]*\}', '', text)
+    text = re.sub(r'@import[^;]*;', '', text)
+    return re.sub(r'url\((?!["\']?data:)[^)]*\)', 'none', text)
 
 
 PAGE_CSS = """
