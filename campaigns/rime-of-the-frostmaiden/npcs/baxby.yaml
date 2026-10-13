@@ -110,6 +110,7 @@ art:
   render:                             # portraits/baxby.png — byte-reproducible bust
     ref: "References/PCs/Baxby.png"   # axe-beak art from the Frostmaiden book, Gemini-modified (Nicolas)
     crop: [780, 18, 1920, 940]
+    matte: "342720"   # outline colour painted over the keyed bg before the downscale: no light edge halo
     flip_h: true                      # face FE8-canonical screen-left
     zoom: 1.05                        # vanilla face scale: the top just reaches the frame edge (Nicolas, 2026-10-10)
     hand_pass: null

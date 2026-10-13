@@ -19,6 +19,7 @@ art:
     flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/WolframFLAT.png"   # flat ref (downscales crisper)
     crop: [280, 80, 1880, 1413]    # ref pixels, ~1.2 aspect — tight head+shoulders, centred so both shoulders leave the frame at the bottom corners
+    matte: "0e0f25"   # outline colour painted over the keyed bg before the downscale: no light edge halo
     zoom: 0.89                     # as big as the shoulders allow without a flat chop at the sides (Nicolas, 2026-10-10)
     flatten: 9                     # painted ref: flat tones instead of speckle
     hand_pass: null

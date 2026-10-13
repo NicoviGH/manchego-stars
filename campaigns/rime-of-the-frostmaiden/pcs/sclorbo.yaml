@@ -18,6 +18,7 @@ art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/Sclorbo Portrait clean.png"
     crop: [342, 297, 1786, 1500]   # ref pixels, ~1.2 aspect
+    matte: "161220"   # outline colour painted over the keyed bg before the downscale: no light edge halo
     hand_pass: null
   approach: custom
   fidelity: faithful

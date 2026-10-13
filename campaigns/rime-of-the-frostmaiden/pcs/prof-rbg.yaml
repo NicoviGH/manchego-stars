@@ -18,8 +18,9 @@ art:
     flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/RBG3:4_Flat.png"   # flat 3/4 ref (downscales crisper)
     crop: [60, 40, 2240, 1856]     # ref pixels, ~1.2 aspect — whole top hat + coat
+    matte: "190f17"   # outline colour painted over the keyed bg before the downscale: no light edge halo
     zoom: 0.88                     # headroom kept by choice at the 2026-10-10 rescale review
-    hand_pass: null
+    hand_pass: portraits/prof-rbg_corner_trim.py   # clears a stray 2x2 speck off the lower-left coat outline
   approach: custom
   fidelity: faithful
   must_keep:                  # tells that make the bust read as "Geenius"

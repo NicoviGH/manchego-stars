@@ -31,7 +31,7 @@ class Keyed(object):
 
 ART = {'portrait': ANY, 'source': ANY, 'hand_pass': ANY, 'palette': ANY, 'vendored': ANY,
        'map_sprite': {'mu': ANY, 'wait': ANY},
-       'render': {'bg_thresh': ANY, 'crop': ANY, 'hand_pass': ANY, 'ref': ANY, 'zoom': ANY}}
+       'render': {'bg_thresh': ANY, 'crop': ANY, 'hand_pass': ANY, 'matte': ANY, 'ref': ANY, 'zoom': ANY}}
 REWARD = [{'id': ANY, 'amount': ANY}]
 
 # One shape for every unit a chapter places, whatever roster key holds it: the readers treat
