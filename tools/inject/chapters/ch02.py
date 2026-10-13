@@ -7,7 +7,7 @@ from PIL import Image
 
 import portrait_tool
 from inject.cast import (
-    _bust_dir, _classed_cast, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit,
+    _bust_dir, _classed_cast, class_enum_for, unit_items, deploy_class_for, load_unit,
     PORTRAIT_MAP)
 from inject.chapter_ids import (
     CH02_BOSS_SLOT, CH02_CHWINGA, CH02_CHWINGA_PORTRAIT_SLOT, CH02_CHWINGA_SPRITE_SRC,
@@ -336,16 +336,15 @@ def inject_ch02(campaign, verbose=True):
     # 2a-bis. Off-map recruit join-LOAD: the party persists from ch01 (already in the save),
     #     but a cutscene recruit was never a unit -- so LOAD him in HERE, his first prep
     #     roster, or the deploy cap sizes a slot nothing fills (#23). For ch02 that is Baxby
-    #     (ch01 ending cutscene; recruit.via = market = off-map). Each rides its CLASS_LOADOUT
+    #     (ch01 ending cutscene; recruit.via = market = off-map). Each rides its unit file's
     #     kit, blue, on a walkable NW tile (PREP re-picks positions). Empty for a chapter with
     #     no newly-available off-map recruit (then no LOAD1 is emitted -- see step 4).
     join_recruits = offmap_join_recruits(campaign, chap['chapter_number'])
     for uid, _s, ce, _d, _l in join_recruits:
-        if ce not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (ch02 join recruit %s)' % (ce, uid))
+        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     jx, jy = CH02_RECRUIT_JOIN_POS
     recruit_join = [_ally_unit_entry(leader, slot, dce, lv, jx, jy,
-                                     ', '.join(CLASS_LOADOUT[ce]),
+                                     ', '.join(unit_items(campaign, uid)),
                                      ' /* %s -- off-map recruit joins the party (#23) */' % uid)
                     for uid, slot, ce, dce, lv in join_recruits]
 

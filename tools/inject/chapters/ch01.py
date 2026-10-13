@@ -8,7 +8,7 @@ from PIL import Image
 
 import fe8_talk_font
 from inject.boot import _lord_select_event_seq, LORDSEL_EXPLAINER_MSG
-from inject.cast import _classed_cast, CLASS_LOADOUT, GUEST_PORTRAIT_MAP, load_unit, PORTRAIT_MAP
+from inject.cast import _classed_cast, unit_items, GUEST_PORTRAIT_MAP, load_unit, PORTRAIT_MAP
 from inject.chapter_ids import (
     CH01_BOSS_SLOT, CH01_GOAL_STATUS_MSG, CH01_GOAL_WINDOW_MSG, CH01_LORDSEL_BG,
     PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT)
@@ -345,8 +345,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # via market -> ch02 prep; Trex ch03) are not in the ch01 join-LOAD / lord-select / world map.
     cast, cast_names = _classed_cast(campaign, available_at=chap['chapter_number'])
     for unit_id, _, class_enum, _, _ in cast:
-        if class_enum not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (unit %s)' % (class_enum, unit_id))
+        unit_items(campaign, unit_id)   # fails fast on a unit file with no kit
     if len(cast) > len(LORDSEL_CONFIRM_MSGS):
         sys.exit('ERROR: %d lord candidates > %d reserved confirm text ids'
                  % (len(cast), len(LORDSEL_CONFIRM_MSGS)))
@@ -359,7 +358,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # (ce) for EVERY unit: the #65 clone-class approach is retired (custom anims ride the
     # per-character _u25 path; see deploy_class_for). The split survives only as a seam.
     join = [_ally_unit_entry(leader, slot, dce, lv, x, y,
-                             ', '.join(CLASS_LOADOUT[ce]), ' /* %s */' % uid)
+                             ', '.join(unit_items(campaign, uid)), ' /* %s */' % uid)
             for (uid, slot, ce, dce, lv), (x, y) in zip(cast, CH01_JOIN_POSITIONS)]
     deploy = _deploy_cap_entries(chap, cast, leader, 'ch01')
 

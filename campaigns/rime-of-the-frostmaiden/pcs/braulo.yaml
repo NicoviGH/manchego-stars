@@ -129,7 +129,6 @@ inventory:
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 3
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Braulo is a stock FE8 Pirate -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

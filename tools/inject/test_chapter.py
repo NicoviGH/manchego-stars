@@ -6,7 +6,7 @@ import sys
 
 from inject.boot import _lord_select_event_seq, LORDSEL_EXPLAINER_MSG
 from inject.cast import (
-    _chapter_unit, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit, PORTRAIT_MAP,
+    _chapter_unit, class_enum_for, unit_items, deploy_class_for, load_unit, PORTRAIT_MAP,
     RAW_PID_BATTLE_ANIMS)
 from inject.chapter_ids import CH01_LORDSEL_BG, CH05_CLASS_IDS, CH05_ITEM_IDS
 from inject.decomp import _replace_brace_block, REPO
@@ -213,8 +213,6 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False, bench=None):
         class_enum = class_enum_for(unit)
         if class_enum is None:
             continue
-        if class_enum not in CLASS_LOADOUT:
-            sys.exit('ERROR: no test loadout for %s (unit %s)' % (class_enum, unit_id))
         units.append((unit_id, slot, class_enum, unit))
     if len(units) > len(TEST_SPAWN_POSITIONS):
         sys.exit('ERROR: %d classed cast > %d test spawn positions'
@@ -223,7 +221,7 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False, bench=None):
     leader = 'CHARACTER_%s' % units[0][1].upper()  # the lord slot anchors the roster
     entries = []
     for (unit_id, slot, class_enum, unit), (x, y) in zip(units, TEST_SPAWN_POSITIONS):
-        items = ', '.join(CLASS_LOADOUT[class_enum])
+        items = ', '.join(unit_items(campaign, unit_id))
         entries.append(
             '    {\n'
             '        .charIndex = CHARACTER_%s,\n'

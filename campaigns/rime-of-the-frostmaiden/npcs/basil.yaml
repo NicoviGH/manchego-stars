@@ -94,6 +94,16 @@ promotion:
                               # Priest's default was CLASS_SAGE (anima); that mismatch is why
                               # the class changed. Guarded by the decomp-pinned test.
 
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
+  - id: heal-staff
+    name: "Heal Staff"
+    fe_base: heal
+    fe_weapon_type: Staff
+    is_staff: true
+  - id: vulnerary
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
+    fe_base: vulnerary
+
 recruited_via: "story — repotted from the Elven Tomb (Ch5)"
 recruit:
   chapter: ch05-the-elven-tomb

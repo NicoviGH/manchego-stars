@@ -130,7 +130,7 @@ difference by naming it (`ch06_messie_gather` calls `gather_cast`).
    - Party → `MS_ChNNDeployCap`, the never-LOADed cap template the group points at. Real flow:
      author `deployment.deploy_slots` (== `deploy_limit` tiles) in the YAML and use
      `_deploy_cap_entries` + a `PREP` CALL. Fast-boot additionally declares `MS_ChNNBootSeed` — the
-     same roster ARMED from `CLASS_LOADOUT` — and `LOAD1`s it so PREP has a party from a cold New
+     same roster ARMED from each unit file's `inventory:` (`unit_items`) — and `LOAD1`s it so PREP has a party from a cold New
      Game. (`deploy_slots` is not optional: `_deploy_cap_entries` sys.exits without it.)
    - Enemies → `MS_ChNNLine`, `LOAD1`ed by the beginning scene, plus one `MS_ChNNWave<turn>` per
      reinforcement wave (each needs its own table — one table cannot serve two turns). Every

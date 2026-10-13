@@ -69,17 +69,20 @@ promotion:
   default: paladin
 
 # ── Inventory (joins with stock gear) ─────────────────────────────────────────
-inventory:
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
   - id: iron-lance
     name: "Iron Lance"
     fe_base: iron-lance
     fe_weapon_type: Lance
-    damage_type: piercing             # cosmetic — the beak/talons
+    damage_type: piercing           # the beak: his lead weapon, so FE8 equips it first; ch04 locks on it
   - id: iron-sword
     name: "Iron Sword"
     fe_base: iron-sword
     fe_weapon_type: Sword
-    damage_type: slashing             # cosmetic
+    damage_type: slashing           # cosmetic flavor label only
+  - id: vulnerary
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
+    fe_base: vulnerary
 
 # ── Battle animation (#206) ────────────────────────────────────────────────────
 # Baxby rides CLASS_CAVALIER so the axe-beak can BE a mounted playable unit, and until this

@@ -7,7 +7,7 @@ import sys
 import fe8_talk_font
 import portrait_tool
 from inject.cast import (
-    _bust_dir, _classed_cast, _vendor_mug_to_bust, char_symbol, CLASS_LOADOUT, GUEST_PORTRAIT_MAP,
+    _bust_dir, _classed_cast, _vendor_mug_to_bust, char_symbol, unit_items, GUEST_PORTRAIT_MAP,
     load_unit, PORTRAIT_MAP)
 from inject.chapter_ids import (
     CH04_MOOSE_MOV_TABLE, CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG, CH05_ARRIVAL_NO_LUPIN_MSG,
@@ -1687,17 +1687,17 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     #    and the YAML's deploy_slots tiles, then redeploys the player's picks (cf. ch03/ch04).
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
     for uid, _slot, ce, _dce, _level in cast:
-        if ce not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (ch05 field roster %s)' % (ce, uid))
+        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch05')
     declare_unit_table(CH05_ALLY_TABLE, cap_rows,
                        'ch05 PREP deploy-cap template (never LOADed; the CAP is the parity)')
-    # --ch05-boot only: the field roster armed from CLASS_LOADOUT on the deploy tiles, so PREP
-    # has a party to pick from a COLD New Game. The real chain omits it -- the party persists.
+    # --ch05-boot only: the field roster armed from each unit file's inventory on the deploy
+    # tiles, so PREP has a party to pick from a COLD New Game. The real chain omits it -- the
+    # party persists.
     slots = chap['deployment']['deploy_slots']
     seed_rows = [_ally_unit_entry(leader, slot, dce, level, x, y,
-                                  ', '.join(CLASS_LOADOUT[ce]),
+                                  ', '.join(unit_items(campaign, uid)),
                                   ' /* %s -- ch05 boot party seed (armed; PREP re-picks) */' % uid)
                  for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     declare_unit_table(CH05_BOOT_SEED_TABLE, seed_rows,
@@ -1721,7 +1721,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         declare_unit_table(
             CH05_LUPIN_PROOF_TABLE,
             [_ally_unit_entry(leader, lslot, ldce, llevel, slots[0][0], slots[0][1],
-                              ', '.join(CLASS_LOADOUT[lce]),
+                              ', '.join(unit_items(campaign, _uid)),
                               ' /* Lupin -- --ch05-lupin proof/film ROM only */')],
             'ch05 --ch05-lupin: Lupin alone, LOADed before the opening branch so CHECK_ALIVE '
             'finds him and scene 4 plays its ALIVE arm')
@@ -1809,7 +1809,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
                                        CH04_MOOSE_MOV_TABLE, 'the white moose (ch05 scene 7)')
     bx, by = CH05_BASIL_GREEN_POS
     declare_unit_table(CH05_BASIL_TABLE, [_ally_unit_entry(
-        leader, basil[1], basil[3], basil[4], bx, by, ', '.join(CLASS_LOADOUT[basil[2]]),
+        leader, basil[1], basil[3], basil[4], bx, by, ', '.join(unit_items(campaign, basil[0])),
         ' /* basil -- green until the opening join beat CUSAs her blue (#25) */',
         allegiance=basil_faction)],
         'ch05 Basil: %s at the pocket mouth; the opening join makes her the escort'

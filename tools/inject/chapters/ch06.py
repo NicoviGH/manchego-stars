@@ -5,7 +5,7 @@ import os
 import re
 import sys
 
-from inject.cast import CLASS_LOADOUT, _classed_cast, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
+from inject.cast import unit_items, _classed_cast, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_SURVIVED_FLAGS, CH06_BOAT_TALK_FLAGS,
                                 CH06_BOAT_TALK_MSGS, CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
                                 CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
@@ -693,17 +693,17 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     #    the YAML's deploy_slots tiles, then redeploys the player's picks (cf. ch03/ch04/ch05).
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
     for uid, _slot, ce, _dce, _level in cast:
-        if ce not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (ch06 field roster %s)' % (ce, uid))
+        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch06')
     declare_unit_table(CH06_ALLY_TABLE, cap_rows,
                        'ch06 PREP deploy-cap template (never LOADed; the CAP is the parity)')
-    # --ch06-boot only: the field roster armed from CLASS_LOADOUT on the deploy tiles, so PREP
-    # has a party to pick from a COLD New Game. The real chain omits it -- the party persists.
+    # --ch06-boot only: the field roster armed from each unit file's inventory on the deploy
+    # tiles, so PREP has a party to pick from a COLD New Game. The real chain omits it -- the
+    # party persists.
     slots = chap['deployment']['deploy_slots']
     seed_rows = [_ally_unit_entry(leader, slot, dce, level, x, y,
-                                  ', '.join(CLASS_LOADOUT[ce]),
+                                  ', '.join(unit_items(campaign, uid)),
                                   ' /* %s -- ch06 boot party seed (armed; PREP re-picks) */' % uid)
                  for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     declare_unit_table(CH06_BOOT_SEED_TABLE, seed_rows,
@@ -719,7 +719,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     for n, (uid, (x, y)) in enumerate(sorted(gather_tiles.items())):
         declare_unit_table(CH06_MESSIE_AUDIENCE % n, [
             _ally_unit_entry(leader, by_uid[uid][1], by_uid[uid][3], by_uid[uid][4], x, y,
-                             ', '.join(CLASS_LOADOUT[by_uid[uid][2]]),
+                             ', '.join(unit_items(campaign, uid)),
                              ' /* %s -- on the shore when Messie surfaces */' % uid)],
             'ch06 %s around the centre island, for Messie on the ice (#26)' % uid)
 

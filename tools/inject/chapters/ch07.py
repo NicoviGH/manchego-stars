@@ -3,7 +3,7 @@
 import os
 import sys
 
-from inject.cast import CLASS_LOADOUT, _classed_cast, ENEMY_BASE_SLOT
+from inject.cast import unit_items, _classed_cast, ENEMY_BASE_SLOT
 from inject.chapter_frame import write_event_group
 from inject.chapter_ids import CH07_CHAPTER_YAML, CH07_GOAL_STATUS_MSG, CH07_GOAL_WINDOW_MSG
 from inject.class_ids import ChapterClassIds
@@ -91,15 +91,14 @@ def inject_ch07(campaign, boot=False, verbose=True):
     # 2. Rosters: the never-LOADed cap template PREP reads, the boot seed, and the line.
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
     for uid, _slot, ce, _dce, _level in cast:
-        if ce not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (ch07 field roster %s)' % (ce, uid))
+        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch07')
     declare_unit_table(CH07_ALLY_TABLE, cap_rows,
                        'ch07 PREP deploy-cap template (never LOADed; the CAP is the parity)')
     slots = chap['deployment']['deploy_slots']
     seed_rows = [_ally_unit_entry(leader, slot, dce, level, x, y,
-                                  ', '.join(CLASS_LOADOUT[ce]),
+                                  ', '.join(unit_items(campaign, uid)),
                                   ' /* %s -- ch07 boot party seed (armed; PREP re-picks) */' % uid)
                  for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     declare_unit_table(CH07_BOOT_SEED_TABLE, seed_rows,

@@ -36,13 +36,9 @@ PROLOGUE_REWRITTEN_GUEST_SLOTS = (PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PR
 PROLOGUE_LAYOUT = ('Ch00PrologueMap', 'ch00-prologue')  # (asset label, maps/ source stem)
 PROLOGUE_CHAPTER_YAML = 'ch00-prologue-a-dagger-of-ice.yaml'
 # The consumables a ch00 guest may carry. WEAPON_ITEM_ENUM is weapons-only (#53 seam rule).
-_GUEST_CONSUMABLES = {'vulnerary': 'ITEM_VULNERARY'}
-
-
 def guest_items_for(unit):
     """A guest's `.items` initialiser body, from its YAML inventory in order."""
-    return ', '.join(_GUEST_CONSUMABLES[i['id']] if i['id'] in _GUEST_CONSUMABLES
-                     else fe_item_enum(i) for i in unit.get('inventory') or ())
+    return ', '.join(fe_item_enum(i) for i in unit.get('inventory') or ())
 
 
 # Stand up the designed ch00 ("A Dagger of Ice") as the New Game target: register its

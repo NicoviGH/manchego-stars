@@ -293,19 +293,9 @@ def placed_entry(campaign, uid, unit, recruited):
 
 
 def _player_weapon(campaign, uid, unit, class_enum):
-    """The weapon a cast member actually fights with, read where the ROM reads it.
-
-    The unit YAML's `inventory:` where it has one. A recruit without one is armed by the ROM
-    elsewhere: a placed recruit by its placing entry, an off-map join by the join-LOAD's
-    `CLASS_LOADOUT` kit (ch05's join-LOAD, `inject.cast`). Reading only the YAML scored lupin
-    and sahnar as weaponless -- 0 kills/round for a Cavalier and a sword duelist."""
-    if unit.get('inventory'):
-        return _weapon_for(unit['inventory'])
-    entry = placed_entry(campaign, uid, unit,
-                         inject.hosting.recruit_chapter_number(campaign, unit))
-    if entry and entry.get('inventory'):
-        return _weapon_for(entry['inventory'])
-    return _weapon_from_item_enums(inject.cast.CLASS_LOADOUT.get(class_enum, ()))
+    """The weapon a cast member actually fights with: the first attacking item of its unit
+    file's `inventory:`, the kit every roster that LOADs it reads (`inject.cast.unit_items`)."""
+    return _weapon_for(unit.get('inventory'))
 
 
 def _player_lines(campaign, uid, gained):
@@ -517,7 +507,6 @@ VANILLA_ONLY_ITEM_TO_WEAPON = {
     'ITEM_ANIMA_ELFIRE':      'elfire',       # Ch13 Pablo (plain vanilla stats; the #8
                                               # effectiveness experiment stays reverted)
     'ITEM_LANCE_STEEL':       'steel-lance',
-    'ITEM_LANCE_SLIM':        'slim-lance',
     'ITEM_LANCE_SHORTSPEAR':  'short-spear',
     'ITEM_BOW_STEEL':         'steel-bow',
     'ITEM_SWORD_ZANBATO':     'zanbato',

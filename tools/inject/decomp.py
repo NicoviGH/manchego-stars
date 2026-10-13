@@ -35,6 +35,7 @@ WEAPON_ITEM_ENUM = {
     'iron-sword': 'ITEM_SWORD_IRON', 'steel-sword': 'ITEM_SWORD_STEEL',
     'rapier': 'ITEM_SWORD_RAPIER', 'iron-lance': 'ITEM_LANCE_IRON',
     'silver-lance': 'ITEM_LANCE_SILVER', 'javelin': 'ITEM_LANCE_JAVELIN',
+    'slim-lance': 'ITEM_LANCE_SLIM',
     'killing-edge': 'ITEM_SWORD_KILLER',
     'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
     'hand-axe': 'ITEM_AXE_HANDAXE', 'killer-axe': 'ITEM_AXE_KILLER',
@@ -42,10 +43,19 @@ WEAPON_ITEM_ENUM = {
 }
 
 
+# The cast's non-attacking kit: staves, consumables, keys. Kept apart from WEAPON_ITEM_ENUM
+# because difficulty inverts that one into the attacking-weapon model.
+OTHER_ITEM_ENUM = {
+    'heal': 'ITEM_STAFF_HEAL', 'vulnerary': 'ITEM_VULNERARY',
+    'lockpick': 'ITEM_LOCKPICK',
+}
+
+
 def fe_item_enum(inv_entry):
     """The vanilla ITEM_ enum for a YAML inventory entry -- its fe_base (flavor name over a
-    vanilla weapon) if present, else its id (a plain vanilla weapon)."""
-    return WEAPON_ITEM_ENUM[inv_entry.get('fe_base') or inv_entry['id']]
+    vanilla item) if present, else its id (a plain vanilla item)."""
+    key = inv_entry.get('fe_base') or inv_entry['id']
+    return WEAPON_ITEM_ENUM.get(key) or OTHER_ITEM_ENUM[key]
 
 
 def _find_brace_block(text, marker, path):

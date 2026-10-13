@@ -111,7 +111,6 @@ inventory:
   - id: goodberry
     name: "Goodberry"          # reflavored Vulnerary (consumable)
     fe_base: vulnerary
-    uses: 3
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Marty the Merry Mushroom is a stock FE8 Shaman -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

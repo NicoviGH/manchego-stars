@@ -24,5 +24,8 @@ neither chapter could lock.
 A force that drifts, or a party that falls further behind, still fails the gate. The row and the
 chapter report name the decision (`[accepted ADR 0042]`).
 
-ch01 (party x1.4078) and ch02 (x1.4081) carry a ceiling of 1.41, the figure Nicolas accepted.
+ch01 (party x1.4078) carries a ceiling of 1.41, the figure Nicolas accepted. ch02 carries 1.43
+(party x1.4216): once the gate read the kit the ROM fields (#486), Pinky fights with Vanessa's
+Slim Lance rather than the Iron Lance his file had claimed, and Nicolas re-pinned the ceiling to
+match (2026-10-13).
 **With them, ch00-ch06 are all `balance_locked`, and #430 step 6 is done.**

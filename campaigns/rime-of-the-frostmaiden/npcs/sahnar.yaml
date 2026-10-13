@@ -37,7 +37,7 @@ dnd:
 # (Druid/Shaman) was the alt but we're already magic-rich, so sword is the coverage win.
 fe_stats:
   class: myrmidon
-  level: 1
+  level: 5                      # Joshua joins Ch5 at L5 (UnitDef_088B5914); ch05 places her there
   # Vanilla FE8 Myrmidon stats, verbatim from data_classes.c [CLASS_MYRMIDON - 1].
   HP: 16
   STR: 4
@@ -65,6 +65,13 @@ growth_rates:
 promotion:
   branch: [swordmaster, assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
   default: swordmaster
+
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
+  - id: killing-edge
+    name: "Killing Edge"
+    fe_base: killing-edge           # Joshua's whole Ch5 kit (UnitDef_088B5914: Killing Edge alone)
+    fe_weapon_type: Sword
+    damage_type: slashing           # cosmetic flavor label only
 
 recruited_via: "story — talked down by Basil after Ravisin summons her (Ch5)"
 recruit:

@@ -16,7 +16,7 @@ from inject.chapter_ids import (
     CH06_MESSIE_PID,
     PROLOGUE_SEPHEK_SLOT)
 from inject.class_ids import DEFAULT_CAMPAIGN, vanilla_class_enum, vanilla_class_enums
-from inject.decomp import REPO
+from inject.decomp import fe_item_enum, REPO
 from inject.hosting import _load_chapter_yaml, recruit_chapter_number
 from inject.text import display_name
 
@@ -175,27 +175,19 @@ def deploy_class_for(unit):
 # All edits are restorable build artifacts (PATCHED_DECOMP_FILES). Authored chapters
 # (real maps/events/objectives from YAML) supersede this whole step.
 
-# Stock starting loadout per class enum (vanilla ITEM_ ids; see constants/items.h).
-CLASS_LOADOUT = {
-    'CLASS_PIRATE':         ['ITEM_AXE_IRON', 'ITEM_AXE_HANDAXE', 'ITEM_VULNERARY'],
-    'CLASS_SHAMAN':         ['ITEM_DARK_FLUX', 'ITEM_VULNERARY'],
-    'CLASS_ARCHER':         ['ITEM_BOW_IRON', 'ITEM_VULNERARY'],
-    'CLASS_MAGE':           ['ITEM_ANIMA_FIRE', 'ITEM_VULNERARY'],
-    'CLASS_PRIEST':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],
-    'CLASS_CLERIC':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],  # Basil: same kit as the
-                                                                    # other healer; the classes
-                                                                    # differ by promotion tree
-                                                                    # and bases, not by weapon
-                                                                    # (both are STAFF-only at D)
-    'CLASS_ARMOR_KNIGHT':   ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'],
-    'CLASS_PEGASUS_KNIGHT': ['ITEM_LANCE_SLIM', 'ITEM_LANCE_JAVELIN', 'ITEM_VULNERARY'],
-    'CLASS_THIEF':          ['ITEM_SWORD_IRON', 'ITEM_DOORKEY', 'ITEM_CHESTKEY',
-                             'ITEM_VULNERARY'],  # Trex: the utility kit for the look-test
-    'CLASS_CAVALIER':       ['ITEM_SWORD_IRON', 'ITEM_LANCE_IRON', 'ITEM_VULNERARY'],  # Baxby (mount)
-    # Sahnar: sword-locked, and the Killing Edge is the point of her -- the crit threat is the
-    # identity, so the look-test bench has to be able to show a crit (FE8 calls it SWORD_KILLER).
-    'CLASS_MYRMIDON':       ['ITEM_SWORD_IRON', 'ITEM_SWORD_KILLER', 'ITEM_VULNERARY'],
-}
+def unit_items(campaign, unit_id):
+    """The ITEM_ enums a cast member fields, in slot order: its unit file's `inventory:`.
+
+    One home for the kit (#486): every roster that LOADs the unit -- its join, a boot party
+    seed, a bench -- reads it here. Promotion-gated (`unlock:`) and story-only entries are
+    design notes, not items the ROM fields, so they are skipped."""
+    unit = load_unit(campaign, unit_id)
+    items = [fe_item_enum(i) for i in unit.get('inventory') or ()
+             if not i.get('unlock') and not i.get('story_only')]
+    if not items:
+        sys.exit('ERROR: %s has no fieldable inventory: (its unit file is the kit\'s home)'
+                 % unit_id)
+    return items
 
 
 def classed_cast(campaign):

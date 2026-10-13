@@ -64,6 +64,21 @@ promotion:
   branch: [paladin, great-knight]   # vanilla FE8 Cavalier branch (classchg-data.c [CLASS_CAVALIER])
   default: paladin
 
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
+  - id: iron-sword
+    name: "Iron Sword"
+    fe_base: iron-sword
+    fe_weapon_type: Sword
+    damage_type: slashing           # cosmetic flavor label only
+  - id: iron-lance
+    name: "Iron Lance"
+    fe_base: iron-lance
+    fe_weapon_type: Lance
+    damage_type: piercing           # cosmetic flavor label only
+  - id: vulnerary
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
+    fe_base: vulnerary
+
 recruited_via: "story — Marty talks the direwolf pack into the sled team (Ch4)"
 recruit:
   chapter: ch04-the-white-moose
