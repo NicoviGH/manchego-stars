@@ -90,23 +90,17 @@ growth_rates:
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
 # Wolfram's personal-weapon flavor (Warhammer) is parked in lore/wolfram.md as a POST-MVP item;
-# his fire/forge identity rides on the sprite art. Javelin gives the armored unit its ranged option.
-inventory:
+# his fire/forge identity rides on the sprite art.
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
   - id: iron-lance
     name: "Iron Lance"
-    fe_base: iron-lance             # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses); no custom tuning
-    fe_weapon_type: Lance           # FE Knight weapon class (baseRanks ITYPE_LANCE)
-    damage_type: piercing           # cosmetic flavor label only
-  - id: javelin
-    name: "Javelin"
-    fe_base: javelin                # 1–2 range thrown lance; vanilla stats (the armored unit's ranged option)
+    fe_base: iron-lance
     fe_weapon_type: Lance
-    range: 2
-    damage_type: bludgeoning        # cosmetic flavor label only
+    damage_type: piercing           # cosmetic flavor label only
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 2
+
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Wolfram is a stock FE8 Knight -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

@@ -58,17 +58,20 @@ promotion:
   branch: [rogue, assassin]  # vanilla FE8 Thief branch (classchg-data.c [CLASS_THIEF])
   default: rogue
 
-# ── Inventory — the FIGHTING kit (an iron sword: a Thief fights, weakly, like vanilla Colm).
-#    This is what difficulty.py reads (_weapon_for) to model him as a combatant; without it he
-#    resolved to the staff/support path (0 throughput) as if a healer. The steal/unlock utility
-#    (door + chest keys + vulnerary) rides the DEPLOY loadout CLASS_LOADOUT['CLASS_THIEF'], not
-#    the combat model. fe_base = vanilla FE8 stats (Mt/Hit/Crit/Wt), no custom tuning.
-inventory:
+# ── Inventory — vanilla Colm's Ch3 join kit. Every roster that LOADs him reads it, and
+#    difficulty.py models him off its first weapon (the iron sword). fe_base = vanilla FE8 stats.
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
   - id: iron-sword
     name: "Iron Sword"
     fe_base: iron-sword
     fe_weapon_type: Sword
     damage_type: slashing           # cosmetic flavor label only
+  - id: lockpick
+    name: "Lockpick"
+    fe_base: lockpick             # Colm's own Ch3 kit (UnitDef: Iron Sword, Lockpick, Vulnerary)
+  - id: vulnerary
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
+    fe_base: vulnerary
 
 recruited_via: "story — joins after the Termalaine mine (Ch3)"
 recruit:

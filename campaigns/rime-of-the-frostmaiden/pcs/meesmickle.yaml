@@ -102,7 +102,6 @@ inventory:
   - id: goodberry
     name: "Goodberry"         # reflavored Vulnerary (party-wide name; her "blood-dark draught")
     fe_base: vulnerary
-    uses: 3
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Meesmickle is a stock FE8 Shaman -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

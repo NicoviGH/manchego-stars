@@ -81,15 +81,20 @@ growth_rates:
 
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
 # Stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
-inventory:
-  - id: iron-lance
-    name: "Iron Lance"
-    fe_base: iron-lance                   # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses)
-    fe_weapon_type: Lance                 # FE Pegasus Knight weapon class (baseRanks ITYPE_LANCE, D)
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
+  - id: slim-lance
+    name: "Slim Lance"
+    fe_base: slim-lance
+    fe_weapon_type: Lance
+    # light lance; vanilla stats
+  - id: javelin
+    name: "Javelin"
+    fe_base: javelin
+    fe_weapon_type: Lance
+    range: 2                      # 1-2 range thrown lance; vanilla stats
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 3
 
 # ── Battle Animation ──────────────────────────────────────────────────────────
 # Pinky is the army's flier, and a flier's hover-and-swoop can't be faked from 3 static

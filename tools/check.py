@@ -88,6 +88,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 DEAD_CONCEPTS = [
     # retired by #486: a unit's class is a vanilla token resolved like an enemy's, no display map
     r'CLASS_MAP',
+    # retired by #486: a cast member's kit lives in its unit file's inventory, read by unit_items
+    r'CLASS_LOADOUT',
     # retired by #459: the roster keeps vanilla's recruit cadence, not a fixed pool (ADR 0342)
     r'16–18 (?:pool|roster|units)',
     # retired by #479: a wave lands by `arrives_turn` inside `enemy_units`, the one spelling

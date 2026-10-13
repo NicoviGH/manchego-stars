@@ -4,7 +4,7 @@ import os
 import sys
 
 from inject.raw_pids import enemy_pid_for
-from inject.cast import _classed_cast, char_symbol, CLASS_LOADOUT, PORTRAIT_MAP
+from inject.cast import _classed_cast, char_symbol, unit_items, PORTRAIT_MAP
 from inject.chapter_ids import (
     CH04_ENDING_MSG, CH04_ENDING_NO_LUPIN_MSG, CH04_GOAL_STATUS_MSG, CH04_GOAL_WINDOW_MSG,
     CH04_LUPIN_TALK_MSG, CH04_MOOSE_MOV_TABLE, CH04_MOOSE_MSG, CH04_MOOSE_PID, CH04_NIMSY_FID,
@@ -266,7 +266,7 @@ def _ch04_wave_pack_kit(chap, wave):
     return cls, ai, ', '.join(items) or '0'
 
 
-def ch04_turn2_reveal_rows(chap, lupin):
+def ch04_turn2_reveal_rows(campaign, chap, lupin):
     """The turn-2 wolf-pack reveal wave: the convertible Mauthe Doog pack with its LEADER tile
     reassigned to Lupin (red, his CHARACTER_ slot pid, Cavalier under the hood). 5 generic
     Mauthe Doogs + Lupin = 6 -- holds the turn-2 parity count (enemy_rows still reports 6
@@ -287,7 +287,7 @@ def ch04_turn2_reveal_rows(chap, lupin):
     _uid, slot, class_enum, deploy_class, level = lupin
     lupin_row = _enemy_unit_entry(
         char_symbol(slot), deploy_class, level, False,
-        leader_pos[0], leader_pos[1], ', '.join(CLASS_LOADOUT[class_enum]),
+        leader_pos[0], leader_pos[1], ', '.join(unit_items(campaign, _uid)),
         ai,
         ' /* lupin -- hostile pack leader (red; Marty parleys him blue) */')
     generics = [_enemy_unit_entry(
@@ -428,15 +428,14 @@ def inject_ch04(campaign, boot=False, verbose=True):
 
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
     for uid, _slot, ce, _dce, _level in cast:
-        if ce not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (ch04 field roster %s)' % (ce, uid))
+        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch04')
     ally = '{\n' + '\n'.join(cap_rows) + '\n    { 0 },\n}'
 
     slots = chap['deployment']['deploy_slots']
     seed_rows = [_ally_unit_entry(
-        leader, slot, dce, level, x, y, ', '.join(CLASS_LOADOUT[ce]),
+        leader, slot, dce, level, x, y, ', '.join(unit_items(campaign, uid)),
         ' /* %s -- ch04 boot party seed (armed; PREP re-picks) */' % uid)
         for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     seed = '{\n' + '\n'.join(seed_rows) + '\n    { 0 },\n}'
@@ -448,7 +447,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # enemy_rows still reports 6 for the difficulty read (parity held); the split is here.
     lupin = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
                  if r[0] == 'lupin')
-    turn2_rows = ch04_turn2_reveal_rows(chap, lupin)
+    turn2_rows = ch04_turn2_reveal_rows(campaign, chap, lupin)
     turn2_wave = enemy_rows(chap, CH04_CLASS_IDS, enemy_pid_for('ch04'), arrives_turn=2)
     if [len(initial_rows), len(turn2_wave), len(turn3_rows)] != [10, 6, 7]:
         sys.exit('ERROR: ch04 realigned roster must stay 10 line + 6 turn-2 reveal + 7 turn-3')

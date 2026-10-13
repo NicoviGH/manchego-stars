@@ -1420,11 +1420,11 @@ class PlayerArrivesLeveled(unittest.TestCase):
         self.assertEqual(out['baseHP'], 23)
 
     def test_a_placed_recruit_fights_with_its_placing_entrys_weapon(self):
-        # sahnar's unit YAML carries no inventory; ch05 places her with the Killing Edge.
+        # sahnar joins with Joshua's kit, the Killing Edge alone (her unit file).
         self.assertEqual(df.player_combatant(CAMPAIGN, 'sahnar').weapon.name, 'killing-edge')
 
     def test_an_off_map_join_fights_with_its_join_load_kit(self):
-        # lupin joins off-map; the join-LOAD arms him from CLASS_LOADOUT, a sword first.
+        # lupin joins off-map; the join-LOAD arms him from his unit file, a sword first.
         self.assertEqual(df.player_combatant(CAMPAIGN, 'lupin').weapon.name, 'iron-sword')
 
     def test_the_leveled_field_is_who_has_joined_at_the_level_they_arrive(self):
