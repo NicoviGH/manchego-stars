@@ -1686,8 +1686,6 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # 2. Rosters. The cap template is NEVER LOADed -- PREP reads its entry count (the cap)
     #    and the YAML's deploy_slots tiles, then redeploys the player's picks (cf. ch03/ch04).
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
-    for uid, _slot, ce, _dce, _level in cast:
-        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch05')
     declare_unit_table(CH05_ALLY_TABLE, cap_rows,

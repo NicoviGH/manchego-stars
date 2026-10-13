@@ -292,10 +292,11 @@ def placed_entry(campaign, uid, unit, recruited):
                 None)
 
 
-def _player_weapon(campaign, uid, unit, class_enum):
-    """The weapon a cast member actually fights with: the first attacking item of its unit
-    file's `inventory:`, the kit every roster that LOADs it reads (`inject.cast.unit_items`)."""
-    return _weapon_for(unit.get('inventory'))
+def _player_weapon(campaign, uid):
+    """The weapon a cast member actually fights with: the first attacking item of the kit every
+    roster that LOADs it reads (`inject.cast.unit_items`), so the gate and the ROM share one
+    filter."""
+    return _weapon_from_item_enums(inject.cast.unit_items(campaign, uid))
 
 
 def _player_lines(campaign, uid, gained):
@@ -313,7 +314,7 @@ def _player_lines(campaign, uid, gained):
         growths, _ = inject.stats.donor_growths_and_ranks(
             _characters_text(), inject.stats.GROWTH_DONOR[uid])
         lines = careers(eff, growths, gained, _class_caps(class_enum))
-    weapon = _player_weapon(campaign, uid, unit, class_enum)
+    weapon = _player_weapon(campaign, uid)
     return lines, weapon, CLASS_TAGS.get(class_enum, frozenset())
 
 

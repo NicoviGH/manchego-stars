@@ -223,8 +223,6 @@ def inject_ch03(campaign, boot=False, verbose=True):
     #    - UnitDef_088B4A80: the 10 enemies (vanilla Ch3 parity) -- grell on the vanilla ch4
     #      boss slot, the kobolds/svirfneblin on the generic autolevelled slot.
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
-    for uid, _s, ce, _d, _l in cast:
-        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch03')
     ally = '{\n' + '\n'.join(cap_rows) + '\n    { 0 },\n}'

@@ -344,8 +344,6 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # available_at=1: the founding party on the field at ch01 -- later recruits (Baxby ch01
     # via market -> ch02 prep; Trex ch03) are not in the ch01 join-LOAD / lord-select / world map.
     cast, cast_names = _classed_cast(campaign, available_at=chap['chapter_number'])
-    for unit_id, _, class_enum, _, _ in cast:
-        unit_items(campaign, unit_id)   # fails fast on a unit file with no kit
     if len(cast) > len(LORDSEL_CONFIRM_MSGS):
         sys.exit('ERROR: %d lord candidates > %d reserved confirm text ids'
                  % (len(cast), len(LORDSEL_CONFIRM_MSGS)))
