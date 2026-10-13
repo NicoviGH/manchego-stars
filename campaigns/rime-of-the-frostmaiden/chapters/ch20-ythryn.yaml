@@ -1,6 +1,7 @@
 # ch20 — Ythryn (the finale). PLANNED (#486): a seed, not authoritative.
 id: ch20-ythryn
 title: "Ythryn"
+location: "Ythryn, beneath the Reghed Glacier"
 chapter_number: 20
 status: planned
 milestone: M4
@@ -27,7 +28,6 @@ design_notes: >
   Built like vanilla's two-part Final: the corrupted enemy first, then the god in the Demon
   King's place. Both maps iced (Nicolas).
 plan:
-  location: "Ythryn, beneath the Reghed Glacier"
   story: >
     The Rime breaks. The epilogue carries Pinky's Wish, a happy-ending beat (Nicolas,
     2026-10-12).

@@ -1,6 +1,7 @@
 # ch10 — The Dark Duchess. PLANNED (#486): a seed, not authoritative.
 id: ch10-the-dark-duchess
 title: "The Dark Duchess"
+location: "The Dark Duchess, a Luskan pirate ship frozen in the Sea of Moving Ice"
 chapter_number: 10
 status: planned
 milestone: M4
@@ -30,7 +31,6 @@ design_notes: >
   the ships on turn 3, and a third ship arrives on turn 5. No ballistae (Nicolas: they belong
   on a map built for them). The book's crew is undead, and our skeletons are already vendored.
 plan:
-  location: "The Dark Duchess, a Luskan pirate ship frozen in the Sea of Moving Ice"
   story: >
     The table's frozen-wreck chapter, on the book's own wreck: the Dark Duchess, where the
     White Wyrm Arveiaturace keeps part of her hoard (Rime p.127). String Cheese is RBG's

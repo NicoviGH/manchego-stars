@@ -1,6 +1,7 @@
 # ch15 — Easthaven Burns. PLANNED (#486): a seed, not authoritative.
 id: ch15-easthaven-burns
 title: "Easthaven Burns"
+location: "Easthaven"
 chapter_number: 15
 status: planned
 milestone: M4
@@ -29,7 +30,6 @@ design_notes: >
   Two Faces map stands in for a burning town; the dragon is a Draco Zombie reskin (FE8's dragon
   class, used in Darkling Woods and the Final). Two Faces' own boss is a Gorgon, not a dragon.
 plan:
-  location: "Easthaven"
   story: >
     FE8's "too late" slot. Sephek's return is ours (the table never played it): FE8 has a
     returning villain, so we do too (Nicolas, 2026-10-12; ADR 0166's two-boss venue).

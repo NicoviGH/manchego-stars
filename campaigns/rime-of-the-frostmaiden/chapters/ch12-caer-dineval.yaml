@@ -1,6 +1,7 @@
 # ch12 — Caer-Dineval. PLANNED (#486): a seed, not authoritative.
 id: ch12-caer-dineval
 title: "Caer-Dineval"
+location: "Caer-Dineval, on Lac Dinneshere"
 chapter_number: 12
 status: planned
 milestone: M4
@@ -30,7 +31,6 @@ design_notes: >
   Village of Silence's shape: rescue someone hidden from monsters, then a lore reveal in a
   sanctuary. Kelvin's Cairn looms over the town (Rime p.39), so a mountain map fits.
 plan:
-  location: "Caer-Dineval, on Lac Dinneshere"
   story: >
     It gives the party the destination and the stakes (a dragon, and where it is built), the
     first Speaker on their side, and the opposite of their Bremen coup: freeing a Speaker from

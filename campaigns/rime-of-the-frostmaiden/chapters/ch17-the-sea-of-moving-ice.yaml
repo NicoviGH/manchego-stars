@@ -1,6 +1,7 @@
 # ch17 — The Sea of Moving Ice. PLANNED (#486): a seed, not authoritative.
 id: ch17-the-sea-of-moving-ice
 title: "The Sea of Moving Ice"
+location: "The Sea of Moving Ice"
 chapter_number: 17
 status: planned
 milestone: M4
@@ -29,7 +30,6 @@ design_notes: >
   through Lyon. Its play is protecting fleeing civilians at a river while the possessed friend
   escapes; ours is protecting the crew while Auril's servants attack the crossing.
 plan:
-  location: "The Sea of Moving Ice"
   story: >
     The true enemy shows her face. Taking back the beasts' minds was rejected (Nicolas,
     2026-10-12), so the chapter still needs its beat.

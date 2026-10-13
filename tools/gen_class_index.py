@@ -29,6 +29,14 @@ def squish(s):
     return re.sub(r'\s+', ' ', str(s if s is not None else '')).strip()
 
 
+def class_label(token):
+    """A vanilla class token as the game spells it: 'armor-knight' -> 'Armor Knight'. Tokens are
+    vanilla's own enum names lower-cased (inject.class_ids.vanilla_class_enum), so title-casing
+    them gives the in-game name for every class we field, with no decomp read (this index is
+    regenerated on CI's checks job, which has no submodule)."""
+    return ' '.join(w.capitalize() for w in str(token).replace('_', '-').split('-'))
+
+
 def promotion_cell(promo):
     """"**Default** / Other / Other" from promotion.branch + promotion.default."""
     if not promo:
@@ -41,13 +49,13 @@ def promotion_cell(promo):
     for c in [default] + list(branch):
         if c is not None and c not in ordered:
             ordered.append(c)
-    return ' / '.join('**%s**' % c if i == 0 and default else c
+    return ' / '.join('**%s**' % class_label(c) if i == 0 and default else class_label(c)
                       for i, c in enumerate(ordered))
 
 
 def fe_base(unit):
     cls = (unit.get('fe_stats') or {}).get('class')
-    return 'TBD (post-MVP)' if cls is None or not str(cls).strip() else cls
+    return 'TBD (post-MVP)' if cls is None or not str(cls).strip() else class_label(cls)
 
 
 def dnd_source(unit):

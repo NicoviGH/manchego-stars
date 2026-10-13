@@ -83,7 +83,7 @@ dnd:
 # No D&D-derived tuning. FE has a single Pow stat (= STR here). LCK: ClassData defines no
 # base luck (it is a character-layer stat) — set 0 until personal luck is assigned deliberately.
 fe_stats:
-  class: Pirate
+  class: pirate
   level: 1
   HP: 19
   STR: 4                            # FE Pow (Pirate basePow)
@@ -97,8 +97,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [Warrior, Berserker]      # vanilla Pirate branch (classchg-data.c [CLASS_PIRATE])
-  default: Berserker                # thematic lean; player may pick either.
+  branch: [warrior, berserker]      # vanilla Pirate branch (classchg-data.c [CLASS_PIRATE])
+  default: berserker                # thematic lean; player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Pirate growths from data_classes.c ──────
 growth_rates:

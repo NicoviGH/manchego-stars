@@ -51,7 +51,7 @@ art:
 # (ClassData defines no base luck — a character-layer stat) until personal luck is assigned.
 # This is the army's flier role (lance flier; promotes to Falcon Knight).
 fe_stats:
-  class: "Pegasus Knight"
+  class: pegasus-knight
   level: 1
   HP: 14
   STR: 4                                  # FE Pow (Pegasus Knight basePow)
@@ -65,8 +65,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: ["Falcon Knight", "Wyvern Knight"]   # vanilla Pegasus Knight branch (classchg-data.c)
-  default: "Falcon Knight"                      # thematic lean; player may pick either.
+  branch: [falcon-knight, wyvern-knight]   # vanilla Pegasus Knight branch (classchg-data.c)
+  default: falcon-knight                      # thematic lean; player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Pegasus Knight growths from data_classes.c ──
 growth_rates:

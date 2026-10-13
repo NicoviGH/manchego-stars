@@ -9,6 +9,7 @@
 
 id: ch05-the-elven-tomb
 title: "The Elven Tomb"
+location: "The elven tomb beyond Lonelywood"
 chapter_number: 5
 status: active                 # the slice is reached: roster/levels re-grounded against vanilla Ch5
                                # and the party (`make difficulty CH=ch05` = PARITY), dialogue LOCKED
@@ -259,6 +260,7 @@ enemy_units:
   # ch04's cottage: on a 1:1 retile the placement is vanilla's, not ours — which is also what
   # keeps `make difficulty CH=ch05` measuring the twin it claims to.
   - id: ravisin
+    face: ravisin                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Ravisin"
     is_boss: true
     count: 1
@@ -659,6 +661,7 @@ enemy_units:
   # Ravisin arm the weapon in scene 3 (`vanilla 0x9BD`) and then have to deal with it.
   # DECIDED 2026-08-14 (Nicolas, #25). The eruption keeps its six reinforcements without her.
   - id: sahnar
+    face: sahnar                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Sahnar"
     count: 1
     class: myrmidon             # Joshua's exact class/donor — a fast, crit-threat sword duelist

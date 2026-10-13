@@ -1,6 +1,7 @@
 # ch18 — Grimskalle. PLANNED (#486): a seed, not authoritative.
 id: ch18-grimskalle
 title: "Grimskalle"
+location: "Grimskalle, on the Island of Solstice"
 chapter_number: 18
 status: planned
 milestone: M4
@@ -28,7 +29,6 @@ design_notes: >
   The four Tests of the Frostmaiden can be the gimmick. Two Faces of Evil's own map went to
   ch15, so Grimskalle needs another; Father and Son's keep is the proposal.
 plan:
-  location: "Grimskalle, on the Island of Solstice"
   story: >
     The bundle's fix: Auril is away casting the Rime, so she is not fought here (DM bundle
     p.51), and the Codicil gives up her weakness (ADR 0332's late source with real access).

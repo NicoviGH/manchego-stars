@@ -36,7 +36,7 @@ dnd:
 # + promos, but no Joshua-style duelist). The elegant moon-elf blade fits; undead-magic
 # (Druid/Shaman) was the alt but we're already magic-rich, so sword is the coverage win.
 fe_stats:
-  class: Myrmidon
+  class: myrmidon
   level: 1
   # Vanilla FE8 Myrmidon stats, verbatim from data_classes.c [CLASS_MYRMIDON - 1].
   HP: 16
@@ -63,8 +63,8 @@ growth_rates:
   LCK: 30
 
 promotion:
-  branch: [Swordmaster, Assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
-  default: Swordmaster
+  branch: [swordmaster, assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
+  default: swordmaster
 
 recruited_via: "story — talked down by Basil after Ravisin summons her (Ch5)"
 recruit:

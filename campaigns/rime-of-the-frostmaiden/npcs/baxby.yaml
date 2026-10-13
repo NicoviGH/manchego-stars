@@ -41,7 +41,7 @@ donor:
 # Authored FE-style (no 5e conversion). Sword + Lance mount; beak/claws are flavor on a
 # vanilla lance/sword (the weapon TYPE drives the triangle, the bird look rides the art).
 fe_stats:
-  class: Cavalier
+  class: cavalier
   level: 1
   HP: 20
   STR: 5
@@ -65,8 +65,8 @@ growth_rates:
 
 # ── Promotion (FE8 branched Cavalier) ─────────────────────────────────────────
 promotion:
-  branch: [Paladin, "Great Knight"]   # vanilla Cavalier branch (classchg-data.c [CLASS_CAVALIER])
-  default: Paladin
+  branch: [paladin, great-knight]   # vanilla Cavalier branch (classchg-data.c [CLASS_CAVALIER])
+  default: paladin
 
 # ── Inventory (joins with stock gear) ─────────────────────────────────────────
 inventory:

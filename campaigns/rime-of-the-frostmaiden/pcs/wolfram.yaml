@@ -59,7 +59,7 @@ dnd:
 # No D&D-derived tuning. FE Knight is a pure-Lance physical unit: single Pow stat (= STR), no MAG.
 # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
 fe_stats:
-  class: Knight              # FE8 Armor Knight (display name "Knight")
+  class: armor-knight              # FE8 Armor Knight
   level: 1
   HP: 17
   STR: 5                          # FE Pow (Armor Knight basePow)
@@ -73,8 +73,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [General, "Great Knight"]   # vanilla Armor Knight branch (classchg-data.c [CLASS_ARMOR_KNIGHT])
-  default: General                    # thematic lean; player may pick either.
+  branch: [general, great-knight]   # vanilla Armor Knight branch (classchg-data.c [CLASS_ARMOR_KNIGHT])
+  default: general                    # thematic lean; player may pick either.
 
 # ── Growth Rates (% per level) — vanilla Armor Knight growths from data_classes.c ──
 growth_rates:

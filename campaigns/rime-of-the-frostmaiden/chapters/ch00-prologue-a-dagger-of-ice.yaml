@@ -10,6 +10,7 @@
 
 id: ch00-prologue-a-dagger-of-ice
 title: "A Dagger of Ice"
+location: "A snowbound mountain pass on Torg's caravan route"
 chapter_number: 0
 status: active                 # built / in-progress slice; combat data is grounded + authoritative
 milestone: M3
@@ -124,6 +125,7 @@ difficulty_note: >
 player_units:
   # Hlin = the FRAIL must-survive lead (our "lord" / Eirika-analog). Book p.22: old & frail.
   - id: hlin-trollbane
+    face: hlin-trollbane                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Hlin Trollbane"
     fe_name: "Hlin"              # FE8 name buffer is 12 chars; "Hlin Trollbane" (14) overflows
     class: fighter               # old dwarf bounty hunter, handaxe, past her prime — UNPROMOTED & frail (Eirika-analog lead; only Scramsax the "Jeigan" is a Seth-justified prepromote). Female Fighter map sprite (community repo) so she reads as a woman
@@ -145,6 +147,7 @@ player_units:
       hand_pass: "portraits/guest_vendor_busts.py — silver-hair age recolor + 18->16 color merge"
   # Scramsax = the STRONG Jagen (our Seth-analog) who protects Hlin and does the killing.
   - id: scramsax
+    face: scramsax                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Scramsax"
     class: hero                  # retired sellsword, a real veteran (book p.33); promoted, strong
     is_npc: true                 # The Northlook's proprietor; the cold-open's "Jeigan"
@@ -167,6 +170,7 @@ player_units:
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
   - id: sephek-kaltro
+    face: sephek-kaltro                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Sephek Kaltro"
     fe_name: "Sephek"           # FE8 name buffer is 12 chars; "Sephek Kaltro" (13) overflows
     is_boss: true

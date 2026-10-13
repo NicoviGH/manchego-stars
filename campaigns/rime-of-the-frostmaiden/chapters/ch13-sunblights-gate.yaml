@@ -1,6 +1,7 @@
 # ch13 — Sunblight's Gate. PLANNED (#486): a seed, not authoritative.
 id: ch13-sunblights-gate
 title: "Sunblight's Gate"
+location: "The approach to Sunblight, in the Spine of the World"
 chapter_number: 13
 status: planned
 milestone: M4
@@ -31,7 +32,6 @@ design_notes: >
   seize; ch13 keeps Hamill's objective on Renvall's map: Durth holds the castle while patrols
   close in from behind. A map built with ballistae, so Pepperjack and Brie debut here.
 plan:
-  location: "The approach to Sunblight, in the Spine of the World"
   story: >
     Pays off ch11 (the son who fled comes back) and puts a clock on ch14 (the dragon is nearly
     ready).

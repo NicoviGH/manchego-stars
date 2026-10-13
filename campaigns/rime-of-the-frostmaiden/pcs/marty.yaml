@@ -54,7 +54,7 @@ dnd:
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
 # Adjust during Phase 1 playtesting.
 fe_stats:
-  class: Shaman              # FE base class — Dark mage. Marty's D&D Druid maps to Shaman→Druid
+  class: shaman              # FE base class — Dark mage. Marty's D&D Druid maps to Shaman→Druid
                              # (FE8 has a real Druid class, reachable only via Shaman). Differentiates
                              # from Meesmickle at PROMOTION (Marty leans Druid; Meesmickle leans Summoner),
                              # not at base. See docs/decisions.md §Class Mapping & Promotions.
@@ -74,8 +74,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [Druid, Summoner]  # vanilla Shaman branch (classchg-data.c [CLASS_SHAMAN])
-  default: Druid             # thematic lean (Marty = D&D Druid); player may pick either.
+  branch: [druid, summoner]  # vanilla Shaman branch (classchg-data.c [CLASS_SHAMAN])
+  default: druid             # thematic lean (Marty = D&D Druid); player may pick either.
   # Summoner grants the vanilla FE8 Summon command (CA_SUMMON) — a stock class feature, not a
   # custom ability — so the "summon creatures" fantasy is reachable the FE-pure way if chosen.
 

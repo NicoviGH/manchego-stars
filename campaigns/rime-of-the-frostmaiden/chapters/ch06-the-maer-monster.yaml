@@ -5,6 +5,7 @@
 
 id: ch06-the-maer-monster
 title: "The Maer Monster"
+location: "Maer Dualdon, off Bremen"
 chapter_number: 6
 status: active                 # the slice is reached: roster/levels/AI re-grounded against vanilla
                                # Ch6 unit by unit (#334), the map is painted and compiled (#331),
@@ -743,6 +744,7 @@ enemy_units:
   # vanilla Ch6 puts its difficulty in the hostage clock, not the boss. No personal: block
   # -- ch06 has no injector yet, and #284 requires every declared line to have a route.
   - id: nerra
+    face: nerra                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Nerra"
     fe_name: "Nerra"
     is_boss: true
