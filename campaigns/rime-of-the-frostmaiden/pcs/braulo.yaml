@@ -18,6 +18,7 @@ art:
     flip_h: true               # mirror to FE8-canonical screen-left facing
     ref: "References/PCs/BrauloFLAT.png"   # flat ref (downscales crisper)
     crop: [20, 120, 2028, 1793]    # ref pixels, ~1.2 aspect — whole subject
+    matte: "4c1b21"   # outline colour painted over the keyed bg before the downscale: no light edge halo
     zoom: 0.95                     # as big as the shoulders allow without a flat chop at the sides (Nicolas, 2026-10-10)
     flatten: 9                     # painted ref: flat tones instead of speckle
     hand_pass: null

@@ -26,6 +26,8 @@ Usage:
       --bg-thresh d   RGB distance from the border colour treated as background.
       --matte rrggbb  paint the keyed background this colour (the outline's) before
                       the downscale, so a light background cannot halo the edge.
+                      Every ref-pipeline bust ships matted (2026-10-13): pngquant re-picks
+                      the palette, so interior tones shift a little too -- compare by eye.
       --preview big   also write a 3x nearest-neighbour preview.
 
 The --crop box is per-character framing; aim for ~96:80 (1.2) aspect.

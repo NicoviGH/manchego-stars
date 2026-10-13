@@ -17,6 +17,7 @@ art:
   render:                     # exact reproduction of the shipped bust (tools/ref_to_bust.py)
     ref: "References/PCs/MartyFlat.png"   # flat/bold cel ref — survives the downscale crisper than the painterly one
     crop: [0, 35, 2222, 1887]      # ref pixels, ~1.2 aspect
+    matte: "2d1617"   # outline colour painted over the keyed bg before the downscale: no light edge halo
     zoom: 0.74                     # headroom kept by choice at the 2026-10-10 rescale review
     hand_pass: portraits/marty_eye_fixup.py   # redraws the ~17px face crisp (eyes/smile), keyed off the face blob
   approach: custom
