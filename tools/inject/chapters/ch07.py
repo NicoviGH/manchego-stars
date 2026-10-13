@@ -76,8 +76,6 @@ def inject_ch07(campaign, boot=False, verbose=True):
 
     # 2. Rosters: the never-LOADed cap template PREP reads, the boot seed, and the line.
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
-    for uid, _slot, ce, _dce, _level in cast:
-        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch07')
     declare_unit_table(CH07_ALLY_TABLE, cap_rows,

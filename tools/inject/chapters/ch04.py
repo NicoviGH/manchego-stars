@@ -427,8 +427,6 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # grass were exactly the ones no injector had written a line for.
 
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
-    for uid, _slot, ce, _dce, _level in cast:
-        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch04')
     ally = '{\n' + '\n'.join(cap_rows) + '\n    { 0 },\n}'

@@ -74,7 +74,7 @@ C0D
 ~~~
 /// - Mode 5               #Ranged Animation
 # A bird has nothing to throw. He rides a Cavalier's AnimConf, so a JAVELIN would land here --
-# not in his ch01+ kit (Iron Sword + Iron Lance, CLASS_LOADOUT), but an unarmed mode that armed
+# not in his kit (Iron Lance + Iron Sword, npcs/baxby.yaml), but an unarmed mode that armed
 # nothing would freeze the opponent's dodge, so this is the melee charge, whole.
 C03
 C07

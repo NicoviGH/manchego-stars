@@ -294,8 +294,6 @@ def inject_ch02(campaign, verbose=True):
     #     kit, blue, on a walkable NW tile (PREP re-picks positions). Empty for a chapter with
     #     no newly-available off-map recruit (then no LOAD1 is emitted -- see step 4).
     join_recruits = offmap_join_recruits(campaign, chap['chapter_number'])
-    for uid, _s, ce, _d, _l in join_recruits:
-        unit_items(campaign, uid)   # fails fast on a unit file with no kit
     jx, jy = CH02_RECRUIT_JOIN_POS
     recruit_join = [_ally_unit_entry(leader, slot, dce, lv, jx, jy,
                                      ', '.join(unit_items(campaign, uid)),
