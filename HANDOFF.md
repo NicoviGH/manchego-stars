@@ -6,32 +6,38 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-14 (Claude): the bust matte landed (#488); recruit level and kit now have one
-home, stacked as #489 on the wiki PR #487. **Nicolas's order: finish the wiki and merge it, THEN
-resume ch07+ planning with the updated wiki.** What landed and why is in `git log`, the PRs and
-#486 -- this file keeps no "recently landed" list.
+Refreshed 2026-10-14 (Claude, later): the wiki review turned up one cause behind many bugs --
+readers re-deriving what the build decides -- so the consolidation (#491) is in flight ahead of
+the wiki. **Nicolas's order: finish the wiki and merge it, THEN resume ch07+ planning with the
+updated wiki.** What landed and why is in `git log`, the PRs and #486 -- this file keeps no
+"recently landed" list.
 
 ## In flight
 
-- **Draft PR #487 (`feat/486-chapter-wiki`), ROM byte-identical.** The chapter wiki generator
-  (published privately at https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate and
-  republish to the same file after any change), the ch09-ch20 planned stubs, and the data
-  standardization. Nicolas still has **layout work** to do on it; ask him for his list.
-- **PR #489 (`data/486-recruit-kit`), stacked on #487.** Every roster that LOADs a cast member
-  reads its unit file's `inventory:` (`inject.cast.unit_items`); `CLASS_LOADOUT` is retired.
-  Reviewed (`/code-review medium`) and fixed; gate green. Deliberate ROM changes: Trex joins ch03
-  with Colm's kit (he joined with nothing), Sahnar is L5 + Killing Edge everywhere, Baxby carries
-  the lance first. **Merge it after #487: retarget it to `main` (`gh pr edit 489 --base main`)
-  BEFORE #487's branch is deleted**, or GitHub closes it.
+- **PR #492 (`refactor/491-unit-art`), ROM byte-identical.** `inject.unit_art` (one answer for a
+  unit's bust and map sprite) and `inject.decomp.ITEM_ENUM` (one item table); ADR 0344. Proven
+  IDENTICAL in all 16 fingerprint configs. A second consolidation commit is due on it (one
+  enemy-pid resolver for the seven `chNN_enemy_pid`, one cast-stat function the stats emitter
+  and difficulty share, `item_icon_id`'s 12-line scan), then a fresh 16-config fingerprint round.
+  **Stash `chwinga glow fix` (on this branch)** restores the ch02 chwinga's green bust, lost since
+  #488 (its RGB-keyed recolour matched nothing); it waits on Nicolas's OK of
+  `map-review/chwinga_glow_fix.png`, then commits on #492 (a deliberate ROM change).
+- **PR #487 (`feat/486-chapter-wiki`), stacked on #492.** The wiki (published privately at
+  https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate and republish to the same file),
+  the ch09-ch20 stubs, the data standardization, and #489's recruit kit folded in (#489 closed:
+  Trex joins ch03 with Colm's kit, Sahnar is L5 + Killing Edge, Baxby carries the lance first --
+  deliberate ROM changes). Wiki-side resolver work is in stash `wiki resolver integration`.
+  Merge order: #492, then #487.
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
   locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
   locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
 
 **Next, in order** (the full state, every decision and every open pick: #486, latest comments):
 
-1. **Wiki pass on #487.** First the `/code-review` findings on its own code (checklist in #487's
-   latest comment), then Nicolas's layout list, regenerate + republish, `/code-review medium`,
-   merge on his word, then #489 (retarget first, above).
+1. **#492 then #487.** Finish #492's second consolidation commit and its fingerprint round,
+   `/code-review medium`, merge on his word. Rebase #487 on main, pop the wiki stash, audit every
+   wiki cell against the resolvers (anything the wiki still derives itself is a bug), republish,
+   take Nicolas's layout list, `/code-review medium`, merge on his word.
 2. **#486 planning, continue WITH Nicolas** on the updated wiki: the open picks on the Open
    decisions page (ch07's exit hook first: #27's ending waits on it); then Act IV beats (ch17
    beat and map, ch18 map); the recruit pass (who fills each vanilla role ch09-ch17); the
