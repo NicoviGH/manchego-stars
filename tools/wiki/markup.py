@@ -63,10 +63,11 @@ STAT_RANGE_NOTE = ('Stats with two figures separated by a ~ are presented as a r
 
 def infobox(title, image, rows):
     body = ''.join('<tr><th>%s\n</th><td><p>%s\n</p></td></tr>' % (esc(k), v) for k, v in rows if v)
+    pic = ('<tr><th><p>%s<br /><span style="font-size: 77%%"></span></p></th></tr>' % image
+           if image else '')
     return ('<table class="infobox"><tbody><tr><td><table style="width:100%%"><tbody><tr><th>%s\n'
-            '</th></tr><tr><th><p>%s<br /><span style="font-size: 77%%"></span></p></th></tr>'
-            '</tbody></table></td></tr><tr><td><table style="width:100%%"><tbody>%s</tbody>'
-            '</table></td></tr></tbody></table>' % (esc(title), image, body))
+            '</th></tr>%s</tbody></table></td></tr><tr><td><table style="width:100%%"><tbody>%s'
+            '</tbody></table></td></tr></tbody></table>' % (esc(title), pic, body))
 
 
 def toc(entries, prefix):

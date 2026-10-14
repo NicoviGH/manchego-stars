@@ -11,6 +11,7 @@ id: ch05-the-elven-tomb
 title: "The Elven Tomb"
 location: "The elven tomb beyond Lonelywood"
 chapter_number: 5
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # the slice is reached: roster/levels re-grounded against vanilla Ch5
                                # and the party (`make difficulty CH=ch05` = PARITY), dialogue LOCKED
                                # (PR #196), map painted and hosted. Combat data here is authoritative

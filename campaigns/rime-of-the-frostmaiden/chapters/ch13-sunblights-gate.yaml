@@ -3,6 +3,7 @@ id: ch13-sunblights-gate
 title: "Sunblight's Gate"
 location: "The approach to Sunblight, in the Spine of the World"
 chapter_number: 13
+act: 'III'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: survive_or_boss

@@ -3,6 +3,7 @@ id: ch14-sunblight
 title: "Sunblight"
 location: "Sunblight, Xardorok's fortress"
 chapter_number: 14
+act: 'III'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: big_battle_seize

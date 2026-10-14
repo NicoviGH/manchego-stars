@@ -1104,6 +1104,67 @@ def page(pid, title, body, tools=(), category=None):
                esc(category or ''), body))
 
 
+BASE_GAME = 'Fire Emblem: The Sacred Stones'
+
+
+def home_page(chs, units):
+    """The Fire Emblem Wiki's game page (its The Sacred Stones article), filled with ours:
+    infobox, lead, Plot by act, Gameplay, Chapters, Characters. Acts and the gameplay notes
+    come from campaign.yaml; everything else from the chapters and units."""
+    camp = campaign_yaml()
+    title = str(camp.get('title', 'Manchego Stars')).split(':')[0]
+    built = [c for c in chs if c.get('status') != 'planned']
+    pcs = [k for k, u in units.items() if u['_kind'] == 'pcs']
+    recruits = [r for c in chs for r in recruits_of(c) if r not in pcs]
+    box = mk.infobox(title, '', [
+        ('Base game', '<i>%s</i>' % mk.fe(BASE_GAME)),
+        ('Campaign', '<i>Rime of the Frostmaiden</i> (<i>Dungeons &amp; Dragons</i> 5th edition)'),
+        ('Platform(s)', mk.fe('Game Boy Advance')),
+        ('Built from', '<code>fireemblem8u</code> (the FE8 decompilation)'),
+    ])
+    lead = ('<p><i><b>%s</b></i> is a <i>%s</i> ROM hack for the %s, built from the game\'s '
+            'decompilation. It turns a finished <i>Rime of the Frostmaiden</i> campaign into a '
+            'tactics game: the %d player characters become units, and the campaign\'s story '
+            'becomes %d chapters.\n</p>' % (esc(title), mk.fe(BASE_GAME, 'Fire Emblem: The Sacred '
+            'Stones'), mk.fe('Game Boy Advance'), len(pcs), len(chs)))
+    toc, parts = [], []
+    acts = camp.get('acts') or {}
+    plot = mk.main_article('chapters', 'List of chapters in %s' % title)
+    toc.append((1, 'Plot', 'home-Plot'))
+    for act in acts:
+        members = [c for c in chs if str(c.get('act')) == str(act)]
+        if not members:
+            continue
+        anchor = 'home-Act_%s' % act
+        toc.append((2, 'Act %s' % act, anchor))
+        body = para(acts[act]) + ''.join(
+            para(c.get('narrative') or (c.get('plan') or {}).get('story')) for c in members)
+        plot += mk.h(3, 'Act %s' % act, anchor) + body
+    parts.append(mk.h(2, 'Plot', 'home-Plot') + plot)
+    notes = camp.get('gameplay') or []
+    if notes:
+        toc.append((1, 'Gameplay', 'home-Gameplay'))
+        body = ('<p>A turn-based strategy game on <i>%s</i>\'s own engine and rules. What plays '
+                'differently:\n</p>' % mk.fe(BASE_GAME, 'The Sacred Stones'))
+        for n in notes:
+            anchor = 'home-%s' % re.sub(r'\W+', '_', n['title'])
+            toc.append((2, n['title'], anchor))
+            body += mk.h(3, n['title'], anchor) + para(n.get('text'))
+        parts.append(mk.h(2, 'Gameplay', 'home-Gameplay') + body)
+    toc.append((1, 'Chapters', 'home-Chapters'))
+    parts.append(mk.h(2, 'Chapters', 'home-Chapters') + mk.main_article(
+        'chapters', 'List of chapters in %s' % title) + '<p>A playthrough runs %d chapters, '
+        'from the prologue to the finale; %d are built and %d are planned.\n</p>'
+        % (len(chs), len(built), len(chs) - len(built)))
+    toc.append((1, 'Characters', 'home-Characters'))
+    parts.append(mk.h(2, 'Characters', 'home-Characters') + mk.main_article(
+        'roster', 'List of characters in %s' % title) + '<p><i>%s</i> features %d playable '
+        'characters: the %d player characters of the campaign, who found the company, and %d '
+        'recruits who join along the way.\n</p>' % (esc(title), len(pcs) + len(recruits),
+                                                     len(pcs), len(recruits)))
+    return page('home', title, box + lead + mk.toc(toc, 'home') + ''.join(parts))
+
+
 def index_page(chs):
     rows = []
     for c in chs:
@@ -1112,7 +1173,7 @@ def index_page(chs):
         rows.append((mk.ours(c['_slug'], c['_slug']), mk.ours(c['_slug'], c.get('title')),
                      twin_label(c.get('parity_reference')), twin_label(c.get('fe8_base_map')),
                      esc(st)))
-    return page('home', 'Chapters', '<p><b>Manchego Stars Wiki</b> lists every chapter of the '
+    return page('chapters', 'List of chapters in Manchego Stars', '<p>Every chapter of the '
                 'campaign, built and planned. Each page is generated from the chapter\'s YAML and '
                 'the FE8 decomp, so it is only as current as the last build.</p>' + wikitable(
                     ['Ch', 'Title', 'Curve twin', 'Map donor', 'Status'], rows))
@@ -1137,7 +1198,7 @@ def roster_page(chs, units):
             class_html((u.get('fe_stats') or {}).get('class')),
             mk.ours(first['_slug'], first['_slug']) if first else '')
            for k, u in sorted(units.items()) if u['_kind'] == 'pcs']
-    return page('roster', 'Roster', mk.h(2, 'Founding party', 'pcs') +
+    return page('roster', 'List of characters in Manchego Stars', mk.h(2, 'Founding party', 'pcs') +
                 wikitable(['', 'Name', 'Class', 'Joins'], pcs) +
                 mk.h(2, 'Recruits by chapter', 'recruits') +
                 wikitable(['', 'Name', 'Class / role', 'Joins'], rows))
@@ -1215,7 +1276,8 @@ def chrome(pages_html, chs):
     pages, nested exactly as the same render nests it; the wiki's own tools, notices and search
     are dropped, and our navigation sits in their portlets."""
     nav = ''.join('<li class="mw-list-item"><a href="#%s">%s</a></li>' % (esc(a), esc(t)) for a, t in
-                  (('home', 'Chapters'), ('roster', 'Roster'), ('decisions', 'Open decisions')))
+                  (('home', 'Main page'), ('chapters', 'List of chapters'), ('roster', 'Characters'),
+                   ('decisions', 'Open decisions')))
     chap_nav = ''.join('<li class="mw-list-item"><a href="#%s">%s %s</a></li>'
                        % (esc(c['_slug']), esc(c['_slug']), esc(c.get('title'))) for c in chs)
     portlet = ('<div role="navigation" class="mw-portlet" id="%s"><h3 lang="en" dir="ltr">%s</h3>'
@@ -1269,7 +1331,8 @@ def build():
     if first is not None:
         first['_founding'] = sorted(k for k, u in units.items() if u['_kind'] == 'pcs')
     opens = open_questions(chs)
-    pages = [index_page(chs), roster_page(chs, units), decisions_page(chs, opens)]
+    pages = [home_page(chs, units), index_page(chs), roster_page(chs, units),
+             decisions_page(chs, opens)]
     for i, c in enumerate(chs):
         pages.append(chapter_page(c, chs[i - 1] if i else None,
                                   chs[i + 1] if i + 1 < len(chs) else None, units, chs))

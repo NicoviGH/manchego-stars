@@ -3,6 +3,7 @@ id: ch10-the-dark-duchess
 title: "The Dark Duchess"
 location: "The Dark Duchess, a Luskan pirate ship frozen in the Sea of Moving Ice"
 chapter_number: 10
+act: 'II'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: marquee_setpiece

@@ -3,6 +3,7 @@ id: ch15-easthaven-burns
 title: "Easthaven Burns"
 location: "Easthaven"
 chapter_number: 15
+act: 'III'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: big_battle_gray

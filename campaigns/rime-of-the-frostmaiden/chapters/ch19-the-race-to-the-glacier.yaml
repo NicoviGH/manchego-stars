@@ -3,6 +3,7 @@ id: ch19-the-race-to-the-glacier
 title: "The Race to the Glacier"
 location: "The tundra and the foot of the Reghed Glacier"
 chapter_number: 19
+act: 'IV–V'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: big_battle_gray

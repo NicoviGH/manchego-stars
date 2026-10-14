@@ -11,6 +11,7 @@ id: ch04-the-white-moose
 title: "The White Moose"
 location: "The forest outside Lonelywood"
 chapter_number: 4
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # map + roster grounded and hosted; scenes/parley remain follow-up work
 milestone: M3
 cadence: monster_debut          # see docs/CHAPTERS.md — 🟨 fog-of-war forest hunt (tone shift to monsters)

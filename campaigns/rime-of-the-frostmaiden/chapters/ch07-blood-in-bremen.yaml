@@ -6,6 +6,7 @@ id: ch07-blood-in-bremen
 title: "Blood in Bremen"
 location: "Bremen, from the docks to the Town Hall"
 chapter_number: 7
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # the slice is reached: the force is vanilla Ch7's own, re-dressed
 balance_locked: true  # holds parity on instrument v2 with the Fighter boss on Gheb's line; ADR 0343
 milestone: M3

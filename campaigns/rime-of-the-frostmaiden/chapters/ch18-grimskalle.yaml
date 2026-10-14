@@ -3,6 +3,7 @@ id: ch18-grimskalle
 title: "Grimskalle"
 location: "Grimskalle, on the Island of Solstice"
 chapter_number: 18
+act: 'IV–V'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: big_battle_seize

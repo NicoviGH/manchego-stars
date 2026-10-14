@@ -7,6 +7,7 @@ id: ch06-the-maer-monster
 title: "The Maer Monster"
 location: "Maer Dualdon, off Bremen"
 chapter_number: 6
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # the slice is reached: roster/levels/AI re-grounded against vanilla
                                # Ch6 unit by unit (#334), the map is painted and compiled (#331),
                                # the placement is authored (#360), and the chapter is HOSTED on

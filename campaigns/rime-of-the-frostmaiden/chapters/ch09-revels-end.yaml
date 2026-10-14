@@ -4,6 +4,7 @@ id: ch09-revels-end
 title: "Revel's End"
 location: "Revel's End, the prison on the Sea of Moving Ice coast"
 chapter_number: 9
+act: 'II'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: breakout

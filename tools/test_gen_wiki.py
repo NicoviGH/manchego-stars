@@ -45,6 +45,17 @@ class TestGenWiki(unittest.TestCase):
             self.assertEqual(got, [x for x in order if x in got], c['_slug'])
             self.assertTrue(set(got) <= set(order), c['_slug'])
 
+    def test_the_home_page_is_the_game_article(self):
+        # The Fire Emblem Wiki's game page: Plot by act (each chapter names its `act:`),
+        # Gameplay, Chapters, Characters; every chapter's story lands under its act.
+        home = section(self.page, 'home')
+        got = re.findall(r'class="mw-headline" id="home-([A-Za-z_]+)"', home)
+        self.assertEqual([g for g in got if not g.startswith('Act_') and g in
+                          ('Plot', 'Gameplay', 'Chapters', 'Characters')],
+                         ['Plot', 'Gameplay', 'Chapters', 'Characters'])
+        for c in self.chapters:
+            self.assertTrue(c.get('act'), c['_slug'])
+
     def test_open_decisions_are_the_yaml_questions(self):
         want = sum(len(c.get('open_questions') or []) for c in self.chapters)
         self.assertEqual(self.k, want)

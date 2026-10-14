@@ -88,7 +88,7 @@ CHAPTER = {
     'is_prologue': ANY, 'is_mvp_finale': ANY, 'balance_locked': ANY, 'accepted_residual': ANY,
     # prose: the design record
     'narrative': ANY, 'design_notes': ANY, 'cadence': ANY, 'parity_reference': ANY,
-    'difficulty_note': ANY, 'strategy': ANY, 'fe8_base_map': ANY, 'fe8_cadence_base': ANY,
+    'difficulty_note': ANY, 'strategy': ANY, 'act': ANY, 'fe8_base_map': ANY, 'fe8_cadence_base': ANY,
     'forest_composition': ANY, 'win_condition': ANY, 'lose_condition': ANY,
     'signature_moments': [{'pc': ANY, 'trigger': ANY}],
     'introduces': [{'concept': ANY, 'coverage': ANY, 'status': ANY, 'where': ANY}],

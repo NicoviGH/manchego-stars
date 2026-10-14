@@ -3,6 +3,7 @@ id: ch20-ythryn
 title: "Ythryn"
 location: "Ythryn, beneath the Reghed Glacier"
 chapter_number: 20
+act: 'IV–V'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: finale

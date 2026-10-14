@@ -13,11 +13,10 @@
 > `docs/fe8-pacing-reference.md`.
 
 **The arc (Nicolas, 2026-10-12):** one conspiracy revealed in layers, FE8's shape. From
-Messie's farewell the goal is to end the Rime. Act II (ch08–ch12) the party are fugitives
-condemned for the Bremen coup while the duergar go free; Act III (ch13–ch16) the duergar's
-chardalyn dragon burns the towns; Acts IV–V (ch17–ch20) the root is the Rime itself, which
-only Ythryn's mythallar can break, and Auril comes down to stop it. Twenty chapters: the
-race to the glacier takes the Darkling Woods slot, and the finale is the two-part Final.
+Messie's farewell the goal is to end the Rime. Each act's summary is `campaign.yaml` →
+`acts:`, and each chapter names its own `act:`; the wiki's home page reads both. Twenty
+chapters: the race to the glacier takes the Darkling Woods slot, and the finale is the
+two-part Final.
 
 ---
 

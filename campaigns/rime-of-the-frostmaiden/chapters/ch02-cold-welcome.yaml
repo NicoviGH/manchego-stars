@@ -6,6 +6,7 @@ id: ch02-cold-welcome
 title: "Cold Welcome"
 location: "The road into Targos"
 chapter_number: 2
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # built / in-progress slice; combat data is grounded + authoritative
 milestone: M3
 cadence: breather_defend          # see docs/CHAPTERS.md — 🟦

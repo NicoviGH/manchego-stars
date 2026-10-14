@@ -3,6 +3,7 @@ id: ch17-the-sea-of-moving-ice
 title: "The Sea of Moving Ice"
 location: "The Sea of Moving Ice"
 chapter_number: 17
+act: 'IV–V'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: marquee_setpiece

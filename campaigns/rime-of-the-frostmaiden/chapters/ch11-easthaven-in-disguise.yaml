@@ -3,6 +3,7 @@ id: ch11-easthaven-in-disguise
 title: "Easthaven in Disguise"
 location: "Easthaven and its frozen harbour"
 chapter_number: 11
+act: 'II'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: breather_defend

@@ -6,6 +6,7 @@ id: ch03-the-termalaine-mine
 title: "The Termalaine Mine"
 location: "Termalaine's tourmaline mine"
 chapter_number: 3
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # design locked + grounded (decomp + DM notes + Frostmaiden book); slice in build
 milestone: M3
 cadence: big_battle_seize       # see docs/CHAPTERS.md — mirrors FE8 Ch3 "big battle / recruit" (Colm→Trex)

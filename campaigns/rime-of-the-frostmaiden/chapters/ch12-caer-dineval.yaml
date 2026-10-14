@@ -3,6 +3,7 @@ id: ch12-caer-dineval
 title: "Caer-Dineval"
 location: "Caer-Dineval, on Lac Dinneshere"
 chapter_number: 12
+act: 'II'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: planned
 milestone: M4
 cadence: rescue
