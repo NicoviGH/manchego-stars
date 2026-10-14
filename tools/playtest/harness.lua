@@ -5158,7 +5158,7 @@ end
 -- landing. The PACING half (judging the 5 cutscenes in motion) stays a human-at-mGBA pass.
 -- Built on a "ch02start" save-state checkpoint (ckpt_ch02start plays the whole chain ONCE at
 -- top speed); ch02 / smoke_ch02 / clear_ch02 LOAD it so each is fast. Char/class/item ids from
--- the decomp + the ch02 build (CH02_CHWINGA / CH02_ITEM_IDS in tools/build_campaign.py).
+-- the decomp + the ch02 build (CH02_CHWINGA in inject/chapter_ids.py, the gift enums from inject.decomp.ITEM_ENUM).
 -- The chwinga ON THE FIELD. Glimmerfrost (MANSEL, 0xC8) is not among them since 2026-08-30:
 -- she inhabits the (1,12) hut and hands her charm over on the visit, so she is never a unit.
 local CH02_PARK = { x = 0, y = 0 }                -- NW corner end-turn tile (15x15 map; deploy is row 3+)

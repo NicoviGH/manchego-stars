@@ -8,6 +8,8 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject.decomp import ITEM_ENUM
+import inject.decomp
 import inject.chapter_ids
 import inject.hosting
 import inject.villages
@@ -109,7 +111,7 @@ class VillageGiftsInheritVanilla(unittest.TestCase):
 
     def test_the_live_ch05_villages_inherit_vanilla(self):
         chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.chapter_ids.CH05_CHAPTER_YAML)
-        inject.villages.assert_village_gifts_match_vanilla(chap, inject.chapter_ids.CH05_ITEM_IDS)
+        inject.villages.assert_village_gifts_match_vanilla(chap, inject.decomp.ITEM_ENUM)
 
 
 class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
@@ -149,7 +151,7 @@ class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
         self.assertIn('Vendor(ShopList_Event_Ch5Vendor, 6, 10)', body)
 
     def test_village_reward_item_uses_the_chapters_own_map(self):
-        """It used to close over CH04_ITEM_IDS, which made a shared helper silently ch04-only:
+        """It used to close over ITEM_ENUM, which made a shared helper silently ch04-only:
         ch05's stat boosters are not in that dict, so the first reuser would die on a KeyError."""
         village = {'id': 'a', 'visit_reward': [{'id': 'booster-def'}]}
         self.assertEqual(inject.villages.village_reward_item(village, {'booster-def': 'ITEM_BOOSTER_DEF'}),

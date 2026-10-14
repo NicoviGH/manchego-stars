@@ -11,8 +11,10 @@ from PIL import Image
 import chapter_schema
 from yaml_loader import yaml_load
 import map_sprite_tool
-from inject.cast import classed_cast, load_unit, SCRIPTED_NEUTRAL_SPRITES
-from inject.chapter_ids import CH02_CHWINGA, CH02_CHWINGA_SPRITE_SRC, PROLOGUE_GUEST_SPRITES
+from inject.cast import load_unit
+from inject.chapter_ids import CH02_CHWINGA_SPRITE_SRC
+from inject.unit_art import (_unit_donor, cast_sprites, chwinga_sprite, FACTION_TINTED_CAST,
+                             guest_sprites, neutral_sprites)
 from inject.decomp import BMUNIT_C, REPO
 from inject.paths import (
     BMUDISP_C, MOVE_GFX_DIR, MU_C, PREP_UNITSELECT_C, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
@@ -291,9 +293,6 @@ def _inject_cast_palette(palette_u16, char_slots, extra_char_ids=()):
 # play: Trex stands GREEN, then the talk-recruit CUSA flips him to the BLUE player palette
 # (#23). A charId-keyed cast override is unconditional -- it would pin one colour, so a
 # green Trex would wrongly render in his blue player palette (Nicolas, 2026-07-10).
-FACTION_TINTED_CAST = frozenset({'trex'})
-
-
 def inject_map_sprites(campaign, verbose=True):
     """Give cast members a custom overworld sprite distinct from their class.
 
@@ -306,17 +305,15 @@ def inject_map_sprites(campaign, verbose=True):
     asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
     # An id is claimed only for a member that actually HAS a sheet, i.e. only where a wait
     # row is about to be written -- see claim_sms_id (#227).
-    idle = [(uid, slot, cls, claim_sms_id()) for (uid, slot, cls, _) in classed_cast(campaign)
-            if os.path.isfile(os.path.join(asset_dir, uid + '.png'))]
+    idle = [(s.uid, s.wearers[0], s.cls, claim_sms_id()) for s in cast_sprites(campaign)]
 
     # Cold-open guests (PROLOGUE_GUEST_SPRITES) get the same SMS/MU overrides but render
     # through FE8's standard player palette -- so they are kept out of custom_slots (no
     # cast-palette override) below.
     guest_idle, guest_bases = [], {}
-    for uid, slot, cls, base in PROLOGUE_GUEST_SPRITES:
-        if os.path.isfile(os.path.join(asset_dir, uid + '.png')):
-            guest_idle.append((uid, slot, cls, claim_sms_id()))
-            guest_bases[uid] = base
+    for s in guest_sprites(campaign):
+        guest_idle.append((s.uid, s.wearers[0], s.cls, claim_sms_id()))
+        guest_bases[s.uid] = s.donor
 
     if not idle and not guest_idle:
         if verbose:
@@ -656,12 +653,10 @@ def _inject_scripted_neutral_sprites(campaign, asset_dir, pointer_externs, verbo
     SCRIPTED_NEUTRAL_SPRITES.
     """
     neutral_ids = []
-    for uid, char_ids, donor in SCRIPTED_NEUTRAL_SPRITES:
-        idle_png = os.path.join(asset_dir, uid + '.png')
-        if not os.path.isfile(idle_png):
-            continue
-        mu_png = os.path.join(asset_dir, uid + '_mu.png')
-        if not os.path.isfile(mu_png):
+    for s in neutral_sprites(campaign):
+        uid, char_ids, donor, idle_png = s.uid, s.wearers, s.donor, s.sheet
+        mu_png = s.walk
+        if mu_png is None:
             # No hand-drawn walk: glide on the idle, as the cast do. The donor is the row's own,
             # so nothing here needs a unit YAML (Messie, #26).
             mu_png = os.path.join(tempfile.mkdtemp(prefix='manchego_mu_'), uid + '_mu.png')
@@ -710,13 +705,12 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
     of truth stays sclorbo.png (no committed derived asset); one shared SMS slot + MU sheet
     serve all three identical NPC slots. Must run inside inject_map_sprites (it owns the
     gMapSpriteOverride / gMuImgOverride tables)."""
-    asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
-    src_idle = os.path.join(asset_dir, CH02_CHWINGA_SPRITE_SRC + '.png')
-    if not os.path.isfile(src_idle):
+    chwinga = chwinga_sprite(campaign)
+    if chwinga is None:
         if verbose:
             print('  (no %s.png yet; chwinga keep their class sprite)' % CH02_CHWINGA_SPRITE_SRC)
         return
-    donor = _donor_base(campaign, CH02_CHWINGA_SPRITE_SRC)        # 'Civilian_F1'
+    src_idle, donor = chwinga.sheet, chwinga.donor                 # donor 'Civilian_F1'
     donor_png = os.path.join(WAIT_GFX_DIR, 'unit_icon_wait_%s_sheet.png' % donor)
     _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor)
 
@@ -747,7 +741,7 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
 
     # The three NPC slots all override onto the one shared chwinga slot/sheet. Insert at
     # the front of each table (linear scan; chwinga charIds are distinct from cast slots).
-    slots = [slot for _, slot in CH02_CHWINGA]
+    slots = list(chwinga.wearers)
     _insert_table_head(UNIT_ICON_WAIT_C, 'gMapSpriteOverride[]',
                        ''.join('\tCHARACTER_%s, %d,\n' % (s.upper(), sms) for s in slots))
     _insert_table_head(UNIT_ICON_MOVE_C, 'gMuImgOverride[]',
@@ -764,12 +758,7 @@ def _donor_base(campaign, uid, guest_bases=None):
     (PROLOGUE_GUEST_SPRITES) instead of a unit YAML."""
     if guest_bases and uid in guest_bases:
         return guest_bases[uid]
-    unit = load_unit(campaign, uid)
-    try:
-        return unit['art']['map_sprite']['base']
-    except (KeyError, TypeError):
-        sys.exit('ERROR: %s has map_sprites/%s.png but no art.map_sprite.base in its YAML '
-                 '(needed to read the SMS size from the decomp)' % (uid, uid))
+    return _unit_donor(campaign, uid)
 
 
 def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases=None,

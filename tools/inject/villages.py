@@ -43,9 +43,9 @@ def village_reward_id(village):
 def village_reward_item(village, item_ids):
     """The FE item enum a village hands over, or None when its reward is the line alone.
 
-    `item_ids` is the CHAPTER's id->enum map. It used to close over CH04_ITEM_IDS, which made a
-    shared helper silently ch04-only: ch05's gifts (the two stat boosters) are not in that dict,
-    so the first chapter to reuse it would have died on a KeyError naming ch04.
+    `item_ids` is the id->enum map (inject.decomp.ITEM_ENUM). It used to close over the ch04
+    table, which made a shared helper silently ch04-only: ch05's gifts (the two stat boosters)
+    were not in that dict, so the first chapter to reuse it would have died on a KeyError.
     """
     reward = village_reward_id(village)
     return item_ids[reward] if reward else None

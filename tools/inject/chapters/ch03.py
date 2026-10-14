@@ -9,7 +9,7 @@ from inject.chapter_ids import (
     CH03_BOSS_PID, CH03_BRUTE_MINIBOSS_PID, CH03_CHAPTER_YAML, CH03_ENDING_CARD_MSG,
     CH03_ENDING_MSGS, CH03_GOAL_STATUS_MSG, CH03_GOAL_WINDOW_MSG, CH03_MIDMAP_MSGS,
     CH03_OPENING_CARD_MSG, CH03_OPENING_MSGS, CH03_TREX_ENTRANCE_MSG, CH03_TREX_TALK_MSG)
-from inject.decomp import _replace_brace_block, REPO
+from inject.decomp import _replace_brace_block, REPO, ITEM_ENUM
 from inject.chapter_frame import write_event_group
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
@@ -61,13 +61,6 @@ CH03_ENDING_SCRIPT = 'EventScr_089F19F8'
 # and `brigand-brute`, the steel brute's `deploy_class`: a Brigand for parity that deploys on
 # the Lizardzerker sprite. Grell = vanilla Mogall; archer/thief stay vanilla.
 CH03_CLASS_IDS = ChapterClassIds('ch03')
-CH03_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'hand-axe': 'ITEM_AXE_HANDAXE',
-                 'steel-axe': 'ITEM_AXE_STEEL', 'iron-sword': 'ITEM_SWORD_IRON',
-                 'iron-lance': 'ITEM_LANCE_IRON', 'javelin': 'ITEM_LANCE_JAVELIN',
-                 'iron-bow': 'ITEM_BOW_IRON', 'evil-eye': 'ITEM_MONSTER_EVILEYE',
-                 'red-gem': 'ITEM_REDGEM',
-                 'pure-water': 'ITEM_PUREWATER', 'antitoxin': 'ITEM_ANTITOXIN',
-                 'door-key': 'ITEM_DOORKEY', 'chest-key': 'ITEM_CHESTKEY'}
 # The FF5 navy chest metatile in the cave-interior tileset (retile.py): closed 17 / open 29.
 # gBmMapBaseTiles stores metatile<<2 (compile_layout: .mar = metatile<<5, mar_to_map >>3, so
 # the loaded tile = metatile<<2), so the open-chest tile a MapChange writes is 29<<2 (#23).
@@ -254,7 +247,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
         talk_recruiters(campaign, chap['chapter_number']), trex_char,
         CH03_TREX_TALK_FLAG, CH03_TREX_TALK_SCRIPT, CH03_TREX_TALK_MSG)
 
-    enemies = enemy_rows(chap, CH03_CLASS_IDS, CH03_ITEM_IDS, ch03_enemy_pid)
+    enemies = enemy_rows(chap, CH03_CLASS_IDS, ITEM_ENUM, ch03_enemy_pid)
     enemy = '{\n' + '\n'.join(enemies) + '\n    { 0 },\n}'
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
@@ -284,7 +277,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
     # the ch02<->ch03 swap).
     loc_events = '{\n' + ''.join(
         '    Chest(%s, %d, %d) /* %s */\n'
-        % (CH03_ITEM_IDS[c['contents'][0]['id']], c['position'][0], c['position'][1],
+        % (ITEM_ENUM[c['contents'][0]['id']], c['position'][0], c['position'][1],
            c['contents'][0]['id'])
         for c in chap['chests']) + ''.join(
         '    Door_(%d, %d)\n' % (d['position'][0], d['position'][1])

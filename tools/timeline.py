@@ -55,8 +55,7 @@ def vanilla_bodies(parity_ref, mode=None):
         for i, d in enumerate(dif.vanilla_unit_defs(text, array)):
             if d['allegiance'] != 'FACTION_ID_RED':
                 continue
-            keys = [dif.ITEM_TO_WEAPON.get(it) or dif.VANILLA_ONLY_ITEM_TO_WEAPON.get(it)
-                    for it in d['items']]
+            keys = [dif.ITEM_TO_WEAPON.get(it) for it in d['items']]
             weapons = [fc.W[k] for k in keys if k and fc.W[k].kind != 'staff']
             if not weapons:
                 continue

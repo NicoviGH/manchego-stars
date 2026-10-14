@@ -8,8 +8,8 @@ from inject.boot import _lord_select_event_seq, LORDSEL_EXPLAINER_MSG
 from inject.cast import (
     _chapter_unit, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit, PORTRAIT_MAP,
     RAW_PID_BATTLE_ANIMS)
-from inject.chapter_ids import CH01_LORDSEL_BG, CH05_CLASS_IDS, CH05_ITEM_IDS
-from inject.decomp import _replace_brace_block, REPO
+from inject.chapter_ids import CH01_LORDSEL_BG, CH05_CLASS_IDS
+from inject.decomp import _replace_brace_block, REPO, ITEM_ENUM
 from inject.paths import CH1_EVENTINFO_H, CH1_EVENTSCRIPT_H, CH1_UDEFS_H
 from inject.reskins import enemy_class_reskins
 
@@ -185,7 +185,7 @@ def _sandbox_foe_roster(campaign, bench=None):
         if not unit.get('battle_anim'):
             continue
         x, y = _next_sandbox_tile(tiles, uid)
-        items = [CH05_ITEM_IDS[i['fe_base']] for i in unit.get('inventory') or []]
+        items = [ITEM_ENUM[i['fe_base']] for i in unit.get('inventory') or []]
         entries.append(
             '    {\n'
             '        .charIndex = %s,\n'

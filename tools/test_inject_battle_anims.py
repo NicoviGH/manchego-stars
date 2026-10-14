@@ -428,7 +428,7 @@ class TestRawPidBattleAnim(unittest.TestCase):
         chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.chapter_ids.CH05_CHAPTER_YAML)
         moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
         self.assertEqual([i['fe_base'] for i in moose['inventory']], ['fire-fang'])
-        self.assertEqual(inject.chapter_ids.CH05_ITEM_IDS['fire-fang'], 'ITEM_MONSTER_FIREFANG')
+        self.assertEqual(inject.decomp.ITEM_ENUM['fire-fang'], 'ITEM_MONSTER_FIREFANG')
         self.assertNotIn('rotten-claw', [i['fe_base'] for i in moose['inventory']])
 
     def test_the_gap_row_takes_a_u25_it_did_not_have(self):

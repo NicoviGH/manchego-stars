@@ -4,14 +4,10 @@ import os
 import re
 import sys
 
-from PIL import Image
-
 import portrait_tool
-from inject.arena import arena_presentation_config
-from inject.cast import _bust_dir, dressed_guest_slots, GUEST_PORTRAIT_MAP, PORTRAIT_MAP
-from inject.chapter_ids import (
-    CH02_CHWINGA_PORTRAIT_SLOT, CH02_CHWINGA_SPRITE_SRC, CH05_VISIT_FACES)
+from inject.cast import _bust_dir
 from inject.paths import PORTRAIT_DATA_C, PORTRAIT_DIR
+from inject.unit_art import busts, dress_slot
 
 
 # Our busts are all framed identically: the mouth window sits at tile (col 2, row 6)
@@ -60,15 +56,7 @@ def dressed_portrait_slots(campaign):
     Conditioned on the asset actually existing, like dressed_guest_slots: normalizing a slot we
     did NOT dress would misalign the vanilla face still sitting in it.
     """
-    slots = set(PORTRAIT_MAP.values()) | set(dressed_guest_slots(campaign))
-    if os.path.isfile(os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')):
-        slots |= set(CH02_CHWINGA_PORTRAIT_SLOT.values())
-    vendor = os.path.join(_bust_dir(campaign), 'vendor')
-    slots |= {slot for mug, slot, _rc in CH05_VISIT_FACES.values()
-              if os.path.isfile(os.path.join(vendor, mug))}
-    slots |= {override['face_slot']
-              for override in arena_presentation_config(campaign)['chapters'].values()}
-    return sorted(slots)
+    return sorted({bust.slot for bust in busts(campaign)})
 
 
 def inject_portraits(campaign, verbose=True):
@@ -77,14 +65,13 @@ def inject_portraits(campaign, verbose=True):
     if not os.path.isdir(PORTRAIT_DIR):
         sys.exit('ERROR: decomp portrait dir not found: %s' % PORTRAIT_DIR)
 
-    guests = {u: s for u, s in GUEST_PORTRAIT_MAP.items()
-              if s in dressed_guest_slots(campaign)}
-    for unit, vanilla in list(PORTRAIT_MAP.items()) + list(guests.items()):
+    for bust in busts(campaign, kinds=('cast', 'guest')):
+        unit, vanilla = bust.uid, bust.slot
         bust_path = os.path.join(bust_dir, unit + '.png')
         if not os.path.isfile(bust_path):
             sys.exit('ERROR: missing bust for %s: %s' % (unit, bust_path))
 
-        im = Image.open(bust_path)
+        im = bust.image()
         portrait_tool._check_indexed(im, bust_path)
         if im.size != (portrait_tool.BUST_W, portrait_tool.BUST_H):
             sys.exit('ERROR: %s is %s, expected %dx%d bust'
@@ -92,17 +79,7 @@ def inject_portraits(campaign, verbose=True):
 
         # Busts are already canonical FE8 facing (screen-left) -- facing is baked
         # at the render stage (ref_to_bust --flip-h, recorded as art.render.flip_h).
-        # static_portrait=True: custom busts are non-animated (no mouth flap, no
-        # eye-blink) -- aligning per-frame mouth/eye art for custom portraits is
-        # infeasible, so we lock them still. See portrait_tool.generate.
-        tileset, mouth, chibi, pal_bytes = portrait_tool.generate(im, static_portrait=True)
-
-        base = os.path.join(PORTRAIT_DIR, 'portrait_' + vanilla)
-        tileset.save(base + '_tileset.png')
-        mouth.save(base + '_mouth.png')
-        chibi.save(base + '_chibi.png')
-        with open(base + '_palette.agbpal', 'wb') as f:
-            f.write(pal_bytes)
+        dress_slot(vanilla, im)
 
         if verbose:
             print('  %-10s -> portrait_%s (tileset/mouth/chibi/palette)' % (unit, vanilla))

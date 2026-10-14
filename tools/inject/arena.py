@@ -15,7 +15,7 @@ from inject.cast import _vendor_mug_to_bust, GUEST_PORTRAIT_MAP, PORTRAIT_MAP
 from inject.chapter_ids import CH02_CHWINGA_PORTRAIT_SLOT, CH05_VISIT_FACES
 from inject.decomp import DECOMP, REPO, vanilla_decomp_text
 from inject.hosts import hosted_chapters
-from inject.paths import PORTRAIT_DIR, UIARENA_C
+from inject.paths import UIARENA_C
 
 
 def inject_arena_attendant_portraits(campaign, verbose=True):
@@ -40,14 +40,8 @@ def inject_arena_attendant_portraits(campaign, verbose=True):
         if slot in written:
             continue
         bust = _vendor_mug_to_arena_bust(override['portrait_path'])
-        tileset, mouth, chibi, pal_bytes = portrait_tool.generate(
-            bust, static_portrait=True)
-        base = os.path.join(PORTRAIT_DIR, 'portrait_' + slot)
-        tileset.save(base + '_tileset.png')
-        mouth.save(base + '_mouth.png')
-        chibi.save(base + '_chibi.png')
-        with open(base + '_palette.agbpal', 'wb') as f:
-            f.write(pal_bytes)
+        from inject.unit_art import dress_slot     # unit_art imports this module
+        dress_slot(slot, bust)
         written.add(slot)
         if verbose:
             print('  Arena attendant host %d -> portrait_%s' % (host, slot))

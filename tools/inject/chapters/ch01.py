@@ -13,7 +13,7 @@ from inject.chapter_ids import (
     CH01_BOSS_SLOT, CH01_GOAL_STATUS_MSG, CH01_GOAL_WINDOW_MSG, CH01_LORDSEL_BG,
     PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT)
 from inject.decomp import (
-    _replace_brace_block, DECOMP, FOUNDING_EXP_FLAG, git_env, LORDSEL_FLAG_BASE, REPO)
+    _replace_brace_block, DECOMP, FOUNDING_EXP_FLAG, git_env, LORDSEL_FLAG_BASE, REPO, ITEM_ENUM)
 from inject.chapter_frame import write_event_group
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
@@ -41,7 +41,6 @@ CH01_CHAPTER_YAML = 'ch01-the-iron-trail.yaml'
 CH01_JOIN_POSITIONS = [(c, r) for r in (8, 9) for c in range(1, 6)]
 
 
-CH01_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON'}
 # ch01's grunts are goblins: campaign.yaml's goblin reskins `dress` ch01's soldier and fighter.
 # armor-knight is dressed by nobody, so the chief stays a vanilla Knight.
 CH01_CLASS_IDS = ChapterClassIds('ch01')
@@ -369,8 +368,8 @@ def inject_ch01(campaign, verbose=True, boot=False):
     by_eid = {e['id']: e for e in chap['enemy_units']}
     chief, reinf = by_eid['goblin-chief'], by_eid['goblin-reinforcements']
     cx, cy = chief['positions'][0]
-    enemies = enemy_rows(chap, CH01_CLASS_IDS, CH01_ITEM_IDS, ch01_enemy_pid)
-    reinforce = enemy_rows(chap, CH01_CLASS_IDS, CH01_ITEM_IDS, ch01_enemy_pid,
+    enemies = enemy_rows(chap, CH01_CLASS_IDS, ITEM_ENUM, ch01_enemy_pid)
+    reinforce = enemy_rows(chap, CH01_CLASS_IDS, ITEM_ENUM, ch01_enemy_pid,
                            arrives_turn=reinf['arrives_turn'])
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:

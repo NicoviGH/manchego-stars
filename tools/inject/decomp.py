@@ -26,26 +26,74 @@ LORDSEL_FLAG_BASE = 0xF0
 FOUNDING_EXP_FLAG = 0xFB
 
 
-# Vanilla FE8 weapon key -> ITEM_ enum (constants/items.h). The single source mapping a
-# campaign weapon (a plain vanilla id, or a flavor name's fe_base) to the decomp item.
+# Item id -> ITEM_ enum (constants/items.h): THE table, for every item any chapter, unit or
+# twin names (a plain vanilla id, or a flavor name's fe_base). It used to be eight -- this
+# weapons-only one, seven per-chapter CHnn_ITEM_IDS copies and a ch00 consumables map, which
+# agreed only because nobody had made them disagree yet (#491). difficulty's ITEM_TO_WEAPON is
+# derived from it: the entries fe_combat models.
 # Shared because BOTH sides need it: content (build_campaign) emits enemy/guest loadouts from
 # it; pipeline (difficulty) inverts it to resolve vanilla enemies. Lives here so neither side
 # has to open the other's file to extend it (the seam: docs/decisions.md).
-WEAPON_ITEM_ENUM = {
-    'iron-sword': 'ITEM_SWORD_IRON', 'steel-sword': 'ITEM_SWORD_STEEL',
-    'rapier': 'ITEM_SWORD_RAPIER', 'iron-lance': 'ITEM_LANCE_IRON',
-    'silver-lance': 'ITEM_LANCE_SILVER', 'javelin': 'ITEM_LANCE_JAVELIN',
+ITEM_ENUM = {
+    'elfire': 'ITEM_ANIMA_ELFIRE',
+    'fire': 'ITEM_ANIMA_FIRE',
+    'thunder': 'ITEM_ANIMA_THUNDER',
+    'antitoxin': 'ITEM_ANTITOXIN',
+    'halberd': 'ITEM_AXE_HALBERD',
+    'hand-axe': 'ITEM_AXE_HANDAXE',
+    'hatchet': 'ITEM_AXE_HATCHET',
+    'iron-axe': 'ITEM_AXE_IRON',
+    'killer-axe': 'ITEM_AXE_KILLER',
+    'steel-axe': 'ITEM_AXE_STEEL',
+    'venin-axe': 'ITEM_AXE_VENIN',
+    'iron-blade': 'ITEM_BLADE_IRON',
+    'booster-def': 'ITEM_BOOSTER_DEF',
+    'energy-ring': 'ITEM_BOOSTER_POW',
+    'booster-skl': 'ITEM_BOOSTER_SKL',
+    'iron-bow': 'ITEM_BOW_IRON',
+    'steel-bow': 'ITEM_BOW_STEEL',
+    'chest-key': 'ITEM_CHESTKEY',
+    'flux': 'ITEM_DARK_FLUX',
+    'door-key': 'ITEM_DOORKEY',
+    'elixir': 'ITEM_ELIXIR',
+    'guiding-ring': 'ITEM_GUIDINGRING',
+    'hero-crest': 'ITEM_HEROCREST',
+    'knight-crest': 'ITEM_KNIGHTCREST',
+    'horseslayer': 'ITEM_LANCE_HORSESLAYER',
+    'iron-lance': 'ITEM_LANCE_IRON',
+    'javelin': 'ITEM_LANCE_JAVELIN',
+    'short-spear': 'ITEM_LANCE_SHORTSPEAR',
+    'silver-lance': 'ITEM_LANCE_SILVER',
+    'slim-lance': 'ITEM_LANCE_SLIM',
+    'steel-lance': 'ITEM_LANCE_STEEL',
+    'venin-lance': 'ITEM_LANCE_VENIN',
+    'lightning': 'ITEM_LIGHT_LIGHTNING',
+    'evil-eye': 'ITEM_MONSTER_EVILEYE',
+    'fetid-claw': 'ITEM_MONSTER_FETIDCLW',
+    'fire-fang': 'ITEM_MONSTER_FIREFANG',
+    'hell-fang': 'ITEM_MONSTER_HELLFANG',
+    'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
+    'venin-claw': 'ITEM_MONSTER_VENINCLW',
+    'orions-bolt': 'ITEM_ORIONSBOLT',
+    'pure-water': 'ITEM_PUREWATER',
+    'red-gem': 'ITEM_REDGEM',
+    'heal-staff': 'ITEM_STAFF_HEAL',
+    'mend': 'ITEM_STAFF_MEND',
+    'armorslayer': 'ITEM_SWORD_ARMORSLAYER',
+    'iron-sword': 'ITEM_SWORD_IRON',
     'killing-edge': 'ITEM_SWORD_KILLER',
-    'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
-    'hand-axe': 'ITEM_AXE_HANDAXE', 'killer-axe': 'ITEM_AXE_KILLER',
-    'iron-bow': 'ITEM_BOW_IRON', 'fire': 'ITEM_ANIMA_FIRE', 'flux': 'ITEM_DARK_FLUX',
+    'rapier': 'ITEM_SWORD_RAPIER',
+    'steel-sword': 'ITEM_SWORD_STEEL',
+    'zanbato': 'ITEM_SWORD_ZANBATO',
+    'torch': 'ITEM_TORCH',
+    'vulnerary': 'ITEM_VULNERARY',
 }
 
 
 def fe_item_enum(inv_entry):
     """The vanilla ITEM_ enum for a YAML inventory entry -- its fe_base (flavor name over a
     vanilla weapon) if present, else its id (a plain vanilla weapon)."""
-    return WEAPON_ITEM_ENUM[inv_entry.get('fe_base') or inv_entry['id']]
+    return ITEM_ENUM[inv_entry.get('fe_base') or inv_entry['id']]
 
 
 def _find_brace_block(text, marker, path):
