@@ -43,6 +43,8 @@ RUNNING IT (lessons from #479, which ran it over all 15 configurations):
     check` or a commit: `test_scene_actors` reads the injected tree, and a boot config's tree
     fails it for reasons that have nothing to do with your change.
   * A change to `inject/steps.py` reaches every configuration (`fingerprint_reach.py`).
+  * Pass flags as `--flags="--ch05-boot"`, with the `=`: argparse reads `--flags --ch05-boot`
+    as two options and exits 2 before injecting (9 of 16 baselines lost to it, #486).
   * A refactor that only rewords a generated comment reads CHANGED here. Prove it is comment-only
     by copying `src/events`, `src/events_udefs.c` and `texts/texts.txt` after each run and diffing
     them with C comments and whitespace stripped (texts.txt must stay byte-identical), then build
