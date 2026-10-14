@@ -95,7 +95,7 @@ objective:
     fail_is_soft: true          # a fallen chwinga forfeits only its own gift, not the chapter
 
 win_condition: all_enemies_defeated
-lose_condition: all_player_units_defeated         # FE8 lord rule; chwinga loss is a per-unit soft penalty
+lose_condition: lord_defeated         # FE8 lord rule; chwinga loss is a per-unit soft penalty
 soft_penalty_on_chwinga_loss:
   description: "Each chwinga that dies forfeits its own charm-gift; surviving chwinga still gift theirs."
 

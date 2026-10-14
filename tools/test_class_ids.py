@@ -59,5 +59,25 @@ class DuplicateClaim(unittest.TestCase):
         self.assertIn("'a' and 'b'", str(cm.exception))
 
 
+class DisplayName(unittest.TestCase):
+    def test_every_vanilla_class_reads_as_the_game_names_it(self):
+        # The wiki and the class index print classes by this rule; the game's own nameTextId
+        # is the reference (FE8 truncates "Pegasus Kn."/"Wyvern Kn."; the full names win).
+        import re
+        from inject.decomp import vanilla_decomp_text
+        classes = vanilla_decomp_text('src/data_classes.c')
+        texts = vanilla_decomp_text('texts/texts.txt')
+        msgs = {int(m.group(1), 16): m.group(2) for m in
+                re.finditer(r'^## MSG_([0-9A-Fa-f]+)\n(.*?)\[X\]', texts, re.M)}
+        for m in re.finditer(r'\[(CLASS_\w+) - 1\]\s*=\s*\{(.*?)\n\s*\},', classes, re.S):
+            n = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', m.group(2))
+            if not n:
+                continue
+            game = re.sub(r'\[[^\]]*\]', '', msgs.get(int(n.group(1), 0), '')).strip()
+            token = m.group(1)[len('CLASS_'):].lower().replace('_', '-')
+            self.assertEqual(game.replace(' Kn.', ' Knight'), class_ids.class_display_name(token),
+                             token)
+
+
 if __name__ == '__main__':
     unittest.main()

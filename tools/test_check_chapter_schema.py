@@ -330,6 +330,7 @@ class TestRosterKeysAgree(unittest.TestCase):
         except ImportError as e:
             self.skipTest('build_campaign unavailable (%s)' % e)
         self.assertEqual(check.ROSTER_KEYS, inject.raw_pids.ENEMY_ROSTER_KEYS)
+        self.assertEqual(check.PLACED_ROSTER_KEYS, inject.raw_pids.PLACED_ROSTER_KEYS)
 
 
 class TestRealChapters(unittest.TestCase):

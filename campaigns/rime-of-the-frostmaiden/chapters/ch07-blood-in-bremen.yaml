@@ -52,7 +52,7 @@ objective:
   seize_tile: [9, 4]
 
 win_condition: seize
-lose_condition: all_player_units_defeated
+lose_condition: lord_defeated
 
 # Vanilla Ch7's own numbers (chapter_settings L07), and its open map: no fog.
 difficulty:

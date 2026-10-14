@@ -107,7 +107,7 @@ objective:
     (Nicolas, 2026-07-06; decisions.md). The grell is visible from turn 1.
 
 win_condition: boss_defeated
-lose_condition: all_player_units_defeated         # FE8 lord rule
+lose_condition: lord_defeated         # FE8 lord rule
 
 difficulty_note: >
   Enemy pressure mirrors vanilla FE8 Ch3 1:1 (10 slots; see enemy_units). `make

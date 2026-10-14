@@ -19,6 +19,7 @@ Exit 0 = clean, 1 = drift found. Run from the repo root.
 """
 
 import ast
+import functools
 import glob
 import os
 import re
@@ -841,6 +842,8 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
 # module's `checks` CI job runs on a bare interpreter with no Pillow and no submodule, so it
 # must stay import-free; the schema tests fail if the two ever diverge.
 ROSTER_KEYS = ('enemy_units',)
+# Mirrors inject.raw_pids.PLACED_ROSTER_KEYS (every key that places a body), same reason.
+PLACED_ROSTER_KEYS = ROSTER_KEYS + ('neutral_units', 'green_allies')
 
 
 def _roster_entries(d):
@@ -1010,7 +1013,11 @@ def check_recruits_have_unit_files(fail):
                     fail.append('%s: recruits %r, which has no pcs/ or npcs/ file' % (rel, uid))
 
 
+@functools.lru_cache(maxsize=None)
 def _slot_tables(camp):
+    """campaign.yaml's `cast_slots`/`guest_slots`. inject.cast reads the same tables but
+    imports Pillow, which the bare `checks` job does not have, so this reads them itself --
+    once per campaign."""
     import yaml
     for path in _campaign_yamls():
         if os.path.dirname(path) == camp:
@@ -1029,8 +1036,10 @@ def check_unit_faces_bound(fail):
         camp = os.path.join(REPO, *rel.split('/')[:2])
         cast, guests = _slot_tables(camp)
         bound = set(cast) | set(guests)
-        for key in ('enemy_units', 'player_units', 'neutral_units', 'green_units'):
-            for u in d.get(key) or []:
+        deployment = d.get('deployment') if isinstance(d.get('deployment'), dict) else {}
+        placed = [u for key in PLACED_ROSTER_KEYS + ('player_units',) for u in d.get(key) or []]
+        for u in placed + list(deployment.get('green_allies') or []):
+            if isinstance(u, dict):
                 face, uid = u.get('face'), u.get('id')
                 if face and face not in bound:
                     fail.append('%s: %s wears face %r, which no slot table dresses'

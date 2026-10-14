@@ -124,7 +124,7 @@ objective:
   description: "Defeat Nerra, the merfolk elder"
 
 win_condition: nerra_defeated
-lose_condition: all_player_units_defeated
+lose_condition: lord_defeated
 
 # ── Difficulty (D3) ─────────────────────────────────────────────────────────────
 # Vanilla FE8 Ch6's OWN mode offsets, copied verbatim from chapter_settings
@@ -1178,8 +1178,6 @@ rescue_boats:
     - "I can't offer you much but my gratitude. If you see it, please tell me everything you can."
 
 economy:
-  reward_sites:
-  - gift: antitoxin
   # Vanilla Ch6 grants the Bolt in its ENDING scene, gated on CHECK_ALIVE for every
   # civilian -- keep them alive; boarding is NOT required for the bonus. prof-rbg is
   # our Archer, so this is a literal-parity reward that lands on a real unit.

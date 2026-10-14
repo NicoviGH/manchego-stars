@@ -9,7 +9,7 @@ is DERIVED. Do not hand-edit docs/CLASSES.md -- edit the YAML and regenerate:
 
 The *rationale* (why each PC maps to its FE class, the promotion seam) lives in
 docs/decisions.md, not here. Freshness is enforced by tools/check.py (it imports
-generate() and diffs the committed file). Stdlib + pyyaml only.
+generate() and diffs the committed file). Stdlib + pyyaml (+ the decomp-free inject.class_ids).
 """
 
 import glob
@@ -18,6 +18,9 @@ import re
 import sys
 
 import yaml
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject.class_ids import class_display_name  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PCS = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/pcs')
@@ -30,11 +33,9 @@ def squish(s):
 
 
 def class_label(token):
-    """A vanilla class token as the game spells it: 'armor-knight' -> 'Armor Knight'. Tokens are
-    vanilla's own enum names lower-cased (inject.class_ids.vanilla_class_enum), so title-casing
-    them gives the in-game name for every class we field, with no decomp read (this index is
-    regenerated on CI's checks job, which has no submodule)."""
-    return ' '.join(w.capitalize() for w in str(token).replace('_', '-').split('-'))
+    """A class token as the game names it ('armor-knight' -> 'Knight'): the one rule, shared
+    with the wiki (inject.class_ids.class_display_name)."""
+    return class_display_name(token)
 
 
 def promotion_cell(promo):

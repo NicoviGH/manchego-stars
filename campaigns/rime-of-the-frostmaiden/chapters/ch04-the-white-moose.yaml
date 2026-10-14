@@ -127,7 +127,7 @@ objective:
     into ch05.
 
 win_condition: all_enemies_defeated      # parley'd (green) wolves and the fleeing moose do not count
-lose_condition: all_player_units_defeated
+lose_condition: lord_defeated
 
 difficulty_note: >
   First monster map and first fog-of-war map — the single new idea is the fog

@@ -17,11 +17,11 @@ roster derived from the unit YAML.
 | Braulo | Barbarian (Path of the Berserker) — Hermit Crab | Pirate | **Berserker** / Warrior |
 | Marty the Merry Mushroom | Druid (Circle of Spores) — Sporemaster | Shaman | **Druid** / Summoner |
 | Meesmickle | Warlock (The Fiend) — Vampire Tabaxi | Shaman | **Summoner** / Druid |
-| Pinky | — | Pegasus Knight | **Falcon Knight** / Wyvern Knight |
+| Pinky | — | Pegasus Knight | **Falcoknight** / Wyvern Knight |
 | Prof. R.B. Geenius | Artificer (Artillerist) — Underfolk | Archer | **Sniper** / Ranger |
 | Rootis | Sorcerer (Draconic Bloodline) — Snowperson | Mage | **Sage** / Mage Knight |
 | Sclorbo | Bard (College of Lore) — Chwinga | Priest | **Bishop** / Sage |
-| Wolfram | Metallurgist (School of the Smith) — Mineralscale Drakeborn | Armor Knight | **General** / Great Knight |
+| Wolfram | Metallurgist (School of the Smith) — Mineralscale Drakeborn | Knight | **General** / Great Knight |
 
 ## Recruits & NPCs
 

@@ -235,9 +235,14 @@ def c_recruits_have_unit_files():
 
 
 def c_unit_faces_bound():
-    # ch01's boss wears izobai.png; name a bust no slot table dresses.
-    with doctored({CH01: sub1(r'(face:\s*)izobai\b', r'\g<1>izobai-canary')}):
-        return run(check.check_unit_faces_bound)
+    # ch01's boss wears izobai.png; name a bust no slot table dresses. And dress one of ch02's
+    # green allies the same way: the check once read a `green_units` key no chapter has, so a
+    # green ally's face went unchecked. Fires only if BOTH are reported.
+    with doctored({CH01: sub1(r'(face:\s*)izobai\b', r'\g<1>izobai-canary'),
+                   CH02: sub1(r'^(\s*)- id: chwinga-mote$', r'\g<0>\n\g<1>  face: mote-canary')}):
+        fail, out = run(check.check_unit_faces_bound)
+    both = all(any(tag in f for f in fail) for tag in ('izobai-canary', 'mote-canary'))
+    return (fail if both else []), out
 
 
 def c_personal_line_routes():

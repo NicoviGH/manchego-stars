@@ -148,7 +148,7 @@ objective:
         above; see decisions.md).
 
 win_condition: boss_defeated
-lose_condition: all_player_units_defeated
+lose_condition: lord_defeated
 
 difficulty_note: >
   Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar; `make
@@ -1748,13 +1748,6 @@ events:
 # + Armorslayer 1,260 + Torch 500, plus an Armory + Vendor. We MATCH the magnitude and the
 # delivery channels (this is the first chapter at the FE8-Ch5 reward tier — §Reward budget):
 economy:
-  reward_sites:                # the "villages" of Ch5, retiled as elven reliquary niches spread to the
-                                 # map edges; the eruption's undead race to desecrate them (save-all bonus).
-    - gift: booster-def          # ≈ Ch5 Dracoshield (+Def) — first stat-booster in the campaign
-    - gift: booster-skl          # ≈ Ch5 Secret Book (+Skl)
-    - gift: armorslayer          # ≈ Ch5 Armorslayer (vanilla's answer to its Armor-Knight boss;
-                                 #   ours has no armour to slay, so it reads as a plain strong sword)
-    - gift: torch                # ≈ Ch5 Torch (flavored an elven everburning lamp)
   elven_store:                   # ≈ Ch5's Armory + Vendor — an ancient elven quartermaster's reliquary
     armory: true                 #   the party requisitions (narrative: the tomb kept its stores)
     vendor: true
