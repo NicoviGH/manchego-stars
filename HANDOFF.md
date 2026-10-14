@@ -6,39 +6,42 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-13 (Claude): the campaign-arc planning pass (#486) is half done. The plan for
-ch09-ch20 now lives in `status: planned` chapter YAMLs, read through a generated wiki, on draft PR
-#487. **What landed and why is in `git log`, the PRs and #486** -- this file keeps no
-"recently landed" list.
+Refreshed 2026-10-14 (Claude): the bust matte landed (#488); recruit level and kit now have one
+home, stacked as #489 on the wiki PR #487. **Nicolas's order: finish the wiki and merge it, THEN
+resume ch07+ planning with the updated wiki.** What landed and why is in `git log`, the PRs and
+#486 -- this file keeps no "recently landed" list.
 
 ## In flight
 
-- **Draft PR #487 (`feat/486-chapter-wiki`), ROM byte-identical** (injection fingerprint, all 16
-  configs). It holds the chapter wiki generator (on that branch until it merges; published privately at
-  https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate and republish to the same file
-  after any chapter edit), the ch09-ch20 planned stubs, and the data standardization
-  (faces in campaign.yaml, one class-token vocabulary, `location:`, three recruit stubs, keyed
-  busts). Not yet `/code-review`ed; do that before asking Nicolas to merge.
+- **Draft PR #487 (`feat/486-chapter-wiki`), ROM byte-identical.** The chapter wiki generator
+  (published privately at https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate and
+  republish to the same file after any change), the ch09-ch20 planned stubs, and the data
+  standardization. Nicolas still has **layout work** to do on it; ask him for his list.
+- **PR #489 (`data/486-recruit-kit`), stacked on #487.** Every roster that LOADs a cast member
+  reads its unit file's `inventory:` (`inject.cast.unit_items`); `CLASS_LOADOUT` is retired.
+  Reviewed (`/code-review medium`) and fixed; gate green. Deliberate ROM changes: Trex joins ch03
+  with Colm's kit (he joined with nothing), Sahnar is L5 + Killing Edge everywhere, Baxby carries
+  the lance first. **Merge it after #487: retarget it to `main` (`gh pr edit 489 --base main`)
+  BEFORE #487's branch is deleted**, or GitHub closes it.
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
   locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
   locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
 
 **Next, in order** (the full state, every decision and every open pick: #486, latest comments):
 
-1. **Queued, approved work:** (a) recruit level and kit get one home (the build ignores a unit
-   file's `inventory:`, `difficulty.py` reads it first; plan on #486), proved by fingerprint plus
-   `make difficulty-gate`; (b) re-render the 15 ref-pipeline busts with `matte` to clear the edge
-   halo, before/after shown to Nicolas before any commit.
-2. **#486 planning, continue WITH Nicolas:** the open picks on the wiki's Open decisions page; then
-   Act IV beats (ch17 beat and map, ch18 map); the recruit pass (who fills each vanilla role
-   ch09-ch17); the legendary-weapon pass (one per PC); the back-half onboarding catalog; then the
-   arc ADR, and close the ledger.
-3. **#27 -- ch07's ending** once its exit hook is settled (pick pending on #486), and the move to
-   Distant Blade. The rest of the ending is known: Messie in the top hat, the fish tax, his
-   farewell reveal, the 10,000 gold, **Meriwa + Esio Trot join** (ADR 0342), the town crier. Ask
-   Nicolas for his flow first. Recruit art inputs: `references/References/Recruits/esio-trot/`;
-   Meriwa is the ch06 Mermaid plus a portrait. Still write NO custom or copied code
-   (`docs/adding-a-chapter.md`). `make CH07BOOT=1`.
+1. **Wiki pass on #487.** First the `/code-review` findings on its own code (checklist in #487's
+   latest comment), then Nicolas's layout list, regenerate + republish, `/code-review medium`,
+   merge on his word, then #489 (retarget first, above).
+2. **#486 planning, continue WITH Nicolas** on the updated wiki: the open picks on the Open
+   decisions page (ch07's exit hook first: #27's ending waits on it); then Act IV beats (ch17
+   beat and map, ch18 map); the recruit pass (who fills each vanilla role ch09-ch17); the
+   legendary-weapon pass (one per PC); the back-half onboarding catalog; then the arc ADR.
+3. **#27 -- ch07's ending** once its exit hook is settled, and the move to Distant Blade. The rest
+   of the ending is known: Messie in the top hat, the fish tax, his farewell reveal, the 10,000
+   gold, **Meriwa + Esio Trot join** (ADR 0342), the town crier. Ask Nicolas for his flow first.
+   Recruit art inputs: `references/References/Recruits/esio-trot/`; Meriwa is the ch06 Mermaid
+   plus a portrait. Still write NO custom or copied code (`docs/adding-a-chapter.md`).
+   `make CH07BOOT=1`.
 4. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337), and
    loses its blood (cast palette index 6). It joins at ch08's start (#28).
 5. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
@@ -47,8 +50,9 @@ ch09-ch20 now lives in `status: planned` chapter YAMLs, read through a generated
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
 - `make difficulty-gate` enforces ch00-ch07. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
-- ch01-ch02 lock through `accepted_residual` (party clear-load 1.41, ADR 0042), with x1.4078 /
-  x1.4081 measured, so a party-side regression there fails the gate too.
+- ch01-ch02 lock through `accepted_residual` (ADR 0326): ch01 ceiling 1.41 at x1.4078; ch02
+  ceiling 1.43 at x1.4216 once #489 lands (Pinky's real Slim Lance), so a party-side regression
+  there fails the gate too.
 - The Monte Carlo simulator is #456, parked behind its trigger.
 
 ## Chapter work
