@@ -63,8 +63,25 @@ fog: none
 
 difficulty_note: >
   Morally gray chapter -- the party is the aggressor. The fight is vanilla Ch7's: a militia
-  spread over open ground and both piers, two harpoon launchers, and the Speaker on the door.
+  spread over open ground and both piers, a harpooner among the archers, and the Speaker on
+  the door.
   Dialogue should sit in the ambiguity, not celebrate.
+
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  Move toward the Town Hall and seize it. The party enters from the west edge, and the
+  militia is spread over the open ground and both piers.
+
+  Dorbulgruf holds the door. He is a level 12 Fighter with a Steel Axe and a Hand Axe, so
+  he hits at one or two tiles, and he does not move. Fighters have poor Resistance: open
+  with Rootis, Marty and Meesmickle, then finish him with a lance. He drops a Hero Crest.
+
+  Two archers flank the Town Hall door and a harpooner covers the east pier, so keep Pinky
+  back until they fall. The fishers carry Steel Axes; meet them with lances and armour.
+
+  Bring Trex to steal the Energy Ring from one of the three mages. The mage on the west
+  side drops a Pure Water.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:

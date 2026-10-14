@@ -112,6 +112,24 @@ difficulty_note: >
   bows/magic are the neutral ranged answer. Comfortable vanilla-FE hit rates
   (~75%) via forest cover. Clear in ~8-10 turns.
 
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  Move east toward the goblin camp and kill everything in your way, then seize the camp on
+  the chief's tile. Four units deploy; pick them in the preparations screen.
+
+  The six line goblins are level 1: three Soldiers with lances on the east side near the
+  camp, and three Fighters with axes in the middle of the map. Braulo's axe beats the spear
+  goblins and the chief's lance, so send him at the east side. Wolfram's armour soaks the
+  axe goblins even though the triangle is against him.
+
+  The chief is an Armor Knight who does not move from the seize tile. Physical hits do
+  little to him; Rootis, Marty and Meesmickle's magic and R.B. Geenius's bow are the clean
+  answer. Use the forts to heal between fights.
+
+  On turn 3 three more goblins (two Fighters and a Soldier) enter from the west edge, behind
+  you. Leave someone sturdy at the rear, or turn back to meet them before seizing.
+
 # ── Player Units ──────────────────────────────────────────────────────────────
 # Whole cast is RECRUITED (Northlook scene); the field obeys vanilla Ch1: 4 slots.
 # Pick Units (prep flow) chooses which 4; the chosen lord (#42) is force-deployed.

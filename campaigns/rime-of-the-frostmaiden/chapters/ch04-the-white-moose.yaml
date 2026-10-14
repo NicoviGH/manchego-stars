@@ -141,6 +141,22 @@ difficulty_note: >
   the house target is measured vanilla parity; generosity lives in the recruit and
   the mercy, not in a softened fight.
 
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  Rout the forest under fog: you see only three tiles from each unit. Advance slowly, keep
+  units on forest tiles, and never end a turn alone at the edge of what you can see.
+
+  Four Mogalls hold the east side in a cluster and hit with dark magic, so keep low-Resistance
+  units out of their combined reach and take them one at a time. Revenants and Bonewalkers
+  hold the middle and south.
+
+  On turn 2 a pack of six Mauthe Doogs appears in the northwest corner. Deploy Marty and
+  talk to them: the pack turns green, Lupin joins you, and you no longer have to fight it.
+
+  On turn 3 seven more undead (four Revenants, three Bonewalkers) appear on the east and
+  south sides, close to where you will be by then. Visit Lonelywood for an Iron Axe.
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   deploy_limit: 9               # vanilla FE8 Ch4 fields 9; Pick Units chooses 9 of the 10 available

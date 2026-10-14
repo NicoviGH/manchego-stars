@@ -188,6 +188,24 @@ difficulty_note: >
   clean DefeatBoss so Ravisin is the climax. (Playtest remains the arbiter; the static bar
   is a proxy — spatial check + `--ch05-boot` playtest still owed at the build slice.)
 
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  Defeat Ravisin to win. She is a Druid with Flux in the northeast and does not move; the
+  White Moose stands beside her. Her guardians and the moose do not all have to fall.
+
+  Sahnar rises as an enemy Myrmidon with a Killing Edge, fast and dangerous. Only Basil can
+  recruit her, so deploy Basil, clear the enemies around Sahnar, then walk Basil up to talk
+  while your sturdier units screen her. This is the chapter's escort.
+
+  Four reliquary niches sit near the map's edges (north, west, east and south), and the
+  undead race to desecrate them. Each holds an item (a Torch, a Secret Book, an
+  Armorslayer and a Dragonshield); reach all four and you also earn a Guiding Ring.
+
+  Reinforcements arrive on turn 2 (two spear guards from the southeast), turn 6 (two axe
+  reavers from the east) and turn 8 (two archers next to Ravisin), so finish the boss before
+  the last wave if you can. The tomb also has the first arena and an armory and vendor.
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   prep_screen: true            # STANDING PROTOCOL since ch01, not a per-chapter call and NOT a

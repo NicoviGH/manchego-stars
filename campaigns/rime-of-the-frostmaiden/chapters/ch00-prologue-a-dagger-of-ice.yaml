@@ -121,6 +121,20 @@ difficulty_note: >
   and cold-immunity are FLAVOR ONLY here (shown in dialogue), NOT a mechanical gate.
   ~4-6 turns, comfortable hit rates. The tension is "don't let frail Hlin get swarmed."
 
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  Hlin must survive, and she is the weaker of the two. Scramsax is the veteran: a Hero with a
+  Steel Sword who can take every enemy on the map by himself, so let him lead.
+
+  The two caravan guards are Soldiers with Iron Lances, standing in front of Sephek on the
+  east edge. Hlin's axes beat their lances, so she can safely trade with one guard at a time;
+  keep her out of reach of both at once, and drink her Vulnerary if she drops low.
+
+  Sephek does not move. His Iron Sword beats Hlin's axe, so keep her away from him and let
+  Scramsax, whose sword is neutral against him, finish him once the guards are down. Hlin's
+  Hand Axe can chip him from two tiles away if you want to share the experience.
+
 # ── Player Units ────────────────────────────────────────────────────────────────
 player_units:
   # Hlin = the FRAIL must-survive lead (our "lord" / Eirika-analog). Book p.22: old & frail.

@@ -116,6 +116,24 @@ difficulty_note: >
   our melee cast's low RES. The doors/chokepoints, not stat inflation, make the descent
   tense.
 
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  Fight down through the mine and kill the grell at the bottom of the central shaft. It is a
+  Mogall with Evil Eye and it does not move, so the danger is the kobolds on the way down.
+
+  Two kobolds carry the keys: one drops a Door Key, the other a Chest Key. Trex joins
+  partway through as a green unit; talk to him and he becomes your thief. With him you can
+  open the four chests (Iron Lance, Iron Sword, Javelin, and a Red Gem) and steal a Pure
+  Water and an Antitoxin from two of the kobolds.
+
+  Watch the svirfneblin thief: he can steal from anyone he outspeeds. The kobold throwers
+  carry Hand Axes and hit from two tiles, and a slinger with a bow covers the middle rooms,
+  so keep Pinky back until it falls.
+
+  Evil Eye is magic, so send units with good Resistance into the grell's reach and heal
+  between attacks.
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   # Field parity: deploy_limit = vanilla FE8 Ch3 player deploy-slot count (decisions.md §Field parity;

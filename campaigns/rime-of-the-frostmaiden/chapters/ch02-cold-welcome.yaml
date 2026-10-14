@@ -90,7 +90,7 @@ objective:
   description: "Defeat the raider band; keep the chwinga alive to claim their charms"
   constraint:
     type: protect_green_allies
-    units: [chwinga-mote, chwinga-rime, chwinga-glimmer]
+    units: [chwinga-mote, chwinga-rime]   # Glimmer waits in the southern hut, off the field
     description: "Each chwinga that survives gifts a charm at chapter end (per-unit soft-fail)"
     fail_is_soft: true          # a fallen chwinga forfeits only its own gift, not the chapter
 
@@ -101,16 +101,34 @@ soft_penalty_on_chwinga_loss:
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
-  Teaches protect-the-vulnerable: three green chwinga sit where the raid converges, so
-  the party must hold a perimeter around them rather than rush forward. The chwinga ride
-  the Pegasus chassis (verified balance match to vanilla's Ross+Garcia green help), and
-  the single enemy ARCHER hard-counters fliers (iron bow vs three pegasi) — that bow IS
-  the protect tension. All-physical roster (axe + one bow) keeps the weapon triangle
+  Teaches protect-the-vulnerable: two green chwinga Priests hold the forest/fort pair where
+  the raid converges, so the party must hold a perimeter around them rather than rush
+  forward; they heal each other, and that pair is the balance match to vanilla's green
+  Ross+Garcia help. A third chwinga, Glimmer, waits in the southern hut and pays out on the
+  visit. All-physical roster (six brigands and one archer) keeps the weapon triangle
   readable — no enemy magic yet (FE8 fields no enemy casters until ~Ch5–6; our first is
-  the Ch4 frost druid). Comfortable vanilla-FE hit rates (~75%). One reinforcement pair
-  enters turn 3 from the edge OPPOSITE the boss to flank a party that has pushed forward
-  (FE8's pattern). Parity bar: vanilla enemies + 3 green chwinga ≈ vanilla Ch2 (5 raiders
-  + green Ross/Garcia) — the chwinga are the swing factor, not enemy-level inflation.
+  ch05's frost druid, Ravisin). Comfortable vanilla-FE hit rates (~75%). One reinforcement
+  pair enters turn 3 from the edge OPPOSITE the boss to flank a party that has pushed
+  forward (FE8's pattern). Parity bar: vanilla enemies + the two green chwinga ≈ vanilla Ch2
+  (5 raiders + green Ross/Garcia) — the chwinga are the swing factor, not enemy-level
+  inflation.
+
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  Defeat every raider. Five units deploy; the party starts in the northwest.
+
+  Two green chwinga Priests sit on the forest and fort tiles just ahead of you, in the
+  raid's path. They heal each other, but they cannot fight, and each one that dies takes its
+  gift with it (a Hand Axe and an Elixir). Move up fast and form a wall in front of them.
+  The raider captain (Steel Axe) and two of his brigands start close to them.
+
+  Every raider but one carries an axe, so lance users win the trades: Wolfram and Baxby
+  are the best walls here. Keep Pinky away from the lone archer on the east side until
+  someone has dealt with it.
+
+  On turn 3 two more raiders arrive from the west edge, behind the party. Visit the southern
+  hut for Glimmer's Pure Water on the way.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 # Field parity (decisions.md §"Field parity", 2026-06-10): deploy_limit = vanilla Ch2's
@@ -595,11 +613,11 @@ design_notes: >
   FE8 base: "The Protected" (DefeatAll + protect-the-green-ally). No enemy caster on the
   field — FE8 withholds casters until mid-game and our first is the ch05 frost-druid boss
   (Ravisin); an early one would break the physical-triangle teaching ramp. The protect
-  layer is three GREEN chwinga (snow-spirits) on the Pegasus chassis — the verified balance
-  match to vanilla's green Ross+Garcia — with the chapter's SIGNATURE beat being per-unit
-  soft-fail: a chwinga that dies forfeits only its own charm-gift (Red Gem / Elixir / Pure
-  Water, vanilla Ch2's three village gifts 1:1), never a game over. The single enemy archer
-  hard-counters the fliers, so the bow IS the protect tension. The ending's frozen body is a
+  layer is two GREEN chwinga (snow-spirits) fielded as Priests — the balance match to
+  vanilla's green Ross+Garcia — with the chapter's SIGNATURE beat being per-unit soft-fail:
+  a chwinga that dies forfeits only its own charm-gift (a Hand Axe and an Elixir; the third
+  chwinga, Glimmer, hands over Pure Water from her hut), never a game over. Vanilla Ch2's
+  Red Gem moved to ch03 in the ch02/ch03 swap (`payload_deviations`). The ending's frozen body is a
   *story* seed only (no combat here): the town blames the druids' sacrifice rumor, while Rootis
   clocks it as Sephek's dagger-of-ice kill — a breadcrumb for his Act-II reckoning, distinct
   from Ravisin (see docs/decisions.md §Story → Sephek arc). The chardalyn berserkers are
