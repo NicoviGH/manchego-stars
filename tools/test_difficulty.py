@@ -1713,14 +1713,15 @@ class ItemEconomy(unittest.TestCase):
                                            {'id': 'vulnerary'}]}],
             'chests': [{'contents': [{'id': 'red-gem'}]}],
             'enemy_units': [{'id': 'k', 'item_drop': 'chest-key'}],
-            'post_chapter': {'available_shops': ['termalaine']},
+            'post_chapter': {'available_shops': ['termalaine']},     # a town: not a shop here
+            'map': {'vanilla_layout': 'Ch2Map'},          # its shops are the map donor's
         }
         ours = df.chapter_economy(chap)
         self.assertEqual(ours['gold'], 150)               # village gold only: no clear stipend (ADR 0092)
         self.assertEqual(ours['gifts'], ['vulnerary'])
         self.assertEqual(ours['chests'], ['red-gem'])
         self.assertEqual(ours['drops'], ['chest-key'])
-        self.assertEqual(ours['shops'], ['termalaine'])
+        self.assertEqual(ours['shops'], ['ShopList_Event_Ch2Armory'])
 
     def test_chapter_economy_counts_non_village_delivery_vehicles(self):
         """A gift is a gift whatever carries it (#26).

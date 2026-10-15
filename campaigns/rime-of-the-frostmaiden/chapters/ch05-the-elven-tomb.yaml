@@ -1767,9 +1767,8 @@ events:
 # + Armorslayer 1,260 + Torch 500, plus an Armory + Vendor. We MATCH the magnitude and the
 # delivery channels (this is the first chapter at the FE8-Ch5 reward tier — §Reward budget):
 economy:
-  elven_store:                   # ≈ Ch5's Armory + Vendor — an ancient elven quartermaster's reliquary
-    armory: true                 #   the party requisitions (narrative: the tomb kept its stores)
-    vendor: true
+  # The elven store, an ancient quartermaster's reliquary the party requisitions, is vanilla
+  # Ch5's Armory (2,1) + Vendor (6,10), inherited with the map (inject.villages.chapter_shops).
   save_all_bonus: guiding-ring   # vanilla Ch5's own save-all-villages reward, kept as itself.
                                  # It is the chapter's promotion FORESHADOW (decisions.md — the
                                  # promotion seam): nobody is near level 10 in the MVP, so it sits
@@ -1937,7 +1936,6 @@ villages:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  available_shops: [elven-reliquary]   # the in-tomb elven store (Armory + Vendor); see economy block
   units_available_to_recruit:
     - id: sahnar                         # Myrmidon (sword duelist); see npcs/sahnar.yaml
       description: "Sahnar (she/her), the reawakened elven royal — a moon-elf mummy, recruited via Basil's Talk (the Joshua beat). Playable Myrmidon."

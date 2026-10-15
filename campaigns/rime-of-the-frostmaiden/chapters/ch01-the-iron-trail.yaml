@@ -76,7 +76,7 @@ narrative: >
 map:
   file: maps/ch01-the-iron-trail.mar     # painted in the HTML editor (ch00 flow)
   tileset: snowy-bern                    # shared winter tileset (#41)
-  base_layout: Ch13EirikaMap             # vanilla 25×16 layout, winter-reskinned
+  vanilla_layout: Ch13EirikaMap             # vanilla 25×16 layout, winter-reskinned
   size: "25x16"
   description: >
     Linear snowy trail between peak ridges: Bryn Shander outskirts at the left

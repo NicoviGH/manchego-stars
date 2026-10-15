@@ -160,12 +160,35 @@ def location_events(villages, village_slots, shops=(), flags=None, houses=(), se
 
 
 
-def chapter_location_events(chap, village_slots, shops=(), flags=None, house_scripts=(),
-                            seize=False):
-    """A chapter's Location list off its own `villages:` (#479: was one wrapper per chapter).
+def vanilla_eventinfo_stem(layout):
+    """A vanilla map's chapter as its src/events file stem: Ch5Map -> ch5, and a route map
+    Ch13EirikaMap -> ch13a (Ephraim's: ch13b), which is how the decomp names those files."""
+    stem = re.sub(r'Map$', '', layout).lower()
+    return stem.replace('eirika', 'a').replace('ephraim', 'b')
+
+
+def chapter_shops(chap):
+    """The shops a chapter's map stands on, as vanilla wired them: the Armory/Vendor/SecretShop
+    lines of the map donor's own Location list (`map.vanilla_layout`), at HEAD.
+
+    A shop is part of the map: the Shop command reads the tile, and the line only names the
+    stock. A chapter on vanilla's map has vanilla's shops where vanilla put them, read once for
+    the injector, difficulty and the wiki. Before this, ch05 copied its two lines into a module
+    tuple and every other chapter had none, so ch02 shipped without vanilla Ch2's Armory."""
+    layout = (chap.get('map') or {}).get('vanilla_layout')
+    if not layout:
+        return []
+    info = vanilla_decomp_text('src/events/%s-eventinfo.h' % vanilla_eventinfo_stem(layout))
+    return [(macro, sym, int(x), int(y)) for macro, sym, x, y in re.findall(
+        r'\b(Armory|Vendor|SecretShop)\(\s*(\w+),\s*(\d+),\s*(\d+)\s*\)', info)]
+
+
+def chapter_location_events(chap, village_slots, flags=None, house_scripts=(), seize=False):
+    """A chapter's Location list off its own `villages:` and `shops:` (#479: was one wrapper
+    per chapter).
 
     `village_slots` is the chapter's {village id: (script symbol, msg, ...)} table; each visit
-    runs the slot's script. `shops` and `flags` as in `location_events`. `house_scripts` are
+    runs the slot's script. `flags` as in `location_events`. `house_scripts` are
     the scripts for the YAML's `type: house` events, in YAML order, one each. `seize` adds the
     objective's `seize_tile`."""
     houses = [e for e in chap.get('events', []) if e.get('type') == 'house']
@@ -174,7 +197,7 @@ def chapter_location_events(chap, village_slots, shops=(), flags=None, house_scr
                  % (chap.get('id', '?'), len(houses), len(house_scripts)))
     return location_events(chap.get('villages', []),
                            {vid: slot[0] for vid, slot in village_slots.items()},
-                           shops, flags=flags,
+                           chapter_shops(chap), flags=flags,
                            houses=[(script, h['tile'][0], h['tile'][1])
                                    for script, h in zip(house_scripts, houses)],
                            seize=chap['objective']['seize_tile'] if seize else None)
@@ -204,7 +227,6 @@ def assert_village_tiles_visitable(chap, maps_dir, stem):
                      'unobtainable. Paint a village tile there (#205).'
                      % (village['id'], x, y, terrain[y][x]))
 
-
 def vanilla_village_gifts(layout, eventinfo=None, eventscript=None):
     """{(x, y): ITEM_ enum} -- what vanilla hands out at each village on `layout`'s chapter.
 
@@ -212,7 +234,7 @@ def vanilla_village_gifts(layout, eventinfo=None, eventscript=None):
     `Village(flag, script, x, y)` entries; the ITEM is a RAW id inside that script's
     `SVAL(EVT_SLOT_3, <id>)`, which is why it is easy to have and never look at.
     """
-    stem = re.sub(r'Map$', '', layout).lower()          # Ch5Map -> ch5
+    stem = vanilla_eventinfo_stem(layout)
     if eventinfo is None:
         eventinfo = vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     if eventscript is None:

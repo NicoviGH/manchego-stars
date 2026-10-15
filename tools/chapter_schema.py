@@ -106,8 +106,8 @@ CHAPTER = {
     'soft_penalty_on_chwinga_loss': {'description': ANY},
     'charm_gifts': {'note': ANY},
     # the map
-    'map': {'file': ANY, 'size': ANY, 'tileset': ANY, 'base_layout': ANY,
-            'vanilla_layout': ANY, 'description': ANY, 'terrain_note': ANY,
+    'map': {'file': ANY, 'size': ANY, 'tileset': ANY, 'vanilla_layout': ANY, 'description': ANY,
+            'terrain_note': ANY,
             'placement_directives': ANY,
             'terrain_mechanic': {'boat_pockets': ANY, 'channels': ANY, 'crossings': ANY,
                                  'ice_walls': ANY, 'lake_ice': ANY, 'snow_drifts': ANY}},
@@ -145,9 +145,8 @@ CHAPTER = {
     'cutscene_actors': ANY,
     'events': [EVENT],
     'arena_presentation': {'attendant': {'face_slot': ANY, 'portrait': ANY}},
-    'available_shops': ANY,      # difficulty.py reads it here as well as under post_chapter
-    'economy': {'elven_store': {'armory': ANY, 'vendor': ANY},
-                'reward_sites': [{'gift': ANY}],
+    'available_shops': ANY,      # a world-map TOWN shop label (campaign.yaml world_map)
+    'economy': {'reward_sites': [{'gift': ANY}],
                 'save_all_bonus': ANY, 'save_all_gate': ANY},
     'post_chapter': {'available_shops': ANY, 'ends_mvp': ANY,
                      'net_gold': ANY, 'hooks': ANY, 'unlocks_chapter': ANY,

@@ -86,6 +86,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #493: a chapter names its vanilla map donor once, as `map.vanilla_layout`
+    r'base_layout',
+    # retired by #493: in-map shops are the map donor's, inherited (villages.chapter_shops)
+    r'elven_store', r'CH05_SHOPS',
     # retired by #486: a unit's class is a vanilla token resolved like an enemy's, no display map
     r'CLASS_MAP',
     # retired by #486: a cast member's kit lives in its unit file's inventory, read by unit_items

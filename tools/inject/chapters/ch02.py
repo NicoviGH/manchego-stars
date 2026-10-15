@@ -32,7 +32,7 @@ from inject.text import (
 from inject.units import (
     _ally_unit_entry, _deploy_cap_entries, enemy_ai_initialiser, enemy_rows)
 from inject.villages import (
-    chapter_location_events, DEFAULT_VILLAGE_SPEAKER, village_boxes, village_reward_item,
+    assert_village_tiles_visitable, chapter_location_events, DEFAULT_VILLAGE_SPEAKER, village_boxes, village_reward_item,
     village_script)
 
 
@@ -220,6 +220,7 @@ def inject_ch02(campaign, verbose=True):
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
+    assert_village_tiles_visitable(chap, maps_dir, CH02_LAYOUT[1])
 
     # 0. Cutscene beat splits, consumed from the locked chapter YAML (cf. inject_ch01).
     op_card, op_beats = _split_event_beats(chap, 'chapter_start', 'ch02 opening',

@@ -36,6 +36,7 @@ import inject.hosts  # noqa: E402
 import inject.paths  # noqa: E402
 import inject.raw_pids  # noqa: E402
 import inject.stats  # noqa: E402
+import inject.villages  # noqa: E402
 import argparse
 import json
 import sys
@@ -2775,8 +2776,10 @@ def chapter_economy(chap):
     for ed in chapter_roster_entries(chap):
         if ed.get('item_drop'):
             drops.append(ed['item_drop'])
-    pc = chap.get('post_chapter') or {}
-    shops = list(pc.get('available_shops') or chap.get('available_shops') or [])
+    # The in-map shops' stock lists, the same thing vanilla_economy reports for the twin. Not
+    # `available_shops`: that is a world-map TOWN label, and reading it made ch02 look stocked
+    # beside vanilla Ch2's Armory while ch02 had no shop at all.
+    shops = [sym for _macro, sym, _x, _y in inject.villages.chapter_shops(chap)]
     return {'gold': gold, 'gifts': gifts, 'chests': chests, 'drops': drops, 'shops': shops}
 
 

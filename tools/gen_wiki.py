@@ -36,6 +36,7 @@ import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
 import inject.stats                                    # noqa: E402
 import inject.unit_art as unit_art                     # noqa: E402
+import inject.villages                                 # noqa: E402
 import portrait_tool                                   # noqa: E402
 from inject.class_ids import class_display_name        # noqa: E402
 from wiki import art                                   # noqa: E402
@@ -883,12 +884,7 @@ def item_rows_html(chap):
 
 
 def shop_html(chap):
-    try:
-        import importlib
-        mod = importlib.import_module('inject.chapters.%s' % chap['_slug'])
-    except Exception:
-        return ''
-    shops = getattr(mod, '%s_SHOPS' % chap['_slug'].upper(), None)
+    shops = inject.villages.chapter_shops(chap)
     if not shops:
         return ''
     text = inject.decomp.vanilla_decomp_text('src/data_items.c')

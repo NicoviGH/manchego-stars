@@ -10,6 +10,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.decomp
 import inject.chapter_ids
+import inject.chapters.ch02
 import inject.hosting
 import inject.villages
 
@@ -149,13 +150,46 @@ class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
         self.assertIn('Armory(ShopList_Event_Ch5Armory, 2, 1)', body)
         self.assertIn('Vendor(ShopList_Event_Ch5Vendor, 6, 10)', body)
 
-    def test_village_reward_item_uses_the_chapters_own_map(self):
-        """It used to close over ITEM_ENUM, which made a shared helper silently ch04-only:
-        ch05's stat boosters are not in that dict, so the first reuser would die on a KeyError."""
+    def test_village_reward_item_reads_the_campaign_item_table(self):
+        """It used to close over ch04's item table, which made a shared helper silently
+        ch04-only: ch05's stat boosters were not in it, so the first reuser died on a KeyError."""
         village = {'id': 'a', 'visit_reward': [{'id': 'booster-def'}]}
         self.assertEqual(inject.villages.village_reward_item(village),
                          'ITEM_BOOSTER_DEF')
         self.assertIsNone(inject.villages.village_reward_item({'id': 'b'}))
+
+
+CAMPAIGN = 'rime-of-the-frostmaiden'
+
+
+class ShopsAreTheMapDonors(unittest.TestCase):
+    """A chapter on vanilla's map has vanilla's shops where vanilla put them, read from the
+    donor's own Location list (chapter_shops). ch02 shipped without vanilla Ch2's Armory while
+    ch05 copied its two lines into a module tuple."""
+
+    def _chap(self, yaml_name):
+        return inject.hosting._load_chapter_yaml(CAMPAIGN, yaml_name)
+
+    def test_ch02_fields_vanilla_ch2s_armory(self):
+        chap = self._chap(inject.chapters.ch02.CH02_CHAPTER_YAML)
+        body = inject.villages.chapter_location_events(chap, {
+            v['id']: ('MS_X',) for v in chap['villages']})
+        self.assertIn('Armory(ShopList_Event_Ch2Armory, 5, 7)', body)
+
+    def test_ch05_keeps_its_armory_and_vendor(self):
+        rows = inject.villages.chapter_shops(self._chap(inject.chapter_ids.CH05_CHAPTER_YAML))
+        self.assertEqual(rows, [('Armory', 'ShopList_Event_Ch5Armory', 2, 1),
+                                ('Vendor', 'ShopList_Event_Ch5Vendor', 6, 10)])
+
+    def test_a_donor_without_shops_adds_none(self):
+        self.assertEqual(inject.villages.chapter_shops({'map': {'vanilla_layout': 'Ch3Map'}}), [])
+        self.assertEqual(inject.villages.chapter_shops({'map': {}}), [])
+
+    def test_a_route_map_resolves_to_its_route_s_file(self):
+        self.assertEqual(inject.villages.vanilla_eventinfo_stem('Ch13EirikaMap'), 'ch13a')
+        self.assertEqual(inject.villages.vanilla_eventinfo_stem('Ch13EphraimMap'), 'ch13b')
+        self.assertEqual(inject.villages.chapter_shops(
+            {'map': {'vanilla_layout': 'Ch13EirikaMap'}}), [])
 
 
 if __name__ == '__main__':

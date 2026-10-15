@@ -242,12 +242,6 @@ CH05_RUIN_ORIGIN = 740
 # defect ch04 shipped and fixed (a summer forest in a snowbound fog chapter, Nicolas 2026-08-05):
 # a retile inherits the twin's BACKDROP too, and the twin's backdrop is about the twin's setting.
 CH05_VISIT_BG = 'BG_INTERIOR_BROWN'  # Nicolas's pick 2026-08-09, chosen off an in-engine
-# The elven store (`economy.elven_store`). Armory/Vendor take their stock DIRECTLY -- no script,
-# no text -- so these are wired PERMANENTLY, not as placeholders. Stock is vanilla Ch5's own,
-# which is what `make difficulty CH=ch05` prices the shop tier against.
-CH05_SHOPS = (('Armory', 'ShopList_Event_Ch5Armory', 2, 1),
-              ('Vendor', 'ShopList_Event_Ch5Vendor', 6, 10))
-
 CH05_LAYOUT = ('Ch05ElvenTombMap', 'ch05-the-elven-tomb')   # (asset label, maps/ stem)
 CH05_TILESET = 'port-or-town-winter'             # stem 'PortTown'; ch05 is the first chapter to
                                                  # use it, so it self-registers (the Cave idiom)
@@ -1832,7 +1826,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         # Location = the four reliquary visits + the elven store. The shops are wired for good (a
         # shop needs no script and no text); the visits own their rewards, and each carries its
         # CH05_VILLAGE_FLAGS event id -- the race (#25).
-        'locationBasedEvents': chapter_location_events(chap, CH05_VILLAGE_SLOTS, CH05_SHOPS,
+        'locationBasedEvents': chapter_location_events(chap, CH05_VILLAGE_SLOTS,
                                                        flags=CH05_VILLAGE_FLAGS),
         'characterBasedEvents': sahnar_char_events,
     }, roster=CH05_ALLY_TABLE, scenes=(CH05_BEGINNING_SCRIPT, CH05_ENDING_SCRIPT))

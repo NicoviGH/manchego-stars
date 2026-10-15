@@ -87,7 +87,7 @@ narrative: >
 map:
   file: maps/ch03-the-termalaine-mine.mar    # painted on the cave-interior metatiles (gen_map_editor eyedropper flow)
   tileset: cave-interior        # vendored FE cave/dungeon tileset, arctic palette (model on the ch01/ch02 winter pipeline)
-  base_layout: Ch3Map           # vanilla Ch3 "Bandits of Borgo" geometry, repainted as a mine interior
+  vanilla_layout: Ch3Map           # vanilla Ch3 "Bandits of Borgo" geometry, repainted as a mine interior
                                 #   RULED 2026-07-04 (Nicolas): Borgo repaint CONFIRMED — the 2026-06-29
                                 #   proposed custom Gem-Mine blockout (#23) is rejected; decisions.md ADR.
   size: "17×16"                 # = vanilla Ch3Map dims (enemy/seize tiles cite vanilla coords); painted 2026-07-06

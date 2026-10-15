@@ -13,7 +13,7 @@ status: planned                # brainstorm SEED, NOT authoritative: enemy roste
                                # (brainstorming skill digests this). Exempt from the parity gate until then.
 milestone: M3
 cadence: scripted_defeat        # see docs/CHAPTERS.md — 🎬 (the MVP wall)
-fe8_base_map: "TBD"   # Hamill Canyon was named here, but ch01 is built on it (base_layout Ch13EirikaMap); open question below
+fe8_base_map: "TBD"   # Hamill Canyon was named here, but ch01 is built on it (vanilla_layout Ch13EirikaMap); open question below
 parity_reference: "FE8 Ch8"   # the twin is the chapter NUMBER, not the borrowed map (#459); scripted defeat, so informational
 is_mvp_finale: true
 

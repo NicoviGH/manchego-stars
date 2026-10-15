@@ -69,7 +69,8 @@ narrative: >
 map:
   file: maps/ch02-cold-welcome.mar     # hand-authored on the snow metatiles (ch01 flow)
   tileset: snowy-bern                  # shared winter tileset (#41)
-  base_layout: Ch2Map                  # vanilla 15×15 "The Protected", winter-reskinned
+  vanilla_layout: Ch2Map               # vanilla 15×15 "The Protected", winter-reskinned; its
+                                       # Armory (5,7) is Targos's, inherited with the map
   size: "15×15"                 # compact, mirrors FE8 Ch2 (coords top out ~14×14)
   description: >
     Compact snowy road into Targos. The party rolls in aboard the Rolling Cheddar (their
