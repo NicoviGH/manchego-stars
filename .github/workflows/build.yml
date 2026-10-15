@@ -247,3 +247,35 @@ jobs:
       # passes (enforces nothing). Reads the decomp HEAD, so it needs the submodule (above).
       - name: Enemy-pressure parity curve + per-chapter gate
         run: make CAMPAIGN=rime-of-the-frostmaiden difficulty-gate
+
+      # The wiki (#486) is generated here because it renders donor maps from the build
+      # tree's graphics. Every run builds it, so a broken generator fails the PR; only a
+      # main run publishes it, and the deploy-wiki job below serves it on GitHub Pages.
+      - name: Generate the wiki
+        run: python3 tools/gen_wiki.py
+
+      - name: Upload the wiki (main only)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/wiki
+
+  # Publishes what the build job uploaded, so the wiki follows main with no manual step
+  # (ADR in docs/decisions.md: "The wiki is a GitHub Pages site CI deploys from main").
+  deploy-wiki:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4

@@ -8,8 +8,8 @@ Nothing on a page is typed by hand. Each section names its source:
   * OUR chapter       -- campaigns/<c>/chapters/ch*.yaml (active or `status: planned`)
   * the vanilla TWIN  -- the decomp at HEAD (units, recruits, drops, chests, gifts, shops),
                          read through difficulty.py's readers, never the working tree
-  * the twin's play   -- the Fire Emblem Wiki's own Strategy section, read from the local
-                         mirror in References/fe8-wiki/ and labelled as theirs
+  * the twin's play   -- the Fire Emblem Wiki's own Strategy section, read from its vendored
+                         copy in tools/wiki/vendor/twins/ and labelled as theirs
 The stylesheets in tools/wiki/assets/ are the wiki's own (Timeless skin + site styles), so the
 page reads like the reference it borrows from; the branding is ours.
 """
@@ -48,7 +48,7 @@ ROOT = os.path.dirname(TOOLS)
 CAMPAIGN = 'rime-of-the-frostmaiden'
 CAMP = os.path.join(ROOT, 'campaigns', CAMPAIGN)
 ASSETS = os.path.join(TOOLS, 'wiki', 'assets')
-WIKI_MIRROR = os.path.join(ROOT, 'references', 'References', 'fe8-wiki')
+WIKI_MIRROR = os.path.join(TOOLS, 'wiki', 'vendor', 'twins')   # the twins' pages, GFDL (CREDITS.md)
 OUT = os.path.join(ROOT, 'build', 'wiki', 'index.html')
 
 # Vanilla FE8 by chapter NUMBER on Eirika's route (the curve twin, #459), plus the decomp stem
@@ -1095,6 +1095,25 @@ def _ai_shape(chap, ed):
         return None
 
 
+def chapter_status(chap):
+    """Where a chapter stands, from its YAML `status:`: `planned` (a seed), `complete` (Nicolas
+    has signed it off), `active` under construction. The balance lock is a separate fact."""
+    st = str(chap.get('status') or '')
+    return 'Planned' if st == 'planned' else 'Complete' if st == 'complete' else 'Under construction'
+
+
+def status_notice(chap):
+    """Template:Stub's notice shape (a bold-italic line between rules) atop an unfinished
+    chapter, or '' for a complete one."""
+    st = chapter_status(chap)
+    if st == 'Complete':
+        return ''
+    what = ('planned: its story, map and roster are a seed and may change'
+            if st == 'Planned' else 'under construction: what is built is playable, and the '
+            'rest is still being made')
+    return "----\n'''''This chapter is %s.'''''\n----\n" % what
+
+
 def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
     slug = chap['_slug']
     title = chap.get('title', slug)
@@ -1247,7 +1266,7 @@ def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
                         for ed in bosses_of(chap)]
 
     c['strategy'] = chap.get('strategy')
-    return wp.chapter(c)
+    return status_notice(chap) + wp.chapter(c)
 
 
 RANK_PARAMS = (('sw', 'sword'), ('la', 'lance'), ('ax', 'axe'), ('bo', 'bow'),
@@ -1391,10 +1410,10 @@ def _join_lines(uid, name, chap, units):
             '%s joins at the end of %s.' % (name, where))
 
 
-HD_ART = os.path.join(ROOT, 'references', 'References', 'PCs', 'HD Art')
+HD_ART = os.path.join(CAMP, 'portraits', 'hd')    # the PCs' HD art at the 640px the page embeds
 # Illustrations cropped from *Rime of the Frostmaiden*, with index.yaml naming each one's printed
 # page and the book's caption. Book art, never the busts Nicolas made as sprite sources.
-BOOK_ART = os.path.join(ROOT, 'references', 'References', 'Book Art')
+BOOK_ART = os.path.join(CAMP, 'lore', 'book-art')
 
 
 def book_art(files, *keys):
@@ -1430,7 +1449,7 @@ def jpeg_uri(img, longest=640):
 
 
 def hd_art(uid, units):
-    """The unit's HD artwork in References/PCs/HD Art (`<Name>HD.<ext>`, the name being its id,
+    """The unit's HD artwork in portraits/hd/ (`<Name>HD.<ext>`, the name being its id,
     its first name, or a part of its id), as a PIL image."""
     if not os.path.isdir(HD_ART):
         return None
@@ -1868,8 +1887,8 @@ def design_page(chap, navbox_html=''):
     plan = chap.get('plan') or {}
     ckey = twin_key(chap.get('parity_reference'))
     parts = [mk.infobox('%s/Design notes' % title, '', [
-        ('Status', esc('Planned' if chap.get('status') == 'planned' else
-                       'Locked' if chap.get('balance_locked') else 'Active')),
+        ('Status', esc(chapter_status(chap))),
+        ('Balance', 'Locked' if chap.get('balance_locked') else 'Open'),
         ('Curve twin', twin_label(chap.get('parity_reference'))),
         ('Map donor', twin_label(chap.get('fe8_base_map'))),
         ('Source', '<code>%s</code>' % esc(chap['_file'])),
@@ -2038,15 +2057,14 @@ def home_page(chs, units, navbox_html=''):
 def index_page(chs, navbox_html=''):
     rows = []
     for c in chs:
-        st = 'Planned' if c.get('status') == 'planned' else ('Locked' if c.get('balance_locked')
-                                                           else 'Active')
         rows.append((mk.ours(c['_slug'], c['_slug']), mk.ours(c['_slug'], c.get('title')),
                      twin_label(c.get('parity_reference')), twin_label(c.get('fe8_base_map')),
-                     esc(st)))
+                     esc(chapter_status(c)), 'Locked' if c.get('balance_locked') else ''))
     return page('chapters', 'List of chapters in Manchego Stars', '<p>Every chapter of the '
                 'campaign, built and planned. Each page is generated from the chapter\'s YAML and '
                 'the FE8 decomp, so it is only as current as the last build.</p>' + wikitable(
-                    ['Ch', 'Title', 'Curve twin', 'Map donor', 'Status'], rows) + navbox_html)
+                    ['Ch', 'Title', 'Curve twin', 'Map donor', 'Status', 'Balance'], rows)
+                + navbox_html)
 
 
 def css():

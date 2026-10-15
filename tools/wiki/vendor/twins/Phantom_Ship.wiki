@@ -1,0 +1,2758 @@
+{{Stub}}
+{{Chapter Infobox
+|image=[[File:Cm fe08 11B.png|200px]]
+|location=[[Grado#Taizel|Taizel]]
+|weather=[[Fog of War]]
+|new units=[[L'Arachel]], [[Dozla]]
+|boss=[[Monster]]
+|previous=[[Turning Traitor]]
+|next=[[Landing at Taizel]]
+}}
+
+'''Phantom Ship''' (Japanese: {{hl|幽霊船|Yūreisen}} ''Phantom Ship'') is the eleventh chapter of [[Ephraim]]'s route in {{FE8}}.
+
+After completing this chapter, the player is immediately sent into [[Landing at Taizel|the next]]. It is not possible to return to the [[world map]] during the next chapter.
+
+==Plot==
+{{main|Phantom Ship/Script}}
+
+When [[Selena (The Sacred Stones)|Selena]] returns to [[Grado]] Keep, Emperor [[Vigarde]] is disappointed that she failed to execute [[Duessel]]. Selena begs for a second chance, and [[Lyon]] gives her a mission to obtain a [[dragonstone]] located in [[Za'albul Marsh]]. Selena gratefully accepts; she choses to renew her oath of service to Vigarde, and leaves for Za'albul Marsh.
+
+On a ship to Grado, [[Myrrh]] observes the sea for the first time; [[Ephraim]] is also sailing for the first time, but feels he must remain calm and attentive as a leader. Ephraim and Myrrh's conversation is interrupted when [[Seth]] notices an unknown ship approaching them with an inhuman crew. On the other ship, [[Riev]] instructs the [[monster]]s to wreak havoc on the ocean.
+
+During the battle, the monsters' ship comes alongside Ephraim's as they board. Later, Ephraim spots another ship in the distance, but cannot identify its crew—on the other ship, [[L'Arachel]] and [[Dozla]] prepare to fight the monsters terrorizing the ocean.
+
+Ephraim can talk to L'Arachel during the battle; Ephraim does not recognize her or tales of her exploits, buts asks for her assistance fighting the monsters, which she is glad to provide. L'Arachel can then talk to Dozla, informing him that they will now be working with Ephraim.
+
+Once the monsters are routed, L'Arachel introduces herself to Ephraim; Ephraim introduces himself as the prince of [[Renais]], and L'Arachel clarifies that she is the princess of [[Rausten]]. Ephraim informs L'Arachel of his mission to Grado, and L'Arachel insists on accompanying him in spite of the dangers; if Dozla is alive, L'Arachel informs him of their new destination, and Dozla unquestioningly accompanies her.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Ephraim]] dies
+|ally=1–11{{h|+2|Upon L'Arachel and Dozla being recruited}}
+|other=0{{h|+2|Reinforcements}}{{h|−2|Upon L'Arachel and Dozla being recruited}}
+|enemy=10{{h|+38|Reinforcements}}
+|map={{Tab
+|tab1=Initial
+|tab2=Turn 2
+|tab3=Turn 3
+|tab4=Turn 5
+|content1=<div>[[File:Cm fe08 11B initial.png]]</div>
+|content2=<div>[[File:Cm fe08 11B turn 2.png]]</div>
+|content3=<div>[[File:Cm fe08 11B turn 3.png]]</div>
+|content4=<div>[[File:Cm fe08 11B turn 5.png]]</div>
+}}
+|col=21
+|row=19
+}}
+|content2={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Ephraim]] dies
+|ally=1–11{{h|+2|Upon L'Arachel and Dozla being recruited}}
+|other=0{{h|+2|Reinforcements}}{{h|−2|Upon L'Arachel and Dozla being recruited}}
+|enemy=10{{h|+44|Reinforcements}}
+|map={{Tab
+|tab1=Initial
+|tab2=Turn 2
+|tab3=Turn 3
+|tab4=Turn 5
+|content1=<div>[[File:Cm fe08 11B initial.png]]</div>
+|content2=<div>[[File:Cm fe08 11B turn 2.png]]</div>
+|content3=<div>[[File:Cm fe08 11B turn 3.png]]</div>
+|content4=<div>[[File:Cm fe08 11B turn 5.png]]</div>
+}}
+|col=21
+|row=19
+}}
+}}
+
+The ships in the map image move into those positions over time.
+*At first, the player ship and enemy ship are far apart.
+*On turn 2, the enemy ship moves closer to the player ship.
+*On turn 3, three plank bridges appear to connect the two ships.
+*On turn 5, the NPC ship appears.
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=L'Arachel
+|portrait=[[File:portrait l'arachel fe08.png]]
+|class=Troubadour
+|HP=18
+|lv=3
+|inventory={{Item|8|Mend}}<br>{{Item|8|White Gem}}<br>{{Item|8|Elixir}}
+|recruitment method=NPC, talk to with [[Ephraim]], or automatically at the end of the chapter if she survived<br><small>(Appears on turn 5)</small>
+}}
+|newunit2={{NewUnit
+|name=Dozla
+|portrait=[[File:portrait dozla fe08.png]]
+|class=Berserker
+|HP=43
+|lv=1
+|inventory={{Item|8|Battle Axe}}<br>{{Item|8|Elixir}}
+|recruitment method=NPC, talk to with [[L'Arachel]], or automatically at the end of the chapter if he survived<br><small>(Appears on turn 5)</small>
+}}
+|forced1=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=duessel
+|return19=cormag
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|itemlast=Short Spear
+|obtainlast=Dropped by the boss [[Deathgoyle]] (reinforcement)
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=16~18
+|str=3~5
+|skill=2~3
+|spd=3~4
+|lck=1~2
+|def=2~3
+|res=4~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=• One immediately begins moving unprovoked.<br>• The other three will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=21~23
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=6~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=• The closest two immediately begin moving unprovoked.<br>• The other two will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=8
+|#=1
+|hp=21~22
+|str=7~8
+|skill=3~5
+|spd=6~8
+|lck=0~1
+|def=6~7
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=21~23
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=6~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until turn 5.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=9
+|#=5
+|hp=28~30
+|str=3~5
+|skill=1~2
+|spd=0~1
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=2
+|hp=22~24
+|str=5~7
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=1
+|hp=29~31
+|str=4~5
+|skill=1~2
+|spd=0~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=2
+|hp=20~22
+|str=5~6
+|skill=4~5
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=One will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=3
+|hp=22~24
+|str=5~7
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Two will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=35
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=22~24
+|str=5~7
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=3
+|#=1
+|hp=35
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=22~24
+|str=5~7
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=16~18
+|str=3~5
+|skill=2~3
+|spd=3~4
+|lck=1~2
+|def=2~3
+|res=4~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=3
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=1
+|#=2
+|hp=19
+|str=6
+|skill=3
+|spd=6
+|lck=0
+|def=6
+|res=0
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=15
+|str=2
+|skill=1
+|spd=2
+|lck=0
+|def=2
+|res=4
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=8
+|#=1
+|hp=37
+|str=13
+|skill=14
+|spd=14
+|lck=0
+|def=13
+|res=5
+|con=11
+|mov=7
+|inventory={{Item|8|Short Spear|type=drop}}
+|notes=Begins moving unprovoked on the turn after it appears.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=21~23
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=6~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=• One immediately begins moving unprovoked.<br>• The other three will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=• The closest two immediately begin moving unprovoked.<br>• The other two will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until turn 5.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=9
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=One will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Two will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Short Spear|type=drop}}
+|notes=Begins moving unprovoked on the turn after it appears.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=17~19
+|str=4~6
+|skill=2~4
+|spd=3~5
+|lck=1~3
+|def=2~3
+|res=5~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=• One immediately begins moving unprovoked.<br>• The other three will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=23~25
+|str=8~10
+|skill=4~6
+|spd=7~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=• The closest two immediately begin moving unprovoked.<br>• The other two will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=8
+|#=1
+|hp=22~24
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=7~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=23~25
+|str=8~10
+|skill=4~6
+|spd=7~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until turn 5.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=9
+|#=5
+|hp=29~32
+|str=4~6
+|skill=1~3
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=22~24
+|str=6~7
+|skill=5~7
+|spd=3~5
+|lck=0~1
+|def=3~5
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=2
+|hp=24~26
+|str=6~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=1
+|hp=30~33
+|str=5~6
+|skill=1~3
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~2
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=2
+|hp=21~23
+|str=5~7
+|skill=5~6
+|spd=3~5
+|lck=0~1
+|def=3~5
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=One will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=3
+|hp=24~26
+|str=6~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Two will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=41~45
+|str=6~9
+|skill=1~4
+|spd=2~4
+|lck=3~7
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=24~26
+|str=6~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=3
+|#=1
+|hp=35
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=24~26
+|str=6~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=17~19
+|str=4~6
+|skill=2~4
+|spd=3~5
+|lck=1~3
+|def=2~3
+|res=5~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=3
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=1
+|#=2
+|hp=19
+|str=6
+|skill=3
+|spd=6
+|lck=0
+|def=6
+|res=0
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=15
+|str=2
+|skill=1
+|spd=2
+|lck=0
+|def=2
+|res=4
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=8
+|#=1
+|hp=37
+|str=13
+|skill=14
+|spd=14
+|lck=0
+|def=13
+|res=5
+|con=11
+|mov=7
+|inventory={{Item|8|Short Spear|type=drop}}
+|notes=Begins moving unprovoked on the turn after it appears.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=23~25
+|str=8~10
+|skill=4~6
+|spd=7~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=• One immediately begins moving unprovoked.<br>• The other three will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=• The closest two immediately begin moving unprovoked.<br>• The other two will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until turn 5.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=9
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=One will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Two will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Short Spear|type=drop}}
+|notes=Begins moving unprovoked on the turn after it appears.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=19~22
+|str=6~9
+|skill=3~6
+|spd=4~7
+|lck=2~5
+|def=2~4
+|res=5~8
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=• One immediately begins moving unprovoked.<br>• The other three will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=• The closest two immediately begin moving unprovoked.<br>• The other two will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=8
+|#=1
+|hp=25~29
+|str=9~12
+|skill=5~8
+|spd=8~11
+|lck=0~2
+|def=7~9
+|res=0~3
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until turn 5.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=9
+|#=5
+|hp=33~38
+|str=6~9
+|skill=2~5
+|spd=1~3
+|lck=0~2
+|def=0~2
+|res=0~3
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=4~8
+|lck=0~3
+|def=4~6
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=2
+|hp=27~31
+|str=8~11
+|skill=4~7
+|spd=4~6
+|lck=0~2
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=1
+|hp=34~39
+|str=6~10
+|skill=2~6
+|spd=1~4
+|lck=0~3
+|def=0~3
+|res=1~3
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=2
+|hp=23~28
+|str=6~10
+|skill=6~9
+|spd=4~7
+|lck=0~2
+|def=4~6
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=One will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=3
+|hp=27~31
+|str=8~11
+|skill=4~7
+|spd=4~6
+|lck=0~2
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Two will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=33~40
+|str=11~15
+|skill=9~13
+|spd=9~13
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=53~60
+|str=11~16
+|skill=4~8
+|spd=3~7
+|lck=10~15
+|def=1~5
+|res=2~5
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=27~31
+|str=8~11
+|skill=4~7
+|spd=4~6
+|lck=0~2
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=3
+|#=1
+|hp=52~59
+|str=10~15
+|skill=4~8
+|spd=3~7
+|lck=9~15
+|def=1~5
+|res=2~5
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=27~31
+|str=8~11
+|skill=4~7
+|spd=4~6
+|lck=0~2
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=8
+|hp=19~22
+|str=6~9
+|skill=3~6
+|spd=4~7
+|lck=2~5
+|def=2~4
+|res=5~8
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=3
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=1
+|#=2
+|hp=21~22
+|str=7~8
+|skill=3~5
+|spd=6~8
+|lck=0~1
+|def=6~7
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=16~17
+|str=3~4
+|skill=1~3
+|spd=2~4
+|lck=0~2
+|def=2~3
+|res=4~5
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving unprovoked on the turn after it appears.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=8
+|#=1
+|hp=38~39
+|str=14~15
+|skill=14~16
+|spd=14~15
+|lck=0~1
+|def=13~14
+|res=5~6
+|con=11
+|mov=7
+|inventory={{Item|8|Short Spear|type=drop}}
+|notes=Begins moving unprovoked on the turn after it appears.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Javelin}}
+|notes=Begins moving unprovoked on the turn after it appears.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=• One immediately begins moving unprovoked.<br>• The other three will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=• The closest two immediately begin moving unprovoked.<br>• The other two will not move until turn 4.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until turn 5.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=9
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=One will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Two will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=8
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Will not move until turn 5.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving unprovoked on the turn after it appears.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Short Spear|type=drop}}
+|notes=Begins moving unprovoked on the turn after it appears.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Javelin}}
+|notes=Begins moving unprovoked on the turn after it appears.
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turn 2
+**The enemy ship approaches, bringing the main enemy army of 6 [[Revenant]]s, 12 [[Bonewalker]]s, 1 [[Wight]], and 2 [[Entombed]]
+*Turn 3
+**2 [[Mogall]]s from the northwest corner of the map
+**2 [[Mogall]]s from the southwest corner of the map
+*Turns 4–6
+**1 [[Bonewalker]] with a [[Steel Lance]] from the upper stairs on the enemy ship
+**1 [[Bonewalker]] with a [[Steel Sword]] from the lower stairs on the enemy ship
+*Turn 4
+**2 [[Gargoyle]]s from the northeast corner of the map
+**2 [[Mogall]]s from the southeast corner of the map
+*Turn 5
+**4 [[Mogall]]s; two from north of the enemy ship, two from south of the enemy ship <small>(Difficult only)</small>
+**2 [[Gargoyle]]s with [[Iron Lance]]s from west of the player ship
+**1 [[Gargoyle]] with a [[Steel Lance]] from west of the player ship <small>(Difficult only)</small>
+**1 [[Gargoyle]] with a [[Javelin]] from west of the player ship <small>(Difficult only)</small>
+**The boss [[Deathgoyle]] from west of the player ship
+
+===NPC data===
+{{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[L'Arachel]]
+|class=Troubadour
+|type=other
+|lv=3
+|#=1
+|hp=18
+|str=6
+|skill=6
+|spd=10
+|lck=12
+|def=5
+|res=8
+|con=5
+|mov=6
+|inventory={{Item|8|Mend}} • {{Item|8|White Gem}} • {{Item|8|Elixir}}
+|notes=Appears on a southeast ship on turn 4.
+}}
+{{ChapUnitCellGBA
+|name=[[Dozla]]
+|class=Berserker
+|type=other
+|lv=1
+|#=1
+|hp=43
+|str=16
+|skill=11
+|spd=9
+|lck=4
+|def=11
+|res=6
+|con=16
+|mov=6
+|inventory={{Item|8|Battle Axe}} • {{Item|8|Elixir}}
+|notes=Appears on a southeast ship on turn 4.
+|last=y
+}}
+{{ChapUnitFtr}}
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Monster}}
+{{Tab
+|tab1=Easy
+|tab2=Normal
+|tab3=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Generic portrait deathgoyle fe08.png]]
+|sprite=deathgoyle enemy
+|class=Deathgoyle
+|affin=dark
+|lv={{h|8|3 in the Japanese version}}
+|HP={{h|37|29 in the Japanese version}}
+|str={{h|13|12 in the Japanese version}}
+|skill={{h|14|7 in the Japanese version}}
+|spd={{h|14|10 in the Japanese version}}
+|luck=0
+|def={{h|13|11 in the Japanese version}}
+|res={{h|5|2 in the Japanese version}}
+|move=7
+|con=11
+|aid=10
+|inventory={{Item|8|Short Spear|type=drop}}
+|la=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Generic portrait deathgoyle fe08.png]]
+|sprite=deathgoyle enemy
+|class=Deathgoyle
+|affin=dark
+|lv={{h|8|3 in the Japanese version}}
+|HP={{h|37|23 in the Japanese version}}
+|str={{h|13|8 in the Japanese version}}
+|skill={{h|14|5 in the Japanese version}}
+|spd={{h|14|8 in the Japanese version}}
+|luck=0
+|def={{h|13|9 in the Japanese version}}
+|res={{h|5|1 in the Japanese version}}
+|move=7
+|con=11
+|aid=10
+|inventory={{Item|8|Short Spear|type=drop}}
+|la=A
+}}
+|content3={{BossStats GBA
+|portrait=[[File:Generic portrait deathgoyle fe08.png]]
+|sprite=deathgoyle enemy
+|class=Deathgoyle
+|affin=dark
+|lv={{h|8|3 in the Japanese version}}
+|HP={{h|38~39|26~27 in the Japanese version}}
+|str={{h|14~15|10 in the Japanese version}}
+|skill={{h|14~16|6~7 in the Japanese version}}
+|spd={{h|14~15|9~10 in the Japanese version}}
+|luck=0~1
+|def={{h|13~14|10 in the Japanese version}}
+|res={{h|5~6|2 in the Japanese version}}
+|move=7
+|con=11
+|aid=10
+|inventory={{Item|8|Short Spear|type=drop}}
+|la=A
+}}
+}}
+
+==Strategy==
+{{strategy}}
+{{sectstub}}
+This chapter is significantly harder on Difficult mode due to the sheer amount of enemies with high stats for this point of the game. This also makes recruiting L'Arachel very hard due to her low durability. It is highly recommended to deploy promoted units such as Seth and Duessel for this chapter.
+
+==Trivia==
+*This chapter, alongside [[Creeping Darkness]], was possibly one of the last chapters added to the game in development, being the only two chapters completely absent from the prototype. This may also be the reason it does not have a corresponding world map location, instead occurring between locations, as the world map was already laid out in essentially its final form even in the very early prototype.
+**This fact is also supported by the fact that Creeping Darkness and Phantom Ship are the only two chapters with their titles listed out of order, being at the end of the list, internally.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Phantom Ship
+|jpn-name={{h|幽霊船|Yūreisen}}
+|jpn-mean=Ghost Ship
+|span-name=El buque fantasma
+|span-mean=The ghost ship
+|fren-name=Navire fantôme
+|fren-mean=Ghost Ship
+|ger-name=Geisterschiff
+|ger-mean=Ghost Ship
+|ital-name=La nava fantasma
+|ital-mean=The ghost ship
+}}
+
+==Gallery==
+{{sectstub}}
+
+{{ChapterNav
+|prechapter=Turning Traitor
+|nextchapter=Landing at Taizel
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

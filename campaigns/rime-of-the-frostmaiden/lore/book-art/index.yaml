@@ -1,0 +1,12 @@
+# Illustrations cropped from Rime of the Frostmaiden (printed page; PDF page = printed + 1).
+# Key = the character's lore stem or unit id. Caption = the book's own where it has one.
+sephek-kaltro:    {page: 23, caption: "Sephek Kaltro"}
+duvessa-shane:    {page: 33, caption: "Speaker Duvessa Shane"}
+messie:           {page: 31, caption: "Adventurers encounter the monster of Maer Dualdon"}
+izobai:           {page: 36, caption: "Two surly polar bears pull a goblin wagon across the snowy tundra"}
+white-moose:      {page: 81, caption: "The dreaded white moose of Lonelywood is no one's prey"}
+ravisin:          {page: 85, caption: "Ravisin and an awakened shrub"}
+basil:            {page: 85, caption: "Ravisin and an awakened shrub (detail)"}
+grell:            {page: 96, caption: "The true monster of the mine reveals itself"}
+trex:             {page: 99, caption: "Trex"}
+vellynne-harpell: {page: 273, caption: "Vellynne Harpell and her kobold minions"}

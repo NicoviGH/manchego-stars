@@ -1,0 +1,1660 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 5.png|200px]]
+|location=Serafew
+|new units=[[Natasha]], [[Joshua]]
+|boss=[[Saar]]
+|previous=[[Ancient Horrors]]
+|next=[[Unbroken Heart]]
+}}
+
+{{quote|One more thing... A traitor to the empire has fled Castle Grado. We've received reports she is hiding somewhere here in Serafew. I don't care if you have to tear this town apart. Find the turncoat.|[[Glen]] to [[Saar]] on [[Natasha]]}}
+
+'''The Empire's Reach''' (Japanese: {{hl|帝国の影|Teikoku no kage}} ''The Empire's Shadow'') is the fifth chapter of {{FE8}}. [[Eirika]] reaches the border town Serafew and encounters troops from [[Grado]]. She also meets [[Natasha|a woman]] bearing dire news.
+
+==Plot==
+{{main|The Empire's Reach/Script}}
+After escaping the [[monster]]s of [[Za'ha Woods]], [[Eirika]] marks her next destination as Serafew. Serafew is a border town shared between [[Renais]] and [[Grado]]. However, it is currently completely under occupation by Grado, to the displeasure of many of the town's residents.<ref>{{cite|Life in Serafew's been harder since the Grado occupation force took over here. Serafew's got Renais citizens as well as Grado, but it's been hardest on us. They've singled out families from Renais for the most awful atrocities. Please, traveler, take this sword. It's an armorslayer. It'll cut through even the strongest armor. Take it and strike down that blackheart, Saar.|Villager|The Sacred Stones}}</ref>
+
+The chapter opens with [[Joshua]] musing to himself about the local [[arena]], though he is interrupted by [[Natasha|a passing cleric]]. She quickly apologizes to Joshua and continues on her way, to Joshua's disappointment. Joshua decides to go to the arena to gamble some coin. Nearby, [[Glen]] of the [[Imperial Three]] approaches [[Saar]] and tells him to be on the lookout for a deserter.
+
+Eirika and her allies are able to enter the town due to relatively low security, and encounter [[Saleh|a mysterious man]] who asks about [[Myrrh|an indigo haired girl]]. Eirika says she has seen no such person and the man moves on. After a moment, another disturbance happens and Eirika and Seth decide to carefully investigate. They see [[Natasha]] surrounded by her pursuers. Eirika is confused by the accusations of treason directed towards a [[cleric]]. Natasha, seeing her chance, slips past the soldiers and approaches Eirika telling her she bears important news. Eirika tells Natasha to wait until the pursuing Grado soldiers are taken care of.
+
+At the start of the battle, Joshua leaves the arena disappointed that his pocket is lighter than when he entered. One of the nearby soldiers threatens to report him to the captain, though Joshua brushes it off. If Natasha speaks to Joshua, Joshua decides to join Eirika's group to protect Natasha after losing a coinflip wager to her.
+
+At the end of the chapter, after all enemies are defeated, Natasha tells Eirika that Emperor [[Vigarde]] and Prince [[Lyon]] plan to destroy the [[Sacred Stone (object)|Sacred Stones]]. Natasha learned this information from [[MacGregor|her mentor]] before he was executed a few days prior. Seth doesn't entirely believe the story but thinks the information is too dire to ignore, Eirika agrees. If Natasha sustains mortal wounds during the battle she is still able to inform Eirika and Seth of the danger to the Sacred Stones shortly before expiring.
+
+If Eirika's troops visited each of the houses during the chapter, a villager speaks to Eirika shortly before she leaves and gifts her with a [[Guiding Ring]] out of gratitude.
+
+==Chapter data==
+{{ChapData
+|victory=Defeat [[Saar]]
+|defeat=[[Eirika]] dies
+|ally=2–9{{h|+1|Upon Joshua being recruited}}
+|enemy=16{{h|+7|Reinforcements}}{{h|−1|Upon Joshua being recruited}}
+|map=[[File:Cm fe08 5.png]]
+|col=15
+|row=21
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Natasha
+|portrait=[[File:portrait natasha fe08.png]]
+|class=Cleric
+|HP=18
+|lv=1
+|inventory={{Item|8|Mend}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically from preparations
+}}
+|newunit2={{NewUnit
+|name=Joshua
+|portrait=[[File:portrait joshua fe08.png]]
+|class=Myrmidon
+|HP=24
+|lv=5
+|inventory={{Item|8|Killing Edge}}
+|recruitment method=Enemy, talk to with [[Natasha]]
+}}
+|forced1=eirika
+|forced2=natasha
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Dragonshield
+|obtain1=Visit southern most [[village]]
+|item2=Armorslayer
+|obtain2=Visit east central [[village]]
+|item3=Secret Book
+|obtain3=Visit west central [[village]]
+|item4=Torch
+|item4article=Torch (item)
+|obtain4=Visit northern most [[village]]
+|itemlast=Guiding Ring
+|obtainlast=At the end of the chapter if every village was visited
+}}
+
+===Shop data===
+{{Tab
+|header=Shop data
+|width=70%
+|constyle=text-align: center
+|tab1=Armory (NTSC-J)
+|default=2
+|tab2=Armory (NTSC-U/PAL)
+|tab3=Vendor (NTSC-J)
+|tab4=Vendor (NTSC-U/PAL)
+|content1={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron sword.png]]
+{{!}} [[Iron Sword]]
+{{!}} class="roundr" {{!}} 460
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba slim sword.png]]
+{{!}} [[Slim Sword]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel sword.png]]
+{{!}} [[Steel Sword]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron lance.png]]
+{{!}} [[Iron Lance]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba slim lance.png]]
+{{!}} [[Slim Lance]]
+{{!}} class="roundr" {{!}} 450
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel lance.png]]
+{{!}} [[Steel Lance]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron axe.png]]
+{{!}} [[Iron Axe]]
+{{!}} class="roundr" {{!}} 270
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel axe.png]]
+{{!}} [[Steel Axe]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron bow.png]]
+{{!}} [[Iron Bow]]
+{{!}} class="roundr" {{!}} 540
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel bow.png]]
+{{!}} [[Steel Bow]]
+{{!}} class="roundr" {{!}} 720
+{{tableend}}
+|content2={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba slim sword.png]]
+{{!}} [[Slim Sword]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron sword.png]]
+{{!}} [[Iron Sword]]
+{{!}} class="roundr" {{!}} 460
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel sword.png]]
+{{!}} [[Steel Sword]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba slim lance.png]]
+{{!}} [[Slim Lance]]
+{{!}} class="roundr" {{!}} 450
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron lance.png]]
+{{!}} [[Iron Lance]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel lance.png]]
+{{!}} [[Steel Lance]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron axe.png]]
+{{!}} [[Iron Axe]]
+{{!}} class="roundr" {{!}} 270
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel axe.png]]
+{{!}} [[Steel Axe]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron bow.png]]
+{{!}} [[Iron Bow]]
+{{!}} class="roundr" {{!}} 540
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel bow.png]]
+{{!}} [[Steel Bow]]
+{{!}} class="roundr" {{!}} 720
+{{tableend}}
+|content3={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba torch staff.png]]
+{{!}} [[Torch (staff)|Torch]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba vulnerary.png]]
+{{!}} [[Vulnerary]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba fire.png]]
+{{!}} [[Fire]]
+{{!}} class="roundr" {{!}} 560
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lightning.png]]
+{{!}} [[Lightning]]
+{{!}} class="roundr" {{!}} 630
+{{tableend}}
+|content4={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba fire.png]]
+{{!}} [[Fire]]
+{{!}} class="roundr" {{!}} 560
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lightning.png]]
+{{!}} [[Lightning]]
+{{!}} class="roundr" {{!}} 630
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba vulnerary.png]]
+{{!}} [[Vulnerary]]
+{{!}} class="roundr" {{!}} 300
+{{tableend}}
+}}
+
+===Enemy data===
+{{missingstats}}
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Saar]]
+|class=Knight
+|lv=8
+|#=1
+|hp=30
+|str=11
+|skill=7
+|spd=3
+|lck=4
+|def=11
+|res=3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=6
+|#=2
+|hp=20~21
+|str=3~4
+|skill=0~1
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=5
+|#=4
+|hp=20
+|str=5
+|skill=2
+|spd=4
+|lck=0
+|def=2
+|res=0
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=The far northwestern one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=5
+|#=4
+|hp=20
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The eastern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=5
+|#=2
+|hp=18
+|str=4
+|skill=3
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=The one near the boss immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=6
+|#=1
+|hp=18~19
+|str=4~5
+|skill=8~9
+|spd=8~9
+|lck=0~1
+|def=4~5
+|res=0~1
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=4
+|#=1
+|hp=18
+|str=4
+|skill=3
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=4
+|#=1
+|hp=20
+|str=5
+|skill=2
+|spd=4
+|lck=0
+|def=2
+|res=0
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=[[Joshua]]
+|class=Myrmidon
+|lv=5
+|#=1
+|hp=24
+|str=8
+|skill=13
+|spd=14
+|lck=7
+|def=5
+|res=2
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=• Not present during [[preparations]].<br>• Does not attack [[Natasha]].
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bandit (character)|Bandit]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=22
+|str=7
+|skill=3
+|spd=7
+|lck=2
+|def=5
+|res=2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=4
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=5
+|#=2
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=6
+|#=2
+|hp=20~21
+|str=5~6
+|skill=1~2
+|spd=5~6
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Saar]]
+|class=Knight
+|lv=8
+|#=1
+|hp=26
+|str=9
+|skill=5
+|spd=3
+|lck=4
+|def=12
+|res=3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=6
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=5
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=The far northwestern one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=5
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The eastern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=The one near the boss immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=[[Joshua]]
+|class=Myrmidon
+|lv=5
+|#=1
+|hp=24
+|str=8
+|skill=13
+|spd=14
+|lck=7
+|def=5
+|res=2
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=• Not present during [[preparations]].<br>• Will attack [[Natasha]] if she is in his attack range.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bandit (character)|Bandit]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=6
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Saar]]
+|class=Knight
+|lv=8
+|#=1
+|hp=30
+|str=11
+|skill=7
+|spd=3
+|lck=4
+|def=11
+|res=3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=6
+|#=2
+|hp=22~23
+|str=4~5
+|skill=0~2
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=5
+|#=4
+|hp=21~22
+|str=5~7
+|skill=2~3
+|spd=4~5
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=The far northwestern one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=5
+|#=4
+|hp=21~22
+|str=3~5
+|skill=0~1
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The eastern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=5
+|#=2
+|hp=19~20
+|str=4~5
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=The one near the boss immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=6
+|#=1
+|hp=20~21
+|str=5~6
+|skill=9~10
+|spd=8~10
+|lck=0~2
+|def=4~5
+|res=0~1
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=4
+|#=1
+|hp=18~19
+|str=4~5
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=4
+|#=1
+|hp=20~21
+|str=5~6
+|skill=2~3
+|spd=4~5
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=[[Joshua]]
+|class=Myrmidon
+|lv=5
+|#=1
+|hp=24
+|str=8
+|skill=13
+|spd=14
+|lck=7
+|def=5
+|res=2
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=• Not present during [[preparations]].<br>• Does not attack [[Natasha]].
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bandit (character)|Bandit]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=22~23
+|str=7~8
+|skill=3~4
+|spd=7~8
+|lck=2~3
+|def=5~6
+|res=2~3
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=4
+|#=1
+|hp=20~21
+|str=5~6
+|skill=1~2
+|spd=5~6
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=5
+|#=2
+|hp=21~22
+|str=5~7
+|skill=1~2
+|spd=5~6
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=6
+|#=2
+|hp=22~23
+|str=6~7
+|skill=1~3
+|spd=5~6
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Saar]]
+|class=Knight
+|lv=8
+|#=1
+|hp=26
+|str=9
+|skill=5
+|spd=3
+|lck=4
+|def=12
+|res=3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=6
+|#=2
+|hp=24
+|str=5~6
+|skill=1~2
+|spd=2
+|lck=1~2
+|def=1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=5
+|#=4
+|hp=23~24
+|str=7
+|skill=3~4
+|spd=5
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=The far northwestern one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=5
+|#=4
+|hp=23
+|str=5
+|skill=1~2
+|spd=2
+|lck=1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The eastern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=5
+|#=2
+|hp=21
+|str=5~6
+|skill=5
+|spd=4~5
+|lck=1
+|def=3~4
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=The one near the boss immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=6
+|#=1
+|hp=22
+|str=6
+|skill=10
+|spd=9
+|lck=2
+|def=5
+|res=1
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=4
+|#=1
+|hp=21
+|str=5
+|skill=4
+|spd=4
+|lck=1
+|def=4
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=4
+|#=1
+|hp=23
+|str=7
+|skill=3
+|spd=5
+|lck=0
+|def=3
+|res=1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=[[Joshua]]
+|class=Myrmidon
+|lv=5
+|#=1
+|hp=24
+|str=8
+|skill=13
+|spd=14
+|lck=7
+|def=5
+|res=2
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=• Not present during [[preparations]].<br>• Will attack [[Natasha]] if she is in his attack range.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bandit (character)|Bandit]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=24
+|str=9
+|skill=4
+|spd=8
+|lck=3
+|def=5
+|res=3
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=4
+|#=1
+|hp=22
+|str=6
+|skill=2
+|spd=6
+|lck=0
+|def=3
+|res=1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=5
+|#=2
+|hp=23
+|str=7
+|skill=2
+|spd=6
+|lck=0
+|def=4
+|res=1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=6
+|#=2
+|hp=24~25
+|str=7~8
+|skill=2
+|spd=6
+|lck=1
+|def=3~4
+|res=1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Saar]]
+|class=Knight
+|lv=8
+|#=1
+|hp=32~33
+|str=12~13
+|skill=7~9
+|spd=3~4
+|lck=4~5
+|def=11~12
+|res=3~4
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=6
+|#=2
+|hp=25~28
+|str=6~8
+|skill=1~4
+|spd=1~4
+|lck=1~3
+|def=0~2
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=5
+|#=4
+|hp=24~27
+|str=7~10
+|skill=3~6
+|spd=5~8
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=The far northwestern one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=5
+|#=4
+|hp=24~27
+|str=5~8
+|skill=1~4
+|spd=1~3
+|lck=0~3
+|def=0~2
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The eastern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=5
+|#=2
+|hp=21~25
+|str=5~8
+|skill=5~7
+|spd=4~7
+|lck=1~4
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=The one near the boss immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=6
+|#=1
+|hp=23~26
+|str=6~9
+|skill=10~13
+|spd=9~12
+|lck=1~4
+|def=4~7
+|res=0~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=4
+|#=1
+|hp=20~24
+|str=4~8
+|skill=5~7
+|spd=3~7
+|lck=0~4
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=4
+|#=1
+|hp=24~26
+|str=7~9
+|skill=2~6
+|spd=4~8
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=[[Joshua]]
+|class=Myrmidon
+|lv=5
+|#=1
+|hp=24
+|str=8
+|skill=13
+|spd=14
+|lck=7
+|def=5
+|res=2
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=• Not present during [[preparations]].<br>• Does not attack [[Natasha]].
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bandit (character)|Bandit]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=26~28
+|str=9~11
+|skill=3~7
+|spd=7~9
+|lck=2~4
+|def=5~7
+|res=2~4
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=4
+|#=1
+|hp=24~26
+|str=7~9
+|skill=1~5
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=5
+|#=2
+|hp=24~27
+|str=7~10
+|skill=2~5
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=6
+|#=2
+|hp=25~28
+|str=8~10
+|skill=2~5
+|spd=5~8
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Saar]]
+|class=Knight
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=6
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=5
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=The far northwestern one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=5
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The eastern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=The one near the boss immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=[[Joshua]]
+|class=Myrmidon
+|lv=5
+|#=1
+|hp=24
+|str=8
+|skill=13
+|spd=14
+|lck=7
+|def=5
+|res=2
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=• Not present during [[preparations]].<br>• Will attack [[Natasha]] if she is in his attack range.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bandit (character)|Bandit]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=6
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turn 2
+**2 [[Brigand]]s from the southeastern border of the map
+*Turn 6
+**2 [[Brigand]]s from the eastern border of the map near the arena
+*Turn 8
+**2 [[Brigand]]s from the northeast corner of the map
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Saar}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait saar fe08.png]]
+|sprite=knight enemy
+|class=Knight
+|affin=anima
+|lv=8
+|HP={{h|30|26 in the Japanese version}}
+|str={{h|11|9 in the Japanese version}}
+|skill={{h|7|5 in the Japanese version}}
+|spd=3
+|luck=4
+|def={{h|11|12 in the Japanese version}}
+|res=3
+|move=4
+|con=13
+|aid=12
+|inventory={{Item|8|Javelin}}
+|la=C
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait saar fe08.png]]
+|sprite=knight enemy
+|class=Knight
+|affin=anima
+|lv=8
+|HP={{h|32~33|29~31 in the Japanese version}}
+|str={{h|12~13|10~11 in the Japanese version}}
+|skill={{h|7~9|6~7 in the Japanese version}}
+|spd=3~4
+|luck={{h|4~5|5~6 in the Japanese version}}
+|def={{h|11~12|13~14 in the Japanese version}}
+|res={{h|3~4|4 in the Japanese version}}
+|move=4
+|con=13
+|aid=12
+|inventory={{Item|8|Javelin}}
+|la=C
+}}
+}}
+
+==Strategy==
+{{strategy}}
+This chapter features the first [[arena]] in the game. Arenas are not as useful in ''The Sacred Stones'' as other games, as alternate less-risky training methods, [[skirmish]]es, are available. Feel free to use it for some extra [[experience]], but stay aware of the risks.
+
+Recruiting [[Joshua]] is less intimidating than it initially appears. He will not harm Natasha, so simply kill any nearby mobile enemies while staying away from Joshua, then simply have Natasha walk up to him. However, as this is not true of the Japanese release, an alternate strategy is to unequip [[Seth]]'s weapons and have him bait Joshua nearer to Natasha so that she may speak to Joshua before he can attack her.
+
+Brigand reinforcements will appear near the starting location, so make sure that your squishy units aren't undefended. There is a free [[Guiding Ring]] if you visit all the villages. This task is pretty easy, albeit it will take you a couple extra turns. There isn't a turn limit to this chapter, so take all the time you need.
+
+==Trivia==
+[[File:Ss fe08 joshua attacks natasha.png|thumb|[[Joshua]] attacking [[Natasha]] in the Japanese release.]]
+* [[Tethys]] and [[Amelia]] make cameo appearances in villages in this chapter.<!--debating removing this-->
+* In the international versions of the game, Joshua is programmed so that he will not attack Natasha; however, that is not the case in the Japanese version, and he will attack Natasha if she is in his movement range.
+{{Clear}}
+
+==Etymology and other languages==
+{{Names
+|eng-name=The Empire's Reach
+|jpn-name={{h|帝国の影|Teikoku no kage}}
+|jpn-mean=The Empire's Shadow
+|span-name=Cuidad fronteriza
+|span-mean=Border's care
+|fren-name=L'ombre impériale
+|fren-mean=The imperial shadow
+|ger-name=Griff des Imperiums
+|ger-mean=Reach of the Empire
+|ital-name=La mano dell'impero
+|ital-mean=The Empire's Reach
+}}
+
+==Gallery==
+{{sectstub}}
+==References==
+{{Refbar}}
+
+{{ChapterNav
+|prechapter=Ancient Horrors
+|nextchapter=Unbroken Heart
+}}
+
+{{Nav8}}
+{{DEFAULTSORT:Empire's Reach, The}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

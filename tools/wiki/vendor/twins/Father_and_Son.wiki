@@ -1,0 +1,4162 @@
+{{Stub}}
+{{Chapter Infobox
+|image=[[File:Cm fe08 14B.png|200px]]
+|location=[[Grado Keep]]
+|new units=[[Rennac]], [[Knoll]]
+|boss=[[Vigarde]]
+|previous=[[Fluorspar's Oath]]
+|next=[[Scorched Sand]]
+}}
+
+{{Quote|The Grado capital... It looks like it hasn't changed at all since the last time I was here. Eirika and I came here once long ago with our father. Duessel taught me the lance, and I studied history with Lyon. I never imagined I'd come back here armed for battle.
+|[[Ephraim]]}}
+
+'''Father and Son''' (Japanese: {{hl|父と子と|Chichi to ko to}} ''Father and son'') is the fourteenth chapter of [[Ephraim]]'s route in {{FE8}}.
+
+==Plot==
+{{main|Father and Son/Script}}
+
+[[Ephraim]]'s army reaches the capital of [[Grado]], Grado Keep; Ephraim reminisces on when he visited two years prior, when [[Lyon]] taught him history, and he agreed to teach Lyon how to wield a [[lance]]. A minor earthquake occurs before Ephraim begins his assault on the capital, and [[Myrrh]] feels the source of the foul energy she has been tracking emanating from within the keep. Inside Grado Keep, Lyon speaks with an unresponsive [[Vigarde]], asking if he has done the right thing. A soldier arrives, and Lyon's appearance changes, unnerving the soldier; the soldier informs Vigarde and Lyon that Ephraim's forces have entered the keep, and Lyon orders the Grado soldiers to fight and defeat Ephraim.
+
+During the battle, [[Rennac]] enters the keep to loot it during the battle. If Ephraim talks to Rennac, Rennac recognizes Ephraim, and offers to be hired for 9,980 [[gold]] out of fear of Ephraim's reputation as "the Beast of Renais", which Ephraim can accept or reject. Alternately, if [[L'Arachel]] speaks to Rennac, she recognizes him and tells him to accompany her; Rennac initially refuses, citing poor treatment and low wages earlier, but reluctantly complies with her continued insistence.
+
+When Vigarde is fought, he is unresponsive; when he is defeated and the throne seized, his body disintegrates. Ephraim and [[Seth]] are taken aback, but decide to patrol the castle regardless. Ephraim and Seth come across Lyon; Lyon claims to have planned the war from the beginning, to have befriended Ephraim and Eirika only to better destroy [[Renais]], and to have killed [[Fado]] himself. Ephraim is shocked, and Lyon think to kill Ephraim, but finds himself too weak to attempt; Lyon then teleports away. After Lyon has left, a soldier informs Ephraim that they have found a cell block and a captive.
+
+Ephraim and Seth arrive at the cells to find [[Knoll]], a former arcane researcher for Grado awaiting execution. Knoll explains to them the circumstances that lead to the war: Approximately a year ago, Vigarde died of an illness, and Lyon attempted to use Grado's Sacred Stone to resurrect him. One day Lyon created what he called the [[Dark Stone (object)|Dark Stone]], with which he resurrected Vigarde; in front of Knoll, Lyon then destroyed Grado's Sacred Stone, and stated the the other four stones must also be destroyed. After explaining the reason for the war, Knoll escorts Ephraim and Seth to the chamber which housed the Sacred Stones, where Grado's [[Sacred Twin]] relics are located; Knoll asks Ephraim to take them.
+
+In Grado Keep's throne room, a messenger arrives to inform Ephraim that [[Eirika]] is under attack from two Grado armies lead by [[Caellach]] and [[Valter]] at [[Jehanna]]. Ephraim orders his army to march to Eirika's aid immediately.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Seize the throne
+|defeat=[[Ephraim]] dies
+|ally=1–12{{h|+1|Upon Rennac being recruited}}
+|enemy=42{{h|+29|Reinforcements}}{{h|−1|Upon Rennac being recruited}}
+|map={{tab
+|tab1=Map
+|tab2=Secret shop
+|content1=<div>[[File:Cm fe08 14B.png]]</div>
+|content2=<div>[[File:Cm fe08 14B secret shop.png]]</div>
+}}
+|col=29
+|row=31
+}}
+|content2={{ChapData
+|victory=Seize the throne
+|defeat=[[Ephraim]] dies
+|ally=1–12{{h|+1|Upon Rennac being recruited}}
+|enemy=42{{h|+39|Reinforcements}}{{h|−1|Upon Rennac being recruited}}
+|map={{tab
+|tab1=Map
+|tab2=Secret shop
+|content1=<div>[[File:Cm fe08 14B.png]]</div>
+|content2=<div>[[File:Cm fe08 14B secret shop.png]]</div>
+}}
+|col=29
+|row=31
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Rennac
+|portrait=[[File:portrait rennac fe08.png]]
+|class=Rogue
+|HP=28
+|lv=1
+|inventory={{Item|8|Steel Sword}}<br>{{Item|8|Elixir}}<br>{{Item|8|Member Card}}
+|recruitment method=Enemy, talk to with [[Ephraim]] and pay him [[Gold|9,980G]], or talk to with [[L'Arachel]]
+}}
+|newunit2={{NewUnit
+|name=Knoll
+|portrait=[[File:portrait knoll fe08.png]]
+|class=Shaman
+|HP=21
+|lv=10
+|inventory={{Item|8|Flux}}<br>{{Item|8|Nosferatu}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically at the end of the chapter
+}}
+|forced1=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=duessel
+|return19=cormag
+|return20=l'Arachel
+|return21=dozla
+|return22=ewan
+|return23=marisa
+|return24=gerik
+|return25=tethys
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Knight Crest
+|obtain1=Dropped by [[Vigarde]]
+|item2=Shine
+|obtain2=Dropped by enemy [[Bishop]] (drops unequipped item)<br><small>(Western version only)</small>
+|item3=Sleep
+|item3article=Sleep (staff)
+|obtain3=Dropped by enemy [[Bishop]] (drops unequipped item)
+|item4=Red Gem
+|obtain4=Dropped by enemy [[Druid]]
+|item5=Door Key
+|obtain5=Dropped by enemy [[Knight]]
+|item6=Door Key
+|obtain6=Dropped by enemy [[Knight]]
+|item7=Door Key
+|obtain7=Dropped by enemy [[Knight]]
+|item8=Door Key
+|obtain8=Dropped by enemy [[Shaman]]
+|item9=Chest Key
+|obtain9=Dropped by enemy [[Shaman]]
+|item10=Armorslayer
+|obtain10=Dropped by enemy [[Mercenary]]<br><small>(Western version only)</small>
+|item11=Longbow
+|obtain11=Dropped by enemy [[Sniper]]
+|item12=Swordreaver
+|obtain12=Dropped by enemy [[Fighter]]
+|item13=Hammer
+|obtain13=Dropped by enemy [[Fighter]] (reinforcement)
+|item14=Elixir
+|obtain14=Steal from [[Rennac]] or recruit him (reinforcement)
+|item15=Member Card
+|obtain15=Steal from [[Rennac]] or recruit him (reinforcement)
+|item16=Guiding Ring
+|obtain16=Open left [[chest]] in southern room
+|item17=10,000G
+|item17image=gold
+|item17article=Gold
+|obtain17=Open middle [[chest]] in southern room<br><small>(Western version only)</small>
+|item18=Hammerne
+|obtain18=Open right [[chest]] in southern room
+|item19=Spear
+|obtain19=Open north eastern [[chest]]
+|item20=Angelic Robe
+|obtain20=Open north western [[chest]]
+|item21=Body Ring
+|obtain21=Steal from enemy [[Archer]]
+|item22=Gleipnir
+|obtain22=Automatically at end of chapter
+|itemlast=Garm
+|obtainlast=Automatically at end of chapter
+}}
+
+===Shop data===
+{{Tab
+|header=Secret Shop
+|width=70%
+|constyle=text-align: center
+|default=2
+|tab1= (NTSC-J)
+|tab2= (NTSC-U/PAL)
+|content1={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lancereaver.png]]
+{{!}} [[Lancereaver]]
+{{!}} class="roundr" {{!}} 1,800
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba swordreaver.png]]
+{{!}} [[Swordreaver]]
+{{!}} class="roundr" {{!}} 2,100
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba axereaver.png]]
+{{!}} [[Axereaver]]
+{{!}} class="roundr" {{!}} 1,950
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer bow.png]]
+{{!}} [[Killer Bow]]
+{{!}} class="roundr" {{!}} 1,400
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba purge.png]]
+{{!}} [[Purge]]
+{{!}} class="roundr" {{!}} 3,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba bolting.png]]
+{{!}} [[Bolting]]
+{{!}} class="roundr" {{!}} 2,500
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba recover.png]]
+{{!}} [[Recover]]
+{{!}} class="roundr" {{!}} 2,250
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba angelic robe.png]]
+{{!}} [[Angelic Robe]]
+{{!}} class="roundr" {{!}} 8,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba energy ring.png]]
+{{!}} [[Energy Ring]]
+{{!}} class="roundr" {{!}} 8,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lockpick.png]]
+{{!}} [[Lockpick]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba hero crest.png]]
+{{!}} [[Hero Crest]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba knight crest.png]]
+{{!}} [[Knight Crest]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba orion's bolt.png]]
+{{!}} [[Orion's Bolt]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elysian whip.png]]
+{{!}} [[Elysian Whip]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba guiding ring.png]]
+{{!}} [[Guiding Ring]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba ocean seal.png]]
+{{!}} [[Ocean Seal]]
+{{!}} class="roundr" {{!}} 10,000
+{{tableend}}
+|content2={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel blade.png]]
+{{!}} [[Steel Blade]]
+{{!}} class="roundr" {{!}} 1,250
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba silver blade.png]]
+{{!}} [[Silver Blade]]
+{{!}} class="roundr" {{!}} 1,800
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killing edge.png]]
+{{!}} [[Killing Edge]]
+{{!}} class="roundr" {{!}} 1,300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer lance.png]]
+{{!}} [[Killer Lance]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba battle axe.png]]
+{{!}} [[Battle Axe]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer axe.png]]
+{{!}} [[Killer Axe]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer bow.png]]
+{{!}} [[Killer Bow]]
+{{!}} class="roundr" {{!}} 1,400
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba barrier.png]]
+{{!}} [[Barrier]]
+{{!}} class="roundr" {{!}} 2,250
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba physic.png]]
+{{!}} [[Physic]]
+{{!}} class="roundr" {{!}} 3,750
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lockpick.png]]
+{{!}} [[Lockpick]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba hero crest.png]]
+{{!}} [[Hero Crest]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba knight crest.png]]
+{{!}} [[Knight Crest]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba orion's bolt.png]]
+{{!}} [[Orion's Bolt]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elysian whip.png]]
+{{!}} [[Elysian Whip]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba guiding ring.png]]
+{{!}} [[Guiding Ring]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba ocean seal.png]]
+{{!}} [[Ocean Seal]]
+{{!}} class="roundr" {{!}} 10,000
+{{tableend}}
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Vigarde]]
+|class=General
+|lv=13
+|#=1
+|hp=52
+|str=21
+|skill=14
+|spd=11
+|lck=9
+|def=20
+|res=12
+|con=17
+|mov=5
+|inventory={{Item|8|Spear}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=24~27
+|str=6~9
+|skill=5~8
+|spd=5~8
+|lck=3~6
+|def=3~5
+|res=11~14
+|con=7
+|mov=6
+|inventory={{Item|8|Silence|link=Silence (staff)}} • {{Item|8|Shine}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=24~27
+|str=6~9
+|skill=5~8
+|spd=5~8
+|lck=3~6
+|def=3~5
+|res=11~14
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Shine|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Red Gem|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=19~22
+|str=5~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=19~22
+|str=5~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=19~21
+|str=5~7
+|skill=3~4
+|spd=4~5
+|lck=1~2
+|def=2~3
+|res=6~7
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=19~21
+|str=5~7
+|skill=3~4
+|spd=4~5
+|lck=1~2
+|def=2~3
+|res=6~7
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=25~27
+|str=8~10
+|skill=4~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=• The eastern one immediately begins moving unprovoked.<br>• The other begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=2
+|hp=20~22
+|str=6~7
+|skill=11~13
+|spd=11~13
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=23~26
+|str=6~8
+|skill=10~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Armorslayer|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=1
+|hp=19~21
+|str=4~6
+|skill=4~6
+|spd=5~7
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=3
+|hp=22~25
+|str=7~9
+|skill=4~5
+|spd=1~2
+|lck=1~3
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=25~27
+|str=8~10
+|skill=4~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=2
+|hp=24~27
+|str=6~7
+|skill=1~3
+|spd=2~3
+|lck=1~2
+|def=0~1
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=25~28
+|str=8~10
+|skill=4~6
+|spd=6~7
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Swordreaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=25~27
+|str=8~10
+|skill=4~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=One immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=6
+|hp=22~25
+|str=7~9
+|skill=4~5
+|spd=1~2
+|lck=1~3
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=12
+|#=1
+|hp=22~24
+|str=6~7
+|skill=5~7
+|spd=4~6
+|lck=2~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=20~22
+|str=6~7
+|skill=11~13
+|spd=11~13
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=20~22
+|str=6~7
+|skill=11~13
+|spd=11~13
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=4
+|hp=22~25
+|str=7~9
+|skill=4~5
+|spd=1~2
+|lck=1~3
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=13
+|#=3
+|hp=22~25
+|str=6~8
+|skill=5~7
+|spd=5~6
+|lck=2~4
+|def=4~5
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=23~26
+|str=6~8
+|skill=10~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Sniper
+|lv=5
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=5
+|lck=0
+|def=5
+|res=2
+|con=8
+|mov=6
+|inventory={{Item|8|Longbow|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Rennac]]
+|class=Rogue
+|lv=1
+|#=1
+|hp=28
+|str=10
+|skill=16
+|spd=17
+|lck=5
+|def=9
+|res=11
+|con=7
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Elixir}} • {{Item|8|Member Card|type=drop}}
+|notes=Prioritizes opening [[chest]]s, then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=25~28
+|str=8~10
+|skill=4~6
+|spd=6~7
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hammer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=25~28
+|str=8~10
+|skill=4~6
+|spd=6~7
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=3
+|hp=25~28
+|str=6~8
+|skill=2~3
+|spd=2~3
+|lck=1~3
+|def=0~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=1
+|hp=25~28
+|str=6~8
+|skill=2~3
+|spd=2~3
+|lck=1~3
+|def=0~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=2
+|hp=23~26
+|str=6~8
+|skill=10~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=2
+|hp=22~25
+|str=7~9
+|skill=4~5
+|spd=1~2
+|lck=1~3
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=13
+|#=2
+|hp=20~23
+|str=6~8
+|skill=11~13
+|spd=11~13
+|lck=2~3
+|def=3~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=6
+|hp=19~21
+|str=4~6
+|skill=4~6
+|spd=5~7
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=5
+|hp=19~21
+|str=5~7
+|skill=3~4
+|spd=4~5
+|lck=1~2
+|def=2~3
+|res=6~7
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=3
+|hp=19~21
+|str=5~7
+|skill=3~4
+|spd=4~5
+|lck=1~2
+|def=2~3
+|res=6~7
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=2
+|hp=19~21
+|str=5~7
+|skill=3~4
+|spd=4~5
+|lck=1~2
+|def=2~3
+|res=6~7
+|con=7
+|mov=5
+|inventory={{Item|8|Nosferatu}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Vigarde]]
+|class=General
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=17
+|mov=5
+|inventory={{Item|8|Spear}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Silence|link=Silence (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Red Gem|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Swordreaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=One immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=13
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Sniper
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Longbow|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Rennac]]
+|class=Rogue
+|lv=1
+|#=1
+|hp=26
+|str=8
+|skill=11
+|spd=15
+|lck=5
+|def=8
+|res=3
+|con=7
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Elixir}} • {{Item|8|Member Card|type=drop}}
+|notes=Prioritizes opening [[chest]]s, then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=10
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Vigarde]]
+|class=General
+|lv=13
+|#=1
+|hp=52
+|str=21
+|skill=14
+|spd=11
+|lck=9
+|def=20
+|res=12
+|con=17
+|mov=5
+|inventory={{Item|8|Spear}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=25~28
+|str=6~10
+|skill=5~8
+|spd=5~8
+|lck=4~7
+|def=3~5
+|res=12~15
+|con=7
+|mov=6
+|inventory={{Item|8|Silence|link=Silence (staff)}} • {{Item|8|Shine}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=25~28
+|str=6~10
+|skill=5~8
+|spd=5~8
+|lck=4~7
+|def=3~5
+|res=12~15
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Shine|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=22~26
+|str=10~14
+|skill=5~8
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~11
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=22~26
+|str=10~14
+|skill=5~8
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~11
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Red Gem|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=20~23
+|str=6~9
+|skill=4~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=20~23
+|str=6~9
+|skill=4~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=20~22
+|str=6~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=20~22
+|str=6~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=26~29
+|str=9~11
+|skill=4~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=• The eastern one immediately begins moving unprovoked.<br>• The other begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=2
+|hp=21~24
+|str=6~8
+|skill=12~14
+|spd=12~14
+|lck=2~4
+|def=3~4
+|res=1~3
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=25~27
+|str=7~9
+|skill=11~13
+|spd=10~12
+|lck=2~4
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Armorslayer|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=1
+|hp=20~23
+|str=5~8
+|skill=5~7
+|spd=6~7
+|lck=1~3
+|def=3~4
+|res=5~7
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=3
+|hp=24~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=2~3
+|def=11~13
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=26~29
+|str=9~11
+|skill=4~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=2
+|hp=26~29
+|str=6~9
+|skill=2~4
+|spd=2~4
+|lck=1~3
+|def=0~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=27~30
+|str=9~12
+|skill=5~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Swordreaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=26~29
+|str=9~11
+|skill=4~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=One immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=6
+|hp=24~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=2~3
+|def=11~13
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=12
+|#=1
+|hp=23~26
+|str=6~8
+|skill=6~8
+|spd=5~7
+|lck=2~4
+|def=4~5
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=21~24
+|str=6~8
+|skill=12~14
+|spd=12~14
+|lck=2~4
+|def=3~4
+|res=1~3
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=21~24
+|str=6~8
+|skill=12~14
+|spd=12~14
+|lck=2~4
+|def=3~4
+|res=1~3
+|con=8
+|mov=5
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=4
+|hp=24~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=2~3
+|def=11~13
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=13
+|#=3
+|hp=24~26
+|str=7~8
+|skill=6~8
+|spd=5~7
+|lck=3~4
+|def=4~5
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=25~27
+|str=7~9
+|skill=11~13
+|spd=10~12
+|lck=2~4
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Sniper
+|lv=5
+|#=1
+|hp=27~30
+|str=9~12
+|skill=8~11
+|spd=6~9
+|lck=2~5
+|def=6~8
+|res=3~6
+|con=8
+|mov=6
+|inventory={{Item|8|Longbow|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Rennac]]
+|class=Rogue
+|lv=1
+|#=1
+|hp=28
+|str=10
+|skill=16
+|spd=17
+|lck=5
+|def=9
+|res=11
+|con=7
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Elixir}} • {{Item|8|Member Card|type=drop}}
+|notes=Prioritizes opening [[chest]]s, then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=27~30
+|str=9~12
+|skill=5~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hammer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=27~30
+|str=9~12
+|skill=5~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=3
+|hp=27~29
+|str=7~9
+|skill=2~4
+|spd=2~4
+|lck=2~3
+|def=1~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=1
+|hp=27~29
+|str=7~9
+|skill=2~4
+|spd=2~4
+|lck=2~3
+|def=1~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=2
+|hp=25~27
+|str=7~9
+|skill=11~13
+|spd=10~12
+|lck=2~4
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=2
+|hp=24~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=2~3
+|def=11~13
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=13
+|#=2
+|hp=22~24
+|str=7~8
+|skill=12~14
+|spd=12~14
+|lck=2~4
+|def=3~4
+|res=1~3
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=6
+|hp=20~23
+|str=5~8
+|skill=5~7
+|spd=6~7
+|lck=1~3
+|def=3~4
+|res=5~7
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=5
+|hp=20~22
+|str=6~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=3
+|hp=20~22
+|str=6~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=2
+|hp=20~22
+|str=6~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Nosferatu}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Vigarde]]
+|class=General
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=17
+|mov=5
+|inventory={{Item|8|Spear}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Silence|link=Silence (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Red Gem|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Swordreaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=One immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=13
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Sniper
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Longbow|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Rennac]]
+|class=Rogue
+|lv=1
+|#=1
+|hp=26
+|str=8
+|skill=11
+|spd=15
+|lck=5
+|def=8
+|res=3
+|con=7
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Elixir}} • {{Item|8|Member Card|type=drop}}
+|notes=Prioritizes opening [[chest]]s, then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=10
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Vigarde]]
+|class=General
+|lv=13
+|#=1
+|hp=53~55
+|str=21~23
+|skill=14~15
+|spd=11~12
+|lck=9~10
+|def=20~21
+|res=12~13
+|con=17
+|mov=5
+|inventory={{Item|8|Spear}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=30~36
+|str=10~16
+|skill=9~13
+|spd=7~12
+|lck=8~14
+|def=4~7
+|res=16~22
+|con=7
+|mov=6
+|inventory={{Item|8|Silence|link=Silence (staff)}} • {{Item|8|Shine}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=30~36
+|str=10~16
+|skill=9~13
+|spd=7~12
+|lck=8~14
+|def=4~7
+|res=16~22
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Shine|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=28~34
+|str=17~23
+|skill=8~14
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~18
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=28~34
+|str=17~23
+|skill=8~14
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~18
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Red Gem|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=22~26
+|str=8~12
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=22~26
+|str=8~12
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=22~25
+|str=8~11
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=22~25
+|str=8~11
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=30~34
+|str=11~14
+|skill=5~9
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=• The eastern one immediately begins moving unprovoked.<br>• The other begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=2
+|hp=23~28
+|str=7~11
+|skill=13~16
+|spd=13~16
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=28~32
+|str=9~12
+|skill=13~16
+|spd=11~15
+|lck=3~7
+|def=5~8
+|res=2~4
+|con=9
+|mov=5
+|inventory={{Item|8|Armorslayer|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=1
+|hp=22~26
+|str=7~11
+|skill=7~10
+|spd=6~10
+|lck=2~4
+|def=3~5
+|res=6~10
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=3
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=1~4
+|lck=2~5
+|def=11~14
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=30~34
+|str=11~14
+|skill=5~9
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=2
+|hp=29~33
+|str=8~12
+|skill=2~6
+|spd=2~5
+|lck=2~5
+|def=1~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=30~35
+|str=11~15
+|skill=5~9
+|spd=7~11
+|lck=1~4
+|def=3~6
+|res=1~4
+|con=11
+|mov=5
+|inventory={{Item|8|Swordreaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=30~34
+|str=11~14
+|skill=5~9
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=One immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=6
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=1~4
+|lck=2~5
+|def=11~14
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=12
+|#=1
+|hp=25~30
+|str=7~11
+|skill=7~10
+|spd=6~9
+|lck=3~7
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=23~28
+|str=7~11
+|skill=13~16
+|spd=13~16
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=23~28
+|str=7~11
+|skill=13~16
+|spd=13~16
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=8
+|mov=5
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=4
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=1~4
+|lck=2~5
+|def=11~14
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=13
+|#=3
+|hp=26~31
+|str=7~11
+|skill=8~11
+|spd=6~10
+|lck=3~7
+|def=4~7
+|res=1~4
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=28~32
+|str=9~12
+|skill=13~16
+|spd=11~15
+|lck=3~7
+|def=5~8
+|res=2~4
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Sniper
+|lv=5
+|#=1
+|hp=34~41
+|str=12~18
+|skill=11~17
+|spd=8~12
+|lck=5~11
+|def=7~11
+|res=5~9
+|con=8
+|mov=6
+|inventory={{Item|8|Longbow|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Rennac]]
+|class=Rogue
+|lv=1
+|#=1
+|hp=28
+|str=10
+|skill=16
+|spd=17
+|lck=5
+|def=9
+|res=11
+|con=7
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Elixir}} • {{Item|8|Member Card|type=drop}}
+|notes=Prioritizes opening [[chest]]s, then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=30~35
+|str=11~15
+|skill=5~9
+|spd=7~11
+|lck=1~4
+|def=3~6
+|res=1~4
+|con=11
+|mov=5
+|inventory={{Item|8|Hammer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=30~35
+|str=11~15
+|skill=5~9
+|spd=7~11
+|lck=1~4
+|def=3~6
+|res=1~4
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=3
+|hp=30~34
+|str=9~12
+|skill=3~7
+|spd=3~5
+|lck=2~5
+|def=1~3
+|res=1~4
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=1
+|hp=30~34
+|str=9~12
+|skill=3~7
+|spd=3~5
+|lck=2~5
+|def=1~3
+|res=1~4
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=2
+|hp=28~32
+|str=9~12
+|skill=13~16
+|spd=11~15
+|lck=3~7
+|def=5~8
+|res=2~4
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=2
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=1~4
+|lck=2~5
+|def=11~14
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=13
+|#=2
+|hp=24~29
+|str=7~11
+|skill=14~17
+|spd=14~17
+|lck=3~7
+|def=3~6
+|res=2~4
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=6
+|hp=22~26
+|str=7~11
+|skill=7~10
+|spd=6~10
+|lck=2~4
+|def=3~5
+|res=6~10
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=7
+|hp=22~25
+|str=8~11
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=3
+|hp=22~25
+|str=8~11
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=4
+|hp=22~25
+|str=8~11
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=14
+|#=2
+|hp=24~28
+|str=4~8
+|skill=4~9
+|spd=5~9
+|lck=6~9
+|def=1~4
+|res=11~15
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Mend}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=22~26
+|str=8~12
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=22~26
+|str=8~12
+|skill=4~8
+|spd=5~9
+|lck=2~4
+|def=3~5
+|res=7~11
+|con=7
+|mov=5
+|inventory={{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=14
+|#=2
+|hp=23~27
+|str=8~12
+|skill=7~10
+|spd=6~11
+|lck=2~4
+|def=3~5
+|res=6~10
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Vigarde]]
+|class=General
+|lv=13
+|#=1
+|hp=56
+|str=23
+|skill=17
+|spd=14
+|lck=10
+|def=21
+|res=13
+|con=17
+|mov=5
+|inventory={{Item|8|Spear}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=34
+|str=13~14
+|skill=10~11
+|spd=10~12
+|lck=13
+|def=4~5
+|res=19~20
+|con=7
+|mov=6
+|inventory={{Item|8|Silence|link=Silence (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Bishop
+|lv=6
+|#=1
+|hp=34
+|str=13~14
+|skill=10~11
+|spd=10~12
+|lck=13
+|def=4~5
+|res=19~20
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=32~34
+|str=19~20
+|skill=11~12
+|spd=11~12
+|lck=4~5
+|def=6~7
+|res=14~18
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Druid
+|lv=5
+|#=1
+|hp=32~34
+|str=19~20
+|skill=11~12
+|spd=11~12
+|lck=4~5
+|def=6~7
+|res=14~18
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Red Gem|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=26
+|str=11~12
+|skill=6
+|spd=6~8
+|lck=3~4
+|def=5
+|res=9~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=1
+|hp=26
+|str=11~12
+|skill=6
+|spd=6~8
+|lck=3~4
+|def=5
+|res=9~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=24~26
+|str=10~11
+|skill=7
+|spd=7~8
+|lck=3~5
+|def=3~4
+|res=8~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=1
+|hp=24~26
+|str=10~11
+|skill=7
+|spd=7~8
+|lck=3~5
+|def=3~4
+|res=8~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=33~35
+|str=13~15
+|skill=7~8
+|spd=9~10
+|lck=2~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=2
+|hp=27~29
+|str=9~10
+|skill=15
+|spd=15~16
+|lck=4~5
+|def=5
+|res=2~3
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=1
+|hp=31
+|str=10
+|skill=13
+|spd=14
+|lck=6
+|def=7
+|res=3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=1
+|hp=25
+|str=10
+|skill=9
+|spd=8
+|lck=4
+|def=3
+|res=8
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=3
+|hp=29~32
+|str=10~13
+|skill=6~8
+|spd=2~3
+|lck=3~6
+|def=13~15
+|res=3~4
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=33~35
+|str=13~15
+|skill=7~8
+|spd=9~10
+|lck=2~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=2
+|hp=32~34
+|str=11~12
+|skill=4~5
+|spd=3~4
+|lck=3~4
+|def=1
+|res=2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=1
+|hp=33
+|str=14
+|skill=8
+|spd=9
+|lck=2
+|def=3
+|res=2
+|con=11
+|mov=5
+|inventory={{Item|8|Swordreaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=2
+|hp=33~35
+|str=13~15
+|skill=7~8
+|spd=9~10
+|lck=2~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=One immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=6
+|hp=29~32
+|str=10~13
+|skill=6~8
+|spd=2~3
+|lck=3~6
+|def=13~15
+|res=3~4
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}} • {{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=12
+|#=1
+|hp=31
+|str=10
+|skill=10
+|spd=8
+|lck=6
+|def=5
+|res=2
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=27~29
+|str=9~10
+|skill=15
+|spd=15~16
+|lck=4~5
+|def=5
+|res=2~3
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=12
+|#=1
+|hp=27~29
+|str=9~10
+|skill=15
+|spd=15~16
+|lck=4~5
+|def=5
+|res=2~3
+|con=8
+|mov=5
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=4
+|hp=29~32
+|str=10~13
+|skill=6~8
+|spd=2~3
+|lck=3~6
+|def=13~15
+|res=3~4
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving if a door to the northern hall is opened.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=13
+|#=3
+|hp=29~31
+|str=9~10
+|skill=10
+|spd=7~10
+|lck=5~6
+|def=6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=1
+|hp=30~32
+|str=11
+|skill=14~15
+|spd=14
+|lck=5~6
+|def=7
+|res=3
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Sniper
+|lv=5
+|#=1
+|hp=40
+|str=15
+|skill=14
+|spd=11
+|lck=7
+|def=8
+|res=8
+|con=8
+|mov=6
+|inventory={{Item|8|Longbow|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Rennac]]
+|class=Rogue
+|lv=1
+|#=1
+|hp=26
+|str=8
+|skill=11
+|spd=15
+|lck=5
+|def=8
+|res=3
+|con=7
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Elixir}} • {{Item|8|Member Card|type=drop}}
+|notes=Prioritizes opening [[chest]]s, then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=13
+|#=2
+|hp=33
+|str=14
+|skill=8
+|spd=9
+|lck=2
+|def=3
+|res=2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=3
+|hp=33~34
+|str=10~11
+|skill=4~5
+|spd=4
+|lck=4~5
+|def=1~2
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=13
+|#=1
+|hp=33~34
+|str=10~11
+|skill=4~5
+|spd=4
+|lck=4~5
+|def=1~2
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=13
+|#=2
+|hp=30~32
+|str=11
+|skill=14~15
+|spd=14
+|lck=5~6
+|def=7
+|res=3
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=13
+|#=2
+|hp=29~32
+|str=10~13
+|skill=6~8
+|spd=2~3
+|lck=3~6
+|def=13~15
+|res=3~4
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Myrmidon
+|lv=13
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=13
+|#=6
+|hp=25
+|str=10
+|skill=9
+|spd=8
+|lck=4
+|def=3
+|res=8
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=13
+|#=14
+|hp=24~26
+|str=10~11
+|skill=7
+|spd=7~8
+|lck=3~5
+|def=3~4
+|res=8~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=14
+|#=2
+|hp=26~27
+|str=6
+|skill=7~8
+|spd=8
+|lck=8
+|def=2~3
+|res=14~15
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=14
+|#=2
+|hp=26
+|str=11~12
+|skill=6
+|spd=6~8
+|lck=3~4
+|def=5
+|res=9~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=14
+|#=2
+|hp=26~27
+|str=10~11
+|skill=8~11
+|spd=9
+|lck=3~4
+|def=5
+|res=8~9
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turn 2
+**[[Rennac]] appears south of the northeastern chest
+**2 [[Fighter]]s from the southwestern hall
+**2 [[Soldier]]s with [[Steel Lance]]s from the southeastern hall
+*Turn 3
+**1 [[Soldier]] with a [[Javelin]] from the southwestern hall
+**1 [[Soldier]] with a [[Steel Lance]] from the southwestern hall
+**2 [[Mercenary|Mercenaries]] from the southeastern hall
+*Turn 4
+**2 [[Knight]]s from the southwestern hall
+**2 [[Myrmidon]]s from the southeastern hall
+*Turns 7–9
+**2 [[Mage]]s with [[Elfire]] from the northwestern hall
+**1 [[Shaman]] with [[Luna (tome)|Luna]] from the northeastern hall
+**1 [[Shaman]] with [[Flux]] from the northeastern hall
+*For 2 <small>(Easy/Normal)</small>/4 <small>(Difficult)</small> turns after opening the door to the treasure room
+**1 [[Shaman]] with [[Luna (tome)|Luna]] from the right stairs in the treasure room
+**1 [[Shaman]] with [[Nosferatu]] from the left stairs in the treasure room
+*After opening the door to the throne room <small>(Difficult only)</small>
+**2 [[Priest]]s, 1 [[Shaman]] with [[Luna (tome)|Luna]], 1 [[Shaman]] with [[Nosferatu]], and 2 [[Mage]]s with [[Thunder]] in the throne room
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Vigarde}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait vigarde fe08.png]]
+|sprite=general enemy
+|class=General
+|affin=anima
+|lv=13
+|HP=52
+|str=21
+|skill={{h|14|16 in the Japanese version}}
+|spd={{h|11|13 in the Japanese version}}
+|luck=9
+|def=20
+|res=12
+|move=5
+|con=17
+|aid=16
+|inventory={{Item|8|Spear}}<br>{{Item|8|Knight Crest|type=drop}}
+|sw=A
+|la=S
+|ax=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait vigarde fe08.png]]
+|sprite=general enemy
+|class=General
+|affin=anima
+|lv=13
+|HP={{h|53~55|56 in the Japanese version}}
+|str=21~23
+|skill={{h|14~15|17 in the Japanese version}}
+|spd={{h|11~12|14 in the Japanese version}}
+|luck=9~10
+|def=20~21
+|res=12~13
+|move=5
+|con=17
+|aid=16
+|inventory={{Item|8|Spear}}<br>{{Item|8|Knight Crest|type=drop}}
+|sw=A
+|la=S
+|ax=A
+}}
+}}
+
+==Strategy==
+{{strategy}}
+The only source of time pressure on this map is recruiting Rennac before he flees as no other enemy thieves/rogues appear on this map. Rennac will spawn in the upper right and make his way left. As Ephraim is forced to the right side and can recruit him for a decent chunk of money in a pinch, the choice of where to deploy L'Arachel depends on how fast each side can reach the area outside the throne room. Once he is recruited, there is no longer any pressure to advance quickly.
+
+There are multiple stats staff enemies on this map, and unlike [[Fort Rigwald]] their presence near reinforcement zones, Rennac, and the greater danger of being [[Berserk (condition)|berserk]] make it difficult to simply wait them out. Pre-battle the unit order should be manipulated so that high resistance evasive units (or, at least, ones little threat if berserked) are near the bottom by removing them from deployment and adding them back in, as the enemy AI strongly favors those lower on the list for determining who to target with these staffs. If at all possible both sides should be equipped with a [[Restore]] staff user near the top of the deployment order, and low resistance units should be kept clear of their range (to view the range of an enemy stats staff wielder the player can press A on them when viewing their ranges) if there will not be a Restore staff immediately handy
+
+Beware unlocking the treasure room and (on Difficult mode) the throne room causes reinforcements to spawn. Anyone trying to loot the treasure room will need an escort.
+
+==Trivia==
+* This chapter contains the only obtainable [[Sleep (staff)|Sleep staff]] in [[Ephraim]]'s route of {{title|The Sacred Stones}}, though actually getting it requires that the bishop equips his [[Shine]] tome. This issue is only present in the localized version, as in the Japanese version the status-inflicting staves are the only thing present in this unit's inventory.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Father and Son
+|jpn-name={{h|父と子と|Chichi to ko to}}
+|jpn-mean=Father and son
+|span-name=Padre e hijo
+|span-mean=Father and son
+|fren-name=Père et fils
+|fren-mean=Father and son
+|ger-name=Vater und Sohn
+|ger-mean=Father and Son
+|ital-name=Padre e figlio
+|ital-mean=Father and son
+}}
+
+==Gallery==
+{{sectstub}}
+
+{{ChapterNav
+|prechapter=Fluorspar's Oath
+|nextchapter=Scorched Sand
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

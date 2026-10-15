@@ -1,0 +1,1005 @@
+{{Chapter Infobox
+|title=Ancient Horrors
+|image=[[File:Cm fe08 4.png|200px]]
+|location=[[Za'ha Woods]]
+|new units=[[Artur]], [[Lute]]
+|boss=[[Monster]]
+|previous=[[The Bandits of Borgo]]
+|next=[[The Empire's Reach]]
+}}
+
+{{quote|O divine light, show me... Is this a sign of dark days to come?|Artur}}
+
+'''Ancient Horrors''' (Japanese: {{hl|異形の者たち|Igyō no mono-tachi}} ''Grotesque Figures'') is the fourth chapter of {{FE8}}. This chapter's tutorial introduces the [[Trinity of Magic]] and [[monster]]s.
+
+==Plot==
+{{main|Ancient Horrors/Script}}
+
+Having defeated [[Bazba]] and his bandit gang, [[Eirika]] continues her journey south to [[Grado]] in search of [[Ephraim]]. In their path is [[Za'ha Woods]], an ancient forest in [[Renais]]. Some time after entering the forest Eirika notices strange figures in the forest, and she asks [[Seth]] about them.
+
+[[Artur]] and [[Lute]], residents of the forest, also notice the creatures; Artur is concerned by this, wondering how [[monster]]s rise while the [[Sacred Stone (object)|Sacred Stones]] exist. Lute recognizes some of the monsters, mentioning that they are [[revenant]]s, walking [[human]] corpses. Artur tells Lute to stay in the village while he goes to meet the travelers up north. Lute is happy to, claiming that she could easily protect the village.
+
+Approaching Eirika, Artur tells her group that they need to head south as quickly as possible to avoid being surrounded by monsters. Eirika questions Artur, asking if they are the same monsters that served [[Fomortiis|the Demon king]] in the past; Artur is unsure, but thinks they match descriptions of the legends. A [[mogall]] then approaches and attacks Artur, though it is easily dispatched. Eirika insists on helping Artur, and the battle beings.
+
+During the battle [[L'Arachel]] and her two retainers appear at the top of the cliffs to the northeast; she strongly desires to smite the monsters in the name of justice, but agrees with [[Rennac]] to find a safer way down than off the cliffs. Lute either joins to assist Eirika's group during the battle after someone goes to the village, or insists on accompanying them after the battle.
+
+After Eirika routs the monsters from the area, Seth insists that the corpses be burned to prevent them from rising again. Eirika is still in disbelief, having never seen such abominations outside of myths and tales. Seth is greatly concerned by this new development, and recommends that they return to [[Frelia]] to regroup. Eirika insists they continue south in search of her brother, and Seth relents, and reaffirms his goal to protect Eirika at all costs.
+
+The maiden from earlier arrives on the scene, introducing herself as L'Arachel. L'Arachel is downcast when Eirika informs her that the monsters have already been vanquished. Eirika asks L'Arachel of her identity, though L'Arachel is stopped by [[Dozla]], saying it would be inappropriate to reveal her identity. L'Arachel is happy to ride off mysteriously, leaving Eirika somewhat dumbfounded.
+
+==Chapter data==
+{{ChapData
+|victory=Defeat all monsters
+|defeat=[[Eirika]] dies
+|ally=2–9{{h|+1|Upon Lute being recruited}}
+|other={{h|0|L'Arachel, Dozla, and Rennac appear briefly on turn 2, but leave immediately before the start of turn 3 player phase}}
+|enemy=15{{h|+7|Reinforcements}}
+|map=[[File:Cm fe08 4.png]]
+|col=15
+|row=15
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Artur
+|portrait=[[File:portrait artur fe08.png]]
+|class=Monk
+|HP=19
+|lv=2
+|inventory={{Item|8|Lightning}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically from preparations
+}}
+|newunit2={{NewUnit
+|name=Lute
+|portrait=[[File:portrait lute fe08.png]]
+|class=Mage
+|HP=17
+|lv=1
+|inventory={{Item|8|Fire}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Visit southern [[village]] or automatically<br> at the end of the chapter
+}}
+|forced1=eirika
+|forced2=artur
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Iron Axe
+|obtain1=Visit northern [[village]]
+|itemlast=Vulnerary
+|obtainlast=Steal from enemy [[Revenant]] (reinforcement)
+}}
+
+===Enemy data===
+{{missingstats}}
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Normal <small>(Japan)</small>
+|tab3=Difficult
+|tab4=Difficult <small>(Japan)</small>
+|default=1
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=15
+|str=2
+|skill=1
+|spd=2
+|lck=0
+|def=2
+|res=4
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=3
+|#=2
+|hp=25
+|str=2
+|skill=0
+|spd=0
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=3
+|hp=25
+|str=2
+|skill=0
+|spd=0
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=1
+|#=3
+|hp=25
+|str=2
+|skill=0
+|spd=0
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=2
+|#=1
+|hp=15
+|str=2
+|skill=1
+|spd=2
+|lck=0
+|def=2
+|res=4
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=20
+|str=4
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=3
+|#=2
+|hp=20
+|str=4
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=1
+|#=1
+|hp=35
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|forest]].<br>• Only moves to attack units in range.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=1
+|#=2
+|hp=20
+|str=4
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=20
+|str=4
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=1
+|hp=25
+|str=2
+|skill=0
+|spd=0
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=4
+|inventory={{Item|8|Fetid Claw}} • {{Item|8|Vulnerary}}
+|notes=Does not move and initiate combat in the same action.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=3
+|hp=25
+|str=2
+|skill=0
+|spd=0
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=15
+|str=2
+|skill=1
+|spd=2
+|lck=0
+|def=2
+|res=4
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=3
+|#=2
+|hp=27
+|str=3
+|skill=0~1
+|spd=1
+|lck=0
+|def=0
+|res=0~1
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=3
+|hp=26
+|str=2~3
+|skill=0
+|spd=0~1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=1
+|#=3
+|hp=25
+|str=2
+|skill=0
+|spd=0
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=2
+|#=1
+|hp=15
+|str=3
+|skill=2
+|spd=3
+|lck=0
+|def=2
+|res=5
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=21
+|str=5
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=3
+|#=2
+|hp=21~22
+|str=5
+|skill=3
+|spd=3
+|lck=0
+|def=3
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=1
+|#=1
+|hp=35
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|forest]].<br>• Only moves to attack units in range.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=1
+|#=2
+|hp=20
+|str=4
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=21
+|str=5
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Fetid Claw}} • {{Item|8|Vulnerary}}
+|notes=Does not move and initiate combat in the same action.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=16~17
+|str=3~4
+|skill=1~3
+|spd=2~4
+|lck=0~2
+|def=2~3
+|res=4~5
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=3
+|#=2
+|hp=28~32
+|str=3~6
+|skill=0~3
+|spd=0~2
+|lck=0~2
+|def=0~2
+|res=0~2
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=3
+|hp=27~31
+|str=3~5
+|skill=0~3
+|spd=0~2
+|lck=0~2
+|def=0~2
+|res=0~2
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=1
+|#=3
+|hp=27~29
+|str=3~4
+|skill=0~2
+|spd=0~1
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=2
+|#=1
+|hp=16~18
+|str=3~5
+|skill=1~4
+|spd=2~5
+|lck=0~3
+|def=2~4
+|res=4~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=22~24
+|str=5~7
+|skill=2~5
+|spd=3~5
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=3
+|#=2
+|hp=23~25
+|str=5~8
+|skill=2~5
+|spd=3~5
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=1
+|#=1
+|hp=37~38
+|str=4~5
+|skill=0~1
+|spd=1~2
+|lck=1~2
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|forest]].<br>• Only moves to attack units in range.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=1
+|#=2
+|hp=22~23
+|str=5~6
+|skill=2~4
+|spd=3~4
+|lck=0~1
+|def=1~3
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=22~24
+|str=5~7
+|skill=2~5
+|spd=3~5
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=1
+|hp=27~31
+|str=3~5
+|skill=0~3
+|spd=0~2
+|lck=0~2
+|def=0~2
+|res=0~2
+|con=6
+|mov=4
+|inventory={{Item|8|Fetid Claw}} • {{Item|8|Vulnerary}}
+|notes=Does not move and initiate combat in the same action.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=3
+|hp=27~31
+|str=3~5
+|skill=0~3
+|spd=0~2
+|lck=0~2
+|def=0~2
+|res=0~2
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=1
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|forest]].<br>• Only moves to attack units in range.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Fetid Claw}} • {{Item|8|Vulnerary}}
+|notes=Does not move and initiate combat in the same action.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=2
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turn 2
+**3 [[Bonewalker]]s from the eastern border of the map
+*After reaching the row just south of the snag
+**4 [[Revenant]]s from the northwest corner of the map
+
+===Boss data===
+{{main|Monster}}
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Generic portrait entombed fe08.png]]
+|sprite=entombed enemy
+|class=Entombed
+|affin=dark
+|lv=1
+|HP=35
+|str=3
+|skill=0
+|spd=1
+|luck=0
+|def=0
+|res=0
+|move=5
+|con=6
+|aid=5
+|inventory={{Item|8|Fetid Claw}}
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Generic portrait entombed fe08.png]]
+|sprite=entombed enemy
+|class=Entombed
+|affin=dark
+|lv=1
+|HP={{h|37~38|38~40 in the Japanese version}}
+|str=4~5
+|skill={{h|0~1|1~2 in the Japanese version}}
+|spd=1~2
+|luck={{h|1~2|2~3 in the Japanese version}}
+|def=0~1
+|res=0~1
+|move=5
+|con=6
+|aid=5
+|inventory={{Item|8|Fetid Claw}}
+}}
+}}
+
+==Strategy==
+{{strategy}}
+{{sectstub}}
+This map introduces two users of offensive magic: [[Lute]] and [[Artur]]. Artur is a [[Monk]], so he can handle the [[dark magic]]-wielding [[Mogall]]s and frequently double the slow enemies in this chapter, but his low physical bulk is a drawback to consider. Lute is a [[Mage]] whose low physical bulk may put her in danger if one chooses to visit her village early with someone like [[Vanessa]], so putting her in a nearby forest and rescuing her the next turn is recommended. Regardless, {{title|The Sacred Stones}} is known for its weaker [[monster]] units, so as long as you keep your units safe, this chapter shouldn't be an issue. Since this is a rout map, be wary of the reinforcements that spawn near the start of the map, and be mindful that you aren't swarmed. Always try to keep your units on forest tiles to avoid unnecessary hits.
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=Ancient Horrors
+|eng-mean=The title refers to the appearance of [[monster]]s in the chapter, previously only known of in ancient myths.
+|jpn-name={{h|異形の者たち|Igyō no mono-tachi}}
+|jpn-mean=Grotesque Figures
+|span-name=Horrores olvidados
+|span-mean=Forgotten horrors
+|fren-name=Horreurs du passé
+|fren-mean=Horrors of the past
+|ger-name=Uralter Schrecken
+|ger-mean=Ancient Horror
+|ital-name=Antichi orrori
+|ital-mean=Ancient Horrors
+}}
+<!--
+==Gallery==
+{{sectstub}}
+<gallery>
+</gallery>
+-->
+==References==
+{{refbar}}
+
+{{ChapterNav
+|prechapter=The Bandits of Borgo
+|nextchapter=The Empire's Reach
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

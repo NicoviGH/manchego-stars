@@ -1,0 +1,855 @@
+{{Chapter Infobox
+|title=Sacred Stone
+|image=[[File:Cm fe08 F-2.png|200px]]
+|location=Black Temple
+|boss=[[Fomortiis]]
+|previous=[[Sacred Stone (part 1)]]
+}}
+
+{{Quote| Listen, everyone. I can never repay you for all you've done so far. Now, please, one last time...Lend me your strength. To defeat the Demon King! To restore peace to our lands! To take the peace we all dream of and make it real!|[[Eirika]]}}
+
+'''Sacred Stone''' (Japanese: {{hl|聖魔の光石|Seima no kōseki}} ''Light Stones of Saints and Demons'') is the final chapter of {{FE8}}. This page covers the second part of the chapter.
+
+==Plot==
+{{main|Sacred Stone (part 2)/Script (Eirika)|Sacred Stone (part 2)/Script (Ephraim)}}
+
+The Demon King [[Fomortiis]] revives himself with [[Lyon]]'s power; [[Eirika]] and [[Ephraim]] are astonished by his power, but resolve to defeat him with the help of each other and the rest of their friends. [[L'Arachel]] informs the twins that the power of the [[Sacred Stone (object)|Sacred Stone]]s comes from human will. With the group's combined willpower, Fomortiis's soul is trapped within [[Rausten]]'s Sacred Stone; however, they then contend with the Demon King's soulless body.
+
+Once Fomortiis's body is destroyed, everyone rejoices at the end of the conflict across [[Magvel]]. [[Innes]] points out that Fomortiis cannot return with his body destroyed, and Ephraim and Eirika note that they achieved such without the might of the legendary heroes. Other groups of character converse, discussing how they claimed victory, or what to do with the future. The twins then return home.
+
+In the epilogue, Eirika and Ephraim see off many major figures they encountered; the leave L'Arachel at Rausten, [[Joshua]] at Jehanna, [[Myrrh]] to [[Caer Pelyn]], and Innes to [[Frelia]], before reaching [[Renais Castle]]. In Eirika's route, the twins decide to rest at Castle Renais; Eirika suggests they seal away Rausten's Sacred Stone first, though she wonders if its power could resurrect the many that died in the war—Ephraim reminds her they cannot, and the two decide to fulfill Lyon's dreams of bettering the world. In Ephraim's route, Ephraim receives word of a massive landslide in [[Grado]] and leaves to aid its people, wishing to aid the citizens Lyon aimed to protect, and hoping to become a great king in the future.
+
+After the staff credits, the epilogue ends with a flashback to when Lyon first met Ephraim and Eirika, hoping they can become friends.
+
+==Chapter data==
+{{ChapData
+|victory=Defeat [[Fomortiis]]
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally={{h|1–12|Every unit that survived part 1 will carry over; maximum 12}}
+|enemy=1{{h|+8|Reinforcements}}
+|map=[[File:Cm fe08 F-2.png]]
+|col=23
+|row=20
+}}
+
+Units deployed in the previous part of the chapter carry over into this one, and are arranged on the map based on deployment order. Eirika, Ephraim, Seth, and L'Arachel (if deployed) are placed in fixed positions and ignored in deployment order.
+
+===Character data===
+{{ChapChars
+|game#=08
+|forced1=eirika
+|forced2=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+|return22=l'Arachel
+|return23=dozla
+|return24=saleh
+|return25=ewan
+|return26=cormag
+|return27=rennac
+|return28=duessel
+|return29=knoll
+|return30=myrrh
+|return31=syrene
+}}
+
+===Enemy data===
+{{Missingstats}}<!--I couldn't get a Cyclops to appear across 500+ spawns-->
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal <small>(Japan)</small>
+|tab4=Difficult
+|tab5=Difficult <small>(Japan)</small>
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Fomortiis]]
+|class=Demon King
+|classarticle=Demon King (class)
+|lv=20
+|#=1
+|hp=120
+|str=23{{h|+10|Granted by Demon Light}}
+|skill=20{{h|+10|Granted by Demon Light}}
+|spd=18
+|lck=10{{h|+10|Granted by Demon Light}}
+|def=25{{h|+10|Granted by Demon Light}}
+|res=25{{h|+15|Granted by Demon Light}}
+|con=25
+|mov=2
+|inventory={{Item|8|Demon Light}} • {{Item|8|Ravager}} • {{Item|8|Nightmare}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=6
+|#=Varies
+|hp=45~49
+|str=7~10
+|skill=3~4
+|spd=3~4
+|lck=6~8
+|def=1~2
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=8
+|#=Varies
+|hp=30~33
+|str=10~12
+|skill=8~10
+|spd=8~10
+|lck=1~2
+|def=7~8
+|res=5~6
+|con=9
+|mov=6
+|inventory={{Item|8|Runesword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=12
+|#=Varies
+|hp=32~36
+|str=11~13
+|skill=9~11
+|spd=9~11
+|lck=1~3
+|def=7~9
+|res=5~7
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=7
+|#=Varies
+|hp=29~32
+|str=9~12
+|skill=9~12
+|spd=7~9
+|lck=1~2
+|def=6~8
+|res=4~6
+|con=8
+|mov=6
+|inventory={{Item|8|Killer Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=14
+|#=Varies
+|hp=37~42
+|str=15~18
+|skill=10~13
+|spd=12~15
+|lck=1~3
+|def=12~14
+|res=4~6
+|con=11
+|mov=7
+|inventory={{Item|8|Heavy Spear}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Arch Mogall
+|lv=9
+|#=Varies
+|hp=23~26
+|str=14~17
+|skill=7~9
+|spd=6~8
+|lck=2~4
+|def=4~5
+|res=11~13
+|con=5
+|mov=6
+|inventory={{Item|8|Crimson Eye}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=11
+|#=Varies
+|hp=50~55
+|str=15~18
+|skill=9~11
+|spd=8~10
+|lck=1~3
+|def=12~14
+|res=6~8
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=13
+|#=Varies
+|hp=32~37
+|str=11~13
+|skill=18~21
+|spd=18~21
+|lck=4~6
+|def=7~9
+|res=6~8
+|con=8
+|mov=8
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=12
+|#=Varies
+|hp=36~41
+|str=12~15
+|skill=8~11
+|spd=9~11
+|lck=1~3
+|def=11~12
+|res=6~8
+|con=12
+|mov=8
+|inventory={{Item|8|Halberd}} • {{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Cyclops
+<!--|lv=16?-->
+|#=Varies
+|con=16
+|mov=5
+|inventory={{Item|8|Battle Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=15
+|#=Varies
+|hp=28~31
+|str=20~24
+|skill=9~11
+|spd=9~11
+|lck=6~8
+|def=7~8
+|res=15~18
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Draco Zombie
+|lv=5
+|#=Varies
+|hp=62~66
+|str=4~7{{h|+10|Granted by Wretched Air}}
+|skill=2~3{{h|+10|Granted by Wretched Air}}
+|spd=3~4
+|lck=2~4
+|def=3~5{{h|+20|Granted by Wretched Air}}
+|res=4~5{{h|+10|Granted by Wretched Air}}
+|con=25
+|mov=5
+|inventory={{Item|8|Wretched Air}}
+|notes=Will not move until provoked.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Fomortiis]]
+|class=Demon King
+|classarticle=Demon King (class)
+|lv=20
+|#=1
+|hp=120
+|str=23{{h|+10|Granted by Ravager}}
+|skill=20{{h|+10|Granted by Ravager}}
+|spd=18
+|lck=10
+|def=25{{h|+15|Granted by Ravager}}
+|res=25{{h|+10|Granted by Ravager}}
+|con=25
+|mov=2
+|inventory={{Item|8|Ravager}} • {{Item|8|Demon Light}} • {{Item|8|Nightmare}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Fetid Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Fomortiis]]
+|class=Demon King
+|classarticle=Demon King (class)
+|lv=20
+|#=1
+|hp=120
+|str=23{{h|+10|Granted by Ravager}}
+|skill=20{{h|+10|Granted by Ravager}}
+|spd=18
+|lck=10
+|def=25{{h|+15|Granted by Ravager}}
+|res=25{{h|+10|Granted by Ravager}}
+|con=25
+|mov=2
+|inventory={{Item|8|Ravager}} • {{Item|8|Demon Light}} • {{Item|8|Nightmare}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Fetid Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Fomortiis]]
+|class=Demon King
+|classarticle=Demon King (class)
+|lv=20
+|#=1
+|hp=120
+|str=24~25{{h|+10|Granted by Demon Light}}
+|skill=21~22{{h|+10|Granted by Demon Light}}
+|spd=18~19
+|lck=10~12{{h|+10|Granted by Demon Light}}
+|def=25~26{{h|+10|Granted by Demon Light}}
+|res=25~26{{h|+15|Granted by Demon Light}}
+|con=25
+|mov=2
+|inventory={{Item|8|Demon Light}} • {{Item|8|Ravager}} • {{Item|8|Nightmare}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=6
+|#=Varies
+|hp=52~58
+|str=11~14
+|skill=5~7
+|spd=4~6
+|lck=10~14
+|def=2~3
+|res=2~4
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=8
+|#=Varies
+|hp=35~41
+|str=12~15
+|skill=10~13
+|spd=10~12
+|lck=2~3
+|def=8~10
+|res=7~9
+|con=9
+|mov=6
+|inventory={{Item|8|Runesword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=12
+|#=Varies
+|hp=38~43
+|str=13~16
+|skill=11~14
+|spd=11~13
+|lck=2~4
+|def=8~11
+|res=7~10
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=7
+|#=Varies
+|hp=35~40
+|str=12~15
+|skill=12~15
+|spd=9~11
+|lck=2~3
+|def=8~10
+|res=6~8
+|con=8
+|mov=6
+|inventory={{Item|8|Killer Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=14
+|#=Varies
+|hp=44~50
+|str=19~23
+|skill=13~16
+|spd=15~17
+|lck=2~4
+|def=14~17
+|res=5~8
+|con=11
+|mov=7
+|inventory={{Item|8|Heavy Spear}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Arch Mogall
+|lv=9
+|#=Varies
+|hp=27~31
+|str=18~23
+|skill=10~13
+|spd=8~11
+|lck=4~7
+|def=5~7
+|res=13~16
+|con=5
+|mov=6
+|inventory={{Item|8|Crimson Eye}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=11
+|#=Varies
+|hp=57~64
+|str=19~23
+|skill=11~14
+|spd=10~12
+|lck=2~4
+|def=14~16
+|res=8~10
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=13
+|#=Varies
+|hp=38~44
+|str=13~16
+|skill=21~25
+|spd=21~25
+|lck=6~9
+|def=9~11
+|res=7~10
+|con=8
+|mov=8
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=10
+|#=Varies
+|hp=43~49
+|str=15~18
+|skill=11~14
+|spd=11~13
+|lck=2~4
+|def=12~14
+|res=7~10
+|con=12
+|mov=8
+|inventory={{Item|8|Halberd}} • {{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Cyclops
+<!--|lv=16?-->
+|#=Varies
+|con=16
+|mov=5
+|inventory={{Item|8|Battle Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=15
+|#=Varies
+|hp=31~36
+|str=25~29
+|skill=11~15
+|spd=11~14
+|lck=8~12
+|def=7~9
+|res=18~22
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Draco Zombie
+|lv=5
+|#=Varies
+|hp=70~75
+|str=8~11{{h|+10|Granted by Wretched Air}}
+|skill=4~6{{h|+10|Granted by Wretched Air}}
+|spd=5~7
+|lck=5~7
+|def=6~8{{h|+20|Granted by Wretched Air}}
+|res=5~6{{h|+10|Granted by Wretched Air}}
+|con=25
+|mov=5
+|inventory={{Item|8|Wretched Air}}
+|notes=Will not move until provoked.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Fomortiis]]
+|class=Demon King
+|classarticle=Demon King (class)
+|lv=20
+|#=1
+|hp=120
+|str=23{{h|+10|Granted by Ravager}}
+|skill=20{{h|+10|Granted by Ravager}}
+|spd=18
+|lck=10
+|def=25{{h|+15|Granted by Ravager}}
+|res=25{{h|+10|Granted by Ravager}}
+|con=25
+|mov=2
+|inventory={{Item|8|Ravager}} • {{Item|8|Demon Light}} • {{Item|8|Nightmare}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Fetid Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=
+|#=Varies
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=
+|mov=
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*On turn 1, [[Fomortiis]] will spawn 8 random promoted [[monster]] units around him. Fomortiis will not initiate combat on this turn.
+*Fomortiis will continue to summon sets of 8 random promoted monster units if both of the following are true:
+**[[Nightmare]] cannot be cast (see below).
+**The number of summoned units currently on the map is less than 3.
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Fomortiis}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|name=Fomortiis
+|portrait=[[File:Generic portrait demon king fe08.png]]
+|sprite=demon king enemy
+|class=Demon King
+|classlink=Demon King (class)
+|affin=dark
+|lv=20
+|HP=120
+|str=23{{h|+10|Granted by Demon Light}}
+|skill=20{{h|+10|Granted by Demon Light}}
+|spd=18
+|luck=10{{h|+10|Granted by Demon Light}}
+|def=25{{h|+10|Granted by Demon Light}}
+|res=25{{h|+15|Granted by Demon Light}}
+|move=2
+|con=25
+|aid=24
+|inventory={{Item|8|Demon Light}}<br>{{Item|8|Ravager}}<br>{{Item|8|Nightmare}}
+}}
+|content2={{BossStats GBA
+|name=Fomortiis
+|portrait=[[File:Generic portrait demon king fe08.png]]
+|sprite=demon king enemy
+|class=Demon King
+|classlink=Demon King (class)
+|affin=dark
+|lv=20
+|HP=120
+|str=24~25{{h|+10|Granted by Demon Light}}
+|skill=21~22{{h|+10|Granted by Demon Light}}
+|spd=18~19
+|luck=10~12{{h|+10|Granted by Demon Light}}
+|def=25~26{{h|+10|Granted by Demon Light}}
+|res=25~26{{h|+15|Granted by Demon Light}}
+|move=2
+|con=25
+|aid=24
+|inventory={{Item|8|Demon Light}}<br>{{Item|8|Ravager}}<br>{{Item|8|Nightmare}}
+}}
+}}
+
+==Strategy==
+{{strategy}}
+[[Fomortiis]] can either be very easy or challenging, depending on if the player can kill him in two turns. It is important to note that Fomortiis will always waste his first turn [[summon]]ing (i.e., he won't attack even if the player attacked him on their first turn). The [[monster]]s he summons will also not act on the turn that they are summoned. He is close enough that Eirika, Ephraim, Seth, and a promoted L'Arachel will be able to reach him and attack him on the first turn. With enough units able to wield the [[Sacred Twin]]s, this fight is easily won.
+
+If the player has managed to break all the [[Sacred Twin]]s in their possession, or has not trained up enough units to two-turn him, killing Fomortiis becomes more difficult. If the player finds they cannot kill him on turn 2, is best to fall back and await the assault from the summoned monsters. It is imperative to clear the monsters out quickly, as Fomortiis will summon more if the fight drags on, namely every time the number of summons drops to at most 3. When an opportunity arises, send in someone powerful to get some chip damage in before they are forced to retreat due to the next wave of monsters showing up.
+
+Do beware his [[Nightmare]] attack as it can send several allies within a three tile radius of him to sleep; he will cast this whenever at least 5 allies can be put to sleep, of which Fomortiis is in range of at least 4. Fomortiis is mobile, though his movement is low, so keep allies healed or out of his range if they have taken heavy damage. Without the Sacred Twins  the [[Wyvern Knight (The Sacred Stones)|Wyvern Knight]]'s [[Pierce]] skill and the [[Bishop]]'s [[Slayer]]-boosted [[Aura]] become effective alternate options for quickly dealing large amounts of damage. If the [[Berserk (staff)|Berserk Staff]] was obtained (requires making an enemy break [[Mend]] in international releases), it can be used on enemy [[Draco Zombie]]s, which will maul Fomortiis for heavy damage before dying, if you clear out other enemies to force them to go after Fomortiis.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Sacred Stone
+|eng-mean=Refers to the last of the Sacred Stones.
+|jpn-name={{h|聖魔の光石|Seima no kōseki}}
+|jpn-mean=Light Stones of Saints and Demons; named after the game's subtitles.
+|ger-name=Der Heilige Stein
+|ger-mean=The Sacred Stone. Same as above.
+|ital-name=La Sacra Pietra
+|ital-mean=The Sacred Stone
+|span-name=La piedra sagrada
+}}
+
+==Gallery==
+<gallery>
+Map fe08 black temple depths.png|The chapter map.
+</gallery>
+
+{{ChapterNav
+|prechapter=Sacred Stone (part 1)
+|name=Sacred Stone
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

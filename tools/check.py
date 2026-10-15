@@ -796,16 +796,16 @@ def check_yaml_parses(fail):
 
 
 def check_chapter_status(fail):
-    """Every chapter YAML must declare its maturity: `status: active|planned`. Vertical-slice
-    workflow -- `planned` chapters are non-authoritative brainstorm SEED (enemy roster/levels
-    re-grounded against vanilla + party data on arrival), `active` ones are built/in-progress
-    with grounded combat data. Invariant: a `planned` chapter must NOT be `balance_locked: true`
+    """Every chapter YAML must declare its maturity: `status: active|complete|planned`.
+    Vertical-slice workflow -- `planned` chapters are non-authoritative brainstorm SEED (enemy
+    roster/levels re-grounded against vanilla + party data on arrival), `active` ones are
+    built/in-progress with grounded combat data, and `complete` ones Nicolas has signed off. Invariant: a `planned` chapter must NOT be `balance_locked: true`
     -- you cannot lock the parity of a chapter whose enemies are an ungrounded sketch (that
     half-state is exactly what makes the difficulty curve and readers treat a seed as truth)."""
     for rel, d in _chapters():
         status = d.get('status')
-        if status not in ('active', 'planned'):
-            fail.append('%s: missing/invalid `status` (must be active|planned, got %r)'
+        if status not in ('active', 'complete', 'planned'):
+            fail.append('%s: missing/invalid `status` (must be active|complete|planned, got %r)'
                         % (rel, status))
         elif status == 'planned' and d.get('balance_locked'):
             fail.append('%s: status:planned cannot be balance_locked:true -- a planned '
@@ -991,7 +991,7 @@ def _chapter_deployment_violations(rel, d, cast=()):
             msgs.append('%s: deployment.deploy_slots (%d) must match '
                         'deployment.deploy_limit (%r) -- the slot list IS the cap '
                         'template' % (rel, len(slots), limit))
-    if d.get('status') == 'active' and limit is None:
+    if d.get('status') in ('active', 'complete') and limit is None:
         msgs.append('%s: an active chapter with a `deployment:` block needs a '
                     'machine-readable deployment.deploy_limit (prose notes are for '
                     'planned seeds)' % rel)

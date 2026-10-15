@@ -1,0 +1,2989 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 9A.png|200px]]
+|location=[[Carcino]]
+|new units=[[Tana]], [[Amelia]]
+|boss=[[Binks]]
+|previous=[[A New Journey]]
+|next=[[Revolt at Carcino]]
+}}
+
+'''Distant Blade''' (Japanese: {{hl|後背の刃|Kōhai no ha}} ''Blade of the Hinterlands'') is the ninth chapter of [[Eirika]]'s route in {{FE8}}.
+
+==Plot==
+{{main|Distant Blade/Script}}
+As [[Eirika]] makes her way towards [[Rausten]], Emperor [[Vigarde]] relays new orders to his generals in [[Grado]] Keep. Vigarde sends [[Glen]] to capture Eirika and [[Valter]] to [[Ephraim]]; [[Caellach]] to destroy the [[Sacred Stone (object)|Sacred Stone]] of [[Jehanna]] and [[Riev]] to destroy Rausten's stone; and [[Duessel]] to fight Ephraim and [[Frelia]]. Vigarde tells [[Selena (The Sacred Stones)|Selena]] to await further orders in the capital.
+
+Outside of Port Kiris in [[Carcino]], [[Tana]] catches [[Eirika]] and asks to join her army. Eirika initially refuses, but acquiesces when Tana insists.
+
+Once at Port Kiris, [[Seth]] ensures Eirika remembers the fake identity they agreed she would use to avoid enemies of [[Renais]]. Before they can seek a ship to their destination, Eirika notices [[L'Arachel]] nearby; Eirika approaches and greets her. L'Arachel offers Eirika a pastry, but explains that ships are afraid to set sail for fear of a "giant ghost ship" in the waters. L'Arachel suggests that Eirika instead pass through the longer overland route to reach Rausten, before departing for Rausten with [[Dozla]] and [[Rennac]]. After they leave, Eirika is approached by a mercenary by the name of [[Binks]]; he asks if she is Princess Eirika of Renais, and intends to capture her for a bounty.
+
+During the battle, reinforcements from Grado appear on the battlefield; among their ranks is a fresh recruit named [[Amelia]]. [[Franz]] or Eirika can approach Amelia, and will assume she is a citizen and attempt to get her to safety; Amelia corrects them, but is persuaded to join them when she no longer believes what Grado has said about Eirika's character. Alternately, the Grado soldiers—with Amelia in tow—will leave the battle when the mercenaries are not winning definitively.
+
+Once the mercenaries are routed, Seth corners one of the remaining mercenaries and interrogates him; the mercenary states that [[Pablo]], one of the members of the Carcino Council of Elders, hired him. Eirika realizes that [[Innes]] is in danger as he was going to pass through Carcino to reach Jehanna. Then, a messenger arrives to inform Eirika that Innes has been trapped by Carcino's forces in a siege; Eirika sends the messenger to Frelia and assures them that she will save the prince herself. If the player visited each of the villages, Rennac—one of L'Arachel's attendants—approaches Eirika; he asks if L'Arachel and Dozla have left, and rejoices when Eirika confirms they have.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Eirika]] dies
+|ally=2–11{{h|+1|Upon Amelia being recruited}}
+|enemy=23{{h|+15|reinforcements}}{{h|−1|Upon Amelia being recruited}}
+|map=[[File:Cm fe08 9A.png]]
+|col=28
+|row=24
+}}
+|content2={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Eirika]] dies
+|ally=2–11{{h|+1|Upon Amelia being recruited}}
+|enemy=29{{h|+17|reinforcements}}{{h|−1|Upon Amelia being recruited}}
+|map=[[File:Cm fe08 9A d.png]]
+|col=28
+|row=24
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Tana
+|portrait=[[File:portrait tana fe08.png]]
+|class=Pegasus Knight
+|HP=20
+|lv=4
+|inventory={{Item|8|Heavy Spear}}<br>{{Item|8|Javelin}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically from preparations
+}}
+|newunit2={{NewUnit
+|name=Amelia
+|portrait=[[File:portrait amelia fe08.png]]
+|class=Recruit
+|HP=16
+|lv=1
+|inventory={{Item|8|Slim Lance}}<br>{{Item|8|Speedwing}}
+|recruitment method=Enemy, talk to with [[Franz]] or [[Eirika]]
+}}
+|forced1=eirika
+|forced2=tana
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Ocean Seal
+|obtain1=Dropped by enemy [[Pirate]]
+|item2=Killing Edge
+|obtain2=Dropped by enemy [[Myrmidon]]
+|item3=Axereaver
+|obtain3=Dropped by enemy [[Soldier]]
+|item4=Elfire
+|obtain4=Dropped by enemy [[Mage]] (reinforcement)
+|item5=Dragonshield
+|obtain5=Visit western [[village]]
+|item6=Rapier
+|obtain6=Visit eastern [[village]]
+|item7=Speedwing
+|obtain7=Steal from [[Amelia]] or recruit her (reinforcement)
+|itemlast=Angelic Robe
+|obtainlast=At the end of the chapter if every [[village]] was visited
+}}
+
+===Shop data===
+{{Tab
+|header=Shop data
+|width=70%
+|constyle=text-align: center
+|tab1=Armory (NTSC-J)
+|default=2
+|tab2=Armory (NTSC-U/PAL)
+|tab3=Vendor (NTSC-J)
+|tab4=Vendor (NTSC-U/PAL)
+|content1={{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style="width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron sword.png]]
+{{!}} [[Steel Sword]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron blade.png]]
+{{!}} [[Iron Blade]]
+{{!}} class="roundr" {{!}} 980
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron lance.png]]
+{{!}} [[Iron Lance]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba steel lance.png]]
+{{!}} [[Steel Lance]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron axe.png]]
+{{!}} [[Iron Axe]]
+{{!}} class="roundr" {{!}} 270
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba steel axe.png]]
+{{!}} [[Steel Axe]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba hammer.png]]
+{{!}} [[Hammer]]
+{{!}} class="roundr" {{!}} 800
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba hand axe.png]]
+{{!}} [[Hand Axe]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron bow.png]]
+{{!}} [[Iron Bow]]
+{{!}} class="roundr" {{!}} 540
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba steel bow.png]]
+{{!}} [[Steel Bow]]
+{{!}} class="roundr" {{!}} 720
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba short bow.png]]
+{{!}} [[Short Bow]]
+{{!}} class="roundr" {{!}} 1,760
+{{tableend}}
+|content2={{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style="width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron sword.png]]
+{{!}} [[Iron Sword]]
+{{!}} class="roundr" {{!}} 460
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba steel sword.png]]
+{{!}} [[Steel Sword]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron blade.png]]
+{{!}} [[Iron Blade]]
+{{!}} class="roundr" {{!}} 980
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron lance.png]]
+{{!}} [[Iron Lance]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba steel lance.png]]
+{{!}} [[Steel Lance]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba javelin.png]]
+{{!}} [[Javelin]]
+{{!}} class="roundr" {{!}} 400
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron axe.png]]
+{{!}} [[Iron Axe]]
+{{!}} class="roundr" {{!}} 270
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba steel axe.png]]
+{{!}} [[Steel Axe]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba hand axe.png]]
+{{!}} [[Hand Axe]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba iron bow.png]]
+{{!}} [[Iron Bow]]
+{{!}} class="roundr" {{!}} 540
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba steel bow.png]]
+{{!}} [[Steel Bow]]
+{{!}} class="roundr" {{!}} 720
+{{tableend}}
+|content3={{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style="width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba fire.png]]
+{{!}} [[Fire]]
+{{!}} class="roundr" {{!}} 560
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba thunder.png]]
+{{!}} [[Thunder]]
+{{!}} class="roundr" {{!}} 700
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba lightning.png]]
+{{!}} [[Lightning]]
+{{!}} class="roundr" {{!}} 630
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba shine.png]]
+{{!}} [[Shine]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba mend.png]]
+{{!}} [[Mend]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba unlock.png]]
+{{!}} [[Unlock]]
+{{!}} class="roundr" {{!}} 1,500
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba vulnerary.png]]
+{{!}} [[Vulnerary]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba elixir.png]]
+{{!}} [[Elixir]]
+{{!}} class="roundr" {{!}} 3,000
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba antitoxin.png]]
+{{!}} [[Antitoxin]]
+{{!}} class="roundr" {{!}} 450
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba torch.png]]
+{{!}} [[Torch (item)|Torch]]
+{{!}} class="roundr" {{!}} 1,000
+{{tableend}}
+|content4={{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style="width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba fire.png]]
+{{!}} [[Fire]]
+{{!}} class="roundr" {{!}} 560
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba thunder.png]]
+{{!}} [[Thunder]]
+{{!}} class="roundr" {{!}} 700
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba lightning.png]]
+{{!}} [[Lightning]]
+{{!}} class="roundr" {{!}} 630
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba shine.png]]
+{{!}} [[Shine]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba mend.png]]
+{{!}} [[Mend]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba unlock.png]]
+{{!}} [[Unlock]]
+{{!}} class="roundr" {{!}} 1,500
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba vulnerary.png]]
+{{!}} [[Vulnerary]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba antitoxin.png]]
+{{!}} [[Antitoxin]]
+{{!}} class="roundr" {{!}} 450
+{{!-}}
+{{!}} class="roundl" style="text-align: right" {{!}} [[File:Is gba torch.png]]
+{{!}} [[Torch (item)|Torch]]
+{{!}} class="roundr" {{!}} 1,000
+{{tableend}}
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Binks]]
+|class=Warrior
+|lv=5
+|#=1
+|hp=42
+|str=16
+|skill=10
+|spd=8
+|lck=3
+|def=12
+|res=8
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Steel Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=20~22
+|str=5~6
+|skill=9~10
+|spd=9~10
+|lck=1~2
+|def=4~5
+|res=0~1
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=3
+|hp=22~23
+|str=4~5
+|skill=0~2
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=22~23
+|str=4~5
+|skill=0~2
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Axereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Sniper
+|lv=2
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=5
+|lck=0
+|def=5
+|res=2
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=20~22
+|str=5~6
+|skill=9~10
+|spd=9~10
+|lck=1~2
+|def=4~5
+|res=0~1
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Myrmidon
+|lv=9
+|#=1
+|hp=18~20
+|str=5~6
+|skill=10~11
+|spd=10~11
+|lck=1~2
+|def=2~3
+|res=0~1
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=22~24
+|str=6~8
+|skill=3~4
+|spd=5~6
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=22~24
+|str=6~8
+|skill=3~4
+|spd=5~6
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=3
+|hp=19~21
+|str=4~6
+|skill=4~5
+|spd=3~5
+|lck=0~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Shaman
+|lv=8
+|#=1
+|hp=17~18
+|str=3~4
+|skill=1~3
+|spd=2~4
+|lck=0~1
+|def=2~3
+|res=4~6
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=21~23
+|str=5~7
+|skill=3~4
+|spd=6~8
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Ocean Seal|type=drop}}
+|notes=Does not move on turn 1.<br>Turn 2 onwards, moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=21~23
+|str=5~7
+|skill=3~4
+|spd=6~8
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=21~23
+|str=5~7
+|skill=3~4
+|spd=6~8
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s, but prioritizes attacking units if he can do so without moving. If no destroyable villages exist, moves to attack units unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=1
+|hp=20~22
+|str=5~6
+|skill=9~10
+|spd=9~10
+|lck=1~2
+|def=4~5
+|res=0~1
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=2
+|hp=17~18
+|str=2~3
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=3~5
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=2
+|hp=19~21
+|str=4~6
+|skill=4~5
+|spd=3~5
+|lck=0~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=22~23
+|str=4~5
+|skill=0~2
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=8
+|#=1
+|hp=20~21
+|str=5~6
+|skill=9~10
+|spd=8~10
+|lck=0~2
+|def=4~5
+|res=0~1
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=22~24
+|str=6~8
+|skill=3~4
+|spd=5~6
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=22~24
+|str=6~8
+|skill=3~4
+|spd=5~6
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=1
+|hp=17~18
+|str=2~3
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=3~5
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=9
+|#=3
+|hp=22~24
+|str=4~6
+|skill=1~2
+|spd=1~2
+|lck=0~2
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Leaves the map at the start of turn 12, if Amelia is alive and unrecruited.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=1
+|#=1
+|hp=16
+|str=4
+|skill=3
+|spd=4
+|lck=6
+|def=2
+|res=3
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Speedwing}}
+|notes=• Will not move until provoked.<br>• Leaves the map at the start of turn 12.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Binks]]
+|class=Warrior
+|lv=5
+|#=1
+|hp=42
+|str=16
+|skill=10
+|spd=8
+|lck=3
+|def=12
+|res=8
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Iron Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=23
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~2
+|def=5
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=3
+|hp=24
+|str=6
+|skill=2
+|spd=2
+|lck=1
+|def=1
+|res=1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=24
+|str=5
+|skill=1
+|spd=2
+|lck=1
+|def=0
+|res=1
+|con=6
+|mov=5
+|inventory={{Item|8|Axereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Sniper
+|lv=2
+|#=1
+|hp=27
+|str=10
+|skill=8
+|spd=7
+|lck=2
+|def=7
+|res=4
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=23~24
+|str=6
+|skill=10~11
+|spd=10
+|lck=1~2
+|def=5
+|res=1
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Myrmidon
+|lv=9
+|#=1
+|hp=21
+|str=7
+|skill=12
+|spd=11
+|lck=2
+|def=3
+|res=1
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=25
+|str=9
+|skill=4
+|spd=5
+|lck=1
+|def=3
+|res=1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=26
+|str=8
+|skill=4
+|spd=5
+|lck=1
+|def=3
+|res=1
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=3
+|hp=21~22
+|str=5~6
+|skill=5
+|spd=5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Shaman
+|lv=8
+|#=1
+|hp=19
+|str=4
+|skill=3
+|spd=4
+|lck=1
+|def=3
+|res=5
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Ocean Seal|type=drop}}
+|notes=Does not move on turn 1.<br>Turn 2 onwards, moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=24
+|str=8
+|skill=5
+|spd=8
+|lck=1
+|def=3
+|res=1
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=24
+|str=8
+|skill=5
+|spd=8
+|lck=1
+|def=3
+|res=1
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s, but prioritizes attacking units if he can do so without moving. If no destroyable villages exist, moves to attack units unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=2
+|hp=19
+|str=4
+|skill=5
+|spd=5
+|lck=1
+|def=4
+|res=4
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Leaves the map at the start of turn 10, if Amelia is alive and unrecruited.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=1
+|#=1
+|hp=16
+|str=4
+|skill=3
+|spd=4
+|lck=6
+|def=2
+|res=3
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Speedwing}}
+|notes=• Will not move until provoked.<br>• Leaves the map at the start of turn 10.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Binks]]
+|class=Warrior
+|lv=5
+|#=1
+|hp=42
+|str=16
+|skill=10
+|spd=8
+|lck=3
+|def=12
+|res=8
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Steel Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=22~24
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~3
+|def=4~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=3
+|hp=21~23
+|str=5~7
+|skill=9~11
+|spd=9~10
+|lck=1~2
+|def=4~6
+|res=0~2
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=21~23
+|str=5~7
+|skill=9~11
+|spd=9~10
+|lck=1~2
+|def=4~6
+|res=0~2
+|con=9
+|mov=5
+|inventory={{Item|8|Axereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Sniper
+|lv=2
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=5
+|lck=0
+|def=5
+|res=2
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=22~24
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~3
+|def=4~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Myrmidon
+|lv=9
+|#=1
+|hp=19~21
+|str=5~7
+|skill=11~12
+|spd=11~12
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=24~26
+|str=7~9
+|skill=3~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=24~26
+|str=7~9
+|skill=3~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=3
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=4~5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Shaman
+|lv=8
+|#=1
+|hp=18~19
+|str=4~5
+|skill=2~3
+|spd=3~4
+|lck=0~2
+|def=2~3
+|res=5~6
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=22~25
+|str=6~8
+|skill=3~5
+|spd=7~8
+|lck=0~2
+|def=3~4
+|res=0~1
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Ocean Seal|type=drop}}
+|notes=Does not move on turn 1.<br>Turn 2 onwards, moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=22~25
+|str=6~8
+|skill=3~5
+|spd=7~8
+|lck=0~2
+|def=3~4
+|res=0~1
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=22~25
+|str=6~8
+|skill=3~5
+|spd=7~8
+|lck=0~2
+|def=3~4
+|res=0~1
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s, but prioritizes attacking units if he can do so without moving. If no destroyable villages exist, moves to attack units unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=1
+|hp=22~24
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~3
+|def=4~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=2
+|hp=18~20
+|str=3~5
+|skill=3~5
+|spd=4~5
+|lck=0~2
+|def=3~4
+|res=4~5
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=2
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=4~5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=23~25
+|str=5~6
+|skill=1~2
+|spd=1~3
+|lck=1~2
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=8
+|hp=21~23
+|str=5~7
+|skill=9~11
+|spd=9~10
+|lck=1~2
+|def=4~6
+|res=0~2
+|con=9
+|mov=5
+|#=1
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=24~26
+|str=7~9
+|skill=3~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=24~26
+|str=7~9
+|skill=3~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=1
+|hp=18~20
+|str=3~5
+|skill=3~5
+|spd=4~5
+|lck=0~2
+|def=3~4
+|res=4~5
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=9
+|#=3
+|hp=24~26
+|str=5~7
+|skill=1~3
+|spd=2~3
+|lck=1~2
+|def=0~1
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Leaves the map at the start of turn 12, if Amelia is alive and unrecruited.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=1
+|#=1
+|hp=16
+|str=4
+|skill=3
+|spd=4
+|lck=6
+|def=2
+|res=3
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Speedwing}}
+|notes=• Will not move until provoked.<br>• Leaves the map at the start of turn 12.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Binks]]
+|class=Warrior
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Iron Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Axereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Sniper
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Myrmidon
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Shaman
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Ocean Seal|type=drop}}
+|notes=Does not move on turn 1.<br>Turn 2 onwards, moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s, but prioritizes attacking units if he can do so without moving. If no destroyable villages exist, moves to attack units unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Leaves the map at the start of turn 10, if Amelia is alive and unrecruited.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=1
+|#=1
+|hp=16
+|str=4
+|skill=3
+|spd=4
+|lck=6
+|def=2
+|res=3
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Speedwing}}
+|notes=• Will not move until provoked.<br>• Leaves the map at the start of turn 10.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Binks]]
+|class=Warrior
+|lv=5
+|#=1
+|hp=44~45
+|str=17~18
+|skill=10~11
+|spd=8~9
+|lck=3~4
+|def=12~13
+|res=8~9
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Steel Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=25~29
+|str=7~10
+|skill=11~14
+|spd=10~13
+|lck=2~5
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=3
+|hp=26~30
+|str=7~9
+|skill=1~5
+|spd=2~4
+|lck=1~3
+|def=0~2
+|res=0~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=26~30
+|str=7~9
+|skill=1~5
+|spd=2~4
+|lck=1~3
+|def=0~2
+|res=0~3
+|con=6
+|mov=5
+|inventory={{Item|8|Axereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Sniper
+|lv=2
+|#=1
+|hp=32~39
+|str=11~17
+|skill=10~16
+|spd=8~12
+|lck=4~10
+|def=7~11
+|res=5~9
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=25~29
+|str=7~10
+|skill=11~14
+|spd=10~13
+|lck=2~5
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Myrmidon
+|lv=9
+|#=1
+|hp=21~26
+|str=6~10
+|skill=12~15
+|spd=12~15
+|lck=2~5
+|def=3~5
+|res=1~3
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=27~31
+|str=9~12
+|skill=4~8
+|spd=6~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=27~31
+|str=9~12
+|skill=4~8
+|spd=6~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=3
+|hp=23~27
+|str=6~9
+|skill=6~9
+|spd=4~8
+|lck=2~5
+|def=3~6
+|res=0~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Shaman
+|lv=8
+|#=1
+|hp=20~22
+|str=6~8
+|skill=2~6
+|spd=3~7
+|lck=1~3
+|def=2~4
+|res=5~9
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=25~29
+|str=8~11
+|skill=4~8
+|spd=7~10
+|lck=1~3
+|def=3~5
+|res=0~3
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Ocean Seal|type=drop}}
+|notes=Does not move on turn 1.<br>Turn 2 onwards, moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=25~29
+|str=8~11
+|skill=4~8
+|spd=7~10
+|lck=1~3
+|def=3~5
+|res=0~3
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=9
+|#=1
+|hp=23~28
+|str=6~10
+|skill=6~9
+|spd=5~8
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=9
+|#=1
+|hp=23~28
+|str=6~10
+|skill=6~9
+|spd=5~8
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=25~29
+|str=8~11
+|skill=4~8
+|spd=7~10
+|lck=1~3
+|def=3~5
+|res=0~3
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+|notes=Moves to raid [[village]]s, but prioritizes attacking units if he can do so without moving. If no destroyable villages exist, moves to attack units unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=25~29
+|str=8~11
+|skill=4~8
+|spd=7~10
+|lck=1~3
+|def=3~5
+|res=0~3
+|con=10
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=25~29
+|str=8~11
+|skill=4~8
+|spd=7~10
+|lck=1~3
+|def=3~5
+|res=0~3
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=25~29
+|str=8~11
+|skill=4~8
+|spd=7~10
+|lck=1~3
+|def=3~5
+|res=0~3
+|con=10
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=25~29
+|str=8~11
+|skill=4~8
+|spd=7~10
+|lck=1~3
+|def=3~5
+|res=0~3
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s, but prioritizes attacking units if he can do so without moving. If no destroyable villages exist, moves to attack units unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=1
+|hp=25~29
+|str=7~10
+|skill=11~14
+|spd=10~13
+|lck=2~5
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=2
+|hp=20~23
+|str=5~8
+|skill=5~8
+|spd=5~8
+|lck=1~3
+|def=3~5
+|res=4~8
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=2
+|hp=23~27
+|str=6~9
+|skill=6~9
+|spd=4~8
+|lck=2~5
+|def=3~6
+|res=0~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=26~30
+|str=7~9
+|skill=1~5
+|spd=2~4
+|lck=1~3
+|def=0~2
+|res=0~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=8
+|#=1
+|hp=24~28
+|str=7~10
+|skill=11~14
+|spd=9~13
+|lck=1~5
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=27~31
+|str=9~12
+|skill=4~8
+|spd=6~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=2
+|hp=27~31
+|str=9~12
+|skill=4~8
+|spd=6~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=1
+|hp=20~23
+|str=5~8
+|skill=5~8
+|spd=5~8
+|lck=1~3
+|def=3~5
+|res=4~8
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=9
+|#=3
+|hp=27~31
+|str=7~10
+|skill=2~5
+|spd=2~4
+|lck=1~4
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Leaves the map at the start of turn 12, if Amelia is alive and unrecruited.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=1
+|#=1
+|hp=16
+|str=4
+|skill=3
+|spd=4
+|lck=6
+|def=2
+|res=3
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Speedwing}}
+|notes=• Will not move until provoked.<br>• Leaves the map at the start of turn 12.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=27~31
+|str=9~12
+|skill=4~8
+|spd=6~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Binks]]
+|class=Warrior
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Iron Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Axereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Sniper
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Myrmidon
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Killing Edge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Shaman
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Ocean Seal|type=drop}}
+|notes=Does not move on turn 1.<br>Turn 2 onwards, moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s, but prioritizes attacking units if he can do so without moving. If no destroyable villages exist, moves to attack units unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=Moves to raid [[village]]s; moves to attacks units if one is in range or all villages are destroyed or visited.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Pirate
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Moves to raid [[village]]s, but prioritizes attacking units if he can do so without moving. If no destroyable villages exist, moves to attack units unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Archer
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Soldier
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mercenary
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Fighter
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Mercenary
+|class=Mage
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Leaves the map at the start of turn 10, if Amelia is alive and unrecruited.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=1
+|#=1
+|hp=16
+|str=4
+|skill=3
+|spd=4
+|lck=6
+|def=2
+|res=3
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Speedwing}}
+|notes=• Will not move until provoked.<br>• Leaves the map at the start of turn 10.
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turn 2
+**1 [[Pirate]] from the northwest corner of the map
+*Turn 3
+**1 [[Mercenary]] from northeast of the vendor
+**1 [[Mage]] with [[Fire]] from northeast of the vendor
+**2 [[Archer]]s from southwest of the boss
+*Turn 4
+**1 [[Soldier]] from northeast of the vendor
+**1 [[Mercenary]] from northeast of the vendor
+**1 [[Fighter]] with a [[Steel Axe]] from southwest of the boss
+**1 [[Fighter]] with an [[Iron Axe]] from southwest of the boss
+*Turn 5
+**1 [[Fighter]] with a [[Steel Axe]] from northeast of the vendor <small>(Difficult only)</small>
+**1 [[Mage]] with [[Elfire]] from southwest of the boss
+**1 [[Mage]] with [[Fire]] from southwest of the boss
+**3 [[Soldier]]s from the southwest corner of the map
+**[[Amelia]] from the southwest corner of the map
+**1 [[Fighter]] with an [[Iron Axe]] and a [[Hand Axe]] from northeast of the vendor <small>(Difficult only)</small>
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Binks}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait binks fe08.png]]
+|sprite=warrior enemy
+|class=Warrior
+|affin=dark
+|lv=5
+|HP=42
+|str=16
+|skill=10
+|spd=8
+|luck=3
+|def=12
+|res=8
+|move=6
+|con=13
+|aid=12
+|inventory={{Item|8|Steel Axe}}<br>{{Item|8|Iron Bow}}{{h|*|Japanese version only}}<br>{{Item|8|Steel Bow}}{{h|*|Western version only}}
+|ax=B
+|bo=C
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait binks fe08.png]]
+|sprite=warrior enemy
+|class=Warrior
+|affin=dark
+|lv=5
+|HP={{h|44~45|46 in the Japanese version}}
+|str=17~18
+|skill={{h|10~11|11~12 in the Japanese version}}
+|spd=8~9
+|luck=3~4
+|def=12~13
+|res=8~9
+|move=6
+|con=13
+|aid=12
+|inventory={{Item|8|Steel Axe}}<br>{{Item|8|Iron Bow}}{{h|*|Japanese version only}}<br>{{Item|8|Steel Bow}}{{h|*|Western version only}}
+|ax=B
+|bo=C
+}}
+}}
+
+==Strategy==
+{{strategy}}
+The first challenge is to push through the enemies at the top of the map. You will want to move quickly, likely with help from mounted units if you intend to save the western Village (which yields a [[Dracoshield]]). The [[Pirate]] who starts closest will take several turns to reach it, so try to break through to him at a brisk pace. On Difficult mode, a Pirate starts at the top of the map, and he'll move a lot faster due to not starting on water tiles, so you'll need to move faster to catch him. Difficult mode also gives the [[Sniper]] massive stat increases compared to normal and easy, so bring someone strong like [[Seth]] to take care of him.
+
+The other Village only contains another [[Rapier]] for [[Eirika]], but saving both will net you an [[Angelic Robe]]. While fliers can reach it in fairly short order, it'll be much safer by taking care of the Pirate below where you start, since there are [[Archer]]s that deal effective damage near the village. Pirate [[Ross]] can bait out the Pirate to have the village be in no immediate danger, so it can be visited at your leisure.
+
+Even if you do not wish to train her, [[Amelia]]'s [[Speedwing]] is a valuable acquisition. If not looking to recruit Amelia at all, [[Colm]] can [[Steal]] it. As a bonus, when Amelia reappears in [[Hamill Canyon|Chapter&nbsp;13]], she'll have another Speedwing that can be stolen, or be traded away after recruiting Amelia there, which can be done at the player's discretion. Regardless of whether you're trying to recruit Amelia or steal here Speedwing, avoid entering her attack range until you are ready to engage her, as she will attack anyone in range and likely fall to the counter. However, since she has only 4 Move, the [[Soldier]]s surrounding her can all be baited to charge at someone outside of her attack range. If aiming to recruit, an Eirika positioned six spaces away once the coast is clear, can talk to Amelia from outside of her range.
+
+[[Binks]] is easy to beat once the [[Mercenary|Mercenaries]] and reinforcements are dealt with. He is immobile, and the [[Axereaver]] dropped by a nearby Soldier puts him at a great disadvantage. Even if no one on your team can tank an attack, Binks does not have a [[Hand Axe]] or any form of healing, so as a last resort you could attack uncounterably, Rescue the attacker away to safety using a mounted unit's [[Canto]], and repeat until he is defeated.
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=Distant Blade
+|jpn-name={{h|後背の刃|Kōhai no ha}}
+|jpn-mean=Blade of the Hinterlands
+|span-name=Mal puerto
+|span-mean=Wrong Harbor
+|fren-name=Lame distante
+|fren-mean=Distant Blade
+|ger-name=Ferne Klinge
+|ger-mean=Distant Blade
+|ital-name=Una lama lontana
+|ital-mean=A Distant Blade
+}}
+
+==Gallery==
+{{sectstub}}
+
+{{ChapterNav
+|prechapter=A New Journey
+|nextchapter=Revolt at Carcino
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

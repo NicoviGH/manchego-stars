@@ -23,8 +23,9 @@ a file is for writers. Keep the Profile true when the character changes.
 A character from *Rime of the Frostmaiden* also gets a **`## Book`** section right after the
 Profile: what the book says of them, with the printed page and its own words quoted, and where
 ours departs. The wiki prints it as a Trivia line. The book's illustration of them, when it has
-one, is cropped into `References/Book Art/` (local, beside the HD art) with its page and caption
-in that folder's `index.yaml`.
+one, is cropped into [`book-art/`](book-art) with its page and the book's caption in
+`book-art/index.yaml` (credited in `CREDITS.md`). Book art only: the busts made as sprite sources
+stay in References.
 
 ## Why
 

@@ -1,0 +1,3072 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 13A.png|200px]]
+|location=[[Jehanna]]
+|new units=[[Cormag]], [[Amelia]]
+|boss=[[Aias]], [[Pablo]]
+|previous=[[Village of Silence]]
+|next=[[Queen of White Dunes]]
+}}
+
+'''Hamill Canyon''' (Japanese: {{hl|ハミル渓谷|Hamiru Keikoku}} ''Hamill Canyon'') is the thirteenth chapter of [[Eirika]]'s route in {{FE8}}.
+
+==Plot==
+{{main|Hamill Canyon/Script}}
+At Grado Keep, [[Valter]] reports [[Glen]]'s death to [[Cormag]]; Cormag demands to know who killed Glen, and Valter informs him that [[Eirika]] did and where she is. Cormag immediately departs, and Valter muses to himself about Eirika.
+
+As Eirika's group reaches in [[Jehanna]], a messenger from [[Frelia]] arrives; the messenger relays that the Frelian army has pushed [[Pablo]]'s forces to retreat towards Jehanna, and that [[Ephraim]] has forced the enemy to surrender at [[Fort Rigwald]] and is marching towards the capital of Grado. Innes doubts that Ephraim could truly beat the elite forces at the capital, but Eirika believes in her brother's abilities.
+
+The messenger departs and Eirika prepares to engage Grado's army. Eirika advises [[L'Arachel]] to stay behind, and L'Arachel dramatically refuses; L'Arachel states that she cannot allow Grado to destroy Jehanna's [[Sacred Stone (object)|Sacred Stone]], and that knights of [[Rausten]] are marching to their current location. Eirika asks how she could know that, but L'Arachel leaves before answering.
+
+Grado's army prepares to face Eirika's. [[Caellach]] talks to [[Aias]]—a former mercenary comrade of his—and is confident Aias will win. Caellach states he will handle the advancing knights of Rausten, and Aias assures Caellach he will defeat Eirika.
+
+Once Eirika's group arrive on the battlefield, [[Seth]] warns Eirika that Pablo's army is advancing from the rear. L'Arachel reminds Eirika that they must survive until Rausten's knights can arrive.
+
+During the battle, Cormag appears on the field, and Eirika can talk to him. Cormag challenges Eirika to a duel to avenge Glen, whom he accuses her of killing. Eirika tries to explain that she did not fight Glen, but lacks proof; Eirika relays to Cormag Glen's final words to her: that Eirika had the same gentle heart that she did when the two first met. Cormag realizes that Valter lied to him about his brother's death, and decides to join Eirika to seek vengeance, in spite of being marked a traitor to Grado.
+
+Additionally, if [[Amelia]] was not recruited or killed in [[Distant Blade|Chapter&nbsp;9]], she will appear on the battlefield, and can be spoken to by Eirika or [[Franz]]. Eirika or Franz mistake Amelia for a commoner, and attempt to usher her of the battlefield; however, Amelia informs them that she is a Grado soldier. Amelia believes Eirika to be a "merciless fiend", but is convinced this is false—by seeing Eirika firsthand or by Franz's account—and joins them.
+
+Eventually, the knights of Rausten arrive, bringing the battle to a decisive end in favor of Eirika and her allies. One of them reports to L'Arachel and refers to her as "princess". L'Arachel finally reveals herself to Eirika as the princess of the theocracy of Rausten. L'Arachel claims to have been "acting under divine order to strike down evil", and the soldier informs Eirika she was inspired by the tales a court troubadour. The soldier also gives L'Arachel gold from King [[Mansel]]. Seth then brings news from Jehanna: the palace has surrendered to a Grado army lead by [[Lyon]], the prince of Grado.
+
+If Aias was not killed in the battle, he rides to Jehanna Hall and confronts Caellach. Aias concludes that Caellach planned to abandon him from the beginning, which Caellach confirms. Caellach explains that he "will not be chained to [his] past", and quickly kills Aias.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Survive 11 turns or defeat [[Aias]]
+|defeat=[[Eirika]] dies
+|ally=1–12{{h|+2|Upon Cormag and Amelia being recruited}}
+|enemy=22{{h|*|Amelia will not appear if she was recruited or killed in Chapter&nbsp;9}}{{h|+36|Reinforcements}}{{h|−2|Upon Cormag and Amelia being recruited}}
+|map=[[File:Cm fe08 13A.png]]
+|col=25
+|row=16
+}}
+|content2={{ChapData
+|victory=Survive 11 turns or defeat [[Aias]]
+|defeat=[[Eirika]] dies
+|ally=1–12{{h|+2|Upon Cormag and Amelia being recruited}}
+|enemy=28{{h|*|Amelia will not appear if she was recruited or killed in Chapter&nbsp;9}}{{h|+38|Reinforcements}}{{h|−2|Upon Cormag and Amelia being recruited}}
+|map=[[File:Cm fe08 13A d.png]]
+|col=25
+|row=16
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Cormag
+|portrait=[[File:portrait cormag fe08.png]]
+|class=Wyvern Rider
+|HP={{h|30~32|36~38 in the Japanese version}}
+|lv=11
+|inventory={{Item|8|Killer Lance}}<br>{{Item|8|Steel Lance}}{{h|*|Western version only}}<br>{{Item|8|Elysian Whip}}
+|recruitment method=Enemy, talk to with [[Eirika]]
+}}
+|newunit2={{NewUnit
+|name=Amelia
+|portrait=[[File:portrait amelia fe08.png]]
+|class=Recruit
+|HP={{h|16~19|18~20 in the Japanese version}}
+|lv={{h|4|5 in the Japanese version}}
+|inventory={{Item|8|Slim Lance}}<br>{{Item|8|Vulnerary}}<br>{{Item|8|Speedwing}}
+|recruitment method=Enemy, talk to with [[Franz]] or [[Eirika]]<br><small>(Does not appear if she was previously killed or recruited in [[Distant Blade|Chapter&nbsp;9]])</small>
+}}
+|forced1=eirika
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+|return22=l'Arachel
+|return23=dozla
+|return24=saleh
+|return25=ewan
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Knight Crest
+|obtain1=Dropped by [[Aias]]
+|item2=Zanbato
+|obtain2=Dropped by enemy [[Mercenary]] (reinforcement)
+|item3=Body Ring
+|obtain3=Steal from enemy [[Brigand]] (reinforcement)
+|item4=Hand Axe
+|obtain4=Dropped by enemy [[Warrior]] (reinforcement; drops unequipped item)
+|item5=Swordslayer
+|obtain5=Dropped by enemy [[Warrior]] (reinforcement; drops unequipped item)
+|item6=Red Gem
+|obtain6=Steal from enemy [[Priest]]
+|item7=Vulnerary
+|obtain7=Steal from [[Amelia]] or recruit her
+|item8=Speedwing
+|obtain8=Steal from [[Amelia]] or recruit her
+|item9=Elysian Whip
+|obtain9=Dropped by [[Cormag]] or recruit him
+|itemlast=5,000G
+|itemlastimage=gold
+|itemlastarticle=Gold
+|obtainlast=Automatically at the end of the chapter
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=4
+|hp=21~23
+|str=5~7
+|skill=5~6
+|spd=4~6
+|lck=1~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Two man [[Ballista (weapon)|Ballistae]].
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=12
+|#=4
+|hp=21~24
+|str=7~9
+|skill=3~5
+|spd=0~2
+|lck=1~2
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Steel Bow}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=4
+|hp=24~26
+|str=7~8
+|skill=4~6
+|spd=6~8
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=13
+|#=1
+|hp=21~23
+|str=3~4
+|skill=3~5
+|spd=4~5
+|lck=3~5
+|def=1~2
+|res=8~10
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=10
+|#=1
+|hp=20~21
+|str=2~3
+|skill=2~3
+|spd=3~4
+|lck=1~3
+|def=1~2
+|res=7~8
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Mend}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=3
+|hp=24~27
+|str=6~7
+|skill=1~3
+|spd=2~3
+|lck=1~2
+|def=0~1
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=4
+|#=1
+|hp=16~19
+|str=4~7
+|skill=3~6
+|spd=4~7
+|lck=6~9
+|def=2~5
+|res=3~6
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Vulnerary}} • {{Item|8|Speedwing}}
+|notes=• Immediately begins moving unprovoked.<br>• Not present if she was recruited or killed in [[Distant Blade|Chapter&nbsp;9]].
+}}
+{{ChapUnitCellGBA
+|name=[[Aias]]
+|class=Great Knight
+|lv=10
+|#=1
+|hp=46
+|str=18
+|skill=11
+|spd=10
+|lck=11
+|def=19
+|res=12
+|con=14
+|mov=6
+|inventory={{Item|8|Short Spear}} • {{Item|8|Silver Blade}} • {{Item|8|Swordslayer}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=25~27
+|str=8~10
+|skill=4~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=22~24
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~3
+|def=4~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=3
+|hp=22~25
+|str=6~8
+|skill=10~12
+|spd=9~11
+|lck=1~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=3
+|hp=25~27
+|str=8~10
+|skill=4~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=1
+|hp=23~25
+|str=8~10
+|skill=4~5
+|spd=6~7
+|lck=1~2
+|def=9~10
+|res=0~1
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Cormag]]
+|class=Wyvern Rider
+|lv=11
+|#=1
+|hp=30~32
+|str=14~16
+|skill=9~11
+|spd=10~12
+|lck=4~6
+|def=12~14
+|res=2~4
+|con=11
+|mov=7
+|inventory={{Item|8|Killer Lance}} • {{Item|8|Steel Lance}} • {{Item|8|Elysian Whip|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=1
+|hp=23~25
+|str=8~10
+|skill=4~5
+|spd=6~7
+|lck=1~2
+|def=9~10
+|res=0~1
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=6
+|hp=24~26
+|str=7~8
+|skill=4~6
+|spd=6~8
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=24~26
+|str=7~8
+|skill=4~6
+|spd=6~8
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7|inventory={{Item|8|Iron Sword}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=24~26
+|str=7~8
+|skill=4~6
+|spd=6~8
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=3
+|hp=23~26
+|str=6~8
+|skill=4~5
+|spd=6~7
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=9
+|#=1
+|hp=36
+|str=13
+|skill=9
+|spd=12
+|luck=9
+|def=7
+|res=17
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Purge}} • {{Item|8|Mend}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=25~27
+|str=8~9
+|skill=2~4
+|spd=6~7
+|lck=0~2
+|def=3~4
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=25~27
+|str=8~9
+|skill=2~4
+|spd=6~7
+|lck=0~2
+|def=3~4
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Axe}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=2
+|hp=25~27
+|str=8~9
+|skill=2~4
+|spd=6~7
+|lck=0~2
+|def=3~4
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=12
+|#=2
+|hp=22~25
+|str=6~8
+|skill=10~12
+|spd=9~11
+|lck=1~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=2
+|#=1
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Swordslayer}} • {{Item|8|Hand Axe|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=11
+|#=2
+|hp=18~20
+|str=3~5
+|skill=4~5
+|spd=4~6
+|lck=1~2
+|def=3~4
+|res=4~6
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Two man [[Ballista (weapon)|Ballistae]].
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Bow}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Vulnerary}} • {{Item|8|Speedwing}}
+|notes=• Immediately begins moving unprovoked.<br>• Not present if she was recruited or killed in [[Distant Blade|Chapter&nbsp;9]].
+}}
+{{ChapUnitCellGBA
+|name=[[Aias]]
+|class=Great Knight
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=14
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Steel Lance}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Cormag]]
+|class=Wyvern Rider
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Killer Lance}} • {{Item|8|Elysian Whip|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=9
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Purge}} • {{Item|8|Mend}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Axe}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Swordslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=11
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=4
+|hp=22~25
+|str=6~8
+|skill=5~7
+|spd=5~6
+|lck=2~4
+|def=4~5
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Two man [[Ballista (weapon)|Ballistae]].
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=12
+|#=4
+|hp=23~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=1~3
+|def=11~12
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Steel Bow}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=4
+|hp=25~28
+|str=7~9
+|skill=5~7
+|spd=7~8
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=13
+|#=1
+|hp=22~24
+|str=3~5
+|skill=4~5
+|spd=4~6
+|lck=3~6
+|def=1~2
+|res=9~11
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=10
+|#=1
+|hp=21~22
+|str=2~4
+|skill=3~4
+|spd=3~5
+|lck=2~4
+|def=1~2
+|res=8~9
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Mend}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=3
+|hp=26~29
+|str=6~9
+|skill=2~4
+|spd=2~4
+|lck=1~3
+|def=0~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=4
+|#=1
+|hp=16~19
+|str=4~7
+|skill=3~6
+|spd=4~7
+|lck=6~9
+|def=2~5
+|res=3~6
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Vulnerary}} • {{Item|8|Speedwing}}
+|notes=• Immediately begins moving unprovoked.<br>• Not present if she was recruited or killed in [[Distant Blade|Chapter&nbsp;9]].
+}}
+{{ChapUnitCellGBA
+|name=[[Aias]]
+|class=Great Knight
+|lv=10
+|#=1
+|hp=46
+|str=18
+|skill=11
+|spd=10
+|lck=11
+|def=19
+|res=12
+|con=14
+|mov=6
+|inventory={{Item|8|Short Spear}} • {{Item|8|Silver Blade}} • {{Item|8|Swordslayer}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=26~29
+|str=9~11
+|skill=4~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=23~26
+|str=6~8
+|skill=10~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=3
+|hp=24~27
+|str=7~9
+|skill=11~13
+|spd=10~12
+|lck=2~4
+|def=5~6
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=3
+|hp=26~29
+|str=9~11
+|skill=4~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=1
+|hp=24~27
+|str=9~11
+|skill=5~6
+|spd=6~8
+|lck=1~2
+|def=9~10
+|res=0~2
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Cormag]]
+|class=Wyvern Rider
+|lv=11
+|#=1
+|hp=30~32
+|str=14~16
+|skill=9~11
+|spd=10~12
+|lck=4~6
+|def=12~14
+|res=2~4
+|con=11
+|mov=7
+|inventory={{Item|8|Killer Lance}} • {{Item|8|Steel Lance}} • {{Item|8|Elysian Whip|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=1
+|hp=24~27
+|str=9~11
+|skill=5~6
+|spd=6~8
+|lck=1~2
+|def=9~10
+|res=0~2
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=6
+|hp=25~28
+|str=7~9
+|skill=5~7
+|spd=7~8
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=25~28
+|str=7~9
+|skill=5~7
+|spd=7~8
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=25~28
+|str=7~9
+|skill=5~7
+|spd=7~8
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=3
+|hp=25~27
+|str=7~9
+|skill=4~6
+|spd=6~8
+|lck=2~3
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=9
+|#=1
+|hp=36
+|str=13
+|skill=9
+|spd=12
+|luck=9
+|def=7
+|res=17
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Purge}} • {{Item|8|Mend}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=26~29
+|str=8~11
+|skill=3~5
+|spd=6~8
+|lck=1~2
+|def=3~5
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=26~29
+|str=8~11
+|skill=3~5
+|spd=6~8
+|lck=1~2
+|def=3~5
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Axe}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=2
+|hp=26~29
+|str=8~11
+|skill=3~5
+|spd=6~8
+|lck=1~2
+|def=3~5
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=12
+|#=2
+|hp=24~27
+|str=7~9
+|skill=11~13
+|spd=10~12
+|lck=2~4
+|def=5~6
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=2
+|#=1
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Swordslayer}} • {{Item|8|Hand Axe|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=11
+|#=2
+|hp=19~21
+|str=4~6
+|skill=4~6
+|spd=5~7
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Two man [[Ballista (weapon)|Ballistae]].
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Bow}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Vulnerary}} • {{Item|8|Speedwing}}
+|notes=• Immediately begins moving unprovoked.<br>• Not present if she was recruited or killed in [[Distant Blade|Chapter&nbsp;9]].
+}}
+{{ChapUnitCellGBA
+|name=[[Aias]]
+|class=Great Knight
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=14
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Steel Lance}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Cormag]]
+|class=Wyvern Rider
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Killer Lance}} • {{Item|8|Elysian Whip|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=9
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Purge}} • {{Item|8|Mend}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Axe}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Swordslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=11
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=5
+|hp=25~29
+|str=7~10
+|skill=7~10
+|spd=5~9
+|lck=3~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Three man [[Ballista (weapon)|Ballistae]].
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=12
+|#=4
+|hp=26~30
+|str=9~12
+|skill=4~8
+|spd=1~3
+|lck=2~5
+|def=11~14
+|res=1~4
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=1
+|hp=32~39
+|str=11~15
+|skill=10~16
+|spd=12~18
+|lck=4~8
+|def=8~12
+|res=5~9
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=31~38
+|str=11~15
+|skill=10~16
+|spd=12~18
+|lck=4~8
+|def=8~12
+|res=5~9
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Steel Bow}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=4
+|hp=28~33
+|str=8~12
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=13
+|#=1
+|hp=24~27
+|str=4~8
+|skill=4~8
+|spd=5~9
+|lck=5~9
+|def=1~4
+|res=11~14
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=10
+|#=1
+|hp=22~26
+|str=3~7
+|skill=3~7
+|spd=4~8
+|lck=4~7
+|def=1~3
+|res=9~13
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Mend}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=31~38
+|str=11~15
+|skill=10~16
+|spd=12~18
+|lck=4~8
+|def=8~12
+|res=5~9
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=5
+|hp=29~33
+|str=8~12
+|skill=2~6
+|spd=2~5
+|lck=2~5
+|def=1~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=1
+|hp=25~29
+|str=7~10
+|skill=7~10
+|spd=5~9
+|lck=3~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=1
+|hp=29~33
+|str=8~12
+|skill=2~6
+|spd=2~5
+|lck=2~5
+|def=1~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=1
+|hp=27~31
+|str=8~11
+|skill=12~15
+|spd=11~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=4
+|#=1
+|hp=16~19
+|str=4~7
+|skill=3~6
+|spd=4~7
+|lck=6~9
+|def=2~5
+|res=3~6
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Vulnerary}} • {{Item|8|Speedwing}}
+|notes=• Immediately begins moving unprovoked.<br>• Not present if she was recruited or killed in [[Distant Blade|Chapter&nbsp;9]].
+}}
+{{ChapUnitCellGBA
+|name=[[Aias]]
+|class=Great Knight
+|lv=10
+|#=1
+|hp=47~49
+|str=18~20
+|skill=11~12
+|spd=10~11
+|lck=11~12
+|def=19~20
+|res=12~13
+|con=14
+|mov=6
+|inventory={{Item|8|Short Spear}} • {{Item|8|Silver Blade}} • {{Item|8|Swordslayer}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=1
+|hp=30~34
+|str=11~14
+|skill=5~9
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=27~30
+|str=8~11
+|skill=12~15
+|spd=10~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=3
+|hp=27~31
+|str=8~11
+|skill=12~15
+|spd=11~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=3
+|hp=30~34
+|str=11~14
+|skill=5~9
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=1
+|hp=28~32
+|str=11~14
+|skill=5~9
+|spd=7~11
+|lck=1~4
+|def=9~12
+|res=1~3
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Cormag]]
+|class=Wyvern Rider
+|lv=11
+|#=1
+|hp=30~32
+|str=14~16
+|skill=9~11
+|spd=10~12
+|lck=4~6
+|def=12~14
+|res=2~4
+|con=11
+|mov=7
+|inventory={{Item|8|Killer Lance}} • {{Item|8|Steel Lance}} • {{Item|8|Elysian Whip|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=1
+|hp=28~32
+|str=11~14
+|skill=5~9
+|spd=7~11
+|lck=1~4
+|def=9~12
+|res=1~3
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=6
+|hp=28~33
+|str=8~12
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=28~33
+|str=8~12
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=28~33
+|str=8~12
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=3
+|hp=27~32
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=9
+|#=1
+|hp=37~40
+|str=14~17
+|skill=9~13
+|spd=12~15
+|luck=9~12
+|def=7~10
+|res=18~21
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Purge}} • {{Item|8|Mend}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=29~34
+|str=10~14
+|skill=3~7
+|spd=6~9
+|lck=1~3
+|def=3~6
+|res=1~3
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=29~34
+|str=10~14
+|skill=3~7
+|spd=6~9
+|lck=1~3
+|def=3~6
+|res=1~3
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Axe}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=2
+|hp=29~34
+|str=10~14
+|skill=3~7
+|spd=6~9
+|lck=1~3
+|def=3~6
+|res=1~3
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=12
+|#=2
+|hp=27~31
+|str=8~11
+|skill=12~15
+|spd=11~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=2
+|#=1
+|hp=43~50
+|str=16~21
+|skill=9~13
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Swordslayer}} • {{Item|8|Hand Axe|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=11
+|#=2
+|hp=21~25
+|str=6~10
+|skill=6~9
+|spd=6~9
+|lck=1~4
+|def=3~5
+|res=5~9
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=12
+|#=2
+|hp=28~33
+|str=8~12
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Three man [[Ballista (weapon)|Ballistae]].
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Knight
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Bow}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Priest
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=12
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=[[Amelia]]
+|class=Recruit
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Vulnerary}} • {{Item|8|Speedwing}}
+|notes=• Immediately begins moving unprovoked.<br>• Not present if she was recruited or killed in [[Distant Blade|Chapter&nbsp;9]].
+}}
+{{ChapUnitCellGBA
+|name=[[Aias]]
+|class=Great Knight
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=14
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Steel Lance}} • {{Item|8|Knight Crest|type=drop}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=12
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Wyvern Rider
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Cormag]]
+|class=Wyvern Rider
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Killer Lance}} • {{Item|8|Elysian Whip|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=9
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Purge}} • {{Item|8|Mend}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Brigand
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Axe}} • {{Item|8|Body Ring}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Swordslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=11
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turn 2
+**1 [[Fighter]] with an [[Iron Axe]] and a [[Hand Axe]] from the upper northwestern fort
+**1 [[Mercenary]] with a [[Zanbato]] from the lower northwestern fort
+*Turns 3–5
+**1 [[Mercenary]] with an [[Iron Sword]] from the lower northwestern fort
+**1 [[Fighter]] with an [[Iron Axe]] from the upper northwestern fort
+*Turn 5
+**[[Cormag]] and 2 other [[Wyvern Rider]]s from the southwest corner of the map
+*Turns 5, 7, and 9
+**2 [[Cavalier]]s with [[Iron Lance]]s; one from the upper northeastern fort, one from the upper southeastern fort
+**1 [[Cavalier]] with an [[Iron Sword]] and a [[Javelin]] from the lower northeastern fort
+**1 [[Cavalier]] with an [[Iron Sword]] from the middle southeastern fort
+**1 [[Cavalier]] with an [[Iron Lance]] and a [[Javelin]] from the lower southeastern fort
+*Turn 9
+**[[Pablo]] and a squad of 4 [[Brigand]]s, 2 [[Mercenary|Mercenaries]], 1 [[Warrior]], and 2 [[Mage]]s appear from west of ally starting positions
+**2 [[Cavalier]]s with [[Steel Lance]]s from west of ally starting positions <small>(Difficult only)</small>
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Aias}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait aias fe08.png]]
+|sprite=great knight enemy
+|class=Great Knight
+|affin=anima
+|lv={{h|10|9 in the Japanese version}}
+|HP={{h|46|41 in the Japanese version}}
+|str={{h|18|15 in the Japanese version}}
+|skill={{h|11|7 in the Japanese version}}
+|spd={{h|10|8 in the Japanese version}}
+|luck=11
+|def={{h|19|16 in the Japanese version}}
+|res=12
+|move=6
+|con=14
+|aid=11
+|inventory=<small>'''Japanese version:'''</small><br>{{Item|8|Silver Sword}} • {{Item|8|Steel Lance}} • {{Item|8|Knight Crest|type=drop}}<br><small>'''Western version:'''</small><br>{{Item|8|Short Spear}} • {{Item|8|Silver Blade}} • {{Item|8|Swordslayer}} • {{Item|8|Knight Crest|type=drop}}
+|sw=A
+|la={{h|B|A in the Japanese version}}
+|ax=B
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait aias fe08.png]]
+|sprite=great knight enemy
+|class=Great Knight
+|affin=anima
+|lv={{h|10|9 in the Japanese version}}
+|HP=47~49
+|str=18~20
+|skill=11~12
+|spd=10~11
+|luck=11~12
+|def=19~20
+|res=12~13
+|move=6
+|con=14
+|aid=11
+|inventory=<small>'''Japanese version:'''</small><br>{{Item|8|Silver Sword}} • {{Item|8|Steel Lance}} • {{Item|8|Knight Crest|type=drop}}<br><small>'''Western version:'''</small><br>{{Item|8|Short Spear}} • {{Item|8|Silver Blade}} • {{Item|8|Swordslayer}} • {{Item|8|Knight Crest|type=drop}}
+|sw=A
+|la={{h|B|A in the Japanese version}}
+|ax=B
+}}
+}}
+
+{{main|Pablo}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait pablo fe08.png]]
+|sprite=sage enemy
+|class=Sage
+|affin=ice
+|lv={{h|9|5 in the Japanese version}}
+|HP={{h|36|40~44 in the Japanese version}}
+|mag={{h|13|17~21 in the Japanese version}}
+|skill={{h|9|12~15 in the Japanese version}}
+|spd={{h|12|13~17 in the Japanese version}}
+|luck={{h|9|10~12 in the Japanese version}}
+|def={{h|7|7~10 in the Japanese version}}
+|res={{h|17|21~24 in the Japanese version}}
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Elfire}}<br>{{Item|8|Purge}}<br>{{Item|8|Mend}}
+|an=B
+|li=B
+|st=C
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait pablo fe08.png]]
+|sprite=sage enemy
+|class=Sage
+|affin=ice
+|lv={{h|9|5 in the Japanese version}}
+|HP=37~40
+|mag=14~17
+|skill=9~13
+|spd=12~15
+|luck=9~12
+|def=7~10
+|res=18~21
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Elfire}}<br>{{Item|8|Purge}}<br>{{Item|8|Mend}}
+|an=B
+|li=B
+|st=C
+}}
+}}
+
+==Strategy==
+{{strategy}}
+{{sectstub}}
+If you wish to recruit [[Cormag]], don't get impatient and kill [[Aias]] before Turn 5, as that's when he shows up as an enemy reinforcement.
+
+The map can be a bit daunting at first due to the large group of enemies, especially with the presence of promoted [[Ranger (The Sacred Stones)|Ranger]]s. However, the Rangers are not that much stronger than the normal enemies, and units with decent bulk can survive taking hits from them and other enemies. Reduce their numbers to where your units can capture the forts, and then it'll be easy from there.
+
+[[Pablo]] is a scare with his high magic and [[Purge]] tome, but if he is baited to equip said tome, your units can make quick work of him due to being brought down to 0 speed, and reducing his dodging capabilities. To get the [[Swordslayer]], position a grounded lance unit in a nearby forest to get the [[Warrior]] to equip his [[Hand Axe]], and then finish him off. A lance unit will also make it more likely for the [[Brigand]] with the [[Body Ring]] to survive so that it can then be stolen.
+
+==Trivia==
+*In the Japanese version, Aias's default weapon is the Silver Blade instead of the Short Spear.
+*Some enemy units are mistakenly named "Remnant" in the English version, which is supposed to be used for the remnants of Grado's army in later chapters. In the Japanese version, these units are named {{hl|パブロ私兵|Paburo shihei}} ''Pablo Private Soldier''.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Hamill Canyon
+|jpn-name={{h|ハミル渓谷|Hamiru keikoku}}
+|jpn-mean=Hamill Canyon
+|span-name=El paso de Hamill
+|span-mean=Hamill Pass
+|fren-name=Canyon de Hamill
+|fren-mean=Hamill Canyon
+|ger-name=Der Canyon von Hamill
+|ger-mean=The Canyon of Hamill
+|ital-name=Il canyon di Hamill
+|ital-mean=Hamill Canyon
+|por-name=Cânion de Hamill
+|por-mean=Hamill canyon; from the name of the location, used in the "Sacred, Dark, And..." [[Lost Lore]] event in {{FEH}}.
+|ch-trad-name={{h|赫米爾溪谷|Hèmǐ'ěr xīgǔ}}
+|ch-trad-mean=Hamill valley; from the name of the location, used in the "Sacred, Dark, And..." Lost Lore event in ''Heroes''.
+}}
+
+==Gallery==
+<gallery>
+Cm fe08 13A.png|The chapter map.
+</gallery>
+
+{{ChapterNav
+|prechapter=Village of Silence
+|nextchapter=Queen of White Dunes
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

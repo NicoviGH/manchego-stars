@@ -1,0 +1,123 @@
+{{Stub}}
+{{Location Infobox
+|title=Lagdou
+|image=[[File:FESS Lagdou Ruins.png]]
+|caption=Artwork of the Lagdou Ruins from the world map.
+|chapter=None, can be accessed from the world map after [[Last Hope|Chapter&nbsp;19]].
+|country=[[Jehanna]]
+|appearances={{title|The Sacred Stones}}
+}}
+'''Lagdou Ruins''' (Japanese: {{hl|ラグドゥ遺跡|Ragudu iseki}} ''Lagdou Ruins'') is a location that appears in {{FE8}}, unlocked after completing [[Last Hope|Chapter&nbsp;19]]. The ruins consists of ten consecutive areas in which the player fights against various monsters. Five characters can be unlocked in the ruins during the [[Creature Campaign]]: [[Glen]], [[Hayden]], [[Valter]], [[Fado]], and [[Lyon]].
+
+Throughout the ruins, there are chests with D-level items and [[gold]], which tends to make up for the broken weapons lost during battles. Various monsters throughout the ruins also have chances to drop valuable stat boosting items, gems, and even [[Master Seal]]s.
+
+==Floors==
+{{clear}}
+{| class="cellpadding-3 basic width-45" style="border-width: 2px"
+! style="background: none" colspan="3" | Maps of the Lagdou Ruins
+|- style="color: var(--emphasized-text-color)"
+! style="border-top-left-radius: 15px; width: 20%" | Floor
+! style="border-top-right-radius: 15px" | Map
+|-
+| [[/Floor 1|Floor 1]]
+| [[File:Cm fe08 L-1.png|200px]]
+|-
+| [[/Floor 2|Floor 2]]
+| [[File:Cm fe08 L-2.png|200px]]
+|-
+| [[/Floor 3|Floor 3]]
+| [[File:Cm fe08 L-3.png|200px]]
+|-
+| [[/Floor 4|Floor 4]]
+| [[File:Cm fe08 L-4.png|200px]]
+|-
+| [[/Floor 5|Floor 5]]
+| [[File:Cm fe08 L-5.png|200px]]
+|-
+| [[/Floor 6|Floor 6]]
+| [[File:Cm fe08 L-6.png|200px]]
+|-
+| [[/Floor 7|Floor 7]]
+| [[File:Cm fe08 L-7.png|200px]]
+|-
+| [[/Floor 8|Floor 8]]
+| [[File:Cm fe08 L-8.png|200px]]
+|-
+| [[/Floor 9|Floor 9]]
+| [[File:Cm fe08 L-9.png|200px]]
+|-
+| [[/Floor 10|Floor 10]]
+| [[File:Cm fe08 L-10.png|200px]]
+|-
+| class="roundb" colspan="3" |
+|}
+
+==Characters==
+{| class="cellpadding-2 sortable basic width-70"
+! style="border-radius: 15px; border: 1px solid {{Color2}}; background-color: transparent" | Portrait
+! style="border-radius: 15px; border: 1px solid {{Color2}}; background-color: transparent" | Name
+! style="border-radius: 15px; border: 1px solid {{Color2}}; background-color: transparent" | Class
+! style="border-radius: 15px; border: 1px solid {{Color2}}; background-color: transparent" | Joining conditions
+|-
+| [[File:Portrait glen fe08.png]]
+| [[Glen]]
+| [[Wyvern Lord]]
+| Clear Floor 5
+|-
+| [[File:Portrait hayden fe08.png]]
+| [[Hayden]]
+| [[Forest Knight|Ranger]]
+| Defeat 200+ enemies in one run
+|-
+| [[File:Portrait valter fe08.png]]
+| [[Valter]]
+| [[Wyvern Knight (The Sacred Stones)|Wyvern Knight]]
+| Clear Floor 7
+|-
+| [[File:Portrait fado fe08.png]]
+| [[Fado]]
+| [[General]]
+| Clear the ruins once
+|-
+| [[File:Portrait lyon 02 fe08.png]]
+| [[Lyon]]
+| [[Necromancer]]
+| Clear the ruins three times
+|-
+! style="border-top: 1px solid {{Color2}}; background: none" colspan="5" |
+|}
+<!--
+==Trivia==
+-->
+==Etymology and other languages==
+{{Names
+|eng-name=Lagdou Ruins
+|jpn-name={{h|ラグドゥ遺跡|Ragudu iseki}}
+|jpn-mean=Lagdou Ruins. Possibly named after [[wikipedia:Lugdunum|Lugdunum]], a Roman city which became the city of [[wikipedia:Lyon|Lyon]]. While it does not match the spelling of Lugdunum ({{h|ルグドゥヌム|Rugudunumu}}), it matches [[wikipedia:Lugduname|Lugduname]] ({{h|ラグドゥネーム|Ragudunēmu}}), a sweetening agent named after the city.
+|span-name=Ruinas Lagdou
+|span-mean=Lagdou Ruins
+|fren-name=Ruines de Lagdou
+|fren-mean=Lagdou Ruins
+|ger-name=Ruinen von Lagdou
+|ger-mean=Lagdou Ruins
+|ital-name=Rovine di Lagdou
+|ital-mean=Lagdou Ruins
+}}
+
+==Gallery==
+<gallery>
+Mi fe08 lagdou ruins.png|World map icon of the Lagdou Ruins in {{title|The Sacred Stones}}.
+Cm fe08 L-1.png|Floor 1
+Cm fe08 L-2.png|Floor 2
+Cm fe08 L-3.png|Floor 3
+Cm fe08 L-4.png|Floor 4
+Cm fe08 L-5.png|Floor 5
+Cm fe08 L-6.png|Floor 6
+Cm fe08 L-7.png|Floor 7
+Cm fe08 L-8.png|Floor 8
+Cm fe08 L-9.png|Floor 9
+Cm fe08 L-10.png|Floor 10
+</gallery>
+
+{{Nav8}}
+[[Category:Locations in Fire Emblem: The Sacred Stones]]

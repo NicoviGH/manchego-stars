@@ -1,0 +1,1911 @@
+{{Stub}}
+{{Chapter Infobox
+|image=[[File:Cm fe08 18.png|200px]]
+|location=[[Darkling Woods (location)|Neleras Peak]]
+|boss=[[Gorgon]]
+|previous=[[River of Regrets]]
+|next=[[Last Hope]]
+}}
+
+{{Quote|Yes. An unpleasant odor, like sulphur. It's emanating from this valley.|[[Eirika]]}}
+
+'''Two Faces of Evil''' (Japanese: {{hl|魔の双面|Ma no sōmen}} ''The Demon's Two Faces'') is the eighteenth chapter of {{FE8}}.
+
+==Plot==
+{{main|Two Faces of Evil/Script (Eirika)|Two Faces of Evil/Script (Ephraim)}}
+
+As the group pursue [[Lyon]] into a valley, the twins ask [[L'Arachel]] if Lyon is permanently lost; L'Arachel states that, as far as she knows, [[Fomortiis]] has consumed Lyon's soul, and not even the [[Sacred Stone (object)|Sacred Stone]]s could restore such a state. In [[Eirika]]'s route, Eirika chooses to hold on to some hope that Lyon can be saved; in [[Ephraim]]'s route, Ephraim accepts Lyon is lost and resolves to personally put his body to rest. Regardless of route, a soldier leads the group into the valley Lyon was tracked to. Ephraim notices [[Gorgon Egg]]s scattered about the valley; when the eggs start to hatch, Ephraim orders everyone to prepare for battle.
+
+After the monsters are routed, Lyon teleports in front of the group before teleporting away; in Eirika's route, Eirika chases him further into the valley; in Ephraim's route, Ephraim does instead. In Eirika's route, Lyon appears before Eirika in pain, claiming that [[Renais]]'s Sacred Stone may be able to heal him; when Eirika gives him the stone, Fomortiis reveals it to be a trick, and destroys the stone. Fomortiis then leaves before Ephraim and company can reach him. In Ephraim's route, Ephraim moves to attack Fomortiis, but is immobilized by a magic trap that allows Fomortiis to take and destroy the Stone; Fomortiis then interrogates Ephraim about his intentions before revealing himself to truly be Lyon, that him being the Demon King was merely and act. Lyon then informs Ephraim that in ten days, he will perform a ceremony in [[Darkling Woods (location)|Darkling Woods]] that will turn him into the true Demon King, and then leaves. The twin that confronted Lyon is left distraught, and is comforted by the other before regrouping. L'Arachel states they still have hope as [[Rausten]]'s Sacred Stone is still intact, and the group resumes their journey to Rausten.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally=1–{{h|12|10 in the Japanese version (blue squares at coordinate (2, 3) and coordinate (4, 3) are missing)}}
+|enemy=28
+|map=[[File:Cm fe08 18.png]]
+|col=23
+|row=28
+}}
+|content2={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally=1–{{h|12|10 in the Japanese version (blue squares at coordinate (2, 3) and coordinate (4, 3) are missing)}}
+|enemy=34{{h|+11|Reinforcements}}
+|map=[[File:Cm fe08 18 d.png]]
+|col=23
+|row=28
+}}
+}}
+
+This chapter features [[Hazards#Lava geysers|lava geysers]]; these tiles deal 10 damage to any unit that ends their turn on one. They are visible on the map as glowing, uneven red ground.
+
+===Character data===
+{{ChapChars
+|game#=08
+|forced1=eirika
+|forced2=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+|return22=l'Arachel
+|return23=dozla
+|return24=saleh
+|return25=ewan
+|return26=cormag
+|return27=rennac
+|return28=duessel
+|return29=knoll
+|return30=myrrh
+|return31=syrene
+}}
+<small>Note: Only one of Eirika or Ephraim is required to be deployed, with the other being optional. The required unit will be whichever one the player chose to follow during [[A New Journey|the Chapter&nbsp;8 interlude]].</small>
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=15
+|#=1
+|hp=44
+|str=18
+|skill=14
+|spd=11
+|lck=3
+|def=10
+|res=19
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=4
+|#=7
+|hp=25
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=3
+|#=7
+|hp=20
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=2
+|#=3
+|hp=15
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=1
+|#=1
+|hp=10
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=16
+|#=4
+|hp=19~22
+|str=6~8
+|skill=4~5
+|spd=4~6
+|lck=2~4
+|def=2~4
+|res=6~8
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=1
+|hp=27~30
+|str=10~13
+|skill=6~8
+|spd=9~11
+|lck=1~2
+|def=8~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=6
+|#=1
+|hp=22~25
+|str=12~16
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Shadowshot}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=1
+|hp=27~30
+|str=10~13
+|skill=6~8
+|spd=9~11
+|lck=1~2
+|def=8~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=50% of the time, does not do anything. Otherwise, attacks units in range.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=19
+|str=8
+|skill=3
+|spd=4
+|lck=0
+|def=5
+|res=7
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=16
+|#=1
+|hp=26~29
+|str=10~12
+|skill=6~8
+|spd=9~11
+|lck=0~2
+|def=8~10
+|res=1~2
+|con=8
+|mov=6
+|inventory={{Item|8|Toxin Lance|image=poison lance}} • {{Item|8|Javelin}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=3
+|hp=19
+|str=8
+|skill=3
+|spd=4
+|lck=0
+|def=5
+|res=7
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=2
+|hp=19
+|str=8
+|skill=3
+|spd=4
+|lck=0
+|def=5
+|res=7
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=19
+|str=8
+|skill=3
+|spd=4
+|lck=0
+|def=5
+|res=7
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The southeastern one and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=19
+|str=8
+|skill=3
+|spd=4
+|lck=0
+|def=5
+|res=7
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=One from the east and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=19
+|str=8
+|skill=3
+|spd=4
+|lck=0
+|def=5
+|res=7
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+|notes=Immediately begins moving upon hatching.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=4
+|#=7
+|hp=25
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=3
+|#=7
+|hp=20
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=2
+|#=3
+|hp=15
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=1
+|#=1
+|hp=10
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=16
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Slim Lance}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The southeastern one and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=One from the east and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+|notes=Immediately begins moving upon hatching.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=15
+|#=1
+|hp=44
+|str=18
+|skill=14
+|spd=11
+|lck=3
+|def=10
+|res=19
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=4
+|#=7
+|hp=25
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=3
+|#=7
+|hp=20
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=2
+|#=3
+|hp=15
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=1
+|#=1
+|hp=10
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=16
+|#=4
+|hp=20~23
+|str=7~9
+|skill=4~6
+|spd=5~7
+|lck=3~5
+|def=3~4
+|res=7~9
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=1
+|hp=28~32
+|str=11~14
+|skill=7~9
+|spd=10~12
+|lck=1~2
+|def=9~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=6
+|#=1
+|hp=23~26
+|str=13~18
+|skill=5~9
+|spd=5~8
+|lck=2~6
+|def=5~8
+|res=11~14
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Shadowshot}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=1
+|hp=28~32
+|str=11~14
+|skill=7~9
+|spd=10~12
+|lck=1~2
+|def=9~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=50% of the time, does not do anything. Otherwise, attacks units in range.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=22~26
+|str=13~17
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=16
+|#=1
+|hp=28~31
+|str=11~13
+|skill=6~9
+|spd=9~12
+|lck=1~2
+|def=8~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Toxin Lance|image=poison lance}} • {{Item|8|Javelin}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=3
+|hp=22~25
+|str=12~16
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=2
+|hp=22~25
+|str=12~16
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=22~26
+|str=13~17
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The southeastern one and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=22~26
+|str=13~17
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=One from the east and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=22~26
+|str=13~17
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+|notes=Immediately begins moving upon hatching.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=4
+|#=7
+|hp=25
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=3
+|#=7
+|hp=20
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=2
+|#=3
+|hp=15
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=1
+|#=1
+|hp=10
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=16
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Slim Lance}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The southeastern one and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=One from the east and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+|notes=Immediately begins moving upon hatching.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=15
+|#=1
+|hp=45~47
+|str=20~21
+|skill=15~16
+|spd=11~13
+|lck=4~5
+|def=10~11
+|res=20~21
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=4
+|#=8
+|hp=25
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=3
+|#=11
+|hp=20
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=2
+|#=4
+|hp=15
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=1
+|#=1
+|hp=10
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=16
+|#=4
+|hp=22~27
+|str=8~13
+|skill=6~9
+|spd=6~10
+|lck=4~8
+|def=3~5
+|res=7~11
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=1
+|hp=32~38
+|str=13~18
+|skill=8~12
+|spd=11~15
+|lck=1~3
+|def=9~13
+|res=2~4
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=6
+|#=1
+|hp=28~35
+|str=21~28
+|skill=9~14
+|spd=9~14
+|lck=6~11
+|def=6~10
+|res=15~21
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Shadowshot}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=1
+|hp=32~38
+|str=13~18
+|skill=8~12
+|spd=11~15
+|lck=1~3
+|def=9~13
+|res=2~4
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=50% of the time, does not do anything. Otherwise, attacks units in range.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=28~35
+|str=21~27
+|skill=9~14
+|spd=8~14
+|lck=6~11
+|def=6~10
+|res=15~20
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=16
+|#=1
+|hp=31~37
+|str=12~17
+|skill=8~11
+|spd=11~14
+|lck=1~3
+|def=9~13
+|res=1~4
+|con=8
+|mov=6
+|inventory={{Item|8|Toxin Lance|image=poison lance}} • {{Item|8|Javelin}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=3
+|hp=28~34
+|str=20~27
+|skill=8~14
+|spd=8~13
+|lck=5~11
+|def=6~10
+|res=15~20
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=2
+|hp=28~34
+|str=20~27
+|skill=8~14
+|spd=8~13
+|lck=5~11
+|def=6~10
+|res=15~20
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=9
+|hp=28~35
+|str=21~27
+|skill=9~14
+|spd=8~14
+|lck=6~11
+|def=6~10
+|res=15~20
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The southeastern one and three from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=28~35
+|str=21~27
+|skill=9~14
+|spd=8~14
+|lck=6~11
+|def=6~10
+|res=15~20
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=One from the east and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=28~35
+|str=21~27
+|skill=9~14
+|spd=8~14
+|lck=6~11
+|def=6~10
+|res=15~20
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+|notes=Immediately begins moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=2
+|hp=28~35
+|str=21~27
+|skill=9~14
+|spd=8~14
+|lck=6~11
+|def=6~10
+|res=15~20
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Shadowshot}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=1
+|hp=29~36
+|str=22~29
+|skill=9~15
+|spd=9~14
+|lck=6~12
+|def=6~10
+|res=16~21
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=Immediately begins moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=16
+|#=7
+|hp=37~43
+|str=13~18
+|skill=7~11
+|spd=5~8
+|lck=1~4
+|def=8~11
+|res=2~5
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=16
+|#=2
+|hp=37~43
+|str=13~18
+|skill=7~11
+|spd=5~8
+|lck=1~4
+|def=8~11
+|res=2~5
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=1
+|hp=32~38
+|str=13~18
+|skill=8~12
+|spd=11~15
+|lck=1~3
+|def=9~13
+|res=2~4
+|con=8
+|mov=6
+|inventory={{Item|8|Heavy Spear}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=1
+|hp=32~38
+|str=13~18
+|skill=8~12
+|spd=11~15
+|lck=1~3
+|def=9~13
+|res=2~4
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=4
+|#=8
+|hp=25
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=3
+|#=11
+|hp=20
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=2
+|#=4
+|hp=15
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon Egg
+|lv=1
+|#=1
+|hp=10
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=10
+|res=10
+|con=0
+|mov=0
+|notes=Starts with 5 HP; recovers 5 HP per turn once active.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=16
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Slim Lance}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=9
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The southeastern one and three from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=One from the east and one from the northwest immediately begin moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}}
+|notes=Immediately begins moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Shadowshot}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=Immediately begins moving upon hatching.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=16
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=16
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=17
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Slim Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*If a [[Gorgon Egg]] reaches its max HP through natural regeneration, it will hatch into a [[Gorgon]]. These Gorgons can act on the same turn that they hatch.
+*After entering the southeastern area (columns 15–23, rows 21–28) <small>(Difficult only)</small>
+**2 [[Bael]]s with [[Sharp Claw]]s from the southeast
+*After approaching the three Gorgon Eggs surrounding lava (columns 20–23, rows 15–19) <small>(Difficult only)</small>
+**1 [[Bael]] with a [[Poison Claw]] from the eastern border of the map
+**1 [[Bael]] with a [[Sharp Claw]] from the eastern border of the map
+*After entering the northwestern area (columns 1–15, rows 1–9) <small>(Difficult only)</small>
+**2 [[Bael]]s with [[Sharp Claw]]s from the north
+**1 [[Gargoyle]] with a [[Heavy Spear]] from the northwest cliffs
+*After entering the northeastern area (columns 18–23, rows 1–11) <small>(Difficult only)</small>
+**2 [[Bael]]s with [[Sharp Claw]]s from the north
+**1 [[Bael]] with a [[Poison Claw]] from the north
+**1 [[Gargoyle]] with a [[Horseslayer]] from the northeast corner of the map
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Gorgon}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Generic portrait gorgon fe08.png]]
+|sprite=gorgon enemy
+|class=Gorgon
+|affin=dark
+|lv={{h|15|8 in the Japanese version}}
+|HP=44
+|mag=18
+|skill=14
+|spd=11
+|luck=3
+|def=10
+|res=19
+|move=6
+|con=11
+|aid=10
+|inventory={{Item|8|Demon Surge}}<br>{{Item|8|Stone|link=Petrify (tome)}}{{h|*|Western version only}}
+|da=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Generic portrait gorgon fe08.png]]
+|sprite=gorgon enemy
+|class=Gorgon
+|affin=dark
+|lv={{h|15|8 in the Japanese version}}
+|HP=45~47
+|mag=20~21
+|skill=15~16
+|spd=11~13
+|luck=4~5
+|def=10~11
+|res=20~21
+|move=6
+|con=11
+|aid=10
+|inventory={{Item|8|Demon Surge}}<br>{{Item|8|Stone|link=Petrify (tome)}}{{h|*|Western version only}}
+|da=A
+}}
+}}
+
+==Strategy==
+{{strategy}}
+The [[Gorgon Eggs|eggs]] hatching appear to present time pressure, but in actuality most hatch slowly enough that this chapter is mostly just a bucket of experience to prepare you for the much harder next chapter. This chapter has a lot of enemies with [[Petrify (tome)|Stone]], however inaccurate they are, so bring [[Restore]] staves. Despite what you'd expect, flying units (enemies or allies) can not cross the abyss, though they're still helpful to deploy for reaching eggs atop cliffs and quickly smashing eggs. 
+
+The only real threat in this chapter is the risk of the [[Shadowshot]] [[Gorgon]] picking off a weak unit, especially if they are afflicted with Stone. Otherwise just move fast and crush as many eggs as possible. Each egg destroyed gives 50 experience, regardless of other factors (even if the attacking unit would earn more experience attacking a normal enemy, such as [[Myrrh]]), and this chapter is fantastic at leveling up both stragglers and units that are already high level, provided they have movement speed to keep up and don't die to Shadowshot. Don't be too afraid of stepping on the lava tiles if they don't put a unit within range of death from Shadowshot, especially if you have [[Physic]] staves handy, as their damage is minimal and enemies aren't aggressive enough to take advantage of the wounds.
+
+Difficult mode adds reinforcements, but these are all trigger based and spawn far enough away they really just stop weak units from wandering off on their own.
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=Two Faces of Evil
+|jpn-name={{h|魔の双面|Ma no sōmen}}
+|jpn-mean=The Demon's Two Faces
+|ger-name=Gesichter des Bösen
+|ger-mean=Faces of Evil
+|ital-name=Le due facce del male
+|ital-mean=The Two Faces of Evil
+|span-name=Las dos caras del mal
+}}
+
+==Gallery==
+{{sectstub}}
+
+{{ChapterNav
+|prechapter=River of Regrets
+|nextchapter=Last Hope
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

@@ -1,0 +1,3678 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 19.png|200px]]
+|weather=[[Fog of War]]
+|location=[[Rausten]]
+|boss=[[Riev]]
+|previous=[[Two Faces of Evil]]
+|next=[[Darkling Woods]]
+}}
+{{Quote|March on! March, minions of the Demon King! Your time is upon you! Tonight, we claim not only Pontifex Mansel's sad life, but also Rausten's Sacred Stone!|[[Riev]]}}
+
+'''Last Hope''' (Japanese: {{hl|残されし希望|Nokosareshi kibō}} ''The hope that remains'') is the nineteenth chapter of {{FE8}}.
+
+==Plot==
+{{main|Last Hope/Script (Eirika)|Last Hope/Script (Ephraim)}}
+
+When the group reaches [[Rausten Court]], [[L'Arachel]] reunites with Pontifex [[Mansel]], her uncle. [[Eirika]] and [[Ephraim]] introduce themselves, and inform Mansel of the circumstances of [[Magvel]] and [[Fomortiis|the Demon King]]. Mansel contemplates the situation, and decides to grant L'Arachel Rausten's [[Sacred Stone (object)|Sacred Stone]]; however, in response to her haste to take it with her, he suggests they stay and rest, to which they accept.
+
+In Eirika's route, L'Arachel consoles Eirika over her encounter with the Demon King; L'Arachel states that [[Lyon]] cannot be saved, but asks what he would have wanted her to do, then suggests they go eat. In Ephraim's route, Tana consoles Ephraim if she is alive; Ephraim attempts to push her away, but Tana refuses to let her bonds with Ephraim and Eirika break, and Ephraim realizes he got as far as he did with his friends. If Tana is dead, L'Arachel consoles Ephraim instead; Ephraim refuses to show weakness and intends to keep his thoughts about Lyon to himself—L'Arachel states that some burdens must be shared, and Ephraim agrees and thanks her for speaking with him.
+
+At the entrance of Rausten Court, a soldier is on patrol at night; [[Riev]] begins to taunt him from the darkness before a [[Grado]] soldier attacks and kills him, and Riev begins an assault on Rausten. Another soldier informs Mansel of the siege; L'Arachel volunteers her and her company to defend the castle, and they begin a battle.
+
+As the battle begins, Riev orders his soldiers to take Rausten and destroy its Sacred Stone, and he relishes his opportunity to wreak vengeance upon Mansel for excommunicating him. The twins resolve themselves to face Lyon and the Demon King in an upcoming battle.
+
+Once the invasion is repelled, the twins celebrate their victory. In Eirika's route, she thanks L'Arachel for her encouragement earlier; In Ephraim's route, he thanks Tana for her words, or L'Arachel's for hers if Tana is dead. L'Arachel then takes them to the Sacred Stone chamber and retrieves Rausten's Stone; Eirika and [[Myrrh]] suggest they make haste, and the group leave. Before the group can exit Rausten Court, however, Mansel stops them; he grants them Rausten's [[Sacred Twin]] relics, though he asks they be returned once the Demon King is defeated. Additionally, if at least six of the NPC units (including Mansel) survived the battle, L'Arachel complements the soldiers' performance and requests their continued defense of her uncle, and they grant the twins a [[Light Brand]].
+
+==Chapter data==
+{{ChapData
+|victory=Protect [[Mansel]] for 13 turns or defeat [[Riev]]
+|defeat=[[Eirika]], [[Ephraim]], or [[Mansel]] dies
+|ally=1–17
+|other=10
+|enemy={{h|25|24 in the Japanese version}}{{h|+72|Reinforcements}}
+|map={{tab
+|tab1=Map
+|tab2=Secret shop
+|content1=<div>[[File:Cm fe08 19.png]]</div>
+|content2=<div>[[File:Cm fe08 19 secret shop.png]]</div>
+}}
+|col=29
+|row=25
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|forced1=eirika
+|forced2=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+|return22=l'Arachel
+|return23=dozla
+|return24=saleh
+|return25=ewan
+|return26=cormag
+|return27=rennac
+|return28=duessel
+|return29=knoll
+|return30=myrrh
+|return31=syrene
+}}
+<small>Note: Only one of Eirika or Ephraim is required to be deployed, with the other being optional. The required unit will be whichever one the player chose to follow during [[A New Journey|the Chapter&nbsp;8 interlude]].</small>
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Aura
+|obtain1=Dropped by [[Riev]]
+|item2=Brave Lance
+|obtain2=Dropped by enemy [[General]]
+|item3=Brave Sword
+|obtain3=Dropped by enemy [[Hero]]
+|item4=Brave Bow
+|obtain4=Dropped by enemy [[Sniper]]
+|item5=Runesword
+|obtain5=Open left [[chest]] in western room
+|item6=Speedwing
+|obtain6=Open middle [[chest]] in western room
+|item7=Fenrir
+|obtain7=Open right [[chest]] in western room
+|item8=Bolting
+|obtain8=Open bottom [[chest]] in eastern room
+|item9=5,000G
+|item9image=gold
+|item9article=Gold
+|obtain9=Open middle [[chest]] in eastern room
+|item10=Fortify
+|obtain10=Open upper [[chest]] in eastern room
+|item11=Goddess Icon
+|obtain11=Steal from enemy [[Archer]]
+|item12=Lockpick
+|obtain12=Steal from enemy [[Thief]] (reinforcement)
+|item13=Lockpick
+|obtain13=Steal from enemy [[Thief]] (reinforcement)
+|item14=Lockpick
+|obtain14=Steal from enemy [[Thief]] (reinforcement)
+|item15=Light Brand
+|obtain15=Automatically at end of chapter if six NPC units survive
+|item16=10,000G
+|item16image=gold
+|item16article=Gold
+|obtain16=Automatically at end of chapter
+|item17=Ivaldi
+|obtain17=Automatically at end of chapter
+|itemlast=Latona
+|obtainlast=Automatically at end of chapter
+}}
+
+===Shop data===
+{{Tab
+|header=Secret Shop
+|width=70%
+|constyle=text-align: center
+|tab1= (NTSC-J)
+|tab2= (NTSC-U/PAL)
+|content1={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba shamshir.png]]
+{{!}} [[Shamshir]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba spear.png]]
+{{!}} [[Spear]]
+{{!}} class="roundr" {{!}} 9,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba battle axe.png]]
+{{!}} [[Battle Axe]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba physic.png]]
+{{!}} [[Physic]]
+{{!}} class="roundr" {{!}} 3,750
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba angelic robe.png]]
+{{!}} [[Angelic Robe]]
+{{!}} class="roundr" {{!}} 8,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba energy ring.png]]
+{{!}} [[Energy Ring]]
+{{!}} class="roundr" {{!}} 8,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba secret book.png]]
+{{!}} [[Secret Book]]
+{{!}} class="roundr" {{!}} 8,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba speedwing.png]]
+{{!}} [[Speedwing]]
+{{!}} class="roundr" {{!}} 8,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba goddess icon.png]]
+{{!}} [[Goddess Icon]]
+{{!}} class="roundr" {{!}} 8,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba dragonshield.png]]
+{{!}} [[Dragonshield]]
+{{!}} class="roundr" {{!}} 8,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba hero crest.png]]
+{{!}} [[Hero Crest]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba knight crest.png]]
+{{!}} [[Knight Crest]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba orion's bolt.png]]
+{{!}} [[Orion's Bolt]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elysian whip.png]]
+{{!}} [[Elysian Whip]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba guiding ring.png]]
+{{!}} [[Guiding Ring]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba ocean seal.png]]
+{{!}} [[Ocean Seal]]
+{{!}} class="roundr" {{!}} 10,000
+{{tableend}}
+|content2={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba barrier.png]]
+{{!}} [[Barrier]]
+{{!}} class="roundr" {{!}} 2,250
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba physic.png]]
+{{!}} [[Physic]]
+{{!}} class="roundr" {{!}} 3,750
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lockpick.png]]
+{{!}} [[Lockpick]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba hero crest.png]]
+{{!}} [[Hero Crest]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba knight crest.png]]
+{{!}} [[Knight Crest]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba orion's bolt.png]]
+{{!}} [[Orion's Bolt]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elysian whip.png]]
+{{!}} [[Elysian Whip]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba guiding ring.png]]
+{{!}} [[Guiding Ring]]
+{{!}} class="roundr" {{!}} 10,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba ocean seal.png]]
+{{!}} [[Ocean Seal]]
+{{!}} class="roundr" {{!}} 10,000
+{{tableend}}
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Riev]]
+|class=Bishop
+|lv=16
+|#=1
+|hp=49
+|str=14
+|skill=21
+|spd=19
+|lck=9
+|def=16
+|res=18
+|con=7
+|mov=6
+|inventory={{Item|8|Aura|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=18
+|#=2
+|hp=26~29
+|str=9~11
+|skill=5~7
+|spd=1~3
+|lck=2~4
+|def=12~14
+|res=2~3
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=18
+|#=2
+|hp=23~27
+|str=7~10
+|skill=13~15
+|spd=13~15
+|lck=3~5
+|def=3~5
+|res=2~3
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=25~28
+|str=7~9
+|skill=7~9
+|spd=6~8
+|lck=3~5
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=25~28
+|str=7~9
+|skill=7~9
+|spd=6~8
+|lck=3~5
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}} • {{Item|8|Goddess Icon}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=18
+|#=2
+|hp=27~30
+|str=8~10
+|skill=12~14
+|spd=11~13
+|lck=3~5
+|def=6~7
+|res=2~3
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=4
+|#=1
+|hp=21
+|str=8
+|skill=4
+|spd=3
+|lck=0
+|def=13
+|res=3
+|con=15
+|mov=5
+|inventory={{Item|8|Brave Lance|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=5
+|#=1
+|hp=21
+|str=8
+|skill=4
+|spd=3
+|lck=0
+|def=13
+|res=3
+|con=15
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Sword|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=2
+|hp=21
+|str=6
+|skill=11
+|spd=10
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=1
+|hp=28~32
+|str=10~13
+|skill=5~7
+|spd=7~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=1
+|hp=28~32
+|str=10~13
+|skill=5~7
+|spd=7~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=1
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=1
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=2
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Steel Blade}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=5
+|lck=0
+|def=5
+|res=2
+|con=8
+|mov=6
+|inventory={{Item|8|Brave Bow|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=5
+|lck=0
+|def=5
+|res=2
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=6
+|#=1
+|hp=22~25
+|str=10~13
+|skill=5~8
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~11
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Will not move until provoked.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=14
+|hp=21
+|str=6
+|skill=11
+|spd=10
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=6
+|#=7
+|hp=26~30
+|str=10~13
+|skill=5~8
+|spd=7~9
+|lck=1~4
+|def=12~15
+|res=4~7
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=6
+|#=3
+|hp=34~38
+|str=11~14
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=3
+|hp=21
+|str=7
+|skill=6
+|spd=5
+|lck=0
+|def=5
+|res=2
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage Knight
+|version=male
+|lv=5
+|#=7
+|hp=20
+|str=4
+|skill=3
+|spd=5
+|lck=0
+|def=5
+|res=5
+|con=8
+|mov=7
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=9
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=6
+|#=7
+|hp=28~32
+|str=8~11
+|skill=6~9
+|spd=8~10
+|lck=1~4
+|def=8~11
+|res=4~7
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=5
+|#=7
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Thief
+|lv=18
+|#=3
+|hp=21~24
+|str=3~4
+|skill=6~8
+|spd=13~15
+|lck=4~6
+|def=2~3
+|res=2~3
+|con=6
+|mov=6
+|inventory={{Item|8|Poison Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=6
+|#=4
+|hp=26~30
+|str=10~13
+|skill=5~8
+|spd=3~6
+|lck=1~4
+|def=14~17
+|res=4~7
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=2
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Hand Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Riev]]
+|class=Bishop
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Aura|type=drop}}
+|notes=Will move if a player is in his range.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}} • {{Item|8|Goddess Icon}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Brave Lance|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Sword|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Brave Bow|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=14
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=6
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=6
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage Knight
+|version=male
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=7
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=11
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=6
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Thief
+|lv=18
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=6
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Riev]]
+|class=Bishop
+|lv=16
+|#=1
+|hp=49
+|str=14
+|skill=21
+|spd=19
+|lck=9
+|def=16
+|res=18
+|con=7
+|mov=6
+|inventory={{Item|8|Aura|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=18
+|#=2
+|hp=27~31
+|str=10~12
+|skill=5~8
+|spd=1~3
+|lck=3~5
+|def=12~14
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=18
+|#=2
+|hp=25~28
+|str=8~10
+|skill=14~16
+|spd=14~16
+|lck=3~6
+|def=3~5
+|res=2~4
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=26~30
+|str=8~10
+|skill=7~10
+|spd=6~9
+|lck=4~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=26~30
+|str=8~10
+|skill=7~10
+|spd=6~9
+|lck=4~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}} • {{Item|8|Goddess Icon}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=18
+|#=2
+|hp=28~32
+|str=9~11
+|skill=13~15
+|spd=12~14
+|lck=3~6
+|def=6~8
+|res=2~4
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=22~26
+|str=10~14
+|skill=5~8
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~11
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=4
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~8
+|spd=3~6
+|lck=1~4
+|def=14~17
+|res=4~7
+|con=15
+|mov=5
+|inventory={{Item|8|Brave Lance|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=5
+|#=1
+|hp=27~31
+|str=10~13
+|skill=5~8
+|spd=3~6
+|lck=1~4
+|def=14~17
+|res=4~7
+|con=15
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=28~32
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Sword|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=2
+|hp=26~29
+|str=7~10
+|skill=13~16
+|spd=12~15
+|lck=1~4
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=1
+|hp=30~34
+|str=11~14
+|skill=6~8
+|spd=7~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=1
+|hp=30~34
+|str=11~14
+|skill=6~8
+|spd=7~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=1
+|hp=35~39
+|str=11~15
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=1
+|hp=35~39
+|str=11~15
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=2
+|hp=28~32
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Steel Blade}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=27~30
+|str=9~12
+|skill=8~11
+|spd=6~9
+|lck=2~5
+|def=6~8
+|res=3~6
+|con=8
+|mov=6
+|inventory={{Item|8|Brave Bow|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=27~30
+|str=9~12
+|skill=8~11
+|spd=6~9
+|lck=2~5
+|def=6~8
+|res=3~6
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=6
+|#=1
+|hp=23~26
+|str=11~14
+|skill=5~9
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~12
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Will not move until provoked.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=14
+|hp=26~29
+|str=7~10
+|skill=13~16
+|spd=12~15
+|lck=1~4
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=6
+|#=7
+|hp=27~32
+|str=10~14
+|skill=5~8
+|spd=7~9
+|lck=1~4
+|def=12~15
+|res=4~7
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=6
+|#=3
+|hp=36~40
+|str=12~15
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=3
+|hp=27~30
+|str=9~12
+|skill=8~11
+|spd=6~9
+|lck=2~5
+|def=6~8
+|res=3~6
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage Knight
+|version=male
+|lv=5
+|#=7
+|hp=23~27
+|str=7~10
+|skill=5~8
+|spd=8~11
+|lck=2~5
+|def=5~8
+|res=8~11
+|con=8
+|mov=7
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=9
+|hp=35~39
+|str=11~15
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=6
+|#=7
+|hp=29~34
+|str=8~11
+|skill=6~10
+|spd=8~10
+|lck=1~4
+|def=8~11
+|res=4~7
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=5
+|#=7
+|hp=26~30
+|str=8~11
+|skill=8~11
+|spd=9~12
+|lck=1~4
+|def=7~9
+|res=4~6
+|con=9
+|mov=7
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=28~32
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=28~32
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Thief
+|lv=18
+|#=3
+|hp=22~25
+|str=3~4
+|skill=6~9
+|spd=14~16
+|lck=5~7
+|def=2~3
+|res=2~4
+|con=6
+|mov=6
+|inventory={{Item|8|Poison Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=6
+|#=4
+|hp=27~32
+|str=10~14
+|skill=5~8
+|spd=3~6
+|lck=1~4
+|def=14~17
+|res=4~7
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=2
+|hp=35~39
+|str=11~15
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Hand Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Riev]]
+|class=Bishop
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Aura|type=drop}}
+|notes=Will move if a player is in his range.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}} • {{Item|8|Goddess Icon}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Brave Lance|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Sword|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Brave Bow|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=14
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=6
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=6
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage Knight
+|version=male
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=7
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=11
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=6
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Thief
+|lv=18
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=6
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Riev]]
+|class=Bishop
+|lv=16
+|#=1
+|hp=50~52
+|str=15~16
+|skill=21~23
+|spd=19~20
+|lck=10~11
+|def=16~17
+|res=19~20
+|con=7
+|mov=6
+|inventory={{Item|8|Aura|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=18
+|#=2
+|hp=30~37
+|str=11~15
+|skill=7~10
+|spd=2~4
+|lck=3~7
+|def=13~17
+|res=2~5
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=18
+|#=2
+|hp=28~34
+|str=10~13
+|skill=15~19
+|spd=15~19
+|lck=5~8
+|def=4~6
+|res=2~5
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=29~35
+|str=9~13
+|skill=9~13
+|spd=8~11
+|lck=5~9
+|def=5~7
+|res=2~4
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=29~35
+|str=9~13
+|skill=9~13
+|spd=8~11
+|lck=5~9
+|def=5~7
+|res=2~4
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}} • {{Item|8|Goddess Icon}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=18
+|#=2
+|hp=31~38
+|str=10~14
+|skill=14~18
+|spd=13~17
+|lck=5~8
+|def=6~9
+|res=2~5
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=28~35
+|str=17~24
+|skill=9~14
+|spd=8~14
+|lck=3~7
+|def=5~9
+|res=13~18
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=4
+|#=1
+|hp=36~45
+|str=13~19
+|skill=7~11
+|spd=4~8
+|lck=3~7
+|def=16~21
+|res=7~12
+|con=15
+|mov=5
+|inventory={{Item|8|Brave Lance|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=5
+|#=1
+|hp=37~46
+|str=14~19
+|skill=7~11
+|spd=4~8
+|lck=3~7
+|def=16~22
+|res=7~13
+|con=15
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=38~47
+|str=12~17
+|skill=15~20
+|spd=13~17
+|lck=4~10
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Sword|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=2
+|hp=34~41
+|str=10~15
+|skill=16~22
+|spd=15~21
+|lck=4~9
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=1
+|hp=33~40
+|str=13~18
+|skill=7~11
+|spd=9~12
+|lck=2~4
+|def=4~6
+|res=2~4
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=1
+|hp=33~40
+|str=13~18
+|skill=7~11
+|spd=9~12
+|lck=2~4
+|def=4~6
+|res=2~4
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=1
+|hp=45~54
+|str=17~24
+|skill=9~15
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=1
+|hp=45~54
+|str=17~24
+|skill=9~15
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=2
+|hp=38~47
+|str=12~17
+|skill=15~20
+|spd=13~17
+|lck=4~10
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Steel Blade}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=35~41
+|str=13~18
+|skill=12~17
+|spd=8~12
+|lck=6~11
+|def=7~11
+|res=5~9
+|con=8
+|mov=6
+|inventory={{Item|8|Brave Bow|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=35~41
+|str=13~18
+|skill=12~17
+|spd=8~12
+|lck=6~11
+|def=7~11
+|res=5~9
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=6
+|#=1
+|hp=28~35
+|str=18~25
+|skill=9~14
+|spd=9~14
+|lck=3~8
+|def=5~9
+|res=13~18
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Will not move until provoked.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=14
+|hp=34~41
+|str=10~15
+|skill=16~22
+|spd=15~21
+|lck=4~9
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=6
+|#=7
+|hp=37~44
+|str=14~19
+|skill=7~12
+|spd=8~12
+|lck=3~8
+|def=14~19
+|res=6~11
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=6
+|#=3
+|hp=46~55
+|str=17~24
+|skill=10~15
+|spd=9~14
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=3
+|hp=35~41
+|str=13~18
+|skill=12~17
+|spd=8~12
+|lck=6~11
+|def=7~11
+|res=5~9
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage Knight
+|version=male
+|lv=5
+|#=7
+|hp=29~36
+|str=12~17
+|skill=9~14
+|spd=13~18
+|lck=6~11
+|def=6~10
+|res=13~18
+|con=8
+|mov=7
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=9
+|hp=45~54
+|str=17~24
+|skill=9~15
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=6
+|#=7
+|hp=39~46
+|str=12~17
+|skill=10~15
+|spd=9~14
+|lck=5~10
+|def=9~13
+|res=6~11
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=5
+|#=7
+|hp=34~40
+|str=11~17
+|skill=12~17
+|spd=14~19
+|lck=4~10
+|def=8~12
+|res=5~9
+|con=9
+|mov=7
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=38~47
+|str=12~17
+|skill=15~20
+|spd=13~17
+|lck=4~10
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=38~47
+|str=12~17
+|skill=15~20
+|spd=13~17
+|lck=4~10
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Thief
+|lv=18
+|#=3
+|hp=24~29
+|str=3~5
+|skill=8~13
+|spd=15~19
+|lck=6~10
+|def=2~4
+|res=2~5
+|con=6
+|mov=6
+|inventory={{Item|8|Poison Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=6
+|#=4
+|hp=38~47
+|str=14~19
+|skill=7~12
+|spd=4~8
+|lck=3~8
+|def=17~22
+|res=8~13
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=2
+|hp=45~54
+|str=17~24
+|skill=9~15
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Hand Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Riev]]
+|class=Bishop
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Aura|type=drop}}
+|notes=Will move if a player is in his range.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Archer
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}} • {{Item|8|Goddess Icon}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Brave Lance|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Sword|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=17
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Brave Bow|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=4
+|#=14
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=6
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=6
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sniper
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage Knight
+|version=male
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=7
+|inventory={{Item|8|Elfire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=5
+|#=11
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=6
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Silver Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Thief
+|lv=18
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=General
+|lv=6
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turns 2–8
+**2 [[Swordmaster]]s from the right southwest entrance
+**1 [[Great Knight]] from the right southwest entrance
+*Turns 3, 5, and 7
+**1 [[Warrior]] with a [[Silver Axe]] from the northeast corner of the map
+**1 [[Sniper]] from the northeast corner of the map
+*Turns 3–9
+**1 [[Mage Knight]] from the left southwest entrance
+**1 [[Warrior]] with a [[Silver Axe]] from the left southwest entrance
+**1 [[Paladin]] from the left southwest entrance
+**1 [[Ranger (The Sacred Stones)|Ranger]] from the left southwest entrance
+*Turns 4, 6, and 8
+**1 [[Hero]] with a [[Silver Sword]] from the northeast corner
+**1 [[Hero]] with a [[Silver Axe]] from the northeast corner
+*Turn 6
+**1 [[Thief]] from the western border of the map
+*Turns 6 and 7
+**1 [[Thief]] from the southeast corner of the map
+*Turns 9 and 11
+**2 [[General]]s from the southeast corner of the map
+*Turns 10 and 12
+**2 [[Warrior]]s with [[Silver Axe]]s and [[Hand Axe]]s from the southeast corner of the map
+
+===NPC data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Easy/Normal <small>(Japan)</small>
+|tab3=Difficult
+|tab4=Difficult <small>(Japan)</small>
+|content1={{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Mansel]]
+|class=Pontifex
+|type=other
+|lv=17
+|#=1
+|hp=21
+|str=11
+|skill=3
+|spd=2
+|lck=17
+|def=5
+|res=8
+|con=8
+|mov=5
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]].<br>• Death results in a [[Game Over]].
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=General
+|type=other
+|lv=1
+|#=1
+|hp=26~29
+|str=10~12
+|skill=5~7
+|spd=3~5
+|lck=1~3
+|def=14~16
+|res=4~6
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Silver Blade}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=2
+|hp=19~21
+|str=6~7
+|skill=3~4
+|spd=0~1
+|lck=0~2
+|def=9~11
+|res=0~1
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=4
+|hp=19~20
+|str=6~7
+|skill=2~4
+|spd=0~1
+|lck=0~1
+|def=9~10
+|res=0~1
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=2
+|hp=19~21
+|str=6~7
+|skill=3~4
+|spd=0~1
+|lck=0~2
+|def=9~11
+|res=0~1
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Vulnerary}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Mansel]]
+|class=Pontifex
+|type=other
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]].<br>• Death results in a [[Game Over]].
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=General
+|type=other
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Vulnerary}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Mansel]]
+|class=Pontifex
+|type=other
+|lv=17
+|#=1
+|hp=21
+|str=11
+|skill=3
+|spd=2
+|lck=17
+|def=5
+|res=8
+|con=8
+|mov=5
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]].<br>• Death results in a [[Game Over]].
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=General
+|type=other
+|lv=1
+|#=1
+|hp=33~38
+|str=12~15
+|skill=7~9
+|spd=4~6
+|lck=3~5
+|def=16~18
+|res=7~9
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Silver Blade}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=2
+|hp=19~21
+|str=6~7
+|skill=3~4
+|spd=0~1
+|lck=0~2
+|def=9~11
+|res=0~1
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=4
+|hp=19~20
+|str=6~7
+|skill=2~4
+|spd=0~1
+|lck=0~1
+|def=9~10
+|res=0~1
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=2
+|hp=19~21
+|str=6~7
+|skill=3~4
+|spd=0~1
+|lck=0~2
+|def=9~11
+|res=0~1
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Vulnerary}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Mansel]]
+|class=Pontifex
+|type=other
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]].<br>• Death results in a [[Game Over]].
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=General
+|type=other
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=5
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=[[Rausten]]
+|class=Knight
+|type=other
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Vulnerary}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Riev}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait riev fe08.png]]
+|sprite=bishop enemy
+|class=Bishop
+|affin=dark
+|lv=16
+|HP={{h|49|44 in the Japanese version}}
+|mag=14
+|skill=21
+|spd=19
+|luck=9
+|def={{h|16|17 in the Japanese version}}
+|res=18
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Aura|type=drop}}
+|li={{h|S|A in the Japanese version}}
+|st=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait riev fe08.png]]
+|sprite=bishop enemy
+|class=Bishop
+|affin=dark
+|lv=16
+|HP={{h|50~52|46~48 in the Japanese version}}
+|str=15~16
+|skill=21~23
+|spd=19~20
+|luck=10~11
+|def={{h|16~17|17~18 in the Japanese version}}
+|res=19~20
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Aura|type=drop}}
+|li={{h|S|A in the Japanese version}}
+|st=A
+}}
+}}
+
+==Strategy==
+{{strategy}}
+This chapter contains [[fog of war]] so it's best to bring along a [[Torch (item)|Torch]], [[Torch (staff)|Torch Staff]] or a unit with enhanced visibility. After the initial cleanup, most enemies will spawn outside the castle behind chokepoints, so the interior of the map can safely be ignored entirely if these are plugged by durable units fast enough. The only exceptions to this are a single thief that spawns west near the treasure room, and the enemies that start in the southeast later on. While previous castle maps have had several, no stats staffs are present on this chapter and a single poison sword on the otherwise weak Thief is the only stats condition so there is no need to bring [[Restore]] staffs.
+
+An easy way to grab the spoils in the chests on the western side is to [[warp]] a unit into the locked room from the starting position just above it. A [[Rogue]], [[Thief]], or [[Assassin]] with a [[lockpick]] would be ideal, as they would be able to unlock the door when they are finished opening the chests. They can then they can make their way south and stand against the interior wall, allowing you to get a better view of the large stairway where masses of enemies, and their master [[Riev]], are gathered. Beware that on Difficult the thieves that spawn here can actually roll high enough speed to steal from a base [[Rennac]] (on the Japanese version, where his base speed is lower, they don't even require a random roll) or even an early promoted [[Colm]], so if doing this you'll want to fill their inventory with weapons (which can't be stolen) and send the Speedwing to convoy.
+
+Be thoughtful about the unit that you place at the southern bottleneck. If you plan to clear the area and take out [[Riev]] you will need to strike a balance between killing enemy units quickly (aim for at least six units per turn) and making sure that your unit that is on their kill streak doesn't die due to an accumulation of chip damage. While there are a few [[Mage Knight]]s that spawn, most enemies will deal physical damage, so a unit with high [[defense]] is your safest bet. Some [[Pure Water]] or a [[ward|Ward Staff]] might be helpful here if your defensive unit does not have a lot of [[resistance]].
+
+Some of the units you positioned in the northwest should move east to take care of the reinforcements that spawn from the northeast. Be careful as there are several [[Sniper]]s that spawn from this direction, so flying units should carry a [[Fili Shield]] if they are to be used. The units that start in the throne room should clear the interior hallways of enemies before focusing on the bottleneck at the southern entrance. A small group of units can then be sent to the southeast interior to deal with the reinforcements that begin to spawn there on turn 9. [[Thief]]s carrying a [[lockpick]] will spawn on western and southeastern sides of the map on turn 6, and another thief will spawn on the southeastern side on turn 7. Be sure to have the chests emptied by then, or position your units accordingly to prevent their escape. The middle chest on the eastern side contains 5,000G so if that is stolen you will be unable to recover it.
+
+If you manage to keep at least six NPC units alive at the end of the chapter you'll receive a [[Light Brand]], which includes Mansel. The General next to Mansel is the easiest to keep alive thanks to his higher stats. This will largely be determining by your opening performance. The Knights on the eastern side of the map are generally easier to keep alive as they are further away from enemies at battle start. Just remember that [[General]]s and [[Warrior]]s will appear from the southeast corner near the end of the battle (turns 9 through 12), so you will need to station units there capable of dealing with them. Alternatively, you can rescue them using a mounted unit or use a [[Rescue (staff)|Rescue]] staff to bring them out of harm's reach. Keep in mind that the enemy will prioritize attacking the NPCs over your own units, and the NPCs will attack any enemy units that walk into their range, usually resulting in their death.
+
+====Filler units====
+This chapter has the highest deployment limit of any map so far, and only the following level has more slots. If playing without engaging in [[Skirmish]]es, this usually means you actually have more deployment slots than you have trained units. Since there's no enemy fliers, siege tomes, or [[Long Bow]]s present utility units with poor combat are relatively safe as long as you're aware of where reinforcements spawn. [[Saleh]], being able to contribute healing and [[Torch (staff)|Torch]] staff uses with the occasional 2 range hit, is an obvious choice if he's not already part of your team. [[Innes]] has plenty of positions where he can safely fire from 2 range, but beware that he can die from full HP if an enemy injures him and dies on the counter attack to allow a second hit. Deploying ''both'' [[Colm]] and [[Rennac]] allows quickly getting the chests on both sides, and can be repurposed as spotters once they're done. While an untrained [[Seth]] has fallen off at this point, he's still useful for dealing with the initial unprompted enemies and the enemy thiefs without wasting stronger units, as well as as a taxi. While [[Duessel]] will perform excellently on Easy or Normal mode, too many enemies on Difficult have enough speed to double him for him to be especially useful at base. An untrained [[Myrrh]] doesn't especially help, but she can pick up a few easy kills (and thus levels) on injured enemies in the top corridor without being a liability if the other units advance ahead of her afterwards. If promoted into a [[Summoner]], Knoll's phantoms provide useful distractions and scouting while he himself can provide some healing. Untrained cavaliers and fliers can function as taxis, but the utility of such is limited on this level.
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=Last Hope
+|jpn-name={{h|残されし希望|Nokosareshi kibō}}
+|jpn-mean=The hope that remains
+|fren-name=Dernier espoir
+|fren-mean=Last hope
+|ger-name=Letzte Hoffnung
+|ger-mean=Last Hope
+|ital-name=L'ultima speranza
+|ital-mean=The last hope
+|span-name=última esperanza
+|span-mean=last hope; likely lowercase due to font limitations.
+}}
+
+==Gallery==
+<gallery>
+Map fe08 rausten court.png|The chapter map.
+</gallery>
+
+{{ChapterNav
+|prechapter=Two Faces of Evil
+|nextchapter=Darkling Woods
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]
