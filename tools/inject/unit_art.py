@@ -323,6 +323,32 @@ def unit_bust(campaign, uid):
     return b.image()
 
 
+@functools.lru_cache(maxsize=None)
+def vanilla_slot_bust(slot):
+    """The vanilla face a character slot shows when no bust dresses it (Halvar wears Bazba's):
+    its tileset decoded to a 96x80 bust with the closed mouth laid on where portrait_data.c puts
+    it, in the slot's own palette. Read from the pristine submodule, or None for a faceless slot."""
+    from inject.decomp import _find_brace_block, vanilla_decomp_text
+    chars = vanilla_decomp_text('src/data_characters.c')
+    s, e = _find_brace_block(chars, '[CHARACTER_%s - 1]' % slot.upper().replace('CHARACTER_', ''),
+                             'src/data_characters.c')
+    m = re.search(r'\.portraitId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars[s:e])
+    if not m or int(m.group(1), 0) == 0:
+        return None
+    row = re.search(r'\{portrait_(\w+)_tileset,[^}]*?,\s*(\d+),\s*(\d+),\s*(\d+),[^}]*\},\s*//\s*%d\b'
+                    % (int(m.group(1), 0) - 1), vanilla_decomp_text('src/portrait_data.c'))
+    if not row:
+        return None
+    name, xmouth, ymouth = row.group(1), int(row.group(3)), int(row.group(4))
+    base = os.path.join(REPO, 'fireemblem8u', 'graphics', 'portrait', 'portrait_' + name)
+    bust = portrait_tool.decode(Image.open(base + '_tileset.png'))
+    mouth = Image.open(base + '_mouth.png').crop((0, 0, portrait_tool.MOUTH_W,
+                                                  portrait_tool.MOUTH_H))
+    bust.paste(mouth, (xmouth * 8, ymouth * 8))
+    bust.putpalette(_agbpal(base + '_palette.agbpal'))
+    return bust
+
+
 def dress_slot(slot, bust):
     """Overwrite one vanilla portrait slot with a bust: the four files every bust pass writes.
     Custom busts are static (no mouth flap, no blink) -- see portrait_tool.generate."""

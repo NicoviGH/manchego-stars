@@ -19,9 +19,12 @@ class LuaLiteral(unittest.TestCase):
         self.assertEqual('{ 0xCA, 0xC9 }', gen_symbols.lua_literal([0xCA, 0xC9]))
         self.assertEqual('{\n    [0xB0] = true,\n}', gen_symbols.lua_literal({0xB0: True}))
         self.assertEqual('{\n    ["prof-rbg"] = 0x05,\n}', gen_symbols.lua_literal({'prof-rbg': 5}))
+        # A string, quoted and escaped so Lua reads back exactly these characters (casthelp's
+        # expected help-text lines carry apostrophes; a quote or backslash must survive too).
+        self.assertEqual('"a \\"b\\" c\\\\"', gen_symbols.lua_literal('a "b" c\\'))
 
     def test_refuses_what_lua_would_misread(self):
-        for bad in (False, 'x', 1.5, None):
+        for bad in (False, 1.5, None):
             with self.assertRaises(TypeError):
                 gen_symbols.lua_literal(bad)
 

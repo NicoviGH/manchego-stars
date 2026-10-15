@@ -1213,6 +1213,18 @@ def aid_of(cls_enum, con):
             (20 - con if 'CA_FEMALE' in attrs else 25 - con))
 
 
+def boss_face(ed, files):
+    """The face a boss shows: the bust its `face:` names, else the vanilla face of the slot it
+    rides (Halvar rides Bazba's, and nothing dresses it), else None (the grell has none)."""
+    if ed.get('face'):
+        return files.portrait(ed['face'])
+    slot = inject.cast.ENEMY_BASE_SLOT.get(ed.get('id'))
+    bust = unit_art.vanilla_slot_bust(slot) if slot else None
+    if bust is None:
+        return None
+    return files.add('Portrait %s ms.png' % ed.get('id'), png_uri(bust, key_index0=True), 96, 80)
+
+
 def boss_modes(chap, ed, files, shifts=None, modes=None):
     """[(difficulty label, {{BossStats GBA}} data)] for one boss as the ROM loads it, one per
     difficulty, folded to ('All', ...) when no difficulty moves it. The chapter page's Boss
@@ -1226,7 +1238,7 @@ def boss_modes(chap, ed, files, shifts=None, modes=None):
     donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
              or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')))
     ranks = _ranks(cls_enum, donor)
-    port = files.portrait(ed['face']) if ed.get('face') else None
+    port = boss_face(ed, files)
     sprite_key = 'ms %s' % ed.get('id')
     files.sprite('Ma gba %s.gif' % sprite_key, sprite_frame(chap, token, uid=ed.get('id')))
     inv = [wiki_item(i, files) for i in ed.get('inventory') or []]
@@ -1524,7 +1536,7 @@ def boss_page(chap, ed, units, files):
     chapter page's own Boss data), and its quotes from the chapter's scenes."""
     name = ed.get('name')
     cls, _article = wiki_class(ed.get('class'))
-    port = files.portrait(ed['face']) if ed.get('face') else None
+    port = boss_face(ed, files)
     battle, death = _quotes(chap, name, units)
     battle, death = battle or ed.get('taunt'), death or ed.get('death_quote')
     title = chap.get('title', chap['_slug'])
@@ -1607,7 +1619,7 @@ def list_wikitext(chs, units, files):
             first = first_appearance(ed['name'], chs, units) or c
             if chs.index(first) > chs.index(c):
                 first = c
-            bosses.append((port(ed['face']) if ed.get('face') else 'N/A', ed['name'],
+            bosses.append(('[[File:%s|64x64px]]' % boss_face(ed, files) if boss_face(ed, files) else 'N/A', ed['name'],
                            cls_link(ed.get('class')), chapter_link(first), chapter_link(c)))
     others = []
     for stem in npc_stems(chs, units):
@@ -1849,15 +1861,18 @@ def css():
 
 
 # Ours, not the wiki's: one file holds every page, so the router shows one at a time; and the
-# site's wide-screen banner slot (15.25rem, an image from its servers) collapses to its own
-# narrow-screen margin, since the artifact viewer cannot load the image.
+# site's banner slot (#p-logo, over the 15.25rem the content leaves it) shows our title screen
+# where the Fire Emblem Wiki shows its logo, embedded since the viewer loads nothing remote.
+TITLE_SCREEN = os.path.join(TOOLS, 'wiki', 'assets', 'title-screen.png')
 PAGE_CSS = """
 /* jquery.makeCollapsible.styles (MediaWiki core; not in the vendored skin) */
 .mw-collapsible-toggle-default::before{content:'['}
 .mw-collapsible-toggle-default::after{content:']'}
 .mw-collapsible-toggle-default .mw-collapsible-text{cursor:pointer}
 section.page[hidden]{display:none!important}
-#mw-content-container{margin-top:3.5rem!important}
+.mw-wiki-logo.fallback{width:288px!important;height:192px;background-size:contain;
+  image-rendering:pixelated;border-radius:6px}
+#p-logo{transform:translate(-50%,26%)!important}
 """
 
 JS = """
@@ -1941,7 +1956,9 @@ def chrome(pages_html, chs):
         '<div id="content-bottom-stuff"><div id="catlinks" class="catlinks"><div id="mw-normal-'
         'catlinks" class="mw-normal-catlinks">Categories: <ul><li id="ms-cat"></li></ul></div></div>'
         '</div></div>'
-        '<div id="mw-site-navigation"><div id="site-navigation" class="sidebar-chunk"><h2><span>'
+        '<div id="mw-site-navigation"><div id="p-logo" class="mw-portlet" role="banner"><a class='
+        '"mw-wiki-logo fallback" href="#home" title="Visit the main page"></a></div>'
+        '<div id="site-navigation" class="sidebar-chunk"><h2><span>'
         'Navigation</span></h2><div class="sidebar-inner">'
         + portlet % ('p-navigation', 'Navigation', '', nav)
         + portlet % ('p-chapters', 'Chapters', '', chap_nav) + '</div></div></div>'
@@ -2006,9 +2023,10 @@ def build():
         print('wiki: %d file(s) no template could find: %s' % (
             len(wsite_.missing_files), ', '.join(sorted(wsite_.missing_files)[:12])))
     n_open = sum(len(v) for v in opens.values())
-    doc = ('<meta charset="utf-8"><title>Manchego Stars Wiki</title><style>%s\n%s</style>'
+    banner = '.mw-wiki-logo{background-image:url(%s)!important}' % png_uri(TITLE_SCREEN)
+    doc = ('<meta charset="utf-8"><title>Manchego Stars Wiki</title><style>%s\n%s\n%s</style>'
            '%s<script>%s</script>'
-           % (css(), PAGE_CSS, chrome(''.join(pages), chs), JS))
+           % (css(), PAGE_CSS, banner, chrome(''.join(pages), chs), JS))
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write(doc)

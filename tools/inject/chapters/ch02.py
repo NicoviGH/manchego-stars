@@ -215,8 +215,8 @@ def inject_ch02(campaign, verbose=True):
     each that survives gifts its charm (a Hand Axe, an Elixir) at the ending scene via CHECK_ALIVE
     -> GIVEITEMTO (per-unit soft-fail, no game over). The third, Glimmer, is the southern hut's
     inhabitant and hands over its Pure Water on the visit. Enemies are vanilla Ch2's exact mix,
-    reflavored chardalyn berserkers (still on the stock brigand sprite: no chardalyn reskin is
-    drawn yet). Reinforcements move to the empty table 088B4758 (088B4718 is now the chwinga).
+    reflavored chardalyn raiders on the stock brigand sprite: they are regular raiders (Nicolas,
+    2026-10-15). Reinforcements move to the empty table 088B4758 (088B4718 is now the chwinga).
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)

@@ -13,6 +13,9 @@
 id: sahnar
 name: Sahnar
 help_text: "A snow-elf princess who guarded a tomb for ages. A peerless duelist."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
+# She/her (Nicolas, 2026-10-15). Inert on a foot unit, as Basil's note says: both CA_FEMALE
+# readers gate on CA_MOUNTEDAID, and Swordmaster and Assassin are foot classes too.
+gender: female
 
 # LOCKED 2026-08-08 (Nicolas's red-pen on the draft).
 # The UNIVERSAL falls-in-battle quote (#6): chapter=0xFF, so it fires in every chapter.

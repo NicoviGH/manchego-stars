@@ -113,6 +113,8 @@ WANTED = [
     'gBmMapFog',                # u8** fog map (include/bmmap.h): non-zero = the player can SEE
                                 # that tile this turn. A red unit standing on a zero tile is not
                                 # drawn at all -- which looks exactly like a broken map sprite.
+    'sMsgString',               # struct MsgBuffer (src/msg.c): buffer1 (offset 0) holds the
+                                # text GetStringFromIndex last decoded (casthelp reads it)
     'sActiveMsg',               # int (src/msg.c): the message index GetStringFromIndex last
                                 # DECODED into its buffer. The only witness to WHICH message a
                                 # scene actually showed -- box counts cannot tell two arms of a
@@ -180,6 +182,9 @@ WANTED = [
                                 # draws the chapter title card (src/uichapterstatus.c)
     'gProcScr_SALLYCURSOR',     # proc script: the preparations screen
                                 # (src/prep_sallycursor.c; opened by event cmd 0x3E)
+    'StatScreen_OnIdle',        # the status screen's key handler (statscreen.c): R opens help, B leaves
+    'gProcScr_HelpBoxMoveCtrl', # proc script: the status screen's help box (statscreen.c)
+    'HbMoveCtrl_OnIdle',        # its key handler: the D-pad walks HelpBoxInfo.adj*, B or R closes
     'gProcScr_StatScreen',      # proc script: a unit's status screen (src/statscreen.c), the
                                 # only place FE8 draws a unit's 96x80 BUST beside its name,
                                 # class and stat line. `recordcast` gates its capture on this
@@ -342,7 +347,8 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     a second copy of a Python constant -- and each one a top-level local in a chunk that sits
     at Lua's 200-local ceiling. The cast's pid is its PORTRAIT_MAP slot, never its STAT_DONOR:
     the harness's own comments warned about that trap three times over."""
-    from inject.cast import _classed_cast, PORTRAIT_MAP
+    from inject.cast import _classed_cast, classed_cast, load_unit, PORTRAIT_MAP
+    from inject.text import help_text_body, slot_desc_text_id
     from inject.chapter_ids import (CH01_BOSS_SLOT, CH02_CHWINGA, CH04_MOOSE_PID, CH05_BOSS_PID,
                                     CH05_MOOSE_PID, CH06_BOAT_PIDS, PROLOGUE_HLIN_SLOT,
                                     PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
@@ -370,6 +376,13 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     slot_of = dict(CH02_CHWINGA)
     return {
         'CAST': cast,
+        # Each classed cast member's help text message: the slot's own descTextId, which the
+        # names pass writes (ADR 0346). `casthelp` asserts R on the name decodes exactly this.
+        'HELP_MSG': {uid: slot_desc_text_id(slot) for uid, slot, _c, _ in classed_cast(campaign)},
+        # ...and the first line that message decodes to, so `casthelp` reads the WORDS too: the
+        # slot's id is the same one vanilla used, and only the text tells ours from Eirika's.
+        'HELP_LINE1': {uid: help_text_body(load_unit(campaign, uid)['help_text']).split('[')[0]
+                       for uid, _s, _c, _ in classed_cast(campaign)},
         'LORD_CANDIDATES': len(lords),
         'LORDSEL_FLAG_BASE': LORDSEL_FLAG_BASE,
         'PROLOGUE': {'hlin': char(PROLOGUE_HLIN_SLOT), 'scramsax': char(PROLOGUE_SCRAMSAX_SLOT),
@@ -390,10 +403,12 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
 
 
 def lua_literal(value, indent=1):
-    """A Python dict/list/int/True as a Lua table constructor (keys sorted: a stable file)."""
+    """A Python dict/list/int/str/True as a Lua table constructor (keys sorted: a stable file)."""
     pad = '    ' * indent
     if value is True:
         return 'true'
+    if isinstance(value, str):
+        return '"%s"' % value.replace('\\', '\\\\').replace('"', '\\"')
     if isinstance(value, bool) or not isinstance(value, (dict, list, int)):
         raise TypeError('no Lua literal for %r' % (value,))
     if isinstance(value, int):

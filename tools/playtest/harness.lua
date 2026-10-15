@@ -460,6 +460,8 @@ local CALLBACK_NAMES = {
     [SYM.BattleForecast_LoopDisplay] = "battle_forecast_display",
     [SYM.sub_8091AEC] = "unit_list_input",
     [SYM.PrepItemSupply_Loop_GiveTakeKeyHandler] = "supply_input",
+    [SYM.StatScreen_OnIdle] = "stat_screen_input",
+    [SYM.HbMoveCtrl_OnIdle] = "help_box_input",
 }
 local PREP_CALLBACK_NAMES = {
     [SYM.PrepScreenMenu_OnStartPress] = "prep_main_fight",
@@ -672,6 +674,15 @@ local function observeController()
         }
     end
     put("supply_screen", observedProc(SYM.ProcScr_BmSupplyScreen))
+    put("stat_screen", observedProc(SYM.gProcScr_StatScreen))
+    local helpBox = observedProc(SYM.gProcScr_HelpBoxMoveCtrl)
+    put("help_box", helpBox)
+    if helpBox then
+        -- struct HelpBoxProc (statscreen.h): +0x2C is the HelpBoxInfo the box points at, whose
+        -- +0x08 is adjLeft -- the entry LEFT moves to, NULL where LEFT goes nowhere.
+        local info = ru32(helpBox.addr + 0x2C)
+        observation.help_box = { info = info, left = info ~= 0 and ru32(info + 0x08) ~= 0 }
+    end
     local unitList = observedProc(SYM.ProcScr_UnitListScreen_Field)
     put("unit_list", unitList)
     if unitList then
@@ -4769,6 +4780,65 @@ scenarios.recordcast = function()
     end
     return result("PASS", string.format(
         "%s: map sprite + status screen captured (pid 0x%02X at (%d,%d))", name, pid, u.x, u.y))
+end
+
+-- CASTHELP (ADR 0346): R on a cast member's name reads ITS OWN help text, never its slot's
+-- vanilla character's. A verdict on memory, so it runs headless: for every classed cast member
+-- on the TESTCH sandbox it opens the status screen (R), opens help (R, which lands on Str), steps
+-- LEFT onto the name/portrait entry (HbPopulate_SSCharacter fills it from the unit's descTextId)
+-- and asserts `sActiveMsg` is that unit's message AND that its decoded first line (sMsgString's
+-- buffer1) is the unit's own: the id alone is the one vanilla used. A member missing FAILs: a
+-- check that skipped the unit it could not find would pass on nothing.
+scenarios.casthelp = function()
+    if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
+    local names = {}
+    for name, _ in pairs(CAMPAIGN.HELP_MSG) do names[#names + 1] = name end
+    table.sort(names)
+    local bad = {}
+    local function now() return Controller.classify(observeController()) end
+    for _, name in ipairs(names) do
+        local want = CAMPAIGN.HELP_MSG[name]
+        local u = blue(CAMPAIGN.CAST[name])
+        if not u then
+            bad[#bad + 1] = name .. " not deployed"
+        elseif not cursorTo(u.x, u.y) then
+            bad[#bad + 1] = name .. " never under the cursor"
+        elseif not guardedInput("open_stat_screen", "R", "the status screen opens",
+                function() return now() == "stat_screen" end, 240) then
+            bad[#bad + 1] = name .. ": status screen never opened"
+        elseif not guardedInput("open_help", "R", "the help box opens",
+                function() return now() == "stat_screen_help" end, 120) then
+            bad[#bad + 1] = name .. ": help never opened"
+        elseif not guardedInput("help_left", "LEFT", "help moves onto the name",
+                function() return INSPECT.activeMsg() == want end, 120) then
+            bad[#bad + 1] = string.format("%s: help read MSG_%03X, want MSG_%03X",
+                name, INSPECT.activeMsg(), want)
+        else
+            local line, at = {}, SYM.sMsgString
+            while #line < 64 do
+                local b = ru8(at + #line)
+                if b < 0x20 then break end
+                line[#line + 1] = string.char(b)
+            end
+            line = table.concat(line)
+            if line ~= CAMPAIGN.HELP_LINE1[name] then
+                bad[#bad + 1] = string.format("%s: help reads %q, want %q",
+                    name, line, CAMPAIGN.HELP_LINE1[name])
+            end
+        end
+        -- Back to the map whatever happened, each step only where its state is live.
+        if now() == "stat_screen_help" then
+            guardedInput("close_help", "B", "the help box closes",
+                function() return now() == "stat_screen" end, 120)
+        end
+        if now() == "stat_screen" then
+            guardedInput("close_stat_screen", "B", "back on the map",
+                function() return now() == "player_map_idle" end, 240)
+        end
+    end
+    if #bad > 0 then return result("FAIL", table.concat(bad, "; ")) end
+    return result("PASS", string.format("%d cast members: R on the name reads their own help text",
+        #names))
 end
 
 -- RECORDRAVISIN (#19): the named ch05 boss is a raw CharacterData pid (0xB8), so she cannot

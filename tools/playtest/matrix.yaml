@@ -224,6 +224,8 @@ scenarios:
     kind: record        # a capture for a human look-test, same as recordanim -- not a machine
                         # verdict. Its PASS is still gated on gProcScr_StatScreen actually
                         # being live, so it cannot green-light a frame that never opened.
+  casthelp:                                            # ADR 0346: R on each cast name, headless
+    rom: testch
   ckpt_ch02start: {}
   ch03midmap:
     rom: ch03boot

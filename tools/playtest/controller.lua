@@ -293,6 +293,33 @@ local RULES = {
         end,
     },
     {
+        -- The status screen's help box (gProcScr_HelpBoxMoveCtrl), a blocking child of the
+        -- status screen: while it is up the status screen reads no keys, so it is checked
+        -- first. HbMoveCtrl_OnIdle walks HelpBoxInfo.adj* on the D-pad and closes on B or R.
+        name = "help_box",
+        check = function(observation)
+            if not proc(observation, "help_box") then return rejected("help_box proc absent") end
+            if not idleIs(observation, "help_box", "help_box_input") then
+                return matched("transition", string.format("help_box idle=%s, not its key handler",
+                    tostring(idleOf(observation, "help_box"))))
+            end
+            return matched("stat_screen_help", "help_box in its key handler")
+        end,
+    },
+    {
+        -- A unit's status screen (gProcScr_StatScreen), opened by R on a unit under the map
+        -- cursor. Above player_phase for the unit list's reason: the map is still underneath.
+        name = "stat_screen",
+        check = function(observation)
+            if not proc(observation, "stat_screen") then return rejected("stat_screen proc absent") end
+            if not idleIs(observation, "stat_screen", "stat_screen_input") then
+                return matched("transition", string.format("stat_screen idle=%s, not its key handler",
+                    tostring(idleOf(observation, "stat_screen"))))
+            end
+            return matched("stat_screen", "stat_screen in its key handler")
+        end,
+    },
+    {
         -- The in-map convoy (ProcScr_BmSupplyScreen), opened by the unit menu's Supply
         -- command. Above player_phase for the same reason as the unit list: the map is still
         -- underneath it, and answering `player_map_idle` here offers cursor moves that go
@@ -617,6 +644,16 @@ function M.legalActions(observation)
         add(actions, "cancel_pick", "B", "prep_units.on_b")
     elseif state == "supply_screen" then
         add(actions, "close_supply", "B", "supply_screen.on_b")
+    elseif state == "stat_screen" then
+        -- StatScreen_OnIdle: R starts the help box (StartStatScreenHelp, on Str on page 1), B
+        -- leaves. Page turns are not offered: nothing needs them yet.
+        add(actions, "open_help", "R", "stat_screen.on_r")
+        add(actions, "close_stat_screen", "B", "stat_screen.on_b")
+    elseif state == "stat_screen_help" then
+        if observation.help_box and observation.help_box.left then
+            add(actions, "help_left", "LEFT", "help_box.adjLeft")
+        end
+        add(actions, "close_help", "B", "help_box.on_b")
     elseif state == "unit_list_screen" then
         -- sub_809144C (unitlistscreen.c): DOWN/UP walk the roster, LEFT/RIGHT change page, A
         -- opens the highlighted unit's stat screen, B leaves. The roster index it moves is
@@ -705,6 +742,11 @@ function M.legalActions(observation)
                 add(actions, "select_unit", "A", "map.cursor.blue_unit")
             elseif observation.cursor.unit_select_kind == "no_control" then
                 add(actions, "inspect_unit", "A", "map.cursor.no_control_unit")
+            end
+            -- PlayerPhase_MainIdle opens the status screen on R for any unit under the cursor.
+            if observation.cursor.unit_select_kind == "control"
+                or observation.cursor.unit_select_kind == "no_control" then
+                add(actions, "open_stat_screen", "R", "map.cursor.on_unit")
             end
         end
     elseif state == "unit_selected" then
