@@ -1,5 +1,8 @@
 # Handoff - Manchego Stars live state
 
+**Read this from main** (`git show main:HANDOFF.md`): on a feature branch this file is the copy
+from when the branch was cut, and may be days old.
+
 `HANDOFF.md` is live state only: where the tree is, what is in flight, what is owed, what to do
 next. **Settled decisions live in `docs/decisions.md`** — if a thing is decided, it belongs there
 and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and backlog

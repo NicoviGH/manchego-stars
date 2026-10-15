@@ -39,7 +39,10 @@ silent, ask; don't infer it from the ROM.
 
 Read these at the top of every session before touching code:
 1. `AGENTS.md` (this file)
-2. `HANDOFF.md` (project root, if it exists) — most recent session's state, blockers, and next steps
+2. **`git show main:HANDOFF.md`** — most recent session's state, blockers, and next steps. Read
+   main's copy, never the working tree's: a feature branch carries the snapshot from when it was
+   cut, and the guard only stops a branch from EDITING it (a session opened on #487 read a day-old
+   copy, 2026-10-15).
 3. `docs/decisions.md` — the INDEX of settled decisions (283 of them, one file each under
    `docs/decisions/`). Read the index, then open the two or three your task needs. Do not
    re-litigate what is in there. It was a single 728 KB file until #384 — ~197,000 tokens,
