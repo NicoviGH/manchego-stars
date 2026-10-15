@@ -7,6 +7,7 @@ name: "Prof. R.B. Geenius"
 death_quote: "Ah... discheesed at last. ...Be Gouda, Pinky."  # falls-in-battle quote (#6 dialogue pass; lore/prof-rbg.md)
 lord_pitch: "Archer -- deadly to fliers, but helpless up close."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 fe_name: "Prof. RBG"                      # FE8 name buffer is <=12 chars; full name overflows it
+help_text: "An underfolk artificer and ex-mobster. He always has a plan, and a pun."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 portrait_ref: portraits/prof-rbg.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/prof-rbg.jpg
 # Portrait source: https://www.dndbeyond.com/avatars/34221/708/1581111423-57759993.jpeg

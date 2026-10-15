@@ -11,6 +11,7 @@
 id: trex
 name: Trex
 fe_name: Trex                            # already short; explicit for the <=12-char name buffer
+help_text: "A kobold leader who taught himself Common from a miner's ledgers."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 # Falls-in-battle quote (#6 dialogue pass; lore/trex.md). Self-taught eloquent diplomat to
 # the last -- negotiator's diction ("trade", "term"), dignity over groveling, and the mask of
 # eloquence slipping to his one real subject: the warren's survival.

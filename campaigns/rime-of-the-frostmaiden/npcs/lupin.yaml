@@ -16,6 +16,7 @@
 
 id: lupin
 name: Lupin
+help_text: "The leader of an awakened direwolf pack. He bargains hard, in spectacles."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 # Provisional death line (blunt pack-pragmatist voice); finalized in the Stage-4 ch04 dialogue-pass.
 death_quote: "The pack... runs on without me. See them to the far side -- that was the whole of the bargain."
 

@@ -12,6 +12,7 @@
 
 id: sahnar
 name: Sahnar
+help_text: "A snow-elf princess who guarded a tomb for ages. A peerless duelist."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 
 # LOCKED 2026-08-08 (Nicolas's red-pen on the draft).
 # The UNIVERSAL falls-in-battle quote (#6): chapter=0xFF, so it fires in every chapter.

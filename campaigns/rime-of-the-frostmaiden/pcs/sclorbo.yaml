@@ -5,6 +5,7 @@
 
 id: sclorbo
 name: Sclorbo
+help_text: "A chwinga bard who never speaks. He lends courage to anyone in need."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 death_quote: "(Sclorbo's glow dims -- one last wave of courage, then still.)"  # falls-in-battle quote (#6); impression text, never speaks (lore/sclorbo.md)
 lord_pitch: "Healer -- mends allies, deals no damage; guard him."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/sclorbo.png     # GBA-ready sprite pending (issue #23)

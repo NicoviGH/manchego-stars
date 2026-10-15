@@ -11,6 +11,7 @@
 
 id: baxby
 name: Baxby
+help_text: "An axe beak who hauls the party's sled. Strong, steady, and loyal."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 # fe_name not needed — "Baxby" is 5 chars, well under FE8's 12-char name buffer.
 # Falls-in-battle quote (#6). Register from his ch01-ending recruit lines (ch01 YAML):
 # a gruff, dignified veteran teamster — "honest terms / hauled freight over this ice" —

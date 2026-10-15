@@ -5,15 +5,17 @@ import re
 import sys
 
 from yaml_loader import yaml_load
-from inject.cast import load_unit, PORTRAIT_MAP, RAW_PID_PORTRAITS
+from inject.cast import class_enum_for, load_unit, PORTRAIT_MAP, RAW_PID_PORTRAITS
 from inject.decomp import REPO
 from inject.paths import ITEMS_C, TEXTS_TXT
 from inject.text import (
-    display_name, name_message_body, raw_pid_name_text_id, set_message_body, vanilla_name_text_id)
+    display_name, name_message_body, raw_pid_name_text_id, set_message_body, vanilla_name_text_id,
+    write_help_text)
 
 
 def inject_names(campaign, verbose=True):
-    """Write each cast member's display name into its vanilla slot's name message."""
+    """Write each cast member's display name into its vanilla slot's name message, and its
+    `help_text:` into the slot's description message."""
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
     for unit_id, slot in PORTRAIT_MAP.items():
@@ -24,6 +26,13 @@ def inject_names(campaign, verbose=True):
         set_message_body(lines, text_id, name_message_body(name))
         if verbose:
             print('  %-10s -> MSG_%03X (was %s): %s' % (unit_id, text_id, slot, name))
+        # A classed cast member is selectable, so R on its name must read its own help text,
+        # never the slot's vanilla character's (#493).
+        if unit.get('help_text'):
+            write_help_text(lines, slot, unit)
+        elif class_enum_for(unit) is not None:
+            sys.exit('ERROR: %s has no help_text: R on its name would read %s\'s vanilla '
+                     'description' % (unit_id, slot))
     for _pid, (unit_id, slot, _portrait_id, name) in sorted(RAW_PID_PORTRAITS.items()):
         text_id = raw_pid_name_text_id(slot)
         appended = isinstance(slot, int)   # an id the build allocated (inject/message_alloc.py)

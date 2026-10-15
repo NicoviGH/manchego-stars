@@ -5,6 +5,7 @@
 
 id: rootis
 name: Rootis
+help_text: "A snowperson sorcerer of dragon blood. Kind, and fond of a mystery."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 death_quote: "Oh... this is the melting part. ...It was warm, with you."  # falls-in-battle quote (#6 dialogue pass; lore/rootis.md)
 lord_pitch: "Anima mage -- reliable ranged magic, but frail."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/rootis.png      # GBA-ready sprite pending (issue #23)

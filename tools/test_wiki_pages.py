@@ -215,6 +215,11 @@ class CharacterLayout(unittest.TestCase):
                       self.pages['The White Moose'])
         self.assertNotIn('Brie', self.pages)          # a map ballista, not a character
 
+    def test_the_help_text_under_the_artwork_is_the_units_own(self):
+        text = self.pages['Braulo']
+        self.assertIn('|help_text=A hermit crab merchant from the sea floor.', text)
+        self.assertNotIn('princess', text)
+
     def test_personality_is_the_lore_profile_verbatim(self):
         name, profile = gen_wiki.lore_profiles()['braulo']
         self.assertIn('==Personality==\n' + profile, self.pages['Braulo'])

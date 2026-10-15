@@ -17,6 +17,7 @@
 
 id: basil
 name: Basil
+help_text: "A goodberry shrub, once Ravisin's. She feeds and heals the party."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 
 # LOCKED 2026-08-16 (Nicolas): Basil has ONE death quote and this is it.
 # It fires in every chapter (#6, chapter=0xFF). A second, ch05-only box was written and wired

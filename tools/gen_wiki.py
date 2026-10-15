@@ -1467,7 +1467,7 @@ def cast_page(uid, units, chs, files):
     g = inject.stats.cast_growths(uid)
     ranks = _ranks(cls_enum, inject.stats.STAT_DONOR.get(uid))
     recruit, role = _join_lines(uid, name, joins, units)
-    help_text = inject.text.slot_help_text(inject.cast.PORTRAIT_MAP[uid])
+    help_text = inject.text.slot_help_text(inject.cast.PORTRAIT_MAP[uid], unit)
     race = (unit.get('dnd') or {}).get('race')
     art = hd_art(uid, units)
     artwork = None
