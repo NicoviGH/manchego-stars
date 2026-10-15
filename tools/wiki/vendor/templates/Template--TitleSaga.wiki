@@ -1,0 +1,1 @@
+''[[{{#switch:{{{1|}}}|Yutona Heroes War Chronicles=TearRing Saga|Berwick Saga=TearRing Saga Series|War of the Scions=Vestaria Saga I|The Sacred Sword of Silvanister=Vestaria Saga II| Lucca Gaiden | Chronicles of the Norden Civil War=Vestaria Saga Gaiden}}: {{{1}}}|<span style="{{{2|}}}">{{{1}}}</span>]]''<noinclude>[[Category:Formatting templates]]</noinclude>

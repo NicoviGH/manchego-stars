@@ -1,0 +1,30 @@
+{| style="border-spacing: 3px; margin: auto; border-radius: 10px; background: {{Color3}}; border: 3px solid {{Color2}}; text-align: center" class="cellpadding-3 pixel-art"
+|
+{| style="border-spacing: 1px; border-radius: 10px;; background: {{Color1}}; border: 3px solid {{Color2}}"
+| style="width: 100px" rowspan="2" |{{{portrait|[[File:Portrait lyn fe07.png]]}}}<br>'''{{{character|{{PAGENAME}}}}}'''<br>[[{{{class|Lord}}}]]<br>[[File:Is gba {{{affin|wind}}}affin.png|link={{{affin|Wind}}} (affinity)]]
+| style="width: 80px; border: 1px solid {{Color2}}; background: {{Color3}}" | {{{port1|[[File:Small portrait lilina fe06.png]]}}}<br >'''[[{{{support1}}}]]'''<br>[[{{{class1|Mage}}}]] [[File:Is gba {{{affin1|light}}}affin.png|link={{{affin1|Light}}} (affinity)]]
+| style="width: 60px; background: {{Color3}}" | <small>''Initial'':</small> {{{initialpoints1}}}<br><small>''Per turn''</small>:{{{plus1|+}}}
+| style="width: 80px; border: 1px solid {{Color2}}; background: {{Color3}}" | {{{port3|[[File:Small portrait lilina fe06.png]]}}}<br>'''[[{{{support3}}}]]'''<br>[[{{{class3|Mage}}}]] [[File:Is gba {{{affin3|dark}}}affin.png|link={{{affin3|Dark}}} (affinity)]]
+| style="width: 80px; background: {{Color3}}" | <small>''Initial'':</small> {{{initialpoints3}}}<br><small>''Per turn''</small>:{{{plus3|+}}}
+| style="{{#ifexpr: {{{supports|0}}} < 5|display: none;}} width: 80px; border: 1px solid {{Color2}}; background: {{Color3}}" | {{{port5|}}}<br>'''[[{{{support5}}}]]'''<br>[[{{{class5|}}}]] [[File:Is gba {{{affin5}}}affin.png|link={{{affin5}}} (affinity)]]
+| style="{{#ifexpr: {{{supports|0}}} < 5|display: none;}} width: 60px; background: {{Color3}}" | <small>''Initial'':</small> {{{initialpoints5}}}<br><small>''Per turn''</small>:{{{plus5|+}}}
+| style="{{#ifexpr: {{{supports|0}}} < 7|display: none;}} width: 80px; border: 1px solid {{Color2}}; background: {{Color3}}" | {{{port7|}}}<br>'''[[{{{support7}}}]]'''<br>[[{{{class7|}}}]] [[File:Is gba {{{affin7}}}affin.png|link={{{affin7}}} (affinity)]]
+| style="{{#ifexpr: {{{supports|0}}} < 7|display: none;}} width: 60px; background: {{Color3}}" | <small>''Initial'':</small> {{{initialpoints7}}}<br><small>''Per turn''</small>:{{{plus7|+}}}
+| style="{{#ifexpr: {{{supports|0}}} < 9|display: none;}} width: 80px; border: 1px solid {{Color2}}; background: {{Color3}}" | {{{port9|}}}<br>'''[[{{{support9}}}]]'''<br>[[{{{class9|}}}]] [[File:Is gba {{{affin9}}}affin.png|link={{{affin9}}} (affinity)]]
+| style="{{#ifexpr: {{{supports|0}}} < 9|display: none;}} width: 80px; background: {{Color3}}" | <small>''Initial'':</small> {{{initialpoints9}}}<br><small>''Per turn''</small>:{{{plus9|+}}}
+|- style="background: {{Color3}}"
+| {{{port2|[[File:Small portrait lilina fe06.png]]}}}<br>'''[[{{{support2}}}]]'''<br>[[{{{class2|Mage}}}]] [[File:Is gba {{{affin2|wind}}}affin.png|link={{{affin2|Wind}}} (affinity)]]
+| style="border: 1px solid {{Color2}}" | <small>''Initial'':</small> {{{initialpoints2}}}<br><small>''Per turn''</small>:{{{plus2|+}}}
+| style="{{#ifexpr: {{{supports|0}}} < 4|display: none;}}" | {{{port4|}}}<br>'''[[{{{support4}}}]]'''<br>[[{{{class4|}}}]] [[File:Is gba {{{affin4}}}affin.png|link={{{affin4}}} (affinity)]]
+| style="{{#ifexpr: {{{supports|0}}} < 4|display: none;}} border: 1px solid {{Color2}}" | <small>''Initial'':</small> {{{initialpoints4}}}<br><small>''Per turn''</small>:{{{plus4|+}}}
+| style="{{#ifexpr: {{{supports|0}}} < 6|display: none;}}" | {{{port6|}}}<br>'''[[{{{support6}}}]]'''<br>[[{{{class6|}}}]] [[File:Is gba {{{affin6}}}affin.png|link={{{affin6}}} (affinity)]]
+| style="{{#ifexpr: {{{supports|0}}} < 6|display: none;}} border: 1px solid {{Color2}}" | <small>''Initial'':</small> {{{initialpoints6}}}<br><small>''Per turn''</small>:{{{plus6|+}}}
+| style="{{#ifexpr: {{{supports|0}}} < 8|display: none;}}" | {{{port8|}}}<br>'''[[{{{support8}}}]]'''<br>[[{{{class8|}}}]] [[File:Is gba {{{affin8}}}affin.png|link={{{affin8}}} (affinity)]]
+| style="{{#ifexpr: {{{supports|0}}} < 8|display: none;}} border: 1px solid {{Color2}}" | <small>''Initial'':</small> {{{initialpoints8}}}<br><small>''Per turn''</small>:{{{plus8|+}}}
+| style="{{#ifexpr: {{{supports|0}}} < 10|display: none;}}" | {{{port10|}}}<br>'''[[{{{support10}}}]]'''<br>[[{{{class10|}}}]] [[File:Is gba {{{affin10}}}affin.png|link={{{affin10}}} (affinity)]]
+| style="{{#ifexpr: {{{supports|0}}} < 10|display: none;}} border: 1px solid {{Color2}}" | <small>''Initial'':</small> {{{initialpoints10}}}<br><small>''Per turn''</small>:{{{plus10|+}}}
+|}
+|}
+<div style="font-size: smaller; text-align: center">See {{sect|Support|GBA games}} for more details on supports.</div><noinclude>
+
+{{doc}}</noinclude>

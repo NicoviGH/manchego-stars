@@ -1,0 +1,1 @@
+{{color|#c2191f|[Activate]}}<noinclude><br />This is to properly format {{TCGCipher}} skill descriptions, for skills which can be activated only in its player's Action Phase ({{color|#c2191f|起動}}). To use type:  '''<nowiki>{{CipherActivate}}</nowiki>''' [[Category:TCG templates]]</noinclude>

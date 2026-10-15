@@ -1,0 +1,5 @@
+{| style="margin: 0.9em auto 0.8em; text-align: center; border-radius: 14px; border: 3px solid {{Color2}}; background: {{Color3}}; padding: 4px"
+| style="width:calc(100%/3)" | {{#if: {{{prechapter|}}} | ←&nbsp;[[{{{prechapter}}}]]&nbsp;• }}{{#if:{{{prealternate|}}} | <br>←&nbsp;[[{{{prealternate}}}]]&nbsp;• }}{{#if:{{{prealternate2|}}} | <br>←&nbsp;[[{{{prealternate2}}}]]&nbsp;• }}{{#if:{{{prealternate3|}}} | <br>←&nbsp;[[{{{prealternate3}}}]]&nbsp;• }}{{#if:{{{prealternate4|}}} | <br>←&nbsp;[[{{{prealternate4}}}]]&nbsp;• }}
+! style="width:calc(100%/3)" |  {{{name|{{PAGENAME}}}}}
+| style="width:calc(100%/3)" | {{#if:{{{nextchapter|}}} | •&nbsp;[[{{{nextchapter}}}]]&nbsp;→ }}{{#if:{{{nextalternate|}}} | <br>•&nbsp;[[{{{nextalternate}}}]]&nbsp;→ }}{{#if:{{{nextalternate2|}}} | <br>•&nbsp;[[{{{nextalternate2}}}]]&nbsp;→ }}{{#if:{{{nextalternate3|}}} | <br>•&nbsp;[[{{{nextalternate3}}}]]&nbsp;→ }} {{#if:{{{nextalternate4|}}} | <br>•&nbsp;[[{{{nextalternate4}}}]]&nbsp;→ }}
+|}<noinclude>{{doc}}</noinclude>

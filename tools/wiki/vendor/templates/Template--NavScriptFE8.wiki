@@ -1,0 +1,19 @@
+{| class="mw-collapsible mw-collapsed navbox" style="--navbox-color: #54265f"
+! [[:Category:Scripts of Fire Emblem: The Sacred Stones|Scripts of ''Fire Emblem: The Sacred Stones'']]
+|-
+|
+{|
+! class="roundtl" style="width: 10%" rowspan="3" | [[List of chapters in Fire Emblem: The Sacred Stones|Chapters]]
+! style="width: 10%" class="roundtr" | Pre-split
+| {{abbr|P|Prologue}}: [[The Fall of Renais/Script|The Fall of Renais]] • 1: [[Escape!/Script|Escape!]] • 2: [[The Protected/Script|The Protected]] • 3: [[The Bandits of Borgo/Script|The Bandits of Borgo]] • 4: [[Ancient Horrors/Script|Ancient Horrors]] • 5: [[The Empire's Reach/Script|The Empire's Reach]] • 5x: [[Unbroken Heart/Script|Unbroken Heart]] • 6: [[Victims of War/Script|Victims of War]] • 7: [[Waterside Renvall/Script|Waterside Renvall]] • 8: [[It's a Trap!/Script|It's a Trap!]] • [[A New Journey/Script|A New Journey]]
+|-
+! Eirika's Route
+| 9: [[Distant Blade/Script|Distant Blade]] • 10: [[Revolt at Carcino/Script|Revolt at Carcino]] • 11: [[Creeping Darkness/Script|Creeping Darkness]] • 12: [[Village of Silence/Script|Village of Silence]] • 13: [[Hamill Canyon/Script|Hamill Canyon]] • 14: [[Queen of White Dunes/Script|Queen of White Dunes]] • 15: [[Scorched Sand/Script (Eirika)|Scorched Sand]] • 16: [[Ruled by Madness/Script (Eirika)|Ruled by Madness]] • 17: [[River of Regrets/Script (Eirika)|River of Regrets]] • 18: [[Two Faces of Evil/Script (Eirika)|Two Faces of Evil]] • 19: [[Last Hope/Script (Eirika)|Last Hope]] • 20: [[Darkling Woods/Script (Eirika)|Darkling Woods]] • Final: Sacred Stone ([[Sacred Stone (part 1)/Script (Eirika)|part 1]] • [[Sacred Stone (part 2)/Script (Eirika)|part 2]])
+|-
+! Ephraim's Route
+| 9: [[Fort Rigwald/Script|Fort Rigwald]] • 10: [[Turning Traitor/Script|Turning Traitor]] • 11: [[Phantom Ship/Script|Phantom Ship]] • 12: [[Landing at Taizel/Script|Landing at Taizel]] • 13: [[Fluorspar's Oath/Script|Fluorspar's Oath]] • 14: [[Father and Son/Script|Father and Son]] • 15: [[Scorched Sand/Script (Ephraim)|Scorched Sand]] • 16: [[Ruled by Madness/Script (Ephraim)|Ruled by Madness]] • 17: [[River of Regrets/Script (Ephraim)|River of Regrets]] • 18: [[Two Faces of Evil/Script (Ephraim)|Two Faces of Evil]] • 19: [[Last Hope/Script (Ephraim)|Last Hope]] • 20: [[Darkling Woods/Script (Ephraim)|Darkling Woods]] • Final: Sacred Stone ([[Sacred Stone (part 1)/Script (Ephraim)|part 1]] • [[Sacred Stone (part 2)/Script (Ephraim)|part 2]])
+|-
+! class="roundb" colspan="2" | Supports
+| [[Amelia/Supports|Amelia]] • [[Artur/Supports|Artur]] • [[Colm/Supports|Colm]] • [[Cormag/Supports|Cormag]] • [[Dozla/Supports|Dozla]] • [[Duessel/Supports|Duessel]] • [[Eirika/Supports|Eirika]] • [[Ephraim/Supports|Ephraim]] • [[Ewan/Supports|Ewan]] • [[Forde/Supports|Forde]] • [[Franz/Supports|Franz]] • [[Garcia/Supports|Garcia]] • [[Gerik/Supports|Gerik]] • [[Gilliam/Supports|Gilliam]] • [[Innes/Supports|Innes]] • [[Joshua/Supports|Joshua]] • [[Knoll/Supports|Knoll]] • [[Kyle/Supports|Kyle]] • [[L'Arachel/Supports|L'Arachel]] • [[Lute/Supports|Lute]] • [[Marisa/Supports|Marisa]] • [[Moulder/Supports|Moulder]] • [[Myrrh/Supports|Myrrh]] • [[Natasha/Supports|Natasha]] • [[Neimi/Supports|Neimi]] • [[Rennac/Supports|Rennac]] • [[Ross/Supports|Ross]] • [[Saleh/Supports|Saleh]] • [[Seth/Supports|Seth]] • [[Syrene/Supports|Syrene]] • [[Tana/Supports|Tana]] • [[Tethys/Supports|Tethys]] • [[Vanessa/Supports|Vanessa]]
+|}
+|}<noinclude>[[Category:Navigation templates|ScriptFE8]]</noinclude>

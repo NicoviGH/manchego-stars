@@ -1,0 +1,43 @@
+{| class="round width-40" style="margin: auto; border: 1px solid {{Color2}}; background: {{Color3}}; text-align: center"
+| colspan="5" |
+{|class="round" style="border: 1px solid {{Color2}}; background: {{Color1}}; width: 100%; margin: auto; font-size: larger"
+! Chapter Data
+|}
+|-
+|style="width:47%"|
+{| class="round" style="border: 1px solid {{Color2}}; background: {{Color1}}; width: 100%; margin: auto; font-size: larger"
+! Conditions
+|}
+| colspan="4" style="width:53%" |
+{| class="round" style="border: 1px solid {{Color2}}; background: {{Color1}}; width: 100%; margin: auto; font-size: larger"
+! Unit Data
+|}
+|-
+| '''Victory:''' {{{victory}}}
+! class="roundtl" style="border: 1px solid {{Color2}}; background: #3850e0" | Player
+! style="border: 1px solid {{Color2}}; background: #f8f840; color: #444; {{#if:{{{partner|}}}||display: none}}" | Partner
+! style="border: 1px solid {{Color2}}; background: #089000; {{#if:{{{other|}}}||display: none}}" | Other
+! class="{{#if: {{{third|}}}||roundtr}}" style="border: 1px solid {{Color2}}; background: #a83028" | Enemy
+! class="roundtr" style="border: 1px solid {{Color2}}; background: #f8f840; color: #444; {{#if:{{{third|}}}||display:none}}" | Third
+|-
+| '''Defeat:''' {{{defeat}}}
+| class="roundbl" style="border: 1px solid {{Color2}}; background: #3850e0" | {{{ally}}}
+| style="border: 1px solid {{Color2}}; background: #f8f840; color: black; {{#if:{{{partner|}}}||display: none}}" | {{{partner}}}
+| style="border: 1px solid {{Color2}}; background: #089000; {{#if:{{{other|}}}||display: none}}" | {{{other}}}
+| class="{{#if: {{{third|}}}||roundbr}}" style="border: 1px solid {{Color2}}; background: #a83028" | {{{enemy}}}
+| class="roundbr" style="border: 1px solid {{Color2}}; background: #f8f840; color: black; {{#if:{{{third|}}}||display: none}}" | {{{third}}}
+|-
+{{#if: {{{map|}}}|
+{{!}} colspan="5" {{!}}
+{{(!}} style="margin: auto; border: 1px solid {{Color2}}"
+{{!}} class="table-image-responsive-shrink" {{!}} {{{map}}}
+{{!)}}
+}}
+|-
+{{#if: {{{col|}}}|
+{{!}} colspan="5" {{!}} '''Map dimensions:'''<br>{{{col}}} columns by {{{row}}} rows
+}}
+|-
+| colspan="5" | {{#if: {{{mapdesign|}}}|'''Map based from''': {{{mapdesign}}}<br>}}{{#if: {{{mapmusic|}}}|'''Map phase music:''' {{{mapmusic}}}<br>}}{{#if: {{{battlemusic|}}}|'''Battle phase music:''' {{{battlemusic}}}}}
+|}<noinclude>
+{{doc}}</noinclude>

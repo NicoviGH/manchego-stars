@@ -1,0 +1,5 @@
+<div style="border-top:solid 2px #ddd; border-bottom:solid 2px #ddd">
+{|
+|'''This section details unofficial strategies that may help with completion of the chapter. This may not work for everybody.'''
+|}
+</div><noinclude>[[Category:Notice templates]]</noinclude>

@@ -1,0 +1,8 @@
+<noinclude>{|
+</noinclude>|-
+|{{{1|Portrait}}}
+|[[{{{2|Name}}}]]
+|{{{3|Class}}}
+|{{{4|Appears}}}
+|{{{5|Joins}}}<noinclude>
+|} [[Category:Character list templates]]</noinclude>

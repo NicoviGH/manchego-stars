@@ -1,0 +1,69 @@
+<noinclude>{| class="round" style="border: 2px solid {{Color2}}; background: {{Color3}}; font-weight: bold; text-align: center; margin: auto"
+|- style="background: {{color1}}"
+| rowspan="2" style="border-top-left-radius: 15px; border: 1px solid {{Color2}}" | Character
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[The Fall of Renais|P]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Escape!|1]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[The Protected|2]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[The Bandits of Borgo|3]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Ancient Horrors|4]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[The Empire's Reach|5]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Unbroken Heart|5x]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Victims of War|6]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Waterside Renvall|7]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[It's a Trap!|8]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Distant Blade|9]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Revolt at Carcino|10]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Creeping Darkness|11]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Village of Silence|12]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Hamill Canyon|13]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Queen of White Dunes|14]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Scorched Sand|15]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Ruled by Madness|16]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[River of Regrets|17]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Two Faces of Evil|18]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Last Hope|19]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Darkling Woods|20]]
+| colspan="2" style="border-top-right-radius: 15px; border: 1px solid {{Color2}}" | Endgame
+
+|- style="background: {{color1}}"
+| style="border: 1px solid {{Color2}}; width: 15px" | [[Sacred Stone (part 1)|1]]
+| style="border: 1px solid {{Color2}}; width: 15px" | [[Sacred Stone (part 2)|2]]
+</noinclude>|-
+| style="{{#ifeq: {{{last|}}}|y|border-bottom-left-radius: 15px;|}} background: {{color1}}; border: 1px solid {{Color2}}" | [[{{{Name}}}]]
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{P|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{P|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{1|}}}| R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{1|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{2|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{2|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{3|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{3|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{4|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{4|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{5|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{5|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{5x|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{5x|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{6|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{6|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{7|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{7|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{8|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{8|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{9|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{9|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{10|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{10|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{11|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{11|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{12|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{12|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{13|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{13|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{14|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{14|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{15|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{15|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{16|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{16|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{17|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{17|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{18|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{18|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{19|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{19|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{20|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{20|}}}
+| style="border: 1px solid {{Color2}}; background: #{{#switch: {{{E-1|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{E-1|}}}
+| style="{{#ifeq: {{{last|}}}|y|border-bottom-right-radius: 15px;|}} border: 1px solid {{Color2}}; background: #{{#switch: {{{E-2|}}} | R|A|F = 3850e0 | E = a83028 | {{Color3}}}}" | {{{E-2|}}}<noinclude>
+|-
+| style="font-weight: normal; font-size: smaller; list-style: inside" colspan="25" |
+<div class="round" style="border: 1px solid {{Color2}}; background: {{Color1}}; font-weight: bold">Legend</div>
+{{div col|2}}
+*R: Required for deployment
+*A: Available for deployment
+*E: Appears as an enemy unit
+*F: Joins after {{h|map start|Prologue to Chapter&nbsp;3}} / {{h|preparations|Chapter&nbsp;4 onwards}}
+{{div col end}}
+|}
+
+{{DEFAULTSORT:FE08 Availability Cell}}
+[[Category:Stat templates]]</noinclude>

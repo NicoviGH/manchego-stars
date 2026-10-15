@@ -1,0 +1,4 @@
+[[File:GBARankSword.gif|link=Sword|Swords|class=pixel-art]]<noinclude>{{clear}}
+For weapon level stats in article pages. It's easier than having to remember the whole title of the file!
+[[Category:GBA weapon level templates]]
+</noinclude>

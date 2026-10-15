@@ -1,0 +1,7 @@
+{| class="cellpadding-3 sortable basic width-70 {{{class|}}}"
+!class="round" style="border: 1px solid {{Color2}}; background-color: transparent"|Portrait
+!class="round" style="border: 1px solid {{Color2}}; background-color: transparent"|Name
+!class="round" style="border: 1px solid {{Color2}}; background-color: transparent"|Class
+!class="round" style="border: 1px solid {{Color2}}; background-color: transparent"|First appears in
+!class="round" style="border: 1px solid {{Color2}}; background-color: transparent"|Fought in<noinclude>
+|} [[Category:Character list templates]]</noinclude>

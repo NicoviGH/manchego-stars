@@ -1,0 +1,11 @@
+{{#if:{{{ACB|}}}|<small>[[Wikipedia:Australian Classification Board|ACB]]:</small> {{{ACB}}}<br />}}{{
+  #if:{{{CERO|}}}|<small>[[Wikipedia:Computer Entertainment Rating Organization|CERO]]:</small> {{{CERO}}}<br />}}{{
+  #if:{{{ESRB|}}}|<small>[[Wikipedia:Entertainment Software Rating Board|ESRB]]:</small> {{{ESRB}}}<br />}}{{
+  #if:{{{OFLC|}}}|<small>[[Wikipedia:Australian Classification Board|OFLC]]:</small> {{{OFLC}}}<br />}}{{
+  #if:{{{PEGI|}}}|<small>[[Wikipedia:Pan European Game Information|PEGI]]:</small> {{{PEGI}}}<br />}}{{
+  #if:{{{USK|}}}|<small>[[Wikipedia:Unterhaltungssoftware Selbstkontrolle|USK]]:</small> {{{USK}}}<br />}}{{
+  #if:{{{GRAC|}}}|<small>[[Wikipedia:Game Rating and Administration Committee|GRAC]]:</small> {{{GRAC}}}<br />}}{{
+  #if:{{{GCAM|}}}|<small>[[Wikipedia:General Commission for Audiovisual Media|GCAM]]:</small> {{{GCAM}}}<br />}}{{
+  #if:{{{GSRR|}}}|<small>[[Wikipedia:Game Software Rating Regulations|GSRR]]:</small> {{{GSRR}}}<br />}}{{
+  #if:{{{3|}}}|<small>[[{{{1}}}|{{{2}}}]]:</small> {{{3|}}} | {{
+  #if:{{{2|}}}|<small>{{{1}}}:</small> {{{2}}} }}}}<noinclude>[[Category:Formatting templates]]</noinclude>

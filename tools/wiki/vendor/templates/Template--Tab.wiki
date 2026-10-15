@@ -1,0 +1,38 @@
+<div class="{{#if:{{{header|}}}|round}} tab_main {{{class|}}}" style="margin: auto; width: {{{width|fit-content}}}; {{#if:{{{header|}}}|border: 2px solid {{Color2}}; background: {{Color3}}|margin-top: 1em}};">
+{{#if:{{{header|}}}|<div class="round" style="border: 2px solid {{Color2}}; background: {{Color1}}; text-align: center; padding: 3px; font-size: larger; margin: 3px 3px 1em">'''{{{header}}}'''</div>}}
+<div class="tabcontainer" style="padding-bottom: 2px; margin: 4px 4px 0; text-align: center; {{{tabstyle|}}}">
+<span class="tab_tab {{#ifeq:{{{default|1}}}|1|tabselected}}">{{{tab1}}}</span> <!--
+-->{{Tab/Tab|2|{{{default}}}|{{{tab2|}}}}} <!--
+-->{{Tab/Tab|3|{{{default}}}|{{{tab3|}}}}} <!--
+-->{{Tab/Tab|4|{{{default}}}|{{{tab4|}}}}} <!--
+-->{{Tab/Tab|5|{{{default}}}|{{{tab5|}}}}} <!--
+-->{{Tab/Tab|6|{{{default}}}|{{{tab6|}}}}} <!--
+-->{{Tab/Tab|7|{{{default}}}|{{{tab7|}}}}} <!--
+-->{{Tab/Tab|8|{{{default}}}|{{{tab8|}}}}} <!--
+-->{{Tab/Tab|9|{{{default}}}|{{{tab9|}}}}} <!--
+-->{{Tab/Tab|10|{{{default}}}|{{{tab10|}}}}} <!--
+-->{{Tab/Tab|11|{{{default}}}|{{{tab11|}}}}} <!--
+-->{{Tab/Tab|12|{{{default}}}|{{{tab12|}}}}} <!--
+-->{{Tab/Tab|13|{{{default}}}|{{{tab13|}}}}} <!--
+-->{{Tab/Tab|14|{{{default}}}|{{{tab14|}}}}} <!--
+-->{{Tab/Tab|15|{{{default}}}|{{{tab15|}}}}}
+</div>
+<div class="tabcontents" style="height: {{{height|auto}}}; margin: auto; {{#if:{{{header|}}}|padding: 4px; border-top: 2px solid {{Color2}};}} {{{constyle|}}}">
+{{Tab/Content|1|{{{default|1}}}|{{{tab1|}}}|{{{content1}}}}}
+{{Tab/Content|2|{{{default}}}|{{{tab2|}}}|{{{content2}}}}}
+{{Tab/Content|3|{{{default}}}|{{{tab3|}}}|{{{content3}}}}}
+{{Tab/Content|4|{{{default}}}|{{{tab4|}}}|{{{content4}}}}}
+{{Tab/Content|5|{{{default}}}|{{{tab5|}}}|{{{content5}}}}}
+{{Tab/Content|6|{{{default}}}|{{{tab6|}}}|{{{content6}}}}}
+{{Tab/Content|7|{{{default}}}|{{{tab7|}}}|{{{content7}}}}}
+{{Tab/Content|8|{{{default}}}|{{{tab8|}}}|{{{content8}}}}}
+{{Tab/Content|9|{{{default}}}|{{{tab9|}}}|{{{content9}}}}}
+{{Tab/Content|10|{{{default}}}|{{{tab10|}}}|{{{content10}}}}}
+{{Tab/Content|11|{{{default}}}|{{{tab11|}}}|{{{content11}}}}}
+{{Tab/Content|12|{{{default}}}|{{{tab12|}}}|{{{content12}}}}}
+{{Tab/Content|13|{{{default}}}|{{{tab13|}}}|{{{content13}}}}}
+{{Tab/Content|14|{{{default}}}|{{{tab14|}}}|{{{content14}}}}}
+{{Tab/Content|15|{{{default}}}|{{{tab15|}}}|{{{content15}}}}}
+</div>
+</div><noinclude>{{Doc}}
+</noinclude>

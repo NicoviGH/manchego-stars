@@ -1,0 +1,191 @@
+==Easy Mode world map tutorial==
+{{Quote|Once cleared, battle sites become {{color|red|bases}}. You can {{color|red|manage items}} on any base. To manage items, place the cursor on your character icon. Then, press the A Button to bring up the {{color|red|Manage Items}} command. Choose Manage Items to trade possessions with your supply convoy or with other units. Some map areas have {{color|red|shops}} and {{color|red|armories}}. To see if a base has a shop or an armory, move the cursor to that base. For example, in Ide, where Eirika is now, there is an {{color|red|armory}}. Check the corner of the screen for the {{color|red|base name}} and any {{color|red|shop icons}}.}}
+
+==Introduction==
+{{Quote|Eirika and company pursue the thief who stole her bracelet. Their chase leads them into the mountains, where Bazba's Bandits pillage at will. Eirika cannot ignore her countrymen's pleas for help. She leads her group in search of the bandits' stronghold.}}
+
+==Opening==
+'''Seth:''' The local villagers tell me that Bazba's Bandits keep their lair nearby. A few of them saw a lad matching the description of our bracelet thief. It seems a fair guess that the youth is one of these bandits.<br>
+'''Eirika:''' Bandits... Here in Renais, our homeland. I had no idea... Burning our villages... Stealing from our people with no fear of reprisal?<br>
+'''Seth:''' It wasn't always like this. The knights used to protect the citizenry... However, with Renais in ruins and her army tattered, law and order are hard to find. It doesn't look like the Grado army is interested in maintaining order here. If nothing changes, Renais will continue this sad plunge into savagery.<br>
+'''Eirika:''' ......
+
+'''Neimi (off-screen):''' Uh... Hello?<br>
+(Neimi moves on screen)<br>
+'''Neimi:''' Pardon me for asking... but are you all some sort of...mercenary troop?<br>
+'''Eirika:''' Why do you ask?<br>
+'''Neimi:''' P-p-please, you have to help Colm. You have to! I told him it was too dangerous, but he wouldn't listen to me!<br>
+'''Eirika:''' Please, you must calm yourself. Start at the beginning, and speak slowly.<br>
+'''Neimi:''' All right... Sniff. I'm Neimi. I'm from... I used to be from a village named Lark... Except the village is gone.<br>
+'''Eirika:''' Gone? What do you mean?<br>
+'''Neimi:''' Bazba's Bandits burned it down. Only Colm and I escaped. The other villagers... The bandits attacked them and...<br>
+'''Eirika:''' ......<br>
+'''Seth:''' Neimi, what are you doing here?<br>
+'''Neimi:''' Bazba's Bandits... They have a hideout here in these mountains. That's where Colm... Um, Colm's my...uh... We've known each other since we were kids. He went to steal back something the bandits took from me...<br>
+'''Eirika:''' He went alone? That's a very dangerous thing...<br>
+'''Neimi:''' Yes, I know. Th-that's what I told him, but he wouldn't listen to me. If I lose Colm, too, I don't know... I... I'll...sniff...<br>
+'''Eirika:''' Wait, please don't cry. Don't worry. We'll find your friend and see that he's not harmed.<br>
+'''Neimi:''' Really? Really and truly? Oh, thank you! Thank you!!! I... I don't have much money, but...I'll do anything to help.<br>
+'''Seth:''' Your Highness? What will it be?<br>
+'''Eirika:''' If the thief we're after has gone to the bandits' lair as well... Well, it seems as though we share a common cause with Neimi. She is a citizen of Renais, after all. And isn't it our duty to defend our countrymen? I'm only sad that we weren't here to protect her friends and neighbors... So, yes, I feel we must help her.<br>
+'''Seth:''' Very well. Neimi, I trust you can lead the way?<br>
+'''Neimi:''' Er, yes... It's this way.
+
+===In Easy Mode===
+'''Seth:''' It figures. The doors are locked. With no keys and no thief to pick the locks, we're stuck outside.<br>
+'''Eirika:''' I see. We're at an impasse then, aren't we?<br>
+'''Seth:''' Actually... No, we're in luck. You see that wall there, milady?<br>
+'''Eirika:''' Yes, I do. It's cracked...<br>
+'''Seth:''' That's right. A few well-aimed blows should bring it crumbling down.
+
+{{Quote|{{color|red|Walls}} with cracks in them can be attacked and destroyed. Once a wall is destroyed, you can pass through the opening you've created. When your way seems blocked, be sure to check all the {{color|red|walls}}.}}
+
+'''Neimi:''' Um... Is there anything I can do to help? I feel so... When I was little I used to go hunting with my grandfather. What I mean is I can{{GBAdash}} I'm not bad with a bow.<br>
+'''Eirika:''' A bow?<br>
+'''Neimi:''' Uh-huh.<br>
+'''Eirika:''' What do you think, Seth?<br>
+'''Seth:''' An archer would come in handy in tight quarters like these. With a good bow, we could attack from afar without fear...<br>
+'''Eirika:''' Well, Neimi, can you take orders and keep out of danger?<br>
+'''Neimi:''' I... I'll try, Your Highness.
+
+(Neimi moves to attack a brigand; hits him)
+
+{{Quote|Bows are {{color|red|ranged weapons}}. They can be used to attack enemies who are a space away. Additionally, they can be used to attack over walls.}}
+
+'''Bazba:''' Huh? Don't know who it is, but it looks like we got guests. Let's give 'em a warm welcome, lads! Remember, use your axes to hit 'em from this side of the wall! They can't hurt what they can't hit! Now, get out there and cut 'em up!
+
+{{Quote|The bandits' {{color|red|hand axes}} can be used in both {{color|red|direct}} and {{color|red|indirect combat}}. They can be wielded like normal axes in direct, hand-to-hand combat or thrown to strike enemies who are a space away or at an angle to you. Like bows, they can also hit enemies on the {{color|red|other sides of walls}}.}}
+
+{{Quote|Place the cursor on a unit and press the {{color|red|R Button}} to display that unit's {{color|red|status}}. For example, if you select a bandit and press the {{color|red|R Button}}, you'll see that he's carrying a hand axe. If you press the {{color|red|R Button}} again, you'll see {{color|red|help information}} for each item on-screen. You can use the {{color|red|R Button}} to see the properties of weapons and items. If there's something you don't understand about {{color|red|unit information}}, press the {{color|red|R Button}}.}}
+
+===In Normal and Hard Modes===
+'''Neimi:''' Um... Is there anything I can do to help? I feel so... When I was little I used to go hunting with my grandfather. What I mean is I can{{GBAdash}} I'm not bad with a bow.<br>
+'''Seth:''' Really?<br>
+'''Neimi:''' Uh-huh.<br>
+'''Seth:''' I see. You should remain behind and protect Princess Eirika.
+
+'''Bazba:''' Hm. Not sure who's out there, but it looks like we've got guests. Let's give 'em a warm welcome, lads. You see a stranger, stick an axe in him!
+
+==In battle==
+===NPC phase of turn 1===
+(Colm appears from the stairs)
+
+'''Colm:''' And here we go! Ha! And not a soul saw me. These bandits are easy picking. I guess I might as well start with these chests here.
+
+{{Quote|The {{color|red|thief}} Colm has appeared. Thieves can {{color|red|steal}} items from other units. Also, they can {{color|red|open the locks}} of {{color|red|doors}} and {{color|red|chests}}. Thieves are handy allies to have around.|Easy Mode only}}
+
+(Colm moves to the nearby door)
+
+{{Quote|Colm and Neimi are childhood friends. Try moving Neimi next to Colm and have her {{color|red|talk}} to him. He may decide to join you.|Easy Mode only}}
+
+===Easy Mode tutorial, turn 2===
+{{Quote|Enemy units may sometimes drop items when they are defeated. In the same way you searched for hand axes earlier, try looking at enemy items with the {{color|red|R Button}}. {{color|red|Green items}} are items that will be dropped. Check enemy items beforehand to gain the advantage in combat.}}
+
+==Talk conversations==
+===Neimi and Colm===
+'''Neimi:''' C-Colm...<br>
+'''Colm:''' Neimi?! What are you doing here? I told you to wait for me, didn't I?<br>
+'''Neimi:''' I couldn't... It's too dangerous. C'mon, let's go home.<br>
+'''Colm:''' We don't have a home! Don't you get it? Look, just leave everything to me. I can take care of it in a flash, but I don't need a clumsy oaf like you tagging along.<br>
+'''Neimi:''' But...but...<br>
+'''Colm:''' Oh, this is ridiculous. We'll talk later. Don't leave my side, Neimi.<br>
+'''Neimi:''' I{{GBAdash}} All right.<br>
+(Colm is recruited)
+
+{{Quote|Colm and Neimi have an {{color|red|invisible bond}} that ties them together. Units that have such a bond can develop a {{color|red|support relationship}}. Units become closer and their bond stronger the longer they are {{color|red|adjacent to one another}}. Eventually, they will be able to share a {{color|red|support conversation}}. Units that share a support relationship fight with {{color|red|improved abilities}} when they are near each other. There are three levels of support units can share: {{color|red|C, B, and A}}. Levels are gained by staying side-by-side as much as possible. Colm and Neimi are not the only units that can have support relationships. Eirika and Seth, among others, can grow close to other units as well. Watch how characters interact with each other to guess at who might share a support relationship with whom. If you have two units you think may have such a bond, {{color|red|place them next to one another again and again}}. Who knows: they may eventually share a {{color|red|support conversation}}. However, bear in mind that each unit can have only {{color|red|5}} support relationships.|Easy Mode only}}
+
+==Battle quotes==
+===Fighting Bazba===
+'''Bazba:''' I'm the head of this bandit pack, the mighty Bazba! Hope you've enjoyed your life, 'cuz it's about to end!
+
+===Defeating Bazba===
+'''Bazba:''' I'm the...mighty...Bazba... This...ain't{{GBAdash}}
+
+==Ending==
+===If Neimi and Colm are alive===
+'''Neimi:''' C-Colm...<br>
+'''Colm:''' What now? I told you not to worry. I could've robbed these bandits blind on my own, thank you very much.<br>
+'''Neimi:''' I was... worried...<br>
+'''Colm:''' H-hold on! I'm sorry! C'mon! Don't start bawling!<br>
+'''Neimi:''' Aaah...sniff... No more...dangerous stuff...by yourself...<br>
+'''Colm:''' Fine, fine. I promise. But you have to stop crying all the time. All right?<br>
+'''Neimi:''' Uh-huh...<br>
+'''Colm:''' Oh, yeah. Take a look at this.<br>
+'''Neimi:''' Hm?<br>
+'''Colm:''' I got your mirror back. Remember how you cried when we left Lark? You thought you'd lost this. I knew it was your mother's, and I knew those thugs had taken it. So I went and got it back! See what happens when you give me a job? Guaranteed results!<br>
+'''Neimi:''' Colm... Aa... Waaah... Colm...<br>
+'''Colm:''' Hey! Wh-why are you crying this time? C'mon! Stop! Knock it off! Please, Neimi...<br>
+'''Seth:''' ...This is quite touching, but... I think you'd best return Princess Eirika's bracelet to her now.<br>
+'''Colm:''' Wh-what are you talking about? Are you trying to say that I{{GBAdash}} Whoa! Whoa there! Hold it! It's right here! Take it!<br>
+'''Seth:''' ...... Tell me, boy, is this the path you've chosen for your life? If this girl matters to you, you must quit this dark road.<br>
+'''Colm:''' Uh, yeah... Right.<br>
+'''Seth:''' We're leaving. Do not expect to be rescued again. Farewell.<br>
+'''Colm:''' ...Hey, wait! Let us go with you. You can't just leave us here.<br>
+'''Seth:''' Pardon?<br>
+'''Colm:''' Neimi and I... We've got no home to return to. No matter where we go, there's just gonna be more fighting. You're mercenaries, right? Well, then take us with you. I'm a handy guy to have around. I know I can help you out.<br>
+'''Seth:''' I would prefer not, but I'll agree with Eirika's decision. Our duty is a grave one however. We've no time to waste shepherding you.<br>
+'''Colm:''' That's fine with us. You just wait{{GBAdash}}I promise you won't regret your decision.
+
+===Regardless of Neimi and Colm's status===
+'''Seth:''' I retrieved your bracelet from the bandits' stronghold. Here you are, Princess.<br>
+'''Eirika:''' Thank you, Seth. You know... Father gave me this bracelet when I was a child. It has only one match in the world, and my brother wears it.<br>
+'''Seth:''' Lady Eirika, you must take care never to lose that bracelet. It is the proof that King Fado entrusted the future of Renais to you, his children.<br>
+'''Eirika:''' Seth... What is it you're not telling me?<br>
+'''Seth:''' ...I apologize, Your Highness. When the time comes, I will tell you what I know. Until then, I...<br>
+'''Eirika:''' I see. If you tell me it must wait, then it can wait. I trust you.<br>
+'''Seth:''' Then we should get moving again. We're safe from bandits for now, but I can't guarantee for how long.<br>
+'''Eirika:''' This... This is just the beginning, isn't it? If we hope to free our homeland, it will take battle after battle...<br>
+'''Seth:''' I'm afraid so, Your Highness. The day you and Prince Ephraim win back the freedom and honor of Renais will come. But I fear it lies at the end of a long and treacherous road.<br>
+'''Eirika:''' I know. I must fight for that day. In the names of all those I could not save, I'll lead us home. Let's go. My brother awaits!
+
+(At Grado Keep)
+
+'''Selena:''' General Duessel.<br>
+'''Duessel:''' Selena. Have you been back long? Tell me, how fares the campaign in Renais?<br>
+'''Selena:''' Signs of chaos abound. Brigands ride without fear, and the peasants' cries fill the air.<br>
+'''Duessel:''' Hmm... If Grado's troops do not enforce public order, the situation will only worsen. And still, His Majesty has given us no orders. Perhaps, just this once, I should take the lead...<br>
+'''Glen:''' What could His Majesty be thinking? Breaking our long-held alliance with Renais{{GBAdash}}invading without warning... He's never been this way before. He abhors violence.<br>
+'''Selena:''' ......<br>
+'''Glen:''' And have you noticed the recent promotions? Who are they going to? Certainly not to the soldiers who have Grado's best interests at heart. I fear this invasion is the prelude to a much larger war. I feel as though His Majesty is no longer the man we knew him to be.<br>
+'''Selena:''' Glen, it doesn't matter what any of us might think of our orders. We are his servants, and we will not question His Majesty's intentions.<br>
+'''Glen:''' I know that, Selena. And yet...<br>
+'''Duessel:''' That's enough. Both of you. His Majesty summons us. Let's hope we can learn a little during our audience.
+
+(At Vigarde's throne room)
+
+'''Vigarde:''' ...I appreciate your work in fulfilling your previous orders. You are the hammers that drive the nails of the empire's will... You will continue to operate ...without hesitation... wherever I send you.<br>
+'''Duessel:''' By your command.<br>
+'''Selena:''' In Your Majesty's name.<br>
+'''Glen:''' Yes, sire...<br>
+'''Vigarde:''' ...However, I know this... You, my Imperial Three, lack the strength to conquer the remaining nations alone. In the invasion of Renais, certain soldiers performed beyond expectation. I have chosen them to join you as new generals in the empire's service. ...Come.
+
+(Riev, Caellach, and Valter enter)
+
+'''Vigarde:''' ...The performance of these men surpassed even your own. With the addition of these three... The empire will have six generals strong enough to conquer this land. Do you understand?<br>
+'''Riev:''' Heh heh heh... I am Riev, given the name Blood Beryl by His Majesty. I know I am a newcomer, but I pray for your favor.<br>
+'''Duessel:''' ...Understood.<br>
+'''Caellach:''' I'm Caellach. I was a mercenary, fighting in the desert. Seems I'm to be called Tiger Eye... You're a fine-lookin' lass, aren't you? Yeah, I'm gonna love working with you.<br>
+'''Selena:''' ......<br>
+'''Valter:''' So we meet again. You know me as General Valter, but you will call me the Moonstone. I'll save you worthless dogs from your own incompetence. You'll thank me later.<br>
+'''Glen:''' Valter... You scum!<br>
+'''Duessel:''' Peace, Glen.<br>
+'''Vigarde:''' Selena. Caellach. You will bring me Frelia.<br>
+'''Selena:''' Yes, sire.<br>
+'''Caellach:''' Sure. Good as done.<br>
+'''Vigarde:''' Riev. Duessel. You are charged with the defense of the empire. ...I will speak to you individually with more details later.<br>
+'''Riev:''' Heh heh heh... Understood, Your Majesty.<br>
+'''Duessel:''' By your command, sire.<br>
+'''Valter:''' And me?<br>
+'''Vigarde:''' Valter, Glen... I have other duties for you...<br>
+'''Glen:''' Yes, Your Majesty?<br>
+'''Vigarde:''' Renais has fallen, but Princess Eirika still eludes us... Her brother, Prince Ephraim, leads a resistance within our borders. Bring the siblings to me. Ha ha... Of course.<br>
+'''Glen:''' ......
+
+{{ChapterNav
+|name=The Bandits of Borgo
+|prechapter=The Protected/Script{{!}}The Protected
+|nextchapter=Ancient Horrors/Script{{!}}Ancient Horrors
+}}
+{{NavScriptFE8}}
+{{DEFAULTSORT:Bandits of Borgo, The/Script}}
+[[Category:Scripts of Fire Emblem: The Sacred Stones]]

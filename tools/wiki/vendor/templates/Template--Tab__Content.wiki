@@ -1,0 +1,22 @@
+<div class="tab_content" style="
+{{#ifeq:{{{1}}}|{{{2}}}
+ |
+ |{{#ifeq:{{{1}}}|{{{3}}}
+  |
+  |display: none
+ }}
+}}">
+{{{4}}}
+</div><noinclude>
+==Purpose==
+Properly formats the tab contents. For use with the [[Template:Tab|Tab template]].
+
+==Usage==
+::'''<nowiki>{{</nowiki>Tab/Content '''| ''number'' | ''default'' | ''tabtext'' | ''content'' }}
+
+*'''number''': The number of the tab
+*'''default''': The number of the tab to select by default
+*'''tabtext''': The parameter containing the tab text (eg. {{{tab2}}})
+*'''content''': The parameter containing the content (eg. {{{content2}}})
+[[Category:Formatting templates]]
+</noinclude>

@@ -1,0 +1,6 @@
+{| style="margin: auto; background: {{Color1}}; border: 3px solid {{Color2}}; width: 100%; border-radius: 80px"
+| style="border-radius: 80px; background: {{Color3}}; width: 60px" | [[File:Project Characters.png|80px]]
+| This article is part of '''[[Fire Emblem Wiki:Project Characters|Project Characters]]''', a  project focused on writing articles for every character present in the ''Fire Emblem'' series.
+|}<noinclude>
+
+{{doc}}</noinclude>

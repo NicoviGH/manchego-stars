@@ -1,0 +1,32 @@
+{| class="round" style="border: 2px solid {{Color2}}; background: {{Color3}}; font-weight: bold; text-align: center; margin: auto"
+|- style="background: {{color1}}"
+| rowspan="2" class="roundtl" style="border: 1px solid {{Color2}}" | Character
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[The Fall of Renais|P]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Escape!|1]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[The Protected|2]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[The Bandits of Borgo|3]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Ancient Horrors|4]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[The Empire's Reach|5]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Unbroken Heart|5x]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Victims of War|6]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Waterside Renvall|7]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[It's a Trap!|8]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[{{#if: {{{1|}}} | Fort Rigwald | Distant Blade}}|9]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[{{#if: {{{1|}}} | Turning Traitor | Revolt at Carcino}}|10]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[{{#if: {{{1|}}} | Phantom Ship | Creeping Darkness}}|11]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[{{#if: {{{1|}}} | Landing at Taizel | Village of Silence}}|12]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[{{#if: {{{1|}}} | Fluorspar's Oath | Hamill Canyon}}|13]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[{{#if: {{{1|}}} | Father and Son | Queen of White Dunes}}|14]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Scorched Sand|15]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Ruled by Madness|16]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[River of Regrets|17]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Two Faces of Evil|18]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Last Hope|19]]
+| rowspan="2" style="border: 1px solid {{Color2}}; width: 15px" | [[Darkling Woods|20]]
+| colspan="2" class="roundtr" style="border: 1px solid {{Color2}}" | Endgame
+|- style="background: {{color1}}"
+| style="border: 1px solid {{Color2}}; width: 15px" | [[Sacred Stone (part 1)|1]]
+| style="border: 1px solid {{Color2}}; width: 15px" | [[Sacred Stone (part 2)|2]]<noinclude>
+
+{{DEFAULTSORT:FE08 Availability Hdr}}
+[[Category:Stat templates]]</noinclude>

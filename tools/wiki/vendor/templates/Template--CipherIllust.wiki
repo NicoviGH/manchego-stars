@@ -1,0 +1,5 @@
+[[Artists of the Fire Emblem series/Fire Emblem Cipher#{{CipherIRaw|{{{1|まよ}}}}}|{{CipherIRaw|{{{1|まよ}}}}}]]<noinclude>
+==Usage==
+Used to generate translated names of {{TCGCipher}} illustrators based on the raw Japanese credit of a card, and links to that name's section of the [[Artists of the Fire Emblem series/Fire Emblem Cipher|''Cipher'' artist listing page]].  In addition to being a component of [[Template:CipherImageDesc]] (fueling the "artist=" field passed into its invocation of [[Template:File desc]]), it can  be invoked by itself whenever a link to the artist listing page is necessary (such as in an invocation of [[Template:TCGCipherData]]'s "artist#=" fields).
+
+[[Category:Formatting templates]]</noinclude>

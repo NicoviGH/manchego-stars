@@ -1,0 +1,22 @@
+<noinclude>{|
+</noinclude>|-
+| class="pixel-art {{#if:{{{last|}}}|roundbl}}" rowspan="2" | [[File:Ma gba {{lc:{{{class}}}}} {{{version|}}} {{{type|enemy}}}.gif]]
+| rowspan="2" | {{{name}}}
+| rowspan="2" | [[{{{classarticle|{{{class}}}}}}|{{{class}}}]]
+| {{{lv|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{#|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{hp|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{str|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{skill|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{spd|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{lck|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{def|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{res|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{con|?<includeonly>[[Category:Articles missing stat data]]</includeonly>}}}
+| {{{mov|{{nwh}}}}}
+| class="pixel-art" | {{{inventory|{{nwh}}}}}
+|-
+| {{#if:{{{last|}}}|class="roundbr"}} colspan="12" | {{{notes|{{nwh}}}}}<noinclude>
+|}<noinclude>
+
+{{doc}}</noinclude>

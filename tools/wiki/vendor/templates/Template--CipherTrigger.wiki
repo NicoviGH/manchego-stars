@@ -1,0 +1,1 @@
+{{color|#0050ff|[Trigger]}}<noinclude><br />This is to properly format {{TCGCipher}} skill descriptions, for skills whose effects are automatically triggered when specific conditions are met ({{color|#0050ff|自動}}). To use type:  '''<nowiki>{{CipherTrigger}}</nowiki>''' [[Category:TCG templates]]</noinclude>

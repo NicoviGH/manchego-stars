@@ -1,0 +1,270 @@
+{{Character Infobox
+|image=[[File:FESS Colm.png|200px]]
+|caption=Artwork of Colm from {{title|The Sacred Stones}}.
+|help_text=A childhood friend of Neimi who hails from Renais. He can be snide.
+|gender=Male
+|race=[[Human]]
+|nationality=[[Renais]]
+|startingclass=[[Thief]]
+|voice=*Henry Mason<br><small>(English, {{title|Heroes}})</small>
+*[[wikipedia:Daiki Yamashita|Daiki Yamashita]]<br><small>(Japanese, {{title|Heroes}})</small>
+|appearances=*{{title|The Sacred Stones}}
+*{{title|Heroes}}
+}}
+
+{{quote|See what happens when you give me a job? Guaranteed results!|Colm, to [[Neimi]].}}
+
+'''Colm''' (Japanese: {{hl|コーマ|Kooma}} ''Coma'') is a playable [[thief]] in {{FE8}}. Colm first appears in [[The Bandits of Borgo|Chapter&nbsp;3]], along with his childhood friend [[Neimi]], who are both from the village of [[Lark]].
+
+=={{FE8}}==
+===Role===
+Colm appears in Chapter&nbsp;3 along with Neimi. He appears in the bandit stronghold as a neutral unit, ready to get the enemy treasure. He goes with the intention of retrieving a mirror stolen from Neimi, but she requests help from [[Eirika]]'s army, and he joins the group. After the chapter [[Seth]] tells him and Neimi to leave, but he asks to go along with Eirika's group, because their home is gone. The two then join the army in their adventures.
+
+===Starting stats and growth rates===
+{{CharStats GBA
+|portrait=[[File:Portrait colm fe08.png]]
+|sprite=thief
+|class=Thief
+|affin=light
+|lv=2
+|HP=18
+|str=4
+|skill=4
+|spd={{h|10|12 in the Japanese version}}
+|luck=8
+|def=3
+|res=1
+|move=6
+|con=6
+|aid=5
+|inventory={{Item|8|Iron Sword}}<br>{{Item|8|Lockpick}}<br>{{Item|8|Vulnerary}}
+|sw=E
+|HP1=75
+|str1=40
+|skill1=40
+|spd1=65
+|luck1=45
+|def1=25
+|res1=20
+|recruit=[[The Bandits of Borgo|Chapter&nbsp;3]], talk to with [[Neimi]] or automatically at the end of the chapter if both he and Neimi survived
+}}
+
+===Promotion stat gains===
+{{PromotionGains
+|class1=[[Rogue]]
+|hp1=2
+|str1=1
+|skill1=1
+|spd1=0
+|def1=2
+|res1=2
+|con1=1
+|move1=0
+|skills1=[[Locktouch|Pick]]
+|weaponlvl1=--
+|class=[[Assassin]]
+|hp=3
+|str=1
+|skill=0
+|spd=0
+|def=2
+|res=2
+|con=2
+|move=0
+|skills=[[Lethality|Silencer]]
+|weaponlvl={{SwordGBA}} +30
+}}
+
+===Analysis===
+{{analysis}}
+Colm is the first thief that the player will get in ''The Sacred Stones'', and is one of two if only considering units who perform such roles by default. His early joining time and weak enemies give him some room to grow, although for much of the game he will have trouble harming or surviving against [[Knight]]s and other high defense lance units. As a Thief, he can [[steal]], use [[Lockpick]]s, and see further into [[fog of war]]. His lockpick utility is limited, however, as Chest Keys are buyable from the overworld. As such, he will initially see use for that reason alone, although he arguably has the best combat potential of the Game Boy Advance-era Thieves and can serve as a fairly potent combatant as well. The item for [[class change]] that Colm uses is the [[Ocean Seal]], and unless [[Ross]] promoted to [[Pirate]], he is the only one who uses it. His starting combat statistics are not very good, especially considering that 4 base strength, but his growth rates can make him at least serviceable. In the international version his base Speed has taken a significant hit, which on Difficult makes training him mandatory to obtain many stealables and even leaves the possibility (16%) an enemy Thief in his join chapter will have enough Speed to steal his lockpick with no way to replace them.
+
+As an [[Assassin]], Colm will gain [[Lethality|Silencer]], which can instantly kill any target except for [[Fomortiis]]. He also gets access to the [[Shamshir]] sword, which has a hefty 35 critical, which bodes well for him as Silencer uses half of his critical rate and doubles his experience when it activates, allowing him to level up quickly for a promoted unit. However, Silencer is unreliable, and somewhat superfluous given that a critical will usually kill (except against bosses, but Silencer happens even less often against them), and Silencer will happen on average one every two criticals. He also loses the ability to steal, which can deter players from going that route in favor of his alternate promotion, the [[Rogue]]. As a Rogue, Colm will not perform nearly as well in combat, but will not even need lockpicks anymore due to the [[Locktouch|Pick]] skill, which allows him to open anything for free. He also retains his ability to steal, which can be helpful for later chapters where enemies have items that benefit them, but can be stolen, such as [[Caellach]] and the [[Hoplon Guard]] in [[Scorched Sand|Chapter&nbsp;15]]. Both classes have identical maximum statistics, although the low cap of 20 for strength, defense, and resistance can be a pain.
+
+Colm's best support option is, without a shadow of a doubt, [[Neimi]], whose [[Fire affinity]] compliments him by buffing his attack and critical hit rate. The true strength of this support, however, is its speed, being among the fastest supports in the game and already coming with a C support. If the player seeks to use Colm as an Assassin, having him support Neimi is highly recommended, as his chances for activating Silencer become much higher. [[Rennac]], the other default thief, can also boost Colm's critical hit rate with his [[Dark affinity]], while serving as the new stealer for the rest of the game should Colm be an Assassin. [[Moulder]] (who has [[Anima (affinity)|Anima]]), [[Marisa]], and [[Kyle]] (who both have [[Ice]]) all increase his defenses, which can help him survive hits. However, the latter four all have dramatically slower supports, so they will take far longer to kick into effect.
+
+=={{FEH}}==
+{{main|Colm/Heroes{{!}}Colm/''Heroes''}}
+
+There is one variation of Colm available in ''Heroes''.
+
+==Personality==
+Colm is quite harsh and mocking, shown in his conversations with Neimi. However, he does care for her, and may be only trying to get Neimi to be less sensitive. Often he only thinks about himself, but other times he can be very chivalrous. He is young, probably around the same age as Neimi, but still is a skilled thief. In his B support with [[Kyle]], it is shown that he hates studying.
+
+Originally he came from a village called Lark, but it was burnt down by [[Bazba]]'s Bandits. As he and Neimi had nowhere to go, he joined Eirika's army. He may have feelings for Neimi, and they can marry and have two children if they receive an A support level. In his B support conversation with [[Rennac]], he states that his father made he and his brothers work hard. In his C support with Kyle, he says his mother used to make a remedy for freckles and insomnia.
+
+==Supports==
+{{Main|Colm/Supports}}
+{{SupportSysGBA
+|supports=5
+|portrait=[[File:portrait colm fe08.png]]
+|character=Colm
+|class=Thief
+|affin=light
+|port1=[[File:small portrait neimi fe08.png]]
+|support1=Neimi
+|class1=Archer
+|affin1=fire
+|initialpoints1=80
+|plus1=+3
+|port2=[[File:small portrait marisa fe08.png]]
+|support2=Marisa
+|class2=Myrmidon
+|affin2=ice
+|initialpoints2=0
+|plus2=+2
+|port3=[[File:small portrait rennac fe08.png]]
+|support3=Rennac
+|class3=Rogue
+|affin3=dark
+|initialpoints3=5
+|plus3=+2
+|port4=[[File:small portrait moulder fe08.png]]
+|support4=Moulder
+|class4=Priest
+|affin4=anima
+|initialpoints4=0
+|plus4=+2
+|port5=[[File:small portrait kyle fe08.png]]
+|support5=Kyle
+|class5=Cavalier
+|affin5=ice
+|initialpoints5=5
+|plus5=+2
+}}
+
+==Endings==
+'''Colm, Good-Natured Thief'''<br>
+He politely refused an invitation to become a spy for Renais, returning instead to his hometown. He spent the rest of his days as a chivalrous rogue helping those in need from the shadows.
+
+'''Colm and Neimi'''<br>
+The childhood friends became lovers first, then husband and wife. Worried for Neimi's well-being, Colm gave up his adventurer's ways. Neimi passed on her grandfather's skill in archery to her own son and daughter.
+
+==Quotes==
+===Battle quotes===
+{{quote|Fighting's all well and good, but where's all the treasure?|Colm, in the [[Sacred Stone (part 2)|Final Chapter]] of {{title|The Sacred Stones}}.}}
+
+===Death quote===
+{{quote|To think of it... Me... In this place... Neimi...|Colm's death quote in {{title|The Sacred Stones}}.}}
+
+===''Heroes'' quotes===
+{{main|Colm/Quotes (Heroes)}}
+
+==Other appearances==
+==={{TCGCipher}}===
+Colm is featured on one card in {{TCGCipher}}.
+{{TCGCipherData
+|name=Colm
+|image1=[[File:TCGCipher B11-015N.png|150px]]
+|title1=Good-Natured Thief
+|name1=Colm
+|affil1=Elibe
+|gender1=Male
+|weapon1=Sword
+|quote1=Ha! And not a soul saw me. These bandits are easy picking.
+|attack1=50
+|support1=10
+|atkcost1=2
+|range1=1
+|class1=Thief
+|tier1=Base
+|skill1='''"Oops! Beg your pardon.":''' {{CipherTrigger}} When this unit is deployed: Reveal the top card of your opponent's deck. You may then place that card in their Retreat Area.<br>'''Pick:''' {{CipherActivate}} {{CipherTap}} Reveal the top card of your opponent's deck. If the deployment cost of that card is 3 or higher, you may {{CipherFlipOne}} to draw a card.
+|no1=B11-015N
+|artist1={{CipherIllust|ワダサチコ}}
+}}
+
+==Flavor text==
+{{DescriptionHdr}}
+{{DescriptionCell
+|game={{title|The Sacred Stones}}
+|english=A childhood friend of Neimi who<br>hails from Renais. He can be snide.
+|japanese=ルネス王国のラクの村出身<br>ネイミーとは幼なじみのお調子者
+}}
+{{DescriptionFtr}}
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=Colm
+|eng-mean=An Irish name meaning "dove", usually named in honor of Saint Colm Cille.<ref>{{cite web|url=https://www.babynamesofireland.com/colm |title=Colm - Meaning of Name Colm - Pronounce Colm Irish Boy Name |site=www.babynamesofireland.com |retrieved=6 December, 2017}}</ref>
+|jpn-name={{hover|コーマ|Kōma}}
+|jpn-mean=Officially romanized as '''Coma'''. Derived from ''[[wikipedia:Colmar|Colmar]]'', a French city. The city is famous for the [[wikipedia:Colmar Treasure|Colmar Treasure]], a hoard of Jewish valuables dating back to the Black Plague that were hidden in the wall of the house until their discovery in 1863, fitting with the character's class. The character is introduced stealing a bracelet, which appears to be a reference to the most notable item from the hoard, a Jewish marriage ring.
+|span-name=Colm
+|fren-name=Colm
+|ger-name=Colm
+|ital-name=Colm
+|por-br-name=Colm
+|ch-trad-name={{h|寇馬|Kòumǎ}}
+|ch-trad-mean=Coma
+}}
+
+==Gallery==
+{| class="mw-collapsible mw-collapsed pixel-art width-75" style="margin: auto; border: 2px solid {{Color2}}; background: {{Color1}}; border-radius: 15px; text-align: center"
+! style="border: 1px solid {{Color2}}; background: {{Color1}}; border-radius: 15px" | [[File:Small portrait colm fe08.png]] Sprite Gallery
+|-
+|
+{| style="width: 100%; background: {{Color3}}; border-radius: 15px; border: 1px solid {{Color2}}; margin: auto; border-spacing: 0"
+| rowspan="2" | [[File:Portrait colm fe08.png]]
+| style="border-left: 1px solid {{Color2}}; border-bottom: 1px solid {{Color2}}" | [[File: Ma gba thief other.gif]] [[Thief]] [[File: Ma gba thief playable.gif]]
+| style="border-left: 1px solid {{Color2}}; border-bottom: 1px solid {{Color2}}" | [[Rogue]] [[File: Ma gba rogue playable.gif]]
+| style="border-left: 1px solid {{Color2}}; border-bottom: 1px solid {{Color2}}" | [[Assassin]] [[File: Ma gba assassin playable.gif]]
+|-
+| style="border-left: 1px solid {{Color2}}" | [[File:Bs fe08 npc colm thief sword.png]] [[File:Bs fe08 colm thief sword.png]] <br>[[Sword]]
+| style="border-left: 1px solid {{Color2}}" | [[File:Bs fe08 colm rogue sword.png]] <br>[[Sword]]
+| style="border-left: 1px solid {{Color2}}" | [[File:Bs fe08 colm assassin sword.png]] <br>[[Sword]]
+|}
+|}
+
+===Official artwork===
+<gallery>
+FESS Colm.png|Artwork of Colm from {{title|The Sacred Stones}}.
+</gallery>
+
+===Battle animations===
+<gallery>
+Ba fe08 colm thief sword.gif|Colm attacking with a [[sword]] as a [[Thief]] in {{title|The Sacred Stones}}.
+Ba fe08 colm thief sword critical.gif|Colm performing a [[critical hit]] with a sword as a Thief in ''The Sacred Stones''.
+Ba fe08 colm assassin sword.gif|Colm attacking with a sword as an [[Assassin]] in ''The Sacred Stones''.
+Ba fe08 colm assassin sword critical.gif|Colm performing a critical hit with a sword as an Assassin in ''The Sacred Stones''.
+Ba fe08 colm rogue sword.gif|Colm attacking with a sword as a [[Rogue]] in ''The Sacred Stones''.
+Ba fe08 colm rogue sword critical.gif|Colm performing a critical hit with a sword as a Rogue in ''The Sacred Stones''.
+</gallery>
+
+==={{title|Heroes}} artwork===
+====Character artwork====
+<gallery>
+FEH Colm Capable Thief 01.png|Artwork of Colm: Capable Thief.
+FEH Colm Capable Thief 02.png|Artwork of Colm: Capable Thief.
+FEH Colm Capable Thief 02a.png|Artwork of Colm: Capable Thief.
+FEH Colm Capable Thief 03.png|Artwork of Colm: Capable Thief.
+</gallery>
+
+====[[Meet some of the Heroes]] artwork====
+<gallery>
+FEH mth Colm Capable Thief 01.png|Artwork of Colm: Capable Thief.
+FEH mth Colm Capable Thief 02.png|Artwork of Colm: Capable Thief.
+FEH mth Colm Capable Thief 03.png|Artwork of Colm: Capable Thief.
+FEH mth Colm Capable Thief 04.png|Artwork of Colm: Capable Thief.
+FEH mth Neimi Tearful Archer 03.png|Colm in artwork of [[Neimi: Tearful Archer]].
+</gallery>
+
+====Other artwork====
+<gallery>
+FEH CYL round eight day seven illustration.png|Artwork featuring Colm released on the seventh day of [[Choose Your Legends]]: [[Choose Your Legends/2024 results|Round 8]].
+</gallery>
+
+==={{title|Cipher}} artwork===
+<gallery>
+TCGCipher Colm 01.jpg|Artwork of Colm.
+</gallery>
+
+==References==
+{{refbar}}
+
+{{Project Characters}}
+{{Nav8}}
+{{NavH}}
+[[Category:Playable characters in Fire Emblem: The Sacred Stones]]
+[[Category:Playable characters in Fire Emblem Heroes]]

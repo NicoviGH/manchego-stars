@@ -1,0 +1,5 @@
+{| class="width-25" style="margin: auto; background: {{Color1}}; border: 2px solid {{Color2}}; border-radius: 10px; text-align: center"
+| style="padding: 5px" | {{{1|{{{image|No Image Available.}}}}}}
+|}<noinclude>
+
+{{doc}}</noinclude>

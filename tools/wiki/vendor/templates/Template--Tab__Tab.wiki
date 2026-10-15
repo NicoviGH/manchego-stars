@@ -1,0 +1,14 @@
+{{#if:{{{3|}}}|<span class="tab_tab {{#ifeq:{{{2}}}|{{{1}}}|tabselected}}">{{{3}}}</span>}}<noinclude>
+
+==Purpose==
+Properly formats the tabs. For use with the [[Template:Tab|Tab template]].
+
+==Usage==
+::'''<nowiki>{{</nowiki>Tab/Tab '''| ''number'' | ''default'' | ''tabtext'' }}
+
+*'''number''': The number of the tab
+*'''default''': The number of the tab to select by default
+*'''tabtext''': The parameter containing the tab text (eg. {{{tab2}}})
+
+[[Category:Formatting templates]]
+</noinclude>

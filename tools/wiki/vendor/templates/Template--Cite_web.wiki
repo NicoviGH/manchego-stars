@@ -1,0 +1,2 @@
+<includeonly><span style="font-variant-emoji: unicode">{{#if:{{{quote|}}}|"{{{quote|}}}" —}} {{#if:{{{author|}}}|{{{author}}},}} [{{{url|}}} {{{title|}}}]{{#if:{{{type|}}}{{{location|}}}|&#32;({{{type|}}}{{#if:{{{type|}}}|{{#if:{{{location|}}}|;&#32;}}}}{{{location|}}})}}, {{{site|}}}{{#if:{{{published|}}}|, ''Published: {{{published}}}''}}{{#if:{{{retrieved|}}}|, ''Retrieved: {{{retrieved}}}''}}</span></includeonly><noinclude>
+{{doc}}</noinclude>

@@ -1,0 +1,2 @@
+{{#invoke:Item|main<noinclude>|gba|Iron Sword</noinclude>}}<noinclude>
+{{doc}}</noinclude>

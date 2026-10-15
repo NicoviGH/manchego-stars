@@ -1,0 +1,5 @@
+''[[Fire Emblem Cipher]]''<noinclude>
+
+This is to properly format Fire Emblem Games. To use type: <code>{&#123;TCGCipher}}</code>
+
+[[Category:Abbreviation templates]]</noinclude>

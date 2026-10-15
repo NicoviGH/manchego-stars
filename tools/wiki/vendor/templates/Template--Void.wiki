@@ -1,0 +1,8 @@
+<noinclude>
+
+==Usage==
+This template is blank. It is used to represent a value being empty on other templates.
+
+To use this template, type: '''<nowiki>{{Void}}</nowiki>'''
+
+[[Category:Formatting templates]]</noinclude>

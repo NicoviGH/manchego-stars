@@ -1,0 +1,228 @@
+{| class="chapter-table width-60"
+| style="border: none; background: none" |
+{| class="chapter-table" style="border-radius: 11px; background: {{Color1}}; width: 100%"
+! style="border: none; background: none" | Items
+|}
+|-
+| style="border: none; background: none" |
+{| style="width: 100%" {{#switch:{{{platform}}}|fe02|fe03|fe04|fe05|gba|gcn|wii|ds|fe13|fe14|fe15=class="pixel-art"}}
+! style="border-top-left-radius: 9px; width: 5%" |
+! style="width: 30%" | Name
+! style="border-top-right-radius: 9px; width: 65%" | Obtainment Method
+|-
+{{#if: {{{item1|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item1image|{{{item1}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item1article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item1}}}}}}|{{{item1}}}]]'''
+{{!}} {{{obtain1}}}}}
+|-
+{{#if: {{{item2|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item2image|{{{item2}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item2article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item2}}}}}}|{{{item2}}}]]'''
+{{!}} {{{obtain2}}}}}
+|-
+{{#if: {{{item3|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item3image|{{{item3}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item3article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item3}}}}}}|{{{item3}}}]]'''
+{{!}} {{{obtain3}}}}}
+|-
+{{#if: {{{item4|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item4image|{{{item4}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item4article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item4}}}}}}|{{{item4}}}]]'''
+{{!}} {{{obtain4}}}}}
+|-
+{{#if: {{{item5|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item5image|{{{item5}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item5article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item5}}}}}}|{{{item5}}}]]'''
+{{!}} {{{obtain5}}}}}
+|-
+{{#if: {{{item6|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item6image|{{{item6}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item6article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item6}}}}}}|{{{item6}}}]]'''
+{{!}} {{{obtain6}}}}}
+|-
+{{#if: {{{item7|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item7image|{{{item7}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item7article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item7}}}}}}|{{{item7}}}]]'''
+{{!}} {{{obtain7}}}}}
+|-
+{{#if: {{{item8|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item8image|{{{item8}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item8article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item8}}}}}}|{{{item8}}}]]'''
+{{!}} {{{obtain8}}}}}
+|-
+{{#if: {{{item9|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item9image|{{{item9}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item9article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item9}}}}}}|{{{item9}}}]]'''
+{{!}} {{{obtain9}}}}}
+|-
+{{#if: {{{item10|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item10image|{{{item10}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item10article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item10}}}}}}|{{{item10}}}]]'''
+{{!}} {{{obtain10}}}}}
+|-
+{{#if: {{{item11|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item11image|{{{item11}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item11article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item11}}}}}}|{{{item11}}}]]'''
+{{!}} {{{obtain11}}}}}
+|-
+{{#if: {{{item12|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item12image|{{{item12}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item12article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item12}}}}}}|{{{item12}}}]]'''
+{{!}} {{{obtain12}}}}}
+|-
+{{#if: {{{item13|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item13image|{{{item13}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item13article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item13}}}}}}|{{{item13}}}]]'''
+{{!}} {{{obtain13}}}}}
+|-
+{{#if: {{{item14|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item14image|{{{item14}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item14article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item14}}}}}}|{{{item14}}}]]'''
+{{!}} {{{obtain14}}}}}
+|-
+{{#if: {{{item15|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item15image|{{{item15}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item15article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item15}}}}}}|{{{item15}}}]]'''
+{{!}} {{{obtain15}}}}}
+|-
+{{#if: {{{item16|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item16image|{{{item16}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item16article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item16}}}}}}|{{{item16}}}]]'''
+{{!}} {{{obtain16}}}}}
+|-
+{{#if: {{{item17|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item17image|{{{item17}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item17article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item17}}}}}}|{{{item17}}}]]'''
+{{!}} {{{obtain17}}}}}
+|-
+{{#if: {{{item18|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item18image|{{{item18}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item18article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item18}}}}}}|{{{item18}}}]]'''
+{{!}} {{{obtain18}}}}}
+|-
+{{#if: {{{item19|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item19image|{{{item19}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item19article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item19}}}}}}|{{{item19}}}]]'''
+{{!}} {{{obtain19}}}}}
+|-
+{{#if: {{{item20|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item20image|{{{item20}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item20article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item20}}}}}}|{{{item20}}}]]'''
+{{!}} {{{obtain20}}}}}
+|-
+{{#if: {{{item21|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item21image|{{{item21}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item21article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item21}}}}}}|{{{item21}}}]]'''
+{{!}} {{{obtain21}}}}}
+|-
+{{#if: {{{item22|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item22image|{{{item22}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item22article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item22}}}}}}|{{{item22}}}]]'''
+{{!}} {{{obtain22}}}}}
+|-
+{{#if: {{{item23|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item23image|{{{item23}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item23article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item23}}}}}}|{{{item23}}}]]'''
+{{!}} {{{obtain23}}}}}
+|-
+{{#if: {{{item24|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item24image|{{{item24}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item24article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item24}}}}}}|{{{item24}}}]]'''
+{{!}} {{{obtain24}}}}}
+|-
+{{#if: {{{item25|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item25image|{{{item25}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item25article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item25}}}}}}|{{{item25}}}]]'''
+{{!}} {{{obtain25}}}}}
+|-
+{{#if: {{{item26|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item26image|{{{item26}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item26article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item26}}}}}}|{{{item26}}}]]'''
+{{!}} {{{obtain26}}}}}
+|-
+{{#if: {{{item27|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item27image|{{{item27}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item27article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item27}}}}}}|{{{item27}}}]]'''
+{{!}} {{{obtain27}}}}}
+|-
+{{#if: {{{item28|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item28image|{{{item28}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item28article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item28}}}}}}|{{{item28}}}]]'''
+{{!}} {{{obtain28}}}}}
+|-
+{{#if: {{{item29|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item29image|{{{item29}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item29article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item29}}}}}}|{{{item29}}}]]'''
+{{!}} {{{obtain29}}}}}
+|-
+{{#if: {{{item30|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item30image|{{{item30}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item30article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item30}}}}}}|{{{item30}}}]]'''
+{{!}} {{{obtain30}}}}}
+|-
+{{#if: {{{item31|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item31image|{{{item31}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item31article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item31}}}}}}|{{{item31}}}]]'''
+{{!}} {{{obtain31}}}}}
+|-
+{{#if: {{{item32|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item32image|{{{item32}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item32article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item32}}}}}}|{{{item32}}}]]'''
+{{!}} {{{obtain32}}}}}
+|-
+{{#if: {{{item33|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item33image|{{{item33}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item33article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item33}}}}}}|{{{item33}}}]]'''
+{{!}} {{{obtain33}}}}}
+|-
+{{#if: {{{item34|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item34image|{{{item34}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item34article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item34}}}}}}|{{{item34}}}]]'''
+{{!}} {{{obtain34}}}}}
+|-
+{{#if: {{{item35|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item35image|{{{item35}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item35article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item35}}}}}}|{{{item35}}}]]'''
+{{!}} {{{obtain35}}}}}
+|-
+{{#if: {{{item36|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item36image|{{{item36}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item36article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item36}}}}}}|{{{item36}}}]]'''
+{{!}} {{{obtain36}}}}}
+|-
+{{#if: {{{item37|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item37image|{{{item37}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item37article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item37}}}}}}|{{{item37}}}]]'''
+{{!}} {{{obtain37}}}}}
+|-
+{{#if: {{{item38|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item38image|{{{item38}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item38article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item38}}}}}}|{{{item38}}}]]'''
+{{!}} {{{obtain38}}}}}
+|-
+{{#if: {{{item39|}}}|
+{{!}} [[File:Is {{{platform}}} {{lc:{{{item39image|{{{item39}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+{{!}} '''[[{{{item39article|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{item39}}}}}}|{{{item39}}}]]'''
+{{!}} {{{obtain39}}}}}
+|-
+| style="border-bottom-left-radius: 9px" | [[File:Is {{{platform}}} {{lc:{{{itemlastimage|{{{itemlast}}}}}}}}.png{{#switch:{{{platform}}}|fewa|fewa2|fe16={{!}}x20px|fe17={{!}}x24px}}]]
+| '''[[{{{itemlastarticle|{{#switch:{{{platform}}}|ps1|ps2|vs1|vs2=Saga:}}{{{itemlast}}}}}}|{{{itemlast}}}]]'''
+| style="border-bottom-right-radius: 9px" | {{{obtainlast}}}
+|}
+|}<includeonly>[[Category:pages using deprecated templates]]</includeonly><noinclude>{{Deprecated|ChapItemsHdr|ChapItemsCell FE1|ChapItemsFtr}}
+
+==Usage==
+Use for item data on chapter pages. Only the item name is necessary for sprites, they've been taken care of in the coding. Even if there is only one item, use <code>itemlast</code> and <code>obtainlast</code> to ensure the template is rounded.
+<pre>
+{{ChapItems
+|platform= platform abbreviation (i.e. snes, gba, gcn, wii, or ds)
+|item1= First item
+|obtain1= Obtainment method for first item
+|item2= Second item
+|obtain2= Obtainment method for second item
+|itemlast=Final item
+|obtainlast= Obtainment method for last item
+}}
+</pre>
+[[Category:Chapter data templates]]
+</noinclude>

@@ -1,0 +1,487 @@
+{|class="cellpadding-3 mw-collapsible mw-collapsed basic" style="border-width: 2px; width: 700px; max-width:100%"
+!style="background: none" colspan="6"| ''Fire Emblem Cipher'' data for {{{name|{{PAGENAME}}}}}
+|-
+<!--Entry 1 begins here.-->
+|class="round" style="border:1px solid {{Color2}}; width: 25%; height: 150px" rowspan="6"| {{#if:{{{altimage1|}}}|
+{{Tab| tab1=Normal| content1={{{image1|<small>No image available.</small>}}}| tab2={{{altlabel1|Promo}}}| content2={{{altimage1}}}| tab3={{#if: {{{alt2image1|}}} | {{{alt2label1|}}} }}| content3={{{alt2image1}}}| tab4={{#if:{{{alt3image1|}}}| {{{alt3label1|Promo}}} }}| content4= {{{alt3image1}}}| tab5={{#if:{{{alt4image1|}}}| {{{alt4label1|Promo}}} }}| content5= {{{alt4image1}}}| tab6={{#if:{{{alt5image1|}}}| {{{alt5label1|Promo}}} }}| content6= {{{alt5image1}}} }}|{{{image1|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" | {{{title1|--}}}, {{{name1|--}}}
+|-
+| style="border:2px solid {{Color3}}; background: #fff; width: 1%" rowspan="4"| [[File:Ic TCGCipher {{{affil1|Archanea}}} small.png|20px|{{{affil1|Archanea}}}]]{{#if:{{{affil2-1|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-1}}} small.png|20px|{{{affil2-1}}}]]}}<p></p>[[File:It TCGCipher {{{gender1|Female}}}.png|20px|{{{gender1|Female}}}]]{{#if:{{{weapon1|}}}|<p></p>[[File:Iw TCGCipher {{{weapon1}}}.png|20px|{{{weapon1}}}]] }}{{#if:{{{type1|}}}|<p></p>{{{type1}}} }}
+| colspan="4"|"''{{{quote1|--}}}''"
+|-
+| style="width: 18%"| '''Attack:''' {{{attack1|1}}}
+| style="width: 18%"| '''Support:''' {{{support1|1}}}
+| style="width: 18%"| '''Range:''' {{{range1|1}}}
+| style="width: 18%"| '''Deploy Cost:''' {{{atkcost1|1}}}
+|-
+|colspan="2" | '''Class:''' {{#if:{{{class1|}}}|{{{class1}}}|None}}
+| '''Tier:''' {{#if:{{{tier1|}}}|[[:Category:{{{tier1}}} classes|{{{tier1}}}]]|None}}
+| '''Class Change Cost:''' {{{cccost1|--}}}
+|-
+| colspan="4" | {{{skill1|--}}}
+|-
+!class="roundb" colspan="5" | <small>Card #{{{no1|001}}} • Artist: {{{artist1|--}}}</small>
+|-
+<!--Entry 2 begins here.-->
+{{#if:{{{no2|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage2|}}}|
+{{Tab| tab1=Normal| content1={{{image2|<small>No image available.</small>}}}| tab2={{{altlabel2|Promo}}}| content2={{{altimage2|<small>No image available.</small>}}}| tab3={{#if: {{{alt2image2|}}} | {{{alt2lable2|Promo}}} }} | content3={{{alt2image2}}}| tab4={{#if:{{{alt3image2|}}}| {{{alt3label2|Promo}}} }}| content4= {{{alt3image2}}}| tab5={{#if:{{{alt4image2|}}}| {{{alt4label2|Promo}}} }}| content5= {{{alt4image2}}}| tab6={{#if:{{{alt5image2|}}}| {{{alt5label2|Promo}}} }}| content6= {{{alt5image2}}} }}|{{{image2|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title2|--}}}, {{{name2|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil2|Archanea}}} small.png|20px|{{{affil2|Archanea}}}]]{{#if:{{{affil2-2|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-2}}} small.png|20px|{{{affil2-2}}}]]}}<p></p>[[File:It TCGCipher {{{gender2|Female}}}.png|20px|{{{gender2|Female}}}]]{{#if:{{{weapon2|}}}|<p></p>[[File:Iw TCGCipher {{{weapon2}}}.png|20px|{{{weapon2}}}]] }}{{#if:{{{type2|}}}|<p></p>{{{type2}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote2|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack2|1}}}
+{{!}} '''Support:''' {{{support2|1}}}
+{{!}} '''Range:''' {{{range2|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost2|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class2|}}}|{{{class2}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier2|}}}|[[:Category:{{{tier2}}} classes|{{{tier2}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost2|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill2|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no2|001}}} • Artist: {{{artist2|--}}}</small>}}
+|-
+<!--Entry 3 begins here.-->
+{{#if:{{{no3|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage3|}}}|
+{{Tab| tab1=Normal| content1={{{image3|<small>No image available.</small>}}}| tab2={{{altlabel3|Promo}}}| content2={{{altimage3}}}| tab3={{#if:{{{alt2image3|}}}| {{{alt2label3|Promo}}} }}| content3= {{{alt2image3}}}| tab4={{#if:{{{alt3image3|}}}| {{{alt3label3|Promo}}} }}| content4= {{{alt3image3}}}| tab5={{#if:{{{alt4image3|}}}| {{{alt4label3|Promo}}} }}| content5= {{{alt4image3}}}| tab6={{#if:{{{alt5image3|}}}| {{{alt5label3|Promo}}} }}| content6= {{{alt5image3}}} }}|{{{image3|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title3|--}}}, {{{name3|--}}}
+{{!}}-
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil3|Archanea}}} small.png|20px|{{{affil3|Archanea}}}]]{{#if:{{{affil2-3|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-3}}} small.png|20px|{{{affil2-3}}}]]}}<p></p>[[File:It TCGCipher {{{gender3|Female}}}.png|20px|{{{gender3|Female}}}]]{{#if:{{{weapon3|}}}|<p></p>[[File:Iw TCGCipher {{{weapon3}}}.png|20px|{{{weapon3}}}]] }}{{#if:{{{type3|}}}|<p></p>{{{type3}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote3|--}}}''"
+{{!}}-
+{{!}} '''Attack:''' {{{attack3|1}}}
+{{!}} '''Support:''' {{{support3|1}}}
+{{!}} '''Range:''' {{{range3|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost3|1}}}
+{{!}}-
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class3|}}}|{{{class3}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier3|}}}|[[:Category:{{{tier3}}} classes|{{{tier3}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost3|--}}}
+{{!}}-
+{{!}} colspan="4" {{!}} {{{skill3|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no3|001}}} • Artist: {{{artist3|--}}}</small>}}
+|-
+<!--Entry 4 begins here.-->
+{{#if:{{{no4|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage4|}}}|
+{{Tab| tab1=Normal| content1={{{image4|<small>No image available.</small>}}}| tab2={{{altlabel4|Promo}}}| content2={{{altimage4}}}| tab3={{#if:{{{alt2image4|}}}| {{{alt2label4|Promo}}} }}| content3={{{alt2image4}}}| tab4={{#if:{{{alt3image4|}}}| {{{alt3label4|Promo}}} }}| content4= {{{alt3image4}}}| tab5={{#if:{{{alt4image4|}}}| {{{alt4label4|Promo}}} }}| content5= {{{alt4image4}}}| tab6={{#if:{{{alt5image4|}}}| {{{alt5label4|Promo}}} }}| content6= {{{alt5image4}}} }}|{{{image4|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title4|--}}}, {{{name4|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil4|Archanea}}} small.png|20px|{{{affil4|Archanea}}}]]{{#if:{{{affil2-4|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-4}}} small.png|20px|{{{affil2-4}}}]]}}<p></p>[[File:It TCGCipher {{{gender4|Female}}}.png|20px|{{{gender4|Female}}}]]{{#if:{{{weapon4|}}}|<p></p>[[File:Iw TCGCipher {{{weapon4}}}.png|20px|{{{weapon4}}}]] }}{{#if:{{{type4|}}}|<p></p>{{{type4}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote4|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack4|1}}}
+{{!}} '''Support:''' {{{support4|1}}}
+{{!}} '''Range:''' {{{range4|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost4|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class4|}}}|{{{class4}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier4|}}}|[[:Category:{{{tier4}}} classes|{{{tier4}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost4|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill4|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no4|001}}} • Artist: {{{artist4|--}}}</small>}}
+|-
+<!--Entry 5 begins here.-->
+{{#if:{{{no5|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage5|}}}|
+{{Tab| tab1=Normal| content1={{{image5|<small>No image available.</small>}}}| tab2={{{altlabel5|Promo}}}| content2={{{altimage5}}}| tab3={{#if:{{{alt2image5|}}}| {{{alt2label5|Promo}}} }}| content3={{{alt2image5}}}| tab4={{#if:{{{alt3image5|}}}| {{{alt3label5|Promo}}} }}| content4= {{{alt3image5}}}| tab5={{#if:{{{alt4image5|}}}| {{{alt4label5|Promo}}} }}| content5= {{{alt4image5}}}| tab6={{#if:{{{alt5image5|}}}| {{{alt5label5|Promo}}} }}| content6= {{{alt5image5}}} }}|{{{image5|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title5|--}}}, {{{name5|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil5|Archanea}}} small.png|20px|{{{affil5|Archanea}}}]]{{#if:{{{affil2-5|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-5}}} small.png|20px|{{{affil2-5}}}]]}}<p></p>[[File:It TCGCipher {{{gender5|Female}}}.png|20px|{{{gender5|Female}}}]]{{#if:{{{weapon5|}}}|<p></p>[[File:Iw TCGCipher {{{weapon5}}}.png|20px|{{{weapon5}}}]] }}{{#if:{{{type5|}}}|<p></p>{{{type5}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote5|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack5|1}}}
+{{!}} '''Support:''' {{{support5|1}}}
+{{!}} '''Range:''' {{{range5|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost5|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class5|}}}|{{{class5}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier5|}}}|[[:Category:{{{tier5}}} classes|{{{tier5}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost5|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill5|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no5|001}}} • Artist: {{{artist5|--}}}</small>}}
+|-
+<!--Entry 6 begins here.-->
+{{#if:{{{no6|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage6|}}}|
+{{Tab| tab1=Normal| content1={{{image6|<small>No image available.</small>}}}| tab2={{{altlabel6|Promo}}}| content2={{{altimage6}}}| tab3={{#if:{{{alt2image6|}}}| {{{alt2label6|Promo}}} }}| content3={{{alt2image6}}}| tab4={{#if:{{{alt3image6|}}}| {{{alt3label6|Promo}}} }}| content4= {{{alt3image6}}}| tab5={{#if:{{{alt4image6|}}}| {{{alt4label6|Promo}}} }}| content5= {{{alt4image6}}}| tab6={{#if:{{{alt5image6|}}}| {{{alt5label6|Promo}}} }}| content6= {{{alt5image6}}} }}|{{{image6|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title6|--}}}, {{{name6|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil6|Archanea}}} small.png|20px|{{{affil6|Archanea}}}]]{{#if:{{{affil2-6|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-6}}} small.png|20px|{{{affil2-6}}}]]}}<p></p>[[File:It TCGCipher {{{gender6|Female}}}.png|20px|{{{gender6|Female}}}]]{{#if:{{{weapon6|}}}|<p></p>[[File:Iw TCGCipher {{{weapon6}}}.png|20px|{{{weapon6}}}]] }}{{#if:{{{type6|}}}|<p></p>{{{type6}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote6|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack6|1}}}
+{{!}} '''Support:''' {{{support6|1}}}
+{{!}} '''Range:''' {{{range6|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost6|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class6|}}}|{{{class6}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier6|}}}|[[:Category:{{{tier6}}} classes|{{{tier6}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost6|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill6|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no6|001}}} • Artist: {{{artist6|--}}}</small>}}
+|-
+<!--Entry 7 begins here.-->
+{{#if:{{{no7|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage7|}}}|
+{{Tab| tab1=Normal| content1={{{image7|<small>No image available.</small>}}}| tab2={{{altlabel7|Promo}}}| content2={{{altimage7}}}| tab3={{#if:{{{alt2image7|}}}| {{{alt2label7|Promo}}} }}| content3={{{alt2image7}}}| tab4={{#if:{{{alt3image7|}}}| {{{alt3label7|Promo}}} }}| content4= {{{alt3image7}}}| tab5={{#if:{{{alt4image7|}}}| {{{alt4label7|Promo}}} }}| content5= {{{alt4image7}}}| tab6={{#if:{{{alt5image7|}}}| {{{alt5label7|Promo}}} }}| content6= {{{alt5image7}}} }}|{{{image7|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title7|--}}}, {{{name7|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil7|Archanea}}} small.png|20px|{{{affil7|Archanea}}}]]{{#if:{{{affil2-7|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-7}}} small.png|20px|{{{affil2-7}}}]]}}<p></p>[[File:It TCGCipher {{{gender7|Female}}}.png|20px|{{{gender7|Female}}}]]{{#if:{{{weapon7|}}}|<p></p>[[File:Iw TCGCipher {{{weapon7}}}.png|20px|{{{weapon7}}}]] }}{{#if:{{{type7|}}}|<p></p>{{{type7}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote7|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack7|1}}}
+{{!}} '''Support:''' {{{support7|1}}}
+{{!}} '''Range:''' {{{range7|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost7|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class7|}}}|{{{class7}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier7|}}}|[[:Category:{{{tier7}}} classes|{{{tier7}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost7|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill7|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no7|001}}} • Artist: {{{artist7|--}}}</small>}}
+|-
+<!--Entry 8 begins here.-->
+{{#if:{{{no8|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage8|}}}|
+{{Tab| tab1=Normal| content1={{{image8|<small>No image available.</small>}}}| tab2={{{altlabel8|Promo}}}| content2={{{altimage8}}}| tab3={{#if:{{{alt2image8|}}}| {{{alt2label8|Promo}}} }}| content3={{{alt2image8}}}| tab4={{#if:{{{alt3image8|}}}| {{{alt3label8|Promo}}} }}| content4= {{{alt3image8}}}| tab5={{#if:{{{alt4image8|}}}| {{{alt4label8|Promo}}} }}| content5= {{{alt4image8}}}| tab6={{#if:{{{alt5image8|}}}| {{{alt5label8|Promo}}} }}| content6= {{{alt5image8}}} }}|{{{image8|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title8|--}}}, {{{name8|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil8|Archanea}}} small.png|20px|{{{affil8|Archanea}}}]]{{#if:{{{affil2-8|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-8}}} small.png|20px|{{{affil2-8}}}]]}}<p></p>[[File:It TCGCipher {{{gender8|Female}}}.png|20px|{{{gender8|Female}}}]]{{#if:{{{weapon8|}}}|<p></p>[[File:Iw TCGCipher {{{weapon8|Sword}}}.png|20px|{{{weapon8|Sword}}}]] }}{{#if:{{{type8|}}}|<p></p>{{{type8}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote8|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack8|1}}}
+{{!}} '''Support:''' {{{support8|1}}}
+{{!}} '''Range:''' {{{range8|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost8|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class8|}}}|{{{class8}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier8|}}}|[[:Category:{{{tier8}}} classes|{{{tier8}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost8|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill8|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no8|001}}} • Artist: {{{artist8|--}}}</small>}}
+|-
+<!--Entry 9 begins here.-->
+{{#if:{{{no9|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage9|}}}|
+{{Tab| tab1=Normal| content1={{{image9|<small>No image available.</small>}}}| tab2={{{altlabel9|Promo}}}| content2={{{altimage9}}}| tab3={{#if:{{{alt2image9|}}}| {{{alt2label9|Promo}}} }}| content3={{{alt2image9}}}| tab4={{#if:{{{alt3image9|}}}| {{{alt3label9|Promo}}} }}| content4= {{{alt3image9}}}| tab5={{#if:{{{alt4image9|}}}| {{{alt4label9|Promo}}} }}| content5= {{{alt4image9}}}| tab6={{#if:{{{alt5image9|}}}| {{{alt5label9|Promo}}} }}| content6= {{{alt5image9}}} }}|{{{image9|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title9|--}}}, {{{name9|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil9|Archanea}}} small.png|20px|{{{affil9|Archanea}}}]]{{#if:{{{affil2-9|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-9}}} small.png|20px|{{{affil9}}}]]}}<p></p>[[File:It TCGCipher {{{gender9|Female}}}.png|20px|{{{gender9|Female}}}]]{{#if:{{{weapon9|}}}|<p></p>[[File:Iw TCGCipher {{{weapon9}}}.png|20px|{{{weapon9}}}]] }}{{#if:{{{type9|}}}|<p></p>{{{type9}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote9|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack9|1}}}
+{{!}} '''Support:''' {{{support9|1}}}
+{{!}} '''Range:''' {{{range9|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost9|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class9|}}}|{{{class9}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier9|}}}|[[:Category:{{{tier9}}} classes|{{{tier9}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost9|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill9|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no9|001}}} • Artist: {{{artist9|--}}}</small>}}
+|-
+<!--Entry 10 begins here.-->
+{{#if:{{{no10|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage10|}}}|
+{{Tab| tab1=Normal| content1={{{image10|<small>No image available.</small>}}}| tab2={{{altlabel10|Promo}}}| content2={{{altimage10}}}| tab3={{#if:{{{alt2image10|}}}| {{{alt2label10|Promo}}} }}| content3={{{alt2image10}}}| tab4={{#if:{{{alt3image10|}}}| {{{alt3label10|Promo}}} }}| content4= {{{alt3image10}}}| tab5={{#if:{{{alt4image10|}}}| {{{alt4label10|Promo}}} }}| content5= {{{alt4image10}}}| tab6={{#if:{{{alt5image10|}}}| {{{alt5label10|Promo}}} }}| content6= {{{alt5image10}}} }}|{{{image10|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title10|--}}}, {{{name10|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil10|Archanea}}} small.png|20px|{{{affil10|Archanea}}}]]{{#if:{{{affil2-10|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-10}}} small.png|20px|{{{affil2-10}}}]]}}<p></p>[[File:It TCGCipher {{{gender10|Female}}}.png|20px|{{{gender10|Female}}}]]{{#if:{{{weapon10|}}}|<p></p>[[File:Iw TCGCipher {{{weapon10}}}.png|20px|{{{weapon10}}}]] }}{{#if:{{{type10|}}}|<p></p>{{{type10}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote10|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack10|1}}}
+{{!}} '''Support:''' {{{support10|1}}}
+{{!}} '''Range:''' {{{range10|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost10|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class10|}}}|{{{class10}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier10|}}}|[[:Category:{{{tier10}}} classes|{{{tier10}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost10|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill10|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no10|001}}} • Artist: {{{artist10|--}}}</small>}}
+|-
+<!--Entry 11 begins here.-->
+{{#if:{{{no11|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage11|}}}|
+{{Tab| tab1=Normal| content1={{{image11|<small>No image available.</small>}}}| tab2={{{altlabel11|Promo}}}| content2={{{altimage11}}}| tab3={{#if:{{{alt2image11|}}}| {{{alt2label11|Promo}}} }}| content3={{{alt2image11}}}| tab4={{#if:{{{alt3image11|}}}| {{{alt3label11|Promo}}} }}| content4= {{{alt3image11}}}| tab5={{#if:{{{alt4image11|}}}| {{{alt4label11|Promo}}} }}| content5= {{{alt4image11}}}| tab6={{#if:{{{alt5image11|}}}| {{{alt5label11|Promo}}} }}| content6= {{{alt5image11}}} }}|{{{image11|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title11|--}}}, {{{name11|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil11|Archanea}}} small.png|20px|{{{affil11|Archanea}}}]]{{#if:{{{affil2-11|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-11}}} small.png|20px|{{{affil2-11}}}]]}}<p></p>[[File:It TCGCipher {{{gender11|Female}}}.png|20px|{{{gender11|Female}}}]]{{#if:{{{weapon11|}}}|<p></p>[[File:Iw TCGCipher {{{weapon11}}}.png|20px|{{{weapon11}}}]] }}{{#if:{{{type11|}}}|<p></p>{{{type11}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote11|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack11|1}}}
+{{!}} '''Support:''' {{{support11|1}}}
+{{!}} '''Range:''' {{{range11|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost11|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class11|}}}|{{{class11}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier11|}}}|[[:Category:{{{tier11}}} classes|{{{tier11}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost11|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill11|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no11|001}}} • Artist: {{{artist11|--}}}</small>}}
+|-
+<!--Entry 12 begins here.-->
+{{#if:{{{no12|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage12|}}}|
+{{Tab| tab1=Normal| content1={{{image12|<small>No image available.</small>}}}| tab2={{{altlabel12|Promo}}}| content2={{{altimage12}}}| tab3={{#if:{{{alt2image12|}}}| {{{alt2label12|Promo}}} }}| content3={{{alt2image12}}}| tab4={{#if:{{{alt3image12|}}}| {{{alt3label12|Promo}}} }}| content4= {{{alt3image12}}}| tab5={{#if:{{{alt4image12|}}}| {{{alt4label12|Promo}}} }}| content5= {{{alt4image12}}}| tab6={{#if:{{{alt5image12|}}}| {{{alt5label12|Promo}}} }}| content6= {{{alt5image12}}} }}|{{{image12|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title12|--}}}, {{{name12|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil12|Archanea}}} small.png|20px|{{{affil12|Archanea}}}]]{{#if:{{{affil2-12|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-12}}} small.png|20px|{{{affil2-12}}}]]}}<p></p>[[File:It TCGCipher {{{gender12|Female}}}.png|20px|{{{gender12|Female}}}]]{{#if:{{{weapon12|}}}|<p></p>[[File:Iw TCGCipher {{{weapon12}}}.png|20px|{{{weapon12}}}]] }}{{#if:{{{type12|}}}|<p></p>{{{type12}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote12|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack12|1}}}
+{{!}} '''Support:''' {{{support12|1}}}
+{{!}} '''Range:''' {{{range12|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost12|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class12|}}}|{{{class12}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier12|}}}|[[:Category:{{{tier12}}} classes|{{{tier12}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost12|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill12|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no12|001}}} • Artist: {{{artist12|--}}}</small>}}
+|-
+<!--Entry 13 begins here.-->
+{{#if:{{{no13|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage13|}}}|
+{{Tab| tab1=Normal| content1={{{image13|<small>No image available.</small>}}}| tab2={{{altlabel13|Promo}}}| content2={{{altimage13}}}| tab3={{#if:{{{alt2image13|}}}| {{{alt2label13|Promo}}} }}| content3={{{alt2image13}}}| tab4={{#if:{{{alt3image13|}}}| {{{alt3label13|Promo}}} }}| content4= {{{alt3image13}}}| tab5={{#if:{{{alt4image13|}}}| {{{alt4label13|Promo}}} }}| content5= {{{alt4image13}}}| tab6={{#if:{{{alt5image13|}}}| {{{alt5label13|Promo}}} }}| content6= {{{alt5image13}}} }}|{{{image13|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title13|--}}}, {{{name13|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil13|Archanea}}} small.png|20px|{{{affil13|Archanea}}}]]{{#if:{{{affil2-13|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-13}}} small.png|20px|{{{affil2-13}}}]]}}<p></p>[[File:It TCGCipher {{{gender13|Female}}}.png|20px|{{{gender13|Female}}}]]{{#if:{{{weapon13|}}}|<p></p>[[File:Iw TCGCipher {{{weapon13}}}.png|20px|{{{weapon13}}}]] }}{{#if:{{{type13|}}}|<p></p>{{{type13}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote13|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack13|1}}}
+{{!}} '''Support:''' {{{support13|1}}}
+{{!}} '''Range:''' {{{range13|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost13|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class13|}}}|{{{class13}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier13|}}}|[[:Category:{{{tier13}}} classes|{{{tier13}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost13|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill13|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no13|001}}} • Artist: {{{artist13|--}}}</small>}}
+|-
+<!--Entry 14 begins here.-->
+{{#if:{{{no14|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage14|}}}|
+{{Tab| tab1=Normal| content1={{{image14|<small>No image available.</small>}}}| tab2={{{altlabel14|Promo}}}| content2={{{altimage14}}}| tab3={{#if:{{{alt2image14|}}}| {{{alt2label14|Promo}}} }}| content3={{{alt2image14}}}| tab4={{#if:{{{alt3image14|}}}| {{{alt3label14|Promo}}} }}| content4= {{{alt3image14}}}| tab5={{#if:{{{alt4image14|}}}| {{{alt4label14|Promo}}} }}| content5= {{{alt4image14}}}| tab6={{#if:{{{alt5image14|}}}| {{{alt5label14|Promo}}} }}| content6= {{{alt5image14}}} }}|{{{image14|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title14|--}}}, {{{name14|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil14|Archanea}}} small.png|20px|{{{affil14|Archanea}}}]]{{#if:{{{affil2-14|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-14}}} small.png|20px|{{{affil2-14}}}]]}}<p></p>[[File:It TCGCipher {{{gender14|Female}}}.png|20px|{{{gender14|Female}}}]]{{#if:{{{weapon14|}}}|<p></p>[[File:Iw TCGCipher {{{weapon14}}}.png|20px|{{{weapon14}}}]] }}{{#if:{{{type14|}}}|<p></p>{{{type14}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote14|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack14|1}}}
+{{!}} '''Support:''' {{{support14|1}}}
+{{!}} '''Range:''' {{{range14|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost14|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class14|}}}|{{{class14}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier14|}}}|[[:Category:{{{tier14}}} classes|{{{tier14}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost14|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill14|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no14|001}}} • Artist: {{{artist14|--}}}</small>}}
+|-
+<!--Entry 15 begins here.-->
+{{#if:{{{no15|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage15|}}}|
+{{Tab| tab1=Normal| content1={{{image15|<small>No image available.</small>}}}| tab2={{{altlabel15|Promo}}}| content2={{{altimage15}}}| tab3={{#if:{{{alt2image15|}}}| {{{alt2label15|Promo}}} }}| content3={{{alt2image15}}}| tab4={{#if:{{{alt3image15|}}}| {{{alt3label15|Promo}}} }}| content4= {{{alt3image15}}}| tab5={{#if:{{{alt4image15|}}}| {{{alt4label15|Promo}}} }}| content5= {{{alt4image15}}}| tab6={{#if:{{{alt5image15|}}}| {{{alt5label15|Promo}}} }}| content6= {{{alt5image15}}} }}|{{{image15|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title15|--}}}, {{{name15|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil15|Archanea}}} small.png|20px|{{{affil15|Archanea}}}]]{{#if:{{{affil2-15|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-15}}} small.png|20px|{{{affil2-15}}}]]}}<p></p>[[File:It TCGCipher {{{gender15|Female}}}.png|20px|{{{gender15|Female}}}]]{{#if:{{{weapon15|}}}|<p></p>[[File:Iw TCGCipher {{{weapon15}}}.png|20px|{{{weapon15}}}]] }}{{#if:{{{type15|}}}|<p></p>{{{type15}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote15|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack15|1}}}
+{{!}} '''Support:''' {{{support15|1}}}
+{{!}} '''Range:''' {{{range15|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost15|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class15|}}}|{{{class15}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier15|}}}|[[:Category:{{{tier15}}} classes|{{{tier15}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost15|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill15|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no15|001}}} • Artist: {{{artist15|--}}}</small>}}
+|-
+<!--Entry 16 begins here.-->
+{{#if:{{{no16|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage16|}}}|
+{{Tab| tab1=Normal| content1={{{image16|<small>No image available.</small>}}}| tab2={{{altlabel16|Promo}}}| content2={{{altimage16}}}| tab3={{#if:{{{alt2image16|}}}| {{{alt2label16|Promo}}} }}| content3={{{alt2image16}}}| tab4={{#if:{{{alt3image16|}}}| {{{alt3label16|Promo}}} }}| content4= {{{alt3image16}}}| tab5={{#if:{{{alt4image16|}}}| {{{alt4label16|Promo}}} }}| content5= {{{alt4image16}}}| tab6={{#if:{{{alt5image16|}}}| {{{alt5label16|Promo}}} }}| content6= {{{alt5image16}}} }}|{{{image16|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title16|--}}}, {{{name16|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil16|Archanea}}} small.png|20px|{{{affil16|Archanea}}}]]{{#if:{{{affil2-16|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-16}}} small.png|20px|{{{affil2-16}}}]]}}<p></p>[[File:It TCGCipher {{{gender16|Female}}}.png|20px|{{{gender16|Female}}}]]{{#if:{{{weapon16|}}}|<p></p>[[File:Iw TCGCipher {{{weapon16}}}.png|20px|{{{weapon16}}}]] }}{{#if:{{{type16|}}}|<p></p>{{{type16}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote16|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack16|1}}}
+{{!}} '''Support:''' {{{support16|1}}}
+{{!}} '''Range:''' {{{range16|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost16|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class16|}}}|{{{class16}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier16|}}}|[[:Category:{{{tier16}}} classes|{{{tier16}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost16|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill16|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no16|001}}} • Artist: {{{artist16|--}}}</small>}}
+|-
+<!--Entry 17 begins here.-->
+{{#if:{{{no17|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage17|}}}|
+{{Tab| tab1=Normal| content1={{{image17|<small>No image available.</small>}}}| tab2={{{altlabel17|Promo}}}| content2={{{altimage17}}}| tab3={{#if:{{{alt2image17|}}}| {{{alt2label17|Promo}}} }}| content3={{{alt2image17}}}| tab4={{#if:{{{alt3image17|}}}| {{{alt3label17|Promo}}} }}| content4= {{{alt3image17}}}| tab5={{#if:{{{alt4image17|}}}| {{{alt4label17|Promo}}} }}| content5= {{{alt4image17}}}| tab6={{#if:{{{alt5image17|}}}| {{{alt5label17|Promo}}} }}| content6= {{{alt5image17}}} }}|{{{image17|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title17|--}}}, {{{name17|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil17|Archanea}}} small.png|20px|{{{affil17|Archanea}}}]]{{#if:{{{affil2-17|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-17}}} small.png|20px|{{{affil2-17}}}]]}}<p></p>[[File:It TCGCipher {{{gender17|Female}}}.png|20px|{{{gender17|Female}}}]]{{#if:{{{weapon17|}}}|<p></p>[[File:Iw TCGCipher {{{weapon17}}}.png|20px|{{{weapon17}}}]] }}{{#if:{{{type17|}}}|<p></p>{{{type17}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote17|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack17|1}}}
+{{!}} '''Support:''' {{{support17|1}}}
+{{!}} '''Range:''' {{{range17|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost17|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class17|}}}|{{{class17}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier17|}}}|[[:Category:{{{tier17}}} classes|{{{tier17}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost17|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill17|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no17|001}}} • Artist: {{{artist17|--}}}</small>}}
+|-
+<!--Entry 18 begins here.-->
+{{#if:{{{no18|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage18|}}}|
+{{Tab| tab1=Normal| content1={{{image18|<small>No image available.</small>}}}| tab2={{{altlabel18|Promo}}}| content2={{{altimage18}}}| tab3={{#if:{{{alt2image18|}}}| {{{alt2label18|Promo}}} }}| content3={{{alt2image18}}}| tab4={{#if:{{{alt3image18|}}}| {{{alt3label18|Promo}}} }}| content4= {{{alt3image18}}}| tab5={{#if:{{{alt4image18|}}}| {{{alt4label18|Promo}}} }}| content5= {{{alt4image18}}}| tab6={{#if:{{{alt5image18|}}}| {{{alt5label18|Promo}}} }}| content6= {{{alt5image18}}} }}|{{{image18|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title18|--}}}, {{{name18|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil18|Archanea}}} small.png|20px|{{{affil18|Archanea}}}]]{{#if:{{{affil2-18|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-18}}} small.png|20px|{{{affil2-18}}}]]}}<p></p>[[File:It TCGCipher {{{gender18|Female}}}.png|20px|{{{gender18|Female}}}]]{{#if:{{{weapon18|}}}|<p></p>[[File:Iw TCGCipher {{{weapon18}}}.png|20px|{{{weapon18}}}]] }}{{#if:{{{type18|}}}|<p></p>{{{type18}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote18|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack18|1}}}
+{{!}} '''Support:''' {{{support18|1}}}
+{{!}} '''Range:''' {{{range18|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost18|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class18|}}}|{{{class18}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier18|}}}|[[:Category:{{{tier18}}} classes|{{{tier18}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost18|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill18|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no18|001}}} • Artist: {{{artist18|--}}}</small>}}
+|-
+<!--Entry 19 begins here.-->
+{{#if:{{{no19|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage19|}}}|
+{{Tab| tab1=Normal| content1={{{image19|<small>No image available.</small>}}}| tab2={{{altlabel19|Promo}}}| content2={{{altimage19}}}| tab3={{#if:{{{alt2image19|}}}| {{{alt2label19|Promo}}} }}| content3={{{alt2image19}}}| tab4={{#if:{{{alt3image19|}}}| {{{alt3label19|Promo}}} }}| content4= {{{alt3image19}}}| tab5={{#if:{{{alt4image19|}}}| {{{alt4label19|Promo}}} }}| content5= {{{alt4image19}}}| tab6={{#if:{{{alt5image19|}}}| {{{alt5label19|Promo}}} }}| content6= {{{alt5image19}}} }}|{{{image19|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title19|--}}}, {{{name19|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil19|Archanea}}} small.png|20px|{{{affil19|Archanea}}}]]{{#if:{{{affil2-19|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-19}}} small.png|20px|{{{affil2-19}}}]]}}<p></p>[[File:It TCGCipher {{{gender19|Female}}}.png|20px|{{{gender19|Female}}}]]{{#if:{{{weapon19|}}}|<p></p>[[File:Iw TCGCipher {{{weapon19}}}.png|20px|{{{weapon19}}}]] }}{{#if:{{{type19|}}}|<p></p>{{{type19}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote19|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack19|1}}}
+{{!}} '''Support:''' {{{support19|1}}}
+{{!}} '''Range:''' {{{range19|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost19|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class19|}}}|{{{class19}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier19|}}}|[[:Category:{{{tier19}}} classes|{{{tier19}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost19|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill19|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no19|001}}} • Artist: {{{artist19|--}}}</small>}}
+|-
+<!--Entry 20 begins here.-->
+{{#if:{{{no20|}}}|
+{{!}}class="round" style="border:1px solid {{Color2}}; height: 150px" rowspan="6"{{!}} {{#if:{{{altimage20|}}}|
+{{Tab| tab1=Normal| content1={{{image20|<small>No image available.</small>}}}| tab2={{{altlabel20|Promo}}}| content2={{{altimage20}}}| tab3={{#if:{{{alt2image20|}}}| {{{alt2label20|Promo}}} }}| content3={{{alt2image20}}}| tab4={{#if:{{{alt3image20|}}}| {{{alt3label20|Promo}}} }}| content4= {{{alt3image20}}}| tab5={{#if:{{{alt4image20|}}}| {{{alt4label20|Promo}}} }}| content5= {{{alt4image20}}}| tab6={{#if:{{{alt5image20|}}}| {{{alt5label20|Promo}}} }}| content6= {{{alt5image20}}} }}|{{{image20|<small>No image available.</small>}}} }}
+!class="roundt" colspan="5" {{!}} {{{title20|--}}}, {{{name20|--}}}
+{{!-}}
+{{!}}style="border:2px solid {{Color3}}; background: #fff" rowspan="4"{{!}} [[File:Ic TCGCipher {{{affil20|Archanea}}} small.png|20px|{{{affil20|Archanea}}}]]{{#if:{{{affil2-20|}}}|<p></p>[[File:Ic TCGCipher {{{affil2-20}}} small.png|20px|{{{affil2-20}}}]]}}<p></p>[[File:It TCGCipher {{{gender20|Female}}}.png|20px|{{{gender20|Female}}}]]{{#if:{{{weapon20|}}}|<p></p>[[File:Iw TCGCipher {{{weapon20}}}.png|20px|{{{weapon20}}}]] }}{{#if:{{{type20|}}}|<p></p>{{{type20}}} }}
+{{!}} colspan="4"{{!}}"''{{{quote20|--}}}''"
+{{!-}}
+{{!}} '''Attack:''' {{{attack20|1}}}
+{{!}} '''Support:''' {{{support20|1}}}
+{{!}} '''Range:''' {{{range20|1}}}
+{{!}} '''Deploy Cost:''' {{{atkcost20|1}}}
+{{!-}}
+{{!}}colspan="2" {{!}} '''Class:''' {{#if:{{{class20|}}}|{{{class20}}}|None}}
+{{!}} '''Tier:''' {{#if:{{{tier20|}}}|[[:Category:{{{tier20}}} classes|{{{tier20}}}]]|None}}
+{{!}} '''Class Change Cost:''' {{{cccost20|--}}}
+{{!-}}
+{{!}} colspan="4" {{!}} {{{skill20|--}}}
+{{!-}}
+!class="roundb" colspan="5" {{!}} <small>Card #{{{no20|001}}} • Artist: {{{artist20|--}}}</small>}}
+|-
+!class="round" style="border:2px solid {{Color2}}" colspan="6" | <small>Some card information translation provided by Serenes Forest.<br>For more detailed strategic information on these cards, see [http://serenesforest.net/wiki/index.php/{{{serenes|{{{name}}}}}}_(Cipher) their TCG wiki article on {{{sereneslabel|{{{serenes|{{{name}}}}}}}}}] {{#if:{{{serenes2|}}}| as well as [http://serenesforest.net/wiki/index.php/{{{serenes2}}}_(Cipher) {{{serenes2}}}] {{#if:{{{serenes3|}}}| and [http://serenesforest.net/wiki/index.php/{{{serenes3}}}_(Cipher) {{{serenes3}}}]}}}}.</small>
+|}<noinclude>
+{{Deprecated|CipherDataHdr|CipherDataCell|CipherDataFtr}}
+</noinclude><includeonly>[[Category:Pages using deprecated templates]]</includeonly><noinclude>
+
+==Usage==
+Box summarizing the contents of {{TCGCipher}} character cards, for use on character pages in the "Other appearances" section.
+<pre>
+{{TCGCipherData
+|name=The character's name
+|serenes=The name used for this character's respective Serenes TCG wiki article, for the link at the bottom of the template. This is for cases where what they call the character differs from Fire Emblem Wiki (e.g. Japan-only characters)
+|serenes#=The name of a character's alternate identity, if listed on separate pages on Serenes Forest but the same page on Fire Emblem Wiki
+|image#=An image of the card
+|altimage#=If the card has an alternate printing (e.g. a + rarity version or a promotional reprint), put its image here
+|altlabel#=Label for the tab into the alternate card image
+|alt2image#=If the card has a second alternate printing (for those extra special characters with two promo reprints), put its image here
+|alt2label#=Label for the second alternate card image
+|alt3image#=If the card has a third alternate printing (for those extra special characters with two promo reprints), put its image here
+|alt3label#=Label for the third alternate card image
+|alt4image#=If the card has a fourth alternate printing (for those extra special characters with two promo reprints), put its image here
+|alt4label#=Label for the fourth alternate card image
+|alt5image#=If the card has a fifth alternate printing (for those extra special characters with two promo reprints), put its image here
+|alt5label#=Label for the fifth alternate card image
+|title#=The card's character title
+|name#=The card character's name (in case of cases like Camus, where one character is known by multiple names)
+|affil#=The card's national/continent affiliation. Insert one of the following: Archanea, Jugdral, Elibe, Tellius, Ylisse, Hoshido, Nohr, None.
+|affil2-#=The card's second national/continent affiliation. Only invoke on dual-affiliation cards.
+|gender#=The card's gender
+|weapon#=The card's weapon type. Insert one of the following: Sword, Lance, Axe, Bow, Knife, Tome, Staff, Dragonstone, Fang
+|type#=Any class/effectiveness types assigned to the card. Insert the full icon code at 20px width/height
+|quote#=The quote attributed to the card
+|attack#=The card's attack power
+|support#=The card's support power
+|atkcost#=The card's deployment cost
+|range#=The card's range
+|class#=The card's class
+|tier#=The class's promotion tier
+|cccost#=The promotion cost needed to promote to this card. Only applies to advanced-class cards
+|skill#=The names and descriptions for the card's skills
+|no#=The card's number
+|artist#=The card's artist
+}}
+</pre>
+[[Category:TCG templates]]
+</noinclude>

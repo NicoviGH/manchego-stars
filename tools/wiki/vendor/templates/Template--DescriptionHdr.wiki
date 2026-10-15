@@ -1,0 +1,8 @@
+{| class="cellpadding-3 basic width-90" style="border-radius: 20px; border-width: 2px; padding: 4px"
+|- style="color: var(--emphasized-text-color)"
+! class="roundtl" style="width: 20%" | Game
+! style="width: 40%" | Text<br><small>(English)</small>
+! class="roundtr" style="width: 40%" | Text<br><small>(Japanese)</small><noinclude>
+|}
+
+{{doc}}</noinclude>

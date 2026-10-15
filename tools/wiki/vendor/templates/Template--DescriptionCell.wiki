@@ -1,0 +1,8 @@
+<noinclude>{| class="cellpadding-3 basic width-90" style="border-radius: 20px; border-width: 2px; padding: 4px"
+</noinclude>|-
+| {{{1|{{{game}}}}}}
+| <div style="white-space: pre; margin: auto; width: fit-content; text-align: left">{{{2|{{{english|--}}}}}}</div>{{#ifeq:{{#invoke:String|replace|{{{2|{{{english|--}}}}}}|??|}}||[[Category:Articles missing flavor text]]}}
+| <div style="white-space: pre; margin: auto; width: fit-content; text-align: left" lang="ja">{{{3|{{{japanese|--}}}}}}</div>{{#ifeq:{{#invoke:String|replace|{{{3|{{{japanese|--}}}}}}|??|}}||[[Category:Articles missing flavor text]]}}<noinclude>
+|}
+
+{{doc}}</noinclude>

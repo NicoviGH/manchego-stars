@@ -1,0 +1,49 @@
+{| class="mw-collapsible mw-collapsed navbox" style="--navbox-color: #54265f"
+! ''[[Fire Emblem: The Sacred Stones]]''
+|-
+|
+{|
+! class="roundt" colspan="2" | [[List of characters in Fire Emblem: The Sacred Stones#Main Story|Playable characters]]
+| [[Amelia]] • [[Artur]] • [[Colm]] • [[Cormag]] • [[Dozla]] • [[Duessel]] • [[Eirika]] • [[Ephraim]] • [[Ewan]] • [[Forde]] • [[Franz]] • [[Garcia]] • [[Gerik]] • [[Gilliam]] • [[Innes]] • [[Joshua]] • [[Knoll]] • [[Kyle]] • [[L'Arachel]] • [[Lute]] • [[Marisa]] • [[Moulder]] • [[Myrrh]] • [[Natasha]] • [[Neimi]] • [[Rennac]] • [[Ross]] • [[Saleh]] • [[Seth]] • [[Syrene]] • [[Tana]] • [[Tethys]] • [[Vanessa]]
+|-
+! colspan="2" | [[List of characters in Fire Emblem: The Sacred Stones#Creature Campaign|Creature Campaign characters]]
+| [[Caellach]] • [[Fado]] • [[Glen]] • [[Hayden]] • [[Ismaire]] • [[Lyon]] • [[Orson]] • [[Riev]] • [[Selena (The Sacred Stones)|Selena]] • [[Valter]]
+|-
+! colspan="2" | [[List of characters in Fire Emblem: The Sacred Stones#Other|Non-playable characters]]
+| [[Dara]] • [[Klimt]] • [[Mansel]]
+|-
+! colspan="2" | [[List of characters in Fire Emblem: The Sacred Stones#Bosses|Bosses]]
+| [[Aias]] • [[Bandit (character)|Bandit]] • [[Bazba]] • [[Beran]] • [[Binks]] • [[Bone]] • [[Breguet]] • [[Caellach]] • [[Carlyle]] • [[Fomortiis]] • [[Gheb]] • [[Lyon]] • [[Morva]] • [[Murray]] • [[Novala]] • [[O'Neill]] • [[Orson]] • [[Pablo]] • [[Riev]] • [[Saar]] • [[Selena (The Sacred Stones)|Selena]] • [[Tirado]] • [[Valter]] • [[Vigarde]] • [[Zonta]]
+|-
+! colspan="2" | Background characters
+| [[Grado (character)|Grado]] • [[Latona (character)|Latona]] • [[MacGregor]] • [[Monica (The Sacred Stones)|Monica]] • [[Nada Kuya]]
+|-
+! colspan="2" | [[Sacred Twins]] and [[personal weapons]]
+| [[Audhulma]] • [[Excalibur]] • [[Garm]] • [[Gleipnir]] • [[Ivaldi]] • [[Latona]] • [[Nidhogg]] • [[Rapier]] • [[Reginleif]] • [[Sieglinde]] • [[Siegmund]] • [[Vidofnir]]
+|-
+! style="width: 10%" rowspan="4" | [[List of chapters in Fire Emblem: The Sacred Stones|Chapters]]
+! style="width: 10%" | Pre-split
+| {{abbr|P|Prologue}}: [[The Fall of Renais]] • 1: [[Escape!]] • 2: [[The Protected]] • 3: [[The Bandits of Borgo]] • 4: [[Ancient Horrors]] • 5: [[The Empire's Reach]] • 5x: [[Unbroken Heart]] • 6: [[Victims of War]] • 7: [[Waterside Renvall]] • 8: [[It's a Trap!]] • [[A New Journey]]
+|-
+! Eirika's Route
+| 9: [[Distant Blade]] • 10: [[Revolt at Carcino]] • 11: [[Creeping Darkness]] • 12: [[Village of Silence]] • 13: [[Hamill Canyon]] • 14: [[Queen of White Dunes]]
+|-
+! Ephraim's Route
+| 9: [[Fort Rigwald]] • 10: [[Turning Traitor]] • 11: [[Phantom Ship]] • 12: [[Landing at Taizel]] • 13: [[Fluorspar's Oath]] • 14: [[Father and Son]]
+|-
+! Post-split
+|15: [[Scorched Sand]] • 16: [[Ruled by Madness]] • 17: [[River of Regrets]] • 18: [[Two Faces of Evil]] • 19: [[Last Hope]] • 20: [[Darkling Woods]] • {{abbr|F|Final}}: Sacred Stone ([[Sacred Stone (part 1)|part 1]] • [[Sacred Stone (part 2)|part 2]])
+|-
+! colspan="2" | Locations
+| '''[[Magvel]]''' • [[Carcino]] ([[Caer Pelyn]]) • [[Darkling Woods (location)|Darkling Woods]] • [[Frelia]] ([[Tower of Valni]]) • [[Grado]] ([[Renvall]]) • [[Jehanna]] ([[Lagdou Ruins]]) • [[Rausten]] ([[Melkaen Coast]]) • [[Renais]] ([[Za'ha Woods]])
+|-
+! colspan="2" | Groups, objects, and concepts
+| [[Five heroes]] • [[Gerik's Mercenaries]] • [[Imperial Three]] • [[Legend of the Sacred Stones]] • [[Monster]]s • [[Sacred Stone (object)|Sacred Stone]]s • [[Sacred Twins]] • [[War of the Stones]]
+|-
+! colspan="2" | Lists
+| [[List of chapters in Fire Emblem: The Sacred Stones|Chapters]] • [[List of characters in Fire Emblem: The Sacred Stones|Characters]] ([[Availability chart/The Sacred Stones|Availability chart]]) • [[List of classes in Fire Emblem: The Sacred Stones|Classes]] ([[Class change/Game Boy Advance games#Fire Emblem: The Sacred Stones|Class change]]) • [[Hidden treasure/Game Boy Advance games#Hidden treasure locations in The Sacred Stones|Hidden treasure]] • [[List of items in Fire Emblem: The Sacred Stones|Items]] • [[:Category:Scripts of Fire Emblem: The Sacred Stones|Scripts]] • [[Skills#The Sacred Stones|Skills]] • [[List of supports in Fire Emblem: The Sacred Stones|Supports]] • [[List of weapons in Fire Emblem: The Sacred Stones|Weapons]]
+|-
+! class="roundb" colspan="2" | Related topics
+| [[Creature Campaign]] • {{title|The Sacred Stones Comic}} • [[Fire Emblem: The Sacred Stones (novelization)|Novelization]] • [[List of version differences/Fire Emblem: The Sacred Stones|List of version differences]] ([[Name chart/Fire Emblem: The Sacred Stones|Name chart]]) • [[Minor characters#Magvel|Minor characters]] • [[Fire Emblem: The Sacred Stones pre-release information|Pre-release information]] ([[Fire Emblem: The Sacred Stones build 040531_2253|Build 040531_2253]] • [[Unused content in Fire Emblem: The Sacred Stones|Unused content]]) • [[Sound Room of Fire Emblem: The Sacred Stones|Sound Room]] • [[Timeline of Magvel|Timeline]] • [[World map]]
+|}
+|}<noinclude>[[Category:Navigation templates|08]]</noinclude>

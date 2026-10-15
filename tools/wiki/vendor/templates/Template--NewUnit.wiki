@@ -1,0 +1,19 @@
+{| style="border-radius: 14px; border: 2px solid {{Color2}}; background: {{Color3}}; padding: 4px; text-align: center; margin: auto; max-width: 350px"
+! style="border-radius: 14px; border: 1px solid {{Color2}}; padding: 2px; font-size: larger" | [[{{{namearticle|{{{name}}}}}}|{{{name}}}]]
+|-
+| style="padding: 2px; width: 300px; height: 50px" | {{{portrait}}}
+|-
+|
+{| class="chapter-table" style="width: 100%; padding: 2px; border: none; background: none; border-radius: 0"
+| style="border-radius: 5px" colspan="2" | '''[[{{{classarticle|{{{class}}}}}}|{{{class}}}]]'''
+|-
+| style="width: {{{width|{{#if:{{{inventory}}}|35|50}}%}}}; border-radius: 5px" | '''HP'''<br>{{{HP}}}
+{{#if:{{{inventory}}}|{{!}} style="border-radius: 5px" rowspan="2" {{!}} '''Inventory'''<br>{{{inventory|{{nwh}}}}}
+{{!-}} }}
+| style="border-radius: 5px" | '''Level'''<br>{{{lv}}}
+|-
+| style="border-radius: 5px" colspan="2" | '''{{{recruitment method}}}'''
+|}
+|}<noinclude>
+
+{{doc}}</noinclude>

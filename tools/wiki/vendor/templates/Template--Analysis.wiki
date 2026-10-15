@@ -1,0 +1,5 @@
+<div style="border-top:solid 2px #ddd; border-bottom:solid 2px #ddd">
+{|
+|'''This character analysis section may not be accurate to every player's experience.'''
+|}
+</div><noinclude>[[Category:Notice templates]]</noinclude>
