@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-344 decisions. Read this index, then open the two or three you need — the whole
+345 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -225,6 +225,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0090` | [~~No arena~~ — SUPERSEDED 2026-07-29. The arena is KEPT, and it keeps its name.](decisions/0090-no-arena-superseded-2026-07-29-the-arena-is.md) | 2026-07-29 | — |
 | `0091` | [Arena presentation: winter is campaign-wide; attendants remain chapter-owned.](decisions/0091-arena-presentation-winter-is-campaign-wide-attendants-remain-chapter.md) | 2026-08-11 | #265 |
 | `0092` | [Gold availability follows vanilla FE8 — no per-chapter clear bonus](decisions/0092-gold-availability-follows-vanilla-fe8-no-per-chapter-clear.md) | 2026-06-17 | — |
+| `0345` | [A chapter's in-map shops are its map donor's](decisions/0345-a-chapter-s-shops-are-its-map-donor-s.md) | 2026-10-14 | #493 |
 
 ---
 
