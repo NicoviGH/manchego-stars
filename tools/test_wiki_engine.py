@@ -28,6 +28,7 @@ FLOORS = {
     # Two empty <p class="mw-empty-elt"> MediaWiki leaves between the TCG card's icons.
     'Colm': 0.9998,
     'Dara': 1.0,
+    'Escape!': 1.0,
     # The manual citations: MediaWiki opens a definition list at a mid-line `;` in "(PDF; pg.".
     'Fire_Emblem--_The_Sacred_Stones': 0.9992,
     'Imperial_Three': 1.0,
@@ -36,6 +37,7 @@ FLOORS = {
     'Sacred_Stone_(object)': 1.0,
     'The_Bandits_of_Borgo': 1.0,
     'The_Bandits_of_Borgo__Script': 1.0,
+    'The_Protected': 1.0,
 }
 
 

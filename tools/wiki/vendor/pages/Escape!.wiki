@@ -1,0 +1,486 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 1.png]]
+|location=Border Mulan
+|new units=[[Franz]], [[Gilliam]], [[Vanessa]], [[Moulder]]
+|boss=[[Breguet]]
+|previous=[[The Fall of Renais]]
+|next=[[The Protected]]
+}}
+
+{{Quote|Perhaps we can retake Mulan. But, Princess, you must act with caution. Your people need you, too.|[[Seth]] to [[Eirika]]}}
+
+'''Escape!''' (Japanese: {{hl|脱出行|Dasshutsu gyō}} ''Escape'') is the first chapter of {{FE8}}. In this chapter, [[Eirika]] and [[Seth]] continue on their travel to [[Frelia]], and meet up with [[Franz]] and [[Gilliam]] on the way. They then rescue Princess [[Tana]] from the castle where she is being held hostage.
+
+==Plot==
+{{main|Escape!/Script}}
+
+[[Grado]] soldiers led by [[Breguet]] arrive outside a fort at [[Border Mulan]]. Princess [[Tana]] of [[Frelia]] sends a messenger to King [[Hayden]] to inform him of the situation, but remains at the fort to await news of [[Eirika]]'s escape from [[Renais]]. When Brequet takes the fort, Tana is taken prisoner. Eirika and [[Seth]] arrive to find the fort under Grado's control; Seth suggests bypassing it, but Eirika decides they will liberate the fort, as she does not want Frelia's citizens to suffer the same atrocities hers did.
+
+During the battle, Breguet recognizes Eirika, and orders his soldiers to bring her to him. Later, [[Franz]] and [[Gilliam]] arrive from the north; they notice that Grado has taken the fort, and resolve to liberate it. Franz can speak with Eirika and Seth—Franz informs Eirika that Tana was at the fortress, and Eirika hurries to her friend's safety; Seth tells Franz that it is the responsibility of them both to keep Eirika safe.
+
+After Eirika seizes the castle, she reunites with Tana; both are grateful that the other is safe, but Tana is distressed to learn that [[Ephraim]] is unaccounted for. Tana then suggests they leave for Castle Frelia, and Eirika agrees. At the castle, Hayden initially rejoices for the safety of Tana and Eirika. Hayden then relays to Eirika confirmation of [[Fado]]'s death; he suggests Eirika stay and rest at Frelia. Hayden also shares the knowledge that Ephraim continues to fight against Grado. Eirika decides to march into Grado to help her brother; Hayden strongly objects, and states that Frelia has few soldiers to spare, as Prince [[Innes]] marches to fight Grado with most of them. However, seeing Eirika's determination, Hayden decides to support Eirika with what soldiers and resources he can spare, and wishes her well. Later, Tana attempts to dissuade Eirika from venturing to Grado, but Eirika remains stalwart in her decision. Tana laments the tragedy of the war, while Eirika accepts the reality of it.
+
+==Chapter data==
+{{ChapData
+|victory=Seize the castle
+|defeat=[[Eirika]] dies
+|ally=2{{h|+2|Upon Franz and Gilliam arriving}}
+|enemy=7{{h|+3|Reinforcements}}
+|map=[[File:Cm fe08 1.png]]
+|col=15
+|row=10
+}}
+
+===Character data===
+{{ChapChars
+|newunit1={{NewUnit
+|name=Franz
+|portrait=[[File:Portrait franz fe08.png]]
+|class=Cavalier
+|HP={{h|20|21 in the Japanese version}}
+|lv=1
+|inventory={{Item|8|Iron Sword}}<br>{{Item|8|Iron Lance}}<br>{{Item|8|Vulnerary}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically on turn 2
+}}
+|newunit2={{NewUnit
+|name=Gilliam
+|portrait=[[File:Portrait gilliam fe08.png]]
+|class=Knight
+|HP=25
+|lv=4
+|inventory={{Item|8|Iron Lance}}
+|recruitment method=Automatically on turn 2
+}}
+|newunit3={{NewUnit
+|name=Vanessa
+|portrait=[[File:Portrait vanessa fe08.png]]
+|class=Pegasus Knight
+|HP=17
+|lv=1
+|inventory={{Item|8|Slim Lance}}<br>{{Item|8|Javelin}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically at the end of the chapter
+}}
+|newunit4={{NewUnit
+|name=Moulder
+|portrait=[[File:Portrait moulder fe08.png]]
+|class=Priest
+|HP=20
+|lv=3
+|inventory={{Item|8|Heal}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically at the end of the chapter
+}}
+|game#=08
+|forced1=eirika
+|return1=seth
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|itemlast=5,000G
+|itemlastimage=gold
+|itemlastarticle=Gold
+|obtainlast=Automatically at end of chapter
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|tab3=Difficult <small>(Japan)</small>
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Breguet]]
+|class=Knight
+|lv=4
+|#=1
+|hp=20
+|str=8
+|skill=2
+|spd=1
+|lck=2
+|def=9
+|res=0
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=2
+|#=2
+|hp=20~21
+|str=3~4
+|skill=0~1
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=3
+|#=1
+|hp=21~22
+|str=3~5
+|skill=0~1
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not act until turn 2; does not move and initiate combat in the same action.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=2
+|#=3
+|hp=20~21
+|str=5~6
+|skill=2~3
+|spd=4~5
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=One begins moving unprovoked each turn.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=1
+|#=2
+|hp=20
+|str=5
+|skill=2
+|spd=4
+|lck=0
+|def=2
+|res=0
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=2
+|#=1
+|hp=20~21
+|str=3~4
+|skill=0~1
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Breguet]]
+|class=Knight
+|lv=4
+|#=1
+|hp=20~21
+|str=8~9
+|skill=2~3
+|spd=1~2
+|lck=2~3
+|def=9~10
+|res=0~1
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=2
+|#=2
+|hp=20~22
+|str=3~5
+|skill=0~2
+|spd=1~3
+|lck=0~2
+|def=0~2
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=3
+|#=1
+|hp=21~23
+|str=3~6
+|skill=0~2
+|spd=1~3
+|lck=0~2
+|def=0~2
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not act until turn 2; does not move and initiate combat in the same action.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=2
+|#=3
+|hp=20~22
+|str=5~7
+|skill=2~4
+|spd=4~6
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=One begins moving unprovoked each turn.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=1
+|#=2
+|hp=20~21
+|str=5~6
+|skill=2~3
+|spd=4~5
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=2
+|#=1
+|hp=20~22
+|str=3~5
+|skill=0~2
+|spd=1~3
+|lck=0~2
+|def=0~2
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Breguet]]
+|class=Knight
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=2
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not act until turn 2; does not move and initiate combat in the same action.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=2
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=One begins moving unprovoked each turn.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=1
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Soldier
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*After Eirika reaches the column with two forts
+**2 [[Fighter]]s from the southeast corner of the map
+**1 [[Soldier]] from the southeast corner of the map
+
+===Boss data===
+{{Main|Breguet}}
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait breguet fe08.png]]
+|sprite=knight enemy
+|class=Knight
+|affin=thunder
+|lv=4
+|HP=20
+|str=8
+|skill=2
+|spd=1
+|luck=2
+|def=9
+|res=0
+|move=4
+|con=13
+|aid=12
+|inventory={{Item|8|Iron Lance}}
+|la=C
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait breguet fe08.png]]
+|sprite=knight enemy
+|class=Knight
+|affin=thunder
+|lv=4
+|HP={{h|20~21|22~23 in the Japanese version}}
+|str={{h|8~9|9~10 in the Japanese version}}
+|skill=2~3
+|spd=1~2
+|luck=2~3
+|def=9~10
+|res=0~1
+|move=4
+|con=13
+|aid=12
+|inventory={{Item|8|Iron Lance}}
+|la=C
+}}
+}}
+
+==Strategy==
+{{Strategy}}
+This chapter is very straight forward—move towards the throne and kill all units in your way. It'll be easier to train Eirika if you pit her versus the [[Fighter]]s due to the [[weapon triangle]]. Remember that [[Franz]] and [[Gilliam]] will join you on turn 2 and appear towards the northeastern ridge. Also, note that after you cross the middle of the map, three reinforcement units will appear from the bottom right corner. [[Breguet|The boss]] should fall fairly quickly if you use Eirika's Rapier as it does [[bonus damage]] versus armored units. Afterwards, seize the throne. Alternatively, you can use Seth's [[Silver Lance]].
+
+==Etymology and other languages==
+{{Names
+|eng-name=Escape!
+|jpn-name={{h|脱出行|Dasshutsu gyō}}
+|jpn-mean=Escape
+|span-name=La huida
+|span-mean=Escape
+|fren-name=Sauve-qui-peut!
+|fren-mean=Run for your life!
+|ger-name=Flucht!
+|ger-mean=Escape!
+|ital-name=Fuga!
+|ital-mean=Escape!
+}}
+<!--
+==Gallery==
+-->
+{{ChapterNav
+|prechapter=The Fall of Renais
+|nextchapter=The Protected
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

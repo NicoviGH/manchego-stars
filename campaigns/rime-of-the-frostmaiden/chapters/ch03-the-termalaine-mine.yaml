@@ -140,6 +140,13 @@ deployment:
   # Field parity: deploy_limit = vanilla FE8 Ch3 player deploy-slot count (decisions.md §Field parity;
   # fe8-pacing-reference §1b: Ch3 = 9, read from .size UnitDef_Event_Ch3Ally/20).
   deploy_limit: 9               # vanilla FE8 Ch3 fields 9 — ~our whole current roster (8 PCs + Baxby)
+  # The on-map talk-recruit, GREEN until a party member talks to him (vanilla Colm's pattern).
+  # Class, level and kit are his unit file's; this says only where he stands.
+  green_allies:
+    - id: trex
+      face: trex
+      position: [2, 4]          # Colm's tile: green Colm walks to (2,4) on the upper-left ledge of
+                                # vanilla Ch3 (spawns 0,5), the ledge the party naturally reaches to Talk
   # [col, row] — the west entrance of the mine (the same walkable left-edge tiles the
   # fast-boot spawned onto; PREP hides everyone and redeploys the picks onto these). One
   # per deploy_limit (the _deploy_cap_entries schema requires len(deploy_slots) == deploy_limit).

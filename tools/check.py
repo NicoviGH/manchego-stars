@@ -917,16 +917,19 @@ def _int_pair(v):
             and all(isinstance(c, int) and not isinstance(c, bool) for c in v))
 
 
-def _unit_entry_violations(rel, kind, entries):
+def _unit_entry_violations(rel, kind, entries, cast=()):
     """Entries of a roster list (player_units / green_allies) must be mappings
-    carrying what the injectors index: id/class/level/position ([col, row])."""
+    carrying what the injectors index: id/class/level/position ([col, row]). A cast member
+    (ch03's green Trex) takes class and level from his unit file, so he names only where he
+    stands: repeating them here would be a second copy to drift."""
     msgs = []
     for g in entries or []:
         if not isinstance(g, dict):
             msgs.append('%s: %s entry %r must be a mapping (id/class/level/'
                         'position ...)' % (rel, kind, g))
             continue
-        missing = [k for k in ('id', 'class', 'level', 'position') if k not in g]
+        keys = ('id', 'position') if g.get('id') in cast else ('id', 'class', 'level', 'position')
+        missing = [k for k in keys if k not in g]
         if missing:
             msgs.append('%s: %s entry %r missing %s'
                         % (rel, kind, g.get('id', '?'), ', '.join(missing)))
@@ -936,7 +939,7 @@ def _unit_entry_violations(rel, kind, entries):
     return msgs
 
 
-def _chapter_deployment_violations(rel, d):
+def _chapter_deployment_violations(rel, d, cast=()):
     """Schema violations for one parsed chapter YAML (pure; unit-tested in
     test_check_chapter_schema.py). The normalized shape (#107, audit 2.2): ALL
     deployment data lives under the `deployment:` block (deploy_limit,
@@ -991,7 +994,7 @@ def _chapter_deployment_violations(rel, d):
                     'machine-readable deployment.deploy_limit (prose notes are for '
                     'planned seeds)' % rel)
     msgs.extend(_unit_entry_violations(rel, 'deployment.green_allies',
-                                       dep.get('green_allies')))
+                                       dep.get('green_allies'), cast))
     return msgs
 
 
@@ -1064,7 +1067,8 @@ def check_chapter_deployment_schema(fail):
     9 files). The injectors and difficulty.py read ONE shape; this gate keeps new
     chapters on it."""
     for rel, d in _chapters():
-        fail.extend(_chapter_deployment_violations(rel, d))
+        cast, _guests = _slot_tables(os.path.join(REPO, *rel.split('/')[:2]))
+        fail.extend(_chapter_deployment_violations(rel, d, set(cast)))
 
 
 def check_chapter_yaml_schema(fail):

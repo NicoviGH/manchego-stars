@@ -227,6 +227,7 @@ def render(text, res=None):
     _AUTONUMBER[0] = 0
     # A tag's attributes may span lines (Tab/Content's style); the sanitizer joins them.
     text = re.sub(r'<[a-zA-Z][^<>]*>', lambda m: re.sub(r'\s*\n\s*', ' ', m.group(0)), text)
+    notoc = '__NOTOC__' in text
     text = re.sub(r'__[A-Z]+__', '', text)                 # behaviour switches
     text = re.sub(r'<br\s*/>', '<br>', text)              # the sanitizer's spelling
     text = _refs(text, res)
@@ -235,7 +236,45 @@ def render(text, res=None):
     lines = text.split('\n')
     out = []
     _blocks(lines, 0, len(lines), out, res)
-    return _drop_stray_end_tags(re.sub(r'style="([^"]*)"', _css_unescape, '\n'.join(out)))
+    body = _drop_stray_end_tags(re.sub(r'style="([^"]*)"', _css_unescape, '\n'.join(out)))
+    return body if notoc else _with_toc(body)
+
+
+def _with_toc(body):
+    """MediaWiki's table of contents: four or more headings get one, before the first."""
+    heads = list(re.finditer(r'<h([2-6])><span class="mw-headline" id="([^"]*)">(.*?)</span>'
+                             r'</h\1>', body))
+    if len(heads) < 4:
+        return body
+    items, counters, prev = [], [0] * 7, None
+    top = min(int(h.group(1)) for h in heads)
+    depth_open = 0
+    for h in heads:
+        level = int(h.group(1)) - top + 1
+        counters[level] += 1
+        for deeper in range(level + 1, 7):
+            counters[deeper] = 0
+        number = '.'.join(str(counters[k]) for k in range(1, level + 1))
+        if prev is None:
+            items.append('<ul>')
+            depth_open = 1
+        elif level > prev:
+            items[-1] = items[-1][:-len('</li>')]
+            items.append('<ul>' * (level - prev))
+            depth_open += level - prev
+        elif level < prev:
+            items.append('</ul></li>' * (prev - level))
+            depth_open -= prev - level
+        items.append('<li class="toclevel-%d"><a href="#%s"><span class="tocnumber">%s</span> '
+                     '<span class="toctext">%s</span></a></li>'
+                     % (level, h.group(2), number, re.sub(r'<[^>]+>', '', h.group(3))))
+        prev = level
+    items.append('</ul>' + '</li></ul>' * (depth_open - 1))
+    toc = ('<div id="toc" class="toc" role="navigation" aria-labelledby="mw-toc-heading">'
+           '<div class="toctitle" lang="en" dir="ltr"><h2 id="mw-toc-heading">Contents</h2>'
+           '</div>%s</div>' % ''.join(items))
+    first = heads[0].start()
+    return body[:first] + toc + '\n' + body[first:]
 
 
 VOID = {'br', 'img', 'hr', 'wbr', 'meta', 'input', 'col', 'area', 'source'}

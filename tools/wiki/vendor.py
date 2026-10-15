@@ -34,6 +34,8 @@ UA = {'User-Agent': 'Mozilla/5.0 (manchego-stars wiki vendoring)'}
 EXEMPLARS = (
     'Fire Emblem: The Sacred Stones',                         # the game article (home page)
     'The Bandits of Borgo',                                   # chapter
+    'The Protected',                                          # chapter with a shop (ch02's twin)
+    'Escape!',                                                # chapter with a gold gift
     'The Bandits of Borgo/Script',                            # chapter script
     'A New Journey',                                          # interlude chapter
     'Colm',                                                   # playable character
@@ -45,6 +47,8 @@ EXEMPLARS = (
     'Availability chart/The Sacred Stones',
 )
 NAVBOX = 'Template:Nav8'
+# The wiki's own UI glyphs the templates draw (game art comes from the ROM, never from here).
+FILES = ('SNESItemDrop.png', 'Is gba gold.png')
 
 MAGIC = {'PAGENAME', 'NAMESPACE', 'FULLPAGENAME', 'BASEPAGENAME', 'SUBPAGENAME', '!', '(!',
          '!)', '!-', '=', 'DEFAULTSORT', 'DISPLAYTITLE', 'lc', 'uc', 'ucfirst', 'lcfirst',
@@ -149,6 +153,18 @@ def main():
     seen, missing = set(), []
     crawl(list(EXEMPLARS) + [NAVBOX], seen, missing)
     dynamic_templates(seen, missing)
+    os.makedirs(os.path.join(VENDOR, 'files'), exist_ok=True)
+    for name in FILES:
+        # Special:FilePath sits behind a bot challenge; the API hands over the CDN URL.
+        api = 'https://fireemblemwiki.org/w/api.php?' + urllib.parse.urlencode({
+            'action': 'query', 'titles': 'File:' + name, 'prop': 'imageinfo',
+            'iiprop': 'url', 'format': 'json'})
+        with urllib.request.urlopen(urllib.request.Request(api, headers=UA), timeout=30) as r:
+            info = json.load(r)['query']['pages']
+        url = next(iter(info.values()))['imageinfo'][0]['url']
+        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30) as r:
+            with open(os.path.join(VENDOR, 'files', name), 'wb') as f:
+                f.write(r.read())
     print('%d titles vendored, %d missing on the wiki (template calls inside unused '
           'branches)' % (len(seen) - len(missing), len(missing)))
 

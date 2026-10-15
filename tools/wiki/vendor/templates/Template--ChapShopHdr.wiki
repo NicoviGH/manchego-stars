@@ -1,0 +1,15 @@
+{| class="wikitable {{#switch:{{{1}}}|fe01|fe02|fe03|fe04|febs|fe05|fe06|fe07|fe08|fe09|fe10|fe11|fe12|fe13|fe14|fe15|trs01|trs02|vs01|vs02=pixel-art}} round center-icons" style="border-collapse: separate; border: none; margin: auto; width: 100%"
+{{#switch:{{{1}}}
+|#default=! class="roundl" style="width: 10%" {{!}}
+! style="width: 60%" {{!}} Name
+! class="roundr" style="width: 30%" {{!}} Cost
+|fe09=! class="roundl" style="width:6.25%" {{!}}
+! style="width: 37.5%" {{!}} Name
+! style="width: 18.75%" {{!}} Cost
+! class="roundr" style="width: 37.5%" {{!}} Difficulty
+|fe14|fe16|fe17= ! class="roundl" style="width: 7.692%" {{!}}
+! style="width: 46.154%" {{!}} Name
+! style="width: 23.077%" {{!}} Stock
+! style="width: 23.077%" {{!}} Cost
+}}<noinclude>
+|}</noinclude>

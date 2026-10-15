@@ -37,6 +37,7 @@ import inject.raw_pids                                 # noqa: E402
 import inject.stats                                    # noqa: E402
 import inject.unit_art as unit_art                     # noqa: E402
 import inject.villages                                 # noqa: E402
+from wiki import pages as wp, site as wsite             # noqa: E402
 import portrait_tool                                   # noqa: E402
 from inject.class_ids import class_display_name        # noqa: E402
 from wiki import art                                   # noqa: E402
@@ -261,23 +262,6 @@ def _seen_by(stem):
     return _SEEN.get(stem, set())
 
 
-def wiki_strategy(key):
-    """The twin's Strategy section, from the local mirror of the Fire Emblem Wiki."""
-    path = os.path.join(WIKI_MIRROR, 'strategy-digest.md')
-    if not key or not os.path.exists(path):
-        return ''
-    page = VANILLA[key][2]
-    text = open(path, encoding='utf-8').read()
-    m = re.search(r'^## %s\n(.*?)(?=^## |\Z)' % re.escape(page), text, re.S | re.M)
-    if not m:
-        return ''
-    body = m.group(1).strip()
-    body = re.sub(r'\{\{[^}]*\}\}', '', body)
-    body = re.sub(r"\[\[(?:[^\]|]*\|)?([^\]]*)\]\]", r'\1', body)
-    body = re.sub(r"'''?|''", '', body)
-    return para(body.replace('\n\n', '\n\n'))
-
-
 # ── ours, from the YAML ────────────────────────────────────────────────────────
 
 def load_yaml(path):
@@ -452,49 +436,95 @@ def bosses_of(chap):
 
 
 def item_rows(chap):
-    """(item display, enum, how obtained) for every delivery vehicle the ROM wires. The
-    `economy:` ledger is design bookkeeping no injector reads, so it is not one."""
+    """(item display, enum or None, vehicle) for every delivery vehicle the ROM wires. A vehicle
+    is (kind, detail): ('village', tile), ('chest', tile), ('drop' | 'steal', class token),
+    ('gift', giver), ('save_all', None), ('scene', None), ('boat', None). Gold comes as
+    ('N gold', None, vehicle). The `economy:` ledger is design bookkeeping no injector reads,
+    so it is not one."""
     rows = []
     for v in chap.get('villages') or []:
         for r in v.get('visit_reward') or v.get('reward') or []:
             if r.get('id') == 'gold':
-                rows.append(('%s gold' % r.get('amount'), None, 'Visit village'))
+                rows.append(('%s gold' % r.get('amount'), None, ('village', v.get('tile'))))
             elif r.get('id'):
                 n, e = our_item(r)
-                rows.append((n, e, 'Visit village%s' % (' (%s)' % v['id'] if v.get('id') else '')))
+                rows.append((n, e, ('village', v.get('tile'))))
     for c in chap.get('chests') or []:
         for it in c.get('contents') or []:
             n, e = our_item(it)
-            rows.append((n, e, 'Open chest at %s' % (c.get('position'),)))
+            rows.append((n, e, ('chest', c.get('position'))))
     for e in enemy_list(chap):
-        who = e.get('name') or e.get('class')
         drop = e.get('item_drop')
         if drop:
             n, en = our_item(drop)
-            rows.append((n, en, 'Dropped by %s' % who))
+            rows.append((n, en, ('drop', e.get('class'))))
         for it in e.get('inventory') or []:
             n, en = our_item(it)
             iid = it.get('id') if isinstance(it, dict) else it
             if iid != drop and en and en not in ('ITEM_DOORKEY', 'ITEM_CHESTKEY') \
                     and _is_plain_item(en):
-                rows.append((n, en, 'Steal from %s' % who))
+                rows.append((n, en, ('steal', e.get('class'))))
     for g in (chap.get('deployment') or {}).get('green_allies') or []:
         if g.get('gift'):
             n, en = our_item(g['gift'])
-            rows.append((n, en, 'Gift from %s' % (g.get('name') or g.get('id'))))
+            rows.append((n, en, ('gift', g.get('fe_name') or g.get('name') or g.get('id'))))
     bonus = (chap.get('economy') or {}).get('save_all_bonus')
     if bonus:
         n, en = our_item(bonus)
-        rows.append((n, en, 'Save-all bonus'))
+        rows.append((n, en, ('save_all', None)))
     for site in (chap.get('post_chapter') or {}).get('reward_sites') or []:
         if site.get('gift'):
             n, en = our_item(site['gift'])
-            rows.append((n, en, 'Scene gift'))
+            rows.append((n, en, ('scene', None)))
     for boat in chap.get('rescue_boats') or []:
         for r in (boat.get('talk') or {}).get('reward') or []:
             n, en = our_item(r)
-            rows.append((n, en, 'Talk on a rescue boat'))
+            rows.append((n, en, ('boat', None)))
     return rows
+
+
+def _compass(tile, cols, rows):
+    """A tile as the wiki places a site: 'northern', 'southwestern', 'central'."""
+    x, y = tile
+    ns = 'north' if y < rows / 3 else 'south' if y >= 2 * rows / 3 else ''
+    ew = 'west' if x < cols / 3 else 'east' if x >= 2 * cols / 3 else ''
+    return (ns + ew + 'ern') if (ns or ew) else 'central'
+
+
+def obtain_phrases(rows_, cols, nrows):
+    """How the wiki words each vehicle: 'Open northern left [[chest]]', 'Visit southern
+    [[village]]', 'Steal from enemy [[Brigand]]'. Sites sharing a direction are told apart
+    left/middle/right, as the wiki tells Borgo's three northern chests apart."""
+    places = {}
+    for _n, _e, (kind, detail) in rows_:
+        if kind in ('chest', 'village') and detail and cols and nrows:
+            places.setdefault((kind, _compass(detail, int(cols), int(nrows))), set()).add(
+                tuple(detail))
+    out = []
+    for _n, _e, (kind, detail) in rows_:
+        if kind in ('chest', 'village'):
+            where = ''
+            if detail and cols and nrows:
+                where = _compass(detail, int(cols), int(nrows))
+                same = sorted(places[(kind, where)])
+                if len(same) > 1:
+                    order = ['left', 'middle', 'right'] if len(same) == 3 else \
+                        ['left', 'right'] if len(same) == 2 else [str(i + 1) for i in range(len(same))]
+                    where += ' ' + order[same.index(tuple(detail))]
+                where += ' '
+            out.append('%s %s[[%s]]' % ('Open' if kind == 'chest' else 'Visit', where, kind))
+        elif kind in ('drop', 'steal'):
+            cls, _a = wiki_class(detail)
+            out.append('%s enemy [[%s]]' % ('Dropped by' if kind == 'drop' else 'Steal from', cls))
+        elif kind == 'gift':
+            out.append('Given by %s at the end of the chapter if it survives' % detail)
+        elif kind == 'save_all':
+            out.append('Automatically at end of chapter if every village is saved')
+        elif kind == 'scene':
+            out.append('Automatically at end of chapter')
+        else:
+            out.append('Talk to a rescue boat')
+    return out
 
 
 _SCENES = None
@@ -569,24 +599,6 @@ def class_enum_of(token):
     return difficulty._enemy_class_enum(token)
 
 
-def sprite_html(chap, token, faction='enemy', uid=None):
-    """The map sprite a unit wears in this chapter, drawn the way the engine draws it: its own
-    art or its class's reskin there (inject.unit_art), else the stock class sprite."""
-    sprite = unit_art.unit_sprite(CAMPAIGN, chap['_slug'], uid=uid, token=token)
-    try:
-        frame = (unit_art.idle_frame(CAMPAIGN, sprite, faction) if sprite
-                 else unit_art.class_sprite(class_enum_of(token), faction))
-    except Exception:
-        frame = None
-    if frame is None:
-        return ''
-    box = frame.point(lambda i: 255 if i else 0).getbbox()   # trim the empty rows above the
-    if box:                                                  # figure, as the wiki's sprites are
-        frame = frame.crop((0, box[1], frame.width, frame.height))
-    frame.info['transparency'] = 0
-    return mk.file_img(png_uri(frame), frame.width, frame.height)
-
-
 # ── what the ROM loads, per difficulty mode ────────────────────────────────────
 
 MODE_LABELS = (('tutorial', 'Easy'), ('normal', 'Normal'), ('difficult', 'Difficult'))
@@ -632,62 +644,6 @@ AI_TEXT = {'statue': 'Does not move.', 'striker': 'Attacks units within range.',
            'own-errand': 'Pursues its own errand (loots or escapes).'}
 
 
-def ai_text(chap, ed):
-    try:
-        import chapter_status
-        shape = chapter_status.ai_shape(difficulty.enemy_ai_bytes(chap, ed, 0))
-    except Exception:
-        shape = None
-    return esc(AI_TEXT[shape]) if shape in AI_TEXT else mk.NO_AI
-
-
-def enemy_row(chap, ed, token, level, inv, n, shifts, mode):
-    st = loaded(ed, token, level, shifts, mode)
-    named = ed.get('is_boss') or ed.get('is_miniboss') or personal_of(ed)
-    name = esc(ed.get('fe_name') or ed.get('name')) if named else esc(class_display_name(token))
-    return {'sprite': sprite_html(chap, token, uid=ed.get('id')), 'name': name, 'cls': class_html(token),
-            'lv': level, 'n': n, 'stats': [unit_load.show(st[k]) for k in STAT_KEYS],
-            'inventory': ' • '.join(item_cell(i) for i in inv if not
-                                     (isinstance(i, dict) and i.get('is_key_item'))),
-            'ai': ai_text(chap, ed)}
-
-
-def enemy_section(chap, shifts):
-    entries = enemy_list(chap)
-    if not entries:
-        return ''
-    modes = MODE_LABELS if shifts else (('normal', 'Normal'),)
-    contents = []
-    for mode, _ in modes:
-        start, reinf = [], []
-        for ed in entries:
-            for token, lv, inv, n in bodies(ed):
-                (reinf if ed.get('arrives_turn') else start).append(
-                    enemy_row(chap, ed, token, lv, inv, n, shifts, mode))
-        blocks = [mk.enemy_block('Enemy Units', mk.enemy_rows(start))]
-        if reinf:
-            blocks.append(mk.enemy_block('Reinforcements', mk.enemy_rows(reinf)))
-        contents.append(mk.enemy_tables(blocks))
-    sel = [m for m, _ in modes].index('normal')
-    return mk.note(mk.STAT_RANGE_NOTE) + '<hr />' + mk.tabs([l for _, l in modes], contents, sel)
-
-
-def reinforcement_list(chap):
-    waves = collections.OrderedDict()
-    for ed in sorted((e for e in enemy_list(chap) if e.get('arrives_turn')),
-                     key=lambda e: int(e['arrives_turn'])):
-        for token, lv, inv, n in bodies(ed):
-            weapon = next((our_item(i)[1] for i in inv), None)
-            what = '%d %s' % (n, class_html(token)) if not ed.get('is_boss') else esc(ed.get('name'))
-            if weapon:
-                what += ' with %s' % mk.fe(item_name(weapon), rom_item_name(weapon))
-            waves.setdefault(int(ed['arrives_turn']), []).append(what)
-    if not waves:
-        return ''
-    return '<ul>%s</ul>' % ''.join('<li>Turn %d<ul>%s</ul></li>' % (t, ''.join(
-        '<li>%s</li>' % w for w in ws)) for t, ws in waves.items())
-
-
 # ── boss cards ─────────────────────────────────────────────────────────────────
 
 _RANK_TYPES = (('sword', 'Sword', 'Swords'), ('lance', 'Lance', 'Lances'), ('axe', 'Axe', 'Axes'),
@@ -731,54 +687,6 @@ def _letter(wexp):
     return best[0] if best else ''
 
 
-def boss_section(chap, shifts):
-    cards = []
-    for ed in bosses_of(chap):
-        token, lv = ed.get('class'), int(ed.get('level', 1))
-        cls = class_enum_of(token)
-        modes = MODE_LABELS if shifts else (('normal', 'Normal'),)
-        loads = [loaded(ed, token, lv, shifts, m) for m, _ in modes]
-        donor = inject.stats.BASE_DONOR.get(ed.get('id')) or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id'))
-        ranks = _ranks(cls, donor)
-        rank_cells = [(mk.fe_html(p, mk.file_img(art.named_icon('inventory_category_' + k), 16, 16,
-                                                  label)), _letter(ranks.get(_ITYPE[k])))
-                      for k, p, label in _RANK_TYPES]
-        face = portrait(ed['face']) if ed.get('face') else None
-        attrs = unit_load._class_block(cls)
-        inv = '<br />'.join(item_cell(i) for i in ed.get('inventory') or [])
-        bodies_ = []
-        for st in loads:
-            con = st['Con'][0]
-            aid = (con - 1 if 'CA_MOUNTEDAID' not in attrs else
-                   (20 - con if 'CA_FEMALE' in attrs else 25 - con))
-            stats = {'Max HP': unit_load.show(st['HP']), 'Luck': unit_load.show(st['Lck']),
-                     'Strength': unit_load.show(st['Pow']), 'Defense': unit_load.show(st['Def']),
-                     'Skill (stat)': unit_load.show(st['Skl']),
-                     'Resistance': unit_load.show(st['Res']), 'Speed': unit_load.show(st['Spd']),
-                     'Constitution': unit_load.show(st['Con']),
-                     'Movement': unit_load.show(st['Mov']), 'Aid': aid}
-            bodies_.append(mk.boss_card(
-                mk.file_img(face, 96, 80, ed.get('name')) if face else '',
-                sprite_html(chap, token, uid=ed.get('id')), class_html(token), lv,
-                _affinity(ed), stats, inv, rank_cells))
-        uniq = list(dict.fromkeys(bodies_))
-        labels = [l for _, l in modes]
-        if len(uniq) == 1:
-            body = mk.tabs(['All'], uniq)
-        else:
-            body = mk.tabs(labels, bodies_, [m for m, _ in modes].index('normal'), 'fit-content')
-        cards.append(mk.note(mk.STAT_RANGE_NOTE) + body if not cards else body)
-    return ''.join(cards)
-
-
-def _affinity(ed):
-    aff = ed.get('affinity')
-    if not aff:
-        return ''
-    return mk.fe_html('%s (affinity)' % str(aff).capitalize(),
-                      mk.file_img(art.named_icon('affinity_%s' % aff), 16, 16, aff))
-
-
 # ── page pieces ────────────────────────────────────────────────────────────────
 
 ORDINALS = ('zeroth', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth',
@@ -804,17 +712,6 @@ def victory_text(chap):
 def defeat_text(chap):
     l = str(chap.get('lose_condition') or '')
     return esc(LOSE_TEXT.get(l) or l)
-
-
-def unit_counts(chap):
-    dep = chap.get('deployment') or {}
-    player = dep.get('deploy_limit') or len(dep.get('deploy_slots') or []) or ''
-    start = sum(n for ed in enemy_list(chap) if not ed.get('arrives_turn')
-                for _t, _l, _i, n in bodies(ed))
-    reinf = sum(n for ed in enemy_list(chap) if ed.get('arrives_turn')
-                for _t, _l, _i, n in bodies(ed))
-    enemy = '%d%s' % (start, mk.tooltip('+%d' % reinf, 'reinforcements') if reinf else '')
-    return esc(player), enemy
 
 
 def join_text(uid, unit, chap):
@@ -867,118 +764,339 @@ def available_before(chs, chap):
     return out
 
 
-def minimug_html(uid, units):
-    img = minimug(uid)
-    name = unit_name(uid, units)
-    return '<a href="#unit-%s" title="%s">%s</a>' % (esc(uid), esc(name),
-                                                    mk.file_img(img, 32, 32, name)) if img else ''
+# ── wikitext pages through the Fire Emblem Wiki's templates (#493) ───────────────
+
+def sprite_frame(chap, token, faction='enemy', uid=None):
+    """The map sprite a unit wears in this chapter (PIL), trimmed as the wiki's sprites are."""
+    sprite = unit_art.unit_sprite(CAMPAIGN, chap['_slug'], uid=uid, token=token)
+    try:
+        frame = (unit_art.idle_frame(CAMPAIGN, sprite, faction) if sprite
+                 else unit_art.class_sprite(class_enum_of(token), faction))
+    except Exception:
+        frame = None
+    if frame is None:
+        return None
+    box = frame.point(lambda i: 255 if i else 0).getbbox()
+    if box:
+        frame = frame.crop((0, box[1], frame.width, frame.height))
+    frame.info['transparency'] = 0
+    return frame
 
 
-def item_rows_html(chap):
-    rows = []
-    for name, enum, how in item_rows(chap):
-        how = esc(how).replace('Visit village', 'Visit %s' % mk.fe('Village', 'village'))
-        rows.append((mk.file_img(art.item_icon(enum), 16, 16) if enum else '',
-                     mk.fe(item_name(enum), rom_item_name(enum, name)) if enum else esc(name), how))
-    return mk.items_table(rows) if rows else ''
+class WikiFiles(wsite.Files):
+    """Registers each image under the name the templates build for it. The weapon-rank and
+    affinity icons are the ROM's own; the wiki's UI glyphs (the drop marker) are vendored."""
+
+    RANKS = {'Sword': 'sword', 'Lance': 'lance', 'Axe': 'axe', 'Bow': 'bow',
+             'Anima': 'magic_anima', 'Light': 'magic_light', 'Dark': 'magic_dark',
+             'Staff': 'staff'}
+    AFFINITIES = ('anima', 'dark', 'fire', 'ice', 'light', 'thunder', 'wind')
+
+    def __init__(self):
+        super().__init__()
+        for name, stem in self.RANKS.items():
+            icon = art.named_icon('inventory_category_' + stem)
+            if icon:
+                self.add('GBARank%s.gif' % name, icon, 16, 16)
+        for aff in self.AFFINITIES:
+            icon = art.named_icon('affinity_' + aff)
+            if icon:
+                self.add('Is gba %saffin.png' % aff, icon, 16, 16)
+        vendored = os.path.join(TOOLS, 'wiki', 'vendor', 'files')
+        for fn in sorted(os.listdir(vendored)) if os.path.isdir(vendored) else ():
+            from PIL import Image
+            im = Image.open(os.path.join(vendored, fn))
+            self.add(fn, png_uri(im), im.width, im.height)
+
+    def portrait(self, uid):
+        uri = portrait(uid)
+        return self.add('Portrait %s ms.png' % uid, uri, 96, 80) if uri else None
+
+    def minimug(self, uid):
+        uri = minimug(uid)
+        if uri:
+            self.add('Small portrait %s fe08.png' % uid, uri, 32, 32)
+        return uid
+
+    def item(self, enum, shown):
+        icon = art.item_icon(enum) if enum else None
+        if icon:
+            self.add('Is gba %s.png' % shown.lower(), icon, 16, 16)
+
+    def sprite(self, name, frame):
+        if frame is not None:
+            self.add(name, png_uri(frame), frame.width, frame.height)
 
 
-def shop_html(chap):
-    shops = inject.villages.chapter_shops(chap)
-    if not shops:
-        return ''
-    text = inject.decomp.vanilla_decomp_text('src/data_items.c')
-    labels, bodies_ = [], []
-    for macro, sym, _x, _y in shops:
-        rows = []
-        for enum in difficulty._shoplist_items(
-                inject.decomp.vanilla_decomp_text('src/events_shoplist.c'), sym):
-            m = re.search(r'\[%s\]\s*=\s*\{(.*?)\n\s*\},' % re.escape(enum), text, re.S)
-            uses = re.search(r'\.maxUses\s*=\s*(\d+)', m.group(1)) if m else None
-            per = re.search(r'\.costPerUse\s*=\s*(\d+)', m.group(1)) if m else None
-            cost = int(per.group(1)) * max(int(uses.group(1)) if uses else 1, 1) if per else ''
-            rows.append((mk.file_img(art.item_icon(enum), 16, 16),
-                         mk.fe(item_name(enum), rom_item_name(enum)), cost))
-        labels.append(macro)
-        bodies_.append(mk.shop_table(rows))
-    return mk.boxed_tabs('Shop data', labels, bodies_)
+def wiki_item(it_or_enum, files, drop=False):
+    """{{Item|8|...}} for a YAML item ref or an ITEM_ enum: the ROM's name, the vanilla article."""
+    if isinstance(it_or_enum, str) and it_or_enum.startswith('ITEM_'):
+        enum, fallback = it_or_enum, ''
+    else:
+        fallback, enum = our_item(it_or_enum)
+    shown = rom_item_name(enum, fallback)
+    files.item(enum, shown)
+    article = item_name(enum) if enum else None
+    return wp.item(shown, link=article if article and article != shown else None, drop=drop)
 
 
-def strategy_html(chap, ckey, dkey):
-    out = []
-    ours_ = chap.get('strategy')
-    if ours_:
-        out.append(para(ours_))
-    for key, label in ((ckey, 'curve twin'), (dkey, 'map donor')):
-        if key and (label == 'curve twin' or key != ckey):
-            s = wiki_strategy(key)
-            if s:
-                out.append(mk.collapsible('Vanilla strategy for %s (%s), as the Fire Emblem Wiki '
-                                          'writes it' % (VANILLA[key][1], label), s))
-    return (mk.STRATEGY_DISCLAIMER + ''.join(out)) if out else ''
+@functools.lru_cache(maxsize=None)
+def _reskin_bases():
+    import inject.reskins
+    return {rk['id']: rk['base'] for rk in inject.reskins.enemy_class_reskins(CAMPAIGN)}
 
 
-def chapter_page(chap, prev, nxt, units, chs):
+def wiki_class(token):
+    """(the name the ROM shows, None): a reskin clones its base class whole, name included, so a
+    goblin soldier's unit window says Soldier, and Soldier is the article it links to."""
+    base = _reskin_bases().get(str(token).lower())
+    if base:
+        token = base[len('CLASS_'):].lower().replace('_', '-')
+    return class_display_name(token), None
+
+
+def wiki_unit_row(chap, ed, token, level, inv, n, shifts, mode, files, kind='Enemy'):
+    st = loaded(ed, token, level, shifts, mode)
+    # A named unit shows its name (bosses, personal lines, a named green ally); a generic shows
+    # its class, as the ROM's unit window does.
+    named = (ed.get('is_boss') or ed.get('is_miniboss') or personal_of(ed)
+             or (kind == 'NPC' and (ed.get('fe_name') or ed.get('name'))))
+    cls, article = wiki_class(token)
+    version = 'ms-%s-%s' % (chap['_slug'], ed.get('id') or token)
+    utype = 'npc' if kind == 'NPC' else 'enemy'
+    files.sprite('Ma gba %s %s %s.gif' % (cls.lower(), version, utype),
+                 sprite_frame(chap, token, 'green' if kind == 'NPC' else 'enemy', ed.get('id')))
+    drop = ed.get('item_drop')
+    items = [wiki_item(i, files) for i in inv
+             if not (isinstance(i, dict) and i.get('is_key_item'))]
+    if drop:                       # the ROM carries the drop as the last item (units.py)
+        items.append(wiki_item(drop, files, drop=True))
+    show = lambda k: unit_load.show(st[k])               # noqa: E731
+    return {'name': (ed.get('fe_name') or ed.get('name')) if named else cls,
+            'class': cls, 'class_article': article, 'version': version,
+            'type': 'npc' if kind == 'NPC' else None, 'lv': level, 'n': n,
+            'hp': show('HP'), 'str': show('Pow'), 'skl': show('Skl'), 'spd': show('Spd'),
+            'lck': show('Lck'), 'def': show('Def'), 'res': show('Res'), 'con': show('Con'),
+            'mov': show('Mov'), 'inventory': items, 'notes': AI_TEXT.get(_ai_shape(chap, ed))}
+
+
+def wiki_recruit_npc_row(chap, g, units, files):
+    """A cast member standing green until recruited (Trex): the line his slot loads with,
+    his unit file's class, level and kit -- what the NPC table shows for vanilla's Colm."""
+    uid = g['id']
+    fs = (units.get(uid) or {}).get('fe_stats') or {}
+    token = fs.get('class')
+    cls, article = wiki_class(token)
+    version = 'ms-%s-%s' % (chap['_slug'], uid)
+    files.sprite('Ma gba %s %s npc.gif' % (cls.lower(), version),
+                 sprite_frame(chap, token, 'green', uid))
+    cls_enum, line = inject.stats.cast_loaded_line(CAMPAIGN, uid)
+    mov = difficulty._class_base(cls_enum).get('baseMov', '')
+    return {'name': unit_name(uid, units), 'class': cls, 'class_article': article,
+            'version': version, 'type': 'npc', 'lv': fs.get('level', '?'), 'n': 1,
+            'hp': line['baseHP'], 'str': line['basePow'], 'skl': line['baseSkl'],
+            'spd': line['baseSpd'], 'lck': line['baseLck'], 'def': line['baseDef'],
+            'res': line['baseRes'], 'con': line['baseCon'], 'mov': mov,
+            'inventory': [wiki_item(e, files) for e in inject.cast.unit_items(CAMPAIGN, uid)],
+            'notes': 'Talk to recruit'}
+
+
+def _ai_shape(chap, ed):
+    try:
+        import chapter_status
+        return chapter_status.ai_shape(difficulty.enemy_ai_bytes(chap, ed, 0))
+    except Exception:
+        return None
+
+
+def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
     slug = chap['_slug']
     title = chap.get('title', slug)
     num = chap.get('chapter_number')
     plan = chap.get('plan') or {}
-    ckey, dkey = twin_key(chap.get('parity_reference')), twin_key(chap.get('fe8_base_map'))
     shifts = chapter_shifts(chap)
+    modes = MODE_LABELS if shifts else (('normal', 'Normal'),)
     recs = recruits_of(chap)
-    img, _cap = map_image(chap)
-    a = lambda part: '%s-%s' % (slug, part)              # noqa: E731
-    sections, toc = [], []
+    img, cap = map_image(chap)
+    m = re.search(r'\((\d+)x(\d+)\)', cap or '')
+    cols, rows = (m.groups() if m else (None, None))
+    if img:
+        files.add('MS map %s.png' % slug, img, int(cols or 0) * 16, int(rows or 0) * 16)
+    c = {'title': title, 'location': chap.get('location'),
+         'image': '[[File:MS map %s.png|200px]]' % slug if img else None,
+         'map': '[[File:MS map %s.png]]' % slug if img else None, 'cols': cols, 'rows': rows,
+         'new_units': [unit_name(r, units) for r in recs],
+         'bosses': [b.get('name') for b in bosses_of(chap)] or
+                   ([plan['boss']] if plan.get('boss') else []),
+         'previous': prev.get('title') if prev else None,
+         'next': nxt.get('title') if nxt else None,
+         'lead': 'the %s of \'\'Manchego Stars\'\'' % (
+             'prologue' if chap.get('is_prologue') else
+             '%s chapter' % ORDINALS[num] if isinstance(num, int) and num < len(ORDINALS)
+             else 'chapter %s' % num),
+         'plot': chap.get('narrative') or plan.get('story'),
+         'script_title': '%s/Script' % title if script_of(slug, chap) else None,
+         'victory': victory_text(chap), 'defeat': defeat_text(chap), 'navbox': navbox}
+    dep = chap.get('deployment') or {}
+    c['ally'] = str(dep.get('deploy_limit') or len(dep.get('deploy_slots') or []) or '?')
+    start = sum(n for ed in enemy_list(chap) if not ed.get('arrives_turn')
+                for _t, _l, _i, n in bodies(ed))
+    reinf = sum(n for ed in enemy_list(chap) if ed.get('arrives_turn')
+                for _t, _l, _i, n in bodies(ed))
+    c['enemy'] = '%d%s' % (start, wp.hover('+%d' % reinf, 'Reinforcements') if reinf else '')
+    greens = list(dep.get('green_allies') or [])
+    green_entries = [e for e in enemy_list(chap) if e.get('faction') == 'green']
+    joiners = [g for g in greens if g['id'] in units]           # green until recruited
+    if greens or green_entries:
+        n_green = len(greens) + sum(n for e in green_entries for _t, _l, _i, n in bodies(e))
+        c['other'] = str(n_green) + ''.join(
+            wp.hover('\u22121', 'Upon %s being recruited' % unit_name(g['id'], units))
+            for g in joiners)
+        c['ally'] += ''.join(wp.hover('+1', 'Upon %s being recruited' % unit_name(g['id'], units))
+                             for g in joiners)
 
-    def add(level, text, anchor, body):
-        if body:
-            toc.append((level - 1, text, anchor))
-            sections.append(mk.h(level, text, anchor) + body)
+    cards = []
+    for pu in chap.get('player_units') or []:
+        cls_enum = class_enum_of(pu.get('class'))
+        hp = (difficulty._class_base(cls_enum).get('baseHP', 0)
+              + inject.stats.guest_personal_line(pu, cls_enum).get('baseHP', 0))
+        name, article = wiki_class(pu.get('class'))
+        port = files.portrait(pu['id'])
+        cards.append({'name': pu.get('name') or unit_name(pu['id'], units),
+                      'portrait': '[[File:%s]]' % port if port else '', 'class': name,
+                      'class_article': article, 'hp': hp, 'lv': pu.get('level', 1),
+                      'inventory': [wiki_item(i, files) for i in pu.get('inventory') or []],
+                      'how': 'Automatically from turn 1'})
+    for r in recs:
+        unit = units.get(r) or {}
+        fs = unit.get('fe_stats') or {}
+        try:
+            hp = difficulty.player_combatant(CAMPAIGN, r).hp
+            kit = [wiki_item(e, files) for e in inject.cast.unit_items(CAMPAIGN, r)]
+        except (Exception, SystemExit):
+            hp, kit = fs.get('HP', '?'), []
+        name, article = wiki_class(fs.get('class'))
+        port = files.portrait(r)
+        cards.append({'name': unit_name(r, units), 'portrait': '[[File:%s]]' % port if port
+                      else '', 'class': name, 'class_article': article, 'hp': hp,
+                      'lv': fs.get('level', '?'), 'inventory': kit,
+                      'how': join_text(r, unit, chap)})
+    c['new_unit_cards'] = cards
+    c['available'] = [{'image_key': files.minimug(u), 'page': unit_name(u, units),
+                       'name': unit_name(u, units)} for u in available_before(chs, chap)]
 
-    # Plot
-    script = script_of(slug, chap)
-    plot = (mk.main_article('%s/script' % slug, '%s/Script' % title) if script else '') + \
-        para(chap.get('narrative') or plan.get('story'))
-    add(2, 'Plot', a('Plot'), plot)
-    # Chapter data
-    w = h = '?'
-    m = re.search(r'\((\d+)x(\d+)\)', _cap or '')
-    if m:
-        w, h = m.groups()
-    player, enemy = unit_counts(chap)
-    data = mk.chapter_data(victory_text(chap), defeat_text(chap), player, enemy,
-                           mk.file_img(img, int(w) * 16 if w != '?' else 0,
-                                       int(h) * 16 if h != '?' else 0, title) if img else '',
-                           w, h)
-    toc.append((1, 'Chapter data', a('Chapter_data')))
-    sections.append(mk.h(2, 'Chapter data', a('Chapter_data')) + data)
-    cards = new_unit_cards(chap, recs, units)
-    avail = [minimug_html(u, units) for u in available_before(chs, chap)]
-    add(3, 'Character data', a('Character_data'),
-        mk.characters(cards, [('Available characters', avail)]) if cards or avail else '')
-    add(3, 'Item data', a('Item_data'), item_rows_html(chap))
-    add(3, 'Shop data', a('Shop_data'), shop_html(chap))
-    add(3, 'Enemy data', a('Enemy_data'), enemy_section(chap, shifts))
-    add(4, 'Reinforcements', a('Reinforcements'), reinforcement_list(chap))
-    add(3, 'Boss data', a('Boss_data'), boss_section(chap, shifts))
-    add(2, 'Strategy', a('Strategy'), strategy_html(chap, ckey, dkey))
-    box = mk.infobox(title, mk.file_img(img, 200, 0, title).replace(' height="0"', '') if img
-                     else '', [
-        ('Location', esc(chap.get('location', ''))),
-        ('New units', ', '.join(mk.ours('unit-%s' % r, unit_name(r, units)) for r in recs)),
-        ('Boss(es)', ', '.join(esc(b.get('name', '?')) for b in bosses_of(chap))
-         or esc(plan.get('boss', ''))),
-        ('Previous chapter(s)', mk.ours(prev['_slug'], prev.get('title')) if prev else ''),
-        ('Next chapter(s)', mk.ours(nxt['_slug'], nxt.get('title')) if nxt else ''),
-    ])
-    lead = ('<p><b>%s</b> is the %s of <i>Manchego Stars</i>.\n</p>'
-            % (esc(title), 'prologue' if chap.get('is_prologue') else
-               '%s chapter' % ORDINALS[num] if isinstance(num, int) and num < len(ORDINALS)
-               else 'chapter %s' % esc(num)))
-    return page(slug, title, box + lead + mk.toc(toc, slug) + ''.join(sections),
-                tools=[('%s/script' % slug, 'Script') if script else None,
-                       ('%s/design' % slug, 'Design notes')],
-                category='Planned chapters' if chap.get('status') == 'planned' else 'Chapters')
+    c['items'] = []
+    rows_ = item_rows(chap)
+    for (name, enum, _v), how in zip(rows_, obtain_phrases(rows_, cols, rows)):
+        if enum:
+            shown = rom_item_name(enum, name)
+            files.item(enum, shown)
+            article = item_name(enum)
+            c['items'].append((shown, how, {'article': article} if article != shown else None))
+        elif name.endswith(' gold'):
+            amount = int(name.split()[0])
+            c['items'].append(('{:,}G'.format(amount), how,
+                               {'image': 'gold', 'article': 'Gold'}))
+        else:
+            c['items'].append((name, how, None))
+
+    shops = []
+    data_items = inject.decomp.vanilla_decomp_text('src/data_items.c')
+    shoplists = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
+    for macro, sym, _x, _y in inject.villages.chapter_shops(chap):
+        stock = []
+        for enum in difficulty._shoplist_items(shoplists, sym):
+            blk = re.search(r'\[%s\]\s*=\s*\{(.*?)\n\s*\},' % re.escape(enum), data_items, re.S)
+            uses = re.search(r'\.maxUses\s*=\s*(\d+)', blk.group(1)) if blk else None
+            per = re.search(r'\.costPerUse\s*=\s*(\d+)', blk.group(1)) if blk else None
+            cost = int(per.group(1)) * max(int(uses.group(1)) if uses else 1, 1) if per else ''
+            shown = rom_item_name(enum)
+            files.item(enum, shown)
+            stock.append((shown, cost))
+        shops.append((macro, stock))
+    c['shops'] = shops
+
+    entries = enemy_list(chap)
+    enemy_tabs, npcs = [], []
+    for mode, label in modes:
+        rows_ = [wiki_unit_row(chap, ed, t, lv, inv, n, shifts, mode, files)
+                 for ed in entries if ed.get('faction') != 'green'
+                 for t, lv, inv, n in bodies(ed)]
+        if rows_:
+            enemy_tabs.append((label, rows_))
+    c['enemy_tabs'] = enemy_tabs
+    c['enemy_default'] = str([m for m, _ in modes].index('normal') + 1) if len(modes) > 1 else None
+    for g in greens:
+        if g['id'] in units:
+            npcs.append(wiki_recruit_npc_row(chap, g, units, files))
+        else:
+            for t, lv, inv, n in bodies(g):
+                npcs.append(wiki_unit_row(chap, g, t, lv, inv, n, shifts, 'normal', files, 'NPC'))
+    for ed in green_entries:
+        for t, lv, inv, n in bodies(ed):
+            npcs.append(wiki_unit_row(chap, ed, t, lv, inv, n, shifts, 'normal', files, 'NPC'))
+    c['npcs'] = npcs
+
+    waves = collections.OrderedDict()           # turn -> {(who, weapon): count}
+    for ed in sorted((e for e in entries if e.get('arrives_turn')),
+                     key=lambda e: int(e['arrives_turn'])):
+        for token, lv, inv, n in bodies(ed):
+            cls, _a = wiki_class(token)
+            who = ed.get('name') if ed.get('is_boss') else cls
+            weapon = next((our_item(i)[1] for i in inv), None)
+            turn = waves.setdefault(int(ed['arrives_turn']), collections.OrderedDict())
+            turn[(who, weapon, bool(ed.get('is_boss')))] = \
+                turn.get((who, weapon, bool(ed.get('is_boss'))), 0) + n
+    for turn, groups in waves.items():
+        lines = []
+        for (who, weapon, boss), n in groups.items():
+            what = who if boss else '%d [[%s]]%s' % (n, who, 's' if n > 1 else '')
+            if weapon:
+                what += ' with %s' % wiki_item(weapon, files)
+            lines.append(what)
+        waves[turn] = lines
+    c['reinforcements'] = list(waves.items())
+
+    c['bosses_data'] = []
+    for ed in bosses_of(chap):
+        token, lv = ed.get('class'), int(ed.get('level', 1))
+        cls_enum = class_enum_of(token)
+        cls, article = wiki_class(token)
+        donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
+                 or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')))
+        ranks = _ranks(cls_enum, donor)
+        letters = {k: _letter(ranks.get(_ITYPE[t])) or None for k, t in (
+            ('sw', 'sword'), ('la', 'lance'), ('ax', 'axe'), ('bo', 'bow'), ('an', 'magic_anima'),
+            ('li', 'magic_light'), ('da', 'magic_dark'), ('st', 'staff'))}
+        port = files.portrait(ed['face']) if ed.get('face') else None
+        sprite_key = 'ms %s' % ed.get('id')
+        files.sprite('Ma gba %s.gif' % sprite_key, sprite_frame(chap, token, uid=ed.get('id')))
+        attrs = unit_load._class_block(cls_enum)
+        inv = [wiki_item(i, files) for i in ed.get('inventory') or []]
+        per_mode = []
+        for mode, label in modes:
+            st = loaded(ed, token, lv, shifts, mode)
+            con = st['Con'][0]
+            aid = (con - 1 if 'CA_MOUNTEDAID' not in attrs else
+                   (20 - con if 'CA_FEMALE' in attrs else 25 - con))
+            show = lambda k: unit_load.show(st[k])       # noqa: E731
+            magic = class_enum_of(token) and any(t in ranks for t in (
+                'ITYPE_ANIMA', 'ITYPE_LIGHT', 'ITYPE_DARK', 'ITYPE_STAFF'))
+            per_mode.append((label, {
+                'portrait': '[[File:%s]]' % port if port else None, 'sprite': sprite_key,
+                'class': cls, 'class_article': article, 'lv': lv,
+                'affinity': str(ed['affinity']).capitalize() if ed.get('affinity') else None,
+                'hp': show('HP'),
+                'str': None if magic else show('Pow'), 'mag': show('Pow') if magic else None,
+                'skl': show('Skl'), 'spd': show('Spd'), 'lck': show('Lck'), 'def': show('Def'),
+                'res': show('Res'), 'con': show('Con'), 'mov': show('Mov'), 'aid': aid,
+                'inventory': inv, 'ranks': letters}))
+        if len({repr(s) for _, s in per_mode}) == 1:
+            per_mode = [('All', per_mode[0][1])]
+        c['bosses_data'].append({'page': ed.get('name'), 'modes': per_mode})
+
+    c['strategy'] = chap.get('strategy')
+    return wp.chapter(c)
 
 
 def script_page(chap):
@@ -1228,11 +1346,13 @@ def css():
 # site's wide-screen banner slot (15.25rem, an image from its servers) collapses to its own
 # narrow-screen margin, since the artifact viewer cannot load the image.
 PAGE_CSS = """
+/* jquery.makeCollapsible.styles (MediaWiki core; not in the vendored skin) */
+.mw-collapsible-toggle-default::before{content:'['}
+.mw-collapsible-toggle-default::after{content:']'}
+.mw-collapsible-toggle-default .mw-collapsible-text{cursor:pointer}
 section.page[hidden]{display:none!important}
 #mw-content-container{margin-top:3.5rem!important}
 .ms-script{white-space:pre;overflow-x:auto;font-size:12px}
-.mw-collapsible.mw-collapsed tr+tr{display:none}
-.mw-collapsible th{cursor:pointer}
 """
 
 JS = """
@@ -1261,9 +1381,24 @@ JS = """
    var i=all.indexOf(tab);all.forEach(function(t,j){t.classList.toggle('tabselected',j===i);});
    var bodies=[].filter.call(main.querySelector('.tabcontents').children,function(c){return c.classList.contains('tab_content');});
    bodies.forEach(function(b,j){b.style.display=j===i?'':'none';});return;}
-  var th=e.target.closest&&e.target.closest('.mw-collapsible th');
-  if(th){th.closest('.mw-collapsible').classList.toggle('mw-collapsed');}
+  var tg=e.target.closest&&e.target.closest('.mw-collapsible-toggle');
+  if(tg){e.preventDefault();setCollapsed(tg.closest('.mw-collapsible'),
+                                          !tg.closest('.mw-collapsible').classList.contains('mw-collapsed'));}
  });
+ // MediaWiki's jquery.makeCollapsible, for tables: a [Collapse]/[Expand] toggle in the first
+ // row's last cell; collapsed, every row but the first is hidden.
+ function rows(t){return [].slice.call(t.rows).slice(1);}
+ function setCollapsed(t,c){t.classList.toggle('mw-collapsed',c);
+  rows(t).forEach(function(r){if(r.closest('table')===t)r.style.display=c?'none':'';});
+  var tg=t.querySelector('.mw-collapsible-toggle');tg.setAttribute('aria-expanded',c?'false':'true');
+  tg.classList.toggle('mw-collapsible-toggle-expanded',!c);tg.classList.toggle('mw-collapsible-toggle-collapsed',c);
+  tg.querySelector('.mw-collapsible-text').textContent=c?'Expand':'Collapse';}
+ [].slice.call(document.querySelectorAll('table.mw-collapsible')).forEach(function(t){
+  var first=t.rows[0];if(!first)return;var cells=first.cells;var cell=cells[cells.length-1];
+  var tg=document.createElement('span');tg.className='mw-collapsible-toggle mw-collapsible-toggle-default';
+  tg.setAttribute('role','button');tg.tabIndex=0;tg.innerHTML='<a class="mw-collapsible-text">Collapse</a>';
+  cell.insertBefore(tg,cell.firstChild);t.classList.add('mw-made-collapsible');
+  setCollapsed(t,t.classList.contains('mw-collapsed'));});
 })();
 """
 
@@ -1308,7 +1443,7 @@ def chrome(pages_html, chs):
         '<div id="mw-related-navigation"><div id="page-tools" class="sidebar-chunk"><h2><span>Page '
         'tools</span></h2><div class="sidebar-inner">'
         + portlet % ('p-cactions', 'Page tools', ' id="ms-page-tools"', '') + '</div></div></div>'
-        '</div><div class="visualClear"></div></div>'
+        '<div class="visualClear"></div></div></div>'
         '<div id="mw-footer-container" class="mw-footer-container ts-container"><div id="mw-footer" '
         'class="mw-footer ts-inner" role="contentinfo" lang="en" dir="ltr"><div id="footer-list">'
         '<ul id="footer-info"><li>Built by <code>tools/gen_wiki.py</code>. Layout and stylesheets: '
@@ -1328,13 +1463,31 @@ def build():
     if first is not None:
         first['_founding'] = sorted(k for k, u in units.items() if u['_kind'] == 'pcs')
     opens = open_questions(chs)
+    files = WikiFiles()
+    titles = {}                       # page title -> page id: what a [[link]] opens here
+    for c in chs:
+        titles[c.get('title', c['_slug'])] = c['_slug']
+        titles['%s/Script' % c.get('title', c['_slug'])] = '%s/script' % c['_slug']
+    for uid in units:
+        titles.setdefault(unit_name(uid, units), 'unit-%s' % uid)
+    wsite_ = wsite.Site(titles, files)
     pages = [home_page(chs, units), index_page(chs), roster_page(chs, units),
              decisions_page(chs, opens)]
     for i, c in enumerate(chs):
-        pages.append(chapter_page(c, chs[i - 1] if i else None,
-                                  chs[i + 1] if i + 1 < len(chs) else None, units, chs))
+        title = c.get('title', c['_slug'])
+        wt = chapter_wikitext(c, chs[i - 1] if i else None,
+                              chs[i + 1] if i + 1 < len(chs) else None, units, chs, files)
+        script = script_of(c['_slug'], c)
+        pages.append(page(c['_slug'], title, wsite.render_page(title, wt, wsite_),
+                          tools=[('%s/script' % c['_slug'], 'Script') if script else None,
+                                 ('%s/design' % c['_slug'], 'Design notes')],
+                          category='Planned chapters' if c.get('status') == 'planned'
+                          else 'Chapters'))
         pages.append(script_page(c))
         pages.append(design_page(c, opens))
+    if wsite_.missing_files:
+        print('wiki: %d file(s) no template could find: %s' % (
+            len(wsite_.missing_files), ', '.join(sorted(wsite_.missing_files)[:12])))
     n_open = sum(len(v) for v in opens.values())
     doc = ('<meta charset="utf-8"><title>Manchego Stars Wiki</title><style>%s\n%s</style>'
            '%s<script>%s</script>'

@@ -1,0 +1,834 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 2.png|200px]]
+|location=[[Ide]]
+|new units=[[Ross]], [[Garcia]]
+|boss=[[Bone]]
+|previous=[[Escape!]]
+|next=[[The Bandits of Borgo]]
+}}
+
+{{quote|Don't risk yourself so foolishly... We need to get you some help. Please! Someone help my son!|[[Garcia]]}}
+
+'''The Protected''' (Japanese: {{hl|守るべきもの|Mamoru bekimono}} ''Something to Protect'') is the second chapter of {{FE8}}. [[Eirika]] and company begin their journey toward [[Grado]] to meet with her brother, [[Ephraim]]. As they pass through the village of [[Ide]], they encounter a group of [[bandit]]s harassing the villagers, and agree to put a stop to them.
+
+This chapter features tutorials about [[rescue (command)|rescuing]] units to move them out of harm's way, as well as a tutorial on healing units.
+
+==Plot==
+{{main|The Protected/Script}}
+
+[[Eirika]] begins to travel south using [[Seth]]'s planned route; [[Vanessa]] volunteers to scout ahead on her [[pegasus]]. Ahead of Eirika's group, bandits plan to attack the local villages, [[Grado]]'s invasion having left them vulnerable. [[Ross]] alerts his father, [[Garcia]], that bandits are approaching the village; the two escape during the attack, though Ross suffers an injury. Vanessa, having witnessed the attack, flies back to Eirika to alert her to the situation. Eirika, wishing to aid the villagers, forms a plan: Vanessa will bring the boy to their side of the mountain range and [[Moulder]] will heal him with his staff. If [[Difficulty#Fire Emblem: The Sacred Stones|Easy Mode]] is being played, this will occur through tutorials; in any other mode, it is up to the player's discretion to follow Eirika's plan.
+
+During the battle, Ross can talk to Eirika; Ross asks Eirika for help, but insists he fight with them to save his father. Ross can also talk to Garcia; Garcia urges Ross to get out of danger, but Ross refuses and continues to fight with his father.
+
+After routing the bandits, Seth approaches Garcia, if Garcia and Ross survived the battle, recognizing Garcia from [[Renais]]'s military. Seth mentions that Garcia, known as "the great Garcia", served Renais ten years prior, and requests that he again fight for Renais. Garcia refuses, stating that he is retired, and that he made a promise to his deceased wife that he would protect Ross at all costs. Ross then speaks up, stating that he is no longer a child in need of protection, and that Garcia can never be happy living in peace when being a warrior is part of who he is. Garcia, feeling his son can handle himself now, joins Eirika's forces to serve Renais once again.
+
+Before departing, a villager approaches Eirika and offers her group food and beds to sleep in for the night. Eirika thanks him but rejects the offer, saying her group must continue their travels. The villager notices Eirika's bracelet and warns her not to wear valuable items so openly, as groups like Bazba's Bandits will make her a target.
+
+Later that night, having left Ide, Eirika reminisces on her first round of sparring with her brother [[Ephraim]] three years prior. Having distracted herself, [[Colm]] bumps into her, apologizes, and runs off. Eirika is confused for a moment, then she realizes her bracelet is missing. Eirika is willing to let the valuable trinket go, but Seth is incredibly worried about the bracelet and chases after the man.
+
+==Chapter data==
+{{ChapData
+|victory=Defeat all bandits
+|defeat=[[Eirika]] dies
+|ally=6{{h|+2|Upon Ross and Garcia being recruited}}
+|other=2{{h|−2|Upon Ross and Garcia being recruited}}
+|enemy=6{{h|+2|Reinforcements}}
+|map=[[File:Cm fe08 2.png]]
+|col=15
+|row=15
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Ross
+|portrait=[[File:Portrait ross fe08.png]]
+|class=Journeyman
+|HP=15
+|lv=1
+|inventory={{Item|8|Hatchet}}<br>{{Item|8|Vulnerary}}
+|recruitment method=NPC, talk to with [[Eirika]]<br><small>(or automatically at the end of the chapter if both he and [[Garcia]] survived)</small>
+}}
+|newunit2={{NewUnit
+|name=Garcia
+|portrait=[[File:Portrait garcia fe08.png]]
+|class=Fighter
+|HP=28
+|lv=4
+|inventory={{Item|8|Iron Axe}}<br>{{Item|8|Hand Axe}}<br>{{Item|8|Vulnerary}}
+|recruitment method=NPC, talk to with [[Ross]]<br><small>(or automatically at the end of the chapter if both he and Ross survived)</small>
+}}
+|forced1=eirika
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Vulnerary
+|obtain1=Dropped by enemy [[Brigand]]
+|item2=Red Gem
+|obtain2=Visit northwestern [[village]]
+|item3=Elixir
+|obtain3=Visit northeastern [[village]]
+|itemlast=Pure Water
+|obtainlast=Visit southern [[village]]
+}}
+
+===Shop data===
+{{ChapShop
+|shop1=Armory (NA/EU ver.)
+|stock1=
+{{ChapShopCell|fe08|Slim Sword|480}}
+{{ChapShopCell|fe08|Iron Sword|460}}
+{{ChapShopCell|fe08|Slim Lance|450}}
+{{ChapShopCell|fe08|Iron Lance|360}}
+{{ChapShopCell|fe08|Iron Axe|270}}
+|shop2=Armory (JP ver.)
+|stock2={{ChapShopCell|fe08|Iron Sword|460}}
+{{ChapShopCell|fe08|Slim Sword|480}}
+{{ChapShopCell|fe08|Iron Lance|360}}
+{{ChapShopCell|fe08|Slim Lance|450}}
+{{ChapShopCell|fe08|Iron Axe|270}}
+}}
+
+===Enemy data===
+{{missingstats}}
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Normal
+|tab3=Normal <small>(Japan)</small>
+|tab4=Difficult
+|tab5=Difficult <small>(Japan)</small>
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=1
+|#=1
+|hp=18
+|str=4
+|skill=3
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Bone]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=23
+|str=6
+|skill=4
+|spd=5
+|lck=0
+|def=4
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Vulnerary|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=2
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=1
+|#=1
+|hp=18
+|str=4
+|skill=3
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Bone]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=23
+|str=6
+|skill=4
+|spd=5
+|lck=0
+|def=4
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Vulnerary|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=2
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Bone]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Vulnerary|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=21~23
+|str=5~8
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=1
+|#=1
+|hp=19~20
+|str=4~5
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Bone]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=24~25
+|str=6~8
+|skill=4~5
+|spd=5~6
+|lck=0~1
+|def=4~5
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22~24
+|str=5~9
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Vulnerary|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=2
+|hp=22~24
+|str=5~9
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22~24
+|str=5~9
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=21~23
+|str=5~8
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Bone]]
+|class=Brigand
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Vulnerary|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turn 3
+**2 [[Brigand]]s from the peaks north of the southern [[village]]
+
+===NPC data===
+{{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Ross]]
+|class=Journeyman
+|type=other
+|lv=1
+|#=1
+|hp=15
+|str=5
+|skill=2
+|spd=3
+|lck=8
+|def=3
+|res=0
+|con=8
+|mov=4
+|inventory={{Item|8|Vulnerary}} • {{Item|8|Hatchet}}
+|notes=Starts with 5 HP on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|fort]].
+}}
+{{ChapUnitCellGBA
+|name=[[Garcia]]
+|class=Fighter
+|type=other
+|lv=4
+|#=1
+|hp=28
+|str=8
+|skill=7
+|spd=7
+|lck=3
+|def=5
+|res=1
+|con=14
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}} • {{Item|8|Hatchet}}
+|notes=Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|forest]].
+|last=y
+}}
+{{ChapUnitFtr}}
+
+===Boss data===
+{{main|Bone}}
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait bone fe08.png]]
+|sprite=brigand enemy
+|class=Brigand
+|affin=ice
+|lv=4
+|HP=23
+|str=6
+|skill=4
+|spd=5
+|luck=0
+|def=4
+|res=0
+|move=5
+|con=12
+|aid=11
+|inventory={{Item|8|Iron Axe}}
+|ax=D
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait bone fe08.png]]
+|sprite=brigand enemy
+|class=Brigand
+|affin=ice
+|lv=4
+|HP={{h|24~25|26~27 in the Japanese version}}
+|str={{h|6~8|7~9 in the Japanese version}}
+|skill={{h|4~5|5~6 in the Japanese version}}
+|spd=5~6
+|luck=0~1
+|def=4~5
+|res=0~1
+|move=5
+|con=12
+|aid=11
+|inventory={{Item|8|Iron Axe}}
+|ax=D
+}}
+}}
+
+==Strategy==
+{{Strategy}}
+You'll need to keep [[Ross]] and [[Garcia (The Sacred Stones)|Garcia]] safe if you want to recruit them. A good way of doing this is to [[Rescue (command)|rescue]] Ross with [[Vanessa]] and then fly back left towards the rest of your units. Then, you can have another unit take and drop Ross down so that [[Eirika]] can talk to and recruit him. This process can be repeated with Garcia, with the difference being than you must talk to him with Ross and not Eirika to recruit him. 
+
+Besides that, the chapter itself is very straightforward—just kill all the units on the map. Feel free to visit all the [[village]]s and obtain some free items. The fort in the south is a good place to plant a unit to defeat the boss. Beware of the reinforcements that spawn in the mountains above the bottom village, as the mountain tiles give them good evasion.
+
+This is your first chance to do any shopping. The selection is limited and everything here is for sale on the world map afterwards, so the only remotely pressing purchase is an Iron Sword for Eirika to conserve [[Rapier]] uses, and an [[Iron Lance]] for Seth. On the world map the selection is increased substantially and actually worth some purchases. [[Franz]], [[Gilliam]], [[Seth]], and Vanessa all benefit from the utility of [[Javelin]]s, and Garcia has enough [[Constitution]] to use a [[Steel Axe]] with minimal penalty. If playing on Difficult, a [[Slim Sword]] for [[Seth]] is worth considering, as it will allow him to wound certain enemies (depending on their random stats rolls) without killing them so weaker units can get more experience. On lower difficulties this doesn't really matter as most enemies will still die in a single round of combat with him.
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=The Protected
+|jpn-name={{h|守るべきもの|Mamoru bekimono}}
+|jpn-mean=Something to Protect
+|span-name=En el camino
+|span-mean=On the path
+|fren-name=Protection
+|fren-mean=Protection
+|ger-name=Die Beschützten
+|ger-mean=The Protected
+|ital-name=Il salvataggio
+|ital-mean=The rescue
+}}
+
+==Gallery==
+{{sectstub}}
+
+{{ChapterNav
+|prechapter=Escape!
+|nextchapter=The Bandits of Borgo
+}}
+
+{{Nav8}}
+{{DEFAULTSORT:Protected, The}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]
