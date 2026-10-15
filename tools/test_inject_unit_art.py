@@ -3,8 +3,11 @@
 passes take their members from it, and every other reader asks it. These pin that it covers every
 path the passes used to decide on their own, in the order they claim SMS ids."""
 import os
+import glob
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.cast                                     # noqa: E402
@@ -52,6 +55,20 @@ class Registry(unittest.TestCase):
             self.assertTrue(frame.getbbox(), s.uid)
         self.assertIsNotNone(art.class_sprite('CLASS_SOLDIER', 'enemy'))
 
+    def test_drawing_a_remap_leaves_no_scratch_behind(self):
+        trex = art.unit_sprite(CAMPAIGN, 'ch03', uid='trex')
+        pattern = os.path.join(tempfile.gettempdir(), 'manchego_art_*')
+        before = set(glob.glob(pattern))
+        art.idle_frame(CAMPAIGN, trex, 'green')
+        self.assertEqual(set(glob.glob(pattern)), before)
+
+    def test_a_reskin_reads_its_donor_from_vanilla_and_its_walk_only_if_it_exists(self):
+        # No build tree needed: the donor is the base class's VANILLA wait sheet (#492 review).
+        rk = {'id': 'x', 'base': 'CLASS_ARMOR_KNIGHT', 'slot': 'CLASS_X', 'sprite': 'no-such'}
+        sp = art.reskin_sprite(CAMPAIGN, rk)
+        self.assertEqual(sp.donor, 'Armor_Knight')
+        self.assertIsNone(sp.walk)
+
 
 class Busts(unittest.TestCase):
     def test_dressed_slots_are_the_registry(self):
@@ -61,6 +78,13 @@ class Busts(unittest.TestCase):
     def test_every_bust_kind_is_present(self):
         kinds = {b.kind for b in art.busts(CAMPAIGN)}
         self.assertEqual(kinds, {'cast', 'guest', 'chwinga', 'visit', 'arena'})
+
+    def test_a_cast_reader_never_builds_the_arena_busts(self):
+        # A malformed arena_presentation in any chapter must not take the cast pass down.
+        with mock.patch.dict(art.BUST_KINDS, arena=mock.Mock(side_effect=SystemExit('arena'))):
+            self.assertTrue(art.busts(CAMPAIGN, kinds=('cast', 'guest')))
+            with self.assertRaises(SystemExit):
+                art.busts(CAMPAIGN)
 
     def test_a_unit_s_bust_is_what_the_build_dresses(self):
         self.assertEqual(art.unit_bust(CAMPAIGN, 'sephek-kaltro').size, (96, 80))

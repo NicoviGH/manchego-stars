@@ -24,6 +24,7 @@ A map sprite's palette is one of three rules, which is the whole of what the pas
 import collections
 import functools
 import os
+import re
 import tempfile
 
 from PIL import Image
@@ -125,18 +126,27 @@ def chwinga_sprite(campaign):
                   _unit_donor(campaign, CH02_CHWINGA_SPRITE_SRC), None, 'remap')
 
 
+def reskin_sprite(campaign, rk):
+    """The Sprite one `enemy_class_reskins` entry dresses its class slot with. The donor is the
+    BASE class's VANILLA wait sheet: the sheet is remapped onto that role layout so the enemy
+    faction ramp colours it, and a vanilla read needs no build tree."""
+    donor = vanilla_wait_donor(rk['base'])
+    if donor is None:
+        raise SystemExit('ERROR: enemy_class_reskins %s: base %s has no vanilla wait row'
+                         % (rk['id'], rk['base']))
+    frame = (tuple(int(v) for v in str(rk['frame']).lower().split('x'))
+             if rk.get('frame') else None)
+    return Sprite(rk['sprite'], 'reskin', rk['slot'], (rk['slot'],),
+                  os.path.join(_asset_dir(campaign), rk['sprite'] + '.png'),
+                  _walk(campaign, rk['sprite']), donor, frame, 'remap')
+
+
 def reskin_sprites(campaign):
     """{(chapter, token): Sprite} for every enemy class reskin that dresses a chapter."""
-    from inject.reskins import enemy_class_reskins, _class_field, _wait_symbol_at
+    from inject.reskins import enemy_class_reskins
     out = {}
     for rk in enemy_class_reskins(campaign):
-        _sym, donor = _wait_symbol_at(_class_field(rk['base'], 'SMSId'))
-        frame = (tuple(int(v) for v in str(rk['frame']).lower().split('x'))
-                 if rk.get('frame') else None)
-        sprite = Sprite(rk['sprite'], 'reskin', rk['slot'], (rk['slot'],),
-                        os.path.join(_asset_dir(campaign), rk['sprite'] + '.png'),
-                        os.path.join(_asset_dir(campaign), rk['sprite'] + '_mu.png'),
-                        donor, frame, 'remap')
+        sprite = reskin_sprite(campaign, rk)
         for chapter, tokens in (rk.get('dresses') or {}).items():
             for token in tokens:
                 out[(chapter, token)] = sprite
@@ -190,43 +200,84 @@ def chwinga_bust(campaign):
     return out
 
 
-def busts(campaign, kinds=None):
-    """Every bust the build dresses, by kind: 'cast', 'guest', 'chwinga', 'visit', 'arena'.
-    Conditioned on the asset existing, exactly as each pass was: a slot we do not dress keeps
-    its vanilla face."""
+def _cast_busts(campaign):
     bust_dir = _bust_dir(campaign)
-    out = []
-    for uid, slot in PORTRAIT_MAP.items():
-        out.append(Bust(uid, 'cast', slot, _file_bust(os.path.join(bust_dir, uid + '.png'))))
+    return [Bust(uid, 'cast', slot, _file_bust(os.path.join(bust_dir, uid + '.png')))
+            for uid, slot in PORTRAIT_MAP.items()]
+
+
+def _guest_busts(campaign):
+    bust_dir = _bust_dir(campaign)
     dressed = set(dressed_guest_slots(campaign))
-    for uid, slot in GUEST_PORTRAIT_MAP.items():
-        if slot in dressed:
-            out.append(Bust(uid, 'guest', slot, _file_bust(os.path.join(bust_dir, uid + '.png'))))
-    if os.path.isfile(os.path.join(bust_dir, CH02_CHWINGA_SPRITE_SRC + '.png')):
-        for uid, npc_slot in CH02_CHWINGA:
-            out.append(Bust(uid, 'chwinga', CH02_CHWINGA_PORTRAIT_SLOT[npc_slot],
-                            lambda: chwinga_bust(campaign)))
-    vendor = os.path.join(bust_dir, 'vendor')
+    return [Bust(uid, 'guest', slot, _file_bust(os.path.join(bust_dir, uid + '.png')))
+            for uid, slot in GUEST_PORTRAIT_MAP.items() if slot in dressed]
+
+
+def _chwinga_busts(campaign):
+    """One recoloured image, on each chwinga's portrait slot."""
+    if not os.path.isfile(os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')):
+        return []
+    image = functools.lru_cache(maxsize=None)(lambda: chwinga_bust(campaign))
+    return [Bust(uid, 'chwinga', CH02_CHWINGA_PORTRAIT_SLOT[npc_slot], image)
+            for uid, npc_slot in CH02_CHWINGA]
+
+
+def _visit_busts(campaign):
+    vendor = os.path.join(_bust_dir(campaign), 'vendor')
+    out = []
     for vid, (mug, slot, recolor) in sorted(CH05_VISIT_FACES.items()):
         path = os.path.join(vendor, mug)
         if os.path.isfile(path):
             out.append(Bust(vid, 'visit', slot,
                             lambda path=path, recolor=recolor: _vendor_mug_to_bust(path, recolor)))
+    return out
+
+
+def _arena_busts(campaign):
+    """One bust per attendant SLOT. Two hosts may share a slot only if they share the
+    attendant: keeping the first chapter's art while GetArenaPresentationFace still emits a
+    case for both hosts would put the wrong attendant on screen with a green build."""
+    claimed, out = {}, []
     for host, override in sorted(arena_presentation_config(campaign)['chapters'].items()):
-        out.append(Bust('arena-%s' % host, 'arena', override['face_slot'],
-                        lambda p=override['portrait_path']: _vendor_mug_to_arena_bust(p)))
-    return [b for b in out if kinds is None or b.kind in kinds]
+        slot, portrait = override['face_slot'], override['portrait_path']
+        if slot in claimed:
+            if claimed[slot] != portrait:
+                raise SystemExit('ERROR: %s: Arena attendant face_slot %r is already dressed '
+                                 'with a different portrait (%s) -- give this chapter its own '
+                                 'slot' % (override['chapter_path'], slot, claimed[slot]))
+            continue
+        claimed[slot] = portrait
+        out.append(Bust('arena-%s' % host, 'arena', slot,
+                        lambda p=portrait: _vendor_mug_to_arena_bust(p)))
+    return out
+
+
+BUST_KINDS = {'cast': _cast_busts, 'guest': _guest_busts, 'chwinga': _chwinga_busts,
+              'visit': _visit_busts, 'arena': _arena_busts}
+
+
+def busts(campaign, kinds=None):
+    """Every bust the build dresses, by kind: 'cast', 'guest', 'chwinga', 'visit', 'arena'.
+    Conditioned on the asset existing, exactly as each pass was: a slot we do not dress keeps
+    its vanilla face. Only the kinds asked for are built, so a cast reader neither parses the
+    Arena config nor depends on it."""
+    return [b for kind, make in BUST_KINDS.items() if kinds is None or kind in kinds
+            for b in make(campaign)]
+
+
+@functools.lru_cache(maxsize=None)
+def _unit_busts(campaign):
+    return {b.uid: b for b in busts(campaign, kinds=('cast', 'guest', 'chwinga'))}
 
 
 def unit_bust(campaign, uid):
     """The bust a unit shows, as an image, or None: what the build dresses for it."""
-    for b in busts(campaign, kinds=('cast', 'guest', 'chwinga')):
-        if b.uid == uid:
-            path = os.path.join(_bust_dir(campaign), uid + '.png')
-            if b.kind != 'chwinga' and not os.path.isfile(path):
-                return None
-            return b.image()
-    return None
+    b = _unit_busts(campaign).get(uid)
+    if b is None:
+        return None
+    if b.kind != 'chwinga' and not os.path.isfile(os.path.join(_bust_dir(campaign), uid + '.png')):
+        return None
+    return b.image()
 
 
 def dress_slot(slot, bust):
@@ -278,10 +329,13 @@ def idle_frame(campaign, sprite, faction):
     sheet = sprite.sheet
     if sprite.palette == 'remap':
         donor_png = os.path.join(VANILLA_WAIT_DIR, 'unit_icon_wait_%s_sheet.png' % sprite.donor)
-        out = os.path.join(tempfile.mkdtemp(prefix='manchego_art_'), 'remapped.png')
-        map_sprite_tool.remap_sms_palette(sheet, donor_png, out)
-        sheet = out
-    im = Image.open(sheet)
+        with tempfile.TemporaryDirectory(prefix='manchego_art_') as tmp:
+            out = os.path.join(tmp, 'remapped.png')
+            map_sprite_tool.remap_sms_palette(sheet, donor_png, out)
+            im = Image.open(out)
+            im.load()
+    else:
+        im = Image.open(sheet)
     w, h = sprite.frame or map_sprite_tool.donor_sms_geometry(sprite.donor)[1:]
     frame = im.crop((0, 0, min(w, im.width), h))
     pal = _cast_palette(campaign) if sprite.palette == 'cast' else _faction_palette(faction)
@@ -290,21 +344,26 @@ def idle_frame(campaign, sprite, faction):
     return frame
 
 
-def class_sprite(class_enum, faction):
-    """A vanilla class's stock idle frame, through its SMSId's wait row (vanilla decomp at HEAD,
+@functools.lru_cache(maxsize=None)
+def vanilla_wait_donor(class_enum):
+    """The <Name> of the wait sheet a vanilla class's SMSId points at (vanilla decomp at HEAD,
     so it needs no build), or None for a class with no row."""
-    import re
     from inject.decomp import vanilla_decomp_text
     block = re.search(r'\[%s - 1\]\s*=\s*\{(.*?)\n\s*\},' % re.escape(class_enum),
                       vanilla_decomp_text('src/data_classes.c'), re.S)
     sms = re.search(r'\.SMSId\s*=\s*(0x[0-9a-fA-F]+|\d+)', block.group(1)) if block else None
     if not sms:
         return None
-    row = re.search(r'unit_icon_wait_(\w+)_sheet\}\s*,\s*//\s*%d\s*$' % int(sms.group(1), 0),
+    row = re.search(r'unit_icon_wait_(\w+)_sheet\}.*//\s*%d\s*$' % int(sms.group(1), 0),
                     vanilla_decomp_text('src/unit_icon_wait_data.c'), re.M)
-    if not row:
+    return row.group(1) if row else None
+
+
+def class_sprite(class_enum, faction):
+    """A vanilla class's stock idle frame, or None for a class with no wait row."""
+    name = vanilla_wait_donor(class_enum)
+    if name is None:
         return None
-    name = row.group(1)
     return idle_frame(None, Sprite(name, 'class', class_enum, (), os.path.join(
         VANILLA_WAIT_DIR, 'unit_icon_wait_%s_sheet.png' % name), None, name, None, 'faction'),
         faction)

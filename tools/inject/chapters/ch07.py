@@ -8,7 +8,7 @@ from inject.cast import CLASS_LOADOUT, _classed_cast
 from inject.chapter_frame import write_event_group
 from inject.chapter_ids import CH07_CHAPTER_YAML, CH07_GOAL_STATUS_MSG, CH07_GOAL_WINDOW_MSG
 from inject.class_ids import ChapterClassIds
-from inject.decomp import _replace_brace_block, REPO, ITEM_ENUM
+from inject.decomp import _replace_brace_block, REPO
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH07_EVENT_GROUP, CH07_HOST_INDEX
 from inject.maps import _register_chapter_map
@@ -91,7 +91,7 @@ def inject_ch07(campaign, boot=False, verbose=True):
     declare_unit_table(CH07_BOOT_SEED_TABLE, seed_rows,
                        'ch07 --ch07-boot armed party seed (cold-start PREP fodder)')
     spawns = {key: CH07_HALL_DOOR for key in CH07_HALL_ARCHERS}
-    line_rows = enemy_rows(chap, CH07_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch07'), spawns=spawns,
+    line_rows = enemy_rows(chap, CH07_CLASS_IDS, enemy_pid_for('ch07'), spawns=spawns,
                            reda_symbol=ch07_reda_symbol)
     by_id = {e['id']: e for e in chap['enemy_units']}
     redas = [(ch07_reda_symbol(eid, i),) + tuple(by_id[eid]['positions'][i])

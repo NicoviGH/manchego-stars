@@ -705,7 +705,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
 
     # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
     spawns = ch06_line_spawns(chap, maps_dir)
-    line_rows = enemy_rows(chap, CH06_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch06'), spawns=spawns,
+    line_rows = enemy_rows(chap, CH06_CLASS_IDS, enemy_pid_for('ch06'), spawns=spawns,
                            reda_symbol=ch06_reda_symbol)
     redas = [(ch06_reda_symbol(eid, i), x, y)
              for e in chap['enemy_units'] if e.get('arrives_turn') is None
@@ -714,7 +714,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     declare_unit_table(CH06_LINE_TABLE, line_rows,
                        'ch06 turn-1 line: the merfolk of Maer Dualdon, on our placement (#360), '
                        'surfacing from the channels', redas=redas)
-    wave_rows = enemy_rows(chap, CH06_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch06'),
+    wave_rows = enemy_rows(chap, CH06_CLASS_IDS, enemy_pid_for('ch06'),
                            arrives_turn=CH06_HARD_WAVE_TURN)
     if not wave_rows:
         sys.exit('ERROR: ch06 declares no enemies arriving on turn %d, but a wave table and a '

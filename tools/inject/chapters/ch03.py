@@ -239,7 +239,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
         talk_recruiters(campaign, chap['chapter_number']), trex_char,
         CH03_TREX_TALK_FLAG, CH03_TREX_TALK_SCRIPT, CH03_TREX_TALK_MSG)
 
-    enemies = enemy_rows(chap, CH03_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch03'))
+    enemies = enemy_rows(chap, CH03_CLASS_IDS, enemy_pid_for('ch03'))
     enemy = '{\n' + '\n'.join(enemies) + '\n    { 0 },\n}'
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:

@@ -47,6 +47,9 @@ ITEM_ENUM = {
     'steel-axe': 'ITEM_AXE_STEEL',
     'venin-axe': 'ITEM_AXE_VENIN',
     'iron-blade': 'ITEM_BLADE_IRON',
+    # the four ch05 reliquary gifts (villages) -- vanilla Ch5's own reward tier, and the exact
+    # items `make difficulty CH=ch05` prices the economy against: booster-def, booster-skl,
+    # armorslayer, torch
     'booster-def': 'ITEM_BOOSTER_DEF',
     'energy-ring': 'ITEM_BOOSTER_POW',
     'booster-skl': 'ITEM_BOOSTER_SKL',
@@ -56,6 +59,7 @@ ITEM_ENUM = {
     'flux': 'ITEM_DARK_FLUX',
     'door-key': 'ITEM_DOORKEY',
     'elixir': 'ITEM_ELIXIR',
+    # ch05's save-all-four bonus -- vanilla Ch5's own, handed over at the ending
     'guiding-ring': 'ITEM_GUIDINGRING',
     'hero-crest': 'ITEM_HEROCREST',
     'knight-crest': 'ITEM_KNIGHTCREST',
@@ -71,9 +75,14 @@ ITEM_ENUM = {
     'evil-eye': 'ITEM_MONSTER_EVILEYE',
     'fetid-claw': 'ITEM_MONSTER_FETIDCLW',
     'fire-fang': 'ITEM_MONSTER_FIREFANG',
+    # the GWYLLGI's own vanilla weapon (the moose deploys as one), kept under its vanilla
+    # NAME -- renaming the item would burn 'Hell Fang' for every future Gwyllgi in the
+    # campaign (Nicolas, 2026-08-15)
     'hell-fang': 'ITEM_MONSTER_HELLFANG',
     'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
     'venin-claw': 'ITEM_MONSTER_VENINCLW',
+    # ch06's boats -- vanilla Ch6's own pair: the village gift (antitoxin), and the
+    # save-them-all prize its ENDING scene grants on CHECK_ALIVE
     'orions-bolt': 'ITEM_ORIONSBOLT',
     'pure-water': 'ITEM_PUREWATER',
     'red-gem': 'ITEM_REDGEM',
@@ -81,6 +90,8 @@ ITEM_ENUM = {
     'mend': 'ITEM_STAFF_MEND',
     'armorslayer': 'ITEM_SWORD_ARMORSLAYER',
     'iron-sword': 'ITEM_SWORD_IRON',
+    # FE8 calls the Killing Edge ITEM_SWORD_KILLER -- it is the sword vanilla Joshua carries
+    # on ch05's twin map, and ch05's duelist recruit is his 1:1 (crit-threat duelist)
     'killing-edge': 'ITEM_SWORD_KILLER',
     'rapier': 'ITEM_SWORD_RAPIER',
     'steel-sword': 'ITEM_SWORD_STEEL',

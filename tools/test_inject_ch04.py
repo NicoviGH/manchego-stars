@@ -41,7 +41,7 @@ VANILLA = inject.decomp.vanilla_decomp_text('src/data_characters.c')
 def enemy_rows(chap, **kwargs):
     """ch04's enemy rows, through the shared emitter with ch04's own ids and pid rule."""
     m = inject.chapters.ch04
-    return inject.units.enemy_rows(chap, m.CH04_CLASS_IDS, inject.decomp.ITEM_ENUM, inject.raw_pids.enemy_pid_for('ch04'),
+    return inject.units.enemy_rows(chap, m.CH04_CLASS_IDS, inject.raw_pids.enemy_pid_for('ch04'),
                                    **kwargs)
 
 

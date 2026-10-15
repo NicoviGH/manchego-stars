@@ -29,7 +29,7 @@ from inject import source as injector  # the injector's source, every file of it
 def enemy_rows(chap, **kwargs):
     """ch06's enemy rows, through the shared emitter with ch06's own ids and pid rule."""
     m = inject.chapters.ch06
-    return inject.units.enemy_rows(chap, m.CH06_CLASS_IDS, inject.decomp.ITEM_ENUM, inject.raw_pids.enemy_pid_for('ch06'),
+    return inject.units.enemy_rows(chap, m.CH06_CLASS_IDS, inject.raw_pids.enemy_pid_for('ch06'),
                                    reda_symbol=m.ch06_reda_symbol,
                                    **kwargs)
 

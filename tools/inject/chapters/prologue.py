@@ -11,7 +11,7 @@ from inject.hosting import _load_chapter_yaml, GOAL_TEMPLATE, map_writes
 from inject.chapter_ids import PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT
 from inject.class_ids import ChapterClassIds
 from inject.decomp import (
-    _find_brace_block, _replace_brace_block, fe_item_enum, REPO, ITEM_ENUM)
+    _find_brace_block, _replace_brace_block, fe_item_enum, REPO)
 from inject.hosts import PROLOGUE_CHAPTER_INDEX, PROLOGUE_EVENT_GROUP, PROLOGUE_HOST_INDEX
 from inject.maps import _register_chapter_map
 from inject.montage import inject_opening_montage, inject_world_tour
@@ -133,7 +133,7 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
             return 'CHARACTER_%s' % sephek_slot
         return '0x%02x' % guard_slots[index]
 
-    rows = enemy_rows(chap, ChapterClassIds('prologue'), ITEM_ENUM, pid)
+    rows = enemy_rows(chap, ChapterClassIds('prologue'), pid)
     enemy = '{\n' + '\n'.join(rows) + '\n    { 0 },\n}'
     return ally, enemy
 

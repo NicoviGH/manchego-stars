@@ -441,15 +441,15 @@ def inject_ch04(campaign, boot=False, verbose=True):
         for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     seed = '{\n' + '\n'.join(seed_rows) + '\n    { 0 },\n}'
 
-    initial_rows = enemy_rows(chap, CH04_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch04'))
-    turn3_rows = enemy_rows(chap, CH04_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch04'), arrives_turn=3)
+    initial_rows = enemy_rows(chap, CH04_CLASS_IDS, enemy_pid_for('ch04'))
+    turn3_rows = enemy_rows(chap, CH04_CLASS_IDS, enemy_pid_for('ch04'), arrives_turn=3)
     # Stage 2b -- the turn-2 wolf-pack reveal: the convertible Mauthe Doog wave with its leader
     # tile reassigned to Lupin (red, CHARACTER_DUESSEL). 5 generic Mauthe Doogs + Lupin = 6, so
     # enemy_rows still reports 6 for the difficulty read (parity held); the split is here.
     lupin = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
                  if r[0] == 'lupin')
     turn2_rows = ch04_turn2_reveal_rows(chap, lupin)
-    turn2_wave = enemy_rows(chap, CH04_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch04'), arrives_turn=2)
+    turn2_wave = enemy_rows(chap, CH04_CLASS_IDS, enemy_pid_for('ch04'), arrives_turn=2)
     if [len(initial_rows), len(turn2_wave), len(turn3_rows)] != [10, 6, 7]:
         sys.exit('ERROR: ch04 realigned roster must stay 10 line + 6 turn-2 reveal + 7 turn-3')
 
@@ -520,7 +520,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # No-op today -- ch04's forest is a from-scratch canvas, so its `map:` block names no
     # `vanilla_layout:` and there is no vanilla gift placement to inherit. Wired anyway so the
     # rule travels with the chapter rather than with whoever remembers it (#25).
-    assert_village_gifts_match_vanilla(chap, ITEM_ENUM)
+    assert_village_gifts_match_vanilla(chap)
     # Tile flips (#214): the snag falls into a crossing (the Iron Axe's whole purpose) and each
     # visited village closes its door. Must run AFTER _retarget_host_chapter zeroed changeLayerId.
     _inject_tile_changes('MS_Ch04MapChanges', ch04_map_changes(chap, maps_dir), CH04_HOST_INDEX)
@@ -609,7 +609,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
         symbol, msg, _fid, bg = CH04_VILLAGE_SLOTS[village['id']]
         script = _replace_brace_block(
             script, symbol + '[] =',
-            village_script(msg, village_reward_item(village, ITEM_ENUM), bg),
+            village_script(msg, village_reward_item(village), bg),
             CH5_EVENTSCRIPT_H)
     # The moose-flees beat (Stage 4): fired by the Misc AREA when a unit reaches the tomb-side
     # clearing. Loads the moose, holds on it, RBG's one line, then it bolts NE and is gone.

@@ -16,7 +16,7 @@ from inject.decomp import (
 from inject.paths import (
     BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_POINTER_H,
     BANIMCONF_C, CLASSES_C, CLASSES_H, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
-    UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_C, UNIT_ICON_WAIT_S, WAIT_GFX_DIR)
+    UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_S, WAIT_GFX_DIR)
 from inject.sms import _write_wait_row, claim_sms_id
 from inject.stats import _set_field
 
@@ -64,17 +64,6 @@ def vanilla_class_values():
                                                vanilla_decomp_text('include/constants/classes.h'))}
 
 
-def _class_field(class_enum, field):
-    """Read a numeric field (e.g. SMSId) from a gClassData entry, as written in the C."""
-    with open(CLASSES_C, encoding='utf-8') as f:
-        text = f.read()
-    bs, be = _find_brace_block(text, '[%s - 1]' % class_enum, CLASSES_C)
-    m = re.search(r'\.' + field + r'\s*=\s*(0x[0-9A-Fa-f]+|\d+)', text[bs:be])
-    if not m:
-        sys.exit('ERROR: .%s not found in gClassData[%s]' % (field, class_enum))
-    return int(m.group(1), 0)
-
-
 def _move_table_len():
     """Count rows in unit_icon_move_table[] -> the next contiguous class index. The move
     table is a POSITIONAL array indexed by classId-1 (no designated inits), so an appended
@@ -94,17 +83,6 @@ def _move_row_at(class_value):
             if m:
                 return m.group(1)
     sys.exit('ERROR: no move-table row at index %d (class %#x)' % (idx, class_value))
-
-
-def _wait_symbol_at(sms_id):
-    """The donor `unit_icon_wait_<Name>_sheet` symbol at row `sms_id` (its `// N` comment),
-    and the bare <Name>. The vanilla wait rows are emitted `{..., sym}, // N`."""
-    with open(UNIT_ICON_WAIT_C, encoding='utf-8') as f:
-        for line in f:
-            m = re.search(r'(unit_icon_wait_(\w+)_sheet)\}.*//\s*%d\s*$' % sms_id, line)
-            if m:
-                return m.group(1), m.group(2)
-    sys.exit('ERROR: no wait-table row at SMS id %d' % sms_id)
 
 
 def _move_motion_at(class_value):
@@ -273,7 +251,7 @@ def inject_enemy_class_reskins(campaign, verbose=True):
         if verbose:
             print('  (no enemy_class_reskins declared)')
         return
-    asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
+    from inject.unit_art import reskin_sprite     # unit_art imports this module
     # Append any freshly-declared class slots (slot_id present) before resolving enum
     # values, so a reskin can ride a slot beyond the three vanilla ballista-empties (#23).
     _append_new_reskin_slots(reskins, verbose)
@@ -288,19 +266,18 @@ def inject_enemy_class_reskins(campaign, verbose=True):
             if rk[key] not in values:
                 sys.exit('ERROR: enemy_class_reskins %s: unknown class %r' % (rk['id'], rk[key]))
 
-        # Donor SMS palette + geometry come from the base class's vanilla wait sheet.
-        base_sms = _class_field(base, 'SMSId')
-        donor_sym, donor_name = _wait_symbol_at(base_sms)
-        donor_png = os.path.join(WAIT_GFX_DIR, donor_sym + '.png')
+        # Donor SMS palette + geometry come from the base class's vanilla wait sheet; the
+        # registry (inject.unit_art) is what the wiki draws from, so both read one answer.
+        art = reskin_sprite(campaign, rk)
+        donor_png = os.path.join(WAIT_GFX_DIR, 'unit_icon_wait_%s_sheet.png' % art.donor)
 
         # Graphics once per unique sprite (shared across reskins of the same sprite).
         if sprite not in sprite_sms:
-            stand = os.path.join(asset_dir, sprite + '.png')
-            walk = os.path.join(asset_dir, sprite + '_mu.png')
-            for p in (stand, walk):
-                if not os.path.isfile(p):
+            stand, walk = art.sheet, art.walk
+            for p, name in ((stand, sprite + '.png'), (walk, sprite + '_mu.png')):
+                if not p or not os.path.isfile(p):
                     sys.exit('ERROR: enemy_class_reskins %s: missing map_sprites/%s'
-                             % (rk['id'], os.path.basename(p)))
+                             % (rk['id'], name))
             sym = sprite.replace('-', '_')
             wait_sym = 'unit_icon_wait_manchego_%s_sheet' % sym
             move_sym = 'unit_icon_move_manchego_%s_sheet' % sym
@@ -313,10 +290,7 @@ def inject_enemy_class_reskins(campaign, verbose=True):
             # different size class than the base (the Fire Imp is a tall 16x32 sprite on a
             # 16x16 soldier/fighter -- the engine draws it via the wait-row size flag);
             # else the base class's own SMS size.
-            if rk.get('frame'):
-                dfw, dfh = (int(v) for v in str(rk['frame']).lower().split('x'))
-            else:
-                _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor_name)
+            dfw, dfh = art.frame or map_sprite_tool.donor_sms_geometry(art.donor)[1:]
             macro, fw, fh, _ = map_sprite_tool.sheet_info(
                 os.path.join(WAIT_GFX_DIR, wait_sym + '.png'), (dfw, dfh))
             map_sprite_tool.validate_mu_sheet(os.path.join(MOVE_GFX_DIR, move_sym + '.png'))

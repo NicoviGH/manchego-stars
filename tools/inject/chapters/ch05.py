@@ -7,9 +7,16 @@ import sys
 import fe8_talk_font
 from inject.raw_pids import enemy_pid_for
 from inject.cast import (
-    _bust_dir, _classed_cast, _vendor_mug_to_bust, char_symbol, CLASS_LOADOUT, GUEST_PORTRAIT_MAP,
-    load_unit, PORTRAIT_MAP)
-from inject.chapter_ids import (CH04_MOOSE_MOV_TABLE, CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG, CH05_ARRIVAL_NO_LUPIN_MSG, CH05_ARRIVAL_SLOT, CH05_BASIL_JOIN_NO_LUPIN_MSG, CH05_BASIL_JOIN_SLOT, CH05_BOSS_PID, CH05_CHAPTER_YAML, CH05_CLASS_IDS, CH05_ENDING_ARMS, CH05_ENDING_LOST_MSG, CH05_ENDING_MSGS, CH05_ERUPTION_MSG, CH05_GOAL_STATUS_MSG, CH05_GOAL_WINDOW_MSG, CH05_MOOSE_CHARGE_SLOT, CH05_MOOSE_PID, CH05_MOOSE_QUIP_MSG, CH05_OPENING_SLOTS, CH05_RAVISIN_DEATH_MSG, CH05_RAVISIN_TAUNT_MSG, CH05_SAHNAR_ALONE_SLOT, CH05_SAHNAR_TALK_MSG, CH05_SAHNAR_TALK_NO_LUPIN_MSG, CH05_VILLAGE_SLOTS, CH05_VISIT_FACES, PROLOGUE_SEPHEK_SLOT, CH05_GENERIC_PID)
+    _classed_cast, char_symbol, CLASS_LOADOUT, GUEST_PORTRAIT_MAP, load_unit, PORTRAIT_MAP)
+from inject.chapter_ids import (
+    CH04_MOOSE_MOV_TABLE, CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
+    CH05_ARRIVAL_NO_LUPIN_MSG, CH05_ARRIVAL_SLOT, CH05_BASIL_JOIN_NO_LUPIN_MSG,
+    CH05_BASIL_JOIN_SLOT, CH05_BOSS_PID, CH05_CHAPTER_YAML, CH05_CLASS_IDS, CH05_ENDING_ARMS,
+    CH05_ENDING_LOST_MSG, CH05_ENDING_MSGS, CH05_ERUPTION_MSG, CH05_GOAL_STATUS_MSG,
+    CH05_GOAL_WINDOW_MSG, CH05_MOOSE_CHARGE_SLOT, CH05_MOOSE_PID, CH05_MOOSE_QUIP_MSG,
+    CH05_OPENING_SLOTS, CH05_RAVISIN_DEATH_MSG, CH05_RAVISIN_TAUNT_MSG, CH05_SAHNAR_ALONE_SLOT,
+    CH05_SAHNAR_TALK_MSG, CH05_SAHNAR_TALK_NO_LUPIN_MSG, CH05_VILLAGE_SLOTS, CH05_VISIT_FACES,
+    PROLOGUE_SEPHEK_SLOT, CH05_GENERIC_PID)
 from inject.decomp import _replace_brace_block, REPO, vanilla_decomp_text, ITEM_ENUM
 from inject.chapter_frame import write_event_group
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
@@ -18,7 +25,7 @@ from inject.maps import (
     _drawn_block, _inject_tile_changes, _map_changes_tileset, _register_chapter_map,
     _register_tileset, _snowy_metatile_for, TILESET_STEMS)
 from inject.messages import assert_message_ids_unique
-from inject.unit_art import dress_slot
+from inject.unit_art import busts, dress_slot
 from inject.paths import CH05_EVENTINFO_H, CH05_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT
 from inject.event_scripts import assert_event_scripts_defined, declare_event_script
 from inject.recruit import (
@@ -119,17 +126,13 @@ def inject_ch05_visit_faces(campaign, verbose=True):
     read FRIENDLY (these four hand you gifts) and because Sahnar already IS a Glaceo, so hers
     stays the somber face among them.
     """
-    vendor = os.path.join(_bust_dir(campaign), 'vendor')
-    for vid, (mug, slot, recolor) in sorted(CH05_VISIT_FACES.items()):
-        path = os.path.join(vendor, mug)
-        if not os.path.isfile(path):
-            if verbose:
-                print('  (no %s; ch05 %s keeps its vanilla face)' % (mug, vid))
-            continue
-        dress_slot(slot, _vendor_mug_to_bust(path, recolor))
+    dressed = busts(campaign, kinds=('visit',))
+    for bust in dressed:
+        dress_slot(bust.slot, bust.image())
     if verbose:
-        print('  ch05 reliquary residents -> %s'
-              % ', '.join(sorted(slot for _, slot, _ in CH05_VISIT_FACES.values())))
+        for vid in sorted(set(CH05_VISIT_FACES) - {b.uid for b in dressed}):
+            print('  (no %s; ch05 %s keeps its vanilla face)' % (CH05_VISIT_FACES[vid][0], vid))
+        print('  ch05 reliquary residents -> %s' % ', '.join(sorted(b.slot for b in dressed)))
 
 
 def _chapter_event_by_slot(chap, trigger, slot, err_label):
@@ -1644,7 +1647,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # A retile inherits vanilla's gift PLACEMENT, not just its terrain. Runs before anything is
     # written: the failure it catches is invisible to the parity read (same items, same total,
     # different tiles), so it has to be a gate rather than a review note.
-    assert_village_gifts_match_vanilla(chap, ITEM_ENUM)
+    assert_village_gifts_match_vanilla(chap)
     assert_village_tiles_visitable(chap, maps_dir, CH05_LAYOUT[1])
 
     # 1. Map: register the port-or-town-winter tileset (ch05 is its first user, so it
@@ -1707,12 +1710,12 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # Sahnar is a turn-1 unit now (#25), so she matches the `arrives_turn: None` selector the
     # line table uses -- but she must stay OUT of it, because she LOADs from her own table at
     # her own beat and the line goes down in one LOAD1 before prep.
-    line_rows = enemy_rows(chap, CH05_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch05'), exclude=('sahnar',))
+    line_rows = enemy_rows(chap, CH05_CLASS_IDS, enemy_pid_for('ch05'), exclude=('sahnar',))
     declare_unit_table(CH05_LINE_TABLE, line_rows,
                        'ch05 turn-1 line: the risen tomb-guard, on vanilla Ch5 fighting tiles')
     wave_counts = {}
     for turn in sorted(CH05_WAVE_TABLES):
-        rows = enemy_rows(chap, CH05_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch05'),
+        rows = enemy_rows(chap, CH05_CLASS_IDS, enemy_pid_for('ch05'),
                           arrives_turn=turn, exclude=('sahnar',))
         if not rows:
             sys.exit('ERROR: ch05 declares no enemies arriving on turn %d, but a wave table '
@@ -1724,7 +1727,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # pid is unaddressable, which is exactly what #203 cost ch04's wolf pack. She selects on the
     # turn-1 `arrives_turn: None` now, not the eruption's 2: Ravisin summons her ON SCREEN in
     # scene 3 and she LOADs after the prep CALL, where vanilla LOADs Joshua (#25).
-    sahnar_rows = enemy_rows(chap, CH05_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch05'), exclude=frozenset(
+    sahnar_rows = enemy_rows(chap, CH05_CLASS_IDS, enemy_pid_for('ch05'), exclude=frozenset(
         e['id'] for e in chap['enemy_units'] if e['id'] != 'sahnar'))
     if len(sahnar_rows) != 1:
         sys.exit('ERROR: ch05 expects exactly one Sahnar on the turn-1 board, got %d -- she is '
@@ -1880,7 +1883,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         symbol, msg, _fid = CH05_VILLAGE_SLOTS[village['id']]
         declare_event_script(
             CH05_EVENTSCRIPT_H, symbol,
-            village_script(msg, village_reward_item(village, ITEM_ENUM), CH05_VISIT_BG),
+            village_script(msg, village_reward_item(village), CH05_VISIT_BG),
             'ch05 %s -- the resident\'s line (0x%X) then the gift' % (village['id'], msg))
     # 4c. The Basil->Sahnar Talk script the Character list points at. Same append-AFTER-the-bulk-
     #     write rule as the visits above -- declaring it earlier would have the block rewrite

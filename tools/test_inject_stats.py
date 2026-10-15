@@ -6,8 +6,10 @@ Run:  python3 tools/test_inject_stats.py
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import inject.cast
 import inject.decomp
 import inject.stats
 
@@ -70,6 +72,26 @@ class PersonalBaseDeltas(unittest.TestCase):
     def test_ignores_class_only_mov(self):
         out = inject.stats.personal_base_deltas({'HP': 1, 'MOV': 9}, {'baseHP': 1}, {'baseHP': 0})
         self.assertNotIn('baseMov', out)
+
+
+class CastLoadedLine(unittest.TestCase):
+    """What a cast member loads with: a field its fe_stats leaves out keeps the SLOT's vanilla
+    value, because the injector writes only the authored fields (#492 review)."""
+    CAMP = 'rime-of-the-frostmaiden'
+
+    def test_an_unauthored_field_keeps_the_slots_vanilla_value(self):
+        unit = dict(inject.cast.load_unit(self.CAMP, 'braulo'))
+        unit['fe_stats'] = {k: v for k, v in unit['fe_stats'].items() if k != 'LCK'}
+        with mock.patch('inject.stats.load_unit', return_value=unit):
+            cls, line = inject.stats.cast_loaded_line(self.CAMP, 'braulo')
+        vanilla = inject.decomp.vanilla_decomp_text('src/data_characters.c')
+        eirika = inject.stats.donor_base_stats(vanilla, 'CHARACTER_EIRIKA')   # braulo's slot
+        self.assertEqual(line['baseLck'],
+                         inject.stats.class_base_stats(cls).get('baseLck', 0) + eirika['baseLck'])
+
+    def test_a_name_only_unit_is_a_named_error(self):
+        with self.assertRaisesRegex(ValueError, 'name-only'):
+            inject.stats.cast_loaded_line(self.CAMP, 'brie')
 
 
 class DonorMaps(unittest.TestCase):

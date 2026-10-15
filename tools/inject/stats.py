@@ -196,6 +196,22 @@ def cast_personal_line(campaign, unit_id, vanilla_text=None, classes_text=None):
     return class_enum, cbase, personal_base_deltas(unit['fe_stats'], cbase, dbase)
 
 
+def cast_loaded_line(campaign, unit_id, vanilla_text=None, classes_text=None):
+    """(class_enum, {base field: stat}) a cast member loads with: class base + the personal
+    line its slot carries in the ROM. The injector writes only the fields the unit file's
+    fe_stats authors (`cast_personal_line`); every other field keeps the SLOT's vanilla value,
+    so a reader that filled the gaps from the donor would disagree with the ROM there."""
+    got = cast_personal_line(campaign, unit_id, vanilla_text, classes_text)
+    if got is None:
+        raise ValueError('%s has no class yet (a name-only unit): it loads with no stat line'
+                         % unit_id)
+    class_enum, cbase, layer = got
+    vanilla = vanilla_text or vanilla_decomp_text('src/data_characters.c')
+    personal = donor_base_stats(vanilla, 'CHARACTER_' + PORTRAIT_MAP[unit_id].upper())
+    personal.update(layer)
+    return class_enum, {f: cbase.get(f, 0) + personal[f] for f in BASE_FIELDS}
+
+
 def _set_gender(block, female):
     """Set the CA_FEMALE attribute. Replaces .attributes if present; if absent,
     inserts it only when female (absent already means 0 == male)."""

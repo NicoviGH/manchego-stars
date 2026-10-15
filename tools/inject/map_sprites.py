@@ -13,8 +13,7 @@ from yaml_loader import yaml_load
 import map_sprite_tool
 from inject.cast import load_unit
 from inject.chapter_ids import CH02_CHWINGA_SPRITE_SRC
-from inject.unit_art import (_unit_donor, cast_sprites, chwinga_sprite, FACTION_TINTED_CAST,
-                             guest_sprites, neutral_sprites)
+from inject.unit_art import cast_sprites, chwinga_sprite, guest_sprites, neutral_sprites
 from inject.decomp import BMUNIT_C, REPO
 from inject.paths import (
     BMUDISP_C, MOVE_GFX_DIR, MU_C, PREP_UNITSELECT_C, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
@@ -305,15 +304,14 @@ def inject_map_sprites(campaign, verbose=True):
     asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
     # An id is claimed only for a member that actually HAS a sheet, i.e. only where a wait
     # row is about to be written -- see claim_sms_id (#227).
-    idle = [(s.uid, s.wearers[0], s.cls, claim_sms_id()) for s in cast_sprites(campaign)]
+    # Each entry is (Sprite, SMS id): the registry (inject.unit_art) says which sheet, donor,
+    # walk and palette rule; this pass only claims ids and emits rows.
+    idle = [(sp, claim_sms_id()) for sp in cast_sprites(campaign)]
 
     # Cold-open guests (PROLOGUE_GUEST_SPRITES) get the same SMS/MU overrides but render
-    # through FE8's standard player palette -- so they are kept out of custom_slots (no
-    # cast-palette override) below.
-    guest_idle, guest_bases = [], {}
-    for s in guest_sprites(campaign):
-        guest_idle.append((s.uid, s.wearers[0], s.cls, claim_sms_id()))
-        guest_bases[s.uid] = s.donor
+    # through FE8's standard player palette (their 'faction' rule) -- so they are kept out
+    # of custom_slots (no cast-palette override) below.
+    guest_idle = [(sp, claim_sms_id()) for sp in guest_sprites(campaign)]
 
     if not idle and not guest_idle:
         if verbose:
@@ -331,30 +329,29 @@ def inject_map_sprites(campaign, verbose=True):
     # palette for BOTH sheets so idle/walk share role indices. Temp dir -> no derived asset
     # in the tree (single source of truth stays map_sprites/<id>.png).
     tinted_idle_src, tinted_mu_src, tint_tmp = {}, {}, None
-    for uid, slot, cls, sms in idle:
-        if uid not in FACTION_TINTED_CAST:
+    for sp, _sms in idle:
+        if sp.palette != 'remap':
             continue
+        uid = sp.uid
         if tint_tmp is None:
             tint_tmp = tempfile.mkdtemp(prefix='manchego_tint_')
-        donor_png = os.path.join(WAIT_GFX_DIR,
-                                 'unit_icon_wait_%s_sheet.png' % _donor_base(campaign, uid))
+        donor_png = os.path.join(WAIT_GFX_DIR, 'unit_icon_wait_%s_sheet.png' % sp.donor)
         r_idle = os.path.join(tint_tmp, uid + '.png')
-        map_sprite_tool.remap_sms_palette(os.path.join(asset_dir, uid + '.png'), donor_png, r_idle)
+        map_sprite_tool.remap_sms_palette(sp.sheet, donor_png, r_idle)
         tinted_idle_src[uid] = r_idle
-        committed_mu = os.path.join(asset_dir, uid + '_mu.png')
-        if os.path.isfile(committed_mu):
+        if sp.walk:
             r_mu = os.path.join(tint_tmp, uid + '_mu.png')
-            map_sprite_tool.remap_sms_palette(committed_mu, donor_png, r_mu)
+            map_sprite_tool.remap_sms_palette(sp.walk, donor_png, r_mu)
             tinted_mu_src[uid] = r_mu
 
     mu, mu_tmp = [], None
-    for uid, slot, cls, sms in idle:
+    for sp, _sms in idle:
+        uid, slot, cls = sp.uid, sp.wearers[0], sp.cls
         if uid in tinted_mu_src:                     # faction-tinted committed walk (remapped)
             mu.append((uid, slot, cls, tinted_mu_src[uid]))
             continue
-        committed = os.path.join(asset_dir, uid + '_mu.png')
-        if uid not in FACTION_TINTED_CAST and os.path.isfile(committed):
-            mu.append((uid, slot, cls, committed))
+        if sp.palette != 'remap' and sp.walk:
+            mu.append((uid, slot, cls, sp.walk))
             continue
         if mu_tmp is None:
             mu_tmp = tempfile.mkdtemp(prefix='manchego_mu_')
@@ -363,25 +360,22 @@ def inject_map_sprites(campaign, verbose=True):
             'glide_nudge', 0)
         # A tinted unit with no committed walk glides from its REMAPPED role idle (so the
         # glide tints too); everyone else glides from their raw cast-palette idle.
-        idle_for_synth = tinted_idle_src.get(uid, os.path.join(asset_dir, uid + '.png'))
-        map_sprite_tool.synth_mu_sheet(idle_for_synth,
-                                       _donor_base(campaign, uid), src,
+        idle_for_synth = tinted_idle_src.get(uid, sp.sheet)
+        map_sprite_tool.synth_mu_sheet(idle_for_synth, sp.donor, src,
                                        y_nudge=nudge, verbose=verbose)
         mu.append((uid, slot, cls, src))
 
     # Guests must ship a committed hover/walk sheet (no synth path -- that machinery reads
     # the cast palette / unit YAML, neither of which a standard-palette guest carries).
     guest_mu = []
-    for uid, slot, cls, sms in guest_idle:
-        committed = os.path.join(asset_dir, uid + '_mu.png')
-        if not os.path.isfile(committed):
+    for sp, _sms in guest_idle:
+        if not sp.walk:
             sys.exit('ERROR: guest sprite %s needs a committed map_sprites/%s_mu.png '
-                     '(hover/walk sheet; guests have no synth path)' % (uid, uid))
-        guest_mu.append((uid, slot, cls, committed))
+                     '(hover/walk sheet; guests have no synth path)' % (sp.uid, sp.uid))
+        guest_mu.append((sp.uid, sp.wearers[0], sp.cls, sp.walk))
 
     pointer_externs = []
-    _inject_idle_sprites(campaign, asset_dir, idle + guest_idle, pointer_externs, guest_bases,
-                         src_override=tinted_idle_src)
+    _inject_idle_sprites(idle + guest_idle, pointer_externs, src_override=tinted_idle_src)
     _inject_mu_sprites(mu + guest_mu, pointer_externs)
     # Second look for a cast member who is on the field BEFORE he joins you (appends its
     # own wait rows, so it must follow the cast/guest rows that name their own SMS ids).
@@ -400,9 +394,7 @@ def inject_map_sprites(campaign, verbose=True):
     # its own OBJ bank -- its sheet is drawn to the cast-palette indices, so it must be
     # viewed through that palette (decisions.md Art & Audio).
     # Faction-tinted cast wear the side palette, not the cast override -> excluded here.
-    custom_slots = [slot for uid, slot, _, _ in idle if uid not in FACTION_TINTED_CAST]
-    custom_slots += [slot for uid, slot, _, _ in mu
-                     if uid not in FACTION_TINTED_CAST and slot not in custom_slots]
+    custom_slots = [sp.wearers[0] for sp, _sms in idle if sp.palette == 'cast']
     if custom_slots or neutral_ids:
         pal_png = os.path.join(asset_dir, 'cast_palette.png')
         if not os.path.isfile(pal_png):
@@ -418,16 +410,15 @@ def inject_map_sprites(campaign, verbose=True):
     _inject_ch02_chwinga_sprites(campaign, verbose=verbose)
 
     # Everything declared + committed must have landed in one of the passes above.
-    assert_declared_map_sprites_injected(campaign, {uid for uid, _, _, _ in idle + guest_idle}
+    assert_declared_map_sprites_injected(campaign, {sp.uid for sp, _ in idle + guest_idle}
                                          | {uid for uid, _, _, _ in mu + guest_mu}
                                          | {uid for uid, _, _ in neutral_ids}
                                          | {CH02_CHWINGA_SPRITE_SRC})
 
     if verbose:
-        guest_uids = {uid for uid, _, _, _ in guest_idle}
-        for uid, slot, class_enum, sms in idle + guest_idle:
-            tag = ' [guest, std palette]' if uid in guest_uids else ''
-            print('  %-14s -> idle SMS %d (%s)%s' % (uid, sms, slot, tag))
+        for sp, sms in idle + guest_idle:
+            tag = ' [guest, std palette]' if sp.kind == 'guest' else ''
+            print('  %-14s -> idle SMS %d (%s)%s' % (sp.uid, sms, sp.wearers[0], tag))
         for uid, slot, class_enum, src in mu + guest_mu:
             kind = 'committed' if os.path.dirname(src) == asset_dir else 'glide'
             print('  %-14s -> hover/walk MU sheet (%s, %s)' % (uid, slot, kind))
@@ -496,23 +487,22 @@ def _inject_pre_recruit_variants(campaign, idle, pointer_externs, verbose=True):
     member declaring `pre_recruit_roles`. Runs inside inject_map_sprites, which owns the
     override tables; the table is always emitted (empty == vanilla behaviour)."""
     rows = []
-    for uid, slot, _cls, _sms in idle:
+    for sp, _sms in idle:
+        uid, slot, donor = sp.uid, sp.wearers[0], sp.donor
         roles = pre_recruit_roles(campaign, uid)
         if not roles:
             continue
-        asset_dir = os.path.join(REPO, 'campaigns', campaign, 'map_sprites')
-        donor = _donor_base(campaign, uid)
         _, dfw, dfh = map_sprite_tool.donor_sms_geometry(donor)
         sym = 'unit_icon_wait_manchego_%s_pre_sheet' % uid.replace('-', '_')
         move_sym = 'unit_icon_move_manchego_%s_pre_sheet' % uid.replace('-', '_')
         wait_png = os.path.join(WAIT_GFX_DIR, sym + '.png')
         move_png = os.path.join(MOVE_GFX_DIR, move_sym + '.png')
         donor_png = os.path.join(WAIT_GFX_DIR, 'unit_icon_wait_%s_sheet.png' % donor)
-        for src, dst in ((uid + '.png', wait_png), (uid + '_mu.png', move_png)):
-            src = os.path.join(asset_dir, src)
-            if not os.path.isfile(src):
+        for src, name, dst in ((sp.sheet, uid + '.png', wait_png),
+                               (sp.walk, uid + '_mu.png', move_png)):
+            if not src:
                 sys.exit('ERROR: %s declares pre_recruit_roles but has no map_sprites/%s'
-                         % (uid, os.path.basename(src)))
+                         % (uid, name))
             _remap_indices(src, roles, donor_png, dst)
         map_sprite_tool.validate_mu_sheet(move_png)
         macro, _, _, _ = map_sprite_tool.sheet_info(wait_png, (dfw, dfh))
@@ -751,28 +741,17 @@ def _inject_ch02_chwinga_sprites(campaign, verbose=True):
               % (sms, ', '.join(slots)))
 
 
-def _donor_base(campaign, uid, guest_bases=None):
-    """The vanilla class/monster a cast member reskins (YAML art.map_sprite.base) -- the
-    key that lets us read the sprite's SMS size from the decomp instead of guessing it.
-    Cold-open guests have no pcs/npcs YAML, so their base comes from guest_bases
-    (PROLOGUE_GUEST_SPRITES) instead of a unit YAML."""
-    if guest_bases and uid in guest_bases:
-        return guest_bases[uid]
-    return _unit_donor(campaign, uid)
-
-
-def _inject_idle_sprites(campaign, asset_dir, idle, pointer_externs, guest_bases=None,
-                         src_override=None):
+def _inject_idle_sprites(idle, pointer_externs, src_override=None):
     """Wait-table slot + GetUnitSMSId override for each idle (<id>.png) asset. `src_override`
     ({uid: path}) supplies a pre-processed sheet (e.g. a faction-tinted unit's role-remapped
     idle) in place of the raw map_sprites/<id>.png."""
     src_override = src_override or {}
     wait_rows, incbin, overrides = [], [], []
-    for uid, slot, class_enum, sms in idle:
-        raw = src_override.get(uid) or os.path.join(asset_dir, uid + '.png')
+    for sp, sms in idle:
+        uid, slot = sp.uid, sp.wearers[0]
+        raw = src_override.get(uid) or sp.sheet
         # Frame size from the decomp wait table for the donor base -- not guessed.
-        _, dfw, dfh = map_sprite_tool.donor_sms_geometry(
-            _donor_base(campaign, uid, guest_bases))
+        _, dfw, dfh = map_sprite_tool.donor_sms_geometry(sp.donor)
         macro, fw, fh, nframes = map_sprite_tool.sheet_info(raw, (dfw, dfh))
         sym = 'unit_icon_wait_manchego_%s_sheet' % uid.replace('-', '_')
         shutil.copyfile(raw, os.path.join(WAIT_GFX_DIR, sym + '.png'))

@@ -5,7 +5,7 @@ import sys
 
 from inject.raw_pids import enemy_pid_for
 from inject.cast import (
-    _bust_dir, _classed_cast, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit,
+    _classed_cast, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit,
     PORTRAIT_MAP)
 from inject.chapter_ids import (
     CH02_BOSS_SLOT, CH02_CHWINGA, CH02_CHWINGA_PORTRAIT_SLOT, CH02_CHWINGA_SPRITE_SRC,
@@ -25,7 +25,7 @@ from inject.recruit import ON_MAP_RECRUIT_VIA
 from inject.scenes import (
     backdrop, battle_quote_body, defeat_quote_row, _emit_scene_beats, _make_fid,
     _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats, _stage_beat, write_frame_texts)
-from inject.unit_art import chwinga_bust, dress_slot
+from inject.unit_art import busts, dress_slot
 from inject.text import (
     display_name, _fid_tag, name_message_body, _script_to_message, set_message_body,
     write_nameplate)
@@ -145,15 +145,14 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
     spirit-green, the same swap as the map sprite -- so the single source stays Sclorbo's
     portrait (no committed derived asset). Each chwinga's vanilla portrait slot is collision-
     free; names come from the ch02 YAML (deployment.green_allies fe_name)."""
-    bust_path = os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')
-    if not os.path.isfile(bust_path):
+    dressed = busts(campaign, kinds=('chwinga',))
+    if not dressed:
         if verbose:
             print('  (no %s bust yet; chwinga keep vanilla faces/names)' % CH02_CHWINGA_SPRITE_SRC)
         return
     # Sclorbo's bust recoloured spirit-green (inject.unit_art), one image on all three slots.
-    bust = chwinga_bust(campaign)
-    for vanilla in CH02_CHWINGA_PORTRAIT_SLOT.values():
-        dress_slot(vanilla, bust)
+    for bust in dressed:
+        dress_slot(bust.slot, bust.image())
 
     # 3. name each chwinga slot from the ch02 YAML fe_name (Mote / Rime / Glimmer).
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
@@ -310,7 +309,7 @@ def inject_ch02(campaign, verbose=True):
     by_eid = {e['id']: e for e in chap['enemy_units']}
     grukk, halvar = by_eid['raider-bruiser'], by_eid['raider-captain']
     reinf = by_eid['rear-raiders']
-    enemies = enemy_rows(chap, CH02_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch02'))
+    enemies = enemy_rows(chap, CH02_CLASS_IDS, enemy_pid_for('ch02'))
 
     # 2b. GREEN chwinga (088B4718) -- the protect layer; class + level + positions +
     #     per-survivor gift come from the YAML deployment.green_allies (id order
@@ -351,7 +350,7 @@ def inject_ch02(campaign, verbose=True):
                for g in chap['deployment']['green_allies']]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
-    reinforce = enemy_rows(chap, CH02_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch02'),
+    reinforce = enemy_rows(chap, CH02_CLASS_IDS, enemy_pid_for('ch02'),
                            arrives_turn=reinf['arrives_turn'])
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
@@ -478,7 +477,7 @@ def inject_ch02(campaign, verbose=True):
         symbol, msg, _fid, bg = CH02_VILLAGE_SLOTS[village['id']]
         script = _replace_brace_block(
             script, symbol + '[] =',
-            village_script(msg, village_reward_item(village, ITEM_ENUM), bg),
+            village_script(msg, village_reward_item(village), bg),
             CH3_EVENTSCRIPT_H)
     # Per-chwinga charm-gift: read each chwinga's survival (CHECK_ALIVE writes EVT_SLOT_C)
     # while the battle units are still loaded, BEQ past the give if it fell, else drop the

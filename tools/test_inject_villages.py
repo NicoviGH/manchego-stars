@@ -8,7 +8,6 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from inject.decomp import ITEM_ENUM
 import inject.decomp
 import inject.chapter_ids
 import inject.hosting
@@ -80,38 +79,38 @@ class VillageGiftsInheritVanilla(unittest.TestCase):
 
     def test_a_matching_gift_passes(self):
         inject.villages.assert_village_gifts_match_vanilla(
-            self._chap((12, 19), 'booster-def'), self.ITEMS, self._gifts())
+            self._chap((12, 19), 'booster-def'), self._gifts())
 
     def test_a_swapped_gift_is_refused(self):
         with self.assertRaises(SystemExit) as caught:
             inject.villages.assert_village_gifts_match_vanilla(
-                self._chap((12, 19), 'torch'), self.ITEMS, self._gifts())
+                self._chap((12, 19), 'torch'), self._gifts())
         self.assertIn('vanilla_gift_divergence', str(caught.exception),
                       'the error must name the escape hatch')
 
     def test_a_declared_divergence_is_allowed(self):
         chap = self._chap((12, 19), 'torch')
         chap['villages'][0]['vanilla_gift_divergence'] = 'the tomb has no armoury tier yet'
-        inject.villages.assert_village_gifts_match_vanilla(chap, self.ITEMS, self._gifts())
+        inject.villages.assert_village_gifts_match_vanilla(chap, self._gifts())
 
     def test_a_site_vanilla_does_not_have_is_left_alone(self):
         # a village we ADDED, not moved -- nothing to inherit
         inject.villages.assert_village_gifts_match_vanilla(
-            self._chap((3, 3), 'torch'), self.ITEMS, self._gifts())
+            self._chap((3, 3), 'torch'), self._gifts())
 
     def test_a_from_scratch_canvas_is_skipped(self):
         chap = self._chap((12, 19), 'torch')
         chap['map'] = {}                      # no vanilla_layout -> no vanilla to inherit
-        inject.villages.assert_village_gifts_match_vanilla(chap, self.ITEMS, self._gifts())
+        inject.villages.assert_village_gifts_match_vanilla(chap, self._gifts())
 
     def test_an_unmapped_reward_id_is_refused(self):
         with self.assertRaises(SystemExit):
             inject.villages.assert_village_gifts_match_vanilla(
-                self._chap((12, 19), 'nonesuch'), self.ITEMS, self._gifts())
+                self._chap((12, 19), 'nonesuch'), self._gifts())
 
     def test_the_live_ch05_villages_inherit_vanilla(self):
         chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.chapter_ids.CH05_CHAPTER_YAML)
-        inject.villages.assert_village_gifts_match_vanilla(chap, inject.decomp.ITEM_ENUM)
+        inject.villages.assert_village_gifts_match_vanilla(chap)
 
 
 class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
@@ -154,9 +153,9 @@ class LocationEventsAreBuiltFromTheYaml(unittest.TestCase):
         """It used to close over ITEM_ENUM, which made a shared helper silently ch04-only:
         ch05's stat boosters are not in that dict, so the first reuser would die on a KeyError."""
         village = {'id': 'a', 'visit_reward': [{'id': 'booster-def'}]}
-        self.assertEqual(inject.villages.village_reward_item(village, {'booster-def': 'ITEM_BOOSTER_DEF'}),
+        self.assertEqual(inject.villages.village_reward_item(village),
                          'ITEM_BOOSTER_DEF')
-        self.assertIsNone(inject.villages.village_reward_item({'id': 'b'}, {}))
+        self.assertIsNone(inject.villages.village_reward_item({'id': 'b'}))
 
 
 if __name__ == '__main__':

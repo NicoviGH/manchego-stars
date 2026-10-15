@@ -310,11 +310,10 @@ def _player_weapon(campaign, uid, unit, class_enum):
 
 def _player_lines(campaign, uid, gained):
     """(career stat lines, weapon, tags) for a cast member `gained` levels above its join
-    level: class base + donor personal base (donor-base inheritance), grown on its growth
-    donor's growths."""
-    class_enum, cbase, layer = inject.stats.cast_personal_line(
+    level: the line its ROM slot loads with (`inject.stats.cast_loaded_line`), grown on its
+    growth donor's growths."""
+    class_enum, eff = inject.stats.cast_loaded_line(
         campaign, uid, _characters_text(), _classes_text())
-    eff = {f: cbase.get(f, 0) + layer.get(f, 0) for f in inject.stats.BASE_FIELDS}
     lines = [eff]
     if gained:
         growths, _ = inject.stats.donor_growths_and_ranks(
