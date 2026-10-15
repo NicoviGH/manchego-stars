@@ -118,19 +118,22 @@ difficulty_note: >
 # Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
 # twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
 strategy: |
-  Defeat every raider. Five units deploy; the party starts in the northwest.
+  You'll need to keep the two green [[chwinga]] [[Priest]]s safe if you want their gifts: each
+  one that survives hands over its charm at the end of the chapter (a [[Hand Axe]] and an
+  [[Elixir]]). They sit on the forest and fort tiles just ahead of you, in the raid's path, and
+  cannot fight. A good way of keeping them safe is to move up fast and form a wall in front of
+  them; [[Halvar the Raider Captain|Halvar]] and two of his brigands start close by.
 
-  Two green chwinga Priests sit on the forest and fort tiles just ahead of you, in the
-  raid's path. They heal each other, but they cannot fight, and each one that dies takes its
-  gift with it (a Hand Axe and an Elixir). Move up fast and form a wall in front of them.
-  The raider captain (Steel Axe) and two of his brigands start close to them.
+  Besides that, the chapter itself is very straightforward—just kill all the units on the map.
+  Every raider but one carries an axe, so lance users win the trades: [[Wolfram]] and [[Baxby]]
+  are the best walls here. Keep [[Pinky]] away from the lone archer on the east side until
+  someone has dealt with it. Visit the southern hut for Glimmer's [[Pure Water]]. Beware of the
+  two raiders that arrive from the west edge on turn 3, behind the party.
 
-  Every raider but one carries an axe, so lance users win the trades: Wolfram and Baxby
-  are the best walls here. Keep Pinky away from the lone archer on the east side until
-  someone has dealt with it.
-
-  On turn 3 two more raiders arrive from the west edge, behind the party. Visit the southern
-  hut for Glimmer's Pure Water on the way.
+  This is your first chance to do any shopping. The [[armory]] sells only basic weapons (a
+  [[Slim Sword]], an [[Iron Sword]], a [[Slim Lance]], an [[Iron Lance]] and an [[Iron Axe]]),
+  so the only remotely pressing purchases are an Iron Lance for Pinky to conserve the Slim
+  Lance, and a spare Iron Axe for [[Braulo]].
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 # Field parity (decisions.md §"Field parity", 2026-06-10): deploy_limit = vanilla Ch2's

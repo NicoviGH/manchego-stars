@@ -116,20 +116,19 @@ difficulty_note: >
 # Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
 # twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
 strategy: |
-  Move east toward the goblin camp and kill everything in your way, then seize the camp on
-  the chief's tile. Four units deploy; pick them in the preparations screen.
+  This chapter is very straightforward—move east toward the goblin camp and kill all units in
+  your way. Four units deploy; pick them in the preparations screen. It'll be easier to train
+  [[Braulo]] if you pit him against the three spear-carrying [[Soldier]]s near the camp due to
+  the [[weapon triangle]]; [[Wolfram]]'s armor soaks the three [[Fighter]]s in the middle even
+  though the triangle is against him. The trail is dotted with forts: reduce the goblins'
+  numbers to where your units can hold them, and heal there between fights.
 
-  The six line goblins are level 1: three Soldiers with lances on the east side near the
-  camp, and three Fighters with axes in the middle of the map. Braulo's axe beats the spear
-  goblins and the chief's lance, so send him at the east side. Wolfram's armour soaks the
-  axe goblins even though the triangle is against him.
-
-  The chief is an Armor Knight who does not move from the seize tile. Physical hits do
-  little to him; Rootis, Marty and Meesmickle's magic and R.B. Geenius's bow are the clean
-  answer. Use the forts to heal between fights.
-
-  On turn 3 three more goblins (two Fighters and a Soldier) enter from the west edge, behind
-  you. Leave someone sturdy at the rear, or turn back to meet them before seizing.
+  Note that on turn 3, three reinforcement units (two Fighters and a Soldier) appear from the
+  west edge, behind you, so leave someone sturdy at the rear. [[Izobai|The boss]] is an
+  [[Armor Knight]] who does not move from the camp; physical hits do little to her, but she
+  should fall fairly quickly to [[Rootis]], [[Marty the Merry Mushroom|Marty]] and
+  [[Meesmickle]]'s magic or [[Prof. R.B. Geenius|R.B. Geenius]]'s bow. Afterwards, seize the
+  camp.
 
 # ── Player Units ──────────────────────────────────────────────────────────────
 # Whole cast is RECRUITED (Northlook scene); the field obeys vanilla Ch1: 4 slots.

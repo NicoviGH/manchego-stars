@@ -120,20 +120,23 @@ difficulty_note: >
 # Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
 # twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
 strategy: |
-  Fight down through the mine and kill the grell at the bottom of the central shaft. It is a
-  Mogall with Evil Eye and it does not move, so the danger is the kobolds on the way down.
+  This chapter is very straightforward: fight down through the mine and kill the [[Grell]] at
+  the bottom of the central shaft. There are no time limits or pressures. The Grell is a
+  [[Mogall]] with Evil Eye and does not move, so the danger is the kobolds on the way down.
+  [[Trex]] waits in the galleries as a green unit from turn 1 and can be recruited by talking to
+  him with any party member.
 
-  Two kobolds carry the keys: one drops a Door Key, the other a Chest Key. Trex joins
-  partway through as a green unit; talk to him and he becomes your thief. With him you can
-  open the four chests (Iron Lance, Iron Sword, Javelin, and a Tourmaline) and steal a Pure
-  Water and an Antitoxin from two of the kobolds.
+  You do not need Trex to open the way, because two kobolds carry the keys: one drops a
+  [[Door Key]], the other a [[Chest Key]]. With Trex you can also open the four [[chest]]s (an
+  [[Iron Lance]], an [[Iron Sword]], a [[Javelin]] and a Tourmaline). The kobold throwers carry
+  [[Hand Axe]]s and hit from two tiles, and a slinger with a bow covers the middle rooms, so
+  keep [[Pinky]] back until it falls.
 
-  Watch the svirfneblin thief: he can steal from anyone he outspeeds. The kobold throwers
-  carry Hand Axes and hit from two tiles, and a slinger with a bow covers the middle rooms,
-  so keep Pinky back until it falls.
-
-  Evil Eye is magic, so send units with good Resistance into the grell's reach and heal
-  between attacks.
+  Keep watch of the enemy [[Thief]], a svirfneblin. While he doesn't have any Lockpicks, he can
+  still steal items from your units if he outspeeds them; Trex can steal them back. The
+  [[Antitoxin]] kobold and, more importantly, the [[Pure Water]] kobold can easily be lured out
+  for Trex to claim their items before the rest of your units finish them off. Evil Eye is
+  magic, so send units with good [[Resistance]] into the Grell's reach and heal between attacks.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:

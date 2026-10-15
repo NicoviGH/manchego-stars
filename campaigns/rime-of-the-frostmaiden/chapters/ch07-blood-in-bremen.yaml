@@ -71,18 +71,18 @@ difficulty_note: >
 # Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
 # twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
 strategy: |
-  Move toward the Town Hall and seize it. The party enters from the west edge, and the
-  militia is spread over the open ground and both piers.
+  This chapter is very straightforward, just move towards the Town Hall and kill everything in
+  your way. The party enters from the west edge, and the militia is spread over the open ground
+  and both piers. If you really want the [[Energy Ring]], bring [[Trex]] along so that he can
+  steal it from one of the three mages; the mage on the west side drops a [[Pure Water]]. The
+  two archers flanking the door and the harpooner on the east pier may be irritating, especially
+  if you are using [[Pinky]], so keep him back until they fall. The fishers carry
+  [[Steel Axe]]s; meet them with lances and armor.
 
-  Dorbulgruf holds the door. He is a level 12 Fighter with a Steel Axe and a Hand Axe, so
-  he hits at one or two tiles, and he does not move. Fighters have poor Resistance: open
-  with Rootis, Marty and Meesmickle, then finish him with a lance. He drops a Hero Crest.
-
-  Two archers flank the Town Hall door and a harpooner covers the east pier, so keep Pinky
-  back until they fall. The fishers carry Steel Axes; meet them with lances and armour.
-
-  Bring Trex to steal the Energy Ring from one of the three mages. The mage on the west
-  side drops a Pure Water.
+  [[Dorbulgruf Shalescar|The boss]] is a level 12 [[Fighter]] with a Steel Axe and a
+  [[Hand Axe]], so he hits at one or two tiles, and he does not move. First attack from afar
+  with magic or bows, since Fighters have poor Resistance, then finish him off with a lance. He
+  drops a [[Hero Crest]]. Kill the boss, then seize the Town Hall.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:

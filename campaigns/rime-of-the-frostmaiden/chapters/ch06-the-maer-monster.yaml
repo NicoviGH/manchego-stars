@@ -206,24 +206,21 @@ difficulty_note: >
 # Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
 # twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
 strategy: |
-  Defeat Nerra to win: a Shaman with Flux at the centre of the map who does not move. She has
-  low Defence, so physical attackers bring her down quickly.
+  The sources of time pressure on this map are the two marooned boats, one in the east and one
+  in the west; their crews will die without intervention. Nothing can reach either hull on turn
+  1, and two pursuers do the damage. The Tentacruel in the south takes the west boat's door on
+  turn 2 and poisons the hull, so that is the faster clock: it is the weakest unit on the map,
+  but nobody can board until it dies. The merfolk thrower's [[Javelin]] reaches the east boat
+  from two tiles, starting on turn 2; that door is a job for [[Pinky]] or [[Braulo]], since foot
+  units, cavalry and [[Trex]] cannot reach it. Keep every civilian alive and the chapter ends
+  with an [[Orion's Bolt]] for [[Prof. R.B. Geenius|R.B. Geenius]]. Board the east boat to get
+  an [[Antitoxin]] from Grynsk.
 
-  The real pressure is the two marooned boats, one in the east and one in the west. Nothing
-  can reach either hull on turn 1; two pursuers do the damage, and each has to be killed.
-  The Tentacruel in the south takes the west boat's door on turn 2 and poisons the hull, so
-  that is the faster clock. It is the weakest unit on the map, but nobody can board until
-  it dies. The merfolk thrower's Javelin reaches the east boat from two tiles, starting on
-  turn 2; that door is a job for Pinky or Braulo, since foot, cavalry and Trex cannot reach
-  it. Keep every civilian alive and the chapter ends with an Orion's Bolt for R.B. Geenius.
-  Board the east boat to get an Antitoxin from Grynsk.
-
-  Most of the enemy carries lances, so Braulo's axe wins the trades; keep the cavalry away
-  from the armored guard with the Horseslayer. On turn 4 three more shark riders enter from
-  the west edge.
-
-  The shark rider with the Halberd drops it, and a merfolk soldier drops an Iron Blade; the
-  lamia healer in the northeast drops an Elixir.
+  [[Nerra]] won't move and has low Defense, so physical attackers bring her down quickly; defeat
+  her to win. Most of the enemy carries lances, so Braulo's axe wins the trades; keep the
+  cavalry away from the armored guard with the [[Horseslayer]]. On turn 4 three more shark
+  riders enter from the west edge. The shark rider with the [[Halberd]] drops it, a merfolk
+  soldier drops an [[Iron Blade]], and the lamia healer in the northeast drops an [[Elixir]].
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:

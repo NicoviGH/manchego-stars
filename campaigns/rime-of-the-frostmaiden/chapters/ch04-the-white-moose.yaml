@@ -145,18 +145,19 @@ difficulty_note: >
 # Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
 # twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
 strategy: |
-  Rout the forest under fog: you see only three tiles from each unit. Advance slowly, keep
-  units on forest tiles, and never end a turn alone at the edge of what you can see.
+  This map introduces [[fog of war]]: you see only three tiles from each unit, so advance slowly
+  and never end a turn alone at the edge of what you can see. Four [[Mogall]]s hold the east
+  side in a cluster and hit with [[dark magic]], so keep units with low Resistance out of their
+  combined reach and take them one at a time. Revenants and Bonewalkers hold the middle and
+  south. As long as you keep your units safe, this chapter shouldn't be an issue.
 
-  Four Mogalls hold the east side in a cluster and hit with dark magic, so keep low-Resistance
-  units out of their combined reach and take them one at a time. Revenants and Bonewalkers
-  hold the middle and south.
-
-  On turn 2 a pack of six Mauthe Doogs appears in the northwest corner. Deploy Marty and
-  talk to them: the pack turns green, Lupin joins you, and you no longer have to fight it.
-
-  On turn 3 seven more undead (four Revenants, three Bonewalkers) appear on the east and
-  south sides, close to where you will be by then. Visit Lonelywood for an Iron Axe.
+  Since this is a rout map, be wary of the reinforcements. On turn 2 a pack of six Mauthe Doogs
+  appears in the northwest corner: deploy [[Marty the Merry Mushroom|Marty]] and talk to its
+  leader, [[Lupin]]. The pack turns green, Lupin joins you, and you no longer have to fight it.
+  On turn 3 seven more undead (four Revenants, three Bonewalkers) appear on the east and south
+  sides, close to where you will be by then, so be mindful that you aren't swarmed. Always try
+  to keep your units on forest tiles to avoid unnecessary hits. Visit Lonelywood for an
+  [[Iron Axe]].
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:

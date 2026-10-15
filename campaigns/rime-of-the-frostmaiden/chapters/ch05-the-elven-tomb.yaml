@@ -192,20 +192,22 @@ difficulty_note: >
 # Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
 # twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
 strategy: |
-  Defeat Ravisin to win. She is a Druid with Flux in the northeast and does not move; the
-  White Moose stands beside her. Her guardians and the moose do not all have to fall.
+  This chapter features the first [[arena]] in the game. Feel free to use it for some extra
+  [[experience]], but stay aware of the risks. The tomb also has an [[armory]] and a [[vendor]].
 
-  Sahnar rises as an enemy Myrmidon with a Killing Edge, fast and dangerous. Only Basil can
-  recruit her, so deploy Basil, clear the enemies around Sahnar, then walk Basil up to talk
-  while your sturdier units screen her. This is the chapter's escort.
+  Recruiting [[Sahnar]] is less intimidating than it initially appears. She rises as an enemy
+  [[Myrmidon]] with a [[Killing Edge]], and only [[Basil]] can recruit her: deploy Basil, kill
+  any nearby mobile enemies, then simply have Basil walk up to her while your sturdier units
+  screen her.
 
-  Four reliquary niches sit near the map's edges (north, west, east and south), and the
-  undead race to desecrate them. Each holds an item (a Torch, a Secret Book, an
-  Armorslayer and a Dragonshield); reach all four and you also earn a Guiding Ring.
-
-  Reinforcements arrive on turn 2 (two spear guards from the southeast), turn 6 (two axe
-  reavers from the east) and turn 8 (two archers next to Ravisin), so finish the boss before
-  the last wave if you can. The tomb also has the first arena and an armory and vendor.
+  [[Ravisin]] is a [[Druid]] with [[Flux]] in the northeast and does not move, with the White
+  Moose beside her. Defeat her to win; her guardians and the moose do not all have to fall.
+  Reinforcements appear on turn 2 (two spear guards from the southeast), turn 6 (two axe reavers
+  from the east) and turn 8 (two archers next to Ravisin), so make sure that your squishy units
+  aren't undefended. Four reliquary niches sit near the map's edges, and the undead race to
+  desecrate them. Each holds an item (a [[Torch]], a [[Secret Book]], an [[Armorslayer]] and a
+  [[Dragonshield]]), and there is a free [[Guiding Ring]] if you reach all four. There isn't a
+  turn limit to this chapter, so take all the time you need.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
