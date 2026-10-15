@@ -576,13 +576,6 @@ def rom_item_name(enum, fallback=''):
     return (campaign_yaml().get('item_names') or {}).get(enum) or item_name(enum) or fallback
 
 
-def item_cell(it):
-    """A YAML item ref as the wiki writes an inventory entry: icon, then the linked name.
-    The link goes to the vanilla item's article; the name is the one the ROM shows."""
-    name, enum = our_item(it)
-    return item_html(enum, name)
-
-
 def item_html(enum, fallback=''):
     shown = rom_item_name(enum, fallback)
     icon = art.item_icon(enum)
@@ -714,45 +707,26 @@ def defeat_text(chap):
     return esc(LOSE_TEXT.get(l) or l)
 
 
-def join_text(uid, unit, chap):
+def join_text(uid, units, chap):
+    """How the unit joins, in the wiki's words, from what the build WIRES (#493): a gated parley
+    (the chapter's `parley: {by, recruits_npc}`, inject.recruit.parley_recruiters), an on-map
+    talk any party member can make (inject.recruit.on_map_talk_recruits), else an off-map join
+    at chapter end. The unit file's `recruit.via` is not the answer: nearly every recruit says
+    `story`, and reading it printed "Automatically" for Trex, who has to be talked to."""
+    import inject.recruit
     if uid in (chap.get('_founding') or []):
-        return 'Automatically at the start of the chapter'
-    via = ((unit or {}).get('recruit') or {}).get('via')
-    if via == 'talk':
-        return 'Talk with any party member'
-    if via == 'market':
-        return 'Automatically after the chapter'
-    return 'Automatically'
-
-
-def new_unit_cards(chap, recs, units):
-    """The Character data cards: who the player fields for the first time here, with the kit,
-    level and HP the build loads. The prologue's guests are its `player_units` (class base plus
-    their twin's personal line, inject.stats.guest_personal_line); a cast member joins with its
-    unit file's kit (inject.cast.unit_items) and the stats the build writes for it."""
-    cards = []
-    for pu in chap.get('player_units') or []:
-        cls = class_enum_of(pu.get('class'))
-        hp = (difficulty._class_base(cls).get('baseHP', 0)
-              + inject.stats.guest_personal_line(pu, cls).get('baseHP', 0))
-        cards.append(mk.unit_card(esc(pu.get('name') or unit_name(pu['id'], units)),
-                                  mk.file_img(portrait(pu['id']), 96, 80, pu.get('name')),
-                                  class_html(pu.get('class')), hp, pu.get('level', 1),
-                                  '<br />'.join(item_cell(i) for i in pu.get('inventory') or []),
-                                  'Automatically at the start of the chapter'))
-    for r in recs:
-        unit = units.get(r) or {}
-        fs = unit.get('fe_stats') or {}
-        try:
-            hp = difficulty.player_combatant(CAMPAIGN, r).hp
-            kit = '<br />'.join(item_html(e) for e in inject.cast.unit_items(CAMPAIGN, r))
-        except (Exception, SystemExit):                  # name-only or planned: no ROM kit yet
-            hp, kit = fs.get('HP', '?'), ''
-        cards.append(mk.unit_card(mk.ours('unit-%s' % r, unit_name(r, units)),
-                                  mk.file_img(portrait(r), 96, 80, unit_name(r, units)),
-                                  class_html(fs.get('class')), hp, fs.get('level', '?'), kit,
-                                  join_text(r, unit, chap)))
-    return cards
+        return 'Automatically from turn 1'
+    for e in enemy_list(chap):
+        parley = e.get('parley') or {}
+        if parley.get('recruits_npc') == uid and parley.get('by'):
+            return 'Enemy, talk to with [[%s]]' % unit_name(parley['by'], units)
+    try:
+        talkers = inject.recruit.on_map_talk_recruits(CAMPAIGN, chap.get('chapter_number'))
+    except (Exception, SystemExit):
+        talkers = []
+    if uid in [t[0] for t in talkers]:
+        return 'NPC, talk to with any party member'
+    return 'Automatically at the end of the chapter'
 
 
 def available_before(chs, chap):
@@ -980,7 +954,7 @@ def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
         cards.append({'name': unit_name(r, units), 'portrait': '[[File:%s]]' % port if port
                       else '', 'class': name, 'class_article': article, 'hp': hp,
                       'lv': fs.get('level', '?'), 'inventory': kit,
-                      'how': join_text(r, unit, chap)})
+                      'how': join_text(r, units, chap)})
     c['new_unit_cards'] = cards
     c['available'] = [{'image_key': files.minimug(u), 'page': unit_name(u, units),
                        'name': unit_name(u, units)} for u in available_before(chs, chap)]

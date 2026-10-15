@@ -90,6 +90,13 @@ class ChapterLayout(unittest.TestCase):
         self.assertIn('|name=Trex', npc)
         self.assertIn('{{h|+1|Upon Trex being recruited}}', text)
 
+    def test_a_recruit_joins_the_way_the_build_wires_it(self):
+        # Read from what the build wires, never `recruit.via` (Trex says `story`, and the wiki
+        # printed "Automatically" for a unit you have to talk to).
+        self.assertIn('|recruitment method=NPC, talk to with any party member',
+                      self.pages['ch03'])
+        self.assertIn('|recruitment method=Enemy, talk to with [[Basil]]', self.pages['ch05'])
+
 
 if __name__ == '__main__':
     unittest.main()

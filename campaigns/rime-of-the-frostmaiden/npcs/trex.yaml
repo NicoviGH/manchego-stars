@@ -73,7 +73,7 @@ inventory:                        # the kit the unit joins with, in slot order (
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
 
-recruited_via: "story — joins after the Termalaine mine (Ch3)"
+recruited_via: "story — green in the Termalaine mine (Ch3) until any party member talks to him"
 recruit:
   chapter: ch03-the-termalaine-mine
   via: story

@@ -104,7 +104,7 @@ inventory:                        # the kit the unit joins with, in slot order (
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
 
-recruited_via: "story — repotted from the Elven Tomb (Ch5)"
+recruited_via: "story — green in the Elven Tomb (Ch5) until any party member talks to her"
 recruit:
   chapter: ch05-the-elven-tomb
   via: story

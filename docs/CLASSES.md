@@ -27,7 +27,7 @@ roster derived from the unit YAML.
 
 | Unit | FE base | Promotion | Joins via |
 |---|---|---|---|
-| Basil | Cleric | **Bishop** / Valkyrie | story — repotted from the Elven Tomb (Ch5) |
+| Basil | Cleric | **Bishop** / Valkyrie | story — green in the Elven Tomb (Ch5) until any party member talks to her |
 | Baxby | Cavalier | **Paladin** / Great Knight | — |
 | Brie | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
 | Esio Trot | Fighter | — | story — joins in ch07's ending with Meriwa (ADR 0342) |
@@ -35,7 +35,7 @@ roster derived from the unit YAML.
 | Meriwa | Monk | — | story — joins in ch07's ending with Esio Trot (ADR 0342) |
 | Pepperjack | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
 | Sahnar | Myrmidon | **Swordmaster** / Assassin | story — talked down by Basil after Ravisin summons her (Ch5) |
-| Trex | Thief | **Rogue** / Assassin | story — joins after the Termalaine mine (Ch3) |
+| Trex | Thief | **Rogue** / Assassin | story — green in the Termalaine mine (Ch3) until any party member talks to him |
 | The White Moose | Cavalier | — | story — Marty talks to it at ch08's opening (ADR 0342) |
 
 > **Note.** `pepperjack`/`brie` carry `fe_stats.class: null` because they are NOT
