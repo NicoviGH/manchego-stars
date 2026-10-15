@@ -37,6 +37,7 @@ EXEMPLARS = (
     'The Protected',                                          # chapter with a shop (ch02's twin)
     'Escape!',                                                # chapter with a gold gift
     'The Bandits of Borgo/Script',                            # chapter script
+    'Ancient Horrors/Script',                                 # chapter script with villages
     'A New Journey',                                          # interlude chapter
     'Colm',                                                   # playable character
     'Dara',                                                   # non-playable character
@@ -121,9 +122,10 @@ def crawl(queue, seen, missing):
         queue += sorted(c for c in calls(body, lua) if c not in seen)
         if is_page:
             rendered = fetch(title, 'render')
-            with gzip.open(os.path.join(VENDOR, 'golden', file_name(title) + '.json.gz'),
-                           'wt', encoding='utf-8') as f:
-                json.dump(golden.tokens(rendered), f)
+            # mtime=0: a refresh that changes no token leaves the file byte-identical.
+            with open(os.path.join(VENDOR, 'golden', file_name(title) + '.json.gz'), 'wb') as f:
+                f.write(gzip.compress(json.dumps(golden.tokens(rendered)).encode('utf-8'),
+                                      mtime=0))
 
 
 def dynamic_templates(seen, missing):

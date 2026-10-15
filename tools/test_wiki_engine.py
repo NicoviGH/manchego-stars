@@ -23,6 +23,7 @@ VENDOR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'wiki', 'vendo
 # Exemplar -> the share of the wiki's page our render reproduces (golden.ratio), floored.
 FLOORS = {
     'A_New_Journey': 1.0,
+    'Ancient_Horrors__Script': 1.0,
     'Availability_chart__The_Sacred_Stones': 1.0,
     'Bazba': 1.0,
     # Two empty <p class="mw-empty-elt"> MediaWiki leaves between the TCG card's icons.

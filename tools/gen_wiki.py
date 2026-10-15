@@ -530,30 +530,171 @@ def obtain_phrases(rows_, cols, nrows):
 _SCENES = None
 
 
-def script_of(slug, chap):
-    """The chapter's script, the way the wiki's Script page reads: every scene the scene
-    previewer knows (wired or drafted), box by box with speakers and drawn widths; else the
-    YAML's own event beats, which is where a chapter keeps its scenes before they are drafted."""
+def _scenes():
+    """chapter -> [(trigger, event, title, steps)] for every scene the scene previewer knows: the
+    wired ones as the ROM builds them, then the drafts, one entry per scripted EVENT (a draft
+    split at its beat breaks is still one event). `event` is the YAML event a draft renders."""
     global _SCENES
     if _SCENES is None:
         _SCENES = {}
-        try:
-            for key in scene_preview.registry():
-                _SCENES.setdefault(key.split('/')[0], []).append(
-                    scene_preview.format_scene(scene_preview.preview(key)))
-        except Exception:
-            pass
-        try:
-            for key, scene in scene_preview.drafts().items():
-                _SCENES.setdefault(key.split('/')[0], []).append(scene_preview.format_scene(scene))
-        except Exception:
-            pass
-    scenes = _SCENES.get(slug)
-    if scenes:
-        return ''.join('<pre class="ms-script">%s</pre>' % esc(t.rstrip()) for t in scenes)
-    beats = [(e.get('trigger', ''), e.get('description', '')) for e in chap.get('events') or []
-             if isinstance(e, dict) and e.get('description')]
-    return wikitable(['When', 'Beat'], [(esc(t), para(d)) for t, d in beats]) if beats else ''
+        reg = scene_preview.registry()
+        for key, entry in reg.items():
+            _SCENES.setdefault(key.split('/')[0], []).append(
+                (entry.event.trigger if entry.event else None, None, entry.title,
+                 [scene_preview.preview(key)]))
+        drafts = collections.OrderedDict()
+        for key, scene in scene_preview.drafts().items():
+            stem = re.sub(r'-\d+$', '', key.split('/draft-')[1])
+            drafts.setdefault((key.split('/')[0], stem), []).append(scene)
+        seen = collections.Counter()
+        for (chapter, stem), scenes in drafts.items():
+            trigger = stem.split('.')[0]
+            seen[chapter, trigger] += 1
+            _SCENES.setdefault(chapter, []).append(
+                (trigger, (chapter, trigger, seen[chapter, trigger]), None, scenes))
+    return _SCENES
+
+
+def _scripted_event(chap, ref):
+    """The YAML event a draft renders: the nth scripted event on its trigger."""
+    _chapter, trigger, n = ref
+    evs = [e for e in chap.get('events') or []
+           if isinstance(e, dict) and e.get('script') and e.get('trigger') == trigger]
+    return evs[n - 1] if n <= len(evs) else {}
+
+
+def script_section(trigger, kind=None):
+    """Which section of the wiki's Script page a scene belongs in, from its trigger."""
+    if kind == 'quote' or trigger in ('boss_battle', 'unit_engages_boss', 'boss_death'):
+        return 'Battle quotes'
+    if trigger == 'chapter_start':
+        return 'Opening'
+    if trigger == 'chapter_end':
+        return 'Ending'
+    if trigger == 'visit':
+        return 'Villages'
+    if kind == 'talk' or trigger is None or 'talk' in trigger:   # None: a boat boarded by Talk
+        return 'Talk conversations'
+    return 'In battle'
+
+
+def _script_steps(scenes, units):
+    """`wiki.pages._scene` steps for a run of scenes, as one transcript. A face that leaves
+    for good while the scene goes on is a stage direction, as the wiki writes "(Artur leaves)".
+    A face cleared to free a podium and back later is staging, and the faces cleared when a
+    scene ends are not news either."""
+    out = []
+    for scene in scenes:
+        steps = scene.steps
+        for i, step in enumerate(steps):
+            if step.kind == 'exit':
+                rest = [s for s in steps[i + 1:] if s.kind == 'box']
+                if step.speaker and rest and all(s.speaker != step.speaker for s in rest):
+                    out.append(('stage', None, '%s leaves' % unit_name(step.speaker, units)))
+                continue
+            text = ' '.join(l.strip() for l in step.lines if l.strip())
+            if step.kind == 'box' and text:
+                out.append(('say', unit_name(step.speaker, units), text) if step.speaker
+                           else ('narrate', None, text))
+    return out
+
+
+def _event_for(chap, trigger, ref):
+    """The YAML event a scene renders: a draft's own, else the one event on its trigger."""
+    if ref:
+        return _scripted_event(chap, ref)
+    evs = [e for e in chap.get('events') or []
+           if isinstance(e, dict) and trigger and e.get('trigger') == trigger]
+    return evs[0] if len(evs) == 1 else {}
+
+
+def _when(chap, ev, units):
+    """When a mid-battle scene fires, in the wiki's words ("Turn 2, player phase")."""
+    if ev.get('turn'):
+        return 'Turn %s, player phase' % ev['turn']
+    if ev.get('unit'):
+        named = {e.get('id'): e.get('name') for e in enemy_list(chap)}
+        return 'Upon defeating %s' % (named.get(ev['unit']) or unit_name(ev['unit'], units))
+    if ev.get('zone'):
+        return 'When a unit reaches the %s' % ev['zone'].replace('_', ' ')
+    return None
+
+
+def script_sections(chap, units):
+    """{section: [(subheading, [scene])]} for the chapter's Script page, or {} with no script.
+
+    Subheadings are the wiki's: "Fighting X"/"Defeating X" for battle quotes, "X and Y" for a
+    talk ("Anyone and X" when any unit can start it, as the wiki writes "Visit with anyone"),
+    when it fires for a mid-battle scene, else what the scene is. A section holding one scene
+    needs none, as the wiki's own Opening has none."""
+    slug = chap['_slug']
+    bosses = [b.get('name') for b in bosses_of(chap) if b.get('name')]
+    talks = {unit_name(r, units): by and unit_name(by, units)
+             for r, by in talk_joins(chap).items()}
+    out = collections.OrderedDict()
+    for trigger, ref, title, scenes in _scenes().get(slug, []):
+        ev = _event_for(chap, trigger, ref)
+        steps = _script_steps(scenes, units)
+        if all(kind == 'stage' for kind, _w, _t in steps):
+            continue
+        speakers = list(collections.OrderedDict.fromkeys(
+            w for kind, w, _t in steps if kind == 'say'))
+        section = script_section(trigger, ev.get('type'))
+        if section == 'Opening' and not out.get('Opening') and not speakers:
+            section = 'Introduction'       # a narration card before anyone speaks
+        if section == 'Battle quotes':
+            who = bosses[0] if len(bosses) == 1 else speakers[0]
+            sub = '%s %s' % ('Defeating' if trigger == 'boss_death' else 'Fighting', who)
+        elif section == 'Talk conversations':
+            # Who starts it, then who is talked to, as the wiki heads "Ross and Garcia". A
+            # recruit talk names its wired talker, or "Anyone" when any party member can start
+            # it; a talk only one side speaks in is likewise open to anyone (the rescue boats).
+            joined = next((w for w in speakers if w in talks), None)
+            if joined:
+                pair = [talks[joined] or 'Anyone', joined]
+            else:
+                pair = speakers[:2] if len(speakers) > 1 else ['Anyone'] + speakers
+            sub = ' and '.join(pair)
+            if joined:
+                steps += [('stage', None, '%s is recruited' % joined)]
+        else:
+            sub = (_when(chap, ev, units) if section == 'In battle' else None) or (
+                title[:1].upper() + title[1:] if title
+                else (trigger or '').replace('_', ' ').capitalize())
+        groups = out.setdefault(section, [])
+        base, extra = re.match(r'(.*?)(?: \((.*)\))?$', title or '').groups()
+        prev = groups[-1] if groups else None
+        if extra and prev and prev[2] == base:
+            if extra.startswith('no '):    # the same scene when someone is missing: a variant
+                who = extra[3:]
+                if not isinstance(prev[1][0], tuple):
+                    prev[1][0] = ('With %s' % who, prev[1][0])
+                prev[1].append(('Without %s' % who, steps))
+            else:                          # a follow-on message of the same scene
+                prev[1][-1] = (prev[1][-1][0], prev[1][-1][1] + steps) if isinstance(
+                    prev[1][-1], tuple) else prev[1][-1] + steps
+            continue
+        groups.append((sub, [steps], base))
+    if not out:                            # not drafted yet: the YAML's own beats, in place
+        for ev in chap.get('events') or []:
+            if isinstance(ev, dict) and ev.get('description'):
+                out.setdefault(script_section(ev.get('trigger'), ev.get('type')), []).append(
+                    (None, [ev['description'].strip()], None))
+    for section, groups in out.items():
+        groups = [g[:2] for g in groups]
+        if len(groups) == 1 and section not in ('Battle quotes', 'Talk conversations'):
+            groups = [(None, groups[0][1])]
+        out[section] = groups
+    return out
+
+
+def script_wikitext(chap, prev, nxt, units, navbox=''):
+    sections = script_sections(chap, units)
+    if not sections:
+        return ''
+    return wp.script({'title': chap.get('title', chap['_slug']), 'sections': sections,
+                      'previous': prev.get('title') if prev else None,
+                      'next': nxt.get('title') if nxt else None, 'navbox': navbox})
 
 
 # ── what the ROM shows: names, icons, sprites ──────────────────────────────────
@@ -707,25 +848,36 @@ def defeat_text(chap):
     return esc(LOSE_TEXT.get(l) or l)
 
 
-def join_text(uid, units, chap):
-    """How the unit joins, in the wiki's words, from what the build WIRES (#493): a gated parley
-    (the chapter's `parley: {by, recruits_npc}`, inject.recruit.parley_recruiters), an on-map
-    talk any party member can make (inject.recruit.on_map_talk_recruits), else an off-map join
-    at chapter end. The unit file's `recruit.via` is not the answer: nearly every recruit says
-    `story`, and reading it printed "Automatically" for Trex, who has to be talked to."""
+def talk_joins(chap):
+    """{unit id: who talks them in, None for any party member} for every unit this chapter
+    recruits by Talk, from what the build WIRES (#493): a gated parley (the chapter's
+    `parley: {by, recruits_npc}`, inject.recruit.parley_recruiters) or an on-map talk any party
+    member can make (inject.recruit.on_map_talk_recruits)."""
     import inject.recruit
-    if uid in (chap.get('_founding') or []):
-        return 'Automatically from turn 1'
+    out = {}
     for e in enemy_list(chap):
         parley = e.get('parley') or {}
-        if parley.get('recruits_npc') == uid and parley.get('by'):
-            return 'Enemy, talk to with [[%s]]' % unit_name(parley['by'], units)
+        if parley.get('recruits_npc') and parley.get('by'):
+            out[parley['recruits_npc']] = parley['by']
     try:
         talkers = inject.recruit.on_map_talk_recruits(CAMPAIGN, chap.get('chapter_number'))
     except (Exception, SystemExit):
         talkers = []
-    if uid in [t[0] for t in talkers]:
-        return 'NPC, talk to with any party member'
+    for t in talkers:
+        out.setdefault(t[0], None)
+    return out
+
+
+def join_text(uid, units, chap):
+    """How the unit joins, in the wiki's words: by Talk (`talk_joins`), else an off-map join at
+    chapter end. The unit file's `recruit.via` is not the answer: nearly every recruit says
+    `story`, and reading it printed "Automatically" for Trex, who has to be talked to."""
+    if uid in (chap.get('_founding') or []):
+        return 'Automatically from turn 1'
+    talks = talk_joins(chap)
+    if uid in talks:
+        return ('Enemy, talk to with [[%s]]' % unit_name(talks[uid], units) if talks[uid]
+                else 'NPC, talk to with any party member')
     return 'Automatically at the end of the chapter'
 
 
@@ -909,7 +1061,7 @@ def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
              '%s chapter' % ORDINALS[num] if isinstance(num, int) and num < len(ORDINALS)
              else 'chapter %s' % num),
          'plot': chap.get('narrative') or plan.get('story'),
-         'script_title': '%s/Script' % title if script_of(slug, chap) else None,
+         'script_title': '%s/Script' % title if script_sections(chap, units) else None,
          'victory': victory_text(chap), 'defeat': defeat_text(chap), 'navbox': navbox}
     dep = chap.get('deployment') or {}
     c['ally'] = str(dep.get('deploy_limit') or len(dep.get('deploy_slots') or []) or '?')
@@ -1071,15 +1223,6 @@ def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
 
     c['strategy'] = chap.get('strategy')
     return wp.chapter(c)
-
-
-def script_page(chap):
-    slug, title = chap['_slug'], chap.get('title', chap['_slug'])
-    script = script_of(slug, chap)
-    if not script:
-        return ''
-    return page('%s/script' % slug, '%s/Script' % title, script,
-                tools=[(slug, 'Chapter')], category='Scripts')
 
 
 def design_page(chap, opens):
@@ -1326,7 +1469,6 @@ PAGE_CSS = """
 .mw-collapsible-toggle-default .mw-collapsible-text{cursor:pointer}
 section.page[hidden]{display:none!important}
 #mw-content-container{margin-top:3.5rem!important}
-.ms-script{white-space:pre;overflow-x:auto;font-size:12px}
 """
 
 JS = """
@@ -1451,13 +1593,17 @@ def build():
         title = c.get('title', c['_slug'])
         wt = chapter_wikitext(c, chs[i - 1] if i else None,
                               chs[i + 1] if i + 1 < len(chs) else None, units, chs, files)
-        script = script_of(c['_slug'], c)
+        script = script_wikitext(c, chs[i - 1] if i else None,
+                                 chs[i + 1] if i + 1 < len(chs) else None, units)
         pages.append(page(c['_slug'], title, wsite.render_page(title, wt, wsite_),
                           tools=[('%s/script' % c['_slug'], 'Script') if script else None,
                                  ('%s/design' % c['_slug'], 'Design notes')],
                           category='Planned chapters' if c.get('status') == 'planned'
                           else 'Chapters'))
-        pages.append(script_page(c))
+        if script:
+            pages.append(page('%s/script' % c['_slug'], '%s/Script' % title,
+                              wsite.render_page('%s/Script' % title, script, wsite_),
+                              tools=[(c['_slug'], 'Chapter')], category='Scripts'))
         pages.append(design_page(c, opens))
     if wsite_.missing_files:
         print('wiki: %d file(s) no template could find: %s' % (

@@ -527,6 +527,7 @@ events:
       # (Lupin is silent a moment — running the math. It isn't close.)
       - lupin: "Steady food beats proud starving. The pack pulls your sled. Feed them well, mushroom."
   - trigger: wolf_pack_reveal
+    turn: 2
     type: scripted_event
     description: >
       Turn 2: the pack bursts from the NW fog beside the party's flank and Lupin COMMANDS it —

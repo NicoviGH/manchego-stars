@@ -1,0 +1,159 @@
+==Introduction==
+{{Quote|With her bracelet recovered, Eirika sets out with renewed determination. Passing through the ancient forest Za'ha brings them close to Grado's border. As they near the town of Serafew, Eirika's fears are assuaged by the lack of troops. But never-before-seen terrors crawl in the shadows of the trees.}}
+
+==Opening==
+(Eirika's group arrives from the north)
+
+'''Seth:''' We're approaching Serafew, at the border of Renais and Grado. Once we cross, we'll be in Grado... Renvall won't be much farther.<br>
+'''Eirika:''' That is, assuming we can cross the border without mishap... Oh! Look! Over there!
+
+(Monsters appear across the map)
+
+'''Eirika:''' Those strange figures... What... What are they? Are they...human?<br>
+'''Seth:''' I've never seen anything like it. What could they be?
+
+(At the southwest village)
+
+'''Artur:''' What have we done to deserve the trials before us? What is happening to us? How could such abominations walk our lands while the Sacred Stones protect us?<br>
+'''Lute:''' ......<br>
+'''Artur:''' Lute, please, it's dangerous outside the walls. Stay here in the village.<br>
+'''Lute:''' Those are revenants, aren't they? They were the vanguard of the Demon King in the days of darkness. The Tome of Nazania describes them in Chapter&nbsp;2, section 7, paragraph 8.<br>
+'''Artur:''' You know of them?<br>
+'''Lute:''' Duh! I'm a prodigy. I can recall most everything I see or hear. According to the book, revenants attack using razor-sharp claws. Sounds painful, wouldn't you say?<br>
+'''Artur:''' Yes, er, well... Be that as it may, I must go aid those travelers outside. You should stay here within the safety of the village.<br>
+'''Lute:''' Very well. I don't mind staying here. In fact, it seems the smarter choice.<br>
+(Artur leaves)<br>
+'''Lute:''' Magic is far more powerful than any monster's claws. The thickest hide and strongest armor are useless against magic's power. Yes, I suppose I could have studied swords, but only magic is worthy of me. Even if this village were to be assaulted by monsters, I could defend it perfectly.
+
+{{Quote|There are three different schools of {{color|red|magic}}, each of which is governed by the {{color|red|trinity of magic}}. {{color|red|Light}} is strong against {{color|red|Dark}}. {{color|red|Dark}} is strong against {{color|red|Anima}}. {{color|red|Anima}} is strong against {{color|red|Light}}. For now, just remember that {{color|red|Light is strong against Dark}}.|Easy Mode only}}
+
+(Artur moves towards Eirika's group)
+
+'''Artur:''' Travelers, you must listen to me! The ancient forest of Za'ha is dangerous. Head south and pass through this place before the fiends surround you!<br>
+'''Eirika:''' Who are you?<br>
+'''Artur:''' My name is Artur. The temple has assigned me the task of cleansing the forest of these...things. There are so many of the fiends, though. I wonder if I stand much chance alone. So if you would, please flee now while you have the chance.<br>
+'''Eirika:''' Fiends? You're not talking about the same fiends that served the ancient Demon King? That can't be right... They're nothing but legends and fairy tales...<br>
+'''Artur:''' Yes, I felt the same when I heard. And yet here they are. This place is filled with them. I wonder how far they've spread... Surely they're not in Renais alone.<br>
+'''Eirika:''' But...why are they here? How?<br>
+'''Seth:''' Beware, Your Highness! Something approaches!
+
+(Mogall approaches Artur)
+
+'''Artur:''' Please allow me to deal with this. Evil shade! May the blessed light drive you from this land!
+
+(Artur hits and critically hits the Mogall, killing it)
+
+{{Quote|The {{color|red|magic}} that Artur and Lute wield cannot be stopped by physical {{color|red|defense}}. However, magic {{color|red|resistance}} can affect the damage it does. So, it's possible to do high damage to units like {{color|red|knights}}, who possess strong {{color|red|defenses}}. On the other hand, it's difficult to harm units with high {{color|red|resistance}}, like pegasus knights. Magic can also be used to attack directly or indirectly, like a hand axe. It can be wielded like a sword to strike adjacent foes or like a bow to hit enemies at a distance.|Easy Mode only}}
+
+'''Seth:''' We ought to help. He can't fight them all alone. Do you have orders?
+
+{{Quote|Starting on this map, you'll be able to use the {{color|red|preparations screen}}. You can {{color|red|choose which units}} to send into battle and {{color|red|manage items}} to secure the best chance of victory.|Easy Mode only}}
+
+==In battle==
+===Turn 1, player phase===
+'''Artur:''' One of my companions is in that village to the south. If any of you can get there swiftly, I implore you to watch over her safety.
+
+====Easy Mode tutorial====
+'''Artur:''' Listen to me, travelers! If you can, try to stay in the woods.
+
+'''Eirika:''' Why should we stay in the woods?<br>
+'''Seth:''' In combat, the trees provide cover against attacks. The trees and branches make it difficult for enemies to strike.<br>
+'''Eirika:''' Is that so? Fair enough. Let's stick to trees then.
+
+{{Quote|Forests and other map areas may offer {{color|red|terrain bonuses}}. Units in forests are harder to hit and take less damage when struck. Simply put, staying under trees makes it more difficult for enemies to hit and harm you. Areas that have {{color|red|terrain bonuses}} are {{color|red|forests}}, {{color|red|mountains}}, {{color|red|fortresses}}, and {{color|red|gates}}, to name a few. Use terrain to your advantage during combat to avoid risking your units.}}
+
+===Turn 2, end of enemy phase===
+(L'Arachel, Dozla, and Rennac arrive at the northeast cliff)
+
+'''L'Arachel:''' Oh, my! Those travelers are besieged by the agents of evil!<br>
+'''Dozla:''' Ha ha ha! Right you are, Lady L'Arachel!<br>
+'''L'Arachel:''' I cannot allow this to happen! Come! We must charge down these cliffs and rush to their aid!<br>
+'''Rennac:''' We charge down these cliffs, and the only thing we'll be rushing to is death. How about we find us a nice, gentle path down, hm?<br>
+'''L'Arachel:''' Ah... Yes, well... Let us hurry nonetheless. I simply cannot abide those wicked beasts running amok!
+
+==Villages==
+===Northern village===
+'''Man:''' Do you see that old snag to the south of here? Bet it would make a handy bridge if you could knock it over. Take a weapon to it and give it a few good whacks. That should do it. Here, take this and give it a try. It ought to do the trick.
+
+===Southwest village===
+====Visit with anyone but Eirika or Artur====
+'''Lute:''' ......<br>
+'''Visitor:''' Hm?<br>
+'''Lute:''' Your flesh shows no sign of putrefaction. It seems you're not a revenant. I've decided to join you in battle now. My name is Lute. I'm a mage of superior wisdom and rare ability. I've been reading up on these revenants. They are, quite simply, no match for me. I am superior after all.<br>
+(Lute is recruited)
+
+====Visit with Eirika====
+'''Eirika:''' Who are you?<br>
+'''Lute:''' ......<br>
+'''Eirika:''' Um...<br>
+'''Lute:''' Your flesh shows no sign of putrefaction. It seems you're not a revenant.<br>
+'''Eirika:''' No, I'm not. Are you from around here? There are still monsters about, so you should stay in{{GBAdash}}<br>
+'''Lute:''' No, no. I insist on joining you in combat. My name is Lute. I'm a mage of superior wisdom and rare ability. I've been reading up on these revenants. They are, quite simply, no match for me. I am superior after all.<br>
+'''Eirika:''' What an odd girl...<br>
+(Lute is recruited)
+
+====Visit with Artur====
+'''Artur:''' Lute, help has arrived.<br>
+'''Lute:''' ......<br>
+'''Artur:''' Lute?<br>
+'''Lute:''' Your flesh shows no sign of putrefaction. It seems you're not a revenant.<br>
+'''Artur:''' Well, I should hope not! I wanted you to know help has arrived. Please be patient a bit longer...<br>
+'''Lute:''' No, no. I insist on joining you in combat. I've been reading up on these revenants. They are, quite simply, no match for me. I am superior after all.<br>
+(Lute is recruited)
+
+==Ending==
+===If Artur is alive and Lute unrecruited===
+'''Artur:''' Everything is all right now, Lute.<br>
+'''Lute:''' ......<br>
+'''Artur:''' Lute?<br>
+'''Lute:''' Your flesh shows no sign of putrefaction. It seems you're not a revenant.<br>
+'''Artur:''' Well, I should hope not! However, I'm obliged to help the ones who aided me against those fiends. So I'm afraid I'll be leaving you and traveling with them for a while. What will you do, Lute?<br>
+'''Lute:''' That's a good question. A very good question indeed. Hmm... It's decided. I'll join you, Artur. After all, who wouldn't appreciate the help of a mage such as myself? There's no one better than me.
+
+===If Artur is dead and Lute unrecruited===
+'''Lute:''' ......<br>
+'''Eirika:''' Yes? Who are you? What do you want?<br>
+'''Lute:''' Your flesh shows no sign of putrefaction. It seems you're not a revenant.<br>
+'''Eirika:''' I most certainly am not. Are you from this village? It's still not safe to travel outside.<br>
+'''Lute:''' I am not a villager. I am Lute. I'm a mage! Possibly the best, in fact. I've decided to join you and your crew in gratitude for your help here today. After all, who wouldn't appreciate the help of a mage such as myself? There's no one better than me.<br>
+'''Eirika:''' What an unusual girl...
+
+===Regardless of Artur and Lute's status===
+'''Seth:''' We've killed all the monsters. Still, we'd best burn the bones to ash to be sure they don't return.<br>
+'''Eirika:''' I still can't believe what we've been fighting here... I'd thought those fiends nothing more than myth and legend.<br>
+'''Seth:''' Those revenants are said to be the least of the dark creatures. And yet the weakest of them could outmatch any normal man. We cannot take this enemy lightly.
+
+;If Artur and Lute are alive
+:'''Lute:''' Oh, yes. There are much worse than those revenants and the entombed... Let's see, there's the bonewalkers, mauthe doogs, gargoyles, baels... Why, I'll bet you just about any creature of lore could be walking again. Yes, we're in for some trouble. Even my fabulous power may not be enough.<br>'''Artur:''' O divine light, show me... Is this a sign of dark days to come?<br>(Artur and Lute leave)
+
+'''Eirika:''' By all that's holy, what is happening?<br>
+'''Seth:''' Princess Eirika, perhaps it would be wise to return to Frelia and regroup. Pressing forward seems foolish in light of recent events. We cannot face both Grado's forces and more of those terrible things.<br>
+'''Eirika:''' Seth, I follow your point, and nothing would please me more than running for safety. But what of my brother? He and his men are trapped in the same situation we are. I know full well that I may be leading us into even greater danger, but... Please try to understand.<br>
+'''Seth:''' I do, my princess, and I vow to see you through this safely.
+
+(L'Arachel, Dozla, and Rennac arrive from the east)
+
+'''L'Arachel:''' Aha! Foul creatures, beware! I, L'Arachel, bestow upon you the honor of banishment at my blessed hands!<br>
+'''Eirika:''' ......<br>
+'''L'Arachel:''' Oh... Where are the monsters?<br>
+'''Eirika:''' Well, we just finished...<br>
+'''L'Arachel:''' Ah, glad tidings indeed! The heavens must be rejoicing! I am...a tad disappointed however. After all, I did rush all the way here to show you the splendor of my might.<br>
+'''Dozla:''' Gwah ha ha! It's a real shame, innit, Lady L'Arachel?!<br>
+'''Rennac:''' What's shameful is the way you drag us around the countryside.<br>
+'''Eirika:''' Pardon me, but...who are you?<br>
+'''L'Arachel:''' Me? Since you ask, please allow me to introduce myself. It is I, the true light and glory of the sacred realm of Rausten...<br>
+'''Dozla:''' Stop! Lady L'Arachel, you mustn't continue! You cannot reveal your true identity here!<br>
+'''L'Arachel:''' Oh, yes, you're right. Oh, I get so careless sometimes! Now, I must ride off in anonymity. Oh, how beautifully romantic!<br>
+'''Eirika:''' Uh... Right.<br>
+'''L'Arachel:''' Fare thee well, strangers. Perhaps our paths will cross again. Come, Dozla! Rennac! We ride!<br>
+'''Dozla:''' Gwah ha ha! Let's go, Rennac!<br>
+'''Rennac:''' All right, all right.<br>
+'''Eirika:''' ...What was that about?
+
+{{ChapterNav
+|name=Ancient Horrors
+|prechapter=The Bandits of Borgo/Script{{!}}The Bandits of Borgo
+|nextchapter=The Empire's Reach/Script{{!}}The Empire's Reach
+}}
+{{NavScriptFE8}}
+[[Category:Scripts of Fire Emblem: The Sacred Stones]]

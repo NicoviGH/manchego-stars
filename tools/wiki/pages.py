@@ -166,3 +166,58 @@ def chapter(c):
     if c.get('navbox'):
         out.append(c['navbox'])
     return '\n\n'.join(out) + '\n'
+
+
+# A Script page's sections, in the order `The Bandits of Borgo/Script` and its siblings use.
+SCRIPT_SECTIONS = ('Introduction', 'Opening', 'In battle', 'Talk conversations', 'Villages',
+                   'Battle quotes', 'Ending')
+
+
+def _scene(steps):
+    """One scene as the wiki transcribes it: a speaker's turn per line, `<br>` between lines,
+    narration in {{Quote}}, a stage direction in parentheses ("(Artur leaves)"). Consecutive
+    boxes from one speaker are one turn, as they read.
+
+    steps: [(kind, speaker, text)], kind 'say' | 'narrate' | 'stage'."""
+    turns = []
+    for kind, who, text in steps:
+        if turns and kind == 'say' and turns[-1][:2] == (kind, who):
+            turns[-1][2].append(text)
+        else:
+            turns.append((kind, who, [text]))
+    lines = []
+    for kind, who, t in turns:
+        text = ' '.join(t)
+        lines.append('{{Quote|%s}}' % text if kind == 'narrate' else
+                     '(%s)' % text if kind == 'stage' else "'''%s:''' %s" % (who, text))
+    return '\n'.join(l + ('<br>' if i + 1 < len(lines) and not l.startswith('{{')
+                          and not lines[i + 1].startswith('{{') else '')
+                     for i, l in enumerate(lines))
+
+
+def script(c):
+    """A chapter's Script subpage, laid out as `The Bandits of Borgo/Script` is.
+
+    c['sections']: {section: [(subheading or None, [scene])]}, a scene being `_scene`'s steps,
+    a (label, steps) variant of it (the wiki's "====Visit with Eirika===="), or a plain
+    paragraph (a planned chapter's beat, not yet written)."""
+    out = []
+    for name in SCRIPT_SECTIONS:
+        groups = c['sections'].get(name)
+        if not groups:
+            continue
+        out.append('==%s==' % name)
+        for sub, scenes in groups:
+            if sub:
+                out.append('===%s===' % sub)
+            out.append('\n\n'.join(
+                s if isinstance(s, str) else
+                '====%s====\n%s' % (s[0], _scene(s[1])) if isinstance(s, tuple) else _scene(s)
+                for s in scenes))
+    script_link = lambda t: '%s/Script{{!}}%s' % (t, t) if t else None
+    out.append(_params('ChapterNav', [
+        ('name', c['title']), ('prechapter', script_link(c.get('previous'))),
+        ('nextchapter', script_link(c.get('next')))]))
+    if c.get('navbox'):
+        out.append(c['navbox'])
+    return '\n\n'.join(out) + '\n'

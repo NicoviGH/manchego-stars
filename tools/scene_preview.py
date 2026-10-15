@@ -187,13 +187,13 @@ def _ch05_registry():
     _claim(reg, 'ch05/ravisin-death', 'Ravisin dies',
            inject.chapter_ids.CH05_RAVISIN_DEATH_MSG, inject.chapters.ch05.ch05_ravisin_death_message, BATTLE,
            Event('boss_death', None))
-    _claim(reg, 'ch05/ending', 'the ending, Sahnar recruited',
+    _claim(reg, 'ch05/ending', 'If Basil is alive and Sahnar recruited',
            inject.chapter_ids.CH05_ENDING_MSGS[True], ending, TALK,
            Event('chapter_end', inject.chapters.ch05.CH05_ENDING_SLOT))
-    _claim(reg, 'ch05/ending-no-sahnar', 'the ending, the berry exchange cut',
+    _claim(reg, 'ch05/ending-no-sahnar', 'If Basil is alive and Sahnar unrecruited',
            inject.chapter_ids.CH05_ENDING_MSGS[False], ending, TALK,
            Event('chapter_end', inject.chapters.ch05.CH05_ENDING_SLOT))
-    _claim(reg, 'ch05/ending-basil-died', "the ending, over Basil's body",
+    _claim(reg, 'ch05/ending-basil-died', 'If Basil is dead',
            inject.chapter_ids.CH05_ENDING_LOST_MSG, ending, TALK,
            Event('chapter_end', inject.chapters.ch05.CH05_ENDING_LOST_SLOT))
     # DELIBERATELY absent: the arena tutorial (`ch05_arena_messages`). Its two boxes are locked

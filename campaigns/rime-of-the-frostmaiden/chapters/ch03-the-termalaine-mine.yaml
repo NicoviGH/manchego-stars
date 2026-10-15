@@ -411,6 +411,7 @@ events:
                       # RBG delivers the kill. Keeps the parity roster intact (real combat
                       # kill, not a cutscene-removal). The Brute = the kobold-steel "Icewind Brute"
                       # slot; flag it the miniboss + position it mid-galleries at units/objective wiring.
+    unit: kobold-steel
     type: cutscene
     ea_file: events/ch03-rbg-execution.ea
     description: >
