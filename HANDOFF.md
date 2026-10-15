@@ -6,10 +6,11 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-15 (Claude, session end). #492 is merged. **#487 is the one PR in flight:
-the wiki is being rebuilt on the Fire Emblem Wiki's own templates (#493).** Nicolas's order
-stands: finish the wiki and merge it, THEN resume ch07+ planning with the updated wiki. What
-landed and why is in `git log`, the PRs and #493 -- this file keeps no "recently landed" list.
+Refreshed 2026-10-15 (Claude, evening). **#487 is the one PR in flight:** the wiki on the Fire
+Emblem Wiki's own templates (#493). Script and character pages and the character list are done;
+the cast's in-game help text is their own (ADR 0346). Nicolas's order stands: finish the wiki
+and merge it, THEN resume ch07+ planning with it. What landed and why is in `git log`, the PRs
+and #493 -- this file keeps no "recently landed" list.
 
 ## In flight
 
@@ -23,10 +24,16 @@ landed and why is in `git log`, the PRs and #493 -- this file keeps no "recently
     (`wiki/vendor/`). `mw.py` expands the templates, `render.py` renders wikitext,
     `site.py` resolves links (our page, else the real wiki) and files (the build's art).
     `test_wiki_engine.py`: 14 exemplars, 12 exact, two quirks named beside their floors.
-  - **Chapter pages are done**: `wiki/pages.py` is the layout, `gen_wiki.chapter_wikitext` the
-    data; `test_wiki_pages.py` holds every hosted chapter to the exemplars' section order.
-  - **Still on the old HTML path (`wiki/markup.py`)**: home, Script, roster, design notes,
-    open decisions. `markup.py` retires once the last of them moves.
+  - **Done on the templates**: chapter, Script (`script_sections` sorts scenes into the wiki's
+    sections by trigger) and character pages (cast, bosses, planned recruits, lore NPCs), and the
+    character list. `wiki/pages.py` is the layout, `gen_wiki` the data; every number is the
+    injector's own (`inject.stats.cast_growths`/`cast_ranks`, `boss_modes`, `promotions`).
+    `test_wiki_pages.py` holds each page type to its exemplars' section order.
+  - **Character prose** is each lore file's `## Profile` (lore/README.md says what it is; drafts,
+    Nicolas to red-pen on the wiki). HD art: `references/References/PCs/HD Art/<Name>HD.jpeg`,
+    all eight PCs present.
+  - **Still on the old HTML path (`wiki/markup.py`)**: home, design notes, open decisions.
+    `markup.py` retires once the last of them moves.
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
   locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
   locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
@@ -35,18 +42,15 @@ landed and why is in `git log`, the PRs and #493 -- this file keeps no "recently
 
 **Next, in order** (the full state, every decision and every open pick: #486 and #493):
 
-1. **#493 on #487** -- its unticked boxes, in this order:
-   - The remaining page types on the templates, per the page plan Nicolas agreed: Script
-     subpages (`The Bandits of Borgo/Script` is the exemplar), a character page per unit
-     (`Colm`, `Dara`, `Bazba`), the character and chapter lists, the availability chart, the
-     lord-select concept page (`Imperial Three` / `Sacred Stone (object)` are the concept
-     exemplars), and Nav8's navbox at every page's foot. Classes and items link to the real
-     wiki; supports wait on #494.
-   - Readers: ch01's money gift (`vanilla_payload` reads no gold), boss ranks and personal lines
-     from the INJECTED CharacterData, and a **wield check** (every unit can use the weapon it
-     carries; it replaces the per-chapter item scoping #492 retired, and answers Ravisin's
-     Dark rank).
-   - Strategies rewritten closer to the twins' own text; the chardalyn raiders' sprite.
+1. **#493 on #487** -- its unticked boxes (14), in this order:
+   - Pages: the availability chart, the lord-select concept page (`Imperial Three` /
+     `Sacred Stone (object)` are the exemplars), the chapter list on templates, Nav8's navbox at
+     every page's foot, and the home page off `markup.py`. Supports wait on #494 (the ROM still
+     loads each slot's vanilla partners).
+   - Readers: ch01's money gift (`vanilla_payload` reads no gold), boss personal lines from the
+     INJECTED CharacterData, and the **wield check** (every unit can use what it carries).
+   - Strategies closer to the twins' own text; the chardalyn raiders' sprite; Sahnar's missing
+     `gender:` (pick: female).
    Then republish, Nicolas's layout list, `/code-review medium`, merge on his word. Nicolas is
    leaning toward ch01 on vanilla Ch1's map with Hamill Canyon back as ch08 -- raise it in the
    planning step.
@@ -65,7 +69,8 @@ landed and why is in `git log`, the PRs and #493 -- this file keeps no "recently
 5. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
    count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
 
-- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
+- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, the stat-screen face, and
+  R on a cast member's name (its own help text, ADR 0346; it lands with #487).
   A shop is proven headless now: the scenario DSL's `shop:` step (ch02armory, ch05shops).
 - `make difficulty-gate` enforces ch00-ch07. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
