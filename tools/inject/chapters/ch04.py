@@ -3,13 +3,14 @@
 import os
 import sys
 
+from inject.raw_pids import enemy_pid_for
 from inject.cast import _classed_cast, char_symbol, CLASS_LOADOUT, PORTRAIT_MAP
 from inject.chapter_ids import (
     CH04_ENDING_MSG, CH04_ENDING_NO_LUPIN_MSG, CH04_GOAL_STATUS_MSG, CH04_GOAL_WINDOW_MSG,
     CH04_LUPIN_TALK_MSG, CH04_MOOSE_MOV_TABLE, CH04_MOOSE_MSG, CH04_MOOSE_PID, CH04_NIMSY_FID,
     CH04_OPENING_CARD_MSG, CH04_OPENING_FOREST_BG, CH04_OPENING_MSGS, CH04_REVEAL_MSGS,
-    CH04_VILLAGE_SLOTS)
-from inject.decomp import _replace_brace_block, DECOMP, REPO
+    CH04_VILLAGE_SLOTS, CH04_MONSTER_PIDS)
+from inject.decomp import _replace_brace_block, DECOMP, REPO, ITEM_ENUM
 from inject.chapter_frame import write_event_group
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
@@ -87,26 +88,6 @@ CH04_BOOT_SEED_SYMBOL = 'UnitDef_088B5978'
 CH04_PREP_SCRIPT = 'EventScr_08591FD8'
 CH04_ENDING_SCRIPT = 'EventScr_Ch5_EndingScene'
 CH04_CLASS_IDS = ChapterClassIds('ch04')
-CH04_ITEM_IDS = {
-    'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
-    'iron-sword': 'ITEM_SWORD_IRON',
-    'iron-lance': 'ITEM_LANCE_IRON',
-    'iron-bow': 'ITEM_BOW_IRON',
-    'iron-axe': 'ITEM_AXE_IRON',        # the Lonelywood village's reward (#205)
-    'evil-eye': 'ITEM_MONSTER_EVILEYE',
-    'fetid-claw': 'ITEM_MONSTER_FETIDCLW',
-    'vulnerary': 'ITEM_VULNERARY',
-}
-# Vanilla Ch4 generic-monster charIds (read from events_udefs.s HEAD): the melee Revenant
-# pack uses 0xaa, the melee Bonewalker pack 0xac -- the twin's own line/pack fodder pids.
-CH04_MONSTER_PIDS = {
-    'mauthedoog': '0xb3',
-    'revenant': '0xaa',
-    'bonewalker': '0xac',
-    'bonewalker-bow': '0xad',
-    'mogall': '0xb7',
-    'entoumbed': '0xab',
-}
 # Stage 2b -- the turn-2 wolf-pack reveal + Marty->Lupin parley (issue #24). Lupin rides the
 # collision-free Duessel identity slot (Stage 2a); placed RED as the pack leader, Marty's Talk
 # CUSAs him blue and CUSNs the surviving generics green where they stand. The symbols/ids below
@@ -262,11 +243,6 @@ def ch04_moose_script(unit_symbol, pid, msg, camera_at, flee_route):
             % (unit_symbol, cx, cy, pid, msg, '\n'.join(move), pid))
 
 
-def ch04_enemy_pid(enemy, _index=0):
-    """ch04's enemies ride one monster pid per CLASS (CH04_MONSTER_PIDS)."""
-    return CH04_MONSTER_PIDS[enemy['class']]
-
-
 def _ch04_reveal_wave(chap):
     """The turn-2 convertible pack -- the Mauthe Doog wave Marty parleys (its YAML `parley`
     block). By convention its FIRST authored tile is the pack LEADER (-> Lupin, placed red);
@@ -286,7 +262,7 @@ def _ch04_wave_pack_kit(chap, wave):
     since "the wolves turn the tide" is what the parley buys."""
     cls = CH04_CLASS_IDS.for_entry(wave)
     ai = enemy_ai_initialiser(chap, wave)
-    items = [CH04_ITEM_IDS[i.get('fe_base') or i['id']] for i in wave.get('inventory', [])]
+    items = [ITEM_ENUM[i.get('fe_base') or i['id']] for i in wave.get('inventory', [])]
     return cls, ai, ', '.join(items) or '0'
 
 
@@ -465,15 +441,15 @@ def inject_ch04(campaign, boot=False, verbose=True):
         for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     seed = '{\n' + '\n'.join(seed_rows) + '\n    { 0 },\n}'
 
-    initial_rows = enemy_rows(chap, CH04_CLASS_IDS, CH04_ITEM_IDS, ch04_enemy_pid)
-    turn3_rows = enemy_rows(chap, CH04_CLASS_IDS, CH04_ITEM_IDS, ch04_enemy_pid, arrives_turn=3)
+    initial_rows = enemy_rows(chap, CH04_CLASS_IDS, enemy_pid_for('ch04'))
+    turn3_rows = enemy_rows(chap, CH04_CLASS_IDS, enemy_pid_for('ch04'), arrives_turn=3)
     # Stage 2b -- the turn-2 wolf-pack reveal: the convertible Mauthe Doog wave with its leader
     # tile reassigned to Lupin (red, CHARACTER_DUESSEL). 5 generic Mauthe Doogs + Lupin = 6, so
     # enemy_rows still reports 6 for the difficulty read (parity held); the split is here.
     lupin = next(r for r in on_map_talk_recruits(campaign, chap['chapter_number'])
                  if r[0] == 'lupin')
     turn2_rows = ch04_turn2_reveal_rows(chap, lupin)
-    turn2_wave = enemy_rows(chap, CH04_CLASS_IDS, CH04_ITEM_IDS, ch04_enemy_pid, arrives_turn=2)
+    turn2_wave = enemy_rows(chap, CH04_CLASS_IDS, enemy_pid_for('ch04'), arrives_turn=2)
     if [len(initial_rows), len(turn2_wave), len(turn3_rows)] != [10, 6, 7]:
         sys.exit('ERROR: ch04 realigned roster must stay 10 line + 6 turn-2 reveal + 7 turn-3')
 
@@ -544,7 +520,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # No-op today -- ch04's forest is a from-scratch canvas, so its `map:` block names no
     # `vanilla_layout:` and there is no vanilla gift placement to inherit. Wired anyway so the
     # rule travels with the chapter rather than with whoever remembers it (#25).
-    assert_village_gifts_match_vanilla(chap, CH04_ITEM_IDS)
+    assert_village_gifts_match_vanilla(chap)
     # Tile flips (#214): the snag falls into a crossing (the Iron Axe's whole purpose) and each
     # visited village closes its door. Must run AFTER _retarget_host_chapter zeroed changeLayerId.
     _inject_tile_changes('MS_Ch04MapChanges', ch04_map_changes(chap, maps_dir), CH04_HOST_INDEX)
@@ -633,7 +609,7 @@ def inject_ch04(campaign, boot=False, verbose=True):
         symbol, msg, _fid, bg = CH04_VILLAGE_SLOTS[village['id']]
         script = _replace_brace_block(
             script, symbol + '[] =',
-            village_script(msg, village_reward_item(village, CH04_ITEM_IDS), bg),
+            village_script(msg, village_reward_item(village), bg),
             CH5_EVENTSCRIPT_H)
     # The moose-flees beat (Stage 4): fired by the Misc AREA when a unit reaches the tomb-side
     # clearing. Loads the moose, holds on it, RBG's one line, then it bolts NE and is gone.

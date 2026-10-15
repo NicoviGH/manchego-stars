@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-343 decisions. Read this index, then open the two or three you need — the whole
+344 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -35,6 +35,7 @@ set is ~197,000 tokens and no session has ever needed all of it at once.
 | `0016` | [Tileset vendoring is a one-command import; Ch3's cave tileset is cave-interior (#40).](decisions/0016-tileset-vendoring-is-a-one-command-import-ch3-s.md) | 2026-07-02 | #40 |
 | `0327` | [A reskin says where it is worn, and the harness reads the injector's ids](decisions/0327-a-reskin-says-where-it-is-worn.md) | 2026-10-04 | #26 #347 |
 | `0328` | [Our battle anims link past the 16MB image, in their own object](decisions/0328-our-battle-anims-link-past-the-16mb-image.md) | 2026-10-04 | #26 |
+| `0344` | [A unit's art and its items each have one resolver](decisions/0344-a-unit-s-art-and-its-items-each-have-one-resolver.md) | 2026-10-14 | #491 #487 |
 
 ---
 

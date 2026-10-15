@@ -18,6 +18,7 @@ from unittest import mock
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fe_combat as fc
 import difficulty as df
+from inject.decomp import ITEM_ENUM
 import inject.cast
 import inject.decomp
 import inject.chapter_settings
@@ -1231,12 +1232,13 @@ class VanillaEnemies(unittest.TestCase):
         self.assertIn('horseslayer', names)
         self.assertIn('venin-claw', names)
 
-    def test_vanilla_only_weapons_all_have_modeled_stats(self):
-        # Every difficulty-local vanilla-only item maps to a weapon present in fe_combat.W,
-        # and none of them leaked into the content-owned WEAPON_ITEM_ENUM (#53 seam rule).
-        for item, key in df.VANILLA_ONLY_ITEM_TO_WEAPON.items():
+    def test_item_to_weapon_is_the_modeled_part_of_the_one_item_table(self):
+        # One id->enum table serves the cast, the twins and every chapter (#491); the reverse
+        # map is exactly its entries fe_combat models, so no weapon is modeled off a second list.
+        self.assertEqual(df.ITEM_TO_WEAPON,
+                         {e: k for k, e in df.ITEM_ENUM.items() if k in fc.W})
+        for key in df.ITEM_TO_WEAPON.values():
             self.assertIn(key, fc.W)
-            self.assertNotIn(item, df.WEAPON_ITEM_ENUM.values())
 
     def test_ch13_reference_is_the_hamill_canyon_force(self):
         # 52 armed-RED defs across the 11 curated ch13a arrays (boss squad + main force +

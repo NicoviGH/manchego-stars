@@ -5,13 +5,14 @@ import os
 import re
 import sys
 
-from inject.cast import CLASS_LOADOUT, _classed_cast, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
+from inject.raw_pids import CHAPTER_ENEMY_PIDS, enemy_pid_for
+from inject.cast import CLASS_LOADOUT, _classed_cast, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_SURVIVED_FLAGS, CH06_BOAT_TALK_FLAGS,
                                 CH06_BOAT_TALK_MSGS, CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
                                 CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
                                 CH06_NERRA_RETREAT_MSG, CH06_NERRA_TAUNT_MSG,
                                 CH06_OPENING_CARD_MSG, CH06_OPENING_MSGS, CH06_OPENING_QUIP_MSG)
-from inject.decomp import _replace_brace_block, REPO
+from inject.decomp import _replace_brace_block, REPO, ITEM_ENUM
 from inject.chapter_frame import write_event_group
 from inject.event_scripts import assert_event_scripts_defined, declare_event_script
 from inject.class_ids import ChapterClassIds
@@ -76,25 +77,11 @@ CH06_GOAL_DONOR = 17                             # a CLEAN untouched vanilla def
 # deploys on are the same character and she inherits his real line (#284/#334). Her defeat
 # quote is her FLAGGED retreat line (ADR 0337): SetPidDefeatedFlag raises EVFLAG_DEFEAT_BOSS,
 # and that flag is what fires the win (CA_BOSS alone fires nothing).
-CH06_BOSS_PID = ENEMY_BASE_SLOT['nerra']
-CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla Ch7's own generic,
+CH06_BOSS_PID = CHAPTER_ENEMY_PIDS['ch06']['boss']
 
 # The rescue boats deploy as `fleet`: vanilla's own ship, which ships a 32x32 map sprite (SMSId
 # 0x41) and a 19 HP / 5 Def hull, which a boat's `personal:` line may raise (the west hull is 28).
 CH06_CLASS_IDS = ChapterClassIds('ch06')
-CH06_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'javelin': 'ITEM_LANCE_JAVELIN',
-                 'iron-sword': 'ITEM_SWORD_IRON', 'iron-blade': 'ITEM_BLADE_IRON',
-                 'steel-lance': 'ITEM_LANCE_STEEL',
-                 'halberd': 'ITEM_AXE_HALBERD', 'horseslayer': 'ITEM_LANCE_HORSESLAYER',
-                 'iron-bow': 'ITEM_BOW_IRON', 'flux': 'ITEM_DARK_FLUX',
-                 'thunder': 'ITEM_ANIMA_THUNDER', 'mend': 'ITEM_STAFF_MEND',
-                 'elixir': 'ITEM_ELIXIR',
-                 # the two `fe_base:` redirects -- the YAML's flavour names for the Venin Lance
-                 # (vanilla's Venin Axe, re-classed with its Fighter) and the Bael's Venin Claw
-                 'venin-lance': 'ITEM_LANCE_VENIN', 'venin-claw': 'ITEM_MONSTER_VENINCLW',
-                 # the boats' rewards, owed to the boarding pass: the east hull's Antitoxin and
-                 # the save-them-both Orion's Bolt vanilla Ch6 grants in its ending
-                 'antitoxin': 'ITEM_ANTITOXIN', 'orions-bolt': 'ITEM_ORIONSBOLT'}
 
 
 #  AI_A_08's do-not-attack list, and the ch06 hulls it is repointed at. Vanilla declares it
@@ -244,13 +231,6 @@ def ch06_reda_symbol(enemy_id, index):
     return 'MS_Ch06Surface_%s_%d' % (re.sub(r'[^A-Za-z0-9]', '_', enemy_id), index)
 
 
-def ch06_enemy_pid(enemy, _index=0):
-    """The BOSS takes her own vanilla CHARACTER slot so her flagged defeat quote keys to her and
-    nothing else; everything else shares the slot's autolevelled generic, exactly as vanilla Ch6
-    and Ch7 both do."""
-    return CH06_BOSS_PID if enemy.get('is_boss') else CH06_GENERIC_PID
-
-
 def ch06_boat_rows(chap):
     """The two marooned fishing boats: GREEN `CLASS_FLEET` units, one raw pid each.
 
@@ -304,7 +284,7 @@ def ch06_boarding_wiring(campaign, chap):
                              CH06_BOAT_TALK_MSGS[bid])
         entries += talk_recruit_char_entries(boarders, CH06_BOAT_PIDS[bid], flag, symbol)
         reward = talk.get('reward') or []
-        item = CH06_ITEM_IDS[reward[0]['id']] if reward else None
+        item = ITEM_ENUM[reward[0]['id']] if reward else None
         scripts.append((symbol, village_script(msg, item, talk['background']),
                         'ch06 boarding the %s -- the crew\'s line (0x%X)%s'
                         % (bid, msg, ', then %s' % item if item else '')))
@@ -725,7 +705,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
 
     # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
     spawns = ch06_line_spawns(chap, maps_dir)
-    line_rows = enemy_rows(chap, CH06_CLASS_IDS, CH06_ITEM_IDS, ch06_enemy_pid, spawns=spawns,
+    line_rows = enemy_rows(chap, CH06_CLASS_IDS, enemy_pid_for('ch06'), spawns=spawns,
                            reda_symbol=ch06_reda_symbol)
     redas = [(ch06_reda_symbol(eid, i), x, y)
              for e in chap['enemy_units'] if e.get('arrives_turn') is None
@@ -734,7 +714,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     declare_unit_table(CH06_LINE_TABLE, line_rows,
                        'ch06 turn-1 line: the merfolk of Maer Dualdon, on our placement (#360), '
                        'surfacing from the channels', redas=redas)
-    wave_rows = enemy_rows(chap, CH06_CLASS_IDS, CH06_ITEM_IDS, ch06_enemy_pid,
+    wave_rows = enemy_rows(chap, CH06_CLASS_IDS, enemy_pid_for('ch06'),
                            arrives_turn=CH06_HARD_WAVE_TURN)
     if not wave_rows:
         sys.exit('ERROR: ch06 declares no enemies arriving on turn %d, but a wave table and a '
@@ -844,7 +824,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
         + record_alive_flags([(bid, pid, CH06_BOAT_SURVIVED_FLAGS[bid],
                                CH06_BOAT_SURVIVED_LABELS[bid]) for bid, pid in hulls.items()],
                              'came home: ch07 opens on its crew')
-        + save_all_bonus_script(hulls, CH06_ITEM_IDS[chap['economy']['save_all_bonus']],
+        + save_all_bonus_script(hulls, ITEM_ENUM[chap['economy']['save_all_bonus']],
                                 check='CHECK_ALIVE')
         + '    MUSCSLOW(SONG_INTO_THE_SHADOW_OF_VICTORY) /* vanilla Ch6\'s closing cue */\n'
         + '    STAL(60)\n'

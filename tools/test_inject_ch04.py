@@ -11,6 +11,7 @@ import unittest
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import inject.raw_pids
 import inject.cast
 import inject.chapter_ids
 import inject.chapters.ch04
@@ -40,7 +41,7 @@ VANILLA = inject.decomp.vanilla_decomp_text('src/data_characters.c')
 def enemy_rows(chap, **kwargs):
     """ch04's enemy rows, through the shared emitter with ch04's own ids and pid rule."""
     m = inject.chapters.ch04
-    return inject.units.enemy_rows(chap, m.CH04_CLASS_IDS, m.CH04_ITEM_IDS, m.ch04_enemy_pid,
+    return inject.units.enemy_rows(chap, m.CH04_CLASS_IDS, inject.raw_pids.enemy_pid_for('ch04'),
                                    **kwargs)
 
 
@@ -240,7 +241,7 @@ class Ch04RuntimeHost(unittest.TestCase):
         live in the chapter YAML and the injector reads them."""
         village = self._chap()['villages'][0]
         self.assertEqual('iron-axe', village['visit_reward'][0]['id'])
-        self.assertEqual('ITEM_AXE_IRON', inject.chapters.ch04.CH04_ITEM_IDS['iron-axe'])
+        self.assertEqual('ITEM_AXE_IRON', inject.decomp.ITEM_ENUM['iron-axe'])
         self.assertTrue(village.get('visit_text'), 'the village needs a line to show')
 
     def test_the_moose_sighting_area_does_not_cover_a_village_doorstep(self):

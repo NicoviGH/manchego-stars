@@ -3,7 +3,7 @@
 import re
 import sys
 
-from inject.decomp import vanilla_decomp_text
+from inject.decomp import ITEM_ENUM, vanilla_decomp_text
 from inject.maps import terrain_ids
 from inject.terrain import _map_terrain_grid
 
@@ -40,15 +40,16 @@ def village_reward_id(village):
     return reward[0]['id'] if reward else None
 
 
-def village_reward_item(village, item_ids):
+def village_reward_item(village):
     """The FE item enum a village hands over, or None when its reward is the line alone.
 
-    `item_ids` is the CHAPTER's id->enum map. It used to close over CH04_ITEM_IDS, which made a
-    shared helper silently ch04-only: ch05's gifts (the two stat boosters) are not in that dict,
-    so the first chapter to reuse it would have died on a KeyError naming ch04.
+    It reads the one campaign item table (inject.decomp.ITEM_ENUM). It used to close over the
+    ch04 table, which made a shared helper silently ch04-only: ch05's gifts (the two stat
+    boosters) were not in that dict, so the first chapter to reuse it would have died on a
+    KeyError.
     """
     reward = village_reward_id(village)
-    return item_ids[reward] if reward else None
+    return ITEM_ENUM[reward] if reward else None
 
 
 SAVE_ALL_SKIP_LABEL = '0x2'     # vanilla Ch5's own label for "a site was lost -- skip the gift"
@@ -231,7 +232,7 @@ def vanilla_village_gifts(layout, eventinfo=None, eventscript=None):
     return gifts
 
 
-def assert_village_gifts_match_vanilla(chap, item_ids, gifts=None):
+def assert_village_gifts_match_vanilla(chap, gifts=None):
     """Guard (#25): on a RETILE, which gift sits on which tile is vanilla's decision.
 
     A retile inherits vanilla's terrain (`validate_terrain_matches_vanilla`); this is the same
@@ -267,7 +268,7 @@ def assert_village_gifts_match_vanilla(chap, item_ids, gifts=None):
         if want is None:
             continue        # vanilla has no village on that tile -- a site we ADDED, not moved
         reward = (village.get('visit_reward') or [{}])[0].get('id')
-        got = item_ids.get(reward)
+        got = ITEM_ENUM.get(reward)
         if got is None:
             sys.exit('ERROR: village %r gives %r, which is not in this chapter\'s item map -- '
                      'add it to CHNN_ITEM_IDS so the gift can be checked and injected'

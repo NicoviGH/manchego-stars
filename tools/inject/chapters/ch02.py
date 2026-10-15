@@ -3,17 +3,15 @@
 import os
 import sys
 
-from PIL import Image
-
-import portrait_tool
+from inject.raw_pids import enemy_pid_for
 from inject.cast import (
-    _bust_dir, _classed_cast, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit,
+    _classed_cast, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit,
     PORTRAIT_MAP)
 from inject.chapter_ids import (
     CH02_BOSS_SLOT, CH02_CHWINGA, CH02_CHWINGA_PORTRAIT_SLOT, CH02_CHWINGA_SPRITE_SRC,
     CH02_GOAL_STATUS_MSG, CH02_GOAL_WINDOW_MSG, CH02_MINIBOSS_SLOT, CH02_OPENING_BG,
     CH02_TURN1_MSGS, CH02_VILLAGE_SLOTS)
-from inject.decomp import _replace_brace_block, REPO
+from inject.decomp import _replace_brace_block, REPO, ITEM_ENUM
 from inject.chapter_frame import write_event_group
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter, recruit_chapter_number
@@ -22,11 +20,12 @@ from inject.maps import (
     _drawn_block, _inject_tile_changes, _map_changes_tileset, _register_chapter_map,
     _snowy_metatile_for)
 from inject.paths import (
-    CH3_EVENTINFO_H, CH3_EVENTSCRIPT_H, EVENTS_UDEFS_C, PORTRAIT_DIR, TEXTS_TXT)
+    CH3_EVENTINFO_H, CH3_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT)
 from inject.recruit import ON_MAP_RECRUIT_VIA
 from inject.scenes import (
     backdrop, battle_quote_body, defeat_quote_row, _emit_scene_beats, _make_fid,
     _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats, _stage_beat, write_frame_texts)
+from inject.unit_art import busts, dress_slot
 from inject.text import (
     display_name, _fid_tag, name_message_body, _script_to_message, set_message_body,
     write_nameplate)
@@ -59,12 +58,6 @@ CH02_ENDING_BG = 'BG_MS_TARGOS_WINTER'     # Targos at nightfall -- vendored sno
 # Sclorbo's greenified anim. They were Mov-7 fliers, which gave the units that need rescuing the
 # best escape in the chapter.
 CH02_CLASS_IDS = ChapterClassIds('ch02')
-CH02_ITEM_IDS = {'iron-axe': 'ITEM_AXE_IRON', 'steel-axe': 'ITEM_AXE_STEEL',
-                 'iron-bow': 'ITEM_BOW_IRON', 'vulnerary': 'ITEM_VULNERARY',
-                 'slim-lance': 'ITEM_LANCE_SLIM', 'hand-axe': 'ITEM_AXE_HANDAXE',
-                 'red-gem': 'ITEM_REDGEM', 'elixir': 'ITEM_ELIXIR', 'pure-water': 'ITEM_PUREWATER',
-                 'heal-staff': 'ITEM_STAFF_HEAL'}
-CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
 CH02_VILLAGE_CHWINGA = 'chwinga-glimmer'
 # Dead vanilla Ch3 scripts (slot 3 is ch02's host and inject_ch02 blanks its event lists).
 # 0xAC0/0xAC1 are the first two ids of ch02's block -- it had none until the pool widened.
@@ -118,14 +111,6 @@ def ch02_map_changes(chap, maps_dir):
                 for v in villages]
     return changes
 
-
-# blue glow ramp -> spirit-green, keyed by SOURCE RGB (robust to palette reordering); the
-# same ramp as the map sprite. Everything else (fur collar, tan robe, red tassels) untouched.
-CH02_CHWINGA_GLOW_RECOLOR = {
-    (96, 211, 219): (150, 230, 160), (113, 188, 214): (140, 205, 150),
-    (81, 165, 185): (100, 185, 120), (63, 141, 165): (78, 155, 95),
-    (57, 117, 138): (58, 120, 78),
-}
 # Cutscene message ids -- the dead vanilla Ch3 scene/talk/turn texts our host overwrites
 # (referenced ONLY by ch3-eventscript.h scenes we replace; 0x993/0x994 are LIVE battle
 # quotes in data_battlequotes.c and are deliberately NOT in this pool -- see decisions.md
@@ -160,30 +145,14 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
     spirit-green, the same swap as the map sprite -- so the single source stays Sclorbo's
     portrait (no committed derived asset). Each chwinga's vanilla portrait slot is collision-
     free; names come from the ch02 YAML (deployment.green_allies fe_name)."""
-    bust_path = os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')
-    if not os.path.isfile(bust_path):
+    dressed = busts(campaign, kinds=('chwinga',))
+    if not dressed:
         if verbose:
             print('  (no %s bust yet; chwinga keep vanilla faces/names)' % CH02_CHWINGA_SPRITE_SRC)
         return
-    # 1. recolour Sclorbo's bust: blue glow ramp -> spirit-green (by source RGB).
-    im = Image.open(bust_path).convert('P')
-    pal = list(im.getpalette()[:48])
-    for i in range(16):
-        rgb = tuple(pal[i * 3:i * 3 + 3])
-        if rgb in CH02_CHWINGA_GLOW_RECOLOR:
-            pal[i * 3:i * 3 + 3] = list(CH02_CHWINGA_GLOW_RECOLOR[rgb])
-    chwinga_bust = im.copy()
-    chwinga_bust.putpalette(pal)
-    tileset, mouth, chibi, pal_bytes = portrait_tool.generate(chwinga_bust, static_portrait=True)
-
-    # 2. dress each chwinga's collision-free portrait slot with the one shared green bust.
-    for vanilla in CH02_CHWINGA_PORTRAIT_SLOT.values():
-        base = os.path.join(PORTRAIT_DIR, 'portrait_' + vanilla)
-        tileset.save(base + '_tileset.png')
-        mouth.save(base + '_mouth.png')
-        chibi.save(base + '_chibi.png')
-        with open(base + '_palette.agbpal', 'wb') as f:
-            f.write(pal_bytes)
+    # Sclorbo's bust recoloured spirit-green (inject.unit_art), one image on all three slots.
+    for bust in dressed:
+        dress_slot(bust.slot, bust.image())
 
     # 3. name each chwinga slot from the ch02 YAML fe_name (Mote / Rime / Glimmer).
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
@@ -229,15 +198,6 @@ def offmap_join_recruits(campaign, chapter_number):
 
 
 
-def ch02_enemy_pid(enemy, _index=0):
-    """Grukk rides Bone's slot and Halvar Bazba's, so their nameplates and quotes are theirs;
-    every other raider is the autolevelled generic."""
-    if enemy.get('is_boss'):
-        return 'CHARACTER_%s' % CH02_BOSS_SLOT
-    if enemy.get('is_miniboss'):
-        return 'CHARACTER_%s' % CH02_MINIBOSS_SLOT
-    return CH02_GENERIC_PID
-
 def inject_ch02(campaign, verbose=True):
     """Wire Ch2 "Cold Welcome" (#22) onto chapter slot 3 (ch01's MNC2(0x3) target).
 
@@ -250,19 +210,13 @@ def inject_ch02(campaign, verbose=True):
     (_inject_lord_select_engine) -- no per-chapter wiring beyond the
     CauseGameOverIfLordDies that already sits in EventListScr_Ch3_Misc.
 
-    The protect layer is three GREEN chwinga (pegasus chassis, vanilla Colm table
-    088B4718 repurposed) on distinct NPC slots; each surviving chwinga gifts a charm
-    (Red Gem / Elixir / Pure Water) at the ending scene via CHECK_ALIVE -> GIVEITEMTO
-    (per-unit soft-fail, no game over). Enemies are vanilla Ch2's exact mix, reflavored
-    chardalyn berserkers. Reinforcements move to the empty table 088B4758 (088B4718 is
-    now the chwinga).
-
-    DEFERRED checkpoints (flagged, not in this pass): the DIALOGUE REGROUND -- the locked
-    cutscene text still frames the dropped sled + "snow wolves" and lacks a chwinga intro
-    beat (Nicolas co-write via the dialogue-pass skill; wired as placeholder meanwhile);
-    the chwinga art (map sprite + portrait + name-text over DARA/KLIMT/MANSEL, #38/#39);
-    Vellynne's cutscene bust (#19, placeholder vanilla face here); the chardalyn map-sprite
-    reskin (vanilla brigand sprite for now); and the in-game load-test.
+    The protect layer is two GREEN chwinga on the field, Priests on distinct NPC slots (vanilla
+    Colm table 088B4718 repurposed), wearing Sclorbo's art recoloured green (inject.unit_art);
+    each that survives gifts its charm (a Hand Axe, an Elixir) at the ending scene via CHECK_ALIVE
+    -> GIVEITEMTO (per-unit soft-fail, no game over). The third, Glimmer, is the southern hut's
+    inhabitant and hands over its Pure Water on the visit. Enemies are vanilla Ch2's exact mix,
+    reflavored chardalyn berserkers (still on the stock brigand sprite: no chardalyn reskin is
+    drawn yet). Reinforcements move to the empty table 088B4758 (088B4718 is now the chwinga).
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
@@ -355,7 +309,7 @@ def inject_ch02(campaign, verbose=True):
     by_eid = {e['id']: e for e in chap['enemy_units']}
     grukk, halvar = by_eid['raider-bruiser'], by_eid['raider-captain']
     reinf = by_eid['rear-raiders']
-    enemies = enemy_rows(chap, CH02_CLASS_IDS, CH02_ITEM_IDS, ch02_enemy_pid)
+    enemies = enemy_rows(chap, CH02_CLASS_IDS, enemy_pid_for('ch02'))
 
     # 2b. GREEN chwinga (088B4718) -- the protect layer; class + level + positions +
     #     per-survivor gift come from the YAML deployment.green_allies (id order
@@ -380,8 +334,8 @@ def inject_ch02(campaign, verbose=True):
                      'earn' % uid)
         if 'gift' not in g:
             sys.exit('ERROR: ch02 chwinga %s has no gift' % uid)
-        if g['gift'] not in CH02_ITEM_IDS:
-            sys.exit('ERROR: ch02 chwinga %s gift %r not in CH02_ITEM_IDS' % (uid, g['gift']))
+        if g['gift'] not in ITEM_ENUM:
+            sys.exit('ERROR: ch02 chwinga %s gift %r not in ITEM_ENUM' % (uid, g['gift']))
     # The green table is what DEPLOYS, read from the YAML rather than from CH02_CHWINGA:
     # Glimmerfrost is a village inhabitant, not a unit. Inventory is per-chwinga now (the
     # frail one carries Ross's Vulnerary alongside its Heal staff), and the AI comes from
@@ -389,14 +343,14 @@ def inject_ch02(campaign, verbose=True):
     chwinga = [_ally_unit_entry(None, slot_by_uid[g['id']],
                                 CH02_CLASS_IDS.for_entry(g), g['level'],
                                 g['position'][0], g['position'][1],
-                                ', '.join(CH02_ITEM_IDS[i] for i in g['inventory']),
+                                ', '.join(ITEM_ENUM[i] for i in g['inventory']),
                                 ' /* chwinga %s (gift: %s) */' % (g['id'], g['gift']),
                                 allegiance='GREEN', autolevel=True,
                                 ai=enemy_ai_initialiser(chap, g))
                for g in chap['deployment']['green_allies']]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
-    reinforce = enemy_rows(chap, CH02_CLASS_IDS, CH02_ITEM_IDS, ch02_enemy_pid,
+    reinforce = enemy_rows(chap, CH02_CLASS_IDS, enemy_pid_for('ch02'),
                            arrives_turn=reinf['arrives_turn'])
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
@@ -523,7 +477,7 @@ def inject_ch02(campaign, verbose=True):
         symbol, msg, _fid, bg = CH02_VILLAGE_SLOTS[village['id']]
         script = _replace_brace_block(
             script, symbol + '[] =',
-            village_script(msg, village_reward_item(village, CH02_ITEM_IDS), bg),
+            village_script(msg, village_reward_item(village), bg),
             CH3_EVENTSCRIPT_H)
     # Per-chwinga charm-gift: read each chwinga's survival (CHECK_ALIVE writes EVT_SLOT_C)
     # while the battle units are still loaded, BEQ past the give if it fell, else drop the
@@ -540,7 +494,7 @@ def inject_ch02(campaign, verbose=True):
         '    BEQ(0x%X, EVT_SLOT_C, EVT_SLOT_0) /* fell -> forfeit its own charm */\n'
         '    GIVEITEMTO(CHAR_EVT_PLAYER_LEADER)\n'
         'LABEL(0x%X)\n'
-        % (CH02_ITEM_IDS[g['gift']], g['id'], slot_by_uid[g['id']].upper(),
+        % (ITEM_ENUM[g['gift']], g['id'], slot_by_uid[g['id']].upper(),
            0x30 + i, 0x30 + i)
         for i, g in enumerate(chap['deployment']['green_allies']))
     script = _replace_brace_block(

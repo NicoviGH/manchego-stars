@@ -9,6 +9,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import inject.raw_pids
 import inject.cast
 import inject.chapter_ids
 import inject.chapters.ch06
@@ -28,7 +29,7 @@ from inject import source as injector  # the injector's source, every file of it
 def enemy_rows(chap, **kwargs):
     """ch06's enemy rows, through the shared emitter with ch06's own ids and pid rule."""
     m = inject.chapters.ch06
-    return inject.units.enemy_rows(chap, m.CH06_CLASS_IDS, m.CH06_ITEM_IDS, m.ch06_enemy_pid,
+    return inject.units.enemy_rows(chap, m.CH06_CLASS_IDS, inject.raw_pids.enemy_pid_for('ch06'),
                                    reda_symbol=m.ch06_reda_symbol,
                                    **kwargs)
 

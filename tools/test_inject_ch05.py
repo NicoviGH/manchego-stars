@@ -9,13 +9,13 @@ import shutil
 import sys
 import tempfile
 import unittest
-from unittest import mock
 
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from inject.namespace import stubbed
 import build_campaign as bc
+import inject.raw_pids
 import inject.backgrounds
 import inject.cast
 import inject.chapter_ids
@@ -63,7 +63,7 @@ def location_events(chap):
 def enemy_rows(chap, **kwargs):
     """ch05's enemy rows, through the shared emitter with ch05's own ids and pid rule."""
     m = inject.chapters.ch05
-    return inject.units.enemy_rows(chap, m.CH05_CLASS_IDS, m.CH05_ITEM_IDS, m.ch05_enemy_pid,
+    return inject.units.enemy_rows(chap, m.CH05_CLASS_IDS, inject.raw_pids.enemy_pid_for('ch05'),
                                    **kwargs)
 
 
@@ -2214,8 +2214,8 @@ class Ch05VillageRaidRace(unittest.TestCase):
         an item that existed in no table and was handed over by nothing -- and the campaign
         renames items only for the Goodberry and Tourmaline (Nicolas, 2026-08-09)."""
         bonus = self._chap()['economy']['save_all_bonus']
-        self.assertIn(bonus, inject.chapter_ids.CH05_ITEM_IDS, 'the save-all bonus must be a real FE item')
-        self.assertEqual('ITEM_GUIDINGRING', inject.chapter_ids.CH05_ITEM_IDS[bonus])
+        self.assertIn(bonus, inject.decomp.ITEM_ENUM, 'the save-all bonus must be a real FE item')
+        self.assertEqual('ITEM_GUIDINGRING', inject.decomp.ITEM_ENUM[bonus])
         ending = _ch05_ending(self._chap())
         # Named flags, not a count: the ending also branches on the Sahnar RECRUIT flag now, and
         # a bare CHECK_EVENTID tally would pass with a village gate deleted and the recruit

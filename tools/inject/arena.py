@@ -15,42 +15,18 @@ from inject.cast import _vendor_mug_to_bust, GUEST_PORTRAIT_MAP, PORTRAIT_MAP
 from inject.chapter_ids import CH02_CHWINGA_PORTRAIT_SLOT, CH05_VISIT_FACES
 from inject.decomp import DECOMP, REPO, vanilla_decomp_text
 from inject.hosts import hosted_chapters
-from inject.paths import PORTRAIT_DIR, UIARENA_C
+from inject.paths import UIARENA_C
 
 
 def inject_arena_attendant_portraits(campaign, verbose=True):
-    """Dress each chapter-declared Arena attendant onto its configured vanilla face slot."""
-    overrides = arena_presentation_config(campaign)['chapters']
-    # Validate every slot BEFORE writing any of them, so a bad pairing is reported instead of
-    # discovered halfway through with some slots already dressed. Two chapters may share a
-    # slot only if they share the attendant: silently keeping the first chapter's art while
-    # GetArenaPresentationFace still emits a case for both hosts would put the wrong
-    # attendant on screen with a green build.
-    claimed = {}
-    for _host, override in sorted(overrides.items()):
-        slot, portrait = override['face_slot'], override['portrait_path']
-        if claimed.setdefault(slot, portrait) != portrait:
-            sys.exit('ERROR: %s: Arena attendant face_slot %r is already dressed with a '
-                     'different portrait (%s) -- give this chapter its own slot'
-                     % (override['chapter_path'], slot, claimed[slot]))
-
-    written = set()
-    for host, override in sorted(overrides.items()):
-        slot = override['face_slot']
-        if slot in written:
-            continue
-        bust = _vendor_mug_to_arena_bust(override['portrait_path'])
-        tileset, mouth, chibi, pal_bytes = portrait_tool.generate(
-            bust, static_portrait=True)
-        base = os.path.join(PORTRAIT_DIR, 'portrait_' + slot)
-        tileset.save(base + '_tileset.png')
-        mouth.save(base + '_mouth.png')
-        chibi.save(base + '_chibi.png')
-        with open(base + '_palette.agbpal', 'wb') as f:
-            f.write(pal_bytes)
-        written.add(slot)
+    """Dress each chapter-declared Arena attendant onto its configured vanilla face slot. The
+    members, and the check that two hosts sharing a slot share the attendant, are the
+    registry's (`inject.unit_art`)."""
+    from inject.unit_art import busts, dress_slot     # unit_art imports this module
+    for bust in busts(campaign, kinds=('arena',)):
+        dress_slot(bust.slot, bust.image())
         if verbose:
-            print('  Arena attendant host %d -> portrait_%s' % (host, slot))
+            print('  Arena attendant %s -> portrait_%s' % (bust.uid, bust.slot))
 
 
 def _bgr555(hexstr):

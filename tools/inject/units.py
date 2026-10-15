@@ -6,7 +6,7 @@ import re
 import sys
 
 import chapter_schema
-from inject.decomp import REPO, vanilla_decomp_text
+from inject.decomp import ITEM_ENUM, REPO, vanilla_decomp_text
 from inject.paths import EVENTCALL_H, EVENTS_UDEFS_C
 from inject.raw_pids import entry_body_levels
 
@@ -125,7 +125,7 @@ def _enemy_unit_entry(char, class_enum, level, autolevel, x, y, items, ai, comme
                        items, ai))
 
 
-def enemy_rows(chap, class_ids, item_ids, pid_for, arrives_turn=None, exclude=(), spawns=None,
+def enemy_rows(chap, class_ids, pid_for, arrives_turn=None, exclude=(), spawns=None,
                reda_symbol=None):
     """One enemy UnitDefinition row per authored BODY of a deployment wave (#479).
 
@@ -154,14 +154,14 @@ def enemy_rows(chap, class_ids, item_ids, pid_for, arrives_turn=None, exclude=()
         for index, (x, y) in enumerate(enemy['positions']):
             if pack:
                 cls = class_ids[pack[index]]
-                carried = [item_ids[i] for i in enemy['inventory_by_class'][pack[index]]]
+                carried = [ITEM_ENUM[i] for i in enemy['inventory_by_class'][pack[index]]]
             else:
                 cls = class_ids.for_entry(enemy)
-                carried = [item_ids[item.get('fe_base') or item['id']]
+                carried = [ITEM_ENUM[item.get('fe_base') or item['id']]
                            for item in enemy.get('inventory', []) if not item.get('is_key_item')]
             dropper = bool(drop) and index == 0
             if dropper:
-                carried = _items_with_drop_last(carried, item_ids[drop])
+                carried = _items_with_drop_last(carried, ITEM_ENUM[drop])
             spawn = (spawns or {}).get((enemy['id'], index))
             sx, sy = spawn if spawn else (x, y)
             rows.append(_enemy_unit_entry(

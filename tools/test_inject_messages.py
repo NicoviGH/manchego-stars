@@ -163,10 +163,11 @@ class NamedRawPidsAreExclusive(unittest.TestCase):
         inject.messages.assert_named_raw_pids_are_exclusive()
 
     def test_a_generic_pid_may_still_be_shared(self):
-        """ch05, ch06 and ch07 all spend 0x80 on autolevelled trash, and that is fine -- a generic pid
-        is never named, so nothing global is written for it. The guard must not over-reach."""
+        """ch01, ch05, ch06 and ch07 all spend 0x80 on autolevelled trash, and that is fine -- a
+        generic pid is never named, so nothing global is written for it. The guard must not
+        over-reach. (ch01's was an inline literal the scan could not see until #491 named it.)"""
         claims = inject.messages.raw_pid_claims()
-        self.assertEqual(claims.get('0x80'), {'CH05', 'CH06', 'CH07'})
+        self.assertEqual(claims.get('0x80'), {'CH01', 'CH05', 'CH06', 'CH07'})
         self.assertNotIn('0x80', inject.cast.RAW_PID_PORTRAITS)
 
     def test_discovery_reads_strings_tuples_and_dicts(self):

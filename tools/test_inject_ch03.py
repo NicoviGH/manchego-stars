@@ -38,7 +38,7 @@ class Ch03MidmapExecution(unittest.TestCase):
         """A unique raw pid so the Brute's flagged death quote keys the trigger to it ALONE --
         not the shared generic 0xaa (all trash) and not the grell's 0xb7 (the WIN)."""
         self.assertNotIn(inject.chapter_ids.CH03_BRUTE_MINIBOSS_PID,
-                         (inject.chapters.ch03.CH03_GENERIC_PID, inject.chapter_ids.CH03_BOSS_PID))
+                         (inject.chapter_ids.CH03_GENERIC_PID, inject.chapter_ids.CH03_BOSS_PID))
 
     def test_afev_fires_once_on_the_brute_flag(self):
         """The Misc AFEV watches the Brute-defeat flag, runs the midmap script, and guards the

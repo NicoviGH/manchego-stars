@@ -100,6 +100,8 @@ DEAD_CONCEPTS = [
     # retired by #411: an appended message is reserved by the allocator, never by its writer
     r'set_message_body\([^)]*create=', r'neighbourhood sweep',
     r'build-campaign\.ts', r'build-events\.ts', r'pull-srd', r'map-class\.ts',
+    # retired by #491: one item table (inject.decomp.ITEM_ENUM), one art registry (inject.unit_art)
+    r'WEAPON_ITEM_ENUM', r'CH0\d_ITEM_IDS', r'VANILLA_ONLY_ITEM_TO_WEAPON', r'_GUEST_CONSUMABLES',
     r'srd-snapshot', r'open5e-snapshot', r'CLASS_WEAPON', r'WPN_EXP_E',
     r'zeroed.{0,24}growths?', r'flat-?E rank', r'pure[- ]class (?:growth|rate)',
     r'gen-chapter-index\.rb', r'gen-class-index\.rb',  # ported to Python 2026-06-09

@@ -35,7 +35,7 @@ from collections import namedtuple
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
 from inject.class_ids import DEFAULT_CAMPAIGN  # noqa: E402
-from inject.decomp import DECOMP, vanilla_decomp_text  # noqa: E402  the build tree (#408)
+from inject.decomp import DECOMP, vanilla_decomp_text  # noqa: E402  the build tree (#408, ITEM_ENUM)
 from yaml_loader import yaml_load  # noqa: E402
 ELF = os.path.join(DECOMP, 'fireemblem8.elf')
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -346,7 +346,8 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
                                     CH05_MOOSE_PID, CH06_BOAT_PIDS, PROLOGUE_HLIN_SLOT,
                                     PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
     from inject.chapters.ch01 import CH01_CHAPTER_YAML
-    from inject.chapters.ch02 import CH02_CHAPTER_YAML, CH02_CLASS_IDS, CH02_ITEM_IDS
+    from inject.chapters.ch02 import CH02_CHAPTER_YAML, CH02_CLASS_IDS
+    from inject.decomp import ITEM_ENUM
     from inject.chapters.ch04 import CH04_PACK_PIDS
     from inject.decomp import LORDSEL_FLAG_BASE
     from inject.hosting import _load_chapter_yaml
@@ -377,7 +378,7 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
         # hosted and a film needed its slot.
         'HOST': {c.name: c.host_index for c in hosts.hosted_chapters() if c.name != 'prologue'},
         'CH02_CHWINGA_PIDS': [char(slot_of[g['id']]) for g in field],
-        'CH02_CHARMS': [items[CH02_ITEM_IDS[g['gift']]] for g in field],
+        'CH02_CHARMS': [items[ITEM_ENUM[g['gift']]] for g in field],
         'CH02_ARCHER_CLASS': classes[CH02_CLASS_IDS['archer']],
         'CH04_PACK_PIDS': {int(p, 0): True for p in CH04_PACK_PIDS},   # a SET: indexed by charId
         'CH04_MOOSE_PID': int(CH04_MOOSE_PID, 0),

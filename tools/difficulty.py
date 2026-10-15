@@ -41,7 +41,7 @@ import json
 import sys
 import ai_target
 import fe_combat as fc
-from inject.decomp import WEAPON_ITEM_ENUM   # shared weapon<->ITEM map (seam-neutral)
+from inject.decomp import ITEM_ENUM   # the one item id -> ITEM_ enum table (#491)
 
 # Class -> effectiveness tag a unit carries as a DEFENDER (so enemy effective weapons
 # and our rapier resolve). Only the classes our cast/enemies use need entries.
@@ -310,20 +310,16 @@ def _player_weapon(campaign, uid, unit, class_enum):
 
 def _player_lines(campaign, uid, gained):
     """(career stat lines, weapon, tags) for a cast member `gained` levels above its join
-    level: class base + donor personal base (donor-base inheritance), grown on its growth
-    donor's growths."""
-    unit = inject.cast.load_unit(campaign, uid)
-    unit.setdefault('id', uid)
-    class_enum = inject.cast.class_enum_for(unit)
-    cbase = _class_base(class_enum)
-    dbase = inject.stats.donor_base_stats(_characters_text(), inject.stats.BASE_DONOR[uid])
-    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
+    level: the line its ROM slot loads with (`inject.stats.cast_loaded_line`), grown on its
+    growth donor's growths."""
+    class_enum, eff = inject.stats.cast_loaded_line(
+        campaign, uid, _characters_text(), _classes_text())
     lines = [eff]
     if gained:
         growths, _ = inject.stats.donor_growths_and_ranks(
             _characters_text(), inject.stats.GROWTH_DONOR[uid])
         lines = careers(eff, growths, gained, _class_caps(class_enum))
-    weapon = _player_weapon(campaign, uid, unit, class_enum)
+    weapon = _player_weapon(campaign, uid, inject.cast.load_unit(campaign, uid), class_enum)
     return lines, weapon, CLASS_TAGS.get(class_enum, frozenset())
 
 
@@ -505,40 +501,11 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=
 # pressure sets its bar. We resolve that to the decomp UnitDefinition array(s) holding the
 # fightable red force and project each enemy off class base -- the same footing as ours.
 
-# decomp item enum -> fe_combat weapon key. The inverse of build_campaign's canonical
-# weapon->ITEM map (one source for both directions). Only attacking weapons are listed there;
-# staves/consumables/keys are absent on purpose (an enemy carrying only those resolves to no
-# modeled weapon and is skipped -- with a warning, see unmodeled_enemies).
-# Vanilla-only (monster/exotic) weapons that ONLY the parity-reference forces carry -- our
-# cast never authors these, so they stay out of the content-owned WEAPON_ITEM_ENUM (#53,
-# HANDOFF "Watch out") and live here, merged into the reverse map below.
-VANILLA_ONLY_ITEM_TO_WEAPON = {
-    'ITEM_ANIMA_THUNDER':     'thunder',
-    'ITEM_ANIMA_ELFIRE':      'elfire',       # Ch13 Pablo (plain vanilla stats; the #8
-                                              # effectiveness experiment stays reverted)
-    'ITEM_LANCE_STEEL':       'steel-lance',
-    'ITEM_LANCE_SLIM':        'slim-lance',
-    'ITEM_LANCE_SHORTSPEAR':  'short-spear',
-    'ITEM_BOW_STEEL':         'steel-bow',
-    'ITEM_SWORD_ZANBATO':     'zanbato',
-    'ITEM_BLADE_IRON':        'iron-blade',
-    'ITEM_AXE_VENIN':         'venin-axe',
-    'ITEM_LANCE_VENIN':       'venin-lance',
-    'ITEM_AXE_HALBERD':       'halberd',
-    'ITEM_LANCE_HORSESLAYER': 'horseslayer',
-    'ITEM_MONSTER_FETIDCLW':  'fetid-claw',
-    'ITEM_MONSTER_ROTTENCLW': 'rotten-claw',
-    'ITEM_MONSTER_VENINCLW':  'venin-claw',
-    'ITEM_MONSTER_FIREFANG':  'fire-fang',
-    'ITEM_MONSTER_HELLFANG':  'hell-fang',
-    'ITEM_MONSTER_EVILEYE':   'evil-eye',
-    # Carried by the vanilla PARTY (`vanilla_party`): Ross joins with a Hatchet, Artur with
-    # Lightning. Without them both read as weaponless support.
-    'ITEM_AXE_HATCHET':       'hatchet',
-    'ITEM_LIGHT_LIGHTNING':   'lightning',
-}
-ITEM_TO_WEAPON = {item: key for key, item in WEAPON_ITEM_ENUM.items()}
-ITEM_TO_WEAPON.update(VANILLA_ONLY_ITEM_TO_WEAPON)
+# decomp item enum -> fe_combat weapon key: the ITEM_ENUM entries fe_combat models. Staves,
+# consumables and keys are absent on purpose (an enemy carrying only those resolves to no
+# modeled weapon and is skipped -- with a warning, see unmodeled_enemies). One table serves both
+# directions and both sides, the cast's weapons and the twins' monster/exotic ones (#491).
+ITEM_TO_WEAPON = {item: key for key, item in ITEM_ENUM.items() if key in fc.W}
 
 # parity_reference -> (decomp relpath, [UnitDefinition array names]) for its red force.
 # The single curation point: which vanilla arrays ARE a chapter's fightable enemies (named

@@ -7,6 +7,7 @@ import sys
 from PIL import Image
 
 import fe8_talk_font
+from inject.raw_pids import enemy_pid_for
 from inject.boot import _lord_select_event_seq, LORDSEL_EXPLAINER_MSG
 from inject.cast import _classed_cast, CLASS_LOADOUT, GUEST_PORTRAIT_MAP, load_unit, PORTRAIT_MAP
 from inject.chapter_ids import (
@@ -41,7 +42,6 @@ CH01_CHAPTER_YAML = 'ch01-the-iron-trail.yaml'
 CH01_JOIN_POSITIONS = [(c, r) for r in (8, 9) for c in range(1, 6)]
 
 
-CH01_ITEM_IDS = {'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON'}
 # ch01's grunts are goblins: campaign.yaml's goblin reskins `dress` ch01's soldier and fighter.
 # armor-knight is dressed by nobody, so the chief stays a vanilla Knight.
 CH01_CLASS_IDS = ChapterClassIds('ch01')
@@ -213,12 +213,6 @@ def ch01_turn1_taunt_script(heal_beat):
 
 
 
-def ch01_enemy_pid(enemy, _index=0):
-    """The chief rides Breguet's slot so his flagged quote keys to him alone; every goblin
-    shares the autolevelled generic 0x80."""
-    return 'CHARACTER_%s' % CH01_BOSS_SLOT if enemy.get('is_boss') else '0x80'
-
-
 def inject_ch01(campaign, verbose=True, boot=False):
     """Wire Ch1 "The Iron Trail" (#21) onto chapter slot 2 (ch00's MNC2(0x2) target).
 
@@ -369,8 +363,8 @@ def inject_ch01(campaign, verbose=True, boot=False):
     by_eid = {e['id']: e for e in chap['enemy_units']}
     chief, reinf = by_eid['goblin-chief'], by_eid['goblin-reinforcements']
     cx, cy = chief['positions'][0]
-    enemies = enemy_rows(chap, CH01_CLASS_IDS, CH01_ITEM_IDS, ch01_enemy_pid)
-    reinforce = enemy_rows(chap, CH01_CLASS_IDS, CH01_ITEM_IDS, ch01_enemy_pid,
+    enemies = enemy_rows(chap, CH01_CLASS_IDS, enemy_pid_for('ch01'))
+    reinforce = enemy_rows(chap, CH01_CLASS_IDS, enemy_pid_for('ch01'),
                            arrives_turn=reinf['arrives_turn'])
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:

@@ -11,7 +11,7 @@ from inject.hosting import _load_chapter_yaml, GOAL_TEMPLATE, map_writes
 from inject.chapter_ids import PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT
 from inject.class_ids import ChapterClassIds
 from inject.decomp import (
-    _find_brace_block, _replace_brace_block, fe_item_enum, REPO, WEAPON_ITEM_ENUM)
+    _find_brace_block, _replace_brace_block, fe_item_enum, REPO)
 from inject.hosts import PROLOGUE_CHAPTER_INDEX, PROLOGUE_EVENT_GROUP, PROLOGUE_HOST_INDEX
 from inject.maps import _register_chapter_map
 from inject.montage import inject_opening_montage, inject_world_tour
@@ -35,14 +35,10 @@ from inject.units import enemy_rows
 PROLOGUE_REWRITTEN_GUEST_SLOTS = (PROLOGUE_HLIN_SLOT, PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
 PROLOGUE_LAYOUT = ('Ch00PrologueMap', 'ch00-prologue')  # (asset label, maps/ source stem)
 PROLOGUE_CHAPTER_YAML = 'ch00-prologue-a-dagger-of-ice.yaml'
-# The consumables a ch00 guest may carry. WEAPON_ITEM_ENUM is weapons-only (#53 seam rule).
-_GUEST_CONSUMABLES = {'vulnerary': 'ITEM_VULNERARY'}
-
 
 def guest_items_for(unit):
     """A guest's `.items` initialiser body, from its YAML inventory in order."""
-    return ', '.join(_GUEST_CONSUMABLES[i['id']] if i['id'] in _GUEST_CONSUMABLES
-                     else fe_item_enum(i) for i in unit.get('inventory') or ())
+    return ', '.join(fe_item_enum(i) for i in unit.get('inventory') or ())
 
 
 # Stand up the designed ch00 ("A Dagger of Ice") as the New Game target: register its
@@ -75,9 +71,7 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
     invalidation probe is what exposed it: bumping the boss's `level:` changed no injected
     byte, and two full ROM builds came out byte-identical. Keep this sourced.
 
-    Guest INVENTORIES come from the YAML too (`guest_items_for`): weapons through
-    WEAPON_ITEM_ENUM, and Hlin's Vulnerary through this module's own consumable map, because
-    WEAPON_ITEM_ENUM is weapons-only by the #53 seam rule.
+    Guest INVENTORIES come from the YAML too (`guest_items_for`), through ITEM_ENUM.
 
     slots       -- (hlin, scramsax, sephek) vanilla CHARACTER_ slot names
     classes     -- (hlin, scramsax) CLASS_ enums
@@ -139,7 +133,7 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
             return 'CHARACTER_%s' % sephek_slot
         return '0x%02x' % guard_slots[index]
 
-    rows = enemy_rows(chap, ChapterClassIds('prologue'), WEAPON_ITEM_ENUM, pid)
+    rows = enemy_rows(chap, ChapterClassIds('prologue'), pid)
     enemy = '{\n' + '\n'.join(rows) + '\n    { 0 },\n}'
     return ally, enemy
 

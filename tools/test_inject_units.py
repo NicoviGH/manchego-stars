@@ -106,24 +106,22 @@ class SharedEnemyRows(unittest.TestCase):
         def for_entry(self, entry):
             return 'CLASS_' + entry['class'].upper()
 
-    ITEMS = {'axe': 'ITEM_AXE', 'key': 'ITEM_KEY'}
-
     def _rows(self, entries, **kwargs):
         chap = {'enemy_units': entries}
         with mock.patch.object(inject.units, 'enemy_ai_initialiser', lambda *a: '{ 0 }'):
-            return inject.units.enemy_rows(chap, self._Classes(), self.ITEMS,
+            return inject.units.enemy_rows(chap, self._Classes(),
                                            lambda e, _i: 'PID_' + e['id'], **kwargs)
 
     def test_per_body_levels_reach_the_rows(self):
         rows = self._rows([{'id': 'pack', 'name': 'Pack', 'class': 'wolf', 'levels': [2, 3],
-                            'positions': [[1, 1], [2, 2]], 'inventory': [{'id': 'axe'}]}])
+                            'positions': [[1, 1], [2, 2]], 'inventory': [{'id': 'iron-axe'}]}])
         self.assertEqual(['.level = 2,' in rows[0], '.level = 3,' in rows[1]], [True, True])
 
     def test_the_drop_goes_to_the_first_body_last_and_once(self):
         rows = self._rows([{'id': 'k', 'name': 'K', 'class': 'kobold', 'level': 1,
-                            'positions': [[1, 1], [2, 2]], 'item_drop': 'key',
-                            'inventory': [{'id': 'key'}, {'id': 'axe'}]}])
-        self.assertIn('.items = { ITEM_AXE, ITEM_KEY },', rows[0])
+                            'positions': [[1, 1], [2, 2]], 'item_drop': 'door-key',
+                            'inventory': [{'id': 'door-key'}, {'id': 'iron-axe'}]}])
+        self.assertIn('.items = { ITEM_AXE_IRON, ITEM_DOORKEY },', rows[0])
         self.assertIn('.itemDrop = 1,', rows[0])
         self.assertNotIn('.itemDrop', rows[1])
 

@@ -98,6 +98,14 @@ CH02_CHWINGA_SPRITE_SRC = 'sclorbo'
 # asset). Each chwinga's vanilla portrait slot is collision-free (absent from our ch00-08):
 # Dara reuses FE8's Saleh-grandmother face (Dara IS Saleh's grandmother), Klimt/Mansel their own.
 CH02_CHWINGA_PORTRAIT_SLOT = {'DARA': 'Saleh_Grandma', 'KLIMT': 'Klimt', 'MANSEL': 'Mansel'}
+# blue glow ramp -> spirit-green, keyed by SOURCE RGB (robust to palette reordering); the
+# same ramp as the map sprite. Everything else (fur collar, tan robe, red tassels) untouched.
+CH02_CHWINGA_GLOW_RECOLOR = {
+    (96, 211, 219): (150, 230, 160), (113, 188, 214): (140, 205, 150),
+    (81, 165, 185): (100, 185, 120), (63, 141, 165): (78, 155, 95),
+    (57, 117, 138): (58, 120, 78),
+}
+
 # The turn-1 scene's messages, one per beat. The first two are the fliers-vs-bows debut
 # (RBG warns flier Pinky, Pinky answers); the last three are Halvar's raid bark -- vanilla
 # Ch2's own MSG_957, verbatim, pairing the warning with the announcement exactly as vanilla's
@@ -468,26 +476,6 @@ CH06_NERRA_RETREAT_MSG = appended_message_id('ch06', 'nerra-retreat')   # her de
 # carries her own authored art; the GWYLLGI is the moose; and the MYRMIDON is Sahnar, whose
 # Specter anim and map sprite landed with her recruit (#251) and who turns BLUE mid-chapter.
 CH05_CLASS_IDS = ChapterClassIds('ch05')
-CH05_ITEM_IDS = {'flux': 'ITEM_DARK_FLUX', 'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
-                 # the GWYLLGI's own vanilla weapon (the moose deploys as one), kept
-                 # under its vanilla NAME -- renaming the item would burn 'Hell Fang'
-                 # for every future Gwyllgi in the campaign (Nicolas, 2026-08-15)
-                 'hell-fang': 'ITEM_MONSTER_HELLFANG',
-                 'fire-fang': 'ITEM_MONSTER_FIREFANG',
-                 'iron-lance': 'ITEM_LANCE_IRON', 'iron-axe': 'ITEM_AXE_IRON',
-                 'iron-sword': 'ITEM_SWORD_IRON', 'iron-bow': 'ITEM_BOW_IRON',
-                 # FE8 calls the Killing Edge ITEM_SWORD_KILLER -- it is the sword vanilla
-                 # Joshua carries on this very map, and Sahnar is his 1:1 (crit-threat duelist)
-                 'killing-edge': 'ITEM_SWORD_KILLER',
-                 # the four reliquary gifts (villages) -- vanilla Ch5's own reward tier, and
-                 # the exact items `make difficulty CH=ch05` prices the economy against
-                 'booster-def': 'ITEM_BOOSTER_DEF', 'booster-skl': 'ITEM_BOOSTER_SKL',
-                 'armorslayer': 'ITEM_SWORD_ARMORSLAYER', 'torch': 'ITEM_TORCH',
-                 # the save-all-four bonus -- vanilla Ch5's own, handed over at the ending
-                 'guiding-ring': 'ITEM_GUIDINGRING',
-                 # ch06's boats -- vanilla Ch6's own pair: the village gift, and the
-                 # save-them-all prize its ENDING scene grants on CHECK_ALIVE
-                 'antitoxin': 'ITEM_ANTITOXIN', 'orions-bolt': 'ITEM_ORIONSBOLT'}
 
 
 # ── Message-id ownership across hosted chapters (#198 review, issue #24) ────────
@@ -521,3 +509,24 @@ CH07_CHAPTER_YAML = 'ch07-blood-in-bremen.yaml'
 # The goal pair takes appended ids (#411): ch07 claims no block of vanilla's dead ids.
 CH07_GOAL_WINDOW_MSG = appended_message_id('ch07', 'goal-window')
 CH07_GOAL_STATUS_MSG = appended_message_id('ch07', 'goal-status')
+
+
+# Each chapter's generic (autolevelled) enemy pid, and ch04's one-pid-per-monster-class table.
+# inject.raw_pids.CHAPTER_ENEMY_PIDS reads them; they used to sit in the chapter modules beside
+# seven near-identical chNN_enemy_pid functions (#491).
+CH01_GENERIC_PID = '0x80'
+CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
+CH03_GENERIC_PID = '0xaa'       # vanilla slot-4 generic-minion charIndex (autolevelled trash)
+CH05_GENERIC_PID = '0x80'                        # autolevelled trash (vanilla Ch6's own generic)
+CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla Ch7's own generic,
+CH07_GENERIC_PID = '0x80'
+# Vanilla Ch4 generic-monster charIds (read from events_udefs.s HEAD): the melee Revenant
+# pack uses 0xaa, the melee Bonewalker pack 0xac -- the twin's own line/pack fodder pids.
+CH04_MONSTER_PIDS = {
+    'mauthedoog': '0xb3',
+    'revenant': '0xaa',
+    'bonewalker': '0xac',
+    'bonewalker-bow': '0xad',
+    'mogall': '0xb7',
+    'entoumbed': '0xab',
+}
