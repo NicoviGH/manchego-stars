@@ -46,6 +46,10 @@ and #493 -- this file keeps no "recently landed" list.
 **Next, in order** (the full state, every decision and every open pick: #486 and #493):
 
 1. **#493 on #487** -- its unticked boxes, in this order:
+   - **First, the "For the next instance" section** (Nicolas, 2026-10-15): three twin strategy
+     lines our chapters could not back (Sahnar sparing Basil, ch03's breakable walls, ch06's
+     Halberd drop) -- investigate each as a possible GAME gap, not just text; and Trivia for the
+     book's own characters, naming *Rime of the Frostmaiden* with its words (the OCR file).
    - Pages: the availability chart, the lord-select concept page (`Imperial Three` /
      `Sacred Stone (object)` are the exemplars), the chapter list on templates, Nav8's navbox at
      every page's foot, the home page off `markup.py`, and Open decisions off the wiki (it lives
