@@ -45,15 +45,14 @@ and #493 -- this file keeps no "recently landed" list.
 
 **Next, in order** (the full state, every decision and every open pick: #486 and #493):
 
-1. **#493 on #487** -- its unticked boxes (14), in this order:
+1. **#493 on #487** -- its unticked boxes, in this order:
    - Pages: the availability chart, the lord-select concept page (`Imperial Three` /
      `Sacred Stone (object)` are the exemplars), the chapter list on templates, Nav8's navbox at
-     every page's foot, and the home page off `markup.py`. Supports wait on #494 (the ROM still
-     loads each slot's vanilla partners).
-   - Readers: ch01's money gift (`vanilla_payload` reads no gold), boss personal lines from the
-     INJECTED CharacterData, and the **wield check** (every unit can use what it carries).
-   - Strategies closer to the twins' own text; the chardalyn raiders' sprite; Sahnar's missing
-     `gender:` (pick: female).
+     every page's foot, the home page off `markup.py`, and Open decisions off the wiki (it lives
+     in the YAML and on #486). Supports wait on #494 (the ROM loads each slot's vanilla partners).
+   - Readers: ch01's money gift (`vanilla_payload` reads no gold, nor event GIVEITEMTOs or chest
+     gold), boss personal lines from the INJECTED CharacterData, enemy names, and the **wield
+     check** (every unit can use what it carries); #490's autolevel divergence.
    Then republish, Nicolas's layout list, `/code-review medium`, merge on his word. Nicolas is
    leaning toward ch01 on vanilla Ch1's map with Hamill Canyon back as ch08 -- raise it in the
    planning step.
@@ -72,9 +71,10 @@ and #493 -- this file keeps no "recently landed" list.
 5. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
    count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
 
-- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, the stat-screen face, and
-  R on a cast member's name (its own help text, ADR 0346; it lands with #487).
-  A shop is proven headless now: the scenario DSL's `shop:` step (ch02armory, ch05shops).
+- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
+  Proven headless instead, never owed to him: a shop (the DSL's `shop:` step, ch02armory,
+  ch05shops) and R on a cast member's name (`casthelp`, ADR 0346). Nicolas, 2026-10-15: a
+  check the harness can make headless is never his to make.
 - `make difficulty-gate` enforces ch00-ch07. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (ADR 0326): ch01 ceiling 1.41 at x1.4078; ch02
