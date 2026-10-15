@@ -356,6 +356,18 @@ playtest:
       then:
         - spoke: true
 
+    # The Armory is part of the map (ADR 0345): inherited from vanilla Ch2's own Location list.
+    # Proven headless rather than by eye -- the shop that opens must carry Ch2's own stock.
+    - name: ch02armory
+      proves: >
+        a unit on (5,7) gets the Armory command and the shop that opens stocks vanilla Ch2's
+        list. ch02 shipped without it until 2026-10-14 because nothing read the donor's shops.
+      checkpoint: ch02start
+      given: [on_map]
+      when:
+        # Slim Sword, Iron Sword, Slim Lance, Iron Lance, Iron Axe (ShopList_Event_Ch2Armory)
+        - shop: {x: 5, y: 7, kind: armory, stocks: [0x02, 0x01, 0x15, 0x14, 0x1F]}
+
     - name: ch02raid
       proves: >
         a raider can SACK a Targos hut -- terrain flips to ruins, the Pure Water never

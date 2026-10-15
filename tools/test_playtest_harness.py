@@ -367,7 +367,7 @@ class TestPlaytestHarness(unittest.TestCase):
         harness = _read_harness()
         self.assertIn('scenarios.recordch05eruption = function()', harness)
         body = _block(harness, 'scenarios.recordch05eruption = function()',
-                      '\n-- Park an unexhausted blue unit')
+                      '\n-- THE VISIT HELPERS')
         self.assertIn('endTurn()', body)
         self.assertIn('recordCutscene({', body)
         self.assertIn('turn() >= 2', body)

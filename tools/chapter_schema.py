@@ -78,7 +78,8 @@ PLAYTEST_CASE = {
     'name': ANY, 'kind': ANY, 'boot': ANY, 'checkpoint': ANY, 'deadline': ANY, 'headless': ANY,
     'lua': ANY, 'proves': ANY, 'given': ANY,
     'when': [{'visit': {'x': ANY, 'y': ANY, 'gains': ANY},
-              'talk': {'x': ANY, 'y': ANY, 'gains': ANY}}],
+              'talk': {'x': ANY, 'y': ANY, 'gains': ANY},
+              'shop': {'x': ANY, 'y': ANY, 'kind': ANY, 'stocks': ANY}}],
     'then': [{'spoke': ANY}],
 }
 

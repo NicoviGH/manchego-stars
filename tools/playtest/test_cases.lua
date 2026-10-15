@@ -48,7 +48,35 @@ local function fakeApi(opts)
         a.visits[#a.visits].talk = true
         return table.unpack(r)
     end
+    -- `shop` opens the tile's Armory/Vendor and reports what it stocks.
+    a.shopAt = function(x, y, kind)
+        a.visits[#a.visits + 1] = {x = x, y = y, shop = kind}
+        local step = (opts.shops or {})[#a.visits] or {}
+        return step.ok ~= false, step.why or "refused", step.stock or {}
+    end
     return a
+end
+
+-- `shop`: ch02's Armory, the stock read off the shop that opened.
+do
+    local stock = {0x02, 0x01, 0x15, 0x14, 0x1F}
+    local api = fakeApi({shops = {{stock = stock}}})
+    C.run({name = "ch02armory", given = {"on_map"},
+           ["when"] = {{shop = {x = 5, y = 7, kind = "armory", stocks = stock}}}}, api)
+    check(api.verdict, "PASS", "a shop with the declared stock PASSes")
+    check(api.visits[1].shop, "armory", "the shop step opens the declared kind")
+
+    api = fakeApi({shops = {{stock = {0x01, 0x02}}}})
+    C.run({name = "ch02armory", given = {"on_map"},
+           ["when"] = {{shop = {x = 5, y = 7, kind = "armory", stocks = stock}}}}, api)
+    check(api.verdict, "FAIL", "a shop wired to the wrong list FAILs")
+    contains(api.reason, "stocks [0x01, 0x02]", "the failure names the stock it found")
+
+    api = fakeApi({shops = {{ok = false, why = "live command menu did not expose armory"}}})
+    C.run({name = "ch02armory", given = {"on_map"},
+           ["when"] = {{shop = {x = 5, y = 7, kind = "armory", stocks = stock}}}}, api)
+    check(api.verdict, "FAIL", "a tile with no Armory command FAILs")
+    contains(api.reason, "did not expose armory", "the failure says the command was missing")
 end
 
 -- The happy path: ch05village's shape end to end.

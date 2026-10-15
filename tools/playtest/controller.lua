@@ -17,6 +17,8 @@ local MENU_TALK = 0x5A
 local MENU_VISIT = 0x5C
 local MENU_CHEST = 0x5D
 local MENU_DOOR = 0x5E
+local MENU_ARMORY = 0x5F   -- the shop commands on an Armory / Vendor tile (menu_def.c)
+local MENU_VENDOR = 0x60
 local MENU_ARENA = 0x62
 local MENU_ITEM = 0x67
 local MENU_SUPPLY = 0x69
@@ -647,6 +649,8 @@ function M.legalActions(observation)
         addMenuCommand(actions, observation, MENU_CHEST, "open_chest")
         addMenuCommand(actions, observation, MENU_DOOR, "open_door")
         addMenuCommand(actions, observation, MENU_ARENA, "arena")
+        addMenuCommand(actions, observation, MENU_ARMORY, "armory")
+        addMenuCommand(actions, observation, MENU_VENDOR, "vendor")
         addMenuCommand(actions, observation, MENU_ITEM, "open_items")
         addMenuCommand(actions, observation, MENU_SUPPLY, "open_supply")
         addMenuCommand(actions, observation, MENU_WAIT, "wait")
@@ -805,6 +809,8 @@ M.MENU_BALLISTA_ATTACK = MENU_BALLISTA_ATTACK
 M.MENU_TALK = MENU_TALK
 M.MENU_VISIT = MENU_VISIT
 M.MENU_ARENA = MENU_ARENA
+M.MENU_ARMORY = MENU_ARMORY
+M.MENU_VENDOR = MENU_VENDOR
 M.MENU_WAIT = MENU_WAIT
 M.MENU_STATUS = MENU_STATUS
 M.MENU_END_PHASE = MENU_END_PHASE

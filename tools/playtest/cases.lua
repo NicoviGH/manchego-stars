@@ -95,6 +95,37 @@ local function siteStep(verb, open)
 end
 
 M.WHEN.visit = siteStep("visit", "visitVillage")
+
+-- `shop: {x, y, kind, stocks}`: a unit stands on the tile, takes the Armory or Vendor command,
+-- and the shop that opens must stock exactly `stocks`, in order (item ids). A shop is part of
+-- the map (ADR 0345), so this proves a chapter inherited its donor's shop for real: a missing
+-- command, a shop that never opens, and a shop wired to the wrong list each fail here.
+M.WHEN.shop = function(api, arg, state)
+    if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number"
+        or (arg.kind ~= "armory" and arg.kind ~= "vendor") or type(arg.stocks) ~= "table" then
+        return false, "a `shop` step needs numeric x, y, kind: armory|vendor and a stocks list"
+    end
+    if not api.settle(true) then
+        return false, string.format("the map never returned to player control before (%d,%d)",
+            arg.x, arg.y)
+    end
+    local ok, why, stock = api.shopAt(arg.x, arg.y, arg.kind)
+    if not ok then
+        return false, string.format("%s at (%d,%d): %s", arg.kind, arg.x, arg.y, tostring(why))
+    end
+    state.visits = state.visits + 1
+    state.asserted = state.asserted + 1
+    local function hex(list)
+        local out = {}
+        for i, id in ipairs(list or {}) do out[i] = string.format("0x%02X", id) end
+        return table.concat(out, ", ")
+    end
+    if hex(stock) ~= hex(arg.stocks) then
+        return false, string.format("%s at (%d,%d) stocks [%s], not [%s]",
+            arg.kind, arg.x, arg.y, hex(stock), hex(arg.stocks))
+    end
+    return true
+end
 M.WHEN.talk = siteStep("talk", "talkFrom")
 
 -- ---------------------------------------------------------------- then

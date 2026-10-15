@@ -1989,6 +1989,19 @@ playtest:
       when:
         - visit: {x: 12, y: 19, gains: 0x60}   # reliquary-south -> ITEM_DRACOSHIELD
 
+    - name: ch05shops
+      proves: >
+        the elven store opens: the Armory at (2,1) and the Vendor at (6,10) each stock vanilla
+        Ch5's own list (ADR 0345). Wired since ch05 shipped and never opened by any scenario.
+      given: [on_map]
+      when:
+        # ShopList_Event_Ch5Armory: Slim/Iron/Steel Sword, Slim/Iron/Steel Lance, Iron/Steel Axe,
+        # Iron/Steel Bow
+        - shop: {x: 2, y: 1, kind: armory,
+                 stocks: [0x02, 0x01, 0x03, 0x15, 0x14, 0x16, 0x1F, 0x20, 0x2D, 0x2E]}
+        # ShopList_Event_Ch5Vendor: Fire, Lightning, Heal, Vulnerary
+        - shop: {x: 6, y: 10, kind: vendor, stocks: [0x38, 0x3F, 0x4B, 0x6C]}
+
     - name: ch05reliquaries
       proves: all four reliquaries speak and hand over their OWN gift
       # `spoke` is not decoration: a wired-but-empty message would hand the gift over in

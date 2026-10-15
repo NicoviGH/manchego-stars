@@ -153,6 +153,7 @@ WANTED = [
                                 # +0x2A: TALK_CHOICE_YES = 1, TALK_CHOICE_NO = 2
                                 # (include/scene.h); A commits whichever is highlighted.
     'gProcScr_TalkChoice',      # scene.c inline [Yes] choice (arena wager / shop prompts)
+    'gProcScr_Shop',            # bmshop.c Armory/Vendor screen; ProcShop.shopItems at +0x30
     'TalkChoice_OnIdle',        # exact inline-choice input callback; selectedChoice @ +0x2A
     'ProcScr_AtMenu',           # preparations main-menu owner
     'ProcScr_PrepMenu',         # live semantic preparations command list

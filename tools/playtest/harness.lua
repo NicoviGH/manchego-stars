@@ -191,6 +191,11 @@ local function turn() return ru16(SYM.gPlaySt + 0x10) end
 local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) end
 
 local function findProc(scriptAddr)
+    -- A symbol gen_symbols.py does not export reads as nil, and scanning for nil finds nothing,
+    -- which looks exactly like "the proc never started" (ch02armory's first run, #493).
+    if scriptAddr == nil then
+        error("findProc: nil proc script -- add the symbol to gen_symbols.py's export list", 2)
+    end
     for i = 0, 63 do
         local addr = SYM.sProcArray + i * 0x6C
         if ru32(addr) == scriptAddr then return addr end
@@ -7088,13 +7093,44 @@ scenarios.recordch05eruption = function()
     })
 end
 
--- Park an unexhausted blue unit on a village door and take the Visit command, stopping the
--- moment the location event starts. Split from the dialogue-advancing half so the RECORDER can
--- own the filmed part: `openVillageVisit` is the unfilmed walk-in (a `pre`), the line itself is
--- what the camera wants. Returns ok, reason.
--- `choose` (optional) replaces the Visit command: the `talk` step passes a Talk, so a site that
--- is a UNIT to talk to (ch06's hulls) shares the picking, parking and playing-out below.
-local function openVillageVisit(x, y, choose)
+-- THE VISIT HELPERS (one table, not five locals: harness.lua sits near Lua's 200-local cap, #327).
+local VISIT = {}
+
+-- A visit is a unit standing on a tile and using it -- a village door, an
+-- Armory or Vendor, the Arena, a unit to Talk to from that tile. `VISIT.place` stands the unit
+-- there, `VISIT.open` also takes the tile's command, `VISIT.run` also plays the event out,
+-- `VISIT.shop` opens an Armory/Vendor and reads its stock.
+--
+-- VISIT.place: stand a unit on the tile it will use, skipping the walk. Keeps the engine's
+-- tile->unit grid in sync, so the command check reads the new position at once (the
+-- ch03talk/parley trick). Reads the unit's position LIVE: a scenario that places the same unit
+-- twice holds a table whose x/y went stale.
+function VISIT.place(u, x, y)
+    local ox, oy = rs8(u.addr + 0x10), rs8(u.addr + 0x11)
+    local grid = mapUnitAt(ox, oy)
+    setMapUnit(ox, oy, 0)
+    emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+    setMapUnit(x, y, grid)
+end
+
+-- Take one command off the unit menu by its semantic name ("visit", "armory", "vendor").
+function VISIT.command(semantic)
+    return function()
+        if not selectSemantic(semantic, semantic .. " starts the site's own proc", function(after)
+            return after.menu == nil
+        end, 600) then return false, "live command menu did not expose " .. semantic end
+        return true
+    end
+end
+
+-- VISIT.open: stand an unexhausted blue unit on the tile and take its command, stopping the
+-- moment the tile's own proc starts. One opener for every visit, so the picking and placing
+-- cannot drift between villages, shops and talks. Split from the dialogue-advancing half so the
+-- RECORDER can own the filmed part: `VISIT.open` is the unfilmed walk-in (a `pre`).
+-- Returns ok, reason.
+-- `choose` (optional) replaces the Visit command: `talk` passes a Talk (ch06's hulls),
+-- `VISIT.shop` an Armory or Vendor.
+function VISIT.open(x, y, choose)
     local u
     for i = 0, 19 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
@@ -7105,21 +7141,12 @@ local function openVillageVisit(x, y, choose)
         end
     end
     if not u then return false, "no unexhausted deployed blue unit to send" end
-    -- setMapUnit keeps the engine's tile->unit grid in sync, so the Visit check reads the new
-    -- position immediately (the ch03talk/parley trick).
-    local grid = mapUnitAt(u.x, u.y)
-    setMapUnit(u.x, u.y, 0)
-    emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
-    setMapUnit(x, y, grid)
-    if not cursorTo(x, y) then return false, "cursor could not reach the village" end
+    VISIT.place(u, x, y)
+    if not cursorTo(x, y) then return false, "cursor could not reach the site" end
     if not moveUnit(x, y, x, y) then
-        return false, "could not select the unit standing on the village"
+        return false, "could not select the unit standing on the site"
     end
-    if choose then return choose() end
-    if not selectSemantic("visit", "Visit starts the live location event", function(after)
-        return after.menu == nil
-    end, 600) then return false, "live command menu did not expose Visit" end
-    return true
+    return (choose or VISIT.command("visit"))()
 end
 
 -- Walk in, then advance the line to its end. Shared by ch04's two villages (#205, #24): the
@@ -7131,8 +7158,8 @@ end
 -- the only moment the line and the speaker's face are both on screen. Review captures need it:
 -- a shot taken after the visit returns catches the map, because `done` fires when the ITEM
 -- lands and the box is long gone by then.
-local function visitVillage(x, y, done, onBox, choose)
-    local ok, why = openVillageVisit(x, y, choose)
+function VISIT.run(x, y, done, onBox, choose)
+    local ok, why = VISIT.open(x, y, choose)
     if not ok then return false, why end
     local spoke = false
     for _ = 1, 3600 do
@@ -7148,6 +7175,44 @@ local function visitVillage(x, y, done, onBox, choose)
         end
     end
     return true, nil, spoke
+end
+
+-- Open the Armory or Vendor on (x, y) and read what it stocks, from the live shop proc
+-- (ProcShop.shopItems at +0x30, bmshop.h), then leave it. Returns ok, reason, {item ids}.
+-- The stock comes off the proc the command started, so a shop wired to the wrong list, or a
+-- tile whose command opens nothing, fails here rather than in a playtest.
+function VISIT.shop(x, y, kind)
+    local ok, why = VISIT.open(x, y, VISIT.command(kind))
+    if not ok then return false, why end
+    local proc
+    if not waitFor(function()
+        proc = findProc(SYM.gProcScr_Shop)
+        return proc ~= nil
+    end, 600) then return false, kind .. " command started no shop" end
+    local stock = {}
+    for i = 0, 19 do
+        local id = ru16(proc + 0x30 + i * 2) & 0xFF
+        if id == 0 then break end
+        stock[#stock + 1] = id
+    end
+    -- Leave: B through the greeting, the buy/sell choice and the farewell line.
+    for _ = 1, 60 do
+        if not procActive(SYM.gProcScr_Shop) then break end
+        press(K.B)
+        wait(16)
+    end
+    if procActive(SYM.gProcScr_Shop) then return false, "the shop never closed on B", stock end
+    -- Leaving a shop hands back the unit's command menu, not the map: back out of it too, or
+    -- the next step waits forever for player control (ch05shops' Vendor, after its Armory).
+    for _ = 1, 20 do
+        if controllerState() == "player_map_idle" then break end
+        press(K.B)
+        wait(12)
+    end
+    if controllerState() ~= "player_map_idle" then
+        return false, "the map never came back after the shop closed", stock
+    end
+    return true, nil, stock
 end
 
 -- ch05arena (#264): the active onboarding ledger claims a tutorial on the real arena tile.
@@ -7180,10 +7245,7 @@ scenarios.ch05arena = function()
     end
     local hero = blue(0x01)
     if not hero then return result("FAIL", "leader (0x01) is not deployed") end
-    local grid = mapUnitAt(hero.x, hero.y)
-    setMapUnit(hero.x, hero.y, 0)
-    emu:write8(hero.addr + 0x10, ARENA_X); emu:write8(hero.addr + 0x11, ARENA_Y)
-    setMapUnit(ARENA_X, ARENA_Y, grid)
+    VISIT.place(hero, ARENA_X, ARENA_Y)
     if not cursorTo(ARENA_X, ARENA_Y)
         or not guardedInput("select_unit", "A", "arena staging reach map is generated", function(after)
             return controllerState(after) == "unit_selected"
@@ -7202,9 +7264,7 @@ scenarios.ch05arena = function()
         return result("FAIL", "could not close the arena staging reach map")
     end
     if not fromX then return result("FAIL", "no reachable empty tile beside the arena") end
-    setMapUnit(ARENA_X, ARENA_Y, 0)
-    emu:write8(hero.addr + 0x10, fromX); emu:write8(hero.addr + 0x11, fromY)
-    setMapUnit(fromX, fromY, grid)
+    VISIT.place(hero, fromX, fromY)
     -- Raw placement updates the unit/grid but not FE8's standing-map-sprite pool. Make the
     -- engine select and cancel the staged unit once so PlayerPhase's normal cancel path calls
     -- RefreshUnitSprites before the proof frame; otherwise the old SMS and the live MU can both
@@ -7481,7 +7541,7 @@ scenarios.recordch02huts = function()
         and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
     -- Teleport-and-visit, the ch04/ch05 village idiom: the WALK is not what the camera wants
     -- and pathing across seven tiles of snow is not what this is proving.
-    local ok, why = openVillageVisit(1, 12)          -- targos-hut-south (Glimmerfrost)
+    local ok, why = VISIT.open(1, 12)          -- targos-hut-south (Glimmerfrost)
     if not ok then return result("FAIL", "south hut: " .. tostring(why)) end
     return recordCutscene({
         tag = "ch02huts", maxFrames = 3600, pressEvery = 90,
@@ -7817,7 +7877,7 @@ scenarios.ch05crest = function()
             return result("FAIL", "the map never returned to player control before " .. site.name)
         end
         disarmTheTomb()
-        local ok, why = visitVillage(site.x, site.y, function()
+        local ok, why = VISIT.run(site.x, site.y, function()
             return eventFlag(site.flag)
         end)
         if not ok then
@@ -8990,7 +9050,7 @@ scenarios.ch04cottage = function()
             .. "menu item on the TERRAIN before it ever consults the location event (bmmenu.c)",
             DOOR_X, DOOR_Y, before, VILLAGE_REGULAR))
     end
-    local ok, why, spoke = visitVillage(DOOR_X, DOOR_Y, function()
+    local ok, why, spoke = VISIT.run(DOOR_X, DOOR_Y, function()
         return terrainAt(DOOR_X, DOOR_Y) == VILLAGE_CLOSED
     end)
     if not ok then return result("FAIL", why) end
@@ -9028,7 +9088,7 @@ scenarios.recordch04cottage = function()
             if not bootToMap() then return false, "never reached the ch04 map" end
             waitFor(function() return faction() == 0 and not menuOpen()
                 and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
-            local ok, why = openVillageVisit(DOOR_X, DOOR_Y)
+            local ok, why = VISIT.open(DOOR_X, DOOR_Y)
             if not ok then return false, why end
             pokeNormalConfig()   -- film the line at real speed
         end,
@@ -10002,16 +10062,20 @@ local co = coroutine.create(function()
         visitVillage = function(x, y)
             local before = 0
             for _ in ipairs(collectedItems()) do before = before + 1 end
-            return visitVillage(x, y, function()
+            return VISIT.run(x, y, function()
                 local now = 0
                 for _ in ipairs(collectedItems()) do now = now + 1 end
                 return now ~= before
             end)
         end,
+        -- `shop`: the visit path with Armory/Vendor as the command; returns the stock it opened.
+        shopAt = function(x, y, kind)
+            return VISIT.shop(x, y, kind)
+        end,
         -- `talk`: the visit path with Talk as the command; done once the scene has ended.
         -- A missing Talk command is the failure this catches (a CHAR naming the wrong pair).
         talkFrom = function(x, y)
-            return visitVillage(x, y, function()
+            return VISIT.run(x, y, function()
                 return controllerState() ~= "dialogue_wait"
                     and not procActive(SYM.ProcScr_StdEventEngine)
             end, nil, function()
