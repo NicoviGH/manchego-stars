@@ -49,6 +49,9 @@ RUNNING IT (lessons from #479, which ran it over all 15 configurations):
     by copying `src/events`, `src/events_udefs.c` and `texts/texts.txt` after each run and diffing
     them with C comments and whitespace stripped (texts.txt must stay byte-identical), then build
     the canonical ROM on both sides and compare the sha256.
+  * A run leaves the build tree injected with ITS flags. After a loop over the 16 configurations,
+    run canonical last: a test that reads the injected tree (test_scene_actors) otherwise
+    measures `--ch07-boot`'s output and fails for no reason in your change (#492).
 """
 import argparse
 import hashlib
