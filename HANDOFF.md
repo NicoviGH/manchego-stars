@@ -65,8 +65,8 @@ landed and why is in `git log`, the PRs and #493 -- this file keeps no "recently
 5. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
    count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
 
-- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, the stat-screen face, and
-  ch02's Armory at (5,7).
+- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
+  A shop is proven headless now: the scenario DSL's `shop:` step (ch02armory, ch05shops).
 - `make difficulty-gate` enforces ch00-ch07. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (ADR 0326): ch01 ceiling 1.41 at x1.4078; ch02
