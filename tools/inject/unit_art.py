@@ -22,6 +22,7 @@ A map sprite's palette is one of three rules, which is the whole of what the pas
             faction ramp tints it -- enemy class reskins, the ch02 chwinga, faction-tinted cast.
 """
 import collections
+import colorsys
 import functools
 import os
 import re
@@ -187,14 +188,56 @@ def _file_bust(path):
     return lambda: Image.open(path)
 
 
+def _hls(rgb):
+    return colorsys.rgb_to_hls(*(c / 255 for c in rgb))
+
+
+def _glow_band(rgb):
+    """The chwinga's glow: Sclorbo's cyan ramp (hue 175-205, saturated), not his greys/robe."""
+    h, _l, s = _hls(rgb)
+    return 175 <= h * 360 <= 205 and s >= 0.35
+
+
+def _interp(points, x):
+    points = sorted(points)
+    if x <= points[0][0]:
+        return points[0][1]
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        if x <= x1:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return points[-1][1]
+
+
+def glow_to_green(rgb, pairs=None):
+    """One glow colour -> spirit-green, by the transform the authored pairs define
+    (CH02_CHWINGA_GLOW_RECOLOR): the target hue and saturation, interpolated by lightness, and
+    the authored lightness shift. Exact on the authored sources, and it extends to any shade a
+    re-render adds -- RGB keys did not: #488's matte re-render moved every glow colour, matched
+    none of them, and the chwinga shipped Sclorbo's blue bust with nothing failing."""
+    pairs = pairs or CH02_CHWINGA_GLOW_RECOLOR
+    pts = [(_hls(src), _hls(dst)) for src, dst in pairs.items()]
+    l = _hls(rgb)[1]
+    h = _interp([(a[1], b[0]) for a, b in pts], l)
+    s = _interp([(a[1], b[2]) for a, b in pts], l)
+    dl = _interp([(a[1], b[1] - a[1]) for a, b in pts], l)
+    out = colorsys.hls_to_rgb(h, min(max(l + dl, 0.0), 1.0), s)
+    return tuple(int(round(c * 255)) for c in out)
+
+
 def chwinga_bust(campaign):
-    """Sclorbo's bust with the blue glow ramp shifted to spirit-green (the map sprite's swap)."""
+    """Sclorbo's bust with the glow ramp shifted to spirit-green (the map sprite's swap). A bust
+    with no glow left to shift is an error: the recolour silently doing nothing is the bug."""
     im = Image.open(os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')).convert('P')
     pal = list(im.getpalette()[:48])
-    for i in range(16):
+    shifted = 0
+    for i in range(1, 16):                                # index 0 is the transparent key
         rgb = tuple(pal[i * 3:i * 3 + 3])
-        if rgb in CH02_CHWINGA_GLOW_RECOLOR:
-            pal[i * 3:i * 3 + 3] = list(CH02_CHWINGA_GLOW_RECOLOR[rgb])
+        if _glow_band(rgb):
+            pal[i * 3:i * 3 + 3] = list(CH02_CHWINGA_GLOW_RECOLOR.get(rgb) or glow_to_green(rgb))
+            shifted += 1
+    if not shifted:
+        raise SystemExit('ERROR: %s.png has no glow colours to shift for the ch02 chwinga '
+                         '(inject.unit_art.chwinga_bust)' % CH02_CHWINGA_SPRITE_SRC)
     out = im.copy()
     out.putpalette(pal)
     return out

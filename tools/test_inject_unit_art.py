@@ -90,6 +90,25 @@ class Busts(unittest.TestCase):
         self.assertEqual(art.unit_bust(CAMPAIGN, 'sephek-kaltro').size, (96, 80))
         self.assertEqual(art.unit_bust(CAMPAIGN, 'chwinga-mote').size, (96, 80))
 
+    def test_the_chwinga_glow_turns_green_on_any_render(self):
+        # #488 re-rendered Sclorbo and moved every glow colour; keyed by RGB, the recolour then
+        # matched nothing and the ch02 chwinga shipped his blue bust. The authored pairs define a
+        # transform instead: exact on the pairs, green on every glow shade of the current bust.
+        import colorsys
+        from inject.chapter_ids import CH02_CHWINGA_GLOW_RECOLOR as pairs
+        for src, dst in pairs.items():
+            got = art.glow_to_green(src)
+            self.assertTrue(all(abs(a - b) <= 1 for a, b in zip(got, dst)), (src, got, dst))
+        sclorbo = art.unit_bust(CAMPAIGN, 'sclorbo').getpalette()[:48]
+        mote = art.unit_bust(CAMPAIGN, 'chwinga-mote').getpalette()[:48]
+        glow = [i for i in range(1, 16) if art._glow_band(tuple(sclorbo[i * 3:i * 3 + 3]))]
+        self.assertTrue(glow)
+        for i in glow:
+            h = colorsys.rgb_to_hls(*(c / 255 for c in mote[i * 3:i * 3 + 3]))[0] * 360
+            self.assertTrue(110 <= h <= 150, (i, mote[i * 3:i * 3 + 3]))
+        for i in set(range(16)) - set(glow):               # the robe, fur and tassels stay
+            self.assertEqual(mote[i * 3:i * 3 + 3], sclorbo[i * 3:i * 3 + 3])
+
 
 if __name__ == '__main__':
     unittest.main()

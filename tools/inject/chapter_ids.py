@@ -98,8 +98,9 @@ CH02_CHWINGA_SPRITE_SRC = 'sclorbo'
 # asset). Each chwinga's vanilla portrait slot is collision-free (absent from our ch00-08):
 # Dara reuses FE8's Saleh-grandmother face (Dara IS Saleh's grandmother), Klimt/Mansel their own.
 CH02_CHWINGA_PORTRAIT_SLOT = {'DARA': 'Saleh_Grandma', 'KLIMT': 'Klimt', 'MANSEL': 'Mansel'}
-# blue glow ramp -> spirit-green, keyed by SOURCE RGB (robust to palette reordering); the
-# same ramp as the map sprite. Everything else (fur collar, tan robe, red tassels) untouched.
+# blue glow ramp -> spirit-green: the AUTHORED pairs, which define the transform
+# (inject.unit_art.glow_to_green) rather than key it -- a re-render moves the source colours.
+# The same ramp as the map sprite. Everything else (fur collar, tan robe, red tassels) untouched.
 CH02_CHWINGA_GLOW_RECOLOR = {
     (96, 211, 219): (150, 230, 160), (113, 188, 214): (140, 205, 150),
     (81, 165, 185): (100, 185, 120), (63, 141, 165): (78, 155, 95),
