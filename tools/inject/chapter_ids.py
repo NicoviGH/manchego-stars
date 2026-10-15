@@ -509,3 +509,24 @@ CH07_CHAPTER_YAML = 'ch07-blood-in-bremen.yaml'
 # The goal pair takes appended ids (#411): ch07 claims no block of vanilla's dead ids.
 CH07_GOAL_WINDOW_MSG = appended_message_id('ch07', 'goal-window')
 CH07_GOAL_STATUS_MSG = appended_message_id('ch07', 'goal-status')
+
+
+# Each chapter's generic (autolevelled) enemy pid, and ch04's one-pid-per-monster-class table.
+# inject.raw_pids.CHAPTER_ENEMY_PIDS reads them; they used to sit in the chapter modules beside
+# seven near-identical chNN_enemy_pid functions (#491).
+CH01_GENERIC_PID = '0x80'
+CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
+CH03_GENERIC_PID = '0xaa'       # vanilla slot-4 generic-minion charIndex (autolevelled trash)
+CH05_GENERIC_PID = '0x80'                        # autolevelled trash (vanilla Ch6's own generic)
+CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla Ch7's own generic,
+CH07_GENERIC_PID = '0x80'
+# Vanilla Ch4 generic-monster charIds (read from events_udefs.s HEAD): the melee Revenant
+# pack uses 0xaa, the melee Bonewalker pack 0xac -- the twin's own line/pack fodder pids.
+CH04_MONSTER_PIDS = {
+    'mauthedoog': '0xb3',
+    'revenant': '0xaa',
+    'bonewalker': '0xac',
+    'bonewalker-bow': '0xad',
+    'mogall': '0xb7',
+    'entoumbed': '0xab',
+}

@@ -3,6 +3,7 @@
 import os
 import sys
 
+from inject.raw_pids import enemy_pid_for
 from inject.cast import (
     _bust_dir, _classed_cast, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit,
     PORTRAIT_MAP)
@@ -57,7 +58,6 @@ CH02_ENDING_BG = 'BG_MS_TARGOS_WINTER'     # Targos at nightfall -- vendored sno
 # Sclorbo's greenified anim. They were Mov-7 fliers, which gave the units that need rescuing the
 # best escape in the chapter.
 CH02_CLASS_IDS = ChapterClassIds('ch02')
-CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
 CH02_VILLAGE_CHWINGA = 'chwinga-glimmer'
 # Dead vanilla Ch3 scripts (slot 3 is ch02's host and inject_ch02 blanks its event lists).
 # 0xAC0/0xAC1 are the first two ids of ch02's block -- it had none until the pool widened.
@@ -199,15 +199,6 @@ def offmap_join_recruits(campaign, chapter_number):
 
 
 
-def ch02_enemy_pid(enemy, _index=0):
-    """Grukk rides Bone's slot and Halvar Bazba's, so their nameplates and quotes are theirs;
-    every other raider is the autolevelled generic."""
-    if enemy.get('is_boss'):
-        return 'CHARACTER_%s' % CH02_BOSS_SLOT
-    if enemy.get('is_miniboss'):
-        return 'CHARACTER_%s' % CH02_MINIBOSS_SLOT
-    return CH02_GENERIC_PID
-
 def inject_ch02(campaign, verbose=True):
     """Wire Ch2 "Cold Welcome" (#22) onto chapter slot 3 (ch01's MNC2(0x3) target).
 
@@ -220,19 +211,13 @@ def inject_ch02(campaign, verbose=True):
     (_inject_lord_select_engine) -- no per-chapter wiring beyond the
     CauseGameOverIfLordDies that already sits in EventListScr_Ch3_Misc.
 
-    The protect layer is three GREEN chwinga (pegasus chassis, vanilla Colm table
-    088B4718 repurposed) on distinct NPC slots; each surviving chwinga gifts a charm
-    (Red Gem / Elixir / Pure Water) at the ending scene via CHECK_ALIVE -> GIVEITEMTO
-    (per-unit soft-fail, no game over). Enemies are vanilla Ch2's exact mix, reflavored
-    chardalyn berserkers. Reinforcements move to the empty table 088B4758 (088B4718 is
-    now the chwinga).
-
-    DEFERRED checkpoints (flagged, not in this pass): the DIALOGUE REGROUND -- the locked
-    cutscene text still frames the dropped sled + "snow wolves" and lacks a chwinga intro
-    beat (Nicolas co-write via the dialogue-pass skill; wired as placeholder meanwhile);
-    the chwinga art (map sprite + portrait + name-text over DARA/KLIMT/MANSEL, #38/#39);
-    Vellynne's cutscene bust (#19, placeholder vanilla face here); the chardalyn map-sprite
-    reskin (vanilla brigand sprite for now); and the in-game load-test.
+    The protect layer is two GREEN chwinga on the field, Priests on distinct NPC slots (vanilla
+    Colm table 088B4718 repurposed), wearing Sclorbo's art recoloured green (inject.unit_art);
+    each that survives gifts its charm (a Hand Axe, an Elixir) at the ending scene via CHECK_ALIVE
+    -> GIVEITEMTO (per-unit soft-fail, no game over). The third, Glimmer, is the southern hut's
+    inhabitant and hands over its Pure Water on the visit. Enemies are vanilla Ch2's exact mix,
+    reflavored chardalyn berserkers (still on the stock brigand sprite: no chardalyn reskin is
+    drawn yet). Reinforcements move to the empty table 088B4758 (088B4718 is now the chwinga).
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
@@ -325,7 +310,7 @@ def inject_ch02(campaign, verbose=True):
     by_eid = {e['id']: e for e in chap['enemy_units']}
     grukk, halvar = by_eid['raider-bruiser'], by_eid['raider-captain']
     reinf = by_eid['rear-raiders']
-    enemies = enemy_rows(chap, CH02_CLASS_IDS, ITEM_ENUM, ch02_enemy_pid)
+    enemies = enemy_rows(chap, CH02_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch02'))
 
     # 2b. GREEN chwinga (088B4718) -- the protect layer; class + level + positions +
     #     per-survivor gift come from the YAML deployment.green_allies (id order
@@ -366,7 +351,7 @@ def inject_ch02(campaign, verbose=True):
                for g in chap['deployment']['green_allies']]
 
     # 2c. RED reinforcements (088B4758) -- vanilla 088B4470 mix: one L2 + one L3, turn 3.
-    reinforce = enemy_rows(chap, CH02_CLASS_IDS, ITEM_ENUM, ch02_enemy_pid,
+    reinforce = enemy_rows(chap, CH02_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch02'),
                            arrives_turn=reinf['arrives_turn'])
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:

@@ -13,17 +13,16 @@ from inject.paths import CONST_MAPS_S, ITEMS_C
 
 
 def item_icon_id(item_enum):
-    """gItemData[item].iconId, scanned from data_items.c."""
-    marker = '[%s] = {' % item_enum
+    """gItemData[item].iconId, read from the item's own block in data_items.c. It scanned a fixed
+    12 lines past the marker, which reaches a consumable's iconId but not a weapon's (13+ fields
+    above it) -- harmless while the build only re-icons consumables, wrong for any other reader."""
     with open(ITEMS_C, encoding='utf-8') as f:
-        lines = f.read().splitlines()
-    for i, line in enumerate(lines):
-        if marker in line:
-            for probe in lines[i:i + 12]:
-                m = re.search(r'\.iconId\s*=\s*(0x[0-9a-fA-F]+|\d+)', probe)
-                if m:
-                    return int(m.group(1), 0)
-    sys.exit('ERROR: could not find iconId for %s in %s' % (item_enum, ITEMS_C))
+        text = f.read()
+    m = re.search(r'\[%s\]\s*=\s*\{(.*?)\n\s*\},' % re.escape(item_enum), text, re.S)
+    icon = re.search(r'\.iconId\s*=\s*(0x[0-9a-fA-F]+|\d+)', m.group(1)) if m else None
+    if not icon:
+        sys.exit('ERROR: could not find iconId for %s in %s' % (item_enum, ITEMS_C))
+    return int(icon.group(1), 0)
 
 
 def item_icon_png_path(icon_id):

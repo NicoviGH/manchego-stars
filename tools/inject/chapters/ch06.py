@@ -5,7 +5,8 @@ import os
 import re
 import sys
 
-from inject.cast import CLASS_LOADOUT, _classed_cast, ENEMY_BASE_SLOT, GUEST_PORTRAIT_MAP
+from inject.raw_pids import CHAPTER_ENEMY_PIDS, enemy_pid_for
+from inject.cast import CLASS_LOADOUT, _classed_cast, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_SURVIVED_FLAGS, CH06_BOAT_TALK_FLAGS,
                                 CH06_BOAT_TALK_MSGS, CH06_BOAT_TALK_SCRIPTS, CH06_CHAPTER_YAML, CH06_GOAL_STATUS_MSG,
                                 CH06_GOAL_WINDOW_MSG, CH06_MESSIE_MSG, CH06_MESSIE_PID,
@@ -76,8 +77,7 @@ CH06_GOAL_DONOR = 17                             # a CLEAN untouched vanilla def
 # deploys on are the same character and she inherits his real line (#284/#334). Her defeat
 # quote is her FLAGGED retreat line (ADR 0337): SetPidDefeatedFlag raises EVFLAG_DEFEAT_BOSS,
 # and that flag is what fires the win (CA_BOSS alone fires nothing).
-CH06_BOSS_PID = ENEMY_BASE_SLOT['nerra']
-CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla Ch7's own generic,
+CH06_BOSS_PID = CHAPTER_ENEMY_PIDS['ch06']['boss']
 
 # The rescue boats deploy as `fleet`: vanilla's own ship, which ships a 32x32 map sprite (SMSId
 # 0x41) and a 19 HP / 5 Def hull, which a boat's `personal:` line may raise (the west hull is 28).
@@ -229,13 +229,6 @@ def ch06_line_spawns(chap, maps_dir):
 
 def ch06_reda_symbol(enemy_id, index):
     return 'MS_Ch06Surface_%s_%d' % (re.sub(r'[^A-Za-z0-9]', '_', enemy_id), index)
-
-
-def ch06_enemy_pid(enemy, _index=0):
-    """The BOSS takes her own vanilla CHARACTER slot so her flagged defeat quote keys to her and
-    nothing else; everything else shares the slot's autolevelled generic, exactly as vanilla Ch6
-    and Ch7 both do."""
-    return CH06_BOSS_PID if enemy.get('is_boss') else CH06_GENERIC_PID
 
 
 def ch06_boat_rows(chap):
@@ -712,7 +705,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
 
     # The line SURFACES in beat B: each unit LOADs on a channel tile and walks to its post.
     spawns = ch06_line_spawns(chap, maps_dir)
-    line_rows = enemy_rows(chap, CH06_CLASS_IDS, ITEM_ENUM, ch06_enemy_pid, spawns=spawns,
+    line_rows = enemy_rows(chap, CH06_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch06'), spawns=spawns,
                            reda_symbol=ch06_reda_symbol)
     redas = [(ch06_reda_symbol(eid, i), x, y)
              for e in chap['enemy_units'] if e.get('arrives_turn') is None
@@ -721,7 +714,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     declare_unit_table(CH06_LINE_TABLE, line_rows,
                        'ch06 turn-1 line: the merfolk of Maer Dualdon, on our placement (#360), '
                        'surfacing from the channels', redas=redas)
-    wave_rows = enemy_rows(chap, CH06_CLASS_IDS, ITEM_ENUM, ch06_enemy_pid,
+    wave_rows = enemy_rows(chap, CH06_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch06'),
                            arrives_turn=CH06_HARD_WAVE_TURN)
     if not wave_rows:
         sys.exit('ERROR: ch06 declares no enemies arriving on turn %d, but a wave table and a '

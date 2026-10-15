@@ -3,7 +3,8 @@
 import os
 import sys
 
-from inject.cast import CLASS_LOADOUT, _classed_cast, ENEMY_BASE_SLOT
+from inject.raw_pids import CHAPTER_ENEMY_PIDS, enemy_pid_for
+from inject.cast import CLASS_LOADOUT, _classed_cast
 from inject.chapter_frame import write_event_group
 from inject.chapter_ids import CH07_CHAPTER_YAML, CH07_GOAL_STATUS_MSG, CH07_GOAL_WINDOW_MSG
 from inject.class_ids import ChapterClassIds
@@ -34,8 +35,7 @@ CH07_SEIZE_TEXT = 'Seize hall'                   # vanilla's "Seize gate", for t
 
 # Dorbulgruf rides Murray, vanilla Ch7's boss on the same door (ENEMY_BASE_SLOT). Everyone else
 # shares the slot's autolevelled generic, as vanilla Ch7 does.
-CH07_BOSS_PID = ENEMY_BASE_SLOT['dorbulgruf']
-CH07_GENERIC_PID = '0x80'
+CH07_BOSS_PID = CHAPTER_ENEMY_PIDS['ch07']['boss']
 
 CH07_CLASS_IDS = ChapterClassIds('ch07')
 
@@ -50,11 +50,6 @@ CH07_HALL_ARCHERS = (('bremen-archer', 1), ('bremen-archer', 2))
 
 def ch07_reda_symbol(enemy_id, index):
     return 'MS_Ch07HallDoor_%s_%d' % (enemy_id.replace('-', '_'), index)
-
-
-def ch07_enemy_pid(enemy, _index=0):
-    """The boss on Murray's slot; the rest on the generic, as vanilla Ch7."""
-    return CH07_BOSS_PID if enemy.get('is_boss') else CH07_GENERIC_PID
 
 
 def inject_ch07(campaign, boot=False, verbose=True):
@@ -96,7 +91,7 @@ def inject_ch07(campaign, boot=False, verbose=True):
     declare_unit_table(CH07_BOOT_SEED_TABLE, seed_rows,
                        'ch07 --ch07-boot armed party seed (cold-start PREP fodder)')
     spawns = {key: CH07_HALL_DOOR for key in CH07_HALL_ARCHERS}
-    line_rows = enemy_rows(chap, CH07_CLASS_IDS, ITEM_ENUM, ch07_enemy_pid, spawns=spawns,
+    line_rows = enemy_rows(chap, CH07_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch07'), spawns=spawns,
                            reda_symbol=ch07_reda_symbol)
     by_id = {e['id']: e for e in chap['enemy_units']}
     redas = [(ch07_reda_symbol(eid, i),) + tuple(by_id[eid]['positions'][i])

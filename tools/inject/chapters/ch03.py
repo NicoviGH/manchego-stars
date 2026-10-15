@@ -4,6 +4,7 @@ import os
 import sys
 
 import fe8_talk_font
+from inject.raw_pids import enemy_pid_for
 from inject.cast import _classed_cast, char_symbol, CLASS_LOADOUT, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (
     CH03_BOSS_PID, CH03_BRUTE_MINIBOSS_PID, CH03_CHAPTER_YAML, CH03_ENDING_CARD_MSG,
@@ -53,7 +54,6 @@ CH03_TILESET = 'cave-interior'   # stem 'Cave' (TILESET_STEMS); first chapter to
 CH03_GOAL_DONOR = 6              # vanilla slot 6 = defeat_boss goal template (untouched by our injectors)
                                 # a clean slate -- no vanilla boss name/face/defeat-quote leaks, and our
                                 # flagged gDefeatTalkList entry (CHAPTER_L_4) uniquely keys the DefeatBoss win to it.
-CH03_GENERIC_PID = '0xaa'       # vanilla slot-4 generic-minion charIndex (autolevelled trash)
 # DefeatBoss ending script: repurpose the vanilla Ch4 ending EventScr_089F19F8 (defined in ch4-eventscript.h,
 # already extern-referenced by the vanilla Ch4 Misc's DefeatAll -> visible to ch4-eventinfo.h's Misc list).
 CH03_ENDING_SCRIPT = 'EventScr_089F19F8'
@@ -134,14 +134,6 @@ def _inject_ch03_tile_changes(chap, maps_dir, host_index):
     return _inject_tile_changes('MS_Ch03MapChanges', changes, host_index)
 
 
-
-def ch03_enemy_pid(enemy, _index=0):
-    """The boss (grell) and the mid-map miniboss (Brute) each ride a UNIQUE raw pid so their
-    flagged gDefeatTalkList entries key their death events (WIN / midmap AFEV) to them alone;
-    every other enemy shares the generic autolevelled-trash pid."""
-    return (CH03_BOSS_PID if enemy.get('is_boss')
-            else CH03_BRUTE_MINIBOSS_PID if enemy.get('is_miniboss')
-            else CH03_GENERIC_PID)
 
 def inject_ch03(campaign, boot=False, verbose=True):
     """Host for Ch3 "The Termalaine Mine" (#23) on chapter slot 4: register the cave-interior
@@ -247,7 +239,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
         talk_recruiters(campaign, chap['chapter_number']), trex_char,
         CH03_TREX_TALK_FLAG, CH03_TREX_TALK_SCRIPT, CH03_TREX_TALK_MSG)
 
-    enemies = enemy_rows(chap, CH03_CLASS_IDS, ITEM_ENUM, ch03_enemy_pid)
+    enemies = enemy_rows(chap, CH03_CLASS_IDS, ITEM_ENUM, enemy_pid_for('ch03'))
     enemy = '{\n' + '\n'.join(enemies) + '\n    { 0 },\n}'
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:

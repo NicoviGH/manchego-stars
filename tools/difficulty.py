@@ -312,18 +312,15 @@ def _player_lines(campaign, uid, gained):
     """(career stat lines, weapon, tags) for a cast member `gained` levels above its join
     level: class base + donor personal base (donor-base inheritance), grown on its growth
     donor's growths."""
-    unit = inject.cast.load_unit(campaign, uid)
-    unit.setdefault('id', uid)
-    class_enum = inject.cast.class_enum_for(unit)
-    cbase = _class_base(class_enum)
-    dbase = inject.stats.donor_base_stats(_characters_text(), inject.stats.BASE_DONOR[uid])
-    eff = {f: cbase.get(f, 0) + dbase.get(f, 0) for f in inject.stats.BASE_FIELDS}
+    class_enum, cbase, layer = inject.stats.cast_personal_line(
+        campaign, uid, _characters_text(), _classes_text())
+    eff = {f: cbase.get(f, 0) + layer.get(f, 0) for f in inject.stats.BASE_FIELDS}
     lines = [eff]
     if gained:
         growths, _ = inject.stats.donor_growths_and_ranks(
             _characters_text(), inject.stats.GROWTH_DONOR[uid])
         lines = careers(eff, growths, gained, _class_caps(class_enum))
-    weapon = _player_weapon(campaign, uid, unit, class_enum)
+    weapon = _player_weapon(campaign, uid, inject.cast.load_unit(campaign, uid), class_enum)
     return lines, weapon, CLASS_TAGS.get(class_enum, frozenset())
 
 

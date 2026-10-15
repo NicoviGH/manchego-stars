@@ -179,6 +179,23 @@ def personal_base_deltas(fe_stats, class_base, donor_base):
     return out
 
 
+def cast_personal_line(campaign, unit_id, vanilla_text=None, classes_text=None):
+    """(class_enum, class base, personal layer) for a cast member's slot, or None for a
+    name-only unit. FE8 shows class base + the layer; the layer is `personal_base_deltas`
+    off the unit file's fe_stats and its BASE_DONOR's vanilla line. One function for the
+    injector, which writes the layer, and every reader that wants what the unit loads with
+    (difficulty, the wiki) -- they each assembled it themselves before #491."""
+    unit = load_unit(campaign, unit_id)
+    unit.setdefault('id', unit_id)
+    class_enum = class_enum_for(unit)
+    if class_enum is None:
+        return None
+    vanilla = vanilla_text or vanilla_decomp_text('src/data_characters.c')
+    cbase = class_base_stats(class_enum, classes_text)
+    dbase = donor_base_stats(vanilla, BASE_DONOR[unit_id])
+    return class_enum, cbase, personal_base_deltas(unit['fe_stats'], cbase, dbase)
+
+
 def _set_gender(block, female):
     """Set the CA_FEMALE attribute. Replaces .attributes if present; if absent,
     inserts it only when female (absent already means 0 == male)."""
@@ -212,7 +229,7 @@ def patch_character_data(campaign, verbose=True):
             continue
 
         st = unit['fe_stats']
-        cbase = class_base_stats(class_enum)
+        _, cbase, deltas = cast_personal_line(campaign, unit_id, vanilla)
         # MOV is class-only; we can't set it per-character -- just sanity-check it.
         if 'MOV' in st and int(st['MOV']) != cbase['baseMov']:
             print('  WARN %s: MOV %s != class %s base MOV %d (MOV is class-fixed)'
@@ -227,8 +244,6 @@ def patch_character_data(campaign, verbose=True):
 
         # Personal base layer = (authored - class) + the donor's personal line, so the
         # cast lands at vanilla parity instead of "naked class" (donor-base inheritance, #45).
-        dbase = donor_base_stats(vanilla, BASE_DONOR[unit_id])
-        deltas = personal_base_deltas(st, cbase, dbase)
         for field, delta in deltas.items():
             block = _set_field(block, field, delta, CHARACTERS_C, marker)
 

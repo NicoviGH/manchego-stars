@@ -16,6 +16,7 @@ from PIL import Image
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from inject.namespace import stubbed
 import build_campaign as bc
+import inject.raw_pids
 import inject.backgrounds
 import inject.cast
 import inject.chapter_ids
@@ -63,7 +64,7 @@ def location_events(chap):
 def enemy_rows(chap, **kwargs):
     """ch05's enemy rows, through the shared emitter with ch05's own ids and pid rule."""
     m = inject.chapters.ch05
-    return inject.units.enemy_rows(chap, m.CH05_CLASS_IDS, inject.decomp.ITEM_ENUM, m.ch05_enemy_pid,
+    return inject.units.enemy_rows(chap, m.CH05_CLASS_IDS, inject.decomp.ITEM_ENUM, inject.raw_pids.enemy_pid_for('ch05'),
                                    **kwargs)
 
 

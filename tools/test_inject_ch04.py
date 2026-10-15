@@ -11,6 +11,7 @@ import unittest
 from PIL import Image
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import inject.raw_pids
 import inject.cast
 import inject.chapter_ids
 import inject.chapters.ch04
@@ -40,7 +41,7 @@ VANILLA = inject.decomp.vanilla_decomp_text('src/data_characters.c')
 def enemy_rows(chap, **kwargs):
     """ch04's enemy rows, through the shared emitter with ch04's own ids and pid rule."""
     m = inject.chapters.ch04
-    return inject.units.enemy_rows(chap, m.CH04_CLASS_IDS, inject.decomp.ITEM_ENUM, m.ch04_enemy_pid,
+    return inject.units.enemy_rows(chap, m.CH04_CLASS_IDS, inject.decomp.ITEM_ENUM, inject.raw_pids.enemy_pid_for('ch04'),
                                    **kwargs)
 
 

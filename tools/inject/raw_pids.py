@@ -3,6 +3,7 @@
 Also the roster readers every level/difficulty tool shares (`chapter_roster_entries`,
 `placed_entries`), which is where a raw-pid boss's level comes from.
 """
+import functools
 import re
 import sys
 
@@ -322,3 +323,44 @@ def _unregistered_raw_pid_boss_entries(chap):
             and enemy.get('id') not in ENEMY_BASE_SLOT
             and enemy.get('id') not in registered
             and enemy.get('id') not in prologue_guests]
+
+
+# Which character slot each chapter's enemies ride. A boss and a miniboss each take a named slot
+# of their own, so a flagged defeat quote keys to them alone; every other body rides the
+# chapter's generic autolevelled pid -- except ch04, whose monsters ride one vanilla pid per
+# class. This was seven chNN_enemy_pid functions saying the same thing (#491).
+def _chapter_enemy_pids():
+    from inject import chapter_ids as ids
+    return {
+        'ch01': {'boss': 'CHARACTER_%s' % ids.CH01_BOSS_SLOT, 'generic': ids.CH01_GENERIC_PID},
+        'ch02': {'boss': 'CHARACTER_%s' % ids.CH02_BOSS_SLOT,
+                 'miniboss': 'CHARACTER_%s' % ids.CH02_MINIBOSS_SLOT,
+                 'generic': ids.CH02_GENERIC_PID},
+        'ch03': {'boss': ids.CH03_BOSS_PID, 'miniboss': ids.CH03_BRUTE_MINIBOSS_PID,
+                 'generic': ids.CH03_GENERIC_PID},
+        'ch04': {'by_class': ids.CH04_MONSTER_PIDS},
+        'ch05': {'boss': ids.CH05_BOSS_PID, 'miniboss': ids.CH05_MOOSE_PID,
+                 'generic': ids.CH05_GENERIC_PID},
+        'ch06': {'boss': ENEMY_BASE_SLOT['nerra'], 'generic': ids.CH06_GENERIC_PID},
+        'ch07': {'boss': ENEMY_BASE_SLOT['dorbulgruf'], 'generic': ids.CH07_GENERIC_PID},
+    }
+
+
+CHAPTER_ENEMY_PIDS = _chapter_enemy_pids()
+
+
+def enemy_pid(chapter, enemy, _index=0):
+    """The pid one of `chapter`'s enemy entries rides (CHAPTER_ENEMY_PIDS)."""
+    pids = CHAPTER_ENEMY_PIDS[chapter]
+    if 'by_class' in pids:
+        return pids['by_class'][enemy['class']]
+    if enemy.get('is_boss'):
+        return pids['boss']
+    if enemy.get('is_miniboss') and 'miniboss' in pids:
+        return pids['miniboss']
+    return pids['generic']
+
+
+def enemy_pid_for(chapter):
+    """`enemy_pid` bound to one chapter: the `pid_for` the roster emitters take."""
+    return functools.partial(enemy_pid, chapter)
