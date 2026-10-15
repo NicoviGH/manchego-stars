@@ -14,6 +14,10 @@ merfolk water. He has never drowned anyone.
 He was an animal until a few months ago, and he speaks like someone new to words. He goes back to
 Bremen with the party to make peace.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 28), the lake monster of Maer Dualdon is "an awakened plesiosaurus," and the druid who woke it "expects the plesiosaurus to attack fishing boats from Bremen." It tells the party (p. 31), "I used to just swim around the lake and eat fish." The book never names it. Ours rams boats only to turn their crews home before they reach merfolk water, and has drowned no one.
+
 ## Source canon
 
 - *Rime* p.28: a frost druid's *awaken* spell gave him the Intelligence of an average person and

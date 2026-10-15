@@ -28,6 +28,10 @@ He is calm, unhurried and smug, and speaks to his victims with serene, pitying c
 murder as balancing the scales. Defeat only amuses him. He escapes the prologue in a breath of frost
 and returns to give Ravisin her orders.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (pp. 23-24), Hlin names him her "only suspect." As his life was fading, "the spirit of a frost druid beholden to Auril possessed him," and it uses him "as a living vessel to do the Frostmaiden's work." If he dies, the spirit dies with him.
+
 ## Concept
 
 Outwardly: a charming caravan guard for Torg's trading company — makes friends easily,

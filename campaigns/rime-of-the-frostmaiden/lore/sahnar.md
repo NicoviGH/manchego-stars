@@ -19,6 +19,10 @@ Ravisin wakes her and lets her mistake the party for the tomb's desecrators. Bas
 and Sahnar keeps her purpose with a new enemy: the witch. She is stoic, courtly and composed, with a
 duelist's economy and a dry, distant wit, and once freed she means to see what the world became.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 83), the sarcophagus "holds Sahnar, a moon elf mummy that animates as soon as the lid no longer prevents it from sitting up." She is chaotic good, and "follows the commands of its liberators."
+
 ## Concept
 
 An **elven royal** from a people so old the Rime is younger than her tomb — a princess and a

@@ -19,6 +19,10 @@ She is guileless, gentle and eager. When something matters to her she spills ove
 at once, and she says her feelings out loud. Feeding people is how she shows she cares. It is Basil,
 walked into danger under escort, who turns the ancient duelist Sahnar against Ravisin.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 85), hiding beside Ravisin is "an awakened shrub (a berry bush) that follows Ravisin everywhere, in case the druid gets hungry and wants some berries to munch on." The book never names the shrub; Basil is ours.
+
 ## Concept
 
 **She/her** (2026-08-08). RotFM's awakened shrub has no gender — the book gives it none — so

@@ -17,6 +17,10 @@ every hearth and forge, so that the winter can claim the world.
 She is fervent and certain. She is tender to the beasts she wakes and scornful of people, whom she
 sees as the warmth she has to snuff out, and she believes every frost is a mercy.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 80), Ravisin is "the same evil frost druid who awakened the plesiosaurus in Maer Dualdon," hiding in an elven tomb and set on driving the loggers from the forest. Cornered there (p. 85), she shouts, "Ten-Towns will be destroyed—if not by my hand, then by the Frostmaiden's!" Her berries have "stained the druid's teeth blue."
+
 ## Concept
 
 The frost druid who guards the elven tomb — and the villain thread of Act I. She is an

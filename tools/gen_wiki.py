@@ -747,8 +747,67 @@ def chapter_shifts(chap):
         return None
 
 
-def personal_of(ed):
+BUILD_TREE = os.path.join(ROOT, 'build', 'fireemblem8u')
+
+
+@functools.lru_cache(maxsize=None)
+def rom_text(rel):
+    """A decomp source as the ROM is built from it: the build tree's copy, which holds every
+    injection, when it exists; the pristine submodule otherwise."""
+    path = os.path.join(BUILD_TREE, rel)
+    if os.path.isfile(path):
+        with open(path, encoding='utf-8') as f:
+            return f.read()
+    return inject.decomp.vanilla_decomp_text(rel)
+
+
+def rom_block(rel, token):
+    """One `[token - 1] = {...}` entry of a data table (characters, classes), or ''."""
+    if not token:
+        return ''
+    text = rom_text(rel)
+    try:
+        s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % token, rel)
+    except (Exception, SystemExit):
+        return ''
+    return text[s:e]
+
+
+def enemy_token(chap, ed):
+    """The CharacterData index an enemy entry rides in the ROM (`inject.raw_pids.enemy_pid`),
+    else its stat donor, else None for a chapter the pid table does not host."""
+    try:
+        return inject.raw_pids.enemy_pid(chap['_slug'], ed)
+    except (KeyError, TypeError):
+        return (inject.stats.BASE_DONOR.get(ed.get('id'))
+                or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')))
+
+
+def _field(block, name):
+    m = re.search(r'\.%s\s*=\s*(0x[0-9a-fA-F]+|\d+)' % name, block)
+    return int(m.group(1), 0) if m else 0
+
+
+def rom_portrait(chap, ed):
+    """The face the ROM shows for an enemy, as an image: `GetUnitPortraitId` (bmunit.c) on the
+    injected tables -- the character's portraitId, else its class's defaultPortraitId (a
+    monster's card: the grell shows the Mogall's) -- or None for a faceless unit."""
+    pid = _field(rom_block('src/data_characters.c', enemy_token(chap, ed)), 'portraitId')
+    if not pid:
+        pid = _field(rom_block('src/data_classes.c', class_enum_of(ed.get('class'))),
+                     'defaultPortraitId')
+    if not pid:
+        return None
+    return unit_art.portrait_bust(pid, root=BUILD_TREE if os.path.isdir(BUILD_TREE) else None)
+
+
+def personal_of(ed, chap=None):
     personal = ed.get('personal')
+    if not personal and chap is not None and (ed.get('is_boss') or ed.get('is_miniboss')):
+        # A boss's personal line as the ROM carries it: the injected CharacterData of its pid.
+        block = rom_block('src/data_characters.c', enemy_token(chap, ed))
+        if block:
+            personal = {bf: _field(block, bf) for bf in inject.stats.BASE_FIELDS}
     if not personal:
         uid = ed.get('id')
         donor = inject.stats.BASE_DONOR.get(uid) or inject.cast.ENEMY_BASE_SLOT.get(uid)
@@ -756,8 +815,8 @@ def personal_of(ed):
     return personal
 
 
-def loaded(ed, token, level, shifts, mode):
-    return unit_load.load(class_enum_of(token), int(level), personal=personal_of(ed),
+def loaded(ed, token, level, shifts, mode, chap=None):
+    return unit_load.load(class_enum_of(token), int(level), personal=personal_of(ed, chap),
                           autolevel=bool(ed.get('autolevel')),
                           base_level=difficulty._our_base_level(dict(ed, level=level)),
                           shiftable=difficulty._our_takes_difficulty_shift(ed),
@@ -802,12 +861,7 @@ def _ranks(class_enum, donor):
     out = {}
     blocks = [unit_load._class_block(class_enum)]
     if donor:
-        try:
-            text = inject.decomp.vanilla_decomp_text('src/data_characters.c')
-            s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % donor, 'data_characters.c')
-            blocks.append(text[s:e])
-        except Exception:
-            pass
+        blocks.append(rom_block('src/data_characters.c', donor))
     for b in blocks:
         m = re.search(r'\.baseRanks\s*=\s*\{(.*?)\}', b, re.S)
         for t, v in re.findall(r'\[(ITYPE_\w+)\]\s*=\s*(\w+)', m.group(1) if m else ''):
@@ -988,7 +1042,7 @@ def wiki_class(token):
 
 
 def wiki_unit_row(chap, ed, token, level, inv, n, shifts, mode, files, kind='Enemy'):
-    st = loaded(ed, token, level, shifts, mode)
+    st = loaded(ed, token, level, shifts, mode, chap)
     # A named unit shows its name (bosses, personal lines, a named green ally); a generic shows
     # its class, as the ROM's unit window does.
     named = (ed.get('is_boss') or ed.get('is_miniboss') or personal_of(ed)
@@ -1213,16 +1267,16 @@ def aid_of(cls_enum, con):
             (20 - con if 'CA_FEMALE' in attrs else 25 - con))
 
 
-def boss_face(ed, files):
-    """The face a boss shows: the bust its `face:` names, else the vanilla face of the slot it
-    rides (Halvar rides Bazba's, and nothing dresses it), else None (the grell has none)."""
+def boss_face(chap, ed, files):
+    """The face a boss shows: the bust its `face:` names, else what the ROM shows for its pid
+    (`rom_portrait`: Halvar wears Bazba's, the grell the Mogall's card), else None."""
     if ed.get('face'):
         return files.portrait(ed['face'])
-    slot = inject.cast.ENEMY_BASE_SLOT.get(ed.get('id'))
-    bust = unit_art.vanilla_slot_bust(slot) if slot else None
-    if bust is None:
+    img = rom_portrait(chap, ed)
+    if img is None:
         return None
-    return files.add('Portrait %s ms.png' % ed.get('id'), png_uri(bust, key_index0=True), 96, 80)
+    w, h = img.size
+    return files.add('Portrait %s ms.png' % ed.get('id'), png_uri(img, key_index0=w == 96), w, h)
 
 
 def boss_modes(chap, ed, files, shifts=None, modes=None):
@@ -1235,17 +1289,15 @@ def boss_modes(chap, ed, files, shifts=None, modes=None):
     token, lv = ed.get('class'), int(ed.get('level', 1))
     cls_enum = class_enum_of(token)
     cls, article = wiki_class(token)
-    donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
-             or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')))
-    ranks = _ranks(cls_enum, donor)
-    port = boss_face(ed, files)
+    ranks = _ranks(cls_enum, enemy_token(chap, ed))
+    port = boss_face(chap, ed, files)
     sprite_key = 'ms %s' % ed.get('id')
     files.sprite('Ma gba %s.gif' % sprite_key, sprite_frame(chap, token, uid=ed.get('id')))
     inv = [wiki_item(i, files) for i in ed.get('inventory') or []]
     magic = cls_enum and any(t in ranks for t in MAGIC_ITYPES)
     per_mode = []
     for mode, label in modes:
-        st = loaded(ed, token, lv, shifts, mode)
+        st = loaded(ed, token, lv, shifts, mode, chap)
         show = lambda k: unit_load.show(st[k])           # noqa: E731
         per_mode.append((label, {
             'portrait': '[[File:%s]]' % port if port else None, 'sprite': sprite_key,
@@ -1340,6 +1392,28 @@ def _join_lines(uid, name, chap, units):
 
 
 HD_ART = os.path.join(ROOT, 'references', 'References', 'PCs', 'HD Art')
+# Illustrations cropped from *Rime of the Frostmaiden*, with index.yaml naming each one's printed
+# page and the book's caption. Book art, never the busts Nicolas made as sprite sources.
+BOOK_ART = os.path.join(ROOT, 'references', 'References', 'Book Art')
+
+
+def book_art(files, *keys):
+    """[(file, caption)]: the book's illustration of a character (the first key -- lore stem
+    or unit id -- with one), registered with `files`, or [] when the book has none."""
+    index = os.path.join(BOOK_ART, 'index.yaml')
+    if not os.path.isfile(index):
+        return []
+    meta = load_yaml(index) or {}
+    for key in keys:
+        path = os.path.join(BOOK_ART, '%s.jpg' % key)
+        if key and key in meta and os.path.isfile(path):
+            from PIL import Image
+            uri, (w, h) = jpeg_uri(Image.open(path), longest=480)
+            name = 'Rotf %s.jpg' % key
+            files.add(name, uri, w, h)
+            return [(name, "%s, from ''Rime of the Frostmaiden'' (p. %d)."
+                     % (meta[key]['caption'], meta[key]['page']))]
+    return []
 SHEETS = os.path.join(ROOT, 'data', 'pc-sheets')
 # A vanilla character whose wiki article is not their bare name.
 WIKI_ARTICLE = {'Garcia': 'Garcia (The Sacred Stones)'}
@@ -1434,6 +1508,25 @@ def lore_profiles():
     return out
 
 
+def lore_book(stem):
+    """A lore file's `## Book` section: what *Rime of the Frostmaiden* says of the character,
+    page cited and quoted, and where ours departs (lore/README.md). One Trivia line, or None."""
+    if not stem:
+        return None
+    path = os.path.join(LORE, stem + '.md')
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding='utf-8') as f:
+        m = re.search(r'^## Book\n(.*?)(?=^## |\Z)', f.read(), re.S | re.M)
+    return ' '.join(m.group(1).split()) if m else None
+
+
+def lore_trivia(stem, first=()):
+    """Trivia lines: `first` (the record's own), then the book's."""
+    book = lore_book(stem)
+    return list(first) + ([book] if book else [])
+
+
 def lore_for(uid, name):
     """The lore stem that is `uid`'s: its own id, else its name ("Izobai" -> izobai)."""
     profiles = lore_profiles()
@@ -1500,11 +1593,12 @@ def cast_page(uid, units, chs, files):
         'name': name, 'image': image,
         'caption': ("Artwork of %s." % name if artwork else
                     "%s's portrait from ''Manchego Stars''." % name if port else None),
-        'trivia': cast_trivia(uid, name),
+        'trivia': lore_trivia(lore_for(uid, name), cast_trivia(uid, name)),
         'personality': (lore_profiles().get(lore_for(uid, name)) or (None, None))[1],
         'gallery': {'portrait': port, 'minimug': files.minimug(uid) and
                     'Small portrait %s fe08.png' % uid, 'sprites': sprites,
-                    'artwork': [(artwork, 'Artwork of %s.' % name)] if artwork else []},
+                    'artwork': ([(artwork, 'Artwork of %s.' % name)] if artwork else [])
+                    + book_art(files, lore_for(uid, name), uid)},
         'help_text': help_text, 'gender': str(unit.get('gender', '')).capitalize() or None,
         'race': race, 'startingclass': '[[%s]]' % cls,
         'lead': 'a playable [[%s]] in \'\'Manchego Stars\'\'%s' % (
@@ -1531,12 +1625,37 @@ def cast_page(uid, units, chs, files):
                        if unit.get('death_quote') else None})
 
 
+def boss_classes():
+    """The wiki class page of every class a hosted boss rides AS the vanilla creature (no face,
+    skin or battle anim of its own): what tools/wiki/vendor.py fetches class art for."""
+    return sorted({wiki_class(ed.get('class'))[0] for c in chapters()
+                   if c.get('status') != 'planned' for ed in bosses_of(c)
+                   if not (ed.get('face') or ed.get('skin') or ed.get('battle_anim'))})
+
+
+def class_gallery(ed):
+    """[(file, caption)]: the wiki's own art for the class a boss rides (vendor.class_art),
+    when that boss IS the vanilla creature in game. A boss with its own face, skin or battle
+    anim shows its own art instead, and a class that was never vendored shows nothing."""
+    from wiki import vendor as wv
+    if ed.get('face') or ed.get('skin') or ed.get('battle_anim'):
+        return []
+    title = wiki_class(ed.get('class'))[0]
+    path = os.path.join(TOOLS, 'wiki', 'vendor', 'classes', wv.file_name(title) + '.wiki')
+    if not os.path.isfile(path):
+        return []
+    with open(path, encoding='utf-8') as f:
+        art = wv.class_art(f.read(), title)
+    have = os.path.join(TOOLS, 'wiki', 'vendor', 'files')
+    return [(f, cap) for f, cap in art if os.path.isfile(os.path.join(have, f))]
+
+
 def boss_page(chap, ed, units, files):
     """A boss's page, as `Bazba`'s: the chapter it leads, its stats per difficulty (the
     chapter page's own Boss data), and its quotes from the chapter's scenes."""
     name = ed.get('name')
     cls, _article = wiki_class(ed.get('class'))
-    port = boss_face(ed, files)
+    port = boss_face(chap, ed, files)
     battle, death = _quotes(chap, name, units)
     battle, death = battle or ed.get('taunt'), death or ed.get('death_quote')
     title = chap.get('title', chap['_slug'])
@@ -1550,7 +1669,10 @@ def boss_page(chap, ed, units, files):
         'chapter': title, 'boss_modes': boss_modes(chap, ed, files),
         'personality': (lore_profiles().get(lore_for(ed.get('id'), name)) or (None, None))[1],
         'battle_quotes': [(battle, "%s, in %s." % (name, chapter_link(chap)))] if battle else [],
-        'death_quote': (death, "%s's death quote." % name) if death else None})
+        'death_quote': (death, "%s's death quote." % name) if death else None,
+        'gallery': {'portrait': port, 'artwork': book_art(files, lore_for(ed.get('id'), name),
+                                                          ed.get('id')) + class_gallery(ed)},
+        'trivia': lore_trivia(lore_for(ed.get('id'), name))})
 
 
 def planned_page(uid, units, chs, files):
@@ -1566,7 +1688,8 @@ def planned_page(uid, units, chs, files):
         'name': name, 'image': '[[File:%s|class=pixel-art]]' % port if port else None,
         'startingclass': '[[%s]]' % cls,
         'lead': 'a playable [[%s]] planned for \'\'Manchego Stars\'\'' % cls.lower(),
-        'role': role})
+        'role': role, 'trivia': lore_trivia(lore_for(uid, name)),
+        'gallery': {'portrait': port, 'artwork': book_art(files, lore_for(uid, name), uid)}})
 
 
 def npc_page(stem, chs, units, files):
@@ -1574,12 +1697,16 @@ def npc_page(stem, chs, units, files):
     name, profile = lore_profiles()[stem]
     port = files.portrait(face_key(stem, name))
     first = first_appearance(name, chs, units)
+    art = book_art(files, stem)
+    image, caption = (('[[File:%s|class=pixel-art]]' % port,
+                       "%s's portrait from ''Manchego Stars''." % name) if port else
+                      ('[[File:%s|200px]]' % art[0][0], art[0][1]) if art else (None, None))
     return wp.character({
-        'name': name, 'image': '[[File:%s|class=pixel-art]]' % port if port else None,
-        'caption': "%s's portrait from ''Manchego Stars''." % name if port else None,
+        'name': name, 'image': image, 'caption': caption,
+        'gallery': {'portrait': port, 'artwork': art},
         'lead': 'a non-playable character in \'\'Manchego Stars\'\'',
         'role': '%s first appears in %s.' % (name, chapter_link(first)) if first else None,
-        'personality': profile})
+        'personality': profile, 'trivia': lore_trivia(stem)})
 
 
 def npc_stems(chs, units):
@@ -1619,7 +1746,7 @@ def list_wikitext(chs, units, files):
             first = first_appearance(ed['name'], chs, units) or c
             if chs.index(first) > chs.index(c):
                 first = c
-            bosses.append(('[[File:%s|64x64px]]' % boss_face(ed, files) if boss_face(ed, files) else 'N/A', ed['name'],
+            bosses.append(('[[File:%s|64x64px]]' % boss_face(c, ed, files) if boss_face(c, ed, files) else 'N/A', ed['name'],
                            cls_link(ed.get('class')), chapter_link(first), chapter_link(c)))
     others = []
     for stem in npc_stems(chs, units):

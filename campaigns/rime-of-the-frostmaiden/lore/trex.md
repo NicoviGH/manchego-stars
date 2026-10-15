@@ -18,6 +18,10 @@ He is a diplomat first and a survivor underneath: he opens with terms, reframes 
 and reads people well enough to play the angles. Under the airs, his real concern is always his
 warren's survival.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 98), Trex leads the kobolds in the Termalaine mine, "the one wearing the fake wings and doing the talking," and he is "possessed by a ghost." His kobolds put it their own way (p. 95): "Trex smart! He speaks like human who knows a lot." Ours drops the possession and the wings, so his eloquence is his own.
+
 ## Concept
 
 - **Race:** Kobold — a clever one, and his warren's leader. Kobolds are dragonkin who revere

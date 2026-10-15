@@ -1,0 +1,723 @@
+{{Class Infobox
+|image=[[File:FESoV_Brigand.png|150px]]
+|caption=Artwork of a Brigand from {{title|Echoes: Shadows of Valentia}}.
+|flavor_text=Strong and hearty, the Brigand wields axes and makes an exceptional front-line combatant.
+|type=*Infantry <small>(all titles)</small>
+*Barbarian <small>(''Mystery of the Emblem'')</small>
+|weapons=*[[Axe]] <small>(all titles, specialty in ''Three Houses'')</small>{{h|*|Internally uses swords in Gaiden}}
+*Various <small>(''Three Houses'')</small>
+|skills=[[Death Blow]] <small>(''Three Houses'')</small>
+}}
+
+The '''Brigand''' (Japanese: {{hl|山賊|Sanzoku}} ''Mountainthief'') is a class of [[axe]]-wielding fighters who travel on foot. They first appear in {{FE2}} as an enemy-only class internally using [[sword]]s, as axes do not exist in ''Gaiden''.
+
+The Brigand is traditionally an enemy-only class, with the exceptions being {{FE5}}, in which playable character [[Marty]] is a brigand; {{FE6}}, in which [[Gonzalez]] is a brigand; and {{FE16}}, where the Brigand is a standard promotion option for all playable units. In most games, they can cross mountains.
+
+Brigands generally have low stats in all categories, but above average HP and strength. As enemies, they are not at all difficult to defeat. However, playable brigands often have better stats than those of enemies. Their ability to cross mountains can be useful.
+
+In {{title|Thracia 776}}, brigands can change class to the [[Warrior]] class. In {{title|The Binding Blade}}, brigands become [[Berserker]]s. In the coding for {{title|The Blazing Blade}} and {{title|The Sacred Stones}}, Brigands still promote to Berserker, but this can only be seen via hacking the game.
+
+Similar criminal axe classes are [[Pirate]], [[Bandit]], and [[Barbarian]].
+
+==Stats==
+===Base stats===
+{{BaseStats
+|game1={{title|Gaiden}}
+|hp1=26
+|str1=7
+|skl1=1
+|spd1=2
+|luck1=0
+|def1=2
+|res1=0
+|mov1=4
+|wpnr1=[[Sword]]
+|-
+|game2={{title|Mystery of the Emblem}}
+|hp2=24
+|str2=5
+|skl2=0
+|spd2=3
+|luck2=0
+|def2=3
+|res2=0
+|mov2=6
+|wpnr2=[[Axe]]: 10
+|-
+|game3={{title|Genealogy of the Holy War}}
+|hp3=35
+|str3=5
+|mag3=0
+|skl3=0
+|spd3=7
+|luck3=0
+|def3=5
+|res3=0
+|mov3=6
+|wpnr3={{AxeSNES}} B
+|-
+|game4={{title|Thracia 776}}
+|hp4={{h|22|Normal}}/{{h|24|Alternate (unused)}}
+|str4=5
+|mag4=0
+|skl4=0
+|spd4=0
+|luck4=0
+|def4=3
+|mov4=6
+|con4=9
+|wpnr4={{AxeSNES|5}} E
+|-
+|game5={{title|The Binding Blade}}
+|hp5=20
+|str5=5
+|skl5=1
+|spd5=5
+|luck5=0
+|def5=3
+|res5=0
+|mov5=5
+|con5=12
+|wpnr5={{AxeGBA}} D
+|-
+|game6={{title|The Blazing Blade}}
+|hp6=20
+|str6=5
+|skl6=1
+|spd6=5
+|luck6=0
+|def6=3
+|res6=0
+|mov6=5
+|con6=12
+|wpnr6={{AxeGBA}} D
+|-
+|game7={{title|The Sacred Stones}}
+|hp7=20
+|str7=5
+|skl7=1
+|spd7=5
+|luck7=0
+|def7=3
+|res7=0
+|mov7=5
+|con7=12
+|wpnr7={{AxeGBA}} D
+|-
+|game8={{title|Echoes: Shadows of Valentia}}
+|hp8=26
+|str8=7
+|skl8=1
+|spd8=2
+|luck8=0
+|def8=2
+|res8=0
+|mov8=4
+|wpnr8={{Axe15}}
+|-
+|game9={{title|Three Houses}}
+|hp9=28
+|str9=10
+|mag9=6
+|skl9=7
+|spd9=7
+|luck9=8
+|def9=6
+|res9=2
+|mov9=5
+}}
+
+===Max stats===
+{{MaxStats
+|game1={{title|Gaiden}}
+|hp1=52
+|str1=40
+|skl1=40
+|spd1=40
+|luck1=40
+|def1=40
+|res1=40
+|wpnr1=[[Sword]]
+|-
+|game2={{title|Mystery of the Emblem}}
+|hp2=52
+|str2=20
+|skl2=20
+|spd2=20
+|luck2=20
+|def2=20
+|res2=20
+|mov2=12
+|wpnr2=[[Axe]]: 20
+|-
+|game3={{title|Genealogy of the Holy War}}
+|hp3=80
+|str3=20
+|mag3=15
+|skl3=15
+|spd3=22
+|luck3=30
+|def3=20
+|res3=15
+|mov3=6
+|wpnr3={{AxeSNES}} B
+|-
+|game4={{title|Thracia 776}}
+|hp4=80
+|str4=20
+|mag4=20
+|skl4=20
+|spd4=20
+|luck4=20
+|def4=20
+|res4=20
+|mov4=20
+|con4=20
+|wpnr4={{AxeSNES|5}} A
+|-
+|game5={{title|The Binding Blade}}
+|hp5=60
+|str5=20
+|skl5=20
+|spd5=20
+|luck5=30
+|def5=20
+|res5=20
+|mov5=15
+|con5=20
+|wpnr5={{AxeGBA}} A
+|-
+|game6={{title|The Blazing Blade}}
+|hp6=60
+|str6=20
+|skl6=20
+|spd6=20
+|luck6=30
+|def6=20
+|res6=20
+|mov6=15
+|con6=20
+|wpnr6={{AxeGBA}} A
+|-
+|game7={{title|The Sacred Stones}}
+|hp7=60
+|str7=20
+|skl7=20
+|spd7=20
+|luck7=30
+|def7=20
+|res7=20
+|mov7=15
+|con7=20
+|wpnr7={{AxeGBA}} A
+}}
+
+===Miscellaneous data===
+{{ClassMisc
+|game1={{title|Gaiden}}
+|exp1=30
+|crp1=10
+|-
+|game2={{title|Mystery of the Emblem}}
+|exp2=32
+|-
+|game3={{title|Genealogy of the Holy War}}
+|gold3=5,000
+|-
+|game4={{title|Thracia 776}}
+|crp4={{h|3|Normal}}/{{h|2|Alternate (unused)}}
+|vis4=3
+|-
+|game5={{title|The Binding Blade}}
+|crp5=3
+|-
+|game6={{title|The Blazing Blade}}
+|crp6=3
+|vis6=3
+|-
+|game7={{title|The Sacred Stones}}
+|crp7=3
+|vis7=3
+|-
+|game8={{title|Echoes: Shadows of Valentia}}
+|exp8=30
+|crp8=10
+|-
+|game9={{title|Three Houses}}
+|size9=1
+}}
+
+===Growth rates===
+{{ClassGrowths
+|game1={{title|Gaiden}}
+|hp1=150%
+|str1=50%
+|skl1=50%
+|spd1=50%
+|luck1=0%
+|def1=50%
+|res1=0%
+|-
+|game2={{title|Mystery of the Emblem}}
+|hp2=90%
+|str2=50%
+|skl2=10%
+|spd2=20%
+|luck2=0%
+|def2=50%
+|res2=0%
+|-
+|game3={{title|Genealogy of the Holy War}}
+|hp3=100%
+|str3=30%
+|mag3=0%
+|skl3=30%
+|spd3=30%
+|luck3=0%
+|def3=30%
+|res3=10%
+|-
+|game4={{title|Thracia 776}}
+|hp4=70/90%
+|str4=20/30%
+|mag4=0/3%
+|skl4=15/30%
+|spd4=15/30%
+|luck4=10/20%
+|def4=10/20%
+|con4=20/40%
+|mov4=0%
+|-
+|game5={{title|The Binding Blade}}
+|hp5=82%
+|str5=50%
+|skl5=30%
+|spd5=20%
+|luck5=15%
+|def5=10%
+|res5=10%
+|-
+|game6={{title|The Blazing Blade}}
+|hp6=82%
+|str6=50%
+|skl6=30%
+|spd6=20%
+|luck6=15%
+|def6=10%
+|res6=13%
+|-
+|game7={{title|The Sacred Stones}}
+|hp7=82%
+|str7=50%
+|skl7=30%
+|spd7=20%
+|luck7=15%
+|def7=10%
+|res7=13%
+|-
+|game8={{title|Echoes: Shadows of Valentia}}
+|hp8=120%
+|str8=45%
+|skl8=40%
+|spd8=45%
+|luck8=0%
+|def8=40%
+|res8=10%
+|-
+|game9={{title|Three Houses}}
+|hp9=30%
+|str9={{h|10|Player}}/{{h|25|Enemy}}%
+|mag9=0%
+|skl9=0%
+|spd9=0%
+|luck9=0%
+|def9={{h|0|Player}}/{{h|10|Enemy}}%
+|res9={{h|−5|Player}}/{{h|−10|Enemy}}%
+|cha9=5%
+|wpnr9={{Axe16}} +2 {{Brawling16}} +1
+|-
+|game10={{title|Warriors: Three Hopes}}
+|hp10=20%
+|str10=25%
+|mag10=0%
+|skl10=0%
+|spd10=0%
+|luck10=0%
+|def10=0%
+|res10=0%
+|cha10=5%
+}}
+
+===Promotion gains===
+{{ClassPromoGains
+|game1={{title|The Sacred Stones}}{{h|*|Unused}}
+|hp1=2
+|str1=1
+|skl1=1
+|spd1=0
+|def1=1
+|res1=1
+}}
+
+===Stat modifiers===
+{{ClassMods
+|game1={{title|Three Houses}}
+|hp1=2
+|str1=2
+|mag1=0
+|skl1=0
+|spd1=0
+|luck1=0
+|def1=0
+|res1=0
+|cha1=0
+|mov1=1
+|-
+|game2={{title|Warriors: Three Hopes}}
+|hp2=300
+|str2=2
+|mag2=0
+|skl2=0
+|spd2=0
+|luck2=0
+|def2=0
+|res2=0
+|cha2=0
+|mov2=0
+}}
+
+===Class skills===
+{{ClassSkills
+|game1={{title|Three Houses}}
+|skill1={{Item|16|Death Blow}}
+|learn1=[[Class mastery]]. (100 class Exp required)
+|-
+|game2={{title|Warriors: Three Hopes}}
+|skill2={{Item|fewa2|Lance Buster Lv 2}}
+|learn2=Innate.
+}}
+
+==Class change==
+===''Gaiden''===
+{{Class Change 1
+|sprite=[[File:Bs fe02 enemy brigand sword.png]]
+|class=Brigand
+}}
+
+===''Mystery of the Emblem''===
+{{Class Change 1
+|sprite=[[File:Bs fe03 enemy brigand axe.png]]
+|class=Brigand
+}}
+
+===''Genealogy of the Holy War''===
+The class a unit changes into in ''Genealogy of the Holy War'' is determined by the unit and not the class; however, no units change into or out of the Brigand class.
+{{Class Change 1
+|sprite=[[File:Bs fe04 enemy brigand axe.png]]
+|class=Brigand
+}}
+
+===''Thracia 776''===
+The class a unit changes into in ''Thracia 776'' is determined by the unit and not the class; however, all units in the Brigand class have the following class change option:
+{{Class Change 2
+|sprite1=[[File:Bs fe05 marty brigand axe.png]]
+|basic class=Brigand
+|promotion method=Using a {{Item|5|Knight Proof}} at level&nbsp;10 or higher.
+|sprite2=[[File:Bs fe05 marty warrior axe.png]]
+|promoted class=Warrior
+}}
+
+===''The Binding Blade''===
+{{Class Change Converged
+|sprite1=[[File:Bs fe06 geese pirate axe.png]]
+|basic class 1=Pirate
+|sprite2=[[File:Bs fe06 gonzalez brigand axe.png]]
+|basic class 2=Brigand
+|promotion method=Using a {{Item|6|Hero Crest}} after reaching [[level]]&nbsp;10.
+|sprite3=[[File:Bs fe06 geese berserker axe.png]]
+|promoted class=Berserker
+}}
+
+===''The Blazing Blade''===
+{{Class Change 2
+|sprite1=[[File:Bs fe06 playable brigand axe.png]]
+|basic class=Brigand
+|promotion method=Using an {{Item|7|Earth seal}} after reaching [[level]]&nbsp;10.
+|sprite2=[[File:Bs fe07 dart berserker axe.png]]
+|promoted class=Berserker
+}}
+
+===''The Sacred Stones''===
+{{Class Change Branched
+|sprite1=[[File:Bs fe06 playable brigand axe.png]]
+|basic class=Brigand
+|promotion method=Using an {{Item|8|Ocean Seal}} or {{Item|8|Master Seal}} after reaching [[level]]&nbsp;10.
+|condition=The player can freely choose
+|sprite2=[[File:Bs fe08 ross berserker axe.png]]
+|promoted class 1=Berserker
+|sprite3=[[File:Bs fe08 ross warrior axe.png]]
+|promoted class 2=Warrior
+}}
+
+===''Echoes: Shadows of Valentia''===
+{{Class Change 1
+|sprite=[[File:Ma fe15 brigand enemy.gif]]
+|class=Brigand
+}}
+
+===''Three Houses''===
+{{Class Change FE16
+|sprite=[[File:Ma fe16 brigand playable.gif]]
+|class=Brigand
+|tier=Intermediate
+|req={{Axe16}} C
+}}
+
+===''Warriors: Three Hopes''===
+{| class="class-change"
+! Beginner class
+! Method
+! Intermediate class
+! Method
+! Advanced class
+! Method
+! Master class
+|-
+| rowspan="2" class="pixel-art" | [[File:Ma fewa2 fighter playable.gif]]<br>[[Fighter]]
+| rowspan="2" | Using an {{Item|fewa2|Intermediate Seal|image=seal}} after mastering Fighter.
+| rowspan="2" class="pixel-art" | [[File:Ma fewa2 brigand playable.gif]]<br>[[Brigand]]
+| rowspan="2" | Using an {{Item|fewa2|Advanced Seal|image=seal}} after mastering Brigand.
+| class="pixel-art" | [[File:Ma fe16 warrior playable.gif]]<br>[[Warrior]]
+| rowspan="2" | Using a {{Item|fewa2|Master Seal|image=seal}} after mastering Warrior or Wyvern Rider.
+| rowspan="2" class="pixel-art" | [[File:Ma fe16 wyvern lord playable.gif]]<br>[[Wyvern Lord]]
+|-
+| class="pixel-art" | [[File:Ma fe16 wyvern rider playable.gif]]<br>[[Wyvern Rider]]
+|}
+
+==Playable Brigands==
+{{Notable Units
+|name1=Marty
+|game1={{title|Thracia 776}}
+|name2=Gonzalez
+|game2={{title|The Binding Blade}}
+|name3=Hilda
+|game3={{title|Three Houses}} {{Silver Snow}}
+}}
+
+==Notable enemy Brigands==
+{{Notable Units
+|units=enemy
+|name1=Barth
+|game1={{title|Gaiden}}, {{title|Echoes: Shadows of Valentia}}
+|name2=Garth
+|game2={{title|Gaiden}}, {{title|Echoes: Shadows of Valentia}}
+|name3=Hyman
+|game3={{title|Mystery of the Emblem}}
+|name4=Dory
+|game4={{title|The Binding Blade}}
+|name5=Scollan
+|game5={{title|The Binding Blade}}
+|name6=Batta
+|game6={{title|The Blazing Blade}}
+|name7=Zugu
+|game7={{title|The Blazing Blade}}
+|name8=Migal
+|game8={{title|The Blazing Blade}}
+|name9=Carjiga
+|game9={{title|The Blazing Blade}}
+|name10=Bug
+|game10={{title|The Blazing Blade}}
+|name13=Groznyi
+|game13={{title|The Blazing Blade}}
+|name14=Bone
+|game14={{title|The Sacred Stones}}
+|name15=Bazba
+|game15={{title|The Sacred Stones}}
+|name16=Bandit (character){{!}}Bandit
+|game16={{title|The Sacred Stones}}
+|name17=Brigand Boss
+|game17={{title|Echoes: Shadows of Valentia}}
+|name18=Caspar
+|game18={{title|Three Houses}} {{Blue Lions}} {{Golden Deer}}
+|name19=Hilda
+|game19={{title|Three Houses}} {{Black Eagles}} {{Blue Lions}}
+|name20=Kostas
+|game20={{title|Warriors: Three Hopes}}
+}}
+
+==Notable NPC Brigands==
+{{Notable Units
+|units=neutral
+|name1=Jan
+|game1={{title|The Blazing Blade}}
+|name2=Getz
+|game2={{title|Warriors: Three Hopes}}
+}}
+
+==Flavor text==
+{{DescriptionHdr}}
+{{DescriptionCell
+|game={{title|The Binding Blade}}<br><small>(class roll)</small>
+|english=Mighty axefighters especially skilled<br>in mountain combat.{{h|*|Fan translation}}
+|japanese=斧をもちいて戦う　『山のあらくれ』たち<br>うでっぷしが強く　山での戦闘を得意とする
+}}
+{{DescriptionCell
+|game={{title|The Binding Blade}}<br><small>(help)</small>
+|english=Mighty mountaineers who<br>prefer axes in combat.{{h|*|Fan translation}}
+|japanese=斧で戦う『山のあらくれ』<br>力が強く　山の戦闘が得意
+}}
+{{DescriptionCell
+|game={{title|The Blazing Blade}}<br><small>(class roll)</small>
+|english=Mighty axefighters especially skilled<br>in mountain combat.
+|japanese=斧をもちいて戦う　『山のあらくれ』たち<br>うでっぷしが強く　山での戦闘を得意とする
+}}
+{{DescriptionCell
+|game={{title|The Blazing Blade}}<br><small>(help)</small>
+|english=Mighty mountaineers who<br>prefer axes in combat.
+|japanese=斧で戦う『山のあらくれ』<br>力が強く　山の戦闘が得意
+}}
+{{DescriptionCell
+|game={{title|The Sacred Stones}}<br><small>(class roll)</small>
+|english=Mighty axe fighters especially skilled<br>in mountain combat.
+|japanese=斧をもちいて戦う　『山のあらくれ』たち<br>うでっぷしが強く　山での戦闘を得意とする
+}}
+{{DescriptionCell
+|game={{title|The Sacred Stones}}<br><small>(help)</small>
+|english=Mighty mercenaries who thrive<br>in mountains. Equip: Axes
+|japanese=力が強く山を得意とする『あらくれ』<br>装備『斧』
+}}
+{{DescriptionCell
+|game={{title|Echoes: Shadows of Valentia}}
+|english=An axe-toting thug who<br>revels in violence.
+|japanese=斧を持ち暴れまわる<br>あらくれもの
+}}
+{{DescriptionCell
+|game={{title|Three Houses}}
+|english=Strong and hearty, the Brigand wields axes<br>and makes an exceptional<br>front-line combatant.
+|japanese=力に優れた斧戦士。<br>体力にも優れ、前線で活躍する。
+}}
+{{DescriptionCell
+|game={{title|Fortune's Weave}}
+|english=This rough-and-tumble class cuts<br>down foes with powerful axe<br>strikes.
+|japanese=斧の扱いが自慢の荒くれ者<br>高い威力の一撃で敵を打ち倒す
+}}
+{{DescriptionCell
+|game={{title|Warriors: Three Hopes}}
+|english=Strong and hearty, the Brigand wields axes<br>and makes an exceptional front-line<br>combatant.
+|japanese=力に優れた斧戦士。<br>体力にも優れ、前線で活躍する。
+}}
+{{DescriptionFtr}}
+
+==Trivia==
+*In {{title|Gaiden}}, Brigands are internally the same class as [[Villager]]s; whether a unit is a Villager or a Brigand is determined by its affiliation.
+* In {{FE3}}, Brigands and Fighters have the same sprites.
+* An unused string for the Brigand exists in {{title|New Mystery of the Emblem}}. The string is named <code>MJID_KLEPHT</code>, in reference to the [[wikipedia:klepht|klepht]]s of Ottoman Greece.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Brigand
+|eng-mean=A person who, typically as a member of a band, lives by forcefully or wrongfully taking things.
+|jpn-name=• {{h|山賊|Sanzoku}}<br>• {{h|盗賊|Tōzoku}}<br>• {{h|マウンテンシーフ|Mauntenshīfu}}<br>• {{h|ブリガンド|Burigando}}
+|jpn-mean=• Officially romanized as '''Bandit''' or '''Mountainthief'''. Rendered in hiragana as {{h|さんぞく|Sanzoku}} in ''Mystery of the Emblem''.<br>• Thief. This name is used only in {{title|Gaiden}} and {{title|Echoes: Shadows of Valentia}}. Rendered in hiragana as {{h|とうぞく|Tōzoku}} in ''Gaiden''.<br>• Mountain Thief. This name is used only in ''Genealogy of the Holy War'' and ''Thracia 776''.<br>• Brigand. This name is used only in ''Three Houses'' and ''Warriors: Three Hopes''.
+|span-name=• Forajido<br>• Ladrón
+|span-mean=• Outlaw; in the GBA games and ''Three Houses''.<br>• Thief; used in ''Shadows of Valentia''; this is the name of the [[Thief]] class.
+|fren-name=• Bandit<br>• Voleur<br>• Brigand
+|fren-mean=• Bandit; in the GBA games.<br>• Thief; used in ''Shadows of Valentia''; this is the name of the [[Thief]] class.<br>• Used in {{title|Three Houses}}.
+|ger-name=• Bandit<br>• Dieb
+|ger-mean=• Bandit; used in the GBA games and ''Three Houses''.<br>• Thief; used in ''Shadows of Valentia''; this is the name of the [[Thief]] class.
+|ital-name=• Brigante<br>• Ladro
+|ital-mean=• Brigand; used in the GBA games and ''Three Houses''.<br>• Thief; used in ''Shadows of Valentia''; this is the name of the [[Thief]] class.
+|dut-name=Rover
+|dut-mean=Brigand
+|kor-name=• 도적<br>• {{h|브리건드|beurigeondeu}}
+|kor-mean=• Used in ''Shadows of Valentia''.<br>• Brigand; used in ''Three Houses''.
+|ch-simp-name=• 盗贼<br>• {{h|土匪|tǔfěi}}
+|ch-simp-mean=• Used in ''Shadows of Valentia''.<br>• Bandit; used in ''Three Houses''.
+|ch-trad-name=• 盜賊<br>• {{h|土匪|tǔfěi}}
+|ch-trad-mean=• Used in ''Shadows of Valentia''.<br>• Bandit; used in ''Three Houses''.
+}}
+
+==Gallery==
+===Official artwork===
+<gallery>
+FESoV Brigand.png|Artwork of a Brigand from {{title|Echoes: Shadows of Valentia}}.
+</gallery>
+
+===Portraits===
+<gallery>
+Generic portrait brigand fe03.png|The generic Brigand portrait in {{title|Mystery of the Emblem}}.
+Generic portrait brigand fe04.png|The generic Brigand portrait in {{title|Genealogy of the Holy War}}.
+Generic portrait brigand fe05.png|The generic Brigand portrait in {{title|Thracia 776}}.
+Generic portrait brigand fe06.png|The generic Brigand portrait in the [[Game Boy Advance]] games.
+Generic portrait brigand enemy fe15.png|The generic Brigand portrait in {{title|Echoes: Shadows of Valentia}}.
+Generic portrait brigand possessed fe15.png|The generic Specter/[[Death Mask]] Brigand portrait in ''Echoes: Shadows of Valentia''.
+Generic portrait brigand b fe15.png|An alternate Brigand portrait in ''Echoes: Shadows of Valentia'', seen only in cutscenes.
+Generic small portrait brigand 05 fe16.png|One of the generic male Brigand portraits in {{title|Three Houses}}.
+Generic small portrait brigand female 01 fe16.png|One of the generic female Brigand portraits in ''Three Houses''.
+</gallery>
+
+{{Nav|Click "Expand" to view all {{title|Three Houses}} portraits|
+<gallery>
+Generic small portrait brigand 01 fe16.png|One of the generic male Brigand portraits in ''Three Houses''.
+Generic small portrait brigand 02 fe16.png|One of the generic male Brigand portraits in ''Three Houses''.
+Generic small portrait brigand 03 fe16.png|One of the generic male Brigand portraits in ''Three Houses''.
+Generic small portrait brigand 04 fe16.png|One of the generic male Brigand portraits in ''Three Houses''.
+Generic small portrait brigand 05 fe16.png|One of the generic male Brigand portraits in ''Three Houses''.
+Generic small portrait brigand female 01 fe16.png|One of the generic female Brigand portraits in ''Three Houses''.
+Generic small portrait brigand female 02 fe16.png|One of the generic female Brigand portraits in ''Three Houses''.
+</gallery>
+}}
+
+{{Nav|Click "Expand" to view all {{title|Warriors: Three Hopes}} portraits|
+<gallery>
+Generic small portrait brigand 01 fewa2.png|One of the generic male Brigand portraits in ''Warriors: Three Hopes''.
+Generic small portrait brigand 02 fewa2.png|One of the generic male Brigand portraits in ''Warriors: Three Hopes''.
+Generic small portrait brigand 03 fewa2.png|One of the generic male Brigand portraits in ''Warriors: Three Hopes''.
+Generic small portrait brigand 04 fewa2.png|One of the generic male Brigand portraits in ''Warriors: Three Hopes''.
+Generic small portrait brigand female 01 fewa2.png|One of the generic female Brigand portraits in ''Warriors: Three Hopes''.
+Generic small portrait brigand female 02 fewa2.png|One of the generic female Brigand portraits in ''Warriors: Three Hopes''.
+</gallery>
+}}
+
+===Screenshots===
+<gallery>
+Ss fe16 edelgard brigand.png|[[Edelgard]] as a Brigand in {{title|Three Houses}}.
+Ss fe16 june famitsu 24.jpg|[[Hilda]] as a Brigand in ''Three Houses''.
+</gallery>
+
+==={{title|Cipher}} artwork===
+<gallery>
+TCGCipher Caspar 01.jpg|Artwork of [[Caspar]] as a Brigand.
+TCGCipher Hilda 03.jpg|Artwork of [[Hilda]] as a Brigand.
+</gallery>
+<!--
+==References==
+{{refbar}}
+-->
+
+==See also==
+{{div col|11em}}
+*[[Axe Fighter]]
+*[[Bandit]]
+*[[Barbarian]]
+*[[Corsair]]
+*[[Fighter]]
+*[[Oni Savage]]
+*[[Pirate]]
+{{div col end}}
+
+{{Project Classes}}
+{{NavClassFE2}}
+{{NavClassFE3}}
+{{NavClassFE4}}
+{{NavClassFE5}}
+{{NavClassFE6}}
+{{NavClassFE7}}
+{{NavClassFE8}}
+{{NavClassFE15}}
+{{NavClassFE16}}
+{{NavClassFE18}}
+{{NavClassFEWA2}}
+[[Category:Base classes]]
+[[Category:Intermediate classes]]
+[[Category:Enemy-exclusive classes]]

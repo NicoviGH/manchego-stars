@@ -69,6 +69,19 @@ class TestGenWiki(unittest.TestCase):
             self.assertIn(gen_wiki.load_yaml(os.path.join(
                 gen_wiki.CAMP, 'pcs', uid + '.yaml')).get('lord_pitch'), lord.replace('&#39;', "'"))
 
+    def test_a_faceless_pid_shows_its_class_card(self):
+        # GetUnitPortraitId: the grell's raw pid has no portrait, so the ROM shows the Mogall's.
+        chap = next(c for c in self.chapters if c['_slug'] == 'ch03')
+        grell = next(e for e in chap['enemy_units'] if e['id'] == 'grell')
+        self.assertEqual(gen_wiki.rom_portrait(chap, grell).size, (80, 72))
+
+    def test_book_characters_cite_the_book_in_trivia(self):
+        for stem in ('hlin-trollbane', 'scramsax', 'sephek-kaltro', 'duvessa-shane',
+                     'vellynne-harpell', 'trex', 'izobai', 'ravisin', 'dorbulgruf', 'messie',
+                     'sahnar', 'basil', 'grell'):
+            self.assertRegex(gen_wiki.lore_book(stem) or '', r"Rime of the Frostmaiden'' \(pp?\. ",
+                             stem)
+
     def test_open_decisions_stay_off_the_wiki(self):
         # They live in each chapter's `open_questions` and on #486 (Nicolas, 2026-10-14).
         self.assertNotIn('id="decisions"', self.page)

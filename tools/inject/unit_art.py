@@ -325,9 +325,8 @@ def unit_bust(campaign, uid):
 
 @functools.lru_cache(maxsize=None)
 def vanilla_slot_bust(slot):
-    """The vanilla face a character slot shows when no bust dresses it (Halvar wears Bazba's):
-    its tileset decoded to a 96x80 bust with the closed mouth laid on where portrait_data.c puts
-    it, in the slot's own palette. Read from the pristine submodule, or None for a faceless slot."""
+    """The vanilla face a character slot shows when no bust dresses it (Halvar wears Bazba's).
+    Read from the pristine submodule, or None for a faceless slot."""
     from inject.decomp import _find_brace_block, vanilla_decomp_text
     chars = vanilla_decomp_text('src/data_characters.c')
     s, e = _find_brace_block(chars, '[CHARACTER_%s - 1]' % slot.upper().replace('CHARACTER_', ''),
@@ -335,17 +334,41 @@ def vanilla_slot_bust(slot):
     m = re.search(r'\.portraitId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars[s:e])
     if not m or int(m.group(1), 0) == 0:
         return None
-    row = re.search(r'\{portrait_(\w+)_tileset,[^}]*?,\s*(\d+),\s*(\d+),\s*(\d+),[^}]*\},\s*//\s*%d\b'
-                    % (int(m.group(1), 0) - 1), vanilla_decomp_text('src/portrait_data.c'))
+    return portrait_bust(int(m.group(1), 0))
+
+
+@functools.lru_cache(maxsize=None)
+def portrait_bust(portrait_id, root=None):
+    """Portrait `portrait_id` decoded to a 96x80 bust with the closed mouth laid on where
+    portrait_data.c puts it, in its own palette, or None. `root` is a decomp tree (default the
+    pristine submodule); pass the build tree to see the faces the build dressed."""
+    from inject.decomp import vanilla_decomp_text
+    root = root or os.path.join(REPO, 'fireemblem8u')
+    path = os.path.join(root, 'src', 'portrait_data.c')
+    if root == os.path.join(REPO, 'fireemblem8u') or not os.path.isfile(path):
+        text, root = vanilla_decomp_text('src/portrait_data.c'), os.path.join(REPO, 'fireemblem8u')
+    else:
+        with open(path, encoding='utf-8') as f:
+            text = f.read()
+    row = re.search(r'(?m)^\s*\{([^}]*)\},\s*//\s*%d\b' % (portrait_id - 1), text)
     if not row:
         return None
-    name, xmouth, ymouth = row.group(1), int(row.group(3)), int(row.group(4))
-    base = os.path.join(REPO, 'fireemblem8u', 'graphics', 'portrait', 'portrait_' + name)
-    bust = portrait_tool.decode(Image.open(base + '_tileset.png'))
-    mouth = Image.open(base + '_mouth.png').crop((0, 0, portrait_tool.MOUTH_W,
-                                                  portrait_tool.MOUTH_H))
+    f = [x.strip() for x in row.group(1).split(',')]
+    pdir = os.path.join(root, 'graphics', 'portrait')
+    pal = os.path.join(pdir, f[2] + '.agbpal')
+    if f[0] == '0' and f[4] != '0':
+        # A monster's face is a class card (portrait_Mogall_card), not a bust tileset.
+        card = Image.open(os.path.join(pdir, f[4] + '.png'))
+        card.putpalette(_agbpal(pal))
+        return card
+    if f[0] == '0':
+        return None
+    xmouth, ymouth = int(f[7]), int(f[8])
+    bust = portrait_tool.decode(Image.open(os.path.join(pdir, f[0] + '.png')))
+    mouth = Image.open(os.path.join(pdir, f[3] + '.png')).crop(
+        (0, 0, portrait_tool.MOUTH_W, portrait_tool.MOUTH_H))
     bust.paste(mouth, (xmouth * 8, ymouth * 8))
-    bust.putpalette(_agbpal(base + '_palette.agbpal'))
+    bust.putpalette(_agbpal(pal))
     return bust
 
 

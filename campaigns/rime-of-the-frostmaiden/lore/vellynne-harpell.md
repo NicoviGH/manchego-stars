@@ -20,6 +20,10 @@ She is cold, formal and economical. She treats capable people as instruments, de
 pays on delivery, and she does not finish second. She sets the party on the trail of her stolen
 orb.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 8), she is "a necromancer named Vellynne Harpell, who helps steer them toward the discovery of a lost Netherese enclave entombed in the Reghed Glacier." A rival in the Arcane Brotherhood is less kind (p. 161): but for her family's strings, "that old scarecrow would still be reanimating dead cats in Longsaddle."
+
 ## Concept
 
 The cordial face of a cold guild — and the most dangerous kind of ally: useful, honest

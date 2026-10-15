@@ -14,6 +14,10 @@ He is stubborn and frightened, and the fear comes out as anger: the more scared 
 gets. He talks over people, breaks off when the fear gets close, and gives in grudgingly and all at
 once.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 27), he is Bremen's "town speaker and oldest living resident," twice found "wandering the frozen shores of the Shaengarne in heavy furs, with no memory of how he got there." Ours keeps his wits; the forgetful speaker is the book's.
+
 ## Source canon
 
 - *Rime* p.27: Bremen's speaker and oldest living resident, a shield dwarf, "old even by dwarf

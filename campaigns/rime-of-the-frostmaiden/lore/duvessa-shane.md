@@ -15,6 +15,10 @@ of endless winter have worn her down.
 She is warm, plain-spoken and sincere, leads with thanks, and hires by results. After the iron job
 she takes the party on for ongoing work across Ten-Towns.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 32), Bryn Shander's leader is "Speaker Duvessa Shane": "Though relatively young, Duvessa is the head of the Council of Speakers."
+
 ## Concept
 
 The honest face of the capital. **Lawful good human noble, relatively young** — head of

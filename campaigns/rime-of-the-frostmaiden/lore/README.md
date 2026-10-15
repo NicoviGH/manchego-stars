@@ -20,6 +20,12 @@ numbers or drafting notes). The chapter wiki (`tools/gen_wiki.py`) prints it as 
 Personality section, and its first sentence is their line in the character list. Everything else in
 a file is for writers. Keep the Profile true when the character changes.
 
+A character from *Rime of the Frostmaiden* also gets a **`## Book`** section right after the
+Profile: what the book says of them, with the printed page and its own words quoted, and where
+ours departs. The wiki prints it as a Trivia line. The book's illustration of them, when it has
+one, is cropped into `References/Book Art/` (local, beside the HD art) with its page and caption
+in that folder's `index.yaml`.
+
 ## Why
 
 Manchego Stars units are **stock vanilla FE8 classes with no per-character abilities** (see

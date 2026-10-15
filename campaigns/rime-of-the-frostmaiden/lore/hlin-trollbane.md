@@ -13,6 +13,10 @@ has been investigating the dagger-of-ice murders because nobody else would.
 She is plain and dry, lays out facts like a detective, and hedges her guesses. She tracked the killer down herself and brought
 Scramsax along to take him, and she later hires the party at The Northlook.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 22), Hlin is "a retired bounty hunter who has been stalking a serial killer ever since she found a connection between three murders and a small trading company called Torg's." Her hunt is the adventure's first quest.
+
 ## Concept
 
 Elderly shield dwarf, retired bounty hunter — neutral good, a nasty scar across her nose,

@@ -149,6 +149,60 @@ def dynamic_templates(seen, missing):
         crawl(sorted(wanted), seen, missing)
 
 
+def fetch_file(name):
+    """Download one of the wiki's files into vendor/files. Special:FilePath sits behind a bot
+    challenge; the API hands over the CDN URL."""
+    api = 'https://fireemblemwiki.org/w/api.php?' + urllib.parse.urlencode({
+        'action': 'query', 'titles': 'File:' + name, 'prop': 'imageinfo',
+        'iiprop': 'url', 'format': 'json'})
+    with urllib.request.urlopen(urllib.request.Request(api, headers=UA), timeout=30) as r:
+        info = json.load(r)['query']['pages']
+    page = next(iter(info.values()))
+    if 'imageinfo' not in page:
+        return False
+    with urllib.request.urlopen(urllib.request.Request(page['imageinfo'][0]['url'], headers=UA),
+                                timeout=30) as r:
+        with open(os.path.join(VENDOR, 'files', name), 'wb') as f:
+            f.write(r.read())
+    return True
+
+
+def class_art(wikitext, title):
+    """[(file, caption)] the wiki shows for a class: its infobox artwork, then its own FE8
+    battle sprites (`Bs fe08 <class> ...`; a promotion's sprites are its own page's)."""
+    out = []
+    img = re.search(r'\|image=\[\[File:([^|\]]+)', wikitext)
+    cap = re.search(r'\|caption=(.*)', wikitext)
+    if img:
+        out.append((img.group(1).strip(), cap.group(1).strip() if cap else 'Artwork of a %s.'
+                    % title))
+    # The base class's sprite in the page's own The Sacred Stones class-change block
+    # (`sprite1=`, or `sprite=`): Brigand's is the FE6 file, since FE8 reuses it.
+    block = re.search(r"===''The Sacred Stones''===(.*?)(?:\n===|\n==[^=]|\Z)", wikitext, re.S)
+    sprite = block and re.search(r'\|sprite1?=\[\[File:([^|\]]+)', block.group(1))
+    if sprite:
+        out.append((sprite.group(1).strip(),
+                    "A %s's battle sprite in {{title|The Sacred Stones}}." % title))
+    return out
+
+
+def vendor_class_art():
+    """Each class page our bosses ride (gen_wiki.boss_classes), and the art `class_art` takes
+    from it, into vendor/classes and vendor/files. gen_wiki shows it on a boss that IS the
+    vanilla creature in game (no custom face, skin or battle anim)."""
+    import gen_wiki
+    os.makedirs(os.path.join(VENDOR, 'classes'), exist_ok=True)
+    for title in gen_wiki.boss_classes():
+        text = fetch(title, 'raw')
+        if not text:
+            continue
+        with open(os.path.join(VENDOR, 'classes', file_name(title) + '.wiki'), 'w', encoding='utf-8') as f:
+            f.write(text)
+        for name, _cap in class_art(text, title):
+            if not os.path.exists(os.path.join(VENDOR, 'files', name)):
+                fetch_file(name)
+
+
 def main():
     for sub in ('templates', 'pages', 'golden'):
         os.makedirs(os.path.join(VENDOR, sub), exist_ok=True)
@@ -157,16 +211,8 @@ def main():
     dynamic_templates(seen, missing)
     os.makedirs(os.path.join(VENDOR, 'files'), exist_ok=True)
     for name in FILES:
-        # Special:FilePath sits behind a bot challenge; the API hands over the CDN URL.
-        api = 'https://fireemblemwiki.org/w/api.php?' + urllib.parse.urlencode({
-            'action': 'query', 'titles': 'File:' + name, 'prop': 'imageinfo',
-            'iiprop': 'url', 'format': 'json'})
-        with urllib.request.urlopen(urllib.request.Request(api, headers=UA), timeout=30) as r:
-            info = json.load(r)['query']['pages']
-        url = next(iter(info.values()))['imageinfo'][0]['url']
-        with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=30) as r:
-            with open(os.path.join(VENDOR, 'files', name), 'wb') as f:
-                f.write(r.read())
+        fetch_file(name)
+    vendor_class_art()
     print('%d titles vendored, %d missing on the wiki (template calls inside unused '
           'branches)' % (len(seen) - len(missing), len(missing)))
 

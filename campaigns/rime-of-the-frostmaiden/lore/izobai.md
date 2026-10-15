@@ -16,6 +16,10 @@ She is cunning, mercenary and mocking, prices everyone like loot, and has no sta
 Frostmaiden's winter. She would take a bribe over a fight and never gives back what is already
 hers.
 
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 35), she is "the one-eared goblin boss, Izobai," who sends six goblins after an abandoned sled while she stays behind to guard the band's wagon and the two polar bears that pull it.
+
 ## Concept
 
 - **Wants:** the haul, and to keep it. Iron, coin, anything with a price.
