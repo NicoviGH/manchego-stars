@@ -6,38 +6,43 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-14 (Claude, later): the wiki review turned up one cause behind many bugs --
-readers re-deriving what the build decides -- so the consolidation (#491) is in flight ahead of
-the wiki. **Nicolas's order: finish the wiki and merge it, THEN resume ch07+ planning with the
-updated wiki.** What landed and why is in `git log`, the PRs and #486 -- this file keeps no
-"recently landed" list.
+Refreshed 2026-10-14 (Claude, session end): the wiki review found one cause behind most bugs --
+readers re-deriving what the build decides -- so the consolidation PR (#492) sits under the
+wiki (#487). **Nicolas's order: finish the wiki and merge it, THEN resume ch07+ planning with the
+updated wiki.** Start from **#493** (his full review + first findings). What landed and why is in
+`git log`, the PRs and #486 -- this file keeps no "recently landed" list.
 
 ## In flight
 
-- **PR #492 (`refactor/491-unit-art`), ROM byte-identical.** `inject.unit_art` (one answer for a
-  unit's bust and map sprite) and `inject.decomp.ITEM_ENUM` (one item table); ADR 0344. Proven
-  IDENTICAL in all 16 fingerprint configs. A second consolidation commit is due on it (one
-  enemy-pid resolver for the seven `chNN_enemy_pid`, one cast-stat function the stats emitter
-  and difficulty share, `item_icon_id`'s 12-line scan), then a fresh 16-config fingerprint round.
-  **Stash `chwinga glow fix` (on this branch)** restores the ch02 chwinga's green bust, lost since
-  #488 (its RGB-keyed recolour matched nothing); it waits on Nicolas's OK of
-  `map-review/chwinga_glow_fix.png`, then commits on #492 (a deliberate ROM change).
-- **PR #487 (`feat/486-chapter-wiki`), stacked on #492.** The wiki (published privately at
-  https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate and republish to the same file),
+- **PR #492 (`refactor/491-unit-art`), ROM byte-identical, two commits.** One resolver each for
+  unit art (`inject.unit_art`), item ids (`inject.decomp.ITEM_ENUM`), enemy pids
+  (`inject.raw_pids.enemy_pid`) and a cast member's stat line (`inject.stats.cast_personal_line`);
+  ADR 0344. Commit 1 is proven IDENTICAL in all 16 fingerprint configs; commit 2 in canonical
+  only. **Owed: the other 15 configs for commit 2**, reusing the baselines in
+  `build/fp-baselines/` (recorded once from main's code; `configs.txt` maps name -> flags):
+  `python3 tools/injection_fingerprint.py --check build/fp-baselines/<name>.json --flags="<flags>"`.
+  Then `/code-review medium`, merge on his word.
+  **Stash `chwinga glow fix` (on that branch)** restores the ch02 chwinga's green bust, blue in the
+  ROM since #488; waits on Nicolas's OK of `map-review/chwinga_glow_fix.png`, then commits on #492
+  (a deliberate ROM change).
+- **PR #487 (`feat/486-chapter-wiki`), stacked on #492** (base retargeted). The wiki
+  (https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate + republish to the same file),
   the ch09-ch20 stubs, the data standardization, and #489's recruit kit folded in (#489 closed:
-  Trex joins ch03 with Colm's kit, Sahnar is L5 + Killing Edge, Baxby carries the lance first --
-  deliberate ROM changes). Wiki-side resolver work is in stash `wiki resolver integration`.
-  Merge order: #492, then #487.
+  Trex joins ch03 with Colm's kit, Sahnar L5 + Killing Edge, Baxby lance first -- deliberate ROM
+  changes). The wiki now reads busts, sprites, kits and items through the resolvers. **Next: #493**
+  -- rebuild the generator on the Fire Emblem Wiki's own page source and templates (`action=edit`)
+  instead of eyeballed markup, and fix every finding at the source. Merge order: #492, then #487.
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
   locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
   locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
+- **#490** -- the difficulty model's autolevel diverges from the ROM (unflagged bosses grown,
+  promoted bonus missing); fix before ch09 is measured.
 
 **Next, in order** (the full state, every decision and every open pick: #486, latest comments):
 
-1. **#492 then #487.** Finish #492's second consolidation commit and its fingerprint round,
-   `/code-review medium`, merge on his word. Rebase #487 on main, pop the wiki stash, audit every
-   wiki cell against the resolvers (anything the wiki still derives itself is a bug), republish,
-   take Nicolas's layout list, `/code-review medium`, merge on his word.
+1. **#492** (owed configs, review, merge on his word), then **#493 on #487**, republish, his
+   layout list, `/code-review medium`, merge on his word. Nicolas is leaning toward ch01 on vanilla
+   Ch1's map with Hamill Canyon back as ch08 -- raise it in the planning step.
 2. **#486 planning, continue WITH Nicolas** on the updated wiki: the open picks on the Open
    decisions page (ch07's exit hook first: #27's ending waits on it); then Act IV beats (ch17
    beat and map, ch18 map); the recruit pass (who fills each vanilla role ch09-ch17); the
