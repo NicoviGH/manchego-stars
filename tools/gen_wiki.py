@@ -1344,10 +1344,12 @@ def jpeg_uri(img, longest=640):
 
 
 def hd_art(uid, units):
-    """The unit's HD artwork in References/PCs/HD Art (`<Name>HD.<ext>`), as a PIL image."""
+    """The unit's HD artwork in References/PCs/HD Art (`<Name>HD.<ext>`, the name being its id,
+    its first name, or a part of its id), as a PIL image."""
     if not os.path.isdir(HD_ART):
         return None
-    keys = {uid.replace('-', ''), re.sub(r'\W', '', unit_name(uid, units).split()[0]).lower()}
+    keys = ({uid.replace('-', ''), re.sub(r'\W', '', unit_name(uid, units).split()[0]).lower()}
+            | set(uid.split('-')))                     # prof-rbg's file is RBGHD
     for fn in sorted(os.listdir(HD_ART)):
         stem = os.path.splitext(fn)[0].lower()
         if stem.endswith('hd') and stem[:-2] in keys:
