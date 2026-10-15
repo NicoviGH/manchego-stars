@@ -196,9 +196,9 @@ strategy: |
   [[experience]], but stay aware of the risks. The tomb also has an [[armory]] and a [[vendor]].
 
   Recruiting [[Sahnar]] is less intimidating than it initially appears. She rises as an enemy
-  [[Myrmidon]] with a [[Killing Edge]], and only [[Basil]] can recruit her: deploy Basil, kill
-  any nearby mobile enemies, then simply have Basil walk up to her while your sturdier units
-  screen her.
+  [[Myrmidon]] with a [[Killing Edge]], and only [[Basil]] can recruit her. She will not harm
+  Basil, so simply kill any nearby mobile enemies while staying away from Sahnar, then simply
+  have Basil walk up to her.
 
   [[Ravisin]] is a [[Druid]] with [[Flux]] in the northeast and does not move, with the White
   Moose beside her. Defeat her to win; her guardians and the moose do not all have to fall.
@@ -2031,6 +2031,7 @@ playtest:
     - {name: ch05recruit,      proves: the Talk recruit converts Sahnar on both CHECK_ALIVE arms, lua: ch05recruit}
     - {name: ch05lupinbenched, proves: the recruit's no-Lupin arm plays with Lupin BENCHED,     lua: ch05lupinbenched, boot: ch05lupinboot}
     - {name: ch05lupinkilled,  proves: the recruit's no-Lupin arm plays with Lupin DEAD,        lua: ch05lupinkilled,  boot: ch05lupinboot}
+    - {name: ch05escort,       proves: Sahnar spares Basil as Joshua spares Natasha (AI_A_07's list), lua: ch05escort}
     - {name: ch05raid,         proves: a raider can SACK a reliquary -- terrain flips to ruins and its event id stays unset, lua: ch05raid}
     - {name: ch05crest,        proves: saving all four reliquaries pays out the Guiding Ring,   lua: ch05crest}
 

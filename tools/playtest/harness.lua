@@ -7138,6 +7138,130 @@ scenarios.ch05lupinkilled = function()
     return scenarios.ch05recruit({ lupin = "killed", arm = 0x9D1 })
 end
 
+-- ch05escort: Sahnar will not swing at Basil, the way vanilla Joshua will not swing at Natasha
+-- (#493). That refusal is AI_A_07's do-not-attack list, which holds a literal character id;
+-- `repoint_escort_safe_ai_list` points it at Basil, and test_inject_ch05 proves the SOURCE
+-- edit. This proves the ROM obeys it. Two enemy phases, one run:
+--   1. Basil is the only blue unit in Sahnar's reach  -> her Killing Edge keeps its uses.
+--   2. Control: another blue unit takes Basil's tile  -> the Killing Edge loses a use.
+-- The witness is her WEAPON'S USES, not Basil's HP: only Sahnar's own swing spends them, so
+-- the other enemies' turns cannot make phase 1 fail or pass. Phase 2 is what keeps phase 1
+-- from passing vacuously -- a Sahnar whose AI never acts at all would also "spare" Basil.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05escort (needs a CH05BOOT=1 ROM).
+scenarios.ch05escort = function()
+    local CH05 = dofile(PLAYTEST_DIR .. "/ch05.lua")     -- ch05's shared facts (#314)
+    local BASIL, SAHNAR = CH05.PID.BASIL, CH05.PID.SAHNAR
+    local function edgeUses(u) return ru16(u.addr + 0x1E) >> 8 end   -- items[0]: id | uses<<8
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 6000, true)
+
+    local sah, basil = red(SAHNAR), blue(BASIL)
+    if not sah then return result("FAIL", "Sahnar is not RED at turn 1") end
+    if not basil then return result("FAIL", "Basil is not BLUE at turn 1") end
+    local post = { x = sah.x, y = sah.y }
+    log(string.format("ch05escort: Sahnar runs AI %d/%d (vanilla Joshua: 7/3)",
+        ru8(sah.addr + 0x42), ru8(sah.addr + 0x44)))
+
+    -- Sahnar must be the only enemy who acts, or a raider kills Basil before her turn comes
+    -- and the phase proves nothing (the first run of this did exactly that). Every other red
+    -- unit gets AI_A_06 (do nothing) and AI_B_03 (never move); Sahnar's own AI is untouched.
+    for i = 0, 49 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and u.charId ~= SAHNAR then
+            emu:write8(u.addr + 0x42, 0x06)    -- ai1 -> gAiScript_DoNothing
+            emu:write8(u.addr + 0x43, 0)       -- ai_a_pc: restart the script
+            emu:write8(u.addr + 0x44, 0x03)    -- ai2 -> AiScr_AiB_NeverMove
+            emu:write8(u.addr + 0x45, 0)
+        end
+    end
+
+    -- Put `u` on the first free tile orthogonally adjacent to Sahnar, and refuse to go on if
+    -- any OTHER blue unit already stands in her reach (a sword reaches one tile, and her
+    -- AI_B_03 never moves): the phase must offer her exactly one target.
+    local function parkAdjacent(u)
+        local spot
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+            local tx, ty = post.x + d[1], post.y + d[2]
+            local idx = mapUnitAt(tx, ty)
+            if idx ~= 0 and idx < 0x40 and not (tx == u.x and ty == u.y) then
+                return nil, string.format("another blue unit already stands at (%d,%d)", tx, ty)
+            end
+            if not spot and idx == 0 then spot = { x = tx, y = ty } end
+        end
+        if not spot then return nil, "no free tile adjacent to Sahnar" end
+        local grid = mapUnitAt(u.x, u.y)
+        setMapUnit(u.x, u.y, 0)
+        emu:write8(u.addr + 0x10, spot.x); emu:write8(u.addr + 0x11, spot.y)
+        setMapUnit(spot.x, spot.y, grid)
+        return spot
+    end
+    local function moveTo(u, x, y)
+        local grid = mapUnitAt(u.x, u.y)
+        setMapUnit(u.x, u.y, 0)
+        emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+        setMapUnit(x, y, grid)
+    end
+
+    -- 1. Basil alone in reach.
+    local home = { x = basil.x, y = basil.y }
+    local spot, why = parkAdjacent(basil)
+    if not spot then return result("FAIL", "setup: " .. why) end
+    local before = edgeUses(sah)
+    log(string.format("ch05escort: Basil parked on (%d,%d) beside Sahnar (%d,%d); Killing Edge "
+        .. "at %d uses", spot.x, spot.y, post.x, post.y, before))
+    local phase = runEnemyPhase()
+    if phase ~= "player" then return result("FAIL", "enemy phase 1 ended in " .. tostring(phase)) end
+    sah, basil = red(SAHNAR), blue(BASIL)
+    if not sah then return result("FAIL", "Sahnar left the red array during enemy phase 1") end
+    if sah.x ~= post.x or sah.y ~= post.y then
+        return result("FAIL", string.format("Sahnar moved off her post to (%d,%d)", sah.x, sah.y))
+    end
+    local after = edgeUses(sah)
+    if after ~= before then
+        shot("ch05escort")
+        return result("FAIL", string.format("Sahnar SWUNG at Basil: Killing Edge %d -> %d uses "
+            .. "-- AI_A_07's list does not name our escort", before, after))
+    end
+    if isDead(basil) then
+        return result("FAIL", "Basil died in enemy phase 1 with every other enemy idled -- "
+            .. "inconclusive, find who reached her")
+    end
+    log(string.format("ch05escort: phase 1 -- Sahnar held her Killing Edge at %d uses with Basil "
+        .. "beside her", after))
+
+    -- 2. Control: Basil goes home, another blue unit takes her tile.
+    moveTo(basil, home.x, home.y)
+    -- Not slot 0, the lord: the first run of this control lost her to the Killing Edge and
+    -- ended in a game over. The HP poke is so the control survives the crit it is there to
+    -- invite; it changes nothing about whether Sahnar picks it.
+    local other
+    for i = 1, 61 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        -- On the map: a benched roster unit is US_HIDDEN | US_NOT_DEPLOYED at (-1,-1).
+        if u and u.charId ~= BASIL and not isDead(u) and (u.state & 9) == 0 then other = u; break end
+    end
+    if not other then return result("FAIL", "setup: no second blue unit for the control phase") end
+    spot, why = parkAdjacent(other)
+    if not spot then return result("FAIL", "setup (control): " .. why) end
+    emu:write8(other.addr + 0x12, 80); emu:write8(other.addr + 0x13, 80)   -- maxHP, curHP
+    phase = runEnemyPhase()
+    if phase ~= "player" then return result("FAIL", "enemy phase 2 ended in " .. tostring(phase)) end
+    sah = red(SAHNAR)
+    if not sah then return result("FAIL", "Sahnar left the red array during enemy phase 2") end
+    local control = edgeUses(sah)
+    if control >= after then
+        shot("ch05escort")
+        return result("FAIL", string.format("control: Sahnar did not swing at unit 0x%X either "
+            .. "(Killing Edge still %d uses) -- phase 1 proved nothing", other.charId, control))
+    end
+    return result("PASS", string.format("Sahnar spared Basil (Killing Edge held at %d uses) and "
+        .. "struck unit 0x%X when it took Basil's place (%d -> %d)", after, other.charId,
+        after, control))
+end
+
 -- recordch05eruption: the smallest visual proof for #260. Boot the real ch05 map, idle turn 1,
 -- then record only Ravisin's four-box turn-2 warning through Sahnar's rise and the return of
 -- player control. The recorder advances dialogue while filming; the terminal requires that a
