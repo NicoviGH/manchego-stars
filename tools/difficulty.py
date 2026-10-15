@@ -2683,13 +2683,31 @@ def _gift_items(eventscript_text):
     different slot, no GIVEITEMTO) contributes nothing, as it should."""
     id2e = _item_id_to_enum()
     out = []
-    for g in re.finditer(r'GIVEITEMTO', eventscript_text):
+    # GIVEITEMTO( exactly: GIVEITEMTOMAIN is GOLD (its slot 3 is an amount, not an item id),
+    # and matching it as a prefix read Ch13a's 5,000 as item 0x1388 and dropped it.
+    for g in re.finditer(r'GIVEITEMTO\(', eventscript_text):
         pre = re.findall(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9a-fA-F]+|\d+)\)',
                          eventscript_text[:g.start()])
         if pre:
             enum = id2e.get(int(pre[-1], 0))
             if enum:
                 out.append(enum)
+    return out
+
+
+def _gift_gold(eventscript_text):
+    """Every gold amount the chapter script hands out: for each GIVEITEMTOMAIN / GIVETOSLOT3
+    (eventscr.c EVSUBCMD_GIVEITEMTOMAIN: slot 3 is added to the party's gold), the nearest
+    preceding SVAL(EVT_SLOT_3, n). Ch13a pays 5,000 on both arms of a CHECK_ALIVE, so an
+    amount repeats within one script block counts once."""
+    out = []
+    for block in re.split(r'CONST_DATA EventListScr', eventscript_text):
+        seen = []
+        for g in re.finditer(r'(?:GIVEITEMTOMAIN|GIVETOSLOT3)\(', block):
+            pre = re.findall(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9a-fA-F]+|\d+)\)', block[:g.start()])
+            if pre and int(pre[-1], 0) not in seen:
+                seen.append(int(pre[-1], 0))
+        out += seen
     return out
 
 
@@ -2729,8 +2747,12 @@ def vanilla_economy(parity_ref):
     drops = vanilla_drops(parity_ref) or []
     shops = [(sym, _shoplist_items(shoptext, sym))
              for sym in re.findall(r'(?:Armory|Vendor)\(\s*(\w+)', info)]
-    total = sum(v for _, v in chests) + sum(v for _, v in gifts) + sum(v for _, v in drops)
+    gold = ([int(g) for g in re.findall(r'ChestMoney\(\s*(\d+)', info)]
+            + _gift_gold(script))
+    total = (sum(v for _, v in chests) + sum(v for _, v in gifts) + sum(v for _, v in drops)
+             + sum(gold))
     return {'reference': parity_ref, 'chests': chests, 'gifts': gifts, 'drops': drops,
+            'gold': gold,
             'shops': shops, 'n_villages': len(re.findall(r'Village\(', info)),
             'n_houses': len(re.findall(r'House\(', info)), 'total_gold': total}
 

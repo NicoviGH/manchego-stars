@@ -191,6 +191,7 @@ def vanilla_payload(key):
     out['chests'] = re.findall(r'Chest\((ITEM_\w+)', info)
     out['gold_chests'] = re.findall(r'ChestMoney\(\s*(\d+)', info)
     out['gifts'] = list(difficulty._gift_items(script))
+    out['gold_gifts'] = difficulty._gift_gold(script)
     out['n_villages'] = len(re.findall(r'Village\(', info))
     shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
     out['shops'] = [(sym, difficulty._shoplist_items(shoptext, sym))
@@ -1948,6 +1949,8 @@ def twin_payload_html(chap, ckey):
         rows.append((item_html(e), esc(how), '<code>%s</code>' % esc(e), mark))
     for g in v.get('gold_chests') or []:
         rows.append(('%s gold' % esc(g), 'Chest', '', ''))
+    for g in v.get('gold_gifts') or []:
+        rows.append(('%s gold' % '{:,}'.format(g), 'Given by an event', '', ''))
     out = [wikitable(['Item', 'Vanilla vehicle', 'Enum', 'Ours'], rows)]
     rec = [(esc(pretty_enum(c, 'CHARACTER_')), class_html(k[len('CLASS_'):].lower()), esc(l),
             esc(how)) for c, k, l, how in v['recruits']]
