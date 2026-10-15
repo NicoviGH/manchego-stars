@@ -74,6 +74,18 @@ class TestGenWiki(unittest.TestCase):
         self.assertEqual(gen_wiki.rom_item_name('ITEM_VULNERARY'), 'Goodberry')
 
 
+class TestStrategyNames(unittest.TestCase):
+    def test_strategies_name_items_as_the_rom_does(self):
+        # FE8 keeps one name per item id; where the campaign renames one (campaign.yaml
+        # item_names), the vanilla name never appears in game, so prose must not use it either.
+        renamed = gen_wiki.campaign_yaml().get('item_names') or {}
+        vanilla = {gen_wiki.item_name(e): new for e, new in renamed.items()}
+        for c in gen_wiki.chapters():
+            for old, new in vanilla.items():
+                self.assertNotIn(old, c.get('strategy') or '', '%s: says %r, the game says %r'
+                                 % (c['_slug'], old, new))
+
+
 class TestPayloadCounts(unittest.TestCase):
     def test_a_twin_item_given_twice_needs_two_of_ours(self):
         got = gen_wiki.payload_verdicts(['ITEM_ELIXIR', 'ITEM_ELIXIR', 'ITEM_TORCH'],

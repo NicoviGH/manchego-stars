@@ -35,6 +35,8 @@ import inject.chapter_settings                         # noqa: E402
 import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
 import inject.stats                                    # noqa: E402
+import inject.unit_art as unit_art                     # noqa: E402
+import portrait_tool                                   # noqa: E402
 from inject.class_ids import class_display_name        # noqa: E402
 from wiki import art                                   # noqa: E402
 from wiki import markup as mk                          # noqa: E402
@@ -305,16 +307,24 @@ def units_index():
     return idx
 
 
-_PORTRAITS = {}
+@functools.lru_cache(maxsize=None)
+def _bust(uid):
+    return unit_art.unit_bust(CAMPAIGN, uid) if uid else None
 
 
 def portrait(uid):
-    """Our own bust as a data URI (the wiki shows the in-game face; so do we)."""
-    if uid in _PORTRAITS:
-        return _PORTRAITS[uid]
-    path = os.path.join(CAMP, 'portraits', '%s.png' % uid)
-    _PORTRAITS[uid] = png_uri(path, key_index0=True) if os.path.exists(path) else None
-    return _PORTRAITS[uid]
+    """The bust the build dresses for `uid` (inject.unit_art), as a data URI, or None."""
+    bust = _bust(uid)
+    return png_uri(bust, key_index0=True) if bust is not None else None
+
+
+@functools.lru_cache(maxsize=None)
+def minimug(uid):
+    """The 32x32 minimug the build writes for `uid`: portrait_tool.generate's chibi."""
+    bust = _bust(uid)
+    if bust is None:
+        return None
+    return png_uri(portrait_tool.generate(bust, static_portrait=True)[2], key_index0=True)
 
 
 def png_uri(path_or_image, key_index0=False):
@@ -396,42 +406,13 @@ def map_image(chap):
     return out
 
 
-_ENUM_BY_KEY = None
-
-
-def _enum_lookup():
-    """Normalised spelling -> ITEM_ enum, from vanilla constants/items.h. Our ids are kebab
-    spellings of vanilla names (pure-water, iron-axe, booster-def); vanilla puts a weapon's
-    kind first (ITEM_AXE_IRON), so both orders are indexed. Plain spellings win ties, which
-    keeps `torch` on the Torch item rather than the Torch staff."""
-    global _ENUM_BY_KEY
-    if _ENUM_BY_KEY is None:
-        _ENUM_BY_KEY = {}
-        kinds = ('SWORD', 'LANCE', 'AXE', 'BOW', 'BLADE', 'ANIMA', 'LIGHT', 'DARK', 'STAFF')
-        late = {}
-        for enum, name in _vanilla_item_names().items():          # the game's own names
-            late.setdefault(re.sub(r'[^a-z0-9]', '', name.lower()), enum)
-        for enum in difficulty._item_id_to_enum().values():
-            parts = enum.replace('ITEM_', '').split('_')
-            _ENUM_BY_KEY.setdefault(''.join(parts).lower(), enum)
-            if len(parts) > 1 and parts[0] in kinds:
-                rest = parts[1:]
-                late.setdefault((''.join(rest) + parts[0]).lower(), enum)
-                late.setdefault(''.join(rest).lower(), enum)
-        for k, v in late.items():
-            _ENUM_BY_KEY.setdefault(k, v)
-    return _ENUM_BY_KEY
-
-
 def our_item(it):
-    """A YAML item ref -> (display name, vanilla enum or None)."""
+    """A YAML item ref -> (display name, ITEM_ enum or None), through inject.decomp.ITEM_ENUM:
+    the table the build reads."""
     if isinstance(it, str):
         it = {'id': it}
     iid = it.get('id', '')
-    try:
-        enum = inject.decomp.fe_item_enum(it)
-    except Exception:
-        enum = _enum_lookup().get(str(it.get('fe_base') or iid).replace('-', '').lower())
+    enum = inject.decomp.ITEM_ENUM.get(it.get('fe_base') or iid)
     name = it.get('name') or (item_name(enum) if enum else iid.replace('-', ' ').title())
     return name, enum
 
@@ -573,8 +554,7 @@ def item_cell(it):
 
 def item_html(enum, fallback=''):
     shown = rom_item_name(enum, fallback)
-    custom = (campaign_yaml().get('item_icons') or {}).get(enum)
-    icon = art.item_icon(enum, os.path.join(CAMP, 'item_icons', custom + '.png') if custom else None)
+    icon = art.item_icon(enum)
     return '%s&#160;%s' % (mk.file_img(icon, 16, 16), mk.fe(item_name(enum) or shown, shown))
 
 
@@ -588,23 +568,22 @@ def class_enum_of(token):
     return difficulty._enemy_class_enum(token)
 
 
-def _reskin_sprite(chap, token):
-    """Our own map sprite for a class a reskin dresses in this chapter, or None."""
-    for rk in campaign_yaml().get('enemy_class_reskins') or []:
-        if token in ((rk.get('dresses') or {}).get(chap['_slug']) or []):
-            path = os.path.join(CAMP, 'map_sprites', '%s.png' % rk.get('sprite'))
-            return art.sheet_sprite(path, rk.get('frame', '16x16'))
-    return None
-
-
-def sprite_html(chap, token, faction='enemy'):
-    got = _reskin_sprite(chap, token) if faction == 'enemy' else None
-    if not got:
-        try:
-            got = art.map_sprite(class_enum_of(token), faction)
-        except Exception:
-            got = None
-    return mk.file_img(got[0], got[1], got[2]) if got else ''
+def sprite_html(chap, token, faction='enemy', uid=None):
+    """The map sprite a unit wears in this chapter, drawn the way the engine draws it: its own
+    art or its class's reskin there (inject.unit_art), else the stock class sprite."""
+    sprite = unit_art.unit_sprite(CAMPAIGN, chap['_slug'], uid=uid, token=token)
+    try:
+        frame = (unit_art.idle_frame(CAMPAIGN, sprite, faction) if sprite
+                 else unit_art.class_sprite(class_enum_of(token), faction))
+    except Exception:
+        frame = None
+    if frame is None:
+        return ''
+    box = frame.point(lambda i: 255 if i else 0).getbbox()   # trim the empty rows above the
+    if box:                                                  # figure, as the wiki's sprites are
+        frame = frame.crop((0, box[1], frame.width, frame.height))
+    frame.info['transparency'] = 0
+    return mk.file_img(png_uri(frame), frame.width, frame.height)
 
 
 # ── what the ROM loads, per difficulty mode ────────────────────────────────────
@@ -665,7 +644,7 @@ def enemy_row(chap, ed, token, level, inv, n, shifts, mode):
     st = loaded(ed, token, level, shifts, mode)
     named = ed.get('is_boss') or ed.get('is_miniboss') or personal_of(ed)
     name = esc(ed.get('fe_name') or ed.get('name')) if named else esc(class_display_name(token))
-    return {'sprite': sprite_html(chap, token), 'name': name, 'cls': class_html(token),
+    return {'sprite': sprite_html(chap, token, uid=ed.get('id')), 'name': name, 'cls': class_html(token),
             'lv': level, 'n': n, 'stats': [unit_load.show(st[k]) for k in STAT_KEYS],
             'inventory': ' • '.join(item_cell(i) for i in inv if not
                                      (isinstance(i, dict) and i.get('is_key_item'))),
@@ -779,7 +758,7 @@ def boss_section(chap, shifts):
                      'Movement': unit_load.show(st['Mov']), 'Aid': aid}
             bodies_.append(mk.boss_card(
                 mk.file_img(face, 96, 80, ed.get('name')) if face else '',
-                sprite_html(chap, token), class_html(token), lv,
+                sprite_html(chap, token, uid=ed.get('id')), class_html(token), lv,
                 _affinity(ed), stats, inv, rank_cells))
         uniq = list(dict.fromkeys(bodies_))
         labels = [l for _, l in modes]
@@ -848,6 +827,36 @@ def join_text(uid, unit, chap):
     return 'Automatically'
 
 
+def new_unit_cards(chap, recs, units):
+    """The Character data cards: who the player fields for the first time here, with the kit,
+    level and HP the build loads. The prologue's guests are its `player_units` (class base plus
+    their twin's personal line, inject.stats.guest_personal_line); a cast member joins with its
+    unit file's kit (inject.cast.unit_items) and the stats the build writes for it."""
+    cards = []
+    for pu in chap.get('player_units') or []:
+        cls = class_enum_of(pu.get('class'))
+        hp = (difficulty._class_base(cls).get('baseHP', 0)
+              + inject.stats.guest_personal_line(pu, cls).get('baseHP', 0))
+        cards.append(mk.unit_card(esc(pu.get('name') or unit_name(pu['id'], units)),
+                                  mk.file_img(portrait(pu['id']), 96, 80, pu.get('name')),
+                                  class_html(pu.get('class')), hp, pu.get('level', 1),
+                                  '<br />'.join(item_cell(i) for i in pu.get('inventory') or []),
+                                  'Automatically at the start of the chapter'))
+    for r in recs:
+        unit = units.get(r) or {}
+        fs = unit.get('fe_stats') or {}
+        try:
+            hp = difficulty.player_combatant(CAMPAIGN, r).hp
+            kit = '<br />'.join(item_html(e) for e in inject.cast.unit_items(CAMPAIGN, r))
+        except (Exception, SystemExit):                  # name-only or planned: no ROM kit yet
+            hp, kit = fs.get('HP', '?'), ''
+        cards.append(mk.unit_card(mk.ours('unit-%s' % r, unit_name(r, units)),
+                                  mk.file_img(portrait(r), 96, 80, unit_name(r, units)),
+                                  class_html(fs.get('class')), hp, fs.get('level', '?'), kit,
+                                  join_text(r, unit, chap)))
+    return cards
+
+
 def available_before(chs, chap):
     out = []
     for c in chs:
@@ -858,7 +867,7 @@ def available_before(chs, chap):
 
 
 def minimug_html(uid, units):
-    img = art.minimug(os.path.join(CAMP, 'portraits', '%s.png' % uid))
+    img = minimug(uid)
     name = unit_name(uid, units)
     return '<a href="#unit-%s" title="%s">%s</a>' % (esc(uid), esc(name),
                                                     mk.file_img(img, 32, 32, name)) if img else ''
@@ -947,14 +956,7 @@ def chapter_page(chap, prev, nxt, units, chs):
                            w, h)
     toc.append((1, 'Chapter data', a('Chapter_data')))
     sections.append(mk.h(2, 'Chapter data', a('Chapter_data')) + data)
-    cards = [mk.unit_card(mk.ours('unit-%s' % r, unit_name(r, units)),
-                          mk.file_img(portrait(r), 96, 80, unit_name(r, units)),
-                          class_html((units.get(r) or {}).get('fe_stats', {}).get('class')),
-                          (units.get(r) or {}).get('fe_stats', {}).get('HP', '?'),
-                          (units.get(r) or {}).get('fe_stats', {}).get('level', '?'),
-                          '<br />'.join(item_cell(i) for i in (units.get(r) or {}).get('inventory')
-                                        or []),
-                          join_text(r, units.get(r), chap)) for r in recs]
+    cards = new_unit_cards(chap, recs, units)
     avail = [minimug_html(u, units) for u in available_before(chs, chap)]
     add(3, 'Character data', a('Character_data'),
         mk.characters(cards, [('Available characters', avail)]) if cards or avail else '')
@@ -1187,14 +1189,13 @@ def roster_page(chs, units):
                 continue
             u = units.get(r) or {}
             rows.append(('<span id="unit-%s"></span>%s' % (esc(r), mk.file_img(
-                         art.minimug(os.path.join(CAMP, 'portraits', '%s.png' % r)), 32, 32)),
+                         minimug(r), 32, 32)),
                          esc(unit_name(r, units)), class_html((u.get('fe_stats') or {}).get('class')),
                          mk.ours(c['_slug'], c['_slug'])))
         for role in (c.get('plan') or {}).get('joins_roles') or []:
             rows.append(('', '<i>open</i>', esc(role), mk.ours(c['_slug'], c['_slug'])))
     first = next((c for c in chs if c.get('_founding')), None)
-    pcs = [('<span id="unit-%s"></span>%s' % (esc(k), mk.file_img(art.minimug(os.path.join(
-            CAMP, 'portraits', '%s.png' % k)), 32, 32)), esc(u.get('name', k)),
+    pcs = [('<span id="unit-%s"></span>%s' % (esc(k), mk.file_img(minimug(k), 32, 32)), esc(u.get('name', k)),
             class_html((u.get('fe_stats') or {}).get('class')),
             mk.ours(first['_slug'], first['_slug']) if first else '')
            for k, u in sorted(units.items()) if u['_kind'] == 'pcs']
