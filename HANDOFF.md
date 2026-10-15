@@ -1,43 +1,62 @@
 # Handoff - Manchego Stars live state
 
+**Read this from main** (`git show main:HANDOFF.md`): on a feature branch this file is the copy
+from when the branch was cut, and may be days old.
+
 `HANDOFF.md` is live state only: where the tree is, what is in flight, what is owed, what to do
 next. **Settled decisions live in `docs/decisions.md`** — if a thing is decided, it belongs there
 and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; scope and backlog
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-14 (Claude, later): the wiki review turned up one cause behind many bugs --
-readers re-deriving what the build decides -- so the consolidation (#491) is in flight ahead of
-the wiki. **Nicolas's order: finish the wiki and merge it, THEN resume ch07+ planning with the
-updated wiki.** What landed and why is in `git log`, the PRs and #486 -- this file keeps no
-"recently landed" list.
+Refreshed 2026-10-15 (Claude, evening). **#487 is the one PR in flight:** the wiki on the Fire
+Emblem Wiki's own templates (#493). Script and character pages and the character list are done;
+the cast's in-game help text is their own (ADR 0346). Nicolas's order stands: finish the wiki
+and merge it, THEN resume ch07+ planning with it. What landed and why is in `git log`, the PRs
+and #493 -- this file keeps no "recently landed" list.
 
 ## In flight
 
-- **PR #492 (`refactor/491-unit-art`), ROM byte-identical.** `inject.unit_art` (one answer for a
-  unit's bust and map sprite) and `inject.decomp.ITEM_ENUM` (one item table); ADR 0344. Proven
-  IDENTICAL in all 16 fingerprint configs. A second consolidation commit is due on it (one
-  enemy-pid resolver for the seven `chNN_enemy_pid`, one cast-stat function the stats emitter
-  and difficulty share, `item_icon_id`'s 12-line scan), then a fresh 16-config fingerprint round.
-  **Stash `chwinga glow fix` (on this branch)** restores the ch02 chwinga's green bust, lost since
-  #488 (its RGB-keyed recolour matched nothing); it waits on Nicolas's OK of
-  `map-review/chwinga_glow_fix.png`, then commits on #492 (a deliberate ROM change).
-- **PR #487 (`feat/486-chapter-wiki`), stacked on #492.** The wiki (published privately at
-  https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate and republish to the same file),
-  the ch09-ch20 stubs, the data standardization, and #489's recruit kit folded in (#489 closed:
-  Trex joins ch03 with Colm's kit, Sahnar is L5 + Killing Edge, Baxby carries the lance first --
-  deliberate ROM changes). Wiki-side resolver work is in stash `wiki resolver integration`.
-  Merge order: #492, then #487.
+- **PR #487 (`feat/486-chapter-wiki`, base `main`)**, published at
+  https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m (on the branch, run `gen_wiki.py`, then
+  republish `build/wiki/index.html` to that URL). It carries deliberate ROM changes, so a fingerprint here
+  proves only what a change claims not to move: #489's recruit kit, the green chwinga bust,
+  ch02's Armory (ADR 0345).
+  - **The engine (the branch's `wiki/` package)**: `vendor.py` vendors one real FE8 page per page type we
+    publish, every template and Lua module it reaches, and the wiki's render as golden tokens
+    (`wiki/vendor/`). `mw.py` expands the templates, `render.py` renders wikitext,
+    `site.py` resolves links (our page, else the real wiki) and files (the build's art).
+    `test_wiki_engine.py`: 14 exemplars, 12 exact, two quirks named beside their floors.
+  - **Done on the templates**: chapter, Script (`script_sections` sorts scenes into the wiki's
+    sections by trigger) and character pages (cast, bosses, planned recruits, lore NPCs), and the
+    character list. `wiki/pages.py` is the layout, `gen_wiki` the data; every number is the
+    injector's own (`inject.stats.cast_growths`/`cast_ranks`, `boss_modes`, `promotions`).
+    `test_wiki_pages.py` holds each page type to its exemplars' section order.
+  - **Character prose** is each lore file's `## Profile` (lore/README.md says what it is; drafts,
+    Nicolas to red-pen on the wiki). HD art: `references/References/PCs/HD Art/<Name>HD.jpeg`,
+    all eight PCs present.
+  - **Still on the old HTML path (`wiki/markup.py`)**: home, design notes, open decisions.
+    `markup.py` retires once the last of them moves.
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
   locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
   locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
+- **#490** -- the difficulty model's autolevel diverges from the ROM (unflagged bosses grown,
+  promoted bonus missing); fix before ch09 is measured.
 
-**Next, in order** (the full state, every decision and every open pick: #486, latest comments):
+**Next, in order** (the full state, every decision and every open pick: #486 and #493):
 
-1. **#492 then #487.** Finish #492's second consolidation commit and its fingerprint round,
-   `/code-review medium`, merge on his word. Rebase #487 on main, pop the wiki stash, audit every
-   wiki cell against the resolvers (anything the wiki still derives itself is a bug), republish,
-   take Nicolas's layout list, `/code-review medium`, merge on his word.
+1. **#493 on #487** -- its unticked boxes (14), in this order:
+   - Pages: the availability chart, the lord-select concept page (`Imperial Three` /
+     `Sacred Stone (object)` are the exemplars), the chapter list on templates, Nav8's navbox at
+     every page's foot, and the home page off `markup.py`. Supports wait on #494 (the ROM still
+     loads each slot's vanilla partners).
+   - Readers: ch01's money gift (`vanilla_payload` reads no gold), boss personal lines from the
+     INJECTED CharacterData, and the **wield check** (every unit can use what it carries).
+   - Strategies closer to the twins' own text; the chardalyn raiders' sprite; Sahnar's missing
+     `gender:` (pick: female).
+   Then republish, Nicolas's layout list, `/code-review medium`, merge on his word. Nicolas is
+   leaning toward ch01 on vanilla Ch1's map with Hamill Canyon back as ch08 -- raise it in the
+   planning step.
 2. **#486 planning, continue WITH Nicolas** on the updated wiki: the open picks on the Open
    decisions page (ch07's exit hook first: #27's ending waits on it); then Act IV beats (ch17
    beat and map, ch18 map); the recruit pass (who fills each vanilla role ch09-ch17); the
@@ -53,12 +72,14 @@ updated wiki.** What landed and why is in `git log`, the PRs and #486 -- this fi
 5. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
    count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
 
-- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
+- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, the stat-screen face, and
+  R on a cast member's name (its own help text, ADR 0346; it lands with #487).
+  A shop is proven headless now: the scenario DSL's `shop:` step (ch02armory, ch05shops).
 - `make difficulty-gate` enforces ch00-ch07. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (ADR 0326): ch01 ceiling 1.41 at x1.4078; ch02
-  ceiling 1.43 at x1.4216 once #489 lands (Pinky's real Slim Lance), so a party-side regression
-  there fails the gate too.
+  ceiling 1.43 at x1.4216 with #489's kit (Pinky's real Slim Lance, on #487), so a party-side
+  regression there fails the gate too.
 - The Monte Carlo simulator is #456, parked behind its trigger.
 
 ## Chapter work

@@ -14,6 +14,10 @@
 - **The Ten Towns:** Bryn Shander, Targos, Bremen, Caer-Konig, Caer-Dineval, Easthaven, Good Mead, Termalaine, Lonelywood, Dougan's Hole
 - **Other key locations:** Sunblight (duergar fortress), Grimskalle (Auril's island), Ythryn (lost flying city), the Reghed Glacier
 
+## Lore wiki (mine for character descriptions and story beats)
+
+- [Forgotten Realms Wiki — *Icewind Dale: Rime of the Frostmaiden*](https://forgottenrealms.fandom.com/wiki/Icewind_Dale:_Rime_of_the_Frostmaiden) — the adventure's article, linking a page per NPC, location and faction. Mine it for character descriptions and the published story beats. It summarizes the book; the DM notes and the book scan still decide what happened at our table.
+
 ## Community channels
 
 - [Reddit — r/rimeofthefrostmaiden](https://www.reddit.com/r/rimeofthefrostmaiden/)

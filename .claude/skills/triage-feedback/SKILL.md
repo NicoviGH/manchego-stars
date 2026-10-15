@@ -19,7 +19,7 @@ substantial ones get promoted to their own labeled issue and linked back.
 
 ## Inputs (read FIRST)
 
-1. **Live state:** `HANDOFF.md` — which slice the work is currently on (e.g. content → Ch2
+1. **Live state:** `git show main:HANDOFF.md` — which slice the work is currently on (e.g. content → Ch2
    #22). This decides whether incoming feedback is *upstream* (gates forward progress) or
    *current/downstream* (handled in stream).
 2. **The slice issues** (the workstream this feeds): each chapter issue carries a
@@ -80,7 +80,7 @@ a sprite that misleads in combat → `art` + `bug`). Also capture **sentiment** 
      milestone), then **link it from the slice checklist** as a gating item
      (`- [ ] **Playtest:** … → #NN`). This is exactly the #45/#46 promotion pattern.
 4. **Gate-check against current work** (the anti-tech-debt step):
-   - Read `HANDOFF.md` for the slice in progress. If the feedback targets an **upstream**
+   - Read `git show main:HANDOFF.md` for the slice in progress. If the feedback targets an **upstream**
      slice (earlier than current — e.g. Ch1 feedback while work is on Ch2), it **blocks
      forward progress**: a slice already played by friends regressed. Add the `blocked`
      label to that upstream slice issue, and **surface it loudly** in your reply — name it
