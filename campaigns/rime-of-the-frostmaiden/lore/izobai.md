@@ -6,6 +6,16 @@ dwarves' sled and took forty Battlehammer ingots — she's bolted the best of th
 into plate over her hide. Rides the vanilla Breguet boss slot (armor-knight; our
 "magic beats armor" lesson) with a custom green-goblin bust.
 
+## Profile
+
+Izobai is a goblin warlord out of Karkolohk whose band ambushed a dwarven sled on the Bryn Shander
+trail and took forty Battlehammer ingots; she has bolted the best of the scrap into armour over her
+hide. She holds out in the old waystation on the Iron Trail.
+
+She is cunning, mercenary and mocking, prices everyone like loot, and has no stake in the
+Frostmaiden's winter. She would take a bribe over a fight and never gives back what is already
+hers.
+
 ## Concept
 
 - **Wants:** the haul, and to keep it. Iron, coin, anything with a price.

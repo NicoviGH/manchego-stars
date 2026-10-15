@@ -166,8 +166,8 @@ class ScriptLayout(unittest.TestCase):
 
 
 class CharacterLayout(unittest.TestCase):
-    """Character pages are laid out as `Colm`, `Dara` and `Bazba` are: their sections and page
-    templates, in order, with the exemplars' =={{FE8}}== standing for our game's heading."""
+    """Character pages are laid out as `Colm`, `Dara` and `Bazba` are: their sections, in order,
+    with the exemplars' =={{FE8}}== standing for our game's heading."""
 
     @classmethod
     def setUpClass(cls):
@@ -175,7 +175,7 @@ class CharacterLayout(unittest.TestCase):
         exemplars = []
         for stem in ('Colm', 'Dara', 'Bazba'):
             with open(os.path.join(PAGES, stem + '.wiki'), encoding='utf-8') as f:
-                exemplars.append(skeleton(f.read().replace('=={{FE8}}==', pages.GAME_HEADING)))
+                exemplars.append(cls.headings(f.read().replace('=={{FE8}}==', pages.GAME_HEADING)))
         cls.order = merged(*exemplars)
         chs = gen_wiki.chapters()
         units = gen_wiki.units_index()
@@ -184,10 +184,16 @@ class CharacterLayout(unittest.TestCase):
         cls.pages = {t: w for _p, t, w in gen_wiki.character_pages(chs, units,
                                                                      gen_wiki.WikiFiles())}
 
+    @staticmethod
+    def headings(text):
+        """Section headings only: a character page's inline styling templates ({{Color1}}) are
+        not layout, and they scramble the union of three exemplars."""
+        return [x for x in skeleton(text) if x.startswith('==')]
+
     def test_every_character_page_follows_the_wikis_section_order(self):
         for title, text in sorted(self.pages.items()):
             with self.subTest(title):
-                ours = skeleton(text)
+                ours = self.headings(text)
                 self.assertTrue(is_subsequence(ours, self.order),
                                 '%s: %s\nis not in the wiki\'s order %s' % (title, ours, self.order))
 
@@ -208,6 +214,44 @@ class CharacterLayout(unittest.TestCase):
         self.assertIn('The White Moose joins in [[The Eastway Ambush|Chapter&nbsp;8]].',
                       self.pages['The White Moose'])
         self.assertNotIn('Brie', self.pages)          # a map ballista, not a character
+
+    def test_personality_is_the_lore_profile_verbatim(self):
+        name, profile = gen_wiki.lore_profiles()['braulo']
+        self.assertIn('==Personality==\n' + profile, self.pages['Braulo'])
+
+    def test_a_cast_page_carries_the_records_trivia_and_a_gallery(self):
+        text = self.pages['Trex']
+        self.assertIn("*Trex's base stats, growth rates and weapon ranks are [[Colm]]'s.", text)
+        self.assertIn('Sprite Gallery', text)
+        self.assertIn('[[Rogue]]', text.split('==Gallery==')[1])
+
+    def test_a_named_npc_gets_a_page_from_the_lore(self):
+        self.assertIn('Hlin Trollbane first appears in [[A Dagger of Ice|Prologue]].',
+                      self.pages['Hlin Trollbane'])
+
+
+class CharacterList(unittest.TestCase):
+    """The list is laid out as `List of characters in Fire Emblem: The Sacred Stones` is."""
+
+    @classmethod
+    def setUpClass(cls):
+        with open(os.path.join(PAGES, 'List_of_characters_in_Fire_Emblem--_The_Sacred_Stones.wiki'),
+                  encoding='utf-8') as f:
+            cls.order = skeleton(f.read())
+        chs = gen_wiki.chapters()
+        units = gen_wiki.units_index()
+        first = next(c for c in chs if not c.get('is_prologue'))
+        first['_founding'] = sorted(k for k, u in units.items() if u['_kind'] == 'pcs')
+        cls.text = gen_wiki.list_wikitext(chs, units, gen_wiki.WikiFiles())
+
+    def test_the_list_follows_the_wikis_section_order(self):
+        ours = skeleton(self.text)
+        self.assertTrue(is_subsequence(ours, self.order), '%s\nnot in %s' % (ours, self.order))
+
+    def test_every_playable_boss_and_named_npc_is_listed(self):
+        for row in ('|Trex|[[Thief]]|', '|Ravisin|[[Druid]]|', '|Hlin Trollbane|'):
+            self.assertIn(row, self.text)
+        self.assertIn('[[File:Portrait vellynne ms.png|64x64px]]|Vellynne Harpell|', self.text)
 
 if __name__ == '__main__':
     unittest.main()

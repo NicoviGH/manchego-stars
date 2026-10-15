@@ -37,12 +37,17 @@ SHIFT_MIN_PID = 0x3C
 
 
 @functools.lru_cache(maxsize=None)
+@functools.lru_cache(maxsize=None)
 def _class_block(class_enum):
+    """A class's whole `gClassData` entry. Brace-balanced: the entry nests `.baseRanks = {...},`,
+    and a match that stopped at the first `},` dropped every field from the ranks on (#493:
+    it read every class as rankless, and Ravisin's Druid as unable to wield her Flux)."""
     text = inject.decomp.vanilla_decomp_text('src/data_classes.c')
-    m = re.search(r'\[%s - 1\]\s*=\s*\{(.*?)\n\s*\},' % re.escape(class_enum), text, re.S)
-    if not m:
+    marker = '[%s - 1]' % class_enum
+    if marker not in text:
         raise KeyError(class_enum)
-    return m.group(1)
+    s, e = inject.decomp._find_brace_block(text, marker, 'src/data_classes.c')
+    return text[s:e]
 
 
 def _field(block, name):

@@ -196,7 +196,6 @@ enemy_units:
     inventory:
       - id: evil-eye            # the mogall's innate ranged magic gaze (hits RES); flavor = lightning tentacle
     donor: [14, 1]     # vanilla Bazba, the seize-tile boss -- GuardTileAI + the GuardTile bit
-    death_quote: "*a wet, clicking shriek*"
   # ── 6 Brigand kobolds (vanilla L3-L4 brigands; 2 are key-droppers below) → Icewind kobolds ──
   - id: kobold-axe
     name: "Icewind Kobold"

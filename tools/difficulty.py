@@ -42,6 +42,7 @@ import json
 import sys
 import ai_target
 import fe_combat as fc
+import unit_load
 from inject.decomp import ITEM_ENUM   # the one item id -> ITEM_ enum table (#491)
 
 # Class -> effectiveness tag a unit carries as a DEFENDER (so enemy effective weapons
@@ -83,9 +84,7 @@ def _class_base(class_enum):
 
 def _class_growths(class_enum):
     """Read a class's growth rates (for autoleveling enemies) from vanilla data_classes.c."""
-    text = _classes_text()
-    s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % class_enum, inject.paths.CLASSES_C)
-    block = text[s:e]
+    block = unit_load._class_block(class_enum)
     out = {}
     for gf in inject.stats.GROWTH_FIELDS:
         m = re.search(r'\.' + gf + r'\s*=\s*(-?\d+)', block)
@@ -185,9 +184,7 @@ def _class_caps(class_enum):
     """A PLAYER unit's stat ceilings in `class_enum` (`CheckBattleUnitStatCaps`, bmbattle.c,
     through bmunit.h's UNIT_*_MAX): the class's own max for Pow/Skl/Spd/Def/Res, and the two
     fixed ones -- 60 HP for a non-red unit, 30 Lck for everyone."""
-    text = _classes_text()
-    s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % class_enum, inject.paths.CLASSES_C)
-    block = text[s:e]
+    block = unit_load._class_block(class_enum)
     caps = {'baseHP': 60, 'baseLck': 30}
     for field in ('Pow', 'Skl', 'Spd', 'Def', 'Res'):
         m = re.search(r'\.max' + field + r'\s*=\s*(\d+)', block)

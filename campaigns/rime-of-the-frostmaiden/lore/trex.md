@@ -7,6 +7,17 @@
 > Frostmaiden book "A Beautiful Mine" (pp.93–96), the DM notes, and the canon character as
 > portrayed in published actual-plays (see Sources).
 
+## Profile
+
+Trex is the leader of a warren of Icewind kobolds sheltering in Termalaine's tourmaline mine,
+looking, in his words, for honest work and a warm place to live. He taught himself Common from the
+miners' ledgers, a thousand nights by candle, and speaks it in a careful, slightly over-formal way
+he is quietly proud of.
+
+He is a diplomat first and a survivor underneath: he opens with terms, reframes a fight as a deal,
+and reads people well enough to play the angles. Under the airs, his real concern is always his
+warren's survival.
+
 ## Concept
 
 - **Race:** Kobold — a clever one, and his warren's leader. Kobolds are dragonkin who revere
@@ -16,7 +27,7 @@
 - **Role:** the army's **thief** — steal / chests / doors; the campaign's only one. A foot unit
   (Thief), no flier. See [`npcs/trex.yaml`](../npcs/trex.yaml).
 - **Joins:** mid-map in Ch3 ([`chapters/ch03-the-termalaine-mine.yaml`](../chapters/ch03-the-termalaine-mine.yaml)),
-  defecting to the party during the RBG-execution cutscene.
+  green until any party member Talks to him.
 
 ## Backstory
 

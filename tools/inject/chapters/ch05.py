@@ -811,8 +811,7 @@ def ch05_ravisin_death_message(chap):
     """Ravisin's one locked death box, from the chapter event source of truth.
 
     The event's ``vanilla 0x9C8`` label cites the donor scene; ch05 writes the body to its
-    own Ch6 host block. The separate enemy ``death_quote`` field predates the locked dialogue
-    pass and is deliberately not consulted here.
+    own Ch6 host block.
     """
     return boss_quote_message(chap, 'boss_death', 'ravisin', GUEST_PORTRAIT_MAP['ravisin'],
                               CH05_RAVISIN_DEATH_MSG, 1, seat='[OpenMidRight]')

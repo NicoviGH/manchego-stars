@@ -34,6 +34,7 @@ import inject.cast                                     # noqa: E402
 import inject.chapter_settings                         # noqa: E402
 import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
+import inject.sms                                      # noqa: E402
 import inject.stats                                    # noqa: E402
 import inject.unit_art as unit_art                     # noqa: E402
 import inject.villages                                 # noqa: E402
@@ -900,6 +901,11 @@ def sprite_frame(chap, token, faction='enemy', uid=None):
                  else unit_art.class_sprite(class_enum_of(token), faction))
     except Exception:
         frame = None
+    return _trimmed(frame)
+
+
+def _trimmed(frame):
+    """A sprite frame cropped to its top row of ink, index 0 transparent, as the wiki's are."""
     if frame is None:
         return None
     box = frame.point(lambda i: 255 if i else 0).getbbox()
@@ -1257,7 +1263,6 @@ def promotions(cls_enum):
     """{{PromotionGains}} columns for every class FE8 lets `cls_enum` promote into
     (gPromoJidLut, both branches): the promoted class's promotion bonuses, and the CON/MOV
     its base adds over the unpromoted one."""
-    import inject.sms
     src = unit_load._class_block(cls_enum)
     out = []
     for target in inject.sms.promotion_branches().get(cls_enum) or []:
@@ -1269,12 +1274,30 @@ def promotions(cls_enum):
                     'skill': f(b, 'promotionSkl'), 'spd': f(b, 'promotionSpd'),
                     'def': f(b, 'promotionDef'), 'res': f(b, 'promotionRes'),
                     'con': f(b, 'baseCon') - f(src, 'baseCon'),
-                    'move': f(b, 'baseMov') - f(src, 'baseMov')})
+                    'move': f(b, 'baseMov') - f(src, 'baseMov'),
+                    'weaponlvl': _promotion_wexp(cls_enum, target)})
     return out
 
 
+RANK_TEMPLATE = (('ITYPE_SWORD', 'SwordGBA'), ('ITYPE_LANCE', 'LanceGBA'),
+                 ('ITYPE_AXE', 'AxeGBA'), ('ITYPE_BOW', 'BowGBA'), ('ITYPE_STAFF', 'StaffGBA'),
+                 ('ITYPE_ANIMA', 'AnimaGBA'), ('ITYPE_LIGHT', 'LightGBA'),
+                 ('ITYPE_DARK', 'DarkGBA'))
+
+
+def _promotion_wexp(src, target):
+    """The weapon experience promoting adds, as PromotionGains writes it ("{{SwordGBA}} +30",
+    "--" for none): FE8's ApplyUnitPromotion takes the old class's base ranks off and puts the
+    new class's on, so each type gains the difference."""
+    old, new = _ranks(src, None), _ranks(target, None)
+    gains = ['{{%s}} +%d' % (tpl, new.get(t, 0) - old.get(t, 0)) for t, tpl in RANK_TEMPLATE
+             if new.get(t, 0) - old.get(t, 0) > 0]
+    return ' '.join(gains) or '--'
+
+
 def _quotes(chap, boss_name, units):
-    """(battle quote, death quote) a boss says, from the chapter's own scenes."""
+    """(battle quote, death quote) a boss says, from the chapter's own scenes; a chapter that
+    keeps them on the boss's entry instead (`taunt:`, `death_quote:`) is read by `boss_page`."""
     got = {}
     for trigger, _ref, _title, scenes in _scenes().get(chap['_slug'], []):
         if trigger in ('boss_battle', 'boss_death'):
@@ -1304,6 +1327,128 @@ def _join_lines(uid, name, chap, units):
             '%s joins at the end of %s.' % (name, where))
 
 
+HD_ART = os.path.join(ROOT, 'references', 'References', 'PCs', 'HD Art')
+SHEETS = os.path.join(ROOT, 'data', 'pc-sheets')
+# A vanilla character whose wiki article is not their bare name.
+WIKI_ARTICLE = {'Garcia': 'Garcia (The Sacred Stones)'}
+
+
+def jpeg_uri(img, longest=640):
+    """Artwork as a JPEG data URI, scaled so its longest side is `longest`: the HD sources
+    are megabytes each and the published page has a size cap."""
+    img = img.convert('RGB')
+    img.thumbnail((longest, longest))
+    buf = io.BytesIO()
+    img.save(buf, format='JPEG', quality=85, optimize=True)
+    return 'data:image/jpeg;base64,' + base64.b64encode(buf.getvalue()).decode(), img.size
+
+
+def hd_art(uid, units):
+    """The unit's HD artwork in References/PCs/HD Art (`<Name>HD.<ext>`), as a PIL image."""
+    if not os.path.isdir(HD_ART):
+        return None
+    keys = {uid.replace('-', ''), re.sub(r'\W', '', unit_name(uid, units).split()[0]).lower()}
+    for fn in sorted(os.listdir(HD_ART)):
+        stem = os.path.splitext(fn)[0].lower()
+        if stem.endswith('hd') and stem[:-2] in keys:
+            from PIL import Image
+            return Image.open(os.path.join(HD_ART, fn))
+    return None
+
+
+def dnd_sheet(name):
+    """The unit's D&D Beyond sheet (data/pc-sheets), matched by name, or None."""
+    for path in glob.glob(os.path.join(SHEETS, '*.json')):
+        import json
+        with open(path, encoding='utf-8') as f:
+            d = json.load(f)
+        if isinstance(d, dict) and d.get('name') == name:
+            return d
+    return None
+
+
+def _wiki_link(vanilla_name):
+    art = WIKI_ARTICLE.get(vanilla_name)
+    return '[[%s|%s]]' % (art, vanilla_name) if art else '[[%s]]' % vanilla_name
+
+
+def cast_trivia(uid, name):
+    """Trivia from the record: the D&D character the unit was, and the vanilla units whose
+    data the slot carries (inject.stats' donors, by what each one supplies)."""
+    out = []
+    sheet = dnd_sheet(name)
+    if sheet:
+        race = sheet.get('race') or ''
+        if sheet.get('race_homebrew') and sheet.get('race_base') not in (None, race):
+            race = '%s (a homebrew %s)' % (race, sheet['race_base'])
+        cls = sheet.get('class') or ''
+        if sheet.get('subclass'):
+            cls = '%s (%s)' % (cls, sheet['subclass'])
+        out.append("In the original ''Rime of the Frostmaiden'' campaign, %s was a level %s "
+                   "%s %s." % (name, sheet.get('level'), race, cls))
+    roles = (('base stats', inject.stats.BASE_DONOR), ('growth rates', inject.stats.GROWTH_DONOR),
+             ('weapon ranks', inject.stats.STAT_DONOR))
+    by = collections.OrderedDict()
+    for what, table in roles:
+        if uid in table:
+            by.setdefault(table[uid][len('CHARACTER_'):].capitalize(), []).append(what)
+    if by:
+        parts = ['%s are built on %s\'s' % (' and '.join(w), _wiki_link(d)) if 'base stats' in w
+                 and len(w) == 1 else '%s are %s\'s' % (', '.join(w[:-1]) + (' and ' if len(w) > 1
+                 else '') + w[-1], _wiki_link(d)) for d, w in by.items()]
+        out.append("%s's %s." % (name, '; '.join(parts)))
+    return out
+
+
+LORE = os.path.join(CAMP, 'lore')
+
+
+@functools.lru_cache(maxsize=None)
+def lore_profiles():
+    """{lore file stem: (name, Profile prose)} for every lore file with a `## Profile` -- the one
+    section of a character's lore written to be read as-is (lore/README.md)."""
+    out = {}
+    for path in sorted(glob.glob(os.path.join(LORE, '*.md'))):
+        with open(path, encoding='utf-8') as f:
+            text = f.read()
+        m = re.search(r'^## Profile\n(.*?)(?=^## |\Z)', text, re.S | re.M)
+        if not m:
+            continue
+        name = re.match(r'# (.+?)(?: — |$)', text).group(1).strip()
+        paras = [' '.join(p.split()) for p in m.group(1).strip().split('\n\n')]
+        out[os.path.splitext(os.path.basename(path))[0]] = (name, '\n\n'.join(paras))
+    return out
+
+
+def lore_for(uid, name):
+    """The lore stem that is `uid`'s: its own id, else its name ("Izobai" -> izobai)."""
+    profiles = lore_profiles()
+    for key in (uid, re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-'),
+                (name or '').split()[0].lower() if name else None):
+        if key in profiles:
+            return key
+    return None
+
+
+def first_appearance(name, chs, units):
+    """The first chapter whose scenes give `name` a line, or None. A script may name a speaker
+    by first name alone ("Hlin")."""
+    names = {name, name.split()[0]}
+    for c in chs:
+        for _t, _r, _title, scenes in _scenes().get(c['_slug'], []):
+            if any(k == 'say' and w in names for k, w, _x in _script_steps(scenes, units)):
+                return c
+    return None
+
+
+def face_key(stem, name):
+    """The portrait key a lore character's face is registered under: its stem, else its first
+    name (the guest faces are keyed `duvessa`, `vellynne`)."""
+    faces = dict(inject.cast.PORTRAIT_MAP, **inject.cast.GUEST_PORTRAIT_MAP)
+    first = name.split()[0].lower()
+    return stem if stem in faces else first if first in faces else stem
+
+
 def cast_page(uid, units, chs, files):
     """A cast member's page, as `Colm`'s: the line, growths, ranks and kit the slot loads with
     (inject.stats, the injector's own answers), how the build wires the join, its death quote."""
@@ -1324,9 +1469,28 @@ def cast_page(uid, units, chs, files):
     recruit, role = _join_lines(uid, name, joins, units)
     help_text = inject.text.slot_help_text(inject.cast.PORTRAIT_MAP[uid])
     race = (unit.get('dnd') or {}).get('race')
+    art = hd_art(uid, units)
+    artwork = None
+    if art is not None:
+        uri, (w, h) = jpeg_uri(art)
+        artwork = files.add('MS art %s.jpg' % uid, uri, w, h)
+    sprites = [(cls, 'Ma gba %s playable.gif' % sprite if joins else None)]
+    for target in inject.sms.promotion_branches().get(cls_enum) or []:
+        name_t = class_display_name(target[len('CLASS_'):].lower().replace('_', '-'))
+        key = 'Ma gba ms %s playable.gif' % name_t.lower()
+        files.sprite(key, _trimmed(unit_art.class_sprite(target, 'player')))
+        sprites.append((name_t, key))
+    image = ('[[File:%s|200px]]' % artwork if artwork else
+             '[[File:%s|class=pixel-art]]' % port if port else None)
     return wp.character({
-        'name': name, 'image': '[[File:%s|class=pixel-art]]' % port if port else None,
-        'caption': "%s's portrait from ''Manchego Stars''." % name if port else None,
+        'name': name, 'image': image,
+        'caption': ("Artwork of %s." % name if artwork else
+                    "%s's portrait from ''Manchego Stars''." % name if port else None),
+        'trivia': cast_trivia(uid, name),
+        'personality': (lore_profiles().get(lore_for(uid, name)) or (None, None))[1],
+        'gallery': {'portrait': port, 'minimug': files.minimug(uid) and
+                    'Small portrait %s fe08.png' % uid, 'sprites': sprites,
+                    'artwork': [(artwork, 'Artwork of %s.' % name)] if artwork else []},
         'help_text': help_text, 'gender': str(unit.get('gender', '')).capitalize() or None,
         'race': race, 'startingclass': '[[%s]]' % cls,
         'lead': 'a playable [[%s]] in \'\'Manchego Stars\'\'%s' % (
@@ -1360,6 +1524,7 @@ def boss_page(chap, ed, units, files):
     cls, _article = wiki_class(ed.get('class'))
     port = files.portrait(ed['face']) if ed.get('face') else None
     battle, death = _quotes(chap, name, units)
+    battle, death = battle or ed.get('taunt'), death or ed.get('death_quote')
     title = chap.get('title', chap['_slug'])
     return wp.character({
         'name': name, 'image': '[[File:%s|class=pixel-art]]' % port if port else None,
@@ -1369,6 +1534,7 @@ def boss_page(chap, ed, units, files):
         'lead': 'a [[boss]] appearing in \'\'Manchego Stars\'\'',
         'role': '%s appears as the [[boss]] of %s.' % (name, chapter_link(chap)),
         'chapter': title, 'boss_modes': boss_modes(chap, ed, files),
+        'personality': (lore_profiles().get(lore_for(ed.get('id'), name)) or (None, None))[1],
         'battle_quotes': [(battle, "%s, in %s." % (name, chapter_link(chap)))] if battle else [],
         'death_quote': (death, "%s's death quote." % name) if death else None})
 
@@ -1389,9 +1555,69 @@ def planned_page(uid, units, chs, files):
         'role': role})
 
 
+def npc_page(stem, chs, units, files):
+    """A named character who neither joins nor is fought, as `Dara`'s page: the lore's Profile."""
+    name, profile = lore_profiles()[stem]
+    port = files.portrait(face_key(stem, name))
+    first = first_appearance(name, chs, units)
+    return wp.character({
+        'name': name, 'image': '[[File:%s|class=pixel-art]]' % port if port else None,
+        'caption': "%s's portrait from ''Manchego Stars''." % name if port else None,
+        'lead': 'a non-playable character in \'\'Manchego Stars\'\'',
+        'role': '%s first appears in %s.' % (name, chapter_link(first)) if first else None,
+        'personality': profile})
+
+
+def npc_stems(chs, units):
+    """Lore characters with a Profile that no cast or boss page already covers."""
+    taken = {lore_for(uid, unit_name(uid, units)) for uid in units}
+    for c in chs:
+        for ed in bosses_of(c):
+            taken.add(lore_for(ed.get('id'), ed.get('name')))
+    return [k for k in lore_profiles() if k not in taken]
+
+
+def list_wikitext(chs, units, files):
+    """The character list, from the same units, bosses and lore the character pages read."""
+    def port(key):
+        name = files.portrait(key)
+        return '[[File:%s|64x64px]]' % name if name else 'N/A'
+
+    def cls_link(token):
+        return '[[%s]]' % wiki_class(token)[0]
+
+    playable = []
+    for uid, _slot, _cls, _ in inject.cast.classed_cast(CAMPAIGN):
+        name = unit_name(uid, units)
+        joins = next((c for c in chs if uid in recruits_of(c)), None)
+        first = first_appearance(name, chs, units) or joins
+        if joins and first and chs.index(first) > chs.index(joins):
+            first = joins
+        playable.append((port(uid), name, cls_link((units[uid].get('fe_stats') or {}).get('class')),
+                         chapter_link(first) if first else '', chapter_link(joins) if joins else ''))
+    bosses = []
+    for c in chs:
+        if c.get('status') == 'planned':
+            continue
+        for ed in bosses_of(c):
+            if not ed.get('name'):
+                continue
+            first = first_appearance(ed['name'], chs, units) or c
+            if chs.index(first) > chs.index(c):
+                first = c
+            bosses.append((port(ed['face']) if ed.get('face') else 'N/A', ed['name'],
+                           cls_link(ed.get('class')), chapter_link(first), chapter_link(c)))
+    others = []
+    for stem in npc_stems(chs, units):
+        name, profile = lore_profiles()[stem]
+        others.append((port(face_key(stem, name)), name, re.split(r'(?<=\.)\s', profile, 1)[0]))
+    return wp.character_list({'playable': playable, 'bosses': bosses, 'others': others})
+
+
 def character_pages(chs, units, files):
     """[(page id, title, wikitext)]: every classed cast member, every planned recruit (a class,
-    no slot yet), then every hosted boss. A unit with no class (a map ballista) is no character."""
+    no slot yet), every hosted boss, then every other named character the lore profiles. A unit
+    with no class (a map ballista) is no character."""
     import inject.cast
     classed = [uid for uid, _slot, _cls, _ in inject.cast.classed_cast(CAMPAIGN)]
     out = [('unit-%s' % uid, unit_name(uid, units), cast_page(uid, units, chs, files))
@@ -1405,6 +1631,8 @@ def character_pages(chs, units, files):
         for ed in bosses_of(c):
             if ed.get('name'):
                 out.append(('boss-%s' % ed.get('id'), ed['name'], boss_page(c, ed, units, files)))
+    out += [('npc-%s' % stem, lore_profiles()[stem][0], npc_page(stem, chs, units, files))
+            for stem in npc_stems(chs, units)]
     return out
 
 
@@ -1595,29 +1823,6 @@ def index_page(chs):
                     ['Ch', 'Title', 'Curve twin', 'Map donor', 'Status'], rows))
 
 
-def roster_page(chs, units):
-    rows = []
-    for c in chs:
-        for r in recruits_of(c):
-            if r in (c.get('_founding') or []):
-                continue
-            u = units.get(r) or {}
-            rows.append((mk.file_img(minimug(r), 32, 32),
-                         esc(unit_name(r, units)), class_html((u.get('fe_stats') or {}).get('class')),
-                         mk.ours(c['_slug'], c['_slug'])))
-        for role in (c.get('plan') or {}).get('joins_roles') or []:
-            rows.append(('', '<i>open</i>', esc(role), mk.ours(c['_slug'], c['_slug'])))
-    first = next((c for c in chs if c.get('_founding')), None)
-    pcs = [(mk.file_img(minimug(k), 32, 32), esc(u.get('name', k)),
-            class_html((u.get('fe_stats') or {}).get('class')),
-            mk.ours(first['_slug'], first['_slug']) if first else '')
-           for k, u in sorted(units.items()) if u['_kind'] == 'pcs']
-    return page('roster', 'List of characters in Manchego Stars', mk.h(2, 'Founding party', 'pcs') +
-                wikitable(['', 'Name', 'Class', 'Joins'], pcs) +
-                mk.h(2, 'Recruits by chapter', 'recruits') +
-                wikitable(['', 'Name', 'Class / role', 'Joins'], rows))
-
-
 def decisions_page(chs, opens):
     rows = []
     for c in chs:
@@ -1766,11 +1971,15 @@ def build():
     for c in chs:
         titles[c.get('title', c['_slug'])] = c['_slug']
         titles['%s/Script' % c.get('title', c['_slug'])] = '%s/script' % c['_slug']
+    titles['List of characters in Manchego Stars'] = 'roster'
     chars = character_pages(chs, units, files)
     for pid, title, _wt in chars:
         titles.setdefault(title, pid)
     wsite_ = wsite.Site(titles, files)
-    pages = [home_page(chs, units), index_page(chs), roster_page(chs, units),
+    roster_title = 'List of characters in Manchego Stars'
+    pages = [home_page(chs, units), index_page(chs),
+             page('roster', roster_title, wsite.render_page(
+                 roster_title, list_wikitext(chs, units, files), wsite_)),
              decisions_page(chs, opens)]
     for i, c in enumerate(chs):
         title = c.get('title', c['_slug'])

@@ -6,6 +6,15 @@
 > (migrated from pre-strip commit `e6cc7a6`) as inspiration for dialogue, sprite/palette work,
 > and signature scripted moments — never as FE mechanics.
 
+## Profile
+
+Meesmickle is a vampire tabaxi warlock bound to a fiend. He speaks rarely, and when he does it is
+a dry, sarcastic one-liner delivered flat. He is terrifying in a fight, deadpan about it afterward,
+and treats his fiendish powers as an ordinary part of the day.
+
+His sarcasm is dry and never cruel, and he is less bloodthirsty than he looks: when the party turned
+on Bremen's government over an unpaid fee, Meesmickle sat the battle out.
+
 ## Concept
 
 - **Race:** Vampire Tabaxi

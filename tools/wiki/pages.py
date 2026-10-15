@@ -248,7 +248,7 @@ def promotion_gains(branches):
     for i, b in enumerate(branches, 1):
         n = '' if i == len(branches) else str(i)
         pairs += [('class' + n, b['class'])] + [(k + n, b[k]) for k in (
-            'hp', 'str', 'skill', 'spd', 'def', 'res', 'con', 'move')]
+            'hp', 'str', 'skill', 'spd', 'def', 'res', 'con', 'move', 'weaponlvl')]
     return _params('PromotionGains', pairs)
 
 
@@ -277,6 +277,8 @@ def character(c):
     if sections:
         out.append(GAME_HEADING)
         out += ['%s\n%s' % hb for hb in sections]
+    if c.get('personality'):
+        out.append('==Personality==\n' + c['personality'])
     quotes = [('===Battle quote%s===' % ('s' if len(c.get('battle_quotes') or []) > 1 else ''),
                '\n'.join('{{Quote|%s|%s}}' % q for q in c.get('battle_quotes') or [])),
               ('===Death quote===', '{{Quote|%s|%s}}' % c['death_quote']
@@ -288,6 +290,58 @@ def character(c):
     if c.get('help_text'):
         out.append('==Flavor text==\n{{DescriptionHdr}}\n%s\n{{DescriptionFtr}}' % _params(
             'DescriptionCell', [('game', "''Manchego Stars''"), ('english', c['help_text'])]))
+    if c.get('trivia'):
+        out.append('==Trivia==\n' + '\n'.join('*' + t for t in c['trivia']))
+    if c.get('gallery'):
+        out.append('==Gallery==\n' + gallery(c['name'], c['gallery']))
     if c.get('navbox'):
         out.append(c['navbox'])
+    return '\n\n'.join(out) + '\n'
+
+
+_BORDER = 'style="border-left: 1px solid {{Color2}}%s"'
+
+
+def gallery(name, g):
+    """Colm's Gallery: a collapsed Sprite Gallery (portrait, then the map sprite of each class
+    the unit can be), then the artwork in a <gallery>."""
+    out = []
+    if g.get('sprites'):
+        cells = ['| %s | %s%s' % (_BORDER % '', '[[%s]] ' % cls, '[[File:%s]]' % f if f else '')
+                 for cls, f in g['sprites']]
+        out.append('\n'.join([
+            '{| class="mw-collapsible mw-collapsed pixel-art width-75" style="margin: auto; '
+            'border: 2px solid {{Color2}}; background: {{Color1}}; border-radius: 15px; '
+            'text-align: center"',
+            '! style="border: 1px solid {{Color2}}; background: {{Color1}}; border-radius: '
+            '15px" | %sSprite Gallery' % ('[[File:%s]] ' % g['minimug'] if g.get('minimug') else ''),
+            '|-', '|',
+            '{| style="width: 100%; background: {{Color3}}; border-radius: 15px; border: 1px '
+            'solid {{Color2}}; margin: auto; border-spacing: 0"',
+            '| %s' % ('[[File:%s]]' % g['portrait'] if g.get('portrait') else '')] + cells +
+            ['|}', '|}']))
+    if g.get('artwork'):
+        out.append('===Official artwork===\n<gallery>\n%s\n</gallery>' % '\n'.join(
+            '%s|%s' % fc for fc in g['artwork']))
+    return '\n\n'.join(out)
+
+
+def character_list(c):
+    """`List of characters in Fire Emblem: The Sacred Stones`: playable characters, then bosses,
+    then the other named characters, each in the wiki's own list templates."""
+    out = ["This page contains a list of characters appearing in ''Manchego Stars''."]
+    out.append('==Playable characters==')
+    out.append('\n'.join(['{{CharListHdr|class=pixel-art-3x}}'] + [
+        '{{CharListCell|%s|%s|%s|%s|%s}}' % r for r in c['playable']] + [
+        "{{CharListFtr|%d|''Manchego Stars''}}" % len(c['playable'])]))
+    if c.get('bosses') or c.get('others'):
+        out.append('==Non-playable characters==')
+    if c.get('bosses'):
+        out.append('===Bosses===')
+        out.append('\n'.join(['{{BossListHdr|class=pixel-art-3x}}'] + [
+            '{{BossListCell|%s|%s|%s|%s|%s}}' % r for r in c['bosses']] + ['{{BossListFtr}}']))
+    if c.get('others'):
+        out.append('===Other===')
+        out.append('\n'.join(['{{NPCListHdr|class=pixel-art-3x}}'] + [
+            '{{NPCListCell|%s|%s|%s}}' % r for r in c['others']] + ['{{NPCListFtr}}']))
     return '\n\n'.join(out) + '\n'

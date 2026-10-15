@@ -320,7 +320,6 @@ enemy_units:
     #     undentable by the parity yardstick (inf). One lever, not two.
     #   - NO armour bodyguards. With a real boss line the `frost-sentinel` scaffolding is
     #     redundant (removed 2026-07-23, Nicolas) — the boss carries her own fight.
-    death_quote: "Auril… I gave you everything…"
     skin:
       # APPROVED 2026-08-10 (Nicolas): Garytop's F2E Aversa mug, exact palette edit only.
       # Silver hair -> auburn/chestnut; warm skin -> frost-pale. Preserve the original brown

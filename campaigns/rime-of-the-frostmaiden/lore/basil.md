@@ -2,12 +2,22 @@
 
 > **DRAFT — Phase 0 of the ch05 dialogue pass (2026-07-23). Co-written with Nicolas.
 > Verbalness fork RESOLVED (Groot-flavored + self-sufficient); origin (Ravisin's shrub)
-> approved; calibration lines still await red-pen.** ch05 "The
+> approved.** ch05 "The
 > Elven Tomb" recruit — the Natasha beat (fragile healer the party escorts). Mechanics in
 > [`chapters/ch05-the-elven-tomb.yaml`](../chapters/ch05-the-elven-tomb.yaml) (Cleric;
 > Goodberries = the cosmetic skin on a vanilla heal staff; the in-fiction source of the
 > party's reflavored Vulneraries) and [`npcs/basil.yaml`](../npcs/basil.yaml). Art landed
 > PR #179 (Oddish-sourced).
+
+## Profile
+
+Basil is a small, sentient goodberry shrub, the awakened companion the frost druid Ravisin kept at
+her side so she would always have goodberries to hand. The party takes her in after Ravisin falls,
+repots her, and she becomes their second healer, growing the Goodberries the whole party eats.
+
+She is guileless, gentle and eager. When something matters to her she spills over, several sentences
+at once, and she says her feelings out loud. Feeding people is how she shows she cares. It is Basil,
+walked into danger under escort, who turns the ancient duelist Sahnar against Ravisin.
 
 ## Concept
 
@@ -69,21 +79,14 @@ Sahnar recruit — **no translator crutch**. She is NOT Marty — where Marty *s
 - **Never write her lines as epigrams.** If a line sounds quotable, it is probably wrong for
   her — see `.claude/skills/dialogue-pass/references/natural-speech.md`.
 
-**Calibration lines (draft — for Nicolas's red-pen; not yet used in any beat)**
-- (adopted at the end — repotted, not renamed) "A pot. …Mine?" → "I will grow. For you."
-- (healing in battle) "Hurt. Here. Eat." / "Eat. Grow. Stay."
-- (refusing Ravisin as she rips Sahnar up — her breaking point) "No. Not her. …I won't."
-- (the Sahnar turn — **carries the recruit alone**, offering the berry to the bound mummy)
-  "She hurt you. You are not hers. …Wake up. I have you. Eat."
-- (to Marty, on their two ways of winning people) "You sell. I feed. …Same."
+**Calibration:** her shipped ch05 lines (`make scene SCENE=ch05`), the talk with Sahnar above all.
 
 **Banned:** needing a party-member to translate for her (rejected — she stands on her own);
-writing her **simple-minded** (spare speech, full soul — never dumb); long or winding sentences;
-subordinate clauses; cutesy baby-talk / "hehe" overload; modern slang; any edge (sarcasm,
+writing her **simple-minded** (plain words, full soul — never dumb); cutesy baby-talk / "hehe" overload; modern slang; any edge (sarcasm,
 menace — she has none); a literal "I am Basil" Groot-quote gimmick unless Nicolas asks for it;
 **grieving or mourning Ravisin** (`ravisin.md`: she is never mourned — see Q4 below).
 
-## Open questions for Nicolas
+## Settled questions
 1. ~~**The verbalness fork (A vs B)**~~ — **RESOLVED 2026-07-23:** Groot-flavored + self-sufficient
    (see §Voice header).
 2. ~~**Does Basil name herself or accept the name?**~~ — **RESOLVED 2026-07-23 (Nicolas): neither.

@@ -9,6 +9,16 @@
 > her gender is free of it; the shipped hooded-wraith art reads androgynous (sanity-check at
 > the slice).
 
+## Profile
+
+Sahnar is a snow-elf princess and duelist, set long ago to guard the tomb of her twin brother,
+Orem. She was never asleep. She has been awake and aware in the dark for millennia, and she speaks of
+it flatly, as the purpose she was given.
+
+Ravisin wakes her and lets her mistake the party for the tomb's desecrators. Basil changes her mind,
+and Sahnar keeps her purpose with a new enemy: the witch. She is stoic, courtly and composed, with a
+duelist's economy and a dry, distant wit, and once freed she means to see what the world became.
+
 ## Concept
 
 An **elven royal** from a people so old the Rime is younger than her tomb — a princess and a

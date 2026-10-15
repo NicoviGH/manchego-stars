@@ -5,6 +5,15 @@
 > Recurs from ch01 as proprietor of The Northlook, Bryn Shander (book p.33) — the
 > campaign's home-base innkeeper. His prologue defeat is a retreat, not a death.
 
+## Profile
+
+Scramsax is a retired sellsword who bought an inn, The Northlook in Bryn Shander, which caters to
+mercenaries and adventurers. He is an old friend of Hlin's and comes along as her muscle when she
+corners Sephek, because the murders are bad for business.
+
+He is gruff and economical, talks like he is paying by the word, and is unimpressed by everything,
+himself included.
+
 ## Concept
 
 A retired sellsword who bought an inn: veteran enough that Hlin brings him as the muscle

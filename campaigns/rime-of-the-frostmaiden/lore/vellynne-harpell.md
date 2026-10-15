@@ -10,6 +10,16 @@
 > Realms canon (necromancer, late-blooming to magic in her forties; a nervous-system tremor
 > affecting gait and balance — which is why she rides, never walks).
 
+## Profile
+
+Vellynne Harpell is a necromancer of the Arcane Brotherhood and a Harpell of Longsaddle, who came to
+magic late and is racing three rival wizards across Icewind Dale for the secrets under the ice. A
+tremor keeps her seated, and she travels on a small sled drawn by reanimated kobolds.
+
+She is cold, formal and economical. She treats capable people as instruments, deals straight and
+pays on delivery, and she does not finish second. She sets the party on the trail of her stolen
+orb.
+
 ## Concept
 
 The cordial face of a cold guild — and the most dangerous kind of ally: useful, honest

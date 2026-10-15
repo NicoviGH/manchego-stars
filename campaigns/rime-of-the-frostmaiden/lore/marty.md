@@ -6,6 +6,18 @@
 > (migrated from pre-strip commit `e6cc7a6`) as inspiration for dialogue, sprite/palette work,
 > and signature scripted moments — never as FE mechanics.
 
+## Profile
+
+Marty the Merry Mushroom is a myconid from a spore circle in the coffee country of Colombia, who
+left his community to travel as a barista and share the Chagaccino with the world. He has no voice
+and speaks through telepathic rapport spores, so he greets anyone new with a polite cough of spores
+in their face.
+
+He is the party's diplomat, warm and generous to friends and strangers alike, and he would rather
+understand a monster than fight it. He talked the direwolf Lupin into pulling the party's sled for a
+promise of goodberries, and he spoke with the maer monster to hear its side. When a fight cannot be
+avoided he goes quiet, and stays cheerful while his killing spores spread.
+
 ## Concept
 
 - **Race:** Sporemaster

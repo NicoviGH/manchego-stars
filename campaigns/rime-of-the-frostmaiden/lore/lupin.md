@@ -3,6 +3,17 @@
 > Narrative and flavor only. **Mechanics live in [`npcs/lupin.yaml`](../npcs/lupin.yaml)** —
 > Cavalier under the hood, wolf sprite on top; vanilla FE8 data throughout.
 
+## Profile
+
+Lupin is the leader of an awakened direwolf pack in the forest near Lonelywood. He wears spectacles,
+which are never explained. He speaks well and thinks like a wolf: everything is meat, territory,
+odds and the pack's survival.
+
+He bargains hard and without flourish, counting heads and days of food aloud, and once the numbers
+favour a deal he commits to it completely. Marty won him over with a promise of goodberries, and
+the pack now pulls the party's sled. The one subject that shortens his sentences is the one who
+woke his pack.
+
 ## Concept
 
 - **Who:** leader of the awakened direwolf pack in the White Moose forest; wears

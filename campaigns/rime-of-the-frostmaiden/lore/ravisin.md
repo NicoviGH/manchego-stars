@@ -7,6 +7,16 @@
 > She is **distinct from Sephek Kaltro** ([`sephek-kaltro.md`](sephek-kaltro.md)) — both
 > serve Auril, but they are opposite temperaments; see §Voice.
 
+## Profile
+
+Ravisin is a frost druid and acolyte of the Frostmaiden, and the villain of the story's first act.
+She awakens the wild and raises the frozen dead as the goddess's instruments: the white moose, the
+direwolf pack, the maer monster and the elven tomb's own dead. She means to put out the last fires,
+every hearth and forge, so that the winter can claim the world.
+
+She is fervent and certain. She is tender to the beasts she wakes and scornful of people, whom she
+sees as the warmth she has to snuff out, and she believes every frost is a mercy.
+
 ## Concept
 
 The frost druid who guards the elven tomb — and the villain thread of Act I. She is an
@@ -75,7 +85,7 @@ executioner; she is the **true believer** — fervent, sure, unwavering.
 - "You call them monsters. I call them awake. Everything sleeps beside a fire. …The
   Frostmaiden woke me. Now I wake the world."
 - "The cold had this world once. It will have it again. I only bring it home to her."
-- (death, locked) "Auril… I gave you everything…"
+- (death, locked) "Frostmaiden… the winter is yours…"
 
 **Banned:** **any pathos — grief, self-pity, a wound, an "unanswering goddess" ache, a tragic
 or sympathetic frame. AND any GRUDGE / GRIEVANCE / REVENGE framing — no "the loggers wronged
