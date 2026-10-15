@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """The wiki is the Fire Emblem Wiki's chapter page, cloned and filled from the chapter YAML and
 the decomp (#487). These pin that it builds from the real repo, that every chapter gets its page
-and its subpages, that the open-decisions list is exactly the chapters' `open_questions`, and
-that the numbers it prints are the ones the game produces."""
+and its subpages, that open decisions stay off it, and that the numbers it prints are the ones the game produces."""
 import collections
 import os
 import re
@@ -23,7 +22,7 @@ def section(page, pid):
 class TestGenWiki(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        out, cls.n, cls.k = gen_wiki.build()
+        out, cls.n = gen_wiki.build()
         with open(out, encoding='utf-8') as f:
             cls.page = f.read()
         cls.chapters = gen_wiki.chapters()
@@ -56,10 +55,24 @@ class TestGenWiki(unittest.TestCase):
         for c in self.chapters:
             self.assertTrue(c.get('act'), c['_slug'])
 
-    def test_open_decisions_are_the_yaml_questions(self):
-        want = sum(len(c.get('open_questions') or []) for c in self.chapters)
-        self.assertEqual(self.k, want)
-        self.assertEqual(section(self.page, 'decisions').count('<tr>') - 1, want)
+    def test_every_page_ends_on_the_game_navbox(self):
+        # Template:Nav8's shape, at the foot of every page (#493).
+        pages = re.findall(r'<section class="page".*?</section>', self.page, re.S)
+        self.assertTrue(pages)
+        for p in pages:
+            self.assertIn('mw-collapsed navbox', p, p[:80])
+
+    def test_lord_select_lists_ch01s_candidates(self):
+        import inject.cast
+        lord = section(self.page, 'lord-select')
+        for uid, *_ in inject.cast._classed_cast(gen_wiki.CAMPAIGN, available_at=1)[0]:
+            self.assertIn(gen_wiki.load_yaml(os.path.join(
+                gen_wiki.CAMP, 'pcs', uid + '.yaml')).get('lord_pitch'), lord.replace('&#39;', "'"))
+
+    def test_open_decisions_stay_off_the_wiki(self):
+        # They live in each chapter's `open_questions` and on #486 (Nicolas, 2026-10-14).
+        self.assertNotIn('id="decisions"', self.page)
+        self.assertNotIn('Open questions', self.page)
 
     def test_twin_payload_is_read_from_the_decomp(self):
         # vanilla Ch5's village/clear gifts all reach ch05 (ADR 0049's 1:1 economy)

@@ -1628,6 +1628,91 @@ def list_wikitext(chs, units, files):
     return wp.character_list({'playable': playable, 'bosses': bosses, 'others': others})
 
 
+def lord_select_wikitext(chs, units):
+    """Lord select (ADRs 0062, 0063, 0057, 0061) as a concept page in the shape of the wiki's
+    `Imperial Three` / `Sacred Stone (object)`: lead, how it works, the candidates. Candidates,
+    pitches and floors are the ones ch01's injector emits (`_classed_cast` at ch01, the
+    `lord_pitch:` cards, `lord_floor_rows`), so the page says what the ROM does."""
+    import inject.chapters.ch01 as ch01
+    ch01_chap = next((c for c in chs if c['_slug'] == 'ch01'), None)
+    num = (ch01_chap or {}).get('chapter_number', 1)
+    cast, _names = inject.cast._classed_cast(CAMPAIGN, available_at=num)
+    uids = [row[0] for row in cast]
+    pitches = dict(ch01.lord_select_pitches(CAMPAIGN, uids))
+    try:
+        floors = {u: (hp, df, res) for u, hp, df, res in ch01.lord_floor_rows(CAMPAIGN, uids)}
+    except Exception:                                  # a missing build input: no floor column
+        floors = {}
+    first = chapter_link(ch01_chap) if ch01_chap else 'the first chapter'
+    rows = []
+    for uid in uids:
+        hp, df, res = floors.get(uid, (0, 0, 0))
+        bump = ', '.join('+%d %s' % (v, k) for v, k in ((hp, 'HP'), (df, 'Def'), (res, 'Res'))
+                         if v)
+        rows.append('|-\n| [[%s]] || %s || %s' % (unit_name(uid, units), pitches[uid],
+                                                 bump or 'None'))
+    return '\n\n'.join([
+        "'''Lord select''' is the choice, made once at the start of %s, of which player "
+        "character leads the company for the rest of the game. ''%s'' has no fixed "
+        "[[lord]]: every player character rides an ordinary class, so the player crowns one, "
+        "presumably the character they played at the table." % (first, GAME_TITLE),
+        '==How it works==',
+        "After the muster and before [[preparations]], a menu lists the founding party. As the "
+        "cursor lands on a name it shows that character's face and a short card on their "
+        "strengths, in words rather than numbers. Picking one asks for confirmation, the way "
+        "''[[Fire Emblem: The Sacred Stones|The Sacred Stones]]'' asks which twin to follow "
+        "after [[It's a Trap!]]. The choice is saved and cannot be changed.",
+        "From then on the chosen lead plays the part Eirika and Ephraim play in the original:\n"
+        "* They are always deployed; preparations cannot bench them.\n"
+        "* Only they can [[seize]].\n"
+        "* If they fall, the game is over. Anyone else who falls is lost as usual.",
+        "So that no choice is a trap, a frail lead gets a one-time boost to HP and defenses at "
+        "the start of %s, sized so they survive about as many hits as a sturdy one. It is "
+        "applied once, and matters less as the lead levels." % first,
+        '==Candidates==',
+        '{| class="wikitable"\n! Character !! Card !! Starting boost\n%s\n|}' % '\n'.join(rows),
+    ])
+
+
+def navbox_wikitext(chs, chars, classed):
+    """The game navbox at every page's foot, in Template:Nav8's own shape (a collapsed
+    `navbox` table, one row per group), filled from the pages this build publishes: the
+    playable cast, planned recruits, other characters and bosses by their page ids, the
+    chapters by act, our concept pages and the lists."""
+    playable = sorted({t for pid, t, _ in chars if pid in classed}, key=str.lower)
+    planned = sorted({t for pid, t, _ in chars if pid.startswith('unit-')
+                      and pid not in classed}, key=str.lower)
+    npcs = sorted({t for pid, t, _ in chars if pid.startswith('npc-')}, key=str.lower)
+    bosses = sorted({t for pid, t, _ in chars if pid.startswith('boss-')}, key=str.lower)
+    link = lambda ts: ' • '.join('[[%s]]' % t for t in ts)
+    acts = list(campaign_yaml().get('acts') or {})
+    by_act = [(a, [c for c in chs if str(c.get('act')) == str(a)]) for a in acts]
+    by_act = [(a, m) for a, m in by_act if m]
+
+    def num(c):
+        return ('{{abbr|P|Prologue}}' if c.get('is_prologue')
+                else str(int(re.sub(r'\D', '', c['_slug']) or 0)))
+    rows = ['! class="roundt" colspan="2" | [[%s#Playable characters|Playable characters]]\n| %s'
+            % (ROSTER_TITLE, link(playable))]
+    if planned:
+        rows.append('! colspan="2" | Planned recruits\n| %s' % link(planned))
+    if npcs:
+        rows.append('! colspan="2" | [[%s#Other characters|Non-playable characters]]\n| %s'
+                    % (ROSTER_TITLE, link(npcs)))
+    if bosses:
+        rows.append('! colspan="2" | [[%s#Bosses|Bosses]]\n| %s' % (ROSTER_TITLE, link(bosses)))
+    for i, (a, members) in enumerate(by_act):
+        head = ('! style="width: 10%%" rowspan="%d" | [[%s|Chapters]]\n' % (len(by_act), CHAPTERS_TITLE)
+                if i == 0 else '')
+        rows.append('%s! style="width: 10%%" | Act %s\n| %s' % (head, a, ' • '.join(
+            '%s: [[%s]]' % (num(c), c.get('title', c['_slug'])) for c in members)))
+    rows.append('! colspan="2" | Groups, objects, and concepts\n| [[%s]]' % LORD_SELECT_TITLE)
+    rows.append('! class="roundb" colspan="2" | Lists\n| [[%s|Chapters]] • [[%s|Characters]]'
+                % (CHAPTERS_TITLE, ROSTER_TITLE))
+    return ('{| class="mw-collapsible mw-collapsed navbox" style="--navbox-color: #54265f"\n'
+            "! ''[[%s]]''\n|-\n|\n{|\n%s\n|}\n|}" % (GAME_TITLE, '\n|-\n'.join(rows)))
+
+
 def character_pages(chs, units, files):
     """[(page id, title, wikitext)]: every classed cast member, every planned recruit (a class,
     no slot yet), every hosted boss, then every other named character the lore profiles. A unit
@@ -1650,7 +1735,7 @@ def character_pages(chs, units, files):
     return out
 
 
-def design_page(chap, opens):
+def design_page(chap, navbox_html=''):
     """Ours, not the wiki's: the plan the cloned article has no section for (#487)."""
     slug, title = chap['_slug'], chap.get('title', chap['_slug'])
     plan = chap.get('plan') or {}
@@ -1662,10 +1747,6 @@ def design_page(chap, opens):
         ('Map donor', twin_label(chap.get('fe8_base_map'))),
         ('Source', '<code>%s</code>' % esc(chap['_file'])),
     ])]
-    if opens.get(slug):
-        parts.append(mk.h(2, 'Open questions', '%s-design-open' % slug))
-        parts.append(wikitable(['Question', 'Claude\'s pick'],
-                               [(esc(q.get('q')), esc(q.get('pick', ''))) for q in opens[slug]]))
     prose = plan.get('how_it_plays') or chap.get('design_notes')
     if prose:
         parts.append(mk.h(2, 'How it plays', '%s-design-plays' % slug) + para(prose))
@@ -1684,7 +1765,7 @@ def design_page(chap, opens):
                      else '')) for i in intro]))
     if plan.get('sources'):
         parts.append('<p><small><b>Sources:</b> %s</small></p>' % esc('; '.join(plan['sources'])))
-    return page('%s/design' % slug, '%s/Design notes' % title, ''.join(parts),
+    return page('%s/design' % slug, '%s/Design notes' % title, ''.join(parts) + navbox_html,
                 tools=[(slug, 'Chapter')], category='Design notes')
 
 
@@ -1763,9 +1844,13 @@ def page(pid, title, body, tools=(), category=None):
 
 
 BASE_GAME = 'Fire Emblem: The Sacred Stones'
+GAME_TITLE = 'Manchego Stars'
+ROSTER_TITLE = 'List of characters in Manchego Stars'
+CHAPTERS_TITLE = 'List of chapters in Manchego Stars'
+LORD_SELECT_TITLE = 'Lord select'
 
 
-def home_page(chs, units):
+def home_page(chs, units, navbox_html=''):
     """The Fire Emblem Wiki's game page (its The Sacred Stones article), filled with ours:
     infobox, lead, Plot by act, Gameplay, Chapters, Characters. Acts and the gameplay notes
     come from campaign.yaml; everything else from the chapters and units."""
@@ -1820,10 +1905,10 @@ def home_page(chs, units):
         'characters: the %d player characters of the campaign, who found the company, and %d '
         'recruits who join along the way.\n</p>' % (esc(title), len(pcs) + len(recruits),
                                                      len(pcs), len(recruits)))
-    return page('home', title, box + lead + mk.toc(toc, 'home') + ''.join(parts))
+    return page('home', title, box + lead + mk.toc(toc, 'home') + ''.join(parts) + navbox_html)
 
 
-def index_page(chs):
+def index_page(chs, navbox_html=''):
     rows = []
     for c in chs:
         st = 'Planned' if c.get('status') == 'planned' else ('Locked' if c.get('balance_locked')
@@ -1834,19 +1919,7 @@ def index_page(chs):
     return page('chapters', 'List of chapters in Manchego Stars', '<p>Every chapter of the '
                 'campaign, built and planned. Each page is generated from the chapter\'s YAML and '
                 'the FE8 decomp, so it is only as current as the last build.</p>' + wikitable(
-                    ['Ch', 'Title', 'Curve twin', 'Map donor', 'Status'], rows))
-
-
-def decisions_page(chs, opens):
-    rows = []
-    for c in chs:
-        for q in opens.get(c['_slug'], []):
-            rows.append((mk.ours('%s/design' % c['_slug'], c['_slug']), esc(q.get('q')),
-                         esc(q.get('pick', ''))))
-    return page('decisions', 'Open decisions', '<p>Every open question any chapter carries, in '
-                'chapter order. Each lives in its chapter\'s YAML under <code>open_questions</code>'
-                '; settle it there and it leaves this list.</p>' + wikitable(
-                    ['Ch', 'Question', 'Claude\'s pick'], rows))
+                    ['Ch', 'Title', 'Curve twin', 'Map donor', 'Status'], rows) + navbox_html)
 
 
 def css():
@@ -1928,8 +2001,7 @@ def chrome(pages_html, chs):
     pages, nested exactly as the same render nests it; the wiki's own tools, notices and search
     are dropped, and our navigation sits in their portlets."""
     nav = ''.join('<li class="mw-list-item"><a href="#%s">%s</a></li>' % (esc(a), esc(t)) for a, t in
-                  (('home', 'Main page'), ('chapters', 'List of chapters'), ('roster', 'Characters'),
-                   ('decisions', 'Open decisions')))
+                  (('home', 'Main page'), ('chapters', 'List of chapters'), ('roster', 'Characters')))
     chap_nav = ''.join('<li class="mw-list-item"><a href="#%s">%s %s</a></li>'
                        % (esc(c['_slug']), esc(c['_slug']), esc(c.get('title'))) for c in chs)
     portlet = ('<div role="navigation" class="mw-portlet" id="%s"><h3 lang="en" dir="ltr">%s</h3>'
@@ -1974,38 +2046,42 @@ def chrome(pages_html, chs):
         '</div></div>')
 
 
-def open_questions(chs):
-    return {c['_slug']: list(c.get('open_questions') or []) for c in chs}
-
-
 def build():
     chs = chapters()
     units = units_index()
     first = next((c for c in chs if not c.get('is_prologue')), None)
     if first is not None:
         first['_founding'] = sorted(k for k, u in units.items() if u['_kind'] == 'pcs')
-    opens = open_questions(chs)
     files = WikiFiles()
     titles = {}                       # page title -> page id: what a [[link]] opens here
     for c in chs:
         titles[c.get('title', c['_slug'])] = c['_slug']
         titles['%s/Script' % c.get('title', c['_slug'])] = '%s/script' % c['_slug']
-    titles['List of characters in Manchego Stars'] = 'roster'
+    titles[ROSTER_TITLE] = 'roster'
+    titles[CHAPTERS_TITLE] = 'chapters'
+    titles[GAME_TITLE] = 'home'
+    titles[LORD_SELECT_TITLE] = 'lord-select'
     chars = character_pages(chs, units, files)
     for pid, title, _wt in chars:
         titles.setdefault(title, pid)
     wsite_ = wsite.Site(titles, files)
-    roster_title = 'List of characters in Manchego Stars'
-    pages = [home_page(chs, units), index_page(chs),
-             page('roster', roster_title, wsite.render_page(
-                 roster_title, list_wikitext(chs, units, files), wsite_)),
-             decisions_page(chs, opens)]
+    classed = {'unit-%s' % row[0] for row in inject.cast.classed_cast(CAMPAIGN)}
+    navbox = navbox_wikitext(chs, chars, classed)
+    navbox_html = wsite.render_page(GAME_TITLE, navbox, wsite_)
+    pages = [home_page(chs, units, navbox_html), index_page(chs, navbox_html),
+             page('roster', ROSTER_TITLE, wsite.render_page(
+                 ROSTER_TITLE, list_wikitext(chs, units, files) + '\n\n' + navbox, wsite_)),
+             page('lord-select', LORD_SELECT_TITLE, wsite.render_page(
+                 LORD_SELECT_TITLE, lord_select_wikitext(chs, units) + '\n\n' + navbox, wsite_),
+                  category='Concepts')]
     for i, c in enumerate(chs):
         title = c.get('title', c['_slug'])
         wt = chapter_wikitext(c, chs[i - 1] if i else None,
-                              chs[i + 1] if i + 1 < len(chs) else None, units, chs, files)
+                              chs[i + 1] if i + 1 < len(chs) else None, units, chs, files,
+                              navbox=navbox)
         script = script_wikitext(c, chs[i - 1] if i else None,
-                                 chs[i + 1] if i + 1 < len(chs) else None, units)
+                                 chs[i + 1] if i + 1 < len(chs) else None, units,
+                                 navbox=navbox)
         pages.append(page(c['_slug'], title, wsite.render_page(title, wt, wsite_),
                           tools=[('%s/script' % c['_slug'], 'Script') if script else None,
                                  ('%s/design' % c['_slug'], 'Design notes')],
@@ -2015,14 +2091,13 @@ def build():
             pages.append(page('%s/script' % c['_slug'], '%s/Script' % title,
                               wsite.render_page('%s/Script' % title, script, wsite_),
                               tools=[(c['_slug'], 'Chapter')], category='Scripts'))
-        pages.append(design_page(c, opens))
+        pages.append(design_page(c, navbox_html))
     for pid, title, wt in chars:
-        pages.append(page(pid, title, wsite.render_page(title, wt, wsite_),
+        pages.append(page(pid, title, wsite.render_page(title, wt + '\n\n' + navbox, wsite_),
                           category='Characters'))
     if wsite_.missing_files:
         print('wiki: %d file(s) no template could find: %s' % (
             len(wsite_.missing_files), ', '.join(sorted(wsite_.missing_files)[:12])))
-    n_open = sum(len(v) for v in opens.values())
     banner = '.mw-wiki-logo{background-image:url(%s)!important}' % png_uri(TITLE_SCREEN)
     doc = ('<meta charset="utf-8"><title>Manchego Stars Wiki</title><style>%s\n%s\n%s</style>'
            '%s<script>%s</script>'
@@ -2030,13 +2105,13 @@ def build():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write(doc)
-    return OUT, len(chs), n_open
+    return OUT, len(chs)
 
 
 def main():
-    out, n, k = build()
-    print('wrote %s (%d chapters, %d open questions, %d bytes)' % (
-        os.path.relpath(out, ROOT), n, k, os.path.getsize(out)))
+    out, n = build()
+    print('wrote %s (%d chapters, %d bytes)' % (os.path.relpath(out, ROOT), n,
+                                              os.path.getsize(out)))
 
 
 if __name__ == '__main__':

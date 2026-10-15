@@ -6,8 +6,8 @@
 > map donor, the vanilla payload it owes, the recruit roles it fills, sources, and its own
 > `open_questions`. **Read them through the wiki**: `python3 tools/gen_wiki.py` writes
 > `build/wiki/index.html`, one page per chapter laid out like the Fire Emblem Wiki, with
-> the twin's payload read from the decomp and checked against ours, and every open
-> question gathered on one page. This file keeps only what has no chapter to live in.
+> the twin's payload read from the decomp and checked against ours. Open questions stay in
+> the YAML and on #486, not on the wiki. This file keeps only what has no chapter to live in.
 >
 > Settled design lives in `docs/decisions.md`; the FE8 cadence rules in
 > `docs/fe8-pacing-reference.md`.
@@ -62,8 +62,8 @@ cost. (`npcs/pepperjack.yaml`, `npcs/brie.yaml`.)
 
 ## Open questions
 
-Every open question sits on its chapter as `open_questions`, and the wiki's **Open
-decisions** page lists them all with Claude's pick. Settled since this file's first draft:
+Every open question sits on its chapter as `open_questions`, with Claude's pick, and the
+planning thread on #486 walks them. Settled since this file's first draft:
 the lord is whoever the player crowns (ADR 0062), and each PC gets a planned legendary
 weapon, handed out where vanilla hands out its own (Nicolas, 2026-10-13).
 
