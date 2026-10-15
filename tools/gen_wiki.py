@@ -1183,46 +1183,229 @@ def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
         waves[turn] = lines
     c['reinforcements'] = list(waves.items())
 
-    c['bosses_data'] = []
-    for ed in bosses_of(chap):
-        token, lv = ed.get('class'), int(ed.get('level', 1))
-        cls_enum = class_enum_of(token)
-        cls, article = wiki_class(token)
-        donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
-                 or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')))
-        ranks = _ranks(cls_enum, donor)
-        letters = {k: _letter(ranks.get(_ITYPE[t])) or None for k, t in (
-            ('sw', 'sword'), ('la', 'lance'), ('ax', 'axe'), ('bo', 'bow'), ('an', 'magic_anima'),
-            ('li', 'magic_light'), ('da', 'magic_dark'), ('st', 'staff'))}
-        port = files.portrait(ed['face']) if ed.get('face') else None
-        sprite_key = 'ms %s' % ed.get('id')
-        files.sprite('Ma gba %s.gif' % sprite_key, sprite_frame(chap, token, uid=ed.get('id')))
-        attrs = unit_load._class_block(cls_enum)
-        inv = [wiki_item(i, files) for i in ed.get('inventory') or []]
-        per_mode = []
-        for mode, label in modes:
-            st = loaded(ed, token, lv, shifts, mode)
-            con = st['Con'][0]
-            aid = (con - 1 if 'CA_MOUNTEDAID' not in attrs else
-                   (20 - con if 'CA_FEMALE' in attrs else 25 - con))
-            show = lambda k: unit_load.show(st[k])       # noqa: E731
-            magic = class_enum_of(token) and any(t in ranks for t in (
-                'ITYPE_ANIMA', 'ITYPE_LIGHT', 'ITYPE_DARK', 'ITYPE_STAFF'))
-            per_mode.append((label, {
-                'portrait': '[[File:%s]]' % port if port else None, 'sprite': sprite_key,
-                'class': cls, 'class_article': article, 'lv': lv,
-                'affinity': str(ed['affinity']).capitalize() if ed.get('affinity') else None,
-                'hp': show('HP'),
-                'str': None if magic else show('Pow'), 'mag': show('Pow') if magic else None,
-                'skl': show('Skl'), 'spd': show('Spd'), 'lck': show('Lck'), 'def': show('Def'),
-                'res': show('Res'), 'con': show('Con'), 'mov': show('Mov'), 'aid': aid,
-                'inventory': inv, 'ranks': letters}))
-        if len({repr(s) for _, s in per_mode}) == 1:
-            per_mode = [('All', per_mode[0][1])]
-        c['bosses_data'].append({'page': ed.get('name'), 'modes': per_mode})
+    c['bosses_data'] = [{'page': ed.get('name'), 'modes': boss_modes(chap, ed, files, shifts, modes)}
+                        for ed in bosses_of(chap)]
 
     c['strategy'] = chap.get('strategy')
     return wp.chapter(c)
+
+
+RANK_PARAMS = (('sw', 'sword'), ('la', 'lance'), ('ax', 'axe'), ('bo', 'bow'),
+               ('an', 'magic_anima'), ('li', 'magic_light'), ('da', 'magic_dark'), ('st', 'staff'))
+MAGIC_ITYPES = ('ITYPE_ANIMA', 'ITYPE_LIGHT', 'ITYPE_DARK', 'ITYPE_STAFF')
+
+
+def rank_params(ranks):
+    """{template rank key: letter} from {ITYPE: wexp}, as the stats templates take them."""
+    return {k: _letter(ranks.get(_ITYPE[t])) or None for k, t in RANK_PARAMS}
+
+
+def aid_of(cls_enum, con):
+    """FE8's GetUnitAid: con - 1 on foot; 25 - con mounted (20 - con for a female mount)."""
+    attrs = unit_load._class_block(cls_enum)
+    return (con - 1 if 'CA_MOUNTEDAID' not in attrs else
+            (20 - con if 'CA_FEMALE' in attrs else 25 - con))
+
+
+def boss_modes(chap, ed, files, shifts=None, modes=None):
+    """[(difficulty label, {{BossStats GBA}} data)] for one boss as the ROM loads it, one per
+    difficulty, folded to ('All', ...) when no difficulty moves it. The chapter page's Boss
+    data and the boss's own page both read this."""
+    if shifts is None:
+        shifts = chapter_shifts(chap)
+        modes = MODE_LABELS if shifts else (('normal', 'Normal'),)
+    token, lv = ed.get('class'), int(ed.get('level', 1))
+    cls_enum = class_enum_of(token)
+    cls, article = wiki_class(token)
+    donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
+             or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')))
+    ranks = _ranks(cls_enum, donor)
+    port = files.portrait(ed['face']) if ed.get('face') else None
+    sprite_key = 'ms %s' % ed.get('id')
+    files.sprite('Ma gba %s.gif' % sprite_key, sprite_frame(chap, token, uid=ed.get('id')))
+    inv = [wiki_item(i, files) for i in ed.get('inventory') or []]
+    magic = cls_enum and any(t in ranks for t in MAGIC_ITYPES)
+    per_mode = []
+    for mode, label in modes:
+        st = loaded(ed, token, lv, shifts, mode)
+        show = lambda k: unit_load.show(st[k])           # noqa: E731
+        per_mode.append((label, {
+            'portrait': '[[File:%s]]' % port if port else None, 'sprite': sprite_key,
+            'class': cls, 'class_article': article, 'lv': lv,
+            'affinity': str(ed['affinity']).capitalize() if ed.get('affinity') else None,
+            'hp': show('HP'),
+            'str': None if magic else show('Pow'), 'mag': show('Pow') if magic else None,
+            'skl': show('Skl'), 'spd': show('Spd'), 'lck': show('Lck'), 'def': show('Def'),
+            'res': show('Res'), 'con': show('Con'), 'mov': show('Mov'),
+            'aid': aid_of(cls_enum, st['Con'][0]), 'inventory': inv,
+            'ranks': rank_params(ranks)}))
+    if len({repr(s) for _, s in per_mode}) == 1:
+        per_mode = [('All', per_mode[0][1])]
+    return per_mode
+
+
+# ── character pages ────────────────────────────────────────────────────────────
+
+def chapter_link(chap):
+    """[[Title|Chapter&nbsp;N]], as the wiki names a chapter in running text."""
+    num = chap.get('chapter_number')
+    label = 'Prologue' if chap.get('is_prologue') else 'Chapter&nbsp;%s' % num
+    return '[[%s|%s]]' % (chap.get('title', chap['_slug']), label)
+
+
+def promotions(cls_enum):
+    """{{PromotionGains}} columns for every class FE8 lets `cls_enum` promote into
+    (gPromoJidLut, both branches): the promoted class's promotion bonuses, and the CON/MOV
+    its base adds over the unpromoted one."""
+    import inject.sms
+    src = unit_load._class_block(cls_enum)
+    out = []
+    for target in inject.sms.promotion_branches().get(cls_enum) or []:
+        b = unit_load._class_block(target)
+        f = unit_load._field
+        out.append({'class': '[[%s]]' % class_display_name(
+                        target[len('CLASS_'):].lower().replace('_', '-')),
+                    'hp': f(b, 'promotionHp'), 'str': f(b, 'promotionPow'),
+                    'skill': f(b, 'promotionSkl'), 'spd': f(b, 'promotionSpd'),
+                    'def': f(b, 'promotionDef'), 'res': f(b, 'promotionRes'),
+                    'con': f(b, 'baseCon') - f(src, 'baseCon'),
+                    'move': f(b, 'baseMov') - f(src, 'baseMov')})
+    return out
+
+
+def _quotes(chap, boss_name, units):
+    """(battle quote, death quote) a boss says, from the chapter's own scenes."""
+    got = {}
+    for trigger, _ref, _title, scenes in _scenes().get(chap['_slug'], []):
+        if trigger in ('boss_battle', 'boss_death'):
+            lines = [t for k, w, t in _script_steps(scenes, units) if k == 'say' and w == boss_name]
+            if lines:
+                got.setdefault(trigger, ' '.join(lines))
+    return got.get('boss_battle'), got.get('boss_death')
+
+
+def _join_lines(uid, name, chap, units):
+    """(CharStats `recruit`, Role sentence) for how `uid` joins in `chap`, from the build's
+    wiring (`talk_joins`), worded as Colm's page words his: "Chapter 3, talk to with Neimi"."""
+    if chap is None:
+        return None, None
+    where = chapter_link(chap)
+    if uid in (chap.get('_founding') or []):
+        return ('%s, automatically from turn 1' % where,
+                '%s is one of the founding party, fielded from %s.' % (name, where))
+    talks = talk_joins(chap)
+    if uid in talks:
+        by = '[[%s]]' % unit_name(talks[uid], units) if talks[uid] else 'any party member'
+        side = 'an enemy' if talks[uid] else 'a green unit'
+        return ('%s, talk to with %s' % (where, by),
+                '%s appears in %s as %s, and joins when %s talks to %s.'
+                % (name, where, side, by, name))
+    return ('%s, automatically at the end of the chapter' % where,
+            '%s joins at the end of %s.' % (name, where))
+
+
+def cast_page(uid, units, chs, files):
+    """A cast member's page, as `Colm`'s: the line, growths, ranks and kit the slot loads with
+    (inject.stats, the injector's own answers), how the build wires the join, its death quote."""
+    import inject.text
+    unit = units.get(uid) or {}
+    name = unit_name(uid, units)
+    cls_enum, line = inject.stats.cast_loaded_line(CAMPAIGN, uid)
+    fs = unit.get('fe_stats') or {}
+    cls, _article = wiki_class(fs.get('class'))
+    joins = next((c for c in chs if uid in recruits_of(c)), None)
+    port = files.portrait(uid)
+    sprite = 'ms %s' % uid
+    if joins:
+        files.sprite('Ma gba %s playable.gif' % sprite,
+                     sprite_frame(joins, fs.get('class'), 'player', uid))
+    g = inject.stats.cast_growths(uid)
+    ranks = _ranks(cls_enum, inject.stats.STAT_DONOR.get(uid))
+    recruit, role = _join_lines(uid, name, joins, units)
+    help_text = inject.text.slot_help_text(inject.cast.PORTRAIT_MAP[uid])
+    race = (unit.get('dnd') or {}).get('race')
+    return wp.character({
+        'name': name, 'image': '[[File:%s|class=pixel-art]]' % port if port else None,
+        'caption': "%s's portrait from ''Manchego Stars''." % name if port else None,
+        'help_text': help_text, 'gender': str(unit.get('gender', '')).capitalize() or None,
+        'race': race, 'startingclass': '[[%s]]' % cls,
+        'lead': 'a playable [[%s]] in \'\'Manchego Stars\'\'%s' % (
+            cls.lower(), '. %s first appears in %s' % (name, chapter_link(joins)) if joins
+            else ''),
+        'role': role,
+        'char_stats': {
+            'portrait': '[[File:%s]]' % port if port else None, 'sprite': sprite,
+            'class': cls, 'affinity': inject.stats.CAST_AFFINITY[len('UNIT_AFFIN_'):].lower(),
+            'lv': fs.get('level', 1), 'hp': line['baseHP'], 'str': line['basePow'],
+            'skl': line['baseSkl'], 'spd': line['baseSpd'], 'lck': line['baseLck'],
+            'def': line['baseDef'], 'res': line['baseRes'], 'con': line['baseCon'],
+            'mov': difficulty._class_base(cls_enum).get('baseMov', ''),
+            'aid': aid_of(cls_enum, line['baseCon']),
+            'magic': any(t in ranks for t in MAGIC_ITYPES),
+            'inventory': [wiki_item(e, files) for e in inject.cast.unit_items(CAMPAIGN, uid)],
+            'ranks': rank_params(ranks),
+            'growths': {'hp': g['growthHP'], 'str': g['growthPow'], 'skl': g['growthSkl'],
+                        'spd': g['growthSpd'], 'lck': g['growthLck'], 'def': g['growthDef'],
+                        'res': g['growthRes']},
+            'recruit': recruit},
+        'promotions': promotions(cls_enum),
+        'death_quote': (unit['death_quote'], "%s's death quote in ''Manchego Stars''." % name)
+                       if unit.get('death_quote') else None})
+
+
+def boss_page(chap, ed, units, files):
+    """A boss's page, as `Bazba`'s: the chapter it leads, its stats per difficulty (the
+    chapter page's own Boss data), and its quotes from the chapter's scenes."""
+    name = ed.get('name')
+    cls, _article = wiki_class(ed.get('class'))
+    port = files.portrait(ed['face']) if ed.get('face') else None
+    battle, death = _quotes(chap, name, units)
+    title = chap.get('title', chap['_slug'])
+    return wp.character({
+        'name': name, 'image': '[[File:%s|class=pixel-art]]' % port if port else None,
+        'caption': "%s's portrait from ''Manchego Stars''." % name if port else None,
+        'startingclass': '[[%s]]' % cls,
+        'quote': (battle, name) if battle else None,
+        'lead': 'a [[boss]] appearing in \'\'Manchego Stars\'\'',
+        'role': '%s appears as the [[boss]] of %s.' % (name, chapter_link(chap)),
+        'chapter': title, 'boss_modes': boss_modes(chap, ed, files),
+        'battle_quotes': [(battle, "%s, in %s." % (name, chapter_link(chap)))] if battle else [],
+        'death_quote': (death, "%s's death quote." % name) if death else None})
+
+
+def planned_page(uid, units, chs, files):
+    """A recruit with a class but no slot yet (a planned chapter's joiner): what is decided
+    -- its class and where it joins -- and nothing the build cannot answer yet."""
+    unit = units.get(uid) or {}
+    name = unit_name(uid, units)
+    cls, _article = wiki_class((unit.get('fe_stats') or {}).get('class'))
+    joins = next((c for c in chs if uid in recruits_of(c)), None)
+    port = files.portrait(uid)
+    role = '%s joins in %s.' % (name, chapter_link(joins)) if joins else None   # not wired yet
+    return wp.character({
+        'name': name, 'image': '[[File:%s|class=pixel-art]]' % port if port else None,
+        'startingclass': '[[%s]]' % cls,
+        'lead': 'a playable [[%s]] planned for \'\'Manchego Stars\'\'' % cls.lower(),
+        'role': role})
+
+
+def character_pages(chs, units, files):
+    """[(page id, title, wikitext)]: every classed cast member, every planned recruit (a class,
+    no slot yet), then every hosted boss. A unit with no class (a map ballista) is no character."""
+    import inject.cast
+    classed = [uid for uid, _slot, _cls, _ in inject.cast.classed_cast(CAMPAIGN)]
+    out = [('unit-%s' % uid, unit_name(uid, units), cast_page(uid, units, chs, files))
+           for uid in classed]
+    out += [('unit-%s' % uid, unit_name(uid, units), planned_page(uid, units, chs, files))
+            for uid, u in sorted(units.items())
+            if uid not in classed and (u.get('fe_stats') or {}).get('class')]
+    for c in chs:
+        if c.get('status') == 'planned':
+            continue
+        for ed in bosses_of(c):
+            if ed.get('name'):
+                out.append(('boss-%s' % ed.get('id'), ed['name'], boss_page(c, ed, units, files)))
+    return out
 
 
 def design_page(chap, opens):
@@ -1419,14 +1602,13 @@ def roster_page(chs, units):
             if r in (c.get('_founding') or []):
                 continue
             u = units.get(r) or {}
-            rows.append(('<span id="unit-%s"></span>%s' % (esc(r), mk.file_img(
-                         minimug(r), 32, 32)),
+            rows.append((mk.file_img(minimug(r), 32, 32),
                          esc(unit_name(r, units)), class_html((u.get('fe_stats') or {}).get('class')),
                          mk.ours(c['_slug'], c['_slug'])))
         for role in (c.get('plan') or {}).get('joins_roles') or []:
             rows.append(('', '<i>open</i>', esc(role), mk.ours(c['_slug'], c['_slug'])))
     first = next((c for c in chs if c.get('_founding')), None)
-    pcs = [('<span id="unit-%s"></span>%s' % (esc(k), mk.file_img(minimug(k), 32, 32)), esc(u.get('name', k)),
+    pcs = [(mk.file_img(minimug(k), 32, 32), esc(u.get('name', k)),
             class_html((u.get('fe_stats') or {}).get('class')),
             mk.ours(first['_slug'], first['_slug']) if first else '')
            for k, u in sorted(units.items()) if u['_kind'] == 'pcs']
@@ -1584,8 +1766,9 @@ def build():
     for c in chs:
         titles[c.get('title', c['_slug'])] = c['_slug']
         titles['%s/Script' % c.get('title', c['_slug'])] = '%s/script' % c['_slug']
-    for uid in units:
-        titles.setdefault(unit_name(uid, units), 'unit-%s' % uid)
+    chars = character_pages(chs, units, files)
+    for pid, title, _wt in chars:
+        titles.setdefault(title, pid)
     wsite_ = wsite.Site(titles, files)
     pages = [home_page(chs, units), index_page(chs), roster_page(chs, units),
              decisions_page(chs, opens)]
@@ -1605,6 +1788,9 @@ def build():
                               wsite.render_page('%s/Script' % title, script, wsite_),
                               tools=[(c['_slug'], 'Chapter')], category='Scripts'))
         pages.append(design_page(c, opens))
+    for pid, title, wt in chars:
+        pages.append(page(pid, title, wsite.render_page(title, wt, wsite_),
+                          category='Characters'))
     if wsite_.missing_files:
         print('wiki: %d file(s) no template could find: %s' % (
             len(wsite_.missing_files), ', '.join(sorted(wsite_.missing_files)[:12])))

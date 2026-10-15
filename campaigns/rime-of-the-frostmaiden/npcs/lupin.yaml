@@ -50,16 +50,6 @@ donor:
   why: fresh Cavalier = full growth runway on Kyle's curve, starting from Franz's L1 line
     (ADR 0042's shaman precedent -- a join-appropriate base donor; #403, ADR 0321)
 
-# ── Growth Rates (% per level) — vanilla Cavalier growths from data_classes.c ─
-growth_rates:
-  HP: 75
-  STR: 35
-  SKL: 40
-  SPD: 28
-  DEF: 15
-  RES: 15
-  LCK: 30
-
 promotion:
   branch: [paladin, great-knight]   # vanilla FE8 Cavalier branch (classchg-data.c [CLASS_CAVALIER])
   default: paladin

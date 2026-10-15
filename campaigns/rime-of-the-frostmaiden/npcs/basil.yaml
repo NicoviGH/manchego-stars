@@ -74,17 +74,6 @@ donor:
 # rescued-unit sprite) gate on CA_MOUNTEDAID first. It would start to matter only on Valkyrie.
 gender: female
 
-# ── Growth Rates (% per level) — from data_classes.c. Cleric's growths are BYTE-IDENTICAL
-#    to Priest's, so the class change moved her bases and her promotion tree, not her curve. ──
-growth_rates:
-  HP: 50
-  MAG: 30
-  SKL: 35
-  SPD: 32
-  DEF: 8
-  RES: 50
-  LCK: 45
-
 promotion:
   branch: [bishop, valkyrie]  # vanilla FE8 Cleric branch, gPromoJidLut (classchg-data.c):
                               # {CLASS_BISHOP_F, CLASS_VALKYRIE}. Bishop_F shares Bishop's

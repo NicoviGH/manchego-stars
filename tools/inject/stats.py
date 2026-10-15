@@ -212,6 +212,23 @@ def cast_loaded_line(campaign, unit_id, vanilla_text=None, classes_text=None):
     return class_enum, {f: cbase.get(f, 0) + personal[f] for f in BASE_FIELDS}
 
 
+# Every cast slot's affinity (cosmetic: supports are a later YAML-driven pass).
+CAST_AFFINITY = 'UNIT_AFFIN_ANIMA'
+
+
+def cast_growths(unit_id, vanilla_text=None):
+    """{growth field: %} a cast member levels on: its GROWTH_DONOR's vanilla curve, copied
+    verbatim. One answer for the injector, which writes it, and every reader (the wiki)."""
+    vanilla = vanilla_text or vanilla_decomp_text('src/data_characters.c')
+    return donor_growths_and_ranks(vanilla, GROWTH_DONOR[unit_id])[0]
+
+
+def cast_ranks(unit_id, vanilla_text=None):
+    """The `.baseRanks` initializer a cast member starts with: its STAT_DONOR's, verbatim."""
+    vanilla = vanilla_text or vanilla_decomp_text('src/data_characters.c')
+    return donor_growths_and_ranks(vanilla, STAT_DONOR[unit_id])[1]
+
+
 def _set_gender(block, female):
     """Set the CA_FEMALE attribute. Replaces .attributes if present; if absent,
     inserts it only when female (absent already means 0 == male)."""
@@ -255,7 +272,7 @@ def patch_character_data(campaign, verbose=True):
         s, e = _find_brace_block(text, marker, CHARACTERS_C)
         block = text[s:e]
         block = _set_field(block, 'defaultClass', deploy_class_for(unit), CHARACTERS_C, marker)
-        block = _set_field(block, 'affinity', 'UNIT_AFFIN_ANIMA', CHARACTERS_C, marker)
+        block = _set_field(block, 'affinity', CAST_AFFINITY, CHARACTERS_C, marker)
         block = _set_field(block, 'baseLevel', int(st.get('level', 1)), CHARACTERS_C, marker)
 
         # Personal base layer = (authored - class) + the donor's personal line, so the
@@ -266,8 +283,8 @@ def patch_character_data(campaign, verbose=True):
         # Growths from the growth donor, weapon ranks from the rank donor (usually the same
         # unit; the shamans split -- Mees grows on Ewan but keeps Knoll's Dark rank). Both
         # read from VANILLA so the unit levels and fights like a real FE unit of its class.
-        growths, _ = donor_growths_and_ranks(vanilla, GROWTH_DONOR[unit_id])
-        _, ranks = donor_growths_and_ranks(vanilla, STAT_DONOR[unit_id])
+        growths = cast_growths(unit_id, vanilla)
+        ranks = cast_ranks(unit_id, vanilla)
         for gf, gv in growths.items():
             block = _set_field(block, gf, gv, CHARACTERS_C, marker)
         block, n = re.subn(r'(\.baseRanks\s*=\s*)\{.*?\}',

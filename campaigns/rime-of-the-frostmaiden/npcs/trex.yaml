@@ -44,16 +44,6 @@ donor:
   character: Colm           # vanilla Thief — bases/growths reference (data_classes.c)
   why: the game's starter Thief = full growth runway for a fresh utility unit
 
-# ── Growth Rates (% per level) — vanilla Thief growths from data_classes.c ────
-growth_rates:
-  HP: 50
-  STR: 5
-  SKL: 45
-  SPD: 40
-  DEF: 5
-  RES: 20
-  LCK: 40
-
 promotion:
   branch: [rogue, assassin]  # vanilla FE8 Thief branch (classchg-data.c [CLASS_THIEF])
   default: rogue

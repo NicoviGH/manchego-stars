@@ -99,16 +99,6 @@ promotion:
   branch: [sniper, ranger]   # vanilla Archer branch (classchg-data.c [CLASS_ARCHER])
   default: sniper            # thematic lean; player may pick either.
 
-# ── Growth Rates (% per level) — vanilla Archer growths from data_classes.c ──────
-growth_rates:
-  HP: 70
-  STR: 35
-  SKL: 40
-  SPD: 32
-  DEF: 15
-  RES: 15
-  LCK: 35
-
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
 # RBG's personal-weapon flavor (Fonduedler) is parked in lore/prof-rbg.md as a POST-MVP item;

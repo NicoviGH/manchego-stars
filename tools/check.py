@@ -86,6 +86,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #493: a cast member grows on its stat donor's curve (inject.stats.cast_growths)
+    r'growth_rates',
     # retired by #493: a chapter names its vanilla map donor once, as `map.vanilla_layout`
     r'base_layout',
     # retired by #493: in-map shops are the map donor's, inherited (villages.chapter_shops)

@@ -221,3 +221,73 @@ def script(c):
     if c.get('navbox'):
         out.append(c['navbox'])
     return '\n\n'.join(out) + '\n'
+
+
+GAME_HEADING = "==''Manchego Stars''=="   # the exemplars' =={{FE8}}==: the game the section covers
+
+
+def char_stats(s):
+    """{{CharStats GBA}}: a playable unit's starting line, growths and how it joins."""
+    pairs = [('portrait', s.get('portrait')), ('sprite', s.get('sprite')), ('class', s['class']),
+             ('affin', s.get('affinity')), ('lv', s['lv']), ('HP', s['hp']),
+             ('mag' if s.get('magic') else 'str', s['str']), ('skill', s['skl']),
+             ('spd', s['spd']), ('luck', s['lck']), ('def', s['def']), ('res', s['res']),
+             ('move', s['mov']), ('con', s['con']), ('aid', s['aid']),
+             ('inventory', '<br>'.join(s['inventory']) or None)]
+    pairs += [(k, v) for k, v in sorted(s['ranks'].items()) if v]
+    g = s['growths']
+    pairs += [('HP1', g['hp']), ('mag1' if s.get('magic') else 'str1', g['str']),
+              ('skill1', g['skl']), ('spd1', g['spd']), ('luck1', g['lck']),
+              ('def1', g['def']), ('res1', g['res']), ('recruit', s.get('recruit'))]
+    return _params('CharStats GBA', pairs)
+
+
+def promotion_gains(branches):
+    """{{PromotionGains}}: one column per promotion; the last is unnumbered, as Colm's is."""
+    pairs = []
+    for i, b in enumerate(branches, 1):
+        n = '' if i == len(branches) else str(i)
+        pairs += [('class' + n, b['class'])] + [(k + n, b[k]) for k in (
+            'hp', 'str', 'skill', 'spd', 'def', 'res', 'con', 'move')]
+    return _params('PromotionGains', pairs)
+
+
+def character(c):
+    """A character page, laid out as `Colm` (playable), `Dara` (NPC) and `Bazba` (boss) are."""
+    out = [_params('Character Infobox', [
+        ('name', c['name']), ('image', c.get('image')), ('caption', c.get('caption')),
+        ('help_text', c.get('help_text')), ('gender', c.get('gender')),
+        ('race', c.get('race')), ('startingclass', c.get('startingclass')),
+        ('appearances', "''Manchego Stars''")])]
+    if c.get('quote'):
+        out.append('{{Quote|%s|%s}}' % c['quote'])
+    out.append("'''%s''' is %s." % (c['name'], c['lead']))
+    sections = [('===Role===', c.get('role'))]
+    if c.get('char_stats'):
+        sections.append(('===Starting stats and growth rates===', char_stats(c['char_stats'])))
+    if c.get('promotions'):
+        sections.append(('===Promotion stat gains===', promotion_gains(c['promotions'])))
+    if c.get('boss_modes'):
+        modes = c['boss_modes']
+        body = boss_stats(modes[0][1]) if len(modes) == 1 else tabs(
+            [l for l, _ in modes], [boss_stats(s) for _, s in modes], width=None)
+        sections.append(('===Stats===', '{{also|%s}}\n%s\n%s' % (
+            c['chapter'], STAT_RANGE_NOTE, body)))
+    sections = [(h, b) for h, b in sections if b]
+    if sections:
+        out.append(GAME_HEADING)
+        out += ['%s\n%s' % hb for hb in sections]
+    quotes = [('===Battle quote%s===' % ('s' if len(c.get('battle_quotes') or []) > 1 else ''),
+               '\n'.join('{{Quote|%s|%s}}' % q for q in c.get('battle_quotes') or [])),
+              ('===Death quote===', '{{Quote|%s|%s}}' % c['death_quote']
+               if c.get('death_quote') else None)]
+    quotes = [(h, b) for h, b in quotes if b]
+    if quotes:
+        out.append('==Quotes==')
+        out += ['%s\n%s' % hb for hb in quotes]
+    if c.get('help_text'):
+        out.append('==Flavor text==\n{{DescriptionHdr}}\n%s\n{{DescriptionFtr}}' % _params(
+            'DescriptionCell', [('game', "''Manchego Stars''"), ('english', c['help_text'])]))
+    if c.get('navbox'):
+        out.append(c['navbox'])
+    return '\n\n'.join(out) + '\n'

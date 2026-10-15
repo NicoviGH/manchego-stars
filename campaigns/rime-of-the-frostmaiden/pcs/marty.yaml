@@ -80,16 +80,6 @@ promotion:
   # Summoner grants the vanilla FE8 Summon command (CA_SUMMON) — a stock class feature, not a
   # custom ability — so the "summon creatures" fantasy is reachable the FE-pure way if chosen.
 
-# ── Growth Rates (% per level) — vanilla Shaman growths from data_classes.c ──────
-growth_rates:
-  HP: 50
-  MAG: 50
-  SKL: 32
-  SPD: 30
-  DEF: 10
-  RES: 30
-  LCK: 20
-
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: Marty is an unpromoted Shaman (Dark attacker). Staves come online at his promotion
 # (Druid OR Summoner — both use staves), so his healing is post-MVP; Sclorbo is the MVP healer.

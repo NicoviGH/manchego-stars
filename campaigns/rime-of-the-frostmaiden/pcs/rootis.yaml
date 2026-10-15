@@ -79,16 +79,6 @@ promotion:
   branch: [sage, mage-knight]   # vanilla Mage branch (classchg-data.c [CLASS_MAGE])
   default: sage                   # thematic lean; player may pick either.
 
-# ── Growth Rates (% per level) — vanilla Mage growths from data_classes.c ────────
-growth_rates:
-  HP: 55
-  MAG: 55
-  SKL: 40
-  SPD: 35
-  DEF: 5
-  RES: 30
-  LCK: 20
-
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — tome stats inherited from the vanilla item in `fe_base` (no custom
 # Might). His ice element rides on the flavor NAME + sprite art: "Ray of Frost" is mechanically

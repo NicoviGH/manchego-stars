@@ -642,7 +642,7 @@ class Ch05RecruitIdentities(unittest.TestCase):
         # is the same class, so compare with the `_F` dropped.
         from inject.class_ids import vanilla_class_enum
         base = lambda enum: enum[:-2] if enum.endswith('_F') else enum
-        branches = inject.sms._promotion_branches()['CLASS_CLERIC']
+        branches = inject.sms.promotion_branches()['CLASS_CLERIC']
         promo = inject.cast.load_unit(self.CAMPAIGN, 'basil')['promotion']
         self.assertEqual(sorted(vanilla_class_enum(t) for t in promo['branch']),
                          sorted(base(c) for c in branches))

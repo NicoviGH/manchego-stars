@@ -164,5 +164,50 @@ class ScriptLayout(unittest.TestCase):
         self.assertIn('|prechapter=The Elven Tomb/Script{{!}}The Elven Tomb', self.pages['ch06'])
 
 
+
+class CharacterLayout(unittest.TestCase):
+    """Character pages are laid out as `Colm`, `Dara` and `Bazba` are: their sections and page
+    templates, in order, with the exemplars' =={{FE8}}== standing for our game's heading."""
+
+    @classmethod
+    def setUpClass(cls):
+        from wiki import pages
+        exemplars = []
+        for stem in ('Colm', 'Dara', 'Bazba'):
+            with open(os.path.join(PAGES, stem + '.wiki'), encoding='utf-8') as f:
+                exemplars.append(skeleton(f.read().replace('=={{FE8}}==', pages.GAME_HEADING)))
+        cls.order = merged(*exemplars)
+        chs = gen_wiki.chapters()
+        units = gen_wiki.units_index()
+        first = next(c for c in chs if not c.get('is_prologue'))
+        first['_founding'] = sorted(k for k, u in units.items() if u['_kind'] == 'pcs')
+        cls.pages = {t: w for _p, t, w in gen_wiki.character_pages(chs, units,
+                                                                     gen_wiki.WikiFiles())}
+
+    def test_every_character_page_follows_the_wikis_section_order(self):
+        for title, text in sorted(self.pages.items()):
+            with self.subTest(title):
+                ours = skeleton(text)
+                self.assertTrue(is_subsequence(ours, self.order),
+                                '%s: %s\nis not in the wiki\'s order %s' % (title, ours, self.order))
+
+    def test_a_cast_member_shows_the_line_and_curve_its_slot_loads(self):
+        # Trex rides Colm's donor: Colm's own page prints this exact line and curve.
+        text = self.pages['Trex']
+        for field in ('|HP=18', '|str=4', '|spd=10', '|sw=E', '|HP1=75', '|spd1=65',
+                      '|recruit=[[The Termalaine Mine|Chapter&nbsp;3]], talk to with any party member'):
+            self.assertIn(field, text)
+        self.assertIn('|class1=[[Assassin]]', text)
+
+    def test_a_boss_page_carries_its_chapters_stats_and_its_own_lines(self):
+        text = self.pages['Ravisin']
+        self.assertIn('{{BossStats GBA', text)
+        self.assertIn('===Death quote===', text)
+
+    def test_a_planned_recruit_says_only_what_is_decided(self):
+        self.assertIn('The White Moose joins in [[The Eastway Ambush|Chapter&nbsp;8]].',
+                      self.pages['The White Moose'])
+        self.assertNotIn('Brie', self.pages)          # a map ballista, not a character
+
 if __name__ == '__main__':
     unittest.main()

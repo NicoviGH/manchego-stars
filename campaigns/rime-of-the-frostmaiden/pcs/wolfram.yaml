@@ -77,16 +77,6 @@ promotion:
   branch: [general, great-knight]   # vanilla Armor Knight branch (classchg-data.c [CLASS_ARMOR_KNIGHT])
   default: general                    # thematic lean; player may pick either.
 
-# ── Growth Rates (% per level) — vanilla Armor Knight growths from data_classes.c ──
-growth_rates:
-  HP: 80
-  STR: 40
-  SKL: 30
-  SPD: 15
-  DEF: 28
-  RES: 20
-  LCK: 25
-
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
 # Wolfram's personal-weapon flavor (Warhammer) is parked in lore/wolfram.md as a POST-MVP item;

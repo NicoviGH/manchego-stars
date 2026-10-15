@@ -53,16 +53,6 @@ fe_stats:
   MOV: 7                    # Cavalier baseMov (mounted)
   CON: 9
 
-# ── Growth Rates (% per level) — vanilla Cavalier class growths from data_classes.c ──
-growth_rates:
-  HP: 75
-  STR: 35
-  SKL: 40
-  SPD: 28
-  DEF: 15
-  RES: 15
-  LCK: 30
-
 # ── Promotion (FE8 branched Cavalier) ─────────────────────────────────────────
 promotion:
   branch: [paladin, great-knight]   # vanilla Cavalier branch (classchg-data.c [CLASS_CAVALIER])

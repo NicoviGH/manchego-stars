@@ -78,16 +78,6 @@ promotion:
   branch: [bishop, sage]          # vanilla Priest branch (classchg-data.c [CLASS_PRIEST])
   default: bishop                 # thematic lean (Light attack + staves); player may pick either.
 
-# ── Growth Rates (% per level) — vanilla Priest growths from data_classes.c ──────
-growth_rates:
-  HP: 50
-  MAG: 30
-  SKL: 35
-  SPD: 32
-  DEF: 8
-  RES: 50
-  LCK: 45
-
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # FE-LEGAL for Priest→Bishop: Heal Staff is a base-Priest staff; the attack cantrips are Light tomes
 # usable from the Bishop promotion (base Priest is staff-only). Rapier removed — no Sword rank exists

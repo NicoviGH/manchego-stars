@@ -69,16 +69,6 @@ promotion:
   branch: [falcon-knight, wyvern-knight]   # vanilla Pegasus Knight branch (classchg-data.c)
   default: falcon-knight                      # thematic lean; player may pick either.
 
-# ── Growth Rates (% per level) — vanilla Pegasus Knight growths from data_classes.c ──
-growth_rates:
-  HP: 65
-  STR: 35
-  SKL: 40
-  SPD: 40
-  DEF: 12
-  RES: 35
-  LCK: 35
-
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
 # Stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
 inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)

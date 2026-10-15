@@ -101,16 +101,6 @@ promotion:
   branch: [warrior, berserker]      # vanilla Pirate branch (classchg-data.c [CLASS_PIRATE])
   default: berserker                # thematic lean; player may pick either.
 
-# ── Growth Rates (% per level) — vanilla Pirate growths from data_classes.c ──────
-growth_rates:
-  HP: 75
-  STR: 50
-  SKL: 35
-  SPD: 25
-  DEF: 10
-  RES: 13
-  LCK: 15
-
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
 # MVP: stock FE weapon economy — stats inherited from the vanilla item named in `fe_base`
 # (no custom Might). Braulo's personal-weapon flavor (Ole Shipwrecker, Trident) is parked in

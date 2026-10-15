@@ -52,16 +52,6 @@ donor:
   character: Joshua         # vanilla Myrmidon — bases/growths reference (data_classes.c)
   why: the game's crit-sword duelist archetype
 
-# ── Growth Rates (% per level) — vanilla Myrmidon growths from data_classes.c ─
-growth_rates:
-  HP: 70
-  STR: 35
-  SKL: 40
-  SPD: 40
-  DEF: 15
-  RES: 20
-  LCK: 30
-
 promotion:
   branch: [swordmaster, assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
   default: swordmaster

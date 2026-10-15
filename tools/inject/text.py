@@ -57,6 +57,23 @@ def write_nameplate(lines, slot, unit):
     and its death."""
     set_message_body(lines, vanilla_name_text_id(slot), name_message_body(display_name(unit)))
 
+
+def slot_help_text(slot):
+    """The help text a character slot shows (R on its name), as plain text: the slot's own
+    `descTextId` message. No pass writes it yet, so a cast slot still shows the VANILLA
+    character's line (#493); readers ask here, so the day an injector writes it, they follow."""
+    from inject.decomp import _find_brace_block, vanilla_decomp_text
+    chars = vanilla_decomp_text('src/data_characters.c')
+    s, e = _find_brace_block(chars, '[CHARACTER_%s - 1]' % slot.upper(), CHARACTERS_C)
+    m = re.search(r'\.descTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars[s:e])
+    if not m:
+        return None
+    body = re.search(r'^## MSG_%03X\b[^\n]*\n(.*?)(?=^##|\Z)' % int(m.group(1), 0),
+                     vanilla_decomp_text('texts/texts.txt'), re.S | re.M)
+    if not body:
+        return None
+    return ' '.join(re.sub(r'\[[^\]]*\]', ' ', body.group(1)).split()) or None
+
 GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'
 
 
