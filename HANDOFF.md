@@ -6,43 +6,50 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-14 (Claude, session end): the wiki review found one cause behind most bugs --
-readers re-deriving what the build decides -- so the consolidation PR (#492) sits under the
-wiki (#487). **Nicolas's order: finish the wiki and merge it, THEN resume ch07+ planning with the
-updated wiki.** Start from **#493** (his full review + first findings). What landed and why is in
-`git log`, the PRs and #486 -- this file keeps no "recently landed" list.
+Refreshed 2026-10-15 (Claude, session end). #492 is merged. **#487 is the one PR in flight:
+the wiki is being rebuilt on the Fire Emblem Wiki's own templates (#493).** Nicolas's order
+stands: finish the wiki and merge it, THEN resume ch07+ planning with the updated wiki. What
+landed and why is in `git log`, the PRs and #493 -- this file keeps no "recently landed" list.
 
 ## In flight
 
-- **PR #492 (`refactor/491-unit-art`), ROM byte-identical, two commits.** One resolver each for
-  unit art (`inject.unit_art`), item ids (`inject.decomp.ITEM_ENUM`), enemy pids
-  (`inject.raw_pids.enemy_pid`) and a cast member's stat line (`inject.stats.cast_personal_line`);
-  ADR 0344. Commit 1 is proven IDENTICAL in all 16 fingerprint configs; commit 2 in canonical
-  only. **Owed: the other 15 configs for commit 2**, reusing the baselines in
-  `build/fp-baselines/` (recorded once from main's code; `configs.txt` maps name -> flags):
-  `python3 tools/injection_fingerprint.py --check build/fp-baselines/<name>.json --flags="<flags>"`.
-  Then `/code-review medium`, merge on his word.
-  **Stash `chwinga glow fix` (on that branch)** restores the ch02 chwinga's green bust, blue in the
-  ROM since #488; waits on Nicolas's OK of `map-review/chwinga_glow_fix.png`, then commits on #492
-  (a deliberate ROM change).
-- **PR #487 (`feat/486-chapter-wiki`), stacked on #492** (base retargeted). The wiki
-  (https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m; regenerate + republish to the same file),
-  the ch09-ch20 stubs, the data standardization, and #489's recruit kit folded in (#489 closed:
-  Trex joins ch03 with Colm's kit, Sahnar L5 + Killing Edge, Baxby lance first -- deliberate ROM
-  changes). The wiki now reads busts, sprites, kits and items through the resolvers. **Next: #493**
-  -- rebuild the generator on the Fire Emblem Wiki's own page source and templates (`action=edit`)
-  instead of eyeballed markup, and fix every finding at the source. Merge order: #492, then #487.
+- **PR #487 (`feat/486-chapter-wiki`, base `main`)**, published at
+  https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m (on the branch, run `gen_wiki.py`, then
+  republish `build/wiki/index.html` to that URL). It carries deliberate ROM changes, so a fingerprint here
+  proves only what a change claims not to move: #489's recruit kit, the green chwinga bust,
+  ch02's Armory (ADR 0345).
+  - **The engine (the branch's `wiki/` package)**: `vendor.py` vendors one real FE8 page per page type we
+    publish, every template and Lua module it reaches, and the wiki's render as golden tokens
+    (`wiki/vendor/`). `mw.py` expands the templates, `render.py` renders wikitext,
+    `site.py` resolves links (our page, else the real wiki) and files (the build's art).
+    `test_wiki_engine.py`: 14 exemplars, 12 exact, two quirks named beside their floors.
+  - **Chapter pages are done**: `wiki/pages.py` is the layout, `gen_wiki.chapter_wikitext` the
+    data; `test_wiki_pages.py` holds every hosted chapter to the exemplars' section order.
+  - **Still on the old HTML path (`wiki/markup.py`)**: home, Script, roster, design notes,
+    open decisions. `markup.py` retires once the last of them moves.
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
   locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
   locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
 - **#490** -- the difficulty model's autolevel diverges from the ROM (unflagged bosses grown,
   promoted bonus missing); fix before ch09 is measured.
 
-**Next, in order** (the full state, every decision and every open pick: #486, latest comments):
+**Next, in order** (the full state, every decision and every open pick: #486 and #493):
 
-1. **#492** (owed configs, review, merge on his word), then **#493 on #487**, republish, his
-   layout list, `/code-review medium`, merge on his word. Nicolas is leaning toward ch01 on vanilla
-   Ch1's map with Hamill Canyon back as ch08 -- raise it in the planning step.
+1. **#493 on #487** -- its unticked boxes, in this order:
+   - The remaining page types on the templates, per the page plan Nicolas agreed: Script
+     subpages (`The Bandits of Borgo/Script` is the exemplar), a character page per unit
+     (`Colm`, `Dara`, `Bazba`), the character and chapter lists, the availability chart, the
+     lord-select concept page (`Imperial Three` / `Sacred Stone (object)` are the concept
+     exemplars), and Nav8's navbox at every page's foot. Classes and items link to the real
+     wiki; supports wait on #494.
+   - Readers: ch01's money gift (`vanilla_payload` reads no gold), boss ranks and personal lines
+     from the INJECTED CharacterData, and a **wield check** (every unit can use the weapon it
+     carries; it replaces the per-chapter item scoping #492 retired, and answers Ravisin's
+     Dark rank).
+   - Strategies rewritten closer to the twins' own text; the chardalyn raiders' sprite.
+   Then republish, Nicolas's layout list, `/code-review medium`, merge on his word. Nicolas is
+   leaning toward ch01 on vanilla Ch1's map with Hamill Canyon back as ch08 -- raise it in the
+   planning step.
 2. **#486 planning, continue WITH Nicolas** on the updated wiki: the open picks on the Open
    decisions page (ch07's exit hook first: #27's ending waits on it); then Act IV beats (ch17
    beat and map, ch18 map); the recruit pass (who fills each vanilla role ch09-ch17); the
@@ -58,12 +65,13 @@ updated wiki.** Start from **#493** (his full review + first findings). What lan
 5. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
    count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
 
-- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
+- **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, the stat-screen face, and
+  ch02's Armory at (5,7).
 - `make difficulty-gate` enforces ch00-ch07. A change that moves a locked chapter's force
   reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
 - ch01-ch02 lock through `accepted_residual` (ADR 0326): ch01 ceiling 1.41 at x1.4078; ch02
-  ceiling 1.43 at x1.4216 once #489 lands (Pinky's real Slim Lance), so a party-side regression
-  there fails the gate too.
+  ceiling 1.43 at x1.4216 with #489's kit (Pinky's real Slim Lance, on #487), so a party-side
+  regression there fails the gate too.
 - The Monte Carlo simulator is #456, parked behind its trigger.
 
 ## Chapter work
