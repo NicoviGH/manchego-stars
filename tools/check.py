@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #495: ch06's dropper carries a Horseslayer (shark-rider-horseslayer), and the
+    # chapter-chunk pin is the generic check_chapter_lua_facts
+    r'shark-rider-halberd', r'check_ch06_lua_matches_yaml',
     # retired by #493: a cast member grows on its stat donor's curve (inject.stats.cast_growths)
     r'growth_rates',
     # retired by #493: a chapter names its vanilla map donor once, as `map.vanilla_layout`

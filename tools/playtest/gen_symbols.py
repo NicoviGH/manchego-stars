@@ -405,8 +405,8 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     field = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)['deployment']['green_allies']
     slot_of = dict(CH02_CHWINGA)
     # ch06's dropper, whose drop flips once he swings his second weapon (#495, ch06halberd).
-    dropper = next(e for e in _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)['enemy_units']
-                   if e['id'] == 'shark-rider-horseslayer')
+    dropper = {e['id']: e for e in _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)['enemy_units']}
+    dropper = dropper['shark-rider-horseslayer']     # the id ch06.lua's DROPPER row names
     return {
         'CAST': cast,
         # Each classed cast member's help text message: the slot's own descTextId, which the
