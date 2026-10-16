@@ -109,6 +109,29 @@ class Busts(unittest.TestCase):
         for i in set(range(16)) - set(glow):               # the robe, fur and tassels stay
             self.assertEqual(mote[i * 3:i * 3 + 3], sclorbo[i * 3:i * 3 + 3])
 
+    def test_a_vanilla_bust_lays_its_mouth_on_the_mouth_not_the_eyes(self):
+        # FaceData is xMouth, yMouth, xEyes, yEyes. Reading the eye pair as the mouth stamped
+        # the closed mouth over the eyes and left the mouth's own slot blank on 115 vanilla faces
+        # (Halvar wears Bazba's, #493). Bazba's two pairs differ: mouth (2, 5), eyes (3, 3).
+        import re
+        from PIL import Image
+        import portrait_tool
+        from inject.decomp import vanilla_decomp_text
+        text = vanilla_decomp_text('src/portrait_data.c')
+        row = re.search(r'(?m)^\s*\{(portrait_Bazba_tileset[^}]*)\},\s*//\s*(\d+)', text)
+        f = [x.strip() for x in row.group(1).split(',')]
+        xm, ym = 2, 5                    # Bazba's xMouth, yMouth, read off the decomp row
+        self.assertEqual(f[5:9], ['2', '5', '3', '3'])
+        bust = art.portrait_bust(int(row.group(2)) + 1)
+        pdir = os.path.join(art.REPO, 'fireemblem8u', 'graphics', 'portrait')
+        mouth = Image.open(os.path.join(pdir, f[3] + '.png')).crop(
+            (0, 0, portrait_tool.MOUTH_W, portrait_tool.MOUTH_H))
+        box = (xm * 8, ym * 8, xm * 8 + portrait_tool.MOUTH_W, ym * 8 + portrait_tool.MOUTH_H)
+        self.assertEqual(list(bust.crop(box).getdata()), list(mouth.getdata()))
+        plain = portrait_tool.decode(Image.open(os.path.join(pdir, f[0] + '.png')))
+        eyes = (int(f[7]) * 8, int(f[8]) * 8, int(f[7]) * 8 + 32, int(f[8]) * 8 + 16)
+        self.assertEqual(list(bust.crop(eyes).getdata()), list(plain.crop(eyes).getdata()))
+
 
 if __name__ == '__main__':
     unittest.main()
