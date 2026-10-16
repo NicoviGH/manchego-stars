@@ -2095,14 +2095,26 @@ def index_page(chs, navbox_html=''):
 
 
 def css():
-    """The wiki's own stylesheets, minus what they fetch from the wiki's servers (skin icons,
-    a webfont): the artifact viewer blocks every outside load, so those are dropped here and
-    the page falls back to the system font and plain bullets."""
+    """The wiki's own stylesheets, minus what they fetch from the wiki's servers: the page loads
+    nothing remote, so a skin icon we vendored (assets/timeless/, the phone menu's) is inlined
+    and every other outside load (a webfont, the rest of the icons) is dropped, falling back to
+    the system font and plain bullets."""
     text = '\n'.join(open(os.path.join(ASSETS, f), encoding='utf-8').read()
                      for f in ('skin.css', 'site.css'))
     text = re.sub(r'@font-face\s*\{[^}]*\}', '', text)
     text = re.sub(r'@import[^;]*;', '', text)
-    return re.sub(r'url\((?!["\']?data:)[^)]*\)', 'none', text)
+    return inline_urls(text)
+
+
+def inline_urls(text):
+    """Every outside url() in a stylesheet: a vendored skin icon inlined, anything else none."""
+    def inline(m):
+        icon = os.path.join(ASSETS, 'timeless', os.path.basename(m.group(1).split('?')[0]))
+        if not os.path.exists(icon):
+            return 'none'
+        with open(icon, 'rb') as f:
+            return 'url(data:image/svg+xml;base64,%s)' % base64.b64encode(f.read()).decode()
+    return re.sub(r'url\((?!["\']?data:)([^)]*)\)', inline, text)
 
 
 # Ours, not the wiki's: one file holds every page, so the router shows one at a time; and the
@@ -2118,6 +2130,17 @@ section.page[hidden]{display:none!important}
 .mw-wiki-logo.fallback{width:288px!important;height:192px;background-size:contain;
   image-rendering:pixelated;border-radius:6px}
 #p-logo{transform:translate(-50%,26%)!important}
+/* Ours: Page tools on a phone. The skin hides that sidebar's heading there (Timeless reaches
+   page actions through a header menu we do not ship), so it opens from the header's right
+   with Timeless's own page icon, where its own user menu sits (right:1.2em leaves room for the
+   arrow), as the Navigation menu does from its left. */
+@media screen and (max-width:850px){
+#page-tools h2{display:block;right:1.2em;background-image:url(/w/skins/Timeless/resources/images/page-misc-grey.svg);filter:var(--invert)}
+#page-tools .sidebar-inner{right:0;left:auto}}
+/* Ours: on a phone a table wider than the column scrolls in its own box (#493), where the skin
+   only sets width:100% and the column clips the rest. The wrapper is inert at desktop width. */
+.ms-scroll{display:contents}
+@media screen and (max-width:850px){.ms-scroll{display:block;overflow-x:auto}}
 """
 
 JS = """
@@ -2138,6 +2161,20 @@ JS = """
   var cat=page.getAttribute('data-category');var cl=document.getElementById('ms-cat');
   cl.textContent=cat||'';document.getElementById('catlinks').style.display=cat?'':'none';
   if(target&&target!==page)target.scrollIntoView();else window.scrollTo(0,0);}
+ [].slice.call(document.querySelectorAll('.mw-parser-output table')).forEach(function(t){
+  if(t.parentElement.closest('table'))return;
+  var w=document.createElement('div');w.className='ms-scroll';t.parentNode.insertBefore(w,t);w.appendChild(t);});
+ // Timeless's phone menus: a sidebar's heading opens it as a dropdown over a cover, shown inline
+ // as the skin's own script (not vendored) does; the skin's .dropdown-active rule is desktop-only.
+ var cover=document.getElementById('menus-cover');
+ function closeMenus(){[].slice.call(document.querySelectorAll('.dropdown-active')).forEach(function(c){
+  c.classList.remove('dropdown-active');c.querySelector('.sidebar-inner').style.display='';});cover.style.display='';}
+ cover.addEventListener('click',closeMenus);
+ [].slice.call(document.querySelectorAll('.sidebar-chunk h2')).forEach(function(h){
+  h.addEventListener('click',function(){var c=h.parentNode,open=!c.classList.contains('dropdown-active');
+   closeMenus();if(open){c.classList.add('dropdown-active');c.querySelector('.sidebar-inner').style.display='block';
+   cover.style.display='block';}});});
+ window.addEventListener('hashchange',closeMenus);
  window.addEventListener('hashchange',show);show();
  window.addEventListener('load',function(){setTimeout(show,0);});  // after the browser's own anchor jump
  document.addEventListener('click',function(e){
@@ -2291,9 +2328,12 @@ def build():
         print('wiki: %d file(s) no template could find: %s' % (
             len(wsite_.missing_files), ', '.join(sorted(wsite_.missing_files)[:12])))
     banner = '.mw-wiki-logo{background-image:url(%s)!important}' % png_uri(TITLE_SCREEN)
-    doc = ('<meta charset="utf-8"><title>Manchego Stars Wiki</title><style>%s\n%s\n%s</style>'
+    # The doctype and viewport are the wiki's own <head>: without the viewport a phone lays the
+    # page out at desktop width and the skin's phone rules (max-width:850px) never fire (#493).
+    doc = ('<!DOCTYPE html><meta charset="utf-8"><meta name="viewport" content="width=device-width,'
+           ' initial-scale=1"><title>Manchego Stars Wiki</title><style>%s\n%s\n%s</style>'
            '%s<script>%s</script>'
-           % (css(), PAGE_CSS, banner, chrome(''.join(pages), chs), JS))
+           % (css(), inline_urls(PAGE_CSS), banner, chrome(''.join(pages), chs), JS))
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, 'w', encoding='utf-8') as f:
         f.write(doc)

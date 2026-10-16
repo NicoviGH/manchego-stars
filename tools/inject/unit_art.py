@@ -363,7 +363,7 @@ def portrait_bust(portrait_id, root=None):
         return card
     if f[0] == '0':
         return None
-    xmouth, ymouth = int(f[7]), int(f[8])
+    xmouth, ymouth = int(f[5]), int(f[6])     # FaceData: xMouth, yMouth, then xEyes, yEyes
     bust = portrait_tool.decode(Image.open(os.path.join(pdir, f[0] + '.png')))
     mouth = Image.open(os.path.join(pdir, f[3] + '.png')).crop(
         (0, 0, portrait_tool.MOUTH_W, portrait_tool.MOUTH_H))
