@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-15 (Claude, night). **#487 merged** (`1bc2ae8`): the wiki is built from the
+Refreshed 2026-10-16 (Claude). **#496 merged**: #495's terrain half (ch01-ch03 play like their donors). Earlier, 2026-10-15: **#487 merged** (`1bc2ae8`): the wiki is built from the
 YAML and the decomp on the Fire Emblem Wiki's own templates, and CI deploys `main`'s to
 <https://nicovigh.github.io/manchego-stars/> on every push (ADR 0347) -- never publish it by hand;
 the old artifact is deleted. #493 stays open for the wiki's remaining findings. Nicolas's order:
@@ -25,12 +25,12 @@ fix #495's twin gaps BEFORE resuming ch07+.
 
 **Next, in order:**
 
-1. **#495 -- twin gaps, before ch07** (its boxes are the spec): a standing test that every retile
-   plays like its donor (ch03 167 cells incl. Borgo's three cracked walls and the aesthetic
-   water, ch02's two villages, ch01's gate declared); ch06's Halberd equip-on-use lesson; and the
-   **scene-gold vehicle**, built once for ch01's 5,000 (vanilla pays it in Castle Frelia's scene
-   after Ch1 -- measured on retail with `PT_VANILLA=1 tools/playtest/run.sh vanillagold`) and
-   ch07's 10,000. Each gets its strategy line once the game backs it.
+1. **#495 -- the rest of the twin gaps, before ch07.** The terrain half landed in #496 (ADR 0349:
+   every retile is held to its donor on every run; `map_tileset_tool restore-terrain` is the fix
+   tool). Left: ch06's Halberd equip-on-use lesson, and the **scene-gold vehicle**, built once
+   for ch01's 5,000 (vanilla pays it in Castle Frelia's scene after Ch1 -- measured on retail
+   with `PT_VANILLA=1 tools/playtest/run.sh vanillagold`) and ch07's 10,000. Each gets its
+   strategy line once the game backs it.
 2. **#493 -- the wiki's remaining findings**: **mobile first** (Nicolas, 2026-10-15: the page
    ships no viewport meta, so the skin's phone rules never fire -- see #493's Mobile item),
    then enemy names vs the ROM's unit window, #490's stat
