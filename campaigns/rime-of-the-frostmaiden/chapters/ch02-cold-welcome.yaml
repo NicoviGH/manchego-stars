@@ -481,7 +481,7 @@ villages:
   # The two NORTHERN huts (#495): vanilla Ch2's (4,2) and (7,2) villages, which our retile
   # painted as ruins until 2026-10-15 -- so their gifts had been parked on the chwinga. They
   # pay vanilla's gifts on vanilla's tiles again, the Hand Axe standing in for the Red Gem.
-  # DRAFT 2026-10-15 (Claude, #495) -- awaiting Nicolas's red pen.
+  # LOCKED 2026-10-15 (Nicolas: the tonic as drafted; the axe redrafted to answer the raid).
   - id: targos-hut-west
     tile: [4, 2]               # vanilla `Village(EVFLAG_TMP(9), EventScr_Ch2_Village1, 4, 2)`
     visit_reward:
@@ -489,9 +489,8 @@ villages:
         amount: 1
     vanilla_gift_divergence: "vanilla's Red Gem is ch03's chest; ch03's Hand Axe takes its place (ADR 0052)"
     visit_text:
-      - resident: "Raiders, up from the lake road?"
-      - resident: "Here -- I use this to chop fishing holes in the ice."
-      - resident: "It throws well, too. Take it. I've got another."
+      - resident: "Raiders? Here? Then you'll want more than what you're carrying."
+      - resident: "Take my hand axe. It throws -- hit them before they're on you."
   - id: targos-hut-north
     tile: [7, 2]               # vanilla `Village(EVFLAG_TMP(10), EventScr_Ch2_Village2, 7, 2)`
     visit_reward:
