@@ -120,8 +120,8 @@ class Busts(unittest.TestCase):
         text = vanilla_decomp_text('src/portrait_data.c')
         row = re.search(r'(?m)^\s*\{(portrait_Bazba_tileset[^}]*)\},\s*//\s*(\d+)', text)
         f = [x.strip() for x in row.group(1).split(',')]
-        xm, ym = int(f[5]), int(f[6])
-        self.assertNotEqual((xm, ym), (int(f[7]), int(f[8])))
+        xm, ym = 2, 5                    # Bazba's xMouth, yMouth, read off the decomp row
+        self.assertEqual(f[5:9], ['2', '5', '3', '3'])
         bust = art.portrait_bust(int(row.group(2)) + 1)
         pdir = os.path.join(art.REPO, 'fireemblem8u', 'graphics', 'portrait')
         mouth = Image.open(os.path.join(pdir, f[3] + '.png')).crop(

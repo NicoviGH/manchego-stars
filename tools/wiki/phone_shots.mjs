@@ -8,41 +8,62 @@
 //   node tools/wiki/phone_shots.mjs <out-dir> [page-id ...]      (after python3 tools/gen_wiki.py)
 //   W=1400 H=1000 node tools/wiki/phone_shots.mjs <out-dir> ...  (a desktop window instead)
 //
-// A page id is the wiki's hash (home, ch01, ch01/script, unit-braulo, roster, lord-select);
+// A page id is the wiki's hash (home, ch01, ch01/script, unit-braulo, boss-raider-captain, roster);
 // `menu:#site-navigation` or `menu:#page-tools` opens that header menu on the page shown last.
 // Needs Google Chrome and Node 22+ (its built-in WebSocket); no packages.
 import { spawn } from 'node:child_process';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const CHROME = process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const WIKI = resolve(dirname(fileURLToPath(import.meta.url)), '../../build/wiki/index.html');
-const DEFAULT = ['home', 'ch01', 'ch01/script', 'ch05', 'unit-braulo', 'unit-izobai', 'roster',
-                 'chapters', 'lord-select', 'menu:#site-navigation', 'menu:#page-tools'];
+// Every page type; the menus open on ch01, which has Page tools.
+const DEFAULT = ['home', 'ch01/script', 'ch05', 'unit-braulo', 'boss-raider-captain', 'roster',
+                 'chapters', 'lord-select', 'ch01', 'menu:#site-navigation', 'menu:#page-tools'];
 const [out, ...args] = process.argv.slice(2);
 if (!out) { console.error('usage: phone_shots.mjs <out-dir> [page-id ...]'); process.exit(2); }
 const ids = args.length ? args : DEFAULT;
 mkdirSync(out, { recursive: true });
 
-const port = 9333;
+// Our own Chrome on a port the OS picks (written to DevToolsActivePort), so a browser already
+// holding a debug port is never the one driven; killed on every exit, error or not.
+const profile = mkdtempSync(join(tmpdir(), 'phone-shots-'));
 const chrome = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars',
-  `--remote-debugging-port=${port}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'cdp'))}`,
-  'about:blank'], { stdio: 'ignore' });
+  '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+const fail = msg => { console.error('phone_shots: ' + msg); process.exit(2); };
+chrome.on('error', e => fail(`cannot start Chrome (${CHROME}): ${e.message}`));
+process.on('exit', () => {
+  chrome.kill('SIGKILL');
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 5 }); } catch { /* still closing */ }
+});
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let target;
-for (let i = 0; i < 50 && !target; i++) {
-  try { target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t => t.type === 'page'); }
-  catch { await sleep(200); }
+for (let i = 0; i < 100 && !target; i++) {
+  try {
+    const port = readFileSync(join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0];
+    target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find(t => t.type === 'page');
+  } catch { await sleep(200); }
 }
+if (!target) fail('Chrome exposed no page to drive within 20s');
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(r => { ws.onopen = r; });
 let next = 0;
 const pending = new Map();
-ws.onmessage = e => { const m = JSON.parse(e.data); if (pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } };
+let loaded;
+const onLoad = new Promise(r => { loaded = r; });
+ws.onmessage = e => {
+  const m = JSON.parse(e.data);
+  if (m.method === 'Page.loadEventFired') loaded();
+  if (pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); }
+};
 const send = (method, params = {}) => new Promise(r => { const id = ++next; pending.set(id, r); ws.send(JSON.stringify({ id, method, params })); });
-const run = async expression => (await send('Runtime.evaluate', { expression, returnByValue: true })).result.result.value;
+const run = async expression => {
+  const r = (await send('Runtime.evaluate', { expression, returnByValue: true })).result;
+  if (r.exceptionDetails) fail(`in the page: ${r.exceptionDetails.exception?.description || r.exceptionDetails.text}`);
+  return r.result.value;
+};
 const shoot = async name => {
   const s = await send('Page.captureScreenshot', { format: 'png' });
   writeFileSync(join(out, name.replace(/[^\w-]+/g, '_') + '.png'), Buffer.from(s.result.data, 'base64'));
@@ -52,20 +73,26 @@ const desktop = Boolean(process.env.W);
 await send('Emulation.setDeviceMetricsOverride', { width: +(process.env.W || 390),
   height: +(process.env.H || 844), deviceScaleFactor: desktop ? 1 : 2, mobile: !desktop });
 await send('Emulation.setTouchEmulationEnabled', { enabled: !desktop });
+await send('Page.enable');
 await send('Page.navigate', { url: 'file://' + WIKI + '#home' });
-await sleep(6000);                          // a 10 MB page: its images decode before the router runs
+await onLoad;                               // the router and the table wrapping run before load
+await sleep(300);
 
 let failed = 0;
 for (const id of ids) {
   if (id.startsWith('menu:')) {
-    await run(`window.scrollTo(0,0);document.querySelector('${id.slice(5)} h2').click()`);
+    const sel = JSON.stringify(id.slice(5) + ' h2');
+    if (!await run(`(()=>{const h=document.querySelector(${sel});if(!h||!h.offsetParent)return false;
+      window.scrollTo(0,0);h.click();return true})()`)) fail(`${id}: no visible menu heading on this page`);
     await sleep(400);
     await shoot(id);
     await run(`document.getElementById('menus-cover').click()`);
     continue;
   }
-  await run(`location.hash='${id}'`);
+  await run(`location.hash=${JSON.stringify(id)}`);
   await sleep(800);
+  const shown = await run(`document.querySelector('section.page:not([hidden])').id`);
+  if (shown !== id.split('/')[0] && shown !== id) fail(`${id}: no such page (the router showed ${shown})`);
   await run('window.scrollTo(0,0)');
   await sleep(200);
   const r = await run(`(()=>{const d=document.documentElement;return {width:d.clientWidth,layout:d.scrollWidth}})()`);

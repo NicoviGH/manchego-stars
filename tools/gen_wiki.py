@@ -2106,14 +2106,26 @@ def css():
     return inline_urls(text)
 
 
+TIMELESS_IMAGES = '/w/skins/Timeless/resources/images/'
+
+
+@functools.lru_cache(maxsize=None)
+def _skin_icon(name):
+    """A vendored Timeless icon (assets/timeless/<name>) as a data URI, or None."""
+    icon = os.path.join(ASSETS, 'timeless', name)
+    if not os.path.isfile(icon):
+        return None
+    with open(icon, 'rb') as f:
+        return 'data:image/svg+xml;base64,' + base64.b64encode(f.read()).decode()
+
+
 def inline_urls(text):
-    """Every outside url() in a stylesheet: a vendored skin icon inlined, anything else none."""
+    """Every outside url() in a stylesheet: a Timeless icon we vendored inlined, anything else
+    none."""
     def inline(m):
-        icon = os.path.join(ASSETS, 'timeless', os.path.basename(m.group(1).split('?')[0]))
-        if not os.path.exists(icon):
-            return 'none'
-        with open(icon, 'rb') as f:
-            return 'url(data:image/svg+xml;base64,%s)' % base64.b64encode(f.read()).decode()
+        path = m.group(1).strip().strip('"\'').split('?')[0]
+        uri = path.startswith(TIMELESS_IMAGES) and _skin_icon(path[len(TIMELESS_IMAGES):])
+        return 'url(%s)' % uri if uri else 'none'
     return re.sub(r'url\((?!["\']?data:)([^)]*)\)', inline, text)
 
 
@@ -2166,15 +2178,19 @@ JS = """
   var w=document.createElement('div');w.className='ms-scroll';t.parentNode.insertBefore(w,t);w.appendChild(t);});
  // Timeless's phone menus: a sidebar's heading opens it as a dropdown over a cover, shown inline
  // as the skin's own script (not vendored) does; the skin's .dropdown-active rule is desktop-only.
+ // A click anywhere but the open menu closes it, and so does a link in it: the cover is only
+ // positioned at phone width, and a link to the page already shown changes no hash.
  var cover=document.getElementById('menus-cover');
  function closeMenus(){[].slice.call(document.querySelectorAll('.dropdown-active')).forEach(function(c){
   c.classList.remove('dropdown-active');c.querySelector('.sidebar-inner').style.display='';});cover.style.display='';}
- cover.addEventListener('click',closeMenus);
- [].slice.call(document.querySelectorAll('.sidebar-chunk h2')).forEach(function(h){
-  h.addEventListener('click',function(){var c=h.parentNode,open=!c.classList.contains('dropdown-active');
-   closeMenus();if(open){c.classList.add('dropdown-active');c.querySelector('.sidebar-inner').style.display='block';
-   cover.style.display='block';}});});
- window.addEventListener('hashchange',closeMenus);
+ document.addEventListener('click',function(e){
+  var h=e.target.closest&&e.target.closest('.sidebar-chunk h2');
+  if(h){var c=h.parentNode,open=!c.classList.contains('dropdown-active');closeMenus();
+   if(open){c.classList.add('dropdown-active');c.querySelector('.sidebar-inner').style.display='block';
+    cover.style.display='block';}return;}
+  var menu=e.target.closest&&e.target.closest('.dropdown-active');
+  if(!menu||e.target.closest('a'))closeMenus();
+ });
  window.addEventListener('hashchange',show);show();
  window.addEventListener('load',function(){setTimeout(show,0);});  // after the browser's own anchor jump
  document.addEventListener('click',function(e){
