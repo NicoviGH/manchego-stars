@@ -578,7 +578,14 @@ def restore_donor_terrain(maps_root, stem, donor, decomp_root, declared=None, ap
         blob = source.read()
     painted = {m for map_hits in terrain_impact(maps_root, tileset, set(range(NUM_METATILES)))
                .values() for m in map_hits}
-    free = [m for m in range(1, NUM_METATILES) if not blob[8192 + m] and m not in painted]
+    # A clone takes a BLANK slot: no terrain AND no art. A terrain-0 slot can still hold the
+    # artist's tiles (cave-interior has five), and code can name a metatile no map paints.
+    free = [m for m in range(1, NUM_METATILES)
+            if not blob[8192 + m] and not any(blob[m * 8:m * 8 + 8]) and m not in painted]
+    clones = sum(1 for row in plan if row[4] is not None)
+    if clones > len(free):           # checked before any write, so a failure leaves no half-state
+        raise ValueError('%s has %d blank metatile slots; this restore needs %d clones'
+                         % (tileset, len(free), clones))
     done = []
     for metatile, before, after, where, clone_of in plan:
         if clone_of is None:

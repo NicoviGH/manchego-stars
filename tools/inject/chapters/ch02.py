@@ -65,12 +65,12 @@ CH02_VILLAGE_CHWINGA = 'chwinga-glimmer'
 
 # One event id per hut. It records the visit, disarms that hut's raider hook (Village() puts
 # the same eid on the destruction LOCA), and -- for the south hut -- answers whether
-# Glimmerfrost was reached in time to hand over her charm. ch02 sets no other event flag, so
-# 9 and 10 are free (checked: no ENUT/CHECK_EVENTID anywhere in its host).
+# Glimmerfrost was reached in time to hand over her charm. 9-12 are free: the host's only other
+# flags are ENUT(8) and the 198+ range (checked 2026-10-15, #495).
 # The mug each hut's RESIDENT wears. A chwinga inhabitant brings her own -- see
 # CH02_CHWINGA_PORTRAIT_SLOT, which dresses MANSEL's slot with the green bust, so
 # Glimmerfrost speaks (wordlessly) with her own face rather than a villager stand-in.
-# Three distinct villager mugs across the chapter: these two plus the ending's fisher.
+# Five distinct villager mugs across the chapter: the four huts' plus the ending's fisher.
 CH02_VILLAGE_FLAGS = {
     'targos-hut-south': 'EVFLAG_TMP(9)',
     'targos-hut-east':  'EVFLAG_TMP(10)',
@@ -370,7 +370,7 @@ def inject_ch02(campaign, verbose=True):
         f.write(udefs)
 
     # 3. Event lists (ch3-eventinfo.h). Turn: the rear raiders on turn 3 (FACTION_ID_BLUE
-    #    appear-at-player-phase idiom, cf. inject_ch01). Location: the two Targos huts, and
+    #    appear-at-player-phase idiom, cf. inject_ch01). Location: the four Targos huts, and
     #    no vanilla Seize(14,1), so DefeatAll (CountRedUnits) is the only win path. Misc:
     #    the lord rule and nothing else; ch02's defeat_all objective is FE8's default when no
     #    DefeatBoss/Seize is declared, so it needs no misc entry of its own.
@@ -471,7 +471,7 @@ def inject_ch02(campaign, verbose=True):
         '    REMA\n'
         '    EVBIT_T(7)\n    ENDA\n}', CH3_EVENTSCRIPT_H)
 
-    # The two Targos huts (2026-08-30). Vanilla's own village shape (village_script, shared
+    # The four Targos huts (2026-08-30; the northern two since #495). Vanilla's own village shape (village_script, shared
     # with ch04/ch05): one box over the village BG, then the reward into the visitor's hands.
     # The south hut IS Glimmerfrost -- she hands her charm over when the party reaches her, so
     # her Pure Water is delivered here rather than at the ending like the two on the field.

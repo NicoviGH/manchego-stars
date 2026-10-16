@@ -1108,6 +1108,9 @@ class RestoreDonorTerrain(unittest.TestCase):
             struct.pack_into('<H', raw, (11 * 17 + 6) * 2, 785 << 5)
             with open(path, 'wb') as f:
                 f.write(raw)
+            with open(os.path.join(tmp, 'tilesets', 'cave-interior', 'cave-interior.bin'),
+                      'rb') as f:
+                before = f.read()
             plan = mt.restore_donor_terrain(tmp, stem, 'Ch3Map', self.DECOMP, apply=True)
             self.assertEqual([(row[2], row[3], row[4]) for row in plan], [(0x02, [(6, 11)], 785)])
             with open(path, 'rb') as f:
@@ -1117,7 +1120,37 @@ class RestoreDonorTerrain(unittest.TestCase):
             self.assertEqual(ts.terrain(785), 0x1A)
             self.assertEqual(ts.cfg[twin * 8:twin * 8 + 8], ts.cfg[785 * 8:785 * 8 + 8])
             self.assertEqual(mt.same_art_with_terrain(ts, 785, 0x02), twin)
+            # ...in a slot that held no art: terrain 0 alone is not "free" (12, 14, 48 and 49
+            # carry the artist's tiles with terrain 0, and the first cut overwrote them).
+            self.assertFalse(any(before[twin * 8:twin * 8 + 8]) or before[8192 + twin])
 
+
+
+class CrackedWallChanges(unittest.TestCase):
+    """One break opens the whole wall: a stacked run carries a single trap (bmtrick.c
+    InitMapObstacles, topmost cell), so its MapChange must span the run (#495)."""
+
+    def test_a_stacked_run_breaks_as_one(self):
+        import shutil
+        import inject.terrain
+        maps = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+        stem = 'ch03-the-termalaine-mine'
+        with tempfile.TemporaryDirectory() as tmp:
+            for ext in ('.mar', '.json'):
+                shutil.copy(os.path.join(maps, stem + ext), tmp)
+            shutil.copytree(os.path.join(maps, 'tilesets', 'cave-interior'),
+                            os.path.join(tmp, 'tilesets', 'cave-interior'))
+            path = os.path.join(tmp, stem + '.mar')
+            with open(path, 'rb') as f:
+                raw = bytearray(f.read())
+            struct.pack_into('<H', raw, (9 * 17 + 8) * 2, 789 << 5)   # crack (8,9) under (8,8)
+            with open(path, 'wb') as f:
+                f.write(raw)
+            rows = {(x, y): (w, h, tiles) for x, y, w, h, tiles, _ in
+                    inject.terrain.cracked_wall_changes(tmp, stem, 541)}
+        self.assertEqual(rows[(8, 8)], (1, 2, [541, 541]))
+        self.assertNotIn((8, 9), rows)
+        self.assertEqual(rows[(4, 9)], (1, 1, [541]))
 
 class Ch03FlipsPlayLikeVanillaCh3(unittest.TestCase):
     """A looted chest, an opened door and a broken wall leave ch03 on vanilla Ch3's terrain

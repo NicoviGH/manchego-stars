@@ -115,10 +115,10 @@ class Ch03TileChanges(unittest.TestCase):
     def test_door_open_tile_is_the_metatile_directly_below(self):
         # Vanilla Ch3 doors sit at (6,10)/(10,5)/(2,3); the open tile = the cell one row down
         # on the COMMITTED (hand-painted) map -- a road tile (572), the stairs down (626) and
-        # 79, the FLOOR twin of 492's art (#495 cloned it when the cell took vanilla's FLOOR).
+        # 92, the FLOOR twin of 492's art (#495 cloned it when the cell took vanilla's FLOOR).
         below = [inject.maps._read_map_metatile(self.MAPS, self.STEM, x, y + 1)
                  for (x, y) in [(6, 10), (10, 5), (2, 3)]]
-        self.assertEqual(below, [572, 626, 79])
+        self.assertEqual(below, [572, 626, 92])
 
     def _asm(self, chests, doors):
         """ch03's own change list, through the shared emitter (#214 generalised it out of a

@@ -132,12 +132,17 @@ def ch03_map_changes(chap, maps_dir):
                                            chap['map']['vanilla_layout'])
     for d in chap.get('doors', []):
         x, y = d['position']
+        if (x, y) not in opened:
+            sys.exit('ERROR: ch03 door (%d, %d) is not one of vanilla Ch3\'s, so nothing says '
+                     'what it opens onto -- vanilla opens %s' % (x, y, sorted(opened)))
         want = opened[(x, y)]
         sides = [_read_map_metatile(maps_dir, CH03_LAYOUT[1], x, y + dy) for dy in (1, -1)]
-        tile = next((m if tileset.terrain(m) == want
-                     else mt.same_art_with_terrain(tileset, m, want) for m in sides
-                     if tileset.terrain(m) == want
-                     or mt.same_art_with_terrain(tileset, m, want) is not None), None)
+        tile = None
+        for side in sides:
+            tile = (side if tileset.terrain(side) == want
+                    else mt.same_art_with_terrain(tileset, side, want))
+            if tile is not None:
+                break
         if tile is None:
             sys.exit('ERROR: ch03 door (%d, %d) opens onto terrain 0x%02x in vanilla, and '
                      'neither tile beside it (%d below, %d above) draws with it -- clone one '

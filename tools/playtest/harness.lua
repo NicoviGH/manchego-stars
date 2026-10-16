@@ -5694,6 +5694,9 @@ end
 -- What a broken wall becomes is the MapChange array's job, held to vanilla's by
 -- test_map_tileset's Ch03FlipsPlayLikeVanillaCh3. Run: PT_HOST_CHAPTER=4 run.sh ch03walls.
 scenarios.ch03walls = function()
+    if not SYM.sTrapPool then
+        return result("FAIL", "SYM.sTrapPool is missing -- gen_symbols found no linker map beside the ELF")
+    end
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local WALL_DAMAGED, TRAP_OBSTACLE, HP = 0x1B, 2, 25
     local WALLS = { { x = 8, y = 8 }, { x = 4, y = 9 }, { x = 4, y = 12 } }
@@ -5703,11 +5706,12 @@ scenarios.ch03walls = function()
                 w.x, w.y, terrainAt(w.x, w.y)))
         end
         local found
+        -- Every slot: RemoveTrap frees one in place (type 0), so a hole is not the end.
         for i = 0, 63 do
             local t = SYM.sTrapPool + i * 8
-            local kind = emu:read8(t + 2)
-            if kind == 0 then break end
-            if emu:read8(t) == w.x and emu:read8(t + 1) == w.y then found = t break end
+            if emu:read8(t + 2) ~= 0 and emu:read8(t) == w.x and emu:read8(t + 1) == w.y then
+                found = t break
+            end
         end
         if not found then
             return result("FAIL", string.format("(%d,%d) has no trap -- nothing to break", w.x, w.y))
@@ -5724,14 +5728,14 @@ end
 -- ch03 map, hand a deployed unit a Door Key (and strip its weapon so the command menu is [Door,
 -- Item, Wait] -- Door at row 0, deterministic), park it beside the (2,3) door, drive Door, and
 -- assert gBmMapBaseTiles[3][2] flips from the closed door (812<<2) to the floor tile below it
--- (per Nicolas's "the tile directly below"): 79<<2, the FLOOR twin of 492's art -- 492 itself
+-- (per Nicolas's "the tile directly below"): 92<<2, the FLOOR twin of 492's art -- 492 itself
 -- plays as PLAINS since #495, and vanilla's opened door is FLOOR. Run: PT_HOST_CHAPTER=4 run.sh ch03door
 -- (needs a CH03BOOT=1 ROM). The chest path shares this MapChange array -- verifying the door proves
 -- both mechanisms (GetMapChangeIdAt -> CallTileChangeEvent -> ApplyMapChangesById).
 scenarios.ch03door = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local DX, DY = 2, 3
-    local CLOSED, OPEN_T = 812 * 4, 79 * 4    -- gBmMapBaseTiles holds metatile<<2
+    local CLOSED, OPEN_T = 812 * 4, 92 * 4    -- gBmMapBaseTiles holds metatile<<2
     local pre = baseTile(DX, DY)
     log(string.format("door (%d,%d) tile before = %d (want closed %d)", DX, DY, pre, CLOSED))
     if pre ~= CLOSED then
@@ -6158,10 +6162,11 @@ scenarios.ch02 = function()
         chwinga, deployed, tostring(archer), tostring(boss)))
     shot("ch02-entry")
     if chwinga ~= 2 then return result("FAIL", string.format("want 2 green chwinga, found %d", chwinga)) end
-    -- The two Targos huts must be VILLAGE terrain at entry. They are the decoy the raid walks
+    -- All four Targos huts must be VILLAGE terrain at entry. They are the decoy the raid walks
     -- toward, and pillage reads terrain: a hut painted as anything else is a hut no raider
-    -- targets, which puts the whole force back on the chwinga (#26).
-    for _, hut in ipairs({ {1, 12}, {12, 3} }) do
+    -- targets, which puts the whole force back on the chwinga (#26). (4,2) and (7,2) were
+    -- ruins until #495.
+    for _, hut in ipairs({ {1, 12}, {12, 3}, {4, 2}, {7, 2} }) do
         if terrainAt(hut[1], hut[2]) ~= 0x03 then
             return result("FAIL", string.format(
                 "hut (%d,%d) is terrain 0x%02X at entry, not a village -- nothing raids it and "
@@ -6172,7 +6177,7 @@ scenarios.ch02 = function()
     if not archer then return result("FAIL", "no enemy archer (fliers-vs-bows debut) on the field") end
     if not boss then return result("FAIL", "no boss on the field") end
     result("PASS", string.format(
-        "ch02 entered: 2 chwinga green, %d deployed, archer + boss present, both huts standing",
+        "ch02 entered: 2 chwinga green, %d deployed, archer + boss present, all four huts standing",
         deployed))
 end
 

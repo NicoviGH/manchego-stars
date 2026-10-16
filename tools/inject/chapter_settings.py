@@ -177,10 +177,10 @@ def chapter_bgm(chap):
 
 
 
-def apply_chapter_wall_hp(campaign, verbose=False):
-    """Write every hosted chapter's twin `mapCrackedWallHeath` into its own host slot. Total,
-    like music: a cracked wall's HP is the twin's (bmtrick.c InitMapObstacles reads the CURRENT
-    slot), so ch03's Borgo walls take vanilla Ch3's 25 rather than host slot 4's 50 (#495)."""
+def _copy_from_twin(campaign, copy):
+    """Run `copy(chap, slot, twin_row)` for every hosted chapter -- its host slot's
+    chapter_settings row and its vanilla twin's -- and write the file once. The one loop behind
+    each total copy-the-twin pass (music, cracked walls), returning [(chapter, copy's result)]."""
     from inject.hosts import hosted_chapters
     with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
         settings = json.load(f)
@@ -188,15 +188,24 @@ def apply_chapter_wall_hp(campaign, verbose=False):
     applied = []
     for chapter in hosted_chapters():
         chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
-        hp = rows[twin_settings_index(chap)]['mapCrackedWallHeath']
-        settings['chapters'][chapter.host_index]['mapCrackedWallHeath'] = hp
-        applied.append((chapter.name, hp))
+        applied.append((chapter.name, copy(chap, settings['chapters'][chapter.host_index],
+                                           rows[twin_settings_index(chap)])))
     with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
         json.dump(settings, f, indent=2)
+    return applied
+
+
+def apply_chapter_wall_hp(campaign, verbose=False):
+    """Write every hosted chapter's twin `mapCrackedWallHeath` into its own host slot. Total,
+    like music: a cracked wall's HP is the twin's (bmtrick.c InitMapObstacles reads the CURRENT
+    slot), so ch03's Borgo walls take vanilla Ch3's 25 rather than host slot 4's 50 (#495)."""
+    def copy(_chap, slot, twin):
+        slot['mapCrackedWallHeath'] = twin['mapCrackedWallHeath']
+        return twin['mapCrackedWallHeath']
+    applied = _copy_from_twin(campaign, copy)
     if verbose:
         print('  cracked walls: %s' % ', '.join('%s=%d' % (n, hp) for n, hp in applied))
     return applied
-
 
 # Every leaf of a chapter's `bgm` block, written one by one so the census can see each claim
 # (`chapter_data.OWNED_BY_PASS`). The FE7 Hector/Lyn leaves are dead in FE8; copying them keeps
@@ -208,18 +217,11 @@ BGM_FIELDS = ('bluePhase', 'redPhase', 'greenPhase', 'blueGreenPhaseAlt', 'redPh
 
 def apply_chapter_music(campaign, verbose=False):
     """Write every hosted chapter's twin `bgm` block into its own host slot. Total, like fog."""
-    from inject.hosts import hosted_chapters
-    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
-        settings = json.load(f)
-    applied = []
-    for chapter in hosted_chapters():
-        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
-        twin, slot = chapter_bgm(chap), settings['chapters'][chapter.host_index]['bgm']
+    def copy(chap, slot, twin):
         for field in BGM_FIELDS:
-            slot[field] = twin[field]
-        applied.append((chapter.name, chap['parity_reference']))
-    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
-        json.dump(settings, f, indent=2)
+            slot['bgm'][field] = twin['bgm'][field]
+        return chap['parity_reference']
+    applied = _copy_from_twin(campaign, copy)
     if verbose:
         print('  music: %s' % ', '.join('%s=%s' % (n, r) for n, r in applied))
     return applied

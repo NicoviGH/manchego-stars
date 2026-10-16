@@ -68,13 +68,20 @@ def cracked_wall_changes(maps_dir, stem, rubble):
     with no change covering it has nothing to become. Read off the map's own terrain, so a
     repaint that moves a wall moves its change too. Vanilla Ch3's three are 2x2 regions that also
     redraw the wall above; only the cracked cell changes terrain (WALL_DAMAGED -> ROAD), so 1x1
-    gives the same map to play on. Only the TOPMOST of a stacked pair carries the trap, which is
-    the cell this returns (#495)."""
+    gives the same map to play on. A STACKED run carries one trap, on its topmost cell
+    (InitMapObstacles), and that one break must open the whole run, so the change spans it (#495)."""
     width, height, terrain = _map_terrain_grid(maps_dir, stem)
     damaged = terrain_ids()['TERRAIN_WALL_DAMAGED']
-    return [(x, y, 1, 1, [rubble], 'cracked wall breaks into rubble')
-            for y in range(height) for x in range(width)
-            if terrain[y][x] == damaged and not (y and terrain[y - 1][x] == damaged)]
+    changes = []
+    for y in range(height):
+        for x in range(width):
+            if terrain[y][x] != damaged or (y and terrain[y - 1][x] == damaged):
+                continue
+            run = 1
+            while y + run < height and terrain[y + run][x] == damaged:
+                run += 1
+            changes.append((x, y, 1, run, [rubble] * run, 'cracked wall breaks into rubble'))
+    return changes
 
 
 def _class_terrain_move_costs(table):

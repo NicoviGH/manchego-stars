@@ -184,7 +184,8 @@ deployment:
                                 # tile, strike what reaches you. `cautious` was already these
                                 # bytes; now it is grounded rather than matching by luck.
       gift: vulnerary             # a token: vanilla's three village gifts are back in their villages
-                                  # (#495), and a Vulnerary is what vanilla's greens themselves carry
+                                  # (#495), and a Vulnerary is what vanilla's greens themselves carry.
+                                  # The two charms are ON TOP of the twin's set (Nicolas, 2026-10-15).
     - id: chwinga-rime
       name: "Rime Spark"
       fe_name: "Rime"

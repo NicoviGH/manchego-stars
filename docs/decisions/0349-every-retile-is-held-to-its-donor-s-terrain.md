@@ -42,4 +42,4 @@ huts are fully wired: Location entries, flags 11 and 12, and sacked/visited chan
 were ruins their gifts had been parked on the field chwinga as survival charms (ADR 0051). They
 are back on vanilla's tiles: (4,2) gives the Hand Axe that stands in for the Red Gem (ADR 0052),
 and (7,2) the Elixir. The two field chwinga each give a Vulnerary instead (Nicolas, 2026-10-15),
-so the gift set stays vanilla's.
+so ch02 pays vanilla Ch2's gift set plus two Vulneraries, a 600g token for keeping both alive.
