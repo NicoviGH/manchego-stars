@@ -374,8 +374,8 @@ def map_image(chap):
                     img.paste(ts.metatile_image(m), ((j % w) * 16, (j // w) * 16))
                 out = (png_uri(img), 'Donor map, vanilla art: %s (%dx%d)'
                        % (VANILLA[key][1], w, h))
-    except FileNotFoundError as ex:                    # no build tree yet (a fresh checkout)
-        if os.path.isdir(BUILD_TREE):
+    except FileNotFoundError as ex:                    # no COMPILED tree: a fresh checkout, or
+        if os.path.isfile(os.path.join(BUILD_TREE, 'fireemblem8.gba')):   # CI's tests job
             raise
         out = (None, 'map not rendered (%s)' % ex.__class__.__name__)
     _MAPS[slug] = out
