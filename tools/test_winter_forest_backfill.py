@@ -28,8 +28,9 @@ CASES = (
      '89c0e97a3e880fb3a9f3b8088bde158557a2c6e2f44840be6e488684895a89c1'),
     ('Ch13EirikaMap', 'ch01-the-iron-trail', 33,
      'dc078993983ed4247d05c26e94be228b2f2177cb2aead38b4285b95af7ce64af'),
+    # Re-pinned by #495: (4,2) and (7,2) are villages again, not ruins.
     ('Ch2Map', 'ch02-cold-welcome', 27,
-     '644e916d29927ef176ef103aa056f3d9b349ddc11998cfa399c74e30159ab65d'),
+     '6085bdced182996a36fffd4f4ee951ad88b78623ab6121571b45e46232614b69'),
 )
 
 

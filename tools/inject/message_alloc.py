@@ -27,6 +27,8 @@ VANILLA_MESSAGE_COUNT = 0xD4C
 APPENDED_MESSAGES = {
     # Wolfram's turn-1 call-out of the forts' and the gate's healing (#21, #135 finding 8).
     'ch01': ('terrain-heal-warning',),
+    # The two northern Targos huts, restored from ruins to vanilla Ch2's villages (#495).
+    'ch02': ('hut-west-visit', 'hut-north-visit'),
     # The moose's NAME (#25). A raw pid's stock nameTextId is the generic monster plate every
     # 0xB0-range gap shares, so it can never be retitled for one creature.
     'ch05': ('moose-name',),

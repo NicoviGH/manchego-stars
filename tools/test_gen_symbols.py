@@ -29,6 +29,25 @@ class LuaLiteral(unittest.TestCase):
                 gen_symbols.lua_literal(bad)
 
 
+
+class StaticEwram(unittest.TestCase):
+    """A file-static array is found through the linker map, and refused when its object's
+    section holds anything else (#495: sTrapPool, for the cracked-wall verdict)."""
+
+    MAP = (' src/bmtrick.o(ewram_data)\n'
+           ' ewram_data     0x0203a614      0x208 src/bmtrick.o\n')
+
+    def test_the_section_start_is_the_array(self):
+        self.assertEqual({'sTrapPool': 0x0203A614}, gen_symbols.static_ewram_symbols(self.MAP))
+
+    def test_a_section_of_another_size_is_refused(self):
+        with self.assertRaises(KeyError):
+            gen_symbols.static_ewram_symbols(self.MAP.replace('0x208', '0x210'))
+
+    def test_a_missing_object_is_refused(self):
+        with self.assertRaises(KeyError):
+            gen_symbols.static_ewram_symbols(self.MAP.replace('bmtrick', 'bmtrap'))
+
 class CampaignIds(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -45,7 +64,7 @@ class CampaignIds(unittest.TestCase):
     def test_the_charms_are_the_yaml_gifts_of_the_chwinga_on_the_field(self):
         # Glimmerfrost lives in a hut, so the field pays two charms, not three.
         self.assertEqual([0xCA, 0xC9], self.ids['CH02_CHWINGA_PIDS'])
-        self.assertEqual([0x28, 0x6D], self.ids['CH02_CHARMS'])   # Hand Axe, Elixir
+        self.assertEqual([0x6C, 0x6C], self.ids['CH02_CHARMS'])   # a Vulnerary each (#495)
 
     def test_hosts_follow_the_host_slots(self):
         # Every hosted chapter, so a film can name the slot a chain lands on; from ch01 on each

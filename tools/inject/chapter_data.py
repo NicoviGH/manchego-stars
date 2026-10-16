@@ -140,7 +140,9 @@ OWNED_BY_PASS = dict(
      ('easyModeLevelMalus', 'apply_chapter_difficulty'),
      ('normalModeLevelMalus', 'apply_chapter_difficulty'),
      ('difficultModeLevelBonus', 'apply_chapter_difficulty'),
-     ('battleTileSet', 'inject_battle_platforms')] +
+     ('battleTileSet', 'inject_battle_platforms'),
+     # A cracked wall's HP is the twin's (#495): ch03 places Borgo's three on slot 4.
+     ('mapCrackedWallHeath', 'apply_chapter_wall_hp')] +
     # The fourth total pass: a chapter plays its vanilla TWIN's music, the whole block copied
     # (ADR 0336). Inherited, it was the host slot's: ch04's host is Ch5x.
     [('bgm.' + f, 'apply_chapter_music') for f in
@@ -199,10 +201,6 @@ DECLARED_INHERITED = {
         'different chapter\'s geometry from the slot\'s -- so that is MEASURED, not assumed: '
         '`intro_camera_out_of_bounds()`.',
     'initialPosY': 'see initialPosX -- measured by `intro_camera_out_of_bounds()`',
-    'mapCrackedWallHeath':
-        'the HP of a destructible wall (bmtrick.c:197). Every hosted chapter declares its '
-        'traps (#306) and none places a cracked wall, so nothing reads it. A chapter that '
-        'places one writes this.',
     'victorySongEnemyThreshold':
         'how few enemies must remain for the victory theme (bm.c:1188). Every slot we host '
         'carries vanilla\'s own 1, so the inherited value IS the vanilla behaviour.',

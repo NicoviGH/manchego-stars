@@ -244,6 +244,9 @@ scenarios:
   ch03door:
     rom: ch03boot
     host_chapter: 4
+  ch03walls:                                           # #495 Borgo's cracked walls
+    rom: ch03boot
+    host_chapter: 4
   ch03chest:
     rom: ch03boot
     host_chapter: 4

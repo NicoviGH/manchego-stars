@@ -80,7 +80,7 @@ PLAYTEST_CASE = {
     'when': [{'visit': {'x': ANY, 'y': ANY, 'gains': ANY},
               'talk': {'x': ANY, 'y': ANY, 'gains': ANY},
               'shop': {'x': ANY, 'y': ANY, 'kind': ANY, 'stocks': ANY}}],
-    'then': [{'spoke': ANY}],
+    'then': [{'spoke': ANY, 'event_flag': ANY}],
 }
 
 CHAPTER = {
@@ -118,7 +118,7 @@ CHAPTER = {
     'doors': [{'position': ANY}],
     'chests': [{'position': ANY, 'contents': [{'id': ANY, 'flavor': ANY}]}],
     'villages': [{'id': ANY, 'tile': ANY, 'note': ANY, 'visit_text': ANY,
-                  'visit_reward': REWARD,
+                  'visit_reward': REWARD, 'vanilla_gift_divergence': ANY,
                   'inhabitant': {'id': ANY, 'name': ANY, 'fe_name': ANY}}],
     # the objective
     'objective': {'type': ANY, 'description': ANY, 'note': ANY, 'turns': ANY,

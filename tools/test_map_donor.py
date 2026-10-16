@@ -36,13 +36,13 @@ class TheDonorIsRecovered(unittest.TestCase):
         self.assertEqual(scored[0][1], 'Ch13EirikaMap')
         self.assertNotIn('Ch13EphraimMap', [name for _, name in scored])
 
-    def test_a_low_score_still_identifies_when_it_is_the_only_candidate(self):
-        """ch03 edited the geometry, so it agrees with Borgo only ~85%. That is a fact
-        about our repaint: at 17x16 there is exactly one vanilla layout to be."""
+    def test_the_only_candidate_of_its_size_is_the_donor(self):
+        """At 17x16 there is exactly one vanilla layout to be. ch03 agreed with Borgo only
+        ~85% until #495 gave it Borgo's terrain back; it now agrees cell for cell."""
         _, _, scored = map_donor.candidates('ch03-the-termalaine-mine')
         self.assertEqual(len(scored), 1)
         self.assertEqual(scored[0][1], 'Ch3Map')
-        self.assertLess(scored[0][0], 0.9)
+        self.assertEqual(scored[0][0], 1.0)
 
 
 class AnUnbreakableTieIsReported(unittest.TestCase):
