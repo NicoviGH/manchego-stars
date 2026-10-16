@@ -1744,6 +1744,13 @@ class ItemEconomy(unittest.TestCase):
         self.assertEqual(ours['gold'], 500)
         self.assertEqual(ours['gifts'], ['antitoxin', 'orions-bolt'])
 
+    def test_chapter_economy_counts_a_green_allys_survival_gift(self):
+        """ch02's chwinga each hand over a gift for surviving. The reader did not know that
+        vehicle, so while they carried vanilla's Hand Axe and Elixir it reported ch02 as
+        paying only Glimmerfrost's Pure Water (#495)."""
+        chap = {'deployment': {'green_allies': [{'id': 'a', 'gift': 'vulnerary'}, {'id': 'b'}]}}
+        self.assertEqual(df.chapter_economy(chap)['gifts'], ['vulnerary'])
+
     def test_chapter_economy_survives_a_chapter_with_no_boats(self):
         self.assertEqual(df.chapter_economy({})['gifts'], [])
 

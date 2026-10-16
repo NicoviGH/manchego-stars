@@ -12,6 +12,7 @@ from inject.chapter_ids import (
     CH02_GOAL_STATUS_MSG, CH02_GOAL_WINDOW_MSG, CH02_MINIBOSS_SLOT, CH02_OPENING_BG,
     CH02_TURN1_MSGS, CH02_VILLAGE_SLOTS)
 from inject.decomp import _replace_brace_block, REPO, ITEM_ENUM
+from inject.event_scripts import assert_event_scripts_defined, declare_event_script
 from inject.chapter_frame import write_event_group
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter, recruit_chapter_number
@@ -73,6 +74,8 @@ CH02_VILLAGE_CHWINGA = 'chwinga-glimmer'
 CH02_VILLAGE_FLAGS = {
     'targos-hut-south': 'EVFLAG_TMP(9)',
     'targos-hut-east':  'EVFLAG_TMP(10)',
+    'targos-hut-west':  'EVFLAG_TMP(11)',
+    'targos-hut-north': 'EVFLAG_TMP(12)',
 }
 # The 3x2 ruins block in snowy-bern: metatiles 929-931 over 961-963 (one row apart), the
 # picture the tileset artist drew to fit together. VERIFIED by _drawn_block on every build,
@@ -472,12 +475,16 @@ def inject_ch02(campaign, verbose=True):
     # with ch04/ch05): one box over the village BG, then the reward into the visitor's hands.
     # The south hut IS Glimmerfrost -- she hands her charm over when the party reaches her, so
     # her Pure Water is delivered here rather than at the ending like the two on the field.
+    # A hut on a dead vanilla script overwrites it; one on our own MS_ symbol is declared
+    # after the bulk write below, because declare_event_script APPENDS to the file.
+    own_scripts = []
     for village in chap.get('villages', []):
         symbol, msg, _fid, bg = CH02_VILLAGE_SLOTS[village['id']]
-        script = _replace_brace_block(
-            script, symbol + '[] =',
-            village_script(msg, village_reward_item(village), bg),
-            CH3_EVENTSCRIPT_H)
+        body = village_script(msg, village_reward_item(village), bg)
+        if symbol.startswith('MS_'):
+            own_scripts.append((symbol, body, '%s visit (ch02)' % village['id']))
+            continue
+        script = _replace_brace_block(script, symbol + '[] =', body, CH3_EVENTSCRIPT_H)
     # Per-chwinga charm-gift: read each chwinga's survival (CHECK_ALIVE writes EVT_SLOT_C)
     # while the battle units are still loaded, BEQ past the give if it fell, else drop the
     # charm into the leader's inventory (overflow -> convoy). This is the chapter's
@@ -508,6 +515,9 @@ def inject_ch02(campaign, verbose=True):
         '    ENDA\n}' % CH03_HOST_INDEX, CH3_EVENTSCRIPT_H)
     with open(CH3_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
+    for symbol, body, comment in own_scripts:
+        declare_event_script(CH3_EVENTSCRIPT_H, symbol, body, comment)
+    assert_event_scripts_defined(CH3_EVENTSCRIPT_H, [symbol for symbol, _b, _c in own_scripts])
 
     # 5. Halvar's defeat quote -> head of gDefeatTalkList (same shadowing rule as ch01:
     #    a head entry wins the first-match scan, shadowing any vanilla Bazba entry).

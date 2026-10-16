@@ -476,6 +476,30 @@ events:
       the chief wears scrap-plate that turns blades — but magic doesn't care about
       plate (def→res), and an axe has the edge over his spear.
 
+# ── Declared terrain divergences ────────────────────────────────────────────────
+# The map is Ch13EirikaMap's geometry, but the chapter is vanilla Ch1's twin, and two of Ch1's
+# features have no home on that layout, so they are painted onto its plains (#495). Every
+# other cell carries the donor's terrain (tools/test_map_tileset.py
+# EveryRetilePlaysLikeItsDonor).
+#  - The camp gate, six cells: vanilla Ch1's "Seize the gate", Breguet's +20 avoid / +3 def
+#    included (ADR 0078: the seize tile must read as one). A gate stands in a wall.
+#  - The two hint houses, vanilla Ch1's pair of talk-only Houses: the Bryn Shander compound
+#    (a 3x2 body around its door at (1,7)) and the north house at (13,2).
+terrain_divergence:
+- {tile: [20, 6], from: PLAINS, to: TERRAIN_PILLAR, why: the camp gate's west pillar}
+- {tile: [21, 6], from: PLAINS, to: TERRAIN_BRACE, why: the camp gate's lintel}
+- {tile: [22, 6], from: PLAINS, to: TERRAIN_PILLAR, why: the camp gate's east pillar}
+- {tile: [20, 7], from: PLAINS, to: TERRAIN_WALL_REGULAR, why: the wall the gate stands in}
+- {tile: [21, 7], from: PLAINS, to: TERRAIN_GATE_CASTLE, why: "the seize tile, vanilla Ch1's gate (Breguet's +20 avoid, +3 def)"}
+- {tile: [22, 7], from: PLAINS, to: TERRAIN_WALL_REGULAR, why: the wall the gate stands in}
+- {tile: [0, 6], from: PLAINS, to: TERRAIN_TILE_2E, why: the Bryn Shander compound's roof}
+- {tile: [1, 6], from: PLAINS, to: TERRAIN_TILE_2E, why: the Bryn Shander compound's roof}
+- {tile: [2, 6], from: PLAINS, to: TERRAIN_TILE_2E, why: the Bryn Shander compound's roof}
+- {tile: [0, 7], from: PLAINS, to: TERRAIN_TILE_2E, why: the Bryn Shander compound's wall}
+- {tile: [1, 7], from: PLAINS, to: TERRAIN_VILLAGE_REGULAR, why: "the compound's door, vanilla Ch1's first hint House"}
+- {tile: [2, 7], from: PLAINS, to: TERRAIN_TILE_2E, why: the Bryn Shander compound's wall}
+- {tile: [13, 2], from: PLAINS, to: TERRAIN_HOUSE, why: "the north house, vanilla Ch1's second hint House"}
+
 # ── Post-Chapter ──────────────────────────────────────────────────────────────
 # Economy follows vanilla FE8: NO flat per-chapter clear bonus -- gold comes only from
 # in-map sources (gold-giving villages, sellable drops/gems, chests, arena). See

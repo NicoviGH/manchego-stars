@@ -47,10 +47,11 @@ zone-entry. It now also reads the raw-`TURN` expansion, treats any **flag-gated*
 (ADR 0318) — Ch4 reads 16 line + 7 reinforcements, Ch5's 2/6/8 detection unchanged.
 _Decided: 2026-07-16 (CLAUDE; TDD). Closes the v1 scope noted on #170/#171._
 Worked example — **ch02 (parity FE8 Ch2):** gems + premium consumables only (vanilla Ch2's village
-gifts) + a regular armory + one enemy consumable drop; **no boosters, no promos.** The three chwinga
-"charms" are those gifts — **Elixir / Pure Water / Hand Axe** (the Hand Axe stands in for vanilla's
-**Red Gem**, which is lent forward to ch03's gem mine; see the Ch3-deviations ADR below — net wealth
-across ch02+ch03 is unchanged).
+gifts) + a regular armory + one enemy consumable drop; **no boosters, no promos.** The gifts sit in
+vanilla's three villages on vanilla's tiles — **Hand Axe / Elixir / Pure Water** (the Hand Axe stands
+in for vanilla's **Red Gem**, which is lent forward to ch03's gem mine; see the Ch3-deviations ADR
+below — net wealth across ch02+ch03 is unchanged). The two field chwinga each give a Vulnerary for
+surviving (#495, ADR 0349).
 _Reconstructed: 2026-06-22 (CLAUDE, decomp event-data + `events_shoplist.c` scan) — upgrades
 fe8-pacing §3 from era-buckets to a decomp-pinned curve (correcting the old "promos at Ch9–13": promos
 + boosters actually start Ch5, Master Seal/Secret Shop start ~Ch14a). Companion to the recruit budget._

@@ -1,8 +1,10 @@
 """Chapter 3 (#23): its injector and everything only it reads.
 """
 import os
+import sys
 
 import fe8_talk_font
+import map_tileset_tool as mt
 from inject.raw_pids import enemy_pid_for
 from inject.cast import _classed_cast, char_symbol, unit_items, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (
@@ -14,8 +16,10 @@ from inject.chapter_frame import write_event_group
 from inject.class_ids import ChapterClassIds
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH03_EVENT_GROUP, CH03_HOST_INDEX
+from inject.terrain import cracked_wall_changes
 from inject.maps import (
-    _inject_tile_changes, _read_map_metatile, _register_chapter_map, _register_tileset)
+    _inject_tile_changes, _map_changes_tileset, _read_map_metatile, _register_chapter_map,
+    _register_tileset)
 from inject.paths import CH4_EVENTINFO_H, CH4_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.recruit import on_map_talk_recruits, talk_recruit_wiring, talk_recruiters
 from inject.scenes import (
@@ -60,11 +64,15 @@ CH03_ENDING_SCRIPT = 'EventScr_089F19F8'
 # and `brigand-brute`, the steel brute's `deploy_class`: a Brigand for parity that deploys on
 # the Lizardzerker sprite. Grell = vanilla Mogall; archer/thief stay vanilla.
 CH03_CLASS_IDS = ChapterClassIds('ch03')
-# The FF5 navy chest metatile in the cave-interior tileset (retile.py): closed 17 / open 29.
+# The FF5 navy chest metatile in the cave-interior tileset: closed 17 / open 29.
 # gBmMapBaseTiles stores metatile<<2 (compile_layout: .mar = metatile<<5, mar_to_map >>3, so
 # the loaded tile = metatile<<2), so the open-chest tile a MapChange writes is 29<<2 (#23).
 CH03_CHEST_CLOSED_TILE = 17
 CH03_CHEST_OPEN_TILE = 29
+# What Borgo's three cracked walls break into (#495). Vanilla writes its road metatile 420, which
+# appears nowhere on Ch3Map itself; 541 is what our map paints on 6 of the 9 cells where vanilla
+# paints 452, the road tile beside 420 in those same break regions. TERRAIN_ROAD, as vanilla's.
+CH03_RUBBLE_TILE = 541
 # Left-entrance floor tiles (verified walkable on the painted .mar, clear of enemy tiles) --
 # the party deploys here statically (fast-boot; the real PREP flow lands with deploy_slots + cutscenes).
 # 9 tiles = the ch03 field roster (cast_available_at(3) = the 8 founding party + Baxby, the
@@ -109,24 +117,41 @@ CH03_MIDMAP_SCRIPT = 'EventScr_089F1BD8'   # dead vanilla Ch4 script (defined-on
 CH03_CRIER_FID = '[FID_VillagerYoungBoy]'   # the boy crying the bounty on his crate (book p.95; generic mug)
 
 
-def _inject_ch03_tile_changes(chap, maps_dir, host_index):
-    """Author the ch03 chest + door tile-changes + point slot `host_index` at them (#23).
-
-    Emits MS_Ch03MapChanges (chests then doors -- see _ch03_tile_changes_asm), registers it as
-    a fresh gChapterDataAssetTable word, and sets the host slot's map.changeLayerId to that index
-    (GetChapterMapChangesPointer -> gChapterDataAssetTable[changeLayerId], chapterdata.c). Each
-    door's open tile is read off the painted map (the metatile directly below the door cell)."""
+def ch03_map_changes(chap, maps_dir):
+    """ch03's tile flips -- chests looted, doors opened, Borgo's cracked walls broken (#23, #495)
+    -- as `map_changes_asm` rows. Pure, so a test can hold each flip to vanilla Ch3's own."""
     changes = [(c['position'][0], c['position'][1], 1, 1, [CH03_CHEST_OPEN_TILE],
                 'chest %d -> %d on loot' % (CH03_CHEST_CLOSED_TILE, CH03_CHEST_OPEN_TILE))
                for c in chap.get('chests', [])]
-    # An opened door becomes the passable tile directly BELOW it (Nicolas 2026-07-11), read off
-    # the painted map so a re-retile cannot leave a hand-copied tile number behind.
-    changes += [(d['position'][0], d['position'][1], 1, 1,
-                 [_read_map_metatile(maps_dir, CH03_LAYOUT[1],
-                                     d['position'][0], d['position'][1] + 1)],
-                 'door opens to the floor below')
-                for d in chap.get('doors', [])]
-    return _inject_tile_changes('MS_Ch03MapChanges', changes, host_index)
+    # An opened door looks like the tile directly BELOW it (Nicolas 2026-07-11), read off the
+    # painted map so a re-retile cannot leave a hand-copied tile number behind -- and plays as
+    # vanilla's opened door does (#495). (10,5) sits above the STAIRS but vanilla opens it onto
+    # FLOOR, so a door whose lower neighbour plays differently takes the room's floor above it.
+    tileset = _map_changes_tileset(maps_dir, CH03_LAYOUT)
+    opened = mt.vanilla_map_change_terrain(os.path.join(REPO, 'fireemblem8u'),
+                                           chap['map']['vanilla_layout'])
+    for d in chap.get('doors', []):
+        x, y = d['position']
+        want = opened[(x, y)]
+        sides = [_read_map_metatile(maps_dir, CH03_LAYOUT[1], x, y + dy) for dy in (1, -1)]
+        tile = next((m if tileset.terrain(m) == want
+                     else mt.same_art_with_terrain(tileset, m, want) for m in sides
+                     if tileset.terrain(m) == want
+                     or mt.same_art_with_terrain(tileset, m, want) is not None), None)
+        if tile is None:
+            sys.exit('ERROR: ch03 door (%d, %d) opens onto terrain 0x%02x in vanilla, and '
+                     'neither tile beside it (%d below, %d above) draws with it -- clone one '
+                     '(map_tileset_tool compose-metatile)' % (x, y, want, sides[0], sides[1]))
+        changes.append((x, y, 1, 1, [tile], 'door opens to the floor'))
+    changes += cracked_wall_changes(maps_dir, CH03_LAYOUT[1], CH03_RUBBLE_TILE)
+    return changes
+
+
+def _inject_ch03_tile_changes(chap, maps_dir, host_index):
+    """Emit `ch03_map_changes` as MS_Ch03MapChanges, register it as a fresh
+    gChapterDataAssetTable word, and set the host slot's map.changeLayerId to that index
+    (GetChapterMapChangesPointer -> gChapterDataAssetTable[changeLayerId], chapterdata.c)."""
+    return _inject_tile_changes('MS_Ch03MapChanges', ch03_map_changes(chap, maps_dir), host_index)
 
 
 

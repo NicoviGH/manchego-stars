@@ -119,15 +119,15 @@ difficulty_note: >
 # twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
 strategy: |
   You'll need to keep the two green [[chwinga]] [[Priest]]s safe if you want their gifts: each
-  one that survives hands over its charm at the end of the chapter (a [[Hand Axe]] and an
-  [[Elixir]]). They sit on the forest and fort tiles just ahead of you, in the raid's path, and
+  one that survives hands over a [[Goodberry]] at the end of the chapter. They sit on the forest and fort tiles just ahead of you, in the raid's path, and
   cannot fight. A good way of keeping them safe is to move up fast and form a wall in front of
   them; [[Halvar the Raider Captain|Halvar]] and two of his brigands start close by.
 
   Besides that, the chapter itself is very straightforward—just kill all the units on the map.
   Every raider but one carries an axe, so lance users win the trades: [[Wolfram]] and [[Baxby]]
   are the best walls here. Keep [[Pinky]] away from the lone archer on the east side until
-  someone has dealt with it. Visit the southern hut for Glimmer's [[Pure Water]]. Beware of the
+  someone has dealt with it. Visit the two huts beside your start for a [[Hand Axe]] and an
+  [[Elixir]], and the southern hut for Glimmer's [[Pure Water]]. Beware of the
   two raiders that arrive from the west edge on turn 3, behind the party.
 
   This is your first chance to do any shopping. The [[armory]] sells only basic weapons (a
@@ -183,9 +183,8 @@ deployment:
       donor: {at: [10, 4], allegiance: GREEN}   # Garcia: {AttackInRangeAI, 0, 0} -- hold the
                                 # tile, strike what reaches you. `cautious` was already these
                                 # bytes; now it is grounded rather than matching by luck.
-      gift: hand-axe              # DEVIATION (ch02<->ch03 swap, ADR in decisions.md): vanilla Ch2's Red Gem
-                                  # moves to ch03's gem-mine chest; this slot takes ch03's Hand Axe instead.
-                                  # Net wealth + item set across ch02+ch03 = vanilla.
+      gift: vulnerary             # a token: vanilla's three village gifts are back in their villages
+                                  # (#495), and a Vulnerary is what vanilla's greens themselves carry
     - id: chwinga-rime
       name: "Rime Spark"
       fe_name: "Rime"
@@ -197,7 +196,7 @@ deployment:
       donor: {at: [10, 4], allegiance: GREEN}   # Garcia's posture, not Ross's: Ross runs the
                                 # scripted-approach AI_B_0A that walks him to this fort, and
                                 # ours starts on it. Holding is what we want from both.
-      gift: elixir                # ITEM_ELIXIR 0x6D
+      gift: vulnerary             # a token, as Mote's
   # Glimmerfrost is NOT a map unit: she is the inhabitant of the village at (1,12) and
   # hands over the Pure Water when reached -- vanilla's own item on vanilla's own tile
   # (EventScr_Ch2_Village3 gives 0x6E there). Losing her to a raider and losing a chwinga
@@ -326,11 +325,11 @@ enemy_units:
 # ── Rewards (no chest — vanilla Ch2 has none) ─────────────────────────────────────
 # Vanilla Ch2's loot = three VILLAGE GIFTS (Red Gem / Elixir / Pure Water) + one enemy
 # vulnerary drop. Reward ADR (decisions.md §"Reward/item budget"): ch02 parity = FE8 Ch2
-# = gems + premium consumables, NO boosters/promos. We deliver the gifts as the chwinga
-# charm-gifts (per-survivor) — but with the ch02↔ch03 reward swap: Mote's slot gives a Hand
-# Axe (vanilla Ch2's Red Gem moved to ch03's gem-mine chest), Rime = Elixir, Glimmer = Pure
-# Water. The enemy drop is the chardalyn-scavenger's vulnerary. No on-map chest (vanilla has none).
-# The gift item lives in ONE place — green_allies[].gift above — which the build reads directly.
+# = gems + premium consumables, NO boosters/promos. Each gift is in vanilla's village on
+# vanilla's tile, with the ch02↔ch03 swap (ADR 0052): (4,2) gives a Hand Axe where vanilla's
+# Red Gem moved to ch03's gem-mine chest, (7,2) the Elixir, (1,12) Glimmer's Pure Water. The
+# surviving chwinga each give a Vulnerary. The enemy drop is the chardalyn-scavenger's
+# vulnerary. No on-map chest (vanilla has none).
 chests: []
 
 # ── Playtest ─────────────────────────────────────────────────────────────────────
@@ -362,6 +361,23 @@ playtest:
         - visit: {x: 1, y: 12, gains: 0x6E}    # targos-hut-south -> ITEM_PUREWATER
       then:
         - spoke: true
+
+    # The two northern huts (#495): vanilla Ch2's (4,2)/(7,2) villages, ruins in our retile
+    # until 2026-10-15. Each must open, speak, and record its visit on its own event id.
+    - name: ch02northhuts
+      proves: >
+        the two northern Targos huts, restored from ruins to vanilla Ch2's villages, pay
+        vanilla's gifts on vanilla's tiles (the Hand Axe standing in for the Red Gem), speak,
+        and set their event ids, so a visit shuts each against the raid.
+      checkpoint: ch02start
+      given: [on_map]
+      when:
+        - visit: {x: 4, y: 2, gains: 0x28}    # targos-hut-west -> ITEM_AXE_HANDAXE
+        - visit: {x: 7, y: 2, gains: 0x6D}    # targos-hut-north -> ITEM_ELIXIR
+      then:
+        - spoke: true
+        - event_flag: 11
+        - event_flag: 12
 
     # The Armory is part of the map (ADR 0345): inherited from vanilla Ch2's own Location list.
     # Proven headless rather than by eye -- the shop that opens must carry Ch2's own stock.
@@ -461,6 +477,28 @@ villages:
     note: >
       A decoy with a line. It sits on the eastern route, so it pulls pillaging raiders off
       the crossing without paying a second time.
+  # The two NORTHERN huts (#495): vanilla Ch2's (4,2) and (7,2) villages, which our retile
+  # painted as ruins until 2026-10-15 -- so their gifts had been parked on the chwinga. They
+  # pay vanilla's gifts on vanilla's tiles again, the Hand Axe standing in for the Red Gem.
+  # DRAFT 2026-10-15 (Claude, #495) -- awaiting Nicolas's red pen.
+  - id: targos-hut-west
+    tile: [4, 2]               # vanilla `Village(EVFLAG_TMP(9), EventScr_Ch2_Village1, 4, 2)`
+    visit_reward:
+      - id: hand-axe           # ITEM_AXE_HANDAXE 0x28
+        amount: 1
+    vanilla_gift_divergence: "vanilla's Red Gem is ch03's chest; ch03's Hand Axe takes its place (ADR 0052)"
+    visit_text:
+      - resident: "Raiders, up from the lake road?"
+      - resident: "Here -- I use this to chop fishing holes in the ice."
+      - resident: "It throws well, too. Take it. I've got another."
+  - id: targos-hut-north
+    tile: [7, 2]               # vanilla `Village(EVFLAG_TMP(10), EventScr_Ch2_Village2, 7, 2)`
+    visit_reward:
+      - id: elixir             # ITEM_ELIXIR 0x6D, vanilla's own gift on vanilla's tile
+        amount: 1
+    visit_text:
+      - resident: "A travelling healer wintered with us before the snows closed the road."
+      - resident: "She left this tonic behind. It'll do you more good than me."
 
 charm_gifts:
   note: "Each SURVIVING chwinga gifts its charm at chapter end (gated on the per-unit survival flag); the item is authored per-unit in green_allies[].gift."
@@ -636,9 +674,10 @@ design_notes: >
   (Ravisin); an early one would break the physical-triangle teaching ramp. The protect
   layer is two GREEN chwinga (snow-spirits) fielded as Priests — the balance match to
   vanilla's green Ross+Garcia — with the chapter's SIGNATURE beat being per-unit soft-fail:
-  a chwinga that dies forfeits only its own charm-gift (a Hand Axe and an Elixir; the third
-  chwinga, Glimmer, hands over Pure Water from her hut), never a game over. Vanilla Ch2's
-  Red Gem moved to ch03 in the ch02/ch03 swap (`payload_deviations`). The ending's frozen body is a
+  a chwinga that dies forfeits only its own charm-gift (a Vulnerary each; the third
+  chwinga, Glimmer, hands over Pure Water from her hut), never a game over. Vanilla's other
+  two village gifts are in their own villages; its Red Gem moved to ch03 in the ch02/ch03 swap
+  (`payload_deviations`). The ending's frozen body is a
   *story* seed only (no combat here): the town blames the druids' sacrifice rumor, while Rootis
   clocks it as Sephek's dagger-of-ice kill — a breadcrumb for his Act-II reckoning, distinct
   from Ravisin (see docs/decisions.md §Story → Sephek arc). The chardalyn berserkers are

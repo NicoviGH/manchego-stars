@@ -273,6 +273,40 @@ def vanilla_layout_data(decomp_root, layout_name):
     return width, height, cells, terrain
 
 
+
+def vanilla_map_change_terrain(decomp_root, layout_name):
+    """{(x, y): terrain} -- what each tile of a vanilla layout BECOMES under its own MapChanges
+    (a door opened, a wall broken, a chest looted), in that layout's terrain table. Tiles a
+    change leaves alone (written as 0, bmtrick.c ApplyMapChangesById) are omitted, as is a
+    layout with no changes. Chxx(Eirika)Map's changes are Chxx(Eirika)MapChanges."""
+    path = os.path.join(decomp_root, 'src/data/map/change',
+                        re.sub(r'Map$', 'MapChanges', layout_name) + '.json')
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding='utf-8') as source:
+        changes = json.load(source)['changes']
+    _, _, _, terrain = vanilla_layout_data(decomp_root, layout_name)
+    out = {}
+    for change in changes:
+        with open(os.path.join(decomp_root, 'graphics/map', change['tiles'] + '.bin'),
+                  'rb') as source:
+            raw = source.read()
+        for i in range(change['w'] * change['h']):
+            tile = struct.unpack_from('<H', raw, i * 2)[0]
+            if tile:
+                out[(change['x'] + i % change['w'], change['y'] + i // change['w'])] = \
+                    terrain[tile >> 2]
+    return out
+
+
+def same_art_with_terrain(tileset, metatile, terrain):
+    """A metatile drawn exactly like `metatile` (identical TSA) carrying `terrain`, or None --
+    the twin `restore_donor_terrain` clones when one picture serves two roles."""
+    art = tileset.cfg[metatile * 8:metatile * 8 + 8]
+    return next((m for m in range(NUM_METATILES)
+                 if tileset.cfg[m * 8:m * 8 + 8] == art and tileset.terrain(m) == terrain), None)
+
+
 def preserved_terrain_targets(source_cells, source_terrain, target_tileset, rules, width):
     """Map protected source-terrain cells, rejecting incomplete or invalid variants."""
     protected = rules['preserve_terrain_variants']
@@ -484,6 +518,81 @@ def terrain_impact(maps_root, tileset, metatiles):
             out[stem] = hits
     return out
 
+
+
+def restore_donor_terrain(maps_root, stem, donor, decomp_root, declared=None, apply=False):
+    """Give a compiled retile its donor's terrain back, cell for cell, without repainting art.
+
+    ADR 0013's fix for drift, done for a whole map at once (#495: ch03 had drifted on 167
+    cells). For each painted metatile, the donor terrains of the cells it sits on decide:
+
+      * ONE terrain: re-author the metatile's terrain byte (`set_metatile_terrain`).
+      * SEVERAL: the metatile was reused across roles (a floor tile painted on road and floor
+        alike). It takes the MAJORITY terrain, and every other terrain gets a clone -- the same
+        four quarters composed into a free slot (`compose_metatile`) with that terrain byte --
+        painted on that terrain's cells. The art stays pixel-identical either way.
+
+    `declared` ({(x, y): terrain}) is the chapter's `terrain_divergence` and wins over the
+    donor. Refuses when another map on the tileset paints a metatile it would re-tag, since a
+    terrain byte is shared (`terrain_impact`). Returns the plan as
+    [(metatile, before, after, [(x, y), ...], clone_of)] and writes nothing unless `apply`.
+    """
+    declared = declared or {}
+    with open(os.path.join(maps_root, stem + '.json'), encoding='utf-8') as source:
+        info = json.load(source)
+    width, height = info['width'], info['height']
+    tileset = info.get('tileset', DEFAULT_TILESET)
+    tileset_dir = os.path.join(maps_root, 'tilesets', tileset)
+    ts = _tileset_from_dir(tileset_dir)
+    with open(os.path.join(maps_root, stem + '.mar'), 'rb') as source:
+        raw = source.read()
+    grid = [struct.unpack_from('<H', raw, i * 2)[0] >> 5 for i in range(width * height)]
+    _, _, cells, terrain = vanilla_layout_data(decomp_root, donor)
+    want = [declared.get((i % width, i // width), terrain[cells[i]]) for i in range(len(grid))]
+    by_metatile = {}
+    for i, metatile in enumerate(grid):
+        by_metatile.setdefault(metatile, {}).setdefault(want[i], []).append(i)
+    plan = []
+    for metatile, roles in sorted(by_metatile.items()):
+        if set(roles) == {ts.terrain(metatile)}:
+            continue
+        ranked = sorted(roles, key=lambda t: (-len(roles[t]), t))
+        keep, clones = ranked[0], ranked[1:]
+        if ts.terrain(metatile) in clones:      # never re-tag away a role the tile already serves
+            keep, clones = ts.terrain(metatile), [t for t in ranked if t != ts.terrain(metatile)]
+        if keep != ts.terrain(metatile):
+            plan.append((metatile, ts.terrain(metatile), keep,
+                         [(i % width, i // width) for i in roles[keep]], None))
+        for role in clones:
+            plan.append((None, ts.terrain(metatile), role,
+                         [(i % width, i // width) for i in roles[role]], metatile))
+    others = {m: hits for map_stem, hits in terrain_impact(
+        maps_root, tileset, {row[0] for row in plan if row[0] is not None}).items()
+        if map_stem != stem for m in hits}
+    if others:
+        raise ValueError('metatiles %s are painted on other maps on %s; a terrain byte is '
+                         'shared, so re-tag them by hand' % (sorted(others), tileset))
+    if not apply:
+        return plan
+    with open(os.path.join(tileset_dir, tileset + '.bin'), 'rb') as source:
+        blob = source.read()
+    painted = {m for map_hits in terrain_impact(maps_root, tileset, set(range(NUM_METATILES)))
+               .values() for m in map_hits}
+    free = [m for m in range(1, NUM_METATILES) if not blob[8192 + m] and m not in painted]
+    done = []
+    for metatile, before, after, where, clone_of in plan:
+        if clone_of is None:
+            set_metatile_terrain(tileset_dir, [metatile], after)
+        else:
+            metatile = free.pop(0)
+            compose_metatile(tileset_dir, metatile,
+                             ['%d:%s' % (clone_of, q) for q in ('TL', 'TR', 'BL', 'BR')], after)
+            for x, y in where:
+                grid[y * width + x] = metatile
+        done.append((metatile, before, after, where, clone_of))
+    compile_layout([grid[r * width:(r + 1) * width] for r in range(height)],
+                   os.path.join(maps_root, stem + '.mar'), info.get('id', stem), tileset=tileset)
+    return done
 
 _QUARTERS = {'TL': 0, 'TR': 1, 'BL': 2, 'BR': 3}
 
@@ -889,6 +998,11 @@ if __name__ == '__main__':
     t.add_argument('metatiles', help='comma-separated metatile indices')
     t.add_argument('terrain', type=lambda value: int(value, 0), help='terrain id, e.g. 0x2E')
     t.add_argument('--apply', action='store_true', help='write it (default: report only)')
+    d = sub.add_parser('restore-terrain', help='give a compiled retile its donor\'s terrain '
+                       'back (re-tag, or clone a metatile reused across roles); art untouched')
+    d.add_argument('stem', help='the map stem under campaigns/.../maps/')
+    d.add_argument('donor', help='the vanilla layout, e.g. Ch3Map (tools/map_donor.py names it)')
+    d.add_argument('--apply', action='store_true', help='write it (default: report only)')
     args = ap.parse_args()
     if args.cmd == 'import':
         print(import_febuilder_tileset(args.config, args.object_png, args.out_dir))
@@ -914,6 +1028,20 @@ if __name__ == '__main__':
                     args.tileset_dir, wanted, args.terrain):
                 print('  WROTE %4d: 0x%02X -> 0x%02X' % (metatile, before, after))
         else:
+            print('  (report only -- pass --apply to write)')
+    elif args.cmd == 'restore-terrain':
+        import import_map_layout
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        maps_root = os.path.join(repo, 'campaigns/rime-of-the-frostmaiden/maps')
+        names = {v: k for k, v in import_map_layout.TERRAIN_BY_NAME.items()}
+        for metatile, before, after, where, clone_of in restore_donor_terrain(
+                maps_root, args.stem, args.donor, os.path.join(repo, 'fireemblem8u'),
+                import_map_layout._declared_divergence(args.stem), apply=args.apply):
+            what = ('re-tag %4d' % metatile if clone_of is None else
+                    'clone %4s of %4d' % (metatile if metatile is not None else 'new', clone_of))
+            print('  %-20s %-16s -> %-16s %d cell(s)' % (
+                what, names.get(before, before), names.get(after, after), len(where)))
+        if not args.apply:
             print('  (report only -- pass --apply to write)')
     elif args.cmd == 'compose-metatile':
         print(compose_metatile(args.tileset_dir, args.metatile, args.quarters, args.terrain))

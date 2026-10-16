@@ -80,14 +80,19 @@ CH02_CHWINGA = (
     ('chwinga-glimmer', 'MANSEL'),
 )
 
-# ch02's two Targos huts (2026-08-30). Vanilla Ch2 wires THREE Village() and our retile kept
-# two of its four village-terrain tiles, so the map drew huts backing nothing. They are the
-# raid's DECOY: pillage targets terrain, so villages are what pull six pillaging bandits off
-# the protected greens while the player crosses to reach them.
+# ch02's four Targos huts: vanilla Ch2's four village-terrain cells, three of them its own
+# Village() sites. They are the raid's DECOY: pillage targets terrain, so villages are what
+# pull six pillaging bandits off the protected greens while the player crosses to reach them.
+# The two northern huts (#495) were painted as ruins until 2026-10-15; they run our own MS_
+# scripts and appended messages, since a new message takes no block id (#411).
 #   id                  event script          msg     mug                       backdrop
 CH02_VILLAGE_SLOTS = {
     'targos-hut-south': ('EventScr_089F15A0', 0xAC0, '[FID_VillagerWoman]', CH02_OPENING_BG),
     'targos-hut-east':  ('EventScr_089F1658', 0xAC1, '[FID_VillagerMan3]', CH02_OPENING_BG),
+    'targos-hut-west':  ('MS_Ch02VisitWest', appended_message_id('ch02', 'hut-west-visit'),
+                         '[FID_VillagerMan1]', CH02_OPENING_BG),
+    'targos-hut-north': ('MS_Ch02VisitNorth', appended_message_id('ch02', 'hut-north-visit'),
+                         '[FID_VillagerGirlBrownHair]', CH02_OPENING_BG),
 }
 # The chwinga wear Sclorbo's chwinga map sprite (he is one), recoloured by the green NPC
 # faction palette -- identical green triplets (Nicolas 2026-06-24). Build-time derived from

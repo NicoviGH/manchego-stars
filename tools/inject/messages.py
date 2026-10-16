@@ -76,11 +76,13 @@ HOSTED_CHAPTER_MESSAGE_IDS = {
     # Goal ids only -- ch01/ch02 predate the per-chapter block registry, but their goal strings
     # still have to be unique against every other hosted chapter (#207).
     'ch01': (*CH01_LITERAL_MSGS, CH01_GOAL_WINDOW_MSG, CH01_GOAL_STATUS_MSG),
-    # The goal window/status predate the block registry and sit outside it; the two Targos
-    # hut visits are ch02's first claims from the block it gained when the pool widened.
+    # The goal window/status predate the block registry and sit outside it; the south and east
+    # hut visits are ch02's first claims from the block it gained when the pool widened. The two
+    # northern huts' ids are APPENDED (#495) and claimed through the ledger, not here.
     'ch02': (CH02_GOAL_WINDOW_MSG, CH02_GOAL_STATUS_MSG,
              *CH02_TURN1_MSGS,
-             *(msg for _sym, msg, _fid, _bg in CH02_VILLAGE_SLOTS.values())),
+             *(msg for _sym, msg, _fid, _bg in CH02_VILLAGE_SLOTS.values()
+               if msg < VANILLA_MESSAGE_COUNT)),
 }
 
 

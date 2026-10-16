@@ -5687,17 +5687,51 @@ local function baseTile(x, y)
     return ru16(ru32(grid + y * 4) + x * 2)
 end
 
+-- CH03WALLS (#495): Borgo's three cracked walls stand on the ch03 map the way vanilla Ch3's do.
+-- Each cell reads TERRAIN_WALL_DAMAGED, and InitMapObstacles (bmtrick.c) has given it a
+-- TRAP_OBSTACLE whose HP (`extra`) is vanilla Ch3's mapCrackedWallHeath, 25 -- host slot 4 would
+-- have said 50. sTrapPool is file-static, so SYM finds it through the linker map (gen_symbols).
+-- What a broken wall becomes is the MapChange array's job, held to vanilla's by
+-- test_map_tileset's Ch03FlipsPlayLikeVanillaCh3. Run: PT_HOST_CHAPTER=4 run.sh ch03walls.
+scenarios.ch03walls = function()
+    if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
+    local WALL_DAMAGED, TRAP_OBSTACLE, HP = 0x1B, 2, 25
+    local WALLS = { { x = 8, y = 8 }, { x = 4, y = 9 }, { x = 4, y = 12 } }
+    for _, w in ipairs(WALLS) do
+        if terrainAt(w.x, w.y) ~= WALL_DAMAGED then
+            return result("FAIL", string.format("(%d,%d) is terrain 0x%02X, not a cracked wall",
+                w.x, w.y, terrainAt(w.x, w.y)))
+        end
+        local found
+        for i = 0, 63 do
+            local t = SYM.sTrapPool + i * 8
+            local kind = emu:read8(t + 2)
+            if kind == 0 then break end
+            if emu:read8(t) == w.x and emu:read8(t + 1) == w.y then found = t break end
+        end
+        if not found then
+            return result("FAIL", string.format("(%d,%d) has no trap -- nothing to break", w.x, w.y))
+        end
+        if emu:read8(found + 2) ~= TRAP_OBSTACLE or emu:read8(found + 3) ~= HP then
+            return result("FAIL", string.format("(%d,%d) trap is type %d with %d HP, want %d / %d",
+                w.x, w.y, emu:read8(found + 2), emu:read8(found + 3), TRAP_OBSTACLE, HP))
+        end
+    end
+    return result("PASS", "all three cracked walls are WALL_DAMAGED obstacles with 25 HP")
+end
+
 -- CH03DOOR (#23 chests/doors): prove the door tile-change wiring end-to-end in-engine. Boot to the
 -- ch03 map, hand a deployed unit a Door Key (and strip its weapon so the command menu is [Door,
 -- Item, Wait] -- Door at row 0, deterministic), park it beside the (2,3) door, drive Door, and
 -- assert gBmMapBaseTiles[3][2] flips from the closed door (812<<2) to the floor tile below it
--- (492<<2, per Nicolas's "the tile directly below"). Run: PT_HOST_CHAPTER=4 run.sh ch03door
+-- (per Nicolas's "the tile directly below"): 79<<2, the FLOOR twin of 492's art -- 492 itself
+-- plays as PLAINS since #495, and vanilla's opened door is FLOOR. Run: PT_HOST_CHAPTER=4 run.sh ch03door
 -- (needs a CH03BOOT=1 ROM). The chest path shares this MapChange array -- verifying the door proves
 -- both mechanisms (GetMapChangeIdAt -> CallTileChangeEvent -> ApplyMapChangesById).
 scenarios.ch03door = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local DX, DY = 2, 3
-    local CLOSED, OPEN_T = 812 * 4, 492 * 4   -- gBmMapBaseTiles holds metatile<<2
+    local CLOSED, OPEN_T = 812 * 4, 79 * 4    -- gBmMapBaseTiles holds metatile<<2
     local pre = baseTile(DX, DY)
     log(string.format("door (%d,%d) tile before = %d (want closed %d)", DX, DY, pre, CLOSED))
     if pre ~= CLOSED then
@@ -7860,7 +7894,8 @@ end
 -- brawl. If even they never close on (1,12), then AI1 preemption does not explain the failure
 -- and the cause is structural.
 scenarios.ch02aidiag = function()
-    local HUTS = { { name = "south", x = 1, y = 12 }, { name = "east", x = 12, y = 3 } }
+    local HUTS = { { name = "south", x = 1, y = 12 }, { name = "east", x = 12, y = 3 },
+                   { name = "west", x = 4, y = 2 }, { name = "north", x = 7, y = 2 } }
     local VILLAGE_REGULAR, RUINS = 0x03, 0x25
     if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
     pokeFastConfig()
@@ -7943,11 +7978,14 @@ scenarios.ch02raid = function()
     -- rear raiders spawn beside it -- and the run showed the band takes the EAST hut first,
     -- because six of the nine start east and (12,3) is on their doorstep. Which hut falls is
     -- a real design answer, so the test reports it rather than presuming it.
+    -- The two NORTHERN huts are vanilla's (4,2)/(7,2) villages, ruins in our retile until #495.
     local HUTS = {
         { name = "targos-hut-south", x = 1,  y = 12, flag = 9,  item = 0x6E },
         { name = "targos-hut-east",  x = 12, y = 3,  flag = 10, item = nil  },
+        { name = "targos-hut-west",  x = 4,  y = 2,  flag = 11, item = 0x28 },
+        { name = "targos-hut-north", x = 7,  y = 2,  flag = 12, item = 0x6D },
     }
-    local VILLAGE_REGULAR, RUINS, PUREWATER = 0x03, 0x25, 0x6E
+    local VILLAGE_REGULAR, RUINS = 0x03, 0x25
     if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
     pokeFastConfig()
     waitFor(function() return faction() == 0 and not menuOpen()
@@ -7960,14 +7998,15 @@ scenarios.ch02raid = function()
                 terrainAt(hut.x, hut.y)))
         end
     end
-    -- Count the gift BEFORE: an absolute "the party holds no Pure Water" would fail the
+    -- Count each hut's gift BEFORE: an absolute "the party holds no Elixir" would fail the
     -- moment the chapter ships one anywhere else (ch05raid's lesson, kept).
-    local function waters()
+    local function held(item)
         local n = 0
-        for _, got in ipairs(collectedItems()) do if got == PUREWATER then n = n + 1 end end
+        for _, got in ipairs(collectedItems()) do if got == item then n = n + 1 end end
         return n
     end
-    local before = waters()
+    local before = {}
+    for _, hut in ipairs(HUTS) do if hut.item then before[hut.name] = held(hut.item) end end
     -- Hand the huts to the raiders: never visit one, just give the turns back.
     --
     -- The party is KEPT ALIVE while we wait, the way protectChwinga keeps the greens up for
@@ -8002,10 +8041,11 @@ scenarios.ch02raid = function()
             wait(90)
             shot("ch02raid")
             log(string.format("ch02raid: %s fell on turn %d", fell.name, turn()))
-            if fell.item and waters() > before then
+            if fell.item and held(fell.item) > before[fell.name] then
                 return result("FAIL", string.format(
-                    "%s was sacked but its Pure Water reached the party anyway (%d -> %d) -- "
-                    .. "a lost hut must cost Glimmerfrost's charm", fell.name, before, waters()))
+                    "%s was sacked but its gift 0x%02X reached the party anyway (%d -> %d) -- "
+                    .. "a lost hut must cost its gift", fell.name, fell.item,
+                    before[fell.name], held(fell.item)))
             end
             if eventFlag(SITE_FLAG) then
                 return result("FAIL", string.format(
@@ -8018,10 +8058,13 @@ scenarios.ch02raid = function()
         end
     end
     shot("ch02raid-unraided")
+    local standing = {}
+    for _, hut in ipairs(HUTS) do
+        standing[#standing + 1] = string.format("%s 0x%02X", hut.name, terrainAt(hut.x, hut.y))
+    end
     return result("FAIL", string.format(
-        "twelve turns and BOTH huts still stand (south 0x%02X, east 0x%02X) -- no raider "
-        .. "reached either, so the decoy the chapter is built on does not exist",
-        terrainAt(HUTS[1].x, HUTS[1].y), terrainAt(HUTS[2].x, HUTS[2].y)))
+        "twelve turns and every hut still stands (%s) -- no raider reached one, so the decoy "
+        .. "the chapter is built on does not exist", table.concat(standing, ", ")))
 end
 
 -- ch05raid (#25): can the party LOSE a reliquary? The chapter has declared a village-raid race

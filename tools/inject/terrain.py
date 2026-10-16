@@ -7,7 +7,7 @@ import struct
 import sys
 
 from inject.decomp import vanilla_decomp_text
-from inject.maps import _layout_sidecar, map_tileset
+from inject.maps import _layout_sidecar, map_tileset, terrain_ids
 
 
 def reda_route_move(pid, route, why, who='this unit'):
@@ -57,6 +57,24 @@ def _map_terrain_grid(maps_dir, stem):
     return width, height, [
         [terrain[struct.unpack_from('<H', mar, (y * width + x) * 2)[0] >> 5]
          for x in range(width)] for y in range(height)]
+
+
+
+def cracked_wall_changes(maps_dir, stem, rubble):
+    """One 1x1 MapChange per cracked wall on a painted map: the wall breaks into `rubble`.
+
+    A TERRAIN_WALL_DAMAGED cell gets an obstacle trap at load (bmtrick.c InitMapObstacles), and
+    breaking it runs ApplyMapChangesById(GetMapChangeIdAt(x, y)) (bmbattle.c), so a cracked wall
+    with no change covering it has nothing to become. Read off the map's own terrain, so a
+    repaint that moves a wall moves its change too. Vanilla Ch3's three are 2x2 regions that also
+    redraw the wall above; only the cracked cell changes terrain (WALL_DAMAGED -> ROAD), so 1x1
+    gives the same map to play on. Only the TOPMOST of a stacked pair carries the trap, which is
+    the cell this returns (#495)."""
+    width, height, terrain = _map_terrain_grid(maps_dir, stem)
+    damaged = terrain_ids()['TERRAIN_WALL_DAMAGED']
+    return [(x, y, 1, 1, [rubble], 'cracked wall breaks into rubble')
+            for y in range(height) for x in range(width)
+            if terrain[y][x] == damaged and not (y and terrain[y - 1][x] == damaged)]
 
 
 def _class_terrain_move_costs(table):

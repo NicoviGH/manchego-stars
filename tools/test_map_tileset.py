@@ -990,45 +990,161 @@ class TestDeclaredDivergenceLookup(unittest.TestCase):
         for spelling in ('0x0C', '0x0c', 12, 'TERRAIN_FOREST'):
             self.assertEqual(self.iml._terrain_byte(spelling), forest)
 
-    def test_every_declared_from_matches_vanilla(self):
-        """A `from:` that lies makes the whole allowlist untrustworthy."""
-        import yaml
-        chapter = os.path.join(
-            REPO, 'campaigns/rime-of-the-frostmaiden/chapters/ch06-the-maer-monster.yaml')
-        with open(chapter, encoding='utf-8') as handle:
-            data = yaml.safe_load(handle)
-        _, _, cells, terrain = mt.vanilla_layout_data(
-            os.path.join(REPO, 'fireemblem8u'), 'Ch13EphraimMap')
-        width = data['map']['size'].split('\u00d7')[0]
-        width = int(width) if width.isdigit() else 22
-        names = {v: k for k, v in self.iml.TERRAIN_BY_NAME.items()}
-        for row in data['terrain_divergence']:
-            x, y = row['tile']
-            got = names[terrain[cells[y * width + x]]]
-            self.assertEqual(got, 'TERRAIN_' + row['from'],
-                             'cell (%d, %d) declares from: %s but vanilla is %s'
-                             % (x, y, row['from'], got))
 
-    def test_the_committed_map_diverges_exactly_where_declared(self):
-        """The import validator only runs when a map is IMPORTED, so a later edit to the
-        committed .mar -- ch06's snag repainted standing, 2026-10-09 -- could drift from the
-        allowlist either way: an undeclared change, or an entry describing a cell that now
-        matches vanilla again."""
-        import inject.maps
+class EveryRetilePlaysLikeItsDonor(unittest.TestCase):
+    """A retile is a reskin: every hosted chapter map carries its donor's terrain, cell for
+    cell, except the cells its YAML declares under `terrain_divergence` (ADR 0013, #495).
+
+    `validate_terrain_matches_vanilla` runs only when a map is IMPORTED, so a map imported
+    before that guard existed, or edited afterwards, was never held to it. Measured on
+    2026-10-15: ch03 had drifted on 167 cells (its walls painted as sea, so fliers crossed
+    them, and Borgo's three cracked walls painted solid), ch02's two northern villages were
+    ruins the raid could not target, and ch01's seize gate was undeclared. This runs the same
+    comparison over every committed map, every time.
+
+    The donor is DERIVED from geometry (`map_donor`), not read off `map.vanilla_layout`,
+    because declaring that field also switches on the donor's shops and gift placement for a
+    chapter; where a chapter does declare it, it must name the same layout.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        import chapter_schema
+        import import_map_layout
+        import map_donor
+        cls.iml, cls.donor = import_map_layout, map_donor
+        cls.names = {v: k for k, v in import_map_layout.TERRAIN_BY_NAME.items()}
+        chapters = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/chapters')
+        cls.chapters = []
+        for name in sorted(os.listdir(chapters)):
+            data = chapter_schema.load(os.path.join(chapters, name)) or {}
+            mar = (data.get('map') or {}).get('file')
+            if mar and os.path.exists(os.path.join(map_donor.MAPS, os.path.basename(mar))):
+                cls.chapters.append((os.path.splitext(os.path.basename(mar))[0], data))
+
+    def _compare(self, stem):
+        """(donor, width, ours, vanilla): both maps as terrain bytes, row-major."""
+        width, height, scored = self.donor.candidates(stem)
+        donor = scored[0][1]
+        with open(os.path.join(self.donor.MAPS, stem + '.json'), encoding='utf-8') as source:
+            info = json.load(source)
+        tileset = mt._tileset_from_dir(os.path.join(
+            self.donor.MAPS, 'tilesets', info.get('tileset', mt.DEFAULT_TILESET)))
+        with open(os.path.join(self.donor.MAPS, stem + '.mar'), 'rb') as source:
+            raw = source.read()
+        ours = [tileset.terrain(struct.unpack_from('<H', raw, i * 2)[0] >> 5)
+                for i in range(width * height)]
+        _, _, cells, terrain = mt.vanilla_layout_data(self.donor.DECOMP, donor)
+        return donor, width, ours, [terrain[m] for m in cells]
+
+    def test_every_hosted_chapter_has_a_map(self):
+        self.assertGreaterEqual(len(self.chapters), 8, [s for s, _ in self.chapters])
+
+    def test_a_declared_donor_is_the_derived_one(self):
+        for stem, data in self.chapters:
+            declared = data['map'].get('vanilla_layout')
+            if declared:
+                with self.subTest(stem):
+                    self.assertEqual(self.donor.candidates(stem)[2][0][1], declared)
+
+    def test_terrain_matches_the_donor_except_where_declared(self):
+        for stem, _ in self.chapters:
+            donor, width, ours, vanilla = self._compare(stem)
+            declared = self.iml._declared_divergence(stem)
+            drift = ['(%d, %d) %s, donor %s' % (i % width, i // width,
+                                                self.names.get(got, got),
+                                                self.names.get(want, want))
+                     for i, (got, want) in enumerate(zip(ours, vanilla))
+                     if got != declared.get((i % width, i // width), want)]
+            with self.subTest(stem):
+                self.assertEqual(drift, [], '%s drifted from %s on %d cell(s)'
+                                 % (stem, donor, len(drift)))
+
+    def test_every_declared_cell_really_departs_from_the_donor(self):
+        """An entry describing a cell that matches vanilla again is a stale allowlist line,
+        and a `from:` that lies makes the whole allowlist untrustworthy."""
+        for stem, data in self.chapters:
+            donor, width, _ours, vanilla = self._compare(stem)
+            for row in data.get('terrain_divergence') or []:
+                x, y = row['tile']
+                with self.subTest(stem=stem, tile=(x, y)):
+                    self.assertEqual('TERRAIN_' + row['from'],
+                                     self.names[vanilla[y * width + x]])
+                    self.assertNotEqual(self.iml._terrain_byte(row['to']),
+                                        vanilla[y * width + x])
+
+
+class RestoreDonorTerrain(unittest.TestCase):
+    """`map_tileset_tool restore-terrain` (#495): re-tag a metatile that only ever plays one
+    donor role, clone one reused across roles, and never touch the art."""
+
+    MAPS = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
+    DECOMP = os.path.join(REPO, 'fireemblem8u')
+
+    def test_every_committed_retile_needs_nothing(self):
+        import map_donor
+        for stem in ('ch01-the-iron-trail', 'ch02-cold-welcome', 'ch03-the-termalaine-mine'):
+            donor = map_donor.candidates(stem)[2][0][1]
+            import import_map_layout
+            with self.subTest(stem):
+                self.assertEqual(mt.restore_donor_terrain(
+                    self.MAPS, stem, donor, self.DECOMP,
+                    import_map_layout._declared_divergence(stem)), [])
+
+    def test_a_reused_tile_is_cloned_and_its_art_kept(self):
+        import shutil
+        with tempfile.TemporaryDirectory() as tmp:
+            stem = 'ch03-the-termalaine-mine'
+            for ext in ('.mar', '.json'):
+                shutil.copy(os.path.join(self.MAPS, stem + ext), tmp)
+            shutil.copytree(os.path.join(self.MAPS, 'tilesets', 'cave-interior'),
+                            os.path.join(tmp, 'tilesets', 'cave-interior'))
+            # Paint a WALL tile over a road cell, (6, 11) below the lower door: one picture,
+            # two roles, so the road cell must get a ROAD twin of the wall art.
+            path = os.path.join(tmp, stem + '.mar')
+            with open(path, 'rb') as f:
+                raw = bytearray(f.read())
+            struct.pack_into('<H', raw, (11 * 17 + 6) * 2, 785 << 5)
+            with open(path, 'wb') as f:
+                f.write(raw)
+            plan = mt.restore_donor_terrain(tmp, stem, 'Ch3Map', self.DECOMP, apply=True)
+            self.assertEqual([(row[2], row[3], row[4]) for row in plan], [(0x02, [(6, 11)], 785)])
+            with open(path, 'rb') as f:
+                twin = struct.unpack_from('<H', f.read(), (11 * 17 + 6) * 2)[0] >> 5
+            ts = mt._tileset_from_dir(os.path.join(tmp, 'tilesets', 'cave-interior'))
+            self.assertEqual(ts.terrain(twin), 0x02)
+            self.assertEqual(ts.terrain(785), 0x1A)
+            self.assertEqual(ts.cfg[twin * 8:twin * 8 + 8], ts.cfg[785 * 8:785 * 8 + 8])
+            self.assertEqual(mt.same_art_with_terrain(ts, 785, 0x02), twin)
+
+
+class Ch03FlipsPlayLikeVanillaCh3(unittest.TestCase):
+    """A looted chest, an opened door and a broken wall leave ch03 on vanilla Ch3's terrain
+    (#495): the door above the stairs opens onto FLOOR, Borgo's walls break into ROAD."""
+
+    def test_every_flip_lands_on_vanillas_terrain(self):
+        import inject.chapters.ch03 as ch03
+        chap = yaml.safe_load(open(os.path.join(
+            REPO, 'campaigns/rime-of-the-frostmaiden/chapters/ch03-the-termalaine-mine.yaml'),
+            encoding='utf-8'))
         maps = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden/maps')
-        layout = ('Ch06MaerMonsterMap', 'ch06-maer-monster')
-        tileset = inject.maps._map_changes_tileset(maps, layout)
-        _, _, cells, vanilla = mt.vanilla_layout_data(
-            os.path.join(REPO, 'fireemblem8u'), 'Ch13EphraimMap')
-        declared = self.iml._declared_divergence(layout[1])
-        for y in range(22):
-            for x in range(22):
-                ours = tileset.terrain(inject.maps._read_map_metatile(maps, layout[1], x, y))
-                want = declared.get((x, y), vanilla[cells[y * 22 + x]])
-                self.assertEqual(want, ours, 'cell (%d, %d)' % (x, y))
-        for (x, y), to in declared.items():
-            self.assertNotEqual(vanilla[cells[y * 22 + x]], to,
-                                'cell (%d, %d) is declared but matches vanilla' % (x, y))
+        ts = inject.maps._map_changes_tileset(maps, ch03.CH03_LAYOUT)
+        vanilla = mt.vanilla_map_change_terrain(os.path.join(REPO, 'fireemblem8u'), 'Ch3Map')
+        flipped = {}
+        for x, y, w, h, tiles, _why in ch03.ch03_map_changes(chap, maps):
+            for i, tile in enumerate(tiles):
+                if tile:
+                    flipped[(x + i % w, y + i // w)] = ts.terrain(tile)
+        for cell, terrain in flipped.items():
+            with self.subTest(cell=cell):
+                self.assertEqual(terrain, vanilla.get(cell, terrain))
+        # ...and every vanilla flip that changes what a cell PLAYS as is one of ours.
+        _, _, cells, before = mt.vanilla_layout_data(os.path.join(REPO, 'fireemblem8u'), 'Ch3Map')
+        missing = [cell for cell, terrain in vanilla.items()
+                   if terrain != before[cells[cell[1] * 17 + cell[0]]] and cell not in flipped]
+        self.assertEqual(missing, [])
+
 
 class SetMetatileTerrain(unittest.TestCase):
     """Terrain is separate from art, and shared across every map on the tileset (#26).

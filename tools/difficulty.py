@@ -2847,6 +2847,10 @@ def chapter_economy(chap):
         take(v.get('visit_reward'))
     for boat in chap.get('rescue_boats') or []:
         take((boat.get('talk') or {}).get('reward'))
+    # A green ally's gift for surviving (ch02's chwinga), handed over at the ending (#495).
+    for ally in (chap.get('deployment') or {}).get('green_allies') or []:
+        if ally.get('gift'):
+            gifts.append(ally['gift'])
     bonus = (chap.get('economy') or {}).get('save_all_bonus')
     if bonus:
         gifts.append(bonus)

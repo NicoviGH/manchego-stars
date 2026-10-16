@@ -176,6 +176,28 @@ def chapter_bgm(chap):
     return dict(rows[twin_settings_index(chap)]['bgm'])
 
 
+
+def apply_chapter_wall_hp(campaign, verbose=False):
+    """Write every hosted chapter's twin `mapCrackedWallHeath` into its own host slot. Total,
+    like music: a cracked wall's HP is the twin's (bmtrick.c InitMapObstacles reads the CURRENT
+    slot), so ch03's Borgo walls take vanilla Ch3's 25 rather than host slot 4's 50 (#495)."""
+    from inject.hosts import hosted_chapters
+    with open(CHAPTER_SETTINGS_JSON, encoding='utf-8') as f:
+        settings = json.load(f)
+    rows = json.loads(vanilla_decomp_text('src/data/chapter_settings.json'))['chapters']
+    applied = []
+    for chapter in hosted_chapters():
+        chap = _load_chapter_yaml(campaign, chapter_yaml_for(chapter.name))
+        hp = rows[twin_settings_index(chap)]['mapCrackedWallHeath']
+        settings['chapters'][chapter.host_index]['mapCrackedWallHeath'] = hp
+        applied.append((chapter.name, hp))
+    with open(CHAPTER_SETTINGS_JSON, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, indent=2)
+    if verbose:
+        print('  cracked walls: %s' % ', '.join('%s=%d' % (n, hp) for n, hp in applied))
+    return applied
+
+
 # Every leaf of a chapter's `bgm` block, written one by one so the census can see each claim
 # (`chapter_data.OWNED_BY_PASS`). The FE7 Hector/Lyn leaves are dead in FE8; copying them keeps
 # the twin's block whole rather than half the host's.
