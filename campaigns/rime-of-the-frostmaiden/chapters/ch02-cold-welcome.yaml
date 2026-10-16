@@ -490,7 +490,7 @@ villages:
     vanilla_gift_divergence: "vanilla's Red Gem is ch03's chest; ch03's Hand Axe takes its place (ADR 0052)"
     visit_text:
       - resident: "Raiders? Here? Then you'll want more than what you're carrying."
-      - resident: "Take my hand axe. It throws -- hit them before they're on you."
+      - resident: "Take my hand axe. It's light enough to throw -- hit them before they're on you."
   - id: targos-hut-north
     tile: [7, 2]               # vanilla `Village(EVFLAG_TMP(10), EventScr_Ch2_Village2, 7, 2)`
     visit_reward:
