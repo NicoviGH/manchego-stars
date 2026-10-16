@@ -4555,10 +4555,11 @@ end
 local function teleportAdjacentTo(u, targets)
     local grid = mapUnitAt(u.x, u.y)
     if grid == 0 then return false end
+    local mw, mh = mapSize()   -- the LIVE footprint, as teleportToFiringTile (#204)
     for _, t in ipairs(targets) do
         for _, d in ipairs({ { 0, -1 }, { 0, 1 }, { 1, 0 }, { -1, 0 } }) do
             local tx, ty = t.x + d[1], t.y + d[2]
-            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+            if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
                 setMapUnit(u.x, u.y, 0)
                 emu:write8(u.addr + 0x10, tx); emu:write8(u.addr + 0x11, ty)
                 setMapUnit(tx, ty, grid)
@@ -10352,6 +10353,172 @@ scenarios.ch06clock = function()
         table.concat({ chase[1].spec.id .. " in range turn " .. chase[1].arrived,
                        chase[2].spec.id .. " in range turn " .. chase[2].arrived }, ", "),
         table.concat(told, " | ")))
+end
+
+-- ch06halberd (#495): vanilla Ch6's Halberd lesson, on our lance-carrying dropper.
+--
+-- Vanilla's Fighter carries {Iron Axe, Halberd} and drops his LAST item. The AI equips the
+-- weapon it swings (cp_perform.c), so once he attacks with the Halberd it moves to the front
+-- and he drops the Iron Axe: rush him before he attacks. Ours is a Cavalier carrying
+-- {Iron Lance, Horseslayer}. The AI scores a weapon by damage x hit (cp_battle.c), so against
+-- a foot unit it swings the Iron Lance (equal Mt, +10 Hit) and the drop stays the Horseslayer;
+-- against a mounted unit the Horseslayer's triple Mt wins and the drop flips. Two arms, one run:
+--
+--   * FOOT: a foot unit stands beside him until he attacks it. His inventory is unchanged.
+--   * MOUNTED: a unit of a class on the Horseslayer's own effectiveness list (read from
+--     gItemData, never a hand list) stands beside him until he attacks it. The Horseslayer is
+--     now first and the Iron Lance is the drop.
+--
+-- Each target is held at 60 HP with 0 Pow, so nobody dies and nothing counter-kills him, and
+-- at 0 Def with 4 Spd and Lck. The AI breaks a score tie toward the LATER slot, so a target
+-- both weapons hit 100% (or both deal 0) would flip the foot arm for a reason that is not the
+-- lesson; pinning them keeps Iron Lance's +10 Hit the only difference. The attack is read off gAiDecision as he makes it, because an HP drop cannot say who
+-- dealt it. An arm allows four enemy phases.
+scenarios.ch06halberd = function()
+    local CH06 = dofile(PLAYTEST_DIR .. "/ch06.lua")
+    local D, ITEMS, DROP = CH06.DROPPER, CAMPAIGN.CH06_DROPPER_ITEMS, CAMPAIGN.CH06_DROPPER_DROP
+    if not bootToMap() then return result("FAIL", "never reached the ch06 map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+
+    local function inventory(u)
+        local out = {}
+        for k = 0, 4 do
+            local it = ru16(u.addr + 0x1E + 2 * k)
+            if it == 0 then break end
+            out[#out + 1] = { id = it & 0xFF, uses = it >> 8 }
+        end
+        return out
+    end
+    local function ids(inv)
+        local s = {}
+        for _, it in ipairs(inv) do s[#s + 1] = string.format("0x%02X/%d", it.id, it.uses) end
+        return "{" .. table.concat(s, ", ") .. "}"
+    end
+    local function classOf(u) return ru8(ru32(u.addr + 0x04) + 0x04) end
+
+    local ri
+    for i = 0, 49 do
+        local r = unitAt(SYM.gUnitArrayRed, i)
+        if r and not isDead(r) and r.x == D.x and r.y == D.y then ri = i break end
+    end
+    if not ri then
+        return result("FAIL", string.format("no enemy on (%d,%d), where the YAML places %s",
+            D.x, D.y, D.id))
+    end
+    local function dropper() return unitAt(SYM.gUnitArrayRed, ri) end
+    local inv = inventory(dropper())
+    log(string.format("ch06halberd: %s at (%d,%d) carries %s, drop flag %s", D.id, D.x, D.y,
+        ids(inv), (dropper().state & 0x1000) ~= 0 and "set" or "CLEAR"))
+    if #inv ~= #ITEMS or inv[1].id ~= ITEMS[1] or inv[#inv].id ~= DROP then
+        local want = {}
+        for _, id in ipairs(ITEMS) do want[#want + 1] = string.format("0x%02X", id) end
+        return result("FAIL", string.format("%s loaded with %s; the YAML declares {%s} "
+            .. "dropping 0x%02X", D.id, ids(inv), table.concat(want, ", "), DROP))
+    end
+    if (dropper().state & 0x1000) == 0 then
+        return result("FAIL", D.id .. " loaded without US_DROP_ITEM, so he drops nothing")
+    end
+
+    -- The classes his second weapon is effective against: gItemData[id].pEffectiveness (+0x10),
+    -- a 0-terminated class list (data_itemuse.c's ItemEffectiveness_Horse).
+    local mounted, eff = {}, ru32(SYM.gItemData + DROP * ITEMDATA_STRIDE + 0x10)
+    while eff ~= 0 and ru8(eff) ~= 0 do mounted[ru8(eff)] = true eff = eff + 1 end
+
+    local foot, horse
+    for i = 0, 61 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and not isDead(u) and u.onMap then
+            if mounted[classOf(u)] then horse = horse or u else foot = foot or u end
+        end
+    end
+    if not foot or not horse then
+        return result("FAIL", string.format("the boot deployed no %s unit, so an arm cannot run",
+            foot and "mounted" or "foot"))
+    end
+
+    -- One arm: park `u` beside him, hold both units, run enemy phases until he attacks, then
+    -- move `u` off so the next arm's target is the only one beside him.
+    local function arm(name, u)
+        local idx, home = (u.addr - SYM.gUnitArrayBlue) // UNIT_SIZE, { x = u.x, y = u.y }
+        local function me() return unitAt(SYM.gUnitArrayBlue, idx) end
+        if not teleportAdjacentTo(u, { { x = D.x, y = D.y } }) then
+            return nil, name .. ": no free tile beside him"
+        end
+        -- His own decision, caught the frame the AI makes it: an HP drop alone cannot say
+        -- WHO hit the target, and enemy weapons spend no uses to tell on him.
+        local mine, theirs = ru8(dropper().addr + 0x0B), ru8(me().addr + 0x0B)
+        for t = 1, 4 do
+            -- 60 HP and 0 Pow: nobody dies, nothing counter-kills him. Def 0 and 4 Spd/Lck
+            -- (12 Avoid before terrain) keep both weapons dealing damage at a Hit strictly
+            -- between 0 and 100, so the scores cannot tie. 20/20 tied them at ~0 Hit.
+            local a = me().addr
+            emu:write8(a + 0x12, 60); emu:write8(a + 0x13, 60)
+            emu:write8(a + 0x14, 0); emu:write8(a + 0x17, 0)
+            emu:write8(a + 0x16, 4); emu:write8(a + 0x19, 4)
+            emu:write8(dropper().addr + 0x13, dropper().maxhp)
+            local swung
+            emu:write8(SYM.gAiDecision + 0x00, 0)   -- last phase's decision must not match
+            local watch = callbacks:add("frame", function()
+                if ru8(SYM.gAiDecision + 0x01) == mine and ru8(SYM.gAiDecision + 0x00) == 1 then
+                    swung = { target = ru8(SYM.gAiDecision + 0x06),
+                              slot = ru8(SYM.gAiDecision + 0x07) }
+                end
+            end)
+            local phase = runEnemyPhase()
+            callbacks:remove(watch)
+            if phase ~= "player" then
+                return nil, string.format("%s: the enemy phase returned %s", name, tostring(phase))
+            end
+            local now, m = inventory(dropper()), me()
+            log(string.format("ch06halberd: %s phase %d -- target class 0x%02X at (%d,%d) "
+                .. "%d/60 HP, his decision %s, his inventory %s", name, t, classOf(m), m.x, m.y,
+                m.hp, swung and string.format("slot %d at unit 0x%02X", swung.slot, swung.target)
+                or "none", ids(now)))
+            if swung and swung.target ~= theirs then
+                return nil, string.format("%s: he attacked unit 0x%02X, not the target 0x%02X",
+                    name, swung.target, theirs)
+            end
+            if swung then
+                -- Home if it is still free, else the free tile nearest it that is out of his
+                -- reach: an enemy may have stepped onto home while the arm ran.
+                local mw, mh = mapSize()
+                local best, bx, by
+                for y = 0, mh - 1 do
+                    for x = 0, mw - 1 do
+                        local d = math.abs(x - home.x) + math.abs(y - home.y)
+                        if mapUnitAt(x, y) == 0 and math.abs(x - D.x) + math.abs(y - D.y) > 1
+                            and (not best or d < best) then best, bx, by = d, x, y end
+                    end
+                end
+                if not best then return nil, name .. ": no free tile to move the target off to" end
+                local grid = mapUnitAt(m.x, m.y)
+                setMapUnit(m.x, m.y, 0)
+                emu:write8(m.addr + 0x10, bx); emu:write8(m.addr + 0x11, by)
+                setMapUnit(bx, by, grid)
+                return now
+            end
+        end
+        return nil, string.format("%s: he attacked no one in four enemy phases", name)
+    end
+
+    local after, why = arm("foot", foot)
+    if not after then return result("FAIL", why) end
+    if after[1].id ~= ITEMS[1] or after[#after].id ~= DROP then
+        return result("FAIL", string.format("against a foot unit he swung his second weapon: "
+            .. "inventory is now %s, so the drop flipped without a mounted target", ids(after)))
+    end
+
+    after, why = arm("mounted", horse)
+    if not after then return result("FAIL", why) end
+    if after[1].id ~= DROP or after[#after].id ~= ITEMS[1] then
+        return result("FAIL", string.format("against a mounted unit his inventory is %s; the "
+            .. "lesson needs 0x%02X first and 0x%02X as the drop", ids(after), DROP, ITEMS[1]))
+    end
+    return result("PASS", string.format("vs a foot unit he swings the Iron Lance and still drops "
+        .. "0x%02X; vs a mounted unit he swings 0x%02X and now drops 0x%02X (%s)",
+        DROP, DROP, ITEMS[1], ids(after)))
 end
 
 -- ---------------------------------------------------------------- runner

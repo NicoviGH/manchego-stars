@@ -20,8 +20,11 @@ FE-Repo's only aquatic axe (Squidsmith) was rejected on sight.
 
 Each weapon is swapped for its nearest lance by might: Poison Axe to Venin Lance (FE8's own
 `ITEM_LANCE_VENIN`, Might 4, Hit 65, Weight 8), Steel Axe and Iron Blade to Steel Lance, and Iron
-Axe and Iron Sword to Iron Lance. The Halberd and the Iron Blade stay in inventory as the last
-item, so the drops are vanilla's.
+Axe and Iron Sword to Iron Lance. The Iron Blade stays in inventory as the last item, so that
+drop is vanilla's. The Halberd's Fighter carries {Iron Lance, Horseslayer} and drops the
+Horseslayer: a Cavalier cannot wield the Halberd, and vanilla's lesson is that the drop flips to
+the plain weapon once he swings the strong one. The AI swings the Horseslayer only at a mounted
+target, so the lesson holds (#495, proved by `ch06halberd`).
 
 Measured on instrument v2 before landing (`make difficulty CH=ch06`):
 
@@ -35,6 +38,6 @@ Both hold parity. The shipped option stays closest to vanilla's force. The role 
 and the timeline does not move, because these units keep vanilla's hold-position AI. The mirror
 falls from 27 of 27 bodies to 22 of 27, which is the declared divergence.
 
-The re-class gave one unit a reach it did not have: as a Cavalier, `shark-rider-halberd` reaches
+The re-class gave one unit a reach it did not have: as a Cavalier, `shark-rider-horseslayer` reaches
 the east hull. `check_rescue_targets` caught it, and it takes the same AI_A_08 action as
 `shark-rider-steel` beside it.

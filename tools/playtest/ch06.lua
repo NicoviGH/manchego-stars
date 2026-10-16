@@ -7,7 +7,7 @@
 --
 -- WHAT BELONGS HERE: facts about ch06 that a scenario reads and the chapter YAML declares --
 -- the two hulls, the two pursuers, and the ONE ground cell each hull can be swung at from.
--- `check_ch06_lua_matches_yaml` pins every coordinate and pid below against
+-- `check_chapter_lua_facts` pins every `id`-keyed coordinate below against
 -- `ch06-the-maer-monster.yaml`, so this file cannot drift into asserting a map we do not ship.
 return {
     -- The two marooned boats: GREEN CLASS_FLEET units on raw pids of our own
@@ -32,4 +32,8 @@ return {
         { id = "merfolk-thrower", boat = "boat-east", x = 14, y = 9,  range = 2 },
         { id = "tentacruel",      boat = "boat-west", x = 7,  y = 20, range = 1 },
     },
+
+    -- The dropper (ch06halberd, #495). He never moves (the donor's NeverMove), so he is found
+    -- by this tile; his inventory and drop come from the YAML through CAMPAIGN.CH06_DROPPER_*.
+    DROPPER = { id = "shark-rider-horseslayer", x = 15, y = 16 },
 }
