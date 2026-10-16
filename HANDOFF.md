@@ -9,11 +9,10 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-16 (Claude). **#496 merged**: #495's terrain half (ch01-ch03 play like their donors). Earlier, 2026-10-15: **#487 merged** (`1bc2ae8`): the wiki is built from the
-YAML and the decomp on the Fire Emblem Wiki's own templates, and CI deploys `main`'s to
-<https://nicovigh.github.io/manchego-stars/> on every push (ADR 0347) -- never publish it by hand;
-the old artifact is deleted. #493 stays open for the wiki's remaining findings. Nicolas's order:
-fix #495's twin gaps BEFORE resuming ch07+.
+Refreshed 2026-10-16 (Claude). **#495 is closed**: the twin gaps are fixed. #496 restored ch01-ch03's
+terrain to their donors. #497 gave ch06 the Halberd lesson on a lance pair (`ch06halberd`). #498
+built the scene-gold vehicle (ADR 0350): ch01 pays vanilla Ch1's 5,000 (`ch01gold`) and ch07 pays
+Ch8's 10,000. The wiki deploys `main`'s on every push (ADR 0347); never publish it by hand.
 
 ## In flight
 
@@ -25,25 +24,20 @@ fix #495's twin gaps BEFORE resuming ch07+.
 
 **Next, in order:**
 
-1. **#495 -- the rest of the twin gaps, before ch07.** The terrain half landed in #496 (ADR 0349:
-   every retile is held to its donor on every run; `map_tileset_tool restore-terrain` is the fix
-   tool). Left: ch06's Halberd equip-on-use lesson, and the **scene-gold vehicle**, built once
-   for ch01's 5,000 (vanilla pays it in Castle Frelia's scene after Ch1 -- measured on retail
-   with `PT_VANILLA=1 tools/playtest/run.sh vanillagold`) and ch07's 10,000. Each gets its
-   strategy line once the game backs it.
-2. **#493 -- the wiki's remaining findings**: **mobile first** (Nicolas, 2026-10-15: the page
+1. **#493 -- the wiki's remaining findings**: **mobile first** (Nicolas, 2026-10-15: the page
    ships no viewport meta, so the skin's phone rules never fire -- see #493's Mobile item),
    then enemy names vs the ROM's unit window, #490's stat
    ranges, supports (wait on #494). Nicolas red-pens the drafts on the live wiki: the lore
    Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346, chapter YAML).
-3. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
+2. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
    ending waits on it); then Act IV beats, the recruit pass, the legendary-weapon pass, the
    back-half onboarding catalog, the arc ADR. Nicolas leans toward ch01 on vanilla Ch1's map with
    Hamill Canyon back as ch08 -- raise it there.
-4. **#27 -- ch07's ending** once its exit hook is settled, and the move to Distant Blade (Meriwa +
-   Esio Trot join, ADR 0342; ask Nicolas for his flow first; `make CH07BOOT=1`).
-5. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337).
-6. **#459** stays open for the parity CHECK itself.
+3. **#27 -- ch07's ending** once its exit hook is settled, and the move to Distant Blade (Meriwa +
+   Esio Trot join, ADR 0342; ask Nicolas for his flow first; `make CH07BOOT=1`). The written
+   ending gives its 10,000 an `after_beat` (the giver's line) and a scenario that reaches it.
+4. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337).
+5. **#459** stays open for the parity CHECK itself.
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
   Proven headless instead, never owed to him: a shop (the DSL's `shop:` step, ch02armory,
