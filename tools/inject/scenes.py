@@ -24,21 +24,54 @@ def _beat_is_narration(beat):
     return bool(real) and all('narration' in e for e in real)
 
 
-def _scenic_beat_calls(msgs, beats, labels):
+def _scenic_beat_calls(msgs, beats, labels, after=None):
     """One event-script text call per scenic beat. A beat that is ALL faceless
     `narration` rides an opaque, auto-centered SOLOTEXTBOXSTART box (gProcScr_BoxDialogue,
     helpbox.c) so the aside is never boxless over the scene art (#58); EVT_SLOT_B =
     0x00FF00FF feeds x=y=0xFF -> auto-center (dialogue-box config flag 0x100, sub_800E31C).
-    A beat with any faced speaker rides the normal talk window via Text() (TEXTSTART)."""
+    A beat with any faced speaker rides the normal talk window via Text() (TEXTSTART).
+
+    `after` is {beat index: event lines} played once that beat's text closes (scene gold)."""
     out = []
-    for msg, beat, lbl in zip(msgs, beats, labels):
+    for i, (msg, beat, lbl) in enumerate(zip(msgs, beats, labels)):
         if _beat_is_narration(beat):
             out.append('    SVAL(EVT_SLOT_B, 0xFF00FF) /* auto-center the opaque solo box (#58) */\n'
                        '    SOLOTEXTBOXSTART\n'
                        '    TEXTSHOW(0x%X) /* %s */\n    TEXTEND\n    REMA\n' % (msg, lbl))
         else:
             out.append('    Text(0x%X) /* %s */\n' % (msg, lbl))
+        out.append((after or {}).get(i, ''))
     return ''.join(out)
+
+
+def scene_gold(chap, scene):
+    """[(after_beat or None, amount)] a chapter's `economy.scene_gold` pays in `scene`.
+
+    The vanilla twins pay gold in a scene, not on a tile: Ch1's 5,000 in Castle Frelia's scene
+    after it (`lordsplit`), Ch8's 10,000 in its ending. `after_beat` is 1-based (pay once that
+    beat's text closes); None pays where the scene's injector closes it. A `scene` that is not
+    one of the chapter's cutscene triggers is an error, not a gift that silently never lands."""
+    triggers = {e.get('trigger') for e in chap.get('events') or [] if e.get('type') == 'cutscene'}
+    out = []
+    for g in (chap.get('economy') or {}).get('scene_gold') or []:
+        if g.get('scene') not in triggers:
+            sys.exit('ERROR: %s scene_gold names scene %r; its cutscenes are %s'
+                     % (chap.get('id'), g.get('scene'), sorted(t for t in triggers if t)))
+        if g['scene'] == scene:
+            out.append((g.get('after_beat'), int(g['amount'])))
+    return out
+
+
+def scene_gold_script(amount, restore_bg=None):
+    """Vanilla's own payout lines (lordsplit-eventscript.h): clear the backdrop so the popup
+    shows over the map, `SVAL(EVT_SLOT_3, n)` + `GIVEITEMTOMAIN(CHAR_EVT_PLAYER_LEADER)` (the
+    gold popup, eventscr.c), and, mid-scene, fade back up onto `restore_bg` as vanilla does."""
+    out = ('    CALL(EventScr_RemoveBGIfNeeded) /* the popup shows over the map, as vanilla\'s */\n'
+           '    SVAL(EVT_SLOT_3, 0x%X) /* %d gold, vanilla\'s scene payout */\n'
+           '    GIVEITEMTOMAIN(CHAR_EVT_PLAYER_LEADER)\n' % (amount, amount))
+    if restore_bg:
+        out += '    FADI(16)\n' + backdrop(restore_bg, 'back to the scene', rearm=True)
+    return out
 
 
 # so ch03+ reuse them instead of growing new copy-paste siblings. Pure string/file

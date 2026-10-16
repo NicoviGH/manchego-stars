@@ -332,13 +332,12 @@ events:
 # ── Economy ──────────────────────────────────────────────────────────────────────
 # ch07 carries vanilla CH8'S scripted gift: Hayden's 10,000 gold war funds at Ch8's ending,
 # moved up a chapter because our ch08 is the capture (Nicolas, 2026-10-10; ADR 0339). It is a
-# scene gift (`SVAL(EVT_SLOT_3, 0x2710)` + `GIVEITEMTOMAIN(leader)`, vanilla's own lines),
-# handed over in the ending. Giver = the dialogue pass's call (pick: Messie, the new Speaker).
-# NOT YET WIRED: `difficulty.chapter_economy` has no field for a scene's gold, and grows one
-# when this chapter is built.
+# scene gift, paid with vanilla's own lines in the ending. The ending has no beats yet, so it
+# pays before the fade; once the scene is written it takes an `after_beat`. Giver = the
+# dialogue pass's call (pick: Messie, the new Speaker).
 economy:
-  reward_sites:
-  - gift: gold                  # 10,000, in the ending scene
+  scene_gold:
+    - {amount: 10000, scene: chapter_end}
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:

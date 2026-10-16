@@ -109,5 +109,41 @@ class SharedEventShapes(unittest.TestCase):
         self.assertTrue(out.endswith('    FADU(16)\n'))
 
 
+
+class SceneGold(unittest.TestCase):
+    """The scene-gold vehicle (#495): vanilla's own payout lines, placed by the chapter YAML."""
+
+    CHAP = {'id': 'chx', 'events': [{'trigger': 'chapter_end', 'type': 'cutscene'}],
+            'economy': {'scene_gold': [{'amount': 5000, 'scene': 'chapter_end', 'after_beat': 1}]}}
+
+    def test_pays_with_vanillas_own_lines(self):
+        out = inject.scenes.scene_gold_script(5000)
+        self.assertIn('SVAL(EVT_SLOT_3, 0x1388)', out)          # lordsplit's own 5,000
+        self.assertIn('GIVEITEMTOMAIN(CHAR_EVT_PLAYER_LEADER)', out)
+        self.assertLess(out.index('EventScr_RemoveBGIfNeeded'), out.index('GIVEITEMTOMAIN'),
+                        'the popup must show over the map, not behind the backdrop')
+        self.assertNotIn('BACG', out)
+
+    def test_mid_scene_it_fades_back_up_onto_the_scene(self):
+        out = inject.scenes.scene_gold_script(5000, 'BG_X')
+        self.assertLess(out.index('GIVEITEMTOMAIN'), out.index('BACG(BG_X)'))
+        self.assertIn('REMOVEPORTRAITS', out)                   # re-arms BACG after Text()
+
+    def test_reads_the_scene_it_names(self):
+        self.assertEqual(inject.scenes.scene_gold(self.CHAP, 'chapter_end'), [(1, 5000)])
+        self.assertEqual(inject.scenes.scene_gold(self.CHAP, 'chapter_start'), [])
+
+    def test_a_scene_the_chapter_lacks_is_an_error(self):
+        chap = dict(self.CHAP, economy={'scene_gold': [{'amount': 1, 'scene': 'nowhere'}]})
+        with self.assertRaises(SystemExit):
+            inject.scenes.scene_gold(chap, 'chapter_end')
+
+    def test_beat_calls_play_it_after_the_named_beat(self):
+        beats = [[{'a': 'x'}], [{'b': 'y'}]]
+        out = inject.scenes._scenic_beat_calls((0x10, 0x11), beats, ('one', 'two'),
+                                               after={0: '    PAY\n'})
+        self.assertLess(out.index('Text(0x10)'), out.index('PAY'))
+        self.assertLess(out.index('PAY'), out.index('Text(0x11)'))
+
 if __name__ == '__main__':
     unittest.main()

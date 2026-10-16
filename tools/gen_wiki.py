@@ -462,6 +462,8 @@ def item_rows(chap):
     if bonus:
         n, en = our_item(bonus)
         rows.append((n, en, ('save_all', None)))
+    for g in (chap.get('economy') or {}).get('scene_gold') or []:
+        rows.append(('%d gold' % g['amount'], None, ('scene', None)))
     for site in (chap.get('post_chapter') or {}).get('reward_sites') or []:
         if site.get('gift'):
             n, en = our_item(site['gift'])
@@ -1939,12 +1941,19 @@ def twin_payload_html(chap, ckey):
                 'missing': '<span style="color:var(--no-xmark-color)">not found in ours</span>'
                 }.get(verdict) or 'recorded deviation: %s' % esc(deviations[e])
         rows.append((item_html(e), esc(how), '<code>%s</code>' % esc(e), mark))
-    for g in v.get('gold_chests') or []:
-        rows.append(('%s gold' % '{:,}'.format(g), 'Chest', '', ''))
-    for g in v.get('gold_gifts') or []:
-        rows.append(('%s gold' % '{:,}'.format(g), 'Given by an event', '', ''))
-    for g in v.get('interlude_gold') or []:
-        rows.append(('%s gold' % '{:,}'.format(g), 'Given in the scene after the chapter', '', ''))
+    # The twin's gold, counted against ours the same way: an amount either of our vehicles pays.
+    gold = [(g, 'Chest') for g in v.get('gold_chests') or []] \
+        + [(g, 'Given by an event') for g in v.get('gold_gifts') or []] \
+        + [(g, 'Given in the scene after the chapter') for g in v.get('interlude_gold') or []]
+    ours_gold = [int(n.split()[0]) for n, e, _ in item_rows(chap) if not e and n.endswith(' gold')]
+    gold_dev = {int(k.split()[0]): w for k, w in deviations.items()
+                if str(k).endswith(' gold')}          # `item: 10000 gold` in payload_deviations
+    for (g, how), verdict in zip(gold, payload_verdicts([g for g, _ in gold], ours_gold,
+                                                        gold_dev)):
+        mark = {'delivered': '<span style="color:var(--yes-checkmark-color)">delivered</span>',
+                'missing': '<span style="color:var(--no-xmark-color)">not found in ours</span>'
+                }.get(verdict) or 'recorded deviation: %s' % esc(gold_dev[g])
+        rows.append(('%s gold' % '{:,}'.format(g), how, '', mark))
     out = [wikitable(['Item', 'Vanilla vehicle', 'Enum', 'Ours'], rows)]
     rec = [(esc(pretty_enum(c, 'CHARACTER_')), class_html(k[len('CLASS_'):].lower()), esc(l),
             esc(how)) for c, k, l, how in v['recruits']]

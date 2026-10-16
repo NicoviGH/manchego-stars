@@ -5450,6 +5450,22 @@ scenarios.ckpt_ch02start = function()
     result("PASS", "ch02start checkpoint saved (on the ch02 map, turn 1)")
 end
 
+-- ch01gold (#495): vanilla Ch2 starts at 5,000 gold, paid in Castle Frelia's scene after Ch1
+-- (`lordsplit`; measured on retail by `vanillagold`). ch01 pays it in its ending through
+-- `economy.scene_gold`. This plays the real chain -- seize, ending, save, ch02's opening and
+-- Preparations -- and reads gPlaySt.partyGoldAmount (+0x08, include/types.h) on ch02's map.
+-- Nothing else on that path pays or spends gold, so the reading is the scene's amount exactly.
+scenarios.ch01gold = function()
+    if not reachCh02Map() then return end   -- reachCh02Map already set a FAIL verdict
+    local gold, want = ru32(SYM.gPlaySt + 0x08), CAMPAIGN.CH01_SCENE_GOLD
+    log(string.format("ch01gold: ch02 opens with %d gold; ch01's scene_gold declares %d", gold, want))
+    if gold ~= want then
+        return result("FAIL", string.format("ch02 opens with %d gold, not the %d ch01's ending "
+            .. "declares (vanilla Ch2 opens with 5,000)", gold, want))
+    end
+    result("PASS", string.format("ch02 opens with %d gold, paid by ch01's ending", gold))
+end
+
 -- Read every collected item id (low byte) from all blue inventories + the convoy -- where a
 -- charm-gift lands (leader's inventory, overflow -> convoy).
 local function collectedItems()

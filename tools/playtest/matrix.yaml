@@ -232,6 +232,8 @@ scenarios:
   casthelp:                                            # ADR 0346: R on each cast name, headless
     rom: testch
   ckpt_ch02start: {}
+  ch01gold: {deadline: 900}       # #495: ch01's ending pays vanilla's 5,000; the whole chain,
+                                  # like ckpt_ch02start
   ch03midmap:
     rom: ch03boot
     host_chapter: 4

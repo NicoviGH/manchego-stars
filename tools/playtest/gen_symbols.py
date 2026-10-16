@@ -414,6 +414,9 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
         'PROLOGUE': {'hlin': char(PROLOGUE_HLIN_SLOT), 'scramsax': char(PROLOGUE_SCRAMSAX_SLOT),
                      'sephek': char(PROLOGUE_SEPHEK_SLOT)},
         'CH01_CHIEF': char(CH01_BOSS_SLOT),
+        # What ch01's scenes pay (#495): ch01gold reads it back on ch02's map.
+        'CH01_SCENE_GOLD': sum(g['amount'] for g in (ch01.get('economy') or {}).get(
+            'scene_gold') or []),
         # Every hosted chapter, read off the registry: a range here went stale the day ch07 was
         # hosted and a film needed its slot.
         'HOST': {c.name: c.host_index for c in hosts.hosted_chapters() if c.name != 'prologue'},
