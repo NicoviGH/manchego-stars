@@ -429,8 +429,8 @@ def item_rows(chap):
     """(item display, enum or None, vehicle) for every delivery vehicle the ROM wires. A vehicle
     is (kind, detail): ('village', tile), ('chest', tile), ('drop' | 'steal', class token),
     ('gift', giver), ('save_all', None), ('scene', None), ('boat', None). Gold comes as
-    ('N gold', None, vehicle). The `economy:` ledger is design bookkeeping no injector reads,
-    so it is not one."""
+    ('N gold', None, vehicle). Of the `economy:` block, only what the injectors read is a
+    vehicle (save_all_bonus, scene_gold); the rest is design bookkeeping."""
     rows = []
     for v in chap.get('villages') or []:
         for r in v.get('visit_reward') or v.get('reward') or []:
@@ -1910,6 +1910,32 @@ def design_page(chap, navbox_html=''):
                 tools=[(slug, 'Chapter')], category='Design notes')
 
 
+def our_gold_amounts(chap):
+    """Every gold amount our vehicles pay, read from the data rather than from item_rows'
+    display strings: villages, chests, rescue boats and scene gold."""
+    out = []
+
+    def take(rewards):
+        for r in rewards or []:
+            if r.get('id') == 'gold' and isinstance(r.get('amount'), int):
+                out.append(r['amount'])
+    for v in chap.get('villages') or []:
+        take(v.get('visit_reward') or v.get('reward'))
+    for c in chap.get('chests') or []:
+        take(c.get('contents'))
+    for boat in chap.get('rescue_boats') or []:
+        take((boat.get('talk') or {}).get('reward'))
+    out += [g['amount'] for g in (chap.get('economy') or {}).get('scene_gold') or []]
+    return out
+
+
+def _payload_mark(verdict, why=''):
+    """How the twin table marks one row of the twin's payload against ours."""
+    return {'delivered': '<span style="color:var(--yes-checkmark-color)">delivered</span>',
+            'missing': '<span style="color:var(--no-xmark-color)">not found in ours</span>'
+            }.get(verdict) or 'recorded deviation: %s' % esc(why)
+
+
 def payload_verdicts(twin_items, ours_counts, deviations):
     """'delivered' / 'deviation' / 'missing' per twin item, COUNTED: a twin item handed out
     twice needs two of ours, so a set test would read the second copy as delivered."""
@@ -1937,23 +1963,18 @@ def twin_payload_html(chap, ckey):
     rows = []
     for (e, how), verdict in zip(payload, payload_verdicts([e for e, _ in payload], ours_,
                                                           deviations)):
-        mark = {'delivered': '<span style="color:var(--yes-checkmark-color)">delivered</span>',
-                'missing': '<span style="color:var(--no-xmark-color)">not found in ours</span>'
-                }.get(verdict) or 'recorded deviation: %s' % esc(deviations[e])
-        rows.append((item_html(e), esc(how), '<code>%s</code>' % esc(e), mark))
+        rows.append((item_html(e), esc(how), '<code>%s</code>' % esc(e),
+                     _payload_mark(verdict, deviations.get(e, ''))))
     # The twin's gold, counted against ours the same way: an amount either of our vehicles pays.
     gold = [(g, 'Chest') for g in v.get('gold_chests') or []] \
         + [(g, 'Given by an event') for g in v.get('gold_gifts') or []] \
         + [(g, 'Given in the scene after the chapter') for g in v.get('interlude_gold') or []]
-    ours_gold = [int(n.split()[0]) for n, e, _ in item_rows(chap) if not e and n.endswith(' gold')]
-    gold_dev = {int(k.split()[0]): w for k, w in deviations.items()
-                if str(k).endswith(' gold')}          # `item: 10000 gold` in payload_deviations
-    for (g, how), verdict in zip(gold, payload_verdicts([g for g, _ in gold], ours_gold,
-                                                        gold_dev)):
-        mark = {'delivered': '<span style="color:var(--yes-checkmark-color)">delivered</span>',
-                'missing': '<span style="color:var(--no-xmark-color)">not found in ours</span>'
-                }.get(verdict) or 'recorded deviation: %s' % esc(gold_dev[g])
-        rows.append(('%s gold' % '{:,}'.format(g), how, '', mark))
+    gold_dev = {int(k.split()[0]): w for k, w in deviations.items()   # `item: 10000 gold`
+                if re.fullmatch(r'\d+ gold', str(k))}
+    for (g, how), verdict in zip(gold, payload_verdicts([g for g, _ in gold],
+                                                        our_gold_amounts(chap), gold_dev)):
+        rows.append(('%s gold' % '{:,}'.format(g), how, '', _payload_mark(verdict,
+                                                                          gold_dev.get(g, ''))))
     out = [wikitable(['Item', 'Vanilla vehicle', 'Enum', 'Ours'], rows)]
     rec = [(esc(pretty_enum(c, 'CHARACTER_')), class_html(k[len('CLASS_'):].lower()), esc(l),
             esc(how)) for c, k, l, how in v['recruits']]

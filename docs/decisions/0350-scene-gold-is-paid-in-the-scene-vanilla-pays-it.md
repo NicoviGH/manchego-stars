@@ -15,9 +15,11 @@ paid neither, and ch02's Armory opened on an empty purse. The 2026-06-17 "net wa
 job's 200 gold spent on Baxby) had read vanilla as paying nothing.
 
 **The vehicle.** A chapter declares `economy.scene_gold: [{amount, scene, after_beat}]`.
-`scene` is one of its cutscene triggers, and naming any other scene fails the build.
-`after_beat` (1-based) pays once that beat's text closes. Without it, the scene's injector pays
-where the scene ends. `inject.scenes.scene_gold_script` emits lordsplit's own sequence:
+`scene` is one of its cutscene triggers, and `amount` a positive whole number; anything else
+fails the build at the YAML. `after_beat` (1-based) pays once that beat's text closes. Without
+it the scene pays after its last beat, and a scene with no beats yet pays where it ends. A test
+holds every declared entry to an injector that reads its scene, so none is counted and never
+paid. `inject.scenes.scene_gold_script` emits lordsplit's own sequence:
 `CALL(EventScr_RemoveBGIfNeeded)` so the popup shows over the map, then
 `SVAL(EVT_SLOT_3, n)` and `GIVEITEMTOMAIN(CHAR_EVT_PLAYER_LEADER)`. Mid-scene, it fades back up
 onto the scene's backdrop. `difficulty.chapter_economy` and the wiki count it. A twin's gold

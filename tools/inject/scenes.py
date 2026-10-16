@@ -44,21 +44,49 @@ def _scenic_beat_calls(msgs, beats, labels, after=None):
     return ''.join(out)
 
 
-def scene_gold(chap, scene):
-    """[(after_beat or None, amount)] a chapter's `economy.scene_gold` pays in `scene`.
+def scene_gold_entries(chap):
+    """[(scene, after_beat or None, amount)] for every `economy.scene_gold` entry, checked.
 
     The vanilla twins pay gold in a scene, not on a tile: Ch1's 5,000 in Castle Frelia's scene
-    after it (`lordsplit`), Ch8's 10,000 in its ending. `after_beat` is 1-based (pay once that
-    beat's text closes); None pays where the scene's injector closes it. A `scene` that is not
-    one of the chapter's cutscene triggers is an error, not a gift that silently never lands."""
+    after it (`lordsplit`), Ch8's 10,000 in its ending. A `scene` that is not one of the
+    chapter's cutscene triggers, or an amount that is not a positive whole number, is an error
+    at the YAML, not a gift that never lands or a SVAL that fails deep in the C compile."""
     triggers = {e.get('trigger') for e in chap.get('events') or [] if e.get('type') == 'cutscene'}
     out = []
     for g in (chap.get('economy') or {}).get('scene_gold') or []:
         if g.get('scene') not in triggers:
             sys.exit('ERROR: %s scene_gold names scene %r; its cutscenes are %s'
                      % (chap.get('id'), g.get('scene'), sorted(t for t in triggers if t)))
-        if g['scene'] == scene:
-            out.append((g.get('after_beat'), int(g['amount'])))
+        if not isinstance(g.get('amount'), int) or isinstance(g['amount'], bool) \
+                or g['amount'] <= 0:
+            sys.exit('ERROR: %s scene_gold amount %r is not a positive whole number'
+                     % (chap.get('id'), g.get('amount')))
+        out.append((g['scene'], g.get('after_beat'), g['amount']))
+    return out
+
+
+def scene_gold(chap, scene, n_beats=None, bg=None):
+    """{beat index: payout lines} for what `scene` pays, keyed for `_scenic_beat_calls(after=)`.
+
+    `after_beat` is 1-based: pay once that beat's text closes, then fade back up onto `bg`.
+    Without it the scene pays after its last beat. `n_beats` is the scene's beat count; a scene
+    with no beats yet (None) pays under key None, and cannot honour an `after_beat`."""
+    out = {}
+    for sc, after, amount in scene_gold_entries(chap):
+        if sc != scene:
+            continue
+        if n_beats is None:
+            if after is not None:
+                sys.exit('ERROR: %s scene_gold after_beat %r, but its %s has no beats yet'
+                         % (chap.get('id'), after, scene))
+            key, restore = None, None
+        else:
+            if after is not None and not (isinstance(after, int) and 1 <= after <= n_beats):
+                sys.exit('ERROR: %s scene_gold after_beat %r; its %s has beats 1-%d'
+                         % (chap.get('id'), after, scene, n_beats))
+            key = (after or n_beats) - 1
+            restore = bg if key < n_beats - 1 else None
+        out[key] = out.get(key, '') + scene_gold_script(amount, restore)
     return out
 
 

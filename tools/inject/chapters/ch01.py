@@ -24,7 +24,7 @@ from inject.message_alloc import appended_message_id
 from inject.paths import CH2_EVENTINFO_H, CH2_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.scenes import (
     backdrop, battle_quote_body, defeat_quote_row, _emit_scene_beats, _make_fid,
-    _prepend_defeat_quote, _scenic_beat_calls, scene_gold, scene_gold_script, _split_event_beats,
+    _prepend_defeat_quote, _scenic_beat_calls, scene_gold, _split_event_beats,
     _stage_beat, write_frame_texts)
 from inject.text import (
     DEV_PLACEHOLDER_MSG, _fe_dialogue_text, _fid_tag, name_message_body, _script_to_message,
@@ -743,11 +743,7 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # Vanilla Ch1's 5,000 gold is paid in Castle Frelia's scene right after it (`lordsplit`,
     # King Hayden's war funds); ours rides the YAML's `economy.scene_gold` (#495).
     end_bg = 'BG_MS_BRYN_SHANDER_WINTER'
-    end_gold = {}
-    for after, amount in scene_gold(chap, 'chapter_end'):
-        if not after:
-            sys.exit('ERROR: ch01 scene_gold needs after_beat: the ending is all beats')
-        end_gold[after - 1] = end_gold.get(after - 1, '') + scene_gold_script(amount, end_bg)
+    end_gold = scene_gold(chap, 'chapter_end', len(end_beats), end_bg)
     end_text_calls = _scenic_beat_calls(
         CH01_ENDING_MSGS, end_beats,
         ['A+B -- Duvessa thanks them, commissions them, grants the sled, points west',
