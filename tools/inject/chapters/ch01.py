@@ -24,7 +24,8 @@ from inject.message_alloc import appended_message_id
 from inject.paths import CH2_EVENTINFO_H, CH2_EVENTSCRIPT_H, EVENTS_UDEFS_C, TEXTS_TXT
 from inject.scenes import (
     backdrop, battle_quote_body, defeat_quote_row, _emit_scene_beats, _make_fid,
-    _prepend_defeat_quote, _scenic_beat_calls, _split_event_beats, _stage_beat, write_frame_texts)
+    _prepend_defeat_quote, _scenic_beat_calls, scene_gold, _split_event_beats,
+    _stage_beat, write_frame_texts)
 from inject.text import (
     DEV_PLACEHOLDER_MSG, _fe_dialogue_text, _fid_tag, name_message_body, _script_to_message,
     set_message_body, vanilla_name_text_id, _wrap_fe_lines, write_nameplate)
@@ -739,6 +740,10 @@ def inject_ch01(campaign, verbose=True, boot=False):
     # The ending MNC2s into ch02 "Cold Welcome" (hosted on chapter slot 3 by
     # inject_ch02; see the generated EventScr_Ch2_EndingScene below). Before ch02 landed
     # it parked on the dev placeholder instead.
+    # Vanilla Ch1's 5,000 gold is paid in Castle Frelia's scene right after it (`lordsplit`,
+    # King Hayden's war funds); ours rides the YAML's `economy.scene_gold` (#495).
+    end_bg = 'BG_MS_BRYN_SHANDER_WINTER'
+    end_gold = scene_gold(chap, 'chapter_end', len(end_beats), end_bg)
     end_text_calls = _scenic_beat_calls(
         CH01_ENDING_MSGS, end_beats,
         ['A+B -- Duvessa thanks them, commissions them, grants the sled, points west',
@@ -747,11 +752,11 @@ def inject_ch01(campaign, verbose=True, boot=False):
          'E1 -- Duvessa points to the axe-beak at the market',
          'E2 -- "Marty leans in..." faceless narration (opaque solo box, #58)',
          'E2b -- Marty wins over Baxby the axe-beak (first recruit)',
-         'F -- "Targos is expecting weather. Better hurry."'])
+         'F -- "Targos is expecting weather. Better hurry."'], after=end_gold)
     script = _replace_brace_block(
         script, 'EventScr_Ch2_EndingScene[] =',
         '{\n    MUSC(SONG_VICTORY)\n'
-        + backdrop('BG_MS_BRYN_SHANDER_WINTER', 'Bryn Shander -- vendored winter CG (#21)',
+        + backdrop(end_bg, 'Bryn Shander -- vendored winter CG (#21)',
                    card=(CH01_ENDING_CARD_MSG, 'Bryn Shander'))
         + end_text_calls +
         '    FADI(16) /* fade the town out */\n'

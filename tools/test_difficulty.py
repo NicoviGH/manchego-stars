@@ -1751,6 +1751,12 @@ class ItemEconomy(unittest.TestCase):
         chap = {'deployment': {'green_allies': [{'id': 'a', 'gift': 'vulnerary'}, {'id': 'b'}]}}
         self.assertEqual(df.chapter_economy(chap)['gifts'], ['vulnerary'])
 
+    def test_chapter_economy_counts_scene_gold(self):
+        """Vanilla pays gold in scenes: Ch1's 5,000 after the map, Ch8's 10,000 in its ending.
+        ch01 and ch07 carry those through `economy.scene_gold`, and the report counts them (#495)."""
+        chap = {'economy': {'scene_gold': [{'amount': 5000, 'scene': 'chapter_end'}]}}
+        self.assertEqual(df.chapter_economy(chap)['gold'], 5000)
+
     def test_chapter_economy_survives_a_chapter_with_no_boats(self):
         self.assertEqual(df.chapter_economy({})['gifts'], [])
 

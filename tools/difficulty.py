@@ -2854,6 +2854,9 @@ def chapter_economy(chap):
     bonus = (chap.get('economy') or {}).get('save_all_bonus')
     if bonus:
         gifts.append(bonus)
+    # Gold a scene pays (#495): vanilla Ch1's 5,000 after the map, Ch8's 10,000 in its ending.
+    for g in (chap.get('economy') or {}).get('scene_gold') or []:
+        gold += int(g['amount'])
     for c in chap.get('chests') or []:
         for it in c.get('contents') or []:
             if it.get('id'):

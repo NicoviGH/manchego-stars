@@ -388,6 +388,7 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     from inject.chapters.ch06 import CH06_CHAPTER_YAML
     from inject.decomp import LORDSEL_FLAG_BASE
     from inject.hosting import _load_chapter_yaml
+    from inject.scenes import scene_gold_entries
     import inject.hosts as hosts
 
     chars = _enum_values('include/constants/characters.h', 'CHARACTER_')
@@ -421,6 +422,8 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
         'PROLOGUE': {'hlin': char(PROLOGUE_HLIN_SLOT), 'scramsax': char(PROLOGUE_SCRAMSAX_SLOT),
                      'sephek': char(PROLOGUE_SEPHEK_SLOT)},
         'CH01_CHIEF': char(CH01_BOSS_SLOT),
+        # What ch01's scenes pay (#495): ch01gold reads it back on ch02's map.
+        'CH01_SCENE_GOLD': sum(amount for _s, _a, amount in scene_gold_entries(ch01)),
         # Every hosted chapter, read off the registry: a range here went stale the day ch07 was
         # hosted and a film needed its slot.
         'HOST': {c.name: c.host_index for c in hosts.hosted_chapters() if c.name != 'prologue'},

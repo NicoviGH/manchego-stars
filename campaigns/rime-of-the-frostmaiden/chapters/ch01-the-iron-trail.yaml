@@ -500,16 +500,19 @@ terrain_divergence:
 - {tile: [2, 7], from: PLAINS, to: TERRAIN_TILE_2E, why: the Bryn Shander compound's wall}
 - {tile: [13, 2], from: PLAINS, to: TERRAIN_HOUSE, why: "the north house, vanilla Ch1's second hint House"}
 
+# ── Economy ───────────────────────────────────────────────────────────────────
+# Vanilla FE8 has no flat clear bonus (docs/decisions.md "Economy"), but it does pay gold in
+# scenes. Right after Ch1, Castle Frelia's scene (chapter 0x38, the decomp's `lordsplit`) pays
+# the leader 5,000 -- King Hayden's war funds -- so Ch2 starts at 5,000 (measured on the retail
+# ROM, `vanillagold`, 2026-10-15). Ours pays it in the ending, once Duvessa has handed over the
+# Council's standing commission (beat A): the town's purse, as Hayden's was the crown's. The job
+# pay ("two hundred gold") still goes on Baxby, as the scene says.
+economy:
+  scene_gold:
+    - {amount: 5000, scene: chapter_end, after_beat: 1}   # ch01gold proves it reaches ch02
+
 # ── Post-Chapter ──────────────────────────────────────────────────────────────
-# Economy follows vanilla FE8: NO flat per-chapter clear bonus -- gold comes only from
-# in-map sources (gold-giving villages, sellable drops/gems, chests, arena). See
-# docs/decisions.md "Economy". Vanilla Ch1 is NOT a wash: right after it, Castle Frelia's
-# scene (chapter 0x38, the decomp's `lordsplit`) pays the leader 5,000 gold, so Ch2 starts at
-# 5,000 -- measured on the retail ROM (`vanillagold`, 2026-10-15). ch01 pays nothing, so our
-# party reaches ch02's Armory with 0. The 2026-06-17 "net wash" call (job pay ~200g spent on
-# Baxby) rested on reading vanilla as ~0; restoring the 5,000 is #495, with ch07's scene gold.
 post_chapter:
-  net_gold: 0                   # job pay (~200g) == Baxby's keep; no in-game add/subtract
   available_shops: [bryn-shander]
   units_available_to_recruit:   # Baxby = FREE story-recruit, won over in the ending
     - id: baxby                 # cutscene; joins as a ch02 starting unit. FE8 shops sell

@@ -133,6 +133,8 @@ design_notes: >
 
 # Vanilla Ch8 items this scripted defeat cannot hand out; ch09 carries them (#486).
 payload_deviations:
+  - item: 10000 gold
+    why: "moved to ch07's ending (ADR 0339): our ch08 is the capture, with no Hayden to pay it"
   - item: ITEM_BOOSTER_HP
     why: "deferred to ch09: a scripted defeat has no chests to open"
   - item: ITEM_SWORD_SILVER

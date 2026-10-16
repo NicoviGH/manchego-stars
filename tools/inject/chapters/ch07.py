@@ -13,7 +13,7 @@ from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH07_EVENT_GROUP, CH07_HOST_INDEX
 from inject.maps import _register_chapter_map
 from inject.paths import CH07_EVENTINFO_H, CH07_EVENTSCRIPT_H, TEXTS_TXT
-from inject.scenes import chapter_boss, write_frame_texts
+from inject.scenes import chapter_boss, scene_gold, write_frame_texts
 from inject.text import dev_placeholder_scene, write_nameplate
 from inject.units import _ally_unit_entry, declare_unit_table, _deploy_cap_entries, enemy_rows
 from inject.villages import chapter_location_events
@@ -50,6 +50,15 @@ CH07_HALL_ARCHERS = (('bremen-archer', 1), ('bremen-archer', 2))
 
 def ch07_reda_symbol(enemy_id, index):
     return 'MS_Ch07HallDoor_%s_%d' % (enemy_id.replace('-', '_'), index)
+
+
+def ch07_ending(chap):
+    """The ending: vanilla Ch8's 10,000 gold (Hayden's war funds, moved up a chapter, ADR
+    0339) through `economy.scene_gold`, then the dev placeholder until ch08 hosts. It has no
+    beats yet, so the gold pays before the fade."""
+    gold = scene_gold(chap, 'chapter_end').get(None, '')
+    return ('{\n' + gold + '    FADI(16) /* the hall is taken */\n' + dev_placeholder_scene()
+            + '    ENDA\n}')
 
 
 def inject_ch07(campaign, boot=False, verbose=True):
@@ -121,10 +130,8 @@ def inject_ch07(campaign, boot=False, verbose=True):
                  + '    ENUT(8)\n    EVBIT_T(7)\n    ENDA\n}')
     script = _replace_brace_block(script, CH07_BEGINNING_SCRIPT + '[] =', beginning,
                                   CH07_EVENTSCRIPT_H)
-    script = _replace_brace_block(
-        script, CH07_ENDING_SCRIPT + '[] =',
-        '{\n    FADI(16) /* the hall is taken */\n' + dev_placeholder_scene() + '    ENDA\n}',
-        CH07_EVENTSCRIPT_H)
+    script = _replace_brace_block(script, CH07_ENDING_SCRIPT + '[] =', ch07_ending(chap),
+                                  CH07_EVENTSCRIPT_H)
     with open(CH07_EVENTSCRIPT_H, 'w', encoding='utf-8') as f:
         f.write(script)
 

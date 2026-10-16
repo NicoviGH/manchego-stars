@@ -219,6 +219,8 @@ DEAD_CONCEPTS = [
     r'(?:(?!\b(?:not|never|no|unique)\b)[^.\n]){0,40}\bdense',
     r'\b(?:decision|ADR)s? ids? should (?!not )run 1\.\.',
     r'(?<!not )(?<!never )(?<!no )dense (?:decision|ADR) ids?',
+    # retired by #495: a chapter's gold is what its scenes and sites pay (economy.scene_gold)
+    r'\bnet_gold\b',
 ]
 
 # Hand-written source whose comments carry doctrine -- the same drift surface as

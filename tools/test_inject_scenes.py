@@ -9,6 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_campaign as bc
+import inject.hosting
 import inject.scenes
 
 
@@ -107,6 +108,83 @@ class SharedEventShapes(unittest.TestCase):
         self.assertEqual(2, out.count('CHECK_EXISTS('))
         self.assertLess(out.rindex('MOVE_CLOSEST'), out.index('LOAD1(0x1, MS_T00)'))
         self.assertTrue(out.endswith('    FADU(16)\n'))
+
+
+
+class SceneGold(unittest.TestCase):
+    """The scene-gold vehicle (#495): vanilla's own payout lines, placed by the chapter YAML."""
+
+    CHAP = {'id': 'chx', 'events': [{'trigger': 'chapter_end', 'type': 'cutscene'}],
+            'economy': {'scene_gold': [{'amount': 5000, 'scene': 'chapter_end', 'after_beat': 1}]}}
+
+    def gold(self, **entry):
+        return dict(self.CHAP, economy={'scene_gold': [dict(
+            {'amount': 5000, 'scene': 'chapter_end'}, **entry)]})
+
+    def test_pays_with_vanillas_own_lines(self):
+        out = inject.scenes.scene_gold_script(5000)
+        self.assertIn('SVAL(EVT_SLOT_3, 0x1388)', out)          # lordsplit's own 5,000
+        self.assertIn('GIVEITEMTOMAIN(CHAR_EVT_PLAYER_LEADER)', out)
+        self.assertLess(out.index('EventScr_RemoveBGIfNeeded'), out.index('GIVEITEMTOMAIN'),
+                        'the popup must show over the map, not behind the backdrop')
+        self.assertNotIn('BACG', out)
+
+    def test_mid_scene_it_fades_back_up_onto_the_scene(self):
+        out = inject.scenes.scene_gold(self.CHAP, 'chapter_end', 3, 'BG_X')[0]
+        self.assertLess(out.index('GIVEITEMTOMAIN'), out.index('BACG(BG_X)'))
+        self.assertIn('REMOVEPORTRAITS', out)                   # re-arms BACG after Text()
+
+    def test_without_after_beat_it_pays_after_the_last_beat_with_no_fade_back(self):
+        out = inject.scenes.scene_gold(self.gold(), 'chapter_end', 3, 'BG_X')
+        self.assertEqual(list(out), [2])
+        self.assertNotIn('BACG', out[2])
+
+    def test_a_scene_with_no_beats_pays_under_none(self):
+        self.assertIn(None, inject.scenes.scene_gold(self.gold(), 'chapter_end'))
+        self.assertEqual(inject.scenes.scene_gold(self.gold(), 'chapter_start', 3), {})
+
+    def test_bad_entries_fail_at_the_yaml(self):
+        for chap, args in ((self.gold(scene='nowhere'), ()),
+                           (self.gold(amount=0), ()),
+                           (self.gold(amount='5000'), ()),
+                           (self.gold(after_beat=4), (3,)),
+                           (self.gold(after_beat=1), ())):      # no beats to come after
+            with self.subTest(chap=chap['economy'], args=args), self.assertRaises(SystemExit):
+                inject.scenes.scene_gold(chap, 'chapter_end', *args)
+
+    def test_beat_calls_play_it_after_the_named_beat(self):
+        beats = [[{'a': 'x'}], [{'b': 'y'}]]
+        out = inject.scenes._scenic_beat_calls((0x10, 0x11), beats, ('one', 'two'),
+                                               after={0: '    PAY\n'})
+        self.assertLess(out.index('Text(0x10)'), out.index('PAY'))
+        self.assertLess(out.index('PAY'), out.index('Text(0x11)'))
+
+    def test_every_declared_entry_is_read_by_its_chapters_injector(self):
+        """An entry no injector reads would be counted by the economy and the wiki and never
+        paid. Each chapter that declares scene gold must ask for that scene."""
+        import glob
+        import re
+        import yaml
+        root = os.path.dirname(os.path.abspath(__file__))
+        for path in glob.glob(os.path.join(root, '..', 'campaigns', '*', 'chapters', 'ch*.yaml')):
+            with open(path, encoding='utf-8') as fh:
+                chap = yaml.safe_load(fh)
+            short = os.path.basename(path).split('-')[0]
+            for scene, _after, _amount in inject.scenes.scene_gold_entries(chap):
+                src = os.path.join(root, 'inject', 'chapters', short + '.py')
+                with self.subTest(chapter=short, scene=scene):
+                    self.assertTrue(os.path.exists(src), '%s declares scene gold and has no '
+                                    'injector to pay it' % short)
+                    with open(src, encoding='utf-8') as fh:
+                        self.assertRegex(fh.read(), r"scene_gold\(chap, '%s'" % re.escape(scene))
+
+    def test_ch07_ending_pays_vanilla_ch8s_ten_thousand(self):
+        import inject.chapters.ch07 as ch07
+        chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden',
+                                                 ch07.CH07_CHAPTER_YAML)
+        out = ch07.ch07_ending(chap)
+        self.assertIn('SVAL(EVT_SLOT_3, 0x2710)', out)
+        self.assertLess(out.index('GIVEITEMTOMAIN'), out.index('FADI(16)'))
 
 
 if __name__ == '__main__':

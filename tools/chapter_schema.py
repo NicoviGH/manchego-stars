@@ -148,9 +148,10 @@ CHAPTER = {
     'arena_presentation': {'attendant': {'face_slot': ANY, 'portrait': ANY}},
     'available_shops': ANY,      # a world-map TOWN shop label (campaign.yaml world_map)
     'economy': {'reward_sites': [{'gift': ANY}],
+                'scene_gold': [{'amount': ANY, 'scene': ANY, 'after_beat': ANY}],
                 'save_all_bonus': ANY, 'save_all_gate': ANY},
     'post_chapter': {'available_shops': ANY, 'ends_mvp': ANY,
-                     'net_gold': ANY, 'hooks': ANY, 'unlocks_chapter': ANY,
+                     'hooks': ANY, 'unlocks_chapter': ANY,
                      'promotion_seam': {'note': ANY},
                      'caravan_npcs_added': [{'id': ANY, 'description': ANY}],
                      'units_available_to_recruit': [{'id': ANY, 'description': ANY,
