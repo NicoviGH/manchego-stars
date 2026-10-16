@@ -24,7 +24,7 @@ In FE a unit cannot move through an enemy body. Walking the same map with the li
 **Only the flier and Braulo can honour any clock.** Foot, cavalry and Trex cannot reach the east
 boat at all while the line stands, and reach the west one on turn 11 against a turn-8 fuse.
 
-**The channels are narrow enough that ONE body corks a route.** Removing `shark-rider-halberd` at
+**The channels are narrow enough that ONE body corks a route.** Removing `shark-rider-horseslayer` at
 (15,16) alone turns the east door from unreachable into turn 12; removing `merfolk-trident` at
 (2,14) takes the west door from turn 11 back to the declared 6. That is not a placement anyone
 would have predicted by eye, and it is why this is derived rather than reasoned about.

@@ -219,8 +219,11 @@ strategy: |
   [[Nerra]] won't move and has low Defense, so physical attackers bring her down quickly; defeat
   her to win. Most of the enemy carries lances, so Braulo's axe wins the trades; keep the
   cavalry away from the armored guard with the [[Horseslayer]]. On turn 4 three more shark
-  riders enter from the west edge. The shark rider with the [[Halberd]] drops it, a merfolk
-  soldier drops an [[Iron Blade]], and the lamia healer in the northeast drops an [[Elixir]].
+  riders enter from the west edge. The shark rider south of the east boat drops the last weapon in
+  his inventory. He fights with his [[Iron Lance]] until a mounted unit comes into reach; once
+  he swings his [[Horseslayer]] at [[Baxby]] or [[Lupin]], he drops the Iron Lance instead. Rush
+  him before your cavalry gets near him to take the Horseslayer. A merfolk soldier drops an
+  [[Iron Blade]], and the lamia healer in the northeast drops an [[Elixir]].
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -405,7 +408,7 @@ enemy_units:
     positions: [[16, 15]]
     donor: [15, 15]                 # vanilla L6 fighter
     skin: {look: "a raider on a shark", source: "as shark-rider-poison"}
-  - id: shark-rider-halberd
+  - id: shark-rider-horseslayer
     ai_override:
       ai: '{0x8, 0x3, 0x0, 0x0}'   # AI_A_08 ExceptCivilian + the donor's NeverMove
       why: >
@@ -419,11 +422,15 @@ enemy_units:
     autolevel: true
     inventory:
       - id: iron-lance
-      - id: halberd
-    item_drop: halberd          # SETTLED from events_udefs.c, not the wiki: vanilla's L5 Fighter
-                                # carries {AXE_IRON, AXE_HALBERD} with `.itemDrop = 1`. FE8 drops
-                                # the LAST item, so the Halberd stays the drop; a Cavalier cannot
-                                # swing it, so it fights with the Iron Lance in front of it.
+      - id: horseslayer
+    item_drop: horseslayer      # Vanilla's L5 Fighter carries {AXE_IRON, AXE_HALBERD} with
+                                # `.itemDrop = 1` (events_udefs.c). FE8 drops the LAST item and
+                                # the AI equips the weapon it swings (cp_perform.c), so once he
+                                # attacks with the Halberd he drops the Iron Axe instead. A
+                                # Cavalier cannot wield an axe, so the lance pair keeps that
+                                # lesson: the AI picks the Horseslayer only against a mounted
+                                # target (Iron Lance has equal Mt and +10 Hit otherwise), and
+                                # from then on he drops the Iron Lance. ch06halberd proves both.
     damage_type: piercing
     positions: [[15, 16]]
     donor: [13, 6]                  # vanilla L5 fighter
@@ -1151,7 +1158,7 @@ rescue_boats:
   # ...and the same walk with the enemy LINE standing on it (turn-1 snapshot; derived by
   # `map_placement_preview.reached_on`, never hand-kept). A unit cannot pass through an enemy
   # body, and this map's channels are narrow enough that ONE body corks a route: removing
-  # shark-rider-halberd at (15,16) alone turns `null` into turn 12. The empty-map row above is
+  # shark-rider-horseslayer at (15,16) alone turns `null` into turn 12. The empty-map row above is
   # what the chapter's clock was designed against, and it is not what a player walks.
   reached_on_contested: {foot: null, cavalry: null, flier: 3, braulo: 6, trex: null}
   talk:
@@ -1244,6 +1251,16 @@ playtest:
         both pursuers path to their hull without stalling, and the range-1 Tentacruel attacks the
         west boat only from its pocket door -- the single melee cell the pocket promises
       lua: ch06clock
+      deadline: 900
+
+    # Vanilla Ch6's Halberd lesson on our lance pair (#495): the drop flips once he swings his
+    # second weapon, which the AI does only at a mounted target. Hand-written Lua for the same
+    # reason as ch06clock: it parks units, drives enemy phases and reads his inventory.
+    - name: ch06halberd
+      proves: >
+        the Horseslayer shark rider swings his Iron Lance at a foot unit and keeps dropping the
+        Horseslayer, and once he swings the Horseslayer at a mounted unit he drops the Iron Lance
+      lua: ch06halberd
       deadline: 900
 
     # The boarding pass, from each hull's DOOR -- the one ground cell next to it -- which is the

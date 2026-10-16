@@ -75,6 +75,9 @@ WANTED = [
     'gConvoyItemArray',         # the convoy (extern u16[]; include/variables.h). Low byte of
                                 # each entry is the item id -- where an overflow charm-gift lands.
     'gConvoyItemCount',         # u8 count of live convoy entries (include/bmcontainer.h).
+    'gAiDecision',              # struct AiDecision (include/cp_common.h): the action the AI
+                                # just chose -- actor +0x01, target +0x06, item slot +0x07.
+                                # ch06halberd reads which weapon the dropper swung, and at whom.
     'gItemData',                # struct ItemData[] (include/bmitem.h): per-item attributes
                                 # (IA_WEAPON/IA_STAFF @ +0x08) + encodedRange (min<<4|max @ +0x19).
                                 # Lets the harness read a unit's weapon reach generically.
@@ -382,6 +385,7 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     from inject.chapters.ch02 import CH02_CHAPTER_YAML, CH02_CLASS_IDS
     from inject.decomp import ITEM_ENUM
     from inject.chapters.ch04 import CH04_PACK_PIDS
+    from inject.chapters.ch06 import CH06_CHAPTER_YAML
     from inject.decomp import LORDSEL_FLAG_BASE
     from inject.hosting import _load_chapter_yaml
     import inject.hosts as hosts
@@ -400,6 +404,9 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     # The chwinga ON THE FIELD, in green_allies order, and the charm each survivor pays.
     field = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)['deployment']['green_allies']
     slot_of = dict(CH02_CHWINGA)
+    # ch06's dropper, whose drop flips once he swings his second weapon (#495, ch06halberd).
+    dropper = next(e for e in _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)['enemy_units']
+                   if e['id'] == 'shark-rider-horseslayer')
     return {
         'CAST': cast,
         # Each classed cast member's help text message: the slot's own descTextId, which the
@@ -425,6 +432,8 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
         'CH05_BOSS_PID': int(CH05_BOSS_PID, 0),
         'CH05_MOOSE_PID': int(CH05_MOOSE_PID, 0),
         'CH06_BOAT_PIDS': {k: int(v, 0) for k, v in CH06_BOAT_PIDS.items()},
+        'CH06_DROPPER_ITEMS': [items[ITEM_ENUM[i['id']]] for i in dropper['inventory']],
+        'CH06_DROPPER_DROP': items[ITEM_ENUM[dropper['item_drop']]],
     }
 
 

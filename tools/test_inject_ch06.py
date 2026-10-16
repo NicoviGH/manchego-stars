@@ -68,7 +68,7 @@ class ItemDropIsCarriedOnce(unittest.TestCase):
         from. Vanilla's three ch06 droppers carry 2 / 1 / 2 items; ADR 0329's re-classed
         Mercenary carries one more, the Steel Lance it now fights with, ahead of the drop."""
         chap = inject.hosting._load_chapter_yaml(self.CAMPAIGN, inject.chapters.ch06.CH06_CHAPTER_YAML)
-        expected = {'shark-rider-halberd': 2, 'merfolk-trident-drop': 2, 'lamia-mender': 2}
+        expected = {'shark-rider-horseslayer': 2, 'merfolk-trident-drop': 2, 'lamia-mender': 2}
         rows = enemy_rows(chap)
         for enemy_id, count in expected.items():
             row = next(r for r in rows if '/* %s --' % enemy_id in r)
