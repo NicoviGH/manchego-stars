@@ -175,6 +175,7 @@ deployment:
     - id: chwinga-mote
       name: "Snow Mote"
       fe_name: "Mote"             # <=12 -- name buffer safety
+      help_text: "A tiny elemental spirit of the snow. Shy, curious and kind."   # R on the name in game (inject.text.write_nameplate)
       class: priest
       level: 1
       position: [10, 4]           # vanilla Garcia's post -- FOREST, avoid
@@ -188,6 +189,7 @@ deployment:
     - id: chwinga-rime
       name: "Rime Spark"
       fe_name: "Rime"
+      help_text: "A tiny elemental spirit of the snow. It bobs about like a spark."   # R on the name in game (inject.text.write_nameplate)
       class: priest
       level: 1
       position: [10, 5]           # vanilla Ross's post -- FORT: avoid AND HP regen each turn
@@ -268,6 +270,7 @@ enemy_units:
   - id: raider-bruiser
     name: "Grukk the Bruiser"
     fe_name: "Grukk"            # ≤12 — overrides the vanilla "Bone" slot name plate
+    help_text: "A hulking raider with a heavy axe, posted beside the captain."   # R on the name in game (inject.text.write_nameplate)
     is_miniboss: true
     count: 1
     positions: [[13, 7]]        # on its donor's post, beside the captain
@@ -283,6 +286,7 @@ enemy_units:
   - id: raider-captain
     name: "Halvar the Raider Captain"
     fe_name: "Halvar"          # ≤12 — overrides the vanilla "Bazba" slot name plate
+    help_text: "Captain of the chardalyn raiders. He takes what he likes."   # R on the name in game (inject.text.write_nameplate)
     is_boss: true
     count: 1
     positions: [[11, 7]]        # on Bazba's post: vanilla's boss raids from mid-map

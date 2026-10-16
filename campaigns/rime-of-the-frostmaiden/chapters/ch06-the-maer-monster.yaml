@@ -767,6 +767,7 @@ enemy_units:
     face: nerra                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Nerra"
     fe_name: "Nerra"
+    help_text: "The oldest merfolk of Maer Dualdon. She hunts Bremen's fishers."   # R on the name in game (inject.text.write_nameplate)
     is_boss: true
     count: 1
     class: shaman

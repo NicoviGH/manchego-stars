@@ -38,7 +38,7 @@ REWARD = [{'id': ANY, 'amount': ANY}]
 # them interchangeably (`raw_pids.PLACED_ROSTER_KEYS`, `check.ROSTER_KEYS`, map_placement_preview,
 # difficulty), so a field legal on an enemy is legal on a guest or an ally. ENEMY narrows it.
 UNIT = {
-    'id': ANY, 'name': ANY, 'face': ANY, 'fe_name': ANY, 'class': ANY, 'deploy_class': ANY, 'level': ANY,
+    'id': ANY, 'name': ANY, 'face': ANY, 'fe_name': ANY, 'help_text': ANY, 'class': ANY, 'deploy_class': ANY, 'level': ANY,
     'levels': ANY, 'autolevel': ANY, 'count': ANY, 'composition': ANY,
     'position': ANY, 'positions': ANY, 'boss_tile': ANY, 'camera_at': ANY,
     'is_boss': ANY, 'is_miniboss': ANY, 'hard_mode_only': ANY, 'required': ANY, 'is_npc': ANY,

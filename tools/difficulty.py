@@ -22,6 +22,7 @@ unit's stat line".
 import collections
 import dataclasses
 import functools
+import json
 import os
 import random
 import re
@@ -2698,16 +2699,32 @@ def _gift_items(eventscript_text):
 def _gift_gold(eventscript_text):
     """Every gold amount the chapter script hands out: for each GIVEITEMTOMAIN / GIVETOSLOT3
     (eventscr.c EVSUBCMD_GIVEITEMTOMAIN: slot 3 is added to the party's gold), the nearest
-    preceding SVAL(EVT_SLOT_3, n). Ch13a pays 5,000 on both arms of a CHECK_ALIVE, so an
-    amount repeats within one script block counts once."""
+    preceding SVAL(EVT_SLOT_3, n). Within one script, the stretches between LABELs are the arms
+    of its branches: Ch13a pays 5,000 on each arm of a CHECK_ALIVE, and only one arm runs. So a
+    script pays, per amount, the most any one arm pays -- two payments in one arm both count."""
     out = []
     for block in re.split(r'CONST_DATA EventListScr', eventscript_text):
-        seen = []
-        for g in re.finditer(r'(?:GIVEITEMTOMAIN|GIVETOSLOT3)\(', block):
-            pre = re.findall(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9a-fA-F]+|\d+)\)', block[:g.start()])
-            if pre and int(pre[-1], 0) not in seen:
-                seen.append(int(pre[-1], 0))
-        out += seen
+        most = collections.Counter()
+        for arm in re.split(r'LABEL\(', block):
+            paid = collections.Counter()
+            for g in re.finditer(r'(?:GIVEITEMTOMAIN|GIVETOSLOT3)\(', arm):
+                pre = re.findall(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9a-fA-F]+|\d+)\)', arm[:g.start()])
+                if pre:
+                    paid[int(pre[-1], 0)] += 1
+            most |= paid
+        out += sorted(most.elements())
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def _event_group_stems():
+    """{ChapterEventGroup symbol: event-file stem}, every eventinfo the decomp includes."""
+    info = inject.decomp.vanilla_decomp_text('src/events_info.c')
+    out = {}
+    for stem in re.findall(r'#include "events/(\w+)-eventinfo\.h"', info):
+        text = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+        for group in re.findall(r'ChapterEventGroup\s+(\w+)', text):
+            out[group] = stem
     return out
 
 
@@ -2715,19 +2732,12 @@ def chapter_event_stem(index):
     """The event-file stem of FE8 chapter `index`, through the decomp's own tables: its
     chapter_settings `mapEventDataId` indexes the chapter asset table (data_8B363C.s), whose
     word names a ChapterEventGroup, defined in exactly one events/<stem>-eventinfo.h."""
-    import json
     table = re.findall(r'\.word\s+(\w+)', inject.decomp.vanilla_decomp_text('data/data_8B363C.s'))
     chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
     chapters = chapters if isinstance(chapters, list) else chapters['chapters']
     if not 0 <= index < len(chapters):
         return None
-    group = table[chapters[index]['mapEventDataId']]
-    info = inject.decomp.vanilla_decomp_text('src/events_info.c')
-    for stem in re.findall(r'#include "events/(\w+)-eventinfo\.h"', info):
-        text = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-        if re.search(r'ChapterEventGroup\s+%s\b' % group, text):
-            return stem
-    return None
+    return _event_group_stems().get(table[chapters[index]['mapEventDataId']])
 
 
 def twin_interlude_scripts(eventscript_text):
@@ -2765,6 +2775,28 @@ def vanilla_drops(parity_ref):
     return out
 
 
+def twin_event_payload(stem):
+    """What a vanilla chapter's events hand out, by vehicle, read once for every consumer
+    (vanilla_economy here, gen_wiki's twin payload): chest items and chest gold, scene gifts
+    and scene gold, what the interlude after it gives (twin_interlude_scripts), and its shops
+    of every kind the eventinfo macros name (Armory, Vendor, SecretShop)."""
+    info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
+    out = {'chests': re.findall(r'Chest\((ITEM_\w+)', info),
+           'chest_gold': [int(g) for g in re.findall(r'ChestMoney\(\s*(\d+)', info)],
+           'gifts': list(_gift_items(script)), 'gift_gold': _gift_gold(script),
+           'interlude_gifts': [], 'interlude_gold': [],
+           'shops': [(sym, _shoplist_items(shoptext, sym)) for sym in
+                     re.findall(r'(?:Armory|Vendor|SecretShop)\(\s*(\w+)', info)],
+           'n_villages': len(re.findall(r'Village\(', info)),
+           'n_houses': len(re.findall(r'House\(', info))}
+    for _stem, inter in twin_interlude_scripts(script):
+        out['interlude_gifts'] += _gift_items(inter)
+        out['interlude_gold'] += _gift_gold(inter)
+    return out
+
+
 def vanilla_economy(parity_ref):
     """The vanilla twin's item economy, read from HEAD: chests, gifts (villages/houses/clear
     rewards), shops, and enemy drops, each valued in buy-gold. None if the reference has no
@@ -2773,25 +2805,18 @@ def vanilla_economy(parity_ref):
     stem = PARITY_REFERENCE_STEM.get(parity_ref)
     if stem is None:
         return None
-    info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
-    chests = [(it, item_gold_value(it)) for it in re.findall(r'Chest\((ITEM_\w+)', info)]
-    gifts = [(it, item_gold_value(it)) for it in _gift_items(script)]
+    t = twin_event_payload(stem)
+    chests = [(it, item_gold_value(it)) for it in t['chests']]
+    gifts = [(it, item_gold_value(it)) for it in t['gifts'] + t['interlude_gifts']]
     drops = vanilla_drops(parity_ref) or []
-    shops = [(sym, _shoplist_items(shoptext, sym))
-             for sym in re.findall(r'(?:Armory|Vendor)\(\s*(\w+)', info)]
-    gold = ([int(g) for g in re.findall(r'ChestMoney\(\s*(\d+)', info)]
-            + _gift_gold(script))
-    for _stem, inter in twin_interlude_scripts(script):
-        gifts += [(it, item_gold_value(it)) for it in _gift_items(inter)]
-        gold += _gift_gold(inter)
+    shops = t['shops']
+    gold = t['chest_gold'] + t['gift_gold'] + t['interlude_gold']
     total = (sum(v for _, v in chests) + sum(v for _, v in gifts) + sum(v for _, v in drops)
              + sum(gold))
     return {'reference': parity_ref, 'chests': chests, 'gifts': gifts, 'drops': drops,
             'gold': gold,
-            'shops': shops, 'n_villages': len(re.findall(r'Village\(', info)),
-            'n_houses': len(re.findall(r'House\(', info)), 'total_gold': total}
+            'shops': shops, 'n_villages': t['n_villages'], 'n_houses': t['n_houses'],
+            'total_gold': total}
 
 
 def chapter_economy(chap):

@@ -51,11 +51,18 @@ def vanilla_name_text_id(slot):
 
 
 
-def write_nameplate(lines, slot, unit):
-    """Rename vanilla character `slot`'s nameplate to `unit`'s display name. A boss riding a
-    borrowed slot (Breguet, Bazba, Novala) otherwise shows the vanilla name on its unit window
-    and its death."""
+def write_nameplate(lines, slot, unit, on_map=True):
+    """Rename vanilla character `slot`'s nameplate to `unit`'s display name, and write its
+    `help_text:` over the slot's description. A boss riding a borrowed slot (Breguet, Bazba,
+    Novala) otherwise shows the vanilla name on its unit window and its death, and the vanilla
+    character's line when R is pressed on its name (ADR 0346). A unit standing on the map must
+    carry one; `on_map=False` is for a slot only a scene shows (Glimmerfrost in her hut)."""
     set_message_body(lines, vanilla_name_text_id(slot), name_message_body(display_name(unit)))
+    if unit.get('help_text'):
+        write_help_text(lines, slot, unit)
+    elif on_map:
+        sys.exit('ERROR: %s rides %s with no help_text: R on its name would read %s\'s vanilla '
+                 'description (ADR 0346)' % (unit.get('id'), slot, slot))
 
 
 def slot_desc_text_id(slot):

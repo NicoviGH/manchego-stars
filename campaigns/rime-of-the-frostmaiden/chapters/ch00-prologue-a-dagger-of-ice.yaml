@@ -142,6 +142,7 @@ player_units:
     face: hlin-trollbane                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Hlin Trollbane"
     fe_name: "Hlin"              # FE8 name buffer is 12 chars; "Hlin Trollbane" (14) overflows
+    help_text: "A retired dwarf bounty hunter. She hunts the dagger-of-ice killer."   # R on the name in game (inject.text.write_nameplate)
     class: fighter               # old dwarf bounty hunter, handaxe, past her prime — UNPROMOTED & frail (Eirika-analog lead; only Scramsax the "Jeigan" is a Seth-justified prepromote). Female Fighter map sprite (community repo) so she reads as a woman
     is_npc: true                 # not one of the 7 PCs; a cold-open guest unit
     required: true               # lose if she dies (our lord-death condition)
@@ -163,6 +164,7 @@ player_units:
   - id: scramsax
     face: scramsax                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Scramsax"
+    help_text: "A retired sellsword who keeps the Northlook. Hlin's oldest friend."   # R on the name in game (inject.text.write_nameplate)
     class: hero                  # retired sellsword, a real veteran (book p.33); promoted, strong
     is_npc: true                 # The Northlook's proprietor; the cold-open's "Jeigan"
     required: false              # defeat != game over (Seth precedent; see NOTE 3) — he retreats, alive for Ch1
@@ -187,6 +189,7 @@ enemy_units:
     face: sephek-kaltro                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Sephek Kaltro"
     fe_name: "Sephek"           # FE8 name buffer is 12 chars; "Sephek Kaltro" (13) overflows
+    help_text: "A charming caravan guard who never feels the cold. Auril's executioner."   # R on the name in game (inject.text.write_nameplate)
     is_boss: true
     count: 1
     positions: [[14, 8]]         # O9 — cornered against the SE peaks (O'Neill's vanilla spot)

@@ -182,24 +182,14 @@ def vanilla_payload(key):
     out = {'stem': stem, 'chests': [], 'gifts': [], 'drops': [], 'steals': [], 'shops': [],
            'recruits': [],
            'grants': [], 'enemies': [], 'n_villages': 0, 'error': None}
-    try:
-        info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-        script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    except Exception as ex:                            # stem without events in this decomp
-        out['error'] = 'no event files for %s (%s)' % (stem, ex.__class__.__name__)
+    if not os.path.isfile(os.path.join(inject.decomp.SUBMODULE, 'src', 'events',
+                                       '%s-eventinfo.h' % stem)):
+        out['error'] = 'no event files for %s' % stem
         return out
-    out['chests'] = re.findall(r'Chest\((ITEM_\w+)', info)
-    out['gold_chests'] = re.findall(r'ChestMoney\(\s*(\d+)', info)
-    out['gifts'] = list(difficulty._gift_items(script))
-    out['gold_gifts'] = difficulty._gift_gold(script)
-    out['interlude_gold'] = []
-    for stem2, inter in difficulty.twin_interlude_scripts(script):
-        out['gifts'] += list(difficulty._gift_items(inter))
-        out['interlude_gold'] += difficulty._gift_gold(inter)
-    out['n_villages'] = len(re.findall(r'Village\(', info))
-    shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
-    out['shops'] = [(sym, difficulty._shoplist_items(shoptext, sym))
-                    for sym in re.findall(r'(?:Armory|Vendor|SecretShop)\(\s*(\w+)', info)]
+    t = difficulty.twin_event_payload(stem)          # the one reader vanilla_economy shares
+    out.update(chests=t['chests'], gold_chests=t['chest_gold'], gold_gifts=t['gift_gold'],
+               gifts=t['gifts'] + t['interlude_gifts'], interlude_gold=t['interlude_gold'],
+               n_villages=t['n_villages'], shops=t['shops'])
     for u in difficulty._chapter_udefs(stem):
         if u['allegiance'] == 'FACTION_ID_RED' and u['items']:   # itemless = cutscene load
             out['enemies'].append(u)
@@ -211,10 +201,7 @@ def vanilla_payload(key):
                         and _is_plain_item(it):
                     out['steals'].append(it)
     out['recruits'] = vanilla_joins().get(stem, [])
-    try:
-        out['grants'] = difficulty._named_item_grants(stem)
-    except Exception:
-        pass
+    out['grants'] = difficulty._named_item_grants(stem)
     return out
 
 
@@ -235,20 +222,16 @@ def vanilla_joins():
         for order in (EIRIKA_ORDER, ('ch9b', 'ch10b', 'ch11b', 'ch12b', 'ch13b', 'ch14b')):
             seen = set() if order is EIRIKA_ORDER else set(_seen_by('ch8'))
             for stem in order:
-                try:
-                    talk = difficulty._talk_recruits(stem)
-                    loads = list(difficulty._chapter_udefs(stem))
-                except Exception:
-                    continue
+                talk = difficulty._talk_recruits(stem)
+                loads = list(difficulty._chapter_udefs(stem))
                 rows = []
                 for u in loads:
                     char = u.get('charIndex')
                     if not char or char in seen or not u['items']:
                         continue
-                    try:
-                        if difficulty._character_number(char) not in difficulty.PLAYABLE_PIDS:
-                            continue
-                    except Exception:
+                    if not str(char).startswith('CHARACTER_'):   # a generic's raw pid
+                        continue
+                    if difficulty._character_number(char) not in difficulty.PLAYABLE_PIDS:
                         continue
                     if u['allegiance'] == 'FACTION_ID_BLUE' or char in talk:
                         seen.add(char)
@@ -391,7 +374,9 @@ def map_image(chap):
                     img.paste(ts.metatile_image(m), ((j % w) * 16, (j // w) * 16))
                 out = (png_uri(img), 'Donor map, vanilla art: %s (%dx%d)'
                        % (VANILLA[key][1], w, h))
-    except Exception as ex:                            # a missing build tree, a new layout
+    except FileNotFoundError as ex:                    # no build tree yet (a fresh checkout)
+        if os.path.isdir(BUILD_TREE):
+            raise
         out = (None, 'map not rendered (%s)' % ex.__class__.__name__)
     _MAPS[slug] = out
     return out
@@ -409,10 +394,9 @@ def our_item(it):
 
 
 def enemy_list(chap):
-    try:
-        return list(difficulty.chapter_roster_entries(chap))
-    except Exception:
+    if chap.get('status') == 'planned':             # a seed: its roster is not resolvable yet
         return list(chap.get('enemy_units') or [])
+    return list(difficulty.chapter_roster_entries(chap))
 
 
 _NAMES = {}
@@ -729,7 +713,7 @@ def item_html(enum, fallback=''):
     return '%s&#160;%s' % (mk.file_img(icon, 16, 16), mk.fe(item_name(enum) or shown, shown))
 
 
-def class_html(token, italic=False):
+def class_html(token):
     """A class cell: the game's name for it, linked to the wiki's class article."""
     name = class_display_name(token)
     return mk.fe(name)
@@ -746,10 +730,9 @@ STAT_KEYS = ('HP', 'Pow', 'Skl', 'Spd', 'Lck', 'Def', 'Res', 'Con', 'Mov')
 
 
 def chapter_shifts(chap):
-    try:
-        return inject.chapter_settings.chapter_difficulty_shifts(chap)
-    except BaseException:                              # planned: no `difficulty:` block yet
+    if chap.get('status') == 'planned':             # a seed: no `difficulty:` block yet
         return None
+    return inject.chapter_settings.chapter_difficulty_shifts(chap)
 
 
 BUILD_TREE = os.path.join(ROOT, 'build', 'fireemblem8u')
@@ -919,10 +902,8 @@ def talk_joins(chap):
         parley = e.get('parley') or {}
         if parley.get('recruits_npc') and parley.get('by'):
             out[parley['recruits_npc']] = parley['by']
-    try:
-        talkers = inject.recruit.on_map_talk_recruits(CAMPAIGN, chap.get('chapter_number'))
-    except (Exception, SystemExit):
-        talkers = []
+    talkers = ([] if chap.get('status') == 'planned' else
+               inject.recruit.on_map_talk_recruits(CAMPAIGN, chap.get('chapter_number')))
     for t in talkers:
         out.setdefault(t[0], None)
     return out
@@ -955,11 +936,8 @@ def available_before(chs, chap):
 def sprite_frame(chap, token, faction='enemy', uid=None):
     """The map sprite a unit wears in this chapter (PIL), trimmed as the wiki's sprites are."""
     sprite = unit_art.unit_sprite(CAMPAIGN, chap['_slug'], uid=uid, token=token)
-    try:
-        frame = (unit_art.idle_frame(CAMPAIGN, sprite, faction) if sprite
-                 else unit_art.class_sprite(class_enum_of(token), faction))
-    except Exception:
-        frame = None
+    frame = (unit_art.idle_frame(CAMPAIGN, sprite, faction) if sprite
+             else unit_art.class_sprite(class_enum_of(token), faction))
     return _trimmed(frame)
 
 
@@ -1093,11 +1071,10 @@ def wiki_recruit_npc_row(chap, g, units, files):
 
 
 def _ai_shape(chap, ed):
-    try:
-        import chapter_status
-        return chapter_status.ai_shape(difficulty.enemy_ai_bytes(chap, ed, 0))
-    except Exception:
+    if chap.get('status') == 'planned':             # a seed's enemies carry no AI yet
         return None
+    import chapter_status
+    return chapter_status.ai_shape(difficulty.enemy_ai_bytes(chap, ed, 0))
 
 
 def chapter_status(chap):
@@ -1180,11 +1157,11 @@ def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
     for r in recs:
         unit = units.get(r) or {}
         fs = unit.get('fe_stats') or {}
-        try:
+        if r not in {row[0] for row in inject.cast.classed_cast(CAMPAIGN)}:
+            hp, kit = fs.get('HP', '?'), []         # no slot yet (Meriwa, ch07): nothing loaded
+        else:
             hp = difficulty.player_combatant(CAMPAIGN, r).hp
             kit = [wiki_item(e, files) for e in inject.cast.unit_items(CAMPAIGN, r)]
-        except (Exception, SystemExit):
-            hp, kit = fs.get('HP', '?'), []
         name, article = wiki_class(fs.get('class'))
         port = files.portrait(r)
         cards.append({'name': unit_name(r, units), 'portrait': '[[File:%s]]' % port if port
@@ -1284,9 +1261,11 @@ def rank_params(ranks):
     return {k: _letter(ranks.get(_ITYPE[t])) or None for k, t in RANK_PARAMS}
 
 
-def aid_of(cls_enum, con):
-    """FE8's GetUnitAid: con - 1 on foot; 25 - con mounted (20 - con for a female mount)."""
-    attrs = unit_load._class_block(cls_enum)
+def aid_of(cls_enum, con, char_block=''):
+    """FE8's GetUnitAid: con - 1 on foot; 25 - con mounted (20 - con for a female mount).
+    UNIT_CATTRIBUTES is the character's attributes OR the class's, and CA_FEMALE lives on the
+    character (no class carries it), so `char_block` is the pid's injected CharacterData."""
+    attrs = unit_load._class_block(cls_enum) + char_block
     return (con - 1 if 'CA_MOUNTEDAID' not in attrs else
             (20 - con if 'CA_FEMALE' in attrs else 25 - con))
 
@@ -1331,7 +1310,9 @@ def boss_modes(chap, ed, files, shifts=None, modes=None):
             'str': None if magic else show('Pow'), 'mag': show('Pow') if magic else None,
             'skl': show('Skl'), 'spd': show('Spd'), 'lck': show('Lck'), 'def': show('Def'),
             'res': show('Res'), 'con': show('Con'), 'mov': show('Mov'),
-            'aid': aid_of(cls_enum, st['Con'][0]), 'inventory': inv,
+            'aid': aid_of(cls_enum, st['Con'][0], rom_block('src/data_characters.c',
+                                                            enemy_token(chap, ed))),
+            'inventory': inv,
             'ranks': rank_params(ranks)}))
     if len({repr(s) for _, s in per_mode}) == 1:
         per_mode = [('All', per_mode[0][1])]
@@ -1642,7 +1623,10 @@ def cast_page(uid, units, chs, files):
             'skl': line['baseSkl'], 'spd': line['baseSpd'], 'lck': line['baseLck'],
             'def': line['baseDef'], 'res': line['baseRes'], 'con': line['baseCon'],
             'mov': difficulty._class_base(cls_enum).get('baseMov', ''),
-            'aid': aid_of(cls_enum, line['baseCon']),
+            'aid': aid_of(cls_enum, line['baseCon'], rom_block(
+                'src/data_characters.c', 'CHARACTER_%s' % next(
+                    row[1] for row in inject.cast.classed_cast(CAMPAIGN)
+                    if row[0] == uid).upper())),
             'magic': any(t in ranks for t in MAGIC_ITYPES),
             'inventory': [wiki_item(e, files) for e in inject.cast.unit_items(CAMPAIGN, uid)],
             'ranks': rank_params(ranks),
@@ -1702,7 +1686,8 @@ def boss_page(chap, ed, units, files):
         'death_quote': (death, "%s's death quote." % name) if death else None,
         'gallery': {'portrait': port, 'artwork': book_art(files, lore_for(ed.get('id'), name),
                                                           ed.get('id')) + class_gallery(ed)},
-        'trivia': lore_trivia(lore_for(ed.get('id'), name))})
+        'trivia': lore_trivia(lore_for(ed.get('id'), name)),
+        'help_text': ed.get('help_text')})
 
 
 def planned_page(uid, units, chs, files):
@@ -1796,10 +1781,7 @@ def lord_select_wikitext(chs, units):
     cast, _names = inject.cast._classed_cast(CAMPAIGN, available_at=num)
     uids = [row[0] for row in cast]
     pitches = dict(ch01.lord_select_pitches(CAMPAIGN, uids))
-    try:
-        floors = {u: (hp, df, res) for u, hp, df, res in ch01.lord_floor_rows(CAMPAIGN, uids)}
-    except Exception:                                  # a missing build input: no floor column
-        floors = {}
+    floors = {u: (hp, df, res) for u, hp, df, res in ch01.lord_floor_rows(CAMPAIGN, uids)}
     first = chapter_link(ch01_chap) if ch01_chap else 'the first chapter'
     rows = []
     for uid in uids:
@@ -1958,7 +1940,7 @@ def twin_payload_html(chap, ckey):
                 }.get(verdict) or 'recorded deviation: %s' % esc(deviations[e])
         rows.append((item_html(e), esc(how), '<code>%s</code>' % esc(e), mark))
     for g in v.get('gold_chests') or []:
-        rows.append(('%s gold' % esc(g), 'Chest', '', ''))
+        rows.append(('%s gold' % '{:,}'.format(g), 'Chest', '', ''))
     for g in v.get('gold_gifts') or []:
         rows.append(('%s gold' % '{:,}'.format(g), 'Given by an event', '', ''))
     for g in v.get('interlude_gold') or []:
@@ -2206,7 +2188,27 @@ def chrome(pages_html, chs):
         '</div></div>')
 
 
+def debug_build_flags():
+    """The flags the build tree was last injected with (`.build-config.json`, written by
+    build_campaign), those set, or []: a wiki read from a debug or proof build (CH07BOOT,
+    CH05LUPIN, ...) shows that build's portraits, lines and icons, not the shipped ROM's."""
+    import json
+    try:
+        with open(os.path.join(ROOT, '.build-config.json')) as f:
+            flags = json.load(f).get('flags') or {}
+    except (OSError, ValueError):
+        return []
+    return sorted(k for k, v in flags.items() if v)
+
+
 def build():
+    flags = debug_build_flags()
+    if flags:
+        msg = ('wiki: the build tree holds a %s build, not the shipped ROM; rebuild with no '
+               'flags first' % '+'.join(flags))
+        if os.environ.get('CI'):
+            sys.exit('ERROR: ' + msg)
+        print('WARNING: ' + msg)
     chs = chapters()
     units = units_index()
     first = next((c for c in chs if not c.get('is_prologue')), None)

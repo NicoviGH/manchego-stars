@@ -248,6 +248,7 @@ enemy_units:
     face: dorbulgruf                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Dorbulgruf Shalescar"
     fe_name: "Dorbulgruf"
+    help_text: "Bremen's Speaker, an ancient shield dwarf. He fears for his town."   # R on the name in game (inject.text.write_nameplate)
     is_boss: true
     count: 1
     class: fighter              # vanilla: Murray, Lv12 Cavalier, on the door (9,4). A FIGHTER

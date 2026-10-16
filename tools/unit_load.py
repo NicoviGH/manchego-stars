@@ -37,7 +37,6 @@ SHIFT_MIN_PID = 0x3C
 
 
 @functools.lru_cache(maxsize=None)
-@functools.lru_cache(maxsize=None)
 def _class_block(class_enum):
     """A class's whole `gClassData` entry. Brace-balanced: the entry nests `.baseRanks = {...},`,
     and a match that stopped at the first `},` dropped every field from the ranks on (#493:

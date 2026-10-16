@@ -159,8 +159,9 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
     by_id = ch02_chwinga_identities(chap)
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
+    on_map = {g['id'] for g in chap.get('deployment', {}).get('green_allies', [])}
     for uid, slot in CH02_CHWINGA:
-        write_nameplate(lines, slot, by_id[uid])
+        write_nameplate(lines, slot, by_id[uid], on_map=uid in on_map)
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     if verbose:
