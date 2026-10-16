@@ -9,10 +9,12 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-16 (Claude). **#495 is closed**: the twin gaps are fixed. #496 restored ch01-ch03's
-terrain to their donors. #497 gave ch06 the Halberd lesson on a lance pair (`ch06halberd`). #498
-built the scene-gold vehicle (ADR 0350): ch01 pays vanilla Ch1's 5,000 (`ch01gold`) and ch07 pays
-Ch8's 10,000. The wiki deploys `main`'s on every push (ADR 0347); never publish it by hand.
+Refreshed 2026-10-16 (Claude). **#499 merged: the wiki works on a phone** (doctype + viewport,
+Timeless's header menus, wide tables scroll in their own box; `node tools/wiki/phone_shots.mjs <dir>`
+proves it per page type), and **vanilla faces on the wiki keep their eyes** (`portrait_bust` read
+FaceData's eye pair as the mouth; Halvar/Bazba and 114 others). #495 is closed (ch01-ch03 terrain,
+ch06 Halberd lesson, scene gold, ADR 0350). The wiki deploys `main`'s on every push (ADR 0347);
+never publish it by hand.
 
 ## In flight
 
@@ -24,11 +26,11 @@ Ch8's 10,000. The wiki deploys `main`'s on every push (ADR 0347); never publish 
 
 **Next, in order:**
 
-1. **#493 -- the wiki's remaining findings**: **mobile first** (Nicolas, 2026-10-15: the page
-   ships no viewport meta, so the skin's phone rules never fire -- see #493's Mobile item),
-   then enemy names vs the ROM's unit window, #490's stat
-   ranges, supports (wait on #494). Nicolas red-pens the drafts on the live wiki: the lore
-   Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346, chapter YAML).
+1. **#493 -- the wiki's remaining findings**: enemy names vs the ROM's unit window (named
+   generics print their class: confirm that is what the game shows), then the `vanilla_payload`
+   audit (GIVEITEMTO, chest gold, secret shops), boss ranks from the injected CharacterData, the
+   navbox, #490's stat ranges, supports (wait on #494). Nicolas red-pens the drafts on the
+   live wiki: the lore Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346, chapter YAML).
 2. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
    ending waits on it); then Act IV beats, the recruit pass, the legendary-weapon pass, the
    back-half onboarding catalog, the arc ADR. Nicolas leans toward ch01 on vanilla Ch1's map with
