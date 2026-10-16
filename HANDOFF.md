@@ -9,71 +9,39 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-15 (Claude, evening). **#487 is the one PR in flight:** the wiki on the Fire
-Emblem Wiki's own templates (#493). Script and character pages and the character list are done;
-the cast's in-game help text is their own (ADR 0346). Nicolas's order stands: finish the wiki
-and merge it, THEN resume ch07+ planning with it. What landed and why is in `git log`, the PRs
-and #493 -- this file keeps no "recently landed" list.
+Refreshed 2026-10-15 (Claude, night). **#487 merged** (`1bc2ae8`): the wiki is built from the
+YAML and the decomp on the Fire Emblem Wiki's own templates, and CI deploys `main`'s to
+<https://nicovigh.github.io/manchego-stars/> on every push (ADR 0347) -- never publish it by hand;
+the old artifact is deleted. #493 stays open for the wiki's remaining findings. Nicolas's order:
+fix #495's twin gaps BEFORE resuming ch07+.
 
 ## In flight
 
-- **PR #487 (`feat/486-chapter-wiki`, base `main`)**, published at
-  https://claude.ai/artifact/Nv1KWW44LV7NMDK7PwoK3m (on the branch, run `gen_wiki.py`, then
-  republish `build/wiki/index.html` to that URL). It carries deliberate ROM changes, so a fingerprint here
-  proves only what a change claims not to move: #489's recruit kit, the green chwinga bust,
-  ch02's Armory (ADR 0345).
-  - **The engine (the branch's `wiki/` package)**: `vendor.py` vendors one real FE8 page per page type we
-    publish, every template and Lua module it reaches, and the wiki's render as golden tokens
-    (`wiki/vendor/`). `mw.py` expands the templates, `render.py` renders wikitext,
-    `site.py` resolves links (our page, else the real wiki) and files (the build's art).
-    `test_wiki_engine.py`: 14 exemplars, 12 exact, two quirks named beside their floors.
-  - **Done on the templates**: chapter, Script (`script_sections` sorts scenes into the wiki's
-    sections by trigger) and character pages (cast, bosses, planned recruits, lore NPCs), and the
-    character list. `wiki/pages.py` is the layout, `gen_wiki` the data; every number is the
-    injector's own (`inject.stats.cast_growths`/`cast_ranks`, `boss_modes`, `promotions`).
-    `test_wiki_pages.py` holds each page type to its exemplars' section order.
-  - **Character prose** is each lore file's `## Profile` (lore/README.md says what it is; drafts,
-    Nicolas to red-pen on the wiki). HD art: `references/References/PCs/HD Art/<Name>HD.jpeg`,
-    all eight PCs present.
-  - **Still on the old HTML path (`wiki/markup.py`)**: home, design notes, open decisions.
-    `markup.py` retires once the last of them moves.
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
   locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
   locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
 - **#490** -- the difficulty model's autolevel diverges from the ROM (unflagged bosses grown,
   promoted bonus missing); fix before ch09 is measured.
 
-**Next, in order** (the full state, every decision and every open pick: #486 and #493):
+**Next, in order:**
 
-1. **#493 on #487** -- its unticked boxes, in this order:
-   - **First, the "For the next instance" section** (Nicolas, 2026-10-15): three twin strategy
-     lines our chapters could not back (Sahnar sparing Basil, ch03's breakable walls, ch06's
-     Halberd drop) -- investigate each as a possible GAME gap, not just text; and Trivia for the
-     book's own characters, naming *Rime of the Frostmaiden* with its words (the OCR file).
-   - Pages: the availability chart, the lord-select concept page (`Imperial Three` /
-     `Sacred Stone (object)` are the exemplars), the chapter list on templates, Nav8's navbox at
-     every page's foot, the home page off `markup.py`, and Open decisions off the wiki (it lives
-     in the YAML and on #486). Supports wait on #494 (the ROM loads each slot's vanilla partners).
-   - Readers: ch01's money gift (`vanilla_payload` reads no gold, nor event GIVEITEMTOs or chest
-     gold), boss personal lines from the INJECTED CharacterData, enemy names, and the **wield
-     check** (every unit can use what it carries); #490's autolevel divergence.
-   Then republish, Nicolas's layout list, `/code-review medium`, merge on his word. Nicolas is
-   leaning toward ch01 on vanilla Ch1's map with Hamill Canyon back as ch08 -- raise it in the
-   planning step.
-2. **#486 planning, continue WITH Nicolas** on the updated wiki: the open picks on the Open
-   decisions page (ch07's exit hook first: #27's ending waits on it); then Act IV beats (ch17
-   beat and map, ch18 map); the recruit pass (who fills each vanilla role ch09-ch17); the
-   legendary-weapon pass (one per PC); the back-half onboarding catalog; then the arc ADR.
-3. **#27 -- ch07's ending** once its exit hook is settled, and the move to Distant Blade. The rest
-   of the ending is known: Messie in the top hat, the fish tax, his farewell reveal, the 10,000
-   gold, **Meriwa + Esio Trot join** (ADR 0342), the town crier. Ask Nicolas for his flow first.
-   Recruit art inputs: `references/References/Recruits/esio-trot/`; Meriwa is the ch06 Mermaid
-   plus a portrait. Still write NO custom or copied code (`docs/adding-a-chapter.md`).
-   `make CH07BOOT=1`.
-4. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337), and
-   loses its blood (cast palette index 6). It joins at ch08's start (#28).
-5. **#459** stays open for the parity CHECK itself (plan item 2: ours vs vanilla per chapter, by
-   count and role). Its comment corrects vanilla's Ch9-14 party counts (Ephraim leaves after Ch8).
+1. **#495 -- twin gaps, before ch07** (its boxes are the spec): a standing test that every retile
+   plays like its donor (ch03 167 cells incl. Borgo's three cracked walls and the aesthetic
+   water, ch02's two villages, ch01's gate declared); ch06's Halberd equip-on-use lesson; and the
+   **scene-gold vehicle**, built once for ch01's 5,000 (vanilla pays it in Castle Frelia's scene
+   after Ch1 -- measured on retail with `PT_VANILLA=1 tools/playtest/run.sh vanillagold`) and
+   ch07's 10,000. Each gets its strategy line once the game backs it.
+2. **#493 -- the wiki's remaining findings**: enemy names vs the ROM's unit window, #490's stat
+   ranges, supports (wait on #494). Nicolas red-pens the drafts on the live wiki: the lore
+   Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346, chapter YAML).
+3. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
+   ending waits on it); then Act IV beats, the recruit pass, the legendary-weapon pass, the
+   back-half onboarding catalog, the arc ADR. Nicolas leans toward ch01 on vanilla Ch1's map with
+   Hamill Canyon back as ch08 -- raise it there.
+4. **#27 -- ch07's ending** once its exit hook is settled, and the move to Distant Blade (Meriwa +
+   Esio Trot join, ADR 0342; ask Nicolas for his flow first; `make CH07BOOT=1`).
+5. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337).
+6. **#459** stays open for the parity CHECK itself.
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
   Proven headless instead, never owed to him: a shop (the DSL's `shop:` step, ch02armory,
