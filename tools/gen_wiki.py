@@ -192,6 +192,10 @@ def vanilla_payload(key):
     out['gold_chests'] = re.findall(r'ChestMoney\(\s*(\d+)', info)
     out['gifts'] = list(difficulty._gift_items(script))
     out['gold_gifts'] = difficulty._gift_gold(script)
+    out['interlude_gold'] = []
+    for stem2, inter in difficulty.twin_interlude_scripts(script):
+        out['gifts'] += list(difficulty._gift_items(inter))
+        out['interlude_gold'] += difficulty._gift_gold(inter)
     out['n_villages'] = len(re.findall(r'Village\(', info))
     shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
     out['shops'] = [(sym, difficulty._shoplist_items(shoptext, sym))
@@ -1542,9 +1546,15 @@ def lore_book(stem):
 
 
 def lore_trivia(stem, first=()):
-    """Trivia lines: `first` (the record's own), then the book's."""
-    book = lore_book(stem)
-    return list(first) + ([book] if book else [])
+    """Trivia lines: `first` (the record's own), the lore file's `## Trivia` bullets (the real
+    things a character is drawn from), then the book's."""
+    book, own = lore_book(stem), []
+    path = os.path.join(LORE, '%s.md' % stem) if stem else ''
+    if path and os.path.isfile(path):
+        with open(path, encoding='utf-8') as f:
+            m = re.search(r'^## Trivia\n(.*?)(?=^## |\Z)', f.read(), re.S | re.M)
+        own = [' '.join(b.split()) for b in re.split(r'^- ', m.group(1), flags=re.M)[1:]] if m else []
+    return list(first) + own + ([book] if book else [])
 
 
 def lore_for(uid, name):
@@ -1951,6 +1961,8 @@ def twin_payload_html(chap, ckey):
         rows.append(('%s gold' % esc(g), 'Chest', '', ''))
     for g in v.get('gold_gifts') or []:
         rows.append(('%s gold' % '{:,}'.format(g), 'Given by an event', '', ''))
+    for g in v.get('interlude_gold') or []:
+        rows.append(('%s gold' % '{:,}'.format(g), 'Given in the scene after the chapter', '', ''))
     out = [wikitable(['Item', 'Vanilla vehicle', 'Enum', 'Ours'], rows)]
     rec = [(esc(pretty_enum(c, 'CHARACTER_')), class_html(k[len('CLASS_'):].lower()), esc(l),
             esc(how)) for c, k, l, how in v['recruits']]

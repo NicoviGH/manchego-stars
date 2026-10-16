@@ -478,10 +478,11 @@ events:
 # ── Post-Chapter ──────────────────────────────────────────────────────────────
 # Economy follows vanilla FE8: NO flat per-chapter clear bonus -- gold comes only from
 # in-map sources (gold-giving villages, sellable drops/gems, chests, arena). See
-# docs/decisions.md "Economy". ch01 is a net wash, like vanilla Ch1 (~0 gold): the
-# company's ~200g job payment for recovering the iron is immediately spent winning over
-# Baxby, so nothing is added or subtracted in-game (Nicolas, 2026-06-17). The "two
-# hundred gold" in the ending dialogue is flavor only.
+# docs/decisions.md "Economy". Vanilla Ch1 is NOT a wash: right after it, Castle Frelia's
+# scene (chapter 0x38, the decomp's `lordsplit`) pays the leader 5,000 gold, so Ch2 starts at
+# 5,000 -- measured on the retail ROM (`vanillagold`, 2026-10-15). ch01 pays nothing, so our
+# party reaches ch02's Armory with 0. The 2026-06-17 "net wash" call (job pay ~200g spent on
+# Baxby) rested on reading vanilla as ~0; restoring the 5,000 is #495, with ch07's scene gold.
 post_chapter:
   net_gold: 0                   # job pay (~200g) == Baxby's keep; no in-game add/subtract
   available_shops: [bryn-shander]

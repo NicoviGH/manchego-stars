@@ -20,6 +20,10 @@ invented string cheese on the spot to save the party from a dragon. His dark sid
 does: he executed a kobold in cold blood, with a pleasant pun. His one real
 warmth is for his son, Pinky.
 
+## Trivia
+
+- He draws on Professor Ratigan, the rat villain of Disney's ''The Great Mouse Detective'' (1986), and on ''Ratboy Genius'', Ryan Dorin's YouTube series (2007 on).
+
 ## Concept
 
 - **Race:** Underfolk

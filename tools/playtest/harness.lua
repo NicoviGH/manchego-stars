@@ -1398,6 +1398,7 @@ local function bootToMap(stopAtPrep, want)
     -- names nothing, which is how #232 stayed misdiagnosed for three sessions. The cap is
     -- sized above any real scene and INSPECT.watch is what decides failure.
     for _ = 1, TUNE.bootSteps do
+        if TUNE.bootHook then TUNE.bootHook() end   -- a scenario's per-step poke (vanillagold)
         local observation = observeController()
         local state, why = controllerState(observation)
         if stalled(observation, state) then
@@ -2022,6 +2023,93 @@ scenarios.win = function()
         result("PASS", string.format(
             "DefeatBoss fired; chapter advanced %d -> %d", 1, chapter()))
     end
+end
+
+-- VANILLAGOLD: RETAIL FE8 (PT_VANILLA=1), never our build. Does vanilla's Ch1 "Escape!" pay
+-- the 5,000 gold the Fire Emblem Wiki lists? No Ch1 event, world-map script or C gold path in
+-- the decomp grants it, so this reads the party's gold (gPlaySt+0x08) at each chapter's map
+-- and after each chapter change. Measured 2026-10-15: 0 through the Prologue and Ch1, then
+-- 5,000 inside chapter 0x38 (Castle Frelia, the decomp's `lordsplit`), so Ch2 starts at 5,000. Prologue: Seth kills a 1-HP O'Neill (DefeatBoss). Ch1: Seth
+-- kills a 1-HP Breguet off the gate and Eirika seizes (2,2). Vanilla's own chapter indices,
+-- Prologue 0, Ch1 1, Ch2 2 -- never our hosting slots (inject/hosts.py), which are ours.
+scenarios.vanillagold = function()
+    local PROLOGUE, CH1, CH2 = 0, 1, 2
+    -- Retail boots at text speed 1 (bmio.c:950); our build plays its scenes at max. Hold
+    -- textSpeed 3 (no typewriter delay, GetTextDisplaySpeed) and gameSpeed fast, or the
+    -- Prologue's narration outlasts TUNE.bootSteps. New Game rewrites the config, hence every step.
+    TUNE.bootHook = function()
+        local a = SYM.gPlaySt + 0x40
+        emu:write32(a, (ru32(a) & ~(3 << 5)) | (3 << 5) | (1 << 7))
+    end
+    local EIRIKA, SETH, ONEILL, BREGUET = 0x01, 0x02, 0x68, 0x46
+    local function gold() return ru32(SYM.gPlaySt + 0x08) end
+    local seen = {}
+    local function note(tag)
+        local line = string.format("%s: chapter %d, gold %d", tag, chapter(), gold())
+        seen[#seen + 1] = line
+        log("vanillagold: " .. line)
+    end
+    local function teleport(u, x, y)
+        local grid = mapUnitAt(u.x, u.y)
+        setMapUnit(u.x, u.y, 0)
+        emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+        setMapUnit(x, y, grid)
+    end
+    -- Seth strikes a 1-HP boss from a free adjacent tile; `stop` is the chapter's own outcome.
+    local function killBoss(pid, here)
+        for t = 1, 6 do
+            local boss = red(pid)
+            if isDead(boss) then return true end
+            pokeFrail(boss)
+            local seth = blue(SETH)
+            local spot
+            for _, d in ipairs({ { 0, 1 }, { 1, 0 }, { -1, 0 }, { 0, -1 } }) do
+                local tx, ty = boss.x + d[1], boss.y + d[2]
+                if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then spot = { x = tx, y = ty } break end
+            end
+            if not spot then return false end
+            teleport(seth, spot.x, spot.y)
+            seth = blue(SETH)
+            if not moveUnit(seth.x, seth.y, seth.x, seth.y) then return false end
+            chooseAttack(seth.addr, function() return isDead(red(pid)) or chapter() ~= here end)
+            if isDead(red(pid)) or chapter() ~= here then return true end
+            if runEnemyPhase() ~= "player" then return false end
+        end
+        return false
+    end
+
+    if not bootToMap(nil, PROLOGUE) then return result("FAIL", "never reached the Prologue map") end
+    note("Prologue map")
+    if not killBoss(ONEILL, PROLOGUE) then return result("FAIL", "could not kill O'Neill") end
+    waitFor(function() return chapter() ~= PROLOGUE end, 3600, true)
+    note("after the Prologue")
+    if not bootToMap(nil, CH1) then return result("FAIL", "never reached Ch1's map") end
+    note("Ch1 map")
+    if not killBoss(BREGUET, CH1) then return result("FAIL", "could not kill Breguet") end
+    local eirika = blue(EIRIKA)
+    teleport(eirika, 2, 2)
+    eirika = blue(EIRIKA)
+    if not moveUnit(eirika.x, eirika.y, eirika.x, eirika.y) then
+        return result("FAIL", "no live command menu for Eirika on the gate")
+    end
+    if not selectSemantic("seize", "Seize starts Ch1's win event", function()
+        return chapter() ~= CH1 or procActive(SYM.ProcScr_StdEventEngine)
+    end, 900) then return result("FAIL", "Eirika's menu offered no Seize on (2,2)") end
+    waitFor(function() return chapter() ~= CH1 end, 9000, true)
+    note("after Ch1")
+    -- Ch1 ends with MoveToChapter(0x38): a world-map interlude the controller does not
+    -- classify. Press through it (START skips, A advances) and note every change in gold, so
+    -- a grant inside the interlude is caught where it happens.
+    local last = gold()
+    for step = 1, 4000 do
+        if chapter() == CH2 then break end
+        press(step % 3 == 0 and K.START or K.A, 2)
+        wait(8)
+        if gold() ~= last then last = gold(); note("gold changed during the interlude") end
+    end
+    if chapter() ~= CH2 then return result("FAIL", "the interlude never handed over to Ch2") end
+    note("Ch2 begins")
+    return result("PASS", table.concat(seen, " | "))
 end
 
 -- GOODBERRY: boot to the ch00 map, open Hlin's Item menu (she carries a Hand Axe +

@@ -18,6 +18,10 @@ understand a monster than fight it. He talked the direwolf Lupin into pulling th
 promise of goodberries, and he spoke with the maer monster to hear its side. When a fight cannot be
 avoided he goes quiet, and stays cheerful while his killing spores spread.
 
+## Trivia
+
+- He is named for a real planter, ''Marty the Merry Mushroom'', from the "Merry Mushroom" ceramics Sears sold in the late 1970s.
+
 ## Concept
 
 - **Race:** Sporemaster

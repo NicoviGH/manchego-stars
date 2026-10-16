@@ -20,6 +20,9 @@ numbers or drafting notes). The chapter wiki (`tools/gen_wiki.py`) prints it as 
 Personality section, and its first sentence is their line in the character list. Everything else in
 a file is for writers. Keep the Profile true when the character changes.
 
+A **`## Trivia`** list, when a character has one, names the real things they are drawn from
+(Marty's planter, RBG's rat, Rootis's snowman); the wiki prints each bullet as Trivia.
+
 A character from *Rime of the Frostmaiden* also gets a **`## Book`** section right after the
 Profile: what the book says of them, with the printed page and its own words quoted, and where
 ours departs. The wiki prints it as a Trivia line. The book's illustration of them, when it has

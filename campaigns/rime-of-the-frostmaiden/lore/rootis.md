@@ -16,6 +16,10 @@ He loves a good mystery and always reaches for the most complicated theory first
 obvious answer for someone else. He is one of the party's quieter members, speaks up against
 needless violence, and sat out the party's fight with Bremen's government.
 
+## Trivia
+
+- He is modelled on the snowman of the original ''Animal Crossing'', the low-poly snowman a player builds by rolling two snowballs together.
+
 ## Concept
 
 - **Race:** Snowperson

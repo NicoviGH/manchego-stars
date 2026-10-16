@@ -2711,6 +2711,40 @@ def _gift_gold(eventscript_text):
     return out
 
 
+def chapter_event_stem(index):
+    """The event-file stem of FE8 chapter `index`, through the decomp's own tables: its
+    chapter_settings `mapEventDataId` indexes the chapter asset table (data_8B363C.s), whose
+    word names a ChapterEventGroup, defined in exactly one events/<stem>-eventinfo.h."""
+    import json
+    table = re.findall(r'\.word\s+(\w+)', inject.decomp.vanilla_decomp_text('data/data_8B363C.s'))
+    chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
+    chapters = chapters if isinstance(chapters, list) else chapters['chapters']
+    if not 0 <= index < len(chapters):
+        return None
+    group = table[chapters[index]['mapEventDataId']]
+    info = inject.decomp.vanilla_decomp_text('src/events_info.c')
+    for stem in re.findall(r'#include "events/(\w+)-eventinfo\.h"', info):
+        text = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+        if re.search(r'ChapterEventGroup\s+%s\b' % group, text):
+            return stem
+    return None
+
+
+def twin_interlude_scripts(eventscript_text):
+    """[(stem, script)] for the event-only chapters a twin's ending moves to before the next
+    battle. Vanilla Ch1 ends with MoveToChapter(0x38), Castle Frelia (the decomp files it as
+    `lordsplit`), and THAT scene pays Ch1's 5,000 gold -- measured on the retail ROM
+    (`vanillagold`). A battle chapter is a `prologue`/`chNN` file; anything else reached by a
+    hop is the twin's interlude, and what it gives is the twin's."""
+    out = []
+    for idx in re.findall(r'MoveToChapter\((0x[0-9a-fA-F]+|\d+)\)', eventscript_text):
+        stem = chapter_event_stem(int(idx, 0))
+        if stem and not re.match(r'(prologue|ch\d)', stem) and stem not in [s for s, _ in out]:
+            out.append((stem, inject.decomp.vanilla_decomp_text(
+                'src/events/%s-eventscript.h' % stem)))
+    return out
+
+
 def vanilla_drops(parity_ref):
     """The vanilla twin's enemy DROPS, read from HEAD: for each red unit flagged `.itemDrop`
     in the chapter's curated UnitDefinition arrays, its LAST item (US_DROP_ITEM drops the final
@@ -2749,6 +2783,9 @@ def vanilla_economy(parity_ref):
              for sym in re.findall(r'(?:Armory|Vendor)\(\s*(\w+)', info)]
     gold = ([int(g) for g in re.findall(r'ChestMoney\(\s*(\d+)', info)]
             + _gift_gold(script))
+    for _stem, inter in twin_interlude_scripts(script):
+        gifts += [(it, item_gold_value(it)) for it in _gift_items(inter)]
+        gold += _gift_gold(inter)
     total = (sum(v for _, v in chests) + sum(v for _, v in gifts) + sum(v for _, v in drops)
              + sum(gold))
     return {'reference': parity_ref, 'chests': chests, 'gifts': gifts, 'drops': drops,

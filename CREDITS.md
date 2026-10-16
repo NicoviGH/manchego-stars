@@ -143,6 +143,7 @@ whose `RearUp`/`Attack`/`Charge` supply the three poses `inject_battle_anims` ne
     theirs is under the same GFDL 1.3.
 
 ## AI-generated art (disclose)
+- **The PCs' HD artwork** (`campaigns/.../portraits/hd/`, shown on the wiki's character pages) is AI-generated with Google **Gemini** (prompt-run by Nicolas).
 - **PC/cast portraits** are AI-generated (Google **Gemini / "Nano Banana"**) from reference art, then hand-fitted and indexed into FE8 portraits via our bust pipeline (`tools/ref_to_bust.py`, `tools/portrait_tool.py`). To be disclosed as AI-assisted per community norms.
 - **Baxby the axe-beak portrait** — the reference is the **axe-beak illustration from *Rime of the Frostmaiden*** (© Wizards of the Coast), modified with Google **Gemini** (prompt-run by Nicolas), then fitted/indexed via the bust pipeline (`tools/ref_to_bust.py --crop 780,18,1920,940 --flip-h --zoom 0.88`). Disclose as both AI-assisted and WotC-derived.
 - **Lupin the direwolf portrait** — the reference is **"Hipster Wolf Head With Glasses"** by **TotalityDesigns** (Redbubble listing; found image supplied by Nicolas, 2026-07-03 — private non-commercial use, recheck before any wider distribution; original vendored at `campaigns/.../portraits/vendor/`), fitted/indexed via the bust pipeline (`tools/ref_to_bust.py --crop " -206,0,1033,1032" --zoom 1.0` + the `portraits/lupin_darken.py` ink-deepening pass). Not AI-generated.

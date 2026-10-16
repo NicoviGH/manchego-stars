@@ -37,7 +37,7 @@ sys.path.insert(0, os.path.join(REPO, 'tools'))
 from inject.class_ids import DEFAULT_CAMPAIGN  # noqa: E402
 from inject.decomp import DECOMP, vanilla_decomp_text  # noqa: E402  the build tree (#408, ITEM_ENUM)
 from yaml_loader import yaml_load  # noqa: E402
-ELF = os.path.join(DECOMP, 'fireemblem8.elf')
+ELF = os.environ.get('PT_ELF') or os.path.join(DECOMP, 'fireemblem8.elf')   # PT_VANILLA (run.sh)
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, 'symbols.lua')
 OUT_PROCSCR = os.path.join(HERE, 'procscr.lua')
