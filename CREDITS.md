@@ -125,18 +125,25 @@ whose `RearUp`/`Attack`/`Charge` supply the three poses `inject_battle_anims` ne
 | **Icewind Dale: Ten-Towns Hand Drawn Maps and NPC Builder** (2021) — the ten-towns hand-drawn map (weathered + clean variants) + NPC builder tables | tour drawn-map B (`events/tour-map-b-towns.*`, icy duotone + re-lettering via `tools/gen_drawnmap.py`); NPC builder informs story/NPC work | **Joel Kleine** (@midlifedices) | purchased: [DriveThru product 353776](https://www.drivethrucomics.com/en/product/353776/icewind-dale-ten-towns-hand-drawn-maps-and-npc-builder); published under the DMs Guild Community Content Agreement |
 
 ## Campaign source material (Wizards of the Coast)
-- ***Icewind Dale: Rime of the Frostmaiden*** © Wizards of the Coast — the campaign this hack adapts (privately, for its own players). Book art reused in-ROM: the ch1 opener aurora-township painting (lore-crawl mural), the regional Icewind Dale map (basis/reference for the world-tour backdrops), and the **axe-beak illustration** (the reference for Baxby's portrait — see AI-generated art below).
+- ***Icewind Dale: Rime of the Frostmaiden*** © Wizards of the Coast — the campaign this hack adapts (privately, for its own players). **On the wiki:** the book's illustrations of ten characters, cropped from the book (`campaigns/.../lore/book-art/`, each one's printed page and caption in its `index.yaml`), and short quotations in each book character's Trivia (`lore/*.md` → `## Book`), cited by page. Book art reused in-ROM: the ch1 opener aurora-township painting (lore-crawl mural), the regional Icewind Dale map (basis/reference for the world-tour backdrops), and the **axe-beak illustration** (the reference for Baxby's portrait — see AI-generated art below).
 
 ## Reference material (documentation, not shipped assets)
-- **Fire Emblem Wiki** (<https://fireemblemwiki.org>), the independent community wiki. Mined by
-  `tools/fe8_guide_mine.py` into the generated digest `docs/fe8-guide.md`, which is the *how a chapter
-  is meant to be won* half of our parity work &mdash; the decomp only answers what a chapter contains.
-  **Only game FACTS are committed** (objectives, deploy caps, per-difficulty enemy tables); the wiki's
-  Strategy prose is its own authorship and is deliberately not reproduced in-repo &mdash; the
-  `Shape`/`Pressure`/`Teaches`/`Playstyle` lines are ours, written from it. Fetched HTML lives in the
-  gitignored `.fe8-guide-cache/` and is never redistributed.
+- **Fire Emblem Wiki** (<https://fireemblemwiki.org>), the independent community wiki. Its
+  original content is released under the **GNU Free Documentation License 1.3**; the game art
+  on it is © **Nintendo / Intelligent Systems**. Two uses:
+  - `tools/fe8_guide_mine.py` mines game FACTS into the generated digest `docs/fe8-guide.md`
+    (objectives, deploy caps, per-difficulty enemy tables); fetched HTML stays in the gitignored
+    `.fe8-guide-cache/`.
+  - **Our wiki** (`tools/gen_wiki.py`, published on GitHub Pages) is built on the Fire Emblem
+    Wiki's own templates, skin and page layouts, vendored with their source under
+    `tools/wiki/vendor/` (`templates/`, `pages/`, `golden/`), and prints each twin chapter's
+    Strategy section from `tools/wiki/vendor/twins/`, labelled as theirs. Class artwork and FE8
+    battle sprites shown on boss pages come from the wiki's class pages
+    (`tools/wiki/vendor/classes/`, `tools/wiki/vendor/files/`). Our wiki's text derived from
+    theirs is under the same GFDL 1.3.
 
 ## AI-generated art (disclose)
+- **The PCs' HD artwork** (`campaigns/.../portraits/hd/`, shown on the wiki's character pages) is AI-generated with Google **Gemini** (prompt-run by Nicolas).
 - **PC/cast portraits** are AI-generated (Google **Gemini / "Nano Banana"**) from reference art, then hand-fitted and indexed into FE8 portraits via our bust pipeline (`tools/ref_to_bust.py`, `tools/portrait_tool.py`). To be disclosed as AI-assisted per community norms.
 - **Baxby the axe-beak portrait** — the reference is the **axe-beak illustration from *Rime of the Frostmaiden*** (© Wizards of the Coast), modified with Google **Gemini** (prompt-run by Nicolas), then fitted/indexed via the bust pipeline (`tools/ref_to_bust.py --crop 780,18,1920,940 --flip-h --zoom 0.88`). Disclose as both AI-assisted and WotC-derived.
 - **Lupin the direwolf portrait** — the reference is **"Hipster Wolf Head With Glasses"** by **TotalityDesigns** (Redbubble listing; found image supplied by Nicolas, 2026-07-03 — private non-commercial use, recheck before any wider distribution; original vendored at `campaigns/.../portraits/vendor/`), fitted/indexed via the bust pipeline (`tools/ref_to_bust.py --crop " -206,0,1033,1032" --zoom 1.0` + the `portraits/lupin_darken.py` ink-deepening pass). Not AI-generated.

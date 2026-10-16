@@ -1,0 +1,6 @@
+<noinclude>{| class="cellpadding-3 basic width-90" style="border-radius: 20px; border-width: 2px; padding: 4px"
+</noinclude>|-
+! colspan="3" class="roundb" |
+|}<noinclude>
+
+{{doc}}</noinclude>

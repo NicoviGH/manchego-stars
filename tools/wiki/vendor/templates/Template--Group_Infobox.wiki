@@ -1,0 +1,51 @@
+{| class="infobox"
+|
+{| style="font-size: 10px; width:100%"
+! {{{name|{{PAGENAME}}}}}
+|-
+!
+<span style="font-size: 11px">{{{image|No image available.}}}</span><br>{{{caption|}}}
+{{#if:{{{help_text|}}}
+|<hr>
+''{{{help_text}}}''
+}}
+|}
+|- 
+|
+{| style="width:100%"
+! Leader
+|
+{{{leader|Unknown}}}
+|-
+{{#if:{{{size|}}}|
+! Size
+{{!}}
+{{{size}}}}}
+|-
+{{#if:{{{base|}}}|
+! Headquarters
+{{!}}
+{{{base}}}}}
+|-
+{{#if:{{{type|}}}|
+! Group type
+{{!}}
+{{{type}}}}}
+|-
+{{#if:{{{purpose|}}}|
+! Purpose
+{{!}}
+{{{purpose}}}}}
+|-
+{{#if:{{{startingclass|}}}|
+! Starting class
+{{!}}
+{{{startingclass}}}}}
+|-
+! Appearance(s)
+{{!}}
+{{{appearances|Unknown}}}<includeonly>[[Category:Groups and organizations]]</includeonly>
+|}
+|}<noinclude>
+
+{{doc}}</noinclude>

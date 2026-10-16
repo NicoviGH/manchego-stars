@@ -169,6 +169,26 @@ a = action(supply, "close_supply")
 check(a and a.key, "B", "B leaves the convoy (PrepItemSupply_Loop_GiveTakeKeyHandler)")
 check(action(supply, "cursor_down"), nil, "and the map cursor is not offered while it is up")
 
+-- The status screen and its help box (ADR 0346's `casthelp`). The help box is a blocking child,
+-- so it outranks the status screen, which outranks the map underneath both.
+local statScreen = {
+    procs = { stat_screen = { idle = "stat_screen_input" }, player_phase = { idle = "player_main_idle" } },
+}
+classify(statScreen, "stat_screen", "the status screen outranks the map underneath it")
+a = action(statScreen, "open_help")
+check(a and a.key, "R", "R opens help on the status screen")
+check(action(statScreen, "cursor_down"), nil, "and the map cursor is not offered while it is up")
+local helpBox = {
+    procs = { help_box = { idle = "help_box_input" }, stat_screen = { idle = "stat_screen_input" } },
+    help_box = { info = 0x08A00000, left = true },
+}
+classify(helpBox, "stat_screen_help", "the help box outranks the status screen")
+a = action(helpBox, "help_left")
+check(a and a.key, "LEFT", "LEFT walks to adjLeft where there is one")
+helpBox.help_box.left = false
+check(action(helpBox, "help_left"), nil, "and is not offered where adjLeft is NULL")
+check((action(helpBox, "close_help") or {}).key, "B", "B closes help")
+
 -- Standard menus expose semantic command IDs and enabled availability, never guessed rows.
 local unitMenu = {
     procs = proc("menu", "menu_input"),

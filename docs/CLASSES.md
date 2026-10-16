@@ -17,9 +17,9 @@ roster derived from the unit YAML.
 | Braulo | Barbarian (Path of the Berserker) — Hermit Crab | Pirate | **Berserker** / Warrior |
 | Marty the Merry Mushroom | Druid (Circle of Spores) — Sporemaster | Shaman | **Druid** / Summoner |
 | Meesmickle | Warlock (The Fiend) — Vampire Tabaxi | Shaman | **Summoner** / Druid |
-| Pinky | — | Pegasus Knight | **Falcon Knight** / Wyvern Knight |
+| Pinky | — | Pegasus Knight | **Falcoknight** / Wyvern Knight |
 | Prof. R.B. Geenius | Artificer (Artillerist) — Underfolk | Archer | **Sniper** / Ranger |
-| Rootis | Sorcerer (Draconic Bloodline) — Snowperson | Mage (Ice) | **Sage** / Mage Knight |
+| Rootis | Sorcerer (Draconic Bloodline) — Snowperson | Mage | **Sage** / Mage Knight |
 | Sclorbo | Bard (College of Lore) — Chwinga | Priest | **Bishop** / Sage |
 | Wolfram | Metallurgist (School of the Smith) — Mineralscale Drakeborn | Knight | **General** / Great Knight |
 
@@ -27,13 +27,16 @@ roster derived from the unit YAML.
 
 | Unit | FE base | Promotion | Joins via |
 |---|---|---|---|
-| Basil | Cleric | **Bishop** / Valkyrie | story — repotted from the Elven Tomb (Ch5) |
+| Basil | Cleric | **Bishop** / Valkyrie | story — green in the Elven Tomb (Ch5) until any party member talks to her |
 | Baxby | Cavalier | **Paladin** / Great Knight | — |
 | Brie | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
+| Esio Trot | Fighter | — | story — joins in ch07's ending with Meriwa (ADR 0342) |
 | Lupin | Cavalier | **Paladin** / Great Knight | story — Marty talks the direwolf pack into the sled team (Ch4) |
+| Meriwa | Monk | — | story — joins in ch07's ending with Esio Trot (ADR 0342) |
 | Pepperjack | TBD (post-MVP) | — | not a recruit — vanilla map ballista (RBG's siege), from ~Ch10 |
 | Sahnar | Myrmidon | **Swordmaster** / Assassin | story — talked down by Basil after Ravisin summons her (Ch5) |
-| Trex | Thief | **Rogue** / Assassin | story — joins after the Termalaine mine (Ch3) |
+| Trex | Thief | **Rogue** / Assassin | story — green in the Termalaine mine (Ch3) until any party member talks to him |
+| The White Moose | Cavalier | — | story — Marty talks to it at ch08's opening (ADR 0342) |
 
 > **Note.** `pepperjack`/`brie` carry `fe_stats.class: null` because they are NOT
 > roster recruits — they are vanilla FE8 **map ballistae** (siege emplacements the

@@ -1,0 +1,3 @@
+<includeonly><div class="col-list {{#switch:{{{1|note}}}|note=lettered-list}} refbar">
+{{#tag:references||group="{{{1|note}}}"}}
+</div></includeonly><noinclude>{{doc}}</noinclude>

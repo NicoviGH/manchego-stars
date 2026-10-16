@@ -1,0 +1,68 @@
+{| class="infobox"
+|
+{| style="width:100%"
+! {{{title|{{PAGENAME}}}}}<includeonly>{{#ifeq: {{NAMESPACE}} | User | | [[Category:Chapters]]}}</includeonly>
+|-
+!
+{{{image|No image available.}}}<br><span style="font-size: 77%">{{{caption|}}}</span>
+|}
+|- 
+|
+{| style="width:100%"
+{{#if:{{{location|}}}|
+! Location
+{{!}}
+{{{location}}}}}
+|-
+{{#if:{{{weather|}}}|
+! Weather
+{{!}}
+{{{weather}}}}}
+|-
+{{#if:{{{req units|}}}|
+! Required units
+{{!}}
+{{{req units}}}}}
+|-
+{{#if:{{{new units|}}}|
+! New units
+{{!}}
+{{{new units}}}}}
+|-
+{{#if:{{{boss|}}}|
+! Boss(es)
+{{!}}
+{{{boss}}}}}
+|-
+{{#if:{{{previous|}}}|
+! Previous chapter(s)
+{{!}}
+{{{previous}}}}}
+|-
+{{#if:{{{next|}}}|
+! Next chapter(s)
+{{!}}
+{{{next}}}}}
+|-
+{{#if:{{{sidequest|}}}|
+! Side quest conditions
+{{!}}
+{{{sidequest}}}}}
+|}
+|}<noinclude>
+
+==Usage==
+Use for chapters.
+<pre>{{Chapter Infobox
+|title=
+|image=
+|location=
+|weather=
+|req units=
+|new units=
+|boss=
+|previous=
+|next=
+|sidequest=
+}}</pre>
+[[Category:Infobox templates]]</noinclude>

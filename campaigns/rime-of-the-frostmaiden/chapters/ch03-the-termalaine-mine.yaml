@@ -4,7 +4,9 @@
 
 id: ch03-the-termalaine-mine
 title: "The Termalaine Mine"
+location: "Termalaine's tourmaline mine"
 chapter_number: 3
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # design locked + grounded (decomp + DM notes + Frostmaiden book); slice in build
 milestone: M3
 cadence: big_battle_seize       # see docs/CHAPTERS.md — mirrors FE8 Ch3 "big battle / recruit" (Colm→Trex)
@@ -85,7 +87,7 @@ narrative: >
 map:
   file: maps/ch03-the-termalaine-mine.mar    # painted on the cave-interior metatiles (gen_map_editor eyedropper flow)
   tileset: cave-interior        # vendored FE cave/dungeon tileset, arctic palette (model on the ch01/ch02 winter pipeline)
-  base_layout: Ch3Map           # vanilla Ch3 "Bandits of Borgo" geometry, repainted as a mine interior
+  vanilla_layout: Ch3Map           # vanilla Ch3 "Bandits of Borgo" geometry, repainted as a mine interior
                                 #   RULED 2026-07-04 (Nicolas): Borgo repaint CONFIRMED — the 2026-06-29
                                 #   proposed custom Gem-Mine blockout (#23) is rejected; decisions.md ADR.
   size: "17×16"                 # = vanilla Ch3Map dims (enemy/seize tiles cite vanilla coords); painted 2026-07-06
@@ -106,7 +108,7 @@ objective:
     (Nicolas, 2026-07-06; decisions.md). The grell is visible from turn 1.
 
 win_condition: boss_defeated
-lose_condition: all_player_units_defeated         # FE8 lord rule
+lose_condition: lord_defeated         # FE8 lord rule
 
 difficulty_note: >
   Enemy pressure mirrors vanilla FE8 Ch3 1:1 (10 slots; see enemy_units). `make
@@ -115,11 +117,39 @@ difficulty_note: >
   our melee cast's low RES. The doors/chokepoints, not stat inflation, make the descent
   tense.
 
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  This chapter is very straightforward: fight down through the mine and kill the [[Grell]] at
+  the bottom of the central shaft. There are no time limits or pressures. The Grell is a
+  [[Mogall]] with Evil Eye and does not move, so the danger is the kobolds on the way down.
+  [[Trex]] waits in the galleries as a green unit from turn 1 and can be recruited by talking to
+  him with any party member.
+
+  You do not need Trex to open the way, because two kobolds carry the keys: one drops a
+  [[Door Key]], the other a [[Chest Key]]. With Trex you can also open the four [[chest]]s (an
+  [[Iron Lance]], an [[Iron Sword]], a [[Javelin]] and a Tourmaline). The kobold throwers carry
+  [[Hand Axe]]s and hit from two tiles, and a slinger with a bow covers the middle rooms, so
+  keep [[Pinky]] back until it falls.
+
+  Keep watch of the enemy [[Thief]], a svirfneblin. While he doesn't have any Lockpicks, he can
+  still steal items from your units if he outspeeds them; Trex can steal them back. The
+  [[Antitoxin]] kobold and, more importantly, the [[Pure Water]] kobold can easily be lured out
+  for Trex to claim their items before the rest of your units finish them off. Evil Eye is
+  magic, so send units with good [[Resistance]] into the Grell's reach and heal between attacks.
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   # Field parity: deploy_limit = vanilla FE8 Ch3 player deploy-slot count (decisions.md §Field parity;
   # fe8-pacing-reference §1b: Ch3 = 9, read from .size UnitDef_Event_Ch3Ally/20).
   deploy_limit: 9               # vanilla FE8 Ch3 fields 9 — ~our whole current roster (8 PCs + Baxby)
+  # The on-map talk-recruit, GREEN until a party member talks to him (vanilla Colm's pattern).
+  # Class, level and kit are his unit file's; this says only where he stands.
+  green_allies:
+    - id: trex
+      face: trex
+      position: [2, 4]          # Colm's tile: green Colm walks to (2,4) on the upper-left ledge of
+                                # vanilla Ch3 (spawns 0,5), the ledge the party naturally reaches to Talk
   # [col, row] — the west entrance of the mine (the same walkable left-edge tiles the
   # fast-boot spawned onto; PREP hides everyone and redeploys the picks onto these). One
   # per deploy_limit (the _deploy_cap_entries schema requires len(deploy_slots) == deploy_limit).
@@ -169,7 +199,6 @@ enemy_units:
     inventory:
       - id: evil-eye            # the mogall's innate ranged magic gaze (hits RES); flavor = lightning tentacle
     donor: [14, 1]     # vanilla Bazba, the seize-tile boss -- GuardTileAI + the GuardTile bit
-    death_quote: "*a wet, clicking shriek*"
   # ── 6 Brigand kobolds (vanilla L3-L4 brigands; 2 are key-droppers below) → Icewind kobolds ──
   - id: kobold-axe
     name: "Icewind Kobold"
@@ -384,6 +413,7 @@ events:
                       # RBG delivers the kill. Keeps the parity roster intact (real combat
                       # kill, not a cutscene-removal). The Brute = the kobold-steel "Icewind Brute"
                       # slot; flag it the miniboss + position it mid-galleries at units/objective wiring.
+    unit: kobold-steel
     type: cutscene
     ea_file: events/ch03-rbg-execution.ea
     description: >
@@ -583,3 +613,8 @@ design_notes: >
   (5) The vanilla enemy-thief slot is a SVIRFNEBLIN SKULK (deep-gnome gem-looter, Underdark tie
   to the grell), not a giant rat (RBG & Pinky are the party's rats). Dialogue-pass scope = the
   opening beat + the RBG-execution/Trex-recruit beat; grounds in trex.md + the book.
+
+# A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
+payload_deviations:
+  - item: ITEM_AXE_HANDAXE
+    why: "moved to ch02 in the ch02/ch03 swap (ADR 0052); its chest holds ch02's Red Gem"

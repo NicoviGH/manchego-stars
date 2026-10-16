@@ -1,0 +1,10 @@
+[[:{{{2}}}|{{color|{{{1}}}|{{{3|{{{2}}}}}}}}]]<noinclude>
+
+Based on Wikipedia's [[wikipedia:Template:Colored link|colored link template]].
+==Usage==
+<pre>
+{{colored link|color|Page|Link text (if different from page title; optional)}}
+</pre>
+<code>cl</code> can be used instead of <code>colored link</code>.
+See [[Help:Color]] for more info on colors.
+[[Category:Formatting templates]]

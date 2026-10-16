@@ -191,6 +191,11 @@ local function turn() return ru16(SYM.gPlaySt + 0x10) end
 local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) end
 
 local function findProc(scriptAddr)
+    -- A symbol gen_symbols.py does not export reads as nil, and scanning for nil finds nothing,
+    -- which looks exactly like "the proc never started" (ch02armory's first run, #493).
+    if scriptAddr == nil then
+        error("findProc: nil proc script -- add the symbol to gen_symbols.py's export list", 2)
+    end
     for i = 0, 63 do
         local addr = SYM.sProcArray + i * 0x6C
         if ru32(addr) == scriptAddr then return addr end
@@ -455,6 +460,8 @@ local CALLBACK_NAMES = {
     [SYM.BattleForecast_LoopDisplay] = "battle_forecast_display",
     [SYM.sub_8091AEC] = "unit_list_input",
     [SYM.PrepItemSupply_Loop_GiveTakeKeyHandler] = "supply_input",
+    [SYM.StatScreen_OnIdle] = "stat_screen_input",
+    [SYM.HbMoveCtrl_OnIdle] = "help_box_input",
 }
 local PREP_CALLBACK_NAMES = {
     [SYM.PrepScreenMenu_OnStartPress] = "prep_main_fight",
@@ -667,6 +674,15 @@ local function observeController()
         }
     end
     put("supply_screen", observedProc(SYM.ProcScr_BmSupplyScreen))
+    put("stat_screen", observedProc(SYM.gProcScr_StatScreen))
+    local helpBox = observedProc(SYM.gProcScr_HelpBoxMoveCtrl)
+    put("help_box", helpBox)
+    if helpBox then
+        -- struct HelpBoxProc (statscreen.h): +0x2C is the HelpBoxInfo the box points at, whose
+        -- +0x08 is adjLeft -- the entry LEFT moves to, NULL where LEFT goes nowhere.
+        local info = ru32(helpBox.addr + 0x2C)
+        observation.help_box = { info = info, left = info ~= 0 and ru32(info + 0x08) ~= 0 }
+    end
     local unitList = observedProc(SYM.ProcScr_UnitListScreen_Field)
     put("unit_list", unitList)
     if unitList then
@@ -1382,6 +1398,7 @@ local function bootToMap(stopAtPrep, want)
     -- names nothing, which is how #232 stayed misdiagnosed for three sessions. The cap is
     -- sized above any real scene and INSPECT.watch is what decides failure.
     for _ = 1, TUNE.bootSteps do
+        if TUNE.bootHook then TUNE.bootHook() end   -- a scenario's per-step poke (vanillagold)
         local observation = observeController()
         local state, why = controllerState(observation)
         if stalled(observation, state) then
@@ -2006,6 +2023,93 @@ scenarios.win = function()
         result("PASS", string.format(
             "DefeatBoss fired; chapter advanced %d -> %d", 1, chapter()))
     end
+end
+
+-- VANILLAGOLD: RETAIL FE8 (PT_VANILLA=1), never our build. Does vanilla's Ch1 "Escape!" pay
+-- the 5,000 gold the Fire Emblem Wiki lists? No Ch1 event, world-map script or C gold path in
+-- the decomp grants it, so this reads the party's gold (gPlaySt+0x08) at each chapter's map
+-- and after each chapter change. Measured 2026-10-15: 0 through the Prologue and Ch1, then
+-- 5,000 inside chapter 0x38 (Castle Frelia, the decomp's `lordsplit`), so Ch2 starts at 5,000. Prologue: Seth kills a 1-HP O'Neill (DefeatBoss). Ch1: Seth
+-- kills a 1-HP Breguet off the gate and Eirika seizes (2,2). Vanilla's own chapter indices,
+-- Prologue 0, Ch1 1, Ch2 2 -- never our hosting slots (inject/hosts.py), which are ours.
+scenarios.vanillagold = function()
+    local PROLOGUE, CH1, CH2 = 0, 1, 2
+    -- Retail boots at text speed 1 (bmio.c:950); our build plays its scenes at max. Hold
+    -- textSpeed 3 (no typewriter delay, GetTextDisplaySpeed) and gameSpeed fast, or the
+    -- Prologue's narration outlasts TUNE.bootSteps. New Game rewrites the config, hence every step.
+    TUNE.bootHook = function()
+        local a = SYM.gPlaySt + 0x40
+        emu:write32(a, (ru32(a) & ~(3 << 5)) | (3 << 5) | (1 << 7))
+    end
+    local EIRIKA, SETH, ONEILL, BREGUET = 0x01, 0x02, 0x68, 0x46
+    local function gold() return ru32(SYM.gPlaySt + 0x08) end
+    local seen = {}
+    local function note(tag)
+        local line = string.format("%s: chapter %d, gold %d", tag, chapter(), gold())
+        seen[#seen + 1] = line
+        log("vanillagold: " .. line)
+    end
+    local function teleport(u, x, y)
+        local grid = mapUnitAt(u.x, u.y)
+        setMapUnit(u.x, u.y, 0)
+        emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+        setMapUnit(x, y, grid)
+    end
+    -- Seth strikes a 1-HP boss from a free adjacent tile; `stop` is the chapter's own outcome.
+    local function killBoss(pid, here)
+        for t = 1, 6 do
+            local boss = red(pid)
+            if isDead(boss) then return true end
+            pokeFrail(boss)
+            local seth = blue(SETH)
+            local spot
+            for _, d in ipairs({ { 0, 1 }, { 1, 0 }, { -1, 0 }, { 0, -1 } }) do
+                local tx, ty = boss.x + d[1], boss.y + d[2]
+                if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then spot = { x = tx, y = ty } break end
+            end
+            if not spot then return false end
+            teleport(seth, spot.x, spot.y)
+            seth = blue(SETH)
+            if not moveUnit(seth.x, seth.y, seth.x, seth.y) then return false end
+            chooseAttack(seth.addr, function() return isDead(red(pid)) or chapter() ~= here end)
+            if isDead(red(pid)) or chapter() ~= here then return true end
+            if runEnemyPhase() ~= "player" then return false end
+        end
+        return false
+    end
+
+    if not bootToMap(nil, PROLOGUE) then return result("FAIL", "never reached the Prologue map") end
+    note("Prologue map")
+    if not killBoss(ONEILL, PROLOGUE) then return result("FAIL", "could not kill O'Neill") end
+    waitFor(function() return chapter() ~= PROLOGUE end, 3600, true)
+    note("after the Prologue")
+    if not bootToMap(nil, CH1) then return result("FAIL", "never reached Ch1's map") end
+    note("Ch1 map")
+    if not killBoss(BREGUET, CH1) then return result("FAIL", "could not kill Breguet") end
+    local eirika = blue(EIRIKA)
+    teleport(eirika, 2, 2)
+    eirika = blue(EIRIKA)
+    if not moveUnit(eirika.x, eirika.y, eirika.x, eirika.y) then
+        return result("FAIL", "no live command menu for Eirika on the gate")
+    end
+    if not selectSemantic("seize", "Seize starts Ch1's win event", function()
+        return chapter() ~= CH1 or procActive(SYM.ProcScr_StdEventEngine)
+    end, 900) then return result("FAIL", "Eirika's menu offered no Seize on (2,2)") end
+    waitFor(function() return chapter() ~= CH1 end, 9000, true)
+    note("after Ch1")
+    -- Ch1 ends with MoveToChapter(0x38): a world-map interlude the controller does not
+    -- classify. Press through it (START skips, A advances) and note every change in gold, so
+    -- a grant inside the interlude is caught where it happens.
+    local last = gold()
+    for step = 1, 4000 do
+        if chapter() == CH2 then break end
+        press(step % 3 == 0 and K.START or K.A, 2)
+        wait(8)
+        if gold() ~= last then last = gold(); note("gold changed during the interlude") end
+    end
+    if chapter() ~= CH2 then return result("FAIL", "the interlude never handed over to Ch2") end
+    note("Ch2 begins")
+    return result("PASS", table.concat(seen, " | "))
 end
 
 -- GOODBERRY: boot to the ch00 map, open Hlin's Item menu (she carries a Hand Axe +
@@ -4766,6 +4870,65 @@ scenarios.recordcast = function()
         "%s: map sprite + status screen captured (pid 0x%02X at (%d,%d))", name, pid, u.x, u.y))
 end
 
+-- CASTHELP (ADR 0346): R on a cast member's name reads ITS OWN help text, never its slot's
+-- vanilla character's. A verdict on memory, so it runs headless: for every classed cast member
+-- on the TESTCH sandbox it opens the status screen (R), opens help (R, which lands on Str), steps
+-- LEFT onto the name/portrait entry (HbPopulate_SSCharacter fills it from the unit's descTextId)
+-- and asserts `sActiveMsg` is that unit's message AND that its decoded first line (sMsgString's
+-- buffer1) is the unit's own: the id alone is the one vanilla used. A member missing FAILs: a
+-- check that skipped the unit it could not find would pass on nothing.
+scenarios.casthelp = function()
+    if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
+    local names = {}
+    for name, _ in pairs(CAMPAIGN.HELP_MSG) do names[#names + 1] = name end
+    table.sort(names)
+    local bad = {}
+    local function now() return Controller.classify(observeController()) end
+    for _, name in ipairs(names) do
+        local want = CAMPAIGN.HELP_MSG[name]
+        local u = blue(CAMPAIGN.CAST[name])
+        if not u then
+            bad[#bad + 1] = name .. " not deployed"
+        elseif not cursorTo(u.x, u.y) then
+            bad[#bad + 1] = name .. " never under the cursor"
+        elseif not guardedInput("open_stat_screen", "R", "the status screen opens",
+                function() return now() == "stat_screen" end, 240) then
+            bad[#bad + 1] = name .. ": status screen never opened"
+        elseif not guardedInput("open_help", "R", "the help box opens",
+                function() return now() == "stat_screen_help" end, 120) then
+            bad[#bad + 1] = name .. ": help never opened"
+        elseif not guardedInput("help_left", "LEFT", "help moves onto the name",
+                function() return INSPECT.activeMsg() == want end, 120) then
+            bad[#bad + 1] = string.format("%s: help read MSG_%03X, want MSG_%03X",
+                name, INSPECT.activeMsg(), want)
+        else
+            local line, at = {}, SYM.sMsgString
+            while #line < 64 do
+                local b = ru8(at + #line)
+                if b < 0x20 then break end
+                line[#line + 1] = string.char(b)
+            end
+            line = table.concat(line)
+            if line ~= CAMPAIGN.HELP_LINE1[name] then
+                bad[#bad + 1] = string.format("%s: help reads %q, want %q",
+                    name, line, CAMPAIGN.HELP_LINE1[name])
+            end
+        end
+        -- Back to the map whatever happened, each step only where its state is live.
+        if now() == "stat_screen_help" then
+            guardedInput("close_help", "B", "the help box closes",
+                function() return now() == "stat_screen" end, 120)
+        end
+        if now() == "stat_screen" then
+            guardedInput("close_stat_screen", "B", "back on the map",
+                function() return now() == "player_map_idle" end, 240)
+        end
+    end
+    if #bad > 0 then return result("FAIL", table.concat(bad, "; ")) end
+    return result("PASS", string.format("%d cast members: R on the name reads their own help text",
+        #names))
+end
+
 -- RECORDRAVISIN (#19): the named ch05 boss is a raw CharacterData pid (0xB8), so she cannot
 -- ride recordcast's blue CAST sandbox. Capture her on the real CH05BOOT map instead: the red
 -- unit's live FE8 status screen proves the raw pid -> portraitId binding as well as the dressed
@@ -7063,6 +7226,130 @@ scenarios.ch05lupinkilled = function()
     return scenarios.ch05recruit({ lupin = "killed", arm = 0x9D1 })
 end
 
+-- ch05escort: Sahnar will not swing at Basil, the way vanilla Joshua will not swing at Natasha
+-- (#493). That refusal is AI_A_07's do-not-attack list, which holds a literal character id;
+-- `repoint_escort_safe_ai_list` points it at Basil, and test_inject_ch05 proves the SOURCE
+-- edit. This proves the ROM obeys it. Two enemy phases, one run:
+--   1. Basil is the only blue unit in Sahnar's reach  -> her Killing Edge keeps its uses.
+--   2. Control: another blue unit takes Basil's tile  -> the Killing Edge loses a use.
+-- The witness is her WEAPON'S USES, not Basil's HP: only Sahnar's own swing spends them, so
+-- the other enemies' turns cannot make phase 1 fail or pass. Phase 2 is what keeps phase 1
+-- from passing vacuously -- a Sahnar whose AI never acts at all would also "spare" Basil.
+-- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05escort (needs a CH05BOOT=1 ROM).
+scenarios.ch05escort = function()
+    local CH05 = dofile(PLAYTEST_DIR .. "/ch05.lua")     -- ch05's shared facts (#314)
+    local BASIL, SAHNAR = CH05.PID.BASIL, CH05.PID.SAHNAR
+    local function edgeUses(u) return ru16(u.addr + 0x1E) >> 8 end   -- items[0]: id | uses<<8
+    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
+    pokeFastConfig()
+    waitFor(function()
+        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
+    end, 6000, true)
+
+    local sah, basil = red(SAHNAR), blue(BASIL)
+    if not sah then return result("FAIL", "Sahnar is not RED at turn 1") end
+    if not basil then return result("FAIL", "Basil is not BLUE at turn 1") end
+    local post = { x = sah.x, y = sah.y }
+    log(string.format("ch05escort: Sahnar runs AI %d/%d (vanilla Joshua: 7/3)",
+        ru8(sah.addr + 0x42), ru8(sah.addr + 0x44)))
+
+    -- Sahnar must be the only enemy who acts, or a raider kills Basil before her turn comes
+    -- and the phase proves nothing (the first run of this did exactly that). Every other red
+    -- unit gets AI_A_06 (do nothing) and AI_B_03 (never move); Sahnar's own AI is untouched.
+    for i = 0, 49 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and u.charId ~= SAHNAR then
+            emu:write8(u.addr + 0x42, 0x06)    -- ai1 -> gAiScript_DoNothing
+            emu:write8(u.addr + 0x43, 0)       -- ai_a_pc: restart the script
+            emu:write8(u.addr + 0x44, 0x03)    -- ai2 -> AiScr_AiB_NeverMove
+            emu:write8(u.addr + 0x45, 0)
+        end
+    end
+
+    -- Put `u` on the first free tile orthogonally adjacent to Sahnar, and refuse to go on if
+    -- any OTHER blue unit already stands in her reach (a sword reaches one tile, and her
+    -- AI_B_03 never moves): the phase must offer her exactly one target.
+    local function parkAdjacent(u)
+        local spot
+        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+            local tx, ty = post.x + d[1], post.y + d[2]
+            local idx = mapUnitAt(tx, ty)
+            if idx ~= 0 and idx < 0x40 and not (tx == u.x and ty == u.y) then
+                return nil, string.format("another blue unit already stands at (%d,%d)", tx, ty)
+            end
+            if not spot and idx == 0 then spot = { x = tx, y = ty } end
+        end
+        if not spot then return nil, "no free tile adjacent to Sahnar" end
+        local grid = mapUnitAt(u.x, u.y)
+        setMapUnit(u.x, u.y, 0)
+        emu:write8(u.addr + 0x10, spot.x); emu:write8(u.addr + 0x11, spot.y)
+        setMapUnit(spot.x, spot.y, grid)
+        return spot
+    end
+    local function moveTo(u, x, y)
+        local grid = mapUnitAt(u.x, u.y)
+        setMapUnit(u.x, u.y, 0)
+        emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+        setMapUnit(x, y, grid)
+    end
+
+    -- 1. Basil alone in reach.
+    local home = { x = basil.x, y = basil.y }
+    local spot, why = parkAdjacent(basil)
+    if not spot then return result("FAIL", "setup: " .. why) end
+    local before = edgeUses(sah)
+    log(string.format("ch05escort: Basil parked on (%d,%d) beside Sahnar (%d,%d); Killing Edge "
+        .. "at %d uses", spot.x, spot.y, post.x, post.y, before))
+    local phase = runEnemyPhase()
+    if phase ~= "player" then return result("FAIL", "enemy phase 1 ended in " .. tostring(phase)) end
+    sah, basil = red(SAHNAR), blue(BASIL)
+    if not sah then return result("FAIL", "Sahnar left the red array during enemy phase 1") end
+    if sah.x ~= post.x or sah.y ~= post.y then
+        return result("FAIL", string.format("Sahnar moved off her post to (%d,%d)", sah.x, sah.y))
+    end
+    local after = edgeUses(sah)
+    if after ~= before then
+        shot("ch05escort")
+        return result("FAIL", string.format("Sahnar SWUNG at Basil: Killing Edge %d -> %d uses "
+            .. "-- AI_A_07's list does not name our escort", before, after))
+    end
+    if isDead(basil) then
+        return result("FAIL", "Basil died in enemy phase 1 with every other enemy idled -- "
+            .. "inconclusive, find who reached her")
+    end
+    log(string.format("ch05escort: phase 1 -- Sahnar held her Killing Edge at %d uses with Basil "
+        .. "beside her", after))
+
+    -- 2. Control: Basil goes home, another blue unit takes her tile.
+    moveTo(basil, home.x, home.y)
+    -- Not slot 0, the lord: the first run of this control lost her to the Killing Edge and
+    -- ended in a game over. The HP poke is so the control survives the crit it is there to
+    -- invite; it changes nothing about whether Sahnar picks it.
+    local other
+    for i = 1, 61 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        -- On the map: a benched roster unit is US_HIDDEN | US_NOT_DEPLOYED at (-1,-1).
+        if u and u.charId ~= BASIL and not isDead(u) and (u.state & 9) == 0 then other = u; break end
+    end
+    if not other then return result("FAIL", "setup: no second blue unit for the control phase") end
+    spot, why = parkAdjacent(other)
+    if not spot then return result("FAIL", "setup (control): " .. why) end
+    emu:write8(other.addr + 0x12, 80); emu:write8(other.addr + 0x13, 80)   -- maxHP, curHP
+    phase = runEnemyPhase()
+    if phase ~= "player" then return result("FAIL", "enemy phase 2 ended in " .. tostring(phase)) end
+    sah = red(SAHNAR)
+    if not sah then return result("FAIL", "Sahnar left the red array during enemy phase 2") end
+    local control = edgeUses(sah)
+    if control >= after then
+        shot("ch05escort")
+        return result("FAIL", string.format("control: Sahnar did not swing at unit 0x%X either "
+            .. "(Killing Edge still %d uses) -- phase 1 proved nothing", other.charId, control))
+    end
+    return result("PASS", string.format("Sahnar spared Basil (Killing Edge held at %d uses) and "
+        .. "struck unit 0x%X when it took Basil's place (%d -> %d)", after, other.charId,
+        after, control))
+end
+
 -- recordch05eruption: the smallest visual proof for #260. Boot the real ch05 map, idle turn 1,
 -- then record only Ravisin's four-box turn-2 warning through Sahnar's rise and the return of
 -- player control. The recorder advances dialogue while filming; the terminal requires that a
@@ -7088,13 +7375,44 @@ scenarios.recordch05eruption = function()
     })
 end
 
--- Park an unexhausted blue unit on a village door and take the Visit command, stopping the
--- moment the location event starts. Split from the dialogue-advancing half so the RECORDER can
--- own the filmed part: `openVillageVisit` is the unfilmed walk-in (a `pre`), the line itself is
--- what the camera wants. Returns ok, reason.
--- `choose` (optional) replaces the Visit command: the `talk` step passes a Talk, so a site that
--- is a UNIT to talk to (ch06's hulls) shares the picking, parking and playing-out below.
-local function openVillageVisit(x, y, choose)
+-- THE VISIT HELPERS (one table, not five locals: harness.lua sits near Lua's 200-local cap, #327).
+local VISIT = {}
+
+-- A visit is a unit standing on a tile and using it -- a village door, an
+-- Armory or Vendor, the Arena, a unit to Talk to from that tile. `VISIT.place` stands the unit
+-- there, `VISIT.open` also takes the tile's command, `VISIT.run` also plays the event out,
+-- `VISIT.shop` opens an Armory/Vendor and reads its stock.
+--
+-- VISIT.place: stand a unit on the tile it will use, skipping the walk. Keeps the engine's
+-- tile->unit grid in sync, so the command check reads the new position at once (the
+-- ch03talk/parley trick). Reads the unit's position LIVE: a scenario that places the same unit
+-- twice holds a table whose x/y went stale.
+function VISIT.place(u, x, y)
+    local ox, oy = rs8(u.addr + 0x10), rs8(u.addr + 0x11)
+    local grid = mapUnitAt(ox, oy)
+    setMapUnit(ox, oy, 0)
+    emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
+    setMapUnit(x, y, grid)
+end
+
+-- Take one command off the unit menu by its semantic name ("visit", "armory", "vendor").
+function VISIT.command(semantic)
+    return function()
+        if not selectSemantic(semantic, semantic .. " starts the site's own proc", function(after)
+            return after.menu == nil
+        end, 600) then return false, "live command menu did not expose " .. semantic end
+        return true
+    end
+end
+
+-- VISIT.open: stand an unexhausted blue unit on the tile and take its command, stopping the
+-- moment the tile's own proc starts. One opener for every visit, so the picking and placing
+-- cannot drift between villages, shops and talks. Split from the dialogue-advancing half so the
+-- RECORDER can own the filmed part: `VISIT.open` is the unfilmed walk-in (a `pre`).
+-- Returns ok, reason.
+-- `choose` (optional) replaces the Visit command: `talk` passes a Talk (ch06's hulls),
+-- `VISIT.shop` an Armory or Vendor.
+function VISIT.open(x, y, choose)
     local u
     for i = 0, 19 do
         local c = unitAt(SYM.gUnitArrayBlue, i)
@@ -7105,21 +7423,12 @@ local function openVillageVisit(x, y, choose)
         end
     end
     if not u then return false, "no unexhausted deployed blue unit to send" end
-    -- setMapUnit keeps the engine's tile->unit grid in sync, so the Visit check reads the new
-    -- position immediately (the ch03talk/parley trick).
-    local grid = mapUnitAt(u.x, u.y)
-    setMapUnit(u.x, u.y, 0)
-    emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
-    setMapUnit(x, y, grid)
-    if not cursorTo(x, y) then return false, "cursor could not reach the village" end
+    VISIT.place(u, x, y)
+    if not cursorTo(x, y) then return false, "cursor could not reach the site" end
     if not moveUnit(x, y, x, y) then
-        return false, "could not select the unit standing on the village"
+        return false, "could not select the unit standing on the site"
     end
-    if choose then return choose() end
-    if not selectSemantic("visit", "Visit starts the live location event", function(after)
-        return after.menu == nil
-    end, 600) then return false, "live command menu did not expose Visit" end
-    return true
+    return (choose or VISIT.command("visit"))()
 end
 
 -- Walk in, then advance the line to its end. Shared by ch04's two villages (#205, #24): the
@@ -7131,8 +7440,8 @@ end
 -- the only moment the line and the speaker's face are both on screen. Review captures need it:
 -- a shot taken after the visit returns catches the map, because `done` fires when the ITEM
 -- lands and the box is long gone by then.
-local function visitVillage(x, y, done, onBox, choose)
-    local ok, why = openVillageVisit(x, y, choose)
+function VISIT.run(x, y, done, onBox, choose)
+    local ok, why = VISIT.open(x, y, choose)
     if not ok then return false, why end
     local spoke = false
     for _ = 1, 3600 do
@@ -7148,6 +7457,44 @@ local function visitVillage(x, y, done, onBox, choose)
         end
     end
     return true, nil, spoke
+end
+
+-- Open the Armory or Vendor on (x, y) and read what it stocks, from the live shop proc
+-- (ProcShop.shopItems at +0x30, bmshop.h), then leave it. Returns ok, reason, {item ids}.
+-- The stock comes off the proc the command started, so a shop wired to the wrong list, or a
+-- tile whose command opens nothing, fails here rather than in a playtest.
+function VISIT.shop(x, y, kind)
+    local ok, why = VISIT.open(x, y, VISIT.command(kind))
+    if not ok then return false, why end
+    local proc
+    if not waitFor(function()
+        proc = findProc(SYM.gProcScr_Shop)
+        return proc ~= nil
+    end, 600) then return false, kind .. " command started no shop" end
+    local stock = {}
+    for i = 0, 19 do
+        local id = ru16(proc + 0x30 + i * 2) & 0xFF
+        if id == 0 then break end
+        stock[#stock + 1] = id
+    end
+    -- Leave: B through the greeting, the buy/sell choice and the farewell line.
+    for _ = 1, 60 do
+        if not procActive(SYM.gProcScr_Shop) then break end
+        press(K.B)
+        wait(16)
+    end
+    if procActive(SYM.gProcScr_Shop) then return false, "the shop never closed on B", stock end
+    -- Leaving a shop hands back the unit's command menu, not the map: back out of it too, or
+    -- the next step waits forever for player control (ch05shops' Vendor, after its Armory).
+    for _ = 1, 20 do
+        if controllerState() == "player_map_idle" then break end
+        press(K.B)
+        wait(12)
+    end
+    if controllerState() ~= "player_map_idle" then
+        return false, "the map never came back after the shop closed", stock
+    end
+    return true, nil, stock
 end
 
 -- ch05arena (#264): the active onboarding ledger claims a tutorial on the real arena tile.
@@ -7180,10 +7527,7 @@ scenarios.ch05arena = function()
     end
     local hero = blue(0x01)
     if not hero then return result("FAIL", "leader (0x01) is not deployed") end
-    local grid = mapUnitAt(hero.x, hero.y)
-    setMapUnit(hero.x, hero.y, 0)
-    emu:write8(hero.addr + 0x10, ARENA_X); emu:write8(hero.addr + 0x11, ARENA_Y)
-    setMapUnit(ARENA_X, ARENA_Y, grid)
+    VISIT.place(hero, ARENA_X, ARENA_Y)
     if not cursorTo(ARENA_X, ARENA_Y)
         or not guardedInput("select_unit", "A", "arena staging reach map is generated", function(after)
             return controllerState(after) == "unit_selected"
@@ -7202,9 +7546,7 @@ scenarios.ch05arena = function()
         return result("FAIL", "could not close the arena staging reach map")
     end
     if not fromX then return result("FAIL", "no reachable empty tile beside the arena") end
-    setMapUnit(ARENA_X, ARENA_Y, 0)
-    emu:write8(hero.addr + 0x10, fromX); emu:write8(hero.addr + 0x11, fromY)
-    setMapUnit(fromX, fromY, grid)
+    VISIT.place(hero, fromX, fromY)
     -- Raw placement updates the unit/grid but not FE8's standing-map-sprite pool. Make the
     -- engine select and cancel the staged unit once so PlayerPhase's normal cancel path calls
     -- RefreshUnitSprites before the proof frame; otherwise the old SMS and the live MU can both
@@ -7481,7 +7823,7 @@ scenarios.recordch02huts = function()
         and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
     -- Teleport-and-visit, the ch04/ch05 village idiom: the WALK is not what the camera wants
     -- and pathing across seven tiles of snow is not what this is proving.
-    local ok, why = openVillageVisit(1, 12)          -- targos-hut-south (Glimmerfrost)
+    local ok, why = VISIT.open(1, 12)          -- targos-hut-south (Glimmerfrost)
     if not ok then return result("FAIL", "south hut: " .. tostring(why)) end
     return recordCutscene({
         tag = "ch02huts", maxFrames = 3600, pressEvery = 90,
@@ -7817,7 +8159,7 @@ scenarios.ch05crest = function()
             return result("FAIL", "the map never returned to player control before " .. site.name)
         end
         disarmTheTomb()
-        local ok, why = visitVillage(site.x, site.y, function()
+        local ok, why = VISIT.run(site.x, site.y, function()
             return eventFlag(site.flag)
         end)
         if not ok then
@@ -8990,7 +9332,7 @@ scenarios.ch04cottage = function()
             .. "menu item on the TERRAIN before it ever consults the location event (bmmenu.c)",
             DOOR_X, DOOR_Y, before, VILLAGE_REGULAR))
     end
-    local ok, why, spoke = visitVillage(DOOR_X, DOOR_Y, function()
+    local ok, why, spoke = VISIT.run(DOOR_X, DOOR_Y, function()
         return terrainAt(DOOR_X, DOOR_Y) == VILLAGE_CLOSED
     end)
     if not ok then return result("FAIL", why) end
@@ -9028,7 +9370,7 @@ scenarios.recordch04cottage = function()
             if not bootToMap() then return false, "never reached the ch04 map" end
             waitFor(function() return faction() == 0 and not menuOpen()
                 and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
-            local ok, why = openVillageVisit(DOOR_X, DOOR_Y)
+            local ok, why = VISIT.open(DOOR_X, DOOR_Y)
             if not ok then return false, why end
             pokeNormalConfig()   -- film the line at real speed
         end,
@@ -10002,16 +10344,20 @@ local co = coroutine.create(function()
         visitVillage = function(x, y)
             local before = 0
             for _ in ipairs(collectedItems()) do before = before + 1 end
-            return visitVillage(x, y, function()
+            return VISIT.run(x, y, function()
                 local now = 0
                 for _ in ipairs(collectedItems()) do now = now + 1 end
                 return now ~= before
             end)
         end,
+        -- `shop`: the visit path with Armory/Vendor as the command; returns the stock it opened.
+        shopAt = function(x, y, kind)
+            return VISIT.shop(x, y, kind)
+        end,
         -- `talk`: the visit path with Talk as the command; done once the scene has ended.
         -- A missing Talk command is the failure this catches (a CHAR naming the wrong pair).
         talkFrom = function(x, y)
-            return visitVillage(x, y, function()
+            return VISIT.run(x, y, function()
                 return controllerState() ~= "dialogue_wait"
                     and not procActive(SYM.ProcScr_StdEventEngine)
             end, nil, function()

@@ -39,6 +39,11 @@ CADENCE = {
     'marquee_setpiece':   ('\U0001F3AC', 'marquee set-piece'),
     'big_battle_gray':    ('\U0001F7E5', 'big battle (gray)'),
     'scripted_defeat':    ('\U0001F3AC', 'scripted defeat'),
+    'breakout':           ('\U0001F7E5', 'breakout (seize)'),
+    'survive_or_boss':    ('\U0001F7E8', 'survive or kill the boss'),
+    'defend_town':        ('\U0001F7E6', 'defend / protect'),
+    'finale':             ('\U0001F7E5', 'finale'),
+    'rescue':             ('\U0001F7E8', 'rescue / sanctuary'),
 }
 
 # objective.type token -> FE-canonical label.
@@ -48,6 +53,7 @@ OBJECTIVE = {
     'seize':               'Seize',
     'survive':             'Survive',
     'defeat_boss_or_talk': 'DefeatBoss / Talk',
+    'survive_or_defeat_boss': 'Survive / DefeatBoss',
 }
 
 

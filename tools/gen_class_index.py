@@ -9,7 +9,7 @@ is DERIVED. Do not hand-edit docs/CLASSES.md -- edit the YAML and regenerate:
 
 The *rationale* (why each PC maps to its FE class, the promotion seam) lives in
 docs/decisions.md, not here. Freshness is enforced by tools/check.py (it imports
-generate() and diffs the committed file). Stdlib + pyyaml only.
+generate() and diffs the committed file). Stdlib + pyyaml (+ the decomp-free inject.class_ids).
 """
 
 import glob
@@ -19,6 +19,9 @@ import sys
 
 import yaml
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from inject.class_ids import class_display_name  # noqa: E402
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PCS = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/pcs')
 NPCS = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden/npcs')
@@ -27,6 +30,12 @@ OUT = os.path.join(ROOT, 'docs/CLASSES.md')
 
 def squish(s):
     return re.sub(r'\s+', ' ', str(s if s is not None else '')).strip()
+
+
+def class_label(token):
+    """A class token as the game names it ('armor-knight' -> 'Knight'): the one rule, shared
+    with the wiki (inject.class_ids.class_display_name)."""
+    return class_display_name(token)
 
 
 def promotion_cell(promo):
@@ -41,13 +50,13 @@ def promotion_cell(promo):
     for c in [default] + list(branch):
         if c is not None and c not in ordered:
             ordered.append(c)
-    return ' / '.join('**%s**' % c if i == 0 and default else c
+    return ' / '.join('**%s**' % class_label(c) if i == 0 and default else class_label(c)
                       for i, c in enumerate(ordered))
 
 
 def fe_base(unit):
     cls = (unit.get('fe_stats') or {}).get('class')
-    return 'TBD (post-MVP)' if cls is None or not str(cls).strip() else cls
+    return 'TBD (post-MVP)' if cls is None or not str(cls).strip() else class_label(cls)
 
 
 def dnd_source(unit):

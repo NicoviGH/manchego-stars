@@ -1,0 +1,52 @@
+# ch12 — Caer-Dineval. PLANNED (#486): a seed, not authoritative.
+id: ch12-caer-dineval
+title: "Caer-Dineval"
+location: "Caer-Dineval, on Lac Dinneshere"
+chapter_number: 12
+act: 'II'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
+status: planned
+milestone: M4
+cadence: rescue
+fe8_base_map: "FE8 Ch12 — Village of Silence (layout only)"
+parity_reference: "FE8 Ch12"   # Village of Silence's force (#459)
+narrative: >
+  Following the duergar along the ferry route, the party reaches Caer-Dineval, whose castle the
+  Knights of the Black Sword, a devil cult, hold in secret while they keep Speaker Crannoc
+  hostage. The party frees him, and Huarwar, Cora Mulphoon's missing son. Crannoc gives them the
+  Speaker's Quest: the duergar are building a construct that will lay waste to Ten-Towns, and
+  here is the map to their fortress.
+map: {}
+objective:
+  type: defeat_all
+  description: "Clear the castle (planned)"
+win_condition: "Defeat all enemies (planned)"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch12 (Village of Silence) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch12) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  Village of Silence's shape: rescue someone hidden from monsters, then a lore reveal in a
+  sanctuary. Kelvin's Cairn looms over the town (Rime p.39), so a mountain map fits.
+plan:
+  story: >
+    It gives the party the destination and the stakes (a dragon, and where it is built), the
+    first Speaker on their side, and the opposite of their Bremen coup: freeing a Speaker from
+    usurpers.
+  sources:
+    - "Table: the Black Swords quest and Huarwar (seeded by ch07's inn)"
+    - "Rime p.37-39: Caer-Dineval, the Knights of the Black Sword, Crannoc held hostage"
+    - "Rime p.38: duergar hide in Dinev's Rest"
+    - "Rime p.171: the Speaker's Quest"
+  joins_roles:
+    - "Saleh (sage, joins at prep)"
+    - "Ewan (trainee, hidden in a house): Huarwar"
+  payload_notes: >
+    Owes vanilla Ch12: Saleh and Ewan, Barrier (village), Halberd and Steel Bow (boss drops),
+    Horseslayer.
+open_questions:
+  - q: "Is ch12's job right: free Crannoc and receive the Speaker's Quest?"
+    pick: "Yes"

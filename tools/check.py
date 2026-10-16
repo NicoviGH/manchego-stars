@@ -19,6 +19,7 @@ Exit 0 = clean, 1 = drift found. Run from the repo root.
 """
 
 import ast
+import functools
 import glob
 import os
 import re
@@ -85,6 +86,16 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #493: a cast member grows on its stat donor's curve (inject.stats.cast_growths)
+    r'growth_rates',
+    # retired by #493: a chapter names its vanilla map donor once, as `map.vanilla_layout`
+    r'base_layout',
+    # retired by #493: in-map shops are the map donor's, inherited (villages.chapter_shops)
+    r'elven_store', r'CH05_SHOPS',
+    # retired by #486: a unit's class is a vanilla token resolved like an enemy's, no display map
+    r'CLASS_MAP',
+    # retired by #486: a cast member's kit lives in its unit file's inventory, read by unit_items
+    r'CLASS_LOADOUT',
     # retired by #459: the roster keeps vanilla's recruit cadence, not a fixed pool (ADR 0342)
     r'16–18 (?:pool|roster|units)',
     # retired by #479: a wave lands by `arrives_turn` inside `enemy_units`, the one spelling
@@ -631,7 +642,7 @@ def lua_local_headroom(path, probe_max=8):
 # quarter against 2 free slots (#327). Freezing the count redirects the next helper into a
 # module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
 # scale; thinning the tail only makes it comfortable.
-HARNESS_TOP_LEVEL_LOCALS = 174
+HARNESS_TOP_LEVEL_LOCALS = 173
 
 # `[ \t]`, never `\s`: `\s` matches a NEWLINE, so `local controllerFault` followed by
 # `local function log` merged into one match and the count came out one short. A counter
@@ -785,16 +796,16 @@ def check_yaml_parses(fail):
 
 
 def check_chapter_status(fail):
-    """Every chapter YAML must declare its maturity: `status: active|planned`. Vertical-slice
-    workflow -- `planned` chapters are non-authoritative brainstorm SEED (enemy roster/levels
-    re-grounded against vanilla + party data on arrival), `active` ones are built/in-progress
-    with grounded combat data. Invariant: a `planned` chapter must NOT be `balance_locked: true`
+    """Every chapter YAML must declare its maturity: `status: active|complete|planned`.
+    Vertical-slice workflow -- `planned` chapters are non-authoritative brainstorm SEED (enemy
+    roster/levels re-grounded against vanilla + party data on arrival), `active` ones are
+    built/in-progress with grounded combat data, and `complete` ones Nicolas has signed off. Invariant: a `planned` chapter must NOT be `balance_locked: true`
     -- you cannot lock the parity of a chapter whose enemies are an ungrounded sketch (that
     half-state is exactly what makes the difficulty curve and readers treat a seed as truth)."""
     for rel, d in _chapters():
         status = d.get('status')
-        if status not in ('active', 'planned'):
-            fail.append('%s: missing/invalid `status` (must be active|planned, got %r)'
+        if status not in ('active', 'complete', 'planned'):
+            fail.append('%s: missing/invalid `status` (must be active|complete|planned, got %r)'
                         % (rel, status))
         elif status == 'planned' and d.get('balance_locked'):
             fail.append('%s: status:planned cannot be balance_locked:true -- a planned '
@@ -839,6 +850,8 @@ def _personal_line_route_violations(rel, d, injected_ids, slot_ids):
 # module's `checks` CI job runs on a bare interpreter with no Pillow and no submodule, so it
 # must stay import-free; the schema tests fail if the two ever diverge.
 ROSTER_KEYS = ('enemy_units',)
+# Mirrors inject.raw_pids.PLACED_ROSTER_KEYS (every key that places a body), same reason.
+PLACED_ROSTER_KEYS = ROSTER_KEYS + ('neutral_units', 'green_allies')
 
 
 def _roster_entries(d):
@@ -906,16 +919,19 @@ def _int_pair(v):
             and all(isinstance(c, int) and not isinstance(c, bool) for c in v))
 
 
-def _unit_entry_violations(rel, kind, entries):
+def _unit_entry_violations(rel, kind, entries, cast=()):
     """Entries of a roster list (player_units / green_allies) must be mappings
-    carrying what the injectors index: id/class/level/position ([col, row])."""
+    carrying what the injectors index: id/class/level/position ([col, row]). A cast member
+    (ch03's green Trex) takes class and level from his unit file, so he names only where he
+    stands: repeating them here would be a second copy to drift."""
     msgs = []
     for g in entries or []:
         if not isinstance(g, dict):
             msgs.append('%s: %s entry %r must be a mapping (id/class/level/'
                         'position ...)' % (rel, kind, g))
             continue
-        missing = [k for k in ('id', 'class', 'level', 'position') if k not in g]
+        keys = ('id', 'position') if g.get('id') in cast else ('id', 'class', 'level', 'position')
+        missing = [k for k in keys if k not in g]
         if missing:
             msgs.append('%s: %s entry %r missing %s'
                         % (rel, kind, g.get('id', '?'), ', '.join(missing)))
@@ -925,7 +941,7 @@ def _unit_entry_violations(rel, kind, entries):
     return msgs
 
 
-def _chapter_deployment_violations(rel, d):
+def _chapter_deployment_violations(rel, d, cast=()):
     """Schema violations for one parsed chapter YAML (pure; unit-tested in
     test_check_chapter_schema.py). The normalized shape (#107, audit 2.2): ALL
     deployment data lives under the `deployment:` block (deploy_limit,
@@ -975,13 +991,76 @@ def _chapter_deployment_violations(rel, d):
             msgs.append('%s: deployment.deploy_slots (%d) must match '
                         'deployment.deploy_limit (%r) -- the slot list IS the cap '
                         'template' % (rel, len(slots), limit))
-    if d.get('status') == 'active' and limit is None:
+    if d.get('status') in ('active', 'complete') and limit is None:
         msgs.append('%s: an active chapter with a `deployment:` block needs a '
                     'machine-readable deployment.deploy_limit (prose notes are for '
                     'planned seeds)' % rel)
     msgs.extend(_unit_entry_violations(rel, 'deployment.green_allies',
-                                       dep.get('green_allies')))
+                                       dep.get('green_allies'), cast))
     return msgs
+
+
+def check_chapter_location(fail):
+    """Every chapter names where it happens (`location:`). The wiki's infobox and the plan read
+    it; without it a chapter's place lived only in prose, and every built chapter showed blank
+    (#486)."""
+    for rel, d in _chapters():
+        if not str(d.get('location') or '').strip():
+            fail.append('%s: missing `location:` (where the chapter happens)' % rel)
+
+
+def check_recruits_have_unit_files(fail):
+    """Every unit a chapter recruits has a unit file under pcs/ or npcs/. A recruit named only
+    in `post_chapter` is a unit nothing else can describe (#486: Meriwa, Esio Trot and the White
+    Moose joined in ch07-ch08 with no file, so every reader fell back to a raw id)."""
+    for rel, d in _chapters():
+        camp = os.path.join(REPO, *rel.split('/')[:2])
+        pc = d.get('post_chapter') or {}
+        for key in ('units_available_to_recruit', 'units_recruited_in_chapter'):
+            for r in pc.get(key) or []:
+                uid = r.get('id') if isinstance(r, dict) else r
+                if uid and not any(os.path.isfile(os.path.join(camp, sub, uid + '.yaml'))
+                                   for sub in ('pcs', 'npcs')):
+                    fail.append('%s: recruits %r, which has no pcs/ or npcs/ file' % (rel, uid))
+
+
+@functools.lru_cache(maxsize=None)
+def _slot_tables(camp):
+    """campaign.yaml's `cast_slots`/`guest_slots`. inject.cast reads the same tables but
+    imports Pillow, which the bare `checks` job does not have, so this reads them itself --
+    once per campaign."""
+    import yaml
+    for path in _campaign_yamls():
+        if os.path.dirname(path) == camp:
+            with open(path, encoding='utf-8') as f:
+                d = yaml.safe_load(f) or {}
+            return dict(d.get('cast_slots') or {}), dict(d.get('guest_slots') or {})
+    return {}, {}
+
+
+def check_unit_faces_bound(fail):
+    """A unit's `face:` names a bust the build dresses (campaign.yaml `cast_slots` or
+    `guest_slots`, with its PNG), and a unit whose id IS such a bust declares it. The face used
+    to be knowable only from cast.py's tables, so ch01's boss (`goblin-chief`, wearing izobai.png)
+    had no face any reader could find (#486)."""
+    for rel, d in _chapters():
+        camp = os.path.join(REPO, *rel.split('/')[:2])
+        cast, guests = _slot_tables(camp)
+        bound = set(cast) | set(guests)
+        deployment = d.get('deployment') if isinstance(d.get('deployment'), dict) else {}
+        placed = [u for key in PLACED_ROSTER_KEYS + ('player_units',) for u in d.get(key) or []]
+        for u in placed + list(deployment.get('green_allies') or []):
+            if isinstance(u, dict):
+                face, uid = u.get('face'), u.get('id')
+                if face and face not in bound:
+                    fail.append('%s: %s wears face %r, which no slot table dresses'
+                                % (rel, uid, face))
+                elif face and not os.path.isfile(os.path.join(camp, 'portraits', face + '.png')):
+                    fail.append('%s: %s wears face %r, which has no portraits/%s.png'
+                                % (rel, uid, face, face))
+                if uid in bound and face != uid:
+                    fail.append('%s: %s has a bust of its own (%s.png) but declares face %r'
+                                % (rel, uid, uid, face))
 
 
 def check_chapter_deployment_schema(fail):
@@ -990,7 +1069,8 @@ def check_chapter_deployment_schema(fail):
     9 files). The injectors and difficulty.py read ONE shape; this gate keeps new
     chapters on it."""
     for rel, d in _chapters():
-        fail.extend(_chapter_deployment_violations(rel, d))
+        cast, _guests = _slot_tables(os.path.join(REPO, *rel.split('/')[:2]))
+        fail.extend(_chapter_deployment_violations(rel, d, set(cast)))
 
 
 def check_chapter_yaml_schema(fail):
@@ -3383,6 +3463,7 @@ def check_decision_citations_resolve(fail):
 CHECKS = (
     check_python_compiles, check_lua_chunks_load, check_lua_local_headroom,
     check_hosted_chapters_declared, check_tests_pass, check_yaml_parses, check_chapter_status,
+    check_chapter_location, check_recruits_have_unit_files, check_unit_faces_bound,
     check_chapter_deployment_schema, check_chapter_yaml_schema,
     check_personal_line_injection_routes,
     check_injector_source_has_one_reader,

@@ -12,6 +12,10 @@
 
 id: sahnar
 name: Sahnar
+help_text: "A snow-elf princess who guarded a tomb for ages. A peerless duelist."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
+# She/her (Nicolas, 2026-10-15). Inert on a foot unit, as Basil's note says: both CA_FEMALE
+# readers gate on CA_MOUNTEDAID, and Swordmaster and Assassin are foot classes too.
+gender: female
 
 # LOCKED 2026-08-08 (Nicolas's red-pen on the draft).
 # The UNIVERSAL falls-in-battle quote (#6): chapter=0xFF, so it fires in every chapter.
@@ -36,8 +40,8 @@ dnd:
 # + promos, but no Joshua-style duelist). The elegant moon-elf blade fits; undead-magic
 # (Druid/Shaman) was the alt but we're already magic-rich, so sword is the coverage win.
 fe_stats:
-  class: Myrmidon
-  level: 1
+  class: myrmidon
+  level: 5                      # Joshua joins Ch5 at L5 (UnitDef_088B5914); ch05 places her there
   # Vanilla FE8 Myrmidon stats, verbatim from data_classes.c [CLASS_MYRMIDON - 1].
   HP: 16
   STR: 4
@@ -52,19 +56,16 @@ donor:
   character: Joshua         # vanilla Myrmidon — bases/growths reference (data_classes.c)
   why: the game's crit-sword duelist archetype
 
-# ── Growth Rates (% per level) — vanilla Myrmidon growths from data_classes.c ─
-growth_rates:
-  HP: 70
-  STR: 35
-  SKL: 40
-  SPD: 40
-  DEF: 15
-  RES: 20
-  LCK: 30
-
 promotion:
-  branch: [Swordmaster, Assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
-  default: Swordmaster
+  branch: [swordmaster, assassin]  # vanilla FE8 Myrmidon branch (classchg-data.c [CLASS_MYRMIDON])
+  default: swordmaster
+
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
+  - id: killing-edge
+    name: "Killing Edge"
+    fe_base: killing-edge           # Joshua's whole Ch5 kit (UnitDef_088B5914: Killing Edge alone)
+    fe_weapon_type: Sword
+    damage_type: slashing           # cosmetic flavor label only
 
 recruited_via: "story — talked down by Basil after Ravisin summons her (Ch5)"
 recruit:

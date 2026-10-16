@@ -6,6 +6,20 @@
 > (migrated from pre-strip commit `e6cc7a6`) as inspiration for dialogue, sprite/palette work,
 > and signature scripted moments — never as FE mechanics.
 
+## Profile
+
+Rootis is a snowperson sorcerer with the blood of a white dragon. He is warm, kind and gently funny
+about being made of snow; the blizzards that trouble everyone else are the most comfortable weather
+he has had all year.
+
+He loves a good mystery and always reaches for the most complicated theory first, leaving the
+obvious answer for someone else. He is one of the party's quieter members, speaks up against
+needless violence, and sat out the party's fight with Bremen's government.
+
+## Trivia
+
+- He is modelled on the snowman of the original ''Animal Crossing'', the low-poly snowman a player builds by rolling two snowballs together.
+
 ## Concept
 
 - **Race:** Snowperson
@@ -141,7 +155,7 @@ Hailfall — the sky splits and boulders of ice and fire rain from the clouds.
 
 ## Signature gear (flavor / post-MVP)
 
-MVP loadout: **Ray of Frost** (his cold cantrip, mechanically the basic Anima tome) + a Vulnerary.
+MVP loadout: **Ray of Frost** (his cold cantrip, mechanically the basic Anima tome) + a Goodberry.
 Dropped/parked flavor:
 
 - **Chill Touch** — a grave-cold spell attack, folded out for the stock single-tome loadout.

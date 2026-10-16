@@ -1,0 +1,49 @@
+# ch18 — Grimskalle. PLANNED (#486): a seed, not authoritative.
+id: ch18-grimskalle
+title: "Grimskalle"
+location: "Grimskalle, on the Island of Solstice"
+chapter_number: 18
+act: 'IV–V'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
+status: planned
+milestone: M4
+cadence: big_battle_seize
+fe8_base_map: "FE8 Ch14 Ephraim — Father and Son (layout only; proposed)"
+parity_reference: "FE8 Ch18"   # Two Faces of Evil's force (#459)
+narrative: >
+  On the Island of Solstice the party raids Grimskalle, Auril's frost-giant fortress, while she
+  is away weaving her nightly spell. They take the Codicil of White, which carries the poem that
+  opens the glacier and reveals Auril's weakness.
+map: {}
+objective:
+  type: seize
+  description: "Planned"
+win_condition: "Planned"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch18 (Two Faces of Evil) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch18) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  The four Tests of the Frostmaiden can be the gimmick. Two Faces of Evil's own map went to
+  ch15, so Grimskalle needs another; Father and Son's keep is the proposal.
+plan:
+  story: >
+    The bundle's fix: Auril is away casting the Rime, so she is not fought here (DM bundle
+    p.51), and the Codicil gives up her weakness (ADR 0332's late source with real access).
+  sources:
+    - "Rime p.195, p.203, p.208: the Codicil, Auril's absence, the Tests of the Frostmaiden"
+    - "DM bundle p.51: Avoiding Auril"
+  joins_roles: []
+  payload_notes: >
+    Vanilla Ch18 gives nothing. It also absorbs Last Hope's payload, which the 20-chapter plan
+    would otherwise drop: the Light Brand, a legendary pair (Ivaldi, Latona), 15,000G, Runesword,
+    Speedwing, Fenrir, Bolting, Fortify, the Goddess Icon, Brave weapons, Aura and the secret
+    shop. Grimskalle's vaults hold them.
+open_questions:
+  - q: "Grimskalle's map: Father and Son's keep?"
+    pick: "Yes"
+  - q: "The Codicil reveals Auril's weakness here?"
+    pick: "Yes"

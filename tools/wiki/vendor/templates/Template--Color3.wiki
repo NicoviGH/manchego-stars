@@ -1,0 +1,1 @@
+<includeonly>var(--color3)</includeonly><noinclude>{{color|#222222|222222}} (dark) or {{color|#F5F5F5|F5F5F5}} (light)[[Category:Color templates|3]]</noinclude>

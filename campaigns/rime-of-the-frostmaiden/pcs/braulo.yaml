@@ -4,6 +4,7 @@
 
 id: braulo
 name: Braulo
+help_text: "A hermit crab merchant from the sea floor. He honors every deal he makes."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 death_quote: "The shell's yours now... pass it on..."  # falls-in-battle quote (#6 dialogue pass; lore/braulo.md)
 lord_pitch: "Axe fighter -- tough and strong, but weak to magic."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/braulo.png       # GBA-ready sprite pending (issue #23)
@@ -84,7 +85,7 @@ dnd:
 # No D&D-derived tuning. FE has a single Pow stat (= STR here). LCK: ClassData defines no
 # base luck (it is a character-layer stat) — set 0 until personal luck is assigned deliberately.
 fe_stats:
-  class: Pirate
+  class: pirate
   level: 1
   HP: 19
   STR: 4                            # FE Pow (Pirate basePow)
@@ -98,18 +99,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [Warrior, Berserker]      # vanilla Pirate branch (classchg-data.c [CLASS_PIRATE])
-  default: Berserker                # thematic lean; player may pick either.
-
-# ── Growth Rates (% per level) — vanilla Pirate growths from data_classes.c ──────
-growth_rates:
-  HP: 75
-  STR: 50
-  SKL: 35
-  SPD: 25
-  DEF: 10
-  RES: 13
-  LCK: 15
+  branch: [warrior, berserker]      # vanilla Pirate branch (classchg-data.c [CLASS_PIRATE])
+  default: berserker                # thematic lean; player may pick either.
 
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
 # MVP: stock FE weapon economy — stats inherited from the vanilla item named in `fe_base`
@@ -130,7 +121,6 @@ inventory:
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 3
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Braulo is a stock FE8 Pirate -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

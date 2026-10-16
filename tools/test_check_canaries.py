@@ -223,6 +223,28 @@ def c_chapter_status():
         return run(check.check_chapter_status)
 
 
+def c_chapter_location():
+    with doctored({CH01: sub1(r'^location:.*$', 'location: ""')}):
+        return run(check.check_chapter_location)
+
+
+def c_recruits_have_unit_files():
+    # ch01 recruits Baxby in its ending; point the recruit at a unit with no file.
+    with doctored({CH01: sub1(r'(- id:\s*)baxby\b', r'\g<1>baxby-canary')}):
+        return run(check.check_recruits_have_unit_files)
+
+
+def c_unit_faces_bound():
+    # ch01's boss wears izobai.png; name a bust no slot table dresses. And dress one of ch02's
+    # green allies the same way: the check once read a `green_units` key no chapter has, so a
+    # green ally's face went unchecked. Fires only if BOTH are reported.
+    with doctored({CH01: sub1(r'(face:\s*)izobai\b', r'\g<1>izobai-canary'),
+                   CH02: sub1(r'^(\s*)- id: chwinga-mote$', r'\g<0>\n\g<1>  face: mote-canary')}):
+        fail, out = run(check.check_unit_faces_bound)
+    both = all(any(tag in f for f in fail) for tag in ('izobai-canary', 'mote-canary'))
+    return (fail if both else []), out
+
+
 def c_personal_line_routes():
     # grell's personal line is carried by RAW_PID_PERSONAL_SOURCES and fielded only in ch03;
     # rename it there and the route names an enemy no chapter fields. A FIXED target, so the
@@ -472,6 +494,9 @@ CANARIES = {
     'check_hosted_chapters_declared': (c_hosted_chapters_declared, 'inject_ch42', None),
     'check_yaml_parses': (c_yaml_parses, 'YAML does not parse', None),
     'check_chapter_status': (c_chapter_status, 'someday', None),
+    'check_chapter_location': (c_chapter_location, 'missing `location:`', None),
+    'check_recruits_have_unit_files': (c_recruits_have_unit_files, 'baxby-canary', None),
+    'check_unit_faces_bound': (c_unit_faces_bound, 'izobai-canary', None),
     'check_personal_line_injection_routes': (c_personal_line_routes, 'no chapter fields', 'decomp'),
     'check_chapter_deployment_schema': (c_deployment_schema, 'deploy_limit', None),
     'check_chapter_yaml_schema': (c_yaml_schema, 'did you mean `win_condition`', None),

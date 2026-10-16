@@ -4,6 +4,15 @@
 > included: `portraits/nerra.png`, Freefall's Goth Serra repainted in the merfolk's own colours.
 > Story frame: ADR 0332.
 
+## Profile
+
+Nerra is the oldest and largest of the merfolk of Maer Dualdon. For generations her people let
+Bremen's boats work the lake. This winter someone promised them the fishermen, and she took the
+promise as licence and enjoys it.
+
+She is dry, contemptuous and self-interested, and she looks after herself: when the fight turns, she
+slips back under the water, meaning to return.
+
 ## Source canon
 
 None. The merfolk, their unwritten coexistence with Bremen's fishers, and Auril emboldening them

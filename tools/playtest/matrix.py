@@ -934,7 +934,7 @@ def scenario_driver_text(scenario_name, files=None, harness_source=None):
 # SAME run, so they must hash the same or the cache pays for it twice (#358 review).
 RUN_SH_DEFAULTS = {'PT_DIFFICULTY': 'normal', 'PT_STALL_S': '1800', 'PT_MAX_WALL_S': '7200'}
 
-PLAYTEST_ENV_KEYS = ('PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
+PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
                      'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
                      'PT_DIFFICULTY',
                      # The #345 watchdog knobs. Neither should change a verdict -- they bound

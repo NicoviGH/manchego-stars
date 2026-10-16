@@ -1,0 +1,256 @@
+{{Class Infobox
+|image=[[File:FESoV Mogall.png|200px]]
+|caption=Artwork of a Mogall from {{title|Shadows of Valentia}}.
+|flavor_text=An eyeball-like Terror that continually reproduces.
+|type=*Monster <small>(''Gaiden'', ''The Sacred Stones'')</small>
+*Great Terror <small>(''Echoes: Shadows of Valentia'')</small>
+*Flying <small>(''Echoes: Shadows of Valentia'')</small>
+|weapons=*None <small>(''Gaiden'')</small>
+*[[Dark]] <small>(''The Sacred Stones'')</small>
+*[[Tackle]], [[White magic]] <small>(''Echoes: Shadows of Valentia'')</small>
+|skills=[[Divide]] (''Gaiden'', ''Shadows of Valentia'')
+}}
+
+The '''Mogall''' (Japanese: {{hl|ビグル|Biguru}} ''Bigl'') is an enemy-exclusive [[monster]] [[class]] which was introduced in {{FE2}} and so far only appears in it and {{title|The Sacred Stones}}. They are a species of eerie floating eyeballs with tentacles whose bodies are filled with evil [[Magic (element)|magic]], and the lore of ''The Sacred Stones'' says that seeing one is a bad omen. Depending on the game, they attack either by physically ramming their foes or by casting dark spells.
+
+In ''Gaiden'', Mogall first appear late in [[Land of Sorrow (Gaiden)|Act&nbsp;4]] and, along with [[Deathgoyle]]s and [[White Dragon (monster)|White Dragons]] are among the game's strongest and most dangerous monster enemies. Their high [[strength]] gives their ramming attacks good power and their excellent [[speed]] makes them very difficult, if not impossible, to [[follow-up attack]] against. They are summoned by the late-game bosses [[Jedah]] and [[Duma]], and themselves are each able to summon even more Mogall. With this ability a single Mogall can quickly become a swarm, and combined with their decent [[defense]] and [[avoid]], they tend to be very difficult to deal with and they must be eliminated as quickly as possible after they appear to prevent their numbers from growing out of control.
+
+Their appearance in ''The Sacred Stones'' reduced Mogall into a weaker, early-game class which wields the special [[Dark|dark spells]] [[Evil Eye]] and, less frequently, [[Crimson Eye]]. In terms of stats they resemble conventional human magic-wielding classes such as the [[Mage]] and [[Shaman]], featuring high [[Magic (stat)|magic]] and decent [[speed]] and [[resistance]], but also having very low [[HP]] and [[defense]] which leaves them very vulnerable to physical attacks. The game treats Mogall as a [[:Category:Base classes|base class]], and gives them a [[Class change|"promoted"]] counterpart with the stronger [[Arch Mogall]] class.
+
+==Stats==
+===Base stats===
+{{BaseStats
+|game1={{title|Gaiden}}
+|hp1=32
+|str1=16
+|skl1=10
+|spd1=18
+|luck1=0
+|def1=10
+|res1=4
+|mov1=4
+|-
+|game2={{title|The Sacred Stones}}
+|hp2=15
+|mag2=2
+|skl2=1
+|spd2=2
+|luck2=0
+|def2=2
+|res2=4
+|mov2=5
+|con2=4
+|wpnr2={{DarkGBA}} C
+|-
+|game3={{title|Echoes: Shadows of Valentia}}
+|hp3=32
+|str3=15
+|skl3=10
+|spd3=18
+|luck3=0
+|def3=8
+|res3=4
+|mov3=3
+|wpnr3={{WhiteMagic15}}{{Monster15}}
+}}
+
+===Max stats===
+{{MaxStats
+|game1={{title|Gaiden}}
+|hp1=52
+|str1=40
+|skl1=40
+|spd1=40
+|luck1=40
+|def1=40
+|res1=40
+|mov1=40
+|-
+|game2={{title|The Sacred Stones}}
+|hp2=60
+|mag2=20
+|skl2=20
+|spd2=20
+|luck2=30
+|def2=20
+|res2=20
+|mov2=15
+|con2=20
+|wpnr2={{DarkGBA}} A
+}}
+
+===Miscellaneous data===
+{{ClassMisc
+|game1={{title|Gaiden}}
+|exp1=60
+|crp1=10
+|-
+|game2={{title|The Sacred Stones}}
+|crp2=3
+|vis2=3
+|-
+|game3={{title|Echoes: Shadows of Valentia}}
+|exp3=60
+|crp3=3
+}}
+
+===Autolevel growth rates===
+{{ClassGrowths
+|game1={{title|Gaiden}}
+|hp1=150%
+|str1=50%
+|skl1=50%
+|spd1=50%
+|luck1=0%
+|def1=50%
+|res1=0%
+|-
+|game2={{title|The Sacred Stones}}
+|hp2=50%
+|mag2=45%
+|skl2=32%
+|spd2=30%
+|luck2=30%
+|def2=10%
+|res2=28%
+|-
+|game3={{title|Echoes: Shadows of Valentia}}
+|hp3=100%
+|str3=45%
+|skl3=40%
+|spd3=50%
+|luck3=0%
+|def3=40%
+|res3=5%
+}}
+
+===Class skills===
+{{ClassSkills
+|game1={{title|Echoes: Shadows of Valentia}}
+|skill1={{Item|15|Divide|image=skill class}}
+|learn1=Innate.
+}}
+*{{title|Gaiden}}: Enemy Mogalls possess a summoning skill which allows them to summon more enemy Mogall to join the enemy army.
+*{{title|Echoes: Shadows of Valentia}}: Mogalls additionally possess passive skills marking them as [[File:Is fe15 flier.png|class=pixel-art]]flying and promoted [[File:Is fe15 terror.png|class=pixel-art]]Terror units.
+
+==Class change==
+===''Gaiden''===
+{{Class Change 1
+|tier=Base
+|sprite=[[File:Bs fe02 mogall.png]]
+|class=Mogall
+}}
+
+===''The Sacred Stones''===
+{{Class Change 2
+|sprite1=[[File:Bs fe08 mogall monster.png]]
+|basic class=Mogall
+|promotion method=Promotion defined, but no item assigned.
+|sprite2=[[File:Bs fe08 arch mogall dark.png]]
+|promoted class=Arch Mogall
+}}
+
+===''Echoes: Shadows of Valentia''===
+{{Class Change 1
+|tier=Base
+|sprite=[[File:Ma fe15 mogall enemy.gif]]
+|class=Mogall
+}}
+
+==Other appearances==
+==={{FEH}}===
+[[File:Is feh lute's aide.png|right]]
+A generic Mogall appears in ''Heroes'' as an [[Accessory (Heroes)/Aide|Aide]] to [[Lute: Limitless Curiosity]], based on its appearance in {{title|The Sacred Stones}}.
+
+==Flavor text==
+{{DescriptionHdr}}
+{{DescriptionCell
+|game={{title|The Sacred Stones}}<br><small>(class roll)</small>
+|english=Floating eyes filled with dark power.<br>Simply seeing one is considered a ill omen.
+|japanese=浮遊する凶眼の魔物<br>その眼には、闇の力が宿っている
+}}
+{{DescriptionCell
+|game={{title|The Sacred Stones}}<br><small>(help)</small>
+|english=Perilous floating orbs filled with<br>blighting dark magic.
+|japanese=浮遊する凶眼の魔物<br>その眼には、闇の力が宿っている
+}}
+{{DescriptionCell
+|game={{title|Echoes: Shadows of Valentia}}
+|english=An eyeball-like Terror that<br>continually reproduces.
+|japanese=目玉のような姿の魔物<br>自己増殖を繰り返す
+}}
+{{DescriptionFtr}}
+
+==Trivia==
+* In {{title|Gaiden}}, Mogalls are internally the same class as [[Cleric]]s; whether a unit is a Mogall or a Cleric is determined by its affiliation.
+* In ''Gaiden'', Mogall have four different animations for attacking. The first animation features them ramming the enemy. In the second, they rise up in the air and hit their opponent at an angle. In the third they ram the enemy but fall to the ground and 'bounce' back to starting position, and in the fourth they move slightly up and to the left (less than in the second animation) then ram the enemy. Why this is and what triggers the different animations is unknown.
+* A very similar monster appears in {{TRS1}}. They are called {{Saga|Ops}} and have many similar qualities to their {{title|Gaiden}} appearance, including attacking physically and the ability to replicate.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Mogall
+|eng-mean=Possibly derived from the Irish ''{{lang|ga|mogall}}'', which can mean "eye" or "eyelid".<ref>{{cite web|url=http://www.teanglann.ie/en/eid/Mogall|title=Mogall|site=English–Irish Dictionary (de Bhaldraithe)|retrieved=December 12, 2017}}</ref>
+|eng-fan-name=Bigle
+|eng-fan-mean=In the [[Fan translation#Fire Emblem Gaiden|''Gaiden'' fan translation]].{{clarify|which?}}
+|jpn-name={{h|ビグル|Biguru}}
+|jpn-mean=Officially romanized as '''Bigl'''. May be derived from the somewhat archaic French ''{{lang|fr|bigle}}'', meaning "cross-eyed" and originating from a word that means "to see".<ref>{{Cite web|url=https://en.wiktionary.org/wiki/bigle|title=Bigle|site=Wiktionary|retrieved=December 12, 2017}}</ref>
+|span-name=Óculus
+|span-mean=From the Latin ''{{lang|la|oculus}}'', "eye".
+|fren-name=Mogall
+|ger-name=Mogall
+|ital-name=Mogall
+|dut-name=Mogall
+|por-name=Mogall
+|por-mean=Used in ''Heroes''.
+|kor-name={{h|비글|Bigeul}}
+|kor-mean=Bigl
+|ch-simp-name={{h|比格鲁|Bǐgélǔ}}
+|ch-simp-mean=Bigl
+|ch-trad-name={{h|比格魯|Bǐgélǔ}}
+|ch-trad-mean=Bigl
+}}
+
+==Gallery==
+===Official artwork===
+<gallery>
+FESoV Mogall.png|Artwork of a Mogall from {{title|Shadows of Valentia}}.
+</gallery>
+
+===Portraits===
+<gallery>
+Generic portrait mogall fe08.png|The generic Mogall portrait in {{title|The Sacred Stones}}.
+</gallery>
+
+==={{title|Heroes}} artwork===
+====Character artwork====
+<gallery>
+FEH Lute Limitless Curiosity 01.png|A mogall in artwork of [[Lute: Limitless Curiosity]].
+FEH Lute Limitless Curiosity 02.png|A mogall in artwork of Lute: Limitless Curiosity.
+FEH Lute Limitless Curiosity 02a.png|A mogall in artwork of Lute: Limitless Curiosity.
+FEH Lute Limitless Curiosity 03.png|A mogall in artwork of Lute: Limitless Curiosity.
+</gallery>
+
+====[[Meet some of the Heroes]] artwork====
+<gallery>
+FEH mth Lute Limitless Curiosity 01.png|A mogall in artwork of [[Lute: Limitless Curiosity]].
+FEH mth Lute Limitless Curiosity 02.png|A mogall in artwork of Lute: Limitless Curiosity.
+FEH mth Lute Limitless Curiosity 04.png|A mogall in artwork of Lute: Limitless Curiosity.
+</gallery>
+
+==={{title|Cipher}} artwork===
+<gallery>
+TCGCipher Leon 02.jpg|Mogalls in artwork of [[Leon]].
+TCGCipher Palla 03.jpg|Mogalls in artwork of [[Palla]].
+TCGCipher bonus illustration Sachiko Wada.jpg|Bonus artwork featuring a Mogall.
+</gallery>
+
+==References==
+{{refbar}}
+
+{{Project Classes}}
+{{NavClassFE2}}
+{{NavClassFE8}}
+{{NavClassFE15}}
+[[Category:Monsters]]
+[[Category:Base classes]]
+[[Category:Enemy-exclusive classes]]

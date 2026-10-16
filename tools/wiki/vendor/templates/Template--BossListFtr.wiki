@@ -1,0 +1,4 @@
+<noinclude>{{BossListHdr}}
+</noinclude>|-class="sortbottom"
+|colspan=5 class="roundb" |
+|}<noinclude>[[Category:Character list templates]]</noinclude>

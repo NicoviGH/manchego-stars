@@ -44,6 +44,7 @@ import inject.hosts
 import inject.paths
 import inject.raw_pids
 import difficulty as d
+import unit_load
 
 REPO = inject.decomp.REPO
 PACING_DOC = os.path.join(REPO, 'docs', 'fe8-pacing-reference.md')
@@ -64,15 +65,8 @@ EXP_PER_LEVEL = 100
 # never the working tree, which the build mutates.
 # ---------------------------------------------------------------------------------------
 
-def _classes_text():
-    return inject.decomp.vanilla_decomp_text('src/data_classes.c')
-
-
-@functools.lru_cache(maxsize=None)
 def _class_block(class_enum):
-    text = _classes_text()
-    s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % class_enum, inject.paths.CLASSES_C)
-    return text[s:e]
+    return unit_load._class_block(class_enum)
 
 
 @functools.lru_cache(maxsize=None)

@@ -6,6 +6,18 @@
 > (migrated from pre-strip commit `e6cc7a6`) as inspiration for dialogue, sprite/palette work,
 > and signature scripted moments — never as FE mechanics.
 
+## Profile
+
+Wolfram is a mineralscale drakeborn metallurgist. Born without scales and shamed by his people for
+it, he wandered until he found an alien meteorite ring in the earth. Through it METALLO, a cosmic
+being trillions of years old and the first ever to make metal, named him the First Metallurgist,
+and his scales grew back forged from living metal.
+
+At heart he is a materials nerd. He smells and tastes the metal around him before he names it, eats
+it casually, and lights up at anything rare. He is friendly and works well with the whole party,
+and he never backs down from a fight: when Bremen's Speaker tried to intimidate the party, Wolfram
+stepped forward and took a bite out of his axe.
+
 ## Concept
 
 - **Race:** Mineralscale Drakeborn
@@ -134,7 +146,7 @@ Master of the Forge — Wolfram forges adamantine and mithral, the metals of leg
 
 ## Signature gear (flavor / post-MVP)
 
-MVP loadout is a stock Iron Lance + Javelin (the Javelin is the armored unit's ranged option).
+MVP loadout is a stock Iron Lance and a Goodberry.
 His fire/forge identity rides on the sprite art, not the item names. Named gear, post-MVP:
 
 - **Warhammer** — his heavy personal weapon → an FE Lance (tier TBD, post-MVP).

@@ -6,6 +6,19 @@
 > rides a guest face slot (`GUEST_PORTRAIT_MAP`). Book grounding: printed p.32–33
 > ("Bryn Shander in a Nutshell" + the bust on printed p.33).
 
+## Profile
+
+Duvessa Shane is the Speaker of Bryn Shander and head of the Council of Speakers, young for the post
+and feeling its weight. She knows every name in town and has buried too many of them, and two years
+of endless winter have worn her down.
+
+She is warm, plain-spoken and sincere, leads with thanks, and hires by results. After the iron job
+she takes the party on for ongoing work across Ten-Towns.
+
+## Book
+
+In ''Rime of the Frostmaiden'' (p. 32), Bryn Shander's leader is "Speaker Duvessa Shane": "Though relatively young, Duvessa is the head of the Council of Speakers."
+
 ## Concept
 
 The honest face of the capital. **Lawful good human noble, relatively young** — head of

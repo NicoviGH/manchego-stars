@@ -5,6 +5,7 @@
 
 id: sclorbo
 name: Sclorbo
+help_text: "A chwinga bard who never speaks. He lends courage to anyone in need."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 death_quote: "(Sclorbo's glow dims -- one last wave of courage, then still.)"  # falls-in-battle quote (#6); impression text, never speaks (lore/sclorbo.md)
 lord_pitch: "Healer -- mends allies, deals no damage; guard him."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/sclorbo.png     # GBA-ready sprite pending (issue #23)
@@ -57,7 +58,7 @@ dnd:
 # his whole kit (Cure Wounds, debuff cantrips) is healer/caster — Priest→Bishop is the native fit
 # and the "Lore Bishop" promotion is just Bishop. Dropped Dance.
 fe_stats:
-  class: Priest                   # FE base class — male staff healer (Cleric's male counterpart)
+  class: priest                   # FE base class — male staff healer (Cleric's male counterpart)
   level: 1
   # Vanilla FE8 Priest stats, verbatim from data_classes.c [CLASS_PRIEST - 1]. No D&D-derived tuning.
   # Priest is a magic (Light/staff) class: single Pow = magic attack (= MAG). At BASE it is staff-only
@@ -75,18 +76,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [Bishop, Sage]          # vanilla Priest branch (classchg-data.c [CLASS_PRIEST])
-  default: Bishop                 # thematic lean (Light attack + staves); player may pick either.
-
-# ── Growth Rates (% per level) — vanilla Priest growths from data_classes.c ──────
-growth_rates:
-  HP: 50
-  MAG: 30
-  SKL: 35
-  SPD: 32
-  DEF: 8
-  RES: 50
-  LCK: 45
+  branch: [bishop, sage]          # vanilla Priest branch (classchg-data.c [CLASS_PRIEST])
+  default: bishop                 # thematic lean (Light attack + staves); player may pick either.
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # FE-LEGAL for Priest→Bishop: Heal Staff is a base-Priest staff; the attack cantrips are Light tomes
@@ -118,7 +109,6 @@ inventory:
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 2
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Sclorbo is a stock FE8 Priest -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

@@ -1,0 +1,45 @@
+# ch20 — Ythryn (the finale). PLANNED (#486): a seed, not authoritative.
+id: ch20-ythryn
+title: "Ythryn"
+location: "Ythryn, beneath the Reghed Glacier"
+chapter_number: 20
+act: 'IV–V'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
+status: planned
+milestone: M4
+cadence: finale
+fe8_base_map: "FE8 Final — Sacred Stone, parts 1 and 2 (layout only; iced)"
+parity_reference: "FE8 Final"
+narrative: >
+  Beneath the glacier lies Ythryn, the buried Netherese city whose mythallar can end the Rime.
+  The party fights through to it, and when they light it, Auril comes down to stop them.
+map: {}
+objective:
+  type: defeat_boss
+  description: "Defeat Auril (planned)"
+win_condition: "Defeat Auril (planned)"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Final until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Final) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  Built like vanilla's two-part Final: the corrupted enemy first, then the god in the Demon
+  King's place. Both maps iced (Nicolas).
+plan:
+  story: >
+    The Rime breaks. The epilogue carries Pinky's Wish, a happy-ending beat (Nicolas,
+    2026-10-12).
+  sources:
+    - "Rime ch.7: Ythryn, the mythallar, Iriolarthas; Auril comes to stop it (p.267)"
+    - "Rime p.274: Auril can't truly die while she has worshippers"
+  joins_roles: []
+  payload_notes: >
+    Owes the Final: a Master Seal and an Angelic Robe (chests).
+open_questions:
+  - q: "The finale's first part: Iriolarthas, the undead archwizard guarding the mythallar?"
+    pick: "Yes (Avarice would need setting up earlier)"
+  - q: "Finale tone?"
+    pick: "Heroic with a bittersweet note: the Rime breaks and Auril retreats"

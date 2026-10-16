@@ -1,0 +1,1 @@
+&lsqb;[[File:Is TCGCipher Flip 1.png|x20px|Flip one bond card]]&rsqb;<noinclude><br />This is to properly format {{TCGCipher}} skill descriptions, for skills which require one bond card to be flipped. To use type:  '''<nowiki>{{CipherFlipOne}}</nowiki>''' [[Category:TCG templates]]</noinclude>

@@ -1,0 +1,334 @@
+{{Chapter Infobox
+|location=Border Mulan
+|image=[[File:Ci fe08 P.png|200px]]
+|boss=[[O'Neill]]
+|next=[[Escape!]]
+}}
+
+{{quote|...This is war, isn't it? It's not at all like the games I used to play with my brother or Lyon. I never thought{{nwh}} I didn't know it would be this...savage. Are words useless? Is strength all that matters?|Eirika}}
+
+'''The Fall of Renais''' (Japanese: {{hl|ルネス陥落|Runesu kanraku}} ''Renais's Fall'') is the prologue chapter in {{title|The Sacred Stones}}. In this chapter, [[Eirika]] and [[Seth]] escape from Castle [[Renais]] as it is invaded by [[Grado]] soldiers.
+
+==Plot==
+{{main|The Fall of Renais/Script}}
+As with other games, this game starts with a narration of the history of the game's continent, in this case the history of [[Magvel]].
+
+When troops from [[Grado]] invade [[Renais]], King [[Fado]] sends [[Eirika]], along with his loyal retainer [[Seth]], to the neighboring country of [[Frelia]] for safety. As the two exit the castle, they are confronted by the Moonstone, [[Valter]], who attacks Seth, dealing him a nasty blow. Seth quickly grabs Eirika and escapes, riding off into the mountains. Later, [[O'Neill]] and two of his underlings catch up with Eirika and Seth, and engage them in battle. Having defeated their oppressors, Eirika and Seth continue their journey to Frelia.
+
+==Chapter data==
+{{Tab
+|width=100%
+|default=2
+|tab1=Easy
+|tab2=Normal/Difficult
+|content1={{ChapData
+|victory=Defeat [[O'Neill]]
+|defeat=[[Eirika]] dies
+|ally=2
+|enemy=0{{h|+3|Reinforcements}}
+|map=[[File:Cm fe08 prologue e.png]]
+|col=15
+|row=10
+}}
+|content2={{ChapData
+|victory=Defeat [[O'Neill]]
+|defeat=[[Eirika]] dies
+|ally=2
+|enemy=3
+|map=[[File:Cm fe08 prologue.png]]
+|col=15
+|row=10
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Eirika
+|portrait=[[File:Portrait eirika fe08.png]]
+|class=Lord
+|HP=16
+|lv=1
+|inventory={{Item|8|Vulnerary}}<br>{{Item|8|Rapier}}{{h|*|Granted after moving on Easy Mode, and before gameplay starts on Normal and Hard Modes}}
+|recruitment method=Automatically from turn 1
+}}
+|newunit2={{NewUnit
+|name=Seth
+|portrait=[[File:Portrait seth fe08.png]]
+|class=Paladin
+|HP={{h|30|Starts the chapter with 13/30 HP}}
+|lv=1
+|inventory={{Item|8|Steel Sword}}<br>{{Item|8|Silver Lance}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically from turn 1
+}}
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|itemlast=Rapier
+|obtainlast=Before battle, from [[Seth]]
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|tab3=Difficult <small>(Japan)</small>
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[O'Neill]]
+|class=Fighter
+|lv=4
+|#=1
+|hp=23
+|str=6
+|skill=4
+|spd=7
+|lck=0
+|def=2
+|res=0
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving after the other two Fighters are defeated.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=1
+|#=1
+|hp=22
+|str=5
+|skill=1
+|spd=1
+|lck=0
+|def=5
+|res=0
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=2
+|#=1
+|hp=20
+|str=5
+|skill=2
+|spd=4
+|lck=0
+|def=2
+|res=0
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[O'Neill]]
+|class=Fighter
+|lv=4
+|#=1
+|hp=23~24
+|str=6~7
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving after the other two Fighters are defeated.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=1
+|#=1
+|hp=22~23
+|str=5~6
+|skill=1~2
+|spd=1~2
+|lck=0~1
+|def=5~6
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=2
+|#=1
+|hp=20~21
+|str=5~6
+|skill=2~3
+|spd=4~5
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[O'Neill]]
+|class=Fighter
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving after the other two Fighters are defeated.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Note: These reinforcements are on the map from the beginning on Normal and Difficult modes.
+*Upon moving Eirika to the space next to Seth:
+**2 [[Fighter]]s and [[O'Neill]] appear in the southeastern area of the map
+
+===Boss data===
+{{main|O'Neill}}
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait o'neill fe08.png]]
+|sprite=fighter enemy
+|class=Fighter
+|affin=fire
+|lv=4
+|HP=23
+|str=6
+|skill=4
+|spd=7
+|luck=0
+|def=2
+|res=0
+|con=11
+|aid=10
+|move=5
+|inventory={{Item|8|Iron Axe}}
+|ax=C
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait o'neill fe08.png]]
+|sprite=fighter enemy
+|class=Fighter
+|affin=fire
+|lv=4
+|HP={{h|23~24|25~26 in the Japanese version}}
+|str={{h|6~7|7~8 in the Japanese version}}
+|skill={{h|4~5|5~6 in the Japanese version}}
+|spd=7~8
+|luck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|aid=10
+|move=5
+|inventory={{Item|8|Iron Axe}}
+|ax=C
+}}
+}}
+
+==Strategy==
+{{Strategy}}
+On easy mode the game provides a scripted tutorial to guide the player through this chapter; it is impossible to lose.
+
+On normal and difficult modes, a similar strategy to the scripted tutorial may be used. Together [[Eirika]] and [[Seth]] can take out the enemy [[Fighter]]s with ease.
+
+Depending on which units the player wishes to use later in the game it may be recommended to not use Seth at all to provide Eirika with more [[experience]], though both Eirika or Seth are fully capable of defeating all the units by themselves. Regardless of the player's goals, Eirika can bait the fighters and dodge their attacks fairly consistently. If Eirika is hurt use a [[Vulnerary]] to keep her [[HP]] up.
+
+==Trivia==
+*In the cutscene at Renais Castle before the beginning of the prologue, the two [[General]]s use the unit data of [[Moulder]] and [[Vanessa]].
+*On Easy Mode, Eirika is able to do a follow-up attack on O'Neill despite Eirika having only 9 in Speed and O'Neill having 7 in Speed.
+*On Easy Mode, Seth is scripted to defeat the second enemy with a Steel Sword. For unknown reasons, the durability of the Steel Sword does not decrease when Seth defeats the enemy.
+
+==Etymology and other languages==
+{{Names
+|eng-name=The Fall of Renais
+|jpn-name={{h|ルネス陥落|Runesu kanraku}}
+|jpn-mean=Renais's Fall
+|span-name=La caída de Renais
+|span-mean=The Fall of Renais
+|fren-name=La chute de Renais
+|fren-mean=The Fall of Renais
+|ger-name=Der Fall von Renais
+|ger-mean=The Fall of Renais
+|ital-name=La caduta di Renais
+|ital-mean=The Fall of Renais
+}}
+<!--
+==Gallery==
+-->
+
+{{ChapterNav
+|nextchapter=Escape!
+}}
+
+{{Nav8}}
+{{DEFAULTSORT:Fall of Renais, The}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

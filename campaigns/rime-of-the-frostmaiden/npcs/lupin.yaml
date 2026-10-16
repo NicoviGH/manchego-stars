@@ -16,6 +16,7 @@
 
 id: lupin
 name: Lupin
+help_text: "The leader of an awakened direwolf pack. He bargains hard, in spectacles."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 # Provisional death line (blunt pack-pragmatist voice); finalized in the Stage-4 ch04 dialogue-pass.
 death_quote: "The pack... runs on without me. See them to the far side -- that was the whole of the bargain."
 
@@ -32,7 +33,7 @@ dnd:
 # Baxby (axe-beak Cavalier) as the "beast-cavalry" sled team — on-theme with the campaign's
 # befriend-the-creatures motif. Custom map sprite + battle anim required (#38/#39).
 fe_stats:
-  class: Cavalier
+  class: cavalier
   level: 1
   # Vanilla FE8 Cavalier stats, verbatim from data_classes.c [CLASS_CAVALIER - 1].
   HP: 20
@@ -50,19 +51,24 @@ donor:
   why: fresh Cavalier = full growth runway on Kyle's curve, starting from Franz's L1 line
     (ADR 0042's shaman precedent -- a join-appropriate base donor; #403, ADR 0321)
 
-# ── Growth Rates (% per level) — vanilla Cavalier growths from data_classes.c ─
-growth_rates:
-  HP: 75
-  STR: 35
-  SKL: 40
-  SPD: 28
-  DEF: 15
-  RES: 15
-  LCK: 30
-
 promotion:
-  branch: [Paladin, "Great Knight"]   # vanilla FE8 Cavalier branch (classchg-data.c [CLASS_CAVALIER])
-  default: Paladin
+  branch: [paladin, great-knight]   # vanilla FE8 Cavalier branch (classchg-data.c [CLASS_CAVALIER])
+  default: paladin
+
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
+  - id: iron-sword
+    name: "Iron Sword"
+    fe_base: iron-sword
+    fe_weapon_type: Sword
+    damage_type: slashing           # cosmetic flavor label only
+  - id: iron-lance
+    name: "Iron Lance"
+    fe_base: iron-lance
+    fe_weapon_type: Lance
+    damage_type: piercing           # cosmetic flavor label only
+  - id: vulnerary
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
+    fe_base: vulnerary
 
 recruited_via: "story — Marty talks the direwolf pack into the sled team (Ch4)"
 recruit:

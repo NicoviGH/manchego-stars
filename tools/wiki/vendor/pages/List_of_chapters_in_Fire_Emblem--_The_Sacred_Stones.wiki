@@ -1,0 +1,226 @@
+{{Italic title|Fire Emblem: The Sacred Stones}}
+==Main story==
+{| class="cellpadding-3 basic width-95"
+! style="background: none"" colspan="6" | Chapter List
+|-
+! style="border-top-left-radius: 15px; width: 16.6%" class="pixel-art" | [[File:Ma gba lord eirika playable.gif]] [[File:Ma gba lord ephraim playable.gif]]
+! style="width: 16.6%" | Title
+! style="width: 16.6%" | [[Objectives]]
+! style="width: 16.6%" | Defeat
+! style="width: 16.6%" | New Units
+! style="border-top-right-radius: 15px; width: 16.6%" | [[Boss]]es
+|-
+| Prologue
+| [[The Fall of Renais]]
+| Defeat O'Neill
+| [[Eirika]] dies
+| [[Eirika]], [[Seth]]
+| [[O'Neill]]
+|-
+| Chapter&nbsp;1
+| [[Escape!]]
+| Seize the castle
+| [[Eirika]] dies
+| [[Franz]], [[Gilliam]]
+| [[Breguet]]
+|-
+| Chapter&nbsp;2
+| [[The Protected]]
+| Rout the enemy
+| [[Eirika]] dies
+| [[Vanessa]], [[Moulder]], [[Ross]], [[Garcia]]
+| [[Bone]]
+|-
+| Chapter&nbsp;3
+| [[The Bandits of Borgo]]
+| Seize the throne
+| [[Eirika]] dies
+| [[Neimi]], [[Colm]]
+| [[Bazba]]
+|-
+| Chapter&nbsp;4
+| [[Ancient Horrors]]
+| Rout the enemy
+| [[Eirika]] dies
+| [[Artur]], [[Lute]]
+| [[Entombed]]
+|-
+| Chapter&nbsp;5
+| [[The Empire's Reach]]
+| Defeat Saar
+| [[Eirika]] dies
+| [[Natasha]], [[Joshua]]
+| [[Saar]]
+|-
+| Chapter&nbsp;5x
+| [[Unbroken Heart]]
+| Seize the throne
+| [[Ephraim]] dies
+| [[Ephraim]], [[Forde]], [[Orson]], [[Kyle]]
+| [[Zonta]]
+|-
+| Chapter&nbsp;6
+| [[Victims of War]]
+| Defeat Novala
+| [[Eirika]] dies
+| None
+| [[Novala]]
+|-
+| Chapter&nbsp;7
+| [[Waterside Renvall]]
+| Seize the gate
+| [[Eirika]] dies
+| None
+| [[Murray]]
+|-
+| Chapter&nbsp;8
+| [[It's a Trap!]]
+| Seize the throne
+| [[Eirika]] or [[Ephraim]] dies
+| [[Ephraim]], [[Forde]], [[Kyle]]
+| [[Tirado]]
+|-
+| Chapter&nbsp;9 (Eirika)
+| [[Distant Blade]]
+| Rout the enemy
+| [[Eirika]] dies
+| [[Tana]], [[Amelia]]
+| [[Binks]]
+|-
+| Chapter&nbsp;9 (Ephraim)
+| [[Fort Rigwald]]
+| Seize the throne
+| [[Ephraim]] dies
+| [[Tana]], [[Amelia]]
+| [[Gheb]]
+|-
+| Chapter&nbsp;10 (Eirika)
+| [[Revolt at Carcino]]
+| Seize the gate
+| [[Eirika]] dies
+| [[Innes]], [[Gerik]], [[Tethys]], [[Marisa]]
+| [[Pablo]]
+|-
+| Chapter&nbsp;10 (Ephraim)
+| [[Turning Traitor]]
+| Protect Duessel for 10 turns or defeat Beran 
+| [[Ephraim]] or [[Duessel]] dies
+| [[Duessel]], [[Cormag]]
+| [[Beran]]
+|-
+| Chapter&nbsp;11 (Eirika)
+| [[Creeping Darkness]]
+| Rout the enemy
+| [[Eirika]] dies
+| [[L'Arachel]], [[Dozla]]
+| [[Wight]]
+|-
+| Chapter&nbsp;11 (Ephraim)
+| [[Phantom Ship]]
+| Rout the enemy
+| [[Ephraim]] dies
+| [[L'Arachel]], [[Dozla]]
+| [[Deathgoyle]]
+|-
+| Chapter&nbsp;12 (Eirika)
+| [[Village of Silence]]
+| Rout the enemy
+| [[Eirika]] dies
+| [[Saleh]], [[Ewan]]
+| [[Maelduin]]
+|-
+| Chapter&nbsp;12 (Ephraim)
+| [[Landing at Taizel]]
+| Defeat monster
+| [[Ephraim]] dies
+| [[Ewan]], [[Marisa]]
+| [[Cyclops]]
+|-
+| Chapter&nbsp;13 (Eirika)
+| [[Hamill Canyon]]
+| Survive 11 turns or defeat Aias
+| [[Eirika]] dies
+| [[Cormag]], [[Amelia]]
+| [[Aias]], [[Pablo]]
+|-
+| Chapter&nbsp;13 (Ephraim)
+| [[Fluorspar's Oath]]
+| Rout the enemy
+| [[Ephraim]] dies
+| [[Gerik]], [[Tethys]]
+| [[Selena (The Sacred Stones)|Selena]]
+|-
+| Chapter&nbsp;14 (Eirika)
+| [[Queen of White Dunes]]
+| Seize the throne
+| [[Eirika]] dies
+| [[Rennac]]
+| [[Carlyle]]
+|-
+| Chapter&nbsp;14 (Ephraim)
+| [[Father and Son]]
+| Seize the throne
+| [[Ephraim]] dies
+| [[Rennac]]
+| [[Vigarde]]
+|-
+| Chapter&nbsp;15
+| [[Scorched Sand]]
+| Rout the enemy
+| [[Eirika]] or [[Ephraim]] dies
+| [[Ephraim]], [[Duessel]], [[Knoll]] or [[Eirika]], [[Saleh]], [[Innes]]
+| [[Valter]], [[Caellach]]
+|-
+| Chapter&nbsp;16
+| [[Ruled by Madness]]
+| Seize the throne
+| [[Eirika]] or [[Ephraim]] dies
+| [[Myrrh]]
+| [[Orson]]
+|-
+| Chapter&nbsp;17
+| [[River of Regrets]]
+| Defeat Lyon
+| [[Eirika]] or [[Ephraim]] dies
+| [[Syrene]]
+| [[Lyon]]
+|-
+| Chapter&nbsp;18
+| [[Two Faces of Evil]]
+| Rout the enemy
+| [[Eirika]] or [[Ephraim]] dies
+| None
+| [[Gorgon]]
+|-
+| Chapter&nbsp;19
+| [[Last Hope]]
+| Protect Mansel for 13 turns or defeat Riev 
+| [[Eirika]], [[Ephraim]], or [[Mansel]] dies
+| None
+| [[Riev]]
+|-
+| Chapter&nbsp;20
+| [[Darkling Woods]]
+| Seize the gate
+| [[Eirika]] or [[Ephraim]] dies
+| None
+| [[Morva]], [[Riev]]
+|-
+| Final (part 1)
+| [[Sacred Stone (part 1)]]
+| Defeat Lyon
+| [[Eirika]] or [[Ephraim]] dies
+| None
+| [[Lyon]]
+|-
+| style="border-bottom-left-radius: 15px" | Final (part 2)
+| [[Sacred Stone (part 2)]]
+| Defeat Fomortiis
+| [[Eirika]] or [[Ephraim]] dies
+| None
+| style="border-bottom-right-radius: 15px" | [[Fomortiis]]
+|}
+
+{{DEFAULTSORT:List of chapters in Fire Emblem Sacred Stones}}
+[[Category:Lists of chapters|Fire Emblem Sacred Stones]]
+[[Category:Chapters of Fire Emblem: The Sacred Stones| ]]

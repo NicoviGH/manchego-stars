@@ -263,7 +263,8 @@ def main():
             if im.size != (BUST_W, BUST_H):
                 sys.exit('ERROR: encode expects a %dx%d bust, got %s' % (BUST_W, BUST_H, im.size))
             out = encode(im, corners)
-        out.save(outp)
+        # a decoded bust marks index 0 transparent, as the game draws it (test_bust_key)
+        out.save(outp, **({'transparency': 0} if op == 'decode' else {}))
         print('%s -> %s (%s)' % (inp, outp, op))
 
     else:  # generate

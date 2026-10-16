@@ -1,0 +1,14 @@
+{| class="chap-chars round {{#switch:{{{game#|}}}|01|02|03|04|05|06|07|08|bs=pixel-art}} width-{{#invoke:String|replace|{{{width|80}}}|%|}}" style="margin: auto; border: 2px solid {{Color2}}; background: {{Color3}}; text-align: center" 
+! class="round" style="border: 1px solid {{Color2}}; background: {{Color1}}; width: 100%; font-size: larger" | Characters
+|-
+! <div class="round" style="margin: auto; border: 1px solid {{Color2}}; background: {{Color1}}; width: 66%; padding: 3px">New units</div>
+|-
+|
+{| style="margin: auto; width: 100%"
+{{#invoke:ChapChars|newunits}}
+|}
+|-
+{{#invoke:ChapChars|oldunits}}
+|}<noinclude>
+
+{{doc}}</noinclude>

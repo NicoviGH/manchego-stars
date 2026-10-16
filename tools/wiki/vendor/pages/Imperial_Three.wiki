@@ -1,0 +1,64 @@
+{{Group Infobox
+|leader=[[Grado]]
+|size=Three members at any given time
+|type=High-ranking generals
+|purpose=To serve Grado
+|appearances={{title|The Sacred Stones}}
+}}
+
+The Imperial Three (Japanese: {{hl|三騎|Sanki}} ''Three riders'') are a small group of high ranking generals serving [[Grado]] under the direct command of its emperor [[Vigarde]] in {{FE8}}.
+
+==Overview==
+The Imperial Three is a powerful trio of Grado generals. The original group was composed of [[Duessel]], [[Glen]], and [[Valter]]. Some time before the [[War of the Stones]] Valter attacked civilians and was banished from Grado for his actions. After this [[Selena (The Sacred Stones)|Selena]] was given the title Fluorspar and granted the vacant seat in the Imperial Three. The Imperial Three has its own internal rankings, Duessel is the highest ranking, with Selena being in the middle of the ranks, the lowest seems to be Glen.<ref>{{cite|Selena Fluorspar... Only General Duessel is higher in Emperor Vigarde's esteem...|[[Seth]] to [[Hayden]]|The Sacred Stones}}</ref>
+
+During the War of the Stones in [[Timeline of Magvel|803]] Vigarde appointed three more generals of similar standing to the Imperial Three, these three, [[Caellach]], [[Riev]], and [[Valter]] were also given gemstone titles. The Imperial Three did not seem to approve of these choices, but chose to respect Vigarde on the matter.
+
+By the conclusion of ''The Sacred Stones'' all but one of Grado's highest Generals are killed, with Duessel being the only remainder. The first to die was Selena, who was killed by Ephraim's forces. Next was Glen, who was killed by Valter in [[Carcino]]. Both Caellach and Valter die in [[Jehanna]] against Ephraim's and Eirika's combined forces. The last is Riev, who died against [[Renais]]' forces in [[Darkling Woods (location)|Darkling Woods]], though it is very likely he stopped serving Grado before that battle.
+
+==Members==
+While Vigarde does regard [[Caellach]], [[Riev]], and [[Valter]] as being equal in standing to the Imperial Three they are not regarded as members of it.
+{| class="members"
+| style="border-top-left-radius: 10px; width: 100px" | [[File:FESS Duessel.png|100px]]
+| style="width: 100px" | [[File:FESS Selena.png|70px]]
+| style="border-top-right-radius: 10px; width: 100px" | [[File:FESS Glen.png|75px]]
+|-
+| style="border-bottom-left-radius: 10px" | [[Duessel]]<br><small>The Obsidian</small>
+| [[Selena (The Sacred Stones)|Selena]]<br><small>The Fluorspar</small>
+| style="border-bottom-right-radius: 10px" | [[Glen]]<br><small>The Sunstone</small>
+|}
+<!--
+==Trivia==
+-->
+==Etymology and other languages==
+{{Names
+|eng-name=Imperial Three
+|jpn-name={{h|三騎|Sanki}}
+|jpn-mean=Three riders
+|span-name=Tres generales imperiales
+|span-mean=Three imperial generals
+|fren-name=Trois Imperiaux
+|fren-mean=Imperial Three
+|ger-name=Imperialen Drei
+|ger-mean=Imperial Three
+|ital-name=Trio imperiale
+|ital-mean=Imperial trio
+|por-name=Três lendários generais imperiais
+|por-mean=Three legendary imperial generals; used in ''Heroes''.
+|ch-trad-name={{h|三騎|Sān qí}}
+|ch-trad-mean=Three riders; used in ''Heroes''.
+}}
+<!--
+==Gallery==
+<gallery>
+</gallery>
+-->
+==References==
+{{Refbar}}
+<!--
+==See also==
+-->
+==References==
+{{refbar}}
+
+{{Nav8}}
+[[Category:Groups and organizations in Fire Emblem: The Sacred Stones]]

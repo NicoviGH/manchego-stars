@@ -307,5 +307,48 @@ class SetMessageBodyReplacesTheWholeBody(unittest.TestCase):
         self.assertEqual(['## MSG_001', 'new', ''], lines)
 
 
+
+class HelpText(unittest.TestCase):
+    """A cast member's help text (R on its name), written over its slot's description (#493)."""
+
+    def test_the_pad_follows_the_encoders_runs_not_the_byte_count(self):
+        # 35 + 37 characters: even in total, but the second run is odd and would eat the [X].
+        body = inject.text.help_text_body(
+            'A hermit crab merchant from the sea floor. He honors every deal he makes.')
+        self.assertTrue(body.endswith('makes.[.][X]'), body)
+        self.assertNotIn('[.]', inject.text.help_text_body(
+            "A kobold leader who taught himself Common from a miner's ledgers."))
+
+    def test_the_rule_predicts_every_plain_vanilla_description(self):
+        from inject.decomp import vanilla_decomp_text
+        chars = vanilla_decomp_text('src/data_characters.c')
+        texts = vanilla_decomp_text('texts/texts.txt')
+        checked = 0
+        for i in sorted({int(x, 0) for x in re.findall(
+                r'\.descTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars)}):
+            m = re.search(r'^## MSG_%03X\b[^\n]*\n(.*?)(?=^##|\Z)' % i, texts, re.S | re.M)
+            body = m.group(1).replace('\n', '').strip()
+            padded = body.endswith('[.][X]')
+            core = body[:-6] if padded else body[:-3]
+            if not body.endswith('[X]') or 'Dummy' in body or '[' in core.replace('[LF]', ''):
+                continue
+            checked += 1
+            self.assertEqual(padded, inject.text._eats_end(core.split('[LF]')), 'MSG_%03X' % i)
+        self.assertEqual(50, checked)
+
+    def test_a_line_too_long_for_the_box_stops_the_build(self):
+        with self.assertRaises(SystemExit):
+            inject.text.help_text_body('word ' * 40)
+
+    def test_every_classed_cast_member_has_its_own(self):
+        import inject.cast
+        for uid, slot, _cls, _ in inject.cast.classed_cast('rime-of-the-frostmaiden'):
+            unit = inject.cast.load_unit('rime-of-the-frostmaiden', uid)
+            with self.subTest(uid):
+                self.assertTrue(unit.get('help_text'), uid)
+                inject.text.help_text_body(unit['help_text'])          # fits the box
+                self.assertEqual(' '.join(unit['help_text'].split()),
+                                 inject.text.slot_help_text(slot, unit))
+
 if __name__ == '__main__':
     unittest.main()

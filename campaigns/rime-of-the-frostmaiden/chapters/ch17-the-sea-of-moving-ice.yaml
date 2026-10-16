@@ -1,0 +1,49 @@
+# ch17 — The Sea of Moving Ice. PLANNED (#486): a seed, not authoritative.
+id: ch17-the-sea-of-moving-ice
+title: "The Sea of Moving Ice"
+location: "The Sea of Moving Ice"
+chapter_number: 17
+act: 'IV–V'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
+status: planned
+milestone: M4
+cadence: marquee_setpiece
+fe8_base_map: "TBD"
+parity_reference: "FE8 Ch17"   # River of Regrets's force (#459)
+narrative: >
+  Professor Skant guides the party across the Sea of Moving Ice toward Auril's island. With
+  the towns rallying around the party instead of praying to her, and the party now hunting
+  her Codicil, Auril appears in person for the first time and tries to stop the crossing.
+map: {}
+objective:
+  type: defeat_boss
+  description: "Planned"
+win_condition: "Planned"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch17 (River of Regrets) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch17) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  River of Regrets is the first time vanilla shows the true villain: the Demon King speaks
+  through Lyon. Its play is protecting fleeing civilians at a river while the possessed friend
+  escapes; ours is protecting the crew while Auril's servants attack the crossing.
+plan:
+  story: >
+    The true enemy shows her face. Taking back the beasts' minds was rejected (Nicolas,
+    2026-10-12), so the chapter still needs its beat.
+  sources:
+    - "Table: the party crossed the Sea of Moving Ice (Nicolas, 2026-10-13)"
+    - "Rime ch.5 opening: the Sea of Moving Ice"
+  joins_roles:
+    - "Syrene (flier, green NPC)"
+  payload_notes: >
+    Owes vanilla Ch17: a legendary pair (Nidhogg, Vidofnir), Fimbulvetr, Fenrir, Brave Axe,
+    and Rescue if the civilians live.
+open_questions:
+  - q: "ch17's beat: Auril appears in person, tries to stop the crossing and fails (seeding her weakness)?"
+    pick: "Yes"
+  - q: "Which map for the crossing?"
+    pick: "Decide in the Act IV pass"

@@ -1,0 +1,4 @@
+<noinclude>{{NPCListHdr}}
+</noinclude>|-class="sortbottom"
+|colspan=3 class="roundb" |
+|}<noinclude>[[Category:Character list templates]]</noinclude>

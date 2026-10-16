@@ -143,6 +143,13 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
 APP="$REPO/tools/emulator/mGBA-dev.app/Contents/MacOS/mGBA"
 ROM="$REPO/build/fireemblem8u/fireemblem8.gba"   # the build tree (#408)
+# PT_VANILLA=1: run RETAIL FE8 to measure what vanilla does at runtime. The pristine decomp in
+# build/vanilla-fe8 builds byte-identical to the retail ROM; it is here for its ELF, whose
+# symbols the harness needs to read state and classify screens (gen_symbols.py, PT_ELF).
+if [ "${PT_VANILLA:-0}" = "1" ]; then
+    ROM="$REPO/build/vanilla-fe8/fireemblem8.gba"
+    export PT_ELF="$REPO/build/vanilla-fe8/fireemblem8.elf" MX_SKIP_ROM_CHECK=1
+fi
 SCENARIO="${1:?usage: run.sh <scenario>  (see header: win|ch01win|recordending|recordprep|...)}"
 KEEP_OPEN="${2:-}"
 STATE_DIR="$HERE/states"

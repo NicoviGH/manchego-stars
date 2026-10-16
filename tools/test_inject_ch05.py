@@ -56,7 +56,7 @@ def _ch05_ending(chap):
 def location_events(chap):
     """ch05's Location list, through the shared builder with ch05's slots, shops and flags."""
     m = inject.chapters.ch05
-    return inject.villages.chapter_location_events(chap, m.CH05_VILLAGE_SLOTS, m.CH05_SHOPS,
+    return inject.villages.chapter_location_events(chap, m.CH05_VILLAGE_SLOTS,
                                                    flags=m.CH05_VILLAGE_FLAGS)
 
 

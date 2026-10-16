@@ -112,7 +112,8 @@ class Ch04RuntimeHost(unittest.TestCase):
     def test_turn2_reveal_is_five_generic_wolves_plus_lupin_red_leader(self):
         # The pack leader tile becomes Lupin (red, CHARACTER_DUESSEL, Cavalier under the hood);
         # the other 5 stay generic Mauthe Doogs. 5 + Lupin = 6 -> holds the turn-2 parity count.
-        rows = inject.chapters.ch04.ch04_turn2_reveal_rows(self._chap(), self._lupin())
+        rows = inject.chapters.ch04.ch04_turn2_reveal_rows(
+            self.CAMPAIGN, self._chap(), self._lupin())
         joined = '\n'.join(rows)
         self.assertEqual(len(rows), 6)
         self.assertEqual(joined.count('CLASS_MAUTHEDOOG'), 5)
@@ -127,14 +128,16 @@ class Ch04RuntimeHost(unittest.TestCase):
         # The YAML wave stays 6 for the difficulty read (make difficulty CH=ch04); the
         # 5-generics-plus-Lupin split is injector-side only, so parity is unchanged.
         self.assertEqual(len(enemy_rows(self._chap(), arrives_turn=2)), 6)
-        self.assertEqual(len(inject.chapters.ch04.ch04_turn2_reveal_rows(self._chap(), self._lupin())), 6)
+        self.assertEqual(len(inject.chapters.ch04.ch04_turn2_reveal_rows(
+            self.CAMPAIGN, self._chap(), self._lupin())), 6)
 
     def test_each_generic_wolf_gets_its_own_pid(self):
         # CUSN and CHECK_ALIVE both resolve a pid through GetUnitFromCharId, which returns the
         # FIRST match scanning blue->green->red. Five wolves sharing one pid can therefore only
         # ever be converted ONCE (the second CUSN re-finds the wolf it just turned green), which
         # is why the parley had to reload a table instead. One pid each makes them addressable.
-        rows = inject.chapters.ch04.ch04_turn2_reveal_rows(self._chap(), self._lupin())
+        rows = inject.chapters.ch04.ch04_turn2_reveal_rows(
+            self.CAMPAIGN, self._chap(), self._lupin())
         pids = re.findall(r'\.charIndex = (\w+),', '\n'.join(rows))
         self.assertEqual(len(pids), 6)
         self.assertEqual(len(set(pids)), 6, 'every wolf needs its own pid: %s' % pids)

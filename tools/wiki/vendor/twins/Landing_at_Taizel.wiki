@@ -1,0 +1,4063 @@
+{{Stub}}
+{{Chapter Infobox
+|image=[[File:Cm fe08 12B.png|200px]]
+|location=[[Grado#Taizel|Taizel]]
+|new units=[[Ewan]], [[Marisa]]
+|boss=[[Caellach]], [[Cyclops]]
+|previous=[[Phantom Ship]]
+|next=[[Fluorspar's Oath]]
+}}
+
+'''Landing at Taizel''' (Japanese: {{hl|上陸タイゼル港|Jouriku taizeru minato}} ''Landing at Port Taizel'') is the twelfth chapter of [[Ephraim]]'s route in {{FE8}}.
+
+It is not possible to return to the [[world map]] during this chapter.
+
+==Plot==
+{{main|Landing at Taizel/Script}}
+
+[[Ephraim]] and his army arrive at [[Taizel]], and find no enemy troops. At the same time, [[Saleh]] escorts [[Ewan]] to Taizel; Ewan explains that [[Marisa]], an associate of his, was accidentally assigned the wrong job, and he wishes to inform her—Saleh then leaves to report his inability to find the "Lord Dragon" to his village. On their ship, Ephraim and [[Seth]] disagree on tactics proceeding into Grado; Seth suggests they use their rear guard to help the front line, but Ephraim refuses to abandon their supply convoy in enemy territory. Ephraim then notices [[Myrrh]] trying to say something, but she decides against speaking up. Just then, enemy forces emerge around the city, and Ephraim prepares for battle.
+
+During the battle, [[Caellach]] orders the Grado soldiers forward, reminding them of the losses of Fort Rigwald and General [[Duessel]]. [[Riev]] then arrives, and informs Caellach that Eirika is traveling to [[Jehanna]], where Caellach was ordered to be. Riev takes Caellach back to Grado Keep, and bolsters Grado's forces with [[monster]]s.
+
+A member of Ephraim's army can visit the lone village, where Ewan is searching for Marisa; Ewan asks for help finding her, and offers to help in battle in exchange. Ewan can talk to Marisa; he informs her that she has been assigned to the wrong job, that her commander [[Gerik]] is working east. Ewan suggests Marisa join Ephraim's army with him, as they are headed east, and Marisa agrees.
+
+After the battle, Ephraim's army prepares to rest in the city. Unbeknownst to Ephraim, Myrrh travels east alone. The next morning, Seth informs Ephraim that Myrrh is missing and was likely sighted heading east. Ephraim orders the army to move east, but Seth hesitates; Ephraim assure him that they would be heading east anyway, and explains that he wishes to retain his compassion when he becomes king. The army then travels east.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Defeat boss
+|defeat=[[Ephraim]] dies
+|ally=1–12{{h|+2|Upon Ewan and Marisa being recruited}}
+|enemy=37{{h|+14|Reinforcements}}{{h|−4|Upon Caellach and two Cavaliers leaving, and Marisa being recruited}}
+|map=[[File:Cm fe08 12B.png]]
+}}
+|content2={{ChapData
+|victory=Defeat boss
+|defeat=[[Ephraim]] dies
+|ally=1–12{{h|+2|Upon Ewan and Marisa being recruited}}
+|enemy=37{{h|+30|Reinforcements}}{{h|−4|Upon Caellach and two Cavaliers leaving, and Marisa being recruited}}
+|map=[[File:Cm fe08 12B.png]]
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Ewan
+|portrait=[[File:portrait ewan fe08.png]]
+|class=Pupil
+|HP=15
+|lv=1
+|inventory={{Item|8|Fire}}<br>{{Item|8|Dragonshield}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Visit northern [[village]]
+}}
+|newunit2={{NewUnit
+|name=Marisa
+|portrait=[[File:portrait marisa fe08.png]]
+|class=Myrmidon
+|HP=23
+|lv=5
+|inventory={{Item|8|Shamshir}}<br>{{Item|8|Elixir}}
+|recruitment method=Enemy, talk to with [[Ewan]]; or at the end of the chapter if Ewan is recruited and alive
+}}
+|forced1=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=duessel
+|return19=cormag
+|return20=l'Arachel
+|return21=dozla
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Elfire
+|obtain1=Dropped by enemy [[Mage]]
+|item2=Guiding Ring
+|obtain2=Dropped by enemy [[Shaman]]
+|item3=Horseslayer
+|obtain3=Dropped by enemy [[Gargoyle]]<br><small>(Japanese version only)</small>
+|item4=Short Bow
+|obtain4=Dropped by enemy [[Archer]]<br><small>(Western version only)</small>
+|item5=Elixir
+|obtain5=Steal from [[Marisa]] or recruit her
+|item6=Swordslayer
+|obtain6=Dropped by the boss [[Cyclops]] (reinforcement; drops unequipped item)
+|itemlast=Hand Axe
+|obtainlast=Dropped by the boss [[Cyclops]] (reinforcement; drops unequipped item)
+}}
+
+===Shop data===
+{{Tab
+|header=Vendor
+|width=70%
+|constyle=text-align: center
+|tab1=(NTSC-J)
+|tab2=(NTSC-U/PAL)
+|content1={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba thunder.png]]
+{{!}} [[Thunder]]
+{{!}} class="roundr" {{!}} 700
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elfire.png]]
+{{!}} [[Elfire]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba shine.png]]
+{{!}} [[Shine]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba mend.png]]
+{{!}} [[Mend]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba restore.png]]
+{{!}} [[Restore]]
+{{!}} class="roundr" {{!}} 2,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba vulnerary.png]]
+{{!}} [[Vulnerary]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elixir.png]]
+{{!}} [[Elixir]]
+{{!}} class="roundr" {{!}} 3,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba pure water.png]]
+{{!}} [[Pure Water]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba antitoxin.png]]
+{{!}} [[Antitoxin]]
+{{!}} class="roundr" {{!}} 450
+{{tableend}}
+|content2={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba fire.png]]
+{{!}} [[Fire]]
+{{!}} class="roundr" {{!}} 560
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba thunder.png]]
+{{!}} [[Thunder]]
+{{!}} class="roundr" {{!}} 700
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lightning.png]]
+{{!}} [[Lightning]]
+{{!}} class="roundr" {{!}} 630
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba shine.png]]
+{{!}} [[Shine]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba mend.png]]
+{{!}} [[Mend]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba restore.png]]
+{{!}} [[Restore]]
+{{!}} class="roundr" {{!}} 2,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba vulnerary.png]]
+{{!}} [[Vulnerary]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elixir.png]]
+{{!}} [[Elixir]]
+{{!}} class="roundr" {{!}} 3,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba pure water.png]]
+{{!}} [[Pure Water]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba antitoxin.png]]
+{{!}} [[Antitoxin]]
+{{!}} class="roundr" {{!}} 450
+{{tableend}}
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Caellach]]
+|class=Hero
+|lv=12
+|#=1
+|hp=47
+|str=19
+|skill=14
+|spd=13
+|lck=14
+|def=15
+|res=13
+|con=13
+|mov=6
+|inventory={{Item|8|Tomahawk}} • {{Item|8|Silver Axe}} • {{Item|8|Hoplon Guard}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=2
+|hp=23~26
+|str=6~8
+|skill=4~5
+|spd=6~7
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=• The one near [[Caellach]] leaves the map on turn 1.<br>• The other one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~28
+|str=6~8
+|skill=3~4
+|spd=3~4
+|lck=1~3
+|def=9~11
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=11
+|#=8
+|hp=18~20
+|str=4~6
+|skill=2~4
+|spd=3~5
+|lck=1~2
+|def=2~3
+|res=5~7
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=One from the northwest immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=4
+|hp=18~20
+|str=3~5
+|skill=4~5
+|spd=4~6
+|lck=1~2
+|def=3~4
+|res=4~6
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=The northwestern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=24~26
+|str=7~9
+|skill=3~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=24~26
+|str=7~9
+|skill=3~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=22~25
+|str=6~8
+|skill=3~5
+|spd=7~8
+|lck=0~2
+|def=3~4
+|res=0~1
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=22~25
+|str=6~8
+|skill=3~5
+|spd=7~8
+|lck=0~2
+|def=3~4
+|res=0~1
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=1
+|hp=21~23
+|str=5~7
+|skill=5~6
+|spd=4~6
+|lck=1~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Killer Bow}}
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=22~24
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~3
+|def=4~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=2
+|hp=24~26
+|str=7~9
+|skill=3~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=1
+|hp=18~20
+|str=3~5
+|skill=4~5
+|spd=4~6
+|lck=1~2
+|def=3~4
+|res=4~6
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=22~24
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~3
+|def=4~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=23~26
+|str=6~8
+|skill=4~5
+|spd=6~7
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=18~19
+|str=4~5
+|skill=2~3
+|spd=3~4
+|lck=0~2
+|def=2~3
+|res=5~6
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=22~24
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~3
+|def=4~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=23~26
+|str=6~8
+|skill=4~5
+|spd=6~7
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=2
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=4~5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=23~26
+|str=6~8
+|skill=4~5
+|spd=6~7
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=23~26
+|str=6~8
+|skill=4~5
+|spd=6~7
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=18~19
+|str=4~5
+|skill=2~3
+|spd=3~4
+|lck=0~2
+|def=2~3
+|res=5~6
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=1
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=4~5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Short Bow|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Cyclops
+|lv=9
+|#=1
+|hp=58
+|str=15
+|skill=8
+|spd=9
+|lck=0
+|def=15
+|res=10
+|con=16
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Swordslayer|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=5
+|#=1
+|hp=35
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=19~20
+|str=5~6
+|skill=11~13
+|spd=11~13
+|lck=1~2
+|def=2~3
+|res=0~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=22~24
+|str=5~7
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=27~29
+|str=7~9
+|skill=4~5
+|spd=3~4
+|lck=0~1
+|def=6~7
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=2
+|hp=22~24
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=7~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=22~24
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=7~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Caellach]]
+|class=Hero
+|lv=9
+|#=1
+|hp=42
+|str=16
+|skill=15
+|spd=13
+|lck=14
+|def=13
+|res=13
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Hand Axe}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=2
+|hp=25~27
+|str=7~8
+|skill=5
+|spd=7
+|lck=2
+|def=7
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=• The one near [[Caellach]] leaves the map on turn 1.<br>• The other one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=28
+|str=8
+|skill=4
+|spd=4
+|lck=3
+|def=10
+|res=1
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=11
+|#=8
+|hp=19~20
+|str=5~7
+|skill=3~4
+|spd=4~5
+|lck=1~2
+|def=2~3
+|res=6~7
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=One from the northwest immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=4
+|hp=20~21
+|str=5~6
+|skill=5~6
+|spd=5~6
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=The northwestern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=26~28
+|str=9
+|skill=4~5
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=26~28
+|str=9
+|skill=4~5
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=25~26
+|str=8~9
+|skill=4
+|spd=8
+|lck=2
+|def=4
+|res=1
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=25~26
+|str=8~9
+|skill=4
+|spd=8
+|lck=2
+|def=4
+|res=1
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=1
+|hp=24
+|str=6
+|skill=7
+|spd=5
+|lck=3
+|def=5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Killer Bow}}
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=24
+|str=7
+|skill=12
+|spd=11
+|lck=3
+|def=5
+|res=2
+|con=9
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=2
+|hp=26
+|str=10
+|skill=5
+|spd=6
+|lck=1
+|def=3
+|res=1
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=1
+|hp=20~21
+|str=5~6
+|skill=5~6
+|spd=5~6
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=24
+|str=7
+|skill=12
+|spd=11
+|lck=2
+|def=5
+|res=2
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~27
+|str=7~8
+|skill=5
+|spd=7
+|lck=2
+|def=7
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=19
+|str=6
+|skill=3
+|spd=4~5
+|lck=1
+|def=2~3
+|res=5~6
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=25
+|str=7
+|skill=12
+|spd=11
+|lck=2
+|def=6
+|res=2
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~27
+|str=7~8
+|skill=5
+|spd=7
+|lck=2
+|def=7
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=2
+|hp=23
+|str=6
+|skill=5~6
+|spd=5
+|lck=2
+|def=4~5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~27
+|str=7~8
+|skill=5
+|spd=7
+|lck=2
+|def=7
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~27
+|str=7~8
+|skill=5
+|spd=7
+|lck=2
+|def=7
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=19
+|str=6
+|skill=3
+|spd=4~5
+|lck=1
+|def=2~3
+|res=5~6
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=1
+|hp=23
+|str=6
+|skill=5~6
+|spd=5
+|lck=2
+|def=4~5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Cyclops
+|lv=9
+|#=1
+|hp=40
+|str=13
+|skill=11
+|spd=9
+|lck=0
+|def=16
+|res=4
+|con=16
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Swordslayer|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=5
+|#=1
+|hp=45
+|str=7
+|skill=2
+|spd=4
+|lck=5
+|def=1
+|res=2
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=23
+|str=6
+|skill=6
+|spd=4
+|lck=1
+|def=3
+|res=1
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=26
+|str=7
+|skill=4
+|spd=5
+|lck=0
+|def=3
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=25
+|str=8
+|skill=4
+|spd=5
+|lck=0
+|def=4
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=27
+|str=8
+|skill=3
+|spd=5
+|lck=0
+|def=4
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=20~21
+|str=6
+|skill=13~14
+|spd=13~14
+|lck=2
+|def=3
+|res=1
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=25
+|str=7
+|skill=4
+|spd=4
+|lck=1
+|def=3
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=8
+|hp=30~31
+|str=9
+|skill=5
+|spd=4
+|lck=0~1
+|def=7
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=2
+|hp=24~25
+|str=9
+|skill=5
+|spd=8
+|lck=1
+|def=7~8
+|res=1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=25
+|str=10
+|skill=6
+|spd=8
+|lck=1
+|def=8
+|res=1
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Caellach]]
+|class=Hero
+|lv=12
+|#=1
+|hp=47
+|str=19
+|skill=14
+|spd=13
+|lck=14
+|def=15
+|res=13
+|con=13
+|mov=6
+|inventory={{Item|8|Tomahawk}} • {{Item|8|Silver Axe}} • {{Item|8|Hoplon Guard}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=2
+|hp=25~27
+|str=7~9
+|skill=4~6
+|spd=6~8
+|lck=2~3
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=• The one near [[Caellach]] leaves the map on turn 1.<br>• The other one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=27~29
+|str=7~9
+|skill=3~5
+|spd=3~5
+|lck=2~3
+|def=10~11
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=11
+|#=8
+|hp=19~21
+|str=5~7
+|skill=3~4
+|spd=4~5
+|lck=1~2
+|def=2~3
+|res=6~7
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=One from the northwest immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=4
+|hp=19~21
+|str=4~6
+|skill=4~6
+|spd=5~7
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=The northwestern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=25~28
+|str=8~10
+|skill=4~6
+|spd=6~7
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=25~28
+|str=8~10
+|skill=4~6
+|spd=6~7
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=24~26
+|str=7~9
+|skill=4~6
+|spd=7~9
+|lck=1~2
+|def=3~4
+|res=0~2
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=24~26
+|str=7~9
+|skill=4~6
+|spd=7~9
+|lck=1~2
+|def=3~4
+|res=0~2
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=1
+|hp=22~25
+|str=6~8
+|skill=5~7
+|spd=5~6
+|lck=2~4
+|def=4~5
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Killer Bow}}
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=23~26
+|str=6~8
+|skill=10~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=2
+|hp=25~28
+|str=8~10
+|skill=4~6
+|spd=6~7
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=1
+|hp=19~21
+|str=4~6
+|skill=4~6
+|spd=5~7
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=23~26
+|str=6~8
+|skill=10~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~27
+|str=7~9
+|skill=4~6
+|spd=6~8
+|lck=2~3
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=19~20
+|str=5~6
+|skill=2~4
+|spd=3~5
+|lck=1~2
+|def=2~3
+|res=5~7
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=23~26
+|str=6~8
+|skill=10~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~27
+|str=7~9
+|skill=4~6
+|spd=6~8
+|lck=2~3
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=2
+|hp=22~24
+|str=6~7
+|skill=5~7
+|spd=4~6
+|lck=2~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~27
+|str=7~9
+|skill=4~6
+|spd=6~8
+|lck=2~3
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=25~27
+|str=7~9
+|skill=4~6
+|spd=6~8
+|lck=2~3
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=19~20
+|str=5~6
+|skill=2~4
+|spd=3~5
+|lck=1~2
+|def=2~3
+|res=5~7
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=1
+|hp=22~24
+|str=6~7
+|skill=5~7
+|spd=4~6
+|lck=2~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Short Bow|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Cyclops
+|lv=9
+|#=1
+|hp=58
+|str=15
+|skill=8
+|spd=9
+|lck=0
+|def=15
+|res=10
+|con=16
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Swordslayer|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=5
+|#=1
+|hp=42~46
+|str=6~9
+|skill=1~4
+|spd=2~4
+|lck=3~8
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=22~24
+|str=6~7
+|skill=5~7
+|spd=3~5
+|lck=0~1
+|def=3~5
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=20~22
+|str=6~7
+|skill=12~14
+|spd=12~14
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=24~26
+|str=6~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=29~31
+|str=8~10
+|skill=4~6
+|spd=4~5
+|lck=0~2
+|def=6~8
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=2
+|hp=23~26
+|str=8~10
+|skill=5~6
+|spd=8~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=23~26
+|str=8~10
+|skill=5~6
+|spd=8~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Caellach]]
+|class=Hero
+|lv=9
+|#=1
+|hp=42
+|str=16
+|skill=15
+|spd=13
+|lck=14
+|def=13
+|res=13
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Hand Axe}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=2
+|hp=27~28
+|str=8
+|skill=6
+|spd=8
+|lck=3
+|def=7
+|res=2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=• The one near [[Caellach]] leaves the map on turn 1.<br>• The other one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=30
+|str=9
+|skill=5
+|spd=5
+|lck=3
+|def=11
+|res=1
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=11
+|#=8
+|hp=20~22
+|str=7~8
+|skill=4~5
+|spd=5
+|lck=1~2
+|def=3
+|res=7
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=One from the northwest immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=4
+|hp=21~23
+|str=6~7
+|skill=6
+|spd=6~7
+|lck=2
+|def=4
+|res=6~7
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=The northwestern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=28
+|str=11
+|skill=6
+|spd=8
+|lck=1
+|def=4
+|res=2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=30
+|str=11
+|skill=5
+|spd=7
+|lck=2
+|def=4
+|res=1
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=26
+|str=9
+|skill=5
+|spd=9
+|lck=1
+|def=4
+|res=2
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=27
+|str=9
+|skill=6
+|spd=8
+|lck=2
+|def=4
+|res=1
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=1
+|hp=24
+|str=7
+|skill=7
+|spd=6
+|lck=4
+|def=4
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Killer Bow}}
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=26
+|str=8
+|skill=12
+|spd=11
+|lck=2
+|def=6
+|res=2
+|con=9
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=2
+|hp=27~28
+|str=10~11
+|skill=5~6
+|spd=6~7
+|lck=1~2
+|def=3~4
+|res=1
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=1
+|hp=22
+|str=7
+|skill=6
+|spd=6
+|lck=2
+|def=3
+|res=5
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=26
+|str=8
+|skill=12
+|spd=10
+|lck=2
+|def=6
+|res=1
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=27
+|str=9
+|skill=5
+|spd=7
+|lck=3
+|def=8
+|res=1
+|con=9
+|mov=7
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=20
+|str=7
+|skill=4
+|spd=5
+|lck=2
+|def=3
+|res=7
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=25
+|str=8
+|skill=13
+|spd=11
+|lck=3
+|def=6
+|res=2
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=27
+|str=8
+|skill=6
+|spd=8
+|lck=3
+|def=7
+|res=2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=2
+|hp=24
+|str=7
+|skill=6
+|spd=6
+|lck=3
+|def=4
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=28
+|str=9
+|skill=6
+|spd=8
+|lck=3
+|def=8
+|res=1
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=28
+|str=8
+|skill=6
+|spd=7
+|lck=3
+|def=8
+|res=2
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=20
+|str=6
+|skill=3
+|spd=4
+|lck=2
+|def=3
+|res=7
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=1
+|hp=25
+|str=7
+|skill=7
+|spd=6
+|lck=4
+|def=5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Cyclops
+|lv=9
+|#=1
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=13
+|res=0
+|con=16
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Swordslayer|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=5
+|#=1
+|hp=45
+|str=8~9
+|skill=3~4
+|spd=2~4
+|lck=6
+|def=2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=24
+|str=7
+|skill=7
+|spd=5
+|lck=1
+|def=5
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28
+|str=8~9
+|skill=5
+|spd=5
+|lck=1
+|def=4~5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=27
+|str=8~9
+|skill=4~5
+|spd=4~5
+|lck=1~0
+|def=4~5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=26~27
+|str=9
+|skill=4
+|spd=5
+|lck=1
+|def=4
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=22~23
+|str=7~8
+|skill=14
+|spd=14
+|lck=2~3
+|def=3~4
+|res=2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=26
+|str=8
+|skill=4
+|spd=4
+|lck=0~1
+|def=4
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=8
+|hp=31~32
+|str=10
+|skill=5
+|spd=4~5
+|lck=1
+|def=7~8
+|res=2
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=2
+|hp=26~27
+|str=10~11
+|skill=5~6
+|spd=9
+|lck=1
+|def=8~9
+|res=1~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=25~26
+|str=10
+|skill=6
+|spd=9
+|lck=1
+|def=8
+|res=1~2
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Caellach]]
+|class=Hero
+|lv=12
+|#=1
+|hp=48~50
+|str=19~21
+|skill=14~16
+|spd=13~14
+|lck=14~15
+|def=15~16
+|res=13~14
+|con=13
+|mov=6
+|inventory={{Item|8|Tomahawk}} • {{Item|8|Silver Axe}} • {{Item|8|Hoplon Guard}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=2
+|hp=27~32
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=• The one near [[Caellach]] leaves the map on turn 1.<br>• The other one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=29~34
+|str=8~11
+|skill=5~8
+|spd=4~7
+|lck=2~6
+|def=10~12
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=11
+|#=8
+|hp=21~24
+|str=7~10
+|skill=3~7
+|spd=4~8
+|lck=1~4
+|def=2~5
+|res=6~10
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=One from the northwest immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=4
+|hp=21~25
+|str=6~10
+|skill=6~9
+|spd=6~9
+|lck=1~4
+|def=3~5
+|res=5~9
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=The northwestern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=29~33
+|str=10~14
+|skill=5~8
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=29~33
+|str=10~14
+|skill=5~8
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=26~31
+|str=9~12
+|skill=5~8
+|spd=8~10
+|lck=1~3
+|def=3~6
+|res=1~3
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=26~31
+|str=9~12
+|skill=5~8
+|spd=8~10
+|lck=1~3
+|def=3~6
+|res=1~3
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=1
+|hp=25~29
+|str=7~10
+|skill=7~10
+|spd=5~9
+|lck=3~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Killer Bow}}
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=27~30
+|str=8~11
+|skill=12~15
+|spd=10~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=2
+|hp=29~33
+|str=10~14
+|skill=5~8
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=1
+|hp=21~25
+|str=6~10
+|skill=6~9
+|spd=6~9
+|lck=1~4
+|def=3~5
+|res=5~9
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=27~30
+|str=8~11
+|skill=12~15
+|spd=10~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=27~32
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=20~24
+|str=6~10
+|skill=3~7
+|spd=4~8
+|lck=1~4
+|def=2~5
+|res=6~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=27~30
+|str=8~11
+|skill=12~15
+|spd=10~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=27~32
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=2
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=5~9
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=27~32
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=27~32
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=20~24
+|str=6~10
+|skill=3~7
+|spd=4~8
+|lck=1~4
+|def=2~5
+|res=6~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=1
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=5~9
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Short Bow|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Cyclops
+|lv=9
+|#=1
+|hp=60~62
+|str=15~17
+|skill=8~10
+|spd=9~10
+|lck=0~1
+|def=15~16
+|res=10~11
+|con=16
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Swordslayer|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=5
+|#=1
+|hp=53~61
+|str=11~16
+|skill=4~9
+|spd=3~7
+|lck=10~16
+|def=1~5
+|res=2~5
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=4~8
+|lck=0~3
+|def=4~6
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=22~27
+|str=6~10
+|skill=14~17
+|spd=14~17
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=27~31
+|str=8~11
+|skill=4~7
+|spd=4~6
+|lck=0~2
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=8
+|hp=32~36
+|str=10~13
+|skill=5~8
+|spd=4~6
+|lck=1~3
+|def=7~9
+|res=1~4
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=2
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~3
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~3
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=2
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=5~9
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=2
+|hp=27~30
+|str=8~11
+|skill=12~15
+|spd=10~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=11
+|#=3
+|hp=29~32
+|str=9~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=11
+|#=3
+|hp=29~32
+|str=9~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Caellach]]
+|class=Hero
+|lv=12
+|#=1
+|hp=46
+|str=18
+|skill=16
+|spd=14
+|lck=15
+|def=14
+|res=14
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}} • {{Item|8|Hand Axe}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=2
+|hp=30~32
+|str=9~11
+|skill=8~9
+|spd=8~10
+|lck=4~5
+|def=8~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=• The one near [[Caellach]] leaves the map on turn 1.<br>• The other one immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=34
+|str=10
+|skill=7
+|spd=6
+|lck=4
+|def=12
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Leaves the map on turn 1.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=11
+|#=8
+|hp=23~25
+|str=9~11
+|skill=5~7
+|spd=6~8
+|lck=3~4
+|def=3~4
+|res=7~9
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=One from the northwest immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=4
+|hp=23~25
+|str=8~10
+|skill=8~9
+|spd=8~9
+|lck=2~3
+|def=3~4
+|res=7~9
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=The northwestern two immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=33~34
+|str=12~13
+|skill=7
+|spd=8~9
+|lck=2
+|def=4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=1
+|hp=32~34
+|str=12~14
+|skill=6~8
+|spd=8~9
+|lck=1~3
+|def=4~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=29~31
+|str=11~13
+|skill=7~8
+|spd=9~10
+|lck=2~3
+|def=4~5
+|res=2~3
+|con=10
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Pirate
+|lv=11
+|#=1
+|hp=29~31
+|str=11~13
+|skill=7~8
+|spd=9~10
+|lck=2~3
+|def=4~5
+|res=2~3
+|con=10
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=11
+|#=1
+|hp=28~29
+|str=9~10
+|skill=9~10
+|spd=9
+|lck=5
+|def=5~6
+|res=2
+|con=7
+|mov=5
+|inventory={{Item|8|Killer Bow}}
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=29~32
+|str=9~11
+|skill=13~15
+|spd=12~13
+|lck=4~5
+|def=7
+|res=3
+|con=9
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Fighter
+|lv=11
+|#=2
+|hp=32~34
+|str=12~14
+|skill=6~8
+|spd=8~9
+|lck=1~3
+|def=4~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mage
+|lv=11
+|#=1
+|hp=23~25
+|str=8~10
+|skill=8~9
+|spd=8~9
+|lck=2~3
+|def=3~4
+|res=7~9
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=29~32
+|str=9~11
+|skill=13~15
+|spd=12~13
+|lck=4~5
+|def=7
+|res=3
+|con=9
+|mov=5
+|inventory={{Item|8|Zanbato}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=30~32
+|str=9~11
+|skill=8~9
+|spd=8~10
+|lck=4~5
+|def=8~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=23
+|str=9
+|skill=6
+|spd=5
+|lck=2
+|def=4
+|res=9
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=1
+|hp=29~32
+|str=9~11
+|skill=13~15
+|spd=12~13
+|lck=4~5
+|def=7
+|res=3
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=30~32
+|str=9~11
+|skill=8~9
+|spd=8~10
+|lck=4~5
+|def=8~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=2
+|hp=27~29
+|str=9~10
+|skill=9
+|spd=7~8
+|lck=5~6
+|def=5~6
+|res=2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=30~32
+|str=9~11
+|skill=8~9
+|spd=8~10
+|lck=4~5
+|def=8~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Cavalier
+|lv=11
+|#=1
+|hp=30~32
+|str=9~11
+|skill=8~9
+|spd=8~10
+|lck=4~5
+|def=8~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Shaman
+|lv=10
+|#=1
+|hp=23~24
+|str=8~9
+|skill=4~5
+|spd=5
+|lck=3
+|def=3~4
+|res=8~9
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=1
+|hp=27~28
+|str=9~10
+|skill=8~9
+|spd=7~8
+|lck=4~6
+|def=5~6
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Cyclops
+|lv=9
+|#=1
+|hp=32~33
+|str=9~10
+|skill=6~7
+|spd=7~8
+|lck=0~1
+|def=14~15
+|res=1
+|con=16
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Swordslayer|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=5
+|#=1
+|hp=57~61
+|str=15
+|skill=6~8
+|spd=6
+|lck=14~17
+|def=2~3
+|res=3~5
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=1
+|hp=28
+|str=7~8
+|skill=9
+|spd=6~7
+|lck=0~2
+|def=5~6
+|res=2
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=30~32
+|str=10~11
+|skill=6~7
+|spd=5~6
+|lck=1~2
+|def=4~6
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=30~32
+|str=10~11
+|skill=6~7
+|spd=5~6
+|lck=1~2
+|def=4~6
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=30~32
+|str=10~11
+|skill=6~7
+|spd=5~6
+|lck=1~2
+|def=4~6
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=25~27
+|str=8~9
+|skill=15~17
+|spd=16~17
+|lck=3~4
+|def=4~5
+|res=2~3
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=31~32
+|str=10~11
+|skill=6
+|spd=5~6
+|lck=1~2
+|def=4
+|res=2~3
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+|notes=Will not move until provoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=8
+|hp=36
+|str=13~14
+|skill=6~7
+|spd=5~6
+|lck=1~2
+|def=7~9
+|res=2~3
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=2
+|hp=29~31
+|str=12~14
+|skill=7~9
+|spd=10~11
+|lck=0~2
+|def=9~10
+|res=1~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=29~31
+|str=12~14
+|skill=7~9
+|spd=10~11
+|lck=0~2
+|def=9~10
+|res=1~2
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Archer
+|lv=10
+|#=2
+|hp=27~28
+|str=9~10
+|skill=8~9
+|spd=7~8
+|lck=4~6
+|def=5~6
+|res=1~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Soldier
+|class=Mercenary
+|lv=11
+|#=2
+|hp=29~32
+|str=9~11
+|skill=13~15
+|spd=12~13
+|lck=4~5
+|def=7
+|res=3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=11
+|#=3
+|hp=31
+|str=11~12
+|skill=6~8
+|spd=6
+|lck=1~2
+|def=4~5
+|res=2~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=11
+|#=3
+|hp=31~32
+|str=10~12
+|skill=6~7
+|spd=6~7
+|lck=1~2
+|def=4~5
+|res=2~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*At the start of enemy phase 1
+**A [[Cyclops]] takes [[Caellach]]'s place
+**1 [[Entombed]] from northeast of the boss
+**1 [[Bonewalker]] with a [[Steel Bow]] from west of the boss
+**1 [[Bonewalker]] with a [[Steel Lance]] from northwest of the boss
+**1 [[Bonewalker]] with an [[Iron Sword]] from southeast of the boss
+**1 [[Bonewalker]] with an [[Iron Lance]] from southeast of the boss
+**2 [[Mauthe Doog]]s from near the sides of the village
+**1 [[Bonewalker]] with a [[Toxin Lance]] from southwest of the arena
+**2 [[Bael]]s from between the two sets of eastern stairs
+**3 [[Gargoyle]]s from southwest of the player ship
+*Turns 3–4 <small>(Difficult only)</small>
+**1 [[Archer]] from the eastern ship
+**1 [[Mercenary]] from the eastern ship
+*Turns 4–6 <small>(Difficult only)</small>
+**1 [[Bael]] from above the western stairs
+*Turns 5–7 <small>(Difficult only)</small>
+**1 [[Bael]] from between the two sets of eastern stairs
+*Turns 8–10 <small>(Difficult only)</small>
+**1 [[Bonewalker]] with an [[Iron Sword]] from northwest of the boss
+**1 [[Bonewalker]] with an [[Iron Lance]] from northeast of the boss
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Cyclops}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Generic portrait cyclops fe08.png]]
+|sprite=cyclops enemy
+|class=Cyclops
+|affin=dark
+|lv=9
+|HP=58
+|str=15
+|skill=8
+|spd=9
+|luck=0
+|def=15
+|res=10
+|move=5
+|con=16
+|aid=15
+|inventory={{Item|8|Hand Axe}}<br>{{Item|8|Swordslayer|type=drop}}
+|ax=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Generic portrait cyclops fe08.png]]
+|sprite=cyclops enemy
+|class=Cyclops
+|affin=dark
+|lv=9
+|HP={{h|60~62|32~33 in the Japanese version}}
+|str={{h|15~17|9~10 in the Japanese version}}
+|skill={{h|8~10|6~7 in the Japanese version}}
+|spd={{h|9~10|7~8 in the Japanese version}}
+|luck=0~1
+|def={{h|15~16|14~15 in the Japanese version}}
+|res={{h|10~11|1 in the Japanese version}}
+|move=5
+|con=16
+|aid=15
+|inventory={{Item|8|Hand Axe}}<br>{{Item|8|Swordslayer|type=drop}}
+|ax=A
+}}
+}}
+
+{{Main|Caellach}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait caellach fe08.png]]
+|sprite=hero enemy
+|class=Hero
+|affin=Thunder
+|lv={{h|12|9 in the Japanese version}}
+|HP={{h|47|42 in the Japanese version}}
+|str={{h|19|16 in the Japanese version}}
+|skill={{h|14|15 in the Japanese version}}
+|spd=13
+|luck=14
+|def={{h|15|13 in the Japanese version}}
+|res=13
+|move=6
+|con=13
+|aid=12
+|inventory=<small>'''Japanese version:'''</small><br>{{Item|8|Silver Axe}}<br>{{Item|8|Hand Axe}}<br><small>'''Western version:'''</small><br>{{Item|8|Tomahawk}}<br>{{Item|8|Silver Axe}}<br>{{Item|8|Hoplon Guard}}
+|sw=A
+|ax={{h|S|A in the Japanese version}}
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait caellach fe08.png]]
+|sprite=hero enemy
+|class=Hero
+|affin=thunder
+|lv=12
+|HP={{h|48~50|46 in the Japanese version}}
+|str={{h|19~21|18 in the Japanese version}}
+|skill=14~16
+|spd=13~14
+|luck=14~15
+|def={{h|15~16|14 in the Japanese version}}
+|res=13~14
+|move=6
+|con=13
+|aid=12
+|sw=A
+|ax={{h|S|A in the Japanese version}}
+|inventory=<small>'''Japanese version:'''</small><br>{{Item|8|Silver Axe}}<br>{{Item|8|Hand Axe}}<br><small>'''Western version:'''</small><br>{{Item|8|Tomahawk}}<br>{{Item|8|Silver Axe}}<br>{{Item|8|Hoplon Guard}}
+}}
+}}
+*<small>Note: [[Caellach]] leaves after turn 1.</small>
+
+==Strategy==
+{{strategy}}
+{{sectstub}}
+This level contains no pressure to move forward or complete it quickly: No enemy will destroy the village that [[Ewan]] is recruited at, Marisa will stand still until you enter her range, the boss doesn't move at all, and the [[Gargoyle]]s that spawn at the end of turn 1 are the only reinforcements that don't cleanly spawn on the enemy side of the map's many chokepoints. Thus the player can just stay on the docks, or even the ship, and let the aggressive enemies kill themselves before moving forward at their leisure. The mix of enemies of the right ship are the main concern due to their aggression and being bunched up with a mix of ranged physical attackers and mages, but each of them presents little threat on their own.
+
+Marisa will attack units that enter her range, and overlaps in range with the adjacent Fighter, but will stay still otherwise. She's not a major threat to most units by this point, but is liable to die on a counter attack. The most straight-forward way to avoid this is to remove the other enemies around her, then lure her out with a bulky unit that has no weapons to counter attack with by trading their weapons away or putting them in the convoy before entering her range.
+
+==Trivia==
+*The inn that appears in this chapter was originally called a bar in the Japanese version.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Landing at Taizel
+|jpn-name={{h|上陸タイゼル港|Jouriku taizeru minato}}
+|jpn-mean=Landing at Port Taizel
+|span-name=Aterrizaje en Taizel
+|span-mean=Landing at Taizel
+|fren-name=Arrivée à Taizel
+|fren-mean=Arrival at Taizel
+|ger-name=Die Landung in Taizel
+|ger-mean=The Landing at Taizel
+|ital-name=Arrivo a Taizel
+|ital-mean=Arrival at Taizel
+}}
+
+==Gallery==
+{{sectstub}}
+
+{{ChapterNav
+|prechapter=Phantom Ship
+|nextchapter=Fluorspar's Oath
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

@@ -22,6 +22,7 @@ A map sprite's palette is one of three rules, which is the whole of what the pas
             faction ramp tints it -- enemy class reskins, the ch02 chwinga, faction-tinted cast.
 """
 import collections
+import colorsys
 import functools
 import os
 import re
@@ -187,14 +188,56 @@ def _file_bust(path):
     return lambda: Image.open(path)
 
 
+def _hls(rgb):
+    return colorsys.rgb_to_hls(*(c / 255 for c in rgb))
+
+
+def _glow_band(rgb):
+    """The chwinga's glow: Sclorbo's cyan ramp (hue 175-205, saturated), not his greys/robe."""
+    h, _l, s = _hls(rgb)
+    return 175 <= h * 360 <= 205 and s >= 0.35
+
+
+def _interp(points, x):
+    points = sorted(points)
+    if x <= points[0][0]:
+        return points[0][1]
+    for (x0, y0), (x1, y1) in zip(points, points[1:]):
+        if x <= x1:
+            return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    return points[-1][1]
+
+
+def glow_to_green(rgb, pairs=None):
+    """One glow colour -> spirit-green, by the transform the authored pairs define
+    (CH02_CHWINGA_GLOW_RECOLOR): the target hue and saturation, interpolated by lightness, and
+    the authored lightness shift. Exact on the authored sources, and it extends to any shade a
+    re-render adds -- RGB keys did not: #488's matte re-render moved every glow colour, matched
+    none of them, and the chwinga shipped Sclorbo's blue bust with nothing failing."""
+    pairs = pairs or CH02_CHWINGA_GLOW_RECOLOR
+    pts = [(_hls(src), _hls(dst)) for src, dst in pairs.items()]
+    l = _hls(rgb)[1]
+    h = _interp([(a[1], b[0]) for a, b in pts], l)
+    s = _interp([(a[1], b[2]) for a, b in pts], l)
+    dl = _interp([(a[1], b[1] - a[1]) for a, b in pts], l)
+    out = colorsys.hls_to_rgb(h, min(max(l + dl, 0.0), 1.0), s)
+    return tuple(int(round(c * 255)) for c in out)
+
+
 def chwinga_bust(campaign):
-    """Sclorbo's bust with the blue glow ramp shifted to spirit-green (the map sprite's swap)."""
+    """Sclorbo's bust with the glow ramp shifted to spirit-green (the map sprite's swap). A bust
+    with no glow left to shift is an error: the recolour silently doing nothing is the bug."""
     im = Image.open(os.path.join(_bust_dir(campaign), CH02_CHWINGA_SPRITE_SRC + '.png')).convert('P')
     pal = list(im.getpalette()[:48])
-    for i in range(16):
+    shifted = 0
+    for i in range(1, 16):                                # index 0 is the transparent key
         rgb = tuple(pal[i * 3:i * 3 + 3])
-        if rgb in CH02_CHWINGA_GLOW_RECOLOR:
-            pal[i * 3:i * 3 + 3] = list(CH02_CHWINGA_GLOW_RECOLOR[rgb])
+        if _glow_band(rgb):
+            pal[i * 3:i * 3 + 3] = list(CH02_CHWINGA_GLOW_RECOLOR.get(rgb) or glow_to_green(rgb))
+            shifted += 1
+    if not shifted:
+        raise SystemExit('ERROR: %s.png has no glow colours to shift for the ch02 chwinga '
+                         '(inject.unit_art.chwinga_bust)' % CH02_CHWINGA_SPRITE_SRC)
     out = im.copy()
     out.putpalette(pal)
     return out
@@ -278,6 +321,55 @@ def unit_bust(campaign, uid):
     if b.kind != 'chwinga' and not os.path.isfile(os.path.join(_bust_dir(campaign), uid + '.png')):
         return None
     return b.image()
+
+
+@functools.lru_cache(maxsize=None)
+def vanilla_slot_bust(slot):
+    """The vanilla face a character slot shows when no bust dresses it (Halvar wears Bazba's).
+    Read from the pristine submodule, or None for a faceless slot."""
+    from inject.decomp import _find_brace_block, vanilla_decomp_text
+    chars = vanilla_decomp_text('src/data_characters.c')
+    s, e = _find_brace_block(chars, '[CHARACTER_%s - 1]' % slot.upper().replace('CHARACTER_', ''),
+                             'src/data_characters.c')
+    m = re.search(r'\.portraitId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars[s:e])
+    if not m or int(m.group(1), 0) == 0:
+        return None
+    return portrait_bust(int(m.group(1), 0))
+
+
+@functools.lru_cache(maxsize=None)
+def portrait_bust(portrait_id, root=None):
+    """Portrait `portrait_id` decoded to a 96x80 bust with the closed mouth laid on where
+    portrait_data.c puts it, in its own palette, or None. `root` is a decomp tree (default the
+    pristine submodule); pass the build tree to see the faces the build dressed."""
+    from inject.decomp import vanilla_decomp_text
+    root = root or os.path.join(REPO, 'fireemblem8u')
+    path = os.path.join(root, 'src', 'portrait_data.c')
+    if root == os.path.join(REPO, 'fireemblem8u') or not os.path.isfile(path):
+        text, root = vanilla_decomp_text('src/portrait_data.c'), os.path.join(REPO, 'fireemblem8u')
+    else:
+        with open(path, encoding='utf-8') as f:
+            text = f.read()
+    row = re.search(r'(?m)^\s*\{([^}]*)\},\s*//\s*%d\b' % (portrait_id - 1), text)
+    if not row:
+        return None
+    f = [x.strip() for x in row.group(1).split(',')]
+    pdir = os.path.join(root, 'graphics', 'portrait')
+    pal = os.path.join(pdir, f[2] + '.agbpal')
+    if f[0] == '0' and f[4] != '0':
+        # A monster's face is a class card (portrait_Mogall_card), not a bust tileset.
+        card = Image.open(os.path.join(pdir, f[4] + '.png'))
+        card.putpalette(_agbpal(pal))
+        return card
+    if f[0] == '0':
+        return None
+    xmouth, ymouth = int(f[7]), int(f[8])
+    bust = portrait_tool.decode(Image.open(os.path.join(pdir, f[0] + '.png')))
+    mouth = Image.open(os.path.join(pdir, f[3] + '.png')).crop(
+        (0, 0, portrait_tool.MOUTH_W, portrait_tool.MOUTH_H))
+    bust.paste(mouth, (xmouth * 8, ymouth * 8))
+    bust.putpalette(_agbpal(pal))
+    return bust
 
 
 def dress_slot(slot, bust):

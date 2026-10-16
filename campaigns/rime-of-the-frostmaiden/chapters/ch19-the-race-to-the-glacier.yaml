@@ -1,0 +1,42 @@
+# ch19 — The Race to the Glacier. PLANNED (#486): a seed, not authoritative.
+id: ch19-the-race-to-the-glacier
+title: "The Race to the Glacier"
+location: "The tundra and the foot of the Reghed Glacier"
+chapter_number: 19
+act: 'IV–V'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
+status: planned
+milestone: M4
+cadence: big_battle_gray
+fe8_base_map: "FE8 Ch20 — Darkling Woods (layout only; forest as ice)"
+parity_reference: "FE8 Ch20"   # proposed exception to #459: the 20-chapter plan drops a slot
+narrative: >
+  The race across the tundra to the Reghed Glacier. The queen of the Tiger Tribe, a worshipper
+  of Auril, ambushes the party with the Elk Tribe fighting at their side, and the Codicil's poem
+  cracks the glacier open at a frozen waterfall.
+map: {}
+objective:
+  type: seize
+  description: "Reach the glacier wall (planned)"
+win_condition: "Planned"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch20 (Darkling Woods) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch20) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  Replaces Darkling Woods' gauntlet (Nicolas, 2026-10-12). The Caves of Hunger become the
+  descent into the finale, and the vampire Tekeli-li is cut.
+plan:
+  story: >
+    The last road before the end, and the glacier opened by what the party took from Auril.
+  sources:
+    - "Rime p.215-216: the race to the glacier, the Elk escort, the Tiger ambush, opening the way"
+  joins_roles: []
+  payload_notes: >
+    Darkling Woods gives drops only (elixirs and steel weapons).
+open_questions:
+  - q: "With 20 chapters, ch19 takes Darkling Woods' force and ch20 the Final's (an ADR exception to #459)?"
+    pick: "Yes, measured when the chapters are built"

@@ -1,0 +1,1 @@
+&lsqb;[[File:Is TCGCipher Tap.png|x20px|Tap this unit]]&rsqb;<noinclude><br>This is to properly format {{TCGCipher}} skill descriptions, for skills which require the unit to be tapped. To use type:  '''<nowiki>{{CipherTap}}</nowiki>''' [[Category:TCG templates]]</noinclude>

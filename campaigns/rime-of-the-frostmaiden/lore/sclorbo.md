@@ -6,6 +6,16 @@
 > (migrated from pre-strip commit `e6cc7a6`) as inspiration for dialogue, sprite/palette work,
 > and signature scripted moments — never as FE mechanics.
 
+## Profile
+
+Sclorbo is a chwinga bard of the College of Lore. He never speaks. He communicates in impressions,
+radiating encouragement, comfort or alarm, or landing a withering impression on an enemy. He is the
+party's quiet encourager: confident, sincere, first to help anyone in trouble, and a protector of
+those who cannot protect themselves.
+
+His impressions never deceive; he cannot pretend to feel what he doesn't. He keeps a shameful secret
+from his youth, the reason he can never go home, and turns aside any question about it.
+
 ## Concept
 
 - **Race:** Chwinga

@@ -10,7 +10,9 @@
 
 id: ch00-prologue-a-dagger-of-ice
 title: "A Dagger of Ice"
+location: "A snowbound mountain pass on Torg's caravan route"
 chapter_number: 0
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # built / in-progress slice; combat data is grounded + authoritative
 milestone: M3
 cadence: tutorial               # see docs/CHAPTERS.md — DefeatBoss, basics only
@@ -120,12 +122,27 @@ difficulty_note: >
   and cold-immunity are FLAVOR ONLY here (shown in dialogue), NOT a mechanical gate.
   ~4-6 turns, comfortable hit rates. The tension is "don't let frail Hlin get swarmed."
 
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  Together [[Hlin Trollbane|Hlin]] and [[Scramsax]] can take out the two caravan guards with
+  ease. Hlin must survive, so it is recommended to let Scramsax lead: he is fully capable of
+  defeating every unit on the map by himself.
+
+  Hlin's axes beat the guards' [[Iron Lance]]s, so she can bait them one at a time and trade
+  with them fairly safely; keep her out of reach of both at once. [[Sephek Kaltro|Sephek]] does
+  not move, and his sword beats Hlin's axe, so let Scramsax finish him once the guards are down.
+  Hlin's [[Hand Axe]] can chip him from two tiles away if you want to share the [[experience]].
+  If Hlin is hurt, use a Goodberry to keep her [[HP]] up.
+
 # ── Player Units ────────────────────────────────────────────────────────────────
 player_units:
   # Hlin = the FRAIL must-survive lead (our "lord" / Eirika-analog). Book p.22: old & frail.
   - id: hlin-trollbane
+    face: hlin-trollbane                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Hlin Trollbane"
     fe_name: "Hlin"              # FE8 name buffer is 12 chars; "Hlin Trollbane" (14) overflows
+    help_text: "A retired dwarf bounty hunter. She hunts the dagger-of-ice killer."   # R on the name in game (inject.text.write_nameplate)
     class: fighter               # old dwarf bounty hunter, handaxe, past her prime — UNPROMOTED & frail (Eirika-analog lead; only Scramsax the "Jeigan" is a Seth-justified prepromote). Female Fighter map sprite (community repo) so she reads as a woman
     is_npc: true                 # not one of the 7 PCs; a cold-open guest unit
     required: true               # lose if she dies (our lord-death condition)
@@ -145,7 +162,9 @@ player_units:
       hand_pass: "portraits/guest_vendor_busts.py — silver-hair age recolor + 18->16 color merge"
   # Scramsax = the STRONG Jagen (our Seth-analog) who protects Hlin and does the killing.
   - id: scramsax
+    face: scramsax                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Scramsax"
+    help_text: "A retired sellsword who keeps the Northlook. Hlin's oldest friend."   # R on the name in game (inject.text.write_nameplate)
     class: hero                  # retired sellsword, a real veteran (book p.33); promoted, strong
     is_npc: true                 # The Northlook's proprietor; the cold-open's "Jeigan"
     required: false              # defeat != game over (Seth precedent; see NOTE 3) — he retreats, alive for Ch1
@@ -167,8 +186,10 @@ player_units:
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
 enemy_units:
   - id: sephek-kaltro
+    face: sephek-kaltro                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Sephek Kaltro"
     fe_name: "Sephek"           # FE8 name buffer is 12 chars; "Sephek Kaltro" (13) overflows
+    help_text: "A charming caravan guard who never feels the cold. Auril's executioner."   # R on the name in game (inject.text.write_nameplate)
     is_boss: true
     count: 1
     positions: [[14, 8]]         # O9 — cornered against the SE peaks (O'Neill's vanilla spot)
@@ -311,3 +332,8 @@ design_notes: >
   Sephek's cold/fire motif is pure narrative colour, echoed later by the Ch8 ice trolls.
   From Ch1 the must-survive lead becomes PLAYER-CHOSEN (their D&D character). Keep it tiny
   — this is the front porch, not a room.
+
+# A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
+payload_deviations:
+  - item: ITEM_SWORD_RAPIER
+    why: "Eirika's personal sword, and we have no Eirika; Hlin carries a killer axe in its place"

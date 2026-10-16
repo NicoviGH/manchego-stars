@@ -5,7 +5,7 @@ import sys
 
 from inject.raw_pids import enemy_pid_for
 from inject.cast import (
-    _classed_cast, class_enum_for, CLASS_LOADOUT, deploy_class_for, load_unit,
+    _classed_cast, class_enum_for, unit_items, deploy_class_for, load_unit,
     PORTRAIT_MAP)
 from inject.chapter_ids import (
     CH02_BOSS_SLOT, CH02_CHWINGA, CH02_CHWINGA_PORTRAIT_SLOT, CH02_CHWINGA_SPRITE_SRC,
@@ -32,7 +32,7 @@ from inject.text import (
 from inject.units import (
     _ally_unit_entry, _deploy_cap_entries, enemy_ai_initialiser, enemy_rows)
 from inject.villages import (
-    chapter_location_events, DEFAULT_VILLAGE_SPEAKER, village_boxes, village_reward_item,
+    assert_village_tiles_visitable, chapter_location_events, DEFAULT_VILLAGE_SPEAKER, village_boxes, village_reward_item,
     village_script)
 
 
@@ -159,8 +159,9 @@ def inject_ch02_chwinga_faces(campaign, verbose=True):
     by_id = ch02_chwinga_identities(chap)
     with open(TEXTS_TXT, encoding='utf-8') as f:
         lines = f.read().split('\n')
+    on_map = {g['id'] for g in chap.get('deployment', {}).get('green_allies', [])}
     for uid, slot in CH02_CHWINGA:
-        write_nameplate(lines, slot, by_id[uid])
+        write_nameplate(lines, slot, by_id[uid], on_map=uid in on_map)
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
     if verbose:
@@ -215,11 +216,12 @@ def inject_ch02(campaign, verbose=True):
     each that survives gifts its charm (a Hand Axe, an Elixir) at the ending scene via CHECK_ALIVE
     -> GIVEITEMTO (per-unit soft-fail, no game over). The third, Glimmer, is the southern hut's
     inhabitant and hands over its Pure Water on the visit. Enemies are vanilla Ch2's exact mix,
-    reflavored chardalyn berserkers (still on the stock brigand sprite: no chardalyn reskin is
-    drawn yet). Reinforcements move to the empty table 088B4758 (088B4718 is now the chwinga).
+    reflavored chardalyn raiders on the stock brigand sprite: they are regular raiders (Nicolas,
+    2026-10-15). Reinforcements move to the empty table 088B4758 (088B4718 is now the chwinga).
     """
     maps_dir = os.path.join(REPO, 'campaigns', campaign, 'maps')
     chap = _load_chapter_yaml(campaign, CH02_CHAPTER_YAML)
+    assert_village_tiles_visitable(chap, maps_dir, CH02_LAYOUT[1])
 
     # 0. Cutscene beat splits, consumed from the locked chapter YAML (cf. inject_ch01).
     op_card, op_beats = _split_event_beats(chap, 'chapter_start', 'ch02 opening',
@@ -290,16 +292,13 @@ def inject_ch02(campaign, verbose=True):
     # 2a-bis. Off-map recruit join-LOAD: the party persists from ch01 (already in the save),
     #     but a cutscene recruit was never a unit -- so LOAD him in HERE, his first prep
     #     roster, or the deploy cap sizes a slot nothing fills (#23). For ch02 that is Baxby
-    #     (ch01 ending cutscene; recruit.via = market = off-map). Each rides its CLASS_LOADOUT
+    #     (ch01 ending cutscene; recruit.via = market = off-map). Each rides its unit file's
     #     kit, blue, on a walkable NW tile (PREP re-picks positions). Empty for a chapter with
     #     no newly-available off-map recruit (then no LOAD1 is emitted -- see step 4).
     join_recruits = offmap_join_recruits(campaign, chap['chapter_number'])
-    for uid, _s, ce, _d, _l in join_recruits:
-        if ce not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (ch02 join recruit %s)' % (ce, uid))
     jx, jy = CH02_RECRUIT_JOIN_POS
     recruit_join = [_ally_unit_entry(leader, slot, dce, lv, jx, jy,
-                                     ', '.join(CLASS_LOADOUT[ce]),
+                                     ', '.join(unit_items(campaign, uid)),
                                      ' /* %s -- off-map recruit joins the party (#23) */' % uid)
                     for uid, slot, ce, dce, lv in join_recruits]
 

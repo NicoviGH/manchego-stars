@@ -1,11 +1,10 @@
 """Chapter 3 (#23): its injector and everything only it reads.
 """
 import os
-import sys
 
 import fe8_talk_font
 from inject.raw_pids import enemy_pid_for
-from inject.cast import _classed_cast, char_symbol, CLASS_LOADOUT, GUEST_PORTRAIT_MAP
+from inject.cast import _classed_cast, char_symbol, unit_items, GUEST_PORTRAIT_MAP
 from inject.chapter_ids import (
     CH03_BOSS_PID, CH03_BRUTE_MINIBOSS_PID, CH03_CHAPTER_YAML, CH03_ENDING_CARD_MSG,
     CH03_ENDING_MSGS, CH03_GOAL_STATUS_MSG, CH03_GOAL_WINDOW_MSG, CH03_MIDMAP_MSGS,
@@ -70,12 +69,8 @@ CH03_CHEST_OPEN_TILE = 29
 # the party deploys here statically (fast-boot; the real PREP flow lands with deploy_slots + cutscenes).
 # 9 tiles = the ch03 field roster (cast_available_at(3) = the 8 founding party + Baxby, the
 # ch01 recruit). Trex is NOT here -- he is a Colm-style TALK recruit placed GREEN on the map
-# (CH03_TREX_GREEN_POS), joining via CUSA when a party member talks to him (that CHAR talk +
+# (the YAML's deployment.green_allies), joining via CUSA when a party member talks to him (that CHAR talk +
 # its line ride the ch03 event/cutscene pass, #23 item 4). cast_available_at gives him ch04+ prep.
-CH03_TREX_GREEN_POS = (2, 4)    # Colm's tile: our map is a 1:1 17x16 retile of vanilla Ch3 (Borgo),
-                                # where green Colm walks to (2,4) on the upper-left ledge (spawns 0,5)
-                                # -- UnitDef_088B4718/REDA_088B456C. Trex mirrors the recruit, so he
-                                # stands green on the same ledge the party naturally reaches to Talk.
 # Two free vanilla Ch4 UnitDef tables (defined in events_udefs.c, referenced nowhere but
 # themselves -> safe to repurpose, like the enemy table 088B4A80): one holds Trex GREEN
 # (always LOADed, the on-map talk-recruit); the other is the DEBUG-BOOT party seed (the
@@ -200,7 +195,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
     #      its entry count (cap = cast_available_at(3), the 8 founding party + Baxby) and its
     #      YAML deploy_slots tiles, then redeploys the picks (cf. ch01/ch02 _deploy_cap_entries).
     #    - UnitDef_088B47E4 (boot only): the ARMED party seed -- the same field roster with real
-    #      CLASS_LOADOUT kit, LOADed on --ch03-boot so PREP has a party to pick (ch03 has no
+    #      unit-file kit, LOADed on --ch03-boot so PREP has a party to pick (ch03 has no
     #      prior chapter to found one yet). The real chain (item 3) omits it: the party persists.
     #    - UnitDef_088B49CC: Trex, GREEN in the galleries -- the vanilla Colm pattern (he stands
     #      unrecruited until a party member Talks to him -> CUSA join). Its own table so PREP's
@@ -208,26 +203,26 @@ def inject_ch03(campaign, boot=False, verbose=True):
     #    - UnitDef_088B4A80: the 10 enemies (vanilla Ch3 parity) -- grell on the vanilla ch4
     #      boss slot, the kobolds/svirfneblin on the generic autolevelled slot.
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
-    for uid, _s, ce, _d, _l in cast:
-        if ce not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (ch03 field roster %s)' % (ce, uid))
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch03')
     ally = '{\n' + '\n'.join(cap_rows) + '\n    { 0 },\n}'
-    # Boot party seed: the field roster armed from CLASS_LOADOUT, on the deploy_slots tiles
-    # (PREP hides + re-picks them, so the tiles only need to be legal). Built regardless; only
-    # LOADed when boot (step 4). classIndex rides the deploy class (dce == the vanilla class).
+    # Boot party seed: the field roster armed from each unit file's inventory, on the
+    # deploy_slots tiles (PREP hides + re-picks them, so the tiles only need to be legal). Built
+    # regardless; only LOADed when boot (step 4). classIndex rides the deploy class (dce == the
+    # vanilla class).
     slots = chap['deployment']['deploy_slots']
-    seed_rows = [_ally_unit_entry(leader, slot, dce, lv, x, y, ', '.join(CLASS_LOADOUT[ce]),
+    seed_rows = [_ally_unit_entry(leader, slot, dce, lv, x, y,
+                                  ', '.join(unit_items(campaign, uid)),
                                   ' /* %s -- boot party seed (armed; PREP re-picks) */' % uid)
                  for (uid, slot, ce, dce, lv), (x, y) in zip(cast, slots)]
     seed = '{\n' + '\n'.join(seed_rows) + '\n    { 0 },\n}'
     # Trex: the chapter's on-map recruit, placed GREEN (Colm-style) at the galleries. He is a
     # classed cast member (full cast, not available_at(3)); pull his slot/class from the roster.
     (trex_uid, tslot, _, tdce, tlv), = on_map_talk_recruits(campaign, chap['chapter_number'])
-    tx, ty = CH03_TREX_GREEN_POS
+    tx, ty = next(g['position'] for g in chap['deployment']['green_allies']
+                  if g['id'] == trex_uid)
     trex_green = '{\n' + _ally_unit_entry(
-        leader, tslot, tdce, tlv, tx, ty, '0',
+        leader, tslot, tdce, tlv, tx, ty, ', '.join(unit_items(campaign, trex_uid)),
         ' /* trex -- green talk-recruit (Colm-style; CUSA on talk, #23 item 2) */',
         allegiance='GREEN') + '\n    { 0 },\n}'
     # Trex talk-recruit (#23 item 2): the shared talk-recruit wiring (talk_recruit_wiring, reused

@@ -9,7 +9,9 @@
 
 id: ch04-the-white-moose
 title: "The White Moose"
+location: "The forest outside Lonelywood"
 chapter_number: 4
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # map + roster grounded and hosted; scenes/parley remain follow-up work
 milestone: M3
 cadence: monster_debut          # see docs/CHAPTERS.md — 🟨 fog-of-war forest hunt (tone shift to monsters)
@@ -126,7 +128,7 @@ objective:
     into ch05.
 
 win_condition: all_enemies_defeated      # parley'd (green) wolves and the fleeing moose do not count
-lose_condition: all_player_units_defeated
+lose_condition: lord_defeated
 
 difficulty_note: >
   First monster map and first fog-of-war map — the single new idea is the fog
@@ -139,6 +141,23 @@ difficulty_note: >
   ×1.15 clear-load; parley-path clear-load 2.2 against vanilla's 2.3). Not "lean generous" —
   the house target is measured vanilla parity; generosity lives in the recruit and
   the mercy, not in a softened fight.
+
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  This map introduces [[fog of war]]: you see only three tiles from each unit, so advance slowly
+  and never end a turn alone at the edge of what you can see. Four [[Mogall]]s hold the east
+  side in a cluster and hit with [[dark magic]], so keep units with low Resistance out of their
+  combined reach and take them one at a time. Revenants and Bonewalkers hold the middle and
+  south. As long as you keep your units safe, this chapter shouldn't be an issue.
+
+  Since this is a rout map, be wary of the reinforcements. On turn 2 a pack of six Mauthe Doogs
+  appears in the northwest corner: deploy [[Marty the Merry Mushroom|Marty]] and talk to its
+  leader, [[Lupin]]. The pack turns green, Lupin joins you, and you no longer have to fight it.
+  On turn 3 seven more undead (four Revenants, three Bonewalkers) appear on the east and south
+  sides, close to where you will be by then, so be mindful that you aren't swarmed. Always try
+  to keep your units on forest tiles to avoid unnecessary hits. Visit Lonelywood for an
+  [[Iron Axe]].
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -509,6 +528,7 @@ events:
       # (Lupin is silent a moment — running the math. It isn't close.)
       - lupin: "Steady food beats proud starving. The pack pulls your sled. Feed them well, mushroom."
   - trigger: wolf_pack_reveal
+    turn: 2
     type: scripted_event
     description: >
       Turn 2: the pack bursts from the NW fog beside the party's flank and Lupin COMMANDS it —

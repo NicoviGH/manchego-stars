@@ -10,7 +10,7 @@ messages by symbol address from the .map, so we can confirm text is correct
 WITHOUT loading mGBA.
 
 Usage:
-  tools/verify_text.py                 # sweep all messages, report runaways
+  tools/verify_text.py                 # sweep all messages, report runaways (incl. into the next)
   tools/verify_text.py 0x212 0x213     # decode specific message indices
 """
 
@@ -92,7 +92,7 @@ def decode(rom, table_off, root_idx, start_off):
             if data == 0:
                 break
             cur = root_idx
-    return out
+    return out, off
 
 
 def render(vals):
@@ -130,15 +130,23 @@ def main(argv):
 
     if argv:
         for idx in (int(a, 0) for a in argv):
-            vals = decode(rom, ht, root_idx, msg_offset(rom, gt, idx))
+            vals, _end = decode(rom, ht, root_idx, msg_offset(rom, gt, idx))
             print('MSG_%03X: %r' % (idx, render(vals)))
         return 0
 
     bad = 0
     count = message_count()
+    # A message whose terminator was swallowed (an odd printable run packed it into a pair) does
+    # not run forever: it reads on into the NEXT message and stops at that one's [X]. So the
+    # length bound alone passed it (Braulo's help text ran into Marty's, #493). Every message
+    # must end before the next message's bytes begin.
+    starts = sorted({msg_offset(rom, gt, i) for i in range(count)})
+    following = dict(zip(starts, starts[1:] + [len(rom)]))
     for idx in range(count):
-        vals = decode(rom, ht, root_idx, msg_offset(rom, gt, idx))
-        runaway = any(isinstance(v, str) for v in vals) or len(vals) > RUNAWAY_LEN
+        start = msg_offset(rom, gt, idx)
+        vals, end = decode(rom, ht, root_idx, start)
+        runaway = (any(isinstance(v, str) for v in vals) or len(vals) > RUNAWAY_LEN
+                   or end > following[start])
         if runaway:
             bad += 1
             if bad <= 10:

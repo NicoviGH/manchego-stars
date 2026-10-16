@@ -17,6 +17,7 @@
 
 id: basil
 name: Basil
+help_text: "A goodberry shrub, once Ravisin's. She feeds and heals the party."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 
 # LOCKED 2026-08-16 (Nicolas): Basil has ONE death quote and this is it.
 # It fires in every chapter (#6, chapter=0xFF). A second, ch05-only box was written and wired
@@ -49,7 +50,7 @@ dnd:
 #       a shrub. Cleric's own bases lean the same way Natasha does (-2 HP, -1 Def, +1 Res/Skl
 #       against Priest), so class and donor now push together instead of against each other.
 fe_stats:
-  class: Cleric
+  class: cleric
   level: 1
   # Vanilla FE8 Cleric stats, verbatim from data_classes.c [CLASS_CLERIC - 1].
   HP: 16
@@ -74,27 +75,26 @@ donor:
 # rescued-unit sprite) gate on CA_MOUNTEDAID first. It would start to matter only on Valkyrie.
 gender: female
 
-# ── Growth Rates (% per level) — from data_classes.c. Cleric's growths are BYTE-IDENTICAL
-#    to Priest's, so the class change moved her bases and her promotion tree, not her curve. ──
-growth_rates:
-  HP: 50
-  MAG: 30
-  SKL: 35
-  SPD: 32
-  DEF: 8
-  RES: 50
-  LCK: 45
-
 promotion:
-  branch: [Bishop, Valkyrie]  # vanilla FE8 Cleric branch, gPromoJidLut (classchg-data.c):
+  branch: [bishop, valkyrie]  # vanilla FE8 Cleric branch, gPromoJidLut (classchg-data.c):
                               # {CLASS_BISHOP_F, CLASS_VALKYRIE}. Bishop_F shares Bishop's
                               # nameTextId (0x2d4), so the game shows both as "Bishop".
-  default: Bishop             # ClassData.promotion for CLASS_CLERIC — and it is LIGHT, which is
+  default: bishop             # ClassData.promotion for CLASS_CLERIC — and it is LIGHT, which is
                               # what `battle_anim.spell_palette_tint` below already assumes.
                               # Priest's default was CLASS_SAGE (anima); that mismatch is why
                               # the class changed. Guarded by the decomp-pinned test.
 
-recruited_via: "story — repotted from the Elven Tomb (Ch5)"
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
+  - id: heal-staff
+    name: "Heal Staff"
+    fe_base: heal
+    fe_weapon_type: Staff
+    is_staff: true
+  - id: vulnerary
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
+    fe_base: vulnerary
+
+recruited_via: "story — green in the Elven Tomb (Ch5) until any party member talks to her"
 recruit:
   chapter: ch05-the-elven-tomb
   via: story

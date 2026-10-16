@@ -57,22 +57,34 @@ class TrexRecruitCast(unittest.TestCase):
         cast = {uid: (slot, cls) for uid, slot, cls, _sms in inject.cast.classed_cast(self.CAMPAIGN)}
         self.assertEqual(cast['trex'], ('Rennac', 'CLASS_THIEF'))
 
-    def test_every_classed_cast_member_has_a_test_loadout(self):
-        # inject_test_chapter walks the WHOLE PORTRAIT_MAP and sys.exits on the first class
-        # with no CLASS_LOADOUT row -- so a cast member's class change can break the art bench
-        # (recordcast/recordanim) without touching a single chapter. Caught exactly that when
-        # Basil moved Priest -> Cleric (2026-08-08): CLASS_CLERIC had no row, and ch05's own
-        # guard could not see it because Basil is recruited IN ch05 and so is not on its field
-        # roster. Assert the invariant, not the one class that happened to be missing.
+    def test_every_classed_cast_member_has_a_fieldable_kit(self):
+        # Every roster that LOADs a cast member (its join, the boot seeds, the testch bench)
+        # reads its unit file's `inventory:` through unit_items, which sys.exits on an empty
+        # kit -- so one unit file without a kit breaks the art bench without touching a single
+        # chapter (Basil's Priest -> Cleric move did exactly that to the old per-class table).
         allcast, _ = inject.cast._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
-        missing = sorted({ce for _uid, _slot, ce, *_ in allcast if ce not in inject.cast.CLASS_LOADOUT})
-        self.assertEqual(missing, [], 'classed cast members with no CLASS_LOADOUT row')
+        for uid, *_ in allcast:
+            self.assertTrue(inject.cast.unit_items(self.CAMPAIGN, uid), uid)
+
+    def test_a_placed_recruit_joins_with_its_unit_files_kit(self):
+        # ch05 places Sahnar from its enemy roster; the unit file is the kit's home, so the
+        # placement must say the same level and items, or the boot seeds field another unit.
+        import inject.hosting
+        chap = inject.hosting._load_chapter_yaml(self.CAMPAIGN, 'ch05-the-elven-tomb.yaml')
+        entry = next(e for e in chap['enemy_units'] if e['id'] == 'sahnar')
+        unit = inject.cast.load_unit(self.CAMPAIGN, 'sahnar')
+        self.assertEqual(entry['level'], unit['fe_stats']['level'])
+        self.assertEqual([inject.decomp.fe_item_enum(i) for i in entry['inventory']],
+                         inject.cast.unit_items(self.CAMPAIGN, 'sahnar'))
+
+    def test_trex_joins_with_colms_kit(self):
+        # vanilla Ch3 Colm: L2, Iron Sword, Lockpick, Vulnerary (events_udefs.c).
+        self.assertEqual(inject.cast.unit_items(self.CAMPAIGN, 'trex'),
+                         ['ITEM_SWORD_IRON', 'ITEM_LOCKPICK', 'ITEM_VULNERARY'])
 
     def test_thief_loadout_and_testch_covers_the_whole_cast(self):
-        # inject_test_chapter needs a Thief loadout + one spawn tile per classed cast member
-        # (13 now: 8 founding + Baxby + Trex + Lupin + ch05's Basil and Sahnar); both would
-        # sys.exit otherwise.
-        self.assertIn('CLASS_THIEF', inject.cast.CLASS_LOADOUT)
+        # inject_test_chapter needs one spawn tile per classed cast member (13 now: 8 founding
+        # + Baxby + Trex + Lupin + ch05's Basil and Sahnar); it would sys.exit otherwise.
         allcast, _ = inject.cast._classed_cast(self.CAMPAIGN)   # available_at=None -> everyone
         self.assertEqual(len(allcast), 13)
         self.assertGreaterEqual(len(inject.test_chapter.TEST_SPAWN_POSITIONS), len(allcast))
@@ -156,7 +168,8 @@ class RecruitAvailability(unittest.TestCase):
         uid, slot, class_enum, deploy_class, level = baxby
         self.assertEqual(slot, 'Forde')
         self.assertEqual(class_enum, 'CLASS_CAVALIER')
-        self.assertIn(class_enum, inject.cast.CLASS_LOADOUT)   # the join-LOAD arms him from CLASS_LOADOUT
+        self.assertEqual(inject.cast.unit_items(self.CAMPAIGN, uid),   # the join-LOAD arms him
+                         ['ITEM_LANCE_IRON', 'ITEM_SWORD_IRON', 'ITEM_VULNERARY'])
 
 
 class TalkRecruitWiring(unittest.TestCase):
@@ -624,12 +637,16 @@ class Ch05RecruitIdentities(unittest.TestCase):
         self.assertEqual(table['CLASS_PRIEST']['promotion'], 'CLASS_SAGE',
                          'Priest still defaults into anima -- the reason Basil left it')
         self.assertEqual(table['CLASS_CLERIC']['promotion'], 'CLASS_BISHOP_F')
-        # ...and the YAML's authored branch is the decomp's branch, not a wish.
-        display = {'CLASS_BISHOP_F': 'Bishop', 'CLASS_VALKYRIE': 'Valkyrie'}
-        branches = inject.sms._promotion_branches()['CLASS_CLERIC']
+        # ...and the YAML's authored branch is the decomp's branch, not a wish. The YAML writes
+        # vanilla class tokens; a token names the class, and the gendered variant (BISHOP_F)
+        # is the same class, so compare with the `_F` dropped.
+        from inject.class_ids import vanilla_class_enum
+        base = lambda enum: enum[:-2] if enum.endswith('_F') else enum
+        branches = inject.sms.promotion_branches()['CLASS_CLERIC']
         promo = inject.cast.load_unit(self.CAMPAIGN, 'basil')['promotion']
-        self.assertEqual(sorted(promo['branch']), sorted(display[c] for c in branches))
-        self.assertEqual(promo['default'], 'Bishop')
+        self.assertEqual(sorted(vanilla_class_enum(t) for t in promo['branch']),
+                         sorted(base(c) for c in branches))
+        self.assertEqual(vanilla_class_enum(promo['default']), base('CLASS_BISHOP_F'))
 
     def test_basil_bases_are_vanilla_cleric_class_data_verbatim(self):
         # basil.yaml claims its stat block is class data "verbatim"; that claim is only worth

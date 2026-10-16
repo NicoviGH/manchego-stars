@@ -1,0 +1,2 @@
+<includeonly>{|</includeonly><noinclude><nowiki>{|</nowiki>
+[[Category:Formatting templates]]</noinclude>

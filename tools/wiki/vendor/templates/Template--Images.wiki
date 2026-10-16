@@ -1,0 +1,7 @@
+{| class="basic width-90 notice-template"
+| class="pixel-art" | [[File:Large-secret-book.png|link=Category:Articles needing images]]
+| 
+'''It has been requested that image(s) be placed in this page or section.''' Please submit images to help improve this page and talk on this page's talk page about what images are needed. Remove this when this has been fixed.
+{{#if:{{{1|}}}|----
+'''Reason:''' {{{1}}}}}
+|}<includeonly>[[Category:Articles needing images]]</includeonly><noinclude>[[Category:Notice templates]]</noinclude>

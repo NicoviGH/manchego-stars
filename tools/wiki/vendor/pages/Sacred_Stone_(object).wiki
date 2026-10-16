@@ -1,0 +1,94 @@
+[[File:Ss fe08 sacred stone of renais.png|right|thumb|480px|Renais's Sacred Stone.]]
+
+The '''Sacred Stones''' (Japanese: {{hl|聖石|Seiseki}} ''Sacred Stone'') are five stones of much magical power, after which [[Fire Emblem: The Sacred Stones|said game]] is named. While the Stones never appear as usable items, nor do they have sprites, they play an integral part in the storyline, with their destruction being a goal of the [[Fomortiis|primary antagonist]].
+
+==Characteristics==
+The origins of the Sacred Stones are surrounded in mystery, the only explanation of their origin is that they were blessed upon humanity by some sort of divinity.<ref>{{cite| In its despair, mankind appealed to the heavens, and from a blinding light came hope. THE SACRED STONES These five glorious treasures held the power to dispel evil.|Opening narration|The Sacred Stones}}</ref> There are no significant references to any specific gods throughout the rest of the game. Though, [[Vanessa]] makes a passing mention of a war god named Fale.<ref>{{cite|But this is… The war god Fale's amulet!|[[Vanessa]], upon receiving a gift from [[Syrene]] in a support conversation|The Sacred Stones}}</ref> The game's introductory image scroll may also imply that a [[dragon]] blessed the Sacred Stones to the humans, as the introduction features a large dragon curled around five orbs.
+
+The Sacred Stones' source of power is human will.<ref>{{cite|You must listen to me, Eirika. The stories are true; the Stone does hold the power to stop the Demon King. However, the source of its power is human will, the desire for peace within our hearts.|[[L'Arachel]]|The Sacred Stones}}</ref> Every Sacred Stone holds magical power, presumably, the Stones keep the [[monster]]s born in [[Darkling Woods (location)|Darkling Woods]] at bay, as more and more Stones are destroyed more awash in monster hordes Magvel becomes. [[Grado]]'s Sacred Stone is special in the respect that it is the Stone that houses the Demon King, [[Lyon]] speculated this was why that particular Sacred Stone was responsive to [[dark magic]].<ref>{{cite|Mm... My research isn't complete yet, but there's no mistaking the power the Sacred Stones contain. And the Stone of Grado seems especially responsive to my dark magic. I suppose it's because it contains both sacred and demonic properties.|[[Lyon]]|The Sacred Stones}}</ref>
+
+While Lyon's experimentation with Grado's Stone ended in tragedy, there were several impressive discoveries made. While the distinction between the Demon King's influence and the Stone's power is blurry, Lyon was able to reanimate corpses after his experiments, as demonstrated by Vigarde. Lyon was also able to perform incredible healing feats, healing a child that had been burned in a fire.<ref>{{cite|Uh-huh... A while back, a fire ravaged Serafew, and a little girl got trapped in the flames. Her burns were terrible:<br>
+not even healing staves were able to cure her injuries. But just a sliver of the Stone's power restored her life and healed her wounds. We saved that girl's life, Ephraim! Oh, if you could have seen the tears of joy in her mother's eyes!|[[Lyon]]|The Sacred Stones}}</ref> Lyon had also hoped to use the Sacred Stone to prevent the Earthquake that would destroy Grado, he was, however, unsuccessful.
+
+==History==
+[[File:Ss_fe08_game_opening_story_tablet.png|thumb|left|120px|A carving depicting the original conflict.]]
+===Original conflict===
+Long ago, the legendary heroes used the Sacred Stones to seal away the soul of the [[Fomortiis|Demon King]]. The five Stones were then distributed to the rulers of what became the five great kingdoms of [[Magvel]]: [[Renais]], [[Frelia]], [[Jehanna]], [[Rausten]], and [[Grado]]. Each country enshrined its Sacred Stone in a secure location so that they would be protected should the Demon King ever again pose a threat to Magvel. Each Stone was granted its own chamber, for instance, Renais' Stone was sealed under the castle, and Frelia's Stone had an entire [[Tower of Valni|tower]] built for its protection.
+
+However, one aspect of this story left out in modern retellings is the involvement of the ''Great Dragon'', [[Morva]]. It is said that without his aid mankind would have lost.<ref>{{cite|No, no, that's not right at all. Ah, how quickly did mankind forget its debt to the Great Dragon. To hear the story now, one would think humans alone brought about victory. That is a gross mistelling of the tale. Only through the Great Dragon's strength could the Demon King be sealed away!|[[Dara]]|The Sacred Stones}}</ref> For 800 years Morva stood guard over the Demon King's corpse.
+
+At some point afterwards, Grado's Sacred Stone became known as the [[Fire_Emblem_(item)#Magvel|Fire Emblem]].
+
+===Magvel, years 802-803===
+Some time in the year 802 Lyon created the Dark Stone by separating the Demon King from the Sacred Stone's holy elements. In a disastrous series of events [[Fomortiis]] with his new puppet-prince and the resurrected emperor, set off on a conquest to overwhelm the entirety of Magvel and snuff out every last Sacred Stone. 
+
+The first Stone destroyed was Grado's, Frelia's and Jehanna's Stones followed soon after. The Sacred Stones of Renais and Rausten remained safe, until Lyon took Renais' Stone from Eirika and Ephraim and destroyed it, leaving Rausten's Stone the sole remainder. Rausten's Stone was successful in sealing the Demon King once again.
+
+===Aftermath===
+After the ''[[War of the Stones]]'' only one Sacred Stone, the Stone of Rausten, remains on Magvel. While problematic, chances of the Demon King returning to complete power are low, as his true body was destroyed in the conflict.<ref>{{cite|No, we've done far more than the legends ever told. We've destroyed the Demon King's body. He can never come back.|[[Innes]]|The Sacred Stones}}</ref> Curiously, the Stone belongs to Rausten, but dialogue seems to imply the Rausten's Stone ended up sealed within Renais.<ref>{{cite|That would be nice… But first we must seal this away… This Stone banished the Demon King.|[[Eirika]], in the ending talking to [[Ephraim]] in [[Renais]]|The Sacred Stones}}</ref>
+{{clear}}
+
+==The Dark Stone==
+[[File:Ss_fe08_dark_stone.png|right|thumb|480px|Lyon's experiments.]]
+The Dark Stone (Japanese: {{hl|魔石|Maseki}} ''Demon Stone'') was created approximately a year before the events of the game, around the same time that Lyon's father, [[Vigarde]], died from his illness. His father's death, and the disastrous earthquake that was foreseen to plunge Grado into the ocean, spurred Lyon to take his experiments with the Fire Emblem even further. 
+
+The Dark Stone is said to grant Lyon strange powers,<ref>{{cite|The crown prince of Grado's empire. The Dark Stone gives him strange powers.|[[Necromancer]] help description|The Sacred Stones}}</ref> though its true nature is that of a vessel for the Demon King's soul, one in which his powers are not restrained. Through Lyon having the Stone the Demon King has control over him, though how much control varies depending on which route you take: Complete possession in Eirika's route, or more subtle manipulation in Ephraim's route. The Demon King is allowed to channel his power through Lyon, presumably giving Lyon some of his necromantic abilities.
+
+Technically, the Dark Stone was never explicitly destroyed, but it can be assumed that it dissipated when Fomortiis was reunited with his body.
+{{clear}}
+
+== Trivia ==
+*In [[Fire_Emblem:_The_Sacred_Stones_pre-release_information|pre-release materials]] for ''The Sacred Stones'' there are images of monsters using a weapon called [[Stone Shard|stone shard]]; the item remains in the final release, though unused. The connection of the items is not as evident in the English name, but in the Japanese version, the item is known as "Demon Stone Fragment", with the "Demon Stone" portion being the same name as the Dark Stone, implying that the monsters are using shards of the Dark Stone itself.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Sacred Stone
+|jpn-name={{h|聖石|Seiseki}}
+|jpn-mean="Sacred" or "holy stone".
+|span-name=Piedra Sagrada
+|span-mean=Sacred Stone
+|fren-name=Pierre sacrée
+|fren-mean=Sacred stone
+|ger-name=Heiliger Stein
+|ger-mean=Sacred Stone
+|ital-name=Sacre Pietra
+|ital-mean=Sacred Stone
+|por-name=Pedra sagrada
+|por-mean=Sacred stone; used in {{FEH}}.
+|ch-trad-name={{h|聖石|Shèng shí}}
+|ch-trad-mean=Sacred stone; used in ''Heroes''.
+}}
+
+===Dark Stone===
+{{Names
+|eng-name=Dark Stone
+|jpn-name={{h|魔石|Maseki}}
+|jpn-mean=Demon, monster, evil stone. In the Japanese version, Ismaire does literally refer to the Dark Stone as the dark ''colored'' stone, {{hl|闇色の石|Yamishoku no seki}}, emphasizing its appearance.
+|span-name=Piedra oscura
+|span-mean=Dark stone
+|fren-name=Pierre maudite
+|fren-mean=Cursed stone
+|ger-name=Dunkler Stein
+|ger-mean=Dark Stone
+|ital-name=Pietra Nera
+|ital-mean=Black Stone
+|por-name=Pedra obscura
+|por-mean=Dark stone; used in ''Heroes''.
+|ch-trad-name={{h|魔石|Mó shí}}
+|ch-trad-mean=Evil stone; mentioned by [[Duessel: Obsidian]] in ''Heroes''.<ref>{{Cite|{{lang|zh-Hant|在利昂皇子與那些闇魔道士的研究下，最終創造出了名為【魔石】的寶石……自那天起一切都變了。}}|[[Duessel: Obsidian]] at the home caslte|Heroes}}</ref>
+}}
+
+== Gallery ==
+<gallery>
+Ss fe08 sacred stone of renais.png|[[Eirika]] and [[Ephraim]] in the Sacred Stone chamber in [[Renais]].
+Ss fe08 dark stone.png|[[Lyon]] with [[Grado]]'s Sacred Stone and the Dark Stone. 
+Ss fe08 fomortiis battle.png|[[Fomortiis]] being banished into the Sacred Stone of [[Rausten]].
+</gallery>
+
+==References==
+{{Refbar}}
+
+{{Nav8}}
+
+[[Category:Fire Emblem: The Sacred Stones]]
+[[Category:Objects]]

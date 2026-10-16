@@ -5,7 +5,9 @@
 
 id: ch06-the-maer-monster
 title: "The Maer Monster"
+location: "Maer Dualdon, off Bremen"
 chapter_number: 6
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # the slice is reached: roster/levels/AI re-grounded against vanilla
                                # Ch6 unit by unit (#334), the map is painted and compiled (#331),
                                # the placement is authored (#360), and the chapter is HOSTED on
@@ -123,7 +125,7 @@ objective:
   description: "Defeat Nerra, the merfolk elder"
 
 win_condition: nerra_defeated
-lose_condition: all_player_units_defeated
+lose_condition: lord_defeated
 
 # ── Difficulty (D3) ─────────────────────────────────────────────────────────────
 # Vanilla FE8 Ch6's OWN mode offsets, copied verbatim from chapter_settings
@@ -200,6 +202,25 @@ difficulty_note: >
   turn 3, and Braulo turn 6 with it afloat 96% of the time. Nerra inherits Novala's
   softness on purpose -- but note her Flux does 22 a hit, doubled, to either hull, so she is kept on the
   centre shelf, far from both. Messie is a cutscene, not an encounter, so no route skips XP.
+
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  The sources of time pressure on this map are the two marooned boats, one in the east and one
+  in the west; their crews will die without intervention. Nothing can reach either hull on turn
+  1, and two pursuers do the damage. The Tentacruel in the south takes the west boat's door on
+  turn 2 and poisons the hull, so that is the faster clock: it is the weakest unit on the map,
+  but nobody can board until it dies. The merfolk thrower's [[Javelin]] reaches the east boat
+  from two tiles, starting on turn 2; that door is a job for [[Pinky]] or [[Braulo]], since foot
+  units, cavalry and [[Trex]] cannot reach it. Keep every civilian alive and the chapter ends
+  with an [[Orion's Bolt]] for [[Prof. R.B. Geenius|R.B. Geenius]]. Board the east boat to get
+  an [[Antitoxin]] from Grynsk.
+
+  [[Nerra]] won't move and has low Defense, so physical attackers bring her down quickly; defeat
+  her to win. Most of the enemy carries lances, so Braulo's axe wins the trades; keep the
+  cavalry away from the armored guard with the [[Horseslayer]]. On turn 4 three more shark
+  riders enter from the west edge. The shark rider with the [[Halberd]] drops it, a merfolk
+  soldier drops an [[Iron Blade]], and the lamia healer in the northeast drops an [[Elixir]].
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -743,8 +764,10 @@ enemy_units:
   # vanilla Ch6 puts its difficulty in the hostage clock, not the boss. No personal: block
   # -- ch06 has no injector yet, and #284 requires every declared line to have a route.
   - id: nerra
+    face: nerra                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Nerra"
     fe_name: "Nerra"
+    help_text: "The oldest merfolk of Maer Dualdon. She hunts Bremen's fishers."   # R on the name in game (inject.text.write_nameplate)
     is_boss: true
     count: 1
     class: shaman
@@ -1176,8 +1199,6 @@ rescue_boats:
     - "I can't offer you much but my gratitude. If you see it, please tell me everything you can."
 
 economy:
-  reward_sites:
-  - gift: antitoxin
   # Vanilla Ch6 grants the Bolt in its ENDING scene, gated on CHECK_ALIVE for every
   # civilian -- keep them alive; boarding is NOT required for the bonus. prof-rbg is
   # our Archer, so this is a literal-parity reward that lands on a real unit.
@@ -1240,3 +1261,8 @@ playtest:
         - talk: {x: 4,  y: 18}                # boat-west's door -> Tali, the line is the reward
       then:
         - spoke: true
+
+# Open questions (#486). tools/gen_wiki.py lists them; settling one removes it here.
+open_questions:
+  - q: "Nerra retreated so ch07 might bring her back (ADR 0337), and ch07 didn't. Close the thread?"
+    pick: "Close it: her shipped retreat line stays as bluster; drop 'she means to come back' from her lore"

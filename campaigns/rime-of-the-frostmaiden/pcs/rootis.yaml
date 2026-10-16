@@ -5,6 +5,7 @@
 
 id: rootis
 name: Rootis
+help_text: "A snowperson sorcerer of dragon blood. Kind, and fond of a mystery."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 death_quote: "Oh... this is the melting part. ...It was warm, with you."  # falls-in-battle quote (#6 dialogue pass; lore/rootis.md)
 lord_pitch: "Anima mage -- reliable ranged magic, but frail."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/rootis.png      # GBA-ready sprite pending (issue #23)
@@ -54,11 +55,12 @@ dnd:
   lore: lore/rootis.md
 
 # ── FE Starting Stats (Chapter 1 / level 1 equivalent) ─────────────────────────
-# Rootis is an ice/cold sorcerer, NOT fire. Class corrected from "Mage (Fire)" to "Mage (Ice)".
+# Rootis is an ice/cold sorcerer, NOT fire: the cold lives in his tome's name and his art; the
+# class is plain vanilla Mage.
 # Snow Body (resistant to B/P/S) makes Rootis surprisingly durable for a mage.
 # Adjust during Phase 1 playtesting.
 fe_stats:
-  class: "Mage (Ice)"        # FE base class Mage — cold-type tome caster (Anima reflavored)
+  class: mage        # FE base class Mage — cold-type tome caster (Anima reflavored)
   level: 1
   # Vanilla FE8 Mage stats, verbatim from data_classes.c [CLASS_MAGE - 1]. No D&D-derived tuning.
   # Mage is a magic unit: single Pow stat is the magic attack (= MAG), no STR.
@@ -75,18 +77,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [Sage, "Mage Knight"]   # vanilla Mage branch (classchg-data.c [CLASS_MAGE])
-  default: Sage                   # thematic lean; player may pick either.
-
-# ── Growth Rates (% per level) — vanilla Mage growths from data_classes.c ────────
-growth_rates:
-  HP: 55
-  MAG: 55
-  SKL: 40
-  SPD: 35
-  DEF: 5
-  RES: 30
-  LCK: 20
+  branch: [sage, mage-knight]   # vanilla Mage branch (classchg-data.c [CLASS_MAGE])
+  default: sage                   # thematic lean; player may pick either.
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — tome stats inherited from the vanilla item in `fe_base` (no custom
@@ -103,7 +95,6 @@ inventory:
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 2
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Rootis is a stock FE8 Mage -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

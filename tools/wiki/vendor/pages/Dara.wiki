@@ -1,0 +1,91 @@
+{{Character Infobox
+|name=Dara
+|image=[[File:Portrait dara fe08.png|class=pixel-art]]
+|caption=Portrait of Dara from {{title|The Sacred Stones}}.
+|help_text=An old woman of Caer Pelyn. Over 100 years in age, she is a font of wisdom.
+|gender=Female
+|race=[[Human]]
+|age=100+<ref>{{cite|An old woman of Caer Pelyn. Over 100 years in age, she is a font of wisdom.|Dara's help description|The Sacred Stones}}</ref>
+|family=[[Saleh]] <small>(grandson)</small>
+|titles=Matron
+|startingclass=[[Druid]]
+|appearances={{FE8}}
+}}
+
+{{quote|Hmmm... We of Caer Pelyn have turned away from the world outside. The Great Dragon alone holds all our honor and esteem. In this place, princes and pauper are equals. Do you have a problem with that?|Dara}}
+
+'''Dara''' (Japanese: {{hl|ダラ|Dara}} ''Dara'') is the matron of [[Caer Pelyn]]<ref>{{cite|We are in your debt, Matron.|[[Innes]]|The Sacred Stones}}</ref> and the grandmother of [[Saleh]]. She is an elderly and wise woman, being over 100 years old.
+
+=={{FE8}}==
+===Role===
+Dara appears briefly in [[Village of Silence|Eirika route Chapter&nbsp;12]], after [[Eirika]] and her allies clear the area of [[monster]]s. Dara gives Eirika's party refuge for the night. She informs Eirika of the nature of the "[[Myrrh|Great Dragon]]" and the dragon's relation to the original conflict with the [[Fomortiis|demon king]], seemingly using the term in place of '[[manakete]]' which is curiously considered offensive.<ref>{{cite|Manakete?!? How dare you speak so of the Great Dragon!|Dara, to [[Eirika]]|The Sacred Stones}}</ref> Specifically, she clarifies that humanity could have never won out against the demon king without the aid of the dragonkin.
+
+===Starting stats and growth rates===
+Dara does have some [[Unused content in Fire Emblem: The Sacred Stones|unused]] data that gives her a class. Her class is [[druid]], though, curiously, it is the male variant of the druid class.<ref>{{Cite web| quote=Dara, Saleh's grandmother, has stats as a (male...) Druid and a rather nifty profile description. | author=VincentASM | published=? | retrieved=April 27th, 2015 | url=http://serenesforest.net/general/unused-content/ | title=Unused Content | site=Serenesforest.net | type=webpage }}</ref> Curiously, in-battle animations for the female druid do exist unused in {{title|The Sacred Stones}}. She does have custom growth rates, but she doesn't have any personal base stats, so she uses the male Druid class [[Druid#Base stats|base stats]].
+
+{{CharStats GBA
+|portrait=[[File:Portrait dara fe08.png]]
+|sprite=druid
+|class=Druid
+|affin=dark
+|lv=1
+|HP=19
+|mag=6
+|skill=3
+|spd=4
+|luck=0
+|def=4
+|res=6
+|move=6
+|con=8
+|aid=7
+|an=D
+|da=C
+|st=E
+|HP1=85
+|mag1=40
+|skill1=50
+|spd1=45
+|luck1=20
+|def1=25
+|res1=25
+}}
+
+==Personality==
+Dara is stern but kind and informative. She obviously cares for her grandson. She holds the great dragon in high reverence, acknowledging their contribution to the continued existence of humanity.
+
+==Flavor text==
+{{DescriptionHdr}}
+{{DescriptionCell
+|game={{title|The Sacred Stones}}<br><small>(Unused)</small>
+|english=An old woman of Caer Pelyn. Over 100<br>years in age, she is a font of wisdom.
+|japanese=ポカラの里の長老<br>百歳を越える　この世の生き字引
+}}
+{{DescriptionFtr}}
+
+==Trivia==
+* Dara's name is never mentioned in the main story, instead only seen in her unused character data and some support conversations.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Dara
+|eng-mean=From the Irish ''{{lang|ga|Mac Dara}}'' which means "oak tree". This was the name of a 6th-century saint from Connemara. It is also used as an Anglicized form of ''{{lang|ga|Dáire}}''.<ref>{{cite web |url=https://www.behindthename.com/name/dara-1 |title=Behind the Name: Meaning, origin and history of the name Dara (1) |site=www.behindthename.com |retrieved=8 September 2018}}</ref>
+|jpn-name={{h|ダラ|Dara}}
+|jpn-mean=Dara
+|span-name=Dara
+|fren-name=Dara
+|ger-name=Dara
+|ital-name=Dara
+}}
+
+==Gallery==
+<gallery>
+File:Portrait dara fe08.png|Dara's portrait in {{title|The Sacred Stones}}
+</gallery>
+
+==References==
+{{Refbar}}
+
+{{Nav8}}
+[[Category:Characters]]
+[[Category:NPCs in Fire Emblem: The Sacred Stones]]

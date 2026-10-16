@@ -1,7 +1,7 @@
 """Who is who: the cast's class and portrait bindings and the unit loader.
 
-`CLASS_MAP`, `PORTRAIT_MAP` and `GUEST_PORTRAIT_MAP` bind a campaign character to the vanilla
-slot, class and face it borrows; the raw-pid tables do the same for bodies with no slot.
+`class_enum_for`, `PORTRAIT_MAP` and `GUEST_PORTRAIT_MAP` bind a campaign character to the vanilla
+class, slot and face it borrows; the raw-pid tables do the same for bodies with no slot.
 """
 import os
 import re
@@ -15,34 +15,18 @@ from inject.chapter_ids import (
     CH05_CHAPTER_YAML, CH05_MOOSE_NAME_MSG, CH05_MOOSE_PID, CH06_BOAT_NAME_MSGS, CH06_BOAT_PIDS,
     CH06_MESSIE_PID,
     PROLOGUE_SEPHEK_SLOT)
-from inject.decomp import REPO
+from inject.class_ids import DEFAULT_CAMPAIGN, vanilla_class_enum, vanilla_class_enums
+from inject.decomp import fe_item_enum, REPO
 from inject.hosting import _load_chapter_yaml, recruit_chapter_number
 from inject.text import display_name
 
 
-# Palette index 0 of an FE8 bust is the transparent key, and our authored busts all carry
-# magenta there (see campaigns/*/portraits/*.png). Named because _vendor_mug_to_bust has to
-# WRITE it, not just read it: a community mug arrives keyed on whatever green its artist used.
+# Palette index 0 of an FE8 bust is the transparent key. Our busts keep whatever colour their
+# source put there (green, magenta, sage; the game never draws it) and mark index 0 transparent
+# in the file (tools/test_bust_key.py). Named because _vendor_mug_to_bust has to WRITE a key:
+# a community mug arrives keyed on whatever green its artist used, and ours is magenta.
 PORTRAIT_TRANSPARENT_RGB = (255, 0, 255)
 
-# Our cast wear stock vanilla FE8 classes (docs/decisions.md Class Mapping). Map
-# each unit YAML's display class -> the decomp CLASS_ enum. Parenthetical flavor
-# like "Mage (Ice)" is stripped before lookup.
-CLASS_MAP = {
-    'Pirate':         'CLASS_PIRATE',
-    'Shaman':         'CLASS_SHAMAN',
-    'Archer':         'CLASS_ARCHER',
-    'Mage':           'CLASS_MAGE',
-    'Priest':         'CLASS_PRIEST',
-    'Cleric':         'CLASS_CLERIC',  # Basil (ch05 recruit) -- Priest's twin, but its default
-                                       # promotion is Bishop (light), not Sage (anima)
-
-    'Knight':         'CLASS_ARMOR_KNIGHT',
-    'Pegasus Knight': 'CLASS_PEGASUS_KNIGHT',
-    'Thief':          'CLASS_THIEF',   # Trex (ch03 recruit) -- the army's utility unit
-    'Cavalier':       'CLASS_CAVALIER',  # Baxby the axe-beak (ch01 recruit) -- mounted sword/lance
-    'Myrmidon':       'CLASS_MYRMIDON',  # Sahnar (ch05 recruit) -- the army's sword crit-duelist
-}
 
 
 # The ENEMY-side counterpart of BASE_DONOR: our enemy id -> the vanilla CHARACTER_ slot it is
@@ -93,109 +77,20 @@ ENEMY_CHARACTER_SLOT = dict(
     ENEMY_BASE_SLOT, **{'sephek-kaltro': 'CHARACTER_%s' % PROLOGUE_SEPHEK_SLOT})
 
 
-# our cast bust  ->  vanilla portrait slot whose graphic files we overwrite.
-# Slots are FE8's earliest-available cast so one early chapter shows many faces.
-# (Started as the portrait mapping; it is now the general character-slot key --
-# names, class/stats/growths/gender, death quotes, and map sprites all ride it.)
-PORTRAIT_MAP = {
-    'braulo':     'Eirika',    # the prologue lord -- first face the player sees
-    'marty':      'Seth',
-    'wolfram':    'Franz',
-    'meesmickle': 'Gilliam',
-    'prof-rbg':   'Moulder',
-    'rootis':     'Vanessa',
-    'sclorbo':    'Ross',
-    'pinky':      'Neimi',
-    'pepperjack': 'Garcia',
-    'brie':       'Colm',
-    # ch01 recruit Baxby the axe-beak (npcs/baxby.yaml) -- a classed Cavalier (mount), so a
-    # full cast member. Rides the vanilla Forde slot (a Cavalier absent from our ch00-08 ->
-    # collision-free); the same slot already carried his ch01-ending CUTSCENE face (he speaks
-    # there -- Marty wins him over), and now also his unit/stats/map sprite/death quote. He is
-    # recruited by that ENDING cutscene, so he simply rides the ch02+ prep roster (no on-map
-    # recruit) -- cast_available_at() handles that from his recruit.chapter (ch01).
-    'baxby':      'Forde',
-    # ch03 recruit Trex (npcs/trex.yaml) -- a classed Thief, so unlike the two name-only
-    # NPCs above he IS a full cast member: he rides the vanilla Rennac slot (a Rogue absent
-    # from our ch00-08, referenced nowhere else in the build -> collision-free), which carries
-    # his name / class+stats / bust / map sprite / death quote just like every PC. His mid-map
-    # green->blue JOIN trigger is wired separately (pairs with the #23 mid-map cutscene); here
-    # he is a real deployable unit so his vendored custom sprite renders in his cast colours.
-    'trex':       'Rennac',
-    # ch04 recruit Lupin (npcs/lupin.yaml) -- a classed Cavalier (the wolf IS the mount), so a
-    # full cast member like Trex. Unlike Trex he starts RED (the hostile pack's leader) and is
-    # won by Marty's Talk -> CUSA red->blue (the vanilla Joshua pattern), see recruit.initial_faction.
-    # Rides the vanilla Duessel slot (a Great Knight absent from our ch00-08, referenced nowhere
-    # else -> collision-free); his stat line references Kyle (STAT_DONOR), his identity is Duessel.
-    'lupin':      'Duessel',
-    # The ch05 recruits (#25). Both shipped their art in #179/#181 and then sat INERT for two
-    # months, because art without a slot is art nothing can address: no name, no bust, no stat
-    # line, no map sprite, no death quote -- and, the thing that actually blocked the chapter,
-    # no pid for a Talk to name. These two lines are that identity.
-    # Basil the goodberry shrub (npcs/basil.yaml) rides ARTUR -- a Monk absent from our ch00-08
-    # and referenced nowhere else, so dressing it is collision-free. His stat line references
-    # Natasha (STAT_DONOR) and his class is hers too (Cleric, 2026-08-08). The slot's own gender
-    # does not have to match his: `gender:` in the YAML rewrites .attributes on whatever slot the
-    # unit wears (_set_gender), and promotion is keyed by CLASS in gPromoJidLut, never by the
-    # character -- so a female Cleric on the male Artur slot promotes Bishop/Valkyrie correctly.
-    'basil':      'Artur',
-    # Sahnar (npcs/sahnar.yaml) rides MARISA -- vanilla's OTHER red-to-blue Myrmidon parley,
-    # absent from our ch00-08 and referenced nowhere else. Exact class match, unlike Trex's and
-    # Lupin's slots; her stat line references Joshua (STAT_DONOR), her identity is Marisa.
-    'sahnar':     'Marisa',
-}
+def _slot_table(key, campaign=DEFAULT_CAMPAIGN):
+    """One of campaign.yaml's slot tables, in the order it is written (the injector walks it in
+    that order, so the order is part of the build)."""
+    with open(os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml'), encoding='utf-8') as f:
+        return dict(yaml_load(f)[key])
 
-# Prologue cold-open guests ride vanilla character slots outside PORTRAIT_MAP
-# (PROLOGUE_*_SLOT below); these are the portrait files those slots display.
-# Guest busts are OPTIONAL: a missing PNG keeps the vanilla face, so this wiring
-# works before (and independent of) the art landing.
-GUEST_PORTRAIT_MAP = {
-    'hlin-trollbane': 'Natasha',
-    'scramsax':       'Kyle',
-    'sephek-kaltro':  'O_Neill',
-    # ch01 boss Izobai rides the Breguet slot (CH01_BOSS_SLOT); her death-quote FID
-    # is FID_Breguet, so dressing that slot with izobai.png shows her green-goblin bust.
-    'izobai':         'Breguet',
-    # ch01 Foaming Mugs quest-giver Hruna rides the generic Villager_Woman face slot
-    # (FID tag [FID_VillagerWoman] = 0x60) -- a throwaway NPC mug used nowhere else,
-    # so dressing it with hruna.png is collision-free. Cutscene-only (no map unit).
-    'hruna':          'Villager_Woman',
-    # ch01-ending patron Duvessa Shane (Speaker of Bryn Shander) rides the Selena slot:
-    # her bust is a palette recolor of vanilla Selena (portraits/duvessa.py), and Selena
-    # is a late-game Grado boss absent from our MVP chapters (ch00-08), so dressing
-    # FID_Selena with duvessa.png is collision-free. Recurring cutscene NPC (no map unit).
-    'duvessa':        'Selena',
-    # ch02 quest-giver Vellynne Harpell (recurring Arcane Brotherhood necromancer) rides
-    # the vanilla Ismaire slot (CH02_VELLYNNE_SLOT) -- a regal woman absent from our ch00-08,
-    # collision-free. Her bust is the FE-Repo Sonya (Witch) mug with a snow-white hair recolor
-    # (portraits/vellynne.py); cutscene-only (no map unit).
-    'vellynne':       'Ismaire',
-    # ch03 mid-map RBG-execution beat: the Icewind Brute's snarl now has a mug (Nicolas supplied the
-    # ref, 2026-07-11). It rides the vanilla Caellach slot -- a brutish Grado general absent from our
-    # ch00-08, referenced nowhere else -> collision-free. Bust = ref_to_bust of the HD kobold-brute
-    # ref (flipped to FE8 screen-left, crop 20,90,1970,1710, --zoom 0.70, no sharpen). The zoom
-    # pulled the snout tip out of the top-left corner FE8 did not draw until engine patch 0018
-    # (#471); at 1.0 it lost the whole nose. Cutscene-only (the Brute
-    # is a raw-pid enemy 0xb6; its death quote is silent, so FID_Caellach appears ONLY in the midmap line).
-    'kobold-brute':   'Caellach',
-    # ch05 boss Ravisin is the raw on-map pid 0xb8, but her cutscene/death-quote face dresses
-    # Riev -- a late-game Bishop absent from our ch00-08 and otherwise unused. The raw pid's
-    # CharacterData portraitId is bound separately by RAW_PID_PORTRAITS below.
-    'ravisin':        'Riev',
-    # Messie (ch06-the-maer-monster.yaml) has two faces, so two slots: no hat in ch06, the
-    # mayor's top hat from the end of ch07 (portraits/messie.py renders both). Syrene (vanilla
-    # ch17) and Gheb (vanilla ch9b) are absent from our ch00-08 and named nowhere else ->
-    # collision-free. His on-map pid (CH06_MESSIE_PID) is bound to Syrene by RAW_PID_PORTRAITS.
-    'messie':         'Syrene',
-    'messie-mayor':   'Gheb',
-    # Speaker Dorbulgruf Shalescar hires the party in ch06's opening and is ch07's boss (ADR
-    # 0332). He rides Murray, vanilla Ch7's boss -- ch07's parity twin -- so the face is already
-    # where ch07's boss will look for it, the way Nerra rides Novala. Murray is named nowhere else.
-    'dorbulgruf':     'Murray',
-    # Nerra, ch06's merfolk elder, already RIDES NOVALA (ENEMY_BASE_SLOT above), so his face slot
-    # is the one her unit and her two quotes point at. Novala is named nowhere else.
-    'nerra':          'Novala',
-}
+
+# our cast bust -> the vanilla portrait slot whose graphic files we overwrite; it is also the
+# general character-slot key (names, class/stats/growths/gender, death quotes, map sprites).
+# The table itself, with why each slot was chosen, is campaign.yaml `cast_slots` (#486).
+PORTRAIT_MAP = _slot_table('cast_slots')
+# guests and bosses with a bust -> the vanilla portrait slot their face overwrites;
+# campaign.yaml `guest_slots`.
+GUEST_PORTRAIT_MAP = _slot_table('guest_slots')
 
 
 def _bust_dir(campaign):
@@ -240,13 +135,16 @@ def load_unit(campaign, unit_id):
 
 
 def class_enum_for(unit):
+    """A cast member's CLASS_ enum. `fe_stats.class` is a vanilla class TOKEN ('armor-knight'),
+    the one vocabulary enemies use too (docs/decisions.md Class Mapping: stock vanilla classes),
+    resolved the same way and refused if vanilla has no such class."""
     raw = unit.get('fe_stats', {}).get('class')
     if not raw:
         return None
-    base = re.sub(r'\s*\(.*?\)', '', str(raw)).strip()
-    if base not in CLASS_MAP:
-        sys.exit('ERROR: unit %r class %r not in CLASS_MAP' % (unit.get('id'), base))
-    return CLASS_MAP[base]
+    enum = vanilla_class_enum(raw)
+    if enum not in vanilla_class_enums():
+        sys.exit('ERROR: unit %r class %r is not a vanilla class token' % (unit.get('id'), raw))
+    return enum
 
 
 def deploy_class_for(unit):
@@ -277,27 +175,19 @@ def deploy_class_for(unit):
 # All edits are restorable build artifacts (PATCHED_DECOMP_FILES). Authored chapters
 # (real maps/events/objectives from YAML) supersede this whole step.
 
-# Stock starting loadout per class enum (vanilla ITEM_ ids; see constants/items.h).
-CLASS_LOADOUT = {
-    'CLASS_PIRATE':         ['ITEM_AXE_IRON', 'ITEM_AXE_HANDAXE', 'ITEM_VULNERARY'],
-    'CLASS_SHAMAN':         ['ITEM_DARK_FLUX', 'ITEM_VULNERARY'],
-    'CLASS_ARCHER':         ['ITEM_BOW_IRON', 'ITEM_VULNERARY'],
-    'CLASS_MAGE':           ['ITEM_ANIMA_FIRE', 'ITEM_VULNERARY'],
-    'CLASS_PRIEST':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],
-    'CLASS_CLERIC':         ['ITEM_STAFF_HEAL', 'ITEM_VULNERARY'],  # Basil: same kit as the
-                                                                    # other healer; the classes
-                                                                    # differ by promotion tree
-                                                                    # and bases, not by weapon
-                                                                    # (both are STAFF-only at D)
-    'CLASS_ARMOR_KNIGHT':   ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'],
-    'CLASS_PEGASUS_KNIGHT': ['ITEM_LANCE_SLIM', 'ITEM_LANCE_JAVELIN', 'ITEM_VULNERARY'],
-    'CLASS_THIEF':          ['ITEM_SWORD_IRON', 'ITEM_DOORKEY', 'ITEM_CHESTKEY',
-                             'ITEM_VULNERARY'],  # Trex: the utility kit for the look-test
-    'CLASS_CAVALIER':       ['ITEM_SWORD_IRON', 'ITEM_LANCE_IRON', 'ITEM_VULNERARY'],  # Baxby (mount)
-    # Sahnar: sword-locked, and the Killing Edge is the point of her -- the crit threat is the
-    # identity, so the look-test bench has to be able to show a crit (FE8 calls it SWORD_KILLER).
-    'CLASS_MYRMIDON':       ['ITEM_SWORD_IRON', 'ITEM_SWORD_KILLER', 'ITEM_VULNERARY'],
-}
+def unit_items(campaign, unit_id):
+    """The ITEM_ enums a cast member fields, in slot order: its unit file's `inventory:`.
+
+    One home for the kit (#486): every roster that LOADs the unit -- its join, a boot party
+    seed, a bench -- reads it here. Promotion-gated (`unlock:`) and story-only entries are
+    design notes, not items the ROM fields, so they are skipped."""
+    unit = load_unit(campaign, unit_id)
+    items = [fe_item_enum(i) for i in unit.get('inventory') or ()
+             if not i.get('unlock') and not i.get('story_only')]
+    if not items:
+        sys.exit('ERROR: %s has no fieldable inventory: (its unit file is the kit\'s home)'
+                 % unit_id)
+    return items
 
 
 def classed_cast(campaign):

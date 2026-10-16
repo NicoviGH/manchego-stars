@@ -1,0 +1,151 @@
+{| class="basic cellpadding-3 mw-collapsible name-box width-75"
+! style="background: none" colspan="3"|Names, etymology, and in other regions
+|-
+!style="width:15%" class="roundtl"| Language
+!style="width:25%"| Name
+!style="width:60%" class="roundtr"| Definition, etymology, and notes
+|-
+{{#if:{{{eng-name|}}}|
+{{!}} English
+{{!}} 
+{{{eng-name}}}
+{{!}} 
+{{{eng-mean|--}}}}}
+|-
+{{#if:{{{pal-name|}}}|
+{{!}} English<br><small>(Europe)</small>
+{{!}} 
+{{{pal-name}}}
+{{!}} 
+{{{pal-mean|--}}}}}
+|-
+{{#if:{{{eng-fan-name|}}}|
+{{!}} English<br><small>(unofficial)</small>
+{{!}} 
+{{{eng-fan-name}}}
+{{!}} 
+{{{eng-fan-mean|--}}}}}
+|-
+{{#if:{{{jpn-name|}}}|
+{{!}} Japanese
+{{!}}lang="ja"{{!}} 
+{{{jpn-name}}}
+{{!}} 
+{{{jpn-mean|--}}}}}
+|-
+{{#if:{{{span-name|}}}|
+{{!}} Spanish
+{{!}}lang="es"{{!}} 
+{{{span-name}}}
+{{!}} 
+{{{span-mean|--}}}}}
+|-
+{{#if:{{{span-sp-name|}}}|
+{{!}} Spanish<br><small>(Spain)</small>
+{{!}}lang="es-ES"{{!}} 
+{{{span-sp-name}}}
+{{!}} 
+{{{span-sp-mean|--}}}}}
+|-
+{{#if:{{{span-la-name|}}}|
+{{!}} Spanish<br><small>(Latin America)</small>
+{{!}}lang="es-419"{{!}} 
+{{{span-la-name}}}
+{{!}} 
+{{{span-la-mean|--}}}}}
+|-
+{{#if:{{{fren-name|}}}|
+{{!}} French
+{{!}}lang="fr"{{!}} 
+{{{fren-name}}}
+{{!}} 
+{{{fren-mean|--}}}}}
+|-
+{{#if:{{{fren-fran-name|}}}|
+{{!}} French<br><small>(France)</small>
+{{!}}lang="fr-FR"{{!}} 
+{{{fren-fran-name}}}
+{{!}} 
+{{{fren-fran-mean|--}}}}}
+|-
+{{#if:{{{fren-can-name|}}}|
+{{!}} French<br><small>(Canada)</small>
+{{!}}lang="fr-CA"{{!}} 
+{{{fren-can-name}}}
+{{!}} 
+{{{fren-can-mean|--}}}}}
+|-
+{{#if:{{{ger-name|}}}|
+{{!}} German
+{{!}}lang="de"{{!}} 
+{{{ger-name}}}
+{{!}} 
+{{{ger-mean|--}}}}}
+|-
+{{#if:{{{ital-name|}}}|
+{{!}} Italian
+{{!}}lang="it"{{!}} 
+{{{ital-name}}}
+{{!}} 
+{{{ital-mean|--}}}}}
+|-
+{{#if:{{{dut-name|}}}|
+{{!}} Dutch
+{{!}}lang="nl"{{!}} 
+{{{dut-name}}}
+{{!}} 
+{{{dut-mean|--}}}}}
+|-
+{{#if:{{{por-name|}}}|
+{{!}} Portuguese
+{{!}}lang="pt"{{!}} 
+{{{por-name}}}
+{{!}} 
+{{{por-mean|--}}}}}
+|-
+{{#if:{{{por-pt-name|}}}|
+{{!}} Portuguese<br><small>(Portugal)</small>
+{{!}}lang="pt-PT"{{!}} 
+{{{por-pt-name}}}
+{{!}} 
+{{{por-pt-mean|--}}}}}
+|-
+{{#if:{{{por-br-name|}}}|
+{{!}} Portuguese<br><small>(Brazil)</small>
+{{!}}lang="pt-BR"{{!}} 
+{{{por-br-name}}}
+{{!}} 
+{{{por-br-mean|--}}}}}
+|-
+{{#if:{{{rus-name|}}}|
+{{!}} Russian
+{{!}}lang="ru"{{!}} 
+{{{rus-name}}}
+{{!}} 
+{{{rus-mean|--}}}}}
+|-
+{{#if:{{{kor-name|}}}|
+{{!}} Korean
+{{!}}lang="ko"{{!}} 
+{{{kor-name}}}
+{{!}} 
+{{{kor-mean|--}}}}}
+|-
+{{#if:{{{ch-simp-name|}}}|
+{{!}} Simplified Chinese
+{{!}}lang="zh-Hans"{{!}} 
+{{{ch-simp-name}}}
+{{!}} 
+{{{ch-simp-mean|--}}}}}
+|-
+{{#if:{{{ch-trad-name|}}}|
+{{!}} Traditional Chinese
+{{!}}lang="zh-Hant"{{!}} 
+{{{ch-trad-name}}}
+{{!}} 
+{{{ch-trad-mean|--}}}}}
+|-
+!colspan="3" class="roundb"|
+|}<noinclude>
+
+{{doc}}</noinclude>

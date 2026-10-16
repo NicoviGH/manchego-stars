@@ -107,6 +107,14 @@ class TestDriftShapesFail(unittest.TestCase):
         msgs = violations(d)
         self.assertTrue(any('green_allies' in m and 'class' in m for m in msgs))
 
+    def test_a_cast_green_ally_names_only_where_he_stands(self):
+        # ch03's Trex: class and level are his unit file's, so the chapter gives a position.
+        d = valid_active()
+        d['deployment']['green_allies'] = [{'id': 'trex', 'position': [2, 4]}]
+        self.assertEqual(check._chapter_deployment_violations('chNN.yaml', d, {'trex'}), [])
+        msgs = check._chapter_deployment_violations('chNN.yaml', d, set())
+        self.assertTrue(any('class' in m for m in msgs), msgs)
+
 
 class TestMalformedYamlIsAViolationNotACrash(unittest.TestCase):
     # A typo'd chapter must produce a per-file message, never a traceback that
@@ -330,6 +338,7 @@ class TestRosterKeysAgree(unittest.TestCase):
         except ImportError as e:
             self.skipTest('build_campaign unavailable (%s)' % e)
         self.assertEqual(check.ROSTER_KEYS, inject.raw_pids.ENEMY_ROSTER_KEYS)
+        self.assertEqual(check.PLACED_ROSTER_KEYS, inject.raw_pids.PLACED_ROSTER_KEYS)
 
 
 class TestRealChapters(unittest.TestCase):

@@ -1,0 +1,3276 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 17.png|200px]]
+|location=Narube River
+|new units=[[Syrene]]
+|boss=[[Lyon]]
+|previous=[[Ruled by Madness]]
+|next=[[Two Faces of Evil]]
+}}
+
+{{Quote|Where's Lyon? What have you done with our friend?! ANSWER ME!|[[Ephraim]]}}
+
+'''River of Regrets''' (Japanese: {{hl|決別の大河|Ketsubetsu no taiga}} ''The large river of partings'') is the seventeenth chapter of {{FE8}}.
+
+==Plot==
+{{main|River of Regrets/Script (Eirika)|River of Regrets/Script (Ephraim)}}
+
+Two years prior to the war, [[Lyon]] discusses his research into [[Grado]]'s [[Sacred Stone (object)|Sacred Stone]] with [[Eirika]] and [[Ephraim]]. Lyon is certain that he can do incredible good with the Stone's power, but Father [[MacGregor]] refuses him direct access to it; Eirika and Ephraim are uncertain if the Stones should be utilized, but trust in Lyon's good intentions. Thinking Lyon has worked himself too hard, Ephraim and Eirika decide to take Lyon into the city for a day.
+
+In the present day, the group travels to [[Rausten]], and [[Frelia]]n troops travel ahead of them. The soldiers encounter Grado forces, and are soundly defeated; [[Syrene]] is the last of the Frelians, escorting civilians away from the battle. The group notices the battle and move to intervene, but Lyon teleports in front of them; Eirika is grateful to see him, but Ephraim is hesitant to trust him. In Eirika's route, Lyon is overcome by a wave of pain, instructing Eirika and company to flee him, before the Demon King [[Fomortiis]] begins speaking in Lyon's body; in Ephraim's route, Fomortiis ceases acting like Lyon when Ephraim does not believe him. Regardless of route, the twins conclude that it is Fomortiis possessing Lyon, and Fomortiis engages them in battle.
+
+During the battle, [[Vanessa]], [[Tana]], and [[Innes]] can speak to Syrene. In each case, they instruct Syrene to pull back and not exhaust herself, and Syrene accepts their aid. With Vanessa, Syrene asks her to send a message to their commander before commenting on how much she has grown; with Tana, Syrene initially asks that she stay out of danger, but acquiesces to her insistence; with Innes, Syrene is greatly relieved to be rescued by him, and reports the status of the Frelian troops.
+
+After the battle, Fomortiis flees in Lyon's body, but is pursued by the group; he teleports out of sight, but Innes states that he is being tracked by Frelian soldiers. Innes also informs the twins that a messenger has returned with Frelia's [[Sacred Twin]]s, and he gives them to the twins to distribute as they see fit. Additionally, if Syrene and all of the civilians survived, the civilians thank Syrene and the twins for their help, and gift them with a [[Rescue (staff)|Rescue]] staff.
+
+==Chapter data==
+{{ChapData
+|victory=Defeat [[Lyon]]
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally=1–12{{h|+1|Upon Syrene being recruited}}
+|other=5{{h|−1|Upon Syrene being recruited}}
+|enemy=25{{h|+39|Reinforcements}}
+|map=[[File:Cm fe08 17.png]]
+|col=23
+|row=21
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Syrene
+|portrait=[[File:portrait syrene fe08.png]]
+|class=Falcoknight
+|HP=27
+|lv=1
+|inventory={{Item|8|Silver Lance}}<br>{{Item|8|Javelin}}
+|recruitment method=NPC, talk to with [[Vanessa]], [[Tana]], or [[Innes]], or automatically at the end of the chapter if she survived
+}}
+|forced1=eirika
+|forced2=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+|return22=l'Arachel
+|return23=dozla
+|return24=saleh
+|return25=ewan
+|return26=cormag
+|return27=rennac
+|return28=duessel
+|return29=knoll
+|return30=myrrh
+}}
+<small>Note: Only one of Eirika or Ephraim is required to be deployed, with the other being optional. The required unit will be whichever one the player chose to follow during [[A New Journey|the Chapter&nbsp;8 interlude]].</small>
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Brave Axe
+|obtain1=Dropped by enemy [[Hero]]
+|item2=Guiding Ring
+|obtain2=Dropped by enemy [[Mage]]
+|item3=Fimbulvetr
+|obtain3=Dropped by enemy [[Sage]]
+|item4=Nosferatu
+|obtain4=Dropped by [[Lyon]] (drops unequipped item)
+|item5=Fenrir
+|obtain5=Dropped by [[Lyon]] (drops unequipped item)
+|item6=Elixir
+|obtain6=Steal from enemy [[Valkyrie]]
+|item7=Dragonshield
+|obtain7=Steal from enemy [[Berserker]]
+|item8=Rescue
+|item8article=Rescue (staff)
+|obtain8=Automatically at end of chapter if player recruited [[Syrene]] and all [[civilian]]s survived
+|item9=Nidhogg
+|obtain9=Automatically at end of chapter
+|itemlast=Vidofnir
+|obtainlast=Automatically at end of chapter
+}}
+
+===Shop data===
+{{Tab
+|header=Shop data
+|width=70%
+|constyle=text-align: center
+|tab1=Armory (NTSC-J)
+|default=2
+|tab2=Armory (NTSC-U/PAL)
+|tab3=Vendor (NTSC-J)
+|tab4=Vendor (NTSC-U/PAL)
+|content1={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba slim sword.png]]
+{{!}} [[Slim Sword]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel sword.png]]
+{{!}} [[Steel Sword]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killing edge.png]]
+{{!}} [[Killing Edge]]
+{{!}} class="roundr" {{!}} 1,300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba slim lance.png]]
+{{!}} [[Slim Lance]]
+{{!}} class="roundr" {{!}} 450
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel lance.png]]
+{{!}} [[Steel Lance]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer lance.png]]
+{{!}} [[Killer Lance]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel axe.png]]
+{{!}} [[Steel Axe]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba hand axe.png]]
+{{!}} [[Hand Axe]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer axe.png]]
+{{!}} [[Killer Axe]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel bow.png]]
+{{!}} [[Steel Bow]]
+{{!}} class="roundr" {{!}} 720
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba longbow.png]]
+{{!}} [[Longbow]]
+{{!}} class="roundr" {{!}} 2,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer bow.png]]
+{{!}} [[Killer Bow]]
+{{!}} class="roundr" {{!}} 1,400
+{{tableend}}
+|content2={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron sword.png]]
+{{!}} [[Iron Sword]]
+{{!}} class="roundr" {{!}} 460
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel sword.png]]
+{{!}} [[Steel Sword]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lancereaver.png]]
+{{!}} [[Lancereaver]]
+{{!}} class="roundr" {{!}} 1,800
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killing edge.png]]
+{{!}} [[Killing Edge]]
+{{!}} class="roundr" {{!}} 1,300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron lance.png]]
+{{!}} [[Iron Lance]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel lance.png]]
+{{!}} [[Steel Lance]]
+{{!}} class="roundr" {{!}} 480
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba axereaver.png]]
+{{!}} [[Axereaver]]
+{{!}} class="roundr" {{!}} 1,950
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer lance.png]]
+{{!}} [[Killer Lance]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba javelin.png]]
+{{!}} [[Javelin]]
+{{!}} class="roundr" {{!}} 400
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron axe.png]]
+{{!}} [[Iron Axe]]
+{{!}} class="roundr" {{!}} 270
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel axe.png]]
+{{!}} [[Steel Axe]]
+{{!}} class="roundr" {{!}} 360
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba swordreaver.png]]
+{{!}} [[Swordreaver]]
+{{!}} class="roundr" {{!}} 2,100
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer axe.png]]
+{{!}} [[Killer Axe]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba hand axe.png]]
+{{!}} [[Hand Axe]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba iron bow.png]]
+{{!}} [[Iron Bow]]
+{{!}} class="roundr" {{!}} 540
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba steel bow.png]]
+{{!}} [[Steel Bow]]
+{{!}} class="roundr" {{!}} 720
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba killer bow.png]]
+{{!}} [[Killer Bow]]
+{{!}} class="roundr" {{!}} 1,400
+{{tableend}}
+|content3={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba thunder.png]]
+{{!}} [[Thunder]]
+{{!}} class="roundr" {{!}} 700
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elfire.png]]
+{{!}} [[Elfire]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba shine.png]]
+{{!}} [[Shine]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba divine.png]]
+{{!}} [[Divine]]
+{{!}} class="roundr" {{!}} 2,500
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba flux.png]]
+{{!}} [[Flux]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba luna.png]]
+{{!}} [[Luna (tome)|Luna]]
+{{!}} class="roundr" {{!}} 4,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba mend.png]]
+{{!}} [[Mend]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba recover.png]]
+{{!}} [[Recover]]
+{{!}} class="roundr" {{!}} 2,250
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba restore.png]]
+{{!}} [[Restore]]
+{{!}} class="roundr" {{!}} 2,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elixir.png]]
+{{!}} [[Elixir]]
+{{!}} class="roundr" {{!}} 3,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba pure water.png]]
+{{!}} [[Pure Water]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba antitoxin.png]]
+{{!}} [[Antitoxin]]
+{{!}} class="roundr" {{!}} 450
+{{tableend}}
+|content4={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba thunder.png]]
+{{!}} [[Thunder]]
+{{!}} class="roundr" {{!}} 700
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elfire.png]]
+{{!}} [[Elfire]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba shine.png]]
+{{!}} [[Shine]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba divine.png]]
+{{!}} [[Divine]]
+{{!}} class="roundr" {{!}} 2,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba flux.png]]
+{{!}} [[Flux]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba nosferatu.png]]
+{{!}} [[Nosferatu]]
+{{!}} class="roundr" {{!}} 3,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba mend.png]]
+{{!}} [[Mend]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba restore.png]]
+{{!}} [[Restore]]
+{{!}} class="roundr" {{!}} 2,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elixir.png]]
+{{!}} [[Elixir]]
+{{!}} class="roundr" {{!}} 3,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba pure water.png]]
+{{!}} [[Pure Water]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba antitoxin.png]]
+{{!}} [[Antitoxin]]
+{{!}} class="roundr" {{!}} 450
+{{tableend}}
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=27~30
+|str=9~12
+|skill=5~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=23
+|str=7
+|skill=4
+|spd=7
+|lck=0
+|def=8
+|res=3
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=19
+|str=4
+|skill=3
+|spd=5
+|lck=0
+|def=4
+|res=8
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}} • {{Item|8|Elixir}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=19
+|str=4
+|skill=3
+|spd=5
+|lck=0
+|def=4
+|res=8
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=2
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=21~24
+|str=6~9
+|skill=6~8
+|spd=6~8
+|lck=2~3
+|def=3~4
+|res=6~8
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+|notes=Begins moving if a unit reaches the row just south of [[Syrene]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=21~24
+|str=6~9
+|skill=6~8
+|spd=6~8
+|lck=2~3
+|def=3~4
+|res=6~8
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=4
+|#=1
+|hp=20
+|str=5
+|skill=4
+|spd=4
+|lck=0
+|def=5
+|res=5
+|con=7
+|mov=6
+|inventory={{Item|8|Fimbulvetr|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=3
+|hp=27~30
+|str=11~13
+|skill=6~8
+|spd=7~9
+|lck=2~4
+|def=10~12
+|res=1~2
+|con=10
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=27~30
+|str=11~13
+|skill=6~8
+|spd=7~9
+|lck=2~4
+|def=10~12
+|res=1~2
+|con=10
+|mov=7
+|inventory={{Item|8|Javelin}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=27~30
+|str=11~13
+|skill=6~8
+|spd=7~9
+|lck=2~4
+|def=10~12
+|res=1~2
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=5
+|#=1
+|hp=21
+|str=6
+|skill=11
+|spd=10
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=1
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=2
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=14
+|#=1
+|hp=44
+|str=22
+|skill=13
+|spd=11
+|lck=4
+|def=17
+|res=19
+|con=7
+|mov=6
+|inventory={{Item|8|Fenrir}} • {{Item|8|Nosferatu|type=drop}}
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]].<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Lord
+|lv=3
+|#=1
+|hp=25
+|str=9
+|skill=5
+|spd=7
+|lck=0
+|def=10
+|res=1
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Berserker
+|lv=3
+|#=1
+|hp=24
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Battle Axe}} • {{Item|8|Dragonshield}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=17
+|#=10
+|hp=28~31
+|str=11~14
+|skill=6~8
+|spd=8~10
+|lck=2~4
+|def=10~12
+|res=1~3
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=16
+|#=6
+|hp=27~30
+|str=8~10
+|skill=5~7
+|spd=7~9
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=23
+|str=7
+|skill=4
+|spd=7
+|lck=0
+|def=8
+|res=3
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=2
+|hp=21
+|str=8
+|skill=4
+|spd=6
+|lck=0
+|def=11
+|res=3
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=10
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}} • {{Item|8|Elixir}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+|notes=Begins moving if a unit reaches the row just south of [[Syrene]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Fimbulvetr|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Javelin}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Fenrir}} • {{Item|8|Nosferatu|type=drop}}
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]].<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Lord
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Berserker
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Battle Axe}} • {{Item|8|Dragonshield}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=17
+|#=10
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=16
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=10
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=28~32
+|str=10~13
+|skill=5~7
+|spd=7~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=28~32
+|str=8~11
+|skill=6~9
+|spd=8~10
+|lck=1~4
+|def=8~11
+|res=4~7
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=22~25
+|str=6~9
+|skill=4~7
+|spd=8~11
+|lck=3~6
+|def=4~7
+|res=11~14
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}} • {{Item|8|Elixir}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=22~25
+|str=6~9
+|skill=4~7
+|spd=8~11
+|lck=3~6
+|def=4~7
+|res=11~14
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=2
+|hp=27~31
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=27~31
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=27~31
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=22~25
+|str=7~10
+|skill=6~9
+|spd=7~9
+|lck=2~4
+|def=3~4
+|res=6~8
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+|notes=Begins moving if a unit reaches the row just south of [[Syrene]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=22~25
+|str=7~10
+|skill=6~9
+|spd=7~9
+|lck=2~4
+|def=3~4
+|res=6~8
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=4
+|#=1
+|hp=23~26
+|str=8~11
+|skill=6~9
+|spd=5~8
+|lck=1~3
+|def=5~8
+|res=8~11
+|con=7
+|mov=6
+|inventory={{Item|8|Fimbulvetr|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=3
+|hp=29~32
+|str=12~14
+|skill=6~9
+|spd=8~10
+|lck=2~4
+|def=10~12
+|res=1~3
+|con=10
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=29~32
+|str=12~14
+|skill=6~9
+|spd=8~10
+|lck=2~4
+|def=10~12
+|res=1~3
+|con=10
+|mov=7
+|inventory={{Item|8|Javelin}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=29~32
+|str=12~14
+|skill=6~9
+|spd=8~10
+|lck=2~4
+|def=10~12
+|res=1~3
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=5
+|#=1
+|hp=27~30
+|str=7~10
+|skill=13~16
+|spd=12~15
+|lck=1~4
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=1
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=2
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=14
+|#=1
+|hp=44
+|str=22
+|skill=13
+|spd=11
+|lck=4
+|def=17
+|res=19
+|con=7
+|mov=6
+|inventory={{Item|8|Fenrir}} • {{Item|8|Nosferatu|type=drop}}
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]].<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Lord
+|lv=3
+|#=1
+|hp=25
+|str=9
+|skill=5
+|spd=7
+|lck=0
+|def=10
+|res=1
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Berserker
+|lv=3
+|#=1
+|hp=24
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Battle Axe}} • {{Item|8|Dragonshield}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=17
+|#=10
+|hp=29~33
+|str=12~15
+|skill=7~9
+|spd=8~10
+|lck=3~4
+|def=11~12
+|res=1~3
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=16
+|#=6
+|hp=28~31
+|str=8~11
+|skill=6~8
+|spd=8~10
+|lck=3~5
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=28~32
+|str=8~11
+|skill=6~9
+|spd=8~10
+|lck=1~4
+|def=8~11
+|res=4~7
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=2
+|hp=26~30
+|str=10~13
+|skill=5~8
+|spd=7~9
+|lck=1~4
+|def=12~15
+|res=4~7
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=10
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}} • {{Item|8|Elixir}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+|notes=Begins moving if a unit reaches the row just south of [[Syrene]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Fimbulvetr|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Javelin}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Fenrir}} • {{Item|8|Nosferatu|type=drop}}
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]].<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Lord
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Berserker
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Battle Axe}} • {{Item|8|Dragonshield}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=17
+|#=10
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=16
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=10
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=32~38
+|str=12~17
+|skill=7~10
+|spd=8~11
+|lck=1~4
+|def=3~6
+|res=1~4
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=37~45
+|str=11~16
+|skill=9~15
+|spd=9~13
+|lck=4~9
+|def=9~13
+|res=6~10
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=28~34
+|str=10~16
+|skill=7~12
+|spd=14~20
+|lck=8~13
+|def=5~9
+|res=16~21
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}} • {{Item|8|Elixir}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=28~34
+|str=10~16
+|skill=7~12
+|spd=14~20
+|lck=8~13
+|def=5~9
+|res=16~21
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=2
+|hp=37~46
+|str=11~17
+|skill=14~20
+|spd=13~17
+|lck=4~9
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=37~46
+|str=11~17
+|skill=14~20
+|spd=13~17
+|lck=4~9
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=37~46
+|str=11~17
+|skill=14~20
+|spd=13~17
+|lck=4~9
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=24~29
+|str=9~14
+|skill=8~12
+|spd=8~12
+|lck=2~5
+|def=3~5
+|res=8~11
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+|notes=Begins moving if a unit reaches the row just south of [[Syrene]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=24~29
+|str=9~14
+|skill=8~12
+|spd=8~12
+|lck=2~5
+|def=3~5
+|res=8~11
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=4
+|#=1
+|hp=29~35
+|str=14~20
+|skill=9~15
+|spd=8~13
+|lck=2~6
+|def=6~10
+|res=13~18
+|con=7
+|mov=6
+|inventory={{Item|8|Fimbulvetr|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=3
+|hp=32~38
+|str=13~18
+|skill=8~11
+|spd=9~13
+|lck=3~7
+|def=11~15
+|res=1~4
+|con=10
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=32~38
+|str=13~18
+|skill=8~11
+|spd=9~13
+|lck=3~7
+|def=11~15
+|res=1~4
+|con=10
+|mov=7
+|inventory={{Item|8|Javelin}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=32~38
+|str=13~18
+|skill=8~11
+|spd=9~13
+|lck=3~7
+|def=11~15
+|res=1~4
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=5
+|#=1
+|hp=35~41
+|str=10~16
+|skill=17~22
+|spd=16~21
+|lck=4~10
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=1
+|hp=27~34
+|str=16~23
+|skill=8~13
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~17
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=2
+|hp=27~34
+|str=16~23
+|skill=8~13
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~17
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=14
+|#=1
+|hp=45~47
+|str=23~25
+|skill=14~15
+|spd=11~13
+|lck=4~5
+|def=17~18
+|res=20~21
+|con=7
+|mov=6
+|inventory={{Item|8|Fenrir}} • {{Item|8|Nosferatu|type=drop}}
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]].<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Lord
+|lv=3
+|#=1
+|hp=40~48
+|str=16~21
+|skill=10~15
+|spd=10~14
+|lck=3~7
+|def=13~17
+|res=3~7
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Berserker
+|lv=3
+|#=1
+|hp=39~47
+|str=16~23
+|skill=12~17
+|spd=11~16
+|lck=2~6
+|def=7~11
+|res=2~5
+|con=13
+|mov=6
+|inventory={{Item|8|Battle Axe}} • {{Item|8|Dragonshield}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=17
+|#=10
+|hp=33~39
+|str=14~19
+|skill=8~12
+|spd=10~13
+|lck=3~7
+|def=11~15
+|res=2~4
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=27~34
+|str=16~23
+|skill=8~13
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~17
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=27~34
+|str=16~23
+|skill=8~13
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~17
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=27~34
+|str=16~23
+|skill=8~13
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~17
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=16
+|#=6
+|hp=31~37
+|str=10~13
+|skill=8~11
+|spd=8~12
+|lck=4~8
+|def=7~10
+|res=1~4
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=37~45
+|str=11~16
+|skill=9~15
+|spd=9~13
+|lck=4~9
+|def=9~13
+|res=6~10
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=2
+|hp=35~43
+|str=13~19
+|skill=7~11
+|spd=8~12
+|lck=3~7
+|def=14~18
+|res=6~10
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=10
+|hp=44~52
+|str=16~23
+|skill=9~14
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}} • {{Item|8|Elixir}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Lightning}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Brave Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}}
+|notes=Begins moving if a unit reaches the row just south of [[Syrene]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=17
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Elfire}} • {{Item|8|Guiding Ring|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Fimbulvetr|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Javelin}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=16
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Fenrir}} • {{Item|8|Nosferatu|type=drop}}
+|notes=• Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]].<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Lord
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Lance}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Berserker
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Battle Axe}} • {{Item|8|Dragonshield}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Wyvern Rider
+|lv=17
+|#=10
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=16
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Paladin
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=8
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=10
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turns 3, 5, 7, 9, and 11
+**2 [[Wyvern Rider]]s from the northwest corner of the map
+*Turns 4, 6, and 8
+**1 [[Druid]] with [[Nosferatu]] from just southwest of Lyon
+**1 [[Druid]] with [[Luna (tome)|Luna]] from just southeast of Lyon
+**1 [[Druid]] with [[Flux]] from just south of Lyon
+**2 [[Cavalier]]s from the western forts
+*Turns 10 and 12
+**1 [[Paladin]] from the upper western fort
+**1 [[Great Knight]] from the lower western fort
+*For 5 turns after approaching Lyon (reaching columns 18-23, rows 1-10)
+**2 [[Warrior]]s from the southeastern forts
+
+===NPC data===
+{{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Syrene]]
+|class=Falcoknight
+|type=other
+|lv=1
+|#=1
+|hp=27
+|str={{h|12|10 in the Japanese version}}
+|skill=13
+|spd=15
+|lck=12
+|def={{h|10|8 in the Japanese version}}
+|res={{h|12|10 in the Japanese version}}
+|con=7
+|mov=8
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=River Folk
+|class=Civilian
+|version=female01
+|type=other
+|lv=1
+|#=1
+|hp=9
+|str=0
+|skill=1
+|spd=0
+|lck=0
+|def=2
+|res=1
+|con={{h|4|8 in the Japanese version}}
+|mov=5
+}}
+{{ChapUnitCellGBA
+|name=River Folk
+|class=Civilian
+|version=male01
+|type=other
+|lv=1
+|#=1
+|hp=10
+|str=0
+|skill=1
+|spd=0
+|lck=0
+|def=2
+|res=2
+|con={{h|6|7 in the Japanese version}}
+|mov=5
+}}
+{{ChapUnitCellGBA
+|name=River Folk
+|class=Civilian
+|version=female02
+|type=other
+|lv=1
+|#=1
+|hp=7
+|str=0
+|skill=0
+|spd=0
+|lck=0
+|def=2
+|res=1
+|con={{h|3|6 in the Japanese version}}
+|mov=5
+}}
+{{ChapUnitCellGBA
+|name=River Folk
+|class=Civilian
+|version=male02
+|type=other
+|lv=1
+|#=1
+|hp=8
+|str=1
+|skill=0
+|spd=0
+|lck=0
+|def=2
+|res=0
+|con={{h|4|5 in the Japanese version}}
+|mov=5
+|last=y
+}}
+{{ChapUnitFtr}}
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Lyon}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait lyon 01 fe08.png]]
+|sprite=necromancer enemy
+|class=Necromancer
+|affin=ice
+|lv=14
+|HP=44
+|mag=22
+|skill=13
+|spd=11
+|luck=4
+|def=17
+|res=19
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Fenrir}}<br>{{Item|8|Nosferatu|type=drop}}
+|da=S
+|st={{h|A|S in the Japanese version}}
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait lyon 01 fe08.png]]
+|sprite=necromancer enemy
+|class=Necromancer
+|affin=ice
+|lv=14
+|HP=45~47
+|mag=23~25
+|skill=14~15
+|spd=11~13
+|luck=4~5
+|def=17~18
+|res=20~21
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Fenrir}}<br>{{Item|8|Nosferatu|type=drop}}
+|da=S
+|st={{h|A|S in the Japanese version}}
+}}
+}}
+
+==Strategy==
+{{strategy}}
+The enemies attacking the civilians are the obvious bottleneck here. In addition to the immediately obvious top approach, the Heroes at the bottom part of the map will attempt to ford the river, the mages and sage from the right will attempt to cross by felling the snag, and many waves of cavalry and wyverns will spawn from the left and top-left corner (respectively). Once you identify which points of attack have reinforcements and which ones do not, and position accordingly, the map is more manageable than it seems.
+
+On Difficult, Syrene has a real, though relatively low, risk of dying before any conventional movement can reach her. This can be circumvented by having [[Tethys]] dance for a high movement unit that can survive the Druids. Once the first wave of Druids is cleared, the assigned guard can advance to the forest right of the bridge for a more defensible position to eliminate the replacements.
+
+The Heroes must go across the river in single file and can easily be blocked by a single unit that can move over the river such as a Hero of your own, or a Berserker (armed with a [[Swordreaver]] or, preferably, [[Swordslayer]]). Once they are dealt with no further threats come from the bottom until the player advances upon the boss (at which point the map will likely be over before they are in range to do anything) and the unit can be repurposed.
+
+The mages to the right will attempt to break the snag and attack over the mountain. A Pegasus Knight with javelin or (short) spear can interrupt them, or a unit can stand on the mountain to block them. A quirk of the AI means the Sage will always move after the Mages, and attack even if it has to attack from the adjacent tile, so the blocking unit doesn't actually need 1-2 range to be effective here (though it will make the work quicker). If baited by a unit on the forest by the upper bridge the reinforcement Druids will leave this approach alone, and the Swordmaster near the boss won't advance until provoked so further guard isn't needed after the initial assault.
+
+The mounted units from the left will attack a nearby player unit over civilians they need multiple rounds to reach if given any kind of bait in immediate range. The high number of enemies mean this will likely need multiple guards, but it's also a good chance to get some units straggling in level some extra experience if they don't immediately risk dying. Whoever you field (aside from fliers), the mountains will greatly improve the defense of whoever goes to this area.
+
+Be sure to stock up on Physic staffs during the battle. While Killer weapons can be bought on the world map, Physic staffs can not be till post game, but are amazingly handy during the final chapters.
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=River of Regrets
+|jpn-name={{h|決別の大河|Ketsubetsu no taiga}}
+|jpn-mean=The large river of partings
+|ger-name=Fluss des Bedauerns
+|ger-mean=River of Regret
+|ital-name=Il fiume dei rimpianti
+|ital-mean=The River of Regrets
+|span-name=Río de pesares
+}}
+
+==Gallery==
+<gallery>
+Cm fe08 17.png|The chapter map.
+</gallery>
+
+{{ChapterNav
+|prechapter=Ruled by Madness
+|nextchapter=Two Faces of Evil
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

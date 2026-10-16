@@ -1,0 +1,159 @@
+{{Italic title|Fire Emblem: The Sacred Stones}}
+This page contains a list of characters appearing in {{FE8}}.
+
+Note: <sup>Ek</sup> denotes a chapter on Eirika's route; <sup>Ep</sup> denotes a chapter on Ephraim's.
+
+==Playable characters==
+===Main story===
+{{CharListHdr|class=pixel-art-3x}}
+{{CharListCell|[[File:Portrait eirika fe08.png|64x64px]]|Eirika|[[Lord]]|[[The Fall of Renais|Prologue]]|[[The Fall of Renais|Prologue]]}}
+{{CharListCell|[[File:Portrait seth fe08.png|64x64px]]|Seth|[[Paladin]]|[[The Fall of Renais|Prologue]]|[[The Fall of Renais|Prologue]]}}
+{{CharListCell|[[File:Portrait franz fe08.png|64x64px]]|Franz|[[Cavalier]]|[[The Fall of Renais|Prologue]]|[[Escape!|Chapter&nbsp;1]]}}
+{{CharListCell|[[File:Portrait gilliam fe08.png|64x64px]]|Gilliam|[[Knight]]|[[Escape!|Chapter&nbsp;1]]|[[Escape!|Chapter&nbsp;1]]}}
+{{CharListCell|[[File:Portrait vanessa fe08.png|64x64px]]|Vanessa|[[Pegasus Knight]]|[[Escape!|Chapter&nbsp;1]]|[[Escape!|Chapter&nbsp;1]]}}
+{{CharListCell|[[File:Portrait moulder fe08.png|64x64px]]|Moulder|[[Priest]]|[[Escape!|Chapter&nbsp;1]]|[[Escape!|Chapter&nbsp;1]]}}
+{{CharListCell|[[File:Portrait ross fe08.png|64x64px]]|Ross|[[Journeyman]]|[[The Protected|Chapter&nbsp;2]]|[[The Protected|Chapter&nbsp;2]]}}
+{{CharListCell|[[File:Portrait garcia fe08.png|64x64px]]|Garcia (The Sacred Stones){{!}}Garcia|[[Fighter]]|[[The Protected|Chapter&nbsp;2]]|[[The Protected|Chapter&nbsp;2]]}}
+{{CharListCell|[[File:Portrait neimi fe08.png|64x64px]]|Neimi|[[Archer]]|[[The Bandits of Borgo|Chapter&nbsp;3]]|[[The Bandits of Borgo|Chapter&nbsp;3]]}}
+{{CharListCell|[[File:Portrait colm fe08.png|64x64px]]|Colm|[[Thief]]|[[The Bandits of Borgo|Chapter&nbsp;3]]|[[The Bandits of Borgo|Chapter&nbsp;3]]}}
+{{CharListCell|[[File:Portrait artur fe08.png|64x64px]]|Artur|[[Monk]]|[[Ancient Horrors|Chapter&nbsp;4]]|[[Ancient Horrors|Chapter&nbsp;4]]}}
+{{CharListCell|[[File:Portrait lute fe08.png|64x64px]]|Lute|[[Mage]]|[[Ancient Horrors|Chapter&nbsp;4]]|[[Ancient Horrors|Chapter&nbsp;4]]}}
+{{CharListCell|[[File:Portrait natasha fe08.png|64x64px]]|Natasha|[[Cleric]]|[[The Empire's Reach|Chapter&nbsp;5]]|[[The Empire's Reach|Chapter&nbsp;5]]}}
+{{CharListCell|[[File:Portrait joshua fe08.png|64x64px]]|Joshua|[[Myrmidon]]|[[The Empire's Reach|Chapter&nbsp;5]]|[[The Empire's Reach|Chapter&nbsp;5]]}}
+{{CharListCell|[[File:Portrait ephraim fe08.png|64x64px]]|Ephraim|[[Lord]]|[[Unbroken Heart|Chapter&nbsp;5x]]|[[Unbroken Heart|Chapter&nbsp;5x]]<br>[[It's a Trap!|Chapter&nbsp;8]]}}
+{{CharListCell|[[File:Portrait forde fe08.png|64x64px]]|Forde|[[Cavalier]]|[[Unbroken Heart|Chapter&nbsp;5x]]|[[Unbroken Heart|Chapter&nbsp;5x]]<br>[[It's a Trap!|Chapter&nbsp;8]]}}
+{{CharListCell|[[File:Portrait kyle fe08.png|64x64px]]|Kyle|[[Cavalier]]|[[Unbroken Heart|Chapter&nbsp;5x]]|[[Unbroken Heart|Chapter&nbsp;5x]]<br>[[It's a Trap!|Chapter&nbsp;8]]}}
+{{CharListCell|[[File:Portrait orson fe08.png|64x64px]]|Orson|[[Paladin]]|[[Unbroken Heart|Chapter&nbsp;5x]]|[[Unbroken Heart|Chapter&nbsp;5x]]{{h|*|Only available in this chapter}}}}
+{{CharListCell|[[File:Portrait tana fe08.png|64x64px]]|Tana|[[Pegasus Knight]]|[[Escape!|Chapter&nbsp;1]]|[[Distant Blade|Chapter&nbsp;9]]<sup>Ek</sup> or [[Fort Rigwald|Chapter&nbsp;9]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait amelia fe08.png|64x64px]]|Amelia|[[Recruit]]|[[The Empire's Reach|Chapter&nbsp;5]]|[[Distant Blade|Chapter&nbsp;9]],<sup>Ek</sup> [[Fort Rigwald|Chapter&nbsp;9]],<sup>Ep</sup> or [[Hamill Canyon|Chapter&nbsp;13]]<sup>Ek</sup>{{h|*|if not defeated or recruited in Chapter&nbsp;9}}}}
+{{CharListCell|[[File:Portrait innes fe08.png|64x64px]]|Innes|[[Sniper]]|[[It's a Trap!|Chapter&nbsp;8]]|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup> or [[Scorched Sand|Chapter&nbsp;15]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait gerik fe08.png|64x64px]]|Gerik|[[Mercenary]]|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup> or [[Fluorspar's Oath|Chapter&nbsp;13]]<sup>Ep</sup>|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup> or [[Fluorspar's Oath|Chapter&nbsp;13]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait tethys fe08.png|64x64px]]|Tethys|[[Dancer]]|[[The Empire's Reach|Chapter&nbsp;5]]|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup> or [[Fluorspar's Oath|Chapter&nbsp;13]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait marisa fe08.png|64x64px]]|Marisa|[[Myrmidon]]|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup> or [[Turning Traitor|Chapter&nbsp;10]]<sup>Ep</sup>|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup> or [[Landing at Taizel|Chapter&nbsp;12]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait l'arachel fe08.png|64x64px]]|L'Arachel|[[Troubadour]]|[[Ancient Horrors|Chapter&nbsp;4]]|[[Creeping Darkness|Chapter&nbsp;11]]<sup>Ek</sup> or [[Phantom Ship|Chapter&nbsp;11]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait dozla fe08.png|64x64px]]|Dozla|[[Berserker]]|[[Ancient Horrors|Chapter&nbsp;4]]|[[Creeping Darkness|Chapter&nbsp;11]]<sup>Ek</sup> or [[Phantom Ship|Chapter&nbsp;11]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait saleh fe08.png|64x64px]]|Saleh|[[Sage]]|[[The Empire's Reach|Chapter&nbsp;5]]|[[Village of Silence|Chapter&nbsp;12]]<sup>Ek</sup> or [[Scorched Sand|Chapter&nbsp;15]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait ewan fe08.png|64x64px]]|Ewan|[[Pupil]]|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup> or [[Landing at Taizel|Chapter&nbsp;12]]<sup>Ep</sup>|[[Village of Silence|Chapter&nbsp;12]]<sup>Ek</sup> or [[Landing at Taizel|Chapter&nbsp;12]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait cormag fe08.png|64x64px]]|Cormag|[[Wyvern Rider]]|[[The Empire's Reach|Chapter&nbsp;5]]|[[Hamill Canyon|Chapter&nbsp;13]]<sup>Ek</sup> or [[Turning Traitor|Chapter&nbsp;10]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait rennac fe08.png|64x64px]]|Rennac|[[Rogue]]|[[Ancient Horrors|Chapter&nbsp;4]]|[[Queen of White Dunes|Chapter&nbsp;14]]<sup>Ek</sup> or [[Father and Son|Chapter&nbsp;14]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait duessel fe08.png|64x64px]]|Duessel|[[Great Knight]]|[[The Bandits of Borgo|Chapter&nbsp;3]]|[[Scorched Sand|Chapter&nbsp;15]]<sup>Ek</sup> or [[Turning Traitor|Chapter&nbsp;10]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait knoll fe08.png|64x64px]]|Knoll|[[Shaman]]|[[Scorched Sand|Chapter&nbsp;15]]<sup>Ek</sup> or [[Father and Son|Chapter&nbsp;14]]<sup>Ep</sup>|[[Scorched Sand|Chapter&nbsp;15]]<sup>Ek</sup> or [[Father and Son|Chapter&nbsp;14]]<sup>Ep</sup>}}
+{{CharListCell|[[File:Portrait myrrh fe08.png|64x64px]]|Myrrh|[[Manakete]]|[[It's a Trap!|Chapter&nbsp;8]]|[[Ruled by Madness|Chapter&nbsp;16]]}}
+{{CharListCell|[[File:Portrait syrene fe08.png|64x64px]]|Syrene|[[Falcoknight]]|[[River of Regrets|Chapter&nbsp;17]]|[[River of Regrets|Chapter&nbsp;17]]}}
+{{CharListFtr|33{{h|*|34 including Orson}}|{{FE8}}}}
+
+===Creature Campaign===
+{| class="cellpadding-3 sortable basic width-70" style="border: 1px solid {{Color2}}"
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | Portrait
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | Name
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | Initial class
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | First appears in
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | Joining Conditions
+|-
+| [[File:Portrait caellach fe08.png|64x64px]]
+| [[Caellach]]
+| [[Hero]]
+| [[The Bandits of Borgo|Chapter&nbsp;3]]
+| [[Tower of Valni]]: Clear 3rd floor
+|-
+| [[File:Portrait orson fe08.png|64x64px]]
+| [[Orson]]
+| [[Paladin]]
+| [[Unbroken Heart|Chapter&nbsp;5x]]
+| Tower of Valni: Clear 6th floor
+|-
+| [[File:Portrait riev fe08.png|64x64px]]
+| [[Riev]]
+| [[Bishop]]
+| [[The Bandits of Borgo|Chapter&nbsp;3]]
+| Tower of Valni: Defeat at least 200 enemies in one run
+|-
+| [[File:Portrait ismaire fe08.png|64x64px]]
+| [[Ismaire]]
+| [[Swordmaster]]
+| [[Queen of White Dunes|Chapter&nbsp;14]]<sup>Ek</sup>
+| Tower of Valni: Clear 8th floor
+|-
+| [[File:Portrait selena fe08.png|64x64px]]
+| [[Selena (The Sacred Stones)|Selena]]
+| [[Mage Knight]]
+| [[The Protected|Chapter&nbsp;2]]
+| Tower of Valni: Clear 8th floor 3 times
+|-
+| [[File:Portrait glen fe08.png|64x64px]]
+| [[Glen]]
+| [[Wyvern Lord]]
+| [[The Bandits of Borgo|Chapter&nbsp;3]]
+| [[Lagdou Ruins]]: Clear 5th floor
+|-
+| [[File:Portrait hayden fe08.png|64x64px]]
+| [[Hayden]]
+| [[Forest Knight|Ranger]]
+| [[The Protected|Chapter&nbsp;2]]
+| Lagdou Ruins: Defeat at least 200 enemies in one run
+|-
+| [[File:Portrait valter fe08.png|64x64px]]
+| [[Valter]]
+| [[Wyvern Knight (The Sacred Stones)|Wyvern Knight]]
+| [[The Fall of Renais|Prologue]]
+| Lagdou Ruins: Clear 7th floor
+|-
+| [[File:Portrait fado fe08.png|64x64px]]
+| [[Fado]]
+| [[General]]
+| [[The Fall of Renais|Prologue]]
+| Lagdou Ruins: Clear 10th floor
+|-
+| [[File:Portrait lyon 02 fe08.png|64x64px]]
+| [[Lyon]]
+| [[Necromancer]]
+| [[It's a Trap!|Chapter&nbsp;8]]
+| Lagdou Ruins: Clear 10th floor, 3 times
+|-
+{{CharListFtr|10 extra|Creature Campaign|70%}}
+
+==Non-playable characters==
+===Bosses===
+{{BossListHdr|class=pixel-art-3x}}
+{{BossListCell|[[File:Portrait o'neill fe08.png|64x64px]]|O'Neill|[[Fighter]]|[[The Fall of Renais|Prologue]]|[[The Fall of Renais|Prologue]]}}
+{{BossListCell|[[File:Portrait breguet fe08.png|64x64px]]|Breguet|[[Knight]]|[[Escape!|Chapter&nbsp;1]]|[[Escape!|Chapter&nbsp;1]]}}
+{{BossListCell|[[File:Portrait bone fe08.png|64x64px]]|Bone|[[Brigand]]|[[The Protected|Chapter&nbsp;2]]|[[The Protected|Chapter&nbsp;2]]}}
+{{BossListCell|[[File:Portrait bazba fe08.png|64x64px]]|Bazba|[[Brigand]]|[[The Protected|Chapter&nbsp;2]]|[[The Bandits of Borgo|Chapter&nbsp;3]]}}
+{{BossListCell|[[File:Portrait bandit 01 fe08.png|64x64px]]|Bandit (character){{!}}Bandit|[[Brigand]]|[[The Empire's Reach|Chapter&nbsp;5]]|[[The Empire's Reach|Chapter&nbsp;5]]}}
+{{BossListCell|[[File:Portrait saar fe08.png|64x64px]]|Saar|[[Knight]]|[[The Empire's Reach|Chapter&nbsp;5]]|[[The Empire's Reach|Chapter&nbsp;5]]}}
+{{BossListCell|[[File:Portrait zonta fe08.png|64x64px]]|Zonta|[[Mercenary]]|[[Unbroken Heart|Chapter&nbsp;5x]]|[[Unbroken Heart|Chapter&nbsp;5x]]}}
+{{BossListCell|[[File:Portrait novala fe08.png|64x64px]]|Novala|[[Shaman]]|[[Victims of War|Chapter&nbsp;6]]|[[Victims of War|Chapter&nbsp;6]]}}
+{{BossListCell|[[File:Portrait murray fe08.png|64x64px]]|Murray|[[Cavalier]]|[[Waterside Renvall|Chapter&nbsp;7]]|[[Waterside Renvall|Chapter&nbsp;7]]}}
+{{BossListCell|[[File:Portrait tirado fe08.png|64x64px]]|Tirado|[[General]]|[[Unbroken Heart|Chapter&nbsp;5x]]|[[It's a Trap!|Chapter&nbsp;8]]}}
+{{BossListCell|[[File:Portrait binks fe08.png|64x64px]]|Binks|[[Warrior]]|[[Distant Blade|Chapter&nbsp;9]]<sup>Ek</sup>|[[Distant Blade|Chapter&nbsp;9]]<sup>Ek</sup>}}
+{{BossListCell|[[File:Portrait gheb fe08.png|64x64px]]|Gheb|[[Warrior]]|[[Fort Rigwald |Chapter&nbsp;9]]<sup>Ep</sup>|[[Fort Rigwald |Chapter&nbsp;9]]<sup>Ep</sup>}}
+{{BossListCell|[[File:Portrait pablo fe08.png|64x64px]]|Pablo|[[Sage]]|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup>|[[Revolt at Carcino|Chapter&nbsp;10]]<sup>Ek</sup><br>[[Hamill Canyon|Chapter&nbsp;13]]<sup>Ek</sup>}}
+{{BossListCell|[[File:Portrait beran fe08.png|64x64px]]|Beran|[[Forest Knight|Ranger]]|[[Turning Traitor|Chapter&nbsp;10]]<sup>Ep</sup>|[[Turning Traitor|Chapter&nbsp;10]]<sup>Ep</sup>}}
+{{BossListCell|[[File:Portrait aias fe08.png|64x64px]]|Aias|[[Great Knight]]|[[Hamill Canyon|Chapter&nbsp;13]]<sup>Ek</sup>|[[Hamill Canyon|Chapter&nbsp;13]]<sup>Ek</sup>}}
+{{BossListCell|[[File:Portrait selena fe08.png|64x64px]]|Selena (The Sacred Stones){{!}}Selena|[[Mage Knight]]|[[The Protected|Chapter&nbsp;2]]|[[Fluorspar's Oath|Chapter&nbsp;13]]<sup>Ep</sup>}}
+{{BossListCell|[[File:Portrait carlyle fe08.png|64x64px]]|Carlyle|[[Swordmaster]]|[[Queen of White Dunes|Chapter&nbsp;14]]<sup>Ek</sup>|[[Queen of White Dunes|Chapter&nbsp;14]]<sup>Ek</sup>}}
+{{BossListCell|[[File:Portrait vigarde fe08.png|64x64px]]|Vigarde|[[General]]|[[The Fall of Renais|Prologue]]|[[Father and Son|Chapter&nbsp;14]]<sup>Ep</sup>}}
+{{BossListCell|[[File:Portrait caellach fe08.png|64x64px]]|Caellach|[[Hero]]|[[The Bandits of Borgo|Chapter&nbsp;3]]|[[Scorched Sand|Chapter&nbsp;15]]}}
+{{BossListCell|[[File:Portrait valter fe08.png|64x64px]]|Valter|[[Wyvern Knight (The Sacred Stones)|Wyvern Knight]]|[[The Fall of Renais|Prologue]]|[[Scorched Sand|Chapter&nbsp;15]]}}
+{{BossListCell|[[File:Portrait orson enemy fe08.png|64x64px]]|Orson|[[Paladin]]|[[Unbroken Heart|Chapter&nbsp;5x]]|[[Ruled by Madness|Chapter&nbsp;16]]}}
+{{BossListCell|[[File:Portrait lyon 02 fe08.png|64x64px]]|Lyon|[[Necromancer]]|[[The Fall of Renais|Prologue]]|[[River of Regrets|Chapter&nbsp;17]]<br>[[Sacred Stone (part 1)|Endgame]]}}
+{{BossListCell|[[File:Portrait riev fe08.png|64x64px]]|Riev|[[Bishop]]|[[The Bandits of Borgo|Chapter&nbsp;3]]|[[Last Hope|Chapter&nbsp;19]]<br>[[Darkling Woods|Chapter&nbsp;20]]}}
+{{BossListCell|[[File:Generic portrait draco zombie fe08.png|64x64px]]|Morva|[[Manakete]]|[[Darkling Woods|Chapter&nbsp;20]]|[[Darkling Woods|Chapter&nbsp;20]]}}
+{{BossListCell|[[File:Generic portrait demon king fe08.png|64x64px]]|Fomortiis|[[Demon King (class)|Demon King]]|[[River of Regrets|Chapter&nbsp;17]]|[[Sacred Stone (part 2)|Endgame]]}}
+{{BossListFtr}}
+
+===Other===
+{{NPCListHdr|class=pixel-art-3x}}
+{{NPCListCell|[[File:Portrait fado fe08.png|64x64px]]|Fado|The king of Renais, and Eirika and Ephraim's father. He is killed when Grado invades Renais.}}
+{{NPCListCell|[[File:Portrait hayden fe08.png|64x64px]]|Hayden|The king of Frelia, and Innes and Tana's father.}}
+{{NPCListCell|[[File:Portrait ismaire fe08.png|64x64px]]|Ismaire|The queen of Jehanna, and Joshua's mother.}}
+{{NPCListCell|[[File:Portrait mansel fe08.png|64x64px]]|Mansel|Pontifex of Rausten, and L'Arachel's uncle. Riev carries a grudge against him.}}
+{{NPCListCell|[[File:Portrait glen fe08.png|64x64px]]|Glen|One of Grado's imperial generals and Cormag's older brother.}}
+{{NPCListCell|[[File:Portrait klimt fe08.png|64x64px]]|Klimt|One of the elders of Carcino. Pablo has plans to murder him.}}
+{{NPCListCell|[[File:Portrait dara fe08.png|64x64px]]|Dara|Elder of Caer Pelyn and Saleh's grandmother. She gives the heroes refuge.}}
+{{NPCListCell|N/A|Monica (The Sacred Stones){{!}}Monica|Orson's deceased wife. Was briefly resurrected by Lyon.}}
+{{NPCListFtr}}
+
+{{DEFAULTSORT:List of characters in Fire Emblem Sacred Stones}}
+[[Category:Lists of characters|Fire Emblem Sacred Stones]]
+[[Category:Characters of Fire Emblem: The Sacred Stones| ]]

@@ -1,0 +1,76 @@
+{| class="cellpadding-3 chapter-table" style="border-spacing: 4px; border-radius: 20px; border-width: 2px"
+! class="roundtl" style="width: 100px" |Class
+! style="width: 35px" |HP{{#if:{{{str|}}}|
+!! style="width: 35px" {{!}}{{{strlabel|Str}}}}}{{#if:{{{mag|}}}|
+!! style="width: 35px" {{!}}Mag}}
+! style="width: 35px" |{{{skilllabel|Skill}}}
+! style="width: 35px" |{{{spdlabel|Spd}}}
+! style="width: 35px" |{{{lcklabel|Lck}}}
+! style="width: 35px" |Def{{#if:{{{res|}}}|
+!! style="width: 35px" {{!}}Res}}{{#if:{{{con|}}}|
+!! style="width: 35px" {{!}}{{{conlabel|Con}}}}}
+! style="width: 35px" |{{{movelabel|Mov}}}{{#if:{{{skills|}}}|
+!! Skills}}
+! class="roundtr" |Weapon level
+|-
+{{#if:{{{class1|}}}|
+{{!}} {{{class1}}}
+{{!}} {{{hp1sign|{{{hp1+|+}}}}}}{{{hp1}}}{{#if:{{{str1|}}}|
+{{!}}{{!}} {{{str1sign|{{{str1+|+}}}}}}{{{str1|}}}}}{{#if:{{{mag1|}}}|
+{{!}}{{!}} {{{mag1sign|{{{mag1+|+}}}}}}{{{mag1|}}}}}
+{{!}} {{{skill1sign|{{{skill1+|+}}}}}}{{{skill1}}}
+{{!}} {{{spd1sign|{{{spd1+|+}}}}}}{{{spd1}}}
+{{!}} {{{lck1sign|{{{lck1+|+}}}}}}{{{lck1|0}}}
+{{!}} {{{def1sign|{{{def1+|+}}}}}}{{{def1}}}{{#if:{{{res1|}}}|
+{{!}}{{!}} {{{res1sign|{{{res1+|+}}}}}}{{{res1|}}}}}{{#if:{{{con1|}}}|
+{{!}}{{!}} {{{con1sign|{{{con1+|+}}}}}}{{{con1|}}}}}
+{{!}} {{{move1sign|{{{move1+|+}}}}}}{{{move1}}}{{#if:{{{skills1|}}}|
+{{!}}{{!}} {{{skills1|}}}}}
+{{!}} {{{weaponlvl1}}}}}
+|-
+{{#if:{{{class2|}}}|
+{{!}} {{{class2}}}
+{{!}} {{{hp2sign|{{{hp2+|+}}}}}}{{{hp2}}}{{#if:{{{str2|}}}|
+{{!}}{{!}} {{{str2sign|{{{str2+|+}}}}}}{{{str2|}}}}}{{#if:{{{mag2|}}}|
+{{!}}{{!}} {{{mag2sign|{{{mag2+|+}}}}}}{{{mag2|}}}}}
+{{!}} {{{skill2sign|{{{skill2+|+}}}}}}{{{skill2}}}
+{{!}} {{{spd2sign|{{{spd2+|+}}}}}}{{{spd2}}}
+{{!}} {{{lck2sign|{{{lck2+|+}}}}}}{{{lck2|0}}}
+{{!}} {{{def2sign|{{{def2+|+}}}}}}{{{def2}}}{{#if:{{{res2|}}}|
+{{!}}{{!}} {{{res2sign|{{{res2+|+}}}}}}{{{res2|}}}}}{{#if:{{{con2|}}}|
+{{!}}{{!}} {{{con2sign|{{{con2+|+}}}}}}{{{con2|}}}}}
+{{!}} {{{move2sign|{{{move2+|+}}}}}}{{{move2}}}{{#if:{{{skills2|}}}|
+{{!}}{{!}} {{{skills2|}}}}}
+{{!}} {{{weaponlvl2}}}}}
+|-
+{{#if:{{{class3|}}}|
+{{!}} {{{class3}}}
+{{!}} {{{hp3sign|{{{hp3+|+}}}}}}{{{hp3}}}{{#if:{{{str3|}}}|
+{{!}}{{!}} {{{str3sign|{{{str3+|+}}}}}}{{{str3|}}}}}{{#if:{{{mag3|}}}|
+{{!}}{{!}} {{{mag3sign|{{{mag3+|+}}}}}}{{{mag3|}}}}}
+{{!}} {{{skill3sign|{{{skill3+|+}}}}}}{{{skill3}}}
+{{!}} {{{spd3sign|{{{spd3+|+}}}}}}{{{spd3}}}
+{{!}} {{{lck3sign|{{{lck3+|+}}}}}}{{{lck3|0}}}
+{{!}} {{{def3sign|{{{def3+|+}}}}}}{{{def3}}}{{#if:{{{res3|}}}|
+{{!}}{{!}} {{{res3sign|{{{res3+|+}}}}}}{{{res3|}}}}}{{#if:{{{con3|}}}|
+{{!}}{{!}} {{{con3sign|{{{con3+|+}}}}}}{{{con3|}}}}}
+{{!}} {{{move3sign|{{{move3+|+}}}}}}{{{move3}}}{{#if:{{{skills3|}}}|
+{{!}}{{!}} {{{skills3|}}}}}
+{{!}} {{{weaponlvl3}}}}}
+|-
+| class="roundbl" | {{{class}}}
+| {{{hpsign|{{{hp+|+}}}}}}{{{hp}}}{{#if:{{{str|}}}|
+{{!}}{{!}} {{{strsign|{{{str+|+}}}}}}{{{str|}}}}}{{#if:{{{mag|}}}|
+{{!}}{{!}} {{{magsign|{{{mag+|+}}}}}}{{{mag|}}}}}
+| {{{skillsign|{{{skill+|+}}}}}}{{{skill}}}
+| {{{spdsign|{{{spd+|+}}}}}}{{{spd}}}
+| {{{lcksign|{{{lck+|+}}}}}}{{{lck|0}}}
+| {{{defsign|{{{def+|+}}}}}}{{{def}}}{{#if:{{{res|}}}|
+{{!}}{{!}} {{{ressign|{{{res+|+}}}}}}{{{res|}}}}}{{#if:{{{con|}}}|
+{{!}}{{!}} {{{consign|{{{con+|+}}}}}}{{{con|}}}}}
+| {{{movesign|{{{move+|+}}}}}}{{{move}}}{{#if:{{{skills|}}}|
+{{!}}{{!}} {{{skills|}}}}}
+| class="roundbr" | {{{weaponlvl}}}
+|}<noinclude>
+
+{{doc}}</noinclude>

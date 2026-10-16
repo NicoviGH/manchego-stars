@@ -1,0 +1,77 @@
+{{images}}
+{{Chapter Infobox
+|location=Serafew, Castle Frelia
+|previous=[[It's a Trap!]]
+|next=*[[Distant Blade]] <small>(Eirika's route)</small>
+*[[Fort Rigwald]] <small>(Ephraim's route)</small>
+}}
+
+{{quote|...You've got your father's foolhardy courage, don't you? ...Very well. I entrust all our hope to you three. Innes, you will go to Jehanna, Eirika to Rausten, And Ephraim to the imperial capital. Funding you will have, but of soldiers, we have few to spare. For each of you, a difficult road awaits.|[[Hayden]]}}
+
+'''A New Journey''' (Japanese: {{hl|新たなる旅立ち|Aratanaru tabidachi}} ''A New Departure'') is an interlude sequence in {{FE8}}. The sequence takes place between Chapters [[It's a Trap!|8]] and 9, and in addition to serving as a major story segment, serves as the point where the player [[Alternate route|picks which route to take]] for the next major arc of the game and who their main lord will be for the game's duration.
+
+==Plot==
+{{main|A New Journey/Script}}
+While in [[Serafew]] en route to Castle Frelia, [[Eirika]] and [[Ephraim]] reminisce on their time with Lyon, recalling specifically their interaction before leaving for their trip with Father [[MacGregor]].
+
+In said interaction, Eirika is late to meeting up with [[Lyon]] and Ephraim prior to their trip to the temple flame. The three talk and discuss their planned prayers to the flame, leading to Ephraim teasing Eirika.
+
+The twins then stop reminiscing and begin to wonder as to Lyon's current whereabouts, with special regard to his reaction to his father's order to invade Renais. They nevertheless proceed to Frelia.
+
+Upon arriving at Castle Frelia, [[Tana]] welcomes the twins. At the same time, [[Innes]] arrives from fighting Grado and addresses the twins on his way to the throne room. As Tana apologizes for his curtness, he returns inviting Eirika and Ephraim to the war council on behalf of [[Hayden|his father]], leading the way there. When they arrive, Hayden welcomes them and Innes reports to the favorable progress their army has made against Grado. Hayden adds that he received Eirika's message about Grado's hunt for the stones and has thus increased the guard on Frelia's stone. As the group considers their next step, Epharaim calls in [[Myrrh]] to explain to them all what she explained to him earlier and reveals that she is a manakete. Myrrh states that her people felt a dark energy emanating from the direction of Grado, but she was separated from [[Saleh|her caretaker]] and rescued by Ephraim. Once finished, however, a soldier enters to report that an assault led by [[Caellach]] and [[Selena (The Sacred Stones)|Selena]] resulted in the destruction of Frelia's sacred stone.
+
+At the [[Tower of Valni]], Frelian soldiers attempt and fail to repel the Grado army, allowing Caellach to climb the tower and shatter the stone. Caellach and Selena get into a dispute over Caellach's killing of a defenseless Frelian and Caellach's seeming lack of care for the word of Vigarde before leaving to avoid any reinforcements.
+
+Hayden decides that they must warn [[Jehanna]] and [[Rausten]] of Grado's goals; Innes volunteers to go to Jehanna and Eirika to Rausten. Though Ephraim initially objects, Eirika reassures him that she will be fine, prompting Ephraim to announce his plan to begin a direct assault on Grado to end the war sooner. Hayden promises funding to the three, whom all emphasize the importance of their missions.
+
+As they leave for their own journeys, Eirika and Ephraim bid farewell. Ephraim states that he wishes she didn't have to leave the castle, but Eirika assures him that her journey is the easiest that the royals must embark on. They promise each other that they shall reunite before the end of this war, then leave each other's company. The player is then prompted to decide between which lord to follow while they are separated, which will affect the [[Alternate route#Fire Emblem: The Sacred Stones|next six chapters]].
+
+If the player decided to follow Eirika, [[Kyle]] and [[Forde]] approach her, informing her that Ephraim has ordered the two to accompany Eirika on her travel to Rausten. Ending the interlude in this fashion sends the player to [[Distant Blade]], Eirika's version of Chapter&nbsp;9.
+
+If the player decided to follow Ephraim, [[Seth]] approaches him to inform him that Eirika has ordered the retinue that accompanied her up to this point to follow Ephraim into Grado. Ending the interlude in this fashion sends the player to [[Fort Rigwald]], Ephraim's version of Chapter&nbsp;9.
+
+==Item data==
+{{ChapItems
+|platform=gba
+|itemlast=10,000G
+|itemlastimage=gold
+|itemlastarticle=Gold
+|obtainlast=Automatically prior to the scene where the routes split
+}}
+
+==Strategy==
+{{strategy}}
+While this section is a short trip on the world map that does not involve combat, the lord not chosen will appear, with up to six free level ups, in an isolated and hostile part of [[Scorched Sand|Chapter 15]], so be sure their inventory is combat ready with a [[Vulnerary]] or [[Elixir]] before departing. If you will be taking Ephraim's route consider giving Eirika a [[Heal]] or [[Mend]] staff as she will reappear alongside a playable [[Sage]] who can use, but does not start with, a staff.
+
+==Trivia==
+*This segment's Japanese name is the same as a song from {{FE3}} and {{title|New Mystery of the Emblem}}.
+
+==Etymology and other languages==
+{{Names
+|eng-name=A New Journey
+|jpn-name={{h|新たなる旅立ち|Aratanaru tabidachi}}
+|jpn-mean=A New Departure
+|span-name=Reencuentros
+|span-mean=Reunions
+|fren-name=Un nouveau voyage
+|fren-mean=A new journey
+|ger-name=Eine neue Reise
+|ger-mean=A new journey
+|ital-name=In viaggio
+|ital-mean=Traveling
+}}
+<!--
+==Gallery==
+-->
+{{ChapterNav
+|prechapter=It's a Trap!
+|nextchapter=Distant Blade{{!}}Distant Blade <small>(Eirika's route)</small>
+|nextalternate=Fort Rigwald{{!}}Fort Rigwald <small>(Ephraim's route)</small>
+}}
+
+==See also==
+*[[The Path Is Yours]]
+
+{{Nav8}}
+{{DEFAULTSORT:New Journey, A}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

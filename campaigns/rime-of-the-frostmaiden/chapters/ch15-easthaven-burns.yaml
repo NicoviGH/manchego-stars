@@ -1,0 +1,53 @@
+# ch15 — Easthaven Burns. PLANNED (#486): a seed, not authoritative.
+id: ch15-easthaven-burns
+title: "Easthaven Burns"
+location: "Easthaven"
+chapter_number: 15
+act: 'III'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
+status: planned
+milestone: M4
+cadence: big_battle_gray
+fe8_base_map: "FE8 Ch18 — Two Faces of Evil (layout only; lava as fire)"
+parity_reference: "FE8 Ch15"   # Scorched Sand's force (#459)
+narrative: >
+  The chardalyn dragon falls on Easthaven, the town that condemned the party. They fight
+  through the burning streets, and Sephek Kaltro returns for his reckoning. The dragon takes a
+  beating and flies on toward the next town.
+map: {}
+objective:
+  type: defeat_all
+  description: "Defeat all enemies (planned)"
+win_condition: "Defeat all enemies (planned)"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch15 (Scorched Sand) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch15) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  Scorched Sand's beat: you arrive too late, the city is lost, two bosses hold forts. The fiery
+  Two Faces map stands in for a burning town; the dragon is a Draco Zombie reskin (FE8's dragon
+  class, used in Darkling Woods and the Final). Two Faces' own boss is a Gorgon, not a dragon.
+plan:
+  story: >
+    FE8's "too late" slot. Sephek's return is ours (the table never played it): FE8 has a
+    returning villain, so we do too (Nicolas, 2026-10-12; ADR 0166's two-boss venue).
+  sources:
+    - "Rime ch.4: the dragon razes the towns it reaches; 30 damage sends it to its next target"
+    - "Rime p.58: Captain Imdra Arlaggath commands Easthaven's militia"
+  joins_roles:
+    - "Duessel (armored knight)"
+    - "Knoll's role is already covered by Marty and Meesmickle: needs a swap"
+  payload_notes: >
+    Owes vanilla Ch15: the other legendary pair (Gleipnir, Garm), a Master Seal (village), the
+    Silver Card plus 8 hidden items (search the rubble), and the bosses' Fili Shield and Hoplon
+    Guard.
+  introduces:
+    - {concept: hidden-treasure, where: "search the rubble"}
+open_questions:
+  - q: "The reunion beat without losing units: (a) Messie and Bremen arrive, (b) Captain Arlaggath, who led the ch08 ambush, fights beside them and joins (Duessel's role), or (c) both?"
+    pick: "(c) both"
+  - q: "Who stands with Sephek as the second boss?"
+    pick: "Decide when drafting"

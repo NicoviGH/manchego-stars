@@ -362,7 +362,7 @@ def main():
     res = convert(a.ref, box, a.bg_thresh, a.sharpen, a.zoom, matte, flatten=a.flatten)
     if a.flip_h:
         res = res.transpose(Image.FLIP_LEFT_RIGHT)
-    res.save(a.out)
+    res.save(a.out, transparency=0)   # FE8 never draws index 0; say so in the file (test_bust_key)
     print('%s -> %s (96x80 indexed, %d colors)' % (a.ref, a.out, len(set(res.getdata()))))
     if a.preview:
         res.convert('RGB').resize((BUST_W * 3, BUST_H * 3), Image.NEAREST).save(a.preview)

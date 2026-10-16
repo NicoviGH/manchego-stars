@@ -64,7 +64,7 @@ def sms_rows_for_classes(class_names):
     return {table[c]['sms'] for c in class_names if c in table}
 
 
-def _promotion_branches():
+def promotion_branches():
     """{CLASS_X: [both promotion targets]} from FE8's BRANCHING promotion table,
     `gPromoJidLut[][2]` in src/classchg-data.c.
 
@@ -167,7 +167,7 @@ def sms_reachable_rows(campaign):
     King, spent-ballista variants, Phantom, and civilians.
     """
     table = _vanilla_class_table()
-    branches = _promotion_branches()
+    branches = promotion_branches()
     player_tree = set(branches) | {t for v in branches.values() for t in v}
     closure = {c for c in (_campaign_seed_classes(campaign) | player_tree) if c in table}
     frontier = set(closure)

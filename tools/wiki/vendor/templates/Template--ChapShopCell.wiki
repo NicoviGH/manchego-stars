@@ -1,0 +1,9 @@
+<noinclude>{{ChapShopHdr}}
+</noinclude>|-
+| class="roundl {{#switch:{{{1}}}|fe03|fe04|febs|fe05|fe06|fe07|fe08|fe09|fe10|fe11|fe12|fe13|fe14|fe15|trs01|trs02|vs01|vs02=pixel-art}}" style="text-align: right" | {{#switch:{{{1}}}|fe01|fe02=|#default=[[File:Is {{#switch:{{{1}}}|fe06|fe07|fe08=gba|fe11|fe12=ds|fe09=gcn|fe10=wii|trs01=ps1|trs02=ps2|#default={{{1}}}}} {{{image|{{lc:{{{2}}}}}}}}.png|middle]]}}
+| [[{{{article|{{{2}}}}}}|{{{2}}}]]
+{{#switch:{{{1}}}|#default={{!}} class="roundr" {{!}} {{{3|--}}}
+|fe09|fe14|fe16|fe17={{!}} {{{3|--}}}
+{{!}} class="roundr" {{!}} {{{4|--}}}}}<noinclude>
+|}
+{{Doc}}</noinclude>

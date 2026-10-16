@@ -1,0 +1,80 @@
+<div class="stat-table-flex pixel-art">
+<div class="stat-table-flex-item">
+{|
+| colspan="2" style="background: none; border: none" | {{{portrait|}}}
+|-
+! colspan="2" style="border-width: 2px; border-radius: 5px" | {{#if:{{{sprite|}}}|[[File:Ma gba {{{sprite}}}.gif]]}} ''[[{{{classlink|{{{class}}}}}}|{{{class}}}]]''
+|-
+! style="border-width: 2px; border-radius: 5px 0 0 5px" | [[Level]]
+| style="border-radius: 0 5px 5px 0" | {{{lv}}}
+|-
+! style="border-width: 2px; border-radius: 5px 0 0 5px" | [[Affinity]]
+| style="border-radius: 0 5px 5px 0; min-width: 13px" | {{#if:{{{affin|}}}|[[File:Is gba {{lc:{{{affin}}}}}affin.png|link={{{affin}}} (affinity)]]|{{nwh}}}}
+|}
+</div>
+<div class="stat-grid">
+<div class="stat-table-inner-flex">
+<div class="stat-table-flex-item">
+{| style="border-spacing: 3px"
+! colspan="4" style="border-width: 2px; border-radius: 5px"| Stats
+|-
+! style="border-radius: 5px 0 0 5px" | [[Max HP]]
+| style="border-radius: 0 5px 5px 0" | {{{HP|{{nwh}}}}}
+! style="border-radius: 5px 0 0 5px" | [[Luck]]
+| style="border-radius: 0 5px 5px 0" | {{{luck|{{nwh}}}}}
+|-
+! style="border-radius: 5px 0 0 5px" | [[{{#if:{{{mag|}}}|Magic (stat){{!}}Magic|Strength}}]]
+| style="border-radius: 0 5px 5px 0" | {{{str|{{{mag|{{nwh}}}}}}}}
+! style="border-radius: 5px 0 0 5px" | [[Defense]]
+| style="border-radius: 0 5px 5px 0" | {{{def|{{nwh}}}}}
+|-
+! style="border-radius: 5px 0 0 5px" | [[Skill (stat)|Skill]]
+| style="border-radius: 0 5px 5px 0" | {{{skill|{{nwh}}}}}
+! style="border-radius: 5px 0 0 5px" | [[Resistance]]
+| style="border-radius: 0 5px 5px 0" | {{{res|{{nwh}}}}}
+|-
+! style="border-radius: 5px 0 0 5px" | [[Speed]]
+| style="border-radius: 0 5px 5px 0" | {{{spd|{{nwh}}}}}
+! style="border-radius: 5px 0 0 5px" | [[Constitution]]
+| style="border-radius: 0 5px 5px 0" | {{{con|{{nwh}}}}}
+|-
+! style="border-radius: 5px 0 0 5px" | [[Movement]]
+| style="border-radius: 0 5px 5px 0" | {{{move|{{nwh}}}}}
+! style="border-radius: 5px 0 0 5px" | [[Aid]]
+| style="border-radius: 0 5px 5px 0" | {{{aid|{{nwh}}}}}
+|}
+</div>
+<div class="stat-table-flex-item">
+{| style="border-spacing: 3px"
+! style="border-width: 2px; border-radius: 5px" | Inventory
+|-
+| style="text-align: left; background: none; border: none" | {{{inventory|{{nwh}}}}}
+|-
+| style="background: none; border: none" |
+{| style="width: 100%"
+|+ Weapon Levels
+| style="border-radius: 5px 0 0 5px; min-width: 15px" | {{SwordGBA}}
+| style="border-radius: 0 5px 5px 0" | {{{sw|{{nwh}}}}}
+| style="border-radius: 5px 0 0 5px; min-width: 15px" | {{LanceGBA}}
+| style="border-radius: 0 5px 5px 0" | {{{la|{{nwh}}}}}
+| style="border-radius: 5px 0 0 5px; min-width: 15px" | {{AxeGBA}}
+| style="border-radius: 0 5px 5px 0" | {{{ax|{{nwh}}}}}
+| style="border-radius: 5px 0 0 5px; min-width: 15px" | {{BowGBA}}
+| style="border-radius: 0 5px 5px 0" | {{{bo|{{nwh}}}}}
+|-
+| style="border-radius: 5px 0 0 5px" | {{AnimaGBA}}
+| style="border-radius: 0 5px 5px 0" | {{{an|{{nwh}}}}}
+| style="border-radius: 5px 0 0 5px" | {{LightGBA}}
+| style="border-radius: 0 5px 5px 0" | {{{li|{{nwh}}}}}
+| style="border-radius: 5px 0 0 5px" | {{DarkGBA}}
+| style="border-radius: 0 5px 5px 0" | {{{da|{{nwh}}}}}
+| style="border-radius: 5px 0 0 5px" | {{StaffGBA}}
+| style="border-radius: 0 5px 5px 0" | {{{st|{{nwh}}}}}
+|}
+|}
+</div>
+</div>
+</div>
+</div><noinclude>
+
+{{doc}}</noinclude>

@@ -4,7 +4,9 @@
 
 id: ch07-blood-in-bremen
 title: "Blood in Bremen"
+location: "Bremen, from the docks to the Town Hall"
 chapter_number: 7
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # the slice is reached: the force is vanilla Ch7's own, re-dressed
 balance_locked: true  # holds parity on instrument v2 with the Fighter boss on Gheb's line; ADR 0343
 milestone: M3
@@ -51,7 +53,7 @@ objective:
   seize_tile: [9, 4]
 
 win_condition: seize
-lose_condition: all_player_units_defeated
+lose_condition: lord_defeated
 
 # Vanilla Ch7's own numbers (chapter_settings L07), and its open map: no fog.
 difficulty:
@@ -62,8 +64,25 @@ fog: none
 
 difficulty_note: >
   Morally gray chapter -- the party is the aggressor. The fight is vanilla Ch7's: a militia
-  spread over open ground and both piers, two harpoon launchers, and the Speaker on the door.
+  spread over open ground and both piers, a harpooner among the archers, and the Speaker on
+  the door.
   Dialogue should sit in the ambiguity, not celebrate.
+
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  This chapter is very straightforward, just move towards the Town Hall and kill everything in
+  your way. The party enters from the west edge, and the militia is spread over the open ground
+  and both piers. If you really want the [[Energy Ring]], bring [[Trex]] along so that he can
+  steal it from one of the three mages; the mage on the west side drops a [[Pure Water]]. The
+  two archers flanking the door and the harpooner on the east pier may be irritating, especially
+  if you are using [[Pinky]], so keep him back until they fall. The fishers carry
+  [[Steel Axe]]s; meet them with lances and armor.
+
+  [[Dorbulgruf Shalescar|The boss]] is a level 12 [[Fighter]] with a Steel Axe and a
+  [[Hand Axe]], so he hits at one or two tiles, and he does not move. First attack from afar
+  with magic or bows, since Fighters have poor Resistance, then finish him off with a lance. He
+  drops a [[Hero Crest]]. Kill the boss, then seize the Town Hall.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -226,8 +245,10 @@ enemy_units:
     positions: [[17, 20], [8, 5], [10, 5]]
     donor: [[17, 20], [8, 5], [10, 5]]
   - id: dorbulgruf
+    face: dorbulgruf                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Dorbulgruf Shalescar"
     fe_name: "Dorbulgruf"
+    help_text: "Bremen's Speaker, an ancient shield dwarf. He fears for his town."   # R on the name in game (inject.text.write_nameplate)
     is_boss: true
     count: 1
     class: fighter              # vanilla: Murray, Lv12 Cavalier, on the door (9,4). A FIGHTER
@@ -350,3 +371,15 @@ playtest:
     # The chapter-generic Status-screen capture, on this chapter's own boot: the title card
     # as the ROM draws it, which is the only colour that counts (the card file holds indices).
     - {name: ch07titlecard, proves: "the Status screen draws ch07's title card, in the ROM's own colours", lua: ch07titlecard, kind: record}
+
+# Open questions (#486). tools/gen_wiki.py lists them; settling one removes it here.
+open_questions:
+  - q: "Move ch07 onto Distant Blade's map (Nicolas, 2026-10-12), keeping vanilla Ch7 as the curve twin and Ch7's own payload. Where does the Seize of the Town Hall sit on the new map?"
+    pick: "A Town Hall building on Distant Blade's town; scope the redo on #27 before #485's scenes are wired"
+  - q: "No ballistae on Distant Blade (they belong on a map built for them, now ch13). The locked 'harpoon heads-up before prep' beat in the opening needs rework."
+    pick: "Rework it on #485 when the map moves"
+
+# A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
+payload_deviations:
+  - item: ITEM_KNIGHTCREST
+    why: "Dorbulgruf fights as a Fighter, so he carries a Hero Crest, the Fighter's own promotion item (Nicolas, 2026-10-11)"

@@ -58,6 +58,7 @@ ITEM_ENUM = {
     'chest-key': 'ITEM_CHESTKEY',
     'flux': 'ITEM_DARK_FLUX',
     'door-key': 'ITEM_DOORKEY',
+    'lockpick': 'ITEM_LOCKPICK',
     'elixir': 'ITEM_ELIXIR',
     # ch05's save-all-four bonus -- vanilla Ch5's own, handed over at the ending
     'guiding-ring': 'ITEM_GUIDINGRING',
@@ -86,6 +87,7 @@ ITEM_ENUM = {
     'orions-bolt': 'ITEM_ORIONSBOLT',
     'pure-water': 'ITEM_PUREWATER',
     'red-gem': 'ITEM_REDGEM',
+    'heal': 'ITEM_STAFF_HEAL',
     'heal-staff': 'ITEM_STAFF_HEAL',
     'mend': 'ITEM_STAFF_MEND',
     'armorslayer': 'ITEM_SWORD_ARMORSLAYER',
@@ -101,9 +103,11 @@ ITEM_ENUM = {
 }
 
 
+
+
 def fe_item_enum(inv_entry):
     """The vanilla ITEM_ enum for a YAML inventory entry -- its fe_base (flavor name over a
-    vanilla weapon) if present, else its id (a plain vanilla weapon)."""
+    vanilla item) if present, else its id (a plain vanilla item)."""
     return ITEM_ENUM[inv_entry.get('fe_base') or inv_entry['id']]
 
 

@@ -1,0 +1,3043 @@
+{{Chapter Infobox
+|title=Sacred Stone
+|image=[[File:Cm fe08 F-1.png|200px]]
+|location=Black Temple
+|boss=[[Lyon]]
+|previous=[[Darkling Woods]]
+|next=[[Sacred Stone (part 2)]]
+}}
+{{Quote|When the Demon King reached into me from inside the Dark Stone...When he whispered he would see all my dreams and desires made true...I...I did not reject him. In the shadows of my heart, he saw jealousy...vanity...It was my weakness that put these emotions there, allowed them to thrive.|[[Lyon]]}}
+
+'''Sacred Stone''' (Japanese: {{hl|聖魔の光石|Seima no kōseki}} ''Light Stones of Saints and Demons'') is the final chapter of {{FE8}}. This page covers the first part of the chapter.
+
+It is not possible to return to the [[world map]] during this chapter.
+
+==Plot==
+{{main|Sacred Stone (part 1)/Script (Eirika)|Sacred Stone (part 1)/Script (Ephraim)}}
+
+Eirika's route begins with a flashback to a year and a half prior, when [[Lyon]] and [[Eirika]] bid each other farewell; Eirika reaffirms that he, she, and [[Ephraim]] will always be friends, and Lyon resolves to progress his research into [[Grado]]'s [[Sacred Stone (object)|Sacred Stone]] for universal good. In the present day, the group reaches Lyon in the Black Temple; Lyon apologizes to Eirika for his weakness against [[Fomortiis|the Demon King]] before being overtaken by him and initiating a battle.
+
+Ephraim's route similarly begins with a flashback to a year and a half ago, when Lyon and Ephraim say goodbye to each other. Lyon wonders if they will drift apart in the future, but Ephraim believes they will always be friends, even if [[Renais]] and Grado go to war. In the present day, the group reaches Lyon in the Black Temple. Ephraim asks Lyon if it is his fault Lyon changed, but Lyon tells him it is not; Ephraim resolves to defeat Lyon, but Lyon boasts that he cannot be defeated.
+
+After the battle, once Lyon is defeated, the twins speak to him before he dies. Lyon tells Eirika that he is in love with her; he tells Ephraim that he is jealous of him, but Ephraim says he looked up to Lyon for his kindness. Once Lyon is dead, Fomortiis takes Lyon's body as a vessel for his resurrection.
+
+==Chapter data==
+{{ChapData
+|victory=Defeat [[Lyon]]
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally=2–12
+|enemy=36{{h|+39|Reinforcements}}
+|map=[[File:Cm fe08 F-1.png]]
+|col=23
+|row=25
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|forced1=eirika
+|forced2=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+|return22=l'Arachel
+|return23=dozla
+|return24=saleh
+|return25=ewan
+|return26=cormag
+|return27=rennac
+|return28=duessel
+|return29=knoll
+|return30=myrrh
+|return31=syrene
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Door Key
+|obtain1=Dropped by enemy [[Wight]]
+|item2=Door Key
+|obtain2=Dropped by enemy [[Wight]]
+|item3=Chest Key
+|obtain3=Dropped by enemy [[Wight]]
+|item4=Master Seal
+|obtain4=Open western [[chest]]
+|itemlast=Angelic Robe
+|obtainlast=Open eastern [[chest]]
+}}
+
+Additionally, the random monster reinforcements may have items that will drop upon defeat or can be stolen.
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=18
+|#=1
+|hp=73
+|str=29
+|skill=19
+|spd=15
+|lck=9
+|def=26
+|res=29
+|con=7
+|mov=6
+|inventory={{Item|8|Naglfar}}
+|notes=• Does not move.<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=2
+|hp=23~26
+|str=13~18
+|skill=5~9
+|spd=5~8
+|lck=2~6
+|def=5~8
+|res=11~14
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Shadowshot}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Draco Zombie
+|lv=10
+|#=2
+|hp=62~67
+|str=4~7{{h|+10|Granted by Wretched Air}}
+|skill=1~5{{h|+10|Granted by Wretched Air}}
+|spd=2~6
+|lck=2~5
+|def=3~6{{h|+20|Granted by Wretched Air}}
+|res=3~6{{h|+10|Granted by Wretched Air}}
+|con=25
+|mov=5
+|inventory={{Item|8|Wretched Air}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=7
+|#=1
+|hp=43~47
+|str=11~15
+|skill=6~9
+|spd=6~9
+|lck=0~3
+|def=10~13
+|res=5~7
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=8
+|#=1
+|hp=27~31
+|str=8~10
+|skill=14~18
+|spd=14~18
+|lck=1~4
+|def=6~8
+|res=3~6
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=8
+|#=1
+|hp=31~36
+|str=10~14
+|skill=6~10
+|spd=8~10
+|lck=0~3
+|def=10~12
+|res=4~7
+|con=12
+|mov=8
+|inventory={{Item|8|Swordreaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=7
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=• The two south of [[Lyon]] do not move.<br>• Two from the east and one from the west immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Chest Key|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=26~29
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=26~29
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Axereaver}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=5
+|#=2
+|hp=21
+|str=6
+|skill=6
+|spd=5
+|lck=0
+|def=5
+|res=2
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=23~26
+|str=13~18
+|skill=5~9
+|spd=5~8
+|lck=2~6
+|def=5~8
+|res=11~14
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=3
+|hp=22~26
+|str=13~17
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The two south of [[Lyon]] do not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=2
+|hp=22~26
+|str=13~17
+|skill=5~8
+|spd=5~8
+|lck=2~5
+|def=5~8
+|res=10~13
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=26~29
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=2
+|hp=21
+|str=7
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=2
+|con=9
+|mov=6
+|inventory={{Item|8|Javelin}}
+|notes=The western one begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=5
+|#=2
+|hp=36
+|str=8
+|skill=5
+|spd=5
+|lck=0
+|def=9
+|res=4
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=5
+|#=1
+|hp=21
+|str=6
+|skill=12
+|spd=12
+|lck=0
+|def=5
+|res=2
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=1
+|hp=28~32
+|str=11~14
+|skill=7~10
+|spd=9~12
+|lck=0~3
+|def=10~13
+|res=2~4
+|con=11
+|mov=7
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=3
+|hp=28~32
+|str=11~14
+|skill=7~10
+|spd=9~12
+|lck=0~3
+|def=10~13
+|res=2~4
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Arch Mogall
+|lv=6
+|#=5
+|hp=20~23
+|str=10~13
+|skill=5~8
+|spd=4~7
+|lck=1~4
+|def=3~6
+|res=9~11
+|con=5
+|mov=6
+|inventory={{Item|8|Crimson Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3~9
+|#=Var.
+|hp=21~31
+|str=7~12
+|skill=5~10
+|spd=6~10
+|lck=0~3
+|def=5~8
+|res=2~6
+|con=9
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=3~9
+|#=Var.
+|hp=21~31
+|str=6~12
+|skill=6~12
+|spd=5~9
+|lck=0~3
+|def=5~8
+|res=2~6
+|con=8
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=18
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Naglfar}}
+|notes=• Does not move.<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Draco Zombie
+|lv=10
+|#=2
+|hp=
+|str={{h|+10|Granted by Wretched Air}}
+|skill={{h|+10|Granted by Wretched Air}}
+|spd=
+|lck=
+|def={{h|+20|Granted by Wretched Air}}
+|res={{h|+10|Granted by Wretched Air}}
+|con=25
+|mov=5
+|inventory={{Item|8|Wretched Air}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Swordreaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=• The two south of [[Lyon]] do not move.<br>• Two from the east and one from the west immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Chest Key|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Axereaver}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The two south of [[Lyon]] do not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Javelin}}
+|notes=The western one begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Arch Mogall
+|lv=6
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=6
+|inventory={{Item|8|Crimson Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3~9
+|#=Var.
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=3~9
+|#=Var.
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=18
+|#=1
+|hp=73
+|str=29
+|skill=19
+|spd=15
+|lck=9
+|def=26
+|res=29
+|con=7
+|mov=6
+|inventory={{Item|8|Naglfar}}
+|notes=• Does not move.<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=2
+|hp=23~27
+|str=14~19
+|skill=6~9
+|spd=6~9
+|lck=3~6
+|def=5~8
+|res=11~15
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Shadowshot}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Draco Zombie
+|lv=10
+|#=2
+|hp=64~69
+|str=5~8{{h|+10|Granted by Wretched Air}}
+|skill=2~5{{h|+10|Granted by Wretched Air}}
+|spd=3~6
+|lck=2~5
+|def=3~7{{h|+20|Granted by Wretched Air}}
+|res=3~6{{h|+10|Granted by Wretched Air}}
+|con=25
+|mov=5
+|inventory={{Item|8|Wretched Air}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=7
+|#=1
+|hp=44~49
+|str=12~16
+|skill=6~10
+|spd=6~9
+|lck=0~3
+|def=10~13
+|res=5~7
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=8
+|#=1
+|hp=28~32
+|str=9~11
+|skill=15~18
+|spd=15~18
+|lck=2~5
+|def=6~8
+|res=3~7
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=8
+|#=1
+|hp=33~38
+|str=11~14
+|skill=7~10
+|spd=8~11
+|lck=0~3
+|def=10~12
+|res=4~8
+|con=12
+|mov=8
+|inventory={{Item|8|Swordreaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=27~30
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=27~30
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=7
+|hp=27~30
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=• The two south of [[Lyon]] do not move.<br>• Two from the east and one from the west immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=27~30
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Chest Key|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=27~31
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=27~30
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=27~31
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Axereaver}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=5
+|#=2
+|hp=27~31
+|str=8~12
+|skill=8~12
+|spd=6~9
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=27~30
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=23~27
+|str=14~19
+|skill=6~9
+|spd=6~9
+|lck=3~6
+|def=5~8
+|res=11~15
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=3
+|hp=23~27
+|str=14~18
+|skill=6~9
+|spd=5~9
+|lck=3~6
+|def=5~8
+|res=11~14
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The two south of [[Lyon]] do not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=2
+|hp=23~27
+|str=14~18
+|skill=6~9
+|spd=5~9
+|lck=3~6
+|def=5~8
+|res=11~14
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=27~31
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=2
+|hp=27~30
+|str=8~11
+|skill=6~9
+|spd=7~10
+|lck=0~3
+|def=6~8
+|res=3~6
+|con=9
+|mov=6
+|inventory={{Item|8|Javelin}}
+|notes=The western one begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=5
+|#=2
+|hp=43~47
+|str=11~15
+|skill=6~9
+|spd=6~9
+|lck=0~3
+|def=10~13
+|res=5~7
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=5
+|#=1
+|hp=27~30
+|str=8~10
+|skill=14~17
+|spd=14~17
+|lck=1~4
+|def=6~8
+|res=3~6
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=1
+|hp=29~34
+|str=12~15
+|skill=7~11
+|spd=9~12
+|lck=0~3
+|def=10~13
+|res=2~4
+|con=11
+|mov=7
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=3
+|hp=29~34
+|str=12~15
+|skill=7~11
+|spd=9~12
+|lck=0~3
+|def=10~13
+|res=2~4
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Arch Mogall
+|lv=6
+|#=5
+|hp=21~24
+|str=11~14
+|skill=5~9
+|spd=4~7
+|lck=1~4
+|def=3~6
+|res=9~11
+|con=5
+|mov=6
+|inventory={{Item|8|Crimson Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3~9
+|#=Var.
+|hp=21~33
+|str=7~12
+|skill=5~10
+|spd=6~11
+|lck=0~3
+|def=5~9
+|res=2~7
+|con=9
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=3~9
+|#=Var.
+|hp=21~33
+|str=6~13
+|skill=6~13
+|spd=5~10
+|lck=0~3
+|def=5~9
+|res=2~7
+|con=8
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=18
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Naglfar}}
+|notes=• Does not move.<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Draco Zombie
+|lv=10
+|#=2
+|hp=
+|str={{h|+10|Granted by Wretched Air}}
+|skill={{h|+10|Granted by Wretched Air}}
+|spd=
+|lck=
+|def={{h|+20|Granted by Wretched Air}}
+|res={{h|+10|Granted by Wretched Air}}
+|con=25
+|mov=5
+|inventory={{Item|8|Wretched Air}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Swordreaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=• The two south of [[Lyon]] do not move.<br>• Two from the east and one from the west immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Chest Key|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Axereaver}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The two south of [[Lyon]] do not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Javelin}}
+|notes=The western one begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Arch Mogall
+|lv=6
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=6
+|inventory={{Item|8|Crimson Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3~9
+|#=Var.
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=3~9
+|#=Var.
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=18
+|#=1
+|hp=74~76
+|str=30
+|skill=20~21
+|spd=15~17
+|lck=9~10
+|def=26~27
+|res=30
+|con=7
+|mov=6
+|inventory={{Item|8|Naglfar}}
+|notes=• Does not move.<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=2
+|hp=29~36
+|str=22~29
+|skill=9~15
+|spd=9~14
+|lck=6~12
+|def=6~10
+|res=16~22
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}} • {{Item|8|Shadowshot}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Draco Zombie
+|lv=10
+|#=2
+|hp=75~85
+|str=9~15{{h|+10|Granted by Wretched Air}}
+|skill=4~9{{h|+10|Granted by Wretched Air}}
+|spd=5~10
+|lck=5~11
+|def=7~13{{h|+20|Granted by Wretched Air}}
+|res=4~9{{h|+10|Granted by Wretched Air}}
+|con=25
+|mov=5
+|inventory={{Item|8|Wretched Air}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=7
+|#=1
+|hp=56~65
+|str=18~25
+|skill=10~15
+|spd=9~13
+|lck=1~5
+|def=13~17
+|res=6~11
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=8
+|#=1
+|hp=36~44
+|str=11~17
+|skill=20~25
+|spd=20~25
+|lck=5~10
+|def=7~12
+|res=6~10
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=8
+|#=1
+|hp=43~52
+|str=14~20
+|skill=10~16
+|spd=10~14
+|lck=1~5
+|def=11~15
+|res=7~11
+|con=12
+|mov=8
+|inventory={{Item|8|Swordreaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=35~41
+|str=11~17
+|skill=9~15
+|spd=9~13
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=35~41
+|str=11~17
+|skill=9~15
+|spd=9~13
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=7
+|hp=35~41
+|str=11~17
+|skill=9~15
+|spd=9~13
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=• The two south of [[Lyon]] do not move.<br>• Two from the east and one from the west immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=35~41
+|str=11~17
+|skill=9~15
+|spd=9~13
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Chest Key|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=35~42
+|str=12~17
+|skill=10~15
+|spd=9~14
+|lck=1~5
+|def=7~11
+|res=5~10
+|con=9
+|mov=6
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=35~41
+|str=11~17
+|skill=9~15
+|spd=9~13
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=35~42
+|str=12~17
+|skill=10~15
+|spd=9~14
+|lck=1~5
+|def=7~11
+|res=5~10
+|con=9
+|mov=6
+|inventory={{Item|8|Axereaver}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=5
+|#=2
+|hp=35~41
+|str=12~17
+|skill=12~17
+|spd=8~12
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=35~41
+|str=11~17
+|skill=9~15
+|spd=9~13
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=29~36
+|str=22~29
+|skill=9~15
+|spd=9~14
+|lck=6~12
+|def=6~10
+|res=16~22
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=3
+|hp=29~36
+|str=22~29
+|skill=9~15
+|spd=9~14
+|lck=6~12
+|def=6~10
+|res=16~21
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The two south of [[Lyon]] do not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=2
+|hp=29~36
+|str=22~29
+|skill=9~15
+|spd=9~14
+|lck=6~12
+|def=6~10
+|res=16~21
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=35~42
+|str=12~17
+|skill=10~15
+|spd=9~14
+|lck=1~5
+|def=7~11
+|res=5~10
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=2
+|hp=35~41
+|str=11~17
+|skill=9~15
+|spd=9~13
+|lck=1~5
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Javelin}}
+|notes=The western one begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=5
+|#=2
+|hp=54~63
+|str=17~24
+|skill=9~15
+|spd=8~12
+|lck=1~5
+|def=12~16
+|res=6~10
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=5
+|#=1
+|hp=35~41
+|str=10~16
+|skill=19~24
+|spd=19~24
+|lck=4~10
+|def=7~11
+|res=5~9
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=1
+|hp=40~49
+|str=16~22
+|skill=11~16
+|spd=13~18
+|lck=1~5
+|def=12~17
+|res=3~7
+|con=11
+|mov=7
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=3
+|hp=40~49
+|str=16~22
+|skill=11~16
+|spd=13~18
+|lck=1~5
+|def=12~17
+|res=3~7
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Arch Mogall
+|lv=6
+|#=5
+|hp=26~33
+|str=18~25
+|skill=9~14
+|spd=8~13
+|lck=3~8
+|def=4~8
+|res=12~17
+|con=5
+|mov=6
+|inventory={{Item|8|Crimson Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3~9
+|#=Var.
+|hp=34~44
+|str=11~18
+|skill=9~16
+|spd=9~14
+|lck=1~5
+|def=7~12
+|res=5~10
+|con=9
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=3~9
+|#=Var.
+|hp=34~44
+|str=11~18
+|skill=11~18
+|spd=8~13
+|lck=1~5
+|def=7~12
+|res=5~10
+|con=8
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Lyon]]
+|class=Necromancer
+|lv=18
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Naglfar}}
+|notes=• Does not move.<br>• Avoids all [[Staff#Offensive staves|status staves]].
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Draco Zombie
+|lv=10
+|#=2
+|hp=
+|str={{h|+10|Granted by Wretched Air}}
+|skill={{h|+10|Granted by Wretched Air}}
+|spd=
+|lck=
+|def={{h|+20|Granted by Wretched Air}}
+|res={{h|+10|Granted by Wretched Air}}
+|con=25
+|mov=5
+|inventory={{Item|8|Wretched Air}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Swordreaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=7
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|notes=• The two south of [[Lyon]] do not move.<br>• Two from the east and one from the west immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Chest Key|type=drop}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Lancereaver}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Axereaver}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Stone|link=Petrify (tome)}} • {{Item|8|Demon Surge}}
+|notes=The two south of [[Lyon]] do not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gorgon
+|lv=7
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Demon Surge}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Killing Edge}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Javelin}}
+|notes=The western one begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Elder Bael
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=15
+|mov=6
+|inventory={{Item|8|Lethal Talon}}
+|notes=Will not move until a unit reaches the stairs.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gwyllgi
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=8
+|inventory={{Item|8|Hellfang}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=6
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Arch Mogall
+|lv=6
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=6
+|inventory={{Item|8|Crimson Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3~9
+|#=Var.
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=02
+|lv=3~9
+|#=Var.
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory=Varies
+|notes=Randomly determined: group A.
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*After entering the western part of the map (columns 1–12, rows 8–13)
+**4 [[Deathgoyle]]s from the northeast
+*After entering the eastern part of the map (columns 13–23, rows 8–13)
+**5 [[Arch Mogall]]s from the northwest
+*For 10 turns after a unit waits on the stairs below Lyon (columns 11–13, rows 6–7)
+**3 [[Wight]]s from the stairs above of Lyon; these Wights are randomly set individually to be the melee or ranged variation, with an 80% chance to be melee and a 20% chance to be ranged
+*Note: These reinforcement triggers and locations are based on Eirika's route. On Ephraim's route, the trigger areas and spawn points are horizontally mirrored.
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Lyon}}
+{{Tab
+|tab1=Easy/Normal (Eirika)
+|tab2=Difficult (Eirika)
+|tab3=Easy/Normal (Ephraim)
+|tab4=Difficult (Ephraim)
+|content1={{BossStats GBA
+|portrait=[[File:Portrait lyon 01 fe08.png]]
+|sprite=necromancer enemy
+|class=Necromancer
+|affin=ice
+|lv=18
+|HP=73
+|mag=29
+|skill=19
+|spd=15
+|luck=9
+|def=26
+|res=29
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Naglfar}}
+|da=S
+|st=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait lyon 01 fe08.png]]
+|sprite=necromancer enemy
+|class=Necromancer
+|affin=ice
+|lv=18
+|HP=74~76
+|mag=30
+|skill=20~21
+|spd=15~17
+|luck=9~10
+|def=26~27
+|res=30
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Naglfar}}
+|da=S
+|st=A
+}}
+|content3={{BossStats GBA
+|portrait=[[File:Portrait lyon 02 fe08.png]]
+|sprite=necromancer enemy
+|class=Necromancer
+|affin=ice
+|lv=18
+|HP=73
+|mag=29
+|skill=19
+|spd=15
+|luck=9
+|def=26
+|res=29
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Naglfar}}
+|da=S
+|st=A
+}}
+|content4={{BossStats GBA
+|portrait=[[File:Portrait lyon 02 fe08.png]]
+|sprite=necromancer enemy
+|class=Necromancer
+|affin=ice
+|lv=18
+|HP=74~76
+|mag=30
+|skill=20~21
+|spd=15~17
+|luck=9~10
+|def=26~27
+|res=30
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Naglfar}}
+|da=S
+|st=A
+}}
+}}
+
+===Random monster data===
+====Class rates====
+{| class="basic width-40" style="border-width: 2px; padding: 2px; border-spacing: 4px; margin: 0.9em auto"
+|+ '''Classes (group A)'''
+! style="border-top-left-radius: 15px" | Class
+! style="border-top-right-radius: 15px" | Chance
+|-
+| [[File:Ma gba wight 01 enemy.gif]] [[Wight]] (melee)
+| 80%
+|-
+| style="border-bottom-left-radius: 15px" | [[File:Ma gba wight 02 enemy.gif]] [[Wight]] (ranged)
+| style="border-bottom-right-radius: 15px" | 20%
+|}
+
+====Inventories====
+{{Monster items FE8
+|wight m=y
+|wight r=y
+}}
+
+==Strategy==
+{{strategy}}
+Your units deployed on this map carry over to the final boss and are arranged based on deployment order. Bring [[Tethys]] on this map if at all possible, even if you don't normally use her, as she will allow an additional character to attack the final boss on turn 1 before he starts attacking and make him much easier to deal with.  
+
+Nothing on this map prevents you from advancing slowly and carefully. Take an extra chest key or two to save needing to skip a chest or bring a thief. The necrodragons are best handled by exploiting their low range to get them away from other units: Once they've been provoked, they will keep following even if you retreat. As with Morva last level, high raw HP is the only true defense against them, but their lower Strength (and other stats) mean the selection of units that can survive them isn't nearly as dire.
+
+Save yourself the trouble of fighting 30 wights by never stepping on the staircase below Lyon. Just go around and these reinforcements will never spawn. Lyon doesn't actually move, and isn't even on a gate or throne, so he shouldn't be hard to defeat if you didn't trigger the wight reinforcements.
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=Sacred Stone
+|eng-mean=Refers to the last of the Sacred Stones.
+|jpn-name={{h|聖魔の光石|Seima no kōseki}}
+|jpn-mean=Light Stones of Saints and Demons; named after the game's subtitle.
+|ger-name=Der Heilige Stein
+|ger-mean=The Sacred Stone. Same as above.
+|ital-name=La Sacra Pietra
+|ital-mean=The Sacred Stone
+|span-name=La piedra sagrada
+}}
+
+==Gallery==
+<gallery>
+Map fe08 black temple entrance.png|The chapter map.
+</gallery>
+
+{{ChapterNav
+|prechapter=Darkling Woods
+|name=Sacred Stone
+|nextchapter=Sacred Stone (part 2)
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

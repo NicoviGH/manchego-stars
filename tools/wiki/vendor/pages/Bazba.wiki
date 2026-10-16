@@ -1,0 +1,124 @@
+{{Character Infobox
+|image=[[File:Portrait bazba fe08.png|class=pixel-art]]
+|caption=Bazba's portrait from {{title|The Sacred Stones}}.
+|help_text=The leader of Bazba's Bandits.
+|gender=Male
+|race=[[Human]]
+|nationality=
+|startingclass=[[Brigand]]
+|appearances={{title|The Sacred Stones}}
+}}
+
+{{Quote|Hm. Not sure who's out there, but it looks like we've got guests. Let's give 'em a warm welcome, lads. You see a stranger, stick an axe in him!|Bazba}}
+
+'''Bazba''' (Japanese: {{hl|バズバ|Bazuba}} ''Bazba'') is a [[boss]] appearing in {{FE8}}. He is the titular leader of Bazba's Bandits, a brigand group terrorizing the Borgo region of [[Renais]] during the [[War of the Stones]].
+
+=={{FE8}}==
+===Role===
+Bazba appears as the [[boss]] of [[The Bandits of Borgo|Chapter&nbsp;3]] of {{FE8}}. Though he first appears in [[The Protected|Chapter&nbsp;2]] instructing his subordinate, [[Bone]], to pillage the nearby villages while Renais's military has been thrown into chaos from [[Grado]]'s invasion.<ref>{{cite|One, two, three... Ha ha ha! I love a good war! With all those soldiers preoccupied, we're free to pillage as we please! Right, Bone{{nwh}}you're in charge. Grab everything that's not nailed down and bring it to the hideout.|Bazba to [[Bone]] in [[The Protected|Chapter&nbsp;2]]|The Sacred Stones}}</ref>
+
+[[Eirika]] counters Bone's forces, rescues three villages and also protects [[Ross]] and [[Garcia]]. Eirika did not initially intend on pursuing Bazba himself until [[Colm|a thief]] steals her [[Lunar Brace|bracelet]] and [[Seth]] insists that they recover it.
+
+Bazba is then directly encountered by Eirika's forces in his hideout in the Borgo mountain range. [[Colm]], the one who stole Eirika's bracelet, is also present in the hideout to rob the brigands. Bazba ends up killed during the battle.
+
+===Stats===
+{{also|The Bandits of Borgo}}
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait bazba fe08.png]]
+|sprite=brigand enemy
+|class=Brigand
+|affin=fire
+|lv=6
+|HP=25
+|str=8
+|skill=5
+|spd=7
+|luck=1
+|def=5
+|res=2
+|move=5
+|con=12
+|aid=11
+|inventory={{Item|8|Steel Axe}}<br>{{Item|8|Hand Axe}}
+|ax=C
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait bazba fe08.png]]
+|sprite=brigand enemy
+|class=Brigand
+|affin=fire
+|lv=6
+|HP={{h|26~27|28~29 in the Japanese version}}
+|str={{h|8~10|9~11 in the Japanese version}}
+|skill={{h|5~6|6~7 in the Japanese version}}
+|spd={{h|7~8|8 in the Japanese version}}
+|luck=1~2
+|def=5~6
+|res=2~3
+|move=5
+|con=12
+|aid=11
+|inventory={{Item|8|Steel Axe}}<br>{{Item|8|Hand Axe}}
+|ax=C
+}}}}
+
+==Personality==
+Bazba is as remorseless as he is ruthless; he is even gleeful that [[Grado]]'s assault means that the local villages are ripe for attack. He has no qualms about ordering his men to kill any that intrude into his hideout.
+
+==Quotes==
+===Battle quote===
+{{Quote|I'm the head of this bandit pack, the mighty Bazba! Hope you've enjoyed your life, 'cuz its about to end!|Bazba, in {{title|The Sacred Stones}}.}}
+
+===Death quote===
+{{Quote|I'm the...mighty...Bazba... This...ain't--|Bazba, in {{title|The Sacred Stones}}.}}
+
+==Flavor text==
+{{DescriptionHdr}}
+{{DescriptionCell
+|game={{title|The Sacred Stones}}
+|english=The leader of Bazba's Bandits.
+|japanese=バズバ山賊団の頭目
+}}
+{{DescriptionFtr}}
+
+==Trivia==
+*Bazba has an unused player palette for his battle animation, depicting him with purple pants. In the game, Bazba shares his palette with his subordinate, Bone.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Bazba
+|jpn-name={{h|バズバ|Bazuba}}
+|jpn-mean=Bazuba
+|span-name=Bazba
+|fren-name=Bazba
+|ger-name=Bazba
+|ital-name=Bazba
+}}
+
+==Gallery==
+{| class="mw-collapsible mw-collapsed width-75" style="margin: auto; border: 1px solid {{Color2}}; background: {{Color1}}; border-radius: 15px; text-align: center"
+! style="border: 1px solid {{Color2}}; background: {{Color1}}; border-radius: 15px" | [[File:Small portrait bazba fe08.png]] Sprite Gallery
+|-
+|
+{| style="width: 100%; background: {{Color3}}; border-radius: 15px; border: 1px solid {{Color2}}; margin: auto; border-spacign: 0"
+| rowspan="2" | [[File:Portrait bazba fe08.png]]
+| style="border-left: 1px solid {{Color2}}; border-bottom: 1px solid {{Color2}}" colspan="2" | [[Brigand]] [[File: Ma gba brigand enemy.gif]]
+|-
+| style="border-left: 1px solid {{Color2}}" | [[File:Bs fe08 enemy bazba brigand axe.png]]<br>[[Axe#Basic axes|Basic axe]]
+| [[File:Bs fe08 enemy bazba brigand axe02.png]]<br>[[Axe#Ranged axes|Ranged axe]]
+|}
+|}
+
+<gallery>
+Bs fe08 bazba brigand axe.png|Bazba's unused palette using a basic axe in {{FE8}}.
+Bs fe08 bazba brigand axe02.png|Bazba's unused palette using a ranged axe in {{FE8}}.
+</gallery>
+==References==
+{{Ref}}
+
+{{Nav8}}
+[[Category:Enemies in Fire Emblem: The Sacred Stones]]

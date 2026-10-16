@@ -17,6 +17,21 @@
 > his Act-II death. He does NOT fight in ch05. Slot + brief: `ch05-the-elven-tomb.yaml`
 > §SCENE MAP, "vanilla 9BC".
 
+## Profile
+
+Sephek Kaltro looks like a charming caravan guard for Torg's trading company, comfortable in lethal
+cold without a coat, scarf or gloves. In truth he is a drowned mariner's body inhabited by a frost
+druid's spirit, serving the Frostmaiden as the executioner of Ten-Towners who cheat her sacrifice
+lotteries.
+
+He is calm, unhurried and smug, and speaks to his victims with serene, pitying certainty, framing
+murder as balancing the scales. Defeat only amuses him. He escapes the prologue in a breath of frost
+and returns to give Ravisin her orders.
+
+## Book
+
+In ''Rime of the Frostmaiden'' (pp. 23-24), Hlin names him her "only suspect." As his life was fading, "the spirit of a frost druid beholden to Auril possessed him," and it uses him "as a living vessel to do the Frostmaiden's work." If he dies, the spirit dies with him.
+
 ## Concept
 
 Outwardly: a charming caravan guard for Torg's trading company — makes friends easily,

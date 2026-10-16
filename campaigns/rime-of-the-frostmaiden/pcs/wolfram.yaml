@@ -6,6 +6,7 @@
 
 id: wolfram
 name: Wolfram
+help_text: "A drakeborn with scales of living metal. He can taste the ore in stone."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 death_quote: "Melt me down... forge something better."  # falls-in-battle quote (#6 dialogue pass; lore/wolfram.md)
 lord_pitch: "Armored knight -- huge defense and HP, but slow."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/wolfram.png     # GBA-ready sprite pending (issue #23)
@@ -60,7 +61,7 @@ dnd:
 # No D&D-derived tuning. FE Knight is a pure-Lance physical unit: single Pow stat (= STR), no MAG.
 # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
 fe_stats:
-  class: Knight              # FE8 Armor Knight (display name "Knight")
+  class: armor-knight              # FE8 Armor Knight
   level: 1
   HP: 17
   STR: 5                          # FE Pow (Armor Knight basePow)
@@ -74,39 +75,23 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [General, "Great Knight"]   # vanilla Armor Knight branch (classchg-data.c [CLASS_ARMOR_KNIGHT])
-  default: General                    # thematic lean; player may pick either.
-
-# ── Growth Rates (% per level) — vanilla Armor Knight growths from data_classes.c ──
-growth_rates:
-  HP: 80
-  STR: 40
-  SKL: 30
-  SPD: 15
-  DEF: 28
-  RES: 20
-  LCK: 25
+  branch: [general, great-knight]   # vanilla Armor Knight branch (classchg-data.c [CLASS_ARMOR_KNIGHT])
+  default: general                    # thematic lean; player may pick either.
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
 # Wolfram's personal-weapon flavor (Warhammer) is parked in lore/wolfram.md as a POST-MVP item;
-# his fire/forge identity rides on the sprite art. Javelin gives the armored unit its ranged option.
-inventory:
+# his fire/forge identity rides on the sprite art.
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
   - id: iron-lance
     name: "Iron Lance"
-    fe_base: iron-lance             # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses); no custom tuning
-    fe_weapon_type: Lance           # FE Knight weapon class (baseRanks ITYPE_LANCE)
-    damage_type: piercing           # cosmetic flavor label only
-  - id: javelin
-    name: "Javelin"
-    fe_base: javelin                # 1–2 range thrown lance; vanilla stats (the armored unit's ranged option)
+    fe_base: iron-lance
     fe_weapon_type: Lance
-    range: 2
-    damage_type: bludgeoning        # cosmetic flavor label only
+    damage_type: piercing           # cosmetic flavor label only
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 2
+
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Wolfram is a stock FE8 Knight -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

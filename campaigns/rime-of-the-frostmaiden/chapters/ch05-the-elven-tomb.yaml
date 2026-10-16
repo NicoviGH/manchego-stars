@@ -9,7 +9,9 @@
 
 id: ch05-the-elven-tomb
 title: "The Elven Tomb"
+location: "The elven tomb beyond Lonelywood"
 chapter_number: 5
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # the slice is reached: roster/levels re-grounded against vanilla Ch5
                                # and the party (`make difficulty CH=ch05` = PARITY), dialogue LOCKED
                                # (PR #196), map painted and hosted. Combat data here is authoritative
@@ -147,7 +149,7 @@ objective:
         above; see decisions.md).
 
 win_condition: boss_defeated
-lose_condition: all_player_units_defeated
+lose_condition: lord_defeated
 
 difficulty_note: >
   Our first real boss. Roster GROUNDED (rev.3, 2026-07-23, #25) to the FE8 Ch5 bar; `make
@@ -186,6 +188,26 @@ difficulty_note: >
   No fog — the tension is the escort + the eruption race, not obscured vision. Keep it a
   clean DefeatBoss so Ravisin is the climax. (Playtest remains the arbiter; the static bar
   is a proxy — spatial check + `--ch05-boot` playtest still owed at the build slice.)
+
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  This chapter features the first [[arena]] in the game. Feel free to use it for some extra
+  [[experience]], but stay aware of the risks. The tomb also has an [[armory]] and a [[vendor]].
+
+  Recruiting [[Sahnar]] is less intimidating than it initially appears. She rises as an enemy
+  [[Myrmidon]] with a [[Killing Edge]], and only [[Basil]] can recruit her. She will not harm
+  Basil, so simply kill any nearby mobile enemies while staying away from Sahnar, then simply
+  have Basil walk up to her.
+
+  [[Ravisin]] is a [[Druid]] with [[Flux]] in the northeast and does not move, with the White
+  Moose beside her. Defeat her to win; her guardians and the moose do not all have to fall.
+  Reinforcements appear on turn 2 (two spear guards from the southeast), turn 6 (two axe reavers
+  from the east) and turn 8 (two archers next to Ravisin), so make sure that your squishy units
+  aren't undefended. Four reliquary niches sit near the map's edges, and the undead race to
+  desecrate them. Each holds an item (a [[Torch]], a [[Secret Book]], an [[Armorslayer]] and a
+  [[Dragonshield]]), and there is a free [[Guiding Ring]] if you reach all four. There isn't a
+  turn limit to this chapter, so take all the time you need.
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
@@ -259,6 +281,7 @@ enemy_units:
   # ch04's cottage: on a 1:1 retile the placement is vanilla's, not ours — which is also what
   # keeps `make difficulty CH=ch05` measuring the twin it claims to.
   - id: ravisin
+    face: ravisin                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Ravisin"
     is_boss: true
     count: 1
@@ -299,7 +322,6 @@ enemy_units:
     #     undentable by the parity yardstick (inf). One lever, not two.
     #   - NO armour bodyguards. With a real boss line the `frost-sentinel` scaffolding is
     #     redundant (removed 2026-07-23, Nicolas) — the boss carries her own fight.
-    death_quote: "Auril… I gave you everything…"
     skin:
       # APPROVED 2026-08-10 (Nicolas): Garytop's F2E Aversa mug, exact palette edit only.
       # Silver hair -> auburn/chestnut; warm skin -> frost-pale. Preserve the original brown
@@ -659,6 +681,7 @@ enemy_units:
   # Ravisin arm the weapon in scene 3 (`vanilla 0x9BD`) and then have to deal with it.
   # DECIDED 2026-08-14 (Nicolas, #25). The eruption keeps its six reinforcements without her.
   - id: sahnar
+    face: sahnar                 # the bust it wears: campaign.yaml cast_slots / guest_slots
     name: "Sahnar"
     count: 1
     class: myrmidon             # Joshua's exact class/donor — a fast, crit-threat sword duelist
@@ -1745,16 +1768,8 @@ events:
 # + Armorslayer 1,260 + Torch 500, plus an Armory + Vendor. We MATCH the magnitude and the
 # delivery channels (this is the first chapter at the FE8-Ch5 reward tier — §Reward budget):
 economy:
-  reward_sites:                # the "villages" of Ch5, retiled as elven reliquary niches spread to the
-                                 # map edges; the eruption's undead race to desecrate them (save-all bonus).
-    - gift: booster-def          # ≈ Ch5 Dracoshield (+Def) — first stat-booster in the campaign
-    - gift: booster-skl          # ≈ Ch5 Secret Book (+Skl)
-    - gift: armorslayer          # ≈ Ch5 Armorslayer (vanilla's answer to its Armor-Knight boss;
-                                 #   ours has no armour to slay, so it reads as a plain strong sword)
-    - gift: torch                # ≈ Ch5 Torch (flavored an elven everburning lamp)
-  elven_store:                   # ≈ Ch5's Armory + Vendor — an ancient elven quartermaster's reliquary
-    armory: true                 #   the party requisitions (narrative: the tomb kept its stores)
-    vendor: true
+  # The elven store, an ancient quartermaster's reliquary the party requisitions, is vanilla
+  # Ch5's Armory (2,1) + Vendor (6,10), inherited with the map (inject.villages.chapter_shops).
   save_all_bonus: guiding-ring   # vanilla Ch5's own save-all-villages reward, kept as itself.
                                  # It is the chapter's promotion FORESHADOW (decisions.md — the
                                  # promotion seam): nobody is near level 10 in the MVP, so it sits
@@ -1922,7 +1937,6 @@ villages:
 
 # ── Post-Chapter ─────────────────────────────────────────────────────────────────
 post_chapter:
-  available_shops: [elven-reliquary]   # the in-tomb elven store (Armory + Vendor); see economy block
   units_available_to_recruit:
     - id: sahnar                         # Myrmidon (sword duelist); see npcs/sahnar.yaml
       description: "Sahnar (she/her), the reawakened elven royal — a moon-elf mummy, recruited via Basil's Talk (the Joshua beat). Playable Myrmidon."
@@ -1976,6 +1990,19 @@ playtest:
       when:
         - visit: {x: 12, y: 19, gains: 0x60}   # reliquary-south -> ITEM_DRACOSHIELD
 
+    - name: ch05shops
+      proves: >
+        the elven store opens: the Armory at (2,1) and the Vendor at (6,10) each stock vanilla
+        Ch5's own list (ADR 0345). Wired since ch05 shipped and never opened by any scenario.
+      given: [on_map]
+      when:
+        # ShopList_Event_Ch5Armory: Slim/Iron/Steel Sword, Slim/Iron/Steel Lance, Iron/Steel Axe,
+        # Iron/Steel Bow
+        - shop: {x: 2, y: 1, kind: armory,
+                 stocks: [0x02, 0x01, 0x03, 0x15, 0x14, 0x16, 0x1F, 0x20, 0x2D, 0x2E]}
+        # ShopList_Event_Ch5Vendor: Fire, Lightning, Heal, Vulnerary
+        - shop: {x: 6, y: 10, kind: vendor, stocks: [0x38, 0x3F, 0x4B, 0x6C]}
+
     - name: ch05reliquaries
       proves: all four reliquaries speak and hand over their OWN gift
       # `spoke` is not decoration: a wired-but-empty message would hand the gift over in
@@ -2004,6 +2031,7 @@ playtest:
     - {name: ch05recruit,      proves: the Talk recruit converts Sahnar on both CHECK_ALIVE arms, lua: ch05recruit}
     - {name: ch05lupinbenched, proves: the recruit's no-Lupin arm plays with Lupin BENCHED,     lua: ch05lupinbenched, boot: ch05lupinboot}
     - {name: ch05lupinkilled,  proves: the recruit's no-Lupin arm plays with Lupin DEAD,        lua: ch05lupinkilled,  boot: ch05lupinboot}
+    - {name: ch05escort,       proves: Sahnar spares Basil as Joshua spares Natasha (AI_A_07's list), lua: ch05escort}
     - {name: ch05raid,         proves: a raider can SACK a reliquary -- terrain flips to ruins and its event id stays unset, lua: ch05raid}
     - {name: ch05crest,        proves: saving all four reliquaries pays out the Guiding Ring,   lua: ch05crest}
 

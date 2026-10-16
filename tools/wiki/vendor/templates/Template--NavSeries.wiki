@@ -1,0 +1,33 @@
+{| class="mw-collapsible mw-collapsed round navbox" style="--navbox-color: #9d161d"
+! [[Fire Emblem (series)|''Fire Emblem'' series]]
+|-
+|
+{|
+! style="width: 20%" class="roundt" | Main series
+| {{title|Shadow Dragon & the Blade of Light}} • ''[[Fire Emblem Gaiden|Gaiden]]'' • {{title|Mystery of the Emblem}} • {{title|Genealogy of the Holy War}} • {{title|Thracia 776}} • {{title|The Binding Blade}} • {{title|The Blazing Blade}} • {{title|The Sacred Stones}} • {{title|Path of Radiance}} • {{title|Radiant Dawn}} • {{title|Shadow Dragon}} • {{title|New Mystery of the Emblem}} • ''[[Fire Emblem Awakening|Awakening]]'' • ''[[Fire Emblem Fates|Fates]]'' • ''[[Fire Emblem Echoes: Shadows of Valentia|Echoes: Shadows of Valentia]]'' • {{title|Three Houses}} • ''[[Fire Emblem Engage|Engage]]'' • ''[[Fire Emblem: Fortune's Weave|Fortune's Weave]]''
+|-
+! Spin-offs
+| {{title|Archanea Saga}} • {{TMSFE}} • [[Fire Emblem Heroes|''Heroes'']] • [[Fire Emblem Warriors|''Warriors'']] • [[Fire Emblem Warriors: Three Hopes|''Warriors: Three Hopes'']] • [[Fire Emblem Shadows|''Shadows'']]
+|-
+! Crossover games
+| ''Super Smash Bros.'' ([[Super Smash Bros. Melee|''Melee'']] • [[Super Smash Bros. Brawl|''Brawl'']] • [[Super Smash Bros. for Nintendo 3DS and Wii U|''for Nintendo 3DS and Wii U'']] • [[Super Smash Bros. Ultimate|''Ultimate'']]) • ''[[Club Nintendo Picross+]]'' • {{steam}} • {{PXZ2}} • {{Wario}} • {{DL}}
+|-
+! Unreleased games and prototypes
+| {{FE64}} • [[Fire Emblem: The Blazing Blade build 0206|''The Blazing Blade'' build 0206]] • [[Fire Emblem: The Blazing Blade build 0219|''The Blazing Blade'' build 0219]] • [[Fire Emblem: The Sacred Stones prototype|''The Sacred Stones'' prototype]] • ''[[Fire Emblem Wii]]''
+|-
+! ''TearRing Saga'' series
+| {{titleSaga|Yutona Heroes War Chronicles}} • {{titleSaga|Berwick Saga}}
+|-
+! ''Vestaria Saga'' series
+| {{titleSaga|War of the Scions}} • {{titleSaga|The Sacred Sword of Silvanister}} • {{titleSaga|Lucca Gaiden}} • {{titleSaga|Chronicles of the Norden Civil War}}
+|-
+! Related titles
+| [[Mario Kart: Double Dash!! bonus disc|''Mario Kart: Double Dash!!'' bonus disc]] • [[LINE]] • ''[[Nintendo Badge Arcade]]''
+|-
+! Versions and releases
+| [[List of version differences]] • [[Localization of the Fire Emblem series|Localization of the ''Fire Emblem'' series]] • [[Virtual Console]]
+|-
+! class="roundb" | Other
+| [[References to Fire Emblem in other media|References in other media]] • [[References to other media]]
+|}
+|}<noinclude>[[Category:Navigation templates|Series]]</noinclude>

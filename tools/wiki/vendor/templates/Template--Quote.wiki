@@ -1,0 +1,8 @@
+{| style="margin: 0.9em 0 0.8em"
+! style="width: 20px; vertical-align: top; font-size: 45px; font-family: 'Times New Roman', serif; text-align: left; padding: 4px 2px 0" | “
+| style="font-style: italic" | {{{1}}}
+! style="width: 20px; vertical-align: bottom; font-size: 45px; font-family: 'Times New Roman', serif; text-align: right; padding: 4px 2px 0" | ”
+{{#if:{{{2|}}}|{{!}} style="font-size: smaller" {{!}} <br>—&nbsp;{{{2}}}}}
+|}<noinclude>
+
+{{doc}}</noinclude>

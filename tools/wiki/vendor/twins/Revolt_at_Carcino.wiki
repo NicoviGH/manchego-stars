@@ -1,0 +1,3318 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 10A.png|200px]]
+|location=[[Teraz Plateau]]
+|new units=[[Innes]], [[Gerik]], [[Tethys]], [[Marisa]]
+|boss=[[Pablo]]
+|previous=[[Distant Blade]]
+|next=[[Creeping Darkness]]
+}}
+
+'''Revolt at Carcino''' (Japanese: {{hl|カルチノの内乱|Karuchino no nairan}} ''Rebellion at Carcino'') is the tenth chapter of [[Eirika]]'s route in {{FE8}}.
+
+==Plot==
+{{main|Revolt at Carcino/Script}}
+As [[Eirika]] proceeds to [[Carcino]] to rescue [[Innes]], Emperor [[Vigarde]] orders [[Glen]] to capture Eirika, who he claims massacred citizens and leads a rebellion in Carcino. Glen accepts his orders but, he expresses his doubts on the veracity of Vigarde's claims about Eirika to his brother [[Cormag]]; Glen notes that he has met Eirika once, and thinks her incapable of doing what Vigarde claims she has. [[Valter]] then approaches the two, and chastises Glen for doubting the emperor. Glen accuses Valter of lying his way into a pardon and a promotion, but Valter claims that he, [[Caellach]], and [[Riev]] were promoted to compensate for the unreliability of the [[Imperial Three]]. Cormag threatens Valter, but Valter reminds him that fighting a general would mark him a traitor. Glen departs with his brother, after telling Valter that his crimes are "neither forgotten nor forgiven".
+
+In Carcino, Innes assesses his situation with [[Gerik]] and [[Tethys]] between assaults from [[Pablo]]'s forces. Innes is determined to reach [[Jehanna]] and refuses to surrender. Tethys relays that the group has no more weapons in reserve and the enemy is making preparations to attack again. Innes attempts to save the lives of Gerik and Tethys by firing them, giving them the choice to flee or surrender; they refuse to flee, however, believing that Innes will die without their help. As Innes begins to concoct a strategy to escape, Tethys notices an approaching force of reinforcements: Eirika's company. Eirika and her forces immediately join the battle.
+
+Once the battle begins, Pablo muses to himself over the good fortune his plan to displace [[Klimt]] has yielded, and orders soldiers to kill Innes. Meanwhile, in a hidden location, Klimt laments that Pablo is destroying Carcino's bond with [[Frelia]], and that he powerless to stop Pablo.
+
+In the battle, Eirika or Tana can speak to Innes, and they join forces; Innes can then inform Gerik and Tethys that reinforcements have come. Later, Gerik can talk to [[Marisa]] on the battlefield; though a member of his mercenary group, she has been assigned to his enemies—Gerik is concerned for her reputation if she were to abandon her employers, but Marisa does so unquestioningly.
+
+After Pablo is defeated and the gate has been seized by Eirika, Valter identifies Eirika and muses to himself how fun it will be to fight her; however, for the time being, Valter declines his opportunity to attack and moves on.
+
+Eirika and Innes enter the castle where Klimt was hiding himself, prompting him to come out of his hiding place and greet the two. Klimt announces himself as a member of Carcino's Council of Elders, clarifying that the orders to capture Innes were purely those of Pablo. Klimt explains that Carcino has been divided into two factions: Klimt's faction wishes to retain their alliance with Frelia, while Pablo's seeks to endear his nation to Grado; Pablo began to seize power through violence and assassination, driving Klimt and his allies into hiding. Klimt warns that Pablo will almost certainly send more soldiers after them through Carcino, and that it would be best to return to Frelia.
+
+If Gerik and Tethys survived the battle, Innes thanks them, and hires them for the rest of their journey at double the pay of their previous contract; the two immediately accept the offer. Later, Tethys finds her brother [[Ewan]], who asks her to allow him to accompany her on her adventures; Tethys initially refuses, but Ewan responds that he could protect with magic he learned from his teacher, and Tethys relents and promises to speak to Eirika on his behalf.
+
+[[Seth]] suggests that the group return to Frelia as Klimt suggested, but Innes emphasizes that time is of the essence to prevent Grado's plans. Eirika agrees with Innes but acknowledges that recklessly pressing on will invite more attacks; Ewan then appears and announces that he knows of a mountain pass that leads straight to Jehanna. At Eirika's behest, Ewan elaborates that the pass leads through [[Caer Pelyn]] and is home to his teacher, [[Saleh]]. Eirika then requests that Ewan guide them to Saleh, which Ewan gladly agrees to do.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Seize the gate
+|defeat=[[Eirika]] dies
+|ally=1–12{{h|+4|Upon Innes, Gerik, Tethys, and Marisa being recruited}}
+|other=3{{h|−3|Upon Innes, Gerik, and Tethys being recruited}}
+|enemy=34{{h|+17|Reinforcements}}{{h|−1|Upon Marisa being recruited}}
+|map=[[File:Cm fe08 10A.png]]
+|col=20
+|row=31
+}}
+|content2={{ChapData
+|victory=Seize the gate
+|defeat=[[Eirika]] dies
+|ally=1–12{{h|+4|Upon Innes, Gerik, Tethys, and Marisa being recruited}}
+|other=3{{h|−3|Upon Innes, Gerik, and Tethys being recruited}}
+|enemy=40{{h|+20|Reinforcements}}{{h|−1|Upon Marisa being recruited}}
+|map=[[File:Cm fe08 10A d.png]]
+|col=20
+|row=31
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Innes
+|portrait=[[File:portrait innes fe08.png]]
+|class=Sniper
+|HP={{h|31|28 in the Japanese version}}
+|lv=1
+|inventory={{Item|8|Silver Bow}}<br>{{Item|8|White Gem}}<br>{{Item|8|Vulnerary}}
+|recruitment method=NPC, talk to with [[Tana]] or [[Eirika]], or automatically at the end of the chapter if he survived
+}}
+|newunit2={{NewUnit
+|name=Gerik
+|portrait=[[File:portrait gerik fe08.png]]
+|class=Mercenary
+|HP=32
+|lv=10
+|inventory={{Item|8|Steel Blade}}<br>{{Item|8|Vulnerary}}<br>{{Item|8|Hero Crest}}
+|recruitment method=NPC, talk to with [[Innes]] or [[Tethys]], or automatically at the end of the chapter if he survived<br><small>(Leaves if Tethys dies this chapter)</small>
+}}
+|newunit3={{NewUnit
+|name=Tethys
+|portrait=[[File:portrait tethys fe08.png]]
+|class=Dancer
+|HP=18
+|lv=1
+|inventory={{Item|8|Elixir}}<br>{{Item|8|Vulnerary}}<br>{{Item|8|Goddess Icon}}
+|recruitment method=NPC, talk to with [[Gerik]] or [[Innes]], or automatically at the end of the chapter if she survived<br><small>(Leaves if Gerik dies this chapter)</small>
+}}
+|newunit4={{NewUnit
+|name=Marisa
+|portrait=[[File:portrait marisa fe08.png]]
+|class=Myrmidon
+|HP=23
+|lv=5
+|inventory={{Item|8|Shamshir}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Enemy, talk to with [[Gerik]]
+}}
+|forced1=eirika
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Guiding Ring
+|obtain1=Dropped by [[Pablo]]
+|item2=Longbow
+|obtain2=Dropped by enemy [[Archer]]
+|item3=Door Key
+|obtain3=Dropped by enemy [[Soldier]]
+|item4=Lancereaver
+|obtain4=Dropped by enemy [[Mercenary]]
+|item5=Killer Axe
+|obtain5=Dropped by enemy [[Fighter]] (drops unequipped item)
+|item6=Hand Axe
+|obtain6=Dropped by enemy [[Fighter]] (drops unequipped item)
+|item7=Torch
+|item7image=torch staff
+|item7article=Torch (staff)
+|obtain7=Dropped by enemy [[Priest]]
+|item8=Red Gem
+|obtain8=Steal from enemy [[Myrmidon]]
+|item9=Vulnerary
+|obtain9=Steal from [[Marisa]] or recruit her
+|itemlast=Talisman
+|obtainlast=Steal from enemy [[Pegasus Knight]] (reinforcement)
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=7
+|#=1
+|hp=36
+|str=13
+|skill=9
+|spd=12
+|lck=9
+|def=7
+|res=17
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Guiding Ring|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=4~5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow|type=drop}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=4~5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=3
+|hp=23~25
+|str=5~6
+|skill=1~2
+|spd=1~3
+|lck=1~2
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The two not guarding the door immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=23~25
+|str=5~6
+|skill=1~2
+|spd=1~3
+|lck=1~2
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=1
+|hp=21~23
+|str=5~7
+|skill=9~11
+|spd=9~10
+|lck=1~2
+|def=4~6
+|res=0~2
+|con=9
+|mov=5
+|inventory={{Item|8|Lancereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mage
+|lv=9
+|#=2
+|hp=17~19
+|str=2~4
+|skill=3~4
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=4~5
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=4
+|hp=21~23
+|str=5~7
+|skill=9~11
+|spd=9~10
+|lck=1~2
+|def=4~6
+|res=0~2
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=3
+|hp=19~20
+|str=5~6
+|skill=10~12
+|spd=10~12
+|lck=1~2
+|def=2~3
+|res=0~2
+|con=8
+|mov=5
+|inventory={{Item|8|Slim Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=19~21
+|str=5~7
+|skill=11~12
+|spd=11~12
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=1
+|hp=23~25
+|str=7~9
+|skill=3~4
+|spd=5~6
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Killer Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=19~21
+|str=5~7
+|skill=11~12
+|spd=11~12
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=23~25
+|str=5~6
+|skill=1~2
+|spd=1~3
+|lck=1~2
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=20~22
+|str=5~6
+|skill=4~5
+|spd=4~5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=2
+|hp=23~25
+|str=7~9
+|skill=3~4
+|spd=5~6
+|lck=0~1
+|def=2~3
+|res=0~1
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Vulnerary}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=2
+|hp=23~25
+|str=5~6
+|skill=1~2
+|spd=1~3
+|lck=1~2
+|def=0~1
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Slim Lance}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=2
+|hp=19~20
+|str=5~6
+|skill=10~12
+|spd=10~12
+|lck=1~2
+|def=2~3
+|res=0~2
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=20~22
+|str=5~6
+|skill=4~5
+|spd=4~5
+|lck=1~2
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=2
+|hp=23~25
+|str=7~8
+|skill=2~3
+|spd=5~7
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=1
+|hp=23~25
+|str=7~8
+|skill=2~3
+|spd=5~7
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Priest
+|lv=11
+|#=1
+|hp=20~22
+|str=2~4
+|skill=2~4
+|spd=3~5
+|lck=2~4
+|def=1~2
+|res=7~9
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Heal}} • {{Item|8|Torch|link=Torch (staff)|image=torch staff|type=drop}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=8
+|hp=23~25
+|str=7~8
+|skill=2~3
+|spd=5~7
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=3
+|hp=16~18
+|str=5~6
+|skill=6~8
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=3~4
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Falcoknight
+|lv=1
+|#=1
+|hp=20
+|str=6
+|skill=7
+|spd=7
+|lck=0
+|def=5
+|res=4
+|con=6
+|mov=8
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=16~18
+|str=5~6
+|skill=6~8
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=3~4
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Talisman}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Cavalier
+|lv=10
+|#=3
+|hp=23~25
+|str=6~7
+|skill=3~5
+|spd=6~7
+|lck=1~2
+|def=6~7
+|res=0~1
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=1
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Bow}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Guiding Ring|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow|type=drop}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The two not guarding the door immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Lancereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mage
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Slim Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Killer Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Vulnerary}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Slim Lance}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Priest
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Heal}} • {{Item|8|Torch|link=Torch (staff)|image=torch staff|type=drop}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=8
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Falcoknight
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=8
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Talisman}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Cavalier
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Bow}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=7
+|#=1
+|hp=36
+|str=13
+|skill=9
+|spd=12
+|lck=9
+|def=7
+|res=17
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Guiding Ring|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=22~24
+|str=6~7
+|skill=5~7
+|spd=4~6
+|lck=2~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow|type=drop}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=22~24
+|str=6~7
+|skill=5~7
+|spd=4~6
+|lck=2~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=3
+|hp=24~27
+|str=6~7
+|skill=1~3
+|spd=2~3
+|lck=1~2
+|def=0~1
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The two not guarding the door immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=24~27
+|str=6~7
+|skill=1~3
+|spd=2~3
+|lck=1~2
+|def=0~1
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=1
+|hp=22~25
+|str=6~8
+|skill=10~12
+|spd=9~11
+|lck=1~3
+|def=5~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Lancereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mage
+|lv=9
+|#=2
+|hp=18~20
+|str=3~5
+|skill=4~5
+|spd=4~6
+|lck=1~2
+|def=3~4
+|res=4~6
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=4
+|hp=22~24
+|str=6~7
+|skill=10~11
+|spd=9~11
+|lck=1~3
+|def=4~6
+|res=1~2
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=3
+|hp=20~22
+|str=6~7
+|skill=11~13
+|spd=11~13
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Slim Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=20~23
+|str=6~8
+|skill=11~13
+|spd=11~13
+|lck=2~3
+|def=3~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=1
+|hp=25~27
+|str=8~10
+|skill=4~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Killer Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=20~23
+|str=6~8
+|skill=11~13
+|spd=11~13
+|lck=2~3
+|def=3~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=24~27
+|str=6~7
+|skill=1~3
+|spd=2~3
+|lck=1~2
+|def=0~1
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=21~23
+|str=5~7
+|skill=5~6
+|spd=4~6
+|lck=1~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=2
+|hp=24~26
+|str=7~9
+|skill=3~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Vulnerary}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=2
+|hp=24~27
+|str=6~7
+|skill=1~3
+|spd=2~3
+|lck=1~2
+|def=0~1
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Slim Lance}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=2
+|hp=20~22
+|str=6~7
+|skill=11~13
+|spd=11~13
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=21~23
+|str=5~7
+|skill=5~6
+|spd=4~6
+|lck=1~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=2
+|hp=25~27
+|str=8~9
+|skill=2~4
+|spd=6~7
+|lck=0~2
+|def=3~4
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=1
+|hp=25~27
+|str=8~9
+|skill=2~4
+|spd=6~7
+|lck=0~2
+|def=3~4
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Priest
+|lv=11
+|#=1
+|hp=21~23
+|str=3~4
+|skill=3~5
+|spd=4~5
+|lck=3~5
+|def=1~2
+|res=8~10
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Heal}} • {{Item|8|Torch|link=Torch (staff)|image=torch staff|type=drop}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=8
+|hp=25~27
+|str=8~9
+|skill=2~4
+|spd=6~7
+|lck=0~2
+|def=3~4
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=3
+|hp=17~20
+|str=6~7
+|skill=7~9
+|spd=7~9
+|lck=2~3
+|def=3~4
+|res=4~5
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Falcoknight
+|lv=1
+|#=1
+|hp=20
+|str=6
+|skill=7
+|spd=7
+|lck=0
+|def=5
+|res=4
+|con=6
+|mov=8
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=17~20
+|str=6~7
+|skill=7~9
+|spd=7~9
+|lck=2~3
+|def=3~4
+|res=4~5
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Talisman}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Cavalier
+|lv=10
+|#=3
+|hp=24~26
+|str=7~8
+|skill=4~6
+|spd=6~8
+|lck=1~3
+|def=6~8
+|res=0~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=1
+|#=1
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Bow}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=7
+|#=1
+|hp=34
+|str=13
+|skill=9
+|spd=12
+|lck=9
+|def=7
+|res=17
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Guiding Ring|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=24~25
+|str=7
+|skill=7
+|spd=6
+|lck=3
+|def=4~5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow|type=drop}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=24~25
+|str=7
+|skill=7
+|spd=6
+|lck=3
+|def=4~5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=3
+|hp=26~28
+|str=7~8
+|skill=2~3
+|spd=2~3
+|lck=2~3
+|def=1~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The two not guarding the door immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=26~28
+|str=7~8
+|skill=2~3
+|spd=2~3
+|lck=2~3
+|def=1~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=1
+|hp=25~26
+|str=7~8
+|skill=11~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|res=2
+|con=9
+|mov=5
+|inventory={{Item|8|Lancereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mage
+|lv=9
+|#=2
+|hp=20
+|str=5
+|skill=5~6
+|spd=6
+|lck=1~2
+|def=4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=4
+|hp=25~26
+|str=7~8
+|skill=11~12
+|spd=10~11
+|lck=2~3
+|def=5~6
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=3
+|hp=22~23
+|str=7
+|skill=12~13
+|spd=12~13
+|lck=2~3
+|def=3~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Slim Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=23
+|str=8
+|skill=13~14
+|spd=12~13
+|lck=3
+|def=3
+|res=2
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=1
+|hp=27~28
+|str=10
+|skill=5
+|spd=7
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Killer Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=23
+|str=8
+|skill=13~14
+|spd=12~13
+|lck=3
+|def=3
+|res=2
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=26~28
+|str=7~8
+|skill=2~3
+|spd=2~3
+|lck=2~3
+|def=1~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=24~25
+|str=7
+|skill=6
+|spd=6
+|lck=3
+|def=4~5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=2
+|hp=27~28
+|str=10
+|skill=5
+|spd=7
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Vulnerary}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=2
+|hp=26~28
+|str=7~8
+|skill=2~3
+|spd=2~3
+|lck=2~3
+|def=1~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Slim Lance}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=2
+|hp=22~23
+|str=7
+|skill=12~13
+|spd=12~13
+|lck=2~3
+|def=3~4
+|res=1~2
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=24~25
+|str=7
+|skill=6
+|spd=6
+|lck=3
+|def=4~5
+|res=1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=2
+|hp=27
+|str=9~10
+|skill=3~4
+|spd=7
+|lck=1~2
+|def=4
+|res=1
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=1
+|hp=27
+|str=9~10
+|skill=3~4
+|spd=7
+|lck=1~2
+|def=4
+|res=1
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Priest
+|lv=11
+|#=1
+|hp=23
+|str=4
+|skill=4
+|spd=5
+|lck=5
+|def=2
+|res=10
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Heal}} • {{Item|8|Torch|link=Torch (staff)|image=torch staff|type=drop}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=8
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Falcoknight
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=8
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Talisman}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Cavalier
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Bow}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=7
+|#=1
+|hp=37~38
+|str=14~15
+|skill=9~11
+|spd=12~13
+|lck=9~10
+|def=7~8
+|res=18~19
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Guiding Ring|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=5~9
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow|type=drop}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=2
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=5~9
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=One mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=3
+|hp=28~32
+|str=7~11
+|skill=2~6
+|spd=2~5
+|lck=1~4
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The two not guarding the door immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=28~32
+|str=7~11
+|skill=2~6
+|spd=2~5
+|lck=1~4
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=1
+|hp=26~30
+|str=8~11
+|skill=12~15
+|spd=10~14
+|lck=2~6
+|def=5~7
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Lancereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mage
+|lv=9
+|#=2
+|hp=20~23
+|str=5~8
+|skill=5~8
+|spd=5~9
+|lck=1~3
+|def=3~5
+|res=5~8
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=4
+|hp=26~30
+|str=8~11
+|skill=12~15
+|spd=10~14
+|lck=2~6
+|def=5~7
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=3
+|hp=22~27
+|str=6~10
+|skill=13~16
+|spd=13~16
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=8
+|mov=5
+|inventory={{Item|8|Slim Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=23~27
+|str=7~10
+|skill=13~16
+|spd=13~16
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=1
+|hp=28~32
+|str=10~13
+|skill=4~8
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Killer Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=23~27
+|str=7~10
+|skill=13~16
+|spd=13~16
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=28~32
+|str=7~11
+|skill=2~6
+|spd=2~5
+|lck=1~4
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=23~28
+|str=6~10
+|skill=6~9
+|spd=5~8
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=2
+|hp=28~32
+|str=10~13
+|skill=4~8
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=2
+|hp=28~32
+|str=7~11
+|skill=2~6
+|spd=2~5
+|lck=1~4
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Slim Lance}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=2
+|hp=22~27
+|str=6~10
+|skill=13~16
+|spd=13~16
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=23~28
+|str=6~10
+|skill=6~9
+|spd=5~8
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=2
+|hp=28~32
+|str=9~13
+|skill=3~7
+|spd=6~9
+|lck=1~3
+|def=3~6
+|res=1~3
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=1
+|hp=28~32
+|str=9~13
+|skill=3~7
+|spd=6~9
+|lck=1~3
+|def=3~6
+|res=1~3
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Priest
+|lv=11
+|#=1
+|hp=23~26
+|str=3~7
+|skill=4~7
+|spd=4~8
+|lck=4~8
+|def=1~3
+|res=10~13
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Heal}} • {{Item|8|Torch|link=Torch (staff)|image=torch staff|type=drop}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=1
+|hp=28~32
+|str=10~13
+|skill=4~8
+|spd=6~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Vulnerary}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=11
+|#=2
+|hp=27~30
+|str=8~11
+|skill=12~15
+|spd=10~14
+|lck=2~6
+|def=5~8
+|res=1~4
+|con=9
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=5~9
+|lck=2~6
+|def=4~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=28~32
+|str=7~11
+|skill=2~6
+|spd=2~5
+|lck=1~4
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=8
+|hp=28~32
+|str=9~13
+|skill=3~7
+|spd=6~9
+|lck=1~3
+|def=3~6
+|res=1~3
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=20~24
+|str=6~10
+|skill=9~12
+|spd=9~12
+|lck=2~6
+|def=3~6
+|res=4~8
+|con=5
+|mov=7
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=20~24
+|str=6~10
+|skill=9~12
+|spd=9~12
+|lck=2~6
+|def=3~6
+|res=4~8
+|con=5
+|mov=7
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=20~24
+|str=6~10
+|skill=9~12
+|spd=9~12
+|lck=2~6
+|def=3~6
+|res=4~8
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=3
+|hp=20~24
+|str=6~10
+|skill=9~12
+|spd=9~12
+|lck=2~6
+|def=3~6
+|res=4~8
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Falcoknight
+|lv=1
+|#=1
+|hp=30~36
+|str=10~15
+|skill=11~16
+|spd=11~16
+|lck=4~9
+|def=6~9
+|res=8~13
+|con=6
+|mov=8
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=20~24
+|str=6~10
+|skill=9~12
+|spd=9~12
+|lck=2~6
+|def=3~6
+|res=4~8
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Talisman}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Cavalier
+|lv=10
+|#=3
+|hp=26~31
+|str=7~11
+|skill=6~9
+|spd=7~9
+|lck=2~6
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=1
+|#=1
+|hp=31~37
+|str=11~14
+|skill=10~15
+|spd=12~17
+|lck=4~7
+|def=8~11
+|res=5~8
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Bow}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Pablo]]
+|class=Sage
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Guiding Ring|type=drop}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|gate]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Longbow|type=drop}}
+|notes=Mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=One mans a [[Ballista (weapon)|Ballista]].
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The two not guarding the door immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Lancereaver|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mage
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Slim Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Killer Axe|type=drop}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Slim Lance}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Myrmidon
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Archer
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Bow}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Priest
+|lv=11
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Heal}} • {{Item|8|Torch|link=Torch (staff)|image=torch staff|type=drop}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Fighter
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=[[Marisa]]
+|class=Myrmidon
+|version=female
+|lv=5
+|#=1
+|hp=23
+|str=7
+|skill=12
+|spd=13
+|lck=9
+|def=4
+|res=3
+|con=5
+|mov=5
+|inventory={{Item|8|Shamshir}} • {{Item|8|Vulnerary}}
+|notes=Begins moving if a unit enters the area south of the NPC fortress.
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Mercenary
+|lv=11
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Soldier
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Javelin}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Bandit
+|class=Brigand
+|lv=10
+|#=8
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=7
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Falcoknight
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=8
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Pegasus Knight
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=7
+|inventory={{Item|8|Slim Lance}} • {{Item|8|Talisman}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Cavalier
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Sellsword
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=1
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|last=y
+|inventory={{Item|8|Steel Bow}}
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turns 2–5
+**2 [[Brigand]]s from the eastern peaks
+*After recruiting Marisa
+**1 [[Pegasus Knight]] with an [[Iron Lance]] and a [[Javelin]] from the northwestern peaks <small>(Difficult only)</small>
+**1 [[Pegasus Knight]] with a [[Steel Lance]] and a [[Javelin]] from the northwestern peaks <small>(Difficult only)</small>
+**1 [[Pegasus Knight]] with a [[Slim Lance]] and a [[Javelin]] from the northwestern peaks <small>(Difficult only)</small>
+**4 [[Pegasus Knight]]s with [[Slim Lance]]s from the southwestern peaks
+**1 [[Falcoknight]] from the southwestern peaks
+**3 [[Cavalier]]s from north of Marisa's starting point
+**1 [[Ranger (The Sacred Stones)|Ranger]] from north of Marisa's starting point
+
+===NPC data===
+{{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Innes]]
+|class=Sniper
+|type=other
+|lv=1
+|#=1
+|hp=31
+|str=14
+|skill=13
+|spd=15
+|lck=14
+|def=10
+|res=9
+|con=9
+|mov=6
+|inventory={{Item|8|Silver Bow}} • {{Item|8|White Gem}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=[[Gerik]]
+|class=Mercenary
+|type=other
+|lv=10
+|#=1
+|hp=32
+|str=14
+|skill=13
+|spd=13
+|lck=8
+|def=10
+|res=4
+|con=13
+|mov=5
+|inventory={{Item|8|Steel Blade}} • {{Item|8|Vulnerary}} • {{Item|8|Hero Crest}}
+}}
+{{ChapUnitCellGBA
+|name=[[Tethys]]
+|class=Dancer
+|version=tethys
+|type=other
+|lv=1
+|#=1
+|hp=18
+|str=1
+|skill=2
+|spd=12
+|lck=10
+|def=5
+|res=4
+|con=5
+|mov=5
+|inventory={{Item|8|Elixir}} • {{Item|8|Vulnerary}} • {{Item|8|Goddess Icon}}
+|last=y
+}}
+{{ChapUnitFtr}}
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Pablo}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|name=Pablo
+|portrait=[[File:Portrait pablo fe08.png]]
+|sprite=sage enemy
+|class=Sage
+|affin=ice
+|lv=7
+|HP={{h|36|34 in the Japanese version}}
+|mag=13
+|skill=9
+|spd=12
+|luck=9
+|def=7
+|res=17
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Divine}}<br>{{Item|8|Guiding Ring|type=drop}}
+|an=B
+|li=C
+|st=C
+}}
+|content2={{BossStats GBA
+|name=Pablo
+|portrait=[[File:Portrait pablo fe08.png]]
+|sprite=sage enemy
+|class=Sage
+|affin=ice
+|lv=7
+|HP=37~38
+|mag=14~15
+|skill=9~11
+|spd=12~13
+|luck=9~10
+|def=7~8
+|res=18~19
+|move=6
+|con=7
+|aid=6
+|inventory={{Item|8|Divine}}<br>{{Item|8|Guiding Ring|type=drop}}
+|an=B
+|li=C
+|st=C
+}}
+}}
+
+==Strategy==
+{{strategy}}
+This chapter presents a chain of timed objectives: recruit Innes's squad before their AI gets them killed, recruit Marisa who will start moving once your army moves south, and fend off the reinforcements. Be sure to also avoid the enemy [[Ballista]] range with any fliers you bring.
+
+The enemy Archer on the edge of the map does not move, making it easy to sneak in Tana or Eirika if Vanessa [[Rescue (command)|Rescue]]s them past the rest of the enemies to Innes. Afterwards however, Marisa's squad will start moving.
+
+Marisa is among the weakest units in the game and her Shamshir provides little advantage over the Killing Edges you already have, therefore ignoring or killing her is a viable option. Alternatively, if you can spare a [[Pure Water]] and a weak sword for Gerik, he can enter her range without being targeted by the Priest with the [[Sleep (staff)|Sleep]] staff. You could also bring a staff user with [[Restore]], have Innes use the Ballista on the Priest, or just choke a point with him or Gerik until you've already beaten Pablo.
+
+Most of the reinforcements are weak, but on Difficult mode, the [[Falcoknight]] may present a problem. Innes can use the Ballista along with a second attack from Tethys's [[Dance]] to address this issue. There is also a [[Ranger (The Sacred Stones)|Ranger]] reinforcement, but it spawns far away from your starting position and therefore you will have more time to react.
+
+The main threat Pablo poses is his high [[critical hit]] rate. Seth and Innes, who have high Luck, may face 0 Crit which is guaranteed for either after using Tethys's [[Goddess Icon]].
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=Revolt at Carcino
+|jpn-name={{h|カルチノの内乱|Karuchino no nairan}}
+|jpn-mean=Rebellion at Carcino
+|span-name=Rebelión en Carcino
+|span-mean=Rebellion at Carcino
+|fren-name=Révolte à Carcino
+|fren-mean=Revolt at Carcino
+|ger-name=Revolte in Carcino
+|ger-mean=Revolt at Carcino
+|ital-name=Rivolta a Carcino
+|ital-mean=Revolt at Carcino
+}}
+<!--
+==Gallery==
+{{sectstub}}
+-->
+{{ChapterNav
+|prechapter=Distant Blade
+|nextchapter=Creeping Darkness
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

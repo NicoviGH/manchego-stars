@@ -30,6 +30,27 @@ def vanilla_class_enum(token):
     return 'CLASS_' + str(token).upper().replace('-', '_')
 
 
+# The in-game names title-casing a token gets wrong, from data_classes.c's nameTextId
+# (test_class_ids pins every class against the decomp). FE8 truncates two to fit its box
+# ("Pegasus Kn.", "Wyvern Kn."); the full names are the ones the Fire Emblem Wiki titles.
+_CLASS_NAMES = {'armor-knight': 'Knight', 'falcon-knight': 'Falcoknight',
+                'entoumbed': 'Entombed', 'mauthedoog': 'Mauthe Doog', 'gorgonegg': 'Gorgon Egg',
+                'gorgonegg2': 'Gorgon Egg', 'eirika-lord': 'Lord', 'ephraim-lord': 'Lord',
+                'eirika-master-lord': 'Great Lord', 'ephraim-master-lord': 'Great Lord',
+                'manakete-myrrh': 'Manakete'}
+_VARIANT = re.compile(r'-(f\d?|m\d|t\d|\d|bow)$')
+
+
+def class_display_name(token):
+    """A class token as FE8 names it: 'armor-knight' -> 'Knight', 'mage-f' -> 'Mage'.
+    Decomp-free, so CI's checks job (no submodule) can run the class index with it."""
+    if not token:
+        return '?'
+    t = str(token).lower().replace('_', '-')
+    t = _CLASS_NAMES.get(t) or _CLASS_NAMES.get(_VARIANT.sub('', t)) or _VARIANT.sub('', t)
+    return t if ' ' in t or t[:1].isupper() else ' '.join(w.capitalize() for w in t.split('-'))
+
+
 @functools.lru_cache(maxsize=None)
 def vanilla_class_enums():
     """Every enum name in vanilla FE8's class table (HEAD of the submodule, never the patched

@@ -1,0 +1,34 @@
+<noinclude>{|class="chapter-table width-90"</noinclude><includeonly>|}
+</includeonly>|-
+| style="border: none; background: none" |
+{| class="chapter-table" style="background: {{#switch:{{{type}}}|Enemy=\#a83028|NPC=\#089000|Partner={{#ifeq:{{{platform}}}|fe04|\#089000|goldenrod}}|Third Army=\#f8f840|Other=goldenrod}}; color: {{#switch:{{{type}}}|Partner={{#ifeq:{{{platform}}}|fe04|\#fff|black}}|Third Army|Other=black|#default=\#fff}}; width: 72.5%"
+! style="border: none; background: none" | Reinforcements
+|}
+|-
+| style="border: none; background: none" |
+{| style="width: 100%"
+! class="roundtl" style="width: 3%; min-width: 16px" |
+! style="width: 8%" | Name
+! style="width: 8%" | [[Class]]
+! style="width: 2.5%" | [[Level|Lv]]
+! style="width: 2.5%" | #
+! style="width: 4%" | [[HP]]
+! style="width: 4%" | {{#switch:{{{platform}}}|fe02|gba=[[Str|S]]/[[Mag|M]]|fe15=[[Strength|Atk]]|[[Str]]}}
+! style="width: 4%; {{#switch:{{{platform}}}|fe01|fe02|fe03|gba|fe15=display: none}}" | [[Mag]]
+! style="width: 4%; {{#switch:{{{platform}}}|fe18|ps2=display:none|}}" | {{#switch:{{{platform}}}|fe16|fe17|fewa2|vs1=[[Dex]]|[[Skill (stat)|Skill]]}}
+! style="width: 4%" | {{#ifeq:{{{platform}}}|vs1|[[Speed|Agi]]|[[Spd]]}}
+! style="width: 4%; {{#switch:{{{platform}}}|fe18=|display:none}}" | [[Dex]]
+! style="width: 4%; {{#switch:{{{platform}}}|fe17|fe18|ps2=display:none|}}" | [[Lck]]
+! style="width: 4%; {{#ifeq:{{{platform}}}|vs1||display: none}}" | [[Weapon level|Prf]]
+! style="width: 4%; {{#ifeq:{{{platform}}}|ps1||display: none}}" | [[Weapon level|Wlv]]
+! style="width: 4%" | [[Def]]
+! style="width: 4%; {{#switch:{{{platform}}}|fe05|ps1|ps2=display: none}}" | [[Res]]
+! style="width: 4%; {{#switch:{{{platform}}}|fe17|fe18=|display:none}}" | [[Luck|Lck]]
+! style="width: 4%; {{#switch:{{{platform}}}|fe16|fe18|fewa2=|display: none}}" | [[Cha]]
+! style="width: 4%; {{#switch:{{{platform}}}|fe05|gba|fe17|fe18=|display: none}}" | {{#switch:{{{platform}}}|fe17|fe18=[[Bld]]|[[Con]]}}
+! style="width: 3%" | [[Movement|Mo{{#ifeq:{{{platform}}}|vs1|b|v}}]]
+! class="roundtr" style="width: 40%" | Inventory {{#switch:{{{platform}}}|fe01|fe02|fe03|gba|fe11|fe12=|#default=and Skills}}<noinclude>
+|}
+|}
+
+{{doc}}</noinclude>

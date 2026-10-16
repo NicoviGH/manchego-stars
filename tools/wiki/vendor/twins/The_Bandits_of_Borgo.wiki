@@ -1,0 +1,1196 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 3.png|200px]]
+|location=Borgo Ridge
+|new units=[[Neimi]], [[Colm]]
+|boss=[[Bazba]]
+|previous=[[The Protected]]
+|next=[[Ancient Horrors]]
+}}
+
+'''The Bandits of Borgo''' (Japanese: {{hl|ボルゴ峠の山賊|Borugo-tōge no sanzoku}} ''Bandits of the Borgo Mountain Pass'') is the third chapter of {{FE8}}.
+
+==Plot==
+{{main|The Bandits of Borgo/Script}}
+[[Eirika]] and [[Seth]] pursue the thief who stole Eirika's bracelet to the hideout of [[Bazba]]'s Bandits. Eirika laments the lawlessness Renais has descended into as a result of [[Grado]]'s invasion. Later, a girl named [[Neimi]] approaches the group, begging them to help her friend [[Colm]], who has left alon for Bazba's hideout to retrieve a stolen item. Eirika agrees to help Neimi, as they share a destination and she does not wish to ignore the plight of her countrymen. When they arrive at the hideout and begin to battle, Neimi offers to help with her archery skill.
+
+During the battle, Colm sneaks into the fortress and begins to steal from the bandits. Neimi can talk with Colm; Neimi begs him to leave the hideout with her, but Colm harshly refuses—when Neimi begins to cry, Colm tells her to remain by his side and he carries on with his mission.
+
+After Eirika seizes the throne, if Neimi and Colm both survived, Neimi begins to cry again and makes Colm promise to stop doing such dangerous stuff by himself. Colm reveals that he managed to retrieve her mother's mirror. Seth then interrupts and demands that Colm return Eirika's bracelet; Seth lectures Colm, telling him that if he cares for Neimi, he will choose to lead his life differently. As Seth leaves, Colm requests to join Eirika's group; Seth defers the decision to Eirika, who accepts the two into. Seth then returns the bracelet to Eirika, informing her that she must never lose it. When she questions him, Seth confirms he is keeping information from Eirika, but she choses to trust his reticence.
+
+At Grado keep, the [[Imperial Three]]—[[Duessel]], [[Selena (The Sacred Stones)|Selena]], and [[Glen]]—have been called for an audience with Emperor [[Vigarde]]. Before they see the king, the three discuss the sorrowful state of Renais; Glen and Duessel wonder what Vigarde's intent is with the invasion and neglect of Renais, and the recent choices in promotions. Selena reminds them that it is not their place to question Vigarde's orders. The three proceed to the throne room. Vigarde commends the Imperial Three, but feels more generals are necessary; he proceeds to announce the promotions of [[Riev]], [[Caellach]], and [[Valter]]. Vigarde assigns the generals tasks: Selena and Caellach are to conquer [[Frelia]]; Duessel and Riev are to defend Grado; and Glen and Valter are assigned to capture Eirika and [[Ephraim]].
+
+==Chapter data==
+{{ChapData
+|victory=Seize the throne
+|defeat=[[Eirika]] dies
+|ally=9{{h|+1|Upon Colm being recruited}}
+|other=0{{h|+1|Upon Colm arriving}}{{h|−1|Upon Colm being recruited}}
+|enemy=10
+|map=[[File:Cm fe08 3.png]]
+|col=17
+|row=16
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Neimi
+|portrait=[[File:Portrait neimi fe08.png]]
+|class=Archer
+|HP={{h|17|18 in the Japanese version}}
+|lv=1
+|inventory={{Item|8|Iron Bow}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically from turn 1
+}}
+|newunit2={{NewUnit
+|name=Colm
+|portrait=[[File:Portrait colm fe08.png]]
+|class=Thief
+|HP=18
+|lv=2
+|inventory={{Item|8|Iron Sword}}<br>{{Item|8|Lockpick}}<br>{{Item|8|Vulnerary}}
+|recruitment method=NPC, talk to with [[Neimi]]<br><small>(or automatically at the end of the chapter if both he and Neimi survived)</small>
+}}
+|forced1=eirika
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Door Key
+|obtain1=Dropped by enemy [[Brigand]]
+|item2=Chest Key
+|obtain2=Dropped by enemy [[Brigand]]
+|item3=Javelin
+|obtain3=Open southern [[chest]]
+|item4=Iron Lance
+|obtain4=Open northern left [[chest]]
+|item5=Hand Axe
+|obtain5=Open northern middle [[chest]]
+|item6=Iron Sword
+|obtain6=Open northern right [[chest]]
+|item7=Pure Water
+|obtain7=Steal from enemy [[Brigand]]
+|itemlast=Antitoxin
+|obtainlast=Steal from enemy [[Mercenary]]
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bazba]]
+|class=Brigand
+|lv=6
+|#=1
+|hp=25
+|str=8
+|skill=5
+|spd=7
+|lck=1
+|def=5
+|res=2
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Mercenary
+|lv=2
+|#=1
+|hp=18
+|str=4
+|skill=8
+|spd=8
+|lck=0
+|def=4
+|res=0
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Antitoxin}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=4
+|#=1
+|hp=18
+|str=4
+|skill=3
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Pure Water}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Thief
+|lv=3
+|#=1
+|hp=16
+|str=3
+|skill=1
+|spd=9
+|lck=0
+|def=2
+|res=0
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=4
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Door Key|type=drop}}
+|notes=Starts with 13 HP.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bazba]]
+|class=Brigand
+|lv=6
+|#=1
+|hp=25
+|str=8
+|skill=5
+|spd=7
+|lck=1
+|def=5
+|res=2
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Mercenary
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Antitoxin}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Pure Water}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Thief
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Door Key|type=drop}}
+|notes=Starts with 13 HP.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bazba]]
+|class=Brigand
+|lv=6
+|#=1
+|hp=25
+|str=8
+|skill=5
+|spd=7
+|lck=1
+|def=5
+|res=2
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Mercenary
+|lv=2
+|#=1
+|hp=18
+|str=4
+|skill=8
+|spd=8
+|lck=0
+|def=4
+|res=0
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Antitoxin}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=4
+|#=1
+|hp=18~19
+|str=4~5
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Pure Water}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Thief
+|lv=3
+|#=1
+|hp=16
+|str=3
+|skill=1
+|spd=9
+|lck=0
+|def=2
+|res=0
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=4
+|#=1
+|hp=20~21
+|str=5~6
+|skill=1~2
+|spd=5~6
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=20
+|str=5
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bazba]]
+|class=Brigand
+|lv=6
+|#=1
+|hp=25
+|str=8
+|skill=5
+|spd=7
+|lck=1
+|def=5
+|res=2
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22
+|str=6
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22
+|str=6
+|skill=2
+|spd=6
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Mercenary
+|lv=2
+|#=1
+|hp=19
+|str=4
+|skill=8
+|spd=9
+|lck=1
+|def=5
+|res=0
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Antitoxin}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=4
+|#=1
+|hp=20
+|str=5
+|skill=4
+|spd=4
+|lck=1
+|def=4
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22
+|str=6
+|skill=2
+|spd=6
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Pure Water}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Thief
+|lv=3
+|#=1
+|hp=17
+|str=3
+|skill=2
+|spd=10
+|lck=0
+|def=2
+|res=1
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=4
+|#=1
+|hp=22
+|str=7
+|skill=2
+|spd=6
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22
+|str=6
+|skill=1
+|spd=5
+|lck=0
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Door Key|type=drop}}
+|notes=Starts with 13 HP.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22
+|str=6
+|skill=2
+|spd=5
+|lck=1
+|def=3
+|res=0
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bazba]]
+|class=Brigand
+|lv=6
+|#=1
+|hp=26~27
+|str=8~10
+|skill=5~6
+|spd=7~8
+|lck=1~2
+|def=5~6
+|res=2~3
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22~24
+|str=5~9
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22~24
+|str=5~9
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Mercenary
+|lv=2
+|#=1
+|hp=19~21
+|str=4~6
+|skill=8~10
+|spd=8~10
+|lck=0~2
+|def=4~6
+|res=0~2
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Antitoxin}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=4
+|#=1
+|hp=20~23
+|str=4~7
+|skill=4~6
+|spd=3~6
+|lck=0~3
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22~24
+|str=5~9
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Pure Water}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Thief
+|lv=3
+|#=1
+|hp=16~20
+|str=3~5
+|skill=1~5
+|spd=9~11
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=4
+|#=1
+|hp=23~25
+|str=6~9
+|skill=1~4
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22~24
+|str=5~9
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Door Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=22~24
+|str=5~9
+|skill=1~3
+|spd=5~7
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Bazba]]
+|class=Brigand
+|lv=6
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hand Axe}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Mercenary
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Antitoxin}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Archer
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Pure Water}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Thief
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Hand Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Door Key|type=drop}}
+|notes=Starts with 13 HP.
+}}
+{{ChapUnitCellGBA
+|name=Cutthroat
+|class=Brigand
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Iron Axe}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+===NPC data===
+{{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Colm]]
+|class=Thief
+|type=other
+|lv=2
+|#=1
+|hp=18
+|str=4
+|skill=4
+|spd={{h|10|12 in the Japanese version}}
+|lck=8
+|def=3
+|res=1
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}} • {{Item|8|Vulnerary}}
+|notes=Prioritizes opening [[chest]]s.
+|last=y
+}}
+{{ChapUnitFtr}}
+
+====Reinforcements====
+*Turn 2
+**[[Colm]] from the stairs
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{main|Bazba}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait bazba fe08.png]]
+|sprite=brigand enemy
+|class=Brigand
+|affin=fire
+|lv=6
+|HP=25
+|str=8
+|skill=5
+|spd=7
+|luck=1
+|def=5
+|res=2
+|move=5
+|con=12
+|aid=11
+|inventory={{Item|8|Steel Axe}}<br>{{Item|8|Hand Axe}}
+|ax=C
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait bazba fe08.png]]
+|sprite=brigand enemy
+|class=Brigand
+|affin=fire
+|lv=6
+|HP={{h|26~27|28~29 in the Japanese version}}
+|str={{h|8~10|9~11 in the Japanese version}}
+|skill={{h|5~6|6~7 in the Japanese version}}
+|spd={{h|7~8|8 in the Japanese version}}
+|luck=1~2
+|def=5~6
+|res=2~3
+|move=5
+|con=12
+|aid=11
+|inventory={{Item|8|Steel Axe}}<br>{{Item|8|Hand Axe}}
+|ax=C
+}}
+}}
+
+==Strategy==
+{{strategy}}
+This chapter is very straight forward: Move towards the throne and kill all units in your way. There are no time limits or pressures and the only reinforcement is [[Colm]] on turn 2, who can immediately be recruited by talking to him with [[Neimi]]. Breaking through the walls is slower and completely unnecessary for progression, but if you're truly desperate to raise a character's [[Weapon Rank]] and have nothing better for them to do they can hit it with a cheap weapon ([[Ross]], Neimi, and the lower of [[Franz]]'s ranks are the only ones available now to remotely justify it, and none are at all needed). You do not need to send Colm to unlock the southern [[chest]] because the [[brigand]] next to it will drop a [[Chest Key]] (and, as you can buy them on the world map for extremely cheap , there's no real incentive to conserve it). [[Garcia]], [[Neimi]], and anyone with a [[javelin]] can be used to attack the archer and hand axe wielding brigand. 
+
+Keep watch of the enemy Thief. While he doesn't have any Lockpicks, he can still steal items from your units if he outspeeds them. Colm can steal them back, unless you're playing English Difficult in which case there's a fair chance the thief will match (40%) or outspeed (16%) Colm. Most potential losses at this point are extremely unlikely (you likely sold the gem from the last chapter already and placed the [[Elixir]] and [[Pure Water]] in storage) or merely annoying (a [[Vulnerary]]), but on English Difficult its possible to lose Colm's [[Lockpick]]s if the enemy thief got perfect speed. The loss will significantly cripple him as a utility unit and can only be fixed with significant training to be able to steal lockpicks from future thieves.
+
+The [[Antitoxin]] Mercenary and, more importantly, Pure Water Brigand can easily be lured out for Colm to claim their items before the rest of your units finish them off. Poison won't be encountered till [[Victims of War|Chapter 6]], where only two inaccurate enemies have it, and is rarely seen after that (On A Route it will make a similarly minor appearance in [[Creeping Darkness|Chapter 11]] and won't be seen till they can be freely purchased, while on the B Route it isn't seen again till [[Two Faces of Evil|Chapter 18]], well after it can be purchased and no longer poses any threat) so just sell it off (or ignore it). The Pure Water however is ''much'' more valuable, not only literally but also tactically, providing plenty of useful applications before it can be purchased in quantity. Notably having the second can help counter the [[Mogall]]s in B Route's [[Phantom Ship|Chapter 11]], widely considered one of the game's few chapters with significant difficulty.
+<!--
+==Trivia==
+-->
+
+==Etymology and other languages==
+{{Names
+|eng-name=The Bandits of Borgo
+|jpn-name={{h|ボルゴ峠の山賊|Borugo-tōge no sanzoku}}
+|jpn-mean=Bandits of the Borgo Mountain Pass
+|span-name=Bazba y compañia
+|span-mean=Bazba and company
+|fren-name=Les bandits de Borgo
+|fren-mean=The Bandits of Borgo
+|ger-name=Borgos Banditen
+|ger-mean=Borgo's Bandits
+|ital-name=I banditi di Bazba
+|ital-mean=The bandits of Bazba
+}}
+
+==Gallery==
+{{sectstub}}
+
+{{ChapterNav
+|prechapter=The Protected
+|nextchapter=Ancient Horrors
+}}
+
+{{Nav8}}
+{{DEFAULTSORT:Bandits of Borgo, The}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

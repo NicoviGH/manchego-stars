@@ -11,6 +11,7 @@
 
 id: baxby
 name: Baxby
+help_text: "An axe beak who hauls the party's sled. Strong, steady, and loyal."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 # fe_name not needed — "Baxby" is 5 chars, well under FE8's 12-char name buffer.
 # Falls-in-battle quote (#6). Register from his ch01-ending recruit lines (ch01 YAML):
 # a gruff, dignified veteran teamster — "honest terms / hauled freight over this ice" —
@@ -41,7 +42,7 @@ donor:
 # Authored FE-style (no 5e conversion). Sword + Lance mount; beak/claws are flavor on a
 # vanilla lance/sword (the weapon TYPE drives the triangle, the bird look rides the art).
 fe_stats:
-  class: Cavalier
+  class: cavalier
   level: 1
   HP: 20
   STR: 5
@@ -53,33 +54,26 @@ fe_stats:
   MOV: 7                    # Cavalier baseMov (mounted)
   CON: 9
 
-# ── Growth Rates (% per level) — vanilla Cavalier class growths from data_classes.c ──
-growth_rates:
-  HP: 75
-  STR: 35
-  SKL: 40
-  SPD: 28
-  DEF: 15
-  RES: 15
-  LCK: 30
-
 # ── Promotion (FE8 branched Cavalier) ─────────────────────────────────────────
 promotion:
-  branch: [Paladin, "Great Knight"]   # vanilla Cavalier branch (classchg-data.c [CLASS_CAVALIER])
-  default: Paladin
+  branch: [paladin, great-knight]   # vanilla Cavalier branch (classchg-data.c [CLASS_CAVALIER])
+  default: paladin
 
 # ── Inventory (joins with stock gear) ─────────────────────────────────────────
-inventory:
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
   - id: iron-lance
     name: "Iron Lance"
     fe_base: iron-lance
     fe_weapon_type: Lance
-    damage_type: piercing             # cosmetic — the beak/talons
+    damage_type: piercing           # the beak: his lead weapon, so FE8 equips it first; ch04 locks on it
   - id: iron-sword
     name: "Iron Sword"
     fe_base: iron-sword
     fe_weapon_type: Sword
-    damage_type: slashing             # cosmetic
+    damage_type: slashing           # cosmetic flavor label only
+  - id: vulnerary
+    name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
+    fe_base: vulnerary
 
 # ── Battle animation (#206) ────────────────────────────────────────────────────
 # Baxby rides CLASS_CAVALIER so the axe-beak can BE a mounted playable unit, and until this

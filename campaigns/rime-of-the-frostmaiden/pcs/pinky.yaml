@@ -6,6 +6,7 @@
 
 id: pinky
 name: Pinky
+help_text: "A homunculus raised by Prof. Geenius. He is eager to make his father proud."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 death_quote: "Father...? Did I do good? ...I'll get up in a minute..."  # falls-in-battle quote (#6 dialogue pass; lore/pinky.md)
 lord_pitch: "Flying knight -- soars over terrain; weak to bows."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 portrait_ref: portraits/pinky.png        # 96×80 bust shipped; GBA tile-sheet wiring pending (issue #23)
@@ -52,7 +53,7 @@ art:
 # (ClassData defines no base luck — a character-layer stat) until personal luck is assigned.
 # This is the army's flier role (lance flier; promotes to Falcon Knight).
 fe_stats:
-  class: "Pegasus Knight"
+  class: pegasus-knight
   level: 1
   HP: 14
   STR: 4                                  # FE Pow (Pegasus Knight basePow)
@@ -66,30 +67,25 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: ["Falcon Knight", "Wyvern Knight"]   # vanilla Pegasus Knight branch (classchg-data.c)
-  default: "Falcon Knight"                      # thematic lean; player may pick either.
-
-# ── Growth Rates (% per level) — vanilla Pegasus Knight growths from data_classes.c ──
-growth_rates:
-  HP: 65
-  STR: 35
-  SKL: 40
-  SPD: 40
-  DEF: 12
-  RES: 35
-  LCK: 35
+  branch: [falcon-knight, wyvern-knight]   # vanilla Pegasus Knight branch (classchg-data.c)
+  default: falcon-knight                      # thematic lean; player may pick either.
 
 # ── Inventory (Chapter 1 starting equipment) ───────────────────────────────────
 # Stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
-inventory:
-  - id: iron-lance
-    name: "Iron Lance"
-    fe_base: iron-lance                   # vanilla FE8 stats (Mt/Hit/Crit/Wt/uses)
-    fe_weapon_type: Lance                 # FE Pegasus Knight weapon class (baseRanks ITYPE_LANCE, D)
+inventory:                        # the kit the unit joins with, in slot order (inject.cast.unit_items)
+  - id: slim-lance
+    name: "Slim Lance"
+    fe_base: slim-lance
+    fe_weapon_type: Lance
+    # light lance; vanilla stats
+  - id: javelin
+    name: "Javelin"
+    fe_base: javelin
+    fe_weapon_type: Lance
+    range: 2                      # 1-2 range thrown lance; vanilla stats
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 3
 
 # ── Battle Animation ──────────────────────────────────────────────────────────
 # Pinky is the army's flier, and a flier's hover-and-swoop can't be faked from 3 static

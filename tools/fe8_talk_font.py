@@ -79,6 +79,11 @@ BATTLE_QUOTE_BUDGET_PX = 143
 # clamped to `0xC0` = 192px (helpbox.c:114, :977, :1436) while the text itself draws unclamped.
 SOLO_BOX_BUDGET_PX = 192
 
+# A CHARACTER'S HELP TEXT (R on a unit's name). Measured, not derived: vanilla's 83 descTextId
+# messages never run past two lines, and the widest line any of them draws is 175px.
+HELP_TEXT_BUDGET_PX = 175
+HELP_TEXT_LINES = 2
+
 
 def text_px(text):
     """Drawn width of one line, in pixels. Control tags are the caller's problem: this measures

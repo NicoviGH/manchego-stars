@@ -1,0 +1,8 @@
+<div class="col-list {{{class|}}}" style="columns: {{{1|17em}}}; {{{style|}}}"><noinclude>
+*Item 1
+*Item 2
+*Item 3
+*Item 4
+{{div col end}}
+
+{{doc}}</noinclude>

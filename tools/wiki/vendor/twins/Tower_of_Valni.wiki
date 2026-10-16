@@ -1,0 +1,121 @@
+{{Location Infobox
+|image=[[File:FESS Tower of Valni.png]]
+|caption=Artwork of the Tower of Valni from the world map.
+|chapter=Available from Chapter&nbsp;9 onwards
+|country=[[Frelia]]
+|appearances={{title|The Sacred Stones}}
+}}
+
+The '''Tower of Valni''' (Japanese: {{hl|ヴェルニの塔|Veruni no tō}} ''Tower of Velni'') is a map location in {{FE8}} that is unlocked after completing [[It's a Trap!|Chapter&nbsp;8]]. The tower consists of eight different floors in which the player fights against various monsters. Completing the tower during the [[Creature Campaign]] unlocks five bonus characters: [[Caellach]], [[Orson]], [[Riev]], [[Ismaire]], and [[Selena (The Sacred Stones)|Selena]].
+
+On higher floors of the tower, there are chests with [[Weapon level|D-level]] items and [[gold]], which tends to make up for the broken weapons lost during battles. In addition, the last [[boss]], a [[Cyclops]], has a chance to drop a valuable stat boosting item or a [[Master Seal]].
+
+==Floors==
+{{clear}}
+{| class="cellpadding-3 basic width-65" style="border-width: 2px"
+! style="background: none" colspan="3" | Maps of the Tower of Valni
+|- style="color: var(--emphasized-text-color)"
+! style="border-top-left-radius: 15px; width: 15%" | Floor
+! Map
+! style="border-top-right-radius: 15px" | Chapter unlocked
+|-
+| [[/Floor 1|Floor 1]]
+| [[File:Cm fe08 V-1.png|200px]]
+| Complete [[It's a Trap!|Chapter&nbsp;8]]
+|-
+| [[/Floor 2|Floor 2]]
+| [[File:Cm fe08 V-2.png|200px]]
+| Complete [[Distant Blade|Chapter&nbsp;9A]] or [[Fort Rigwald|Chapter&nbsp;9B]]
+|-
+| [[/Floor 3|Floor 3]]
+| [[File:Cm fe08 V-3.png|200px]]
+| Complete [[Revolt at Carcino|Chapter&nbsp;10A]] or [[Turning Traitor|Chapter&nbsp;10B]] 
+|-
+| [[/Floor 4|Floor 4]]
+| [[File:Cm fe08 V-4.png|200px]]
+| Complete [[Creeping Darkness|Chapter&nbsp;11A]] or [[Phantom Ship|Chapter&nbsp;11B]] 
+|-
+| [[/Floor 5|Floor 5]]
+| [[File:Cm fe08 V-5.png|200px]]
+| Complete [[Village of Silence|Chapter&nbsp;12A]] or [[Landing at Taizel|Chapter&nbsp;12B]] 
+|-
+| [[/Floor 6|Floor 6]]
+| [[File:Cm fe08 V-6.png|200px]]
+| Complete [[Hamill Canyon|Chapter&nbsp;13A]] or [[Fluorspar's Oath|Chapter&nbsp;13B]] 
+|-
+| [[/Floor 7|Floor 7]]
+| [[File:Cm fe08 V-7.png|200px]]
+| Complete [[Scorched Sand|Chapter&nbsp;15]]
+|-
+| [[/Floor 8|Floor 8]]
+| [[File:Cm fe08 V-8.png|200px]]
+| Complete [[Scorched Sand|Chapter&nbsp;15]]
+|-
+| class="roundb" colspan="3" |
+|}
+
+==Characters==
+{| class="cellpadding-2 sortable basic width-70"
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | Portrait
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | Name
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | Class
+! style="border-radius: 15px; border:1px solid {{Color2}}; background-color: transparent" | Joining conditions
+|-
+| [[File:Portrait caellach fe08.png]]
+| [[Caellach]]
+| [[Hero]]
+| Clear Floor 3
+|-
+| [[File:Portrait orson fe08.png]]
+| [[Orson]]
+| [[Paladin]]
+| Clear Floor 6
+|-
+| [[File:Portrait riev fe08.png]]
+| [[Riev]]
+| [[Bishop]]
+| Defeat 200+ enemies in one run
+|-
+| [[File:Portrait ismaire fe08.png]]
+| [[Ismaire]]
+| [[Swordmaster]]
+| Clear the tower once
+|-
+| [[File:Portrait selena fe08.png]]
+| [[Selena (The Sacred Stones)|Selena]]
+| [[Mage Knight]]
+| Clear the tower three times
+|-
+! style="border-top: 1px solid {{Color2}}; background: none" colspan="4" |
+|}
+
+==Trivia==
+* If one looks through ''The Sacred Stones'' text files, there are text labels for a ninth and tenth floor of the Tower of Valni.
+* In the [[Fire Emblem: The Sacred Stones prototype|prototype of ''The Sacred Stones'']], the tower was called the {{hl|バレアルの塔|Barearu no tō}} ''Tower of Baleal''.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Tower of Valni
+|jpn-name={{h|ヴェルニの塔|Veruni no tō}}
+|jpn-mean=Tower of Velni. Derived from ''[[wikipedia:Váli|Váli]]'', a Norse mythological figure. He was the son of ''Odin'' and ''Rindr'', who would go on to avenge ''Baldr's'' death.
+|span-name=Torre de Valni
+|span-mean=Tower of Valni
+|fren-name=Tour de Valni
+|fren-mean=Tower of Valni
+|ger-name=Turm von Valni
+|ger-mean=Tower of Valni
+|ital-name=Torre di Valni
+|ital-mean=Tower of Valni
+|por-br-name=Torre de Valni
+|por-br-mean=Tower of Valni; used as a location in the "Sacred, Dark, And..." [[Lost Lore]] event in {{title|Heroes}}.
+|ch-trad-name={{h|維爾尼之塔|Wéi'ěrní zhī tǎ}}
+|ch-trad-mean=Tower of Velni; used as a location in the "Sacred, Dark, And..." [[Lost Lore]] event in {{title|Heroes}}.
+}}
+
+==Gallery==
+<gallery>
+Mi fe08 tower of valni.png|The Tower of Valni's world map icon in {{title|The Sacred Stones}}.
+</gallery>
+
+{{Nav8}}
+[[Category:Locations in Fire Emblem: The Sacred Stones]]

@@ -1,0 +1,6192 @@
+{{Chapter Infobox
+|image=[[File:Map fe08 renais castle interior.png|200px]]
+|location=[[Renais Castle]]
+|new units=[[Myrrh]]
+|boss=[[Orson]]
+|previous=[[Scorched Sand]]
+|next=[[River of Regrets]]
+}}
+
+{{Quote|What has happened to our home? What has happened to Castle Renais? How did it come to be so ruined? So desolated?|[[Ephraim]]}}
+
+'''Ruled by Madness''' (Japanese: {{hl|荒れ果てた王都|Arehateta ōto}} ''Desolated capital'') is the sixteenth chapter of {{FE8}}.
+
+==Plot==
+{{main|Ruled by Madness/Script (Eirika)|Ruled by Madness/Script (Ephraim)}}
+
+[[Eirika]], [[Ephraim]], and company approach Castle [[Renais]]. Ephraim wonders how Renais has become so desolate; [[Seth]] relays spies' reports, that [[Orson]] has been put in charge of Renais but neglects it. Ephraim and Eirika resolve to liberate their home from Orson's misrule. [[Myrrh]] requests that she be allowed to aid the twins with her [[dragonstone]]; Ephraim agrees, on the condition that she not stray far from them.
+
+In Castle Renais, Orson enters his chamber and speaks to [[Monica (The Sacred Stones)|Monica]]; [[Lyon]] and [[Riev]] later enter as well. In Eirika's route, Riev speaks to Orson, informing him that Eirika and Ephraim are coming for him and pose a threat to Monica; as Riev and Lyon leave, Lyon experiences a bout of pain, but Riev assures him it will soon pass, and the two teleport away. In Ephraim's route, Lyon informs Orson of Ephraim's approach instead, reminding Orson that he is the one who resurrected Monica. In both routes, Orson leaves Monica to deal with the twins, promising Monica he will return.
+
+Orson is eventually defeated in battle, and the castle is secured. Seth leads Ephraim and Eirika to Orson's room, where they find the corpse of Monica, reanimated by similar magic as [[Vigarde]]; Ephraim elects to destroy Monica's corpse. At the throne, Ephraim resolves to rebuild Renais when he becomes king, but doubts he will be accepted. Seth then takes Ephraim and Eirika outside, where crowds cheer; Seth informs them the crowd cheers for the end of Orson's rule, not the start of Ephraim's, and Ephraim decides to dedicate his rule to their happiness.
+
+Ephraim, Eirika, and Seth then return to the throne to find Renais's [[Sacred Stone (object)|Sacred Stone]]. Eirika and Ephraim raise their bracelets, which begin to shine as the throne moves to reveal a stairway; down the stairs, they find the Sacred Stone of Renais, and their bracelets react to the power of the stone, allowing the twins to [[class change]]. Seth then retrieves Renais's [[Sacred Twin]]s, giving Ephraim [[Siegmund]] and Eirika [[Sieglinde]]. The twins return to the throne room with the Sacred Stone; [[L'Arachel]] suggests they travel to [[Rausten]], which houses the last remaining stone, and the group agrees to travel with L'Arachel as their guide.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Eirika Easy/Normal
+|tab2=Eirika Difficult
+|tab3=Ephraim Easy/Normal
+|tab4=Ephraim Difficult
+|content1={{ChapData
+|victory=Seize the throne
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally=1–{{h|12|11 in the Japanese version (blue square at coordinate (14, 2) is missing)}}
+|enemy=29{{h|+12|Reinforcements}}
+|map=[[File:Cm fe08 16A.png]]
+|col=22
+|row=28
+}}
+|content2={{ChapData
+|victory=Seize the throne
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally=1–{{h|12|11 in the Japanese version (blue square at coordinate (14, 2) is missing)}}
+|enemy=35{{h|+15|Reinforcements}}
+|map=[[File:Cm fe08 16A d.png]]
+|col=22
+|row=28
+}}
+|content3={{ChapData
+|victory=Seize the throne
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally=1–{{h|12|11 in the Japanese version (blue square at coordinate (3, 3) is missing)}}
+|enemy={{h|37|36 in the Japanese version}}{{h|+15|Reinforcements}}
+|map=[[File:Cm fe08 16B.png]]
+|col=22
+|row=28
+}}
+|content4={{ChapData
+|victory=Seize the throne
+|defeat=[[Eirika]] or [[Ephraim]] dies
+|ally=1–{{h|12|11 in the Japanese version (blue square at coordinate (3, 3) is missing)}}
+|enemy={{h|42|41 in the Japanese version}}{{h|+15|Reinforcements}}
+|map=[[File:Cm fe08 16B d.png]]
+|col=22
+|row=28
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Myrrh
+|portrait=[[File:portrait myrrh fe08.png]]
+|class=Manakete
+|HP=15
+|lv=1
+|inventory={{Item|8|Dragonstone}}<br>{{Item|8|Elixir}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Automatically from preparations
+}}
+|forced1=eirika
+|forced2=ephraim
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+|return22=l'Arachel
+|return23=dozla
+|return24=saleh
+|return25=ewan
+|return26=cormag
+|return27=rennac
+|return28=duessel
+|return29=knoll
+}}
+<small>Note: Only one of Eirika or Ephraim is required to be deployed, with the other being optional. The required unit will be whichever one the player chose to follow during [[A New Journey|the Chapter&nbsp;8 interlude]].</small>
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Purge
+|obtain1=Dropped by enemy [[Sage]] (reinforcement in Ephraim's route; drops unequipped item)<br><small>(Western version only)</small>
+|item2=Divine
+|obtain2=Dropped by enemy [[Sage]] (reinforcement in Ephraim's route; drops unequipped item)<br><small>(Western version only)</small>
+|item3=Hero Crest
+|obtain3=Dropped by enemy [[Hero]] (Eirika's route)<br>Dropped by enemy [[Warrior]] (Ephraim's route)
+|item4=Physic
+|obtain4=Dropped by enemy [[Priest]]
+|item5=Door Key
+|obtain5=Dropped by enemy [[Knight]]
+|item6=Door Key
+|obtain6=Dropped by enemy [[Knight]] (Ephraim's route only)
+|item7=Chest Key
+|obtain7=Dropped by enemy [[Druid]] (Eirika's route)<br>Dropped by enemy [[Shaman]] (Ephraim's route)
+|item8=Tomahawk
+|obtain8=Open lone western [[chest]]
+|item9=5,000G
+|item9image=gold
+|item9article=Gold
+|obtain9=Open bottom eastern [[chest]]
+|item10=Knight Crest
+|obtain10=Open middle eastern [[chest]]
+|item11=Talisman
+|obtain11=Open upper eastern [[chest]]
+|item12=Red Gem
+|obtain12=Steal from enemy [[Sage]] (Eirika's route)<br>Steal from enemy [[Great Knight]] (Ephraim's route; reinforcement)
+|item13=Vulnerary
+|obtain13=Steal from enemy [[Priest]]
+|item14=Lockpick
+|obtain14=Steal from enemy [[Thief]] (reinforcement)
+|item15=Lockpick
+|obtain15=Steal from enemy [[Thief]] (reinforcement)
+|item16=Elixir
+|obtain16=Steal from enemy [[Great Knight]] (Eirika's route only; reinforcement)
+|item17=Sieglinde
+|obtain17=Automatically at the end of chapter
+|item18=Siegmund
+|obtain18=Automatically at the end of chapter
+|item19=Lunar Brace
+|obtain19=Automatically at the end of chapter
+|itemlast=Solar Brace
+|obtainlast=Automatically at the end of chapter
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Eirika Easy
+|tab2=Eirika Easy <small>(Japan)</small>
+|tab3=Eirika Normal
+|tab4=Eirika Normal <small>(Japan)</small>
+|tab5=Eirika Difficult
+|tab6=Eirika Difficult <small>(Japan)</small>
+|tab7=Ephraim Easy
+|tab8=Ephraim Easy <small>(Japan)</small>
+|tab9=Ephraim Normal
+|tab10=Ephraim Normal <small>(Japan)</small>
+|tab11=Ephraim Difficult
+|tab12=Ephraim Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=48
+|str=18
+|skill=15
+|spd=14
+|lck=6
+|def=14
+|res=11
+|con=12
+|mov=8
+|inventory={{Item|8|Spear}} • {{Item|8|Silver Sword}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=24~28
+|str=9~13
+|skill=7~10
+|spd=6~9
+|lck=1~3
+|def=5~8
+|res=9~13
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Bolting}} • {{Item|8|Red Gem}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=24~28
+|str=9~13
+|skill=7~10
+|spd=6~9
+|lck=1~3
+|def=5~8
+|res=9~13
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Purge|type=drop}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=2
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=1
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=2
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=8
+|#=1
+|hp=23~26
+|str=11~14
+|skill=5~9
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~12
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=2
+|hp=20~23
+|str=6~9
+|skill=4~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=2
+|hp=20~23
+|str=6~9
+|skill=4~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=22
+|str=6
+|skill=9
+|spd=10
+|lck=0
+|def=8
+|res=2
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Hero Crest|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=18
+|str=1
+|skill=1
+|spd=2
+|lck=0
+|def=1
+|res=5
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=18
+|str=1
+|skill=1
+|spd=2
+|lck=0
+|def=1
+|res=5
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=13
+|#=1
+|hp=22~25
+|str=7~9
+|skill=4~5
+|spd=1~2
+|lck=1~3
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=14
+|#=2
+|hp=24~27
+|str=7~9
+|skill=11~13
+|spd=10~12
+|lck=2~4
+|def=5~6
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=1
+|hp=27~30
+|str=9~12
+|skill=5~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Poison Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=27~30
+|str=9~12
+|skill=5~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=19~21
+|str=4~6
+|skill=4~6
+|spd=5~7
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=19~21
+|str=4~6
+|skill=4~6
+|spd=5~7
+|lck=1~2
+|def=3~4
+|res=5~6
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=2
+|hp=23~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=1~3
+|def=11~12
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=4
+|#=1
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=21
+|str=8
+|skill=4
+|spd=6
+|lck=0
+|def=11
+|res=3
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=3
+|hp=21
+|str=8
+|skill=4
+|spd=6
+|lck=0
+|def=11
+|res=3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=2
+|hp=21
+|str=8
+|skill=4
+|spd=6
+|lck=0
+|def=11
+|res=3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=26~29
+|str=8~9
+|skill=5~7
+|spd=7~9
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=26~29
+|str=8~9
+|skill=5~7
+|spd=7~9
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=16
+|#=2
+|hp=20~23
+|str=3~4
+|skill=5~7
+|spd=12~14
+|lck=3~5
+|def=2~3
+|res=1~3
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Runesword}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Purge}} • {{Item|8|Red Gem}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Purge}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Hero Crest|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Poison Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=16
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=48
+|str=18
+|skill=15
+|spd=14
+|lck=6
+|def=14
+|res=11
+|con=12
+|mov=8
+|inventory={{Item|8|Spear}} • {{Item|8|Silver Sword}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=25~29
+|str=10~14
+|skill=7~11
+|spd=6~9
+|lck=1~4
+|def=5~8
+|res=10~14
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Bolting}} • {{Item|8|Red Gem}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=25~29
+|str=10~14
+|skill=7~11
+|spd=6~9
+|lck=1~4
+|def=5~8
+|res=10~14
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Purge|type=drop}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=2
+|hp=34~38
+|str=11~14
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=1
+|hp=34~38
+|str=11~14
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=2
+|hp=28
+|str=8
+|skill=5
+|spd=6
+|lck=0
+|def=5
+|res=0
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=8
+|#=1
+|hp=23~27
+|str=12~16
+|skill=6~9
+|spd=6~9
+|lck=1~5
+|def=4~7
+|res=9~12
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=2
+|hp=21~24
+|str=7~10
+|skill=4~6
+|spd=5~7
+|lck=2~3
+|def=3~4
+|res=7~9
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=2
+|hp=21~24
+|str=7~10
+|skill=4~6
+|spd=5~7
+|lck=2~3
+|def=3~4
+|res=7~9
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=28~32
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=28~32
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=28~32
+|str=8~11
+|skill=11~14
+|spd=11~14
+|lck=1~4
+|def=9~12
+|res=3~6
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Hero Crest|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=18
+|str=1
+|skill=1
+|spd=2
+|lck=0
+|def=1
+|res=5
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=18
+|str=1
+|skill=1
+|spd=2
+|lck=0
+|def=1
+|res=5
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=13
+|#=1
+|hp=24~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=2~3
+|def=11~13
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=14
+|#=2
+|hp=25~28
+|str=7~9
+|skill=11~13
+|spd=11~12
+|lck=2~4
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=1
+|hp=28~32
+|str=10~13
+|skill=5~7
+|spd=7~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Poison Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=28~32
+|str=10~13
+|skill=5~7
+|spd=7~9
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=20~23
+|str=5~8
+|skill=5~7
+|spd=6~7
+|lck=1~3
+|def=3~4
+|res=5~7
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=20~23
+|str=5~8
+|skill=5~7
+|spd=6~7
+|lck=1~3
+|def=3~4
+|res=5~7
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=2
+|hp=24~27
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=2~4
+|def=11~13
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=4
+|#=1
+|hp=22~25
+|str=10~13
+|skill=5~8
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~11
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~8
+|spd=7~9
+|lck=1~4
+|def=12~15
+|res=4~7
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=3
+|hp=21
+|str=8
+|skill=4
+|spd=6
+|lck=0
+|def=11
+|res=3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=2
+|hp=21
+|str=8
+|skill=4
+|spd=6
+|lck=0
+|def=11
+|res=3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=27~31
+|str=8~10
+|skill=6~8
+|spd=7~9
+|lck=3~5
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=27~31
+|str=8~10
+|skill=6~8
+|spd=7~9
+|lck=3~5
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=16
+|#=2
+|hp=21~24
+|str=3~4
+|skill=6~8
+|spd=13~15
+|lck=4~6
+|def=2~3
+|res=2~3
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Runesword}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Purge}} • {{Item|8|Red Gem}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Purge}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Hero Crest|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Poison Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=16
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=50~52
+|str=18~20
+|skill=16~17
+|spd=14~15
+|lck=6~8
+|def=14~15
+|res=11~12
+|con=12
+|mov=8
+|inventory={{Item|8|Spear}} • {{Item|8|Silver Sword}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=31~38
+|str=16~23
+|skill=11~17
+|spd=9~15
+|lck=3~7
+|def=6~11
+|res=15~21
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Bolting}} • {{Item|8|Red Gem}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=31~38
+|str=16~23
+|skill=11~17
+|spd=9~15
+|lck=3~7
+|def=6~11
+|res=15~21
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Purge|type=drop}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=2
+|hp=45~53
+|str=17~23
+|skill=9~14
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=1
+|hp=45~53
+|str=17~23
+|skill=9~14
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=2
+|hp=44~52
+|str=16~23
+|skill=9~14
+|spd=9~13
+|lck=2~6
+|def=7~11
+|res=2~6
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=8
+|#=1
+|hp=29~36
+|str=19~26
+|skill=9~15
+|spd=9~14
+|lck=4~8
+|def=5~9
+|res=14~19
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=2
+|hp=23~28
+|str=9~14
+|skill=6~9
+|spd=6~10
+|lck=2~5
+|def=3~5
+|res=8~12
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=2
+|hp=23~28
+|str=9~14
+|skill=6~9
+|spd=6~10
+|lck=2~5
+|def=3~5
+|res=8~12
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=38~47
+|str=12~17
+|skill=15~20
+|spd=13~17
+|lck=4~10
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=38~47
+|str=12~17
+|skill=15~20
+|spd=13~17
+|lck=4~10
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=38~47
+|str=12~17
+|skill=15~20
+|spd=13~17
+|lck=4~10
+|def=11~15
+|res=5~9
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Hero Crest|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=19~23
+|str=2~4
+|skill=2~4
+|spd=3~5
+|lck=1~5
+|def=1~3
+|res=6~10
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=19~23
+|str=2~4
+|skill=2~4
+|spd=3~5
+|lck=1~5
+|def=1~3
+|res=6~10
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=13
+|#=1
+|hp=27~32
+|str=10~13
+|skill=6~9
+|spd=1~4
+|lck=2~6
+|def=11~15
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=14
+|#=2
+|hp=29~34
+|str=9~12
+|skill=13~16
+|spd=12~15
+|lck=4~7
+|def=6~8
+|res=2~4
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=1
+|hp=32~38
+|str=12~17
+|skill=7~10
+|spd=8~11
+|lck=1~4
+|def=3~6
+|res=1~4
+|con=11
+|mov=5
+|inventory={{Item|8|Poison Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=32~38
+|str=12~17
+|skill=7~10
+|spd=8~11
+|lck=1~4
+|def=3~6
+|res=1~4
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=22~27
+|str=7~12
+|skill=7~10
+|spd=7~10
+|lck=2~4
+|def=3~5
+|res=7~10
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=22~27
+|str=7~12
+|skill=7~10
+|spd=7~10
+|lck=2~4
+|def=3~5
+|res=7~10
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=4
+|hp=28~33
+|str=10~13
+|skill=6~9
+|spd=1~4
+|lck=2~6
+|def=12~16
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=• The southern two do not move.<br>• The northern two begin moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=4
+|#=1
+|hp=28~34
+|str=17~23
+|skill=8~14
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~18
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=1
+|hp=28~33
+|str=10~13
+|skill=6~9
+|spd=1~4
+|lck=2~6
+|def=12~16
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Spear}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=1
+|hp=28~33
+|str=10~13
+|skill=6~9
+|spd=1~4
+|lck=2~6
+|def=12~16
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Horseslayer}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=1
+|hp=28~33
+|str=10~13
+|skill=6~9
+|spd=1~4
+|lck=2~6
+|def=12~16
+|res=2~4
+|con=13
+|mov=4
+|inventory={{Item|8|Killer Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=3
+|#=1
+|hp=34~40
+|str=10~15
+|skill=16~21
+|spd=15~20
+|lck=4~9
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=35~43
+|str=13~19
+|skill=7~11
+|spd=8~12
+|lck=3~7
+|def=14~18
+|res=6~10
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=3
+|hp=35~42
+|str=13~18
+|skill=7~11
+|spd=8~12
+|lck=3~7
+|def=14~18
+|res=6~10
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=2
+|hp=35~42
+|str=13~18
+|skill=7~11
+|spd=8~12
+|lck=3~7
+|def=14~18
+|res=6~10
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=31~36
+|str=10~13
+|skill=7~11
+|spd=8~12
+|lck=4~7
+|def=7~10
+|res=1~4
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=31~36
+|str=10~13
+|skill=7~11
+|spd=8~12
+|lck=4~7
+|def=7~10
+|res=1~4
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=16
+|#=2
+|hp=23~28
+|str=3~5
+|skill=7~12
+|spd=15~18
+|lck=6~9
+|def=2~4
+|res=2~5
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=4
+|#=3
+|hp=28~34
+|str=17~23
+|skill=8~14
+|spd=8~13
+|lck=3~7
+|def=5~9
+|res=12~18
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Runesword}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Purge}} • {{Item|8|Red Gem}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Purge}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Hand Axe}} • {{Item|8|Steel Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=16
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Hero
+|lv=5
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=6
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Hero Crest|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Poison Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Thunder}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+|notes=• The southern two do not move.<br>• The northern two begin moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Spear}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Horseslayer}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Killer Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Silver Lance}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=3
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=16
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=4
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content7={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=48
+|str=18
+|skill=15
+|spd=14
+|lck=6
+|def=14
+|res=11
+|con=12
+|mov=8
+|inventory={{Item|8|Runesword}} • {{Item|8|Silver Lance}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=2
+|hp=23~27
+|str=12~16
+|skill=6~9
+|spd=6~9
+|lck=1~5
+|def=4~7
+|res=9~12
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=1
+|hp=23~27
+|str=12~16
+|skill=6~9
+|spd=6~9
+|lck=1~5
+|def=4~7
+|res=9~12
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=8
+|#=1
+|hp=36~40
+|str=12~15
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hero Crest|type=drop}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=15
+|#=4
+|hp=25~27
+|str=7~9
+|skill=11~13
+|spd=10~12
+|lck=2~4
+|def=5~7
+|res=1~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=1
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=19
+|str=6
+|skill=3
+|spd=4
+|lck=0
+|def=4
+|res=6
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=2
+|hp=19~22
+|str=5~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Monk
+|lv=14
+|#=4
+|hp=21~24
+|str=3~5
+|skill=3~5
+|spd=4~6
+|lck=3~5
+|def=1~2
+|res=8~10
+|con=6
+|mov=5
+|inventory={{Item|8|Lightning}}
+|notes=The southern two begin moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=12
+|#=2
+|hp=25~27
+|str=8~10
+|skill=4~5
+|spd=5~7
+|lck=0~2
+|def=2~4
+|res=0~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=21~24
+|str=7~9
+|skill=3~5
+|spd=0~2
+|lck=1~2
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=1
+|hp=21~24
+|str=7~9
+|skill=3~5
+|spd=0~2
+|lck=1~2
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=14
+|#=2
+|hp=20~22
+|str=5~7
+|skill=5~7
+|spd=5~7
+|lck=1~3
+|def=3~4
+|res=5~7
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=21~22
+|str=2~4
+|skill=3~4
+|spd=3~5
+|lck=2~4
+|def=1~2
+|res=8~9
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Mend}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=21~22
+|str=2~4
+|skill=3~4
+|spd=3~5
+|lck=2~4
+|def=1~2
+|res=8~9
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=21~24
+|str=7~9
+|skill=3~5
+|spd=0~2
+|lck=1~2
+|def=10~12
+|res=1~2
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=1
+|hp=19~22
+|str=5~8
+|skill=3~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=14
+|#=2
+|hp=21~24
+|str=6~8
+|skill=12~14
+|spd=12~14
+|lck=2~4
+|def=3~4
+|res=1~3
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=14
+|#=2
+|hp=26~29
+|str=9~11
+|skill=4~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Soldier
+|lv=14
+|#=2
+|hp=26~29
+|str=6~9
+|skill=2~4
+|spd=2~4
+|lck=1~3
+|def=0~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=14
+|#=1
+|hp=21~24
+|str=3~5
+|skill=3~5
+|spd=4~6
+|lck=3~5
+|def=1~2
+|res=8~11
+|con=5
+|mov=5
+|inventory={{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Mend}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=26~29
+|str=8~9
+|skill=5~7
+|spd=7~9
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=26~29
+|str=8~9
+|skill=5~7
+|spd=7~9
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=2
+|hp=26~29
+|str=8~9
+|skill=5~7
+|spd=7~9
+|lck=2~4
+|def=7~8
+|res=1~2
+|con=9
+|mov=7
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=21
+|str=8
+|skill=4
+|spd=6
+|lck=0
+|def=11
+|res=3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=1
+|hp=20
+|str=5
+|skill=4
+|spd=4
+|lck=0
+|def=5
+|res=5
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=1
+|hp=20
+|str=5
+|skill=4
+|spd=4
+|lck=0
+|def=5
+|res=5
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Purge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=3
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=3
+|#=1
+|hp=19
+|str=4
+|skill=3
+|spd=5
+|lck=0
+|def=4
+|res=8
+|con=6
+|mov=7
+|inventory={{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=18
+|#=2
+|hp=21~24
+|str=3~4
+|skill=6~8
+|spd=13~15
+|lck=4~6
+|def=2~3
+|res=2~3
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content8={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Spear}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hero Crest|type=drop}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=15
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Monk
+|lv=14
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Lightning}}
+|notes=The southern two begin moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Soldier
+|lv=14
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=14
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=5
+|mov=5
+|inventory={{Item|8|Berserk|link=Berserk (staff)}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content9={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=48
+|str=18
+|skill=15
+|spd=14
+|lck=6
+|def=14
+|res=11
+|con=12
+|mov=8
+|inventory={{Item|8|Runesword}} • {{Item|8|Silver Lance}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=2
+|hp=24~28
+|str=13~17
+|skill=6~10
+|spd=6~9
+|lck=2~5
+|def=4~7
+|res=10~13
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=1
+|hp=24~28
+|str=13~17
+|skill=6~10
+|spd=6~9
+|lck=2~5
+|def=4~7
+|res=10~13
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=8
+|#=1
+|hp=37~42
+|str=12~16
+|skill=7~10
+|spd=7~11
+|lck=1~3
+|def=6~8
+|res=1~3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hero Crest|type=drop}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=15
+|#=4
+|hp=26~29
+|str=8~10
+|skill=12~14
+|spd=11~13
+|lck=3~5
+|def=5~7
+|res=2~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=1
+|hp=22~26
+|str=10~14
+|skill=5~8
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~11
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=22~26
+|str=10~14
+|skill=5~8
+|spd=5~8
+|lck=1~4
+|def=4~7
+|res=8~11
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=2
+|hp=20~23
+|str=6~9
+|skill=4~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Monk
+|lv=14
+|#=4
+|hp=22~25
+|str=3~5
+|skill=4~6
+|spd=5~6
+|lck=4~6
+|def=1~2
+|res=8~10
+|con=6
+|mov=5
+|inventory={{Item|8|Lightning}}
+|notes=The southern two begin moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=12
+|#=2
+|hp=26~29
+|str=9~11
+|skill=4~6
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=23~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=1~3
+|def=11~12
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=1
+|hp=23~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=1~3
+|def=11~12
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=14
+|#=2
+|hp=21~23
+|str=6~8
+|skill=5~7
+|spd=6~8
+|lck=1~3
+|def=3~4
+|res=5~7
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=21~24
+|str=3~5
+|skill=3~5
+|spd=4~6
+|lck=3~5
+|def=1~2
+|res=8~11
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Mend}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=21~24
+|str=3~5
+|skill=3~5
+|spd=4~6
+|lck=3~5
+|def=1~2
+|res=8~11
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=23~26
+|str=8~10
+|skill=4~6
+|spd=1~2
+|lck=1~3
+|def=11~12
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=1
+|hp=20~23
+|str=6~9
+|skill=4~5
+|spd=4~6
+|lck=1~3
+|def=2~4
+|res=6~8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=14
+|#=2
+|hp=22~25
+|str=7~9
+|skill=12~14
+|spd=12~14
+|lck=2~4
+|def=3~4
+|res=1~3
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=14
+|#=2
+|hp=28~31
+|str=10~12
+|skill=5~7
+|spd=6~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Soldier
+|lv=14
+|#=2
+|hp=27~30
+|str=7~10
+|skill=2~4
+|spd=2~4
+|lck=2~4
+|def=1~2
+|res=1~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=14
+|#=1
+|hp=22~25
+|str=3~5
+|skill=4~6
+|spd=5~6
+|lck=4~6
+|def=1~2
+|res=9~12
+|con=5
+|mov=5
+|inventory={{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Mend}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=27~31
+|str=8~10
+|skill=6~8
+|spd=7~9
+|lck=3~5
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=27~31
+|str=8~10
+|skill=6~8
+|spd=7~9
+|lck=3~5
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=2
+|hp=27~31
+|str=8~10
+|skill=6~8
+|spd=7~9
+|lck=3~5
+|def=7~9
+|res=1~3
+|con=9
+|mov=7
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~8
+|spd=7~9
+|lck=1~4
+|def=12~15
+|res=4~7
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=1
+|hp=23~27
+|str=8~12
+|skill=6~9
+|spd=5~8
+|lck=1~3
+|def=5~8
+|res=8~11
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=1
+|hp=23~27
+|str=8~12
+|skill=6~9
+|spd=5~8
+|lck=1~3
+|def=5~8
+|res=8~11
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Purge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=3
+|hp=21
+|str=7
+|skill=6
+|spd=7
+|lck=0
+|def=6
+|res=3
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=3
+|#=1
+|hp=19
+|str=4
+|skill=3
+|spd=5
+|lck=0
+|def=4
+|res=8
+|con=6
+|mov=7
+|inventory={{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=18
+|#=2
+|hp=22~25
+|str=3~4
+|skill=6~9
+|spd=14~16
+|lck=5~7
+|def=2~3
+|res=2~4
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content10={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=47
+|str=18
+|skill=14
+|spd=12
+|lck=6
+|def=14
+|res=9
+|con=12
+|mov=8
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Spear}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=3
+|hp=27
+|str=16~17
+|skill=8~9
+|spd=8~9
+|lck=3~4
+|def=6
+|res=12~14
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=8
+|#=1
+|hp=40
+|str=15
+|skill=9
+|spd=10
+|lck=3
+|def=7
+|res=3
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hero Crest|type=drop}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=15
+|#=4
+|hp=28~31
+|str=9~10
+|skill=13~14
+|spd=12~13
+|lck=4~5
+|def=6~7
+|res=2~3
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=3
+|hp=24~25
+|str=12~13
+|skill=6~7
+|spd=7~8
+|lck=2~3
+|def=5~6
+|res=10~11
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=2
+|hp=22~23
+|str=8~9
+|skill=5
+|spd=5~6
+|lck=3
+|def=3~4
+|res=8
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Monk
+|lv=14
+|#=4
+|hp=25
+|str=5
+|skill=5
+|spd=6
+|lck=6
+|def=2
+|res=9~10
+|con=6
+|mov=5
+|inventory={{Item|8|Lightning}}
+|notes=The southern two begin moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=12
+|#=2
+|hp=29~30
+|str=10~11
+|skill=6
+|spd=7~8
+|lck=1~2
+|def=3~4
+|res=1~2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=25~27
+|str=9
+|skill=5~6
+|spd=1~2
+|lck=3
+|def=12
+|res=2~3
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=1
+|hp=25~27
+|str=9
+|skill=5~6
+|spd=1~2
+|lck=3
+|def=12
+|res=2~3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=14
+|#=2
+|hp=23~24
+|str=7~8
+|skill=7
+|spd=7~8
+|lck=2~3
+|def=4
+|res=6~7
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=23~24
+|str=5
+|skill=5
+|spd=5~6
+|lck=5
+|def=2
+|res=10~11
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=23~24
+|str=5
+|skill=5
+|spd=5~6
+|lck=5
+|def=2
+|res=10~11
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=25~27
+|str=9
+|skill=5~6
+|spd=1~2
+|lck=3
+|def=12
+|res=2~3
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=1
+|hp=23
+|str=9
+|skill=6
+|spd=6
+|lck=2
+|def=3
+|res=8
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=14
+|#=2
+|hp=26
+|str=8~9
+|skill=14
+|spd=14~15
+|lck=4
+|def=4
+|res=3
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=14
+|#=1
+|hp=30
+|str=13
+|skill=7
+|spd=9
+|lck=2
+|def=4
+|res=2
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Soldier
+|lv=14
+|#=2
+|hp=29~31
+|str=10~11
+|skill=4
+|spd=3
+|lck=3~4
+|def=2
+|res=2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=14
+|#=1
+|hp=24
+|str=5
+|skill=5
+|spd=5
+|lck=6
+|def=2
+|res=11
+|con=5
+|mov=5
+|inventory={{Item|8|Berserk|link=Berserk (staff)}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content11={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=50~52
+|str=18~20
+|skill=16~17
+|spd=14~15
+|lck=6~8
+|def=14~15
+|res=11~12
+|con=12
+|mov=8
+|inventory={{Item|8|Runesword}} • {{Item|8|Silver Lance}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=2
+|hp=30~37
+|str=20~27
+|skill=10~16
+|spd=9~15
+|lck=4~9
+|def=5~10
+|res=14~20
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=1
+|hp=30~37
+|str=20~27
+|skill=10~16
+|spd=9~15
+|lck=4~9
+|def=5~10
+|res=14~20
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=8
+|#=1
+|hp=47~57
+|str=18~25
+|skill=10~15
+|spd=10~14
+|lck=2~7
+|def=7~12
+|res=3~7
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hero Crest|type=drop}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=15
+|#=4
+|hp=29~35
+|str=9~13
+|skill=13~17
+|spd=12~16
+|lck=4~7
+|def=6~8
+|res=2~5
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=1
+|hp=28~35
+|str=17~24
+|skill=9~14
+|spd=8~14
+|lck=3~7
+|def=5~9
+|res=13~18
+|con=8
+|mov=6
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=2
+|hp=28~35
+|str=17~24
+|skill=9~14
+|spd=8~14
+|lck=3~7
+|def=5~9
+|res=13~18
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=2
+|hp=22~27
+|str=8~13
+|skill=5~8
+|spd=6~9
+|lck=2~4
+|def=3~5
+|res=8~11
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Monk
+|lv=14
+|#=4
+|hp=24~29
+|str=5~8
+|skill=5~9
+|spd=6~9
+|lck=6~10
+|def=1~4
+|res=10~13
+|con=6
+|mov=5
+|inventory={{Item|8|Lightning}}
+|notes=The southern two begin moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=12
+|#=2
+|hp=30~35
+|str=11~15
+|skill=6~9
+|spd=7~10
+|lck=1~3
+|def=3~5
+|res=1~3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=26~31
+|str=9~12
+|skill=5~8
+|spd=1~3
+|lck=2~6
+|def=11~15
+|res=1~4
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=1
+|hp=26~31
+|str=9~12
+|skill=5~8
+|spd=1~3
+|lck=2~6
+|def=11~15
+|res=1~4
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=14
+|#=2
+|hp=23~28
+|str=8~13
+|skill=7~10
+|spd=7~11
+|lck=2~4
+|def=3~5
+|res=7~10
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=23~28
+|str=4~7
+|skill=5~8
+|spd=6~8
+|lck=5~9
+|def=1~3
+|res=10~15
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Mend}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=23~28
+|str=4~7
+|skill=5~8
+|spd=6~8
+|lck=5~9
+|def=1~3
+|res=10~15
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=26~31
+|str=9~12
+|skill=5~8
+|spd=1~3
+|lck=2~6
+|def=11~15
+|res=1~4
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=1
+|hp=22~27
+|str=8~13
+|skill=5~8
+|spd=6~9
+|lck=2~4
+|def=3~5
+|res=8~11
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=14
+|#=2
+|hp=25~31
+|str=8~12
+|skill=14~17
+|spd=14~17
+|lck=4~7
+|def=3~6
+|res=2~4
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=14
+|#=2
+|hp=31~37
+|str=12~17
+|skill=6~10
+|spd=8~11
+|lck=1~4
+|def=3~6
+|res=1~4
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Soldier
+|lv=14
+|#=2
+|hp=31~36
+|str=9~14
+|skill=4~7
+|spd=3~5
+|lck=2~6
+|def=1~3
+|res=1~4
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=14
+|#=1
+|hp=24~29
+|str=5~8
+|skill=5~9
+|spd=6~9
+|lck=6~10
+|def=1~4
+|res=11~16
+|con=5
+|mov=5
+|inventory={{Item|8|Berserk|link=Berserk (staff)}} • {{Item|8|Mend}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=5
+|#=2
+|hp=35~41
+|str=10~16
+|skill=17~22
+|spd=16~21
+|lck=4~10
+|def=7~11
+|res=5~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=8
+|#=2
+|hp=23~28
+|str=8~11
+|skill=4~7
+|spd=0~3
+|lck=1~4
+|def=10~14
+|res=1~3
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=1
+|hp=22~27
+|str=8~13
+|skill=5~8
+|spd=6~9
+|lck=2~4
+|def=3~5
+|res=8~11
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=31~36
+|str=10~13
+|skill=7~11
+|spd=8~12
+|lck=4~7
+|def=7~10
+|res=1~4
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=31~36
+|str=10~13
+|skill=7~11
+|spd=8~12
+|lck=4~7
+|def=7~10
+|res=1~4
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=2
+|hp=31~36
+|str=10~13
+|skill=7~11
+|spd=8~12
+|lck=4~7
+|def=7~10
+|res=1~4
+|con=9
+|mov=7
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=35~43
+|str=13~19
+|skill=7~11
+|spd=8~12
+|lck=3~7
+|def=14~18
+|res=6~10
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=1
+|hp=29~36
+|str=14~21
+|skill=10~15
+|spd=8~14
+|lck=2~6
+|def=6~10
+|res=13~18
+|con=7
+|mov=6
+|inventory={{Item|8|Elfire}} • {{Item|8|Sleep|link=Sleep (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=1
+|hp=29~36
+|str=14~21
+|skill=10~15
+|spd=8~14
+|lck=2~6
+|def=6~10
+|res=13~18
+|con=7
+|mov=6
+|inventory={{Item|8|Divine}} • {{Item|8|Purge|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=3
+|hp=33~39
+|str=11~16
+|skill=11~16
+|spd=13~18
+|lck=4~9
+|def=8~12
+|res=5~9
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=3
+|#=1
+|hp=27~34
+|str=10~15
+|skill=7~12
+|spd=13~20
+|lck=7~12
+|def=5~9
+|res=15~20
+|con=6
+|mov=7
+|inventory={{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=18
+|#=2
+|hp=24~29
+|str=3~5
+|skill=8~13
+|spd=15~19
+|lck=6~10
+|def=2~4
+|res=2~5
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content12={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[Orson]]
+|class=Paladin
+|lv=13
+|#=1
+|hp=51
+|str=20
+|skill=16
+|spd=13
+|lck=8
+|def=15
+|res=10
+|con=12
+|mov=8
+|inventory={{Item|8|Silver Sword}} • {{Item|8|Spear}}
+|notes=Does not move; stands on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|throne]], the chapter's seize point.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=10
+|#=3
+|hp=33~35
+|str=23~26
+|skill=13~14
+|spd=11~14
+|lck=6~8
+|def=5~8
+|res=17~20
+|con=8
+|mov=6
+|inventory={{Item|8|Nosferatu}} • {{Item|8|Eclipse|link=Eclipse (tome)}}
+|notes=• Does not move.<br>• Will not attack until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Warrior
+|lv=8
+|#=1
+|hp=56
+|str=21
+|skill=13
+|spd=12
+|lck=4
+|def=10
+|res=6
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Hero Crest|type=drop}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mercenary
+|lv=15
+|#=4
+|hp=33~36
+|str=11~13
+|skill=15~16
+|spd=13~16
+|lck=5~7
+|def=7~8
+|res=3~4
+|con=9
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Will not move until a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Druid
+|lv=5
+|#=3
+|hp=31~33
+|str=20~22
+|skill=11~13
+|spd=11~12
+|lck=5~6
+|def=6~8
+|res=15~16
+|con=8
+|mov=6
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the southern room or the hall surrounding the throne room.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=2
+|hp=25~26
+|str=12~13
+|skill=6~7
+|spd=6~7
+|lck=3~5
+|def=3~5
+|res=9~10
+|con=7
+|mov=5
+|inventory={{Item|8|Flux}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Monk
+|lv=14
+|#=4
+|hp=27~28
+|str=6~8
+|skill=7~9
+|spd=7~8
+|lck=8~9
+|def=2~3
+|res=11~13
+|con=6
+|mov=5
+|inventory={{Item|8|Lightning}}
+|notes=The southern two begin moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=12
+|#=2
+|hp=33~36
+|str=14~16
+|skill=8
+|spd=9
+|lck=3
+|def=4~5
+|res=3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Begins moving if a unit enters the castle.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=32
+|str=12~13
+|skill=7
+|spd=3
+|lck=4~5
+|def=14
+|res=3
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=1
+|hp=32
+|str=12~13
+|skill=7
+|spd=3
+|lck=4~5
+|def=14
+|res=3
+|con=13
+|mov=4
+|inventory={{Item|8|Javelin}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Mage
+|lv=14
+|#=2
+|hp=26
+|str=11~12
+|skill=9
+|spd=10
+|lck=3~4
+|def=4~5
+|res=8~9
+|con=6
+|mov=5
+|inventory={{Item|8|Fire}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=27~28
+|str=5~6
+|skill=7~8
+|spd=7~8
+|lck=8
+|def=2
+|res=14
+|con=5
+|mov=5
+|inventory={{Item|8|Physic}} • {{Item|8|Vulnerary}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=12
+|#=1
+|hp=27~28
+|str=5~6
+|skill=7~8
+|spd=7~8
+|lck=8
+|def=2
+|res=14
+|con=5
+|mov=5
+|inventory={{Item|8|Physic|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=12
+|#=2
+|hp=30~32
+|str=11~12
+|skill=7
+|spd=3
+|lck=4~5
+|def=12~13
+|res=3~4
+|con=13
+|mov=4
+|inventory={{Item|8|Iron Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=1
+|hp=25~26
+|str=12~13
+|skill=6~7
+|spd=6~7
+|lck=3~5
+|def=3~5
+|res=9~10
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Myrmidon
+|lv=14
+|#=2
+|hp=30
+|str=10~11
+|skill=16
+|spd=17
+|lck=4~5
+|def=4~5
+|res=3
+|con=8
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Fighter
+|lv=14
+|#=1
+|hp=37
+|str=16
+|skill=8
+|spd=9
+|lck=3
+|def=5
+|res=3
+|con=11
+|mov=5
+|inventory={{Item|8|Iron Axe}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Soldier
+|lv=14
+|#=2
+|hp=34~36
+|str=12
+|skill=5~6
+|spd=5
+|lck=4
+|def=3
+|res=3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Priest
+|lv=14
+|#=1
+|hp=27
+|str=6
+|skill=7
+|spd=8
+|lck=9
+|def=3
+|res=15
+|con=5
+|mov=5
+|inventory={{Item|8|Berserk|link=Berserk (staff)}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Swordmaster
+|lv=5
+|#=2
+|hp=37~39
+|str=12~13
+|skill=19~20
+|spd=19~20
+|lck=7~8
+|def=9
+|res=8~9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Knight
+|lv=8
+|#=2
+|hp=28~29
+|str=9
+|skill=6~7
+|spd=2
+|lck=2~3
+|def=13
+|res=2~3
+|con=13
+|mov=4
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Shaman
+|lv=14
+|#=1
+|hp=27
+|str=12
+|skill=6
+|spd=8
+|lck=3
+|def=4
+|res=9
+|con=7
+|mov=5
+|inventory={{Item|8|Luna|link=Luna (tome)}}
+|notes=Immediately begins moving unprovoked.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Cavalier
+|lv=15
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Great Knight
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=13
+|mov=6
+|inventory={{Item|8|Steel Axe}} • {{Item|8|Red Gem}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Sage
+|lv=5
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=6
+|inventory={{Item|8|Sleep|link=Sleep (staff)}} • {{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Ranger
+|classarticle=Ranger (The Sacred Stones)
+|lv=3
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=7
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Remnant
+|class=Valkyrie
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Divine}}
+}}
+{{ChapUnitCellGBA
+|name=Hunter
+|class=Thief
+|lv=18
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=6
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Lockpick}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+=====Eirika's route=====
+*After entering the southern room (the stairs at column 19) or the hall surrounding the throne room (columns 3–22, rows 1–12)
+**6 [[Great Knight]]s from the southwest corner of the map
+**4 [[Cavalier]]s from outside the castle
+**1 [[Thief]] from near the western door to the castle
+*Turn 12
+**1 [[Thief]] from the eastern border of the map
+*Turns 13-15 <small>(Difficult only)</small>
+**1 [[Druid]] from the eastern border of the map
+
+=====Ephraim's route=====
+*After entering the castle (reaching row 4 from the left, or row 22 from the right)
+**6 [[Cavalier]]s from near ally starting positions
+**1 [[Great Knight]] from the southwest corner of the map
+*After entering the southern room (the stairs at column 19) or the hall surrounding the throne room (columns 3–22, rows 1–12)
+**2 [[Sage]]s from the eastern border of the map
+**3 [[Ranger (The Sacred Stones)|Ranger]]s from outside the castle
+**1 [[Valkyrie]] from outside the castle
+*Turn 6
+**1 [[Thief]] from the stairs
+*Turn 17
+**1 [[Thief]] from the eastern border of the map
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Orson}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Portrait orson enemy fe08.png]]
+|sprite=paladin enemy
+|class=Paladin
+|affin=dark
+|lv=13
+|HP=48
+|str=18
+|skill=15
+|spd=14
+|luck=6
+|def=14
+|res=11
+|move=8
+|con=12
+|aid=13
+|inventory=<small>'''Eirika's route, Japanese version:'''</small><br>{{Item|8|Silver Lance}}<br>{{Item|8|Runesword}}<br><small>'''Eirika's route, Western version:'''</small><br>{{Item|8|Spear}}<br>{{Item|8|Silver Sword}}<br><small>'''Ephraim's route, Japanese version:'''</small><br>{{Item|8|Silver Sword}}<br>{{Item|8|Spear}}<br><small>'''Ephraim's route, Western version:'''</small><br>{{Item|8|Runesword}}<br>{{Item|8|Silver Lance}}
+|sw=A
+|la=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Portrait orson enemy fe08.png]]
+|sprite=paladin enemy
+|class=Paladin
+|affin=dark
+|lv=13
+|HP=50~52
+|str=18~20
+|skill=16~17
+|spd=14~15
+|luck=6~8
+|def=14~15
+|res=11~12
+|move=8
+|con=12
+|aid=13
+|inventory=<small>'''Eirika's route, Japanese version:'''</small><br>{{Item|8|Silver Lance}}<br>{{Item|8|Runesword}}<br><small>'''Eirika's route, Western version:'''</small><br>{{Item|8|Spear}}<br>{{Item|8|Silver Sword}}<br><small>'''Ephraim's route, Japanese version:'''</small><br>{{Item|8|Silver Sword}}<br>{{Item|8|Spear}}<br><small>'''Ephraim's route, Western version:'''</small><br>{{Item|8|Runesword}}<br>{{Item|8|Silver Lance}}
+|sw=A
+|la=A
+}}
+}}
+
+==Strategy==
+{{strategy}}
+The main time pressure on this map is the thieves that spawn as reinforcements. The conditions and turn for their spawning varies by the route. For Ephraim's route, the turn 17 thief is far too late to pose a threat to the treasure at any reasonable pace of play, and the turn 6 thief can be defeated without ever having stepping foot in the castle. Once again stats staffs are present so don’t forget to take [[Restore]]s. On Ephraim's route the main one of consequence is the Berserk staff near the back entrance, which can easily be eliminated with a javelin before it gets a second shot off. Others are often more annoying than deadly, but should still be prepared for. 
+
+While Ephraim starts further back, closer to the rear entrance, this doesn't necessarily mean you should use it. The narrow pass and forest make it cumbersome to use, and it doesn't really bypass any real threats. At most only a small force is needed to remove the Berserk bishop, and help stop the turn 6 thief, and this team doesn’t even need to ''enter'' the castle for these. The forest leading up to the back door is however a fine place to station a unit for dealing with the reinforcements that spawn after entering the castle.
+
+Ephraim’s version of the map has several siege tome users where Eirika has only a single Purge user with restrictive AI. The Eclipse tome Druids are no serious threat and can largely be ignored: They can’t kill, have minimal accuracy, and only reinforcements move after them so they likely won’t set up a kill even if they do hit. The Purge Sage is a more serious threat, but his spawning is based on condition, not turn, so it’s easy to avoid him till you’re ready if you know the trigger.
+
+In versions of the map where Orson has a Runesword, he is easily dealt with by placing a magic user at 2 range, as he lacks the power to apply damage to high resistance units and the resistance to take their hits. Otherwise deal with him like any other boss.
+
+==Trivia==
+*In the Japanese version, Orson carries a Silver Lance and a Runesword on Eirika's route, and a Silver Sword and a Spear on Ephraim's route. This was swapped in the Western version. Also in the Japanese version, Orson wields the Silver Sword or Silver Lance by default rather than the Spear or Runesword.
+
+==Etymology and other languages==
+{{Names
+|eng-name=Ruled by Madness
+|jpn-name={{h|荒れ果てた王都|Arehateta ōto}}
+|jpn-mean=Desolated capital
+|span-name=Amor ciego
+|span-mean=Blind love
+|fren-name=Guidé par la folie
+|fren-mean=Guided by madness
+|ger-name=Gefangen im Wahnsinn
+|ger-mean=Trapped in Madness
+|ital-name=In preda alla follia
+|ital-mean=In the grip of Madness
+}}
+
+==Gallery==
+<gallery>
+Map fe08 renais castle interior.png|The chapter map.
+</gallery>
+
+{{ChapterNav
+|prechapter=Scorched Sand
+|nextchapter=River of Regrets
+}}
+
+==References==
+{{refbar}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

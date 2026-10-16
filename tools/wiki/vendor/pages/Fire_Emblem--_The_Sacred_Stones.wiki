@@ -1,0 +1,222 @@
+{{Featured}}
+{{Game Infobox
+|title=''The Sacred Stones''
+|image=[[File:FESS logo.png|200px]]<br>[[File:Ba america fe08.jpg|200px]]
+|caption=North American logo and box art.
+|developer=[[Intelligent Systems]]
+|publisher=[[Nintendo]]
+|director=[[Sachiko Wada]]<br>Taiki Ubukata<br>Kentaro Nishimura
+|released='''Game Boy Advance'''<br>{{JP}}October 7, 2004<ref name="feworld">{{cite web|url=http://www.nintendo.co.jp/fe/few_series.html#08|site=nintendo.co.jp|retrieved=October 7, 2010}}{{dead link}}</ref><br>{{NA}}May 23, 2005<ref name="nindbrelease">{{cite web|url=https://web.archive.org/web/20100625040739/http://www.nindb.net:80/game/fire-emblem-tss.html|title=Fire Emblem: The Sacred Stones|site=NinDB|retrieved=March 5, 2011}}</ref><br>{{AUS}}November 3, 2005<ref>{{cite web|url=https://web.archive.org/web/20060629084827/http://palgn.com.au/article.php?id=3325&sid=7b7984ff736abd9f2b8060f1236324bd|title=Updated Augstralian Release List - 31/10/05|site=palgn.com.au (archived by the Wayback Machine)|retrieved=August 1, 2011}}</ref><br>{{EU}}November 4, 2005<ref name="nindbrelease" /><br>'''Nintendo 3DS'''<br>{{WW}}December 16, 2011<ref name=''ign''>{{cite web|url=https://www.ign.com/articles/2011/12/14/nintendos-free-gba-games-update|title=Nintendo's Free GBA Games Update|site=ign.com|published=December 14, 2011|retrieved=December 14, 2011}}</ref><br/>'''Wii U'''<br/>{{JP}}August 6, 2014<br/>{{EU}}January 1, 2015<br>{{NA}}June 18, 2015<br>'''Game Boy Advance&nbsp;&ndash; Nintendo Classics'''<br>{{WW}}April 21, 2025
+|rating={{Rating|ESRB=E|PEGI=7+|OFLC=G8+|CERO=All Ages|USK=0}}
+|platforms=[[Game Boy Advance]]<br>[[Nintendo 3DS]] <small>(Ambassador Program)</small><br/>[[Wii U]] <small>([[Virtual Console]])</small><br>[[Nintendo Switch]] <small>(Game Boy Advance&nbsp;&ndash; Nintendo Classics)</small>
+|predecessor={{FE7}}
+|successor={{FE9}}
+|strategywiki=Fire Emblem: The Sacred Stones
+|nwiki=Fire Emblem: The Sacred Stones
+}}
+
+'''''Fire Emblem: The Sacred Stones''''' (Japanese: {{hl|ファイアーエムブレム 聖魔の光石|Faia Emuburemu: Seima no Kōseki}} ''Fire Emblem: Light Stones of Saints and Demons'') is a 2004 [[Game Boy Advance]] game. It is the eighth installment in the {{FES}}, the second installment to be released internationally, and the third and final installment released for the Game Boy Advance.<ref>{{cite web|url=http://www.nindb.net/series/fire-emblem.html|title=Fire Emblem Series|site=nindb.com|retrieved=February 18, 2011}}</ref> It is set in the world of [[Magvel]], which has not appeared in any other titles, and holds the distinction of having an entirely unique cast. It stars [[Eirika]] and [[Ephraim]], twin heirs to the kingdom of [[Renais]], as they combat the sudden aggression of their southern neighbor [[Grado]] and investigate the dark forces that have caused their former ally to so swiftly turn on them and the rest of the continent.
+
+In 2011, ''The Sacred Stones'' was given a free limited reissue to early adopters of the [[Nintendo 3DS]], under the Nintendo 3DS Ambassador Program. As with the other Game Boy Advance titles reissued under the program, it was not released as a standalone title. The game was, however, released for the [[Wii U]]'s [[Virtual Console]], in Japan in 2014, and internationally in 2015.
+
+==Plot==
+{{main|:Category:Scripts of Fire Emblem: The Sacred Stones{{!}}Category:Scripts of ''Fire Emblem: The Sacred Stones''}}
+===The fall of Renais===
+In the castle of [[Renais]], troops from [[Grado]] have breached the castle. Fearing the safety of his daughter [[Eirika]], [[Fado|King Fado]] sends his paladin [[Seth]] to take Eirika to safety. On his way out, they are attacked by [[Valter]], a Grado soldier, and several bandits. Soon they meet [[Franz]] and [[Gilliam]] at Mulan, a border town of Renais and Frelia, and rescue Princess [[Tana]] of Frelia. In Frelia they meet [[Hayden|King Hayden]], who sends his vassals Gilliam, [[Vanessa]], and [[Moulder]] to help. Eirika decides to go to Grado and help her brother, despite Hayden's advice to stay safe.
+
+As they travel past the village of [[Ide]], where they meet retired war General [[Garcia]] and his ambitious son [[Ross]], Eirika's bracelet is stolen, and Seth insists that they recover it. She retrieves it from [[Colm]], a snide young thief, with the help of his childhood friend, a tearful archer named [[Neimi]]. Colm had gone to the hideout of the Bandits of Borgo to steal from them. With the help of Neimi, Eirika and her companions located the hideout and eliminated the bandits. Meanwhile, Generals [[Duessel]], [[Selena (The Sacred Stones)|Selena]], and [[Glen]] of Grado talk about the strange behavior of [[Vigarde]], the king of Grado. Normally, Grado would never attack Renais, a longtime ally. Vigarde introduces three new generals to help in the conquest of the continent: [[Riev]], [[Caellach]], and [[Valter]].
+
+In the [[Za'ha Woods]], Eirika finds that [[monster]]s of old legends have appeared. They meet the monk [[Artur]] and his friend [[Lute]], an intelligent young mage. Additionally, they meet a lively young woman named [[L'Arachel]], along with a sardonic rogue [[Rennac]] and boisterous warrior [[Dozla]]; they introduce themselves as going on a holy crusade to defeat evil and leave quickly.
+
+Eirika's army approaches Serafew, the border town of Renais and Grado. A man asks Eirika if she has seen a girl with indigo-colored hair. They meet the cleric [[Natasha]], who has been branded a traitor. A myrmidon named [[Joshua]] also joins Eirika. After the battle, Natasha tells Eirika and Seth that the emperor of Grado plans to destroy the Sacred Stones. According to her, the emperor has changed, and the holders of the Sacred Stones must be warned.
+
+===Eirika and Ephraim reunite===
+Meanwhile, Ephraim is fighting in Fort Renvall with his two loyal knights, [[Forde]] and [[Kyle]], along with the paladin [[Orson]]. He takes control of the fort, but he is forced to escape when enemy troops surround the castle. At the same time, Eirika continues on, meeting a Grado leader who tries to bribe her into giving him her bracelet, but Seth refuses. After Eirika rescues the family, Seth tells her of the bracelet's significance: it is half of a key to the chamber that holds Renais's Sacred Stone; Ephraim's bracelet is the other half. 
+
+At last, Eirika reaches Renvall to help her brother. She battles to get into the fort and reach her brother. As they arrive, Orson meets them, but he has betrayed Renais. Eirika has no choice but to fight. During the battle, Ephraim, Forde, and Kyle arrive to help Eirika. After the battle, Ephraim introduces [[Myrrh]], a girl with indigo hair, who says a great darkness is approaching. Back at Serafew, Eirika and Ephraim reminisce about [[Lyon]], their kind friend and prince of Grado, son of Vigarde. 
+
+They arrive in Frelia, where Tana happily greets them. Her brother [[Innes]], prince of Frelia, has just returned from the war front. Ephraim introduces Myrrh to Hayden. He reveals that she is a [[Manakete]], part of an ancient race of dragon folk. Myrrh explains that she and the had felt a dark wave of energy from Grado and went to investigate. However, she was captured until Ephraim came to rescue her. Suddenly, the Sacred Stone of Frelia is destroyed by troops led by Caellach and Selena. The group then decides to split up - Innes to Jehanna, Eirika to Rausten, and Ephraim directly into Grado.
+
+===Eirika's journey===
+In Grado, Vigarde orders Glen to find Eirika, Valter to find Ephraim, Caellach to take Jehanna's Sacred Stone, Riev to take the Stone of Rausten, Duessel to find Ephraim also, and for Selena to wait in the capital for new orders. 
+
+Eirika goes to Port Kiris to find a ship to Rausten. Princess Tana joins her, saying that she will not be left out. They meet L'Arachel and her companions again; she informs Eirika that no ships are leaving port and advises her to take the overland route. There is a sudden conflict as mercenaries appear to fight Eirika. During the battle, an young soldier of Grado named [[Amelia]] joins Eirika's army. Afterwards, Seth and Eirika learn that the mercenaries are from [[Carcino]], meaning that the alliance between Carcino and Frelia has been broken. Since Innes is going through Carcino to Jehanna, she realizes he is deep in enemy territory and hurries to help him.
+
+In Grado, Glen confesses to his brother [[Cormag]] that he had met Eirika before, and she seemed a kindhearted, gentle woman. However, he has to obey the emperor. In Carcino, Innes is surrounded by Carcinan troops with the mercenaries [[Gerik]] and [[Tethys]]. Eirika helps to save Innes, and along the way, the myrmidon [[Marisa]] goes to Eirika's side. [[Pablo]] retreats, and Eirika meets [[Klimt]], a member of Carcino's Council of Elders, who states that only some have sided with Grado; the rest have kept the alliance. Eirika and Innes now need to travel to Jehanna and Rausten by land. [[Ewan]], the younger brother of Tethys, suggests Caer Pelyn, a mountain pass that goes directly to Jehanna; Eirika decides to take this route.
+
+At Caer Pelyn, the army passes through a fort that Ewan claims to be empty; however, monsters appear. L'Arachel and Dozla appear, without Rennac, and join Eirika. Ewan finds his teacher, [[Saleh]], who was the man looking for a girl back in Serafew. He agrees to lead them through the mountains. General Glen arrives to kill Eirika, but he is convinced that she is innocent and refuses to kill her. When he flies back, he is killed by Valter.
+
+===To Jehanna===
+Eirika continues on in the mountains. Even more monsters appear, and Ewan begins to fight as a novice mage. The elder of Caer Pelyn informs Eirika that it was the Great Dragon helped to seal away the Demon King, instead of just the hero Grado with the Sacred Stones. She says the Great Dragon watches the bones of the Demon King and ensures that it does not revive; however, recently the Great Dragon has disappeared. When Eirika says she has seen Myrrh, the elder reveals that Myrrh is the current form of the Great Dragon. She urges Saleh to leave for Grado at once to find Myrrh; he decides to go with Eirika, as the quickest route to Grado goes through Jehanna.
+
+Valter tells Cormag of Glen's death and that it was Eirika who killed him. Cormag then angrily decides to avenge his brother and flies off to find Eirika. She prepares to fight Grado troops at Hamill Canyon; her goal is to hold out until Rausten troops arrive, according to L'Arachel. Cormag flies in to kill Eirika, but she convinces him that she did not kill Glen. He joins Eirika to avenge his brother. Pablo shows up as well, but shortly, Rausten troops arrive from the north and manage to rout the rest of the enemy forces. L'Arachel reveals to Eirika that she is the princess of Rausten. They continue on to Jehanna.
+
+Eirika thinks about Lyon again, the kindhearted but underconfident prince, much unlike a leader. According to Innes, Jehanna Hall has been overrun with Grado troops, led by Lyon himself. Queen Ismaire is being held captive by Carlyle, her formerly most trusted commander. He has captured her for her love. Caellach arrives, takes Ismaire, and goes to seek out and destroy the Sacred Stone. When Eirika begins to fight, Rennac, L'Arachel's former companion, appears, getting ready to loot the castle. However, Eirika or L'Arachel finds him and he joins Eirika's side. 
+
+After Carlyle is defeated, Caellach fatally wounds Ismaire and destroys the stone. Eirika meets Lyon, who is still the gentle person she has known, but he leaves quickly. Ismaire, dying, calls Joshua to her side, and it is revealed that Joshua is the prince of Jehanna. She dies, leaving him the Sacred Twin weapons of Jehanna: the sword [[Audhulma]] and the anima magic tome [[Excalibur]]. Joshua reveals that he left palace life behind to see the world as a man, not a prince. By now he regrets his decision, and vows to fight Grado and defend Jehanna. They escape the palace, which is burning, and find that two Grado armies led by Caellach and Valter are coming their way.
+
+===Reunited again (Eirika's route)===
+As Eirika and her companions exit Jehanna Hall, a battle breaks out. Early in the battle, Ephraim arrives with Duessel and a shaman named [[Knoll]] and helps Eirika defeat the Grado forces, including Caellach and Valter. Ephraim provides the group with two Sacred Twin weapons from Grado, the axe [[Garm]] and the dark tome [[Gleipnir]]. Ephraim tells the others he has managed to seize Grado's capital and defeat Vigarde. He says that according to Knoll, a Dark Stone has been created by Lyon. Vigarde has already been dead for months, somehow resurrected as only a puppet. Ephraim reveals that Lyon is the one controlling the stone, although he barely believes it. Lyon had said that he was behind the war and that he had only befriended Eirika and Ephraim to invade Renais in the future. L'Arachel suggests that they will still be able to conquer evil with the remaining Sacred Stones.
+
+Eirika and Ephraim return to Renais. When they enter the castle, Myrrh vows that she will start to fight as well. Orson is seen doting on his "wife", Monica, who is unseen. Riev tells him Eirika and Ephraim are marching toward the castle, and he threatens to kill Monica if he fails to succeed in keeping them out. After Orson is defeated, the twins find that "Monica" was a reanimated corpse, just like Vigarde. They go back to the throne room, where Eirika and Ephraim raise their bracelets and open the secret chamber that contains the Stone of Renais. They also find the Sacred Twin weapons, [[Sieglinde]], the Thunder Blade and [[Siegmund]], the Fire Lance.
+
+Two years ago, Lyon is telling of how he plans to use the Sacred Stone to help people. In the present, Eirika's army is at the Narube River, on the way to Rausten. Lyon then appears to the group, still a kindhearted man. However, he switches to a darker personality; "he" reveals himself to be the Demon King. During the battle, the Frelian general [[Syrene]] joins Eirika's side. When Lyon is defeated, he teleports away. Innes then gives Eirika the Sacred Twin weapons of Frelia: [[Nidhogg]], the Serpent Bow, and [[Vidofnir]], the Winged Lance.
+
+===Defeating the Demon King (Eirika)===
+Eirika and the others journey through Mount Neleras, a mountain of extreme heat and sulfur, on Lyon's trail. Eirika asks L'Arachel if there is any way to bring back Lyon; L'Arachel tells her that Lyon no longer exists. It turns out that Lyon has led the army into a trap by bringing them to this place - it is full of dangerous lava and gorgon eggs. After the battle, Eirika meets Lyon, who tricks her into giving him the Sacred Stone by pretending to be the kind Lyon, asking for help. Although they have lost the stone, they look forward and continue on. Eirika accepts that Lyon is gone and vows to avenge him.
+
+In Rausten, the army meets [[Mansel]], Pontifex of Rausten. Eirika and Ephraim explain their journey up to that point. Suddenly, there is an attack led by General Riev. Eirika manages to hold out until the Grado troops retreat. They receive the Sacred Stone and the Sacred Twin weapons of Rausten: the light tome [[Ivaldi]] and the divine staff [[Latona]]. Quickly, Eirika heads to Darkling Woods to find Lyon. "Lyon", or rather, the Demon King, is confronted by Morva, the foster father of Myrrh. Although Myrrh is looking forward to meeting her father again, he is turned into a zombie by Lyon. The army battles many monsters, including Riev and Morva. Lyon runs into the Black Temple, and Eirika and her army follow.
+
+Right before the war begins, Lyon thanks Eirika for encouraging him. He is about to confess something to Eirika, then gives up. In the present, Eirika meets Lyon, who is in his normal state. He apologizes for what has happened, and confesses that it is his fault that he gave in to the Demon King. He is rapidly taken over by the Demon King, who mocks Eirika and teleports away. Eirika's army fights through many powerful monsters to get to Lyon. When he is defeated, he returns to normal and confesses that he has always loved Eirika.
+
+Lyon's body is destroyed and the Demon King is resurrected. Eirika and Ephraim prepare to fight him. L'Arachel tells Eirika that the power to defeat the Demon King is not in the Sacred Stone of Rausten, but in their willpower. All of the fighters prepare to battle, and the Demon King is defeated successfully. His soul is sealed in the Sacred Stone; however, they still most defeat his body. The body is defeated, and the war is finally over. Every member of the army is able to return home. 
+
+Eirika and Ephraim finally make it home to Renais after saying farewell to everyone. They promise to do what Lyon would want - to help everyone have peace and joy. The credits roll.
+
+After the credits, a flashback of Eirika, Ephraim, and Lyon in the castle courtyard occurs. It is their first meeting - Lyon introduces himself shyly, suggesting that they be friends. Afterwards, the total number of turns on the game's chapters and the character endings are shown.
+
+===Ephraim's journey===
+In Grado, Vigarde is giving orders. He orders Glen to find Eirika, Valter to find Ephraim, Caellach to go to Jehanna, Riev to go to Rausten, and Selena to stay in the capital. Duessel is told to go defeat Ephraim. He tries to ask Vigarde the purpose of the war, but he is ignored and has no choice but to go to Ephraim.
+
+Ephraim is going down south into Grado. He invades Fort Rigwald, a Grado fort of strong defenses. He rescues Tana, who is held captive in the fort, and manages to recruit Amelia, a young soldier who believes that the war is wrong. Afterwards, Ephraim asks a soldier about the war. The soldiers tells him that Duessel is opposed to the war, and that Vigarde was convinced to start the war by Prince Lyon. When they leave the fort, Ephraim tells Myrrh that she must return to Frelia, but she insists on going with him because her dragonstone is in Grado, and because she cannot let the dark energy continue. In the capital, Vigarde orders Selena to execute Duessel, who is supposedly a traitor to Grado. She is in disbelief, but she reluctantly follows his orders.
+
+Ephraim presses on, when a Frelian messenger arrives telling him that Carcino has broken their alliance, but Eirika has gone to help Prince Innes. Meanwhile, Selena finds Duessel and tells him to begin the attack on Ephraim; when he refuses, she turns against him and mobilizes the troops against both him and Ephraim. She tells Cormag that if he is a true soldier of Grado, he will also attack Duessel. However, right after the battle starts, Valter comes to Selena and tells her that the emperor has declared her untrustworthy and she must go back to the capital. She returns to the capital to speak with Vigarde herself. 
+
+Tana convinces Cormag to join Ephraim's side, and Ephraim successfully saves Duessel. He is able to hold the enemy forces until the enemy commander decides that they have taken too long and must flee. Duessel tells him of the Dark Stone, which has somehow changed Vigarde. Myrrh says it is the source of the dark energy coming from Grado, and Lyon seems to be carrying this stone. Suddenly, L'Arachel, Dozla, and Rennac appear to Ephraim, the group of people who first appeared to Eirika in the Za'ha Woods. L'Arachel tells Ephraim there is some sort of ghost ship on the seas. Confused, Ephraim continues onto the ship anyway.
+
+In Grado, Vigarde asks Selena why she did not execute Duessel. Ignoring an explanation, Lyon orders her to go to the Za'albul Marsh and find a dragonstone. On the sea, Ephraim is on the ship with the rest of the army. He sees another ship, which pulls up, revealed to be a ship teeming with monsters; this seems to be the ship L'Arachel had referred to. Later, another ship pulls up with L'Arachel and Dozla on it. She and Dozla join Ephraim; afterwards, she reveals that she is the princess of Rausten.
+
+===Heading to the Grado capital===
+Ephraim lands in the town of Taizel, where Grado soldiers quickly attack him, led by General Caellach, who quickly leaves when Riev tells him Jehanna is being taken by Eirika. Riev leaves and summons many monsters to attack Ephraim. On the way, the enthusiastic magic pupil [[Ewan]] joins Ephraim and the aloof myrmidon [[Marisa]]. After the battle, Myrrh appears to fly off to the east. In the morning, Ephraim finds that she is missing, and heads to the east to find her.
+
+Selena is in a village, admiring the dragonstone, when Myrrh comes up and asks her to return it. Myrrh tells her about the Dark Stone and suggests that it has changed someone. Selena tells of how the emperor was a compassionate man, but when a soldier reports that Ephraim has arrived, she tells her to go back to Ephraim, and that she cannot fail in her duty to the emperor by giving back the dragonstone. During the battle, the mercenary [[Gerik]] and [[Tethys]] the dancer join Ephraim, sent by Innes to help him. Ephraim fights against many Grado troops, and many units suffer from Selena's wide magic range of her powerful [[Bolting]] spell. After Selena is killed, Myrrh gets her dragonstone back, but asks why she was killed when she was a good person. Ephraim apologizes, but admits that he does not know how to prevent more losses of good people and vows to find out what is happening.
+
+Ephraim arrives at Grado's capital and reminisces about Lyon two years ago. Lyon is telling Ephraim about the mythology of the War of the Stones. He asks Ephraim to teach him the way of the lance. In the palace, Lyon asks his father if they have been foolish, and that when his father died... he is interrupted when a soldier reports that Ephraim has arrived. His face and demeanor appear to change, and he orders an attack on Ephraim.
+
+During the battle, Rennac appears with the purpose of looting the whole palace. Either Ephraim or L'Arachel find him, and he joins their side, for 9,800 gold if found by Ephraim. When Vigarde is defeated, his body disintegrates. Ephraim hurries downstairs and finds Lyon and demands answers. Lyon says that he has been planning this war his whole life, that he only befriended Eirika and Ephraim to find how to conquer Renais and that he killed King Fado. Lyon vows that he will soon kill Ephraim and teleports away.
+
+A prisoner named Knoll explains to Ephraim that Vigarde had already died a year ago. Lyon fell into despair and worked to somehow resurrect him. By working with Grado's Sacred Stone, also called the Fire Emblem, he managed to create a Dark Stone. When Knoll found out, it was already done - the Fire Emblem had been split apart, and Lyon crushed the sacred stone. The war began, and Lyon scheduled the execution of anyone who was in his way, including Knoll. To help, Knoll finds the Sacred Twin weapons of Grado: the axe [[Garm]] and the dark tome [[Gleipnir]]. Finally, a messenger arrives, telling Ephraim that Eirika is in a dire situation in Jehanna, under attack by forces led by Caellach and Valter. He hurries to Jehanna to help his sister.
+
+===Chapters 15 on (Ephraim)===
+Afterwards, the plot is largely the same as in Eirika's route; however, there are some major differences.
+
+* When Ephraim arrives at Jehanna Hall, most of the army is with him. After he arrives, Eirika exits the palace with Saleh and Innes.
+** Lyon talks to Caellach darkly about his duties; Caellach mentions Joshua as a mercenary he once worked with.
+** Eirika gives Ephraim the Sacred Twin weapons of Jehanna: the sword [[Audhulma]] and the anima tome [[Excalibur]].
+* In Renais's castle, Lyon is the one who tells Orson that Eirika and Ephraim are coming.
+* When Eirika and Ephraim meet Lyon at the Narube River, Lyon almost immediately is taken over by the Demon King.
+** The Demon King mockingly suggests that Ephraim join him and says how he will soon see an unspeakable horror.
+* L'Arachel talks to Ephraim instead of Eirika about how Lyon cannot be saved; Ephraim vows that he will be the one to kill Lyon's body.
+* In Mount Neleras, the Demon King freezes Ephraim's body with magic and takes the Sacred Stone of Renais by force. Afterwards, Lyon appears to revert back to normal, but he admits that the war is his fault and states that he himself ''is'' the Demon King. He requests that Ephraim come to Darkling Woods and stop him.
+* Tana comforts Ephraim in Rausten, instead of L'Arachel with Eirika; later, he thanks her instead of Eirika thanking L'Arachel.
+* In Darkling Woods, Lyon talks to Morva seemingly in a normal state. Again, he confesses that he was always the Demon King, but Morva says that the Demon King had been controlling him from the point that Lyon touched the Dark Stone. Unfortunately, Lyon ignores him.
+** In Eirika's route Myrrh does not tell Eirika that the draco zombie was Morva; in Ephraim's route she sorrowfully cries and admits that he is dead.
+** A flashback is shown of Lyon with his dying father. Lyon says that he and the court mages keep seeing a vision of countless death and starvation in Grado. Vigarde tells Lyon that he must protect his country, but after Vigarde dies, Lyon says he cannot do the task. Then, Lyon and Knoll are shown in the chamber of the Sacred Stone. Lyon orders Knoll to open the chamber, for according to him, the stone can save countless lives. After the flashback, Lyon is shown saying his plan is in place - he will sacrifice himself and the disaster will be averted.
+* In the final chapter, instead of Lyon talking to Eirika, Lyon is talking to Ephraim. They say that they will always be friends, even if Renais and Grado went to war.
+** Afterwards, Ephraim meets Lyon, who is still thinking he will save Grado by resurrecting the Demon King. He declares that no one will stand in his way to save Grado. When Lyon is defeated, he tells Ephraim how envious he was of him. Ephraim tells Lyon that he did have many desirable traits as well. Lyon accepts that it was his fault and dies.
+** The Demon King mocks Lyon for thinking he would save Grado from a disaster.
+** L'Arachel talks to Ephraim instead of Eirika about how human will is important to defeating the Demon King.
+* L'Arachel jokingly suggests that she and Ephraim be betrothed.
+* Myrrh asks if she may visit Ephraim from time to time.
+* Innes says it wasn't so bad working with Ephraim, but one day they will see who is better.
+* Ephraim tells Eirika there has been a calamitous landslide in Grado. He tells her to stay in Renais to protect it while he goes to Grado to help.
+
+==Gameplay==
+A turn-based strategy game as with the rest of the series, ''The Sacred Stones'' is built on the same engine as {{title|The Blazing Blade}} and {{title|The Binding Blade}}, but features a number of unique features which have only been seen before in {{FE2}} and since in {{FE13}}.
+
+===Branched class change===
+In this game, all units except for the lords have two choices for changing their class. For example, a [[myrmidon]] can change class to either an [[assassin]] or a [[swordmaster]]. In addition to these branched promotions, there are also "[[trainee]]" classes, which start out with low stats and are in a stage even lower than normal units. However, they gain experience quickly and after reaching level ten, they can become normal units at the beginning of the next chapter. For example, Ewan starts out as a [[pupil]], but after reaching level&nbsp;10 he can become a [[mage]] or a [[shaman]].
+
+===Monsters===
+Since the Sacred Stones are being destroyed, [[monster]]s have appeared in Magvel. There are many types of monsters, and they usually have inferior stats. All are only enemies. There are promoted forms of other monster classes, although no monster class changes are seen; for example, a [[wight]] is a promoted form of a [[bonewalker]]. Monsters appear in some chapters, rarely alongside human fighters. Some can use regular weapons, but others use special monster weapons. Some of these monster weapons appear as items but seem to be some innate ability of the monster, such as [[Rotten Claw]]. Others are affiliated with dark magic, such as [[Evil Eye]] or [[Petrify (tome)|Stone]].
+
+===World map===
+In this game, like in {{FE2}}, the game's world map is manually traversable by the player. Sometimes monsters will appear in certain locations; traveling to these locations will result in a [[skirmish]], a brief battle with monsters. The player can retreat at any time, ending the battle. In addition to skirmishes, the lord can go to armories and shops in towns and buy weapons and supplies. However, [[secret shop]]s and [[arena]]s cannot be accessed from the world map. The next chapter's location is marked by a flag; after the chapter is cleared, another new point appears.
+
+===Infinite experience points===
+In this game, there are infinite chances for training units, which drastically lowers the difficulty of the game. Skirmishes always continue to appear on the map. Additionally, the [[Tower of Valni]] is a tower located near Frelia's castle which monsters have dominated. It has nine floors, but the player can retreat at any time. Similar to the Tower of Valni is the [[Lagdou Ruins]], unlocked later in the game. It also has nine levels, but it has much stronger monsters. These methods of training never run out, so one can endlessly train units with low risk.
+
+===Creature Campaign===
+{{main|Creature Campaign}}
+The Creature Campaign is a post-game mode, similar in vein to the [[Trial Maps]] of earlier and later games, in which the player can train the characters endlessly in the above methods. Special characters can be unlocked for use such as [[Fado]], [[Ismaire]], and [[Lyon]]. Skirmishes continue to appear, and in the Lagdou Ruins, many different rare items can be found.
+
+==Chapters==
+{{main|List of chapters in Fire Emblem: The Sacred Stones{{!}}List of chapters in ''Fire Emblem: The Sacred Stones''}}
+
+Any single playthrough of ''The Sacred Stones'', from prologue to both parts of final, yields 24 unique maps. The game contains a total of 30 unique chapters if the 6 chapters from the unchosen twin's route are counted, though both twin's tales cannot be experienced simultaneously in one play-through.
+
+While the [[Tower of Valni]], [[Lagdou Ruins]], and [[Melkaen Coast]] locations do not feature actual chapters, they do serve as [[Skirmish]] locations with fully unique maps. Counting the maps in these locations, as Valni has 8 floors and Lagdou has 10 floors, brings the game's total of unique maps up to 49.
+
+==Characters==
+{{main|List of characters in Fire Emblem: The Sacred Stones{{!}}List of characters in ''Fire Emblem: The Sacred Stones''}}
+
+The main story mode of ''The Sacred Stones'' features 34 playable characters, with an additional 9 characters that can be obtained in the Creature Campaign.
+
+==Support conversations==
+{{main|List of supports in Fire Emblem: The Sacred Stones{{!}}List of supports in ''Fire Emblem: The Sacred Stones''}}
+
+==Pre-release information==
+{{main|Fire Emblem: The Sacred Stones pre-release information{{!}}''Fire Emblem: The Sacred Stones'' pre-release information}}
+
+===Pre-release builds===
+{{main|Fire Emblem: The Sacred Stones prototype{{!}}''Fire Emblem: The Sacred Stones'' prototype}}
+A pre-release build of the Japanese version of ''The Sacred Stones'' was leaked to the public in 2008 and is available in patch form at [[:File:The Sacred Stones prototype 0531 Patch.zip]]. The prototype is dated at five months before the Japanese retail release of the game, and compared to the leaked {{FE7}} prototypes, it is vastly incomplete and prototypical. At this stage in development, the game is largely unmodified from ''Fire Emblem'' with most of that game's graphics and music. Only the first eight chapters are even remotely started on, with only the barest infrastructure existing for the rest of the game, and only a handful of characters have portraits, some of which are vastly different from the finished release.
+
+==Trivia==
+[[File:FESS en manual pg 51.png|300px|right]]
+* This game was released in Europe on the same day as {{FE9}}&nbsp;– November 4, 2005.
+* The Japanese and US manuals for ''The Sacred Stones'' uses [[Ephraim]] and [[Myrrh]]'s [[Fire Emblem: The Sacred Stones prototype|prototype]] portraits in one section.<ref>{{cite web|url=https://www.nintendo.co.jp/data/software/manual/man_PBBJ_00.pdf|title=''Fire Emblem: The Sacred Stones'' manual (Japanese)|type=PDF|site=nintendo.co.jp|location=pg. 49|retrieved=January 10, 2017}}</ref><ref>{{cite web|url=https://web.archive.org/web/20170517120857/http://media.nintendo.com/nintendo/bin/hEdz6QCdBMbBoGW9NNCPXH25oCbd4rt3/mSxVebfnU-p96pOI-Il7-f8tOIkQ4bQD.pdf|title=''Fire Emblem: The Sacred Stones'' manual|type=PDF|site=nintendo.com (archived by the Wayback Machine)|location=pg. 51|retrieved=January 10, 2017}}</ref>
+{{clear}}
+
+==Etymology and other languages==
+{{Names
+|eng-name=''Fire Emblem: The Sacred Stones''
+|eng-mean=The title refers to the [[Sacred Stone (object)|Sacred Stone]]s, five holy relics key to the game's story.
+|jpn-name={{h|ファイアーエムブレム 聖魔の光石|Faiā Emuburemu Seima no Kōseki}}
+|jpn-mean=Roughly "''Fire Emblem: Light Stones of Saints [and] Demons''". Alternatively "''Fire Emblem: Light Stones of the Holy Demon''", but that seems unlikely, as it would be an oxymoron.
+|span-name=''Fire Emblem: The Sacred Stones''
+|fren-name=''Fire Emblem: The Sacred Stones''
+|ger-name=''Fire Emblem: The Sacred Stones''
+|ital-name=''Fire Emblem: The Sacred Stones''
+}}
+
+==Gallery==
+<gallery>
+FESS Logo jp.png|Japanese logo.
+FESS logo.png|English logo.
+Ba japan fe08.jpg|Japanese boxart
+Ba america fe08.jpg|North American boxart
+Ba europe fe08.jpg|European boxart
+FESS art01.jpg|Artwork from ''The Sacred Stones''.
+FESS art02.jpg|Artwork from ''The Sacred Stones''.
+</gallery>
+===Screenshots===
+<gallery>
+Ss fe08 title screen jp.png|The Japanese title screen for ''The Sacred Stones''.
+Ss fe08 title screen na.png|The North American title screen for ''The Sacred Stones''.
+Ss fe08 game opening story tablet dragon.png|Still from the game's opening featuring a dragon curled around [[Sacred Stone (object)|the five Sacred Stones]].
+Ss fe08 lute casting aura.png|[[Lute]] casting [[Aura]] against an [[Arch Mogall]].
+Ss fe08 myrrh using dragonstone.png|[[Myrrh]] attacks a [[Wight]] with her [[Dragonstone]].
+Ss fe08 tana ephraim eirika.png|[[Ephraim]] and [[Eirika]] reunite with [[Tana]].
+Ss fe08 ephraim studies.png|[[Ephraim]] studying with [[Lyon]].
+Ss fe08 moving seth.png|Moving [[Seth]] towards an enemy [[Archer]].
+Ss fe08 franz talk command.png|[[Franz]] moves to [[talk]] with [[Amelia|an enemy]].
+Ss fe08 skirmish.png|Encountering a [[skirmish]] on the [[world map]].
+Ss fe08 sound room.png|The game's [[Sound Room]].
+</gallery>
+
+==References==
+{{refbar}}
+
+==External links==
+* ''[https://tanasmanor.net/sites/fe8/ Fire Emblem: The Sacred Stones for Game Boy Advance]'' official English website (mirror by Tanas Manor)
+* [https://www.nintendo.co.jp/n08/be8j/ {{lang|ja|ファイアーエムブレム 聖魔の光石}}] official Japanese website
+* ''[https://www.nintendo.com/games/detail/brIE4OLEZGaGS7yyoCqFHBGGvsLxKi5c Fire Emblem: The Sacred Stones for WiiU]'' official English Virtual Console webpage
+* [https://www.nintendo.co.jp/titles/20010000008308 {{lang|ja|ファイアーエムブレム 聖魔の光石 {{!}} Wii U {{!}} 任天堂}}] official Japanese Virtual Console webpage
+* ''[https://media.nintendo.com/nintendo/bin/hEdz6QCdBMbBoGW9NNCPXH25oCbd4rt3/mSxVebfnU-p96pOI-Il7-f8tOIkQ4bQD.pdf English instruction manual] provided by Nintendo
+* ''[https://www.nintendo.co.jp/data/software/manual/man_PBBJ_00.pdf Japanese instruction manual] provided by Nintendo
+
+{{Nav8}}
+{{NavSeries}}
+{{DEFAULTSORT:Fire Emblem Sacred Stones, The}}
+[[Category:Fire Emblem: The Sacred Stones| ]]

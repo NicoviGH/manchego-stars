@@ -7,6 +7,7 @@ name: "Prof. R.B. Geenius"
 death_quote: "Ah... discheesed at last. ...Be Gouda, Pinky."  # falls-in-battle quote (#6 dialogue pass; lore/prof-rbg.md)
 lord_pitch: "Archer -- deadly to fliers, but helpless up close."  # lord-select card blurb (#46): plain + qualitative, FE8 class-help register (no stats); Nicolas-confirmed 2026-06-21
 fe_name: "Prof. RBG"                      # FE8 name buffer is <=12 chars; full name overflows it
+help_text: "An underfolk artificer and ex-mobster. He always has a plan, and a pun."   # R on the name in game (fe8_talk_font.HELP_TEXT_BUDGET_PX)
 portrait_ref: portraits/prof-rbg.png     # GBA-ready sprite pending (issue #23)
 portrait_source: data/portraits/prof-rbg.jpg
 # Portrait source: https://www.dndbeyond.com/avatars/34221/708/1581111423-57759993.jpeg
@@ -82,7 +83,7 @@ dnd:
 # NOT a custom class — it is Pepperjack, a separately RECRUITABLE unit (flavor: RBG built it).
 # LCK: ClassData has no base luck — set 0 until personal luck is assigned deliberately.
 fe_stats:
-  class: Archer              # FE base class
+  class: archer              # FE base class
   level: 1
   HP: 18
   STR: 4                     # FE Pow (Archer basePow) — bows compute damage off Pow
@@ -96,18 +97,8 @@ fe_stats:
 
 # ── Promotion (FE8 branched — the PLAYER chooses at the Master Seal) ──────────────
 promotion:
-  branch: [Sniper, Ranger]   # vanilla Archer branch (classchg-data.c [CLASS_ARCHER])
-  default: Sniper            # thematic lean; player may pick either.
-
-# ── Growth Rates (% per level) — vanilla Archer growths from data_classes.c ──────
-growth_rates:
-  HP: 70
-  STR: 35
-  SKL: 40
-  SPD: 32
-  DEF: 15
-  RES: 15
-  LCK: 35
+  branch: [sniper, ranger]   # vanilla Archer branch (classchg-data.c [CLASS_ARCHER])
+  default: sniper            # thematic lean; player may pick either.
 
 # ── Inventory (Chapter 1 starting equipment) ─────────────────────────────────
 # MVP: stock FE weapons — stats inherited from the vanilla item in `fe_base` (no custom Might).
@@ -137,7 +128,6 @@ inventory:
   - id: vulnerary
     name: "Goodberry"             # reflavored Vulnerary (party-wide name; see campaign.yaml item_names)
     fe_base: vulnerary
-    uses: 2
 # -- Unique Abilities ------------------------------------------------------
 # NONE. Prof. R.B. Geenius is a stock FE8 Archer -- no per-character mechanics, even on promotion.
 # Individuality comes from flavor text, portrait/sprite art, and palette -- not special

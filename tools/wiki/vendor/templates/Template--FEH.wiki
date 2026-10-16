@@ -1,0 +1,1 @@
+''[[Fire Emblem Heroes]]''<noinclude><br />This is to properly format Fire Emblem Games. To use type:  '''<nowiki>{{FEH}}</nowiki>''' [[Category:Abbreviation templates]]</noinclude>

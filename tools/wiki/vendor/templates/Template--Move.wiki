@@ -1,0 +1,7 @@
+{| class="basic width-90 notice-template"
+| class="pixel-art" | [[File:Is wii shove.png|link=Special:MovePage/{{FULLPAGENAME}}]]
+| 
+'''It has been proposed that this page be moved to [[:{{{target|{{{1}}}}}}]].''' Please [[Special:MovePage/{{FULLPAGENAME}}|move this page]], or discuss this change on the [[{{TALKPAGENAME}}|talk page]] or on Discord.
+----
+'''Reason:''' {{{reason|{{{2}}}}}}
+|}<includeonly>[[Category:Pages to be moved]]</includeonly><noinclude>[[Category:Notice templates]]</noinclude>

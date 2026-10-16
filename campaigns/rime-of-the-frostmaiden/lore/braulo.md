@@ -6,6 +6,17 @@
 > (migrated from pre-strip commit `e6cc7a6`) as inspiration for dialogue, sprite/palette work,
 > and signature scripted moments — never as FE mechanics.
 
+## Profile
+
+Braulo is a hermit crab merchant from the ocean floor who travels the world in search of his
+next shell, sure that the perfect one waits just over the horizon. He is thrifty and driven, always
+after the better deal, and his greed and his sense of justice are one instinct: a deal honoured is
+sacred, and a deal broken is grounds for force.
+
+He is quiet and reserved and says little in the party's banter. When a decision has to be made he
+lands one plain sentence, commits to it, and the others follow. A small isopod lives in his shell and
+now and then peeks out to stare at Marty. Braulo never acknowledges it.
+
 ## Concept
 
 - **Race:** Hermit Crab

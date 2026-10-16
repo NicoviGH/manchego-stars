@@ -1,0 +1,2531 @@
+{{Chapter Infobox
+|image=[[File:Cm fe08 11A.png|200px]]
+|location=[[Caer Pelyn]] mountain range
+|weather=[[Fog of war]]
+|new units=[[L'Arachel]], [[Dozla]]
+|boss=[[Monster]]
+|previous=[[Revolt at Carcino]]
+|next=[[Village of Silence]]
+}}
+
+{{quote|Look there! Through that break in the fog... Looks like we've got some nasty creatures running 'bout this place.|[[Dozla]]}}
+
+'''Creeping Darkness''' (Japanese: {{hl|這いうねる闇|Hai uneru yami}} ''Creeping Darkness'') is the eleventh chapter of [[Eirika]]'s route in {{FE8}}.
+
+After completing this chapter, the player is immediately sent into [[Village of Silence|the next]]. It is not possible to return to the [[world map]] during the next chapter.
+
+==Plot==
+{{main|Creeping Darkness/Script}}
+[[Ewan]] leads [[Eirika]]'s group through the mountain pass; a thick fog has descended as they approach a seemingly abandoned fortress. [[Innes]] asks Ewan if the fort is currently in use, and points out a barely audible, mysterious sound coming from it. They continue to hear the sound, leading Innes to conclude that they have been spotted by the monsters inside the fort. [[Tethys]]—or, if she is dead, Innes—tells Ewan to get somewhere safe; Ewan attempts to protest but does eventually leave. [[L'Arachel]] and [[Dozla]] arrive at the same abandoned fortress, seeking a place to stay for the night; when Dozla informs L'Arachel of the nearby monsters, she is delighted to have a chance to "destroy th[o]se foul things".
+
+In battle, Eirika can speak to L'Arachel. Eirika suggests L'Arachel get to safety, but L'Arachel insists on continuing to fight, and they agree to work together. L'Arachel can then inform Dozla that they will be working with Eirika to defeat the monsters.
+
+Once the monsters have been routed, Eirika thanks L'Arachel for her assistance. L'Arachel realizes that she does not even know Eirika's name, and Eirika introduces herself. L'Arachel recognizes her as the princess of [[Renais]], and assumes that the princess must be lost to have ended up in Carcino of all places. Eirika corrects L'Arachel and informs her of her task to protect [[Rausten]] from [[Grado]]'s imperial army. After hearing of her task, L'Arachel insists on accompanying Eirika.
+
+Ewan continues to guide Eirika's group to his teacher, [[Saleh]]. They eventually reach his house and meet him face-to-face. Eirika and Saleh recognize each other from [[Serafew]] when Saleh was searching for a girl with indigo hair. Ewan asks Saleh to guide Eirika's group to [[Caer Pelyn]]; Saleh accepts Ewan's request as he was headed the same way to complete a mission he recently accepted. Before they depart, Saleh advises they rest for the night, to which Eirika and Innes agree. Ewan, wanting to be helpful, decides to depart ahead of the group and inform [[Dara|the elder]] of their arrival.
+
+The next morning, Eirika and her group depart for Caer Pelyn but are interrupted by [[Glen]] of the [[Imperial Three]]. Glen announces to Eirika that Emperor [[Vigarde]] has assigned him to take her out in retaliation for the alleged massacre of innocents at Port Kiris and the rebellion she led at [[Carcino]]. Eirika denies the accusations; Innes angrily calls Glen an idiot for believing Vigarde's obvious lies and explains that Eirika entered Carcino with her small force to rescue him. Eirika clarifies to Glen that she does not wish to fight him but will if she must. Glen decides to return to question [[Vigarde]], letting Eirika proceed. After Eirika leaves, [[Valter]] approaches Glen, seeing him allow Eirika to leave. Glen tells Valter to move so he can return to the capital. Valter refuses and begins to rant about the anger and indignation he suffered at the hands of Glen and [[Duessel]], asserting that his desire for revenge has kept him alive. Valter then attacks and kills Glen, and sends his soldiers to silence Glen's as he muses to himself over his craving for endless battle and war.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Eirika]] dies
+|ally=1–{{h|11|10 in the Japanese version (blue square at coordinate (4, 13) is missing)}}{{h|+2|Upon L'Arachel and Dozla being recruited}}
+|other=2{{h|−2|Upon L'Arachel and Dozla being recruited}}
+|enemy=41{{h|+1|Reinforcement}}
+|map=[[File:Cm fe08 11A.png]]
+|col=22
+|row=18
+}}
+|content2={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Eirika]] dies
+|ally=1–{{h|11|10 in the Japanese version (blue square at coordinate (4, 13) is missing)}}{{h|+2|Upon L'Arachel and Dozla being recruited}}
+|other=2{{h|−2|Upon L'Arachel and Dozla being recruited}}
+|enemy=41{{h|+13|Reinforcements}}
+|map=[[File:Cm fe08 11A.png]]
+|col=22
+|row=18
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=L'Arachel
+|portrait=[[File:portrait l'arachel fe08.png]]
+|class=Troubadour
+|HP=18
+|lv=3
+|inventory={{Item|8|Mend}}<br>{{Item|8|Elixir}}<br>{{Item|8|Torch|link=Torch (staff)|image=torch staff}}
+|recruitment method=NPC, talk to with [[Eirika]], or automatically at the end of the chapter if she survived
+}}
+|newunit2={{NewUnit
+|name=Dozla
+|portrait=[[File:portrait dozla fe08.png]]
+|class=Berserker
+|HP=43
+|lv=1
+|inventory={{Item|8|Battle Axe}}<br>{{Item|8|Elixir}}
+|recruitment method=NPC, talk to with [[L'Arachel]], or automatically at the end of the chapter if he survived
+}}
+|forced1=eirika
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Chest Key
+|obtain1=Dropped by enemy [[Bonewalker]]
+|item2=Chest Key
+|obtain2=Dropped by enemy [[Bonewalker]]
+|item3=Chest Key
+|obtain3=Dropped by enemy [[Bonewalker]] (reinforcement)
+|item4=Secret Book
+|obtain4=Open eastern [[chest]]
+|item5=Short Spear
+|obtain5=Open center [[chest]]
+|item6=Restore
+|obtain6=Open western [[chest]]
+|item7=Door Key
+|obtain7=Steal from enemy [[Bonewalker]]
+|itemlast=Door Key
+|obtainlast=Steal from enemy [[Bonewalker]] (reinforcement)
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=4
+|hp=29~31
+|str=4~5
+|skill=1~2
+|spd=0~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=The western three immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=6
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=3
+|hp=20
+|str=4
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Slim Sword}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=3
+|hp=21~22
+|str=5~6
+|skill=4~6
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=8
+|#=1
+|hp=22~23
+|str=5~6
+|skill=2~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=20~22
+|str=5~6
+|skill=4~5
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=35
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=16~18
+|str=3~5
+|skill=2~3
+|spd=3~4
+|lck=1~2
+|def=2~3
+|res=4~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=4
+|hp=22~24
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=7~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=19~20
+|str=5~6
+|skill=11~13
+|spd=11~13
+|lck=1~2
+|def=2~3
+|res=0~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=18~20
+|str=5~6
+|skill=11~13
+|spd=11~13
+|lck=1~2
+|def=2~3
+|res=0~1
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Begins moving if a unit enters the eastern treasure room.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=2
+|#=1
+|hp=23
+|str=8
+|skill=5
+|spd=8
+|lck=0
+|def=9
+|res=1
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=It and its squad begin moving if a unit enters the southern wing of the building.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Poison Sword}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=20~22
+|str=5~6
+|skill=4~5
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=18
+|str=4
+|skill=3
+|spd=2
+|lck=0
+|def=3
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=8
+|#=1
+|hp=36
+|str=12
+|skill=15
+|spd=13
+|lck=1
+|def=9
+|res=9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=The western three immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Slim Sword}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Begins moving if a unit enters the eastern treasure room.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=It and its squad begin moving if a unit enters the southern wing of the building.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Poison Sword}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=4
+|hp=30~33
+|str=5~6
+|skill=1~3
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~2
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=The western three immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=6
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=3
+|hp=20
+|str=4
+|skill=2
+|spd=3
+|lck=0
+|def=3
+|res=0
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Slim Sword}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=3
+|hp=22~24
+|str=6~7
+|skill=5~7
+|spd=3~5
+|lck=0~1
+|def=3~5
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=8
+|#=1
+|hp=23~25
+|str=6~7
+|skill=3~4
+|spd=3~5
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=21~23
+|str=5~7
+|skill=5~6
+|spd=3~5
+|lck=0~1
+|def=3~5
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=41~45
+|str=6~9
+|skill=1~4
+|spd=2~4
+|lck=3~7
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=17~19
+|str=4~6
+|skill=2~4
+|spd=3~5
+|lck=1~3
+|def=2~3
+|res=5~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=4
+|hp=23~26
+|str=8~10
+|skill=5~6
+|spd=8~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=20~22
+|str=6~7
+|skill=12~14
+|spd=12~14
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=19~21
+|str=5~7
+|skill=12~14
+|spd=12~14
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Begins moving if a unit enters the eastern treasure room.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=2
+|#=1
+|hp=23
+|str=8
+|skill=5
+|spd=8
+|lck=0
+|def=9
+|res=1
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=It and its squad begin moving if a unit enters the southern wing of the building.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Poison Sword}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=21~23
+|str=5~7
+|skill=5~6
+|spd=3~5
+|lck=0~1
+|def=3~5
+|res=0~2
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=18
+|str=4
+|skill=3
+|spd=2
+|lck=0
+|def=3
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=8
+|#=1
+|hp=36
+|str=12
+|skill=15
+|spd=13
+|lck=1
+|def=9
+|res=9
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=24~27
+|str=7~8
+|skill=3~5
+|spd=4~5
+|lck=0~1
+|def=3~4
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=The western three immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Slim Sword}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Begins moving if a unit enters the eastern treasure room.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=It and its squad begin moving if a unit enters the southern wing of the building.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Poison Sword}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=4
+|hp=34~39
+|str=6~10
+|skill=2~6
+|spd=1~4
+|lck=0~3
+|def=0~3
+|res=1~3
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=The western three immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=6
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=3
+|hp=22~24
+|str=5~7
+|skill=2~5
+|spd=3~5
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Slim Sword}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=3
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=4~8
+|lck=0~3
+|def=4~6
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=8
+|#=1
+|hp=26~30
+|str=8~10
+|skill=3~7
+|spd=4~6
+|lck=0~2
+|def=3~5
+|res=0~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=23~28
+|str=6~10
+|skill=6~9
+|spd=4~7
+|lck=0~2
+|def=4~6
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=53~60
+|str=11~16
+|skill=4~8
+|spd=3~7
+|lck=10~15
+|def=1~5
+|res=2~5
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=19~22
+|str=6~9
+|skill=3~6
+|spd=4~7
+|lck=2~5
+|def=2~4
+|res=5~8
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=4
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~3
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=22~27
+|str=6~10
+|skill=14~17
+|spd=14~17
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=21~26
+|str=6~10
+|skill=14~17
+|spd=14~17
+|lck=2~5
+|def=3~5
+|res=1~3
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Begins moving if a unit enters the eastern treasure room.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=2
+|#=1
+|hp=36~44
+|str=15~20
+|skill=9~15
+|spd=12~16
+|lck=1~5
+|def=12~16
+|res=3~7
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=It and its squad begin moving if a unit enters the southern wing of the building.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Poison Sword}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=23~28
+|str=6~10
+|skill=6~9
+|spd=4~7
+|lck=0~2
+|def=4~6
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=22~24
+|str=5~7
+|skill=2~5
+|spd=3~5
+|lck=0~2
+|def=3~5
+|res=0~2
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=8
+|#=1
+|hp=37~40
+|str=12~13
+|skill=15~16
+|spd=13~14
+|lck=1~2
+|def=9~10
+|res=9~10
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=6
+|hp=34~39
+|str=6~10
+|skill=2~6
+|spd=1~4
+|lck=0~3
+|def=0~3
+|res=1~3
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=2
+|hp=24~29
+|str=6~10
+|skill=7~10
+|spd=4~8
+|lck=0~3
+|def=4~6
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=27~31
+|str=8~11
+|skill=4~7
+|spd=4~6
+|lck=0~2
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=2
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=28~32
+|str=8~12
+|skill=4~8
+|spd=4~7
+|lck=0~3
+|def=3~6
+|res=1~3
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+|notes=The western three immediately begin moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=The one closest to ally starting positions immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Slim Sword}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=8
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Longbow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+|notes=Begins moving if a unit enters the eastern treasure room.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Deathgoyle
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=11
+|mov=7
+|inventory={{Item|8|Steel Lance}}
+|notes=It and its squad begin moving if a unit enters the southern wing of the building.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Poison Sword}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Poison Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=2
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+|notes=Begins moving unprovoked on turn 2.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Wight
+|version=01
+|lv=3
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=9
+|mov=6
+|inventory={{Item|8|Steel Sword}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=6
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=02
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Iron Bow}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Door Key}} • {{Item|8|Chest Key|type=drop}}
+|notes=Prioritizes opening a [[chest]], then escaping.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Toxin Lance|image=poison lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*Turns 4 and 5 <small>(Difficult only)</small>
+**3 [[Revenant]]s from the northwest corner of the map
+*Turn 8 <small>(Difficult only)</small>
+**1 [[Bonewalker]] with an [[Iron Bow]] from the northeast corner of the map
+**1 [[Bonewalker]] with a [[Toxin Lance]] from the northeast corner of the map
+**1 [[Bonewalker]] with an [[Iron Sword]] and a [[Javelin]] from the northeast corner of the map
+*Turn 9
+**1 [[Bonewalker]] with an [[Iron Lance]] and two keys from the southwest corner of the map
+*Turn 12 <small>(Difficult only)</small>
+**1 [[Bonewalker]] with a [[Toxin Lance]] from the southwest corner of the map
+**1 [[Bonewalker]] with an [[Iron Sword]] and a [[Javelin]] from the southwest corner of the map
+**1 [[Bonewalker]] with an [[Iron Bow]] from the southwest corner of the map
+
+===NPC data===
+{{ChapUnitHdr|type=NPC|platform=gba}}
+{{ChapUnitCellGBA
+|name=[[L'Arachel]]
+|class=Troubadour
+|type=other
+|lv=3
+|#=1
+|hp=18
+|str=6
+|skill=6
+|spd=10
+|lck=12
+|def=5
+|res=8
+|con=5
+|mov=6
+|inventory={{Item|8|Mend}} • {{Item|8|Torch|link=Torch (staff)|image=torch staff}} • {{Item|8|Elixir}}
+}}
+{{ChapUnitCellGBA
+|name=[[Dozla]]
+|class=Berserker
+|type=other
+|lv=1
+|#=1
+|hp=43
+|str=16
+|skill=11
+|spd=9
+|lck=4
+|def=11
+|res=6
+|con=16
+|mov=6
+|inventory={{Item|8|Battle Axe}} • {{Item|8|Elixir}}
+|last=y
+}}
+{{ChapUnitFtr}}
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Monster}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Generic portrait wight fe08.png]]
+|sprite=wight 01 enemy
+|class=Wight
+|affin=dark
+|lv={{h|8|3 in the Japanese version}}
+|HP={{h|36|21 in the Japanese version}}
+|str={{h|12|7 in the Japanese version}}
+|skill={{h|15|5 in the Japanese version}}
+|spd={{h|13|6 in the Japanese version}}
+|luck={{h|1|0 in the Japanese version}}
+|def={{h|9|5 in the Japanese version}}
+|res={{h|9|2 in the Japanese version}}
+|move=6
+|con=9
+|aid=8
+|inventory={{Item|8|Steel Sword}}
+|sw=A
+|la=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Generic portrait wight fe08.png]]
+|sprite=wight 01 enemy
+|class=Wight
+|affin=dark
+|lv={{h|8|3 in the Japanese version}}
+|HP=37~40
+|str=12~13
+|skill=15~16
+|spd=13~14
+|luck=1~2
+|def=9~10
+|res=9~10
+|move=6
+|con=9
+|aid=8
+|inventory={{Item|8|Steel Sword}}
+|sw=A
+|la=A
+}}
+}}
+
+==Strategy==
+{{strategy}}
+{{sectstub}}
+This chapter is significantly harder on Difficult mode due to the sheer amount of enemies with high stats for this point of the game. This also makes recruiting L'Arachel very hard due to her low durability. It is highly recommended to deploy promoted units such as Seth, or mounted units for this chapter.
+
+==Trivia==
+[[File:Ss fe08 glen vs valter.png|thumb|[[Glen]] and [[Valter]], two red units, engaging in combat.]]
+* In [[Fire Emblem: The Sacred Stones prototype|the 040531_2253 build]], this chapter's map was originally used for [[Victims of War|Chapter&nbsp;6]]. When Chapter&nbsp;6 was revamped with a new map the old map was used for this chapter instead.
+* This chapter, alongside [[Phantom Ship]], was possibly one of the last chapters added to the game in development, being the only two chapters completely absent from the 040531_2253 build. This may also be the reason it does not have a corresponding world map location, instead occurring between locations, as the world map was already laid out in essentially its final form even in the very early build.
+** This is also supported by the fact that Creeping Darkness and Phantom Ship are the only two chapters with their titles listed out of order, being at the end of the list internally.
+* The cutscene at the end of the chapter is the only instance in the ''Fire Emblem'' series where two red units engage each other in combat without one of them being driven [[berserk (condition)|berserk]].
+{{clear}}
+
+==Etymology and other languages==
+{{Names
+|eng-name=Creeping Darkness
+|jpn-name={{h|這いうねる闇|Hai uneru yami}}
+|jpn-mean=Creeping Darkness
+|span-name=Sombras acechantes
+|span-mean=Lurking Darkness
+|fren-name=Ombre Rampante
+|fren-mean=Creeping Shadow
+|ger-name=Kriechende Finsternis
+|ger-mean=Creeping Darkness
+|ital-name=L'oscurità avanza
+|ital-mean=The Darkness advances
+}}
+
+==Gallery==
+<gallery>
+Ss fe08 glen vs valter.png|[[Glen]] and [[Valter]] engaging in combat.
+</gallery>
+
+{{ChapterNav
+|prechapter=Revolt at Carcino
+|nextchapter=Village of Silence
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

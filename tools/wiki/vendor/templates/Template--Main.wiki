@@ -1,0 +1,2 @@
+<includeonly>:''Main article{{#if:{{{2|}}}|s}}: ''{{#invoke:Main|main}}</includeonly><noinclude>
+{{doc}}</noinclude>

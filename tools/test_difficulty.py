@@ -1420,11 +1420,11 @@ class PlayerArrivesLeveled(unittest.TestCase):
         self.assertEqual(out['baseHP'], 23)
 
     def test_a_placed_recruit_fights_with_its_placing_entrys_weapon(self):
-        # sahnar's unit YAML carries no inventory; ch05 places her with the Killing Edge.
+        # sahnar joins with Joshua's kit, the Killing Edge alone (her unit file).
         self.assertEqual(df.player_combatant(CAMPAIGN, 'sahnar').weapon.name, 'killing-edge')
 
     def test_an_off_map_join_fights_with_its_join_load_kit(self):
-        # lupin joins off-map; the join-LOAD arms him from CLASS_LOADOUT, a sword first.
+        # lupin joins off-map; the join-LOAD arms him from his unit file, a sword first.
         self.assertEqual(df.player_combatant(CAMPAIGN, 'lupin').weapon.name, 'iron-sword')
 
     def test_the_leveled_field_is_who_has_joined_at_the_level_they_arrive(self):
@@ -1713,14 +1713,15 @@ class ItemEconomy(unittest.TestCase):
                                            {'id': 'vulnerary'}]}],
             'chests': [{'contents': [{'id': 'red-gem'}]}],
             'enemy_units': [{'id': 'k', 'item_drop': 'chest-key'}],
-            'post_chapter': {'available_shops': ['termalaine']},
+            'post_chapter': {'available_shops': ['termalaine']},     # a town: not a shop here
+            'map': {'vanilla_layout': 'Ch2Map'},          # its shops are the map donor's
         }
         ours = df.chapter_economy(chap)
         self.assertEqual(ours['gold'], 150)               # village gold only: no clear stipend (ADR 0092)
         self.assertEqual(ours['gifts'], ['vulnerary'])
         self.assertEqual(ours['chests'], ['red-gem'])
         self.assertEqual(ours['drops'], ['chest-key'])
-        self.assertEqual(ours['shops'], ['termalaine'])
+        self.assertEqual(ours['shops'], ['ShopList_Event_Ch2Armory'])
 
     def test_chapter_economy_counts_non_village_delivery_vehicles(self):
         """A gift is a gift whatever carries it (#26).

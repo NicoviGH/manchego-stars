@@ -1,0 +1,193 @@
+{| class="infobox"
+|
+{| style="width:100%"
+! {{{title|''{{PAGENAME}}''}}}<includeonly>{{DISPLAYTITLE:''{{PAGENAME}}''|noreplace}}</includeonly>
+|-
+!
+{{{image|No image available.}}}<br><span style="font-size: 77%">{{{caption|}}}</span>
+|}
+|- 
+|
+{| style="width:100%"
+! Developer(s)
+|
+{{{developer|Unknown}}}
+|-
+{{#if:{{{publisher|}}}|
+! Publisher(s)
+{{!}}
+{{{publisher}}}}}
+|-
+{{#if:{{{director|}}}|
+! Director(s)
+{{!}}
+{{{director}}}}}
+|-
+{{#if:{{{designer|}}}|
+! Designer(s)
+{{!}}
+{{{designer}}}}}
+|-
+{{#if:{{{released|}}}|
+! Release date(s)
+{{!}}
+{{{released}}}}}
+|-
+{{#if:{{{rating|}}}|
+! Rating(s)
+{{!}}
+{{{rating}}}}}
+|-
+{{#if:{{{platforms|}}}|
+! Platform(s)
+{{!}}
+{{{platforms}}}}}
+|-
+{{#if:{{{predecessor|}}}|
+! Predecessor
+{{!}}
+{{{predecessor}}}}}
+|-
+! Successor
+|
+{{{successor|None}}}
+|}
+|- 
+| style="{{#if:{{{noext|}}}|display: none}}" |
+{| class="mw-collapsible mw-collapsed" style="width:100%"
+! colspan="2" style="border: none; text-align: center" | [[Fire Emblem Wiki:Affiliates and Partners|On partnered sites]]
+|-
+{{#if:{{{strategywiki|}}}|
+! [[strategywiki:Main Page|StrategyWiki]]
+{{!}} [[strategywiki:{{{strategywiki}}}|Walkthrough]]
+}}
+|-
+{{#if:{{{armswiki|}}}|
+! [[armswiki:Main Page|Arms Institute]]
+{{!}} [[armswiki:{{{armswiki}}}|{{{armswiki}}}]]}}
+|-
+{{#if:{{{bulbapedia|}}}|
+! [[bulbapedia:Main Page|Bulbapedia]]
+{{!}} [[bulbapedia:{{{bulbapedia}}}|{{{bulbapedia}}}]]}}
+|-
+{{#if:{{{doomwiki|}}}|
+! [[doomwiki:Main Page|Doom Wiki]]
+{{!}} [[doomwiki:{{{doomwiki}}}|{{{doomwiki}}}]]}}
+|-
+{{#if:{{{fzerowiki|}}}|
+! [[fzerowiki:Main Page|F-Zero Wiki]]
+{{!}} [[fzerowiki:{{{fzerowiki}}}|{{{fzerowiki}}}]]}}
+|-
+{{#if:{{{finalfantasy|}}}|
+! [[finalfantasy:Main Page|Final Fantasy Wiki]]
+{{!}} [[finalfantasy:{{{finalfantasy}}}|{{{finalfantasy}}}]]}}
+|-
+{{#if:{{{goldensun|}}}|
+! [[goldensun:Main Page|Golden Sun Universe]]
+{{!}} [[goldensun:{{{goldensun}}}|{{{goldensun}}}]]}}
+|-
+{{#if:{{{splatoonwiki|}}}|
+! [[splatoonwiki:Main Page|Inkipedia]]
+{{!}} [[splatoonwiki:{{{splatoonwiki}}}|{{{splatoonwiki}}}]]}}
+|-
+{{#if:{{{halopedia|}}}|
+! [[halopedia:Main Page|Halopedia]]
+{{!}} [[halopedia:{{{halopedia}}}|{{{halopedia}}}]]}}
+|-
+{{#if:{{{icaruspedia|}}}|
+! [[icaruspedia:Main Page|Icaruspedia]]
+{{!}} [[icaruspedia:{{{icaruspedia}}}|{{{icaruspedia}}}]]}}
+|-
+{{#if:{{{jojowiki|}}}|
+! [[jojowiki:Main Page|JoJo's Bizarre Encyclopedia]]
+{{!}} [[jojowiki:{{{jojowiki}}}|{{{jojowiki}}}]]}}
+|-
+{{#if:{{{lylatwiki|}}}|
+! [[lylatwiki:Main Page|Lylat Wiki]]
+{{!}} [[lylatwiki:{{{lylatwiki}}}|{{{lylatwiki}}}]]}}
+|-
+{{#if:{{{mariowiki|}}}|
+! [[mariowiki:Main Page|Mario Wiki]]
+{{!}} [[mariowiki:{{{mariowiki}}}|{{{mariowiki}}}]]}}
+|-
+{{#if:{{{megatenwiki|}}}|
+! [[megatenwiki:Main Page|Megami Tensei Wiki]]
+{{!}} [[megatenwiki:{{{megatenwiki}}}|{{{megatenwiki}}}]]}}
+|-
+{{#if:{{{metroidwiki|}}}|
+! [[metroidwiki:Main Page|Metroid Wiki]]
+{{!}} [[metroidwiki:{{{metroidwiki}}}|{{{metroidwiki}}}]]}}
+|-
+{{#if:{{{miiwiki|}}}|
+! [[miiwiki:Main Page|MiiWiki]]
+{{!}} [[miiwiki:{{{miiwiki}}}|{{{miiwiki}}}]]}}
+|-
+{{#if:{{{nwiki|}}}|
+! [[nwiki:Main Page|NintendoWiki]]
+{{!}} [[nwiki:{{{nwiki}}}|{{{nwiki}}}]]}}
+|-
+{{#if:{{{nookipedia|}}}|
+!  [[nookipedia:Main Page|Nookipedia]]
+{{!}} [[nookipedia:{{{nookipedia}}}|{{{nookipedia}}}]]}}
+|-
+{{#if:{{{pikipedia|}}}|
+! [[pikipedia:Main Page|Pikmin Wiki]]
+{{!}} [[pikipedia:{{{pikipedia}}}|{{{pikipedia}}}]]}}
+|-
+{{#if:{{{rhythmheaven|}}}|
+! [[rhythmheaven:Main Page|Rhythm Heaven Wiki]]
+{{!}} [[rhythmheaven:{{{rhythmheaven}}}|{{{rhythmheaven}}}]]}}
+|-
+{{#if:{{{sew|}}}|
+! [[squareenix:Main Page|Square Enix Wiki]]
+{{!}} [[squareenix:{{{sew}}}|{{{sew}}}]]}}
+|-
+{{#if:{{{smashwiki|}}}|
+! [[smashwiki:Main Page|SmashWiki]]
+{{!}} [[smashwiki:{{{smashwiki}}}|{{{smashwiki}}}]]}}
+|-
+{{#if:{{{wikibound|}}}|
+! [[wikibound:Main Page|Wikibound]]
+{{!}} [[wikibound:{{{wikibound}}}|{{{wikibound}}}]]}}
+|-
+{{#if:{{{wikifang|}}}|
+! [[wikifang:Main Page|Wikifang]]
+{{!}} [[wikifang:{{{wikifang}}}|{{{wikifang}}}]]}}
+|-
+{{#if:{{{wikirby|}}}|
+! [[wikirby:Main Page|WiKirby]]
+{{!}} [[wikirby:{{{wikirby}}}|{{{wikirby}}}]]}}
+|-
+{{#if:{{{wikimon|}}}|
+! [[wikimon:Main Page|Wikimon]]
+{{!}} [[wikimon:{{{wikimon}}}|{{{wikimon}}}]]}}
+|-
+{{#if:{{{wikisimpsons|}}}|
+! [[wikisimpsons:Main Page|Wikisimpsons]]
+{{!}} [[wikisimpsons:{{{wikisimpsons}}}|{{{wikisimpsons}}}]]}}
+|-
+{{#if:{{{zeldawiki|}}}|
+! [[zeldawiki:Main Page|Zelda Wiki]]
+{{!}} [[zeldawiki:{{{zeldawiki}}}|{{{zeldawiki}}}]]}} 
+|}
+|}<includeonly>[[Category:Games]]</includeonly><noinclude>
+
+==Usage==
+Use for games.
+<pre>{{Game Infobox
+|title=
+|image=
+|caption=
+|developer=
+|publisher=
+|director=
+|designer=
+|released=
+|rating=
+|platforms=
+|predecessor=
+|successor=
+|noext= Set as 'y' if there are no links to external sites
+|strategywiki= (only needed if the game has a StrategyWiki page)
+}}</pre>
+[[Category:Infobox templates]]</noinclude>

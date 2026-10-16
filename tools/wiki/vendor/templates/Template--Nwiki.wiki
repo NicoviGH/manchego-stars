@@ -1,0 +1,4 @@
+{| class="width-50 interwiki-template"
+| [[File:NintendoWiki logo.png|40px]]
+| This article or section is a short summary of {{{2|{{FULLPAGENAME}}}}}.<br>[[nwiki:|NintendoWiki]] features [[nwiki:{{{1|{{PAGENAME}}}}}|a more in-depth article]].
+|}<noinclude>[[Category:Interwiki templates]]</noinclude>

@@ -683,8 +683,8 @@ def loose_ends(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     status = str(chapter.get('status'))
     if status == 'planned' and host_slot(name, campaign) is not None:
         out.append('marked `status: planned` but hosted -- one of the two is stale')
-    if status == 'active' and not any(r.declared for r in rows):
-        out.append('marked `status: active` with no scripted event')
+    if status in ('active', 'complete') and not any(r.declared for r in rows):
+        out.append('marked `status: %s` with no scripted event' % status)
     return out
 
 

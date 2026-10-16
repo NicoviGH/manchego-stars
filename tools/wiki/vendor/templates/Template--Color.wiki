@@ -1,0 +1,12 @@
+<span style="color:{{{1}}}">{{{2}}}</span><noinclude>
+==Usage==
+<pre>{{Color|Color|Text}}</pre>
+
+This template is used to change the color of text appearing anywhere. To use this template, simply fill in the code above. For "color", various input codes can be used. Many of these color codes can be found [[wikipedia:web colors|here]]. Hexadecimal is also usable by this template, but it must be used proceeding a pound symbol (#).
+
+For example, to color a word red, one would type
+:<nowiki>{{color|red|Red text}}</nowiki> giving {{color|red|Red text}}
+or alternatively use hexadecimal:
+:<nowiki>{{color|#f00|Red text}}</nowiki> giving the same {{color|#f00|Red text}}
+See [[Help:Color]] for more.
+[[Category:Formatting templates]]

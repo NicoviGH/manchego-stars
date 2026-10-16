@@ -51,11 +51,77 @@ def vanilla_name_text_id(slot):
 
 
 
-def write_nameplate(lines, slot, unit):
-    """Rename vanilla character `slot`'s nameplate to `unit`'s display name. A boss riding a
-    borrowed slot (Breguet, Bazba, Novala) otherwise shows the vanilla name on its unit window
-    and its death."""
+def write_nameplate(lines, slot, unit, on_map=True):
+    """Rename vanilla character `slot`'s nameplate to `unit`'s display name, and write its
+    `help_text:` over the slot's description. A boss riding a borrowed slot (Breguet, Bazba,
+    Novala) otherwise shows the vanilla name on its unit window and its death, and the vanilla
+    character's line when R is pressed on its name (ADR 0346). A unit standing on the map must
+    carry one; `on_map=False` is for a slot only a scene shows (Glimmerfrost in her hut)."""
     set_message_body(lines, vanilla_name_text_id(slot), name_message_body(display_name(unit)))
+    if unit.get('help_text'):
+        write_help_text(lines, slot, unit)
+    elif on_map:
+        sys.exit('ERROR: %s rides %s with no help_text: R on its name would read %s\'s vanilla '
+                 'description (ADR 0346)' % (unit.get('id'), slot, slot))
+
+
+def slot_desc_text_id(slot):
+    """descTextId of vanilla CHARACTER_<slot>: the message its help text (R on its name) reads."""
+    from inject.decomp import _find_brace_block, vanilla_decomp_text
+    chars = vanilla_decomp_text('src/data_characters.c')
+    s, e = _find_brace_block(chars, '[CHARACTER_%s - 1]' % slot.upper(), CHARACTERS_C)
+    m = re.search(r'\.descTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars[s:e])
+    return int(m.group(1), 0) if m else None
+
+
+def help_text_body(text):
+    """A unit's help text as vanilla writes one: wrapped to HELP_TEXT_BUDGET_PX, at most two lines
+    joined by [LF], `[.]`-padded where the terminator would otherwise be swallowed (`_eats_end`)."""
+    text = _fe_dialogue_text(' '.join(str(text).split()))
+    lines = _wrap_fe_lines(text, fe8_talk_font.HELP_TEXT_BUDGET_PX)
+    if len(lines) > fe8_talk_font.HELP_TEXT_LINES:
+        sys.exit('ERROR: help text runs to %d lines at %dpx (the box holds %d): %r'
+                 % (len(lines), fe8_talk_font.HELP_TEXT_BUDGET_PX,
+                    fe8_talk_font.HELP_TEXT_LINES, text))
+    return '[LF]\n'.join(lines) + ('[.]' if _eats_end(lines) else '') + '[X]'
+
+
+def _eats_end(lines):
+    """Would textencode swallow the terminator after these [LF]-joined lines? It packs a
+    printable byte (>= 0x20) together with the byte after it and a control byte alone, starting
+    afresh after every control code (tools/textencode/textencode.c), so an odd printable run
+    pairs with whatever follows. A plain byte-count parity is wrong: Braulo's 35 + 37 characters
+    are even in total, yet the second run ends odd and ate the [X], so his help text ran into
+    Marty's. This walk predicts the pad on all 50 plain vanilla descriptions."""
+    stream = []
+    for i, line in enumerate(lines):
+        stream += ([0x01] if i else []) + list(line.encode('utf-8'))
+    at = 0
+    while at < len(stream):
+        at += 2 if stream[at] >= 0x20 else 1
+    return at > len(stream)
+
+
+def write_help_text(lines, slot, unit):
+    """Write `unit`'s `help_text:` over its slot's description, so R on its name reads ours."""
+    set_message_body(lines, slot_desc_text_id(slot), help_text_body(unit['help_text']))
+
+
+def slot_help_text(slot, unit=None):
+    """The help text a character slot shows (R on its name), as plain text: `unit`'s own
+    `help_text:` where the build writes it (`write_help_text`), else the slot's vanilla line."""
+    if unit and unit.get('help_text'):
+        return ' '.join(_fe_dialogue_text(' '.join(str(unit['help_text']).split())).split())
+    from inject.decomp import vanilla_decomp_text
+    msg = slot_desc_text_id(slot)
+    if msg is None:
+        return None
+    body = re.search(r'^## MSG_%03X\b[^\n]*\n(.*?)(?=^##|\Z)' % msg,
+                     vanilla_decomp_text('texts/texts.txt'), re.S | re.M)
+    if not body:
+        return None
+    return ' '.join(re.sub(r'\[[^\]]*\]', ' ', body.group(1)).split()) or None
+
 
 GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'
 

@@ -38,7 +38,7 @@ REWARD = [{'id': ANY, 'amount': ANY}]
 # them interchangeably (`raw_pids.PLACED_ROSTER_KEYS`, `check.ROSTER_KEYS`, map_placement_preview,
 # difficulty), so a field legal on an enemy is legal on a guest or an ally. ENEMY narrows it.
 UNIT = {
-    'id': ANY, 'name': ANY, 'fe_name': ANY, 'class': ANY, 'deploy_class': ANY, 'level': ANY,
+    'id': ANY, 'name': ANY, 'face': ANY, 'fe_name': ANY, 'help_text': ANY, 'class': ANY, 'deploy_class': ANY, 'level': ANY,
     'levels': ANY, 'autolevel': ANY, 'count': ANY, 'composition': ANY,
     'position': ANY, 'positions': ANY, 'boss_tile': ANY, 'camera_at': ANY,
     'is_boss': ANY, 'is_miniboss': ANY, 'hard_mode_only': ANY, 'required': ANY, 'is_npc': ANY,
@@ -78,28 +78,37 @@ PLAYTEST_CASE = {
     'name': ANY, 'kind': ANY, 'boot': ANY, 'checkpoint': ANY, 'deadline': ANY, 'headless': ANY,
     'lua': ANY, 'proves': ANY, 'given': ANY,
     'when': [{'visit': {'x': ANY, 'y': ANY, 'gains': ANY},
-              'talk': {'x': ANY, 'y': ANY, 'gains': ANY}}],
+              'talk': {'x': ANY, 'y': ANY, 'gains': ANY},
+              'shop': {'x': ANY, 'y': ANY, 'kind': ANY, 'stocks': ANY}}],
     'then': [{'spoke': ANY}],
 }
 
 CHAPTER = {
     # identity and status
-    'id': ANY, 'chapter_number': ANY, 'title': ANY, 'status': ANY, 'milestone': ANY,
+    'id': ANY, 'chapter_number': ANY, 'title': ANY, 'location': ANY, 'status': ANY, 'milestone': ANY,
     'is_prologue': ANY, 'is_mvp_finale': ANY, 'balance_locked': ANY, 'accepted_residual': ANY,
     # prose: the design record
     'narrative': ANY, 'design_notes': ANY, 'cadence': ANY, 'parity_reference': ANY,
-    'difficulty_note': ANY, 'fe8_base_map': ANY, 'fe8_cadence_base': ANY,
+    'difficulty_note': ANY, 'strategy': ANY, 'act': ANY, 'fe8_base_map': ANY, 'fe8_cadence_base': ANY,
     'forest_composition': ANY, 'win_condition': ANY, 'lose_condition': ANY,
     'signature_moments': [{'pc': ANY, 'trigger': ANY}],
     'introduces': [{'concept': ANY, 'coverage': ANY, 'status': ANY, 'where': ANY}],
+    # the campaign plan (#486): what a planned chapter is for, and every question still open on
+    # a chapter. tools/gen_wiki.py renders both; settling a question removes it from the list.
+    'plan': {'story': ANY, 'sources': ANY, 'joins_roles': ANY,
+             'payload_notes': ANY, 'how_it_plays': ANY, 'objective': ANY, 'boss': ANY,
+             'introduces': [{'concept': ANY, 'where': ANY}]},
+    'open_questions': [{'q': ANY, 'pick': ANY}],
+    # a vanilla-twin item this chapter deliberately does not hand out, and why (gen_wiki marks it)
+    'payload_deviations': [{'item': ANY, 'why': ANY}],
     'messie': {'appears_in': ANY, 'art': ANY, 'art_note': ANY, 'name': ANY, 'pronouns': ANY, 'role': ANY,
                'surfaces': ANY, 'gather': ANY, 'bay': ANY,
                'walks_to': ANY},
     'soft_penalty_on_chwinga_loss': {'description': ANY},
     'charm_gifts': {'note': ANY},
     # the map
-    'map': {'file': ANY, 'size': ANY, 'tileset': ANY, 'base_layout': ANY,
-            'vanilla_layout': ANY, 'description': ANY, 'terrain_note': ANY,
+    'map': {'file': ANY, 'size': ANY, 'tileset': ANY, 'vanilla_layout': ANY, 'description': ANY,
+            'terrain_note': ANY,
             'placement_directives': ANY,
             'terrain_mechanic': {'boat_pockets': ANY, 'channels': ANY, 'crossings': ANY,
                                  'ice_walls': ANY, 'lake_ice': ANY, 'snow_drifts': ANY}},
@@ -137,9 +146,8 @@ CHAPTER = {
     'cutscene_actors': ANY,
     'events': [EVENT],
     'arena_presentation': {'attendant': {'face_slot': ANY, 'portrait': ANY}},
-    'available_shops': ANY,      # difficulty.py reads it here as well as under post_chapter
-    'economy': {'elven_store': {'armory': ANY, 'vendor': ANY},
-                'reward_sites': [{'gift': ANY}],
+    'available_shops': ANY,      # a world-map TOWN shop label (campaign.yaml world_map)
+    'economy': {'reward_sites': [{'gift': ANY}],
                 'save_all_bonus': ANY, 'save_all_gate': ANY},
     'post_chapter': {'available_shops': ANY, 'ends_mvp': ANY,
                      'net_gold': ANY, 'hooks': ANY, 'unlocks_chapter': ANY,

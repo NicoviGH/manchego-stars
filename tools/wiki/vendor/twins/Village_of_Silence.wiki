@@ -1,0 +1,2709 @@
+{{Stub}}
+{{Chapter Infobox
+|image=[[File:Cm fe08 12A.png|200px]]
+|location=[[Caer Pelyn]]
+|new units=[[Saleh]], [[Ewan]]
+|boss=[[Monster]]
+|previous=[[Creeping Darkness]]
+|next=[[Hamill Canyon]]
+}}
+
+{{quote|Do you people truly live in this place? These barren crags seem unfit for human habitation...|[[Innes]] to [[Saleh]].}}
+
+'''Village of Silence''' (Japanese: {{hl|静寂の里|Shijima no sato}} ''Village of Silence'') is the twelfth chapter of [[Eirika]]'s route in {{FE8}}.
+
+It is not possible to return to the [[world map]] during this chapter.
+
+==Plot==
+{{main|Village of Silence/Script}}
+
+[[Eirika]] continues her journey through the [[Caer Pelyn]] mountain range with [[Saleh]]. Eirika's group, and Eirika in particular, has difficulty with the terrain and thin air in the mountainous peaks. [[Saleh]] states they are only half a day's travel to the village; [[Seth]] suggests they rest for the rest of the day, but Eirika insists they continue. Innes notes the inhospitable terrain, but Saleh states they survive with the Great Dragon. Seth then alerts them to approaching [[monster]]s; Saleh notes that monsters have not traveled so far from [[Darkling Woods (location)|Darkling Woods]] in some time, and the group prepares for battle.
+
+At the start of the battle, Saleh states his concern for [[Ewan]], who had went ahead to Caer Pelyn earlier in the day. At the same time, Ewan flees a monster, taking refuge from it in a nearby house.
+
+If someone from Eirika's group visits the southern house Ewan will come out of hiding and help fight off the monsters. If Ewan's house is not visited, Saleh or [[Tethys]] can find him after the battle if they are alive; Ewan expresses his desire to help, and leaves with them to Caer Pelyn.
+
+Upon routing the monsters, Eirika's group enters Caer Pelyn, where they are greeted by Saleh's grandmother, [[Dara]]. If Saleh is alive, Dara asks him about new of the Great Dragon, but Saleh reports that he has found nothing. Innes introduces himself as the prince of [[Frelia]], and requests permission to pass through the area. Dara states that the people of Caer Pelyn are all equal, and welcomes the group into Caer Pelyn's homes and to their supplies. Innes desires to continue through quickly, but Dara insists, mentioning that Eirika is on the verge of collapse. If Saleh died, Dara asks if Eirika and Innes have seen him, and Innes explains that Saleh died fighting monsters.
+
+Later, in one of the buildings, Eirika asks Dara about the Great Dragon. Dara explains that the Great Dragon protected mankind from [[Fomortiis|the Demon King]] 800 years ago; modern retellings of the [[Legend of the Sacred Stones]] do not mention the Great Dragon, but Dara states that the Great Dragon was integral to defeating the Demon King and still watches over his corpse in Darkling Woods. Eirika then asks why there are monsters about the continent; Dara states that the Great Dragon left south with Saleh to investigate a "foul energy"—however, Saleh was separated from the Great Dragon, and has been searching for them across the continent. Eirika realizes that [[Myrrh]] is the Great Dragon, and informs Dara that Myrrh is with her brother in Grado. If Saleh is alive, Dara instructs Saleh to travel to Grado to find Myrrh, but [[L'Arachel]] suggests that Saleh travel with them, as the quickest way to Grado is through Jehanna, to which Saleh agrees.
+
+Dara sees Eirika's group off in their travels to Jehanna. If Saleh is alive, he shows Eirika's group to the path to Jehanna; Dara requests that they look after Saleh, as he is her only grandchild.
+
+==Chapter data==
+{{Tab
+|width=100%
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Eirika]] dies
+|ally=2–{{h|12|11 in the Japanese version (blue square at coordinate (5, 9) is missing)}}{{h|+1|Upon Ewan being recruited}}
+|enemy=32{{h|+12|Reinforcements}}
+|map=[[File:Cm fe08 12A.png]]
+|col=20
+|row=30
+}}
+|content2={{ChapData
+|victory=Defeat all enemies
+|defeat=[[Eirika]] dies
+|ally=2–{{h|12|11 in the Japanese version (blue square at coordinate (5, 9) is missing)}}{{h|+1|Upon Ewan being recruited}}
+|enemy=38{{h|+15|Reinforcements}}
+|map=[[File:Cm fe08 12A d.png]]
+|col=20
+|row=30
+}}
+}}
+
+===Character data===
+{{ChapChars
+|game#=08
+|newunit1={{NewUnit
+|name=Saleh
+|portrait=[[File:portrait saleh fe08.png]]
+|class=Sage
+|HP=30
+|lv=1
+|inventory={{Item|8|Elfire}}<br>{{Item|8|Thunder}}
+|recruitment method=Automatically from preparations
+}}
+|newunit2={{NewUnit
+|name=Ewan
+|portrait=[[File:portrait ewan fe08.png]]
+|class=Pupil
+|HP=15
+|lv=1
+|inventory={{Item|8|Fire}}<br>{{Item|8|Energy Ring}}<br>{{Item|8|Vulnerary}}
+|recruitment method=Visit southern house, or at the end of the chapter if Saleh or [[Tethys]] is alive
+}}
+|forced1=eirika
+|forced2=saleh
+|return1=seth
+|return2=franz
+|return3=gilliam
+|return4=vanessa
+|return5=moulder
+|return6=ross
+|return7=garcia
+|return8=neimi
+|return9=colm
+|return10=artur
+|return11=lute
+|return12=natasha
+|return13=joshua
+|return14=forde
+|return15=kyle
+|return16=tana
+|return17=amelia
+|return18=innes
+|return19=gerik
+|return20=tethys
+|return21=marisa
+|return22=l'Arachel
+|return23=dozla
+}}
+
+===Item data===
+{{ChapItems
+|platform=gba
+|item1=Steel Bow
+|obtain1=Dropped by the boss [[Maelduin]] (drops unequipped item)<br><small>(Western version only)</small>
+|item2=Halberd
+|obtain2=Dropped by the boss [[Maelduin]] (drops unequipped item)
+|item3=Horseslayer
+|obtain3=Dropped by enemy [[Gargoyle]] (reinforcement)
+|itemlast=Barrier
+|obtainlast=Visit northern [[village]]
+}}
+
+===Shop data===
+{{Tab
+|header=Vendor
+|width=70%
+|constyle=text-align: center
+|tab1=(NTSC-J)
+|tab2=(NTSC-U/PAL)
+|content1={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba thunder.png]]
+{{!}} [[Thunder]]
+{{!}} class="roundr" {{!}} 700
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elfire.png]]
+{{!}} [[Elfire]]
+{{!}} class="roundr" {{!}} 1,200
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba shine.png]]
+{{!}} [[Shine]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba mend.png]]
+{{!}} [[Mend]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba restore.png]]
+{{!}} [[Restore]]
+{{!}} class="roundr" {{!}} 2,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba vulnerary.png]]
+{{!}} [[Vulnerary]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elixir.png]]
+{{!}} [[Elixir]]
+{{!}} class="roundr" {{!}} 3,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba pure water.png]]
+{{!}} [[Pure Water]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba antitoxin.png]]
+{{!}} [[Antitoxin]]
+{{!}} class="roundr" {{!}} 450
+{{tableend}}
+|content2={{clear}}
+{{tablebegin}} class="wikitable" style="border-collapse: separate; margin: auto; border: none; background: none"
+! class="roundl" style=" width: 5%" {{!}}
+! style="width: 30%" {{!}} Name
+! class="roundr" style="width: 15%" {{!}} Cost
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba fire.png]]
+{{!}} [[Fire]]
+{{!}} class="roundr" {{!}} 560
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba thunder.png]]
+{{!}} [[Thunder]]
+{{!}} class="roundr" {{!}} 700
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba lightning.png]]
+{{!}} [[Lightning]]
+{{!}} class="roundr" {{!}} 630
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba shine.png]]
+{{!}} [[Shine]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba heal.png]]
+{{!}} [[Heal]]
+{{!}} class="roundr" {{!}} 600
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba mend.png]]
+{{!}} [[Mend]]
+{{!}} class="roundr" {{!}} 1,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba restore.png]]
+{{!}} [[Restore]]
+{{!}} class="roundr" {{!}} 2,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba vulnerary.png]]
+{{!}} [[Vulnerary]]
+{{!}} class="roundr" {{!}} 300
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba elixir.png]]
+{{!}} [[Elixir]]
+{{!}} class="roundr" {{!}} 3,000
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba pure water.png]]
+{{!}} [[Pure Water]]
+{{!}} class="roundr" {{!}} 900
+{{!-}}
+{{!}} class="roundl" style=" text-align: right" {{!}} [[File:Is gba antitoxin.png]]
+{{!}} [[Antitoxin]]
+{{!}} class="roundr" {{!}} 450
+{{tableend}}
+}}
+
+===Enemy data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{missingstats}}
+{{Tab
+|width=100%
+|tab1=Easy
+|tab2=Easy <small>(Japan)</small>
+|tab3=Normal
+|tab4=Normal <small>(Japan)</small>
+|tab5=Difficult
+|tab6=Difficult <small>(Japan)</small>
+|default=3
+|content1={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=9
+|#=1
+|hp=40
+|str=14
+|skill=10
+|spd=9
+|lck=0
+|def=13
+|res=11
+|con=12
+|mov=8
+|inventory={{Item|8|Halberd}} • {{Item|8|Steel Bow|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=3
+|hp=21~23
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=6~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=22~24
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=7~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=21~23
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=6~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=3
+|hp=28~30
+|str=8~9
+|skill=4~5
+|spd=3~5
+|lck=0~1
+|def=6~8
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=27~29
+|str=7~9
+|skill=4~5
+|spd=3~4
+|lck=0~1
+|def=6~7
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=27~29
+|str=7~9
+|skill=4~5
+|spd=3~4
+|lck=0~1
+|def=6~7
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=1
+|hp=18~20
+|str=5~6
+|skill=11~13
+|spd=11~13
+|lck=1~2
+|def=2~3
+|res=0~1
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=19~20
+|str=5~6
+|skill=11~13
+|spd=11~13
+|lck=1~2
+|def=2~3
+|res=0~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=16~18
+|str=3~5
+|skill=2~3
+|spd=3~4
+|lck=1~2
+|def=2~3
+|res=4~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=21~22
+|str=4~6
+|skill=2~3
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=21~22
+|str=4~6
+|skill=2~3
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=3
+|hp=29~31
+|str=4~5
+|skill=1~2
+|spd=0~2
+|lck=0~1
+|def=0~1
+|res=0~1
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Tarvos
+|classarticle=Tarvos (class)
+|lv=9
+|#=2
+|hp=23~25
+|str=7~8
+|skill=3~4
+|spd=5~7
+|lck=0~1
+|def=7~8
+|res=0~1
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=8
+|#=2
+|hp=17~19
+|str=4~6
+|skill=11~12
+|spd=11~12
+|lck=0~2
+|def=2~3
+|res=0~1
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=1
+|hp=28~30
+|str=8~9
+|skill=4~5
+|spd=3~5
+|lck=0~1
+|def=6~8
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=35
+|str=3
+|skill=0
+|spd=1
+|lck=0
+|def=0
+|res=0
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=3
+|hp=18~20
+|str=5~6
+|skill=11~13
+|spd=11~13
+|lck=1~2
+|def=2~3
+|res=0~1
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=21~23
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=6~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=3
+|hp=22~24
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=7~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=22~24
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=7~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=21~23
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=6~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=3
+|hp=21~23
+|str=7~9
+|skill=4~5
+|spd=7~8
+|lck=0~1
+|def=6~8
+|res=0~1
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content2={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Halberd}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Tarvos
+|classarticle=Tarvos (class)
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content3={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=9
+|#=1
+|hp=40
+|str=14
+|skill=10
+|spd=9
+|lck=0
+|def=13
+|res=11
+|con=12
+|mov=8
+|inventory={{Item|8|Halberd}} • {{Item|8|Steel Bow|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=3
+|hp=23~25
+|str=8~10
+|skill=4~6
+|spd=7~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=23~26
+|str=8~10
+|skill=5~6
+|spd=8~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=23~25
+|str=8~10
+|skill=4~6
+|spd=7~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=3
+|hp=30~32
+|str=9~10
+|skill=4~6
+|spd=4~5
+|lck=0~2
+|def=7~8
+|res=1~3
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=29~31
+|str=8~10
+|skill=4~6
+|spd=4~5
+|lck=0~2
+|def=6~8
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=29~31
+|str=8~10
+|skill=4~6
+|spd=4~5
+|lck=0~2
+|def=6~8
+|res=1~2
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=1
+|hp=19~21
+|str=5~7
+|skill=12~14
+|spd=12~14
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=20~22
+|str=6~7
+|skill=12~14
+|spd=12~14
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=17~19
+|str=4~6
+|skill=2~4
+|spd=3~5
+|lck=1~3
+|def=2~3
+|res=5~6
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=22~24
+|str=5~7
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=22~24
+|str=5~7
+|skill=3~4
+|spd=3~4
+|lck=0~1
+|def=3~4
+|res=0~1
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=3
+|hp=30~33
+|str=5~6
+|skill=1~3
+|spd=1~2
+|lck=0~1
+|def=0~1
+|res=0~2
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Tarvos
+|classarticle=Tarvos (class)
+|lv=9
+|#=2
+|hp=25~27
+|str=7~9
+|skill=4~5
+|spd=6~7
+|lck=0~1
+|def=7~9
+|res=0~2
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=8
+|#=2
+|hp=19~20
+|str=5~6
+|skill=11~13
+|spd=11~13
+|lck=1~2
+|def=2~3
+|res=0~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=1
+|hp=30~32
+|str=9~10
+|skill=4~6
+|spd=4~5
+|lck=0~2
+|def=7~8
+|res=1~3
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=41~45
+|str=6~9
+|skill=1~4
+|spd=2~4
+|lck=3~7
+|def=0~3
+|res=1~3
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=3
+|hp=19~21
+|str=5~7
+|skill=12~14
+|spd=12~14
+|lck=1~3
+|def=2~4
+|res=1~2
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=23~25
+|str=8~10
+|skill=4~6
+|spd=7~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=3
+|hp=23~26
+|str=8~10
+|skill=5~6
+|spd=8~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=23~26
+|str=8~10
+|skill=5~6
+|spd=8~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=23~25
+|str=8~10
+|skill=4~6
+|spd=7~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=3
+|hp=23~25
+|str=8~10
+|skill=4~6
+|spd=7~9
+|lck=0~1
+|def=7~8
+|res=0~2
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content4={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Halberd}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Tarvos
+|classarticle=Tarvos (class)
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=8
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Does not move.
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content5={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=9
+|#=1
+|hp=41~43
+|str=14~16
+|skill=10~12
+|spd=9~10
+|lck=0~1
+|def=13~14
+|res=11~12
+|con=12
+|mov=8
+|inventory={{Item|8|Halberd}} • {{Item|8|Steel Bow|type=drop}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~3
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=3
+|hp=33~37
+|str=10~14
+|skill=5~9
+|spd=4~7
+|lck=1~3
+|def=7~9
+|res=2~4
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=32~36
+|str=10~13
+|skill=5~8
+|spd=4~6
+|lck=1~3
+|def=7~9
+|res=1~4
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=32~36
+|str=10~13
+|skill=5~8
+|spd=4~6
+|lck=1~3
+|def=7~9
+|res=1~4
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=1
+|hp=21~26
+|str=6~10
+|skill=14~17
+|spd=14~17
+|lck=2~5
+|def=3~5
+|res=1~3
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=2
+|hp=22~27
+|str=6~10
+|skill=14~17
+|spd=14~17
+|lck=2~6
+|def=3~5
+|res=1~4
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=5
+|hp=19~22
+|str=6~9
+|skill=3~6
+|spd=4~7
+|lck=2~5
+|def=2~4
+|res=5~8
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=26~29
+|str=7~10
+|skill=3~7
+|spd=4~6
+|lck=0~2
+|def=3~5
+|res=0~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=26~29
+|str=7~10
+|skill=3~7
+|spd=4~6
+|lck=0~2
+|def=3~5
+|res=0~3
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=5
+|hp=34~39
+|str=6~10
+|skill=2~6
+|spd=1~4
+|lck=0~3
+|def=0~3
+|res=1~3
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Tarvos
+|classarticle=Tarvos (class)
+|lv=9
+|#=2
+|hp=28~32
+|str=8~12
+|skill=5~8
+|spd=6~9
+|lck=0~2
+|def=8~10
+|res=1~3
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=8
+|#=3
+|hp=21~25
+|str=6~9
+|skill=13~16
+|spd=13~16
+|lck=1~5
+|def=2~5
+|res=1~3
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=1
+|hp=33~37
+|str=10~14
+|skill=5~9
+|spd=4~7
+|lck=1~3
+|def=7~9
+|res=2~4
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=53~60
+|str=11~16
+|skill=4~8
+|spd=3~7
+|lck=10~15
+|def=1~5
+|res=2~5
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=26~29
+|str=7~10
+|skill=3~7
+|spd=4~6
+|lck=0~2
+|def=3~5
+|res=0~3
+|con=7
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=3
+|hp=21~26
+|str=6~10
+|skill=14~17
+|spd=14~17
+|lck=2~5
+|def=3~5
+|res=1~3
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=3
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~3
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~3
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=26~30
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~2
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=27~31
+|str=10~13
+|skill=5~9
+|spd=8~12
+|lck=0~3
+|def=7~10
+|res=1~3
+|con=8
+|mov=6
+|inventory={{Item|8|Short Spear}}
+|last=y
+}}
+{{ChapUnitFtr}}
+|content6={{ChapUnitHdr|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Maelduin
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=8
+|inventory={{Item|8|Halberd}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=4
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Sharp Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mogall
+|lv=9
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=4
+|mov=5
+|inventory={{Item|8|Evil Eye}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Sword}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Steel Lance}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Revenant
+|lv=10
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=4
+|inventory={{Item|8|Rotten Claw}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Tarvos
+|classarticle=Tarvos (class)
+|lv=9
+|#=2
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=10
+|mov=7
+|inventory={{Item|8|Steel Axe}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=8
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bael
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=12
+|mov=5
+|inventory={{Item|8|Poison Claw}}
+|notes=• Starts on a [[Terrain/Game Boy Advance games#Fire Emblem: The Sacred Stones|peak]].<br>• Immediately begins moving unprovoked.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Entombed
+|lv=4
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=5
+|inventory={{Item|8|Fetid Claw}}
+|notes=Does not move.
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Bonewalker
+|version=01
+|lv=7
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=7
+|mov=5
+|inventory={{Item|8|Killing Edge}}
+|last=y
+}}
+{{ChapUnitReinf|type=Enemy|platform=gba}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Mauthe Doog
+|lv=9
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=6
+|mov=7
+|inventory={{Item|8|Fiery Fang|link=Fiery Fang (The Sacred Stones)}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=5
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Axereaver}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=3
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Iron Lance}} • {{Item|8|Javelin}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Steel Lance}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=9
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Horseslayer|type=drop}}
+}}
+{{ChapUnitCellGBA
+|name=Monster
+|class=Gargoyle
+|lv=10
+|#=1
+|hp=
+|str=
+|skill=
+|spd=
+|lck=
+|def=
+|res=
+|con=8
+|mov=6
+|inventory={{Item|8|Short Spear}}
+|last=y
+}}
+{{ChapUnitFtr}}
+}}
+
+====Reinforcements====
+*After reaching the northern half of the map (row 16)
+**3 [[Mauthe Doog]]s from near ally starting positions
+**1 [[Gargoyle]] with a [[Steel Lance]] from the southwest corner of the map <small>(Difficult only)</small>
+**1 [[Gargoyle]] with a [[Steel Lance]] and a [[Javelin]] from the southwest corner of the map <small>(Difficult only)</small>
+**1 [[Gargoyle]] with an [[Axereaver]] from the southwest corner of the map
+**2 [[Gargoyle]]s with [[Iron Lance]]s and [[Javelin]]s; one from the southwest corner of the map, one from the southeast corner of the map
+**1 [[Gargoyle]] with a [[Steel Lance]] from the southeast corner of the map
+**1 [[Gargoyle]] with a [[Horseslayer]] from the southeast corner of the map
+*After entering the northeastern part of the map (columns 9–20, rows 1–10)
+**3 [[Gargoyle]]s with [[Steel Lance]]s from the northwest corner of the map
+**1 [[Gargoyle]] with an [[Iron Lance]] and a [[Javelin]] from the northwest corner of the map
+**1 [[Gargoyle]] with a [[Short Spear]] from the northwest corner of the map <small>(Difficult only)</small>
+
+===Boss data===
+:''Stats with two figures separated by a ~ are presented as a range, representing stats that vary due to random growths. The figures to the left and right of the ~ are the stat's minimum and maximum possible values respectively.''
+{{Main|Monster}}
+{{Tab
+|tab1=Easy/Normal
+|tab2=Difficult
+|content1={{BossStats GBA
+|portrait=[[File:Generic portrait maelduin fe08.png]]
+|sprite=maelduin enemy
+|class=Maelduin
+|affin=dark
+|lv={{h|9|4 in the Japanese version}}
+|HP={{h|40|25 in the Japanese version}}
+|str={{h|14|8 in the Japanese version}}
+|skill={{h|10|4 in the Japanese version}}
+|spd={{h|9|7 in the Japanese version}}
+|luck=0
+|def={{h|13|9 in the Japanese version}}
+|res={{h|11|3 in the Japanese version}}
+|move=8
+|con=12
+|aid=11
+|inventory={{Item|8|Halberd}}<br>{{Item|8|Steel Bow|type=drop}}{{h|*|Western version only}}
+|ax=A
+|bo=A
+}}
+|content2={{BossStats GBA
+|portrait=[[File:Generic portrait maelduin fe08.png]]
+|sprite=maelduin enemy
+|class=Maelduin
+|affin=dark
+|lv={{h|9|4 in the Japanese version}}
+|HP=41~43
+|str=14~16
+|skill=10~12
+|spd=9~10
+|luck=0~1
+|def=13~14
+|res=11~12
+|move=8
+|con=12
+|aid=11
+|inventory={{Item|8|Halberd}}<br>{{Item|8|Steel Bow|type=drop}}{{h|*|Western version only}}
+|ax=A
+|bo=A
+}}
+}}
+
+==Strategy==
+{{strategy}}
+{{sectstub}}
+<!--
+==Trivia==
+-->
+==Etymology and other languages==
+{{Names
+|eng-name=Village of Silence
+|jpn-name={{h|静寂の里|Shijima no sato}}
+|jpn-mean=Village of Silence
+|span-name=La aldea del silencio
+|span-mean=The village of silence
+|fren-name=Village du silence
+|fren-mean=Village of silence
+|ger-name=Das Dorf der Stille
+|ger-mean=The Village of Silence
+|ital-name=Il villaggio dei silenzi
+|ital-mean=The Village of Silences
+}}
+
+==Gallery==
+{{sectstub}}
+
+{{ChapterNav
+|prechapter=Creeping Darkness
+|nextchapter=Hamill Canyon
+}}
+
+{{Nav8}}
+[[Category:Chapters of Fire Emblem: The Sacred Stones]]

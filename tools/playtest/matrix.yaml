@@ -128,6 +128,11 @@ scenarios:
   controller_turn: {}                                  # the #220 controller contract
   smoke: {}
   win: {}
+  # Runs RETAIL FE8, not our build: `PT_VANILLA=1 tools/playtest/run.sh vanillagold` (needs
+  # the pristine build in build/vanilla-fe8 for its symbols). Never selected by a suite.
+  # A MEASUREMENT of retail, not a gate: kind diagnostic, because the world-map interlude it
+  # crosses is a state the controller does not classify, so it presses through it raw.
+  vanillagold: {rom: any, manual: true, kind: diagnostic, deadline: 900}
   goodberry: {}
   ch01: {}
   smoke_ch01: {}
@@ -224,6 +229,8 @@ scenarios:
     kind: record        # a capture for a human look-test, same as recordanim -- not a machine
                         # verdict. Its PASS is still gated on gProcScr_StatScreen actually
                         # being live, so it cannot green-light a frame that never opened.
+  casthelp:                                            # ADR 0346: R on each cast name, headless
+    rom: testch
   ckpt_ch02start: {}
   ch03midmap:
     rom: ch03boot

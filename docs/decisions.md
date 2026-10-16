@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-344 decisions. Read this index, then open the two or three you need — the whole
+348 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -48,6 +48,8 @@ set is ~197,000 tokens and no session has ever needed all of it at once.
 | `0019` | [Playtest test-chapter build (make TESTCH=1)](decisions/0019-playtest-test-chapter-build.md) | 2026-06-23 | — |
 | `0284` | [A decision is a FILE, and decisions.md is the index over them](decisions/0284-a-decision-is-a-file-and-decisions-md-is.md) | 2026-09-17 | #384 |
 | `0289` | [campaign.yaml declares what the BUILD reads, and it is scanned like any other doc](decisions/0289-campaign-yaml-declares-what-the-build-reads.md) | 2026-09-17 | #30 |
+| `0347` | [The wiki is a GitHub Pages site CI deploys from main](decisions/0347-the-wiki-is-a-github-pages-site-ci-deploys-from-main.md) | 2026-10-15 | #486 #493 |
+| `0348` | [A chapter is complete when Nicolas signs it off](decisions/0348-a-chapter-is-complete-when-nicolas-signs-it-off.md) | 2026-10-15 | #493 |
 
 ---
 
@@ -225,6 +227,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0090` | [~~No arena~~ — SUPERSEDED 2026-07-29. The arena is KEPT, and it keeps its name.](decisions/0090-no-arena-superseded-2026-07-29-the-arena-is.md) | 2026-07-29 | — |
 | `0091` | [Arena presentation: winter is campaign-wide; attendants remain chapter-owned.](decisions/0091-arena-presentation-winter-is-campaign-wide-attendants-remain-chapter.md) | 2026-08-11 | #265 |
 | `0092` | [Gold availability follows vanilla FE8 — no per-chapter clear bonus](decisions/0092-gold-availability-follows-vanilla-fe8-no-per-chapter-clear.md) | 2026-06-17 | — |
+| `0345` | [A chapter's in-map shops are its map donor's](decisions/0345-a-chapter-s-shops-are-its-map-donor-s.md) | 2026-10-14 | #493 |
 
 ---
 
@@ -341,6 +344,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0332` | [Bremen hires the party to kill Messie, and the Frostmaiden's plan waits for ch07](decisions/0332-bremen-hires-the-party-to-kill-messie.md) | 2026-10-08 | #26 #27 |
 | `0337` | [Nerra speaks in battle, and retreats instead of dying](decisions/0337-nerra-speaks-and-retreats.md) | 2026-10-10 | #26 |
 | `0339` | [ch06 ends on Messie; the docks and the rescued crews open ch07](decisions/0339-ch06-ends-on-messie-and-the-docks-open-ch07.md) | 2026-10-10 | #26 #27 |
+| `0346` | [A cast member's help text is its own](decisions/0346-a-cast-member-s-help-text-is-its-own.md) | 2026-10-15 | #493 |
 
 ---
 

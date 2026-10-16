@@ -1,0 +1,1 @@
+<span class="explain tooltips" title="{{{2}}}" style="color:{{{3|inherit}}}">{{{1}}}</span><noinclude>{{doc}}</noinclude>

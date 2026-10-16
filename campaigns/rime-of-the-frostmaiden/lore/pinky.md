@@ -4,6 +4,16 @@
 > Pinky is the 8th PC and a lord candidate: a stock vanilla FE8 Pegasus Knight (the army's flier),
 > not an RBG summon. Everything below is story/flavor only.
 
+## Profile
+
+Pinky is a homunculus built by Prof. R.B. Geenius, who raises him as his son. He is childlike,
+sincere and eager. He calls RBG "Father", takes his word as gospel, and lights up at any praise. He
+volunteers for dangerous work before anyone asks; in the Termalaine mine he went ahead alone as the
+party's scout because his father asked him to.
+
+Pinky takes the world literally and assumes the best of everyone, his father included. Being a
+constructed being is a plain fact of life to him.
+
 ## Concept
 
 Pinky is Prof. R.B. Geenius's homunculus "son" — a constructed being RBG made and raises as

@@ -1,0 +1,58 @@
+# ch10 — The Dark Duchess. PLANNED (#486): a seed, not authoritative.
+id: ch10-the-dark-duchess
+title: "The Dark Duchess"
+location: "The Dark Duchess, a Luskan pirate ship frozen in the Sea of Moving Ice"
+chapter_number: 10
+act: 'II'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
+status: planned
+milestone: M4
+cadence: marquee_setpiece
+fe8_base_map: "FE8 Ch11 Ephraim — Phantom Ship (layout only)"
+parity_reference: "FE8 Ch10"   # Revolt at Carcino's force (#459)
+narrative: >
+  Heading back toward Easthaven, the party finds a pirate ship frozen in the Sea of Moving Ice,
+  its hold full of treasure and a white dragon asleep on it. RBG's rope construct, String
+  Cheese, binds the dragon and sacrifices itself so the party can escape. Braulo takes the
+  ship's anchor, which becomes his axe, Ole Shipwrecker.
+map: {}
+objective:
+  type: seize
+  description: "Escort String Cheese to the dragon's tile (planned)"
+win_condition: "Seize the dragon's tile (planned)"
+lose_condition: "The lord dies"
+difficulty_note: "Planned. Force = vanilla Ch10 (Revolt at Carcino) until authored."
+deployment:
+  prep_screen: true
+  note: "Planned: the cap comes from the curve twin (FE8 Ch10) when the chapter is authored."
+enemy_units: []
+events: []
+post_chapter: {}
+design_notes: >
+  The ship map brings its own play: the enemy ship closes in on turn 2, plank bridges connect
+  the ships on turn 3, and a third ship arrives on turn 5. No ballistae (Nicolas: they belong
+  on a map built for them). The book's crew is undead, and our skeletons are already vendored.
+plan:
+  story: >
+    The table's frozen-wreck chapter, on the book's own wreck: the Dark Duchess, where the
+    White Wyrm Arveiaturace keeps part of her hoard (Rime p.127). String Cheese is RBG's
+    signature beat (roadmap).
+  sources:
+    - "Table: the frozen shipwreck, the sleeping dragon, String Cheese, the anchor (roadmap)"
+    - "Rime p.127-131: the Dark Duchess and Arveiaturace"
+  joins_roles:
+    - "Innes (sniper)"
+    - "Gerik (mercenary)"
+    - "Tethys (dancer)"
+    - "Marisa (swordsman, enemy-side talk recruit)"
+  payload_notes: >
+    Owes vanilla Ch10: four recruits (a trapped trio plus an enemy swordsman turned by one of
+    them), the Guiding Ring (boss drop), Longbow, Killer Axe, Lancereaver, Torch staff, Red Gem
+    and Talisman. Carcino's trapped green NPCs fit the third ship that arrives on turn 5.
+  how_it_plays: >
+    Phantom Ship is "hold your deck and the plank chokepoints" against an undead boarding
+    party in fog. The wiki flags it as a difficulty spike; our force comes from the curve twin.
+  introduces:
+    - {concept: dancer, where: "Tethys's role"}
+open_questions:
+  - q: "How does the sleeping-dragon thread play on the map (String Cheese's escort and the binding)?"
+    pick: "Work it out when drafting"

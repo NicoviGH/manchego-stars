@@ -7,7 +7,7 @@ import sys
 import fe8_talk_font
 from inject.raw_pids import enemy_pid_for
 from inject.cast import (
-    _classed_cast, char_symbol, CLASS_LOADOUT, GUEST_PORTRAIT_MAP, load_unit, PORTRAIT_MAP)
+    _classed_cast, char_symbol, unit_items, GUEST_PORTRAIT_MAP, load_unit, PORTRAIT_MAP)
 from inject.chapter_ids import (
     CH04_MOOSE_MOV_TABLE, CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
     CH05_ARRIVAL_NO_LUPIN_MSG, CH05_ARRIVAL_SLOT, CH05_BASIL_JOIN_NO_LUPIN_MSG,
@@ -242,12 +242,6 @@ CH05_RUIN_ORIGIN = 740
 # defect ch04 shipped and fixed (a summer forest in a snowbound fog chapter, Nicolas 2026-08-05):
 # a retile inherits the twin's BACKDROP too, and the twin's backdrop is about the twin's setting.
 CH05_VISIT_BG = 'BG_INTERIOR_BROWN'  # Nicolas's pick 2026-08-09, chosen off an in-engine
-# The elven store (`economy.elven_store`). Armory/Vendor take their stock DIRECTLY -- no script,
-# no text -- so these are wired PERMANENTLY, not as placeholders. Stock is vanilla Ch5's own,
-# which is what `make difficulty CH=ch05` prices the shop tier against.
-CH05_SHOPS = (('Armory', 'ShopList_Event_Ch5Armory', 2, 1),
-              ('Vendor', 'ShopList_Event_Ch5Vendor', 6, 10))
-
 CH05_LAYOUT = ('Ch05ElvenTombMap', 'ch05-the-elven-tomb')   # (asset label, maps/ stem)
 CH05_TILESET = 'port-or-town-winter'             # stem 'PortTown'; ch05 is the first chapter to
                                                  # use it, so it self-registers (the Cave idiom)
@@ -817,8 +811,7 @@ def ch05_ravisin_death_message(chap):
     """Ravisin's one locked death box, from the chapter event source of truth.
 
     The event's ``vanilla 0x9C8`` label cites the donor scene; ch05 writes the body to its
-    own Ch6 host block. The separate enemy ``death_quote`` field predates the locked dialogue
-    pass and is deliberately not consulted here.
+    own Ch6 host block.
     """
     return boss_quote_message(chap, 'boss_death', 'ravisin', GUEST_PORTRAIT_MAP['ravisin'],
                               CH05_RAVISIN_DEATH_MSG, 1, seat='[OpenMidRight]')
@@ -1667,18 +1660,16 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # 2. Rosters. The cap template is NEVER LOADed -- PREP reads its entry count (the cap)
     #    and the YAML's deploy_slots tiles, then redeploys the player's picks (cf. ch03/ch04).
     cast, _ = _classed_cast(campaign, available_at=chap['chapter_number'])
-    for uid, _slot, ce, _dce, _level in cast:
-        if ce not in CLASS_LOADOUT:
-            sys.exit('ERROR: no loadout for %s (ch05 field roster %s)' % (ce, uid))
     leader = 'CHARACTER_%s' % cast[0][1].upper()
     cap_rows = _deploy_cap_entries(chap, cast, leader, 'ch05')
     declare_unit_table(CH05_ALLY_TABLE, cap_rows,
                        'ch05 PREP deploy-cap template (never LOADed; the CAP is the parity)')
-    # --ch05-boot only: the field roster armed from CLASS_LOADOUT on the deploy tiles, so PREP
-    # has a party to pick from a COLD New Game. The real chain omits it -- the party persists.
+    # --ch05-boot only: the field roster armed from each unit file's inventory on the deploy
+    # tiles, so PREP has a party to pick from a COLD New Game. The real chain omits it -- the
+    # party persists.
     slots = chap['deployment']['deploy_slots']
     seed_rows = [_ally_unit_entry(leader, slot, dce, level, x, y,
-                                  ', '.join(CLASS_LOADOUT[ce]),
+                                  ', '.join(unit_items(campaign, uid)),
                                   ' /* %s -- ch05 boot party seed (armed; PREP re-picks) */' % uid)
                  for (uid, slot, ce, dce, level), (x, y) in zip(cast, slots)]
     declare_unit_table(CH05_BOOT_SEED_TABLE, seed_rows,
@@ -1702,7 +1693,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         declare_unit_table(
             CH05_LUPIN_PROOF_TABLE,
             [_ally_unit_entry(leader, lslot, ldce, llevel, slots[0][0], slots[0][1],
-                              ', '.join(CLASS_LOADOUT[lce]),
+                              ', '.join(unit_items(campaign, _uid)),
                               ' /* Lupin -- --ch05-lupin proof/film ROM only */')],
             'ch05 --ch05-lupin: Lupin alone, LOADed before the opening branch so CHECK_ALIVE '
             'finds him and scene 4 plays its ALIVE arm')
@@ -1790,7 +1781,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
                                        CH04_MOOSE_MOV_TABLE, 'the white moose (ch05 scene 7)')
     bx, by = CH05_BASIL_GREEN_POS
     declare_unit_table(CH05_BASIL_TABLE, [_ally_unit_entry(
-        leader, basil[1], basil[3], basil[4], bx, by, ', '.join(CLASS_LOADOUT[basil[2]]),
+        leader, basil[1], basil[3], basil[4], bx, by, ', '.join(unit_items(campaign, basil[0])),
         ' /* basil -- green until the opening join beat CUSAs her blue (#25) */',
         allegiance=basil_faction)],
         'ch05 Basil: %s at the pocket mouth; the opening join makes her the escort'
@@ -1834,7 +1825,7 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
         # Location = the four reliquary visits + the elven store. The shops are wired for good (a
         # shop needs no script and no text); the visits own their rewards, and each carries its
         # CH05_VILLAGE_FLAGS event id -- the race (#25).
-        'locationBasedEvents': chapter_location_events(chap, CH05_VILLAGE_SLOTS, CH05_SHOPS,
+        'locationBasedEvents': chapter_location_events(chap, CH05_VILLAGE_SLOTS,
                                                        flags=CH05_VILLAGE_FLAGS),
         'characterBasedEvents': sahnar_char_events,
     }, roster=CH05_ALLY_TABLE, scenes=(CH05_BEGINNING_SCRIPT, CH05_ENDING_SCRIPT))

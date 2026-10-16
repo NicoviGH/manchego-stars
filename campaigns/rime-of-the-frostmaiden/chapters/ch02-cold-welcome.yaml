@@ -4,7 +4,9 @@
 
 id: ch02-cold-welcome
 title: "Cold Welcome"
+location: "The road into Targos"
 chapter_number: 2
+act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # built / in-progress slice; combat data is grounded + authoritative
 milestone: M3
 cadence: breather_defend          # see docs/CHAPTERS.md — 🟦
@@ -43,8 +45,8 @@ fog: none
 # can still be off the map.
 traps: []
 balance_locked: true  # holds parity on instrument v2 (#430 step 6); ADR 0316
-accepted_residual:     # the party clears this force at x1.41 the twin's rounds: no Seth
-  party_clear_load: 1.41   # (ADR 0042 stands; Nicolas, #430). The force still holds the band.
+accepted_residual:     # the party clears this force at x1.42 the twin's rounds: no Seth
+  party_clear_load: 1.43   # (ADR 0042 stands; Nicolas, #430). The force still holds the band.
   adr: 42
 
 # ── Onboarding (what this chapter first teaches) ─────────────────────────────────
@@ -67,7 +69,8 @@ narrative: >
 map:
   file: maps/ch02-cold-welcome.mar     # hand-authored on the snow metatiles (ch01 flow)
   tileset: snowy-bern                  # shared winter tileset (#41)
-  base_layout: Ch2Map                  # vanilla 15×15 "The Protected", winter-reskinned
+  vanilla_layout: Ch2Map               # vanilla 15×15 "The Protected", winter-reskinned; its
+                                       # Armory (5,7) is Targos's, inherited with the map
   size: "15×15"                 # compact, mirrors FE8 Ch2 (coords top out ~14×14)
   description: >
     Compact snowy road into Targos. The party rolls in aboard the Rolling Cheddar (their
@@ -89,27 +92,48 @@ objective:
   description: "Defeat the raider band; keep the chwinga alive to claim their charms"
   constraint:
     type: protect_green_allies
-    units: [chwinga-mote, chwinga-rime, chwinga-glimmer]
+    units: [chwinga-mote, chwinga-rime]   # Glimmer waits in the southern hut, off the field
     description: "Each chwinga that survives gifts a charm at chapter end (per-unit soft-fail)"
     fail_is_soft: true          # a fallen chwinga forfeits only its own gift, not the chapter
 
 win_condition: all_enemies_defeated
-lose_condition: all_player_units_defeated         # FE8 lord rule; chwinga loss is a per-unit soft penalty
+lose_condition: lord_defeated         # FE8 lord rule; chwinga loss is a per-unit soft penalty
 soft_penalty_on_chwinga_loss:
   description: "Each chwinga that dies forfeits its own charm-gift; surviving chwinga still gift theirs."
 
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
-  Teaches protect-the-vulnerable: three green chwinga sit where the raid converges, so
-  the party must hold a perimeter around them rather than rush forward. The chwinga ride
-  the Pegasus chassis (verified balance match to vanilla's Ross+Garcia green help), and
-  the single enemy ARCHER hard-counters fliers (iron bow vs three pegasi) — that bow IS
-  the protect tension. All-physical roster (axe + one bow) keeps the weapon triangle
+  Teaches protect-the-vulnerable: two green chwinga Priests hold the forest/fort pair where
+  the raid converges, so the party must hold a perimeter around them rather than rush
+  forward; they heal each other, and that pair is the balance match to vanilla's green
+  Ross+Garcia help. A third chwinga, Glimmer, waits in the southern hut and pays out on the
+  visit. All-physical roster (six brigands and one archer) keeps the weapon triangle
   readable — no enemy magic yet (FE8 fields no enemy casters until ~Ch5–6; our first is
-  the Ch4 frost druid). Comfortable vanilla-FE hit rates (~75%). One reinforcement pair
-  enters turn 3 from the edge OPPOSITE the boss to flank a party that has pushed forward
-  (FE8's pattern). Parity bar: vanilla enemies + 3 green chwinga ≈ vanilla Ch2 (5 raiders
-  + green Ross/Garcia) — the chwinga are the swing factor, not enemy-level inflation.
+  ch05's frost druid, Ravisin). Comfortable vanilla-FE hit rates (~75%). One reinforcement
+  pair enters turn 3 from the edge OPPOSITE the boss to flank a party that has pushed
+  forward (FE8's pattern). Parity bar: vanilla enemies + the two green chwinga ≈ vanilla Ch2
+  (5 raiders + green Ross/Garcia) — the chwinga are the swing factor, not enemy-level
+  inflation.
+
+# Player-facing strategy, rendered as the wiki page's Strategy section (#487): the
+# twin's Fire Emblem Wiki advice, rewritten for this chapter's map, force and cast.
+strategy: |
+  You'll need to keep the two green [[chwinga]] [[Priest]]s safe if you want their gifts: each
+  one that survives hands over its charm at the end of the chapter (a [[Hand Axe]] and an
+  [[Elixir]]). They sit on the forest and fort tiles just ahead of you, in the raid's path, and
+  cannot fight. A good way of keeping them safe is to move up fast and form a wall in front of
+  them; [[Halvar the Raider Captain|Halvar]] and two of his brigands start close by.
+
+  Besides that, the chapter itself is very straightforward—just kill all the units on the map.
+  Every raider but one carries an axe, so lance users win the trades: [[Wolfram]] and [[Baxby]]
+  are the best walls here. Keep [[Pinky]] away from the lone archer on the east side until
+  someone has dealt with it. Visit the southern hut for Glimmer's [[Pure Water]]. Beware of the
+  two raiders that arrive from the west edge on turn 3, behind the party.
+
+  This is your first chance to do any shopping. The [[armory]] sells only basic weapons (a
+  [[Slim Sword]], an [[Iron Sword]], a [[Slim Lance]], an [[Iron Lance]] and an [[Iron Axe]]),
+  so the only remotely pressing purchases are an Iron Lance for Pinky to conserve the Slim
+  Lance, and a spare Iron Axe for [[Braulo]].
 
 # ── Deployment ──────────────────────────────────────────────────────────────────
 # Field parity (decisions.md §"Field parity", 2026-06-10): deploy_limit = vanilla Ch2's
@@ -151,6 +175,7 @@ deployment:
     - id: chwinga-mote
       name: "Snow Mote"
       fe_name: "Mote"             # <=12 -- name buffer safety
+      help_text: "A tiny elemental spirit of the snow. Shy, curious and kind."   # R on the name in game (inject.text.write_nameplate)
       class: priest
       level: 1
       position: [10, 4]           # vanilla Garcia's post -- FOREST, avoid
@@ -164,6 +189,7 @@ deployment:
     - id: chwinga-rime
       name: "Rime Spark"
       fe_name: "Rime"
+      help_text: "A tiny elemental spirit of the snow. It bobs about like a spark."   # R on the name in game (inject.text.write_nameplate)
       class: priest
       level: 1
       position: [10, 5]           # vanilla Ross's post -- FORT: avoid AND HP regen each turn
@@ -244,6 +270,7 @@ enemy_units:
   - id: raider-bruiser
     name: "Grukk the Bruiser"
     fe_name: "Grukk"            # ≤12 — overrides the vanilla "Bone" slot name plate
+    help_text: "A hulking raider with a heavy axe, posted beside the captain."   # R on the name in game (inject.text.write_nameplate)
     is_miniboss: true
     count: 1
     positions: [[13, 7]]        # on its donor's post, beside the captain
@@ -259,6 +286,7 @@ enemy_units:
   - id: raider-captain
     name: "Halvar the Raider Captain"
     fe_name: "Halvar"          # ≤12 — overrides the vanilla "Bazba" slot name plate
+    help_text: "Captain of the chardalyn raiders. He takes what he likes."   # R on the name in game (inject.text.write_nameplate)
     is_boss: true
     count: 1
     positions: [[11, 7]]        # on Bazba's post: vanilla's boss raids from mid-map
@@ -334,6 +362,18 @@ playtest:
         - visit: {x: 1, y: 12, gains: 0x6E}    # targos-hut-south -> ITEM_PUREWATER
       then:
         - spoke: true
+
+    # The Armory is part of the map (ADR 0345): inherited from vanilla Ch2's own Location list.
+    # Proven headless rather than by eye -- the shop that opens must carry Ch2's own stock.
+    - name: ch02armory
+      proves: >
+        a unit on (5,7) gets the Armory command and the shop that opens stocks vanilla Ch2's
+        list. ch02 shipped without it until 2026-10-14 because nothing read the donor's shops.
+      checkpoint: ch02start
+      given: [on_map]
+      when:
+        # Slim Sword, Iron Sword, Slim Lance, Iron Lance, Iron Axe (ShopList_Event_Ch2Armory)
+        - shop: {x: 5, y: 7, kind: armory, stocks: [0x02, 0x01, 0x15, 0x14, 0x1F]}
 
     - name: ch02raid
       proves: >
@@ -594,14 +634,19 @@ design_notes: >
   FE8 base: "The Protected" (DefeatAll + protect-the-green-ally). No enemy caster on the
   field — FE8 withholds casters until mid-game and our first is the ch05 frost-druid boss
   (Ravisin); an early one would break the physical-triangle teaching ramp. The protect
-  layer is three GREEN chwinga (snow-spirits) on the Pegasus chassis — the verified balance
-  match to vanilla's green Ross+Garcia — with the chapter's SIGNATURE beat being per-unit
-  soft-fail: a chwinga that dies forfeits only its own charm-gift (Red Gem / Elixir / Pure
-  Water, vanilla Ch2's three village gifts 1:1), never a game over. The single enemy archer
-  hard-counters the fliers, so the bow IS the protect tension. The ending's frozen body is a
+  layer is two GREEN chwinga (snow-spirits) fielded as Priests — the balance match to
+  vanilla's green Ross+Garcia — with the chapter's SIGNATURE beat being per-unit soft-fail:
+  a chwinga that dies forfeits only its own charm-gift (a Hand Axe and an Elixir; the third
+  chwinga, Glimmer, hands over Pure Water from her hut), never a game over. Vanilla Ch2's
+  Red Gem moved to ch03 in the ch02/ch03 swap (`payload_deviations`). The ending's frozen body is a
   *story* seed only (no combat here): the town blames the druids' sacrifice rumor, while Rootis
   clocks it as Sephek's dagger-of-ice kill — a breadcrumb for his Act-II reckoning, distinct
   from Ravisin (see docs/decisions.md §Story → Sephek arc). The chardalyn berserkers are
   Auril-maddened humans — real axes/bow, zero reskin stretch, so balance is exactly vanilla
   Ch2's; the variety is sprite + flavor, with the single bow-user adding a ranged threat
   exactly as FE8 Ch2 does.
+
+# A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
+payload_deviations:
+  - item: ITEM_REDGEM
+    why: "moved to ch03's gem-mine chest in the ch02/ch03 swap (ADR 0052); ch02 hands out ch03's Hand Axe instead"

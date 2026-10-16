@@ -6,6 +6,24 @@
 > (migrated from pre-strip commit `e6cc7a6`) as inspiration for dialogue, sprite/palette work,
 > and signature scripted moments — never as FE mechanics.
 
+## Profile
+
+Professor R.B. Geenius is an underfolk artificer and a former mobster. He grew up a slave in an
+aristocrat's mansion, lived by thieving until his genius was noticed, conned his patron out of his
+fortune and status, and took up artificery while keeping his public record spotless. He became an
+adventurer to turn over a new leaf, though his nature has changed little, and he still keeps a rat
+contact in every town.
+
+He is grandiose, eloquent and delighted with himself, and he makes cheese puns constantly ("Cheesed
+to meet you"). He corrects people with "Um, actually", and he always has an invention ready: he once
+invented string cheese on the spot to save the party from a dragon. His dark side shows in what he
+does: he executed a kobold in cold blood, with a pleasant pun. His one real
+warmth is for his son, Pinky.
+
+## Trivia
+
+- He draws on Professor Ratigan, the rat villain of Disney's ''The Great Mouse Detective'' (1986), and on ''Ratboy Genius'', Ryan Dorin's YouTube series (2007 on).
+
 ## Concept
 
 - **Race:** Underfolk
