@@ -31,7 +31,9 @@ fix #495's twin gaps BEFORE resuming ch07+.
    **scene-gold vehicle**, built once for ch01's 5,000 (vanilla pays it in Castle Frelia's scene
    after Ch1 -- measured on retail with `PT_VANILLA=1 tools/playtest/run.sh vanillagold`) and
    ch07's 10,000. Each gets its strategy line once the game backs it.
-2. **#493 -- the wiki's remaining findings**: enemy names vs the ROM's unit window, #490's stat
+2. **#493 -- the wiki's remaining findings**: **mobile first** (Nicolas, 2026-10-15: the page
+   ships no viewport meta, so the skin's phone rules never fire -- see #493's Mobile item),
+   then enemy names vs the ROM's unit window, #490's stat
    ranges, supports (wait on #494). Nicolas red-pens the drafts on the live wiki: the lore
    Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346, chapter YAML).
 3. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
