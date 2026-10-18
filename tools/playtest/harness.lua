@@ -363,7 +363,10 @@ local controllerState, guardedInput, freezeReport
 -- check_lua_local_headroom` measures it and prints it on every `make check`, because the
 -- hand-maintained number said "two free slots" in three files at once and was wrong in
 -- all three within one PR (#241). `check_lua_chunks_load` fails the build on a crossing.
--- Fields are assigned further down, next to the proc-pool reader they build on.
+-- Fields are assigned further down, next to the proc-pool reader they build on. Declared this
+-- early so every scenario can reach it: a helper hung on a table declared LATER (VISIT, line
+-- ~7400) is out of scope in any scenario written above that line, which is why the shared
+-- R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
 local INSPECT = {}
 local function recordCutscene(o)
     o = o or {}

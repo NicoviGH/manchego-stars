@@ -9,12 +9,13 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-18 (Claude). **#502 merged: the White Moose is a Cavalier on Forde's line**
-(ADR 0351) in ch04, ch05 and as the ch08 recruit: L6, Iron Lance, beast cadence; ch05 holds at
-x0.99 / x1.24 (little clear-load headroom left). Movement tables now come from a unit's class
-(`inject.terrain.class_movement`). #501 fixed Sephek's wiki ranks; #499 made the wiki work on a
-phone (`tools/wiki/phone_shots.mjs`). The wiki deploys `main`'s on every push (ADR 0347); never
-publish it by hand.
+Refreshed 2026-10-18 (Claude). **#505 merged: each chapter names its generics** (ADR 0352):
+Mercenary, Goblin, Raider, Kobold, Risen, Merfolk, Militia (Nicolas's names; ch04 keeps Monster),
+each on a pid of its own cloned from the vanilla generic, plus a `generic_help:` for R on the name
+(which read "The army of Grado" before). A declared `help: {x, y}` playtest step now proves R on
+any unit's name (`ch02generichelp`). #504 made the wiki print what the unit window prints and
+merged every texts.txt reader into `inject.text.messages`. The wiki deploys `main`'s on every push
+(ADR 0347); never publish it by hand.
 
 ## In flight
 
@@ -26,11 +27,11 @@ publish it by hand.
 
 **Next, in order:**
 
-1. **#493 -- the wiki's remaining findings**: enemy names vs the ROM's unit window (named
-   generics print their class: confirm that is what the game shows), then the `vanilla_payload`
-   audit (GIVEITEMTO, chest gold, secret shops), the navbox, #490's stat ranges, supports (wait
-   on #494). Nicolas red-pens the drafts on the
-   live wiki: the lore Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346, chapter YAML).
+1. **#493 -- the wiki's remaining findings**: the `vanilla_payload` audit next (GIVEITEMTO,
+   chest gold, secret shops, against each twin's events, not just the macros it greps), then the
+   navbox, #490's stat ranges, supports (wait on #494). Nicolas red-pens the drafts: the seven
+   `generic_help:` lines (chapter YAMLs), the lore Profiles, the book Trivia, and the ten
+   guest/boss help texts (ADR 0346).
 2. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
    ending waits on it); then Act IV beats, the recruit pass, the legendary-weapon pass, the
    back-half onboarding catalog, the arc ADR. Nicolas leans toward ch01 on vanilla Ch1's map with
@@ -91,7 +92,9 @@ publish it by hand.
   2026-09-30: VS Code's `chrome_crashpad_handler` was burning ~430% CPU, which made every timing
   noisy — suspect it before believing a slowdown.
 - **Primary checkout: `/Users/Yonick/Projects/manchego-stars`**, holding `main`. Clean except the
-  untracked `.agents/`, `map-review/`, `review/` — preserve those and **stage paths explicitly**.
+  gitignored `.agents/`, `map-review/`, `review/` — preserve those and **stage paths explicitly**.
+  `.agents/skills` is a link to `.claude/skills` (Codex reads the tracked skills; its own copies
+  had drifted). `map-review/` is ~46 MB of throwaway renders: prune it when the disk is tight.
   The submodule is pristine now; the ROM is `build/fireemblem8u/fireemblem8.gba` (ADR 0302).
 - **This Mac's disk is ~97% full (6.3 GB free, 2026-09-30).** A decomp tree with outputs is
   ~470 MB; don't add per-config build trees or keep scratch ROM copies around.
