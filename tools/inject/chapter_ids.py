@@ -170,7 +170,6 @@ CH04_NIMSY_FID = '[FID_VillagerOldWoman]'       # vanilla generic (textdefs.txt 
                                                 #   EventScr_089F2304, a Ch5 reinforcement script
                                                 #   whose Turn entry we drop) -> the neutral moose
 CH04_MOOSE_PID = '0xce'                         # its own pid (DISA targets it, and it alone)
-CH04_MOOSE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'   # the Gwyllgi's own cost row
                                                 # Starts at x=9, NOT x=8: (8,2) is the village
                                                 # doorstep (#205), and an AREA covering it fires the
                                                 # sighting the moment a unit steps up to visit.

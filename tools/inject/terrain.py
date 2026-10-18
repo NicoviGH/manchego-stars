@@ -6,6 +6,7 @@ import re
 import struct
 import sys
 
+from inject.class_ids import vanilla_class_enum
 from inject.decomp import vanilla_decomp_text
 from inject.maps import _layout_sidecar, map_tileset, terrain_ids
 
@@ -105,6 +106,28 @@ def _class_terrain_move_costs(table):
     for name, value in re.findall(r'\[(TERRAIN_[A-Z0-9_]+)\]\s*=\s*(-?\d+)', match.group(1)):
         costs[ids[name]] = int(value)
     return costs
+
+
+def class_movement(class_token):
+    """('cost table symbol', baseMov) for one of our chapter YAML class tokens.
+
+    Read off the ENGINE's class row, never a hand-kept table: a chapter whose whole shape is
+    who-can-cross-what cannot afford a second opinion about a class's movement.
+    """
+    enum = vanilla_class_enum(class_token)
+    src = vanilla_decomp_text('src/data_classes.c')
+    block = re.search(r'\[%s - 1\] = \{(.*?)\n    \},' % enum, src, re.S)
+    if not block:
+        raise KeyError('no class row for %r' % enum)
+    # `.pMovCostTable = { Normal, Rain, Snow }`: GetUnitMovementCost (bmunit.c) indexes it by
+    # the chapter's weather, and every chapter we read runs in fine weather -- entry 0. A
+    # pattern that wanted a bare name here matched no class at all, so every class silently
+    # walked the foot table (brigands on peaks, fliers over water) until #430 step 3.
+    table = re.search(r'\.pMovCostTable\s*=\s*\{\s*(\w+)', block.group(1))
+    mov = re.search(r'\.baseMov\s*=\s*(\d+)', block.group(1))
+    if not table:
+        raise KeyError('no movement-cost table in the class row for %r' % enum)
+    return table.group(1), int(mov.group(1))
 
 
 def reachable_tiles(terrain, costs, start):

@@ -76,9 +76,8 @@ ITEM_ENUM = {
     'evil-eye': 'ITEM_MONSTER_EVILEYE',
     'fetid-claw': 'ITEM_MONSTER_FETIDCLW',
     'fire-fang': 'ITEM_MONSTER_FIREFANG',
-    # the GWYLLGI's own vanilla weapon (the moose deploys as one), kept under its vanilla
-    # NAME -- renaming the item would burn 'Hell Fang' for every future Gwyllgi in the
-    # campaign (Nicolas, 2026-08-15)
+    # the GWYLLGI's own vanilla weapon, kept under its vanilla NAME -- renaming the item would
+    # burn 'Hell Fang' for every future Gwyllgi in the campaign (Nicolas, 2026-08-15)
     'hell-fang': 'ITEM_MONSTER_HELLFANG',
     'rotten-claw': 'ITEM_MONSTER_ROTTENCLW',
     'venin-claw': 'ITEM_MONSTER_VENINCLW',

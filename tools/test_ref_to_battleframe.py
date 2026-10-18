@@ -355,9 +355,9 @@ class TestMeleeMotionS(unittest.TestCase):
         self.assertNotIn("banim_code_hit_normal", body)            # a miss lands no hit
 
     def test_beast_cadence_uses_the_gwyllgi_own_voice_not_a_weapon(self):
-        # The white moose (#25) clones CLASS_GWYLLGI, whose OWN anim is banim_cer_at1 (animId
-        # 0xB1) -- NOT the Mauthe Doog's banim_mdg_at1 (0xB0) that Lupin's imported pounce
-        # reads. Its attack_close is growl (mauthedoog_1) -> snap (mauthedoog_2) -> the shared
+        # The beast cadence (the white moose's, ADR 0351) is read off FE8's own Gwyllgi anim,
+        # banim_cer_at1 (animId 0xB1) -- NOT the Mauthe Doog's banim_mdg_at1 (0xB0) that
+        # Lupin's imported pounce reads. Its attack_close is growl (mauthedoog_1) -> snap (mauthedoog_2) -> the shared
         # contact hit -> a padding footfall away (mauthedoog_3). A beast carries no weapon, so
         # there is no swing, no whoosh and no metal anywhere in the mode.
         s = rb.emit_motion_s("moose_at1", self._frames(), motion="melee", cadence="beast")

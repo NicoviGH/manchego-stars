@@ -54,7 +54,7 @@ UNIT = {
     'skin': {'fallback': ANY, 'look': ANY, 'source': ANY},
     'art': ART,
     'map_sprite': {'base': ANY, 'credit': ANY, 'palette': ANY, 'recipe': ANY, 'source': ANY},
-    'battle_anim': {'abbr': ANY, 'clone_from': ANY, 'frames': ANY,
+    'battle_anim': {'abbr': ANY, 'cadence': ANY, 'clone_from': ANY, 'frames': ANY,
                     'import': {'frames_dir': ANY, 'palette_edit': ANY, 'txt': ANY,
                                'vendored': ANY}},
 }

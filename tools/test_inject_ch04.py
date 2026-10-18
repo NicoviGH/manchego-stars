@@ -711,7 +711,9 @@ class Ch04Stage4Scenes(unittest.TestCase):
         the region the moose can reach from its own clearing."""
         maps = os.path.join(inject.decomp.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
         _, _, terrain = inject.terrain._map_terrain_grid(maps, inject.chapters.ch04.CH04_LAYOUT[1])
-        costs = inject.terrain._class_terrain_move_costs(inject.chapter_ids.CH04_MOOSE_MOV_TABLE)
+        moose = next(u for u in self.chap['neutral_units'] if u['id'] == 'white-moose')
+        costs = inject.terrain._class_terrain_move_costs(
+            inject.terrain.class_movement(moose['class'])[0])
         reachable = inject.terrain.reachable_tiles(terrain, costs, inject.chapters.ch04.CH04_MOOSE_POS)
         route = tuple(map(tuple, next(
             u for u in self.chap['neutral_units'] if u['id'] == 'white-moose')['flee_route']))
@@ -726,7 +728,9 @@ class Ch04Stage4Scenes(unittest.TestCase):
         Good terrain is NOT the test -- connectivity is."""
         maps = os.path.join(inject.decomp.REPO, 'campaigns', 'rime-of-the-frostmaiden', 'maps')
         _, _, terrain = inject.terrain._map_terrain_grid(maps, inject.chapters.ch04.CH04_LAYOUT[1])
-        costs = inject.terrain._class_terrain_move_costs(inject.chapter_ids.CH04_MOOSE_MOV_TABLE)
+        moose = next(u for u in self.chap['neutral_units'] if u['id'] == 'white-moose')
+        costs = inject.terrain._class_terrain_move_costs(
+            inject.terrain.class_movement(moose['class'])[0])
         self.assertGreater(costs[terrain[0][14]], 0, 'the NE corner is walkable terrain')
         self.assertNotIn((14, 0), inject.terrain.reachable_tiles(terrain, costs, inject.chapters.ch04.CH04_MOOSE_POS))
 

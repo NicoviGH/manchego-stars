@@ -384,19 +384,16 @@ enemy_units:
     # is now the save-all bonus (see `economy.save_all_bonus`), which is where vanilla puts the
     # chapter's one relic and makes it something the player has to EARN.
   # ── The cornered white moose (the LONE beast — ch04 quarry) ─────────────────
-  # ROLE FIX 2026-07-23: was `is_boss: true`, which INVERTED the chapter's climax — at
-  # threat 14.1 it out-threatened Ravisin (8.4) 1.7x and was 2.2x the vanilla Ch5 ceiling
-  # (6.3), so the "boss" was a speed bump next to it. Level nerfs don't help (gwyllgi is
-  # Spd 14, doubles everything: even L2 = 11.8). So it keeps its terror and changes ROLE:
-  # a NAMED MINIBOSS (vanilla Ch5 precedent: CHARACTER_BANDIT_CH5, a named non-boss threat)
-  # that is CONVERTIBLE — killing Ravisin breaks her hold and it stops fighting. The player
-  # chooses: fight an 11.8-threat monster — the hardest single unit on the map — or push the
-  # objective and let it be. Rewards going for the throat: leaving the moose alive IS a payoff,
-  # on the map, in play. It is NOT priced as avoidable (`convertible: false`) — the previous
-  # chapter is named after this animal, so the model must assume the fight happens.
-  # It was briefly 24.6 (HellFang) and that ALONE was the chapter's entire parity overage:
-  # x0.97 without the moose, x1.20 with. One unit carrying 20% of a 23-enemy force's threat is
-  # not a monster the aggregate can absorb — the band merely hid it (2026-08-15, Nicolas).
+  # A NAMED MINIBOSS, not the boss (vanilla Ch5 precedent: CHARACTER_BANDIT_CH5, a named
+  # non-boss threat): Ravisin is the objective, and the moose is the hardest fight beside her.
+  # Leaving it alive is a payoff the player can take. It is NOT priced as avoidable
+  # (`convertible: false`) — the previous chapter is named after this animal, so the model must
+  # assume the fight happens.
+  # A CAVALIER, as it is when it joins at ch08 in Forde's role (#502; FE8 never changes a
+  # unit's class when it joins): the beast is the mount, as with Lupin and Baxby. It carries
+  # Forde's own personal line at Forde's join level, so the enemy and the recruit are one unit.
+  # Simulated before the swap (#502): ch05 holds at threat x0.99 / clear-load x1.24, with the
+  # moose the force's third-heaviest unit (12%).
   # NB the ending (0x9C9) must never mention the moose -- the player may simply kill it, so no
   # cutscene may assume it survived (Nicolas, 2026-07-30).
   - id: white-moose
@@ -423,29 +420,22 @@ enemy_units:
       - [10, 4]                 #   then down the open x=10 lane at the party. Rows 0-7 of that
                                 #   column are all plains and unoccupied — (9,4) holds a
                                 #   spear-guard, (10,4) does not.
-    class: gwyllgi              # CLASS_GWYLLGI (FE8 beast) stand-in quadruped
-    level: 6
+    class: cavalier             # CLASS_CAVALIER: Forde's class, the one it joins in (#502)
+    level: 6                    # Forde's join level (events_udefs.c, Ch8), the recruit's too
+    personal:                   # Forde's own personal line (data_characters.c [CHARACTER_FORDE])
+      baseHP: 4
+      basePow: 2
+      baseSkl: 6
+      baseSpd: 3
+      baseDef: 2
+      baseRes: 2
+      baseLck: 7
     inventory:
-      # ITS OWN BEAST LINE'S weapon, under its vanilla NAME. Two separate corrections landed here
-      # on 2026-08-15, both Nicolas's:
-      #
-      # 1. It had carried `rotten-claw` — ITEM_MONSTER_ROTTENCLW, the REVENANT's claw, which is
-      #    why ch04's three Revenants hold it. A Gwyllgi swinging a Revenant's weapon, spotted
-      #    off a combat frame reading "Rotten Claw". A different creature's gear entirely.
-      # 2. The obvious fix, HELLFANG (the Gwyllgi's own, 13 mt), made the moose 24.6 threat —
-      #    20% of the WHOLE chapter's threat in one unit, and single-handedly the entire parity
-      #    overage (x0.97 without it, x1.20 with). See the difficulty_note.
-      #
-      # FIREFANG is the Mauthe Doog's, and the Mauthe Doog is this creature's own unpromoted
-      # tier — `data_classes.c` has CLASS_MAUTHEDOOG.promotion = CLASS_GWYLLGI. So this is the
-      # beast's own line at the lower tier, NOT a foreign class's weapon: it answers correction
-      # 1 as fully as HellFang did, and answers 2 as well. 5 mt / 90 hit / wt 5 puts the moose
-      # at 11.8 threat and the chapter at x1.08.
-      # NOT renamed to "Antlers": one name message per item id, so retitling would burn
-      # "Fire Fang" for every future Mauthe Doog, and unwired today is not never.
-      - id: fire-fang
-        fe_base: fire-fang
-    damage_type: bludgeoning    # flavor label only ("antlers/hooves")
+      # The antlers are an Iron Lance: a Cavalier's own weapon. NOT renamed "Antlers": one name
+      # message per item id, so retitling would rename every Iron Lance in the game.
+      - id: iron-lance
+        fe_base: iron-lance
+    damage_type: piercing       # flavor label only ("antlers")
     ai_override:
       ai: '{DefaultAI, 0x9, 0x0}'
       why: >
@@ -506,12 +496,13 @@ enemy_units:
     # warm hues and collapsed the blood-red antlers to tan, which is a chroma wash-out of the
     # one accent the creature is recognised by.
     #
-    # `clone_from: gwyllgi` is Nicolas's call (2026-08-15): the moose already DEPLOYS as
-    # CLASS_GWYLLGI, and the donor's own anim (banim_cer_at1, animId 0xB1) is where the beast
-    # cadence is read from — growl, snap, contact, one footfall away. That is the Gwyllgi's
-    # script, NOT the Mauthe Doog's banim_mdg_at1 that Lupin's pounce borrows.
+    # `clone_from: cavalier`, the class it deploys as: the Cavalier row Lupin and Baxby use, so
+    # its sword, lance and unarmed slots all draw the moose. `cadence: beast` keeps the beast's
+    # growl, snap and footfall (Nicolas, 2026-08-15): the row's own cadence is the Armor
+    # Knight's leap and blade whoosh, which Lupin never uses (his pounce carries its own timing).
     battle_anim:
-      clone_from: gwyllgi
+      clone_from: cavalier
+      cadence: beast
       abbr: moose_at1
       frames:
         - white-moose/ready.png     # the planted stand (master pose 3, rightmost)

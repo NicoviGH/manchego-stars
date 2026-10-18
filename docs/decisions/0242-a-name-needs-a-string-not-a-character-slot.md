@@ -36,11 +36,11 @@ undressed), and `portrait_id` may be None. `dressed_guest_slots` skips name-only
 sitting in `portraits/` cannot silently dress a slot — which is exactly how the moose would have
 picked up the retired full-body Wyrdeer bust. **An asset on disk is not a decision to ship it.**
 
-**And the weapon was a real defect, spotted off a combat frame.** The moose deploys as
-`CLASS_GWYLLGI` but carried `ITEM_MONSTER_ROTTENCLW` — the REVENANT's claw, which is why ch04's
+**And the weapon was a real defect, spotted off a combat frame.** The moose deployed as
+`CLASS_GWYLLGI` (a Cavalier since ADR 0351) but carried `ITEM_MONSTER_ROTTENCLW` — the REVENANT's claw, which is why ch04's
 three Revenants hold it: a different creature's gear entirely. The first fix was `HELLFANG`, the
-Gwyllgi's own, and it was class-correct but cost too much (see the parity ADR below). It now
-carries `FIREFANG` — the Mauthe Doog's, and the Mauthe Doog is this creature's own unpromoted
+Gwyllgi's own, and it was class-correct but cost too much (see the parity ADR below). It then
+carried `FIREFANG` — the Mauthe Doog's, and the Mauthe Doog is this creature's own unpromoted
 tier (`data_classes.c`: `CLASS_MAUTHEDOOG.promotion = CLASS_GWYLLGI`). Same beast line, lower
 tier: it answers the Revenant problem as fully as HellFang did, at 11.8 threat instead of 24.6.
 

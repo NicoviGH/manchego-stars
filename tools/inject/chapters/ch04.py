@@ -7,12 +7,12 @@ from inject.raw_pids import enemy_pid_for
 from inject.cast import _classed_cast, char_symbol, unit_items, PORTRAIT_MAP
 from inject.chapter_ids import (
     CH04_ENDING_MSG, CH04_ENDING_NO_LUPIN_MSG, CH04_GOAL_STATUS_MSG, CH04_GOAL_WINDOW_MSG,
-    CH04_LUPIN_TALK_MSG, CH04_MOOSE_MOV_TABLE, CH04_MOOSE_MSG, CH04_MOOSE_PID, CH04_NIMSY_FID,
+    CH04_LUPIN_TALK_MSG, CH04_MOOSE_MSG, CH04_MOOSE_PID, CH04_NIMSY_FID,
     CH04_OPENING_CARD_MSG, CH04_OPENING_FOREST_BG, CH04_OPENING_MSGS, CH04_REVEAL_MSGS,
     CH04_VILLAGE_SLOTS, CH04_MONSTER_PIDS)
 from inject.decomp import _replace_brace_block, DECOMP, REPO, ITEM_ENUM
 from inject.chapter_frame import write_event_group
-from inject.class_ids import ChapterClassIds
+from inject.class_ids import ChapterClassIds, vanilla_class_enum
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH02_HOST_INDEX, CH04_EVENT_GROUP, CH04_HOST_INDEX
 from inject.maps import (
@@ -24,7 +24,7 @@ from inject.recruit import (
 from inject.scenes import (
     _emit_scene_beats, _make_fid, _scenic_beat_calls, _split_event_beats, backdrop,
     branch_on_flag, variant_beat, write_frame_texts)
-from inject.terrain import assert_scripted_move_reachable, reda_route_move
+from inject.terrain import assert_scripted_move_reachable, class_movement, reda_route_move
 from inject.text import (
     dev_placeholder_scene, _fid_tag, name_message_body, _script_to_message, set_message_body)
 from inject.units import (
@@ -134,7 +134,6 @@ CH04_MOOSE_SCRIPT = 'EventScr_089F2270'         # dead Ch5 script (vanilla's Nat
                                                 #   inject_ch04 replaces) -> the moose-flees beat
 CH04_MOOSE_SYMBOL = 'UnitDef_088B58D8'          # dead Ch5 unit table (referenced only from
 CH04_MOOSE_GUARD_FLAG = 'EVFLAG_TMP(10)'        # AREA one-shot guard (must differ from the talk flag)
-CH04_MOOSE_CLASS = 'CLASS_GWYLLGI'              # geometry token: the 32x32 quadruped wait row
 # (SCRIPTED_NEUTRAL_SPRITES lives in inject/cast.py: it is a CROSS-CHAPTER registry and its
 #  rows name pids from more than one chapter.)
 # Where the party first SEES it: the mid-map clearing, on the tomb-side (NE) half of the 15x15
@@ -456,19 +455,22 @@ def inject_ch04(campaign, boot=False, verbose=True):
     # The white moose: a lone scripted NEUTRAL (green), on its own pid so the flee beat's DISA
     # can only ever take it. Its Wyrdeer map sprite rides the cast palette via gMapPaletteOverride
     # (it never changes faction) -- see the chapter YAML's `art:` block.
+    # Its class is the YAML's, the same creature as ch05's moose and the ch08 recruit (#502); the
+    # 32x32 elk comes from its own sprite entry, not from the class.
+    moose_data = next(u for u in chap['neutral_units'] if u['id'] == 'white-moose')
     mx, my = CH04_MOOSE_POS
     moose_row = _ally_unit_entry(
-        None, 'white-moose', CH04_MOOSE_CLASS, 1, mx, my, '0',
+        None, 'white-moose', vanilla_class_enum(moose_data['class']), 1, mx, my, '0',
         ' /* the white moose -- scripted quarry, never fought (canon: uncatchable) */',
         allegiance='GREEN', char=CH04_MOOSE_PID)
     assert_custom_art_pid_wired(CH04_MOOSE_PID, 'white-moose', 'ch04')
     # Its authored bridge route has to be WALKABLE or MOVE_DEFINED + ENUN hangs the chapter.
-    moose_data = next(u for u in chap['neutral_units'] if u['id'] == 'white-moose')
     moose_camera = tuple(moose_data['camera_at'])
     moose_route = tuple(tuple(point) for point in moose_data['flee_route'])
+    moose_mov_table = class_movement(moose_data['class'])[0]
     for waypoint in moose_route:
         assert_scripted_move_reachable(maps_dir, CH04_LAYOUT[1], CH04_MOOSE_POS,
-                                       waypoint, CH04_MOOSE_MOV_TABLE, 'the white moose')
+                                       waypoint, moose_mov_table, 'the white moose')
 
     with open(EVENTS_UDEFS_C, encoding='utf-8') as f:
         udefs = f.read()

@@ -175,7 +175,8 @@ def _sandbox_foe_roster(campaign, bench=None):
     # Named RAW-PID creatures bench here too, and they must be deployed under their OWN pid.
     # A class-level reskin animates off its class, so the generic 0x80 monster charIndex above
     # is fine for it; a raw-pid creature's anim binds per-CHARACTER through `_u25`, so the same
-    # row under 0x80 would deploy a plain Gwyllgi playing the STOCK HOUND -- a bench that
+    # row under 0x80 would deploy its bare class playing the STOCK anim (the moose as a stock
+    # horseman) -- a bench that
     # proves the opposite of what it was run for. No autolevel: these are named units whose
     # level is the chapter's.
     for uid, (chapter_yaml, pid) in sorted(RAW_PID_BATTLE_ANIMS.items()):

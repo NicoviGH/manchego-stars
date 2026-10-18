@@ -37,6 +37,7 @@ sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import map_tileset_tool as mt                                        # noqa: E402
 import campaign_chapters                                             # noqa: E402
 import chapter_schema                                                # noqa: E402
+from inject.terrain import class_movement                            # noqa: E402,F401
 
 CAMPAIGN = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden')
 MAPS = os.path.join(CAMPAIGN, 'maps')
@@ -266,34 +267,6 @@ def enemy_bodies(chapter):
                 continue
             out.update(tuple(t) for t in chapter_schema.entry_tiles(enemy))
     return out
-
-
-def class_movement(class_token):
-    """('cost table symbol', baseMov) for one of our chapter YAML class tokens.
-
-    Read off the ENGINE's class row, never a hand-kept table: a chapter whose whole shape is
-    who-can-cross-what cannot afford a second opinion about a class's movement.
-    """
-    import difficulty
-    enum = difficulty._enemy_class_enum(class_token)
-    src = _classes_text()
-    block = re.search(r'\[%s - 1\] = \{(.*?)\n    \},' % enum, src, re.S)
-    if not block:
-        raise KeyError('no class row for %r' % enum)
-    # `.pMovCostTable = { Normal, Rain, Snow }`: GetUnitMovementCost (bmunit.c) indexes it by
-    # the chapter's weather, and every chapter we read runs in fine weather -- entry 0. A
-    # pattern that wanted a bare name here matched no class at all, so every class silently
-    # walked the foot table (brigands on peaks, fliers over water) until #430 step 3.
-    table = re.search(r'\.pMovCostTable\s*=\s*\{\s*(\w+)', block.group(1))
-    mov = re.search(r'\.baseMov\s*=\s*(\d+)', block.group(1))
-    if not table:
-        raise KeyError('no movement-cost table in the class row for %r' % enum)
-    return table.group(1), int(mov.group(1))
-
-
-def _classes_text():
-    import inject.decomp
-    return inject.decomp.vanilla_decomp_text('src/data_classes.c')
 
 
 def units_reaching(chapter, terrain, targets):

@@ -107,19 +107,6 @@ BANIM_DONORS = {
               'melee', 'sword'),
     'myrmidon': ('CLASS_MYRMIDON', ['0x0100 | ITYPE_SWORD', '0x0100 | ITYPE_ITEM'],
                  'melee', 'sword'),
-    # The white moose (#25) -- ch05's cornered miniboss, and the first BEAST to fight in a
-    # close-up. Unlike every donor above it, the moose is not cast: it is the raw on-map pid
-    # 0xb9, so its `_u25` binds to a gCharacterData GAP (see RAW_PID_BATTLE_ANIMS).
-    # CLASS_GWYLLGI is the class it already deploys as, and its cadence is read off that
-    # class's OWN anim, banim_cer_at1 -- Nicolas's call, 2026-08-15. Note cer_at1 (0xB1) is
-    # the GWYLLGI's; banim_mdg_at1 (0xB0) is the Mauthe Doog's, and is the one Lupin's
-    # imported pounce reads. They are different scripts for the unpromoted and promoted beast.
-    # BOTH of the donor's slots are repointed: MONSTER is the antlers-and-hooves attack
-    # (fe_base fire-fang) and ITEM is the UNARMED entry. Left vanilla, ITEM draws the stock
-    # purple HOUND -- the cavalier row's #206 defect, on the one chapter whose miniboss is an
-    # elk and whose YAML has said "the FE-Repo has NO elk art" since July.
-    'gwyllgi': ('CLASS_GWYLLGI', ['0x0100 | ITYPE_MONSTER', '0x0100 | ITYPE_ITEM'],
-                'melee', 'beast'),
 }
 
 

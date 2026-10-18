@@ -2,6 +2,8 @@
 # STATUS: planned stub (#486). Class and role are the roster's (docs/roadmap.md recruit cadence,
 # ADR 0342); it retreats from ch05 (#25) and joins at ch08's start (#28). Stats and wiring come
 # when the recruit is built. Its bust already exists (portraits/white-moose.png).
+# Donor: Forde (#502). The ch05 enemy already fights as him -- a Cavalier at his join level, L6,
+# on his personal line -- so the recruit's STAT_DONOR row is CHARACTER_FORDE when #28 builds it.
 id: white-moose
 name: The White Moose
 

@@ -138,19 +138,19 @@ class CharacterUniqueBanim(unittest.TestCase):
             if motion == 'melee':
                 self.assertIn(cadence, _MELEE_CADENCE, name)
 
-    def test_gwyllgi_donor_binds_monster_and_unarmed_to_the_beast_cadence(self):
-        # The white moose (#25) rides CLASS_GWYLLGI -- the class it already deploys as, and
-        # whose own banim (cer_at1) supplies the cadence Nicolas asked for. The vanilla
-        # Gwyllgi AnimConf carries exactly two slots, ITYPE_MONSTER and ITYPE_ITEM, and BOTH
-        # are repointed: the moose swings a monster weapon (antlers-and-hooves -> rotten
-        # claw), and ITEM is the UNARMED entry. Left vanilla, ITEM draws the stock purple
-        # HOUND in the close-up -- the cavalier row's #206 defect on the one chapter whose
-        # miniboss is an elk.
-        donor_class, wtype, motion, cadence = inject.battle_anims.BANIM_DONORS['gwyllgi']
-        self.assertEqual(donor_class, 'CLASS_GWYLLGI')
-        self.assertEqual(wtype, ['0x0100 | ITYPE_MONSTER', '0x0100 | ITYPE_ITEM'])
-        self.assertEqual(motion, 'melee')
-        self.assertEqual(cadence, 'beast')
+    def test_the_moose_clones_the_class_it_deploys_as(self):
+        # The white moose is a Cavalier, as the ch08 recruit is (#502), so it binds through the
+        # Cavalier row Lupin and Baxby use: sword, lance and unarmed all draw the moose. A donor
+        # row of any other class would leave the slots it actually reaches drawing a horseman.
+        chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden',
+                                                 inject.chapter_ids.CH05_CHAPTER_YAML)
+        moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
+        self.assertEqual(moose['battle_anim']['clone_from'], moose['class'])
+        _cls, slots, _motion, _cadence = inject.battle_anims.BANIM_DONORS[moose['class']]
+        self.assertIn('0x0100 | ITYPE_LANCE', slots)     # its Iron Lance
+        self.assertIn('0x0100 | ITYPE_ITEM', slots)      # unarmed
+        # The beast's own timing, not the row's Armor Knight leap (Nicolas, 2026-08-15).
+        self.assertEqual(moose['battle_anim']['cadence'], 'beast')
 
 
     def test_unique_append_returns_next_index_and_appends_the_symbol(self):
@@ -243,7 +243,7 @@ class TestRawPidBattleAnim(unittest.TestCase):
     def test_units_with_battle_anim_finds_the_raw_pid_chapter_unit(self):
         found = dict(inject.battle_anims.units_with_battle_anim('rime-of-the-frostmaiden'))
         self.assertIn('white-moose', found)
-        self.assertEqual(found['white-moose']['battle_anim']['clone_from'], 'gwyllgi')
+        self.assertEqual(found['white-moose']['battle_anim']['clone_from'], 'cavalier')
 
     def test_raw_pid_u25_marker_addresses_the_character_data_gap(self):
         # `[0xb9 - 1]` is how raw_pid_portrait_data already addresses this row; the anim
@@ -262,15 +262,15 @@ class TestRawPidBattleAnim(unittest.TestCase):
     def test_the_sandbox_benches_the_moose_under_its_own_pid(self):
         # The TESTCH sandbox is "one bench for every battle animation" (recordenemy's docstring),
         # and it deployed foes by CLASS alone. That is enough for a class-level reskin, but the
-        # moose's anim binds per-CHARACTER through _u25 -- so a Gwyllgi deployed under the
-        # generic 0x80 monster charIndex plays the stock HOUND, and the bench would prove the
+        # moose's anim binds per-CHARACTER through _u25 -- so a Cavalier deployed under a
+        # generic charIndex plays the stock HORSEMAN, and the bench would prove the
         # opposite of what it was run for. Its foe row must carry charIndex 0xb9.
         body = inject.test_chapter._sandbox_foe_roster('rime-of-the-frostmaiden', 'ch05')
         self.assertIn('.charIndex = 0xb9,', body)
         moose = [b for b in body.split('    {') if '0xb9' in b]
         self.assertEqual(len(moose), 1, 'expected exactly one moose foe row')
-        self.assertIn('CLASS_GWYLLGI', moose[0])
-        self.assertIn('ITEM_MONSTER_FIREFANG', moose[0])    # the slot its anim repoints
+        self.assertIn('CLASS_CAVALIER', moose[0])
+        self.assertIn('ITEM_LANCE_IRON', moose[0])          # a lance slot its anim repoints
         self.assertNotIn('.autolevel', moose[0])            # a named miniboss, not generic trash
 
     def test_every_chapter_benches_every_reskin_it_dresses(self):
@@ -418,18 +418,13 @@ class TestRawPidBattleAnim(unittest.TestCase):
         self.assertIn('.nameTextId = 0x246,', out)
         self.assertIn('.portraitId = 0x48,', out)
 
-    def test_the_moose_carries_its_own_beast_lines_weapon(self):
-        # ITEM_MONSTER_ROTTENCLW is the REVENANT's claw (ch04's three Revenants hold it) -- a
-        # different creature's gear. FIREFANG is the Mauthe Doog's, and the Mauthe Doog is this
-        # creature's own unpromoted tier (data_classes.c: CLASS_MAUTHEDOOG.promotion =
-        # CLASS_GWYLLGI), so the moose stays inside its own line. HELLFANG, the promoted tier's,
-        # is class-correct too but put ONE unit at 20% of the chapter's whole threat -- the
-        # entire parity overage in a single slot. Never renamed either way.
+    def test_the_moose_carries_a_cavalier_s_own_weapon(self):
+        # Its antlers are an Iron Lance, the Cavalier's own weapon (#502), under the item's
+        # vanilla name: one name message per item id.
         chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden', inject.chapter_ids.CH05_CHAPTER_YAML)
         moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
-        self.assertEqual([i['fe_base'] for i in moose['inventory']], ['fire-fang'])
-        self.assertEqual(inject.decomp.ITEM_ENUM['fire-fang'], 'ITEM_MONSTER_FIREFANG')
-        self.assertNotIn('rotten-claw', [i['fe_base'] for i in moose['inventory']])
+        self.assertEqual(moose['class'], 'cavalier')
+        self.assertEqual([i['fe_base'] for i in moose['inventory']], ['iron-lance'])
 
     def test_the_gap_row_takes_a_u25_it_did_not_have(self):
         # gCharacterData's 0xB0-range gaps omit `._u25` entirely (it defaults to {0,0}, which
