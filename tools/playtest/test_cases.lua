@@ -67,7 +67,7 @@ end
 
 -- `help`: R on a generic's name reads the help text its pid is given (#493).
 do
-    local raider = {msg = 0xD5F, line1 = "Reghed nomads driven mad by"}
+    local raider = {msg = 0xD5F, line1 = "Raiders who prey on Ten-Towns"}
     local opts = {pids = {["3,4"] = 0x95}, help = {[0x95] = raider}, helpRead = raider}
     local api = fakeApi(opts)
     C.run({name = "ch02generichelp", given = {"on_map"}, ["when"] = {{help = {x = 3, y = 4}}}}, api)

@@ -150,7 +150,7 @@ deployment:
 # + Breguet (Armor Knight lv4, iron lance, on the objective). Fighters (not
 # brigands) so nothing pathfinds over the peaks.
 generic_name: "Goblin"   # the unit window's name for every generic enemy here (Izobai's goblins; #493)
-generic_help: "Goblins of Izobai's band, who raid the roads of Icewind Dale."   # R on their name (DRAFT for Nicolas, #493)
+generic_help: "Goblins of Izobai's band, who raid the roads of Icewind Dale."   # R on their name (#493)
 enemy_units:
   - id: goblin-spear
     name: "Goblin Spear"

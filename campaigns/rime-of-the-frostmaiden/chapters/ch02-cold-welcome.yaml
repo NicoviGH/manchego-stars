@@ -214,7 +214,7 @@ deployment:
 # Bone (named L4, fixed) + Bazba (named L6, Steel Axe). Halvar = Bazba slot, Grukk = Bone
 # slot. All Iron-tier except the boss's Steel — exactly how FE8 keeps a breather clean.
 generic_name: "Raider"   # the unit window's name for every generic enemy here (Halvar's chardalyn raiders; #493)
-generic_help: "Reghed nomads driven mad by chardalyn, who follow Auril's winds."   # R on their name (DRAFT for Nicolas, #493)
+generic_help: "Raiders who prey on Ten-Towns traffic along the road to Targos."   # R on their name (#493)
 enemy_units:
   - id: chardalyn-raider
     name: "Chardalyn Berserker"
