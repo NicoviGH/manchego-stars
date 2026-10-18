@@ -502,7 +502,14 @@ class RavisinPortrait(unittest.TestCase):
         .miniPortrait = 0x1,
         .baseLevel = 1,
     },'''
+        # ...and each chapter's generic pid with the vanilla row it clones (#493)
+        donors = inject.chapter_ids.GENERIC_PID_DONORS
+        source += ''.join('\n    [%s - 1] = {\n        .nameTextId = 0x24d,\n'
+                          '        .descTextId = 0x2a9,\n        .number = %s,\n    },' % (p, p)
+                          for p in sorted(set(donors) | set(donors.values())))
         patched = inject.raw_pids.raw_pid_portrait_data(source, self.CAMPAIGN)
+        for pid in donors:
+            self.assertIn('.nameTextId = 0x%X,' % inject.cast.RAW_PID_PORTRAITS[pid][1], patched)
         self.assertIn('.nameTextId = 0x246,', patched)
         self.assertIn('.portraitId = 0x48,', patched)
         # Ravisin and Messie are the DRESSED raw pids (Riev's face, Syrene's); the moose and

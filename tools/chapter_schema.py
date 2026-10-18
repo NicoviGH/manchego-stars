@@ -79,7 +79,8 @@ PLAYTEST_CASE = {
     'lua': ANY, 'proves': ANY, 'given': ANY,
     'when': [{'visit': {'x': ANY, 'y': ANY, 'gains': ANY},
               'talk': {'x': ANY, 'y': ANY, 'gains': ANY},
-              'shop': {'x': ANY, 'y': ANY, 'kind': ANY, 'stocks': ANY}}],
+              'shop': {'x': ANY, 'y': ANY, 'kind': ANY, 'stocks': ANY},
+              'help': {'x': ANY, 'y': ANY}}],
     'then': [{'spoke': ANY, 'event_flag': ANY}],
 }
 
@@ -132,6 +133,9 @@ CHAPTER = {
                    'start_area': ANY, 'green_allies': [UNIT]},
     'player_units': [UNIT],
     'enemy_units': [ENEMY],
+    # what the unit window names this chapter's generic enemies, and R on that name reads
+    # (inject.cast._generic_name_rows)
+    'generic_name': ANY, 'generic_help': ANY,
     'neutral_units': [UNIT],
     'green_units': [UNIT],
     'npc_units': [{'id': ANY, 'count': ANY, 'behavior': ANY, 'must_not_be_killed': ANY,

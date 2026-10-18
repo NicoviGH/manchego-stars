@@ -184,6 +184,8 @@ player_units:
       hand_pass: "portraits/guest_vendor_busts.py — 96x80 crop only"
 
 # ── Enemy Units (vanilla FE) ─────────────────────────────────────────────────────
+generic_name: "Mercenary"   # the unit window's name for every generic enemy here (Torrga's hired caravan guards; #493)
+generic_help: "Swords for hire, paid to guard a caravan on the Eastway."   # R on their name (DRAFT for Nicolas, #493)
 enemy_units:
   - id: sephek-kaltro
     face: sephek-kaltro                 # the bust it wears: campaign.yaml cast_slots / guest_slots

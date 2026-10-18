@@ -4871,6 +4871,45 @@ scenarios.recordcast = function()
         "%s: map sprite + status screen captured (pid 0x%02X at (%d,%d))", name, pid, u.x, u.y))
 end
 
+-- R on the name of the unit at (x, y), from the map: open its status screen, open help, move
+-- onto the name and wait (up to 120 frames) for help to decode `want`. Returns true, {msg,
+-- line1} (the message help ended on and its first line), or false and why. Leaves the map as
+-- it found it, each step undone only where its state is live. `casthelp` and the declared
+-- `help:` step (cases.lua) both read help through this.
+INSPECT.helpAt = function(x, y, want)
+    local function now() return Controller.classify(observeController()) end
+    local ok, why = true, nil
+    if not cursorTo(x, y) then
+        ok, why = false, string.format("(%d,%d) never under the cursor", x, y)
+    elseif not guardedInput("open_stat_screen", "R", "the status screen opens",
+            function() return now() == "stat_screen" end, 240) then
+        ok, why = false, "status screen never opened"
+    elseif not guardedInput("open_help", "R", "the help box opens",
+            function() return now() == "stat_screen_help" end, 120) then
+        ok, why = false, "help never opened"
+    else
+        guardedInput("help_left", "LEFT", "help moves onto the name",
+            function() return INSPECT.activeMsg() == want end, 120)
+        local msg = INSPECT.activeMsg()
+        local line, at = {}, SYM.sMsgString
+        while #line < 64 do
+            local b = ru8(at + #line)
+            if b < 0x20 then break end
+            line[#line + 1] = string.char(b)
+        end
+        why = {msg = msg, line1 = table.concat(line)}
+    end
+    if now() == "stat_screen_help" then
+        guardedInput("close_help", "B", "the help box closes",
+            function() return now() == "stat_screen" end, 120)
+    end
+    if now() == "stat_screen" then
+        guardedInput("close_stat_screen", "B", "back on the map",
+            function() return now() == "player_map_idle" end, 240)
+    end
+    return ok, why
+end
+
 -- CASTHELP (ADR 0346): R on a cast member's name reads ITS OWN help text, never its slot's
 -- vanilla character's. A verdict on memory, so it runs headless: for every classed cast member
 -- on the TESTCH sandbox it opens the status screen (R), opens help (R, which lands on Str), steps
@@ -4880,49 +4919,30 @@ end
 -- check that skipped the unit it could not find would pass on nothing.
 scenarios.casthelp = function()
     if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
-    local names = {}
-    for name, _ in pairs(CAMPAIGN.HELP_MSG) do names[#names + 1] = name end
+    -- One name per pid: CAST carries short aliases (`rbg`) beside the full ids.
+    local names, byPid = {}, {}
+    for name, pid in pairs(CAMPAIGN.CAST) do
+        if CAMPAIGN.HELP[pid] and (not byPid[pid] or #name > #byPid[pid]) then byPid[pid] = name end
+    end
+    for _, name in pairs(byPid) do names[#names + 1] = name end
     table.sort(names)
     local bad = {}
-    local function now() return Controller.classify(observeController()) end
     for _, name in ipairs(names) do
-        local want = CAMPAIGN.HELP_MSG[name]
+        local want = CAMPAIGN.HELP[CAMPAIGN.CAST[name]]
         local u = blue(CAMPAIGN.CAST[name])
         if not u then
             bad[#bad + 1] = name .. " not deployed"
-        elseif not cursorTo(u.x, u.y) then
-            bad[#bad + 1] = name .. " never under the cursor"
-        elseif not guardedInput("open_stat_screen", "R", "the status screen opens",
-                function() return now() == "stat_screen" end, 240) then
-            bad[#bad + 1] = name .. ": status screen never opened"
-        elseif not guardedInput("open_help", "R", "the help box opens",
-                function() return now() == "stat_screen_help" end, 120) then
-            bad[#bad + 1] = name .. ": help never opened"
-        elseif not guardedInput("help_left", "LEFT", "help moves onto the name",
-                function() return INSPECT.activeMsg() == want end, 120) then
-            bad[#bad + 1] = string.format("%s: help read MSG_%03X, want MSG_%03X",
-                name, INSPECT.activeMsg(), want)
         else
-            local line, at = {}, SYM.sMsgString
-            while #line < 64 do
-                local b = ru8(at + #line)
-                if b < 0x20 then break end
-                line[#line + 1] = string.char(b)
-            end
-            line = table.concat(line)
-            if line ~= CAMPAIGN.HELP_LINE1[name] then
+            local ok, got = INSPECT.helpAt(u.x, u.y, want.msg)
+            if not ok then
+                bad[#bad + 1] = name .. ": " .. got
+            elseif got.msg ~= want.msg then
+                bad[#bad + 1] = string.format("%s: help read MSG_%03X, want MSG_%03X",
+                    name, got.msg, want.msg)
+            elseif got.line1 ~= want.line1 then
                 bad[#bad + 1] = string.format("%s: help reads %q, want %q",
-                    name, line, CAMPAIGN.HELP_LINE1[name])
+                    name, got.line1, want.line1)
             end
-        end
-        -- Back to the map whatever happened, each step only where its state is live.
-        if now() == "stat_screen_help" then
-            guardedInput("close_help", "B", "the help box closes",
-                function() return now() == "stat_screen" end, 120)
-        end
-        if now() == "stat_screen" then
-            guardedInput("close_stat_screen", "B", "back on the map",
-                function() return now() == "player_map_idle" end, 240)
         end
     end
     if #bad > 0 then return result("FAIL", table.concat(bad, "; ")) end
@@ -10580,6 +10600,16 @@ local co = coroutine.create(function()
                 for _ in ipairs(collectedItems()) do now = now + 1 end
                 return now ~= before
             end)
+        end,
+        -- `help`: R on a unit's name (INSPECT.helpAt), what the build gives its pid, and the pid
+        -- standing on a tile, whatever its faction.
+        helpAt = INSPECT.helpAt,
+        helpFor = function(pid) return CAMPAIGN.HELP[pid] end,
+        pidAt = function(x, y)
+            local id = mapUnitAt(x, y)
+            local unit = id ~= 0 and ru32(SYM.gUnitLookup + id * 4) or 0
+            local character = unit ~= 0 and ru32(unit) or 0
+            return character ~= 0 and ru8(character + 4) or nil
         end,
         -- `shop`: the visit path with Armory/Vendor as the command; returns the stock it opened.
         shopAt = function(x, y, kind)

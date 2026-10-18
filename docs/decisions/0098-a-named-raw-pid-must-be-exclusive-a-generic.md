@@ -11,7 +11,7 @@ issues: [26, 364]
 Our chapters put units on unnamed `gCharacterData` gaps in the 0xB0 range, and two chapters may
 share one of those pids quite legally: ch03's grell and ch04's mogall both ride `0xb7`, because a
 `gDefeatTalkList` entry is keyed by **chapter** as well as pid, so each chapter's quote finds its
-own unit. ch05 and ch06 likewise both spend `0x80` on autolevelled trash.
+own unit. A chapter that NAMES its generics takes a pid of its own instead (ADR 0352).
 
 Giving a pid a NAME breaks that symmetry, and the reason is structural: `RAW_PID_PORTRAITS` writes
 `nameTextId` into `gCharacterData[pid - 1]`, which is **one global row per pid with no chapter

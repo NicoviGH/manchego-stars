@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-351 decisions. Read this index, then open the two or three you need — the whole
+352 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -262,6 +262,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0114` | [Unbuilt chapter boundaries land on a reusable dev placeholder, not a vanilla map](decisions/0114-unbuilt-chapter-boundaries-land-on-a-reusable-dev-placeholder.md) | 2026-06-17 | — |
 | `0115` | [Release versioning: v0.<chapters-playable>.<patch>, staying 0.x until the full MVP ships as v1.0](decisions/0115-release-versioning-v0-chapters-playable-patch-staying-0-x.md) | 2026-06-19 | — |
 | `0116` | [Playtest carryover: testers carry their own .sav across builds; a per-release starter save is the fallback](decisions/0116-playtest-carryover-testers-carry-their-own-sav-across-builds.md) | 2026-06-20 | #59 |
+| `0352` | [A chapter names its generics, on a pid of its own](decisions/0352-a-chapter-names-its-generics-on-a-pid-of-its-own.md) | 2026-10-18 | #493 |
 
 ---
 

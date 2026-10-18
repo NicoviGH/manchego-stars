@@ -25,16 +25,20 @@ VANILLA_MESSAGE_COUNT = 0xD4C
 # {chapter: (message name, ...)}. Order within a chapter is the allocation order; the order of
 # the chapters here is not (they allocate in campaign order whatever this dict says).
 APPENDED_MESSAGES = {
+    # The unit window's name for a chapter's generic enemies and R on it (#493), its YAML
+    # `generic_name:` and `generic_help:`.
+    'ch00': ('generic-name', 'generic-help',),
     # Wolfram's turn-1 call-out of the forts' and the gate's healing (#21, #135 finding 8).
-    'ch01': ('terrain-heal-warning',),
+    'ch01': ('generic-name', 'generic-help', 'terrain-heal-warning'),
     # The two northern Targos huts, restored from ruins to vanilla Ch2's villages (#495).
-    'ch02': ('hut-west-visit', 'hut-north-visit'),
+    'ch02': ('generic-name', 'generic-help', 'hut-west-visit', 'hut-north-visit'),
+    'ch03': ('generic-name', 'generic-help',),
     # The moose's NAME (#25). A raw pid's stock nameTextId is the generic monster plate every
     # 0xB0-range gap shares, so it can never be retitled for one creature.
-    'ch05': ('moose-name',),
+    'ch05': ('generic-name', 'generic-help', 'moose-name'),
     # The two boats' name plates (#360), one each so the boarding pass can name the Burly Ram
     # and the Pronged Goat apart.
-    'ch06': ('boat-east-name', 'boat-west-name',
+    'ch06': ('generic-name', 'generic-help', 'boat-east-name', 'boat-west-name',
              # ...and their boarding scenes (#26): Grynsk aboard the east hull, Tali the west.
              'boat-east-talk', 'boat-west-talk',
              # ...and the opening (#26): the "Bremen" card, beat A in the town hall, and beat B
@@ -45,7 +49,7 @@ APPENDED_MESSAGES = {
              # ...and Nerra's two battle quotes (#26): her taunt and her retreat line.
              'nerra-taunt', 'nerra-retreat'),
     # ch07's goal pair (#27): the Status screen's objective and the goal window's banner.
-    'ch07': ('goal-window', 'goal-status'),
+    'ch07': ('generic-name', 'generic-help', 'goal-window', 'goal-status'),
 }
 
 

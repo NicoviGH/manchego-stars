@@ -303,8 +303,8 @@ def assert_named_raw_pids_are_exclusive(portraits=None, scope=None):
     `RAW_PID_PORTRAITS` writes `nameTextId` into `gCharacterData[pid - 1]`, and that table has ONE
     row per pid with **no chapter dimension** -- unlike `gDefeatTalkList`, where ch03's grell and
     ch04's mogall share 0xb7 quite legally because each entry is keyed by chapter too. So a shared
-    GENERIC pid is fine (ch05 and ch06 both spend 0x80 on autolevelled trash) while a shared NAMED
-    one silently retitles somebody else's units.
+    UNNAMED pid is fine (that 0xb7) while a shared NAMED one silently retitles somebody else's
+    units -- which is why a chapter that names its generics takes a pid of its own (ADR 0352).
 
     ch06's two boats took 0xb4/0xb5, which `CH04_PACK_PIDS` already owned, and two of ch04's five
     Mauthe Doogs would have read "Fishing Boat" on the unit window. Nothing caught it:

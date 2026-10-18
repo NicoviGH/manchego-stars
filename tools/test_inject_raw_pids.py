@@ -127,5 +127,38 @@ class EntryIsTurn1(unittest.TestCase):
     def test_a_placed_non_enemy_entry_is_not_part_of_the_turn1_force(self):
         self.assertFalse(inject.raw_pids.entry_is_turn1('green_allies', {'id': 'g'}))
 
+
+class GenericPidsCloneTheirDonor(unittest.TestCase):
+    """A chapter's generics moved to a pid of their own so they can carry its name (#493). The
+    move must not change how they load: each pid's row is its vanilla donor's, field for field."""
+
+    def test_each_clone_matches_its_donor_except_number_name_and_help(self):
+        from inject.cast import RAW_PID_HELP
+        from inject.chapter_ids import GENERIC_PID_DONORS
+        vanilla = inject.decomp.vanilla_decomp_text('src/data_characters.c')
+        text = inject.raw_pids.raw_pid_portrait_data(vanilla, 'rime-of-the-frostmaiden')
+
+        def fields(src, pid):
+            s, e = inject.decomp._find_brace_block(src, '[%s - 1]' % pid, 'data_characters.c')
+            return dict(re.findall(r'\.(\w+)\s*=\s*([^,\n]+),', src[s:e]))
+
+        for pid, donor in GENERIC_PID_DONORS.items():
+            got, want = fields(text, pid), fields(vanilla, donor)
+            self.assertEqual(got.pop('number'), pid)
+            want.pop('number')
+            self.assertNotEqual(got.pop('nameTextId'), want.pop('nameTextId'), pid)
+            self.assertEqual(int(got.pop('descTextId'), 0), RAW_PID_HELP[pid][0])
+            want.pop('descTextId')
+            self.assertEqual(got, want, '%s is not a clone of %s' % (pid, donor))
+
+    def test_every_chapter_pid_is_its_own(self):
+        from inject.chapter_ids import GENERIC_PIDS
+        pids = [p for ps in GENERIC_PIDS.values() for p in ps]
+        self.assertEqual(len(pids), len(set(pids)))
+        for chapter, ps in GENERIC_PIDS.items():
+            for i, pid in enumerate(ps):
+                self.assertEqual(pid, inject.raw_pids.enemy_pid(chapter, {'id': 'x'}, i))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -13,11 +13,12 @@ from yaml_loader import yaml_load
 from inject.chapter_ids import (
     CH01_BOSS_SLOT, CH02_BOSS_SLOT, CH02_MINIBOSS_SLOT, CH04_MOOSE_PID, CH05_BOSS_PID,
     CH05_CHAPTER_YAML, CH05_MOOSE_NAME_MSG, CH05_MOOSE_PID, CH06_BOAT_NAME_MSGS, CH06_BOAT_PIDS,
-    CH06_MESSIE_PID,
+    CH06_MESSIE_PID, GENERIC_PIDS,
     PROLOGUE_SEPHEK_SLOT)
 from inject.class_ids import DEFAULT_CAMPAIGN, vanilla_class_enum, vanilla_class_enums
 from inject.decomp import fe_item_enum, REPO
 from inject.hosting import _load_chapter_yaml, recruit_chapter_number
+from inject.message_alloc import appended_message_id
 from inject.text import display_name
 
 
@@ -350,6 +351,40 @@ RAW_PID_PORTRAITS = {
     # dressed onto Syrene's slot (GUEST_PORTRAIT_MAP), so his unit points at that portraitId.
     CH06_MESSIE_PID: ('messie', GUEST_PORTRAIT_MAP['messie'], 0x2B, 'Messie'),
 }
+
+
+def _generic_name_rows(campaign=DEFAULT_CAMPAIGN):
+    """Each chapter's generic pids, named from its YAML `generic_name:` (#493), on the moose's
+    name-only shape: an appended message of the chapter's own and no portraitId; and the help
+    text R on that name reads, from `generic_help:`. A chapter in GENERIC_PIDS without a
+    `generic_name:` stops the build (`display_name`), and without a `generic_help:` too: the
+    pid's vanilla line would say "The army of Grado" under a goblin."""
+    chapters = os.path.join(REPO, 'campaigns', campaign, 'chapters')
+    files = {f[:4]: f for f in sorted(os.listdir(chapters)) if f.endswith('.yaml')}
+    for slug, filename in sorted(files.items()):
+        if slug not in GENERIC_PIDS and 'generic_name' in _load_chapter_yaml(campaign, filename):
+            sys.exit('ERROR: %s names its generics but has no pid of its own: add it to '
+                     'chapter_ids.GENERIC_PIDS and GENERIC_PID_DONORS (ADR 0352)' % filename)
+    names, helps = {}, {}
+    for chapter, pids in sorted(GENERIC_PIDS.items()):
+        if chapter not in files:
+            sys.exit('ERROR: GENERIC_PIDS names %s, which has no chapter YAML' % chapter)
+        filename = files[chapter]
+        chap = _load_chapter_yaml(campaign, filename)
+        unit = {'id': '%s-generic' % chapter, 'name': chap.get('generic_name')}
+        if not chap.get('generic_help'):
+            sys.exit('ERROR: %s names its generics but has no generic_help:' % filename)
+        for pid in pids:
+            names[pid] = (unit['id'], appended_message_id(chapter, 'generic-name'), None,
+                          display_name(unit))
+            helps[pid] = (appended_message_id(chapter, 'generic-help'), chap['generic_help'])
+    return names, helps
+
+
+_GENERIC_NAMES, RAW_PID_HELP = _generic_name_rows()
+# A raw pid's help text (R on its name): {pid: (appended message id, text)}. The pid's row is
+# pointed at the message by inject.raw_pids, and inject.names writes the text into it.
+RAW_PID_PORTRAITS.update(_GENERIC_NAMES)
 
 
 RAW_PID_BATTLE_ANIMS = {

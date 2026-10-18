@@ -213,6 +213,8 @@ deployment:
 # (reinforcements): 4 generic Brigand (L3,L3-drops-vulnerary,L3,L2) + 1 Archer (L1) +
 # Bone (named L4, fixed) + Bazba (named L6, Steel Axe). Halvar = Bazba slot, Grukk = Bone
 # slot. All Iron-tier except the boss's Steel — exactly how FE8 keeps a breather clean.
+generic_name: "Raider"   # the unit window's name for every generic enemy here (Halvar's chardalyn raiders; #493)
+generic_help: "Reghed nomads driven mad by chardalyn, who follow Auril's winds."   # R on their name (DRAFT for Nicolas, #493)
 enemy_units:
   - id: chardalyn-raider
     name: "Chardalyn Berserker"
@@ -379,6 +381,17 @@ playtest:
         - spoke: true
         - event_flag: 11
         - event_flag: 12
+
+    # The generics' own name and help (#493): a Raider rides ch02's own pid, so R on its name
+    # reads `generic_help:`, never the donor row's "A member of Bazba's Bandits".
+    - name: ch02generichelp
+      proves: >
+        R on a Raider's name reads ch02's own generic help text, so the chapter's generics carry
+        their own pid and the clone of vanilla's generic row took its new description.
+      checkpoint: ch02start
+      given: [on_map]
+      when:
+        - help: {x: 10, y: 12}    # chardalyn-raider
 
     # The Armory is part of the map (ADR 0345): inherited from vanilla Ch2's own Location list.
     # Proven headless rather than by eye -- the shop that opens must carry Ch2's own stock.

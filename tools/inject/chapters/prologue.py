@@ -14,6 +14,7 @@ from inject.decomp import (
     _find_brace_block, _replace_brace_block, fe_item_enum, REPO)
 from inject.hosts import PROLOGUE_CHAPTER_INDEX, PROLOGUE_EVENT_GROUP, PROLOGUE_HOST_INDEX
 from inject.maps import _register_chapter_map
+from inject.raw_pids import enemy_pid_for
 from inject.montage import inject_opening_montage, inject_world_tour
 from inject.paths import (
     ASSET_TABLE_S, CH1_EVENTINFO_H, CH1_EVENTSCRIPT_H, CH1_UDEFS_H, CHAPTER_SETTINGS_JSON, CHARACTERS_C,
@@ -115,25 +116,18 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
                'scram_items': scram_items, 'scram_level': scram['level'],
                'scram_x': scram['position'][0], 'scram_y': scram['position'][1]})
 
-    # The guards ride two spare non-cast character slots, one per body. `count`/`positions`
-    # decide how many are emitted and where; a disagreement between them would silently ship
-    # a roster nobody authored, so it fails the build instead.
-    guard_slots = (0x80, 0x82)
+    # The guards ride a generic pid apiece (PROLOGUE_GUARD_PIDS); Sephek rides his own slot and
+    # escapes in the ending. `count`/`positions` decide how many are emitted and where; a
+    # disagreement between them would silently ship a roster nobody authored, so it fails the
+    # build instead.
+    if sephek_slot.upper() != PROLOGUE_SEPHEK_SLOT.upper():   # the pid table seats him there
+        sys.exit('ERROR: the prologue roster places Sephek on %s but CHAPTER_ENEMY_PIDS seats '
+                 'him on %s' % (sephek_slot, PROLOGUE_SEPHEK_SLOT))
     if len(guard['positions']) != guard['count']:
         sys.exit('ERROR: ch00 caravan-guard has count=%d but %d position(s)'
                  % (guard['count'], len(guard['positions'])))
-    if guard['count'] > len(guard_slots):
-        sys.exit('ERROR: ch00 caravan-guard count=%d exceeds the %d spare character slot(s); '
-                 'add one to guard_slots in _prologue_roster_blocks'
-                 % (guard['count'], len(guard_slots)))
 
-    def pid(entry, index):
-        # Sephek (boss) rides his own slot and escapes in the ending.
-        if entry.get('is_boss'):
-            return 'CHARACTER_%s' % sephek_slot
-        return '0x%02x' % guard_slots[index]
-
-    rows = enemy_rows(chap, ChapterClassIds('prologue'), pid)
+    rows = enemy_rows(chap, ChapterClassIds('prologue'), enemy_pid_for('ch00'))
     enemy = '{\n' + '\n'.join(rows) + '\n    { 0 },\n}'
     return ally, enemy
 

@@ -376,7 +376,7 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     a second copy of a Python constant -- and each one a top-level local in a chunk that sits
     at Lua's 200-local ceiling. The cast's pid is its PORTRAIT_MAP slot, never its STAT_DONOR:
     the harness's own comments warned about that trap three times over."""
-    from inject.cast import _classed_cast, classed_cast, load_unit, PORTRAIT_MAP
+    from inject.cast import _classed_cast, classed_cast, load_unit, PORTRAIT_MAP, RAW_PID_HELP
     from inject.text import help_text_body, slot_desc_text_id
     from inject.chapter_ids import (CH01_BOSS_SLOT, CH02_CHWINGA, CH04_MOOSE_PID, CH05_BOSS_PID,
                                     CH05_MOOSE_PID, CH06_BOAT_PIDS, PROLOGUE_HLIN_SLOT,
@@ -398,6 +398,9 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     def char(slot):
         return chars['CHARACTER_' + slot.upper()]
 
+    def help_row(msg, text):
+        return {'msg': msg, 'line1': help_text_body(text).split('[')[0]}
+
     cast = {uid: char(slot) for uid, slot in PORTRAIT_MAP.items()}
     cast['rbg'] = cast['prof-rbg']                    # the #65 first mover's short name
     ch01 = _load_chapter_yaml(campaign, CH01_CHAPTER_YAML)
@@ -410,13 +413,15 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     dropper = dropper['shark-rider-horseslayer']     # the id ch06.lua's DROPPER row names
     return {
         'CAST': cast,
-        # Each classed cast member's help text message: the slot's own descTextId, which the
-        # names pass writes (ADR 0346). `casthelp` asserts R on the name decodes exactly this.
-        'HELP_MSG': {uid: slot_desc_text_id(slot) for uid, slot, _c, _ in classed_cast(campaign)},
-        # ...and the first line that message decodes to, so `casthelp` reads the WORDS too: the
-        # slot's id is the same one vanilla used, and only the text tells ours from Eirika's.
-        'HELP_LINE1': {uid: help_text_body(load_unit(campaign, uid)['help_text']).split('[')[0]
-                       for uid, _s, _c, _ in classed_cast(campaign)},
+        # The help text R on a unit's name must read, by pid: the message and its first line
+        # (the words tell ours from vanilla's where the id is vanilla's own). A classed cast
+        # member's is its slot's descTextId, which the names pass writes (ADR 0346); a raw
+        # pid's is RAW_PID_HELP's (a chapter's generics, #493). `casthelp` and the declared
+        # `help:` step both read it.
+        'HELP': {**{char(slot): help_row(slot_desc_text_id(slot),
+                                         load_unit(campaign, uid)['help_text'])
+                    for uid, slot, _c, _ in classed_cast(campaign)},
+                 **{int(pid, 16): help_row(msg, text) for pid, (msg, text) in RAW_PID_HELP.items()}},
         'LORD_CANDIDATES': len(lords),
         'LORDSEL_FLAG_BASE': LORDSEL_FLAG_BASE,
         'PROLOGUE': {'hlin': char(PROLOGUE_HLIN_SLOT), 'scramsax': char(PROLOGUE_SCRAMSAX_SLOT),

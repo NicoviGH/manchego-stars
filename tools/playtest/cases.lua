@@ -128,6 +128,34 @@ M.WHEN.shop = function(api, arg, state)
 end
 M.WHEN.talk = siteStep("talk", "talkFrom")
 
+-- `help: {x, y}`: R on the name of the unit standing on x,y must read the help text its pid is
+-- GIVEN (the build's own table, `api.helpFor`), so the words are never copied into the YAML.
+-- A unit that still reads its donor slot's vanilla line -- "The army of Grado" under a goblin,
+-- #493 -- fails here, and so does a pid the build gives no help text at all.
+M.WHEN.help = function(api, arg, state)
+    if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number" then
+        return false, "a `help` step needs numeric x, y"
+    end
+    if not api.settle(true) then
+        return false, string.format("the map never returned to player control before (%d,%d)",
+            arg.x, arg.y)
+    end
+    local pid = api.pidAt(arg.x, arg.y)
+    local want = pid and api.helpFor(pid)
+    if not want then
+        return false, string.format("(%d,%d) holds %s, which the build gives no help text",
+            arg.x, arg.y, pid and string.format("pid 0x%02X", pid) or "no unit")
+    end
+    local ok, got = api.helpAt(arg.x, arg.y, want.msg)
+    if not ok then return false, string.format("help at (%d,%d): %s", arg.x, arg.y, got) end
+    state.asserted = state.asserted + 1
+    if got.msg ~= want.msg or got.line1 ~= want.line1 then
+        return false, string.format("help at (%d,%d) reads MSG_%03X %q, want MSG_%03X %q",
+            arg.x, arg.y, got.msg, got.line1, want.msg, want.line1)
+    end
+    return true
+end
+
 -- ---------------------------------------------------------------- then
 -- Assertions. Each returns ok, why.
 M.THEN = {}
