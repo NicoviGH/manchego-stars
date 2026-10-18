@@ -786,6 +786,21 @@ def _field(block, name):
     return int(m.group(1), 0) if m else 0
 
 
+@functools.lru_cache(maxsize=None)
+def _rom_messages():
+    texts = rom_text('texts/texts.txt')
+    return {int(m.group(1), 16): re.sub(r'\[[^\]]*\]', '', m.group(2)).strip()
+            for m in re.finditer(r'^## MSG_([0-9A-Fa-f]+)\n(.*?)\[X\]', texts, re.M)}
+
+
+def rom_unit_name(chap, ed):
+    """The name the map hover box and the unit window print for an enemy: its CharacterData
+    entry's nameTextId (player_interface.c, unitinfowindow.c). A generic shows its pid's
+    faction name (Soldier, Cutthroat, Monster), never its class; '' when no entry resolves."""
+    nid = _field(rom_block('src/data_characters.c', enemy_token(chap, ed)), 'nameTextId')
+    return _rom_messages().get(nid, '') if nid else ''
+
+
 def rom_portrait(chap, ed):
     """The face the ROM shows for an enemy, as an image: `GetUnitPortraitId` (bmunit.c) on the
     injected tables -- the character's portraitId, else its class's defaultPortraitId (a
@@ -1037,7 +1052,7 @@ def wiki_class(token):
 def wiki_unit_row(chap, ed, token, level, inv, n, shifts, mode, files, kind='Enemy'):
     st = loaded(ed, token, level, shifts, mode, chap)
     # A named unit shows its name (bosses, personal lines, a named green ally); a generic shows
-    # its class, as the ROM's unit window does.
+    # what the ROM prints for its pid (`rom_unit_name`), its class only when no pid resolves.
     named = (ed.get('is_boss') or ed.get('is_miniboss') or personal_of(ed)
              or (kind == 'NPC' and (ed.get('fe_name') or ed.get('name'))))
     cls, article = wiki_class(token)
@@ -1051,7 +1066,8 @@ def wiki_unit_row(chap, ed, token, level, inv, n, shifts, mode, files, kind='Ene
     if drop:                       # the ROM carries the drop as the last item (units.py)
         items.append(wiki_item(drop, files, drop=True))
     show = lambda k: unit_load.show(st[k])               # noqa: E731
-    return {'name': (ed.get('fe_name') or ed.get('name')) if named else cls,
+    return {'name': ((ed.get('fe_name') or ed.get('name')) if named
+                     else rom_unit_name(chap, ed) or cls),
             'class': cls, 'class_article': article, 'version': version,
             'type': 'npc' if kind == 'NPC' else None, 'lv': level, 'n': n,
             'hp': show('HP'), 'str': show('Pow'), 'skl': show('Skl'), 'spd': show('Spd'),

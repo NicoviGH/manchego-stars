@@ -138,6 +138,35 @@ class TestPayloadCounts(unittest.TestCase):
         self.assertEqual(got, ['delivered', 'missing', 'deviation'])
 
 
+class TestGenericNames(unittest.TestCase):
+    """A generic's name cell is what the ROM's hover box and unit window print: its pid's
+    nameTextId, a faction name (the wiki's own The Protected lists `|name=Cutthroat`), never
+    its class (#493)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.by_slug = {c['_slug']: c for c in gen_wiki.chapters()}
+
+    def generic(self, slug, cls_token):
+        chap = self.by_slug[slug]
+        ed = next(e for e in gen_wiki.enemy_list(chap) if e.get('class') == cls_token
+                  and not (e.get('is_boss') or e.get('is_miniboss')))
+        return gen_wiki.rom_unit_name(chap, ed)
+
+    def test_a_generic_reads_its_pid_s_name_not_its_class(self):
+        self.assertEqual(self.generic('ch01', 'fighter'), 'Soldier')
+        self.assertEqual(self.generic('ch02', 'brigand'), 'Cutthroat')
+        self.assertEqual(self.generic('ch03', 'archer'), 'Monster')
+
+    def test_the_enemy_row_prints_it(self):
+        chap = self.by_slug['ch02']
+        ed = next(e for e in gen_wiki.enemy_list(chap) if e.get('class') == 'brigand')
+        token, lv, inv, n = next(iter(gen_wiki.bodies(ed)))
+        row = gen_wiki.wiki_unit_row(chap, ed, token, lv, inv, n, gen_wiki.chapter_shifts(chap),
+                                     'normal', gen_wiki.WikiFiles())
+        self.assertEqual((row['name'], row['class']), ('Cutthroat', 'Brigand'))
+
+
 class TestUnitLoad(unittest.TestCase):
     """unit_load against the Fire Emblem Wiki's own Distant Blade tables (FE8 Ch9, Eirika),
     which print what the game loads in each mode."""
