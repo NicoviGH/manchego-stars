@@ -3,6 +3,7 @@
 `set_message_body` is the one writer into the decomp's text table; `_script_to_message`
 turns a YAML script beat into FE8 control codes, wrapped to the talk box.
 """
+import functools
 import re
 import sys
 
@@ -116,11 +117,30 @@ def slot_help_text(slot, unit=None):
     msg = slot_desc_text_id(slot)
     if msg is None:
         return None
-    body = re.search(r'^## MSG_%03X\b[^\n]*\n(.*?)(?=^##|\Z)' % msg,
-                     vanilla_decomp_text('texts/texts.txt'), re.S | re.M)
-    if not body:
-        return None
-    return ' '.join(re.sub(r'\[[^\]]*\]', ' ', body.group(1)).split()) or None
+    return messages(vanilla_decomp_text('texts/texts.txt')).get(msg) or None
+
+
+_BREAK_CODES = re.compile(r'\[(?:LF|NL|CR|A)\]')
+
+
+def plain_message(body):
+    """A message body as the player reads it: a line break or A-press is a space ("Your[LF]
+    chosen"), every other control code is nothing ("1[DashedLine]2" is the 12 it draws)."""
+    return ' '.join(re.sub(r'\[[^\]]*\]', '', _BREAK_CODES.sub(' ', body)).split())
+
+
+@functools.lru_cache(maxsize=None)
+def message_bodies(texts):
+    """{message id: raw body, control codes included} for every `## MSG_` in a texts.txt's
+    contents."""
+    return {int(m.group(1), 16): m.group(2) for m in
+            re.finditer(r'^## MSG_([0-9A-Fa-f]+)\b[^\n]*\n(.*?)(?=^##|\Z)', texts, re.S | re.M)}
+
+
+@functools.lru_cache(maxsize=None)
+def messages(texts):
+    """{message id: plain text} for every `## MSG_` in a texts.txt's contents."""
+    return {i: plain_message(b) for i, b in message_bodies(texts).items()}
 
 
 GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'

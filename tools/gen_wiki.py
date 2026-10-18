@@ -35,6 +35,7 @@ import inject.chapter_settings                         # noqa: E402
 import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
 import inject.sms                                      # noqa: E402
+import inject.text                                     # noqa: E402
 import inject.stats                                    # noqa: E402
 import inject.unit_art as unit_art                     # noqa: E402
 import inject.villages                                 # noqa: E402
@@ -132,14 +133,12 @@ def _vanilla_item_names():
     global _ITEM_NAMES
     if _ITEM_NAMES is None:
         items = inject.decomp.vanilla_decomp_text('src/data_items.c')
-        texts = inject.decomp.vanilla_decomp_text('texts/texts.txt')
-        msgs = {int(m.group(1), 16): m.group(2) for m in
-                re.finditer(r'^## MSG_([0-9A-Fa-f]+)\n(.*?)\[X\]', texts, re.M)}
+        msgs = inject.text.messages(inject.decomp.vanilla_decomp_text('texts/texts.txt'))
         _ITEM_NAMES = {}
         for m in re.finditer(r'\[(ITEM_\w+)\]\s*=\s*\{(.*?)\n\s*\},', items, re.S):
             n = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', m.group(2))
             if n and int(n.group(1), 0) in msgs:
-                _ITEM_NAMES[m.group(1)] = re.sub(r'\[[^\]]*\]', '', msgs[int(n.group(1), 0)]).strip()
+                _ITEM_NAMES[m.group(1)] = msgs[int(n.group(1), 0)]
     return _ITEM_NAMES
 
 
@@ -786,19 +785,12 @@ def _field(block, name):
     return int(m.group(1), 0) if m else 0
 
 
-@functools.lru_cache(maxsize=None)
-def _rom_messages():
-    texts = rom_text('texts/texts.txt')
-    return {int(m.group(1), 16): re.sub(r'\[[^\]]*\]', '', m.group(2)).strip()
-            for m in re.finditer(r'^## MSG_([0-9A-Fa-f]+)\n(.*?)\[X\]', texts, re.M)}
-
-
 def rom_unit_name(chap, ed):
     """The name the map hover box and the unit window print for an enemy: its CharacterData
     entry's nameTextId (player_interface.c, unitinfowindow.c). A generic shows its pid's
     faction name (Soldier, Cutthroat, Monster), never its class; '' when no entry resolves."""
     nid = _field(rom_block('src/data_characters.c', enemy_token(chap, ed)), 'nameTextId')
-    return _rom_messages().get(nid, '') if nid else ''
+    return inject.text.messages(rom_text('texts/texts.txt')).get(nid, '') if nid else ''
 
 
 def rom_portrait(chap, ed):
