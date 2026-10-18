@@ -76,7 +76,7 @@ strategy: |
   and both piers. If you really want the [[Energy Ring]], bring [[Trex]] along so that he can
   steal it from one of the three mages; the mage on the west side drops a [[Pure Water]]. The
   two archers flanking the door and the harpooner on the east pier may be irritating, especially
-  if you are using [[Pinky]], so keep him back until they fall. The dock guards carry
+  if you are using [[Pinky]], so keep him back until they fall. The [[Fighter]]s carry
   [[Steel Axe]]s; meet them with lances and armor.
 
   [[Dorbulgruf Shalescar|The boss]] is a level 12 [[Fighter]] with a Steel Axe and a
@@ -166,8 +166,8 @@ enemy_units:
     damage_type: piercing
     positions: [[12, 18]]
     donor: [12, 18]
-  - id: bremen-hired-guard
-    name: "Hired Guard"
+  - id: bremen-hall-guard
+    name: "Hall Guard"
     count: 1
     class: mercenary            # vanilla: 1x Lv8 Mercenary, Iron Sword
     level: 8
@@ -177,8 +177,8 @@ enemy_units:
     damage_type: slashing
     positions: [[13, 13]]
     donor: [13, 13]
-  - id: bremen-hired-guard-young
-    name: "Hired Guard"
+  - id: bremen-hall-guard-young
+    name: "Hall Guard"
     count: 1
     class: mercenary            # vanilla: 1x Lv7 Mercenary, Iron Sword
     level: 7

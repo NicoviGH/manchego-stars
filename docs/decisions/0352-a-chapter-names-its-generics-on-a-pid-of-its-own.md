@@ -35,9 +35,11 @@ chapter can declare.
 The help lines follow vanilla's shape, an allegiance and one fact about where the faction stands
 ("A member of Bazba's Bandits, who roam this region"; "A knight of Frelia, sworn in service of
 Hayden"), and say only what our own story tells the player: ch03's are the wild kobolds that broke
-from Trex's warren, never the warren itself. A line covers every generic in its chapter, so a
-roster entry must fit it: ch07's fishers and sellswords are re-dressed as the Speaker's dock and
-hired guards (stats, kit and tiles unchanged).
+from Trex's warren, never the warren itself. A line covers every generic in its chapter, so the
+roster's fiction must fit it. The player never sees a generic's row `name:` (the game and the wiki
+print the chapter's name), but the strategy, the comments and every later scene are written from
+those rows, so ch07's fishers and sellswords are re-dressed as the Speaker's Dock Guards and Hall
+Guards (stats, kit and tiles unchanged).
 
 _Decided: 2026-10-18 (Nicolas: the names, Monster for ch04, the help lines and ch07's renames;
 Claude: the pid move)._
