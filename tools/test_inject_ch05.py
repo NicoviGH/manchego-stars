@@ -1488,6 +1488,21 @@ class Ch05SahnarAloneOnTheArena(unittest.TestCase):
         self.assertNotIn('FADI', gap)
 
 
+class Ch05TheMooseIsForde(unittest.TestCase):
+    def test_the_moose_fights_on_forde_s_own_line(self):
+        # The enemy moose and the ch08 recruit are one unit in Forde's role (#502): a Cavalier
+        # carrying Forde's personal line. The line is written out in the YAML because a raw-pid
+        # enemy's stats come from `personal:` (as Ravisin's and the grell's do); this holds it
+        # to the decomp, so it cannot drift from the donor it claims.
+        chap = inject.hosting._load_chapter_yaml('rime-of-the-frostmaiden',
+                                                 inject.chapter_ids.CH05_CHAPTER_YAML)
+        moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
+        forde = inject.stats.donor_base_stats(
+            inject.decomp.vanilla_decomp_text('src/data_characters.c'), 'CHARACTER_FORDE')
+        self.assertEqual(moose['class'], 'cavalier')
+        self.assertEqual({k: v for k, v in forde.items() if v}, moose['personal'])
+
+
 class Ch05TheMooseCharges(unittest.TestCase):
     """Scene 7 -- the last beat before turn 1: Pinky asks, and the moose answers (#25).
 
@@ -1592,8 +1607,8 @@ class Ch05TheMooseCharges(unittest.TestCase):
                                            inject.chapters.ch05.CH05_PARTY_CAMERA)
         # The ANIMAL first, then the weight under it. Vanilla names almost none of its ~340
         # SFX, so the cry was found by asking what a CREATURE plays rather than by reading the
-        # song table: `banim_code_sound_mauthedoog_roar` is 0x75, commented "low cry", and the
-        # Mauthe Doog is CLASS_GWYLLGI -- the class the moose wears. Its own voice.
+        # song table: `banim_code_sound_mauthedoog_roar` is 0x75, commented "low cry": a beast's
+        # own voice for the one beast on the map.
         self.assertIn('SOUN(%s)' % inject.chapters.ch05.CH05_MOOSE_BELLOW_SFX, block)
         # 0x32C = song812_mon_mdg_critical1, picked by ear off tools/sfx_preview.py. The id
         # space matters more than the value: `banim_code_sound_*` is NOT the song table, and
@@ -1824,7 +1839,9 @@ class Ch05TheMooseCharges(unittest.TestCase):
         _pen, start, route = inject.chapters.ch05.ch05_moose_station(self._chap())
         for leg in route:      # every leg, from where the run BEGINS -- not from the pen
             inject.terrain.assert_scripted_move_reachable(maps_dir, inject.chapters.ch05.CH05_LAYOUT[1], start, leg,
-                                              inject.chapter_ids.CH04_MOOSE_MOV_TABLE, 'test')
+                                              inject.terrain.class_movement(next(
+                                                  u for u in self._chap()['enemy_units']
+                                                  if u['id'] == 'white-moose')['class'])[0], 'test')
 
     def test_a_missing_charge_tile_is_refused_rather_than_shipped(self):
         chap = self._chap()

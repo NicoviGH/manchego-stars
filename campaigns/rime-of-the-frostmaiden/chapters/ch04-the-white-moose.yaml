@@ -331,9 +331,9 @@ neutral_units:
   - id: white-moose
     name: "The White Moose"
     fe_name: "White Moose"
-    class: gwyllgi              # CLASS_GWYLLGI — geometry token only (32x32 quadruped wait row),
-                                # matching ch05's entry for the SAME creature. Was `wolf`, which
-                                # drifted from ch05 and predates the Wyrdeer art below.
+    class: cavalier             # the SAME creature as ch05's moose and the ch08 recruit, so the
+                                # same class (#502); its flee route is walked on the Cavalier's
+                                # own movement costs, which the injector checks.
     behavior: flee
     flees_to: southeast_edge    # the tomb-side exit; its escape ends the hunt → ch05
     camera_at: [7, 4]           # map-width center: pins the 15-tile map at x=0 while filming

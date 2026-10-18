@@ -22,7 +22,7 @@ from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
 from inject.maps import (_inject_tile_changes, _map_changes_tileset, _read_map_metatile,
                          _register_chapter_map, _register_tileset, snag_fall_change, terrain_ids,
                          TILESET_STEMS)
-from inject.terrain import _class_terrain_move_costs, _map_terrain_grid
+from inject.terrain import _class_terrain_move_costs, _map_terrain_grid, class_movement
 from inject.paths import CH06_EVENTINFO_H, CH06_EVENTSCRIPT_H, CP_DATA_C, TEXTS_TXT
 from inject.recruit import talk_recruit_char_entries, talk_recruiters
 from inject.scenes import (
@@ -215,7 +215,6 @@ def surface_spawns(terrain, units, water=TERRAIN_RIVER, min_walk=SURFACE_MIN_WAL
 
 def ch06_line_spawns(chap, maps_dir):
     """surface_spawns for ch06's turn-1 line, keyed (enemy id, body index)."""
-    from map_placement_preview import class_movement   # local: it imports the injector stack
     _w, _h, terrain = _map_terrain_grid(maps_dir, CH06_LAYOUT[1])
     units = []
     for enemy in chap['enemy_units']:

@@ -463,6 +463,14 @@ class RavisinPortrait(unittest.TestCase):
         .number = 0xb9,
         .defaultClass = CLASS_GORGON,
         .miniPortrait = 0x4,
+        .baseHP = 0,
+        .basePow = 0,
+        .baseSkl = 0,
+        .baseSpd = 0,
+        .baseDef = 0,
+        .baseRes = 0,
+        .baseLck = 0,
+        .baseCon = 0,
     },
     [0xbb - 1] = {
         .baseLevel = 1,
@@ -702,7 +710,7 @@ class Ch05RecruitIdentities(unittest.TestCase):
         maps = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
         inject.chapters.ch05.assert_green_recruit_placement(          # sys.exits on any of the three
             chap, maps, inject.chapters.ch05.CH05_LAYOUT[1], inject.chapters.ch05.CH05_BASIL_GREEN_POS,
-            inject.chapters.ch05.CH05_BASIL_MOV_TABLE, 'Basil',
+            inject.terrain.class_movement('cleric')[0], 'Basil',
             must_reach=tuple(next(e for e in chap['enemy_units']
                                   if e['id'] == 'sahnar')['positions'][0]))
 

@@ -72,7 +72,7 @@ def raw_pid_portrait_data(text, campaign):
                                     unit_id)
 
     # baseLevel LAST and on its own table: a raw-pid boss needs this whether or not it has a
-    # `personal:` line (the moose and the kobold brute have none), and without it the
+    # `personal:` line (the kobold brute has none), and without it the
     # difficulty malus resets the unit and rebuilds it from growths. See RAW_PID_LEVEL_SOURCES.
     for pid, level in sorted(raw_pid_base_levels(campaign).items()):
         marker = '[%s - 1]' % pid.lower()
@@ -130,6 +130,8 @@ RAW_PID_PERSONAL_SOURCES = {
     # passenger inside the portrait loop. Its gap's bases are all zeros in vanilla, so without
     # this row the boss really does fight as a naked Mogall and folds in 1.1 rounds.
     CH03_BOSS_PID: (CH03_CHAPTER_YAML, 'grell'),
+    # ch05's white moose (#502): Forde's personal line, as the ch08 recruit it becomes carries.
+    CH05_MOOSE_PID: (CH05_CHAPTER_YAML, 'white-moose'),
     # ch06's west hull (#26). A rescue hull is a raw-pid unit like a boss, and its line is
     # what the clock is measured on: CLASS_FLEET's 19 HP + 9 = 28 restores vanilla Ch6's
     # foot slack (the chapter YAML says why).

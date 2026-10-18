@@ -9,7 +9,7 @@ from inject.raw_pids import enemy_pid_for
 from inject.cast import (
     _classed_cast, char_symbol, unit_items, GUEST_PORTRAIT_MAP, load_unit, PORTRAIT_MAP)
 from inject.chapter_ids import (
-    CH04_MOOSE_MOV_TABLE, CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
+    CH05_ARENA_FOUND_MSG, CH05_ARENA_RULES_MSG,
     CH05_ARRIVAL_NO_LUPIN_MSG, CH05_ARRIVAL_SLOT, CH05_BASIL_JOIN_NO_LUPIN_MSG,
     CH05_BASIL_JOIN_SLOT, CH05_BOSS_PID, CH05_CHAPTER_YAML, CH05_CLASS_IDS, CH05_ENDING_ARMS,
     CH05_ENDING_LOST_MSG, CH05_ENDING_MSGS, CH05_ERUPTION_MSG, CH05_GOAL_STATUS_MSG,
@@ -36,8 +36,8 @@ from inject.scenes import (
     defeat_boss_goal, defeat_quote_row, ending_call, party_camera_tile, split_on_stage_cut,
     variant_beat, write_frame_texts)
 from inject.terrain import (
-    _class_terrain_move_costs, _map_terrain_grid, assert_scripted_move_reachable, reachable_tiles,
-    reda_route_move)
+    _class_terrain_move_costs, _map_terrain_grid, assert_scripted_move_reachable, class_movement,
+    reachable_tiles, reda_route_move)
 from inject.text import (
     dev_placeholder_scene, _fe_dialogue_text, _fid_tag, _script_box_count, SCRIPT_DIRECTIVES,
     _script_to_message, set_message_body)
@@ -194,7 +194,6 @@ CH05_WAVE_TABLES = {2: 'MS_Ch05Wave2', 6: 'MS_Ch05Wave6', 8: 'MS_Ch05Wave8'}
 # BLUE by the opening's own join beat -- basil.md Q3, and the locked 0x9C2 ("...I wonder.
 # Sahnar. ...She needs me. Take me to her?"), whose trigger is chapter_start, NOT a Talk.
 # So: no CHAR entry for Basil. One CHAR entry, Basil -> Sahnar, exactly like the twin.
-CH05_BASIL_MOV_TABLE = 'TerrainTable_MovCost_MagicNormal'   # Cleric's own cost row (data_classes.c)
 CH05_BASIL_GREEN_POS = (5, 15)   # the row-15 corridor at the deploy pocket's mouth. NOT one of
                                  # the nine deploy_slots (rows 16-19) -- those are the party's
                                  # and PREP fills all nine, so standing on one would cost a
@@ -1759,7 +1758,8 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     basil_faction = recruit_initial_faction(load_unit(campaign, 'basil'))   # GREEN (the default)
     assert_green_recruit_placement(
         chap, maps_dir, CH05_LAYOUT[1], CH05_BASIL_GREEN_POS,
-        CH05_BASIL_MOV_TABLE, 'Basil (ch05 green recruit)',
+        class_movement(load_unit(campaign, 'basil')['fe_stats']['class'])[0],
+        'Basil (ch05 green recruit)',
         # Her WALK-OFF tile, not her load tile: she rises on the arena and immediately steps off
         # it (ch05_sahnar_station), so the escort Basil has to survive is measured to where
         # Sahnar actually stands and fights.
@@ -1776,9 +1776,11 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # waypoint is checked from where the run BEGINS, not from the pen: the run starts in the
     # top-right corner and row 0's walkable stretch is only x=10..14.
     _pen, _from, _route = ch05_moose_station(chap)
+    _moose = next(u for u in chap['enemy_units'] if u['id'] == 'white-moose')
     for _leg in _route:
         assert_scripted_move_reachable(maps_dir, CH05_LAYOUT[1], _from, _leg,
-                                       CH04_MOOSE_MOV_TABLE, 'the white moose (ch05 scene 7)')
+                                       class_movement(_moose['class'])[0],
+                                       'the white moose (ch05 scene 7)')
     bx, by = CH05_BASIL_GREEN_POS
     declare_unit_table(CH05_BASIL_TABLE, [_ally_unit_entry(
         leader, basil[1], basil[3], basil[4], bx, by, ', '.join(unit_items(campaign, basil[0])),
