@@ -24,6 +24,7 @@ import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.decomp                                          # noqa: E402
+import inject.text                                            # noqa: E402
 
 DEC = inject.decomp.SUBMODULE   # vanilla: the submodule, never the build tree (#408)
 
@@ -43,18 +44,7 @@ def _decomp_text(relpath):
 
 def load_messages():
     """MSG id (int) -> raw body text, from the decomp at HEAD."""
-    out, cur, buf = {}, None, []
-    for line in _decomp_text('texts/texts.txt').splitlines(keepends=True):
-        m = re.match(r'##\s*MSG_([0-9A-Fa-f]+)', line)
-        if m:
-            if cur is not None:
-                out[cur] = ''.join(buf)
-            cur, buf = int(m.group(1), 16), []
-        elif cur is not None:
-            buf.append(line)
-    if cur is not None:
-        out[cur] = ''.join(buf)
-    return out
+    return inject.text.message_bodies(_decomp_text('texts/texts.txt'))
 
 
 # Portrait/staging markup -> a readable speaker hint, then stripped.

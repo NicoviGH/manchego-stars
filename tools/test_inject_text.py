@@ -308,6 +308,28 @@ class SetMessageBodyReplacesTheWholeBody(unittest.TestCase):
 
 
 
+class PlainMessageReadsWhatThePlayerSees(unittest.TestCase):
+    """`inject.text.messages`: the one texts.txt reader, as plain text."""
+
+    def test_a_glyph_code_is_its_character_and_a_break_is_a_space(self):
+        self.assertEqual('1-2', inject.text.plain_message('1[DashedLine]2[.][X]'))
+        self.assertEqual('Rich "Merchant"', inject.text.plain_message(
+            'Rich [LQuote]Merchant[RQuote][X]'))
+        self.assertEqual('Your chosen hero', inject.text.plain_message(
+            'Your[LF]chosen[A]hero[X]'))
+
+    def test_a_runtime_substitution_stays_visible(self):
+        self.assertEqual('Thank you, [Tact].', inject.text.plain_message(
+            '[OpenLeft]Thank you, [Tact].[A][X]'))
+
+    def test_the_shared_table_is_read_only(self):
+        from inject.decomp import vanilla_decomp_text
+        msgs = inject.text.messages(vanilla_decomp_text('texts/texts.txt'))
+        self.assertEqual('3-10', msgs[0x528])
+        with self.assertRaises(TypeError):
+            msgs[0x528] = 'x'
+
+
 class HelpText(unittest.TestCase):
     """A cast member's help text (R on its name), written over its slot's description (#493)."""
 
@@ -322,12 +344,11 @@ class HelpText(unittest.TestCase):
     def test_the_rule_predicts_every_plain_vanilla_description(self):
         from inject.decomp import vanilla_decomp_text
         chars = vanilla_decomp_text('src/data_characters.c')
-        texts = vanilla_decomp_text('texts/texts.txt')
+        bodies = inject.text.message_bodies(vanilla_decomp_text('texts/texts.txt'))
         checked = 0
         for i in sorted({int(x, 0) for x in re.findall(
                 r'\.descTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', chars)}):
-            m = re.search(r'^## MSG_%03X\b[^\n]*\n(.*?)(?=^##|\Z)' % i, texts, re.S | re.M)
-            body = m.group(1).replace('\n', '').strip()
+            body = bodies[i].replace('\n', '').strip()
             padded = body.endswith('[.][X]')
             core = body[:-6] if padded else body[:-3]
             if not body.endswith('[X]') or 'Dummy' in body or '[' in core.replace('[LF]', ''):

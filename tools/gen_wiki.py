@@ -36,6 +36,7 @@ import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
 import inject.sms                                      # noqa: E402
 import inject.stats                                    # noqa: E402
+import inject.text                                     # noqa: E402
 import inject.unit_art as unit_art                     # noqa: E402
 import inject.villages                                 # noqa: E402
 from wiki import pages as wp, site as wsite             # noqa: E402
@@ -132,14 +133,12 @@ def _vanilla_item_names():
     global _ITEM_NAMES
     if _ITEM_NAMES is None:
         items = inject.decomp.vanilla_decomp_text('src/data_items.c')
-        texts = inject.decomp.vanilla_decomp_text('texts/texts.txt')
-        msgs = {int(m.group(1), 16): m.group(2) for m in
-                re.finditer(r'^## MSG_([0-9A-Fa-f]+)\n(.*?)\[X\]', texts, re.M)}
+        msgs = inject.text.messages(inject.decomp.vanilla_decomp_text('texts/texts.txt'))
         _ITEM_NAMES = {}
         for m in re.finditer(r'\[(ITEM_\w+)\]\s*=\s*\{(.*?)\n\s*\},', items, re.S):
             n = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', m.group(2))
             if n and int(n.group(1), 0) in msgs:
-                _ITEM_NAMES[m.group(1)] = re.sub(r'\[[^\]]*\]', '', msgs[int(n.group(1), 0)]).strip()
+                _ITEM_NAMES[m.group(1)] = msgs[int(n.group(1), 0)]
     return _ITEM_NAMES
 
 
@@ -751,6 +750,7 @@ def rom_text(rel):
     return inject.decomp.vanilla_decomp_text(rel)
 
 
+@functools.lru_cache(maxsize=None)
 def rom_block(rel, token):
     """One `[token - 1] = {...}` entry of a data table (characters, classes), or ''."""
     if not token:
@@ -784,6 +784,20 @@ def enemy_token(chap, ed):
 def _field(block, name):
     m = re.search(r'\.%s\s*=\s*(0x[0-9a-fA-F]+|\d+)' % name, block)
     return int(m.group(1), 0) if m else 0
+
+
+def rom_unit_name(chap, ed):
+    """The name the map hover box and the unit window print for a generic enemy: its pid's
+    nameTextId (player_interface.c, unitinfowindow.c), a faction name (Soldier, Cutthroat,
+    Monster), never its class. Only the pid the ROM seats it on counts
+    (`inject.raw_pids.enemy_pid`): `enemy_token`'s stat-donor fallback is a named vanilla
+    character. '' when the chapter has no pid table."""
+    try:
+        pid = inject.raw_pids.enemy_pid(chap['_slug'], ed)
+    except (KeyError, TypeError):
+        return ''
+    nid = _field(rom_block('src/data_characters.c', pid), 'nameTextId')
+    return inject.text.messages(rom_text('texts/texts.txt')).get(nid, '') if nid else ''
 
 
 def rom_portrait(chap, ed):
@@ -1037,7 +1051,7 @@ def wiki_class(token):
 def wiki_unit_row(chap, ed, token, level, inv, n, shifts, mode, files, kind='Enemy'):
     st = loaded(ed, token, level, shifts, mode, chap)
     # A named unit shows its name (bosses, personal lines, a named green ally); a generic shows
-    # its class, as the ROM's unit window does.
+    # what the ROM prints for its pid (`rom_unit_name`), its class only when no pid resolves.
     named = (ed.get('is_boss') or ed.get('is_miniboss') or personal_of(ed)
              or (kind == 'NPC' and (ed.get('fe_name') or ed.get('name'))))
     cls, article = wiki_class(token)
@@ -1051,7 +1065,8 @@ def wiki_unit_row(chap, ed, token, level, inv, n, shifts, mode, files, kind='Ene
     if drop:                       # the ROM carries the drop as the last item (units.py)
         items.append(wiki_item(drop, files, drop=True))
     show = lambda k: unit_load.show(st[k])               # noqa: E731
-    return {'name': (ed.get('fe_name') or ed.get('name')) if named else cls,
+    return {'name': ((ed.get('fe_name') or ed.get('name')) if named
+                     else rom_unit_name(chap, ed) or cls),
             'class': cls, 'class_article': article, 'version': version,
             'type': 'npc' if kind == 'NPC' else None, 'lv': level, 'n': n,
             'hp': show('HP'), 'str': show('Pow'), 'skl': show('Skl'), 'spd': show('Spd'),

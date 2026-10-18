@@ -40,7 +40,7 @@ from inject.terrain import (
     reachable_tiles, reda_route_move)
 from inject.text import (
     dev_placeholder_scene, _fe_dialogue_text, _fid_tag, _script_box_count, SCRIPT_DIRECTIVES,
-    _script_to_message, set_message_body)
+    message_bodies, _script_to_message, set_message_body)
 from inject.units import (
     _ally_unit_entry, chapter_label_constant, declare_unit_table, _deploy_cap_entries,
     enemy_ai_initialiser, enemy_rows, safe_ai_clients)
@@ -1521,11 +1521,10 @@ def ch05_beginning_script(chap, basil_char, sahnar_table, sahnar_char,
 def _vanilla_message_body(msg_id, source=None):
     """One committed vanilla message body, immune to the mutable injected text tree."""
     source = vanilla_decomp_text('texts/texts.txt') if source is None else source
-    match = re.search(r'^## MSG_%03X\n(.*?)(?=\n\n## MSG_|\Z)' % msg_id,
-                      source, re.M | re.S)
-    if not match:
+    body = message_bodies(source).get(msg_id)
+    if body is None:
         sys.exit('ERROR: vanilla MSG_%03X is absent from texts/texts.txt at HEAD' % msg_id)
-    return match.group(1).strip()
+    return body.strip()
 
 
 def _tutorial_plain_boxes(body):

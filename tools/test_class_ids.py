@@ -65,15 +65,14 @@ class DisplayName(unittest.TestCase):
         # is the reference (FE8 truncates "Pegasus Kn."/"Wyvern Kn."; the full names win).
         import re
         from inject.decomp import vanilla_decomp_text
+        from inject.text import messages
         classes = vanilla_decomp_text('src/data_classes.c')
-        texts = vanilla_decomp_text('texts/texts.txt')
-        msgs = {int(m.group(1), 16): m.group(2) for m in
-                re.finditer(r'^## MSG_([0-9A-Fa-f]+)\n(.*?)\[X\]', texts, re.M)}
+        msgs = messages(vanilla_decomp_text('texts/texts.txt'))
         for m in re.finditer(r'\[(CLASS_\w+) - 1\]\s*=\s*\{(.*?)\n\s*\},', classes, re.S):
             n = re.search(r'\.nameTextId\s*=\s*(0x[0-9a-fA-F]+|\d+)', m.group(2))
             if not n:
                 continue
-            game = re.sub(r'\[[^\]]*\]', '', msgs.get(int(n.group(1), 0), '')).strip()
+            game = msgs.get(int(n.group(1), 0), '')
             token = m.group(1)[len('CLASS_'):].lower().replace('_', '-')
             self.assertEqual(game.replace(' Kn.', ' Knight'), class_ids.class_display_name(token),
                              token)
