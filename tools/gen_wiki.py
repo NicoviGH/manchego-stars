@@ -32,7 +32,6 @@ import scene_preview                                   # noqa: E402
 import unit_load                                       # noqa: E402
 import inject.cast                                     # noqa: E402
 import inject.chapter_settings                         # noqa: E402
-import inject.chapter_ids                              # noqa: E402
 import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
 import inject.sms                                      # noqa: E402
@@ -765,16 +764,18 @@ def rom_block(rel, token):
 
 
 def enemy_token(chap, ed):
-    """The CharacterData index an enemy entry rides in the ROM (`inject.raw_pids.enemy_pid`;
-    the prologue's boss, which its own injector seats, on PROLOGUE_SEPHEK_SLOT), else its stat
-    donor, else None for a chapter the pid table does not host."""
-    if chap.get('is_prologue') and ed.get('is_boss'):
-        return 'CHARACTER_%s' % inject.chapter_ids.PROLOGUE_SEPHEK_SLOT
+    """The CharacterData index an enemy entry rides in the ROM (`inject.raw_pids.enemy_pid`,
+    else the slot `inject.cast.ENEMY_CHARACTER_SLOT` seats it on), else its stat donor, else
+    None. A slot the build rewrites (the prologue's) is None with no build tree: the vanilla
+    entry there is a different character (O'Neill's Axe C under Sephek's sword)."""
     try:
         return inject.raw_pids.enemy_pid(chap['_slug'], ed)
     except (KeyError, TypeError):
-        return (inject.stats.BASE_DONOR.get(ed.get('id'))
-                or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')))
+        pass
+    slot = inject.cast.ENEMY_CHARACTER_SLOT.get(ed.get('id'))
+    if slot and slot != inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')):
+        return slot if os.path.isdir(BUILD_TREE) else None
+    return inject.stats.BASE_DONOR.get(ed.get('id')) or slot
 
 
 def _field(block, name):

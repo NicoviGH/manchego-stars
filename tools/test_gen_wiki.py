@@ -106,8 +106,15 @@ class TestEnemySlots(unittest.TestCase):
         # Sephek (a Myrmidon, Sword C from Joshua). Reading no slot printed the bare class's
         # Sword D on his page (#493).
         chap = next(c for c in gen_wiki.chapters() if c.get('is_prologue'))
-        boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
-        self.assertEqual(gen_wiki.enemy_token(chap, boss), 'CHARACTER_ONEILL')
+        boss = next(e for e in chap['enemy_units'] if e.get('id') == 'sephek-kaltro')
+        token = gen_wiki.enemy_token(chap, boss)
+        if not os.path.isdir(gen_wiki.BUILD_TREE):
+            self.assertIsNone(token)        # vanilla O'Neill is not who stands there
+            return
+        self.assertEqual(token, 'CHARACTER_ONEILL')
+        ranks = gen_wiki._ranks(gen_wiki.class_enum_of(boss['class']), token)
+        self.assertEqual(gen_wiki._letter(ranks.get('ITYPE_SWORD')), 'C')
+        self.assertNotIn('ITYPE_AXE', ranks)
 
 
 class TestStrategyNames(unittest.TestCase):
