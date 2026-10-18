@@ -158,6 +158,13 @@ class TestGenericNames(unittest.TestCase):
         self.assertEqual(self.generic('ch02', 'brigand'), 'Cutthroat')
         self.assertEqual(self.generic('ch03', 'archer'), 'Monster')
 
+    def test_a_chapter_without_a_pid_table_never_reads_a_donor_s_name(self):
+        # the prologue seats its guards on its own slots; enemy_token's stat-donor fallback
+        # would name a vanilla character, so the row falls back to the class instead
+        chap = self.by_slug['ch00']
+        ed = next(e for e in gen_wiki.enemy_list(chap) if e.get('id') == 'caravan-guard')
+        self.assertEqual('', gen_wiki.rom_unit_name(chap, ed))
+
     def test_the_enemy_row_prints_it(self):
         chap = self.by_slug['ch02']
         ed = next(e for e in gen_wiki.enemy_list(chap) if e.get('class') == 'brigand')

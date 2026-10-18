@@ -6,6 +6,7 @@ turns a YAML script beat into FE8 control codes, wrapped to the talk box.
 import functools
 import re
 import sys
+import types
 
 import fe8_talk_font
 from inject.message_alloc import allocated_message_ids
@@ -120,27 +121,39 @@ def slot_help_text(slot, unit=None):
     return messages(vanilla_decomp_text('texts/texts.txt')).get(msg) or None
 
 
-_BREAK_CODES = re.compile(r'\[(?:LF|NL|CR|A)\]')
+# textdefs.txt: codes the font draws as a character, codes that only space the text, and codes
+# that print a runtime string (the tactician's name, an item, a gold amount).
+_GLYPH_CODES = {'[HASH]': '#', '[DashedLine]': '-', '[LQuote]': '"', '[RQuote]': '"',
+                '[AccentedE]': '\u00e9'}
+_SPACE_CODES = re.compile(r'\[(?:LF|NL|NL2|CR|A|TAB)\]')
+_RUNTIME_CODES = ('[Tact]', '[Item]', '[SetName]', '[G]')
 
 
 def plain_message(body):
-    """A message body as the player reads it: a line break or A-press is a space ("Your[LF]
-    chosen"), every other control code is nothing ("1[DashedLine]2" is the 12 it draws)."""
-    return ' '.join(re.sub(r'\[[^\]]*\]', '', _BREAK_CODES.sub(' ', body)).split())
+    """A message body as the player reads it: a glyph code is its character ("1[DashedLine]2"
+    draws 1-2), a line break or A-press is a space ("Your[LF]chosen"), a runtime substitution
+    stays visible as its code, and every other control code is nothing."""
+    for code, glyph in _GLYPH_CODES.items():
+        body = body.replace(code, glyph)
+    body = _SPACE_CODES.sub(' ', body)
+    body = re.sub(r'\[[^\]]*\]', lambda m: m.group(0) if m.group(0) in _RUNTIME_CODES else '',
+                  body)
+    return ' '.join(body.split())
 
 
 @functools.lru_cache(maxsize=None)
 def message_bodies(texts):
     """{message id: raw body, control codes included} for every `## MSG_` in a texts.txt's
-    contents."""
-    return {int(m.group(1), 16): m.group(2) for m in
-            re.finditer(r'^## MSG_([0-9A-Fa-f]+)\b[^\n]*\n(.*?)(?=^##|\Z)', texts, re.S | re.M)}
+    contents (read-only: the
+    table is shared by every caller)."""
+    return types.MappingProxyType({int(m.group(1), 16): m.group(2) for m in re.finditer(
+        r'^## MSG_([0-9A-Fa-f]+)\b[^\n]*\n(.*?)(?=^##|\Z)', texts, re.S | re.M)})
 
 
 @functools.lru_cache(maxsize=None)
 def messages(texts):
     """{message id: plain text} for every `## MSG_` in a texts.txt's contents."""
-    return {i: plain_message(b) for i, b in message_bodies(texts).items()}
+    return types.MappingProxyType({i: plain_message(b) for i, b in message_bodies(texts).items()})
 
 
 GOAL_WINDOW_MAX_CHARS = 12      # vanilla's own widest: 'Defeat enemy' / 'Seize throne'

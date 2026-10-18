@@ -35,8 +35,8 @@ import inject.chapter_settings                         # noqa: E402
 import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
 import inject.sms                                      # noqa: E402
-import inject.text                                     # noqa: E402
 import inject.stats                                    # noqa: E402
+import inject.text                                     # noqa: E402
 import inject.unit_art as unit_art                     # noqa: E402
 import inject.villages                                 # noqa: E402
 from wiki import pages as wp, site as wsite             # noqa: E402
@@ -750,6 +750,7 @@ def rom_text(rel):
     return inject.decomp.vanilla_decomp_text(rel)
 
 
+@functools.lru_cache(maxsize=None)
 def rom_block(rel, token):
     """One `[token - 1] = {...}` entry of a data table (characters, classes), or ''."""
     if not token:
@@ -786,10 +787,16 @@ def _field(block, name):
 
 
 def rom_unit_name(chap, ed):
-    """The name the map hover box and the unit window print for an enemy: its CharacterData
-    entry's nameTextId (player_interface.c, unitinfowindow.c). A generic shows its pid's
-    faction name (Soldier, Cutthroat, Monster), never its class; '' when no entry resolves."""
-    nid = _field(rom_block('src/data_characters.c', enemy_token(chap, ed)), 'nameTextId')
+    """The name the map hover box and the unit window print for a generic enemy: its pid's
+    nameTextId (player_interface.c, unitinfowindow.c), a faction name (Soldier, Cutthroat,
+    Monster), never its class. Only the pid the ROM seats it on counts
+    (`inject.raw_pids.enemy_pid`): `enemy_token`'s stat-donor fallback is a named vanilla
+    character. '' when the chapter has no pid table."""
+    try:
+        pid = inject.raw_pids.enemy_pid(chap['_slug'], ed)
+    except (KeyError, TypeError):
+        return ''
+    nid = _field(rom_block('src/data_characters.c', pid), 'nameTextId')
     return inject.text.messages(rom_text('texts/texts.txt')).get(nid, '') if nid else ''
 
 
