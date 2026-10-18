@@ -76,7 +76,7 @@ strategy: |
   and both piers. If you really want the [[Energy Ring]], bring [[Trex]] along so that he can
   steal it from one of the three mages; the mage on the west side drops a [[Pure Water]]. The
   two archers flanking the door and the harpooner on the east pier may be irritating, especially
-  if you are using [[Pinky]], so keep him back until they fall. The fishers carry
+  if you are using [[Pinky]], so keep him back until they fall. The dock guards carry
   [[Steel Axe]]s; meet them with lances and armor.
 
   [[Dorbulgruf Shalescar|The boss]] is a level 12 [[Fighter]] with a Steel Axe and a
@@ -108,11 +108,11 @@ deployment:
 # same tile, level, class, inventory, drop and donor AI -- re-dressed as Bremen's militia. The
 # book's muster ("up to 25 soldiers ... and 2 veterans", Rime p.27) is the flavour; the count
 # and shape are the twin's (ADR 0044).
-generic_name: "Militia"   # the unit window's name for every generic enemy here (Bremen's guards, fishers and hired swords; #493)
-generic_help: "Bremen's own people, armed and set against you by their Speaker."   # R on their name (DRAFT for Nicolas, #493)
+generic_name: "Militia"   # the unit window's name for every generic enemy here: the Speaker's guard (#493)
+generic_help: "A guard of Bremen, sworn in service of Speaker Dorbulgruf."   # R on their name (#493), Frelia's shape
 enemy_units:
-  - id: bremen-fisher
-    name: "Fisher"              # the axe block: fishers with gaffs and hatchets
+  - id: bremen-dock-guard
+    name: "Dock Guard"          # the axe block, holding the piers
     count: 3
     class: fighter              # vanilla: 3x Lv7 Fighter, Steel Axe
     level: 7
@@ -122,8 +122,8 @@ enemy_units:
     damage_type: slashing
     positions: [[17, 6], [16, 19], [18, 19]]
     donor: [[17, 6], [16, 19], [18, 19]]
-  - id: bremen-fisher-holding
-    name: "Fisher"
+  - id: bremen-dock-guard-holding
+    name: "Dock Guard"
     count: 2
     class: fighter              # vanilla: 2x Lv7 Fighter, Iron Axe, holding (AI_B 0)
     level: 7
@@ -166,8 +166,8 @@ enemy_units:
     damage_type: piercing
     positions: [[12, 18]]
     donor: [12, 18]
-  - id: bremen-sellsword
-    name: "Sellsword"
+  - id: bremen-hired-guard
+    name: "Hired Guard"
     count: 1
     class: mercenary            # vanilla: 1x Lv8 Mercenary, Iron Sword
     level: 8
@@ -177,8 +177,8 @@ enemy_units:
     damage_type: slashing
     positions: [[13, 13]]
     donor: [13, 13]
-  - id: bremen-sellsword-young
-    name: "Sellsword"
+  - id: bremen-hired-guard-young
+    name: "Hired Guard"
     count: 1
     class: mercenary            # vanilla: 1x Lv7 Mercenary, Iron Sword
     level: 7

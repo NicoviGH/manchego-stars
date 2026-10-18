@@ -32,5 +32,12 @@ which retires the prologue's own pid function. A new chapter adds its pid, its d
 YAML lines; `ch02generichelp` proves R on a Raider's name in game, through the `help:` step any
 chapter can declare.
 
-_Decided: 2026-10-18 (Nicolas: the names, and Monster for ch04; Claude: the pid move and the help
-text, drafts for Nicolas's red pen)._
+The help lines follow vanilla's shape, an allegiance and one fact about where the faction stands
+("A member of Bazba's Bandits, who roam this region"; "A knight of Frelia, sworn in service of
+Hayden"), and say only what our own story tells the player: ch03's are the wild kobolds that broke
+from Trex's warren, never the warren itself. A line covers every generic in its chapter, so a
+roster entry must fit it: ch07's fishers and sellswords are re-dressed as the Speaker's dock and
+hired guards (stats, kit and tiles unchanged).
+
+_Decided: 2026-10-18 (Nicolas: the names, Monster for ch04, the help lines and ch07's renames;
+Claude: the pid move)._

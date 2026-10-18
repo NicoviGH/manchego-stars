@@ -298,7 +298,7 @@ deployment:
 # all-zero AI and the other three AttackInRange. Ours are a single `count: 4` entry and take
 # the majority behaviour; splitting one out is a placement-time decision, not a roster one.
 generic_name: "Merfolk"   # the unit window's name for every generic enemy here (the merfolk and the beasts they ride and lead; #493)
-generic_help: "Merfolk of Maer Dualdon, emboldened this winter by the Frostmaiden."   # R on their name (DRAFT for Nicolas, #493)
+generic_help: "Merfolk of Maer Dualdon, emboldened this winter by the Frostmaiden."   # R on their name (#493)
 enemy_units:
   # ── The trident line (vanilla's 6 Soldiers) → merfolk, Mermaid `2. Lance` ─────
   - id: merfolk-trident
