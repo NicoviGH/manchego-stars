@@ -100,6 +100,16 @@ class TestGenWiki(unittest.TestCase):
         self.assertEqual(gen_wiki.rom_item_name('ITEM_VULNERARY'), 'Goodberry')
 
 
+class TestEnemySlots(unittest.TestCase):
+    def test_the_prologue_boss_reads_the_slot_he_rides(self):
+        # The prologue is not in CHAPTER_ENEMY_PIDS: its injector rewrites O'Neill's slot for
+        # Sephek (a Myrmidon, Sword C from Joshua). Reading no slot printed the bare class's
+        # Sword D on his page (#493).
+        chap = next(c for c in gen_wiki.chapters() if c.get('is_prologue'))
+        boss = next(e for e in chap['enemy_units'] if e.get('is_boss'))
+        self.assertEqual(gen_wiki.enemy_token(chap, boss), 'CHARACTER_ONEILL')
+
+
 class TestStrategyNames(unittest.TestCase):
     def test_strategies_name_items_as_the_rom_does(self):
         # FE8 keeps one name per item id; where the campaign renames one (campaign.yaml

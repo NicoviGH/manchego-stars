@@ -32,6 +32,7 @@ import scene_preview                                   # noqa: E402
 import unit_load                                       # noqa: E402
 import inject.cast                                     # noqa: E402
 import inject.chapter_settings                         # noqa: E402
+import inject.chapter_ids                              # noqa: E402
 import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
 import inject.sms                                      # noqa: E402
@@ -764,8 +765,11 @@ def rom_block(rel, token):
 
 
 def enemy_token(chap, ed):
-    """The CharacterData index an enemy entry rides in the ROM (`inject.raw_pids.enemy_pid`),
-    else its stat donor, else None for a chapter the pid table does not host."""
+    """The CharacterData index an enemy entry rides in the ROM (`inject.raw_pids.enemy_pid`;
+    the prologue's boss, which its own injector seats, on PROLOGUE_SEPHEK_SLOT), else its stat
+    donor, else None for a chapter the pid table does not host."""
+    if chap.get('is_prologue') and ed.get('is_boss'):
+        return 'CHARACTER_%s' % inject.chapter_ids.PROLOGUE_SEPHEK_SLOT
     try:
         return inject.raw_pids.enemy_pid(chap['_slug'], ed)
     except (KeyError, TypeError):
