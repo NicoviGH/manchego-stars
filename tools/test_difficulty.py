@@ -11,6 +11,7 @@ import contextlib
 import copy
 import io
 import os
+import re
 import sys
 import unittest
 from unittest import mock
@@ -1679,6 +1680,64 @@ class ItemEconomy(unittest.TestCase):
 
     def test_unmapped_reference_returns_none(self):
         self.assertIsNone(df.vanilla_economy('FE8 Ch99'))
+
+    # #493's audit: every give-site in every twin, against what the reader returned.
+    def test_a_gift_spelled_by_its_enum_is_read(self):
+        # The Prologue sets the Rapier as SVAL(EVT_SLOT_3, ITEM_SWORD_RAPIER), not a number.
+        t = df.twin_event_payload('prologue')
+        self.assertEqual(t['gifts'], ['ITEM_SWORD_RAPIER'])
+        self.assertEqual(t['gift_to'], [('CHARACTER_EIRIKA',)])
+
+    def test_a_gift_through_a_shared_script_is_read(self):
+        # Ch15's desert treasures CALL(EventScr_GiveTreasureToLuckyDog), whose GIVEITEMTO lives
+        # in events_script_utils.c, not in the chapter's own script.
+        t = df.twin_event_payload('ch15a')
+        hidden = [g for g, to in zip(t['gifts'], t['gift_to'])
+                  if to == ('EventScr_GiveTreasureToLuckyDog',)]
+        self.assertEqual(len(hidden), 9)
+        self.assertIn('ITEM_SWORD_WYRMSLAYER', df.twin_event_payload('ch15b')['gifts'])
+
+    def test_only_eirikas_arm_of_a_route_branch_counts(self):
+        # From Ch15 the routes share a script: CHECK_MODE gives Eirika Gleipnir and Garm, and
+        # Ephraim Audhulma and Excalibur. Our twin chain is Eirika's route.
+        gifts = df.twin_event_payload('ch15a')['gifts']
+        self.assertIn('ITEM_DARK_GLEIPNIR', gifts)
+        self.assertNotIn('ITEM_SWORD_AUDHULMA', gifts)
+        self.assertNotIn(('CHARACTER_EPHRAIM', 'ITEM_SWORD_AUDHULMA'),
+                         df._named_item_grants('ch15a'))
+
+    # Shared scripts that take slot 3 as something other than loot; anything else a twin sets
+    # slot 3 for has to reach a give the reader counts.
+    SLOT3_NOT_LOOT = {
+        'EventScr_LoadUnitForTutorial': 'a tutorial flag',
+        'EventScr_089F3C34': 'a text id (Ch9 opening lines)',
+        'EventScr_089F82FC': 'a UnitDef (Ch19 reinforcements)',
+        'EventScr_9EEAAC': "Rennac's 9,980-gold hire: a cost, not a gift",
+    }
+
+    def test_every_twin_slot3_value_reaches_a_give_the_reader_counts(self):
+        # The audit as a guard: a give vehicle the reader does not know (a macro, a shared
+        # script) makes its SVAL(EVT_SLOT_3) land here instead of going unseen.
+        import gen_wiki
+        give = re.compile(r'(?:GIVEITEMTO|GIVEITEMTOMAIN|GIVETOSLOT3)\(|CALL\((%s)\)' % '|'.join(
+            sorted(df._shared_give_scripts() | set(self.SLOT3_NOT_LOOT))))
+        unread = []
+        for stem, _title, _page in gen_wiki.VANILLA.values():
+            text = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+            for block in text.split('CONST_DATA EventListScr'):
+                sets = list(re.finditer(r'SVAL\(EVT_SLOT_3,\s*\w+\)', block))
+                for i, m in enumerate(sets):
+                    end = sets[i + 1].start() if i + 1 < len(sets) else len(block)
+                    if not give.search(block, m.end(), end):
+                        unread.append('%s: %s' % (stem, m.group(0)))
+        self.assertEqual(unread, [])
+
+    def test_a_gift_on_both_arms_of_a_branch_is_given_once(self):
+        # Ch14 hands Audhulma and Excalibur to Joshua if he lives, else to Eirika.
+        t = df.twin_event_payload('ch14a')
+        self.assertEqual(t['gifts'].count('ITEM_SWORD_AUDHULMA'), 1)
+        self.assertEqual(t['gift_to'][t['gifts'].index('ITEM_SWORD_AUDHULMA')],
+                         ('CHARACTER_JOSHUA', 'CHARACTER_EIRIKA'))
 
     def test_vanilla_drops_reads_the_last_item_of_each_flagged_red_unit(self):
         # #176: vanilla Ch2's brigand carries { Iron Axe, Vulnerary } with .itemDrop set,

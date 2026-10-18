@@ -179,16 +179,16 @@ def _is_plain_item(enum):
 def vanilla_payload(key):
     """Everything the twin hands out and fields, from its own event scripts at HEAD."""
     stem = VANILLA[key][0]
-    out = {'stem': stem, 'chests': [], 'gifts': [], 'drops': [], 'steals': [], 'shops': [],
-           'recruits': [],
-           'grants': [], 'enemies': [], 'n_villages': 0, 'error': None}
+    out = {'stem': stem, 'chests': [], 'gifts': [], 'gift_to': [], 'drops': [], 'steals': [],
+           'shops': [], 'recruits': [], 'enemies': [], 'n_villages': 0, 'error': None}
     if not os.path.isfile(os.path.join(inject.decomp.SUBMODULE, 'src', 'events',
                                        '%s-eventinfo.h' % stem)):
         out['error'] = 'no event files for %s' % stem
         return out
     t = difficulty.twin_event_payload(stem)          # the one reader vanilla_economy shares
     out.update(chests=t['chests'], gold_chests=t['chest_gold'], gold_gifts=t['gift_gold'],
-               gifts=t['gifts'] + t['interlude_gifts'], interlude_gold=t['interlude_gold'],
+               gifts=t['gifts'] + t['interlude_gifts'],
+               gift_to=t['gift_to'] + t['interlude_gift_to'], interlude_gold=t['interlude_gold'],
                n_villages=t['n_villages'], shops=t['shops'])
     for u in difficulty._chapter_udefs(stem):
         if u['allegiance'] == 'FACTION_ID_RED' and u['items']:   # itemless = cutscene load
@@ -201,7 +201,6 @@ def vanilla_payload(key):
                         and _is_plain_item(it):
                     out['steals'].append(it)
     out['recruits'] = vanilla_joins().get(stem, [])
-    out['grants'] = difficulty._named_item_grants(stem)
     return out
 
 
@@ -1981,16 +1980,26 @@ def payload_verdicts(twin_items, ours_counts, deviations):
     return out
 
 
+def gift_vehicle(recipients):
+    """How the twin hands one gift over, from who its script gives it to (difficulty.
+    _gift_records): a named unit, a shared script, or whoever visits or leads."""
+    named = [pretty_enum(r, 'CHARACTER_') for r in recipients if r.startswith('CHARACTER_')]
+    if named and len(named) == len(recipients):
+        return 'Given to %s' % ' or '.join(named)
+    if 'EventScr_GiveTreasureToLuckyDog' in recipients:
+        return 'Hidden treasure (a Thief always finds it)'
+    return 'Gift / village / scene'
+
+
 def twin_payload_html(chap, ckey):
     v = vanilla_payload(ckey)
     if v['error']:
         return '<p><i>%s</i></p>' % esc(v['error'])
     ours_ = collections.Counter(e for _, e, _ in item_rows(chap) if e)
     deviations = {d.get('item'): d.get('why', '') for d in chap.get('payload_deviations') or []}
-    payload = ([(e, 'Chest') for e in v['chests']] + [(e, 'Gift / village / scene')
-               for e in v['gifts']] + [(e, 'Enemy drop') for e in v['drops']]
-               + [(e, 'Steal from an enemy') for e in v['steals']]
-               + [(e, 'Given to %s' % pretty_enum(c, 'CHARACTER_')) for c, e in v['grants']])
+    payload = ([(e, 'Chest') for e in v['chests']] + [(e, gift_vehicle(to))
+               for e, to in zip(v['gifts'], v['gift_to'])] + [(e, 'Enemy drop') for e in v['drops']]
+               + [(e, 'Steal from an enemy') for e in v['steals']])
     rows = []
     for (e, how), verdict in zip(payload, payload_verdicts([e for e, _ in payload], ours_,
                                                           deviations)):
