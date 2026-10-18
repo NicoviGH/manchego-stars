@@ -496,11 +496,13 @@ enemy_units:
     # warm hues and collapsed the blood-red antlers to tan, which is a chroma wash-out of the
     # one accent the creature is recognised by.
     #
-    # `clone_from: cavalier`, the class it deploys as: the Cavalier row that Lupin and Baxby
-    # use, so its sword, lance and unarmed slots all draw the moose, and it takes the
-    # Cavalier's cadence as Lupin does (Nicolas, 2026-10-18).
+    # `clone_from: cavalier`, the class it deploys as: the Cavalier row Lupin and Baxby use, so
+    # its sword, lance and unarmed slots all draw the moose. `cadence: beast` keeps the beast's
+    # growl, snap and footfall (Nicolas, 2026-08-15): the row's own cadence is the Armor
+    # Knight's leap and blade whoosh, which Lupin never uses (his pounce carries its own timing).
     battle_anim:
       clone_from: cavalier
+      cadence: beast
       abbr: moose_at1
       frames:
         - white-moose/ready.png     # the planted stand (master pose 3, rightmost)

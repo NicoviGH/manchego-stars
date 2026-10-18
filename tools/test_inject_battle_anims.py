@@ -146,7 +146,11 @@ class CharacterUniqueBanim(unittest.TestCase):
                                                  inject.chapter_ids.CH05_CHAPTER_YAML)
         moose = next(e for e in chap['enemy_units'] if e['id'] == 'white-moose')
         self.assertEqual(moose['battle_anim']['clone_from'], moose['class'])
-        self.assertIn(moose['class'], inject.battle_anims.BANIM_DONORS)
+        _cls, slots, _motion, _cadence = inject.battle_anims.BANIM_DONORS[moose['class']]
+        self.assertIn('0x0100 | ITYPE_LANCE', slots)     # its Iron Lance
+        self.assertIn('0x0100 | ITYPE_ITEM', slots)      # unarmed
+        # The beast's own timing, not the row's Armor Knight leap (Nicolas, 2026-08-15).
+        self.assertEqual(moose['battle_anim']['cadence'], 'beast')
 
 
     def test_unique_append_returns_next_index_and_appends_the_symbol(self):

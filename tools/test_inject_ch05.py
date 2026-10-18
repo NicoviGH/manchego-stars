@@ -1836,12 +1836,13 @@ class Ch05TheMooseCharges(unittest.TestCase):
         src = injector.injector_source()
         self.assertIn("'the white moose (ch05 scene 7)'", src)
         maps_dir = os.path.join(inject.decomp.REPO, 'campaigns', self.CAMPAIGN, 'maps')
-        _pen, start, route = inject.chapters.ch05.ch05_moose_station(self._chap())
+        chap = self._chap()
+        _pen, start, route = inject.chapters.ch05.ch05_moose_station(chap)
+        moose = next(u for u in chap['enemy_units'] if u['id'] == 'white-moose')
+        table = inject.terrain.class_movement(moose['class'])[0]
         for leg in route:      # every leg, from where the run BEGINS -- not from the pen
             inject.terrain.assert_scripted_move_reachable(maps_dir, inject.chapters.ch05.CH05_LAYOUT[1], start, leg,
-                                              inject.terrain.class_movement(next(
-                                                  u for u in self._chap()['enemy_units']
-                                                  if u['id'] == 'white-moose')['class'])[0], 'test')
+                                              table, 'test')
 
     def test_a_missing_charge_tile_is_refused_rather_than_shipped(self):
         chap = self._chap()

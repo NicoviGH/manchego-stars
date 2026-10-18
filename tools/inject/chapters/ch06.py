@@ -15,7 +15,7 @@ from inject.chapter_ids import (CH06_BOAT_PIDS, CH06_BOAT_SURVIVED_FLAGS, CH06_B
 from inject.decomp import _replace_brace_block, REPO, ITEM_ENUM
 from inject.chapter_frame import write_event_group
 from inject.event_scripts import assert_event_scripts_defined, declare_event_script
-from inject.class_ids import ChapterClassIds
+from inject.class_ids import ChapterClassIds, vanilla_class_enum
 from inject.chapter_settings import chapter_bgm
 from inject.hosting import _load_chapter_yaml, _retarget_host_chapter
 from inject.hosts import CH06_EVENT_GROUP, CH06_HOST_INDEX
@@ -404,7 +404,7 @@ CH06_SNAG_ID = 1
 # MOVE_1STEP's direction codes (eventscr.c EVSUBCMD_MOVE_1STEP): 0 west, 1 east, 2 south, 3 north.
 _STEP_DIRECTION = {(-1, 0): 0, (1, 0): 1, (0, 1): 2, (0, -1): 3}
 # He walks as the Gwyllgi he is built on, so the route is checked against that class's own row.
-CH06_MESSIE_MOV_TABLE = 'TerrainTable_MovCost_AnimalT2Normal'
+CH06_MESSIE_CLASS = 'gwyllgi'
 
 
 def ch06_messie_messages(chap):
@@ -443,7 +443,7 @@ def ch06_messie_route(chap, terrain):
     if sx != tx and sy != ty:
         sys.exit('ERROR: ch06 Messie\'s walk (%d, %d) -> (%d, %d) is not a straight line'
                  % (sx, sy, tx, ty))
-    costs = _class_terrain_move_costs(CH06_MESSIE_MOV_TABLE)
+    costs = _class_terrain_move_costs(class_movement(CH06_MESSIE_CLASS)[0])
     dx, dy = (tx > sx) - (tx < sx), (ty > sy) - (ty < sy)
     x, y = sx, sy
     while (x, y) != (tx, ty):
@@ -738,7 +738,7 @@ def inject_ch06(campaign, boot=False, ending=False, verbose=True):
     terrain = _map_terrain_grid(maps_dir, CH06_LAYOUT[1])[2]
     messie_surface, messie_target = ch06_messie_route(chap, terrain)
     declare_unit_table(CH06_MESSIE_TABLE, [_ally_unit_entry(
-        None, None, 'CLASS_GWYLLGI', 1, messie_surface[0], messie_surface[1], '0',
+        None, None, vanilla_class_enum(CH06_MESSIE_CLASS), 1, messie_surface[0], messie_surface[1], '0',
         ' /* Messie -- a cutscene actor: no class of his own, no AI, never fights */',
         allegiance='GREEN', char=CH06_MESSIE_PID)],
         'ch06 Messie, who surfaces when the merfolk elder falls (#26)')

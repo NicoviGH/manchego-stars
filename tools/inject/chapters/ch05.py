@@ -1777,9 +1777,9 @@ def inject_ch05(campaign, boot=False, lupin_proof=False, moose_only=False,
     # top-right corner and row 0's walkable stretch is only x=10..14.
     _pen, _from, _route = ch05_moose_station(chap)
     _moose = next(u for u in chap['enemy_units'] if u['id'] == 'white-moose')
+    _moose_mov_table = class_movement(_moose['class'])[0]
     for _leg in _route:
-        assert_scripted_move_reachable(maps_dir, CH05_LAYOUT[1], _from, _leg,
-                                       class_movement(_moose['class'])[0],
+        assert_scripted_move_reachable(maps_dir, CH05_LAYOUT[1], _from, _leg, _moose_mov_table,
                                        'the white moose (ch05 scene 7)')
     bx, by = CH05_BASIL_GREEN_POS
     declare_unit_table(CH05_BASIL_TABLE, [_ally_unit_entry(
