@@ -135,9 +135,14 @@ difference by naming it (`ch06_messie_gather` calls `gather_cast`).
    - Enemies → `MS_ChNNLine`, `LOAD1`ed by the beginning scene, plus one `MS_ChNNWave<turn>` per
      reinforcement wave (each needs its own table — one table cannot serve two turns). Every
      entry lives in `enemy_units` with `positions:`, and a wave says `arrives_turn:`. Rows come
-     from `enemy_rows`; the chapter's `chNN_enemy_pid(entry)` gives boss and any named unit a
-     UNIQUE pid so their flagged `gDefeatTalkList` entries key to them alone, and the rest the
-     slot's generic autolevelled PID. Positions/levels/items/AI from the YAML.
+     from `enemy_rows` with `enemy_pid_for('chNN')`: the chapter's row in
+     `raw_pids.CHAPTER_ENEMY_PIDS` gives boss and miniboss a UNIQUE pid, so their flagged
+     `gDefeatTalkList` entries key to them alone, and the rest the chapter's generic pid.
+     Positions/levels/items/AI from the YAML.
+   - The generics' name and help (ADR 0352): `generic_name:` and `generic_help:` in the YAML,
+     a `CHNN_GENERIC_PID` of the chapter's own from the unused 0x92–0xa6 rows in
+     `chapter_ids.GENERIC_PIDS`, the vanilla row it clones in `GENERIC_PID_DONORS`, and
+     `generic-name`/`generic-help` in `message_alloc.APPENDED_MESSAGES`.
    - A convertible/recruitable enemy gets its OWN table and pid even before its Talk is wired — a
      shared pid is unaddressable, which is what #203 cost ch04's wolf pack.
 

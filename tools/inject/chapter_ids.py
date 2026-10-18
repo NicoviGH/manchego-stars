@@ -15,8 +15,8 @@ from inject.message_alloc import appended_message_id
 # Cold-open guests ride vanilla character slots that are NOT in PORTRAIT_MAP, so their
 # names/portraits are free placeholders until custom art (see [[feedback_nicolas_not_an_artist]]).
 # Sephek rides the vanilla prologue boss slot (ONEILL) so he inherits its CA_BOSS
-# attribute -> DefeatBoss fires on his death with no extra flagging. Guards stay
-# generics (0x80/0x82) like vanilla. These are display-name/lord-quote slots only;
+# attribute -> DefeatBoss fires on his death with no extra flagging. Guards ride
+# generics (PROLOGUE_GUARD_PIDS). These are display-name/lord-quote slots only;
 # class/level/stats come from the UnitDefinition below, not the slot's character data.
 PROLOGUE_HLIN_SLOT = 'NATASHA'      # frail must-survive lead (our "lord")
 PROLOGUE_SCRAMSAX_SLOT = 'KYLE'     # strong veteran (our "Jeigan")
@@ -429,7 +429,6 @@ CH05_ENDING_LOST_MSG = 0x9F3               # the host block's last free id
 # name their messages in inject/message_alloc.py (#411).
 CH06_GOAL_WINDOW_MSG = 0x9FE
 CH06_GOAL_STATUS_MSG = 0x9FF
-                                                 # and vanilla Ch6's (both spend 0x80)
 # The two marooned boats are UNITS, not painted scenery, so they can be KILLED -- which is the
 # whole clock (#360). Each takes its OWN raw pid, for the same reason ch04's wolf pack needed one
 # (#203): a shared pid is unaddressable, and each hull has to be independently CHECK_ALIVE-able
@@ -441,7 +440,7 @@ CH06_GOAL_STATUS_MSG = 0x9FF
 # by CHAPTER too), 0xb8 Ravisin, 0xb9 the moose, 0xba Sahnar's. Taking 0xB4/0xB5 would have
 # renamed two of ch04's five wolves to "Fishing Boat": a name plate is written into
 # `gCharacterData`, which is ONE GLOBAL TABLE with no chapter dimension, so a NAMED pid must be
-# exclusive even though a generic one need not be (ch05 and ch06 both spend 0x80 for trash).
+# exclusive even though an unnamed one need not be (ch03's grell and ch04's mogall share 0xb7).
 # 0xbb and 0xbc are the next unnamed gaps -- nameTextId 0x255, the generic monster plate, the
 # same shape as every pid above. `assert_named_raw_pids_are_exclusive` now makes the mistake
 # impossible rather than leaving the next chapter to re-read this comment.
@@ -519,12 +518,34 @@ CH07_GOAL_STATUS_MSG = appended_message_id('ch07', 'goal-status')
 # Each chapter's generic (autolevelled) enemy pid, and ch04's one-pid-per-monster-class table.
 # inject.raw_pids.CHAPTER_ENEMY_PIDS reads them; they used to sit in the chapter modules beside
 # seven near-identical chNN_enemy_pid functions (#491).
-CH01_GENERIC_PID = '0x80'
-CH02_GENERIC_PID = '0x8e'    # vanilla slot-3 generic-minion charIndex (autolevelled trash)
-CH03_GENERIC_PID = '0xaa'       # vanilla slot-4 generic-minion charIndex (autolevelled trash)
-CH05_GENERIC_PID = '0x80'                        # autolevelled trash (vanilla Ch6's own generic)
-CH06_GENERIC_PID = '0x80'                        # autolevelled trash -- vanilla Ch7's own generic,
-CH07_GENERIC_PID = '0x80'
+#
+# A chapter whose generics carry a name of their own (its YAML `generic_name:`, #493) needs a pid
+# of its own: the unit window prints a pid's nameTextId, and gCharacterData has one row per pid
+# with no chapter dimension (ADR 0098). These come from 0x92-0xa6, vanilla's unused "Enemy"
+# rows (no unit definition and no CHARACTER_ constant places them). The build CLONES the vanilla
+# generic each one replaced into it (GENERIC_PID_DONORS, inject.raw_pids), so only the name moves.
+# The prologue's two guards keep two pids, as they did on 0x80/0x82.
+PROLOGUE_GUARD_PIDS = ('0x92', '0x93')
+CH01_GENERIC_PID = '0x94'
+CH02_GENERIC_PID = '0x95'
+CH03_GENERIC_PID = '0x96'
+CH05_GENERIC_PID = '0x97'
+CH06_GENERIC_PID = '0x98'
+CH07_GENERIC_PID = '0x99'
+GENERIC_PIDS = {
+    'ch00': PROLOGUE_GUARD_PIDS, 'ch01': (CH01_GENERIC_PID,), 'ch02': (CH02_GENERIC_PID,),
+    'ch03': (CH03_GENERIC_PID,), 'ch05': (CH05_GENERIC_PID,), 'ch06': (CH06_GENERIC_PID,),
+    'ch07': (CH07_GENERIC_PID,),
+}
+GENERIC_PID_DONORS = {
+    PROLOGUE_GUARD_PIDS[0]: '0x80', PROLOGUE_GUARD_PIDS[1]: '0x82',   # vanilla Prologue's own
+    CH01_GENERIC_PID: '0x80',
+    CH02_GENERIC_PID: '0x8e',    # vanilla slot-3 generic-minion charIndex
+    CH03_GENERIC_PID: '0xaa',    # vanilla slot-4 generic-minion charIndex (a raw monster gap)
+    CH05_GENERIC_PID: '0x80',    # vanilla Ch6's own generic
+    CH06_GENERIC_PID: '0x80',    # vanilla Ch7's own generic
+    CH07_GENERIC_PID: '0x80',
+}
 # Vanilla Ch4 generic-monster charIds (read from events_udefs.s HEAD): the melee Revenant
 # pack uses 0xaa, the melee Bonewalker pack 0xac -- the twin's own line/pack fodder pids.
 CH04_MONSTER_PIDS = {

@@ -272,6 +272,8 @@ deployment:
 # `enemy_class_reskins` in campaign.yaml + inject_enemy_class_battle_anims). `source:
 # palette_swap` = frost/pale recolour of the vanilla frame (no FE-Repo undead anim in that
 # weapon mode); a "FE-Repo: …" source = a borrowable custom anim (all [U] free-to-use).
+generic_name: "Risen"   # the unit window's name for every generic enemy here (the Elven Tomb's undead guardians; #493)
+generic_help: "The dead of the elven tomb, risen to drive off intruders."   # R on their name (DRAFT for Nicolas, #493)
 enemy_units:
   # ── The boss: Ravisin, frost druid (holds the northern rim) ─────────────────
   # PLACEMENT, here and below: every line unit stands on one of vanilla Ch5's OWN sixteen

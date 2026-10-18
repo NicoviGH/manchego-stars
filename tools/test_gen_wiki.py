@@ -102,9 +102,9 @@ class TestGenWiki(unittest.TestCase):
 
 class TestEnemySlots(unittest.TestCase):
     def test_the_prologue_boss_reads_the_slot_he_rides(self):
-        # The prologue is not in CHAPTER_ENEMY_PIDS: its injector rewrites O'Neill's slot for
-        # Sephek (a Myrmidon, Sword C from Joshua). Reading no slot printed the bare class's
-        # Sword D on his page (#493).
+        # The prologue's injector rewrites O'Neill's slot for Sephek (a Myrmidon, Sword C from
+        # Joshua), and that slot counts only once the tree holds the rewrite, even though ch00
+        # is in CHAPTER_ENEMY_PIDS. Reading no slot printed the bare class's Sword D (#493).
         chap = next(c for c in gen_wiki.chapters() if c.get('is_prologue'))
         boss = next(e for e in chap['enemy_units'] if e.get('id') == 'sephek-kaltro')
         token = gen_wiki.enemy_token(chap, boss)
@@ -141,7 +141,7 @@ class TestPayloadCounts(unittest.TestCase):
 class TestGenericNames(unittest.TestCase):
     """A generic's name cell is what the ROM's hover box and unit window print: its pid's
     nameTextId, a faction name (the wiki's own The Protected lists `|name=Cutthroat`), never
-    its class (#493)."""
+    its class (#493). A chapter names its own (`generic_name:`); ch04 keeps vanilla's Monster."""
 
     @classmethod
     def setUpClass(cls):
@@ -153,17 +153,20 @@ class TestGenericNames(unittest.TestCase):
                   and not (e.get('is_boss') or e.get('is_miniboss')))
         return gen_wiki.rom_unit_name(chap, ed)
 
-    def test_a_generic_reads_its_pid_s_name_not_its_class(self):
-        self.assertEqual(self.generic('ch01', 'fighter'), 'Soldier')
-        self.assertEqual(self.generic('ch02', 'brigand'), 'Cutthroat')
-        self.assertEqual(self.generic('ch03', 'archer'), 'Monster')
+    def test_a_generic_reads_its_chapter_s_name_not_its_class(self):
+        self.assertEqual(self.generic('ch00', 'soldier'), 'Mercenary')
+        self.assertEqual(self.generic('ch01', 'fighter'), 'Goblin')
+        self.assertEqual(self.generic('ch02', 'brigand'), 'Raider')
+        self.assertEqual(self.generic('ch03', 'archer'), 'Kobold')
+        self.assertEqual(self.generic('ch04', 'revenant'), 'Monster')
+        self.assertEqual(self.generic('ch05', 'fighter'), 'Risen')
+        self.assertEqual(self.generic('ch06', 'cavalier'), 'Merfolk')
+        self.assertEqual(self.generic('ch07', 'mage'), 'Militia')
 
     def test_a_chapter_without_a_pid_table_never_reads_a_donor_s_name(self):
-        # the prologue seats its guards on its own slots; enemy_token's stat-donor fallback
-        # would name a vanilla character, so the row falls back to the class instead
-        chap = self.by_slug['ch00']
-        ed = next(e for e in gen_wiki.enemy_list(chap) if e.get('id') == 'caravan-guard')
-        self.assertEqual('', gen_wiki.rom_unit_name(chap, ed))
+        # enemy_token's stat-donor fallback names a vanilla character; a generic never takes it
+        uid = next(iter(gen_wiki.inject.stats.BASE_DONOR))
+        self.assertEqual('', gen_wiki.rom_unit_name({'_slug': 'ch99'}, {'id': uid}))
 
     def test_the_enemy_row_prints_it(self):
         chap = self.by_slug['ch02']
@@ -171,7 +174,7 @@ class TestGenericNames(unittest.TestCase):
         token, lv, inv, n = next(iter(gen_wiki.bodies(ed)))
         row = gen_wiki.wiki_unit_row(chap, ed, token, lv, inv, n, gen_wiki.chapter_shifts(chap),
                                      'normal', gen_wiki.WikiFiles())
-        self.assertEqual((row['name'], row['class']), ('Cutthroat', 'Brigand'))
+        self.assertEqual((row['name'], row['class']), ('Raider', 'Brigand'))
 
 
 class TestUnitLoad(unittest.TestCase):

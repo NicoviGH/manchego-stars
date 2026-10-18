@@ -5,12 +5,13 @@ import re
 import sys
 
 from yaml_loader import yaml_load
-from inject.cast import class_enum_for, load_unit, PORTRAIT_MAP, RAW_PID_PORTRAITS
+from inject.cast import (
+    class_enum_for, load_unit, PORTRAIT_MAP, RAW_PID_HELP, RAW_PID_PORTRAITS)
 from inject.decomp import REPO
 from inject.paths import ITEMS_C, TEXTS_TXT
 from inject.text import (
-    display_name, name_message_body, raw_pid_name_text_id, set_message_body, vanilla_name_text_id,
-    write_help_text)
+    display_name, help_text_body, name_message_body, raw_pid_name_text_id, set_message_body,
+    vanilla_name_text_id, write_help_text)
 
 
 def inject_names(campaign, verbose=True):
@@ -40,6 +41,8 @@ def inject_names(campaign, verbose=True):
         if verbose:
             print('  %-10s -> MSG_%03X (%s): %s'
                   % (unit_id, text_id, 'appended' if appended else 'was %s' % slot, name))
+    for text_id, text in sorted(set(RAW_PID_HELP.values())):
+        set_message_body(lines, text_id, help_text_body(text))
     with open(TEXTS_TXT, 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines))
 

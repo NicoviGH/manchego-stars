@@ -769,15 +769,15 @@ def enemy_token(chap, ed):
     None. A slot the build rewrites (the prologue's) counts only once the tree holds the
     rewrite, its class the unit's: in a vanilla or uninjected tree that entry is a different
     character (O'Neill, a Fighter with Axe C, under Sephek's sword)."""
-    try:
-        return inject.raw_pids.enemy_pid(chap['_slug'], ed)
-    except (KeyError, TypeError):
-        pass
     slot = inject.cast.ENEMY_CHARACTER_SLOT.get(ed.get('id'))
     if slot and slot != inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')):
         block = rom_block('src/data_characters.c', slot)
         seated = re.search(r'\.defaultClass\s*=\s*(\w+)', block)
         return slot if seated and seated.group(1) == class_enum_of(ed.get('class')) else None
+    try:
+        return inject.raw_pids.enemy_pid(chap['_slug'], ed)
+    except (KeyError, TypeError):
+        pass
     return inject.stats.BASE_DONOR.get(ed.get('id')) or slot
 
 
@@ -788,14 +788,17 @@ def _field(block, name):
 
 def rom_unit_name(chap, ed):
     """The name the map hover box and the unit window print for a generic enemy: its pid's
-    nameTextId (player_interface.c, unitinfowindow.c), a faction name (Soldier, Cutthroat,
-    Monster), never its class. Only the pid the ROM seats it on counts
+    nameTextId (player_interface.c, unitinfowindow.c), never its class. A pid the build names
+    (`inject.cast.RAW_PID_PORTRAITS`: a chapter's `generic_name:`) reads that name; any other
+    reads its row's own plate (ch04's Monster). Only the pid the ROM seats it on counts
     (`inject.raw_pids.enemy_pid`): `enemy_token`'s stat-donor fallback is a named vanilla
     character. '' when the chapter has no pid table."""
     try:
         pid = inject.raw_pids.enemy_pid(chap['_slug'], ed)
     except (KeyError, TypeError):
         return ''
+    if pid in inject.cast.RAW_PID_PORTRAITS:
+        return inject.cast.RAW_PID_PORTRAITS[pid][3]
     nid = _field(rom_block('src/data_characters.c', pid), 'nameTextId')
     return inject.text.messages(rom_text('texts/texts.txt')).get(nid, '') if nid else ''
 

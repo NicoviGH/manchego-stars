@@ -1194,7 +1194,8 @@ def _our_base_level(enemy_def):
     rather than a coincidence: the four on raw pids get baseLevel = their deploy level from
     RAW_PID_LEVEL_SOURCES (guarded by unregistered_raw_pid_bosses), and the rest ride
     vanilla CHARACTER_ slots that already ship baseLevel >= deploy level. Line units are
-    generics on pid 0x80/0x8e/0xaa, whose gaps carry baseLevel 1."""
+    generics on each chapter's own pid, a clone of a vanilla generic with baseLevel 1
+    (ADR 0352), or on ch04's monster gaps, which carry baseLevel 1 too."""
     if enemy_def.get('is_boss') or enemy_def.get('is_miniboss'):
         return int(enemy_def.get('level', 1))
     return 1

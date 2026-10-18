@@ -59,6 +59,7 @@ def raw_pid_portrait_data(text, campaign):
     pass walks its own table rather than riding along inside the portrait loop. Coupling them
     would have made a `personal:` block silently do nothing for any pid without a bust.
     """
+    text = clone_generic_rows(text)
     for pid, (_unit_id, slot, portrait_id, _name) in sorted(RAW_PID_PORTRAITS.items()):
         marker = '[%s - 1]' % pid.lower()
         start, end = _find_brace_block(text, marker, CHARACTERS_C)
@@ -79,6 +80,27 @@ def raw_pid_portrait_data(text, campaign):
         start, end = _find_brace_block(text, marker, CHARACTERS_C)
         block = _set_field(text[start:end], 'baseLevel', level, CHARACTERS_C, marker)
         text = text[:start] + block + text[end:]
+    return text
+
+
+def clone_generic_rows(text):
+    """Copy each generic pid's donor row onto it whole, so the pid a chapter's generics moved to
+    (#493) loads exactly as the vanilla generic they used to share. Only `.number` and the help
+    text (`RAW_PID_HELP`) change here, and the name binding that follows gives it the
+    chapter's name."""
+    from inject.chapter_ids import GENERIC_PID_DONORS
+    from inject.cast import RAW_PID_HELP
+    for pid, donor in sorted(GENERIC_PID_DONORS.items()):
+        s, e = _find_brace_block(text, '[%s - 1]' % donor, CHARACTERS_C)
+        row = text[s:e].replace('[%s - 1]' % donor, '[%s - 1]' % pid, 1)
+        row, n = re.subn(r'(\.number\s*=\s*)%s,' % donor, r'\g<1>%s,' % pid, row, count=1)
+        if n != 1:
+            sys.exit('ERROR: generic donor %s has no .number to rewrite for %s' % (donor, pid))
+        if pid in RAW_PID_HELP:
+            row = _set_field(row, 'descTextId', '0x%X' % RAW_PID_HELP[pid][0], CHARACTERS_C,
+                             '[%s - 1]' % pid)
+        s, e = _find_brace_block(text, '[%s - 1]' % pid, CHARACTERS_C)
+        text = text[:s] + row + text[e:]
     return text
 
 
@@ -334,6 +356,9 @@ def _unregistered_raw_pid_boss_entries(chap):
 def _chapter_enemy_pids():
     from inject import chapter_ids as ids
     return {
+        # the prologue's two guards ride a pid apiece (`enemy_pid` picks one by body index)
+        'ch00': {'boss': 'CHARACTER_%s' % ids.PROLOGUE_SEPHEK_SLOT,
+                 'generic': ids.PROLOGUE_GUARD_PIDS},
         'ch01': {'boss': 'CHARACTER_%s' % ids.CH01_BOSS_SLOT, 'generic': ids.CH01_GENERIC_PID},
         'ch02': {'boss': 'CHARACTER_%s' % ids.CH02_BOSS_SLOT,
                  'miniboss': 'CHARACTER_%s' % ids.CH02_MINIBOSS_SLOT,
@@ -351,8 +376,8 @@ def _chapter_enemy_pids():
 CHAPTER_ENEMY_PIDS = _chapter_enemy_pids()
 
 
-def enemy_pid(chapter, enemy, _index=0):
-    """The pid one of `chapter`'s enemy entries rides (CHAPTER_ENEMY_PIDS)."""
+def enemy_pid(chapter, enemy, index=0):
+    """The pid body `index` of one of `chapter`'s enemy entries rides (CHAPTER_ENEMY_PIDS)."""
     pids = CHAPTER_ENEMY_PIDS[chapter]
     if 'by_class' in pids:
         return pids['by_class'][enemy['class']]
@@ -360,7 +385,13 @@ def enemy_pid(chapter, enemy, _index=0):
         return pids['boss']
     if enemy.get('is_miniboss') and 'miniboss' in pids:
         return pids['miniboss']
-    return pids['generic']
+    generic = pids['generic']
+    if isinstance(generic, tuple):
+        if index >= len(generic):
+            sys.exit('ERROR: %s %s places %d bodies on %d generic pid(s); add one to its '
+                     'chapter_ids pid tuple' % (chapter, enemy.get('id'), index + 1, len(generic)))
+        return generic[index]
+    return generic
 
 
 def enemy_pid_for(chapter):

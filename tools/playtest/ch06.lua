@@ -23,7 +23,7 @@ return {
     },
 
     -- The two pursuers, by the tile each STARTS on. Every ch06 enemy is the same generic pid
-    -- (CH06_GENERIC_PID 0x80), so a pursuer cannot be found by charId -- it is identified by
+    -- (CH06_GENERIC_PID), so a pursuer cannot be found by charId -- it is identified by
     -- its turn-1 position and then tracked by its index in gUnitArrayRed, which is stable.
     --
     -- They are deliberately different problems. The crab is range 1, so it must OCCUPY the

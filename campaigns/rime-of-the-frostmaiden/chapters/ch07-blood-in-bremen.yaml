@@ -108,6 +108,8 @@ deployment:
 # same tile, level, class, inventory, drop and donor AI -- re-dressed as Bremen's militia. The
 # book's muster ("up to 25 soldiers ... and 2 veterans", Rime p.27) is the flavour; the count
 # and shape are the twin's (ADR 0044).
+generic_name: "Militia"   # the unit window's name for every generic enemy here (Bremen's guards, fishers and hired swords; #493)
+generic_help: "Bremen's own people, armed and set against you by their Speaker."   # R on their name (DRAFT for Nicolas, #493)
 enemy_units:
   - id: bremen-fisher
     name: "Fisher"              # the axe block: fishers with gaffs and hatchets

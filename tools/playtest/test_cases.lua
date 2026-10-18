@@ -54,7 +54,36 @@ local function fakeApi(opts)
         local step = (opts.shops or {})[#a.visits] or {}
         return step.ok ~= false, step.why or "refused", step.stock or {}
     end
+    -- `help`: the pid on a tile, what the build gives it, and what R on its name decoded.
+    a.pidAt = function(x, y) return (opts.pids or {})[x .. "," .. y] end
+    a.helpFor = function(pid) return (opts.help or {})[pid] end
+    a.helpAt = function(x, y, want)
+        a.visits[#a.visits + 1] = {x = x, y = y, help = want}
+        if opts.helpRead == false then return false, "help never opened" end
+        return true, opts.helpRead
+    end
     return a
+end
+
+-- `help`: R on a generic's name reads the help text its pid is given (#493).
+do
+    local raider = {msg = 0xD5F, line1 = "Reghed nomads driven mad by"}
+    local opts = {pids = {["3,4"] = 0x95}, help = {[0x95] = raider}, helpRead = raider}
+    local api = fakeApi(opts)
+    C.run({name = "ch02generichelp", given = {"on_map"}, ["when"] = {{help = {x = 3, y = 4}}}}, api)
+    check(api.verdict, "PASS", "help reading the pid's own text PASSes")
+    check(api.visits[1].help, 0xD5F, "the step waits for the pid's own message")
+
+    opts.helpRead = {msg = 0x2A9, line1 = "The army of Grado, the largest"}
+    api = fakeApi(opts)
+    C.run({name = "ch02generichelp", given = {"on_map"}, ["when"] = {{help = {x = 3, y = 4}}}}, api)
+    check(api.verdict, "FAIL", "a donor's vanilla line FAILs")
+    contains(api.reason, "The army of Grado", "the failure quotes what help read")
+
+    api = fakeApi({pids = {["3,4"] = 0x80}, help = {}, helpRead = raider})
+    C.run({name = "ch02generichelp", given = {"on_map"}, ["when"] = {{help = {x = 3, y = 4}}}}, api)
+    check(api.verdict, "FAIL", "a pid the build gives no help text FAILs")
+    contains(api.reason, "pid 0x80", "the failure names the pid")
 end
 
 -- `shop`: ch02's Armory, the stock read off the shop that opened.

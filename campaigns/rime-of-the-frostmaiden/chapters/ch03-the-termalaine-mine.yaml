@@ -178,6 +178,8 @@ deployment:
 # so the grell carries a personal line to hold Bazba's pressure — verified on `make difficulty
 # CH=ch03`, not faked via the class. The kobolds are agitated victims (the grell preys on
 # them too), territorial toward intruders; Trex (their leader) defects to the party mid-map.
+generic_name: "Kobold"   # the unit window's name for every generic enemy here (the Icewind kobolds and their svirfneblin; #493)
+generic_help: "Icewind kobolds, who have taken the mines under Termalaine."   # R on their name (DRAFT for Nicolas, #493)
 enemy_units:
   # ── BOSS SLOT (vanilla Bazba, Brigand L6 @ (14,1) GuardTile) → the GRELL ──
   - id: grell
