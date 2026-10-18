@@ -1722,8 +1722,11 @@ class ItemEconomy(unittest.TestCase):
         give = re.compile(r'(?:GIVEITEMTO|GIVEITEMTOMAIN|GIVETOSLOT3)\(|CALL\((%s)\)' % '|'.join(
             sorted(df._shared_give_scripts() | set(self.SLOT3_NOT_LOOT))))
         unread = []
+        scripts = {}
         for stem, _title, _page in gen_wiki.VANILLA.values():
-            text = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+            scripts[stem] = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+            scripts.update(df.twin_interlude_scripts(scripts[stem]))   # Ch1's lordsplit pays
+        for stem, text in scripts.items():
             for block in text.split('CONST_DATA EventListScr'):
                 sets = list(re.finditer(r'SVAL\(EVT_SLOT_3,\s*\w+\)', block))
                 for i, m in enumerate(sets):
@@ -1731,6 +1734,38 @@ class ItemEconomy(unittest.TestCase):
                     if not give.search(block, m.end(), end):
                         unread.append('%s: %s' % (stem, m.group(0)))
         self.assertEqual(unread, [])
+
+    @staticmethod
+    def _gives(body):
+        return df._gift_records('CONST_DATA EventListScr EventScr_T[] = {\n%s\n};\n' % body)
+
+    def test_a_give_after_a_merge_label_always_runs(self):
+        # LABEL(0x1) is where both arms meet: its give runs on every path, after the one
+        # before the branch. Reading stretches between LABELs as alternatives counted one.
+        got = self._gives('SVAL(EVT_SLOT_3, ITEM_VULNERARY)\nGIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\n'
+                          'CHECK_ALIVE(CHARACTER_SETH)\nBEQ(0x1, EVT_SLOT_C, EVT_SLOT_0)\n'
+                          'SVAL(EVT_SLOT_3, ITEM_ELIXIR)\nGIVEITEMTO(CHARACTER_SETH)\n'
+                          'LABEL(0x1)\nSVAL(EVT_SLOT_3, ITEM_VULNERARY)\n'
+                          'GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\nENDA')
+        self.assertEqual(sorted(e for e, _ in got), ['ITEM_ELIXIR', 'ITEM_VULNERARY',
+                                                     'ITEM_VULNERARY'])
+
+    def test_a_route_arm_that_ends_without_a_goto_still_skips_the_other(self):
+        # Eirika's arm ends in ENDA, not GOTO; Ephraim's arm after LABEL(0x0) never runs.
+        got = self._gives('CHECK_MODE\nSVAL(EVT_SLOT_1, 0x2)\nBNE(0x0, EVT_SLOT_C, EVT_SLOT_1)\n'
+                          'SVAL(EVT_SLOT_3, ITEM_DARK_GLEIPNIR)\nGIVEITEMTO(CHARACTER_EIRIKA)\n'
+                          'ENDA\nLABEL(0x0)\nSVAL(EVT_SLOT_3, ITEM_SWORD_AUDHULMA)\n'
+                          'GIVEITEMTO(CHARACTER_EPHRAIM)\nENDA')
+        self.assertEqual(got, [('ITEM_DARK_GLEIPNIR', ('CHARACTER_EIRIKA',))])
+
+    def test_a_route_branch_inside_another_keeps_the_gifts_after_it(self):
+        got = self._gives('CHECK_MODE\nSVAL(EVT_SLOT_1, 0x2)\nBNE(0x0, EVT_SLOT_C, EVT_SLOT_1)\n'
+                          'CHECK_MODE\nSVAL(EVT_SLOT_1, 0x3)\nBEQ(0x1, EVT_SLOT_C, EVT_SLOT_1)\n'
+                          'SVAL(EVT_SLOT_3, ITEM_ELIXIR)\nGIVEITEMTO(CHARACTER_EIRIKA)\n'
+                          'LABEL(0x1)\nGOTO(0x2)\nLABEL(0x0)\nSVAL(EVT_SLOT_3, ITEM_TORCH)\n'
+                          'GIVEITEMTO(CHARACTER_EPHRAIM)\nLABEL(0x2)\n'
+                          'SVAL(EVT_SLOT_3, ITEM_VULNERARY)\nGIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\nENDA')
+        self.assertEqual(sorted(e for e, _ in got), ['ITEM_ELIXIR', 'ITEM_VULNERARY'])
 
     def test_a_gift_on_both_arms_of_a_branch_is_given_once(self):
         # Ch14 hands Audhulma and Excalibur to Joshua if he lives, else to Eirika.
