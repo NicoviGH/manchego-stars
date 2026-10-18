@@ -764,13 +764,21 @@ def rom_block(rel, token):
 
 
 def enemy_token(chap, ed):
-    """The CharacterData index an enemy entry rides in the ROM (`inject.raw_pids.enemy_pid`),
-    else its stat donor, else None for a chapter the pid table does not host."""
+    """The CharacterData index an enemy entry rides in the ROM (`inject.raw_pids.enemy_pid`,
+    else the slot `inject.cast.ENEMY_CHARACTER_SLOT` seats it on), else its stat donor, else
+    None. A slot the build rewrites (the prologue's) counts only once the tree holds the
+    rewrite, its class the unit's: in a vanilla or uninjected tree that entry is a different
+    character (O'Neill, a Fighter with Axe C, under Sephek's sword)."""
     try:
         return inject.raw_pids.enemy_pid(chap['_slug'], ed)
     except (KeyError, TypeError):
-        return (inject.stats.BASE_DONOR.get(ed.get('id'))
-                or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')))
+        pass
+    slot = inject.cast.ENEMY_CHARACTER_SLOT.get(ed.get('id'))
+    if slot and slot != inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')):
+        block = rom_block('src/data_characters.c', slot)
+        seated = re.search(r'\.defaultClass\s*=\s*(\w+)', block)
+        return slot if seated and seated.group(1) == class_enum_of(ed.get('class')) else None
+    return inject.stats.BASE_DONOR.get(ed.get('id')) or slot
 
 
 def _field(block, name):
