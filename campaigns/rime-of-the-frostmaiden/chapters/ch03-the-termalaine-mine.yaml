@@ -179,7 +179,7 @@ deployment:
 # CH=ch03`, not faked via the class. The kobolds are agitated victims (the grell preys on
 # them too), territorial toward intruders; Trex (their leader) defects to the party mid-map.
 generic_name: "Kobold"   # the unit window's name for every generic enemy here (the Icewind kobolds and their svirfneblin; #493)
-generic_help: "One of the wild kobolds who drove the miners out of Termalaine's mine."   # R on their name (#493): the feral splinter, never Trex's warren
+generic_help: "One of the wild ones who drove the miners out of Termalaine's mine."   # R on their name (#493): the feral splinter, never Trex's warren; "ones", not "kobolds", so it covers the deep gnome too
 enemy_units:
   # ── BOSS SLOT (vanilla Bazba, Brigand L6 @ (14,1) GuardTile) → the GRELL ──
   - id: grell
@@ -615,7 +615,10 @@ design_notes: >
   grell is VISIBLE from turn 1 (like vanilla Bazba); Pinky's shaft-scout folds into the OPENING
   cutscene (player sees the mogall up top) — revealed_by:pinky_scout dropped from the grell.
   (5) The vanilla enemy-thief slot is a SVIRFNEBLIN SKULK (deep-gnome gem-looter, Underdark tie
-  to the grell), not a giant rat (RBG & Pinky are the party's rats). Dialogue-pass scope = the
+  to the grell), not a giant rat (RBG & Pinky are the party's rats). It keeps vanilla's thief
+  sprite: no kobold thief sprite was found, and one enemy in one chapter did not earn a custom
+  one (Nicolas, 2026-10-18). So it stays a gnome, and the chapter's generic help line is worded
+  to cover it. Dialogue-pass scope = the
   opening beat + the RBG-execution/Trex-recruit beat; grounds in trex.md + the book.
 
 # A vanilla-twin item this chapter deliberately does not hand out (tools/gen_wiki.py marks it).
