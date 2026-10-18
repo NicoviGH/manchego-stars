@@ -9,12 +9,12 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-16 (Claude). **#499 merged: the wiki works on a phone** (doctype + viewport,
-Timeless's header menus, wide tables scroll in their own box; `node tools/wiki/phone_shots.mjs <dir>`
-proves it per page type), and **vanilla faces on the wiki keep their eyes** (`portrait_bust` read
-FaceData's eye pair as the mouth; Halvar/Bazba and 114 others). #495 is closed (ch01-ch03 terrain,
-ch06 Halberd lesson, scene gold, ADR 0350). The wiki deploys `main`'s on every push (ADR 0347);
-never publish it by hand.
+Refreshed 2026-10-18 (Claude). **#502 merged: the White Moose is a Cavalier on Forde's line**
+(ADR 0351) in ch04, ch05 and as the ch08 recruit: L6, Iron Lance, beast cadence; ch05 holds at
+x0.99 / x1.24 (little clear-load headroom left). Movement tables now come from a unit's class
+(`inject.terrain.class_movement`). #501 fixed Sephek's wiki ranks; #499 made the wiki work on a
+phone (`tools/wiki/phone_shots.mjs`). The wiki deploys `main`'s on every push (ADR 0347); never
+publish it by hand.
 
 ## In flight
 
@@ -28,8 +28,8 @@ never publish it by hand.
 
 1. **#493 -- the wiki's remaining findings**: enemy names vs the ROM's unit window (named
    generics print their class: confirm that is what the game shows), then the `vanilla_payload`
-   audit (GIVEITEMTO, chest gold, secret shops), boss ranks from the injected CharacterData, the
-   navbox, #490's stat ranges, supports (wait on #494). Nicolas red-pens the drafts on the
+   audit (GIVEITEMTO, chest gold, secret shops), the navbox, #490's stat ranges, supports (wait
+   on #494). Nicolas red-pens the drafts on the
    live wiki: the lore Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346, chapter YAML).
 2. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
    ending waits on it); then Act IV beats, the recruit pass, the legendary-weapon pass, the
@@ -38,7 +38,9 @@ never publish it by hand.
 3. **#27 -- ch07's ending** once its exit hook is settled, and the move to Distant Blade (Meriwa +
    Esio Trot join, ADR 0342; ask Nicolas for his flow first; `make CH07BOOT=1`). The written
    ending gives its 10,000 an `after_beat` (the giver's line) and a scenario that reaches it.
-4. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337).
+4. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337),
+   now as the Cavalier it joins as (ADR 0351). #28 adds its `STAT_DONOR` row (CHARACTER_FORDE)
+   when it builds the recruit -- not before: `difficulty.py` reads that table as the roster.
 5. **#459** stays open for the parity CHECK itself.
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
