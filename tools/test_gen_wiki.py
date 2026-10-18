@@ -108,8 +108,9 @@ class TestEnemySlots(unittest.TestCase):
         chap = next(c for c in gen_wiki.chapters() if c.get('is_prologue'))
         boss = next(e for e in chap['enemy_units'] if e.get('id') == 'sephek-kaltro')
         token = gen_wiki.enemy_token(chap, boss)
-        if not os.path.isdir(gen_wiki.BUILD_TREE):
-            self.assertIsNone(token)        # vanilla O'Neill is not who stands there
+        oneill = gen_wiki.rom_block('src/data_characters.c', 'CHARACTER_ONEILL')
+        if 'CLASS_MYRMIDON' not in oneill:  # an uninjected tree: vanilla O'Neill stands there
+            self.assertIsNone(token)
             return
         self.assertEqual(token, 'CHARACTER_ONEILL')
         ranks = gen_wiki._ranks(gen_wiki.class_enum_of(boss['class']), token)
