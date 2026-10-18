@@ -163,10 +163,19 @@ class TestGenericNames(unittest.TestCase):
         self.assertEqual(self.generic('ch06', 'cavalier'), 'Merfolk')
         self.assertEqual(self.generic('ch07', 'mage'), 'Militia')
 
-    def test_a_chapter_without_a_pid_table_never_reads_a_donor_s_name(self):
-        # enemy_token's stat-donor fallback names a vanilla character; a generic never takes it
+    def test_a_generic_never_reads_a_stat_donor_s_name(self):
+        # enemy_token's stat-donor fallback names a vanilla character; a generic never takes it,
+        # in a chapter with a pid table or without one
         uid = next(iter(gen_wiki.inject.stats.BASE_DONOR))
+        self.assertEqual('Goblin', gen_wiki.rom_unit_name(self.by_slug['ch01'],
+                                                          {'id': uid, 'class': 'fighter'}))
         self.assertEqual('', gen_wiki.rom_unit_name({'_slug': 'ch99'}, {'id': uid}))
+
+    def test_a_generic_s_stats_read_the_row_it_clones(self):
+        # with no build tree the chapter's own pid is vanilla's "Enemy" stub (a Brigand)
+        chap = self.by_slug['ch01']
+        ed = next(e for e in gen_wiki.enemy_list(chap) if e.get('class') == 'fighter')
+        self.assertEqual('0x80', gen_wiki.enemy_token(chap, ed))
 
     def test_the_enemy_row_prints_it(self):
         chap = self.by_slug['ch02']

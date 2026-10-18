@@ -31,6 +31,7 @@ import difficulty                                      # noqa: E402
 import scene_preview                                   # noqa: E402
 import unit_load                                       # noqa: E402
 import inject.cast                                     # noqa: E402
+import inject.chapter_ids                              # noqa: E402
 import inject.chapter_settings                         # noqa: E402
 import inject.decomp                                   # noqa: E402
 import inject.raw_pids                                 # noqa: E402
@@ -768,17 +769,21 @@ def enemy_token(chap, ed):
     else the slot `inject.cast.ENEMY_CHARACTER_SLOT` seats it on), else its stat donor, else
     None. A slot the build rewrites (the prologue's) counts only once the tree holds the
     rewrite, its class the unit's: in a vanilla or uninjected tree that entry is a different
-    character (O'Neill, a Fighter with Axe C, under Sephek's sword)."""
+    character (O'Neill, a Fighter with Axe C, under Sephek's sword). A generic pid reads as
+    the vanilla row it clones."""
     slot = inject.cast.ENEMY_CHARACTER_SLOT.get(ed.get('id'))
     if slot and slot != inject.cast.ENEMY_BASE_SLOT.get(ed.get('id')):
         block = rom_block('src/data_characters.c', slot)
         seated = re.search(r'\.defaultClass\s*=\s*(\w+)', block)
         return slot if seated and seated.group(1) == class_enum_of(ed.get('class')) else None
     try:
-        return inject.raw_pids.enemy_pid(chap['_slug'], ed)
+        pid = inject.raw_pids.enemy_pid(chap['_slug'], ed)
     except (KeyError, TypeError):
-        pass
-    return inject.stats.BASE_DONOR.get(ed.get('id')) or slot
+        return inject.stats.BASE_DONOR.get(ed.get('id')) or slot
+    # A chapter's generic pid is a CLONE of a vanilla generic (ADR 0352): until the build has
+    # cloned it, its row is vanilla's unused "Enemy" stub, so read the donor, which loads the
+    # same. Its name and help are the build's own (`rom_unit_name`).
+    return inject.chapter_ids.GENERIC_PID_DONORS.get(pid, pid)
 
 
 def _field(block, name):

@@ -6,6 +6,8 @@ and ch04's texts -- and chapters read each other's in both directions. Kept in o
 `hosts.py`'s host slots, so no chapter module has to import another. A constant only its own
 chapter reads stays in `inject/chapters/`.
 """
+import sys
+
 from inject.class_ids import ChapterClassIds
 from inject.message_alloc import appended_message_id
 
@@ -546,6 +548,10 @@ GENERIC_PID_DONORS = {
     CH06_GENERIC_PID: '0x80',    # vanilla Ch7's own generic
     CH07_GENERIC_PID: '0x80',
 }
+_unpaired = {p for ps in GENERIC_PIDS.values() for p in ps} ^ set(GENERIC_PID_DONORS)
+if _unpaired:   # a pid with no donor rides vanilla's uncloned "Enemy" stub (a Brigand, no growths)
+    sys.exit('ERROR: generic pid(s) %s need both a GENERIC_PIDS chapter and a GENERIC_PID_DONORS '
+             'row' % ', '.join(sorted(_unpaired)))
 # Vanilla Ch4 generic-monster charIds (read from events_udefs.s HEAD): the melee Revenant
 # pack uses 0xaa, the melee Bonewalker pack 0xac -- the twin's own line/pack fodder pids.
 CH04_MONSTER_PIDS = {

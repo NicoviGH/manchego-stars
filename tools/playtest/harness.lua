@@ -4871,13 +4871,6 @@ scenarios.recordcast = function()
         "%s: map sprite + status screen captured (pid 0x%02X at (%d,%d))", name, pid, u.x, u.y))
 end
 
--- CASTHELP (ADR 0346): R on a cast member's name reads ITS OWN help text, never its slot's
--- vanilla character's. A verdict on memory, so it runs headless: for every classed cast member
--- on the TESTCH sandbox it opens the status screen (R), opens help (R, which lands on Str), steps
--- LEFT onto the name/portrait entry (HbPopulate_SSCharacter fills it from the unit's descTextId)
--- and asserts `sActiveMsg` is that unit's message AND that its decoded first line (sMsgString's
--- buffer1) is the unit's own: the id alone is the one vanilla used. A member missing FAILs: a
--- check that skipped the unit it could not find would pass on nothing.
 -- R on the name of the unit at (x, y), from the map: open its status screen, open help, move
 -- onto the name and wait (up to 120 frames) for help to decode `want`. Returns true, {msg,
 -- line1} (the message help ended on and its first line), or false and why. Leaves the map as
@@ -4917,12 +4910,21 @@ INSPECT.helpAt = function(x, y, want)
     return ok, why
 end
 
+-- CASTHELP (ADR 0346): R on a cast member's name reads ITS OWN help text, never its slot's
+-- vanilla character's. A verdict on memory, so it runs headless: for every classed cast member
+-- on the TESTCH sandbox it opens the status screen (R), opens help (R, which lands on Str), steps
+-- LEFT onto the name/portrait entry (HbPopulate_SSCharacter fills it from the unit's descTextId)
+-- and asserts `sActiveMsg` is that unit's message AND that its decoded first line (sMsgString's
+-- buffer1) is the unit's own: the id alone is the one vanilla used. A member missing FAILs: a
+-- check that skipped the unit it could not find would pass on nothing.
 scenarios.casthelp = function()
     if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
-    local names = {}
+    -- One name per pid: CAST carries short aliases (`rbg`) beside the full ids.
+    local names, byPid = {}, {}
     for name, pid in pairs(CAMPAIGN.CAST) do
-        if CAMPAIGN.HELP[pid] then names[#names + 1] = name end
+        if CAMPAIGN.HELP[pid] and (not byPid[pid] or #name > #byPid[pid]) then byPid[pid] = name end
     end
+    for _, name in pairs(byPid) do names[#names + 1] = name end
     table.sort(names)
     local bad = {}
     for _, name in ipairs(names) do

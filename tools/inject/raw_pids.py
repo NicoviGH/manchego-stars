@@ -355,21 +355,23 @@ def _unregistered_raw_pid_boss_entries(chap):
 # class. This was seven chNN_enemy_pid functions saying the same thing (#491).
 def _chapter_enemy_pids():
     from inject import chapter_ids as ids
+    def generic(chapter):
+        pids = ids.GENERIC_PIDS[chapter]
+        return pids if len(pids) > 1 else pids[0]
     return {
         # the prologue's two guards ride a pid apiece (`enemy_pid` picks one by body index)
-        'ch00': {'boss': 'CHARACTER_%s' % ids.PROLOGUE_SEPHEK_SLOT,
-                 'generic': ids.PROLOGUE_GUARD_PIDS},
-        'ch01': {'boss': 'CHARACTER_%s' % ids.CH01_BOSS_SLOT, 'generic': ids.CH01_GENERIC_PID},
+        'ch00': {'boss': 'CHARACTER_%s' % ids.PROLOGUE_SEPHEK_SLOT, 'generic': generic('ch00')},
+        'ch01': {'boss': 'CHARACTER_%s' % ids.CH01_BOSS_SLOT, 'generic': generic('ch01')},
         'ch02': {'boss': 'CHARACTER_%s' % ids.CH02_BOSS_SLOT,
                  'miniboss': 'CHARACTER_%s' % ids.CH02_MINIBOSS_SLOT,
-                 'generic': ids.CH02_GENERIC_PID},
+                 'generic': generic('ch02')},
         'ch03': {'boss': ids.CH03_BOSS_PID, 'miniboss': ids.CH03_BRUTE_MINIBOSS_PID,
-                 'generic': ids.CH03_GENERIC_PID},
+                 'generic': generic('ch03')},
         'ch04': {'by_class': ids.CH04_MONSTER_PIDS},
         'ch05': {'boss': ids.CH05_BOSS_PID, 'miniboss': ids.CH05_MOOSE_PID,
-                 'generic': ids.CH05_GENERIC_PID},
-        'ch06': {'boss': ENEMY_BASE_SLOT['nerra'], 'generic': ids.CH06_GENERIC_PID},
-        'ch07': {'boss': ENEMY_BASE_SLOT['dorbulgruf'], 'generic': ids.CH07_GENERIC_PID},
+                 'generic': generic('ch05')},
+        'ch06': {'boss': ENEMY_BASE_SLOT['nerra'], 'generic': generic('ch06')},
+        'ch07': {'boss': ENEMY_BASE_SLOT['dorbulgruf'], 'generic': generic('ch07')},
     }
 
 
@@ -377,7 +379,9 @@ CHAPTER_ENEMY_PIDS = _chapter_enemy_pids()
 
 
 def enemy_pid(chapter, enemy, index=0):
-    """The pid body `index` of one of `chapter`'s enemy entries rides (CHAPTER_ENEMY_PIDS)."""
+    """The pid body `index` of one of `chapter`'s enemy entries rides (CHAPTER_ENEMY_PIDS). A
+    chapter with several generic pids (the prologue's guards) hands them out by the body's
+    index WITHIN its entry, as the prologue's own guard slots always did."""
     pids = CHAPTER_ENEMY_PIDS[chapter]
     if 'by_class' in pids:
         return pids['by_class'][enemy['class']]

@@ -360,9 +360,16 @@ def _generic_name_rows(campaign=DEFAULT_CAMPAIGN):
     `generic_name:` stops the build (`display_name`), and without a `generic_help:` too: the
     pid's vanilla line would say "The army of Grado" under a goblin."""
     chapters = os.path.join(REPO, 'campaigns', campaign, 'chapters')
+    files = {f[:4]: f for f in sorted(os.listdir(chapters)) if f.endswith('.yaml')}
+    for slug, filename in sorted(files.items()):
+        if slug not in GENERIC_PIDS and 'generic_name' in _load_chapter_yaml(campaign, filename):
+            sys.exit('ERROR: %s names its generics but has no pid of its own: add it to '
+                     'chapter_ids.GENERIC_PIDS and GENERIC_PID_DONORS (ADR 0352)' % filename)
     names, helps = {}, {}
     for chapter, pids in sorted(GENERIC_PIDS.items()):
-        filename = next(f for f in sorted(os.listdir(chapters)) if f.startswith(chapter + '-'))
+        if chapter not in files:
+            sys.exit('ERROR: GENERIC_PIDS names %s, which has no chapter YAML' % chapter)
+        filename = files[chapter]
         chap = _load_chapter_yaml(campaign, filename)
         unit = {'id': '%s-generic' % chapter, 'name': chap.get('generic_name')}
         if not chap.get('generic_help'):

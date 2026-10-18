@@ -120,6 +120,9 @@ def _prologue_roster_blocks(chap, by_id, slots, classes, guest_items):
     # escapes in the ending. `count`/`positions` decide how many are emitted and where; a
     # disagreement between them would silently ship a roster nobody authored, so it fails the
     # build instead.
+    if sephek_slot.upper() != PROLOGUE_SEPHEK_SLOT.upper():   # the pid table seats him there
+        sys.exit('ERROR: the prologue roster places Sephek on %s but CHAPTER_ENEMY_PIDS seats '
+                 'him on %s' % (sephek_slot, PROLOGUE_SEPHEK_SLOT))
     if len(guard['positions']) != guard['count']:
         sys.exit('ERROR: ch00 caravan-guard has count=%d but %d position(s)'
                  % (guard['count'], len(guard['positions'])))
