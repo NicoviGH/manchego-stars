@@ -12,7 +12,8 @@ fresh instance — don't rely on auto-compaction.
 Refreshed 2026-10-18 (Claude). **#505 merged: each chapter names its generics** (ADR 0352):
 Mercenary, Goblin, Raider, Kobold, Risen, Merfolk, Militia (Nicolas's names; ch04 keeps Monster),
 each on a pid of its own cloned from the vanilla generic, plus a `generic_help:` for R on the name
-(which read "The army of Grado" before). A declared `help: {x, y}` playtest step now proves R on
+(which read "The army of Grado" before); #506 landed Nicolas's pass on those lines, and ch07's
+fishers and sellswords became the Speaker's Dock and Hall Guards so one line fits the force. A declared `help: {x, y}` playtest step now proves R on
 any unit's name (`ch02generichelp`). #504 made the wiki print what the unit window prints and
 merged every texts.txt reader into `inject.text.messages`. The wiki deploys `main`'s on every push
 (ADR 0347); never publish it by hand.
@@ -29,9 +30,8 @@ merged every texts.txt reader into `inject.text.messages`. The wiki deploys `mai
 
 1. **#493 -- the wiki's remaining findings**: the `vanilla_payload` audit next (GIVEITEMTO,
    chest gold, secret shops, against each twin's events, not just the macros it greps), then the
-   navbox, #490's stat ranges, supports (wait on #494). Nicolas red-pens the drafts: the seven
-   `generic_help:` lines (chapter YAMLs), the lore Profiles, the book Trivia, and the ten
-   guest/boss help texts (ADR 0346).
+   navbox, #490's stat ranges, supports (wait on #494). Nicolas red-pens the drafts on the
+   live wiki: the lore Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346).
 2. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
    ending waits on it); then Act IV beats, the recruit pass, the legendary-weapon pass, the
    back-half onboarding catalog, the arc ADR. Nicolas leans toward ch01 on vanilla Ch1's map with
