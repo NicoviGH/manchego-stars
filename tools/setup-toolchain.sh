@@ -16,7 +16,9 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DECOMP_DIR="${REPO_DIR}/fireemblem8u"
-BASEROM_SRC="/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Fire Emblem - The Sacred Stones (USA, Australia).gba"
+# Through the gitignored `references` link (AGENTS.md, Key File Locations), never an absolute
+# path: the assets folder has moved once already.
+BASEROM_SRC="${REPO_DIR}/references/Fire Emblem - The Sacred Stones (USA, Australia).gba"
 
 say() { printf '\033[1;36m[setup]\033[0m %s\n' "$*"; }
 
