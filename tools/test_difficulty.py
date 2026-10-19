@@ -169,10 +169,9 @@ class AcceptedResidual(unittest.TestCase):
         with self.assertRaises(ValueError):
             df.accept_residual(*self._read(), {'party_clear_load': 1.41})
 
-    def test_ch01_and_ch02_hold_parity_with_their_accepted_residual(self):
-        for chid in ('ch01', 'ch02'):
-            chap = df.load_field(CAMPAIGN, chid)[0]
-            self.assertEqual(df._chapter_pressure(chap)['verdict']['verdict'], 'OK', chid)
+    # No live-chapter assertion here: "ch01 and ch02 hold parity" was a lock written as a test,
+    # and #510 unlocked every chapter (ADR 0353). Their verdicts move in the verdict diff now;
+    # the residual comes back with the re-lock at #510 step 10, never widened to stay green.
 
 
 class CurveGate(unittest.TestCase):
@@ -1150,7 +1149,7 @@ class VanillaUnitDefParser(unittest.TestCase):
                                    'xPosition': 11, 'yPosition': 3,
                                    'classIndex': 'CLASS_ARMOR_KNIGHT', 'level': 4,
                                    'allegiance': 'FACTION_ID_RED', 'itemDrop': False,
-                                   'items': ['ITEM_LANCE_IRON']})
+                                   'autolevel': False, 'items': ['ITEM_LANCE_IRON']})
         self.assertEqual(defs[1]['classIndex'], 'CLASS_SOLDIER')
         self.assertEqual(defs[1]['items'], ['ITEM_LANCE_IRON', 'ITEM_VULNERARY'])
         self.assertEqual(defs[2]['allegiance'], 'FACTION_ID_BLUE')
@@ -1996,9 +1995,9 @@ class RoleCheck(unittest.TestCase):
         """A Saar-shaped boss (armour wall, modest threat) over ordinary line units --
         the profile the vanilla twin actually fields."""
         chap = self._chap([
-            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'count': 6,
+            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'autolevel': True, 'count': 6,
              'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
-            {'id': 'boss', 'class': 'armor-knight', 'level': 8, 'is_boss': True,
+            {'id': 'boss', 'class': 'armor-knight', 'level': 8, 'autolevel': True, 'is_boss': True,
              'inventory': [{'id': 'slim-lance', 'fe_base': 'slim-lance'}]},
         ])
         self.assertEqual(df.role_findings(chap, self.REF), [])
@@ -2017,15 +2016,15 @@ class RoleCheck(unittest.TestCase):
         """A convertible is neutralized rather than ground down, so out-hitting the boss
         is a deliberate 'avoid me' hazard -- the ch05 white moose.
 
-        The outlier here must clear the twin's REAL ceiling (Joshua, 38.9 -> bar 48.6) rather
+        The outlier here must clear the twin's REAL ceiling (Joshua, 34.3 -> bar 42.9) rather
         than its class-base one. A level-12 Gwyllgi's Hell Fang (34.2) no longer reads as an
         outlier at all, which is exactly the point of the ceiling fix: a unit that merely
-        out-hits the twin's GENERICS is not an outlier when the twin fields a 38.9 recruit of
+        out-hits the twin's GENERICS is not an outlier when the twin fields a 34.3 recruit of
         its own. A level-20 Berserker's Killing Edge (61.5) is one."""
         chap = self._chap([
-            {'id': 'moose', 'class': 'berserker', 'level': 20, 'convertible': True,
-             'inventory': [{'id': 'ke', 'fe_base': 'killing-edge'}]},
-            {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+            {'id': 'moose', 'class': 'berserker', 'level': 20, 'autolevel': True,
+             'convertible': True, 'inventory': [{'id': 'ke', 'fe_base': 'killing-edge'}]},
+            {'id': 'boss', 'class': 'druid', 'level': 7, 'autolevel': True, 'is_boss': True,
              'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
         ])
         found = df.role_findings(chap, self.REF)
@@ -2070,23 +2069,25 @@ class RoleCheck(unittest.TestCase):
     def test_the_twins_ceiling_counts_its_own_named_units(self):
         """The outlier bar was the max CLASS-BASE threat (FE8 Ch5: 6.3), which excludes the
         twin's own named units -- so every named unit we field looked like an outlier against
-        a roster of generics. Vanilla Ch5's real ceiling is Joshua at 38.9: his Killing Edge
-        crits a third of the hits that connect (ADR 0314)."""
-        self.assertAlmostEqual(df.vanilla_threat_ceiling('FE8 Ch5'), 38.9, delta=0.2)
+        a roster of generics. Vanilla Ch5's real ceiling is Joshua at 34.3: his Killing Edge
+        crits a third of the hits that connect (ADR 0314). He is unflagged, so he fights on his
+        join line (HP 24, Str 8, Skl 13, Spd 14), not four levels of Myrmidon growth past it
+        (#490; 38.9 read those)."""
+        self.assertAlmostEqual(df.vanilla_threat_ceiling('FE8 Ch5'), 34.3, delta=0.2)
 
     def test_a_cast_members_donor_line_counts_too(self):
         """The second half: a unit's personal line has TWO sources. A chapter enemy carries
         `personal:` in the YAML (Ravisin); a CAST member deployed hostile carries it via
         BASE_DONOR (Sahnar rides Joshua's). Reading only the first made ch05's red Myrmidon
-        measure 6.2 against the 21.4 she actually fights at (38.9 once the Killing Edge's
-        crit and the 2RN hit are read, ADR 0314)."""
+        measure 6.2 against the 21.4 she actually fights at (34.3 once the Killing Edge's
+        crit and the 2RN hit are read, ADR 0314, on the unflagged load #490 measured)."""
         chap = self._chap([
             {'id': 'sahnar', 'class': 'myrmidon', 'level': 5,
              'inventory': [{'id': 'ke', 'fe_base': 'killing-edge'}]},
         ])
         c = df.unit_real_article(chap['enemy_units'][0],
                                 df.enemy_combatants(chap['enemy_units'][0])[0])
-        self.assertAlmostEqual(fc.damage_per_round(c, df.YARDSTICK), 38.9, delta=0.2)
+        self.assertAlmostEqual(fc.damage_per_round(c, df.YARDSTICK), 34.3, delta=0.2)
 
     def test_names_a_single_unit_that_is_the_whole_overage(self):
         """ch05 measured "PARITY (within band)" at x1.20 while the white moose ALONE was the
@@ -2097,9 +2098,9 @@ class RoleCheck(unittest.TestCase):
         # chapter that PASSES while one unit carries the excess. (#285 raised the vanilla side
         # by giving its named units their real lines, so the grunt count rose with it.)
         chap = self._chap([
-            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'count': 20,
+            {'id': 'grunt', 'class': 'soldier', 'level': 5, 'autolevel': True, 'count': 20,
              'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
-            {'id': 'monster', 'class': 'gwyllgi', 'level': 6,
+            {'id': 'monster', 'class': 'gwyllgi', 'level': 6, 'autolevel': True,
              'inventory': [{'id': 'claw', 'fe_base': 'hell-fang'}]},
         ])
         notes = df.solo_contributors(chap, self.REF, 9)
@@ -2142,7 +2143,7 @@ class RoleCheck(unittest.TestCase):
         """Terrain is read from the declared tile: a level-9 Druid folds in 2.8 rounds on
         open ground but survives 5.9 on a throne (+30 avo/+3 def), clearing half of Saar's
         11.3."""
-        squishy = {'id': 'boss', 'class': 'druid', 'level': 9, 'is_boss': True,
+        squishy = {'id': 'boss', 'class': 'druid', 'level': 9, 'autolevel': True, 'is_boss': True,
                    'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         self.assertTrue(any('rounds to kill' in f
                             for f in df.role_findings(self._chap([squishy]), self.REF)))
@@ -2191,7 +2192,7 @@ class PersonalBossLine(unittest.TestCase):
         self.assertEqual(force[0].hp, df.enemy_combatants(chap['enemy_units'][0])[0].hp + 15)
 
     def test_personal_line_lifts_the_boss_in_the_role_check(self):
-        plain = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+        plain = {'id': 'boss', 'class': 'druid', 'level': 7, 'autolevel': True, 'is_boss': True,
                  'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         self.assertTrue(any('rounds' in f for f in df.role_findings({'enemy_units': [plain]},
                                                                    self.REF)))
@@ -2240,7 +2241,7 @@ class PersonalBossLine(unittest.TestCase):
 
     def test_stacking_terrain_onto_a_boss_line_is_flagged(self):
         """Personal Def and terrain stack; together they can make a boss undentable."""
-        boss = {'id': 'boss', 'class': 'druid', 'level': 7, 'is_boss': True,
+        boss = {'id': 'boss', 'class': 'druid', 'level': 7, 'autolevel': True, 'is_boss': True,
                 'tile_terrain': 'throne', 'personal': {'baseHP': 15, 'baseDef': 5},
                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         found = df.role_findings({'enemy_units': [boss]}, self.REF)
@@ -2274,9 +2275,14 @@ class RoleCheckAgainstTheParty(unittest.TestCase):
         self.assertFalse(any('out-threatened' in f for f in found), found)
 
     def test_an_inversion_the_twin_lacks_is_flagged(self):
-        """Without its Pow line, ch03's grell hits the party for 9.7 to the slinger's 13.6;
-        Bazba tops vanilla Ch3's line."""
+        """Vanilla Ch3's line tops Bazba at 1.21x once units load as the ROM loads them (#490:
+        12.3 to his 10.2), so an inversion has to run past that by the band to be one the twin
+        lacks. Without its Pow line and at the slinger's L4, ch03's grell hits the party for
+        7.6 to the slinger's 12.3: 1.60x."""
         chap = self._without_pow(self._ch('ch03'), 'grell')
+        for entry in chap['enemy_units']:
+            if entry.get('id') == 'grell':
+                entry['level'] = 4
         found = df.role_findings(chap, chap['parity_reference'], CAMPAIGN)
         self.assertTrue(any('out-threatened' in f and 'kobold-slinger' in f for f in found),
                         found)
@@ -2488,7 +2494,7 @@ class ModeAwareProjection(unittest.TestCase):
     (the level the YAML and the decomp's UnitDefinition arrays actually declare).
     """
 
-    DEF = {'id': 'skeleton-line', 'class': 'fighter', 'level': 10,
+    DEF = {'id': 'skeleton-line', 'class': 'fighter', 'level': 10, 'autolevel': True,
            'inventory': [{'id': 'iron-axe'}]}
     SHIFTS = {'tutorial': 4, 'normal': 2, 'difficult': 3}
 
@@ -2562,7 +2568,7 @@ class ChapterForceInMode(unittest.TestCase):
 
     def test_a_composition_entry_is_shifted_too(self):
         # A bag entry goes down the _one_enemy branch, which took the mode last.
-        ed = {'id': 'bag', 'composition': ['fighter', 'soldier'], 'level': 12,
+        ed = {'id': 'bag', 'composition': ['fighter', 'soldier'], 'level': 12, 'autolevel': True,
               'inventory_by_class': {'fighter': ['iron-axe'], 'soldier': ['iron-lance']}}
         chap = {'enemy_units': [ed]}
         plain = df.chapter_enemy_force(chap)

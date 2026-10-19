@@ -54,7 +54,8 @@ def target_combatant(boat):
     (a rescue target never attacks back -- FE8's civilian hulls carry no weapon), regardless
     of what its class would otherwise wield."""
     return dif._one_enemy(boat.get('id', 'target'), boat['class'], boat.get('level', 1),
-                          None, personal=boat.get('personal'))
+                          None, personal=boat.get('personal'),
+                          autolevel=bool(boat.get('autolevel')))
 
 
 def hull_board(chapter):

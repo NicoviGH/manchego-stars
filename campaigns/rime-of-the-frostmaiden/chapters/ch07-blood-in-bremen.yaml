@@ -8,7 +8,7 @@ location: "Bremen, from the docks to the Town Hall"
 chapter_number: 7
 act: 'I'                      # the arc's act (campaign.yaml `acts:` holds each act's summary)
 status: active                 # the slice is reached: the force is vanilla Ch7's own, re-dressed
-balance_locked: true  # holds parity on instrument v2 with the Fighter boss on Gheb's line; ADR 0343
+balance_locked: false  # unlocked by #510 until it re-locks on the rebuilt model (ADR 0353); was locked: holds parity on instrument v2 with the Fighter boss on Gheb's line; ADR 0343
 milestone: M3
 traps:                          # vanilla Ch7's two ballistae, on its own tiles: Bremen's harpoon
   - {type: ballista, x: 17, y: 8, item: ITEM_BALLISTA_REGULAR}    # launchers (ADR 0339). The
@@ -372,6 +372,9 @@ playtest:
     # The chapter-generic Status-screen capture, on this chapter's own boot: the title card
     # as the ROM draws it, which is the only colour that counts (the card file holds indices).
     - {name: ch07titlecard, proves: "the Status screen draws ch07's title card, in the ROM's own colours", lua: ch07titlecard, kind: record}
+    # What the ROM loads each red unit with, per PT_DIFFICULTY: the instrument #490 holds the
+    # parity model and the wiki's load path to (Dorbulgruf is the unflagged boss they split on).
+    - {name: ch07redstats, proves: "every red unit's loaded stat line is logged for the mode the run picked", lua: ch07redstats}
 
 # Open questions (#486). tools/gen_wiki.py lists them; settling one removes it here.
 open_questions:
