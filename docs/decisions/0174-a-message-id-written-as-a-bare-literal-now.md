@@ -343,8 +343,8 @@ of the lesson directly above. The build-time half is pinned by a test reading
   seizes / frail+teleport (`reachCh02Map`, `clear_ch02`), not fair-play clears.
 - **DefeatBoss fires from the FLAGGED defeat quote, not `CA_BOSS`** (`eventinfo.c`: `SetPidDefeatedFlag`
   runs for ANY unit whose pid matches a `gDefeatTalkList` entry on death — no boss-attribute gate). So a
-  boss on a **raw pid with no `gCharacterData` entry** (ch03's grell = `0xb7`, chosen to avoid leaking a
-  vanilla boss's name/face/quote) still wins the map via a head-of-list quote keyed to `(pid, CHAPTER_L_N,
+  boss on a **raw pid of its own** (ch03's grell = `0xbf`, a vanilla generic Mogall row cloned onto an
+  unused one, ADR 0098, so no vanilla boss's name/face/quote leaks) still wins the map via a head-of-list quote keyed to `(pid, CHAPTER_L_N,
   EVFLAG_DEFEAT_BOSS)`. **Trade-off:** with no `CA_BOSS` it shows **no boss HP gauge** and the generic
   clear-bot/`findBoss()` (reads `CA_BOSS`) can't target it — so a per-boss load-test must reach it by
   pid+tile (`ch03win`: teleport the grell to the lord and strike), and a future `clear_chNN` needs either a
@@ -352,8 +352,8 @@ of the lesson directly above. The build-time half is pinned by a test reading
 - **A mid-map death-triggered cutscene (miniboss) = the same silent-flagged-quote idiom + a tmp-flag `AFEV`,
   NOT `DefeatBoss`.** ch03's RBG-execution beat fires when the *Icewind Brute* dies (not the boss). Recipe
   (mirror of the win, keyed to a temporary flag so the chapter continues): (1) give the miniboss a **unique
-  raw pid** distinct from the shared generic AND the boss (ch03 Brute = `0xb6`, sibling of the grell's `0xb7`;
-  `0xB0–0xB9` are unnamed → no name/face leak), so its flagged quote keys the trigger to it alone — reusing the
+  raw pid** distinct from the shared generic AND the boss (ch03 Brute = `0xb6`, an unnamed gap →
+  no name/face leak), so its flagged quote keys the trigger to it alone — reusing the
   generic `0xaa` would fire on *any* trash mob's death; (2) a **silent** (`.msg = 0`) `gDefeatTalkList` entry
   `(pid, CHAPTER_L_N, EVFLAG_TMP(a))` — `SetPidDefeatedFlag` sets the flag with no portrait to render;
   (3) a Misc `AFEV(EVFLAG_TMP(b), midmap_script, EVFLAG_TMP(a))` — `EvCheck01_AFEV` runs the script when flag

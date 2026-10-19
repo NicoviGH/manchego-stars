@@ -451,8 +451,9 @@ CH06_GOAL_STATUS_MSG = 0x9FF
 # `gCharacterData`, which is ONE GLOBAL TABLE with no chapter dimension, so a pid whose row the
 # build rewrites must be exclusive, while one it leaves alone need not be (ch04's Mogalls share
 # vanilla's own 0xb7).
-# 0xbb and 0xbc are the next unnamed gaps -- nameTextId 0x255, the generic monster plate, the
-# same shape as every pid above. `assert_rewritten_raw_pids_are_exclusive` now makes the mistake
+# 0xbb..0xbd are ch06's (vanilla's Gargoyle, Deathgoyle and Draco Zombie generics), and 0xbf is
+# ch03's grell: an unused "Enemy" stub with 0xb7's Mogall row cloned onto it (BOSS_PID_ROW_DONORS).
+# The next unused stubs are 0xc2..0xc4; a boss on one takes a donor row the same way. `assert_rewritten_raw_pids_are_exclusive` now makes the mistake
 # impossible rather than leaving the next chapter to re-read this comment.
 CH06_CHAPTER_YAML = 'ch06-the-maer-monster.yaml'
 CH06_BOAT_PIDS = {'boat-east': '0xbb', 'boat-west': '0xbc'}

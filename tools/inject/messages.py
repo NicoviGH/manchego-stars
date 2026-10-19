@@ -297,22 +297,32 @@ def raw_pid_claims(scope=None):
     return dict(claims)
 
 
-def rewritten_raw_pids(portraits=None, personal=None, levels=None):
-    """{raw pid: what the build writes into its gCharacterData row}: a name plate
-    (RAW_PID_PORTRAITS), a personal stat line (RAW_PID_PERSONAL_SOURCES), a baseLevel
-    (RAW_PID_LEVEL_SOURCES). A pid missing here keeps the row vanilla ships."""
+def rewritten_raw_pids(portraits=None):
+    """{raw pid: what the build writes into its gCharacterData row}, from every table that
+    writes one: a whole row cloned from a donor (GENERIC_PID_DONORS, BOSS_PID_ROW_DONORS), a name
+    plate (RAW_PID_PORTRAITS), help text (RAW_PID_HELP), a personal stat line
+    (RAW_PID_PERSONAL_SOURCES), a baseLevel (RAW_PID_LEVEL_SOURCES) and a battle-anim binding
+    (RAW_PID_BATTLE_ANIMS). A pid missing here keeps the row vanilla ships;
+    test_inject_raw_pids diffs the patched table against vanilla to hold this list complete."""
+    import inject.chapter_ids
     import inject.raw_pids                             # it imports this module's neighbours
+    from inject.cast import RAW_PID_BATTLE_ANIMS, RAW_PID_HELP
     portraits = RAW_PID_PORTRAITS if portraits is None else portraits
-    personal = inject.raw_pids.RAW_PID_PERSONAL_SOURCES if personal is None else personal
-    levels = inject.raw_pids.RAW_PID_LEVEL_SOURCES if levels is None else levels
     rows = collections.defaultdict(list)
+    for pid, donor in dict(inject.chapter_ids.GENERIC_PID_DONORS,
+                           **inject.chapter_ids.BOSS_PID_ROW_DONORS).items():
+        rows[pid].append('a row cloned from %s' % donor)
     for pid, (_unit_id, _slot, _portrait_id, name) in portraits.items():
         rows[pid].append('the name plate %r' % name)
-    for pid, (_yaml, unit_id) in personal.items():
+    for pid in RAW_PID_HELP:
+        rows[pid].append('help text')
+    for pid, (_yaml, unit_id) in inject.raw_pids.RAW_PID_PERSONAL_SOURCES.items():
         rows[pid].append("%s's personal stat line" % unit_id)
-    for pid, (_yaml, unit_id) in levels.items():
+    for pid, (_yaml, unit_id) in inject.raw_pids.RAW_PID_LEVEL_SOURCES.items():
         rows[pid].append("%s's baseLevel" % unit_id)
-    return {pid: ', '.join(what) for pid, what in rows.items()}
+    for unit_id, (_yaml, pid) in RAW_PID_BATTLE_ANIMS.items():
+        rows[pid].append("%s's battle anim" % unit_id)
+    return {pid: ', '.join(dict.fromkeys(what)) for pid, what in rows.items()}
 
 
 def assert_rewritten_raw_pids_are_exclusive(rows=None, scope=None):

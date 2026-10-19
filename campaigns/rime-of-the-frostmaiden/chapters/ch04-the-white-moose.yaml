@@ -651,6 +651,9 @@ design_notes: >
 playtest:
   boot: ch04boot                 # CH04BOOT=1; host slot 5 comes from inject/hosts.py
   cases:
+    # What the ROM loads each red unit with, per PT_DIFFICULTY: the instrument #490 and #508 hold
+    # the parity model and the wiki to (the line Mogalls once loaded the grell's boss line).
+    - {name: ch04redstats, proves: "every red unit's loaded stat line is logged for the mode the run picked", lua: ch04redstats}
     - name: ch04village
       proves: the Lonelywood village hands over its Iron Axe
       given: [on_map]

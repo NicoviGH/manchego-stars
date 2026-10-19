@@ -4286,6 +4286,33 @@ scenarios.ch07titlecard = function()
     return scenarios.titlecard()
 end
 
+-- What the ROM loaded each red unit with: the full struct Unit stat line, so the parity model
+-- (difficulty.py) and the wiki's load path (unit_load.py) can both be held to it (#490, #508).
+-- struct Unit (bmunit.h): +04 pClassData (class number at +04), +08 level, +12 maxHP, +14 pow,
+-- +15 skl, +16 spd, +17 def, +18 res, +19 lck. Run once per PT_DIFFICULTY.
+INSPECT.redStats = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local actual = INSPECT.liveDifficulty()
+    local n = 0
+    for i = 0, 49 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and (u.state & US_DEAD) == 0 then
+            n = n + 1
+            log(string.format(
+                '{"event":"red_stats","mode":"%s","char":"0x%02x","class":"0x%02x","level":%d,'
+                .. '"hp":%d,"pow":%d,"skl":%d,"spd":%d,"def":%d,"res":%d,"lck":%d}',
+                actual, u.charId, ru8(ru32(u.addr + 0x04) + 0x04), u.level, u.maxhp, u.pow,
+                ru8(u.addr + 0x15), ru8(u.addr + 0x16), u.def, ru8(u.addr + 0x18),
+                ru8(u.addr + 0x19)))
+        end
+    end
+    if n == 0 then return result("FAIL", "no red units on the map") end
+    return result("PASS", string.format("mode=%s: %d red units logged", actual, n))
+end
+scenarios.ch04redstats = function()
+    return INSPECT.redStats()
+end
+
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.
 scenarios.gameover = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end

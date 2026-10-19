@@ -83,6 +83,16 @@ def raw_pid_portrait_data(text, campaign):
     return text
 
 
+ENEMY_STUB_PLATE = 0x267   # "Enemy": vanilla's unused rows (0x92-0xa6, 0xbf, 0xc2-0xc4)
+
+
+def _row_field(text, pid, field):
+    """An int field of raw pid `pid`'s gCharacterData row in `text`, or None."""
+    s, e = _find_brace_block(text, '[%s - 1]' % pid, CHARACTERS_C)
+    m = re.search(r'\.%s\s*=\s*(0x[0-9a-fA-F]+|\d+)' % field, text[s:e])
+    return int(m.group(1), 0) if m else None
+
+
 def clone_generic_rows(text):
     """Copy each generic pid's donor row onto it whole, so the pid a chapter's generics moved to
     (#493) loads exactly as the vanilla generic they used to share, and a raw-pid boss's fresh row
@@ -91,6 +101,14 @@ def clone_generic_rows(text):
     chapter's name."""
     from inject.chapter_ids import BOSS_PID_ROW_DONORS, GENERIC_PID_DONORS
     from inject.cast import RAW_PID_HELP
+    both = set(GENERIC_PID_DONORS) & set(BOSS_PID_ROW_DONORS)
+    if both:
+        sys.exit('ERROR: %s is in both GENERIC_PID_DONORS and BOSS_PID_ROW_DONORS; a row has one '
+                 'donor' % ', '.join(sorted(both)))
+    for pid in sorted(set(RAW_PID_PERSONAL_SOURCES) | set(RAW_PID_LEVEL_SOURCES)):
+        if pid not in BOSS_PID_ROW_DONORS and _row_field(text, pid, 'nameTextId') == ENEMY_STUB_PLATE:
+            sys.exit('ERROR: raw-pid boss %s sits on an uncloned "Enemy" stub row (a Brigand with no '
+                     'growths or plate); give it a BOSS_PID_ROW_DONORS row to clone' % pid)
     for pid, donor in sorted(dict(GENERIC_PID_DONORS, **BOSS_PID_ROW_DONORS).items()):
         s, e = _find_brace_block(text, '[%s - 1]' % donor, CHARACTERS_C)
         row = text[s:e].replace('[%s - 1]' % donor, '[%s - 1]' % pid, 1)

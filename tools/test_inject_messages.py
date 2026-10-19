@@ -154,10 +154,11 @@ class RewrittenRawPidsAreExclusive(unittest.TestCase):
     """A raw pid whose row the build rewrites (a name plate, a personal line, a baseLevel) may
     be claimed by one chapter only.
 
-    `RAW_PID_PORTRAITS` writes nameTextId into gCharacterData[pid - 1], one row per pid with no
-    chapter dimension -- unlike gDefeatTalkList, where ch03's grell and ch04's mogall share 0xb7
-    legally because each entry is keyed by chapter too. ch06's boats took 0xb4/0xb5, already
-    CH04_PACK_PIDS', and two of ch04's five Mauthe Doogs would have read "Fishing Boat".
+    gCharacterData has one row per pid and no chapter dimension -- unlike gDefeatTalkList, whose
+    entries are keyed by chapter too -- so whatever the build writes there reaches every chapter.
+    ch06's boats took 0xb4/0xb5, already CH04_PACK_PIDS', and two of ch04's five Mauthe Doogs would
+    have read "Fishing Boat"; ch03's grell wrote its boss line into 0xb7, and ch04's Mogalls
+    fought with it (#508).
     """
 
     def test_the_live_registry_is_clean(self):
