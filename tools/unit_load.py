@@ -50,6 +50,74 @@ def _class_block(class_enum):
     return text[s:e]
 
 
+@functools.lru_cache(maxsize=None)
+def rank_thresholds():
+    """{rank letter: weapon exp}, from the decomp's own enum (include/bmitem.h)."""
+    text = inject.decomp.vanilla_decomp_text('include/bmitem.h')
+    return {k: int(v) for k, v in re.findall(r'\bWPN_EXP_([SABCDE])\s*=\s*(\d+)', text)}
+
+
+def _wexp(token):
+    letter = re.match(r'WPN_EXP_([SABCDE0])$', token)
+    if letter:
+        return 0 if letter.group(1) == '0' else rank_thresholds()[letter.group(1)]
+    return int(token, 0)
+
+
+def unit_ranks(class_enum, char_block=''):
+    """{ITYPE: wexp} a unit loads with: its class's baseRanks, each non-zero rank of its
+    character's own over them (UnitInitFromDefinition, bmunit.c). `char_block` is the
+    character's data_characters.c entry, '' for none."""
+    out = {}
+    for b in (_class_block(class_enum), char_block or ''):
+        m = re.search(r'\.baseRanks\s*=\s*\{(.*?)\}', b, re.S)
+        for t, v in re.findall(r'\[(ITYPE_\w+)\]\s*=\s*(\w+)', m.group(1) if m else ''):
+            if _wexp(v):
+                out[t] = _wexp(v)
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def _item_block(item_enum):
+    """One item's gItemData entry, from `.number = ITEM_X` to the next entry."""
+    text = inject.decomp.vanilla_decomp_text('src/data_items.c')
+    m = re.search(r'\.number\s*=\s*%s\s*,(.*?)(?=\.number\s*=|\Z)' % re.escape(item_enum),
+                  text, re.S)
+    if not m:
+        raise KeyError(item_enum)
+    return m.group(1)
+
+
+def item_attributes(item_enum):
+    m = re.search(r'\.attributes\s*=\s*([^,\n]+)', _item_block(item_enum))
+    return frozenset(t.strip() for t in (m.group(1) if m else '').split('|') if t.strip())
+
+
+def can_use_weapon(item_enum, class_enum, char_block='', attributes=frozenset(), autolevel=True):
+    """`CanUnitUseWeapon` (bmitem.c) for a red unit as it loads. `attributes` is the unit's
+    CA_* set (class | character). A lock bit needs its CA_LOCK; the monster lock (IA_LOCK_3)
+    then admits the weapon outright. Otherwise the unit's rank in the weapon's type must reach
+    its requirement, and an autolevelled unit gets there for any type it holds a rank in
+    (`UnitAutolevelWExp` raises it; a rank of 0 stays 0). A sealed weapon (IA_UNUSABLE) is
+    never usable here: nothing we model unseals one."""
+    attrs = item_attributes(item_enum)
+    if 'IA_WEAPON' not in attrs:
+        return False
+    for n in (1, 2, 4, 5, 6, 7):
+        if 'IA_LOCK_%d' % n in attrs and 'CA_LOCK_%d' % n not in attributes:
+            return False
+    if 'IA_LOCK_3' in attrs:
+        return 'CA_LOCK_3' in attributes
+    if 'IA_UNUSABLE' in attrs:
+        return False
+    block = _item_block(item_enum)
+    kind = re.search(r'\.weaponType\s*=\s*(\w+)', block)
+    need = re.search(r'\.weaponRank\s*=\s*(\w+)', block)
+    have = unit_ranks(class_enum, char_block).get(kind.group(1) if kind else '', 0)
+    need = _wexp(need.group(1)) if need else 0
+    return have >= need or (autolevel and have > 0)
+
+
 def _field(block, name):
     m = re.search(r'\.%s\s*=\s*(-?(?:0x[0-9a-fA-F]+|\d+))' % name, block)
     return int(m.group(1), 0) if m else 0

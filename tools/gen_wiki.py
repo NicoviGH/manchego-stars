@@ -868,29 +868,14 @@ _ITYPE = {'sword': 'ITYPE_SWORD', 'lance': 'ITYPE_LANCE', 'axe': 'ITYPE_AXE', 'b
           'staff': 'ITYPE_STAFF'}
 
 
-@functools.lru_cache(maxsize=None)
-def _rank_thresholds():
-    """{rank letter: weapon exp}, from the decomp's own enum (include/bmitem.h)."""
-    text = inject.decomp.vanilla_decomp_text('include/bmitem.h')
-    return {k: int(v) for k, v in re.findall(r'\bWPN_EXP_([SABCDE])\s*=\s*(\d+)', text)}
-
-
 def _ranks(class_enum, donor):
-    """{ITYPE: wexp}: the class's baseRanks, a named character's own over them."""
-    out = {}
-    blocks = [unit_load._class_block(class_enum)]
-    if donor:
-        blocks.append(rom_block('src/data_characters.c', donor))
-    for b in blocks:
-        m = re.search(r'\.baseRanks\s*=\s*\{(.*?)\}', b, re.S)
-        for t, v in re.findall(r'\[(ITYPE_\w+)\]\s*=\s*(\w+)', m.group(1) if m else ''):
-            letter = re.match(r'WPN_EXP_([SABCDE])$', v)
-            out[t] = _rank_thresholds()[letter.group(1)] if letter else int(v, 0)
-    return out
+    """{ITYPE: wexp}: the class's baseRanks, a named character's own over them, as the ROM has
+    them (`unit_load.unit_ranks` owns the rule)."""
+    return unit_load.unit_ranks(class_enum, rom_block('src/data_characters.c', donor))
 
 
 def _letter(wexp):
-    best = [l for l, t in sorted(_rank_thresholds().items(), key=lambda kv: -kv[1])
+    best = [l for l, t in sorted(unit_load.rank_thresholds().items(), key=lambda kv: -kv[1])
             if wexp and wexp >= t]
     return best[0] if best else ''
 

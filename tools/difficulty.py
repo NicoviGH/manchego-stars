@@ -439,7 +439,7 @@ def _character_base_level(char_index):
 
 def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
                      mode=None, shifts=None, shiftable=True, base_level=1, autolevel=True,
-                     realistic=False, personal_growths=None, arsenal=()):
+                     realistic=False, personal_growths=None, arsenal=(), char_index=None):
     """One Combatant as the engine loads it (`unit_load.growth_steps`): class base grown per
     the definition's `autolevel` flag, its class's promoted bonus and the `mode` shift, wielding
     `weapon`, plus any personal boss line (see above), capped at the class maxima
@@ -461,32 +461,57 @@ def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
     capped = {f: min(getattr(c, f), caps[k]) for f, k in (
         ('hp', 'HP'), ('pow', 'Pow'), ('skl', 'Skl'), ('spd', 'Spd'), ('df', 'Def'),
         ('res', 'Res'), ('lck', 'Lck')) if getattr(c, f) > caps[k]}
+    if arsenal:
+        # It carries what its definition lists; it can attack only with what it can use
+        # (CanUnitUseWeapon), and it equips the first of those (#510 step 3).
+        arsenal = _usable(arsenal, class_enum, char_index, autolevel)
+        capped['weapon'] = arsenal[0] if arsenal else None
     return dataclasses.replace(c, arsenal=tuple(arsenal), **capped)
+
+
+def _usable(weapons, class_enum, char_index, autolevel):
+    """The `weapons` a unit of `class_enum` on `char_index` can wield as it loads
+    (`unit_load.can_use_weapon`), in order. A weapon with no decomp item is kept: there is
+    nothing to judge it by."""
+    import exp_curve                        # exp_curve imports this module
+    try:
+        attributes = exp_curve.class_attributes(class_enum)
+    except KeyError:                        # a raw class number: no class block to read
+        return tuple(weapons)
+    attributes = attributes | exp_curve.character_attributes(char_index)
+    block = _character_block(char_index)
+    return tuple(w for w in weapons
+                 if w.name not in ITEM_ENUM
+                 or unit_load.can_use_weapon(ITEM_ENUM[w.name], class_enum, block, attributes,
+                                             autolevel))
+
+
+def _character_block(char_index):
+    """A CHARACTER_ slot's vanilla data_characters.c entry, '' for a generic or unknown one."""
+    if not str(char_index or '').startswith('CHARACTER_'):
+        return ''
+    try:
+        s, e = inject.decomp._find_brace_block(_characters_text(), '[%s - 1]' % char_index,
+                                               inject.paths.CHARACTERS_C)
+    except SystemExit:
+        return ''
+    return _characters_text()[s:e]
 
 
 def _loads_realistically(char_index, class_enum):
     """Does a FLAGGED red unit on this slot take UnitAutolevelRealistic (LoadUnit, bmunit.c:
     625)? CA_BOSS in its character's or class's attributes, or pid < 0x40. Vanilla's flagged
     bosses (Bazba, Saar, Tirado) do, and carry baseLevel >= their level, so they load bare."""
+    import exp_curve                        # exp_curve imports this module
     number = _character_number(char_index) if char_index else None
     if number is not None and number < 0x40:
         return True
-    def boss(block):
-        found = re.search(r'\.attributes\s*=\s*([^,\n]+)', block)
-        return bool(found and 'CA_BOSS' in found.group(1))
     try:
-        if boss(unit_load._class_block(class_enum)):
+        if 'CA_BOSS' in exp_curve.class_attributes(class_enum):
             return True
     except KeyError:                                   # a raw class number: no block to read
         pass
-    if not str(char_index or '').startswith('CHARACTER_'):
-        return False
-    try:
-        start, end = inject.decomp._find_brace_block(_characters_text(), '[%s - 1]' % char_index,
-                                                     inject.paths.CHARACTERS_C)
-    except SystemExit:
-        return False
-    return boss(_characters_text()[start:end])
+    return 'CA_BOSS' in exp_curve.character_attributes(char_index)
 
 
 def _vanilla_load_kwargs(d):
@@ -497,7 +522,8 @@ def _vanilla_load_kwargs(d):
     if realistic and str(ch or '').startswith('CHARACTER_'):
         growths = inject.stats.donor_growths_and_ranks(_characters_text(), ch)[0]
     return dict(autolevel=d['autolevel'], realistic=realistic, personal_growths=growths,
-                shiftable=_takes_difficulty_shift(ch), base_level=_character_base_level(ch))
+                shiftable=_takes_difficulty_shift(ch), base_level=_character_base_level(ch),
+                char_index=ch)
 
 
 def _our_load_kwargs(ed):
@@ -513,7 +539,8 @@ def _our_load_kwargs(ed):
         donor, _enemy_class_enum(ed['class'])) if 'class' in ed else False
     growths = inject.stats.donor_growths_and_ranks(_characters_text(), donor)[0] \
         if realistic and str(donor).startswith('CHARACTER_') else None
-    return dict(autolevel=flagged, realistic=realistic, personal_growths=growths)
+    return dict(autolevel=flagged, realistic=realistic, personal_growths=growths,
+                char_index=donor)
 
 
 def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shifts=None,
@@ -1601,7 +1628,8 @@ def party_matchup(bodies, careers):
     the FIELDED party, once per simulated career (ADR 0311). Per joint career:
 
       threat/slot = sum over enemies of its damage per round against the unit FE8's AI would
-                    attack (`ai_target.pick_target`), / units fielded
+                    attack with whichever carried weapon it picks for that target
+                    (`ai_target.pick_attack`'s rule), / units fielded
       clear-load  = sum over enemies of 1 / the field's COMBINED kill rate on it (the sum of
                     1 / rounds): the party-rounds the force takes to clear. Harmonic, because
                     a plain mean of rounds is dominated by whoever cannot dent the boss; a
