@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-19 (Claude, #515 open). **The parity model is being rebuilt before any party or chapter
+Refreshed 2026-10-19 (Claude, after #515). **The parity model is being rebuilt before any party or chapter
 change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
 grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
 Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
@@ -31,10 +31,10 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
    (ADR 0354). #514: the gate grades Tutorial, Normal and Difficult, never the authored table, and
    reads only locked chapters; role checks read the mode (ADR 0355). The twin's force has ONE
    loader now, `difficulty.vanilla_loaded_units`; read it, don't re-parse UnitDefinitions.
-2. **#510 step 3 is PR #515** (reviewed, review fixes pushed): enemies attack with the weapon
-   the AI picks per target, only weapons they can use (`unit_load.can_use_weapon`), ties to the
-   LATER candidate as in the decomp (ADR 0356). If its CI is green on the head commit, merge it;
-   then **step 4: enemy stats sampled per career from `unit_load`'s ranges**, then 5-9, each with
+2. **#510 step 3 is DONE (#515, ADR 0356):** enemies attack with the weapon the AI picks per
+   target, only weapons they can use (`unit_load.can_use_weapon`), ties to the LATER candidate as
+   in the decomp. Next: **step 4: enemy stats sampled per career from `unit_load`'s ranges**,
+   then 5-9, each with
    an in-engine proof and the verdict diff. Stop when a step moves no verdict.
    - Two open fidelity questions from step 3 (tie order = deployment order; the swung weapon stays
      equipped) are logged on #510 for steps 5 and 7.
