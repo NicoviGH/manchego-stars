@@ -78,5 +78,48 @@ class OldTreeText(unittest.TestCase):
                          (1.06, 1.36, 42))
 
 
+class ParityInputs(unittest.TestCase):
+    """`needed` skips the diff when no parity input changed, so a file the read depends on
+    and the list misses would let a PR move a verdict unseen. Trace a real read instead of
+    trusting the list: every module it loads and every file it opens must be covered."""
+
+    @classmethod
+    def setUpClass(cls):
+        import contextlib
+        import io
+        root = vd.REPO
+        cls.opened = set()
+
+        def hook(event, args):
+            if event == 'open' and isinstance(args[0], str):
+                p = os.path.abspath(args[0])
+                if p.startswith(root + os.sep) and '__pycache__' not in p:
+                    cls.opened.add(os.path.relpath(p, root))
+        sys.addaudithook(hook)
+        with contextlib.redirect_stdout(io.StringIO()):
+            import difficulty
+            difficulty.curve_report(vd.CAMPAIGN, mode='normal')
+        cls.modules = {os.path.relpath(m.__file__, root) for m in list(sys.modules.values())
+                       if getattr(m, '__file__', None)
+                       and os.path.abspath(m.__file__).startswith(root + os.sep)}
+        cls.inputs = vd.parity_inputs()
+
+    def test_every_module_the_read_loads_is_an_input(self):
+        missed = sorted(m for m in self.modules
+                        if not vd.touches_parity([m], self.inputs)
+                        and not m.startswith('tools/test_'))
+        self.assertEqual(missed, [])
+
+    def test_every_file_the_read_opens_is_an_input(self):
+        missed = sorted(p for p in self.opened - self.modules
+                        if not p.endswith('.py') and not vd.touches_parity([p], self.inputs))
+        self.assertEqual(missed, [])
+
+    def test_a_sprite_or_a_probe_is_not_an_input(self):
+        self.assertEqual(vd.touches_parity(
+            ['campaigns/rime-of-the-frostmaiden/portraits/x.png', 'tools/playtest/matrix.py',
+             'docs/roadmap.md'], self.inputs), [])
+
+
 if __name__ == '__main__':
     unittest.main()

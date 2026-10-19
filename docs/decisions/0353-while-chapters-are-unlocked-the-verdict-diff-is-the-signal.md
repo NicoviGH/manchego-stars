@@ -13,11 +13,23 @@ issues: [510]
 lock, a change that moves a chapter's parity would land silently, and a model step could not
 show that it moved the verdicts it claimed to move.
 
-**Every PR that touches code or content prints a verdict diff** (`tools/verdict_diff.py`,
+**Every PR that touches a parity input gets a verdict diff** (`tools/verdict_diff.py`,
 `make verdict-diff`): the campaign curve read on the base commit and on the PR, in the
 authored table and in Tutorial, Normal and Difficult, and every chapter-by-mode cell whose
-verdict, threat ratio, clear-load ratio, accepted residual or per-unit finding moved. CI
-posts it as one PR comment, updated on each push, and in the job summary.
+verdict, threat ratio, clear-load ratio, accepted residual or per-unit finding moved. It runs
+on every PR rather than only on #510's, because the moves it exists to catch come from PRs
+that were not about difficulty: #508's pid rewrite took ch04's Mogalls from 32 HP to 15.
+
+**It stays out of day-to-day work (Nicolas, 2026-10-19).** Most PRs are not about difficulty:
+- **A PR that touches no parity input skips the read**, and the submodule checkout with it.
+  The inputs are derived, not listed by hand: the read's import closure from the source (the
+  whole injector, since it loads itself whole), every campaign YAML, and the engine patches.
+  `test_verdict_diff` traces a real read and fails if a module it loads or a file it opens is
+  not covered, so the skip cannot quietly go stale. A sprite, a Lua probe or a doc skips.
+- **The PR gets a comment only when a cell moved.** An unmoved read goes to the job summary.
+  When a later push stops moving anything, the earlier comment is edited to say so.
+- It runs as its own job beside `build`, which is the PR's critical path, so it adds no wall
+  clock.
 
 - **It never fails a build.** A model step exists to move verdicts. The diff is evidence a
   reviewer reads against the step's claim, and #510's stopping rule ("stop when a step moves
