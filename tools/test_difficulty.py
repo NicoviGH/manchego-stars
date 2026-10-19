@@ -173,6 +173,19 @@ class AcceptedResidual(unittest.TestCase):
     # and #510 unlocked every chapter (ADR 0353). Their verdicts move in the verdict diff now;
     # the residual comes back with the re-lock at #510 step 10, never widened to stay green.
 
+    def test_a_chapter_s_residual_is_what_its_read_consults(self):
+        """The wiring, not the verdict: `_chapter_pressure` hands accept_residual the chapter's
+        own `accepted_residual`, whatever that makes of it."""
+        chap = df.load_field(CAMPAIGN, 'ch01')[0]
+        seen = []
+        real = df.accept_residual
+        try:
+            df.accept_residual = lambda v, m, r, band=0.25: seen.append(r) or real(v, m, r, band)
+            df._chapter_pressure(chap)
+        finally:
+            df.accept_residual = real
+        self.assertEqual(seen, [chap['accepted_residual']])
+
 
 class CurveGate(unittest.TestCase):
     """The --check gate (#48 (b)): PER-CHAPTER opt-in. We author chapters as we go, so the

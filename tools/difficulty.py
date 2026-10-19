@@ -495,7 +495,10 @@ def _our_load_kwargs(ed):
     """The same for one of OUR entries: the flag is the YAML's `autolevel:`, which is what the
     injector emits (inject/units.py), and the slot is the donor a hostile cast member or a
     vanilla-slot boss rides; our raw pids carry no CA_BOSS."""
-    donor = inject.stats.BASE_DONOR.get(ed.get('id')) or inject.cast.ENEMY_BASE_SLOT.get(ed.get('id'))
+    # ENEMY_CHARACTER_SLOT, not ENEMY_BASE_SLOT: the question is the slot's ATTRIBUTES
+    # (CA_BOSS), and Sephek keeps ONEILL's though his stat line is zeroed (inject/cast.py).
+    donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
+             or inject.cast.ENEMY_CHARACTER_SLOT.get(ed.get('id')))
     flagged = bool(ed.get('autolevel'))
     realistic = flagged and bool(donor) and _loads_realistically(
         donor, _enemy_class_enum(ed['class'])) if 'class' in ed else False
@@ -544,7 +547,7 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=
         weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
         out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon,
                               mode=mode, shifts=shifts, base_level=base_level,
-                              shiftable=shiftable, autolevel=bool(enemy_def.get('autolevel'))))
+                              shiftable=shiftable, **_our_load_kwargs(enemy_def)))
     return out
 
 
@@ -1307,7 +1310,7 @@ def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff
                             mode=mode, shifts=shifts,
                             base_level=_our_base_level(dict(ed, level=lv)),
                             shiftable=_our_takes_difficulty_shift(ed),
-                            autolevel=bool(ed.get('autolevel')))
+                            **_our_load_kwargs(ed))
                  for cls, lv in (dict.fromkeys(bodies) if distinct else bodies)]
     else:
         # One body per DECLARED level, not `count` copies of one: a wave authored as
