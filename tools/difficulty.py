@@ -857,8 +857,14 @@ def vanilla_enemies(parity_ref, mode=None):
     return None if bodies is None else [u for u, _ai in bodies]
 
 
-def vanilla_enemy_bodies(parity_ref, mode=None):
-    """`vanilla_enemies`, each unit paired with its 4 AI bytes: [(Combatant, ai)]."""
+def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
+    """(array, index, UnitDefinition dict, Combatant) for every RED unit the twin fields with a
+    modeled weapon, loaded as the engine loads it in `mode` (ADR 0354). None when the reference
+    is uncurated. The one place the twin's force is built; every reader filters or reshapes it.
+
+    The REAL ARTICLE (#285): a named vanilla unit fights as class base PLUS its own
+    CharacterData line, symmetric with our side, which resolves its lines through
+    unit_real_article(). `with_personal=False` reads the same unit off class base alone."""
     spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
     if spec is None:
         return None
@@ -880,19 +886,18 @@ def vanilla_enemy_bodies(parity_ref, mode=None):
             weapon = _weapon_from_item_enums(d['items'])
             if weapon is None:
                 continue
-            # The REAL ARTICLE (#285): a named vanilla unit fights as class base PLUS its own
-            # CharacterData line, so the aggregate reads it that way -- symmetric with our side,
-            # which resolves its lines through unit_real_article(). Measured off class base,
-            # both sides understated their named units and did so unevenly, because the two
-            # sides carry lines through different mechanisms. `inf` is no longer a hazard here:
-            # metric_rounds_to_kill floors the damage rather than dropping the unit.
             ch = d.get('charIndex')
-            out.append((_enemy_from_enum('%s#%d[%s]' % (array_name, i, ch),
-                                         d['classIndex'], d['level'],
-                                         weapon, vanilla_personal_line(ch),
-                                         mode=mode, shifts=shifts, **_vanilla_load_kwargs(d)),
-                        d['ai']))
+            out.append((array_name, i, d, _enemy_from_enum(
+                '%s#%d[%s]' % (array_name, i, ch), d['classIndex'], d['level'], weapon,
+                vanilla_personal_line(ch) if with_personal else None,
+                mode=mode, shifts=shifts, **_vanilla_load_kwargs(d))))
     return out
+
+
+def vanilla_enemy_bodies(parity_ref, mode=None):
+    """`vanilla_enemies`, each unit paired with its 4 AI bytes: [(Combatant, ai)]."""
+    units = vanilla_loaded_units(parity_ref, mode)
+    return None if units is None else [(c, d['ai']) for _a, _i, d, c in units]
 
 
 def _vanilla_internal_name(parity_ref):
@@ -930,28 +935,12 @@ def vanilla_chapter_shifts(parity_ref):
     return None
 
 
-def vanilla_named_bosses(parity_ref, with_personal=True):
+def vanilla_named_bosses(parity_ref, with_personal=True, mode=None):
     """The twin's NAMED units as (name, Combatant). Used only by the role check -- see the
     note in vanilla_enemies about keeping the aggregate class-base-only."""
-    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
-    if spec is None:
-        return []
-    relpath, arrays = spec
-    text = inject.decomp.vanilla_decomp_text(relpath)
-    out = []
-    for array_name in arrays:
-        for d in vanilla_unit_defs(text, array_name):
-            ch = d.get('charIndex')
-            if d['allegiance'] != 'FACTION_ID_RED' or not str(ch or '').startswith('CHARACTER_'):
-                continue
-            weapon = _weapon_from_item_enums(d['items'])
-            if weapon is None:
-                continue
-            out.append((ch.replace('CHARACTER_', '').title(),
-                        _enemy_from_enum(ch, d['classIndex'], d['level'], weapon,
-                                         vanilla_personal_line(ch) if with_personal else None,
-                                         **_vanilla_load_kwargs(d))))
-    return out
+    return [(d['charIndex'].replace('CHARACTER_', '').title(), dataclasses.replace(c, name=d['charIndex']))
+            for _a, _i, d, c in vanilla_loaded_units(parity_ref, mode, with_personal) or []
+            if str(d.get('charIndex') or '').startswith('CHARACTER_')]
 
 
 def vanilla_boss_bar(parity_ref):
@@ -3292,34 +3281,24 @@ def chapter_enemy_groups(chap):
     return g
 
 
-def vanilla_enemy_groups(parity_ref):
+def vanilla_enemy_groups(parity_ref, mode=None):
     """Vanilla twin force split by role, with convertibles (CHAR targets) and reinforcement
     turns (TurnEventPlayer-loaded arrays) auto-detected from HEAD. None if uncurated."""
-    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
-    if spec is None:
+    units = vanilla_loaded_units(parity_ref, mode, with_personal=False)
+    if units is None:
         return None
-    relpath, arrays = spec
     stem = PARITY_REFERENCE_STEM.get(parity_ref)
     conv_chars = _vanilla_convertible_chars(stem) if stem else set()
     reinf_turns = _vanilla_reinforcement_turns(stem) if stem else {}
-    text = inject.decomp.vanilla_decomp_text(relpath)
     g = {'line': [], 'reinforcements': [], 'convertibles': []}
-    for arr in arrays:
-        turn = reinf_turns.get(arr, 1)
-        for i, d in enumerate(vanilla_unit_defs(text, arr)):
-            if d['allegiance'] != 'FACTION_ID_RED':
-                continue
-            weapon = _weapon_from_item_enums(d['items'])
-            if weapon is None:
-                continue
-            u = _enemy_from_enum('%s#%d' % (arr, i), d['classIndex'], d['level'], weapon,
-                                 **_vanilla_load_kwargs(d))
-            if d['charIndex'] in conv_chars:
-                g['convertibles'].append(u)
-            elif turn > 1:
-                g['reinforcements'].append(u)
-            else:
-                g['line'].append(u)
+    for arr, i, d, u in units:
+        u = dataclasses.replace(u, name='%s#%d' % (arr, i))
+        if d['charIndex'] in conv_chars:
+            g['convertibles'].append(u)
+        elif reinf_turns.get(arr, 1) > 1:
+            g['reinforcements'].append(u)
+        else:
+            g['line'].append(u)
     return g
 
 
