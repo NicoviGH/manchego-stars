@@ -92,8 +92,9 @@ enters it early"*; the rules that follow from them:
 
 | What | Where |
 |---|---|
-| Base ROM | `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Fire Emblem - The Sacred Stones (USA, Australia).gba` |
-| Reference PDFs (Tasha's, Metallurgist, etc.) | `/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/References/` (PDFs + frostmaiden-resources.md live here in the source folder; frostmaiden-resources.md is also copied to `docs/`) |
+| Source assets (base ROM, Battle Anims, the books, `References/`) | `references/`: a gitignored link in the repo root to `~/Projects/manchego-stars-assets` (copyrighted, never committed). Every path below goes through it, so moving the folder means repointing one link (`ln -sfn <dir> references`). |
+| Base ROM | `references/Fire Emblem - The Sacred Stones (USA, Australia).gba` |
+| Reference PDFs (Tasha's, Metallurgist, etc.) | `references/References/` (PDFs + frostmaiden-resources.md; frostmaiden-resources.md is also copied to `docs/`) |
 | *Rime of the Frostmaiden*, searchable | `rime-of-the-frostmaiden-ocr.txt` in that References folder: the book PDF is an image-only scan, and this is its OCR text (macOS Vision, 2026-10-11), one `===== PDF page N (printed p.N-1) =====` header per page. grep it; open the page image only to see art or a map. |
 | PC D&D Beyond JSON sheets | `data/pc-sheets/*.json` |
 | PC portrait URLs | `data/pc-sheets/portraits.json` |
@@ -111,7 +112,7 @@ make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba -j$(nproc)
 The decomp's own quickstart (to verify the base ROM builds clean):
 ```sh
 cd fireemblem8u
-./scripts/quickstart.sh --rom "/Users/Yonick/Documents/Claude/Projects/Manchego Stars / Fire Emblem Game/Fire Emblem - The Sacred Stones (USA, Australia).gba"
+./scripts/quickstart.sh --rom "../references/Fire Emblem - The Sacred Stones (USA, Australia).gba"
 ```
 
 **`make` must be green at the end of every session. Never commit a broken build.**
