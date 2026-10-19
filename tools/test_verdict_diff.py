@@ -48,10 +48,10 @@ class Moved(unittest.TestCase):
 
 class Render(unittest.TestCase):
     def test_nothing_moved_still_prints_the_grid(self):
-        s = snap(table={'CH1 ch01': row()})
+        s = snap(normal={'CH1 ch01': row()})
         md = vd.render(s, s)
         self.assertIn('**0 verdict(s) changed**, 0 row(s) moved', md)
-        self.assertIn('| CH1 ch01 | OK |', md)
+        self.assertIn('| CH1 ch01 |  | OK |  |', md)
         self.assertIn('No verdict, ratio or finding moved.', md)
 
     def test_a_flip_is_bold_and_counted(self):
@@ -63,8 +63,16 @@ class Render(unittest.TestCase):
         self.assertIn('| CH4 ch04 | normal | OK → OFF | x1.00 → x1.00 | x1.20 → x1.30 |  |',
                       md)
 
+    def test_a_changed_finding_is_spelled_out_once_across_modes(self):
+        before = snap(normal={'CH3 ch03': row()}, tutorial={'CH3 ch03': row()})
+        after = snap(normal={'CH3 ch03': row(role=['boss folds'])},
+                     tutorial={'CH3 ch03': row(role=['boss folds'])})
+        md = vd.render(before, after)
+        self.assertIn('- CH3 ch03, new (tutorial, normal): boss folds', md)
+        self.assertEqual(md.count('boss folds'), 1)
+
     def test_chapters_sort_by_number_not_text(self):
-        s = snap(table={'CH10 ch10': row(), 'CH2 ch02': row()})
+        s = snap(normal={'CH10 ch10': row(), 'CH2 ch02': row()})
         md = vd.render(s, s)
         self.assertLess(md.index('CH2 ch02'), md.index('CH10 ch10'))
 

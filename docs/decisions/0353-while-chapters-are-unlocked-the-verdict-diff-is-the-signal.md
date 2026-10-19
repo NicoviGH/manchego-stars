@@ -14,8 +14,9 @@ lock, a change that moves a chapter's parity would land silently, and a model st
 show that it moved the verdicts it claimed to move.
 
 **Every PR that touches a parity input gets a verdict diff** (`tools/verdict_diff.py`,
-`make verdict-diff`): the campaign curve read on the base commit and on the PR, in the
-authored table and in Tutorial, Normal and Difficult, and every chapter-by-mode cell whose
+`make verdict-diff`): the campaign curve read on the base commit and on the PR, in
+Tutorial, Normal and Difficult (the authored table too until #510 step 2 retired it, ADR
+0355), and every chapter-by-mode cell whose
 verdict, threat ratio, clear-load ratio, accepted residual or per-unit finding moved. It runs
 on every PR rather than only on #510's, because the moves it exists to catch come from PRs
 that were not about difficulty: #508's pid rewrite took ch04's Mogalls from 32 HP to 15.

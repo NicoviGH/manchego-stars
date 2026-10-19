@@ -1971,7 +1971,7 @@ def report(campaign, ch, mode=None):
               % (num, ref))
 
     _print_pressure(_chapter_pressure(chap, campaign=campaign))
-    print_role_findings(chap, chap.get('parity_reference'), campaign)  # authored table
+    print_role_findings(chap, chap.get('parity_reference'), campaign, mode)
     _print_economy(chap)
     _print_dynamics(chap)
     import timeline                         # timeline imports this module (via danger_map)
@@ -2461,17 +2461,18 @@ def ai_donor_findings(chap):
     return findings
 
 
-def role_findings(chap, parity_ref, campaign=None):
+def role_findings(chap, parity_ref, campaign=None, mode=None):
     """Per-unit role warnings: outlier threat vs the twin's ceiling, and a boss that is not
     the chapter's real centre of gravity. Returns a list of strings (empty == clean).
 
     With a `campaign` and a twin the party model reaches, every arm reads both forces against
-    the party that meets ours (`_role_findings_vs_party`). Otherwise it falls back to the fixed
-    YARDSTICK, as the aggregate does off VANILLA_CHAIN."""
+    the party that meets ours (`_role_findings_vs_party`), each side loaded for `mode` (#510
+    step 2): a boss that holds on Normal can still fold on Tutorial. Otherwise it falls back to
+    the fixed YARDSTICK on the declared levels, as the aggregate does off VANILLA_CHAIN."""
     if campaign and parity_ref in VANILLA_CHAIN:
-        matchup = chapter_matchup(chap, campaign)
+        matchup = chapter_matchup(chap, campaign, mode=mode)
         if matchup is not None:
-            return _role_findings_vs_party(chap, parity_ref, matchup)
+            return _role_findings_vs_party(chap, parity_ref, matchup, mode)
     van = vanilla_enemies(parity_ref)
     if not van:
         return []
@@ -2551,7 +2552,7 @@ def _boss_census(ids):
     return []
 
 
-def _boss_durability_vs_party(entries, parity_ref, lines):
+def _boss_durability_vs_party(entries, parity_ref, lines, mode=None, shifts=None):
     """The durability arms on the party's median lines, in the yardstick's place. Read here
     rather than off the matchup, whose clear-load floors an undentable body to a finite chip
     read and stands every body on open ground: the throne and the wall are what these arms
@@ -2563,10 +2564,11 @@ def _boss_durability_vs_party(entries, parity_ref, lines):
         rate = sum(1.0 / r for r in (fc.rounds_to_kill(u, body, avoid)
                                      for u in lines if u.weapon is not None) if r != inf)
         return 1.0 / rate if rate else inf
-    twin = [party_rounds(c) for n, c in vanilla_named_bosses(parity_ref, with_personal=True)
+    twin = [party_rounds(c) for n, c in vanilla_named_bosses(parity_ref, with_personal=True,
+                                                               mode=mode)
             if 'CA_BOSS' in exp_curve.character_attributes('CHARACTER_' + n.upper())]
     bar = max((r for r in twin if r != inf), default=0.0) or \
-        max((r for r in map(party_rounds, vanilla_enemies(parity_ref) or []) if r != inf),
+        max((r for r in map(party_rounds, vanilla_enemies(parity_ref, mode) or []) if r != inf),
             default=0.0)
     out = []
     for ed in entries:
@@ -2574,7 +2576,8 @@ def _boss_durability_vs_party(entries, parity_ref, lines):
             continue
         tile = ed.get('tile_terrain')
         where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
-        for c in _entry_combatants(ed, real_article=True, drop_staff=False, distinct=True):
+        for c in _entry_combatants(ed, mode=mode, shifts=shifts, real_article=True,
+                                   drop_staff=False, distinct=True):
             body, avoid = on_terrain(c, tile)
             rounds = party_rounds(body, avoid)
             if rounds == inf:
@@ -2587,7 +2590,7 @@ def _boss_durability_vs_party(entries, parity_ref, lines):
     return out
 
 
-def _role_findings_vs_party(chap, parity_ref, matchup):
+def _role_findings_vs_party(chap, parity_ref, matchup, mode=None):
     """The role check on instrument v2 (#430 step 6): our force and the twin's, BOTH met by our
     arriving party (the matchup's `cross` read), so each comparison isolates what authoring
     controls. Reading the twin against vanilla's own party would charge it for Lute's Res: the
@@ -2646,13 +2649,15 @@ def _role_findings_vs_party(chap, parity_ref, matchup):
                            % (name, threat, len(harder),
                               ', '.join('%s (%.1f)' % (n, t) for t, n in harder[:4]),
                               harder[0][0] / threat, parity_ref, van_ratio))
-    out.extend(_boss_durability_vs_party(entries, parity_ref, list(matchup['lines'].values())))
+    shifts = inject.chapter_settings.chapter_difficulty_shifts(chap) if mode else None
+    out.extend(_boss_durability_vs_party(entries, parity_ref, list(matchup['lines'].values()),
+                                         mode, shifts))
     out.extend(_boss_census(e.get('id') for e in entries if e.get('is_boss')))
     return list(dict.fromkeys(out))
 
 
-def print_role_findings(chap, parity_ref, campaign=None):
-    findings = role_findings(chap, parity_ref, campaign)
+def print_role_findings(chap, parity_ref, campaign=None, mode=None):
+    findings = role_findings(chap, parity_ref, campaign, mode)
     print('\n-- PER-UNIT ROLE CHECK (what the per-slot averages hide) ' + '-' * 12)
     if not findings:
         print('  clean -- no threat outliers, boss is the chapter\'s hardest hitter')
@@ -3381,14 +3386,36 @@ def curve_gate_failures(rows):
                                 or r.get('role') or r.get('ai'))]
 
 
-def curve_report(campaign, band=0.25, mode=None):
+def locked_chapters(campaign):
+    """The ids of the chapters content has marked balance-final (`balance_locked: true`)."""
+    paths = glob.glob(os.path.join(inject.decomp.REPO, 'campaigns', campaign, 'chapters',
+                                   'ch*.yaml'))
+    return {c['id'] for c in map(chapter_schema.load, paths) if c.get('balance_locked')}
+
+
+def gate_failures(campaign, modes=MODES):
+    """(locked ids, failures): the --check gate over every difficulty mode (#510 step 2). The
+    finished game ships all three of vanilla's modes, so a locked chapter holds parity only if
+    it holds in each; a failure is labelled with the mode it failed in. The authored table is
+    not one of them: no player meets the levels a chapter declares before its mode's shift.
+    Only locked chapters are read, so with none locked the gate costs nothing."""
+    locked = locked_chapters(campaign)
+    fails = []
+    for mode in (modes if locked else ()):
+        fails += ['%s (%s)' % (label, mode)
+                  for label in curve_gate_failures(curve_report(campaign, mode=mode, only=locked))]
+    return locked, fails
+
+
+def curve_report(campaign, band=0.25, mode=None, only=None):
     """Campaign-wide enemy-pressure curve: one row per authored chapter, ours vs its vanilla
     reference, so spikes/sags across the arc are visible at a glance (#48). Returns the per-chapter
     rows (label / has_ref / verdict / boss_drop) so the --check gate can act on them.
 
     `mode` grades a difficulty mode on BOTH sides instead of the authored table (#303). The
     banner says which, because a verdict that does not name its configuration is the thing
-    #303 set out to fix."""
+    #303 set out to fix. `only`, a set of chapter ids, reads just those chapters: the gate
+    needs its locked ones and nothing else."""
     paths = sorted(glob.glob(os.path.join(
         inject.decomp.REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml')))
     bar = '=' * 86
@@ -3399,8 +3426,7 @@ def curve_report(campaign, band=0.25, mode=None):
           % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
              if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
     if mode:
-        print('  NB per-unit role findings and planned-chapter targets below are graded on the'
-              '\n     AUTHORED table, not on %s -- only the parity rows are mode-shifted.'
+        print('  NB planned-chapter targets below are graded on the AUTHORED table, not on %s.'
               '\n     mirror%% is INVARIANT: a mode shifts stats, never a unit\'s class or level,'
               '\n     and the Hard-only waves are folded into both sides unconditionally.'
               % mode.upper())
@@ -3413,6 +3439,8 @@ def curve_report(campaign, band=0.25, mode=None):
     rows = []
     any_dropped_boss = False
     for chap in sorted(chaps, key=lambda c: c.get('chapter_number', 99)):
+        if only is not None and chap.get('id') not in only:
+            continue
         label = 'CH%s %s' % (chap.get('chapter_number'), chap.get('id', ''))
         # `status: planned` chapters are brainstorm SEED, not authoritative -- their enemy
         # roster/levels are re-grounded against vanilla + party data when the slice is reached
@@ -3455,7 +3483,7 @@ def curve_report(campaign, band=0.25, mode=None):
         verdict = p['verdict']['verdict'] if has_ref else None
         # The per-unit findings ride along so the gate can read them (#284) -- the aggregate
         # above cannot see a single soft unit, which is exactly how two paper bosses shipped.
-        role = role_findings(chap, p['reference'], campaign) if has_ref else []
+        role = role_findings(chap, p['reference'], campaign, mode) if has_ref else []
         if role:
             flag += '  !!role'
         # ... and whether every enemy's AI is grounded in a vanilla donor (#335). Invisible
@@ -3541,7 +3569,8 @@ def main():
                     help='with --curve: the hard CI gate (#48 (b)) -- exit non-zero if any '
                          'balance_locked chapter is off-parity, unreliably measured, '
                          'missing its reference, or carrying an open per-unit role '
-                         'finding (UNLOCKED chapters never gate)')
+                         'finding, in ANY of the three modes (#510 step 2; --mode grades one). '
+                         'UNLOCKED chapters never gate')
     ap.add_argument('--mode', choices=MODES,
                     help='grade a DIFFICULTY MODE instead of the authored table (#303). Both '
                          'sides are shifted by their own chapter\'s declared numbers, so the '
@@ -3554,16 +3583,21 @@ def main():
     ap.add_argument('--res-cap', type=int, default=4, help='floor: max +Res')
     ap.add_argument('--hp-cap', type=int, default=12, help='floor: max +HP')
     args = ap.parse_args()
+    if args.curve and args.check:
+        locked, fails = gate_failures(args.campaign, (args.mode,) if args.mode else MODES)
+        if not locked:
+            print('PARITY GATE: no chapter is balance_locked, so it enforces nothing; '
+                  '`make verdict-diff` shows what a change moves (ADR 0353).')
+        elif fails:
+            print('\n!! PARITY GATE: %d locked chapter-mode(s) off-parity, unreliable, or '
+                  'carrying a role finding: %s' % (len(fails), ', '.join(fails)))
+            sys.exit(1)
+        else:
+            print('\nPARITY GATE: every locked chapter holds parity in %s.'
+                  % ', '.join(m.title() for m in ((args.mode,) if args.mode else MODES)))
+        return
     if args.curve:
-        rows = curve_report(args.campaign, mode=args.mode)
-        if args.check:
-            fails = curve_gate_failures(rows)
-            if fails:
-                print('\n!! PARITY GATE: %d locked chapter(s) off-parity, unreliable, or '
-                      'carrying a role finding: %s'
-                      % (len(fails), ', '.join(fails)))
-                sys.exit(1)
-            print('\nPARITY GATE: all referenced chapters at parity.')
+        curve_report(args.campaign, mode=args.mode)
         return
     if not args.chapter:
         ap.error('--chapter is required (or pass --curve for the campaign-wide report)')
