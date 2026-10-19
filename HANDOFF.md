@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-19 (Claude). **The parity model is being rebuilt before any party or chapter
+Refreshed 2026-10-19 (Claude, after #511). **The parity model is being rebuilt before any party or chapter
 change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
 grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
 Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
@@ -39,9 +39,9 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
 
 **Next, in order (#510's list is the plan):**
 
-1. **#510 step 0: a verdict diff on every PR**, each chapter in Tutorial/Normal/Difficult, before vs
-   after. It replaces the lock as the regression signal while chapters are unlocked. Build it first,
-   so #490's own PR is the first to show its movement.
+1. **#510 step 0 is DONE (#511, ADR 0353).** `make verdict-diff [BASE=ref]`; CI runs it on a
+   PR that touches a parity input (`verdict_diff.py needed`) and comments only when a cell
+   moved. #490's PR is the first that should show movement.
 2. **#510 step 1: land #490** (the bullet above), then steps 2-9 in order, each with an in-engine
    proof and the verdict diff. Stop when a step moves no verdict.
 3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
