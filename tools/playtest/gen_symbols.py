@@ -378,8 +378,9 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     the harness's own comments warned about that trap three times over."""
     from inject.cast import _classed_cast, classed_cast, load_unit, PORTRAIT_MAP, RAW_PID_HELP
     from inject.text import help_text_body, slot_desc_text_id
-    from inject.chapter_ids import (CH01_BOSS_SLOT, CH02_CHWINGA, CH04_MOOSE_PID, CH05_BOSS_PID,
-                                    CH05_MOOSE_PID, CH06_BOAT_PIDS, PROLOGUE_HLIN_SLOT,
+    from inject.chapter_ids import (CH01_BOSS_SLOT, CH02_CHWINGA, CH03_BOSS_PID, CH04_MOOSE_PID,
+                                    CH05_BOSS_PID, CH05_MOOSE_PID, CH06_BOAT_PIDS,
+                                    PROLOGUE_HLIN_SLOT,
                                     PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
     from inject.chapters.ch01 import CH01_CHAPTER_YAML
     from inject.chapters.ch02 import CH02_CHAPTER_YAML, CH02_CLASS_IDS
@@ -436,6 +437,7 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
         'CH02_CHARMS': [items[ITEM_ENUM[g['gift']]] for g in field],
         'CH02_ARCHER_CLASS': classes[CH02_CLASS_IDS['archer']],
         'CH04_PACK_PIDS': {int(p, 0): True for p in CH04_PACK_PIDS},   # a SET: indexed by charId
+        'CH03_BOSS_PID': int(CH03_BOSS_PID, 0),
         'CH04_MOOSE_PID': int(CH04_MOOSE_PID, 0),
         'CH05_BOSS_PID': int(CH05_BOSS_PID, 0),
         'CH05_MOOSE_PID': int(CH05_MOOSE_PID, 0),

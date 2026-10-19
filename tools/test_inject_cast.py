@@ -417,7 +417,8 @@ class RavisinPortrait(unittest.TestCase):
 
     def test_raw_boss_pid_gets_the_riev_identity(self):
         # The fixture carries EVERY registered raw pid, because raw_pid_portrait_data binds all
-        # of them -- the moose (0xb9) joined the registry in #25, the grell (0xb7) in #284.
+        # of them -- the moose (0xb9) joined the registry in #25, the grell in #284 (its row is
+        # 0xb7's, cloned onto its own pid in #490).
         # The grell is the case that proves the two bindings are independent: it takes a personal
         # line and NO identity, so it must keep the generic 0x255 name plate and gain no portrait.
         source = '''[0xb7 - 1] = {
@@ -502,7 +503,11 @@ class RavisinPortrait(unittest.TestCase):
         .miniPortrait = 0x1,
         .baseLevel = 1,
     },'''
-        # ...and each chapter's generic pid with the vanilla row it clones (#493)
+        # ...and each chapter's generic pid with the vanilla row it clones (#493), and the grell's
+        # fresh row, an unused "Enemy" stub until 0xb7's Mogall row is cloned onto it (#490)
+        source += ('\n    [%s - 1] = {\n        .nameTextId = 0x267,\n        .number = %s,\n'
+                   '        .defaultClass = CLASS_BRIGAND,\n        .baseLevel = 1,\n    },'
+                   % ((inject.chapter_ids.CH03_BOSS_PID,) * 2))
         donors = inject.chapter_ids.GENERIC_PID_DONORS
         source += ''.join('\n    [%s - 1] = {\n        .nameTextId = 0x24d,\n'
                           '        .descTextId = 0x2a9,\n        .number = %s,\n    },' % (p, p)
@@ -513,8 +518,8 @@ class RavisinPortrait(unittest.TestCase):
         self.assertIn('.nameTextId = 0x246,', patched)
         self.assertIn('.portraitId = 0x48,', patched)
         # Ravisin and Messie are the DRESSED raw pids (Riev's face, Syrene's); the moose and
-        # ch06's two boats are named without a bust, and the grell takes neither -- so exactly
-        # one name plate stays generic.
+        # ch06's two boats are named without a bust, and the grell takes neither -- so two rows
+        # carry the generic Monster plate: vanilla's 0xb7, and the grell's clone of it.
         self.assertEqual(2, patched.count('.portraitId'))
         self.assertIn('.nameTextId = 0x232,', patched)     # Syrene's name plate, retitled Messie
         self.assertIn('.portraitId = 0x2B,', patched)      # Syrene's face, dressed with his bust
@@ -522,12 +527,12 @@ class RavisinPortrait(unittest.TestCase):
         self.assertIn('.nameTextId = 0x%X,' % inject.chapter_ids.CH05_MOOSE_NAME_MSG, patched)
         self.assertIn('.nameTextId = 0x%X,' % boats['boat-east'], patched)   # the Burly Ram
         self.assertIn('.nameTextId = 0x%X,' % boats['boat-west'], patched)   # the Pronged Goat
-        self.assertEqual(1, patched.count('.nameTextId = 0x255,'))
+        self.assertEqual(2, patched.count('.nameTextId = 0x255,'))
         # ...and every raw-pid boss leaves with a baseLevel matching its deploy level, so the
         # difficulty malus cannot reset its line (#303, RAW_PID_LEVEL_SOURCES).
         self.assertIn('.baseLevel = 7,', patched)      # Ravisin, level 7
         self.assertIn('.baseLevel = 3,', patched)      # the kobold brute, level 3
-        self.assertEqual(5, patched.count('.miniPortrait = 0x4,'))
+        self.assertEqual(6, patched.count('.miniPortrait = 0x4,'))
 
         for chapter_yaml, uid in ((inject.chapter_ids.CH05_CHAPTER_YAML, 'ravisin'),
                                   (inject.chapter_ids.CH03_CHAPTER_YAML, 'grell')):

@@ -59,7 +59,7 @@ from inject.map_sprites import inject_map_sprites
 from inject.maps import inject_winter_tileset
 from inject.messages import (
     assert_literals_are_claimed, assert_message_blocks_disjoint, assert_message_ids_unique,
-    assert_named_raw_pids_are_exclusive, live_ids_in_declared_blocks)
+    assert_rewritten_raw_pids_are_exclusive, live_ids_in_declared_blocks)
 from inject.names import inject_item_names, inject_names
 from inject.platforms import inject_battle_platforms
 from inject.portraits import inject_portraits, patch_portrait_face_data
@@ -258,7 +258,7 @@ STEPS = [
     # hosted chapters claim one message id -- a double-claim is otherwise silent, since
     # verify_text checks runaway text, not who owns a slot.
     Step(assert_message_ids_unique),
-    Step(assert_named_raw_pids_are_exclusive),
+    Step(assert_rewritten_raw_pids_are_exclusive),
     Step(assert_literals_are_claimed),
     Step(assert_message_blocks_disjoint),   # the setup that would make a collision inevitable
     Step(_assert_declared_blocks_clear),

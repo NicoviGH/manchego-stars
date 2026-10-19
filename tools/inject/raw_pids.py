@@ -85,12 +85,13 @@ def raw_pid_portrait_data(text, campaign):
 
 def clone_generic_rows(text):
     """Copy each generic pid's donor row onto it whole, so the pid a chapter's generics moved to
-    (#493) loads exactly as the vanilla generic they used to share. Only `.number` and the help
+    (#493) loads exactly as the vanilla generic they used to share, and a raw-pid boss's fresh row
+    starts as the vanilla generic it reskins (BOSS_PID_ROW_DONORS, #490). Only `.number` and the help
     text (`RAW_PID_HELP`) change here, and the name binding that follows gives it the
     chapter's name."""
-    from inject.chapter_ids import GENERIC_PID_DONORS
+    from inject.chapter_ids import BOSS_PID_ROW_DONORS, GENERIC_PID_DONORS
     from inject.cast import RAW_PID_HELP
-    for pid, donor in sorted(GENERIC_PID_DONORS.items()):
+    for pid, donor in sorted(dict(GENERIC_PID_DONORS, **BOSS_PID_ROW_DONORS).items()):
         s, e = _find_brace_block(text, '[%s - 1]' % donor, CHARACTERS_C)
         row = text[s:e].replace('[%s - 1]' % donor, '[%s - 1]' % pid, 1)
         row, n = re.subn(r'(\.number\s*=\s*)%s,' % donor, r'\g<1>%s,' % pid, row, count=1)
