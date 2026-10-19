@@ -29,6 +29,9 @@ class Moved(unittest.TestCase):
     def test_a_ratio_below_print_precision_does_not_move(self):
         self.assertEqual(vd._moved(row(tr=1.061), row(tr=1.064)), [])
 
+    def test_a_small_move_across_a_rounding_boundary_moves(self):
+        self.assertEqual(vd._moved(row(tr=1.064), row(tr=1.066)), ['threat_ratio'])
+
     def test_a_ratio_the_curve_would_print_differently_moves(self):
         self.assertEqual(vd._moved(row(lr=1.36), row(lr=1.30)), ['load_ratio'])
 

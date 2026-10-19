@@ -22,8 +22,8 @@ posts it as one PR comment, updated on each push, and in the job summary.
 - **It never fails a build.** A model step exists to move verdicts. The diff is evidence a
   reviewer reads against the step's claim, and #510's stopping rule ("stop when a step moves
   no verdict") is read off it.
-- **A ratio moves when its printed value would.** The curve prints two decimals, so the diff
-  ignores movement under 0.005.
+- **A ratio moves when its printed value would.** The curve prints two decimals, and the
+  diff compares those, not a delta.
 - **Both trees read the same vanilla.** The base tree is a worktree with this checkout's
   submodule linked in; the submodule pointer is never committed, so this is the decomp both
   sides were measured against.

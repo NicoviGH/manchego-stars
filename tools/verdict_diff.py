@@ -35,9 +35,6 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAMPAIGN = 'rime-of-the-frostmaiden'
 # The authored table first: it is what the lock graded, so it reads as the familiar column.
 MODES = ('table', 'tutorial', 'normal', 'difficult')
-# A ratio is printed to two places, so a smaller move is not one anybody reading the curve
-# could see either.
-RATIO_EPS = 0.005
 FIELDS = ('verdict', 'threat_ratio', 'load_ratio', 'accepted_adr', 'boss_drop', 'role', 'ai')
 
 
@@ -104,8 +101,10 @@ def _moved(before, after):
     moved = []
     for f in FIELDS:
         b, a = before.get(f), after.get(f)
+        # A ratio moves when the curve would PRINT it differently (two places): a delta
+        # test would miss 1.064 -> 1.066, and an old tree's ratios are already rounded.
         if f.endswith('_ratio') and isinstance(b, float) and isinstance(a, float):
-            if abs(a - b) >= RATIO_EPS:
+            if '%.2f' % a != '%.2f' % b:
                 moved.append(f)
         elif b != a:
             moved.append(f)
