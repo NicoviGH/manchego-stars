@@ -230,11 +230,20 @@ def _finding_changes(changed):
     does not say what a reviewer should look at. One line per (chapter, finding), listing
     the modes it changed in, so a change that lands in all three reads once."""
     lines = {}
+    shape = lambda t: re.sub(r'\d+(?:\.\d+)?', '#', t)    # a finding, numbers aside
     for lab, mode, b, a, _mv in changed:
         for field in ('role', 'ai'):
             was, now = set((b or {}).get(field) or []), set((a or {}).get(field) or [])
-            for sign, texts in (('new', now - was), ('gone', was - now)):
-                for t in sorted(texts):
+            gone, new = sorted(was - now), sorted(now - was)
+            # The same finding with new numbers reads as one change, not a new and a gone.
+            for g in list(gone):
+                twin = next((n for n in new if shape(n) == shape(g)), None)
+                if twin is not None:
+                    gone.remove(g)
+                    new.remove(twin)
+                    lines.setdefault((lab, 'changed', '%s  →  %s' % (g, twin)), []).append(mode)
+            for sign, texts in (('new', new), ('gone', gone)):
+                for t in texts:
                     lines.setdefault((lab, sign, t), []).append(mode)
     if not lines:
         return []

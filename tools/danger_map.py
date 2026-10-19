@@ -112,14 +112,6 @@ class Body:
     arms: tuple
 
 
-def _arms(enemy, combatant):
-    weapons = [dif._weapon_for([item]) for item in (enemy.get('inventory') or ())]
-    weapons = [w for w in weapons if w is not None and w.kind != 'staff']
-    if not weapons and combatant.weapon is not None:
-        weapons = [combatant.weapon]
-    return tuple(dataclasses.replace(combatant, weapon=w) for w in weapons)
-
-
 def bodies(chapter, mode=None, every_mode=False):
     """Every enemy body the chapter fields on `mode` (None reads the authored table, as
     `make difficulty` does). `every_mode` keeps the Difficult-only entries on any mode, for
@@ -142,7 +134,7 @@ def bodies(chapter, mode=None, every_mode=False):
                 table, mov = _movement(enemy, index)
                 out.append(Body(enemy.get('id'), index, tuple(tile), cs.ai_shape(ai), ai[0],
                                 arrives, table, mov,
-                                _arms(enemy, units[min(index, len(units) - 1)])))
+                                fc.arms(units[min(index, len(units) - 1)])))
     return out
 
 

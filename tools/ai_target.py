@@ -131,12 +131,20 @@ def combat_score(atk, dfn, table_id=0, turn=1):
     return best
 
 
-def pick_target(atk, party, table_id=0, turn=1):
-    """The party member the AI attacks: the first highest `combat_score` (the AI keeps a
-    candidate only on a strictly better score). None for an empty party."""
-    best, chosen = None, None
-    for unit in party:
-        s = combat_score(atk, unit, table_id, turn)
-        if best is None or s > best:
-            best, chosen = s, unit
+def pick_attack(atk, party, table_id=0, turn=1):
+    """(target, armed attacker) the AI attacks with: every carried weapon (`fc.arms`) against
+    every party member, items outer and targets inner, keeping a candidate on `>=` -- so a tie
+    goes to the LATER weapon, then the later target (`AiAttemptOffensiveAction`, cp_battle.c).
+    (None, None) for an empty party or a weaponless attacker."""
+    best, chosen = None, (None, None)
+    for armed in fc.arms(atk):
+        for unit in party:
+            s = combat_score(armed, unit, table_id, turn)
+            if best is None or s >= best:
+                best, chosen = s, (unit, armed)
     return chosen
+
+
+def pick_target(atk, party, table_id=0, turn=1):
+    """The party member the AI attacks (`pick_attack`'s target)."""
+    return pick_attack(atk, party, table_id, turn)[0]

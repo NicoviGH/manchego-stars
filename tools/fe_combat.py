@@ -22,7 +22,7 @@ Combat model (bmbattle.c line cites):
 Triangle (GBA FE8): advantage +1 Mt / +15 Hit, disadvantage -1 Mt / -15 Hit.
 """
 import functools
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 
 @dataclass(frozen=True)
@@ -110,6 +110,17 @@ class Combatant:
     con: int
     weapon: Weapon
     tags: frozenset = field(default_factory=frozenset)
+    # Every weapon the unit carries, in inventory order; `weapon` is the one it has equipped,
+    # which is what it counters with. Empty means `weapon` alone. See `arms`.
+    arsenal: tuple = ()
+
+
+def arms(c):
+    """One Combatant per weapon `c` carries, in inventory order: the order FE8's AI tries
+    them in (`AiAttemptOffensiveAction`'s item loop, cp_battle.c). A unit attacks with whichever
+    the AI picks against that target; it defends with its equipped `weapon`."""
+    weapons = c.arsenal or ((c.weapon,) if c.weapon is not None else ())
+    return tuple(replace(c, weapon=w) for w in weapons)
 
 
 def attack_speed(c):
