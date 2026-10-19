@@ -2894,20 +2894,24 @@ class ModeReadsAreHonestAboutScope(unittest.TestCase):
         text = out.getvalue().lower()
         self.assertIn('planned-chapter targets', text)
         self.assertIn('authored table', text)
-        self.assertNotIn('role findings', text)
+        self.assertIn('off\n     vanilla_chain', text)
 
     def test_role_findings_read_the_mode(self):
         """The boss-durability arm loads our boss for the mode it is asked about."""
         chap = df.load_field(CAMPAIGN, 'ch03')[0]
-        seen = []
-        real = df._entry_combatants
+        ours, twin = [], []
+        real = df._entry_combatants, df.vanilla_named_bosses
         try:
             df._entry_combatants = lambda ed, mode=None, shifts=None, **kw: (
-                seen.append(mode) or real(ed, mode=mode, shifts=shifts, **kw))
+                ours.append(mode) or real[0](ed, mode=mode, shifts=shifts, **kw))
+            df.vanilla_named_bosses = lambda ref, with_personal=True, mode=None: (
+                twin.append(mode) or real[1](ref, with_personal, mode))
             df.role_findings(chap, chap['parity_reference'], CAMPAIGN, mode='tutorial')
         finally:
-            df._entry_combatants = real
-        self.assertIn('tutorial', seen)
+            df._entry_combatants, df.vanilla_named_bosses = real
+        # Both sides of the comparison, never one shifted against the other unshifted (#303).
+        self.assertIn('tutorial', ours)
+        self.assertEqual(set(twin), {'tutorial'})
 
 
 class BossBaseLevelMarginIsGuarded(unittest.TestCase):

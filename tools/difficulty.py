@@ -27,6 +27,7 @@ import os
 import random
 import re
 
+import campaign_chapters  # noqa: E402
 import chapter_schema  # noqa: E402
 import inject.cast  # noqa: E402
 import inject.class_ids  # noqa: E402
@@ -1755,8 +1756,7 @@ ROSTER = list(inject.stats.BASE_DONOR.keys())     # the playable cast (each has 
 
 def chapter_path(campaign, ch):
     """Resolve a short id ('ch01') to its chapter YAML path."""
-    hits = sorted(glob.glob(os.path.join(
-        inject.decomp.REPO, 'campaigns', campaign, 'chapters', ch + '*.yaml')))
+    hits = sorted(glob.glob(os.path.join(campaign_chapters.chapters_dir(campaign), ch + '*.yaml')))
     if not hits:
         raise SystemExit('ERROR: no chapter YAML matching %r' % ch)
     return hits[0]
@@ -3388,9 +3388,8 @@ def curve_gate_failures(rows):
 
 def locked_chapters(campaign):
     """The ids of the chapters content has marked balance-final (`balance_locked: true`)."""
-    paths = glob.glob(os.path.join(inject.decomp.REPO, 'campaigns', campaign, 'chapters',
-                                   'ch*.yaml'))
-    return {c['id'] for c in map(chapter_schema.load, paths) if c.get('balance_locked')}
+    return {c['id'] for c in map(chapter_schema.load, campaign_chapters.paths(campaign))
+            if c.get('balance_locked')}
 
 
 def gate_failures(campaign, modes=MODES):
@@ -3416,8 +3415,7 @@ def curve_report(campaign, band=0.25, mode=None, only=None):
     banner says which, because a verdict that does not name its configuration is the thing
     #303 set out to fix. `only`, a set of chapter ids, reads just those chapters: the gate
     needs its locked ones and nothing else."""
-    paths = sorted(glob.glob(os.path.join(
-        inject.decomp.REPO, 'campaigns', campaign, 'chapters', 'ch*.yaml')))
+    paths = campaign_chapters.paths(campaign)
     bar = '=' * 86
     print(bar)
     print('CAMPAIGN ENEMY-PRESSURE CURVE -- ours vs vanilla parity_reference   '
@@ -3426,7 +3424,9 @@ def curve_report(campaign, band=0.25, mode=None, only=None):
           % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
              if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
     if mode:
-        print('  NB planned-chapter targets below are graded on the AUTHORED table, not on %s.'
+        print('  NB planned-chapter targets below, and the role findings of a twin off'
+              '\n     VANILLA_CHAIN (the yardstick fallback), are graded on the AUTHORED table,'
+              '\n     not on %s.'
               '\n     mirror%% is INVARIANT: a mode shifts stats, never a unit\'s class or level,'
               '\n     and the Hard-only waves are folded into both sides unconditionally.'
               % mode.upper())
