@@ -137,6 +137,16 @@ class TestPayloadCounts(unittest.TestCase):
                                         {'ITEM_TORCH': 'kept for ch09'})
         self.assertEqual(got, ['delivered', 'missing', 'deviation'])
 
+    def test_a_gift_to_a_named_unit_is_one_row(self):
+        # Vanilla Ch6 gives the Orion's Bolt to Eirika: one item, listed once with its
+        # recipient. Listing the gift and the grant apart asked ch06 for a second Bolt (#493).
+        chap = next(c for c in gen_wiki.chapters() if c['_slug'] == 'ch06')
+        html = gen_wiki.twin_payload_html(chap, 'FE8 Ch6')
+        self.assertEqual(html.count('<code>ITEM_ORIONSBOLT</code>'), 1)
+        self.assertIn('Given to Eirika', html)
+        hidden = gen_wiki.twin_payload_html(chap, 'FE8 Ch15')
+        self.assertEqual(hidden.count('Hidden treasure'), 9)
+
 
 class TestGenericNames(unittest.TestCase):
     """A generic's name cell is what the ROM's hover box and unit window print: its pid's

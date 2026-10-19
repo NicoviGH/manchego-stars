@@ -1044,15 +1044,11 @@ def _named_item_grants(stem):
     """[(CHARACTER_*, ITEM_*)] a chapter's script hands to a NAMED character -- Eirika's Rapier
     is `SVAL(EVT_SLOT_3, ITEM_SWORD_RAPIER)` + `GIVEITEMTO(CHARACTER_EIRIKA)` in the Prologue,
     not on her joining load. Village gifts go to whoever visits (`CHAR_EVT_ACTIVE_UNIT`), so
-    they are left out, as our own cast leaves them out."""
+    they are left out, as our own cast leaves them out. A gift either of two units gets (Ch14's
+    Audhulma: Joshua if he lives, else Eirika) goes to the first, the arm a full party runs."""
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    out = []
-    for item, char in re.findall(r'SVAL\(EVT_SLOT_3,\s*(\w+)\)\s*GIVEITEMTO\((CHARACTER_\w+)\)',
-                                 script):
-        if not item.startswith('ITEM_'):
-            item = _item_id_to_enum().get(int(item, 0), item)
-        out.append((char, item))
-    return out
+    return [(to[0], item) for item, to in _gift_records(script)
+            if to and all(t.startswith('CHARACTER_') for t in to)]
 
 
 def _vanilla_members(parity_ref):
@@ -2677,44 +2673,149 @@ def _shoplist_items(shoplist_text, list_sym):
     return [it for it in re.findall(r'ITEM_\w+', m.group(1)) if it != 'ITEM_NONE']
 
 
-def _gift_items(eventscript_text):
-    """Every item handed out in the chapter script: for each GIVEITEMTO, the nearest preceding
-    SVAL(EVT_SLOT_3, <id>) sets its item. Catches village/house gifts AND conditional/clear
-    rewards given outside a Village macro (e.g. Ch5's all-villages-saved Guiding Ring, handed to
-    the leader). Returns the ITEM_x enums. An event village that only spawns a unit (SVAL to a
-    different slot, no GIVEITEMTO) contributes nothing, as it should."""
+CHAPTER_MODE_EIRIKA = 2   # include/types.h; the route VANILLA_CHAIN and gen_wiki's twins follow
+
+
+@functools.lru_cache(maxsize=None)
+def _shared_give_scripts():
+    """The shared EventListScrs that GIVEITEMTO slot 3: a chapter that CALLs one gives the
+    item as surely as with its own GIVEITEMTO. Ch15's nine desert treasures go through
+    EventScr_GiveTreasureToLuckyDog, and a chapter-local scan never saw them. It hands the item
+    to a Thief or Rogue always (anyone else by a roll), and vanilla's party has one, so the
+    treasures count as given. Gold has no such vehicle: the one shared script that moves gold
+    (common-events.h's EventScr_9EEB00) charges Rennac's 9,980-gold hire."""
+    names = set()
+    for rel in ('src/events_script_utils.c', 'src/events/common-events.h'):
+        text = inject.decomp.vanilla_decomp_text(rel)
+        for m in re.finditer(r'EventListScr\s+(\w+)\[\]\s*=\s*\{(.*?)\n\};', text, re.S):
+            if re.search(r'GIVEITEMTO\(', m.group(2)):
+                names.add(m.group(1))
+    return frozenset(names)
+
+
+def _merge_gives(a, b):
+    """Two alternatives' gives, as `_script_gives` keeps them: per (kind, value), the larger
+    count, and every recipient either names."""
+    out = dict(a)
+    for key, (n, to) in b.items():
+        m, was = out.get(key, (0, ()))
+        out[key] = (max(n, m), was + tuple(t for t in to if t not in was))
+    return out
+
+
+def _walk_gives(cmds, labels, start, slot3, mode, give):
+    """{(kind, value): (count, recipients)} from cmds[start] to the script's end, along the
+    path that gives the most per value. The route is known, so a CHECK_MODE branch takes one
+    edge; every other branch takes both."""
+    memo, active = {}, set()
+
+    def walk(pc, slot3, cmode, slot1):
+        key = (pc, slot3, cmode, slot1)
+        if key in memo:
+            return memo[key]
+        if key in active:              # a loop back: its gives are already on this path
+            return {}
+        active.add(key)
+        got = {}
+        while pc < len(cmds):
+            c = cmds[pc]
+            if c.startswith(('ENDA', 'ENDB')):
+                break
+            m = re.match(r'SVAL\(EVT_SLOT_(\w),\s*(\w+)\)', c)
+            if m and m.group(1) == '3':
+                slot3 = m.group(2)
+            elif m and m.group(1) == '1':
+                slot1 = int(m.group(2), 0) if m.group(2)[0].isdigit() else None
+            elif c.startswith('CHECK_MODE'):
+                cmode = True
+            elif c.startswith(('CHECK_', 'Evt', 'CALL', 'RANDOMNUMBER')):   # slot C rewritten
+                cmode = False
+            g = give(c)
+            if g and slot3:
+                n, to = got.get((g[0], slot3), (0, ()))
+                got[(g[0], slot3)] = (n + 1, to + (() if g[1] in to else (g[1],)))
+            m = re.match(r'(GOTO|B[A-Z]{2})\((0x[0-9a-fA-F]+|\d+)(.*)\)', c)
+            if m and int(m.group(2), 0) in labels:
+                target = labels[int(m.group(2), 0)]
+                if m.group(1) == 'GOTO':
+                    pc = target
+                    continue
+                if cmode and slot1 is not None and re.match(r',\s*EVT_SLOT_C,\s*EVT_SLOT_1',
+                                                            m.group(3)):
+                    if (mode == slot1) == (m.group(1) == 'BEQ'):   # the route's edge jumps
+                        pc = target
+                        continue
+                else:
+                    jumped = walk(target, slot3, cmode, slot1)
+                    rest = walk(pc + 1, slot3, cmode, slot1)
+                    got = _add_gives(got, _merge_gives(rest, jumped))   # source order
+                    break
+            pc += 1
+        active.discard(key)
+        memo[key] = got
+        return got
+
+    return walk(start, slot3, False, None)
+
+
+def _add_gives(a, b):
+    """Gives made one after the other: counts add."""
+    out = dict(a)
+    for key, (n, to) in b.items():
+        m, was = out.get(key, (0, ()))
+        out[key] = (n + m, was + tuple(t for t in to if t not in was))
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def _script_gives(eventscript_text, mode=CHAPTER_MODE_EIRIKA):
+    """[(kind, slot-3 value, recipients)] every EventListScr in the text hands out, kind 'item'
+    (GIVEITEMTO, or a CALL to a `_shared_give_scripts` script, whose name is the recipient) or
+    'gold' (GIVEITEMTOMAIN / GIVETOSLOT3: eventscr.c adds slot 3 to the party's gold). Each
+    script is walked as it runs (`_walk_gives`): a give reads the slot-3 value set last on its
+    path. Only one arm of a branch runs, so per value a script gives the most any one path
+    gives: Ch13a pays 5,000 on each arm of a CHECK_ALIVE, Ch14 hands Audhulma to Joshua if he
+    lives and to Eirika if not, and from Ch15 the two routes share a script that gives Eirika
+    Gleipnir and Garm and Ephraim Audhulma and Excalibur."""
+    shared = _shared_give_scripts()
+
+    def give(c):
+        m = re.match(r'(GIVEITEMTO|GIVEITEMTOMAIN|GIVETOSLOT3)\((\w*)\)', c)
+        if m:
+            return ('item' if m.group(1) == 'GIVEITEMTO' else 'gold', m.group(2))
+        m = re.match(r'CALL\((\w+)\)', c)
+        return ('item', m.group(1)) if m and m.group(1) in shared else None
+
+    out = []
+    for block in re.split(r'CONST_DATA EventListScr', eventscript_text)[1:]:
+        cmds = [ln.split('//')[0].strip() for ln in block.splitlines()]
+        cmds = [c for c in cmds if c]
+        labels = {int(m.group(1), 0): i for i, c in enumerate(cmds)
+                  for m in [re.match(r'LABEL\((0x[0-9a-fA-F]+|\d+)\)', c)] if m}
+        for (kind, value), (n, to) in _walk_gives(cmds, labels, 0, None, mode, give).items():
+            out += [(kind, value, to)] * n
+    return out
+
+
+def _gift_records(eventscript_text):
+    """[(ITEM_x, recipients)] for every item the chapter script hands out: village and house
+    gifts, clear rewards outside a Village macro (Ch5's all-villages-saved Guiding Ring), gifts
+    to a named unit (the Prologue's Rapier, spelled ITEM_SWORD_RAPIER), and the items a shared
+    script gives. An event village that only spawns a unit (SVAL to another slot, no give)
+    contributes nothing, as it should."""
     id2e = _item_id_to_enum()
     out = []
-    # GIVEITEMTO( exactly: GIVEITEMTOMAIN is GOLD (its slot 3 is an amount, not an item id),
-    # and matching it as a prefix read Ch13a's 5,000 as item 0x1388 and dropped it.
-    for g in re.finditer(r'GIVEITEMTO\(', eventscript_text):
-        pre = re.findall(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9a-fA-F]+|\d+)\)',
-                         eventscript_text[:g.start()])
-        if pre:
-            enum = id2e.get(int(pre[-1], 0))
-            if enum:
-                out.append(enum)
+    for kind, v, to in _script_gives(eventscript_text):
+        enum = v if v.startswith('ITEM_') else id2e.get(int(v, 0)) if v[0].isdigit() else None
+        if kind == 'item' and enum:
+            out.append((enum, tuple(t for t in to if t)))
     return out
 
 
 def _gift_gold(eventscript_text):
-    """Every gold amount the chapter script hands out: for each GIVEITEMTOMAIN / GIVETOSLOT3
-    (eventscr.c EVSUBCMD_GIVEITEMTOMAIN: slot 3 is added to the party's gold), the nearest
-    preceding SVAL(EVT_SLOT_3, n). Within one script, the stretches between LABELs are the arms
-    of its branches: Ch13a pays 5,000 on each arm of a CHECK_ALIVE, and only one arm runs. So a
-    script pays, per amount, the most any one arm pays -- two payments in one arm both count."""
-    out = []
-    for block in re.split(r'CONST_DATA EventListScr', eventscript_text):
-        most = collections.Counter()
-        for arm in re.split(r'LABEL\(', block):
-            paid = collections.Counter()
-            for g in re.finditer(r'(?:GIVEITEMTOMAIN|GIVETOSLOT3)\(', arm):
-                pre = re.findall(r'SVAL\(EVT_SLOT_3,\s*(0x[0-9a-fA-F]+|\d+)\)', arm[:g.start()])
-                if pre:
-                    paid[int(pre[-1], 0)] += 1
-            most |= paid
-        out += sorted(most.elements())
-    return out
+    """Every gold amount the chapter script hands out (`_script_gives`' 'gold')."""
+    return sorted(int(v, 0) for kind, v, _ in _script_gives(eventscript_text)
+                  if kind == 'gold' and v[0].isdigit())
 
 
 @functools.lru_cache(maxsize=None)
@@ -2784,16 +2885,20 @@ def twin_event_payload(stem):
     info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
+    gifts = _gift_records(script)
     out = {'chests': re.findall(r'Chest\((ITEM_\w+)', info),
            'chest_gold': [int(g) for g in re.findall(r'ChestMoney\(\s*(\d+)', info)],
-           'gifts': list(_gift_items(script)), 'gift_gold': _gift_gold(script),
-           'interlude_gifts': [], 'interlude_gold': [],
+           'gifts': [e for e, _ in gifts], 'gift_to': [to for _, to in gifts],
+           'gift_gold': _gift_gold(script),
+           'interlude_gifts': [], 'interlude_gift_to': [], 'interlude_gold': [],
            'shops': [(sym, _shoplist_items(shoptext, sym)) for sym in
                      re.findall(r'(?:Armory|Vendor|SecretShop)\(\s*(\w+)', info)],
            'n_villages': len(re.findall(r'Village\(', info)),
            'n_houses': len(re.findall(r'House\(', info))}
     for _stem, inter in twin_interlude_scripts(script):
-        out['interlude_gifts'] += _gift_items(inter)
+        for item, to in _gift_records(inter):
+            out['interlude_gifts'].append(item)
+            out['interlude_gift_to'].append(to)
         out['interlude_gold'] += _gift_gold(inter)
     return out
 
