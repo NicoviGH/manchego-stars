@@ -46,27 +46,17 @@ def vanilla_bodies(parity_ref, mode=None):
     arriving on the turn its eventscript loads its array, armed with every attacking item it
     carries. Named units carry their personal line, as `difficulty.vanilla_enemies` reads
     them."""
-    relpath, arrays = dif.PARITY_REFERENCE_UDEFS[parity_ref]
     turns = dif._vanilla_reinforcement_turns(dif.PARITY_REFERENCE_STEM[parity_ref])
-    shifts = dif.vanilla_chapter_shifts(parity_ref) if mode else None
-    text = inject.decomp.vanilla_decomp_text(relpath)
     out = []
-    for array in arrays:
-        for i, d in enumerate(dif.vanilla_unit_defs(text, array)):
-            if d['allegiance'] != 'FACTION_ID_RED':
-                continue
-            keys = [dif.ITEM_TO_WEAPON.get(it) for it in d['items']]
-            weapons = [fc.W[k] for k in keys if k and fc.W[k].kind != 'staff']
-            if not weapons:
-                continue
-            ch = d['charIndex']
-            unit = dif._enemy_from_enum('%s#%d[%s]' % (array, i, ch), d['classIndex'],
-                                        d['level'], weapons[0], dif.vanilla_personal_line(ch),
-                                        mode=mode, shifts=shifts, **dif._vanilla_load_kwargs(d))
-            table, mov = pp.class_movement(d['classIndex'][len('CLASS_'):].lower())
-            out.append(dm.Body(array, i, tuple(d['position']), cs.ai_shape(d['ai']),
-                               d['ai'][0], turns.get(array, 1), table, mov,
-                               tuple(dataclasses.replace(unit, weapon=w) for w in weapons)))
+    for array, i, d, unit in dif.vanilla_loaded_units(parity_ref, mode):
+        keys = [dif.ITEM_TO_WEAPON.get(it) for it in d['items']]
+        weapons = [fc.W[k] for k in keys if k and fc.W[k].kind != 'staff']
+        if not weapons:
+            continue
+        table, mov = pp.class_movement(d['classIndex'][len('CLASS_'):].lower())
+        out.append(dm.Body(array, i, tuple(d['position']), cs.ai_shape(d['ai']),
+                           d['ai'][0], turns.get(array, 1), table, mov,
+                           tuple(dataclasses.replace(unit, weapon=w) for w in weapons)))
     return out
 
 

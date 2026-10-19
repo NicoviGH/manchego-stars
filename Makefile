@@ -102,13 +102,14 @@ endif
 
 # Enforcing form of the campaign curve (#48 (b)): per-chapter OPT-IN gate -- non-zero
 # exit only for chapters marked `balance_locked: true` in their YAML that read
-# off-parity or unreliably measured (with zero locks the gate passes). CI runs this
-# target; chapters opt in as their enemy inventories are authored and playtested.
+# off-parity or unreliably measured in ANY of the three difficulty modes (#510 step 2;
+# with zero locks the gate reads nothing and passes). CI runs this target; chapters opt in
+# as their enemy inventories are authored and playtested.
 difficulty-gate:
 	@python3 tools/difficulty.py --campaign $(CAMPAIGN) --curve --check
 
-# Every chapter's parity verdict, base vs this tree, in the authored table and all three
-# difficulty modes (#510 step 0, ADR 0353). Informational: it never fails. CI runs it on a
+# Every chapter's parity verdict, base vs this tree, in each of the three difficulty
+# modes (#510 step 0, ADR 0353). Informational: it never fails. CI runs it on a
 # PR that touches a parity input; this is the same read locally (~50s).
 #   make verdict-diff               # origin/main vs the working tree
 #   make verdict-diff BASE=main

@@ -187,6 +187,41 @@ class AcceptedResidual(unittest.TestCase):
         self.assertEqual(seen, [chap['accepted_residual']])
 
 
+class GateGradesEveryMode(unittest.TestCase):
+    """#510 step 2: the finished game ships all three of vanilla's modes, so a locked chapter
+    holds parity only if it holds in each, and the authored table is not one of them."""
+
+    def _gate(self, off_in, locked=('ch04',)):
+        row = lambda mode: {'label': 'CH4 ch04', 'locked': True, 'has_ref': True,
+                            'verdict': 'OFF' if mode in off_in else 'OK', 'boss_drop': False}
+        seen = []
+        real = (df.locked_chapters, df.curve_report)
+        try:
+            df.locked_chapters = lambda campaign: set(locked)
+            df.curve_report = lambda campaign, mode=None, only=None: (
+                seen.append((mode, only)) or [row(mode)])
+            return df.gate_failures(CAMPAIGN), seen
+        finally:
+            df.locked_chapters, df.curve_report = real
+
+    def test_a_chapter_off_in_one_mode_fails_and_names_it(self):
+        (_locked, fails), _ = self._gate(off_in={'difficult'})
+        self.assertEqual(fails, ['CH4 ch04 (difficult)'])
+
+    def test_every_mode_is_read_and_never_the_authored_table(self):
+        _, seen = self._gate(off_in=set())
+        self.assertEqual([m for m, _only in seen], list(df.MODES))
+        self.assertNotIn(None, [m for m, _only in seen])
+
+    def test_only_the_locked_chapters_are_read(self):
+        _, seen = self._gate(off_in=set())
+        self.assertTrue(all(only == {'ch04'} for _m, only in seen))
+
+    def test_with_nothing_locked_nothing_is_read(self):
+        (locked, fails), seen = self._gate(off_in=set(), locked=())
+        self.assertEqual((locked, fails, seen), (set(), [], []))
+
+
 class CurveGate(unittest.TestCase):
     """The --check gate (#48 (b)): PER-CHAPTER opt-in. We author chapters as we go, so the
     gate enforces a chapter only once content marks it balance-final with `balance_locked:
@@ -2850,15 +2885,33 @@ class ModeReadsAreHonestAboutScope(unittest.TestCase):
         finally:
             del df.PARITY_REFERENCE_UDEFS['FE8 Creature Campaign']
 
-    def test_role_findings_are_not_reported_as_mode_graded(self):
-        # role_findings/vanilla_projection run on the authored table. Under --mode the
-        # banner must say so rather than implying everything was shifted.
+    def test_only_the_planned_targets_are_reported_as_unshifted(self):
+        # Role findings read the mode since #510 step 2 (ADR 0355); the planned chapters'
+        # targets (vanilla_projection) still run on the authored table, and the banner says so.
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            df.curve_report('rime-of-the-frostmaiden', mode='normal')
-        text = out.getvalue()
-        self.assertIn('role findings', text.lower())
-        self.assertIn('authored table', text.lower())
+            df.curve_report('rime-of-the-frostmaiden', mode='normal', only=set())
+        text = out.getvalue().lower()
+        self.assertIn('planned-chapter targets', text)
+        self.assertIn('authored table', text)
+        self.assertIn('off\n     vanilla_chain', text)
+
+    def test_role_findings_read_the_mode(self):
+        """The boss-durability arm loads our boss for the mode it is asked about."""
+        chap = df.load_field(CAMPAIGN, 'ch03')[0]
+        ours, twin = [], []
+        real = df._entry_combatants, df.vanilla_named_bosses
+        try:
+            df._entry_combatants = lambda ed, mode=None, shifts=None, **kw: (
+                ours.append(mode) or real[0](ed, mode=mode, shifts=shifts, **kw))
+            df.vanilla_named_bosses = lambda ref, with_personal=True, mode=None: (
+                twin.append(mode) or real[1](ref, with_personal, mode))
+            df.role_findings(chap, chap['parity_reference'], CAMPAIGN, mode='tutorial')
+        finally:
+            df._entry_combatants, df.vanilla_named_bosses = real
+        # Both sides of the comparison, never one shifted against the other unshifted (#303).
+        self.assertIn('tutorial', ours)
+        self.assertEqual(set(twin), {'tutorial'})
 
 
 class BossBaseLevelMarginIsGuarded(unittest.TestCase):

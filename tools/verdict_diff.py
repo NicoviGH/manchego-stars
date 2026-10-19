@@ -3,7 +3,7 @@
 
 While #510 rebuilds the parity model, every chapter is unlocked, so the `difficulty-gate` lock
 no longer says when a change moves a chapter. This is what replaces it as the regression
-signal: the campaign curve read in the authored table and in each difficulty mode
+signal: the campaign curve read in each of the game's three difficulty modes
 (Tutorial / Normal / Difficult), on the base tree and on this one, and the rows that moved.
 It never fails a build. A moved verdict is the point of a model step, and the table is what a
 reviewer reads to decide whether it moved the way the step claimed.
@@ -38,8 +38,9 @@ import tempfile
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CAMPAIGN = 'rime-of-the-frostmaiden'
-# The authored table first: it is what the lock graded, so it reads as the familiar column.
-MODES = ('table', 'tutorial', 'normal', 'difficult')
+# The game's three modes, never the authored table: no player meets a chapter at the levels it
+# declares before its mode's shift, so the gate does not grade it either (#510 step 2).
+MODES = ('tutorial', 'normal', 'difficult')
 FIELDS = ('verdict', 'threat_ratio', 'load_ratio', 'accepted_adr', 'boss_drop', 'role', 'ai')
 TOOLS = os.path.join(REPO, 'tools')
 # Where the read starts. This tool is one: a change to how it reads is a change to the read.
@@ -150,7 +151,7 @@ def snapshot_mode(tree, mode):
     out = io.StringIO()
     with contextlib.redirect_stdout(out):
         import difficulty
-        rows = difficulty.curve_report(CAMPAIGN, mode=None if mode == 'table' else mode)
+        rows = difficulty.curve_report(CAMPAIGN, mode=mode)
     text = out.getvalue()
     snap = {}
     for r in rows:
@@ -224,6 +225,25 @@ def _chapter_key(label):
     return (int(m.group(1)) if m else 999, label)
 
 
+def _finding_changes(changed):
+    """The per-unit findings each moved row gained or lost, in words: "role moved" alone
+    does not say what a reviewer should look at. One line per (chapter, finding), listing
+    the modes it changed in, so a change that lands in all three reads once."""
+    lines = {}
+    for lab, mode, b, a, _mv in changed:
+        for field in ('role', 'ai'):
+            was, now = set((b or {}).get(field) or []), set((a or {}).get(field) or [])
+            for sign, texts in (('new', now - was), ('gone', was - now)):
+                for t in sorted(texts):
+                    lines.setdefault((lab, sign, t), []).append(mode)
+    if not lines:
+        return []
+    out = ['', '**Per-unit findings that changed:**', '']
+    for (lab, sign, t), modes in sorted(lines.items(), key=lambda kv: _chapter_key(kv[0][0])):
+        out.append('- %s, %s (%s): %s' % (lab, sign, ', '.join(modes), t))
+    return out
+
+
 def moved_cells(before, after):
     """How many chapter-by-mode cells moved between two snapshots."""
     labels = set().union(*(before.get(m, {}).keys() | after.get(m, {}).keys() for m in MODES))
@@ -265,6 +285,7 @@ def render(before, after, base_name='base', head_name='head'):
             lab, m, (b or {}).get('verdict', '--'), (a or {}).get('verdict', '--'),
             _ratio(b, 'threat_ratio'), _ratio(a, 'threat_ratio'),
             _ratio(b, 'load_ratio'), _ratio(a, 'load_ratio'), ', '.join(rest)))
+    out += _finding_changes(changed)
     return '\n'.join(out) + '\n'
 
 

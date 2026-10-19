@@ -77,8 +77,8 @@ jobs:
       - name: Unit tests (make test)
         run: make test
 
-  # Every chapter's parity verdict, the PR's base vs the PR, in the authored table and all
-  # three difficulty modes (#510 step 0, ADR 0353). While #510 has every chapter unlocked,
+  # Every chapter's parity verdict, the PR's base vs the PR, in each of the three
+  # difficulty modes (#510 step 0, ADR 0353). While #510 has every chapter unlocked,
   # this is the regression signal the lock used to be. Informational: it never fails the PR.
   # Quiet by design: a PR that touches no parity input skips the read (and the submodule
   # checkout), and the PR gets a comment only when a cell moved.
@@ -292,14 +292,13 @@ jobs:
       - name: Verify ROM text decodes cleanly
         run: python3 tools/verify_text.py
 
-      # Surface the campaign enemy-pressure curve (ours vs vanilla parity references) on
-      # every build so balance spikes/sags and parity regressions are visible at a glance
-      # (#48), AND hard-fail any chapter content has marked balance-final. PER-CHAPTER gate
-      # (#48 (b)): `--check` enforces only chapters with `balance_locked: true` in their YAML,
-      # so unwritten / mid-authoring chapters stay informational and never redden CI -- we
-      # author chapters as we go and lock each one when it's balanced. With zero locks this
-      # passes (enforces nothing). Reads the decomp HEAD, so it needs the submodule (above).
-      - name: Enemy-pressure parity curve + per-chapter gate
+      # Hard-fail any chapter content has marked balance-final. PER-CHAPTER gate (#48 (b)):
+      # `--check` reads only chapters with `balance_locked: true` in their YAML, in each of the
+      # three difficulty modes (#510 step 2, ADR 0355), so unwritten / mid-authoring chapters
+      # never redden CI. With zero locks it reads nothing and passes. What a change MOVES is
+      # the verdict-diff job's to show (ADR 0353). Reads the decomp HEAD, so it needs the
+      # submodule (above).
+      - name: Parity gate on the locked chapters, every mode
         run: make CAMPAIGN=rime-of-the-frostmaiden difficulty-gate
 
       # The wiki (#486) is generated here because it renders donor maps from the build
