@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-19 (Claude, after #513). **The parity model is being rebuilt before any party or chapter
+Refreshed 2026-10-19 (Claude, after #514). **The parity model is being rebuilt before any party or chapter
 change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
 grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
 Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
@@ -25,13 +25,18 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
 
 **Next, in order (#510's list is the plan):**
 
-1. **#510 steps 0 and 1 are DONE.** #511: the verdict diff (`make verdict-diff`; CI runs it on a
-   PR that touches a parity input and comments only when a cell moved; ADR 0353). #513: units
-   load as the ROM loads them (ADR 0354) and ch00-ch07 are unlocked. 9 of 32 cells flipped; ch01
-   is OFF in every mode (its party half reads x1.415, past its x1.41 residual ceiling, NOT widened).
-2. **#510 step 2: the gate grades all three modes**, then steps 3-9 in order, each with an
-   in-engine proof and the verdict diff. Stop when a step moves no verdict. The verdict diff's
-   `table` column (authored levels, no shift) is not a game mode: drop it once step 2 lands.
+1. **#510 steps 0-2 are DONE.** #511: the verdict diff (`make verdict-diff`; CI runs it on a
+   PR that touches a parity input, comments only when a cell moved, and spells out each per-unit
+   finding that changed; ADR 0353). #513: units load as the ROM loads them; ch00-ch07 unlocked
+   (ADR 0354). #514: the gate grades Tutorial, Normal and Difficult, never the authored table, and
+   reads only locked chapters; role checks read the mode (ADR 0355). The twin's force has ONE
+   loader now, `difficulty.vanilla_loaded_units`; read it, don't re-parse UnitDefinitions.
+2. **#510 step 3: AI weapon choice per target**, then steps 4-9 in order, each with an in-engine
+   proof and the verdict diff. Stop when a step moves no verdict.
+   - **Findings to bring to step 10, not to act on before it** (Nicolas, 2026-10-19: no content
+     change until then): ch01 OFF in every mode (party half x1.415 vs its x1.41 residual); ch04
+     OFF on Difficult; ch03's grell 1.3x vanilla Ch3's hardest hitter (Tutorial/Normal); ch04's
+     Entombed 2.0x vanilla Ch4's on Difficult; ch07's hall guards out-hit Dorbulgruf on Difficult.
 3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
    Nicolas the options. Baseline (2026-10-19, in #510): the force side is near parity, and the
    clear-load excess is the party, mostly vanilla's Seth. Baxby-as-Seth is a past discussion, NOT a
