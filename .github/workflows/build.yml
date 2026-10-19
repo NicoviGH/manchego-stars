@@ -77,6 +77,43 @@ jobs:
       - name: Unit tests (make test)
         run: make test
 
+  # Every chapter's parity verdict, the PR's base vs the PR, in the authored table and all
+  # three difficulty modes (#510 step 0, ADR 0353). While #510 has every chapter unlocked,
+  # this is the regression signal the lock used to be. Informational: it never fails the PR.
+  # Its own job, beside `tests`: eight curve reads take ~50s even in parallel.
+  verdict-diff:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: python3 -m pip install numpy pillow pyyaml
+
+      # The checkout is the PR merged into its base, so base.sha -> HEAD is exactly the
+      # PR's effect, even when the branch is behind main.
+      - name: Verdict diff
+        run: |
+          python3 tools/verdict_diff.py run --base "${{ github.event.pull_request.base.sha }}" \
+            --out verdict-diff.md
+          cat verdict-diff.md >> "$GITHUB_STEP_SUMMARY"
+
+      # One comment per PR, edited on each push, so the thread holds the current diff only.
+      - name: Post it on the PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" --edit-last \
+            --body-file verdict-diff.md \
+            || gh pr comment "${{ github.event.pull_request.number }}" --body-file verdict-diff.md
+
   # The real "make green" gate. Mirrors the fireemblem8u decomp's own build.yml: a
   # MOCK base ROM (random 16MB) lets `make` compile + link the full ROM without the
   # copyrighted original -- which is what we want (we diverge from vanilla anyway).
