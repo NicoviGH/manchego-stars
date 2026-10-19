@@ -33,10 +33,8 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
    loader now, `difficulty.vanilla_loaded_units`; read it, don't re-parse UnitDefinitions.
 2. **#510 step 3: AI weapon choice per target**, then steps 4-9 in order, each with an in-engine
    proof and the verdict diff. Stop when a step moves no verdict.
-   - **Findings to bring to step 10, not to act on before it** (Nicolas, 2026-10-19: no content
-     change until then): ch01 OFF in every mode (party half x1.415 vs its x1.41 residual); ch04
-     OFF on Difficult; ch03's grell 1.3x vanilla Ch3's hardest hitter (Tutorial/Normal); ch04's
-     Entombed 2.0x vanilla Ch4's on Difficult; ch07's hall guards out-hit Dorbulgruf on Difficult.
+   - **Findings for step 10 are logged on #510** (comment 2026-10-19), not here: not acted on
+     before step 10 (Nicolas, 2026-10-19).
 3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
    Nicolas the options. Baseline (2026-10-19, in #510): the force side is near parity, and the
    clear-load excess is the party, mostly vanilla's Seth. Baxby-as-Seth is a past discussion, NOT a
