@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.decomp
 import inject.paths
 import inject.raw_pids
+import inject.stats
 
 
 class SlotRiderPersonalLine(unittest.TestCase):
@@ -57,7 +58,7 @@ class RawPidBossBaseLevel(unittest.TestCase):
     is guarded rather than merely documented.
     """
 
-    RAW_BOSSES = {'0xb7': 8, '0xb6': 3, '0xb8': 7, '0xb9': 6}
+    RAW_BOSSES = {inject.chapter_ids.CH03_BOSS_PID: 8, '0xb6': 3, '0xb8': 7, '0xb9': 6}
 
     def test_every_raw_pid_boss_is_registered(self):
         missing = inject.raw_pids.unregistered_raw_pid_bosses('rime-of-the-frostmaiden')
@@ -150,6 +151,39 @@ class GenericPidsCloneTheirDonor(unittest.TestCase):
             self.assertEqual(int(got.pop('descTextId'), 0), RAW_PID_HELP[pid][0])
             want.pop('descTextId')
             self.assertEqual(got, want, '%s is not a clone of %s' % (pid, donor))
+
+    @staticmethod
+    def _fields(src, pid):
+        s, e = inject.decomp._find_brace_block(src, '[%s - 1]' % pid, 'data_characters.c')
+        return dict(re.findall(r'\.(\w+)\s*=\s*([^,\n]+),', src[s:e]))
+
+    def test_a_raw_pid_boss_row_starts_as_its_donor(self):
+        """The grell's 0xbf is an unused "Enemy" stub (a Brigand, no growths, the 0x267 plate)
+        until 0xb7's vanilla Mogall row is cloned onto it (#508): everything but its own line and
+        baseLevel is the donor's."""
+        from inject.chapter_ids import BOSS_PID_ROW_DONORS
+        vanilla = inject.decomp.vanilla_decomp_text('src/data_characters.c')
+        text = inject.raw_pids.raw_pid_portrait_data(vanilla, 'rime-of-the-frostmaiden')
+        own = set(inject.stats.BASE_FIELDS) | {'number', 'baseLevel'}
+        for pid, donor in BOSS_PID_ROW_DONORS.items():
+            got, want = self._fields(text, pid), self._fields(vanilla, donor)
+            self.assertEqual(got['number'], pid)
+            self.assertEqual({k: v for k, v in got.items() if k not in own},
+                             {k: v for k, v in want.items() if k not in own},
+                             '%s is not a clone of %s' % (pid, donor))
+        self.assertEqual(self._fields(text, '0xb7'), self._fields(vanilla, '0xb7'))
+
+    def test_every_row_the_pass_changes_is_a_declared_rewrite(self):
+        """The exclusivity guard (assert_rewritten_raw_pids_are_exclusive) only sees the pids
+        `rewritten_raw_pids` lists, so a writer it does not know would let #508 happen again.
+        Every row this pass changes must be on the list."""
+        import inject.messages
+        vanilla = inject.decomp.vanilla_decomp_text('src/data_characters.c')
+        text = inject.raw_pids.raw_pid_portrait_data(vanilla, 'rime-of-the-frostmaiden')
+        changed = {'0x%02x' % int(m, 16) for m in re.findall(r'\[(0x[0-9a-fA-F]+) - 1\]', vanilla)
+                   if self._fields(text, m) != self._fields(vanilla, m)}
+        self.assertTrue(changed)
+        self.assertEqual(changed - set(inject.messages.rewritten_raw_pids()), set())
 
     def test_every_chapter_pid_is_its_own(self):
         from inject.chapter_ids import GENERIC_PIDS

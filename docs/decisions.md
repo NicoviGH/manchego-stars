@@ -243,7 +243,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0095` | [The gate is the spine plus the last two chapters; depth lives in the chapter suite](decisions/0095-the-gate-is-the-spine-plus-the-last-two.md) | 2026-08-23 | #302 |
 | `0096` | [A blanket pkill is a serial-world habit, and parallel dispatch turned it into a saboteur](decisions/0096-a-blanket-pkill-is-a-serial-world-habit-and.md) | 2026-08-23 | #310 |
 | `0097` | [A build is 50 seconds, and 26 of them were the same battle anims every time](decisions/0097-a-build-is-50-seconds-and-26-of-them.md) | 2026-08-23 | #302 #309 |
-| `0098` | [A NAMED raw pid must be exclusive; a GENERIC one need not be](decisions/0098-a-named-raw-pid-must-be-exclusive-a-generic.md) | 2026-09-04 | #26 #364 |
+| `0098` | [A raw pid whose row the build rewrites must be exclusive; an untouched one need not be](decisions/0098-a-raw-pid-whose-row-the-build-rewrites-must-be-exclusive.md) | 2026-09-04 | #26 #364 #490 |
 | `0099` | [The parity model prices the YAML; only the EMITTED ROWS are the ROM](decisions/0099-the-parity-model-prices-the-yaml-only-the-emitted.md) | 2026-09-04 | #26 #364 |
 | `0100` | [A load-test that reads the roster before PREP settles is a diagnostic that LIES](decisions/0100-a-load-test-that-reads-the-roster-before-prep.md) | 2026-09-04 | #26 |
 | `0101` | [The asset table is addressed by a u8, so ch06 RECLAIMS a slot rather than appending](decisions/0101-the-asset-table-is-addressed-by-a-u8-so.md) | 2026-09-03 | #26 |

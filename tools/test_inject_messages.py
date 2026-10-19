@@ -150,26 +150,41 @@ class MessageBlockPool(unittest.TestCase):
             claims={'bogus': (0x969, 0x96A, 0x96B, 0x96C)}))
 
 
-class NamedRawPidsAreExclusive(unittest.TestCase):
-    """A raw pid carrying a NAME PLATE may be claimed by one chapter only.
+class RewrittenRawPidsAreExclusive(unittest.TestCase):
+    """A raw pid whose row the build rewrites (a name plate, a personal line, a baseLevel) may
+    be claimed by one chapter only.
 
-    `RAW_PID_PORTRAITS` writes nameTextId into gCharacterData[pid - 1], one row per pid with no
-    chapter dimension -- unlike gDefeatTalkList, where ch03's grell and ch04's mogall share 0xb7
-    legally because each entry is keyed by chapter too. ch06's boats took 0xb4/0xb5, already
-    CH04_PACK_PIDS', and two of ch04's five Mauthe Doogs would have read "Fishing Boat".
+    gCharacterData has one row per pid and no chapter dimension -- unlike gDefeatTalkList, whose
+    entries are keyed by chapter too -- so whatever the build writes there reaches every chapter.
+    ch06's boats took 0xb4/0xb5, already CH04_PACK_PIDS', and two of ch04's five Mauthe Doogs would
+    have read "Fishing Boat"; ch03's grell wrote its boss line into 0xb7, and ch04's Mogalls
+    fought with it (#508).
     """
 
     def test_the_live_registry_is_clean(self):
-        inject.messages.assert_named_raw_pids_are_exclusive()
+        inject.messages.assert_rewritten_raw_pids_are_exclusive()
 
-    def test_an_unnamed_pid_may_still_be_shared(self):
-        """ch03's grell and ch04's Mogall both ride 0xb7, and that is fine -- an unnamed pid has
-        nothing global written for it. The guard must not over-reach. A chapter that NAMES its
-        generics (`generic_name:`, #493) takes a pid of its own instead, and the guard holds it
-        to that."""
+    def test_a_pid_with_a_rewritten_stat_line_is_exclusive_too(self):
+        """A personal line and a baseLevel are written into the same global row as a name. ch03's
+        grell took 0xb7, vanilla's generic Mogall pid, and ch04's four line Mogalls ride 0xb7 as
+        the twin's do: every one of them fought with the grell's boss line, 32 HP to the 15 the
+        gate measured (#490's ch04redstats)."""
+        rows = {'0xb7': 'personal line'}
+        scope = {'CH03_BOSS_PID': '0xb7', 'CH04_MONSTER_PIDS': {'mogall': '0xb7'}}
+        with self.assertRaises(SystemExit) as caught:
+            inject.messages.assert_rewritten_raw_pids_are_exclusive(rows=rows, scope=scope)
+        self.assertIn('0xb7', str(caught.exception))
+        self.assertIn('CH03 and CH04', str(caught.exception))
+
+    def test_an_untouched_pid_may_still_be_shared(self):
+        """A pid whose row the build leaves as vanilla ships it has nothing global written for
+        it, so chapters may share it (ch04's Mogalls ride vanilla's own 0xb7). The guard must not
+        over-reach. A chapter that NAMES its generics (`generic_name:`, #493) takes a pid of its
+        own instead, and the guard holds it to that."""
+        rows = inject.messages.rewritten_raw_pids()
         claims = inject.messages.raw_pid_claims()
-        self.assertEqual(claims.get('0xb7'), {'CH03', 'CH04'})
-        self.assertNotIn('0xb7', inject.cast.RAW_PID_PORTRAITS)
+        self.assertNotIn('0xb7', rows)
+        self.assertEqual(claims.get('0xb7'), {'CH04'})
         for pid in inject.chapter_ids.GENERIC_PID_DONORS:
             self.assertEqual(1, len(claims[pid]), pid)
 
@@ -189,7 +204,8 @@ class NamedRawPidsAreExclusive(unittest.TestCase):
         scope = dict(injector_constants(inject.messages._RAW_PID_CONST_RE.pattern),
                      CH06_BOAT_PIDS={'boat-east': '0xb4', 'boat-west': '0xb5'})
         with self.assertRaises(SystemExit) as caught:
-            inject.messages.assert_named_raw_pids_are_exclusive(portraits, scope)
+            inject.messages.assert_rewritten_raw_pids_are_exclusive(
+                inject.messages.rewritten_raw_pids(portraits=portraits), scope)
         self.assertIn('0xb4', str(caught.exception))
         self.assertIn('CH04', str(caught.exception))
 

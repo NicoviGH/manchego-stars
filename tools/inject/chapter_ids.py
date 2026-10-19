@@ -128,7 +128,11 @@ CH02_TURN1_MSGS = (0x98f, 0x991, 0xAC2, 0xAC3, 0xAC4)
 CH03_GOAL_WINDOW_MSG = 0x19D     # vanilla slot 6's defeat_boss window
 CH03_GOAL_STATUS_MSG = 0x1A7
 CH03_CHAPTER_YAML = 'ch03-the-termalaine-mine.yaml'
-CH03_BOSS_PID = '0xb7'          # grell rides a raw charIndex (NOT the vanilla ch4 boss ENTOUMBED_CH4=0x49):
+# The grell rides a pid of its own, because the build writes its boss line into the row. It
+# rode 0xb7, vanilla's generic Mogall pid, until #490 found ch04's line Mogalls (which ride 0xb7
+# as the twin's do) fighting with that line. 0xbf is an unused "Enemy" row; BOSS_PID_ROW_DONORS
+# clones 0xb7's vanilla row onto it, so it keeps the Monster plate and the Mogall class.
+CH03_BOSS_PID = '0xbf'          # grell rides a raw charIndex (NOT the vanilla ch4 boss ENTOUMBED_CH4=0x49):
 # The grell's flagged death quote (gDefeatTalkList) sets EVFLAG_DEFEAT_BOSS -> the Misc DefeatBoss AFEV.
 # Body rides a dead vanilla Ch4 message id: 0x9A3 is the Ch4 opening cutscene's first line (Seth/Eirika at
 # Serafew), referenced ONLY inside EventScr_Ch4_BeginningScene -- which inject_ch03 replaces -> dead in our build.
@@ -146,6 +150,9 @@ CH03_TREX_ENTRANCE_MSG = 0x9AE              # light turn-1 on-map beat (Pinky te
 # DefeatBoss WIN, keyed to a tmp flag + a Misc AFEV instead of the win flag. It rides ON-MAP (no
 # BG), like Trex's entrance. Reuses the dead Ch4 death-scene 0x9AF..0x9B1 message block.
 CH03_BRUTE_MINIBOSS_PID = '0xb6'   # the Icewind Brute -- a clean raw charIndex sibling of the grell's
+                                   # (an unnamed gap: zero name/face/quote, no vanilla leak).
+                                   # Distinct from the shared generic so its flagged death quote
+                                   # keys the midmap trigger to the Brute ALONE (first-match pid scan).
 # 7 beats (RESTAGED 2026-07-11): A Pinky reaches out (faced) · A2 the Brute lunges at Pinky (FACELESS
 # action box) · A3 the Brute's snarl (faced mug) · B RBG "Say cheese" (faced) · B2 the shot/kill (FACELESS
 # action box) · B3 Pinky+RBG (faced two-hander) · C Wolfram (faced). The two faceless narration boxes ride
@@ -383,9 +390,10 @@ CH05_MOOSE_CHARGE_SLOT = ('vanilla 0x9C4', 0x9F1, 2,
 # 0x9D2 was ch05's one spare, so the block is now EXACTLY spent -- the endings and the taunt fit
 # and nothing is left over. Another beat names its message in inject/message_alloc.py (#411).
 CH05_MOOSE_QUIP_MSG = 0x9D2
-# Raw charIndexes. Pids need only be unique WITHIN a chapter -- gDefeatTalkList entries carry
-# .chapter, so ch03's 0xb7 and ch04's 0xb7 coexist -- but the boss and the moose need their own
-# so their flagged death entries key to them alone.
+# Raw charIndexes. A pid the build leaves alone need only be unique WITHIN a chapter --
+# gDefeatTalkList entries carry .chapter -- but the boss and the moose need their own so their
+# flagged death entries key to them alone, and so their lines, written into the global row, reach
+# nobody else (assert_rewritten_raw_pids_are_exclusive).
 CH05_BOSS_PID = '0xb8'                           # Ravisin: flagged EVFLAG_DEFEAT_BOSS -> the WIN
 CH05_MOOSE_PID = '0xb9'                          # the white moose: named, but NOT the win condition
 # The moose's NAME, appended past vanilla's last message by the build (inject/message_alloc.py).
@@ -438,13 +446,14 @@ CH06_GOAL_STATUS_MSG = 0x9FF
 #
 # 0xB0..0xBA IS FULL, and a first draft of this line took 0xB4/0xB5 believing otherwise. The
 # range's real occupancy is 0xb0/b1/b2/b4/b5 CH04_PACK_PIDS, 0xb3 ch04's Mauthe Doog, 0xb6 ch03's
-# Brute, 0xb7 ch03's grell (which ch04's mogall shares -- legal, because a defeat quote is keyed
-# by CHAPTER too), 0xb8 Ravisin, 0xb9 the moose, 0xba Sahnar's. Taking 0xB4/0xB5 would have
+# Brute, 0xb7 vanilla's generic Mogall (ch04's line), 0xb8 Ravisin, 0xb9 the moose, 0xba Sahnar's. Taking 0xB4/0xB5 would have
 # renamed two of ch04's five wolves to "Fishing Boat": a name plate is written into
-# `gCharacterData`, which is ONE GLOBAL TABLE with no chapter dimension, so a NAMED pid must be
-# exclusive even though an unnamed one need not be (ch03's grell and ch04's mogall share 0xb7).
-# 0xbb and 0xbc are the next unnamed gaps -- nameTextId 0x255, the generic monster plate, the
-# same shape as every pid above. `assert_named_raw_pids_are_exclusive` now makes the mistake
+# `gCharacterData`, which is ONE GLOBAL TABLE with no chapter dimension, so a pid whose row the
+# build rewrites must be exclusive, while one it leaves alone need not be (ch04's Mogalls share
+# vanilla's own 0xb7).
+# 0xbb..0xbd are ch06's (vanilla's Gargoyle, Deathgoyle and Draco Zombie generics), and 0xbf is
+# ch03's grell: an unused "Enemy" stub with 0xb7's Mogall row cloned onto it (BOSS_PID_ROW_DONORS).
+# The next unused stubs are 0xc2..0xc4; a boss on one takes a donor row the same way. `assert_rewritten_raw_pids_are_exclusive` now makes the mistake
 # impossible rather than leaving the next chapter to re-read this comment.
 CH06_CHAPTER_YAML = 'ch06-the-maer-monster.yaml'
 CH06_BOAT_PIDS = {'boat-east': '0xbb', 'boat-west': '0xbc'}
@@ -464,7 +473,7 @@ CH06_BOAT_TALK_SCRIPTS = {'boat-east': 'MS_Ch06BoardEast', 'boat-west': 'MS_Ch06
 CH06_BOAT_TALK_MSGS = {'boat-east': appended_message_id('ch06', 'boat-east-talk'),
                        'boat-west': appended_message_id('ch06', 'boat-west-talk')}
 # Messie, the boss-death cutscene's actor: 0xbd, the next unnamed 0x255 gap after the boats
-# (0xbe is Fomortiis). He is NAMED, so the pid is his alone (assert_named_raw_pids_are_exclusive).
+# (0xbe is Fomortiis). He is NAMED, so the pid is his alone (assert_rewritten_raw_pids_are_exclusive).
 # The opening (#26): the location card, then one message per beat. Appended, never block ids.
 CH06_OPENING_CARD_MSG = appended_message_id('ch06', 'opening-card')
 CH06_OPENING_MSGS = (appended_message_id('ch06', 'opening-hall'),
@@ -547,6 +556,11 @@ GENERIC_PID_DONORS = {
     CH05_GENERIC_PID: '0x80',    # vanilla Ch6's own generic
     CH06_GENERIC_PID: '0x80',    # vanilla Ch7's own generic
     CH07_GENERIC_PID: '0x80',
+}
+# A raw-pid boss that took a fresh row: the vanilla row it is cloned from, before its own line
+# is written over it (inject.raw_pids.clone_generic_rows).
+BOSS_PID_ROW_DONORS = {
+    CH03_BOSS_PID: '0xb7',       # the grell: vanilla's generic Mogall
 }
 _unpaired = {p for ps in GENERIC_PIDS.values() for p in ps} ^ set(GENERIC_PID_DONORS)
 if _unpaired:   # a pid with no donor rides vanilla's uncloned "Enemy" stub (a Brigand, no growths)

@@ -297,31 +297,59 @@ def raw_pid_claims(scope=None):
     return dict(claims)
 
 
-def assert_named_raw_pids_are_exclusive(portraits=None, scope=None):
-    """Guard: a raw pid that gets a NAME PLATE may be claimed by only one chapter.
-
-    `RAW_PID_PORTRAITS` writes `nameTextId` into `gCharacterData[pid - 1]`, and that table has ONE
-    row per pid with **no chapter dimension** -- unlike `gDefeatTalkList`, where ch03's grell and
-    ch04's mogall share 0xb7 quite legally because each entry is keyed by chapter too. So a shared
-    UNNAMED pid is fine (that 0xb7) while a shared NAMED one silently retitles somebody else's
-    units -- which is why a chapter that names its generics takes a pid of its own (ADR 0352).
-
-    ch06's two boats took 0xb4/0xb5, which `CH04_PACK_PIDS` already owned, and two of ch04's five
-    Mauthe Doogs would have read "Fishing Boat" on the unit window. Nothing caught it:
-    `assert_pack_pids_addressable` checks that ch04's pack is addressable within ch04, and the
-    0xB0-range occupancy lived in prose in three separate comments, none of which was complete.
-    """
+def rewritten_raw_pids(portraits=None):
+    """{raw pid: what the build writes into its gCharacterData row}, from every table that
+    writes one: a whole row cloned from a donor (GENERIC_PID_DONORS, BOSS_PID_ROW_DONORS), a name
+    plate (RAW_PID_PORTRAITS), help text (RAW_PID_HELP), a personal stat line
+    (RAW_PID_PERSONAL_SOURCES), a baseLevel (RAW_PID_LEVEL_SOURCES) and a battle-anim binding
+    (RAW_PID_BATTLE_ANIMS). A pid missing here keeps the row vanilla ships;
+    test_inject_raw_pids diffs the patched table against vanilla to hold this list complete."""
+    import inject.chapter_ids
+    import inject.raw_pids                             # it imports this module's neighbours
+    from inject.cast import RAW_PID_BATTLE_ANIMS, RAW_PID_HELP
     portraits = RAW_PID_PORTRAITS if portraits is None else portraits
+    rows = collections.defaultdict(list)
+    for pid, donor in dict(inject.chapter_ids.GENERIC_PID_DONORS,
+                           **inject.chapter_ids.BOSS_PID_ROW_DONORS).items():
+        rows[pid].append('a row cloned from %s' % donor)
+    for pid, (_unit_id, _slot, _portrait_id, name) in portraits.items():
+        rows[pid].append('the name plate %r' % name)
+    for pid in RAW_PID_HELP:
+        rows[pid].append('help text')
+    for pid, (_yaml, unit_id) in inject.raw_pids.RAW_PID_PERSONAL_SOURCES.items():
+        rows[pid].append("%s's personal stat line" % unit_id)
+    for pid, (_yaml, unit_id) in inject.raw_pids.RAW_PID_LEVEL_SOURCES.items():
+        rows[pid].append("%s's baseLevel" % unit_id)
+    for unit_id, (_yaml, pid) in RAW_PID_BATTLE_ANIMS.items():
+        rows[pid].append("%s's battle anim" % unit_id)
+    return {pid: ', '.join(dict.fromkeys(what)) for pid, what in rows.items()}
+
+
+def assert_rewritten_raw_pids_are_exclusive(rows=None, scope=None):
+    """Guard: a raw pid whose row the build rewrites may be claimed by only one chapter.
+
+    `gCharacterData` has ONE row per pid and **no chapter dimension** -- unlike
+    `gDefeatTalkList`, whose entries carry `.chapter` -- so whatever the build writes there
+    reaches every unit on that pid in EVERY chapter. A pid the build leaves alone may be shared;
+    one it rewrites may not.
+
+    It bit twice. ch06's two boats took 0xb4/0xb5, which `CH04_PACK_PIDS` already owned, and two
+    of ch04's five Mauthe Doogs would have read "Fishing Boat" (the name plate). ch03's grell took
+    0xb7, vanilla's own generic Mogall pid, and ch04's four line Mogalls, on 0xb7 as the twin's
+    are, all fought with the grell's boss line (the stat line, #490): nothing checked a stat
+    line, because the guard said "named".
+    """
+    rows = rewritten_raw_pids() if rows is None else rows
     claims = raw_pid_claims(scope)
-    for pid, (_unit_id, _slot, _portrait_id, name) in sorted(portraits.items()):
+    for pid, what in sorted(rows.items()):
         owners = claims.get(pid, set())
         if len(owners) > 1:
             sys.exit(
-                'ERROR: raw pid %s is NAMED %r but claimed by %s. A name plate is written into '
+                'ERROR: raw pid %s carries %s but is claimed by %s. The build writes it into '
                 'gCharacterData[%s - 1], which has one row per pid and no chapter dimension, so '
-                'every unit on that pid in EVERY chapter takes the name. Give the named unit a '
-                'pid of its own (an unnamed 0x255 gap).'
-                % (pid, name, ' and '.join(sorted(owners)), pid))
+                'every unit on that pid in EVERY chapter takes it. Give the unit a pid of its own '
+                '(clone a generic row onto a free one: inject.raw_pids.clone_generic_rows).'
+                % (pid, what, ' and '.join(sorted(owners)), pid))
     return claims
 
 

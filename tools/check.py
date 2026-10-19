@@ -86,6 +86,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #490: the guard covers every rewritten raw-pid row, not only name plates
+    r'assert_named_raw_pids_are_exclusive',
+    # retired by #508: no two chapters share a pid the build writes a line into
+    r"grell and ch04's mogall share",
     # retired by #495: ch06's dropper carries a Horseslayer (shark-rider-horseslayer), and the
     # chapter-chunk pin is the generic check_chapter_lua_facts
     r'shark-rider-halberd', r'check_ch06_lua_matches_yaml',

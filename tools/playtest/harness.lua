@@ -4286,6 +4286,33 @@ scenarios.ch07titlecard = function()
     return scenarios.titlecard()
 end
 
+-- What the ROM loaded each red unit with: the full struct Unit stat line, so the parity model
+-- (difficulty.py) and the wiki's load path (unit_load.py) can both be held to it (#490, #508).
+-- struct Unit (bmunit.h): +04 pClassData (class number at +04), +08 level, +12 maxHP, +14 pow,
+-- +15 skl, +16 spd, +17 def, +18 res, +19 lck. Run once per PT_DIFFICULTY.
+INSPECT.redStats = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local actual = INSPECT.liveDifficulty()
+    local n = 0
+    for i = 0, 49 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and (u.state & US_DEAD) == 0 then
+            n = n + 1
+            log(string.format(
+                '{"event":"red_stats","mode":"%s","char":"0x%02x","class":"0x%02x","level":%d,'
+                .. '"hp":%d,"pow":%d,"skl":%d,"spd":%d,"def":%d,"res":%d,"lck":%d}',
+                actual, u.charId, ru8(ru32(u.addr + 0x04) + 0x04), u.level, u.maxhp, u.pow,
+                ru8(u.addr + 0x15), ru8(u.addr + 0x16), u.def, ru8(u.addr + 0x18),
+                ru8(u.addr + 0x19)))
+        end
+    end
+    if n == 0 then return result("FAIL", "no red units on the map") end
+    return result("PASS", string.format("mode=%s: %d red units logged", actual, n))
+end
+scenarios.ch04redstats = function()
+    return INSPECT.redStats()
+end
+
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.
 scenarios.gameover = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
@@ -5525,7 +5552,7 @@ end
 -- defeat quote sets EVFLAG_TMP(10) -> the Ch4 Misc AFEV(EVFLAG_TMP(11), midmap, EVFLAG_TMP(10))
 -- runs the on-map RBG-execution cutscene ONCE. Proves the midmap trigger fires and the chapter
 -- KEEPS GOING (unlike the boss WIN). The Brute rides a unique raw pid (0xb6, distinct from the
--- 0xaa generics + the 0xb7 grell) so its flagged death keys the trigger to it alone. Same
+-- 0xaa generics + the grell's own pid) so its flagged death keys the trigger to it alone. Same
 -- park-adjacent-and-strike trick (park the target beside a live blue unit, then strike); the Brute is a melee Brigand, so poke it frail (1 HP)
 -- and hit at range 1 -- a dead defender throws no counter. Must NOT touch the grell (that would end
 -- the chapter). Definitive assertion: EVFLAG_TMP(10) (Brute defeated) then EVFLAG_TMP(11) (the AFEV
@@ -9883,7 +9910,7 @@ end
 -- (mashing at "Press START" would boot a spurious New Game). Fresh CH03BOOT New Game.
 scenarios.recordch03win = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
-    if not red(0xb7) then return result("FAIL", "grell (pid 0xb7) not found in the red array") end
+    if not red(CAMPAIGN.CH03_BOSS_PID) then return result("FAIL", "grell (CAMPAIGN.CH03_BOSS_PID) not found in the red array") end
     local leader = blue(0x01)
     if not leader then return result("FAIL", "leader (0x01) not deployed") end
     emu:write16(leader.addr + 0x1E, 0x2D1F) -- Iron Axe in items[0]: guaranteed in-range kill weapon
@@ -9901,9 +9928,9 @@ scenarios.recordch03win = function()
     -- entrance) so the attack target is unambiguously the grell. Re-park each attempt in case a
     -- whiff or the grell's AI move disturbs it (mirrors the ch03win PASS/FAIL retry).
     local function parkGrell()
-        local g = red(0xb7)
+        local g = red(CAMPAIGN.CH03_BOSS_PID)
         if not g or isDead(g) then return false end
-        pokeFrail(g); g = red(0xb7)
+        pokeFrail(g); g = red(CAMPAIGN.CH03_BOSS_PID)
         local ggrid = mapUnitAt(g.x, g.y)
         for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
             local tx, ty = leader.x + d[1], leader.y + d[2]
@@ -9940,7 +9967,7 @@ scenarios.recordch03win = function()
         local deadAt = nil
         for i = 1, 900 do
             if i % 2 == 0 then shot("ch03win") end
-            if not deadAt and (isDead(red(0xb7)) or eventFlag(2)) then deadAt = i end
+            if not deadAt and (isDead(red(CAMPAIGN.CH03_BOSS_PID)) or eventFlag(2)) then deadAt = i end
             if deadAt then
                 if i > deadAt + 200 then break end                 -- ~200f tail: death + defeat quote
                 if i > deadAt + 70 and i % 10 == 0 then press(K.A, 2) end -- clear EXP AFTER the death anim
@@ -9949,17 +9976,17 @@ scenarios.recordch03win = function()
         end
     end
     for turn = 1, 3 do
-        if isDead(red(0xb7)) or eventFlag(2) then break end
+        if isDead(red(CAMPAIGN.CH03_BOSS_PID)) or eventFlag(2) then break end
         if not parkGrell() then return result("FAIL", "no free tile adjacent to the leader for the grell") end
         cursorTo(leader.x, leader.y)
         for f = 1, 30 do if f % 3 == 0 then shot("ch03win") end yield() end -- frame the standoff
         filmedAttack()
-        if isDead(red(0xb7)) or eventFlag(2) then break end
+        if isDead(red(CAMPAIGN.CH03_BOSS_PID)) or eventFlag(2) then break end
         -- a whiff: run the enemy phase (filming) and retry next player turn
         for f = 1, 40 do if f % 4 == 0 then shot("ch03win") end yield() end
         if runEnemyPhase() == "gameover" then return result("FAIL", "unexpected game over") end
     end
-    if not (isDead(red(0xb7)) or eventFlag(2)) then
+    if not (isDead(red(CAMPAIGN.CH03_BOSS_PID)) or eventFlag(2)) then
         return result("FAIL", "could not kill the grell in 3 turns")
     end
     -- Film the defeat quote + the DefeatBoss ending cutscene. Advance text with a bounded

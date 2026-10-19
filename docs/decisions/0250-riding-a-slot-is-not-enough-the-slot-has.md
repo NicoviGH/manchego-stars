@@ -15,8 +15,8 @@ reddened CH0 — caught by the very gate this issue added, on its first run.
 `PROLOGUE_REWRITTEN_GUEST_SLOTS` now names that exclusion and an assert keeps it in step with
 the injector.
 
-**ch03's grell is the one that was really wrong**, and for the opposite reason: it rides raw pid
-`0xb7`, and a CharacterData gap is all zeros. It goes from 1.1 to **3.6 rounds** on an authored
+**ch03's grell is the one that was really wrong**, and for the opposite reason: it rides a raw
+pid (its own since ADR 0098's #508 rewrite), and a raw pid's row carries no personal line. It goes from 1.1 to **3.6 rounds** on an authored
 line, HP 21/Def 3 → HP 36/Def 8.
 
 **A `personal:` block is not injected by writing it.** `RAW_PID_PERSONAL_SOURCES` is what carries

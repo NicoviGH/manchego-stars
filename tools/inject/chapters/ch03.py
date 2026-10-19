@@ -107,10 +107,6 @@ CH03_OPENING_TOWN_BG = 'BG_MS_TARGOS_WINTER'      # beats A-B: the Termalaine st
 CH03_OPENING_MINE_BG = 'BG_MS_TERMALAINE_MINE'    # beats C-E: inside the mine (sign, Pinky's scout) -- swaps in after Wolfram's "we're going in"
 CH03_ENDING_BG = 'BG_MS_TARGOS_WINTER'
 CH03_TREX_ENTRANCE_SCRIPT = 'EventScr_089F1B38'  # dead Ch4 Village script (its list ref is dropped by the host) -> Trex's light turn-1 entrance beat
-                                   # 0xb7 (0xB0..0xB9 are all UNNAMED gaps in gCharacterData, a
-                                   # designated-init array -> zero name/face/quote, no vanilla leak).
-                                   # Distinct from the shared generic 0xaa so its flagged death quote
-                                   # keys the midmap trigger to the Brute ALONE (first-match pid scan).
 CH03_BRUTE_DEFEAT_FLAG = 'EVFLAG_TMP(10)'  # set by the Brute's silent gDefeatTalkList entry on death
 CH03_MIDMAP_GUARD_FLAG = 'EVFLAG_TMP(11)'  # AFEV ent-flag: guards the one-shot (set after the beat fires)
 CH03_MIDMAP_SCRIPT = 'EventScr_089F1BD8'   # dead vanilla Ch4 script (defined-only; its list ref dropped by the host)
@@ -508,7 +504,7 @@ def inject_ch03(campaign, boot=False, verbose=True):
         f.write('\n'.join(lines))
 
     # 5. The grell's flagged gDefeatTalkList entry keys the DefeatBoss win to its raw pid (first-match
-    #    scan wins; no vanilla 0xb7 entry to shadow). .flag = EVFLAG_DEFEAT_BOSS is what fires the win.
+    #    scan wins; no vanilla entry on its pid to shadow). .flag = EVFLAG_DEFEAT_BOSS is what fires the win.
     #    .msg = 0: NO death quote (the grell has no portrait, so the faceless line rendered boxless +
     #    unreadable; Nicolas cut it). The engine still sets the flag -- DisplayDefeatTalkForPid only
     #    shows the quote `if (ent->msg != 0)` but SetPidDefeatedFlag runs regardless (eventinfo.c:595).

@@ -36,7 +36,7 @@ class Ch03MidmapExecution(unittest.TestCase):
 
     def test_miniboss_pid_is_a_clean_sibling_distinct_from_boss_and_generic(self):
         """A unique raw pid so the Brute's flagged death quote keys the trigger to it ALONE --
-        not the shared generic 0xaa (all trash) and not the grell's 0xb7 (the WIN)."""
+        not the shared generic 0xaa (all trash) and not the grell's own pid (the WIN)."""
         self.assertNotIn(inject.chapter_ids.CH03_BRUTE_MINIBOSS_PID,
                          (inject.chapter_ids.CH03_GENERIC_PID, inject.chapter_ids.CH03_BOSS_PID))
 
