@@ -1237,6 +1237,9 @@ cutscene_actors: [marty, braulo]
 # rows from this block (#314) -- the ROM from `boot:`, PT_HOST_CHAPTER from the host-slot
 # registry. Nothing about them is written a second time in `matrix.yaml`.
 #
+payload_deviations:
+  - item: ITEM_AXE_HALBERD
+    why: "the Fighter is a Cavalier here, so the axe pair is the Iron Lance + Horseslayer, with the same equip-on-use drop flip (#497)"
 # ch06clock is the case #360 could not run because ch06 had no debug boot when it landed: the
 # pockets are a claim about the ENGINE'S pathing, and `mapshot` photographs turn 1 while the
 # question needs several enemy phases. ch06boarding proves the boarding pass. The opening is
