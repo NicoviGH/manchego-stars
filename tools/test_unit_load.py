@@ -16,6 +16,27 @@ import difficulty as df
 import unit_load as ul
 
 
+class CanUseWeapon(unittest.TestCase):
+    """`CanUnitUseWeapon` at load (bmitem.c), with `UnitAutolevelWExp`'s rank raise."""
+
+    def test_a_class_with_no_rank_in_the_type_cannot_use_it(self):
+        """ch06's trident-drop Soldier carries an Iron Blade only to drop it (ADR 0329)."""
+        self.assertFalse(ul.can_use_weapon('ITEM_BLADE_IRON', 'CLASS_SOLDIER'))
+
+    def test_a_flagged_unit_reaches_any_rank_in_a_type_it_holds(self):
+        """A Soldier holds D lances; autolevelled, a Steel Lance (D) and a Silver (A) both work."""
+        self.assertTrue(ul.can_use_weapon('ITEM_LANCE_SILVER', 'CLASS_SOLDIER', autolevel=True))
+
+    def test_an_unflagged_unit_needs_the_rank(self):
+        self.assertFalse(ul.can_use_weapon('ITEM_LANCE_SILVER', 'CLASS_SOLDIER', autolevel=False))
+        self.assertTrue(ul.can_use_weapon('ITEM_LANCE_IRON', 'CLASS_SOLDIER', autolevel=False))
+
+    def test_a_monster_weapon_needs_the_monster_lock(self):
+        self.assertFalse(ul.can_use_weapon('ITEM_MONSTER_FETIDCLW', 'CLASS_SOLDIER'))
+        self.assertTrue(ul.can_use_weapon('ITEM_MONSTER_FETIDCLW', 'CLASS_ENTOUMBED',
+                                          attributes=frozenset({'CA_LOCK_3'})))
+
+
 class GrowthSteps(unittest.TestCase):
     def test_an_unflagged_unit_loads_bare_whatever_its_level(self):
         """LoadUnit only calls UnitAutolevel for a `.autolevel` definition."""

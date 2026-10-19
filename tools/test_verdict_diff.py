@@ -71,6 +71,14 @@ class Render(unittest.TestCase):
         self.assertIn('- CH3 ch03, new (tutorial, normal): boss folds', md)
         self.assertEqual(md.count('boss folds'), 1)
 
+    def test_a_finding_with_new_numbers_reads_as_one_change(self):
+        before = snap(normal={'CH7 ch07': row(role=['boss threat 14.3 out-hit'])})
+        after = snap(normal={'CH7 ch07': row(role=['boss threat 11.8 out-hit'])})
+        md = vd.render(before, after)
+        self.assertIn('- CH7 ch07, changed (normal): boss threat 14.3 out-hit  →  '
+                      'boss threat 11.8 out-hit', md)
+        self.assertNotIn(', new (', md)
+
     def test_chapters_sort_by_number_not_text(self):
         s = snap(normal={'CH10 ch10': row(), 'CH2 ch02': row()})
         md = vd.render(s, s)

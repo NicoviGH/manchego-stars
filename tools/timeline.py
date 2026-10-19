@@ -24,7 +24,6 @@ than this reads; the comparison holds because the twin is read the same way.
 """
 import argparse
 import collections
-import dataclasses
 import os
 import sys
 
@@ -49,14 +48,9 @@ def vanilla_bodies(parity_ref, mode=None):
     turns = dif._vanilla_reinforcement_turns(dif.PARITY_REFERENCE_STEM[parity_ref])
     out = []
     for array, i, d, unit in dif.vanilla_loaded_units(parity_ref, mode):
-        keys = [dif.ITEM_TO_WEAPON.get(it) for it in d['items']]
-        weapons = [fc.W[k] for k in keys if k and fc.W[k].kind != 'staff']
-        if not weapons:
-            continue
         table, mov = pp.class_movement(d['classIndex'][len('CLASS_'):].lower())
         out.append(dm.Body(array, i, tuple(d['position']), cs.ai_shape(d['ai']),
-                           d['ai'][0], turns.get(array, 1), table, mov,
-                           tuple(dataclasses.replace(unit, weapon=w) for w in weapons)))
+                           d['ai'][0], turns.get(array, 1), table, mov, fc.arms(unit)))
     return out
 
 

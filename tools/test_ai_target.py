@@ -6,6 +6,7 @@ scores. Run:
 
     python3 tools/test_ai_target.py
 """
+import dataclasses
 import os
 import sys
 import unittest
@@ -91,11 +92,23 @@ class PickTarget(unittest.TestCase):
         frail = unit('frail', hp=10, df=0)
         self.assertIs(ai_target.pick_target(atk, [tough, frail], 0), frail)
 
-    def test_a_tie_goes_to_the_first(self):
+    def test_a_tie_goes_to_the_later_target(self):
+        """`tmpResult.score >= finalResult.score` (cp_battle.c): the later candidate wins."""
         atk = unit()
         a, b = unit('a'), unit('b')
-        self.assertIs(ai_target.pick_target(atk, [a, b], 0), a)
-        self.assertIs(ai_target.pick_target(atk, [b, a], 0), b)
+        self.assertIs(ai_target.pick_target(atk, [a, b], 0), b)
+        self.assertIs(ai_target.pick_target(atk, [b, a], 0), a)
+
+    def test_the_ai_swings_the_weapon_that_scores_best_against_that_target(self):
+        """ch06halberd's lesson (#495): a Horseslayer comes out only against a mounted
+        target; the Iron Lance does the work against everyone else."""
+        lancer = dataclasses.replace(unit(pow=8, skl=6),
+                                     weapon=fc.W['iron-lance'],
+                                     arsenal=(fc.W['iron-lance'], fc.W['horseslayer']))
+        rider = dataclasses.replace(unit('rider', hp=22, df=6), tags=frozenset({'cav'}))
+        walker = unit('walker', hp=22, df=6)
+        self.assertEqual(ai_target.pick_attack(lancer, [rider], 0)[1].weapon.name, 'horseslayer')
+        self.assertEqual(ai_target.pick_attack(lancer, [walker], 0)[1].weapon.name, 'iron-lance')
 
 
 if __name__ == '__main__':

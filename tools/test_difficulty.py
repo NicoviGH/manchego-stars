@@ -751,7 +751,7 @@ class OneForceEveryReader(unittest.TestCase):
         chap = {'parity_reference': 'FE8 Prologue',
                 'enemy_units': [{'id': 'sleeper', 'class': 'general', 'level': 20,
                                  'is_boss': True, 'arrives_turn': 3,
-                                 'inventory': [{'id': 'silver-lance'}]}]}
+                                 'inventory': [{'id': 'steel-lance'}]}]}
         self.assertTrue(any('sleeper' in f for f in df.role_findings(chap, 'FE8 Prologue')))
 
 
@@ -782,7 +782,7 @@ class DeclaredLevelsEverywhere(unittest.TestCase):
         # a malus the ROM never applies.
         chap = {'enemy_units': [{'id': 'b', 'class': 'general', 'is_boss': True,
                                  'levels': [10],
-                                 'inventory': [{'id': 'silver-lance'}]}]}
+                                 'inventory': [{'id': 'steel-lance'}]}]}
         shifts = {'tutorial': 4, 'normal': 2, 'difficult': 3}
         plain = df.chapter_units(chap)[0][1]
         shifted = df.chapter_units(chap, mode='tutorial', shifts=shifts)[0][1]
@@ -825,7 +825,7 @@ class RoleFindingsGradeTypesNotBodies(unittest.TestCase):
         chap = {'parity_reference': 'FE8 Prologue',
                 'enemy_units': [{'id': 'w', 'class': 'general', 'levels': [19, 20],
                                  'is_boss': True,
-                                 'inventory': [{'id': 'silver-lance'}]}]}
+                                 'inventory': [{'id': 'steel-lance'}]}]}
         findings = df.role_findings(chap, 'FE8 Prologue')
         self.assertEqual([f for f in findings if 'flagged is_boss' in f], [], findings)
         self.assertEqual(len(findings), len(set(findings)), findings)
@@ -833,7 +833,7 @@ class RoleFindingsGradeTypesNotBodies(unittest.TestCase):
     def test_bodies_at_DIFFERENT_levels_are_different_types(self):
         # `levels: [2, 3]` is two distinct units and both get graded; `count: 2` is one.
         ed = {'id': 'w', 'class': 'general', 'levels': [19, 20], 'is_boss': True,
-              'inventory': [{'id': 'silver-lance'}]}
+              'inventory': [{'id': 'steel-lance'}]}
         self.assertEqual(len(df._entry_combatants(ed, distinct=True)), 2)
         self.assertEqual(len(df._entry_combatants(dict(ed, levels=None, level=20, count=2),
                                                   distinct=True)), 1)
@@ -863,7 +863,7 @@ class GuardsSeeTheWholeRoster(unittest.TestCase):
         # silent multiplier.
         ed = {'id': 'bag', 'composition': ['general', 'general'], 'level': 10,
               'personal': {'hp': 20},
-              'inventory_by_class': {'general': ['silver-lance']}}
+              'inventory_by_class': {'general': ['steel-lance']}}
         plain = df._entry_combatants(ed)
         real = df._entry_combatants(ed, real_article=True)
         self.assertEqual([u.hp for u in real], [u.hp for u in plain])
@@ -872,7 +872,7 @@ class GuardsSeeTheWholeRoster(unittest.TestCase):
         # the bag branch passed base_level=1/shiftable=True by construction while the class
         # branch resolved both, so a bag boss took a malus the ROM never applies.
         ed = {'id': 'bag', 'composition': ['general'], 'level': 10, 'is_boss': True,
-              'inventory_by_class': {'general': ['silver-lance']}}
+              'inventory_by_class': {'general': ['steel-lance']}}
         shifts = {'tutorial': 4, 'normal': 2, 'difficult': 3}
         self.assertEqual(df._entry_combatants(ed)[0].hp,
                          df._entry_combatants(ed, mode='tutorial', shifts=shifts)[0].hp)
@@ -2068,10 +2068,11 @@ class RoleCheck(unittest.TestCase):
         than its class-base one. A level-12 Gwyllgi's Hell Fang (34.2) no longer reads as an
         outlier at all, which is exactly the point of the ceiling fix: a unit that merely
         out-hits the twin's GENERICS is not an outlier when the twin fields a 34.3 recruit of
-        its own. A level-20 Berserker's Killing Edge (61.5) is one."""
+        its own. A level-20 Berserker's Killer Axe is one (a Berserker wields axes only, so the Killing
+        Edge this fixture once carried is a weapon the ROM never lets it swing, #510 step 3)."""
         chap = self._chap([
             {'id': 'moose', 'class': 'berserker', 'level': 20, 'autolevel': True,
-             'convertible': True, 'inventory': [{'id': 'ke', 'fe_base': 'killing-edge'}]},
+             'convertible': True, 'inventory': [{'id': 'ka', 'fe_base': 'killer-axe'}]},
             {'id': 'boss', 'class': 'druid', 'level': 7, 'autolevel': True, 'is_boss': True,
              'inventory': [{'id': 'flux', 'fe_base': 'flux'}]},
         ])
@@ -2727,20 +2728,31 @@ class ChapterPressureInMode(unittest.TestCase):
         self.assertLess(df._chapter_pressure(chap, mode='normal')['ours'][0],
                         df._chapter_pressure(chap)['ours'][0])
 
-    def test_a_mode_moves_the_ratio_only_a_little(self):
-        # The claim #303 rests on: both sides shift by their own chapter's numbers, so a mode
-        # read stays close to the authored one. Not equal: instrument v2 (#430) meets the
-        # shifted force with an UNSHIFTED party, and a kill threshold or an AI target can
-        # flip (ch04 on Difficult moves threat by 0.21). A mode that shifted one side alone
-        # moves it by far more.
+    def test_shifting_both_sides_moves_the_ratio_less_than_shifting_ours_alone(self):
+        """The claim #303 rests on: each side shifts by its own chapter's numbers, so a mode
+        read compares two tuned tables. A fixed bound on |mode - authored| tested the chapters,
+        not the model (ch04 on Difficult sits 0.26 off its authored read on faithful loads,
+        which is ch04's own content, logged on #510). This tests the model: zero the twin's
+        shift and the ratio must move at least as far as with both sides shifted."""
+        real = df.vanilla_chapter_shifts
+        moved = []
         for chid in ('ch00', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'):
             chap = df.load_field('rime-of-the-frostmaiden', chid)[0]
-            authored = df._chapter_pressure(chap)['verdict']
-            for mode in df.MODES:
-                v = df._chapter_pressure(chap, mode=mode)['verdict']
-                for ratio in ('threat_ratio', 'load_ratio'):
-                    self.assertLess(abs(v[ratio] - authored[ratio]), 0.25,
-                                    '%s %s on %s' % (chid, ratio, mode))
+            authored = df._chapter_pressure(chap)['verdict']['threat_ratio']
+            for mode in ('tutorial', 'difficult'):
+                both = df._chapter_pressure(chap, mode=mode)['verdict']['threat_ratio']
+                try:
+                    df.vanilla_chapter_shifts = lambda ref: dict.fromkeys(df.MODES, 0)
+                    df._MATCHUPS.clear()
+                    ours_alone = df._chapter_pressure(chap, mode=mode)['verdict']['threat_ratio']
+                finally:
+                    df.vanilla_chapter_shifts = real
+                    df._MATCHUPS.clear()
+                self.assertLessEqual(abs(both - authored), abs(ours_alone - authored) + 1e-9,
+                                     '%s on %s' % (chid, mode))
+                moved.append(ours_alone != both)
+        # The patch must have reached the read at least once, or every `<=` above was 0 <= 0.
+        self.assertTrue(any(moved))
 
 
 class BossesAreImmuneToTheMalus(unittest.TestCase):

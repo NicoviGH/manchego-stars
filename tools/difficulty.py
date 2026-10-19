@@ -171,13 +171,21 @@ def _weapon_for(inventory):
     Priest's promotion-gated Light tomes) are skipped too -- so a staff-only healer
     resolves to None, the support path, instead of leaking promoted kit into base offense
     or crashing (#62). The YAML's own `unlock` flag is the data-driven gate."""
+    weapons = _weapons_for(inventory)
+    return weapons[0] if weapons else None
+
+
+def _weapons_for(inventory):
+    """Every weapon `_weapon_for` would accept, in inventory order: the unit's arsenal, which
+    the AI chooses from per target (`fc.arms`)."""
+    out = []
     for item in inventory or []:
         if item.get('unlock'):                    # not yet usable at base class
             continue
         key = item.get('fe_base') or item.get('id')
         if key in fc.W:
-            return fc.W[key]
-    return None
+            out.append(fc.W[key])
+    return tuple(out)
 
 
 def _stats_to_combatant(name, stats, weapon, tags=frozenset()):
@@ -431,7 +439,7 @@ def _character_base_level(char_index):
 
 def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
                      mode=None, shifts=None, shiftable=True, base_level=1, autolevel=True,
-                     realistic=False, personal_growths=None):
+                     realistic=False, personal_growths=None, arsenal=(), char_index=None):
     """One Combatant as the engine loads it (`unit_load.growth_steps`): class base grown per
     the definition's `autolevel` flag, its class's promoted bonus and the `mode` shift, wielding
     `weapon`, plus any personal boss line (see above), capped at the class maxima
@@ -453,32 +461,57 @@ def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
     capped = {f: min(getattr(c, f), caps[k]) for f, k in (
         ('hp', 'HP'), ('pow', 'Pow'), ('skl', 'Skl'), ('spd', 'Spd'), ('df', 'Def'),
         ('res', 'Res'), ('lck', 'Lck')) if getattr(c, f) > caps[k]}
-    return dataclasses.replace(c, **capped) if capped else c
+    if arsenal:
+        # It carries what its definition lists; it can attack only with what it can use
+        # (CanUnitUseWeapon), and it equips the first of those (#510 step 3).
+        arsenal = _usable(arsenal, class_enum, char_index, autolevel)
+        capped['weapon'] = arsenal[0] if arsenal else None
+    return dataclasses.replace(c, arsenal=tuple(arsenal), **capped)
+
+
+def _usable(weapons, class_enum, char_index, autolevel):
+    """The `weapons` a unit of `class_enum` on `char_index` can wield as it loads
+    (`unit_load.can_use_weapon`), in order. A weapon with no decomp item is kept: there is
+    nothing to judge it by."""
+    import exp_curve                        # exp_curve imports this module
+    try:
+        attributes = exp_curve.class_attributes(class_enum)
+    except KeyError:                        # a raw class number: no class block to read
+        return tuple(weapons)
+    attributes = attributes | exp_curve.character_attributes(char_index)
+    block = _character_block(char_index)
+    return tuple(w for w in weapons
+                 if w.name not in ITEM_ENUM
+                 or unit_load.can_use_weapon(ITEM_ENUM[w.name], class_enum, block, attributes,
+                                             autolevel))
+
+
+def _character_block(char_index):
+    """A CHARACTER_ slot's vanilla data_characters.c entry, '' for a generic or unknown one."""
+    if not str(char_index or '').startswith('CHARACTER_'):
+        return ''
+    try:
+        s, e = inject.decomp._find_brace_block(_characters_text(), '[%s - 1]' % char_index,
+                                               inject.paths.CHARACTERS_C)
+    except SystemExit:
+        return ''
+    return _characters_text()[s:e]
 
 
 def _loads_realistically(char_index, class_enum):
     """Does a FLAGGED red unit on this slot take UnitAutolevelRealistic (LoadUnit, bmunit.c:
     625)? CA_BOSS in its character's or class's attributes, or pid < 0x40. Vanilla's flagged
     bosses (Bazba, Saar, Tirado) do, and carry baseLevel >= their level, so they load bare."""
+    import exp_curve                        # exp_curve imports this module
     number = _character_number(char_index) if char_index else None
     if number is not None and number < 0x40:
         return True
-    def boss(block):
-        found = re.search(r'\.attributes\s*=\s*([^,\n]+)', block)
-        return bool(found and 'CA_BOSS' in found.group(1))
     try:
-        if boss(unit_load._class_block(class_enum)):
+        if 'CA_BOSS' in exp_curve.class_attributes(class_enum):
             return True
     except KeyError:                                   # a raw class number: no block to read
         pass
-    if not str(char_index or '').startswith('CHARACTER_'):
-        return False
-    try:
-        start, end = inject.decomp._find_brace_block(_characters_text(), '[%s - 1]' % char_index,
-                                                     inject.paths.CHARACTERS_C)
-    except SystemExit:
-        return False
-    return boss(_characters_text()[start:end])
+    return 'CA_BOSS' in exp_curve.character_attributes(char_index)
 
 
 def _vanilla_load_kwargs(d):
@@ -489,7 +522,8 @@ def _vanilla_load_kwargs(d):
     if realistic and str(ch or '').startswith('CHARACTER_'):
         growths = inject.stats.donor_growths_and_ranks(_characters_text(), ch)[0]
     return dict(autolevel=d['autolevel'], realistic=realistic, personal_growths=growths,
-                shiftable=_takes_difficulty_shift(ch), base_level=_character_base_level(ch))
+                shiftable=_takes_difficulty_shift(ch), base_level=_character_base_level(ch),
+                char_index=ch)
 
 
 def _our_load_kwargs(ed):
@@ -505,7 +539,8 @@ def _our_load_kwargs(ed):
         donor, _enemy_class_enum(ed['class'])) if 'class' in ed else False
     growths = inject.stats.donor_growths_and_ranks(_characters_text(), donor)[0] \
         if realistic and str(donor).startswith('CHARACTER_') else None
-    return dict(autolevel=flagged, realistic=realistic, personal_growths=growths)
+    return dict(autolevel=flagged, realistic=realistic, personal_growths=growths,
+                char_index=donor)
 
 
 def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shifts=None,
@@ -541,14 +576,16 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=
         return [_one_enemy(name, enemy_def['class'], level,
                            _weapon_for(enemy_def.get('inventory')),
                            mode=mode, shifts=shifts, base_level=base_level,
-                           shiftable=shiftable, **_our_load_kwargs(enemy_def))]
+                           shiftable=shiftable, arsenal=_weapons_for(enemy_def.get('inventory')),
+                           **_our_load_kwargs(enemy_def))]
     by_class = enemy_def.get('inventory_by_class', {})
     out = []
     for cls in dict.fromkeys(enemy_def.get('composition', [])):   # distinct, order-stable
-        weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
-        out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon,
+        inventory = [{'id': w} for w in by_class.get(cls, [])]
+        out.append(_one_enemy('%s-%s' % (name, cls), cls, level, _weapon_for(inventory),
                               mode=mode, shifts=shifts, base_level=base_level,
-                              shiftable=shiftable, **_our_load_kwargs(enemy_def)))
+                              shiftable=shiftable, arsenal=_weapons_for(inventory),
+                              **_our_load_kwargs(enemy_def)))
     return out
 
 
@@ -843,11 +880,13 @@ def resolve_donor(parity_ref, spec):
 
 def _weapon_from_item_enums(item_enums):
     """First decomp item enum that maps to a real attacking weapon (else None)."""
-    for it in item_enums:
-        key = ITEM_TO_WEAPON.get(it)
-        if key:
-            return fc.W[key]
-    return None
+    weapons = _weapons_from_item_enums(item_enums)
+    return weapons[0] if weapons else None
+
+
+def _weapons_from_item_enums(item_enums):
+    """Every decomp item enum that maps to a real attacking weapon, in inventory order."""
+    return tuple(fc.W[ITEM_TO_WEAPON[it]] for it in item_enums if ITEM_TO_WEAPON.get(it))
 
 
 def vanilla_enemies(parity_ref, mode=None):
@@ -891,7 +930,8 @@ def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
             out.append((array_name, i, d, _enemy_from_enum(
                 '%s#%d[%s]' % (array_name, i, ch), d['classIndex'], d['level'], weapon,
                 vanilla_personal_line(ch) if with_personal else None,
-                mode=mode, shifts=shifts, **_vanilla_load_kwargs(d))))
+                mode=mode, shifts=shifts, arsenal=_weapons_from_item_enums(d['items']),
+                **_vanilla_load_kwargs(d))))
     return out
 
 
@@ -1295,12 +1335,12 @@ def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff
         # `personal:` or donor-matching id on such an entry describes the GROUP.
         # `base_level`/`shiftable` are resolved the same way the class branch resolves them,
         # so a bag boss is not handed a malus the engine never applies.
-        units = [_one_enemy('%s-%s' % (name, cls), cls, lv,
-                            _weapon_for([{'id': w} for w in by_class.get(cls, [])]),
+        kit = {cls: [{'id': w} for w in by_class.get(cls, [])] for cls, _lv in bodies}
+        units = [_one_enemy('%s-%s' % (name, cls), cls, lv, _weapon_for(kit[cls]),
                             mode=mode, shifts=shifts,
                             base_level=_our_base_level(dict(ed, level=lv)),
                             shiftable=_our_takes_difficulty_shift(ed),
-                            **_our_load_kwargs(ed))
+                            arsenal=_weapons_for(kit[cls]), **_our_load_kwargs(ed))
                  for cls, lv in (dict.fromkeys(bodies) if distinct else bodies)]
     else:
         # One body per DECLARED level, not `count` copies of one: a wave authored as
@@ -1578,7 +1618,7 @@ def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
 
 
 def _stat_key(u):
-    return (u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con, u.weapon, u.tags)
+    return (u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.lck, u.con, u.weapon, u.tags, u.arsenal)
 
 
 def party_matchup(bodies, careers):
@@ -1588,7 +1628,8 @@ def party_matchup(bodies, careers):
     the FIELDED party, once per simulated career (ADR 0311). Per joint career:
 
       threat/slot = sum over enemies of its damage per round against the unit FE8's AI would
-                    attack (`ai_target.pick_target`), / units fielded
+                    attack with whichever carried weapon it picks for that target
+                    (`ai_target.pick_attack`'s rule), / units fielded
       clear-load  = sum over enemies of 1 / the field's COMBINED kill rate on it (the sum of
                     1 / rounds): the party-rounds the force takes to clear. Harmonic, because
                     a plain mean of rounds is dominated by whoever cannot dent the boss; a
@@ -1616,28 +1657,36 @@ def party_matchup(bodies, careers):
         return {m: {k: fn(u) for k, u in dict(zip(keys[m], careers[m])).items()}
                 for m in keys}
 
+    # The enemy ATTACKS with whichever carried weapon the AI picks against that target
+    # (`fc.arms`, #510 step 3) and DEFENDS with its equipped one, so the score and damage
+    # tables are read per arm and the party's kill rate on the equipped body.
     reads = {}
     for e, weights in bodies:
         key = (_stat_key(e), weights)
         if key not in reads:
+            arms = fc.arms(e)
             reads[key] = (
-                table(full, lambda u: ai_target.combat_score(e, u, weights)),
-                table(struck, lambda u: fc.damage_per_round(e, u)),
+                [table(full, lambda u, a=a: ai_target.combat_score(a, u, weights)) for a in arms],
+                [table(struck, lambda u, a=a: fc.damage_per_round(a, u)) for a in arms],
                 table({m: striking[m] for m in armed},
                       lambda u: (fc.damage_per_round(u, e) / e.hp,
                                  (lambda r: 0.0 if r == inf else 1.0 / r)(
                                      metric_rounds_to_kill(e, u)))))
     read = [reads[(_stat_key(e), weights)] for e, weights in bodies]
     n, order = career_pairing({m: len(careers[m]) for m in names})
-    rank = {m: -i for i, m in enumerate(names)}         # ties go to the first, as in FE8
     per = [[0.0, 0.0] for _ in bodies]
     for i in range(n):
         at = {m: order[m][i] for m in names}
-        for j, (score, dpr, inv) in enumerate(read):
-            target = max(names, key=lambda m: (score[m][full[m][at[m]]], rank[m]))
+        for j, (scores, dprs, inv) in enumerate(read):
+            # AiAttemptOffensiveAction: items outer, targets inner, kept on `>=`, so a tie
+            # goes to the LATER weapon, then the later target (cp_battle.c).
+            if scores:                      # a weaponless body attacks no one
+                _s, arm, k = max((scores[a][m][full[m][at[m]]], a, k)
+                                 for a in range(len(scores)) for k, m in enumerate(names))
+                target = names[k]
+                per[j][0] += dprs[arm][target][struck[target][at[target]]]
             rates = [inv[m][striking[m][at[m]]] for m in armed]
             rate = sum(r for r, _floor in rates) or sum(f for _r, f in rates)
-            per[j][0] += dpr[target][struck[target][at[target]]]
             per[j][1] += 1.0 / rate if rate else inf
     slots = max(1, len(names))
     return {'threat': sum(p[0] for p in per) / n / slots,
