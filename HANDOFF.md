@@ -9,62 +9,70 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-18 (Claude). **#505 merged: each chapter names its generics** (ADR 0352):
-Mercenary, Goblin, Raider, Kobold, Risen, Merfolk, Militia (Nicolas's names; ch04 keeps Monster),
-each on a pid of its own cloned from the vanilla generic, plus a `generic_help:` for R on the name
-(which read "The army of Grado" before); #506 landed Nicolas's pass on those lines, and ch07's
-fishers and sellswords became the Speaker's Dock and Hall Guards so one line fits the force. A declared `help: {x, y}` playtest step now proves R on
-any unit's name (`ch02generichelp`). #504 made the wiki print what the unit window prints and
-merged every texts.txt reader into `inject.text.messages`. The wiki deploys `main`'s on every push
-(ADR 0347); never publish it by hand.
+Refreshed 2026-10-19 (Claude). **The parity model is being rebuilt before any party or chapter
+change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
+grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
+Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
+the end of #510. Never widen an `accepted_residual` to get green: design or model fidelity is the fix.
+This session also merged #507 (the twin-payload reader reads every give-site: enum gifts, Ch15's
+shared-script treasures, route and either/or branches) and #509 (#508: ch03's grell rode vanilla's
+generic Mogall pid 0xb7, so ch04's Mogalls fought with its boss line; ADR 0098 now covers every
+rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
 
 ## In flight
 
-- **Draft PR #485 (`feat/27-ch07-scenes`)**, text only: ch07's opening, boss quotes and houses are
-  locked; nothing wired. **ch07 is moving to Distant Blade's map** (Nicolas, 2026-10-12), so the
-  locked "harpoon heads-up before prep" beat needs rework (its ballistae move to ch13).
-- **#490** -- the difficulty model's autolevel diverges from the ROM (unflagged bosses grown,
-  promoted bonus missing); fix before ch09 is measured.
+- **`feat/490-autolevel`** (pushed, one WIP commit made with `--no-verify`, no PR yet). It holds:
+  `unit_load.growth_steps`, the one description of the engine's load path that `unit_load` (ranges)
+  and `difficulty` (means) both read; the `.autolevel` flag on vanilla udefs; `_loads_realistically`;
+  the caller wiring (`timeline.py`, `rescue_forecast.py`); fixture updates; and the `ch07redstats`
+  probe. Before a PR:
+  - **Rebase on main.** `INSPECT.redStats` and `ch04redstats` landed on main with #509; drop the
+    branch's own `scenarios.redstats` copy and point `ch07redstats` at `INSPECT.redStats`.
+  - **Revert its ch04 YAML edit** (the Entombed's `autolevel: true` removed). That is a content
+    change, and content waits for #510 step 10.
+  - **Unlock ch00-ch07** (#510 step 1). Red until then: `AcceptedResidual` (ch01),
+    `RoleCheckAgainstTheParty.test_an_inversion_the_twin_lacks_is_flagged`, and
+    `test_rescue_forecast`'s "declared level is autoleveled" (a boat with no `autolevel:` loads bare,
+    as in the ROM: fix the test, not the model).
+  - Proven so far: 259 ch07 stat reads and ch04's promoted Entombed (43 HP) inside `unit_load`'s ranges.
+- **Draft PR #485 (`feat/27-ch07-scenes`)**, text only, unchanged: ch07 moves to Distant Blade's map.
 
-**Next, in order:**
+**Next, in order (#510's list is the plan):**
 
-1. **#493 -- the wiki's remaining findings**: the `vanilla_payload` audit next (GIVEITEMTO,
-   chest gold, secret shops, against each twin's events, not just the macros it greps), then the
-   navbox, #490's stat ranges, supports (wait on #494). Nicolas red-pens the drafts on the
-   live wiki: the lore Profiles, the book Trivia, and the ten guest/boss help texts (ADR 0346).
-2. **#486 planning, continue WITH Nicolas** on the live wiki: ch07's exit hook first (#27's
-   ending waits on it); then Act IV beats, the recruit pass, the legendary-weapon pass, the
-   back-half onboarding catalog, the arc ADR. Nicolas leans toward ch01 on vanilla Ch1's map with
-   Hamill Canyon back as ch08 -- raise it there.
-3. **#27 -- ch07's ending** once its exit hook is settled, and the move to Distant Blade (Meriwa +
-   Esio Trot join, ADR 0342; ask Nicolas for his flow first; `make CH07BOOT=1`). The written
-   ending gives its 10,000 an `after_beat` (the giver's line) and a scenario that reaches it.
-4. **#25 -- the White Moose retreats in ch05** instead of dying (Nerra's pattern, ADR 0337),
-   now as the Cavalier it joins as (ADR 0351). #28 adds its `STAT_DONOR` row (CHARACTER_FORDE)
-   when it builds the recruit -- not before: `difficulty.py` reads that table as the roster.
-5. **#459** stays open for the parity CHECK itself.
+1. **#510 step 0: a verdict diff on every PR**, each chapter in Tutorial/Normal/Difficult, before vs
+   after. It replaces the lock as the regression signal while chapters are unlocked. Build it first,
+   so #490's own PR is the first to show its movement.
+2. **#510 step 1: land #490** (the bullet above), then steps 2-9 in order, each with an in-engine
+   proof and the verdict diff. Stop when a step moves no verdict.
+3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
+   Nicolas the options. Baseline (2026-10-19, in #510): the force side is near parity, and the
+   clear-load excess is the party, mostly vanilla's Seth. Baxby-as-Seth is a past discussion, NOT a
+   decision (ADR 0342 rejected it).
+4. **#493 -- the wiki's remaining findings** (navbox, #490's stat ranges, supports after #494), and
+   **#486 planning with Nicolas**, as before. #493's `vanilla_payload` audit is done (#507).
 
 - **Owed in Nicolas's next playtest** (on #31): ch06's closing cue by ear, and the stat-screen face.
   Proven headless instead, never owed to him: a shop (the DSL's `shop:` step, ch02armory,
   ch05shops) and R on a cast member's name (`casthelp`, ADR 0346). Nicolas, 2026-10-15: a
   check the harness can make headless is never his to make.
-- `make difficulty-gate` enforces ch00-ch07. A change that moves a locked chapter's force
-  reddens CI: re-measure, and fix toward the twin or bring Nicolas the residual.
-- ch01-ch02 lock through `accepted_residual` (ADR 0326): ch01 ceiling 1.41 at x1.4078; ch02
-  ceiling 1.43 at x1.4216 with #489's kit (Pinky's real Slim Lance, on #487), so a party-side
-  regression there fails the gate too.
-- The Monte Carlo simulator is #456, parked behind its trigger.
+- **ch04's line Mogalls changed in game with #509:** 15 HP where playtesters met 32.
+- The Monte Carlo simulator is #456, now #510 step 9.
 
 ## Chapter work
 
-- **#27 -- ch07** is hosted on slot 8 and locked at x0.95 / x1.09. `make chapter CH=ch07` is its
-  state.
+- **#27 -- ch07** is hosted on slot 8, under re-evaluation with the rest (#510); its ending and
+  the Distant Blade move wait on #486. `make chapter CH=ch07` is its state.
 - **#24 -- ch04 owes the terrain-bonus lesson** (vanilla Ch4's "stay in the woods"), a dialogue pass.
 - **#335** -- the AI audit (behavioural drift is invisible to every gate; proposes an
-  `ai_divergence:` allowlist).
+  `ai_divergence:` allowlist). It feeds #510 step 7.
 
 ## Traps a fresh session walks into
 
+- **A verdict scenario may not drive the UI with raw `press()`** (`check.py`, #238): wrapping a
+  `record*` scenario as a verdict fails the drift check. Run the record path once headless as
+  one-off evidence instead, or write the verdict on `guardedInput`/`selectSemantic`.
+- **What the ROM loads, read off the map:** `INSPECT.redStats` (`ch04redstats`), one run per
+  `PT_DIFFICULTY`. Compare it against `unit_load.load`'s ranges before trusting either model.
 - **Grep the campaign before proposing a name.** "Halvar", offered for a recruit, was already
   ch02's raider captain (`npc-bench.md`'s name bank is not a list of free names).
 - **Our own scenes are named `MS_*`.** Any code that matches `EventScr_` must ask whether it
