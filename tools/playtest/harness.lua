@@ -4312,6 +4312,9 @@ end
 scenarios.ch04redstats = function()
     return INSPECT.redStats()
 end
+scenarios.ch07redstats = function()
+    return INSPECT.redStats()
+end
 
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.
 scenarios.gameover = function()

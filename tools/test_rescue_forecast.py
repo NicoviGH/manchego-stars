@@ -69,9 +69,17 @@ class TargetCombatant(unittest.TestCase):
 
     def test_a_declared_level_is_autoleveled_not_ignored(self):
         """The exact bug: a naive class-base read never grows past L1."""
+        l1 = rf.target_combatant({'id': 'hull', 'class': 'armor-knight', 'autolevel': True})
+        l10 = rf.target_combatant({'id': 'hull', 'class': 'armor-knight', 'level': 10,
+                                   'autolevel': True})
+        self.assertGreater(l10.hp, l1.hp)
+
+    def test_an_unflagged_boat_loads_bare_as_the_rom_does(self):
+        """#490: without `autolevel:` the engine loads a unit at its class base whatever level
+        it declares, and the shared path now says so for a boat too."""
         l1 = rf.target_combatant({'id': 'hull', 'class': 'armor-knight'})
         l10 = rf.target_combatant({'id': 'hull', 'class': 'armor-knight', 'level': 10})
-        self.assertGreater(l10.hp, l1.hp)
+        self.assertEqual(l10.hp, l1.hp)
 
     def test_a_class_carrying_an_effectiveness_tag_keeps_it(self):
         """`fe_combat` reads `tags` to resolve effective weapons (a Rapier vs `armor`). A

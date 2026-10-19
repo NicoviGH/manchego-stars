@@ -108,7 +108,8 @@ def autolevel(base, growths, level):
 MODES = ('tutorial', 'normal', 'difficult')
 
 
-def mode_stats(base, growths, level, mode, shifts, base_level=1):
+def mode_stats(base, growths, level, mode, shifts, base_level=1, autolevel=True,
+               promoted=False):
     """`base` autoleveled to `level`, then shifted by a chapter's difficulty `shifts`
     for `mode` -- the engine's own difficulty mechanism, modeled (#303).
 
@@ -131,6 +132,11 @@ def mode_stats(base, growths, level, mode, shifts, base_level=1):
       * the bonus rounds TWICE. Difficult is `inc(level-1)` then `inc(bonus)` as two
         separate roundings, not one rounding of `inc(level-1+bonus)`.
 
+    `autolevel` is the UnitDefinition's flag: an unflagged unit loads at class + personal base
+    and grows only by the shift, and on Normal the penalty's re-autolevel grows it anyway
+    (#490, read on the ROM). `promoted` adds GetCurrentPromotedLevelBonus()'s 9 (19 on
+    Difficult) levels. The branches are `unit_load.growth_steps`, which the wiki reads too.
+
     This is a mean-value proxy, as the rest of the model is: the engine's real
     `GetAutoleveledStatIncrease` jitters by +/-(growth*n)/8 and resolves the remainder
     with a coin flip (`GetStatIncrease`, bmbattle.c:1241), so a single unit's stats are
@@ -140,22 +146,21 @@ def mode_stats(base, growths, level, mode, shifts, base_level=1):
     if mode not in MODES:
         raise ValueError('unknown difficulty mode %r (want one of %s)'
                          % (mode, ', '.join(MODES)))
-    shift = shifts[mode]
-    projected = autolevel(base, growths, level)
-    if not shift:
-        return projected
-    if mode == 'difficult':
-        out = dict(projected)
+    return _project(base, growths, unit_load.growth_steps(
+        level, autolevel, promoted, base_level, shifts[mode], mode))
+
+
+def _project(base, growths, steps, personal_growths=None):
+    """`base` grown by `unit_load.growth_steps`' chunks, each rounded on its own: the engine
+    rolls each UnitAutolevelCore call apart, so Difficult is round(level-1) + round(bonus), not
+    one rounding of the sum."""
+    out = dict(base)
+    for levels, source in steps:
+        g = growths if source == 'class' else (personal_growths or {})
         for gf in inject.stats.GROWTH_FIELDS:
             field = 'base' + gf[len('growth'):]
-            out[field] = projected[field] + int(shift * growths.get(gf, 0) / 100 + 0.5)
-        return out
-    if level <= base_level:                  # `level > baseLevel` gate: no penalty at all
-        return projected
-    target = level - shift
-    if target > base_level:
-        return autolevel(base, growths, target)
-    return dict(base)                        # re-derived from base, re-autolevel skipped
+            out[field] = out.get(field, 0) + int(levels * g.get(gf, 0) / 100 + 0.5)
+    return out
 
 
 def _weapon_for(inventory):
@@ -424,29 +429,89 @@ def _character_base_level(char_index):
 
 
 def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
-                     mode=None, shifts=None, shiftable=True, base_level=1):
-    """One Combatant: class base autoleveled to `level`, wielding `weapon`, plus any
-    personal boss line (see above). Generics carry no personal line, so they are unchanged.
+                     mode=None, shifts=None, shiftable=True, base_level=1, autolevel=True,
+                     realistic=False, personal_growths=None):
+    """One Combatant as the engine loads it (`unit_load.growth_steps`): class base grown per
+    the definition's `autolevel` flag, its class's promoted bonus and the `mode` shift, wielding
+    `weapon`, plus any personal boss line (see above), capped at the class maxima
+    (UnitCheckStatCaps). Generics carry no personal line, so they are unchanged.
 
-    With `mode` and `shifts` both given the class projection runs through `mode_stats`
-    instead, so the unit reads as the engine would load it in that difficulty mode.
-    `shiftable=False` models the `>= 0x3C` gate. The personal line stays a flat delta
-    applied afterwards, which is faithful either way: the engine's penalty re-derives
-    from charBase+classBase and its bonus adds onto them, and both compose additively."""
+    `shiftable=False` models the `>= 0x3C` gate; without `mode` and `shifts` the unit reads as
+    Normal with no shift. `realistic` is the CA_BOSS / pid < 0x40 branch, which levels on
+    `personal_growths` from `base_level`. The personal line stays a flat delta applied
+    afterwards, which is faithful: the engine's penalty re-derives from charBase+classBase and
+    its bonus adds onto them, and both compose additively."""
     base, growths = _class_base(class_enum), _class_growths(class_enum)
-    if mode and shifts and shiftable:
-        stats = mode_stats(base, growths, int(level), mode, shifts, base_level=base_level)
-    else:
-        stats = autolevel(base, growths, int(level))
-    c = _stats_to_combatant(name, stats, weapon, CLASS_TAGS.get(class_enum, frozenset()))
-    return _apply_personal(c, personal)
+    _b, _g, caps, promoted = unit_load.class_line(class_enum)
+    shift = shifts[mode] if mode and shifts and shiftable else 0
+    stats = _project(base, growths, unit_load.growth_steps(
+        int(level), autolevel, promoted, base_level, shift, mode or 'normal', realistic),
+        personal_growths)
+    c = _apply_personal(_stats_to_combatant(name, stats, weapon,
+                                            CLASS_TAGS.get(class_enum, frozenset())), personal)
+    capped = {f: min(getattr(c, f), caps[k]) for f, k in (
+        ('hp', 'HP'), ('pow', 'Pow'), ('skl', 'Skl'), ('spd', 'Spd'), ('df', 'Def'),
+        ('res', 'Res'), ('lck', 'Lck')) if getattr(c, f) > caps[k]}
+    return dataclasses.replace(c, **capped) if capped else c
+
+
+def _loads_realistically(char_index, class_enum):
+    """Does a FLAGGED red unit on this slot take UnitAutolevelRealistic (LoadUnit, bmunit.c:
+    625)? CA_BOSS in its character's or class's attributes, or pid < 0x40. Vanilla's flagged
+    bosses (Bazba, Saar, Tirado) do, and carry baseLevel >= their level, so they load bare."""
+    number = _character_number(char_index) if char_index else None
+    if number is not None and number < 0x40:
+        return True
+    def boss(block):
+        found = re.search(r'\.attributes\s*=\s*([^,\n]+)', block)
+        return bool(found and 'CA_BOSS' in found.group(1))
+    try:
+        if boss(unit_load._class_block(class_enum)):
+            return True
+    except KeyError:                                   # a raw class number: no block to read
+        pass
+    if not str(char_index or '').startswith('CHARACTER_'):
+        return False
+    try:
+        start, end = inject.decomp._find_brace_block(_characters_text(), '[%s - 1]' % char_index,
+                                                     inject.paths.CHARACTERS_C)
+    except SystemExit:
+        return False
+    return boss(_characters_text()[start:end])
+
+
+def _vanilla_load_kwargs(d):
+    """`_enemy_from_enum`'s load-path arguments for one vanilla UnitDefinition `d`."""
+    ch = d.get('charIndex')
+    realistic = d['autolevel'] and _loads_realistically(ch, d['classIndex'])
+    growths = None
+    if realistic and str(ch or '').startswith('CHARACTER_'):
+        growths = inject.stats.donor_growths_and_ranks(_characters_text(), ch)[0]
+    return dict(autolevel=d['autolevel'], realistic=realistic, personal_growths=growths,
+                shiftable=_takes_difficulty_shift(ch), base_level=_character_base_level(ch))
+
+
+def _our_load_kwargs(ed):
+    """The same for one of OUR entries: the flag is the YAML's `autolevel:`, which is what the
+    injector emits (inject/units.py), and the slot is the donor a hostile cast member or a
+    vanilla-slot boss rides; our raw pids carry no CA_BOSS."""
+    # ENEMY_CHARACTER_SLOT, not ENEMY_BASE_SLOT: the question is the slot's ATTRIBUTES
+    # (CA_BOSS), and Sephek keeps ONEILL's though his stat line is zeroed (inject/cast.py).
+    donor = (inject.stats.BASE_DONOR.get(ed.get('id'))
+             or inject.cast.ENEMY_CHARACTER_SLOT.get(ed.get('id')))
+    flagged = bool(ed.get('autolevel'))
+    realistic = flagged and bool(donor) and _loads_realistically(
+        donor, _enemy_class_enum(ed['class'])) if 'class' in ed else False
+    growths = inject.stats.donor_growths_and_ranks(_characters_text(), donor)[0] \
+        if realistic and str(donor).startswith('CHARACTER_') else None
+    return dict(autolevel=flagged, realistic=realistic, personal_growths=growths)
 
 
 def _one_enemy(name, class_token, level, weapon, personal=None, mode=None, shifts=None,
-               base_level=1, shiftable=True):
+               base_level=1, shiftable=True, **load):
     return _enemy_from_enum(name, _enemy_class_enum(class_token), level, weapon, personal,
                             mode=mode, shifts=shifts, base_level=base_level,
-                            shiftable=shiftable)
+                            shiftable=shiftable, **load)
 
 
 # "What bodies does this entry place" is chapter-SCHEMA knowledge, so it lives beside the
@@ -475,14 +540,14 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=
         return [_one_enemy(name, enemy_def['class'], level,
                            _weapon_for(enemy_def.get('inventory')),
                            mode=mode, shifts=shifts, base_level=base_level,
-                           shiftable=shiftable)]
+                           shiftable=shiftable, **_our_load_kwargs(enemy_def))]
     by_class = enemy_def.get('inventory_by_class', {})
     out = []
     for cls in dict.fromkeys(enemy_def.get('composition', [])):   # distinct, order-stable
         weapon = _weapon_for([{'id': w} for w in by_class.get(cls, [])])
         out.append(_one_enemy('%s-%s' % (name, cls), cls, level, weapon,
                               mode=mode, shifts=shifts, base_level=base_level,
-                              shiftable=shiftable))
+                              shiftable=shiftable, **_our_load_kwargs(enemy_def)))
     return out
 
 
@@ -644,7 +709,8 @@ def vanilla_redas(text):
 
 def vanilla_unit_defs(text, array_name):
     """Parse `CONST_DATA struct UnitDefinition <array_name>[] = { ... };` from decomp text
-    into a list of per-entry dicts (charIndex, classIndex, level, allegiance, itemDrop, items).
+    into a list of per-entry dicts (charIndex, classIndex, level, allegiance, itemDrop,
+    autolevel, items).
     The trailing `{ 0 }` terminator (no .classIndex) is skipped. `charIndex` is the named
     character enum for allies/bosses (a numeric token for generics, None if absent). `itemDrop`
     is the `.itemDrop = 1` bit -- when set, the unit drops its LAST item on death (US_DROP_ITEM,
@@ -681,6 +747,8 @@ def vanilla_unit_defs(text, array_name):
             'level': int(lvl.group(1)) if lvl else 1,
             'allegiance': alg.group(1) if alg else None,
             'itemDrop': bool(re.search(r'\.itemDrop\s*=\s*1', block)),
+            # Only a flagged unit grows past class + personal base (LoadUnit, bmunit.c:617).
+            'autolevel': bool(re.search(r'\.autolevel\s*=\s*1', block)),
             'items': [t.strip() for t in items.group(1).split(',') if t.strip()]
                      if items else [],
         })
@@ -822,9 +890,7 @@ def vanilla_enemy_bodies(parity_ref, mode=None):
             out.append((_enemy_from_enum('%s#%d[%s]' % (array_name, i, ch),
                                          d['classIndex'], d['level'],
                                          weapon, vanilla_personal_line(ch),
-                                         mode=mode, shifts=shifts,
-                                         shiftable=_takes_difficulty_shift(ch),
-                                         base_level=_character_base_level(ch)),
+                                         mode=mode, shifts=shifts, **_vanilla_load_kwargs(d)),
                         d['ai']))
     return out
 
@@ -883,7 +949,8 @@ def vanilla_named_bosses(parity_ref, with_personal=True):
                 continue
             out.append((ch.replace('CHARACTER_', '').title(),
                         _enemy_from_enum(ch, d['classIndex'], d['level'], weapon,
-                                         vanilla_personal_line(ch) if with_personal else None)))
+                                         vanilla_personal_line(ch) if with_personal else None,
+                                         **_vanilla_load_kwargs(d))))
     return out
 
 
@@ -1242,7 +1309,8 @@ def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff
                             _weapon_for([{'id': w} for w in by_class.get(cls, [])]),
                             mode=mode, shifts=shifts,
                             base_level=_our_base_level(dict(ed, level=lv)),
-                            shiftable=_our_takes_difficulty_shift(ed))
+                            shiftable=_our_takes_difficulty_shift(ed),
+                            **_our_load_kwargs(ed))
                  for cls, lv in (dict.fromkeys(bodies) if distinct else bodies)]
     else:
         # One body per DECLARED level, not `count` copies of one: a wave authored as
@@ -3244,7 +3312,8 @@ def vanilla_enemy_groups(parity_ref):
             weapon = _weapon_from_item_enums(d['items'])
             if weapon is None:
                 continue
-            u = _enemy_from_enum('%s#%d' % (arr, i), d['classIndex'], d['level'], weapon)
+            u = _enemy_from_enum('%s#%d' % (arr, i), d['classIndex'], d['level'], weapon,
+                                 **_vanilla_load_kwargs(d))
             if d['charIndex'] in conv_chars:
                 g['convertibles'].append(u)
             elif turn > 1:

@@ -11,7 +11,8 @@ its randomness as a range the way the Fire Emblem Wiki prints generic enemies ("
                                  GetCurrentPromotedLevelBonus() levels -- 9, or 19 on
                                  Difficult (bmdifficulty.c:53) -- when its class is promoted.
   UnitAutolevelRealistic         an autolevelled CA_BOSS or pid < 0x40 levels up from its
-                                 baseLevel instead; we have no flagged one, so it is not modeled.
+                                 baseLevel on its PERSONAL growths instead (vanilla Ch13's
+                                 Amelia and Cormag; none of ours).
   eventscr.c:2328                every red unit with pid >= 0x3C then takes the chapter's
                                  shift, flagged or not: Difficult adds `bonus` levels of class
                                  growths (UnitAutolevelCore); Easy/Normal run
@@ -21,8 +22,8 @@ its randomness as a range the way the Fire Emblem Wiki prints generic enemies ("
   GetAutoleveledStatIncrease     growth*n jittered by +-1/8, then the remainder rolled
   (bmbattle.c:1241)              (GetStatIncrease) -- the source of the range.
 
-Stats are capped at the class maximum (UnitCheckStatCaps). #490 records where the parity
-model still differs from this.
+Stats are capped at the class maximum (UnitCheckStatCaps). `growth_steps` is that path as
+data, and difficulty.py's mean-value model reads the same steps (#490), so the two agree.
 """
 import functools
 import re
@@ -91,32 +92,67 @@ def _grow(line, growths, levels):
     return out
 
 
-def _autolevel(line, growths, promoted, level, hard):
-    if promoted:
-        line = _grow(line, growths, 19 if hard else 9)
-    return _grow(line, growths, level - 1)
+def growth_steps(level, autolevel=True, promoted=False, base_level=1, shift=0, mode='normal',
+                 realistic=False):
+    """The growth the engine gives one red unit at load, as [(levels, growths)] chunks applied
+    in order to class + personal base, each rolled (and, in the parity model, rounded) on its
+    own. `growths` is 'class' or 'personal'. The one description of the load path this module
+    and difficulty.py both read (#490); the docstring above says where each branch lives.
+
+    `shift` is the chapter's level shift for `mode`, 0 for a unit under the pid >= 0x3C gate.
+    `realistic` marks an autolevelled CA_BOSS or pid < 0x40 (vanilla Ch13's Amelia and Cormag):
+    it levels on its personal growths from `base_level`, and the penalty's re-autolevel still
+    runs UnitAutolevel on class growths."""
+    hard = mode == 'difficult'
+
+    def auto(lv, hard):                                # UnitAutolevel
+        return ([(19 if hard else 9, 'class')] if promoted else []) \
+            + ([(lv - 1, 'class')] if lv > 1 else [])
+
+    if not autolevel:
+        steps = []
+    elif realistic:
+        steps = [(level - base_level, 'personal')] if level > base_level else []
+    else:
+        steps = auto(level, hard)
+    if shift and hard:
+        steps = steps + [(shift, 'class')]             # UnitAutolevelCore
+    elif shift and level > base_level:                 # UnitAutolevelPenalty: from base again
+        steps = auto(level - shift, False) if level - shift > base_level else []
+    return steps
+
+
+def _grow_personal(line, growths, levels):
+    """`levels` real level-ups on personal growths (CheckBattleUnitLevelUp): one roll per stat,
+    +1 per whole 100%."""
+    out = dict(line)
+    for s in GROWN:
+        g = growths.get(s, 0)
+        out[s] = (line[s][0] + levels * (g // 100), line[s][1] + levels * -(-g // 100))
+    return out
 
 
 def load(class_enum, level, personal=None, autolevel=True, base_level=1, shiftable=True,
-         shifts=None, mode='normal'):
+         shifts=None, mode='normal', realistic=False, personal_growths=None):
     """{stat: (min, max)} for one red unit loaded in `mode`. `personal` is the character's
-    base line (decomp `base*` names, or the YAML's short names)."""
+    base line (decomp `base*` names, or the YAML's short names); `personal_growths` its growths,
+    read only on the realistic branch."""
     base, growths, caps, promoted = class_line(class_enum)
     personal = _personal(personal)
-    start = {s: base[s] + personal.get(s, 0) for s in STATS}
-    line = {s: (v, v) for s, v in start.items()}
-    hard = mode == 'difficult'
-    if autolevel:
-        line = _autolevel(line, growths, promoted, level, hard)
+    line = {s: (base[s] + personal.get(s, 0),) * 2 for s in STATS}
     shift = (shifts or {}).get(mode, 0) if shiftable else 0
-    if shift and hard:
-        line = _grow(line, growths, shift)
-    elif shift and level > base_level:
-        line = {s: (v, v) for s, v in start.items()}   # re-derived from base
-        if level - shift > base_level:
-            line = _autolevel(line, growths, promoted, level - shift, hard)
+    for levels, source in growth_steps(level, autolevel, promoted, base_level, shift, mode,
+                                       realistic):
+        if source == 'class':
+            line = _grow(line, growths, levels)
+        else:
+            line = _grow_personal(line, _personal_growths(personal_growths), levels)
     return {s: (min(lo, caps[s]), min(hi, caps[s])) if s in caps else (lo, hi)
             for s, (lo, hi) in line.items()}
+
+
+def _personal_growths(g):
+    return {s: (g or {}).get('growth' + s, (g or {}).get(s, 0)) for s in GROWN}
 
 
 _SHORT = {'hp': 'HP', 'pow': 'Pow', 'str': 'Pow', 'skl': 'Skl', 'spd': 'Spd', 'lck': 'Lck',

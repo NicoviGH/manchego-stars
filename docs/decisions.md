@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-353 decisions. Read this index, then open the two or three you need — the whole
+354 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -203,6 +203,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0343` | [Dorbulgruf fights as a Fighter, on Gheb's line](decisions/0343-dorbulgruf-fights-as-a-fighter-on-gheb-s-line.md) | 2026-10-11 | #27 |
 | `0351` | [The White Moose is a Cavalier on Forde's line, as enemy and as recruit](decisions/0351-the-white-moose-is-a-cavalier-on-forde-s-line.md) | 2026-10-18 | #502 #25 #28 |
 | `0353` | [While chapters are unlocked, the verdict diff is the regression signal](decisions/0353-while-chapters-are-unlocked-the-verdict-diff-is-the-signal.md) | 2026-10-19 | #510 |
+| `0354` | [The parity model loads units as the ROM loads them](decisions/0354-the-parity-model-loads-units-as-the-rom-loads-them.md) | 2026-10-19 | #490 #510 |
 
 ---
 

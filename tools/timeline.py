@@ -62,9 +62,7 @@ def vanilla_bodies(parity_ref, mode=None):
             ch = d['charIndex']
             unit = dif._enemy_from_enum('%s#%d[%s]' % (array, i, ch), d['classIndex'],
                                         d['level'], weapons[0], dif.vanilla_personal_line(ch),
-                                        mode=mode, shifts=shifts,
-                                        shiftable=dif._takes_difficulty_shift(ch),
-                                        base_level=dif._character_base_level(ch))
+                                        mode=mode, shifts=shifts, **dif._vanilla_load_kwargs(d))
             table, mov = pp.class_movement(d['classIndex'][len('CLASS_'):].lower())
             out.append(dm.Body(array, i, tuple(d['position']), cs.ai_shape(d['ai']),
                                d['ai'][0], turns.get(array, 1), table, mov,
