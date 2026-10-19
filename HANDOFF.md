@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-19 (Claude, after #511). **The parity model is being rebuilt before any party or chapter
+Refreshed 2026-10-19 (Claude, after #513). **The parity model is being rebuilt before any party or chapter
 change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
 grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
 Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
@@ -21,29 +21,17 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
 
 ## In flight
 
-- **`feat/490-autolevel`** (pushed, one WIP commit made with `--no-verify`, no PR yet). It holds:
-  `unit_load.growth_steps`, the one description of the engine's load path that `unit_load` (ranges)
-  and `difficulty` (means) both read; the `.autolevel` flag on vanilla udefs; `_loads_realistically`;
-  the caller wiring (`timeline.py`, `rescue_forecast.py`); fixture updates; and the `ch07redstats`
-  probe. Before a PR:
-  - **Rebase on main.** `INSPECT.redStats` and `ch04redstats` landed on main with #509; drop the
-    branch's own `scenarios.redstats` copy and point `ch07redstats` at `INSPECT.redStats`.
-  - **Revert its ch04 YAML edit** (the Entombed's `autolevel: true` removed). That is a content
-    change, and content waits for #510 step 10.
-  - **Unlock ch00-ch07** (#510 step 1). Red until then: `AcceptedResidual` (ch01),
-    `RoleCheckAgainstTheParty.test_an_inversion_the_twin_lacks_is_flagged`, and
-    `test_rescue_forecast`'s "declared level is autoleveled" (a boat with no `autolevel:` loads bare,
-    as in the ROM: fix the test, not the model).
-  - Proven so far: 259 ch07 stat reads and ch04's promoted Entombed (43 HP) inside `unit_load`'s ranges.
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only, unchanged: ch07 moves to Distant Blade's map.
 
 **Next, in order (#510's list is the plan):**
 
-1. **#510 step 0 is DONE (#511, ADR 0353).** `make verdict-diff [BASE=ref]`; CI runs it on a
-   PR that touches a parity input (`verdict_diff.py needed`) and comments only when a cell
-   moved. #490's PR is the first that should show movement.
-2. **#510 step 1: land #490** (the bullet above), then steps 2-9 in order, each with an in-engine
-   proof and the verdict diff. Stop when a step moves no verdict.
+1. **#510 steps 0 and 1 are DONE.** #511: the verdict diff (`make verdict-diff`; CI runs it on a
+   PR that touches a parity input and comments only when a cell moved; ADR 0353). #513: units
+   load as the ROM loads them (ADR 0354) and ch00-ch07 are unlocked. 9 of 32 cells flipped; ch01
+   is OFF in every mode (its party half reads x1.415, past its x1.41 residual ceiling, NOT widened).
+2. **#510 step 2: the gate grades all three modes**, then steps 3-9 in order, each with an
+   in-engine proof and the verdict diff. Stop when a step moves no verdict. The verdict diff's
+   `table` column (authored levels, no shift) is not a game mode: drop it once step 2 lands.
 3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
    Nicolas the options. Baseline (2026-10-19, in #510): the force side is near parity, and the
    clear-load excess is the party, mostly vanilla's Seth. Baxby-as-Seth is a past discussion, NOT a
