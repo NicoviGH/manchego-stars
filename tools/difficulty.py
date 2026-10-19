@@ -3415,15 +3415,19 @@ def curve_report(campaign, band=0.25, mode=None):
         ai = ai_donor_findings(chap) if has_ref else []
         if ai:
             flag += '  !!ai'
+        # The numbers ride along for tools/verdict_diff.py (#510 step 0), which diffs every
+        # chapter's row before and after a change instead of trusting the lock.
+        v = p.get('verdict') or {}
         rows.append({'label': label[:22].strip(), 'locked': locked, 'has_ref': has_ref,
                      'verdict': verdict, 'boss_drop': boss_drop, 'role': role, 'ai': ai,
-                     'mirror': p['mirror']})
+                     'mirror': p['mirror'], 'threat': ot, 'clear': ol,
+                     'threat_ratio': v.get('threat_ratio'), 'load_ratio': v.get('load_ratio'),
+                     'accepted_adr': (int(v['accepted']['adr']) if v.get('accepted')
+                                      else None)})
         if not has_ref:
             print('  %-22s %-13s %5.1f           %5.1f             %-7s (no ref)%s'
                   % (label[:22], (p['reference'] or '?')[:13], ot, ol, '--', flag))
             continue
-        vt, vl = p['vanilla']
-        v = p['verdict']
         print('  %-22s %-13s %4.1f (x%.2f)     %4.1f (x%.2f)       %-7s %s%s'
               % (label[:22], (p['reference'] or '?')[:13], ot, v['threat_ratio'],
                  ol, v['load_ratio'], '%.0f%%' % p['mirror']['pct'] if p['mirror'] else '--',

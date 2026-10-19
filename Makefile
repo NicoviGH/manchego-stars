@@ -33,7 +33,7 @@ export PATH := $(BREW_PY):$(PATH)
 endif
 endif
 
-.PHONY: all clean verify check test matrix difficulty difficulty-gate scene chapter python-bin
+.PHONY: all clean verify check test matrix difficulty difficulty-gate verdict-diff scene chapter python-bin
 
 all: fireemblem8.gba
 
@@ -106,6 +106,15 @@ endif
 # target; chapters opt in as their enemy inventories are authored and playtested.
 difficulty-gate:
 	@python3 tools/difficulty.py --campaign $(CAMPAIGN) --curve --check
+
+# Every chapter's parity verdict, base vs this tree, in the authored table and all three
+# difficulty modes (#510 step 0, ADR 0353). Informational: it never fails. CI runs it on a
+# PR that touches a parity input; this is the same read locally (~50s).
+#   make verdict-diff               # origin/main vs the working tree
+#   make verdict-diff BASE=main
+BASE ?= origin/main
+verdict-diff:
+	@python3 tools/verdict_diff.py run --base $(BASE)
 
 # See an authored scene exactly as FE8 will wrap it -- from the chapter YAML, with no ROM
 # build and no emulator (#311). The authoring loop; a scene still gets one real run before

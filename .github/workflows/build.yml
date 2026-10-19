@@ -77,6 +77,60 @@ jobs:
       - name: Unit tests (make test)
         run: make test
 
+  # Every chapter's parity verdict, the PR's base vs the PR, in the authored table and all
+  # three difficulty modes (#510 step 0, ADR 0353). While #510 has every chapter unlocked,
+  # this is the regression signal the lock used to be. Informational: it never fails the PR.
+  # Quiet by design: a PR that touches no parity input skips the read (and the submodule
+  # checkout), and the PR gets a comment only when a cell moved.
+  verdict-diff:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
+      PR: ${{ github.event.pull_request.number }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # The checkout is the PR merged into its base, so BASE_SHA -> HEAD is exactly the
+      # PR's effect, even when the branch is behind main. Exit 3 = nothing to read.
+      - name: Does the PR touch a parity input?
+        id: need
+        run: python3 tools/verdict_diff.py needed --base "$BASE_SHA" || [ $? -eq 3 ]
+
+      - name: Submodule and dependencies
+        if: steps.need.outputs.needed == 'true'
+        run: |
+          git submodule update --init --recursive
+          python3 -m pip install numpy pillow pyyaml
+
+      - name: Verdict diff
+        id: diff
+        if: steps.need.outputs.needed == 'true'
+        run: |
+          python3 tools/verdict_diff.py run --base "$BASE_SHA" --out verdict-diff.md
+          cat verdict-diff.md >> "$GITHUB_STEP_SUMMARY"
+
+      # One comment per PR, edited on each push. Posted only when a cell moved; when a later
+      # push moves nothing, an earlier comment is edited to say so rather than left stale.
+      - name: Comment on the PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          if [ "${{ steps.diff.outputs.moved }}" != "" ] && [ "${{ steps.diff.outputs.moved }}" != "0" ]; then
+            gh pr comment "$PR" --edit-last --body-file verdict-diff.md \
+              || gh pr comment "$PR" --body-file verdict-diff.md
+          else
+            echo "## Parity verdict diff (#510)" > quiet.md
+            echo >> quiet.md
+            echo "As of $(git rev-parse --short HEAD), no verdict, ratio or finding moves." >> quiet.md
+            gh pr comment "$PR" --edit-last --body-file quiet.md || true
+          fi
+
   # The real "make green" gate. Mirrors the fireemblem8u decomp's own build.yml: a
   # MOCK base ROM (random 16MB) lets `make` compile + link the full ROM without the
   # copyrighted original -- which is what we want (we diverge from vanilla anyway).
