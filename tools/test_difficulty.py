@@ -2659,14 +2659,57 @@ class PartyMatchup(unittest.TestCase):
         m = df.party_matchup([(enemy, 0)], {'tough': [tough], 'frail': [frail]})
         self.assertAlmostEqual(m['threat'], fc.damage_per_round(enemy, frail) / 2)
 
-    def test_the_field_ranks_on_the_median_line_not_one_rolled_career(self):
-        # Careers come in rolled order: the middle ENTRY of an unsorted list is one random
-        # draw. `steady` has the better median; its middle entry alone is its worst roll.
+    def test_the_field_is_the_one_picked_most_often_over_the_careers(self):
+        # `steady` outhits `even` in four careers of five; its one bad roll benches it there.
         enemy = combatant('e', hp=30, dfc=5, weapon='iron-lance')
         steady = [combatant('steady', pow_=p) for p in (14, 14, 2, 14, 14)]
         even = [combatant('even', pow_=10) for _ in range(5)]
         field = df.fielded_careers({'steady': steady, 'even': even}, [enemy], 1)
         self.assertEqual(list(field), ['steady'])
+
+    def test_each_career_fields_its_own_team(self):
+        """#510 step 5: a unit is fielded in the careers where it makes the cut, and only
+        those, so the read meets the team a player with that career's units would deploy."""
+        enemy = combatant('e', hp=30, dfc=5, weapon='iron-lance')
+        steady = [combatant('steady', pow_=p) for p in (14, 14, 2, 14, 14)]
+        even = [combatant('even', pow_=10) for _ in range(5)]
+        m = df.party_matchup([(enemy, 0)], {'steady': steady, 'even': even}, deploy_cap=1)
+        self.assertAlmostEqual(m['fielded']['steady'], 0.8)
+        self.assertAlmostEqual(m['fielded']['even'], 0.2)
+
+    def test_a_forced_unit_is_fielded_however_weak(self):
+        """`IsCharacterForceDeployed_`: prep cannot bench it."""
+        enemy = combatant('e', hp=30, dfc=5, weapon='iron-lance')
+        weak, strong = combatant('weak', pow_=1), combatant('strong', pow_=14)
+        m = df.party_matchup([(enemy, 0)], {'strong': [strong], 'weak': [weak]}, deploy_cap=1,
+                             forced={'weak'})
+        self.assertEqual(m['fielded'], {'weak': 1.0, 'strong': 0.0})
+
+    def test_a_tie_goes_to_the_later_unit_in_map_order(self):
+        """The AI keeps a tied target on `>=`, so the later slot wins, and prep puts the
+        force-deployed units first (SortPlayerUnitsForPrepScreen): with `a` forced, `b` is
+        the later slot."""
+        enemy = combatant('e', pow_=12, weapon='iron-lance')
+        a, b = combatant('a', weapon='iron-lance'), combatant('b', weapon='iron-lance')
+        self.assertEqual(df._map_order({'b': [b], 'a': [a]}, {'a'}), ['a', 'b'])
+        party = {'a': [a], 'b': [b]}
+        self.assertEqual(df.party_matchup([(enemy, 0)], party)['targeted'],
+                         {'a': 0.0, 'b': 1.0})
+        self.assertEqual(df.party_matchup([(enemy, 0)], party, forced={'b'})['targeted'],
+                         {'b': 0.0, 'a': 1.0})
+
+    def test_our_party_reads_in_the_order_the_rom_loads_it(self):
+        """`ch07blueorder` (2026-10-21) logged the ROM's blue table in slot order on the ch07
+        boot: the founding join-LOAD in PORTRAIT_MAP order, then Baxby (ch01's recruit)
+        before Trex (ch03's). The arriving party's own order had both pairs the other way."""
+        rom = ['braulo', 'marty', 'wolfram', 'meesmickle', 'prof-rbg', 'rootis', 'sclorbo',
+               'pinky', 'baxby', 'trex']
+        self.assertEqual(df.inject.cast.load_order('rime-of-the-frostmaiden')[:10], rom)
+
+    def test_the_twins_forced_units_are_read_from_the_decomp(self):
+        self.assertEqual(df.vanilla_forced('FE8 Ch2'), {'Eirika'})
+        self.assertEqual(df.vanilla_forced('FE8 Ch4'), {'Eirika', 'Artur'})
+        self.assertEqual(df.vanilla_forced('FE8 Ch5'), {'Eirika', 'Natasha'})
 
     def test_the_prologue_fields_its_guests_on_their_twins_lines(self):
         # ch00's injector writes each guest slot's `twin:` line and emits no `.autolevel`, so

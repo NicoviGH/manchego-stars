@@ -4316,6 +4316,31 @@ scenarios.ch07redstats = function()
     return INSPECT.redStats()
 end
 
+-- The blue unit table in slot order once prep has deployed: the order FE8's AI breaks a
+-- target tie in (cp_battle.c, `>=`: the later slot wins), which SortPlayerUnitsForPrepScreen
+-- (prepscreen.c) sets to force-deployed units first, then the rest in their existing order.
+-- The parity model's `_map_order` claims that order (#510 step 5).
+INSPECT.blueOrder = function()
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    local n, deployed = 0, 0
+    for i = 0, 61 do
+        local u = unitAt(SYM.gUnitArrayBlue, i)
+        if u and u.charId ~= 0 then
+            n = n + 1
+            local on = (u.state & US_NOT_DEPLOYED) == 0
+            if on then deployed = deployed + 1 end
+            log(string.format('{"event":"blue_slot","slot":%d,"char":"0x%02x","deployed":%s}',
+                i, u.charId, on and "true" or "false"))
+        end
+    end
+    if n == 0 then return result("FAIL", "no blue units in the table") end
+    return result("PASS", string.format("%d blue units logged in slot order, %d deployed", n,
+                                        deployed))
+end
+scenarios.ch07blueorder = function()
+    return INSPECT.blueOrder()
+end
+
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.
 scenarios.gameover = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end

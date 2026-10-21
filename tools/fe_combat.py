@@ -287,4 +287,4 @@ def kills_per_round(atk, dfn, terrain_avoid=0):
     """Kill throughput, capped at 1.0 per unit (overkill doesn't count twice). One-
     rounding an enemy is worth exactly one kill; a two-round matchup is worth 0.5."""
     dpr = damage_per_round(atk, dfn, terrain_avoid)
-    return 0.0 if dpr <= 0 else min(1.0, dpr / dfn.hp)
+    return where(dpr > 0, minimum(1.0, dpr / dfn.hp), 0.0)
