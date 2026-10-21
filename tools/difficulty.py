@@ -138,11 +138,10 @@ def mode_stats(base, growths, level, mode, shifts, base_level=1, autolevel=True,
     (#490, read on the ROM). `promoted` adds GetCurrentPromotedLevelBonus()'s 9 (19 on
     Difficult) levels. The branches are `unit_load.growth_steps`, which the wiki reads too.
 
-    This is a mean-value proxy, as the rest of the model is: the engine's real
-    `GetAutoleveledStatIncrease` jitters by +/-(growth*n)/8 and resolves the remainder
-    with a coin flip (`GetStatIncrease`, bmbattle.c:1241), so a single unit's stats are
-    a random variable. Both sides of a parity read go through this same function, so
-    the comparison stays apples-to-apples.
+    This is the mean-value line: the engine's real `GetAutoleveledStatIncrease` jitters by
+    +/-(growth*n)/8 and resolves the remainder with a coin flip (`GetStatIncrease`,
+    bmbattle.c:1241), so a single unit's stats are a random variable. The parity read rolls
+    it instead (`enemy_careers`, #510 step 4); this line is the planning number.
     """
     if mode not in MODES:
         raise ValueError('unknown difficulty mode %r (want one of %s)'
@@ -211,26 +210,16 @@ def _class_caps(class_enum):
 _STAT_ORDER = ('HP', 'Pow', 'Skl', 'Spd', 'Def', 'Res', 'Lck')   # the order FE8 rolls them in
 
 
-def _stat_increase(growth, rng):
-    """`GetStatIncrease` (bmbattle.c): +1 per whole 100 of growth, then one `Roll1RN` on the
-    rest (rng.c: `threshold > NextRN_100()`)."""
-    result = 0
-    while growth > 100:
-        result += 1
-        growth -= 100
-    return result + (1 if growth > rng.randrange(100) else 0)
-
-
 def level_up(growths, rng):
     """One player level-up's stat gains, transcribed from `CheckBattleUnitLevelUp`
     (bmbattle.c). Every stat rolls once; an EMPTY level then re-rolls up to twice, walking the
     stats in order and stopping at the first that gains. That re-roll couples the stats, which
     is why `grown` simulates rather than reading each stat off a binomial."""
-    gains = {f: _stat_increase(growths.get('growth' + f, 0), rng) for f in _STAT_ORDER}
+    gains = {f: unit_load.stat_increase(growths.get('growth' + f, 0), rng) for f in _STAT_ORDER}
     if not any(gains.values()):
         for _ in range(2):
             for f in _STAT_ORDER:
-                gains[f] = _stat_increase(growths.get('growth' + f, 0), rng)
+                gains[f] = unit_load.stat_increase(growths.get('growth' + f, 0), rng)
                 if gains[f]:
                     return gains
     return gains
@@ -453,20 +442,84 @@ def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
     base, growths = _class_base(class_enum), _class_growths(class_enum)
     _b, _g, caps, promoted = unit_load.class_line(class_enum)
     shift = shifts[mode] if mode and shifts and shiftable else 0
-    stats = _project(base, growths, unit_load.growth_steps(
-        int(level), autolevel, promoted, base_level, shift, mode or 'normal', realistic),
-        personal_growths)
+    steps = unit_load.growth_steps(int(level), autolevel, promoted, base_level, shift,
+                                   mode or 'normal', realistic)
+    stats = _project(base, growths, steps, personal_growths)
     c = _apply_personal(_stats_to_combatant(name, stats, weapon,
                                             CLASS_TAGS.get(class_enum, frozenset())), personal)
-    capped = {f: min(getattr(c, f), caps[k]) for f, k in (
-        ('hp', 'HP'), ('pow', 'Pow'), ('skl', 'Skl'), ('spd', 'Spd'), ('df', 'Def'),
-        ('res', 'Res'), ('lck', 'Lck')) if getattr(c, f) > caps[k]}
+    capped = {f: min(getattr(c, f), caps[k]) for f, k in _GROWN_FIELDS
+              if getattr(c, f) > caps[k]}
     if arsenal:
         # It carries what its definition lists; it can attack only with what it can use
         # (CanUnitUseWeapon), and it equips the first of those (#510 step 3).
         arsenal = _usable(arsenal, class_enum, char_index, autolevel)
         capped['weapon'] = arsenal[0] if arsenal else None
-    return dataclasses.replace(c, arsenal=tuple(arsenal), **capped)
+    chunks = tuple((n, tuple(sorted((growths if src == 'class' else personal_growths or {})
+                                    .items())), src) for n, src in steps)
+    roll = (chunks, tuple(
+        (f, getattr(c, f) - capped.get(f, getattr(c, f)) - sum(
+            int(n * dict(g).get('growth' + k, 0) / 100 + 0.5) for n, g, _s in chunks), caps[k])
+        for f, k in _GROWN_FIELDS)) if chunks else None
+    return LoadedUnit(**dict(vars(c), arsenal=tuple(arsenal), roll=roll, **capped))
+
+
+# Combatant field -> the engine's stat name, for the seven stats a load grows.
+_GROWN_FIELDS = (('hp', 'HP'), ('pow', 'Pow'), ('skl', 'Skl'), ('spd', 'Spd'), ('df', 'Def'),
+                 ('res', 'Res'), ('lck', 'Lck'))
+
+
+@dataclasses.dataclass
+class LoadedUnit(fc.Combatant):
+    """A red unit as `_enemy_from_enum` loads it: its mean-value line, plus `roll`, what it takes
+    to roll it as the engine does (`enemy_careers`). `roll` is (chunks, fields): the growth
+    steps as (levels, growths, 'class' | 'personal'), and per stat (field, offset, cap), where
+    the offset takes the line back to its unrounded, uncapped base. None for a unit that loads
+    without growing, which has one line. It is not part of the unit's identity (compare=False):
+    two bodies with one line are the same opponent at the mean."""
+    roll: tuple = dataclasses.field(default=None, compare=False)
+
+
+ENEMY_TRIALS = GROWTH_TRIALS
+
+
+@functools.lru_cache(maxsize=None)
+def _rolled_gains(chunks):
+    """ENEMY_TRIALS draws of what a load's growth `chunks` add to each stat, in _STAT_ORDER.
+    A class chunk is one `UnitAutolevelCore` call (GetAutoleveledStatIncrease per stat, rolled
+    in the engine's order); a personal chunk is `UnitAutolevelRealistic`'s real level-ups.
+    Seeded on the chunks, so a reading is the same every run."""
+    rng = random.Random('%d:%r' % (GROWTH_SEED, chunks))
+    rows = []
+    for _ in range(ENEMY_TRIALS):
+        gains = dict.fromkeys(_STAT_ORDER, 0)
+        for n, g, src in chunks:
+            g = dict(g)
+            if src == 'class':
+                for f in _STAT_ORDER:
+                    gains[f] += unit_load.autolevel_increase(g.get('growth' + f, 0) * n, rng)
+            else:
+                for _ in range(n):
+                    for f, up in level_up(g, rng).items():
+                        gains[f] += up
+        rows.append(tuple(gains[f] for f in _STAT_ORDER))
+    return tuple(rows)
+
+
+def enemy_careers(unit):
+    """A loaded unit once per simulated load (#510 step 4): its line rolled as the engine rolls
+    it, ENEMY_TRIALS times, and held to its class caps (UnitCheckStatCaps). The counterpart of
+    the party's `careers`. A unit with no growth to roll, or a plain Combatant, is one career,
+    itself."""
+    roll = getattr(unit, 'roll', None)
+    if not roll:
+        return [unit]
+    chunks, fields = roll
+    gains = [dict(zip(_STAT_ORDER, row)) for row in _rolled_gains(chunks)]
+    names = dict(_GROWN_FIELDS)
+    # A career is one line: it carries no roll of its own, or a reader would roll it again.
+    return [dataclasses.replace(unit, roll=None, **{
+        f: min(getattr(unit, f) + offset + g[names[f]], cap) for f, offset, cap in fields})
+        for g in gains]
 
 
 def _usable(weapons, class_enum, char_index, autolevel):
@@ -1639,53 +1692,94 @@ def party_matchup(bodies, careers):
                     reappears.
 
     Each side is normalised by its own field, so a twin that fields two units (vanilla's
-    prologue) is not divided by our eight. Returns {'threat', 'clear'} as averages over the
-    joint careers, and 'per_enemy': a (name, threat, clear, weapon) average for each body, in
-    order."""
+    prologue) is not divided by our eight. Every enemy body is rolled as the engine loads it
+    (`enemy_careers`, #510 step 4) and enters each joint career as a career of its own,
+    independent of every other body's, identical bodies included. Returns {'threat', 'clear'}
+    as averages over the joint careers, and 'per_enemy': a (name, threat, clear, weapon)
+    average for each body, in order."""
     names = list(careers)
-    armed = [m for m in names if careers[m][0].weapon is not None]
+    armed_set = {m for m in names if careers[m][0].weapon is not None}
     inf = float('inf')
-    # A pairing is read once per DISTINCT (enemy, member line) on the stats it reads, as
-    # `dice_profile` does: the AI's score reads the whole line, being hit reads Def, Res, Spd,
-    # Con and Lck, and hitting reads Pow, Skl, Spd, Con and Lck. The joint careers are then
-    # lookups. Identical enemy bodies share one read.
-    full = {m: [_stat_key(u) for u in careers[m]] for m in names}
-    struck = {m: [(u.df, u.res, u.spd, u.con, u.lck) for u in careers[m]] for m in names}
-    striking = {m: [(u.pow, u.skl, u.spd, u.con, u.lck) for u in careers[m]] for m in names}
+    # A pairing is read once per DISTINCT (enemy line, member line) on the stats it reads, as
+    # `dice_profile` does: the AI's score reads both whole lines, being hit reads the member's
+    # Def, Res, Spd, Con and Lck, and hitting its Pow, Skl, Spd, Con and Lck (with the member
+    # in the key: its weapon and tags are not in those). Read lazily: with both sides rolled,
+    # the pairs the joint careers meet are far fewer than all of them.
+    # Every key is interned to an int once: hashing the Weapon-bearing tuples on each lookup
+    # cost more than the combat math they saved.
+    ids = {}
 
-    def table(keys, fn):
-        return {m: {k: fn(u) for k, u in dict(zip(keys[m], careers[m])).items()}
-                for m in keys}
-
-    # The enemy ATTACKS with whichever carried weapon the AI picks against that target
-    # (`fc.arms`, #510 step 3) and DEFENDS with its equipped one, so the score and damage
-    # tables are read per arm and the party's kill rate on the equipped body.
-    reads = {}
+    def intern(key):
+        return ids.setdefault(key, len(ids))
+    full = {m: [intern(('line', m, _stat_key(u))) for u in careers[m]] for m in names}
+    struck = {m: [intern(('struck', m, (u.df, u.res, u.spd, u.con, u.lck)))
+                  for u in careers[m]] for m in names}
+    striking = {m: [intern(('striking', m, (u.pow, u.skl, u.spd, u.con, u.lck)))
+                    for u in careers[m]] for m in names}
+    # An enemy line is read whole by the score, by its attacking stats when it strikes, and by
+    # its defending ones when it is struck, so each half keys on only what it reads.
+    lines = {}                              # enemy line id -> (arms, line, attack, defence ids)
+    rolled = []
     for e, weights in bodies:
-        key = (_stat_key(e), weights)
-        if key not in reads:
-            arms = fc.arms(e)
-            reads[key] = (
-                [table(full, lambda u, a=a: ai_target.combat_score(a, u, weights)) for a in arms],
-                [table(struck, lambda u, a=a: fc.damage_per_round(a, u)) for a in arms],
-                table({m: striking[m] for m in armed},
-                      lambda u: (fc.damage_per_round(u, e) / e.hp,
-                                 (lambda r: 0.0 if r == inf else 1.0 / r)(
-                                     metric_rounds_to_kill(e, u)))))
-    read = [reads[(_stat_key(e), weights)] for e, weights in bodies]
-    n, order = career_pairing({m: len(careers[m]) for m in names})
+        own = []
+        for c in enemy_careers(e):
+            key = intern(('enemy', _stat_key(c)))
+            if key not in lines:
+                lines[key] = (fc.arms(c), c,
+                              intern(('attack', c.pow, c.skl, c.spd, c.con, c.lck, c.tags,
+                                      c.arsenal or c.weapon)),
+                              intern(('defence', c.hp, c.df, c.res, c.spd, c.con, c.lck,
+                                      c.tags, c.weapon)))
+            own.append(key)
+        rolled.append((own, weights, intern(('weights', weights))))
+    score, dpr, inv = {}, {}, {}
+
+    def kill_rate(e, u):
+        """(kill rate, its floored stand-in): 1 / `metric_rounds_to_kill`, which is the rate
+        itself whenever `u` can dent `e`."""
+        d = fc.damage_per_round(u, e)
+        if d > 0:
+            return d / e.hp, d / e.hp
+        r = metric_rounds_to_kill(e, u)
+        return 0.0, 0.0 if r == inf else 1.0 / r
+
+    counts = {m: len(careers[m]) for m in names}
+    counts.update({'body#%d' % j: len(own) for j, (own, _w, _i) in enumerate(rolled)})
+    n, order = career_pairing(counts)
+    body_order = [order['body#%d' % j] for j in range(len(rolled))]
     per = [[0.0, 0.0] for _ in bodies]
     for i in range(n):
-        at = {m: order[m][i] for m in names}
-        for j, (scores, dprs, inv) in enumerate(read):
-            # AiAttemptOffensiveAction: items outer, targets inner, kept on `>=`, so a tie
-            # goes to the LATER weapon, then the later target (cp_battle.c).
-            if scores:                      # a weaponless body attacks no one
-                _s, arm, k = max((scores[a][m][full[m][at[m]]], a, k)
-                                 for a in range(len(scores)) for k, m in enumerate(names))
-                target = names[k]
-                per[j][0] += dprs[arm][target][struck[target][at[target]]]
-            rates = [inv[m][striking[m][at[m]]] for m in armed]
+        at = [(m, order[m][i]) for m in names]
+        for j, (own, weights, wid) in enumerate(rolled):
+            ek = own[body_order[j][i]]
+            arms, e, attack, defence = lines[ek]
+            if arms:                        # a weaponless body attacks no one
+                scores = []
+                for m, c in at:
+                    key = (ek, wid, full[m][c])
+                    if key not in score:
+                        score[key] = [ai_target.combat_score(a, careers[m][c], weights)
+                                      for a in arms]
+                    scores.append(score[key])
+                # The enemy ATTACKS with whichever carried weapon the AI picks against that
+                # target (`fc.arms`, #510 step 3) and DEFENDS with its equipped one.
+                # AiAttemptOffensiveAction: items outer, targets inner, kept on `>=`, so a tie
+                # goes to the LATER weapon, then the later target (cp_battle.c).
+                _s, arm, k = max((s[a], a, k) for a in range(len(arms))
+                                 for k, s in enumerate(scores))
+                t, c = at[k]
+                key = (attack, arm, struck[t][c])
+                if key not in dpr:
+                    dpr[key] = fc.damage_per_round(arms[arm], careers[t][c])
+                per[j][0] += dpr[key]
+            rates = []
+            for m, c in at:
+                if m not in armed_set:
+                    continue
+                key = (defence, striking[m][c])
+                if key not in inv:
+                    inv[key] = kill_rate(e, careers[m][c])
+                rates.append(inv[key])
             rate = sum(r for r, _floor in rates) or sum(f for _r, f in rates)
             per[j][1] += 1.0 / rate if rate else inf
     slots = max(1, len(names))

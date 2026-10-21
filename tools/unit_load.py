@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """What the ROM loads a red unit with, per difficulty mode, as min~max ranges.
 
-The parity model (difficulty.py) reads one mean-value line per unit. A wiki table shows what
-the player will actually meet, so this transcribes the engine's load path instead, and keeps
-its randomness as a range the way the Fire Emblem Wiki prints generic enemies ("22~24"):
+A wiki table shows what the player will actually meet, so this transcribes the engine's load
+path, and keeps its randomness as a range the way the Fire Emblem Wiki prints generic enemies
+("22~24"). The parity model (difficulty.py) rolls the same path once per career instead
+(`autolevel_increase`, #510 step 4):
 
   LoadUnit (bmunit.c:617)        stats = character base + class base (luck is personal only);
                                  only a definition with `.autolevel` grows past that.
@@ -23,7 +24,7 @@ its randomness as a range the way the Fire Emblem Wiki prints generic enemies ("
   (bmbattle.c:1241)              (GetStatIncrease) -- the source of the range.
 
 Stats are capped at the class maximum (UnitCheckStatCaps). `growth_steps` is that path as
-data, and difficulty.py's mean-value model reads the same steps (#490), so the two agree.
+data, and difficulty.py's model reads the same steps (#490), so the two agree.
 """
 import functools
 import re
@@ -148,6 +149,23 @@ def _increase_bounds(gn):
         rest = g - 100 * whole
         return whole + (1 if best or rest >= 100 else 0)   # Roll1RN(rest): sure only at 100
     return rolled(lo_g, False), rolled(hi_g, True)
+
+
+def stat_increase(growth, rng):
+    """`GetStatIncrease` (bmbattle.c), one draw: +1 per whole 100 of growth, then one `Roll1RN`
+    on the rest (rng.c: `threshold > NextRN_100()`)."""
+    result = 0
+    while growth > 100:
+        result += 1
+        growth -= 100
+    return result + (1 if growth > rng.randrange(100) else 0)
+
+
+def autolevel_increase(gn, rng):
+    """`GetAutoleveledStatIncrease` (bmbattle.c) for growth*levels = gn, one draw: gn jittered
+    by NextRN_N(gn/4) - gn/8, then `stat_increase`. NextRN_N(k) is NextRN() * k / 0x10000."""
+    jitter = rng.randrange(0x10000) * (gn // 4) // 0x10000 - gn // 8
+    return stat_increase(gn + jitter, rng)
 
 
 def _grow(line, growths, levels):
