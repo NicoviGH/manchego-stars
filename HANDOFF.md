@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-21 (Claude, after #517). **The parity model is being rebuilt before any party or chapter
+Refreshed 2026-10-21 (Claude, after #517; #518 open). **The parity model is being rebuilt before any party or chapter
 change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
 grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
 Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
@@ -21,6 +21,10 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
 
 ## In flight
 
+- **PR #518 (`feat/510-prove-unit-order`)**: closes step 5's open item. Slot order = join order on
+  both sides, Moulder moves ahead of Ross/Garcia in the twin's order, it raises on any join
+  order the player could change, and the enemy-cap invariant is guarded. Reviewed; no verdict
+  moves. **Merge it first** (Nicolas says "merge"; wait for CI on its HEAD).
 - **Draft PR #485 (`feat/27-ch07-scenes`)**, text only, unchanged: ch07 moves to Distant Blade's map.
 
 **Next, in order (#510's list is the plan):**
@@ -37,8 +41,11 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
    ADR 0042 residual lapses, not widened). #517 (ADR 0358): the team is fielded per career,
    forced units first (vanilla's `gForceDeploymentList`), in the ROM's unit order
    (`inject.cast.load_order`, proven by `ch07blueorder`); ch01 Difficult went OK at its
-   residual's edge (x1.407 vs 1.41). Next: **step 6: strategy as data**, then 7-9, each with
-   an in-engine proof and the verdict diff. Stop when a step moves no verdict.
+   residual's edge (x1.407 vs 1.41). Next: **step 6: strategy as data** (curate each twin's wiki
+   Strategy section into per-chapter claims, used as model inputs and as checks), then 7-9, each
+   with an in-engine proof and the verdict diff. Stop when a step moves no verdict.
+   - Verdicts OFF now: ch01 Tutorial/Normal; ch02, ch03, ch04 on Difficult (ch01 Difficult
+     reads OK at its ceiling's edge). All of it waits for step 10; nothing is widened.
    - `party_matchup` reads each unit as ONE Combatant whose stats are numpy arrays over the
      careers; `fe_combat`/`ai_target` take ints or arrays (`max0`/`clamp`/`where`). Keep new
      combat math array-safe, or `test_ai_target.OverCareers` fails. A Normal read is ~5s.
@@ -77,6 +84,10 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
   one-off evidence instead, or write the verdict on `guardedInput`/`selectSemantic`.
 - **What the ROM loads, read off the map:** `INSPECT.redStats` (`ch04redstats`), one run per
   `PT_DIFFICULTY`. Compare it against `unit_load.load`'s ranges before trusting either model.
+  `INSPECT.blueOrder` (`ch07blueorder`) logs the blue table in slot order after prep.
+- **Combat math takes ints OR numpy arrays** (`fe_combat.max0/clamp/where/maximum/minimum`):
+  `party_matchup` reads every unit over all its careers at once. New combat code must stay
+  array-safe, or `test_ai_target.OverCareers` fails. A full Normal read is ~5s; keep it there.
 - **Grep the campaign before proposing a name.** "Halvar", offered for a recruit, was already
   ch02's raider captain (`npc-bench.md`'s name bank is not a list of free names).
 - **Our own scenes are named `MS_*`.** Any code that matches `EventScr_` must ask whether it
