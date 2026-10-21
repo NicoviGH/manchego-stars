@@ -1047,6 +1047,25 @@ def vanilla_chapter_shifts(parity_ref):
     return None
 
 
+def vanilla_forced(parity_ref):
+    """The twin's units FE8 deploys whatever the player picks: `IsCharacterForceDeployed_`
+    (eventinfo.c) over `gForceDeploymentList` (data_event_trigger.c), for the common route the
+    early chain runs on (prologue to Ch8) and the twin's chapter index. Eirika everywhere,
+    Artur in Ch4, Natasha in Ch5. {name}, as `vanilla_party` names them."""
+    name = _vanilla_internal_name(parity_ref)
+    chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
+    index = [c.get('internalName') for c in chapters['chapters']].index(name)
+    text = inject.decomp.vanilla_decomp_text('src/data_event_trigger.c')
+    s, e = inject.decomp._find_brace_block(text, 'gForceDeploymentList[]',
+                                           'src/data_event_trigger.c')
+    out = set()
+    for char, route, chapter in re.findall(r'\{\s*(CHARACTER_\w+)\s*,\s*([\w-]+)\s*,\s*'
+                                           r'(-?\w+)\s*\}', text[s:e]):
+        if route in ('-1', 'CHAPTER_MODE_COMMON') and chapter in ('-1', str(index)):
+            out.add(_ally_name(char))
+    return out
+
+
 def vanilla_named_bosses(parity_ref, with_personal=True, mode=None):
     """The twin's NAMED units as (name, Combatant). Used only by the role check -- see the
     note in vanilla_enemies about keeping the aggregate class-base-only."""
@@ -1695,11 +1714,13 @@ def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
     return threat, clearload
 
 
-def party_matchup(bodies, careers):
+def party_matchup(bodies, careers, deploy_cap=None, forced=()):
     """Instrument v2, layer 1 (#430 step 2b): a force measured against the party that meets it.
 
     `bodies` is [(enemy Combatant, combat-weight table)], `careers` is {unit: [Combatant]} for
-    the FIELDED party, once per simulated career (ADR 0311). Per joint career:
+    the ARRIVING party in join order, once per simulated career (ADR 0311). Each joint career
+    fields its own `deploy_cap` units, `forced` ones first (`_fielded`, #510 step 5); with no
+    cap, everyone arriving fights. Per joint career:
 
       threat/slot = sum over enemies of its damage per round against the unit FE8's AI would
                     attack with whichever carried weapon it picks for that target
@@ -1713,49 +1734,90 @@ def party_matchup(bodies, careers):
                     reappears.
 
     Each side is normalised by its own field, so a twin that fields two units (vanilla's
-    prologue) is not divided by our eight. Every enemy body is rolled as the engine loads it
-    (`enemy_careers`, #510 step 4) and enters each joint career as a career of its own,
-    independent of every other body's, identical bodies included. Returns {'threat', 'clear'}
-    as averages over the joint careers, and 'per_enemy': a (name, threat, clear, weapon)
-    average for each body, in order."""
+    prologue) is not divided by our eight. Every enemy body is rolled per career (`_joint`).
+    Returns {'threat', 'clear'} as averages over the joint careers, 'per_enemy': a (name,
+    threat, clear, weapon) average for each body, in order, and 'fielded': the share of
+    careers each arriving unit is fielded in."""
     import numpy                            # not at the top: CI's checks job has no numpy
-    names = list(careers)
-    armed = [m for m in names if careers[m][0].weapon is not None]
-    rolled = [_rolled_stats(e) for e, _w in bodies]
-    counts = {m: len(careers[m]) for m in names}
-    counts.update({'body#%d' % j: ENEMY_TRIALS if r else 1 for j, r in enumerate(rolled)})
-    n, order = career_pairing(counts)
-    # Every unit is read over all n joint careers at once: one Combatant whose stats are
-    # arrays (fe_combat's formulas take either), so a (body, member) pairing is one call.
-    party = {m: _over_careers(careers[m], order[m]) for m in names}
+    names = _map_order(careers, forced)
+    armed = [k for k, m in enumerate(names) if careers[m][0].weapon is not None]
+    n, party, field = _joint(careers, names, [e for e, _w in bodies])
+    fielded = _fielded(party, field, deploy_cap, forced)
     inf = float('inf')
     per = []
     with numpy.errstate(divide='ignore'):
-        for j, ((e, weights), stats) in enumerate(zip(bodies, rolled)):
-            body = _over_careers([e], order['body#%d' % j], stats)
+        for body, (e, weights) in zip(field, bodies):
             arms = fc.arms(body)
             threat = 0.0
             if arms and names:              # a weaponless body attacks no one
-                # The enemy ATTACKS with whichever carried weapon the AI picks against that
-                # target (`fc.arms`, #510 step 3) and DEFENDS with its equipped one.
+                # The enemy ATTACKS with whichever carried weapon the AI picks against a
+                # FIELDED target (`fc.arms`, #510 step 3) and DEFENDS with its equipped one.
                 # AiAttemptOffensiveAction: items outer, targets inner, kept on `>=`, so a tie
-                # goes to the LATER weapon, then the later target (cp_battle.c): the last
-                # maximum in (weapon, target) order.
+                # goes to the LATER weapon, then the later target in unit order, which is
+                # `_map_order` (cp_battle.c): the last maximum in (weapon, target) order.
                 pairs = [(a, party[m]) for a in arms for m in names]
                 scores = numpy.array([ai_target.combat_score(a, u, weights) for a, u in pairs])
+                scores = numpy.where(numpy.tile(fielded, (len(arms), 1)), scores, -inf)
                 picked = len(pairs) - 1 - numpy.argmax(scores[::-1], axis=0)
                 dprs = numpy.array([fc.damage_per_round(a, u) for a, u in pairs])
                 threat = float(dprs[picked, numpy.arange(n)].sum())
-            rate = sum(fc.damage_per_round(party[m], body) / body.hp for m in armed)
-            floor = sum(1.0 / metric_rounds_to_kill(body, party[m]) for m in armed)
+            rate = sum(numpy.where(fielded[k], fc.damage_per_round(party[names[k]], body)
+                                   / body.hp, 0.0) for k in armed)
+            floor = sum(numpy.where(fielded[k], 1.0 / metric_rounds_to_kill(
+                body, party[names[k]]), 0.0) for k in armed)
             rate = numpy.where(rate > 0, rate, floor) if armed else numpy.zeros(n)
             clear = float(numpy.where(rate > 0, 1.0 / numpy.where(rate > 0, rate, 1), inf).sum())
             per.append((threat, clear))
-    slots = max(1, len(names))
+    slots = max(1, min(len(names), deploy_cap or len(names)))
     return {'threat': sum(p[0] for p in per) / n / slots,
             'clear': sum(p[1] for p in per) / n,
             'per_enemy': [(e.name, p[0] / n, p[1] / n, e.weapon.name)
-                          for (e, _t), p in zip(bodies, per)]}
+                          for (e, _t), p in zip(bodies, per)],
+            'fielded': {m: float(fielded[k].mean()) for k, m in enumerate(names)}}
+
+
+def _map_order(careers, forced=()):
+    """The arriving party in the order its units sit in the ROM's unit table, which is the
+    order FE8's AI breaks a tie in: `SortPlayerUnitsForPrepScreen` (prepscreen.c) pushes the
+    force-deployed units first, then everyone else, each in their existing order, which is the
+    order they joined (`careers` comes in join order)."""
+    return ([m for m in careers if m in forced]
+            + [m for m in careers if m not in forced])
+
+
+def _joint(careers, names, force):
+    """The joint careers (`career_pairing`) of a party and a force, each unit read over all of
+    them at once: (n, {unit: Combatant with array stats}, [Combatant with array stats]).
+    Every enemy body is rolled as the engine loads it (`_rolled_stats`, #510 step 4) and is a
+    career of its own, independent of every other body's, identical bodies included."""
+    rolled = [_rolled_stats(e) for e in force]
+    counts = {m: len(careers[m]) for m in names}
+    counts.update({'body#%d' % j: ENEMY_TRIALS if r else 1 for j, r in enumerate(rolled)})
+    n, order = career_pairing(counts)
+    party = {m: _over_careers(careers[m], order[m]) for m in names}
+    return n, party, [_over_careers([e], order['body#%d' % j], r)
+                      for j, (e, r) in enumerate(zip(force, rolled))]
+
+
+def _fielded(party, field, deploy_cap, forced=()):
+    """bool array (unit, joint career): who the player fields, chosen per career (#510 step 5).
+    Every force-deployed unit, then the best of the rest on `_best_field`'s rule (single-target
+    kill rate against the enemies this career meets), up to `deploy_cap`; a tie goes to the
+    earlier unit, as a stable sort does. Everyone, when the party fits under the cap."""
+    import numpy
+    names = list(party)
+    n = len(next(iter(party.values())).hp) if party else 0
+    if deploy_cap is None or deploy_cap >= len(names):
+        return numpy.ones((len(names), n), dtype=bool)
+    keys = numpy.array([
+        numpy.full(n, float('inf')) if m in forced else
+        numpy.max([numpy.zeros(n) + fc.kills_per_round(party[m], b) for b in field], axis=0)
+        if field else
+        numpy.zeros(n) for m in names])
+    ranked = numpy.argsort(-keys, axis=0, kind='stable')
+    out = numpy.zeros((len(names), n), dtype=bool)
+    out[ranked[:deploy_cap], numpy.arange(n)] = True
+    return out
 
 
 _CAREER_STATS = ('hp', 'pow', 'skl', 'spd', 'df', 'res', 'lck', 'con')
@@ -1784,11 +1846,16 @@ def _median_combatant(careers):
         for f in ('hp', 'pow', 'skl', 'spd', 'df', 'res', 'lck', 'con')})
 
 
-def fielded_careers(careers, force, deploy_cap):
-    """The `deploy_cap` units of an arriving party a player fields, ranked on each unit's
-    median line by `_best_field`'s rule, with all of their careers: {unit: [Combatant]}."""
-    field = _best_field([_median_combatant(c) for c in careers.values()], force, deploy_cap)
-    return {u.name: careers[u.name] for u in field}
+def fielded_careers(careers, force, deploy_cap, forced=()):
+    """The field a player most often deploys against `force` (`_fielded`, chosen per career),
+    in map order, with all of its units' careers: {unit: [Combatant]}. The one team the
+    readers that want one (the timeline, the boss checks, the report) read; the parity read
+    itself fields per career."""
+    names = _map_order(careers, forced)
+    _n, party, field = _joint(careers, names, list(force))
+    mask = _fielded(party, field, deploy_cap, forced)
+    picks = collections.Counter(tuple(names[k] for k in col.nonzero()[0]) for col in mask.T)
+    return {m: careers[m] for m in picks.most_common(1)[0][0]}
 
 
 def bulk_durability(unit, enemies):
@@ -1940,8 +2007,11 @@ def arriving_careers(campaign, ch):
 
 
 def _party_careers(campaign, party):
-    return {uid: player_careers(campaign, uid, level - joined)
-            for uid, (joined, level) in party.items()}
+    """{uid: careers} for an arriving party, in the order the ROM loads it
+    (`inject.cast.load_order`): the order the AI breaks a target tie in (`_map_order`)."""
+    order = inject.cast.load_order(campaign)
+    return {uid: player_careers(campaign, uid, party[uid][1] - party[uid][0])
+            for uid in sorted(party, key=order.index)}
 
 
 def _metrics(field, profiles):
@@ -2191,11 +2261,12 @@ def _chapter_matchup(chap, campaign, mode):
     fields = arriving_fields(chap, campaign, mode)
     if fields is None:
         return None
-    ours = party_matchup(fields['our_force'], fields['our_field'])
-    van = party_matchup(fields['van_force'], fields['van_field'])
+    cap, forced = fields['cap'], fields['van_forced']
+    ours = party_matchup(fields['our_force'], fields['our_party'], cap)
+    van = party_matchup(fields['van_force'], fields['van_party'], cap, forced)
     # The twin's force against OUR party splits the headline in two: the force effect is
     # what authoring controls, the party effect is what the party brings (#430 step 3).
-    cross = party_matchup(fields['van_force'], fields['our_field'])
+    cross = party_matchup(fields['van_force'], fields['our_party'], cap)
 
     def ratio(a, b, key):
         return a[key] / b[key] if b[key] else float('inf')
@@ -2209,9 +2280,11 @@ def _chapter_matchup(chap, campaign, mode):
 
 
 def arriving_fields(chap, campaign, mode=None):
-    """Both sides of a parity read: each force as [(Combatant, combat-weight table)] and the
-    party each side fields against it, {unit: [Combatant]} over the careers. None for a twin
-    off VANILLA_CHAIN or a party the exp model cannot price -- `chapter_matchup`'s fallback."""
+    """Both sides of a parity read: each force as [(Combatant, combat-weight table)], each
+    ARRIVING party in join order, {unit: [Combatant]} over the careers, the deploy `cap`, the
+    twin's `van_forced` units, and each side's most-picked field (`fielded_careers`) for the
+    readers that want one team. None for a twin off VANILLA_CHAIN or a party the exp model
+    cannot price -- `chapter_matchup`'s fallback."""
     import exp_curve                        # exp_curve imports this module
     ref = chap.get('parity_reference')
     if ref not in VANILLA_CHAIN:
@@ -2227,13 +2300,14 @@ def arriving_fields(chap, campaign, mode=None):
     our_force = chapter_enemy_bodies(chap, mode=mode, shifts=shifts)
     van_force = [(u, ai_target.combat_weight_table(ai))
                  for u, ai in vanilla_enemy_bodies(ref, mode)]
-    our_field = fielded_careers(
-        fixed_roster_careers(chap) or _party_careers(campaign, arriving['party']),
-        [u for u, _t in our_force], cap)
-    van_field = fielded_careers(vanilla_party_careers(ref, arriving['vanilla']),
-                                [u for u, _t in van_force], cap)
-    return {'our_force': our_force, 'our_field': our_field,
-            'van_force': van_force, 'van_field': van_field}
+    our_party = fixed_roster_careers(chap) or _party_careers(campaign, arriving['party'])
+    van_party = vanilla_party_careers(ref, arriving['vanilla'])
+    van_forced = vanilla_forced(ref)
+    return {'our_force': our_force, 'van_force': van_force,
+            'our_party': our_party, 'van_party': van_party, 'cap': cap, 'van_forced': van_forced,
+            'our_field': fielded_careers(our_party, [u for u, _t in our_force], cap),
+            'van_field': fielded_careers(van_party, [u for u, _t in van_force], cap,
+                                         van_forced)}
 
 
 def planned_target(chap, campaign):
@@ -2251,9 +2325,8 @@ def planned_target(chap, campaign):
     if levels is None:
         return None
     force = [(u, ai_target.combat_weight_table(ai)) for u, ai in vanilla_enemy_bodies(ref)]
-    field = fielded_careers(vanilla_party_careers(ref, levels), [u for u, _t in force],
-                            chapter_deploy_limit(chap, len(ROSTER)))
-    return party_matchup(force, field)
+    return party_matchup(force, vanilla_party_careers(ref, levels),
+                         chapter_deploy_limit(chap, len(ROSTER)), vanilla_forced(ref))
 
 
 def _warn_dropped(dropped, indent='  '):

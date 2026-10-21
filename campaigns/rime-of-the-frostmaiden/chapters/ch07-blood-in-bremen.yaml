@@ -375,6 +375,9 @@ playtest:
     # What the ROM loads each red unit with, per PT_DIFFICULTY: the instrument #490 holds the
     # parity model and the wiki's load path to (Dorbulgruf is the unflagged boss they split on).
     - {name: ch07redstats, proves: "every red unit's loaded stat line is logged for the mode the run picked", lua: ch07redstats}
+    # The blue unit table's slot order after prep: the AI's tie order, which the parity
+    # model's party order claims (lead first, then join order; #510 step 5).
+    - {name: ch07blueorder, proves: "the blue unit table is logged in slot order with who prep deployed", lua: ch07blueorder}
 
 # Open questions (#486). tools/gen_wiki.py lists them; settling one removes it here.
 open_questions:
