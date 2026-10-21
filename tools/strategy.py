@@ -37,13 +37,13 @@ import re
 
 import yaml
 
+import campaign_chapters
 import difficulty as dif
-import map_tileset_tool as mt
+import map_donor
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TWIN_CLAIMS = os.path.join(REPO, 'tools/wiki/twin_strategy.yaml')
 TWIN_PAGES = os.path.join(REPO, 'tools/wiki/vendor/twins')
-MAPS_DIR = os.path.join(REPO, 'campaigns/rime-of-the-frostmaiden')
 
 KINDS = {
     'terrain': {'tile', 'vs'},
@@ -67,6 +67,7 @@ def plain(text):
     return ' '.join(text.split())
 
 
+@functools.lru_cache(maxsize=None)
 def twin_section(page):
     """The twin page's ==Strategy== section, raw wikitext."""
     with open(os.path.join(TWIN_PAGES, page + '.wiki'), encoding='utf-8') as f:
@@ -124,7 +125,7 @@ def _norm(token):
 
 
 def our_labels(chap, mode=None):
-    """(type, labels) per body of `chap`'s force, in `chapter_enemy_bodies` order. The type
+    """(name, type, labels) per body of `chap`'s force, in `chapter_enemy_bodies` order. The type
     is the body's name (our ids are authored per unit type); the labels add its class,
     'boss' for a boss and 'convertible' for a convertible."""
     shifts = dif.inject.chapter_settings.chapter_difficulty_shifts(chap) if mode else None
@@ -134,19 +135,19 @@ def our_labels(chap, mode=None):
         labels = {_norm(ed.get('id', '')), _norm(u.name), _norm(cls)}
         labels |= {'boss'} if ed.get('is_boss') else set()
         labels |= {'convertible'} if ed.get('convertible') else set()
-        out.append((_norm(u.name), frozenset(labels)))
+        out.append((u.name, _norm(u.name), frozenset(labels)))
     return out
 
 
 def twin_labels(parity_ref, mode=None):
-    """(type, labels) per body of the twin's force, in `vanilla_enemy_bodies` order. The type
+    """(name, type, labels) per body of the twin's force, in `vanilla_enemy_bodies` order. The type
     is the character for a named unit, else the class; the labels hold both, 'boss' for a
     CA_BOSS character and 'convertible'."""
     import exp_curve                        # exp_curve imports difficulty
     stem = dif.PARITY_REFERENCE_STEM.get(parity_ref)
     conv = dif._vanilla_convertible_chars(stem) if stem else set()
     out = []
-    for _a, _i, d, _c in dif.vanilla_loaded_units(parity_ref, mode):
+    for _a, _i, d, c in dif.vanilla_loaded_units(parity_ref, mode):
         char = d['charIndex']
         labels = {_norm(d['classIndex'])}
         if char.startswith('CHARACTER_'):
@@ -156,7 +157,8 @@ def twin_labels(parity_ref, mode=None):
         if char in conv:
             labels.add('convertible')
         named = char.startswith('CHARACTER_')
-        out.append((_norm(char) if named else _norm(d['classIndex']), frozenset(labels)))
+        out.append((c.name, _norm(char) if named else _norm(d['classIndex']),
+                    frozenset(labels)))
     return out
 
 
@@ -184,23 +186,22 @@ def twin_tiles(parity_ref):
 
 
 @functools.lru_cache(maxsize=None)
-def our_tiles(map_file, tileset):
+def our_tiles(maps, stem):
     """{TERRAIN_ name: tiles} on one of our painted maps."""
-    ts = mt._tileset_from_dir(os.path.join(MAPS_DIR, 'maps', 'tilesets', tileset))
-    with open(os.path.join(MAPS_DIR, map_file), 'rb') as f:
-        raw = f.read()
-    return _terrain_counts(ts.terrain(int.from_bytes(raw[i:i + 2], 'little') >> 5)
-                           for i in range(0, len(raw) - 1, 2))
+    return _terrain_counts(map_donor.our_terrain(stem, maps)[2])
 
 
-def chapter_tiles(chap):
-    m = chap.get('map') or {}
-    return our_tiles(m['file'], m.get('tileset', mt.DEFAULT_TILESET)) if m.get('file') else {}
+def chapter_tiles(chap, campaign=campaign_chapters.CAMPAIGN):
+    """{TERRAIN_ name: tiles} on the map `chap` declares, {} for a chapter with none."""
+    path = (chap.get('map') or {}).get('file')
+    if not path:
+        return {}
+    maps = os.path.dirname(os.path.join(REPO, 'campaigns', campaign, path))
+    return our_tiles(maps, os.path.splitext(os.path.basename(path))[0])
 
 
 def _terrain_line(claim, tiles):
-    tile = str(claim['tile']).upper()
-    tile = tile if tile.startswith('TERRAIN_') else 'TERRAIN_' + tile
+    tile = dif._terrain_key(claim['tile'])
     vs = claim['vs']
     if not tiles.get(tile):
         return 'MISS terrain %s vs %s: the map has no %s' % (claim['tile'], vs, tile)
@@ -240,9 +241,9 @@ def _check(claim, bodies, per_enemy, labels, lines, tiles):
         ranked = sorted(load, key=load.get, reverse=True)
         top = min(named, key=ranked.index)
         rank = ranked.index(top) + 1
-        return '%s threat %s: rank %d of %d enemy types by summed threat (%s %.1f; heaviest %s %.1f)' % (
-            'OK  ' if rank == 1 else 'MISS', vs, rank, len(ranked), top, load[top],
-            ranked[0], load[ranked[0]])
+        return ('%s threat %s: rank %d of %d enemy types by summed threat (%s %.1f; heaviest '
+                '%s %.1f)' % ('OK  ' if rank == 1 else 'MISS', vs, rank, len(ranked), top,
+                              load[top], ranked[0], load[ranked[0]]))
     names = _units(claim)
     by_norm = {_norm(m): line for m, line in lines.items()}
     present = [u for u in names if u in by_norm]
@@ -251,20 +252,25 @@ def _check(claim, bodies, per_enemy, labels, lines, tiles):
             kind, '/'.join(names), vs, ', '.join(lines))
     targets = [bodies[k] for k in hit]
     if kind == 'answer':
-        unit = by_norm[present[0]]
-        # The line, not the boss: "train her on the Fighters" weighs them against the other
-        # generics, and a Rapier triples on vanilla Ch1's armoured boss.
-        rounds = {}
-        for b, (t, lab) in zip(bodies, labels):
-            if 'boss' not in lab or matches(lab, vs):
-                rounds[t] = min(rounds.get(t, float('inf')), fc.rounds_to_kill(unit, b))
-        target = min(fc.rounds_to_kill(unit, b) for b in targets)
-        best = min(rounds, key=rounds.get)
+        # Any listed unit whose best matchup is `vs` holds the claim. The line, not the boss:
+        # "train her on the Fighters" weighs them against the other generics, and a Rapier
+        # triples on vanilla Ch1's armoured boss.
+        reads = []
+        for m in present:
+            rounds = {}
+            for b, (t, lab) in zip(bodies, labels):
+                if 'boss' not in lab or matches(lab, vs):
+                    rounds[t] = min(rounds.get(t, float('inf')),
+                                    fc.rounds_to_kill(by_norm[m], b))
+            target = min(fc.rounds_to_kill(by_norm[m], b) for b in targets)
+            best = min(rounds, key=rounds.get)
+            reads.append((target > rounds[best], m, target, best, rounds[best]))
+        miss, m, target, best, top = min(reads)
         return '%s answer %s vs %s: %.1f rounds to kill (its best: %s %.1f)' % (
-            'OK  ' if target <= rounds[best] else 'MISS', present[0], vs, target, best,
-            rounds[best])
+            'MISS' if miss else 'OK  ', m, vs, target, best, top)
     if kind == 'carry':
-        score = {m: max(fc.rounds_to_kill(line, b) for b in targets) for m, line in by_norm.items()}
+        score = {m: max(fc.rounds_to_kill(line, b) for b in targets)
+                 for m, line in by_norm.items()}
         ranked = sorted(score, key=score.get)
         word = 'rounds to kill'
     else:                                   # wall: survives longest
@@ -278,21 +284,25 @@ def _check(claim, bodies, per_enemy, labels, lines, tiles):
         best, score[best], ranked[0], score[ranked[0]])
 
 
-def findings(chap, matchup, mode=None):
-    """{'ours': [line], 'twin': [line]}: every modelled claim of each side, checked against
-    that side's own read in `matchup` (`difficulty.chapter_matchup`)."""
+def findings(chap, matchup, mode=None, campaign=campaign_chapters.CAMPAIGN):
+    """{'ours': ([claim], [line]), 'twin': (...)}: each side's validated claims, and every
+    modelled one checked against that side's own read in `matchup`
+    (`difficulty.chapter_matchup`)."""
     ref = chap.get('parity_reference')
     our_force, van_force = matchup['forces']
     out = {}
     for key, claims, side, force, labels, lines, tiles in (
             ('ours', our_claims(chap), matchup['ours'], our_force, our_labels(chap, mode),
-             matchup['lines'], chapter_tiles(chap)),
+             matchup['lines'], chapter_tiles(chap, campaign)),
             ('twin', twin_claims(ref), matchup['vanilla'], van_force, twin_labels(ref, mode),
              matchup['lines_vanilla'], twin_tiles(ref))):
-        if len(labels) != len(force):
-            raise ValueError('%s: %d labels for %d bodies' % (key, len(labels), len(force)))
-        out[key] = [f for f in (_check(c, force, side['per_enemy'], labels, lines, tiles)
-                                for c in claims) if f]
+        # Labels come from a second walk of the force; it must be the same bodies in the
+        # same order, or every check reads another unit.
+        if [n for n, _t, _lab in labels] != [b.name for b in force]:
+            raise ValueError('%s: the labels do not walk the force body for body' % key)
+        labels = [(t, lab) for _n, t, lab in labels]
+        checked = (_check(c, force, side['per_enemy'], labels, lines, tiles) for c in claims)
+        out[key] = (claims, [f for f in checked if f])
     return out
 
 
@@ -312,12 +322,11 @@ def print_strategy(chap, campaign, mode=None):
     if matchup is None:
         print('  (no party read for this chapter -- claims not checked)')
         return
-    lines = findings(chap, matchup, mode)
-    ref = chap.get('parity_reference')
-    for key, label, claims in (('ours', 'ours', our_claims(chap)),
-                               ('twin', ref, twin_claims(ref))):
+    read = findings(chap, matchup, mode, campaign)
+    for key, label in (('ours', 'ours'), ('twin', chap.get('parity_reference'))):
+        claims, lines = read[key]
         print('  %s:' % label)
-        for line in lines[key] or ['(no modelled claims)']:
+        for line in lines or ['(no modelled claims)']:
             print('    %s' % line)
         for step, topics in sorted(unmodelled(claims).items()):
             print('    unmodelled, step %d: %s' % (step, ', '.join(topics)))

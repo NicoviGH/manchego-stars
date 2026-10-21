@@ -103,17 +103,24 @@ def blocked_grid(cells, terrain):
     return [1 if terrain[m] in IMPASSABLE else 0 for m in cells]
 
 
-def our_map(stem):
-    """(width, height, blocked_grid) for one of our painted maps."""
-    with open(os.path.join(MAPS, stem + '.json'), encoding='utf-8') as source:
+def our_terrain(stem, maps=MAPS):
+    """(width, height, [terrain id per cell]) for one of our painted maps, read under the
+    tileset its .json names."""
+    with open(os.path.join(maps, stem + '.json'), encoding='utf-8') as source:
         info = json.load(source)
     width, height = info['width'], info['height']
     tileset = mt._tileset_from_dir(
-        os.path.join(MAPS, 'tilesets', info.get('tileset', mt.DEFAULT_TILESET)))
-    with open(os.path.join(MAPS, stem + '.mar'), 'rb') as source:
+        os.path.join(maps, 'tilesets', info.get('tileset', mt.DEFAULT_TILESET)))
+    with open(os.path.join(maps, stem + '.mar'), 'rb') as source:
         raw = source.read()
     cells = [struct.unpack_from('<H', raw, i * 2)[0] >> 5 for i in range(width * height)]
-    return width, height, [1 if tileset.terrain(m) in IMPASSABLE else 0 for m in cells]
+    return width, height, [tileset.terrain(m) for m in cells]
+
+
+def our_map(stem):
+    """(width, height, blocked_grid) for one of our painted maps."""
+    width, height, terrain = our_terrain(stem)
+    return width, height, [1 if t in IMPASSABLE else 0 for t in terrain]
 
 
 def candidates(stem):

@@ -2566,6 +2566,14 @@ def on_terrain(combatant, terrain_name):
     return dataclasses.replace(combatant, df=combatant.df + dfn, res=combatant.res + res), avo
 
 
+def _tile_text(tile, combatant):
+    """' on TILE (+avo/+def[/+res])', what `on_terrain` gives `combatant` there; '' off a tile."""
+    if not tile:
+        return ''
+    avo, dfn, res = terrain_cover(tile, 'flier' in combatant.tags)
+    return ' on %s (+%d avo/+%d def%s)' % (tile, avo, dfn, '/+%d res' % res if res else '')
+
+
 # ── Per-unit ROLE check (#25 post-mortem) ───────────────────────────────────────
 # The parity verdict above is an AGGREGATE: threat/slot sums the whole force and divides by
 # the deploy cap, so a single monstrous unit dissolves into the average and a boss that dies
@@ -2811,7 +2819,7 @@ def role_findings(chap, parity_ref, campaign=None, mode=None):
         # class-base-only; this is the one place the real article is compared.
         b_on, b_avo = on_terrain(b, tile)   # `b` is already the real article
         bk = fc.rounds_to_kill(YARDSTICK, b_on, b_avo)
-        where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
+        where = _tile_text(tile, b)
         if bk == float('inf'):
             out.append('boss %s%s cannot be damaged by the parity yardstick at all -- '
                        'terrain and a personal line are stacking too far' % (uid, where))
@@ -2863,10 +2871,10 @@ def _boss_durability_vs_party(entries, parity_ref, lines, mode=None, shifts=None
         if not ed.get('is_boss'):
             continue
         tile = ed.get('tile_terrain')
-        where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
         for c in _entry_combatants(ed, mode=mode, shifts=shifts, real_article=True,
                                    drop_staff=False, distinct=True):
             body, avoid = on_terrain(c, tile)
+            where = _tile_text(tile, c)
             rounds = party_rounds(body, avoid)
             if rounds == inf:
                 out.append('boss %s%s cannot be damaged by the party that meets it'

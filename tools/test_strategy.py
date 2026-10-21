@@ -10,6 +10,7 @@ import unittest
 import yaml
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import campaign_chapters
 import difficulty as dif
 import strategy
 
@@ -28,10 +29,18 @@ class EveryClaimCitesItsSection(unittest.TestCase):
             with self.subTest(ref=ref):
                 self.assertTrue(strategy.twin_claims(ref))
 
-    def test_every_chapter_claim_resolves(self):
+    def test_every_hosted_chapter_is_curated(self):
         for ch in HOSTED:
             with self.subTest(ch=ch):
                 self.assertTrue(strategy.our_claims(chapter(ch)))
+
+    def test_every_chapter_with_claims_resolves(self):
+        """Planned chapters included: a claim is checked where it is written, not when the
+        chapter is next read."""
+        for chap in campaign_chapters.load_all(CAMPAIGN):
+            if chap.get('strategy_claims'):
+                with self.subTest(ch=chap.get('id')):
+                    strategy.our_claims(chap)
 
     def test_every_hosted_twin_is_curated(self):
         for ch in HOSTED:
@@ -100,7 +109,8 @@ class Matching(unittest.TestCase):
     def test_twin_labels_name_class_character_and_boss(self):
         labels = strategy.twin_labels('FE8 Ch1')
         self.assertEqual(len(labels), len(dif.vanilla_enemy_bodies('FE8 Ch1')))
-        self.assertIn(('breguet', frozenset({'armor-knight', 'breguet', 'boss'})), labels)
+        self.assertIn(('breguet', frozenset({'armor-knight', 'breguet', 'boss'})),
+                      [(t, lab) for _n, t, lab in labels])
 
 
 class Terrain(unittest.TestCase):
@@ -122,14 +132,15 @@ class Terrain(unittest.TestCase):
 class Findings(unittest.TestCase):
     def test_ch04_reads_the_mogalls_as_its_threat(self):
         chap = chapter('ch04')
-        out = strategy.findings(chap, dif.chapter_matchup(chap, CAMPAIGN, 'normal'), 'normal')
-        self.assertTrue(any(l.startswith('OK   threat mogall') for l in out['ours']), out)
+        _claims, lines = strategy.findings(
+            chap, dif.chapter_matchup(chap, CAMPAIGN, 'normal'), 'normal')['ours']
+        self.assertTrue(any(l.startswith('OK   threat mogall') for l in lines), lines)
 
     def test_an_answer_claim_leaves_the_boss_out(self):
         chap = chapter('ch01')
-        out = strategy.findings(chap, dif.chapter_matchup(chap, CAMPAIGN, 'normal'), 'normal')
-        self.assertTrue(any(l.startswith('OK   answer eirika vs fighter') for l in out['twin']),
-                        out)
+        _claims, lines = strategy.findings(
+            chap, dif.chapter_matchup(chap, CAMPAIGN, 'normal'), 'normal')['twin']
+        self.assertTrue(any(l.startswith('OK   answer eirika vs fighter') for l in lines), lines)
 
 
 if __name__ == '__main__':
