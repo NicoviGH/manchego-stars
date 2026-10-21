@@ -156,6 +156,34 @@ class EnemyCareers(unittest.TestCase):
                 bare = [u.name for u, _w in fields[side] if getattr(u, 'roll', None) is None]
                 self.assertEqual(bare, [], '%s %s' % (ch, side))
 
+    def test_no_authored_enemy_passes_its_class_cap(self):
+        """`enemy_careers` caps every career at the class maxima after the personal line, as
+        UnitCheckStatCaps does, but the mean line takes `unit_real_article`'s personal line
+        after its cap. The two agree only while no personal line carries a stat past its class
+        cap, which holds for every enemy we author, in every mode; this keeps it that way."""
+        import glob
+        import yaml
+        import inject.chapter_settings
+        over = []
+        pattern = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'campaigns',
+                               'rime-of-the-frostmaiden', 'chapters', 'ch*.yaml')
+        for path in sorted(glob.glob(pattern)):
+            with open(path) as f:
+                chap = yaml.safe_load(f)
+            if chap.get('status') == 'planned' or not chap.get('difficulty'):
+                continue
+            shifts = inject.chapter_settings.chapter_difficulty_shifts(chap)
+            for mode in ul.MODES:
+                for ed in df.chapter_roster_entries(chap):
+                    if 'class' not in ed:
+                        continue
+                    caps = ul.class_line(df._enemy_class_enum(ed['class']))[2]
+                    for u in df._entry_combatants(ed, mode=mode, shifts=shifts,
+                                                  real_article=True, drop_staff=False):
+                        over += ['%s %s %s %s' % (chap['id'], mode, ed.get('id'), f)
+                                 for f, k in df._GROWN_FIELDS if getattr(u, f) > caps[k]]
+        self.assertEqual(over, [])
+
     def test_the_matchup_reads_a_body_once_per_career(self):
         """Against a one-line party, a rolled body's reading is the average of its careers'."""
         unit = df._enemy_from_enum('x', 'CLASS_FIGHTER', 10, fc.W['iron-axe'])

@@ -7,6 +7,7 @@ combatants and hand-computed oracles; the I/O layer is tested against real Ch1 d
 
     python3 tools/test_difficulty.py
 """
+import collections
 import contextlib
 import copy
 import io
@@ -1360,13 +1361,17 @@ class VanillaParty(unittest.TestCase):
         self.assertIsNone(df.vanilla_party('FE8 Ch13'))
 
     def test_the_roster_is_fe8s_early_recruits_in_join_order(self):
+        """Join order is slot order: a unit takes the first free blue slot when it joins
+        (GetFreeBlueUnit, UnitChangeFaction -> GetFreeUnit, bmunit.c). So a chapter's blue
+        LOADs come first, in script order, and its talk recruits after their recruiter:
+        Moulder (Ch2's opening) before Ross and Garcia, whom Ch2's talks recruit (#510 step 5)."""
         joined = [(r.char.replace('CHARACTER_', '').title(), r.level,
                    df.VANILLA_CHAIN[r.fields_from]) for r in df.vanilla_recruits()]
         self.assertEqual(joined, [
             ('Seth', 1, 'FE8 Prologue'), ('Eirika', 1, 'FE8 Prologue'),
             ('Franz', 1, 'FE8 Ch1'), ('Gilliam', 4, 'FE8 Ch1'),
-            ('Vanessa', 1, 'FE8 Ch2'), ('Ross', 1, 'FE8 Ch3'), ('Garcia', 4, 'FE8 Ch3'),
-            ('Moulder', 3, 'FE8 Ch2'), ('Neimi', 1, 'FE8 Ch3'), ('Colm', 2, 'FE8 Ch4'),
+            ('Vanessa', 1, 'FE8 Ch2'), ('Moulder', 3, 'FE8 Ch2'), ('Ross', 1, 'FE8 Ch3'),
+            ('Garcia', 4, 'FE8 Ch3'), ('Neimi', 1, 'FE8 Ch3'), ('Colm', 2, 'FE8 Ch4'),
             ('Artur', 2, 'FE8 Ch4'), ('Lute', 1, 'FE8 Ch4'), ('Natasha', 1, 'FE8 Ch5'),
             ('Joshua', 5, 'FE8 Ch6'),
             # Ch8 reunites Ephraim's band -- their real join, not the Prologue cameo (#459).
@@ -2705,6 +2710,21 @@ class PartyMatchup(unittest.TestCase):
         rom = ['braulo', 'marty', 'wolfram', 'meesmickle', 'prof-rbg', 'rootis', 'sclorbo',
                'pinky', 'baxby', 'trex']
         self.assertEqual(df.inject.cast.load_order('rime-of-the-frostmaiden')[:10], rom)
+
+    def test_every_pair_of_same_chapter_recruits_has_a_known_order(self):
+        """Two of our recruits from one chapter sit in the order they turn blue, which only
+        the chapter's script can fix. ch05's pair is fixed: Basil is made blue in the
+        opening beat, and Sahnar joins by Basil's Talk. A new pair has to have its order
+        established before it is added here."""
+        campaign = 'rime-of-the-frostmaiden'
+        by_chapter = collections.defaultdict(list)
+        for uid in df.inject.cast.load_order(campaign):
+            unit = dict(df.inject.cast.load_unit(campaign, uid), id=uid)
+            chapter = df.inject.hosting.recruit_chapter_number(campaign, unit)
+            if chapter is not None:
+                by_chapter[int(chapter)].append(uid)
+        self.assertEqual({c: u for c, u in by_chapter.items() if len(u) > 1},
+                         {5: ['basil', 'sahnar']})
 
     def test_the_twins_forced_units_are_read_from_the_decomp(self):
         self.assertEqual(df.vanilla_forced('FE8 Ch2'), {'Eirika'})
