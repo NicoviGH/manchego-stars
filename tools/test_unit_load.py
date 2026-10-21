@@ -156,6 +156,33 @@ class EnemyCareers(unittest.TestCase):
                 bare = [u.name for u, _w in fields[side] if getattr(u, 'roll', None) is None]
                 self.assertEqual(bare, [], '%s %s' % (ch, side))
 
+    def test_no_authored_enemy_passes_its_class_cap(self):
+        """`enemy_careers` caps every career at the class maxima after the personal line, as
+        UnitCheckStatCaps does, but the mean line takes `unit_real_article`'s personal line
+        after its cap. The two agree only while no personal line carries a stat past its class
+        cap. That holds for every enemy body of every built chapter, in every mode, and this
+        keeps it that way."""
+        import campaign_chapters
+        import inject.chapter_settings
+        over = []
+        for chap in campaign_chapters.load_all():
+            if chap.get('status') == 'planned':
+                continue
+            try:
+                shifts = inject.chapter_settings.chapter_difficulty_shifts(chap)
+            except SystemExit:          # a chapter with no difficulty block is not built yet
+                continue
+            for mode in ul.MODES:
+                for ed in df.chapter_roster_entries(chap):
+                    bodies = df._entry_combatants(ed, mode=mode, shifts=shifts,
+                                                  real_article=True, drop_staff=False)
+                    for i, u in enumerate(bodies):  # a bag's bodies follow its composition
+                        cls = ed['class'] if 'class' in ed else ed['composition'][i]
+                        caps = ul.class_line(df._enemy_class_enum(cls))[2]
+                        over += ['%s %s %s %s' % (chap['id'], mode, u.name, f)
+                                 for f, k in df._GROWN_FIELDS if getattr(u, f) > caps[k]]
+        self.assertEqual(over, [])
+
     def test_the_matchup_reads_a_body_once_per_career(self):
         """Against a one-line party, a rolled body's reading is the average of its careers'."""
         unit = df._enemy_from_enum('x', 'CLASS_FIGHTER', 10, fc.W['iron-axe'])

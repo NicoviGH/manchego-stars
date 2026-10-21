@@ -38,6 +38,18 @@ before had wolfram/meesmickle and trex/baxby the other way round. That boot fiel
 it carries, so it shows the slot order but not a bench. Vanilla's forced list is read from the
 decomp, which is what the vanilla ROM runs.
 
+**Why join order is slot order, on both sides:** a unit takes the first free blue slot at the
+moment it joins. A LOAD goes through `GetFreeBlueUnit`, and a recruit turning blue goes through
+`UnitChangeFaction` -> `GetFreeUnit` (bmunit.c). So a chapter's blue LOADs come first, in script
+order, and its recruits follow as they turn blue. Two recruits of one chapter could depend on
+the player. In practice none do (2026-10-21):
+- **Vanilla's early chain:** every talk recruit hangs off another (Ross recruits Garcia).
+  `vanilla_recruits` used to list a chapter's talk recruits mid-scan, putting Ross and Garcia
+  ahead of Moulder, who loads in Ch2's opening; it now lists LOADs first. No verdict moved.
+- **Ours:** ch05's pair is fixed by its script. Basil is made blue in the opening beat, and
+  Sahnar joins by Basil's Talk. `test_every_pair_of_same_chapter_recruits_has_a_known_order`
+  fails on any new pair until its order is established.
+
 **What moved:** one verdict. ch01 Difficult goes OFF -> OK: its party half reads x1.407 against
 ADR 0042's x1.41 ceiling, where it read x1.415. Its team is the same in every career, so the tie
 order alone moved it, and it sits 0.003 inside the ceiling. That is an edge, not an

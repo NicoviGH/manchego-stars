@@ -1163,15 +1163,43 @@ class VanillaRecruit:
     fields_from: int       # VANILLA_CHAIN index of the first chapter it can be deployed in
 
 
+def _in_recruit_order(talked, talk, ref):
+    """A chapter's talk recruits in the order they can join: each after the unit that recruits
+    it. Two recruits whose order nothing fixes (neither recruits the other, directly or down a
+    chain) would join in the player's order, so that raises instead of guessing."""
+    def depth(r):                           # how many talk recruits must join before this one
+        n, actor, chain = 0, talk.get(r.char), {r.char}
+        while actor in talk:
+            if actor in chain:
+                raise ValueError('%s: talk recruits %s recruit each other' % (ref, sorted(chain)))
+            chain.add(actor)
+            n, actor = n + 1, talk.get(actor)
+        return n
+    ranked = sorted(talked, key=depth)
+    if len({depth(r) for r in ranked}) != len(ranked):
+        raise ValueError('%s: talk recruits %s are independent, so their slot order depends on '
+                         'the player' % (ref, [r.char for r in ranked]))
+    return ranked
+
+
+def _opening_udefs(stem):
+    """The UnitDefinition arrays a vanilla chapter's opening scene (`*_BeginningScene`) loads:
+    the units on the map before the player's first move."""
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    m = re.search(r'EventScr_\w+_BeginningScene\[\]\s*=\s*\{(.*?)\n\};', script, re.S)
+    return set(re.findall(r'\b(UnitDef_\w+)', m.group(1))) if m else set()
+
+
 def _talk_recruits(stem):
-    """Characters a chapter's talk events recruit: the TARGET of each `CHAR(flag, script,
-    actor, target)` in its eventinfo (Eirika->Ross, Ross->Garcia, Neimi->Colm,
+    """Characters a chapter's talk events recruit, {target: actor}, from each `CHAR(flag,
+    script, actor, target)` in its eventinfo (Eirika->Ross, Ross->Garcia, Neimi->Colm,
     Natasha->Joshua)."""
     relpath = 'src/events/%s-eventinfo.h' % stem
     if not os.path.exists(os.path.join(inject.decomp.SUBMODULE, relpath)):
-        return set()
+        return {}
     info = inject.decomp.vanilla_decomp_text(relpath)
-    return set(re.findall(r'\bCHAR\([^,]+,[^,]+,\s*\w+\s*,\s*(CHARACTER_\w+)\s*\)', info))
+    return {target: actor for actor, target in re.findall(
+        r'\bCHAR\([^,]+,[^,]+,\s*(\w+)\s*,\s*(CHARACTER_\w+)\s*\)', info)}
 
 
 def _udef_sources(stem):
@@ -1193,14 +1221,28 @@ def vanilla_udefs_named(stem, name):
 def _chapter_udefs(stem):
     """Every UnitDefinition a vanilla chapter's eventscript loads, in the order it names them,
     parsed from wherever the decomp defines them."""
+    for _name, u in _chapter_udef_pairs(stem):
+        yield u
+
+
+def _chapter_udef_pairs(stem):
+    """`_chapter_udefs`, each unit with the array it comes from: (array name, unit)."""
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     for name in dict.fromkeys(re.findall(r'\b(UnitDef_\w+)', script)):
-        yield from vanilla_udefs_named(stem, name)
+        for u in vanilla_udefs_named(stem, name):
+            yield name, u
 
 
 @functools.lru_cache(maxsize=None)
 def vanilla_recruits():
     """Everyone FE8 recruits along VANILLA_CHAIN, assuming every recruit succeeds, in join order.
+
+    Join order is the unit table's slot order: a unit takes the first free blue slot when it
+    joins (`GetFreeBlueUnit` for a LOAD, `UnitChangeFaction` -> `GetFreeUnit` for a recruit,
+    bmunit.c). So within a chapter, its BLUE loads join first, in script order, and its talk
+    recruits after, each after the unit that recruits it (Ross before Garcia, whom Ross talks
+    over). No two talk recruits of one early chapter are independent, so no order here waits
+    on the player (#510 step 5).
 
     A character joins at its first ARMED load. Cutscene loads carry no items (the throne room
     stands Moulder and Vanessa up as Generals, Ephraim appears as a Soldier), the same rule the
@@ -1213,20 +1255,29 @@ def vanilla_recruits():
     for index, ref in enumerate(VANILLA_CHAIN):
         stem = PARITY_REFERENCE_STEM[ref]
         talk = _talk_recruits(stem)
-        for u in _chapter_udefs(stem):
+        opening = _opening_udefs(stem)
+        loaded, later, talked = [], [], []
+        for name, u in _chapter_udef_pairs(stem):
             char = u['charIndex']
             if (not char or char in seen or not u['items']
                     or _character_number(char) not in PLAYABLE_PIDS):
                 continue
             if u['allegiance'] == 'FACTION_ID_BLUE':
-                fields_from = index
+                (loaded if name in opening else later).append(VanillaRecruit(
+                    char, u['classIndex'], u['level'], tuple(u['items']), index))
             elif char in talk:
-                fields_from = index + 1
+                talked.append(VanillaRecruit(char, u['classIndex'], u['level'],
+                                             tuple(u['items']), index + 1))
             else:
                 continue
             seen.add(char)
-            out.append(VanillaRecruit(char, u['classIndex'], u['level'], tuple(u['items']),
-                                      fields_from))
+        out.extend(loaded + later + _in_recruit_order(talked, talk, ref))
+        if later and talked:
+            # A mid-chapter arrival and a talk recruit join in whichever order the player
+            # meets them, so their slot order is not the decomp's to give.
+            raise ValueError('%s: %s arrive(s) mid-chapter and %s join(s) by talk, so their '
+                             'slot order depends on the player' % (
+                                 ref, [r.char for r in later], [r.char for r in talked]))
     return tuple(out)
 
 
@@ -1795,10 +1846,8 @@ def _map_order(careers, forced=()):
     """The arriving party in the order its units sit in the ROM's unit table, which is the
     order FE8's AI breaks a tie in: `SortPlayerUnitsForPrepScreen` (prepscreen.c) pushes the
     force-deployed units first, then everyone else, each in their existing order, which is the
-    order they joined (`careers` comes in join order). Ours is read off the ROM
-    (`inject.cast.load_order`). The twin's is its recruit order, taken from the decomp's LOADs
-    and not read off a vanilla ROM. Between two units recruited in one chapter the true order is
-    whichever the player recruits first, which no model knows."""
+    order they joined (`careers` comes in join order: ours `inject.cast.load_order`, read off the
+    ROM by `ch07blueorder`; the twin's `vanilla_recruits`, from the decomp's LOADs and talks)."""
     return ([m for m in careers if m in forced]
             + [m for m in careers if m not in forced])
 

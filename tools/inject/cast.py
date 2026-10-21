@@ -263,9 +263,10 @@ def load_order(campaign):
     founding party by ch01's join-LOAD (`_classed_cast`, PORTRAIT_MAP order), then each recruit
     when its chapter recruits it. FE8 keeps that order (SortPlayerUnitsForPrepScreen only moves
     the force-deployed lead to the front), and its AI breaks a target tie by it.
-    `ch07blueorder` read it off the ROM for the founding cast and one-recruit chapters (#510
-    step 5). Two recruits of one chapter join in whichever order the player recruits them (an
-    on-map recruit is CUSA'd blue when talked to); PORTRAIT_MAP order stands in for that."""
+    `ch07blueorder` read it off the ROM (#510 step 5). A recruit takes the first free slot when
+    it turns blue (UnitChangeFaction), so two recruits of one chapter sit in the order they
+    join; ch05's are the only pair, and its script fixes it (Basil is made blue in the opening
+    beat, and Sahnar joins by Basil's Talk). `test_difficulty` fails on a new pair."""
     out = []
     for index, unit_id in enumerate(PORTRAIT_MAP):
         unit = dict(load_unit(campaign, unit_id), id=unit_id)
