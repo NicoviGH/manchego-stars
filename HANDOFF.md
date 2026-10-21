@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-21 (Claude, after #516). **The parity model is being rebuilt before any party or chapter
+Refreshed 2026-10-21 (Claude, after #517). **The parity model is being rebuilt before any party or chapter
 change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
 grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
 Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
@@ -31,16 +31,19 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
    (ADR 0354). #514: the gate grades Tutorial, Normal and Difficult, never the authored table, and
    reads only locked chapters; role checks read the mode (ADR 0355). The twin's force has ONE
    loader now, `difficulty.vanilla_loaded_units`; read it, don't re-parse UnitDefinitions.
-2. **#510 steps 3-4 are DONE.** #515 (ADR 0356): enemies attack with the weapon the AI picks per
+2. **#510 steps 3-5 are DONE.** #515 (ADR 0356): enemies attack with the weapon the AI picks per
    target. #516 (ADR 0357): every enemy's stats are rolled 1001 times as the engine loads them,
    both sides; it flipped ch02 and ch03 on Difficult to OFF, both on the party half (ch02's
-   ADR 0042 residual lapses, not widened). Next: **step 5: the fielded team chosen per career**,
-   then 6-9, each with an in-engine proof and the verdict diff. Stop when a step moves no verdict.
+   ADR 0042 residual lapses, not widened). #517 (ADR 0358): the team is fielded per career,
+   forced units first (vanilla's `gForceDeploymentList`), in the ROM's unit order
+   (`inject.cast.load_order`, proven by `ch07blueorder`); ch01 Difficult went OK at its
+   residual's edge (x1.407 vs 1.41). Next: **step 6: strategy as data**, then 7-9, each with
+   an in-engine proof and the verdict diff. Stop when a step moves no verdict.
    - `party_matchup` reads each unit as ONE Combatant whose stats are numpy arrays over the
      careers; `fe_combat`/`ai_target` take ints or arrays (`max0`/`clamp`/`where`). Keep new
      combat math array-safe, or `test_ai_target.OverCareers` fails. A Normal read is ~5s.
-   - Two open fidelity questions from step 3 (tie order = deployment order; the swung weapon stays
-     equipped) are logged on #510 for steps 5 and 7.
+   - Open from step 3: the swung weapon stays equipped (#510, for step 7). The tie-order
+     question is settled by step 5.
    - **Findings for step 10 are logged on #510** (comment 2026-10-19), not here: not acted on
      before step 10 (Nicolas, 2026-10-19).
 3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
