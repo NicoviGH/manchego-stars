@@ -2689,8 +2689,14 @@ class PartyMatchup(unittest.TestCase):
         """The AI keeps a tied target on `>=`, so the later slot wins, and prep puts the
         force-deployed units first (SortPlayerUnitsForPrepScreen): with `a` forced, `b` is
         the later slot."""
+        enemy = combatant('e', pow_=12, weapon='iron-lance')
         a, b = combatant('a', weapon='iron-lance'), combatant('b', weapon='iron-lance')
         self.assertEqual(df._map_order({'b': [b], 'a': [a]}, {'a'}), ['a', 'b'])
+        party = {'a': [a], 'b': [b]}
+        self.assertEqual(df.party_matchup([(enemy, 0)], party)['targeted'],
+                         {'a': 0.0, 'b': 1.0})
+        self.assertEqual(df.party_matchup([(enemy, 0)], party, forced={'b'})['targeted'],
+                         {'b': 0.0, 'a': 1.0})
 
     def test_our_party_reads_in_the_order_the_rom_loads_it(self):
         """`ch07blueorder` (2026-10-21) logged the ROM's blue table in slot order on the ch07

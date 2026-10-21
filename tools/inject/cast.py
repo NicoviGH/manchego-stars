@@ -261,9 +261,11 @@ def _chapter_unit(campaign, chapter_yaml, unit_id):
 def load_order(campaign):
     """Every classed cast member, in the order the build LOADs them into the unit table: the
     founding party by ch01's join-LOAD (`_classed_cast`, PORTRAIT_MAP order), then each recruit
-    when its chapter recruits it, PORTRAIT_MAP order within one chapter. FE8 keeps that order
-    (SortPlayerUnitsForPrepScreen only moves the force-deployed lead to the front), and its AI
-    breaks a target tie by it. `ch07blueorder` read it off the ROM (#510 step 5)."""
+    when its chapter recruits it. FE8 keeps that order (SortPlayerUnitsForPrepScreen only moves
+    the force-deployed lead to the front), and its AI breaks a target tie by it.
+    `ch07blueorder` read it off the ROM for the founding cast and one-recruit chapters (#510
+    step 5). Two recruits of one chapter join in whichever order the player recruits them (an
+    on-map recruit is CUSA'd blue when talked to); PORTRAIT_MAP order stands in for that."""
     out = []
     for index, unit_id in enumerate(PORTRAIT_MAP):
         unit = dict(load_unit(campaign, unit_id), id=unit_id)

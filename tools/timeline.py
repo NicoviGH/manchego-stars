@@ -110,9 +110,12 @@ def chapter_timeline(chapter, campaign, mode=None, horizon=HORIZON):
     van_force = [u for u, _t in fields['van_force']]
     return {
         'ours': read(ours_board, our_front(chapter),
-                     _softest(fields['our_field'], ours_force), horizon),
+                     _softest(dif.fielded_careers(fields['our_party'], ours_force,
+                                                  fields['cap']), ours_force), horizon),
         'vanilla': read(van_board, dif.vanilla_front(ref),
-                        _softest(fields['van_field'], van_force), horizon),
+                        _softest(dif.fielded_careers(fields['van_party'], van_force,
+                                                     fields['cap'], fields['van_forced']),
+                                 van_force), horizon),
         'horizon': horizon}
 
 
