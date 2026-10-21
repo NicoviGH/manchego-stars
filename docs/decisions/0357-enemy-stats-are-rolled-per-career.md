@@ -42,6 +42,12 @@ accepted residual no longer applies, and it is not widened (#510). ch03 goes OK 
 clear-load x1.254, just past the band edge (it was x1.23); its force half improved, x1.12 to
 x1.09. The model is not settled until a step stops moving verdicts, so step 5 follows.
 
-**Cost:** with both sides rolled, few (enemy, member) pairs repeat, so a curve read is about
-1.5x what it was. Memo keys are interned to ints, and each half of a pairing keys on only the
-enemy stats it reads. A check against full keys showed identical readings.
+**Cost, and why it went down instead of up:** with both sides rolled, almost no (enemy, member)
+pairing repeats, so the old memo-per-distinct-pair approach cost 1.5-2.9x a read. Instead,
+`party_matchup` reads each unit over all its joint careers at once. It passes a Combatant whose
+stats are numpy arrays, and `fe_combat` and `ai_target` take either ints or arrays through
+`max0`/`clamp`/`where`/`maximum`/`minimum`. The rules stay in one place; only the simulated
+battle has an array branch, and `test_ai_target.OverCareers` pins it to the scalar one element
+by element. A full Normal read went from 27s on main to 4.7s, and agrees with the slow version
+to within 3e-14 (the order floats are summed in). numpy is imported lazily, so the pyyaml-only
+checks job can still import these modules.

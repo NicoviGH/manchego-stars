@@ -88,6 +88,8 @@ def _reaches(weapon, distance):
 def _left(hp_a, hp_d, dmg_ad, dmg_da, counters, a_doubles, d_doubles):
     """HP left on (attacker, target) after the simulated battle: every strike lands, no crit,
     in FE8's order -- attacker, counter, then whoever doubles follows up."""
+    if fc.is_array(a_doubles):
+        return _left_over_careers(hp_a, hp_d, dmg_ad, dmg_da, counters, a_doubles, d_doubles)
     hp = [hp_a, hp_d]
     order = [(1, dmg_ad)]
     if counters:
@@ -103,6 +105,30 @@ def _left(hp_a, hp_d, dmg_ad, dmg_da, counters, a_doubles, d_doubles):
     return hp[0], hp[1]
 
 
+def _left_over_careers(hp_a, hp_d, dmg_ad, dmg_da, counters, a_doubles, d_doubles):
+    """`_left` for stats that are arrays over careers: the same strikes in the same order, each
+    landing only where nobody has fallen yet (the scalar loop's `break`). Only the struck unit
+    can fall, so "stop at the first 0" is "stop once either side is at 0"."""
+    import numpy
+    zero = numpy.zeros_like(a_doubles, dtype=int)
+    hp = [hp_a + zero, hp_d + zero]
+    done = numpy.zeros_like(a_doubles, dtype=bool)
+
+    def strike(struck, dmg, mask):
+        nonlocal done
+        active = mask & ~done
+        hp[struck] = numpy.where(active, numpy.maximum(hp[struck] - dmg, 0), hp[struck])
+        done = done | (active & (hp[struck] == 0))
+    always = numpy.ones_like(done)
+    strike(1, dmg_ad, always)
+    if counters:
+        strike(0, dmg_da, always)
+    strike(1, dmg_ad, a_doubles)                       # the follow-ups are exclusive: the
+    if counters:                                       # attacker's wins, as the elif does
+        strike(0, dmg_da, ~a_doubles & d_doubles)
+    return hp[0], hp[1]
+
+
 def combat_score(atk, dfn, table_id=0, turn=1):
     """`AiComputeCombatScore` for `atk` attacking `dfn`, at the best distance in `atk`'s range.
     Returns 0 for a weaponless attacker."""
@@ -111,23 +137,23 @@ def combat_score(atk, dfn, table_id=0, turn=1):
     c = coefficient_tables()[table_id]
     dmg_ad, dmg_da = fc.damage(atk, dfn), fc.damage(dfn, atk)
     a_doubles, d_doubles = fc.doubles(atk, dfn), fc.doubles(dfn, atk)
-    dealt_hit = min(40, c['coeffDamageDealt'] * (dmg_ad * fc.hit_chance(atk, dfn) // 100))
-    taken_hit = (min(40, c['coeffDamageTaken'] * (dmg_da * fc.hit_chance(dfn, atk) // 100))
+    dealt_hit = fc.minimum(40, c['coeffDamageDealt'] * (dmg_ad * fc.hit_chance(atk, dfn) // 100))
+    taken_hit = (fc.minimum(40, c['coeffDamageTaken'] * (dmg_da * fc.hit_chance(dfn, atk) // 100))
                  if dfn.weapon is not None else None)
     constant = _class_term(table_id) + c['coeffTurnNumber'] * turn
     best = None
     for distance in range(atk.weapon.rng[0], atk.weapon.rng[1] + 1):
         counters = _reaches(dfn.weapon, distance)
         a_hp, d_hp = _left(atk.hp, dfn.hp, dmg_ad, dmg_da, counters, a_doubles, d_doubles)
-        dealt = 50 if d_hp == 0 else dealt_hit
+        dealt = fc.where(d_hp == 0, 50, dealt_hit)
         taken = taken_hit if counters else -10
         total = (dealt
-                 + max(0, c['coeffLowHpOpponent'] * (20 - d_hp))
+                 + fc.max0(c['coeffLowHpOpponent'] * (20 - d_hp))
                  + constant
                  - taken
-                 - max(0, c['coeffLowHpSelf'] * (20 - a_hp)))
-        score = total * 40 if total > 0 else dealt
-        best = score if best is None else max(best, score)
+                 - fc.max0(c['coeffLowHpSelf'] * (20 - a_hp)))
+        score = fc.where(total > 0, total * 40, dealt)
+        best = score if best is None else fc.maximum(best, score)
     return best
 
 

@@ -111,5 +111,38 @@ class PickTarget(unittest.TestCase):
         self.assertEqual(ai_target.pick_attack(lancer, [walker], 0)[1].weapon.name, 'iron-lance')
 
 
+class OverCareers(unittest.TestCase):
+    """`difficulty.party_matchup` reads a unit over every career at once, as a Combatant whose
+    stats are numpy arrays. The formulas are shared, but the simulated battle has an array
+    branch of its own (`_left_over_careers`), so every element must read as the scalar does."""
+    STATS = ('hp', 'pow', 'skl', 'spd', 'df', 'res', 'lck')
+
+    def _lines(self, rng, weapon, n=400):
+        import numpy
+        cols = {f: numpy.array([rng.randint(1, 30 if f == 'hp' else 14) for _ in range(n)])
+                for f in self.STATS}
+        return fc.Combatant('a', con=8, weapon=fc.W[weapon] if weapon else None, **cols)
+
+    def _one(self, arrays, i):
+        return dataclasses.replace(arrays, **{f: int(getattr(arrays, f)[i]) for f in self.STATS})
+
+    def test_every_element_reads_as_the_scalar_does(self):
+        import random
+        rng = random.Random(7)
+        weapons = ['iron-axe', 'javelin', 'iron-bow', 'fire', 'rapier', 'horseslayer', None]
+        for atk_w in weapons[:-1]:
+            for dfn_w in weapons:
+                atk = self._lines(rng, atk_w)
+                dfn = dataclasses.replace(self._lines(rng, dfn_w), tags=frozenset({'cav'}))
+                for table in (0, 1):
+                    score = ai_target.combat_score(atk, dfn, table)
+                    dpr = fc.damage_per_round(atk, dfn)
+                    for i in range(len(atk.hp)):
+                        a, d = self._one(atk, i), self._one(dfn, i)
+                        self.assertEqual(score[i], ai_target.combat_score(a, d, table),
+                                         (atk_w, dfn_w, i))
+                        self.assertAlmostEqual(dpr[i], fc.damage_per_round(a, d), places=12)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -144,6 +144,18 @@ class EnemyCareers(unittest.TestCase):
             self.assertLessEqual(c.hp, caps['HP'])
             self.assertLessEqual(c.pow, caps['Pow'])
 
+    def test_every_body_the_parity_read_meets_carries_its_roll(self):
+        """The roll rides on the unit through every copy the force builders make
+        (`_entry_combatants`, `unit_real_article`, the twin's loader). A copy that drops it
+        reads one mean line and no test of the formula notices. Difficult's bonus levels grow
+        every red unit with pid >= 0x3C, flagged or not, so on Difficult every body rolls."""
+        for ch in ('ch04', 'ch07'):
+            chap = df.load_field('rime-of-the-frostmaiden', ch)[0]
+            fields = df.arriving_fields(chap, 'rime-of-the-frostmaiden', 'difficult')
+            for side in ('our_force', 'van_force'):
+                bare = [u.name for u, _w in fields[side] if getattr(u, 'roll', None) is None]
+                self.assertEqual(bare, [], '%s %s' % (ch, side))
+
     def test_the_matchup_reads_a_body_once_per_career(self):
         """Against a one-line party, a rolled body's reading is the average of its careers'."""
         unit = df._enemy_from_enum('x', 'CLASS_FIGHTER', 10, fc.W['iron-axe'])
