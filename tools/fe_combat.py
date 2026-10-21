@@ -20,9 +20,59 @@ Combat model (bmbattle.c line cites):
   Damage  = max(0, Atk - (Def | Res))                       Res for magic
   Double  if (atkAS - defAS) >= 4                     (BATTLE_FOLLOWUP_SPEED_THRESHOLD)
 Triangle (GBA FE8): advantage +1 Mt / +15 Hit, disadvantage -1 Mt / -15 Hit.
+
+A Combatant's stats may be numpy arrays instead of ints: one unit read over many careers at
+once (difficulty.party_matchup, #510 step 4). Its weapon, tags and Con stay single values. The
+formulas below are written once for both, through the helpers that follow, so there is
+still one place that knows how a round resolves. numpy is imported only when an array arrives,
+so the pyyaml-only CI checks job can import this module.
 """
 import functools
 from dataclasses import dataclass, field, replace
+
+
+def is_array(x):
+    return hasattr(x, 'shape')
+
+
+def max0(x):
+    """max(0, x), for an int or an array."""
+    if is_array(x):
+        import numpy
+        return numpy.maximum(x, 0)
+    return x if x > 0 else 0
+
+
+def clamp(x, lo, hi):
+    """x held to [lo, hi], for an int or an array."""
+    if is_array(x):
+        import numpy
+        return numpy.clip(x, lo, hi)
+    return lo if x < lo else hi if x > hi else x
+
+
+def where(cond, a, b):
+    """`a if cond else b`, elementwise when `cond` is an array (both sides are evaluated)."""
+    if is_array(cond):
+        import numpy
+        return numpy.where(cond, a, b)
+    return a if cond else b
+
+
+def maximum(a, b):
+    """The larger of two ints, or the elementwise larger of two arrays."""
+    if is_array(a) or is_array(b):
+        import numpy
+        return numpy.maximum(a, b)
+    return a if a >= b else b
+
+
+def minimum(a, b):
+    """The smaller of two ints, or the elementwise smaller of two arrays."""
+    if is_array(a) or is_array(b):
+        import numpy
+        return numpy.minimum(a, b)
+    return a if a <= b else b
 
 
 @dataclass(frozen=True)
@@ -127,8 +177,8 @@ def attack_speed(c):
     """Spd minus the weight the unit can't carry (Wt over Con), floored at 0. A weaponless
     support unit (weapon=None, a fielded healer) bears no weight, so its AS is just Spd."""
     if c.weapon is None:
-        return max(0, c.spd)
-    return max(0, c.spd - max(0, c.weapon.wt - c.con))
+        return max0(c.spd)
+    return max0(c.spd - max0(c.weapon.wt - c.con))
 
 
 # A 4-point attack-speed lead earns a follow-up attack (BATTLE_FOLLOWUP_SPEED_THRESHOLD).
@@ -168,7 +218,7 @@ def damage(atk, dfn):
         raw *= 3
     raw += atk.pow
     defence = dfn.res if atk.weapon.kind == 'magic' else dfn.df
-    return max(0, raw - defence)
+    return max0(raw - defence)
 
 
 def hit_chance(atk, dfn, terrain_avoid=0):
@@ -176,7 +226,7 @@ def hit_chance(atk, dfn, terrain_avoid=0):
     tri = triangle(atk.weapon.kind, dfn.weapon.kind) if dfn.weapon else 0
     accuracy = atk.skl * 2 + atk.weapon.hit + atk.lck // 2 + tri * 15
     avoid = attack_speed(dfn) * 2 + terrain_avoid + dfn.lck
-    return max(0, min(100, accuracy - avoid))
+    return clamp(accuracy - avoid, 0, 100)
 
 
 @functools.lru_cache(maxsize=None)
@@ -187,13 +237,24 @@ def true_hit(displayed):
     return sum(1 for a in range(100) for b in range(100) if (a + b) // 2 < displayed) / 1e4
 
 
+@functools.lru_cache(maxsize=None)
+def _true_hit_table():
+    import numpy
+    return numpy.array([true_hit(d) for d in range(101)])
+
+
+def _true_hit(displayed):
+    """`true_hit` for a displayed rate already held to 0-100, int or array."""
+    return _true_hit_table()[displayed] if is_array(displayed) else true_hit(displayed)
+
+
 def crit_rate(atk, dfn):
     """`ComputeBattleUnitCritRate` less `ComputeBattleUnitEffectiveCritRate`'s dodge: weapon
     crit + Skl/2 - the defender's Lck, floored at 0. Rolled on 1RN, so the rate is the
     probability. The +15 of a crit-bonus class is not modelled."""
     if atk.weapon is None:
         return 0
-    return max(0, min(100, atk.weapon.crit + atk.skl // 2 - dfn.lck))
+    return clamp(atk.weapon.crit + atk.skl // 2 - dfn.lck, 0, 100)
 
 
 def expected_hits(atk, dfn, terrain_avoid=0):
@@ -201,8 +262,8 @@ def expected_hits(atk, dfn, terrain_avoid=0):
     2RN x (1 + 2 x P(crit)), since a crit triples a strike that connects."""
     if atk.weapon is None:                # weaponless support unit -> no offense
         return 0.0
-    strikes = 2 if doubles(atk, dfn) else 1
-    return (strikes * true_hit(hit_chance(atk, dfn, terrain_avoid))
+    strikes = where(doubles(atk, dfn), 2, 1)
+    return (strikes * _true_hit(hit_chance(atk, dfn, terrain_avoid))
             * (1 + 2 * crit_rate(atk, dfn) / 100.0))
 
 
@@ -215,6 +276,10 @@ def damage_per_round(atk, dfn, terrain_avoid=0):
 def rounds_to_kill(atk, dfn, terrain_avoid=0):
     """Expected rounds for atk to drop dfn (inf if it can't deal damage)."""
     dpr = damage_per_round(atk, dfn, terrain_avoid)
+    if is_array(dpr):
+        import numpy
+        with numpy.errstate(divide='ignore'):
+            return numpy.where(dpr > 0, dfn.hp / numpy.where(dpr > 0, dpr, 1), float('inf'))
     return float('inf') if dpr <= 0 else dfn.hp / dpr
 
 

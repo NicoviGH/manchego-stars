@@ -86,6 +86,8 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 4: the parity read rolls every enemy per career (enemy_careers)
+    r'mean-value model', r'mean-value proxy',
     # retired by #490: the guard covers every rewritten raw-pid row, not only name plates
     r'assert_named_raw_pids_are_exclusive',
     # retired by #508: no two chapters share a pid the build writes a line into
