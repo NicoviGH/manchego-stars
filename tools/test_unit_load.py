@@ -160,27 +160,26 @@ class EnemyCareers(unittest.TestCase):
         """`enemy_careers` caps every career at the class maxima after the personal line, as
         UnitCheckStatCaps does, but the mean line takes `unit_real_article`'s personal line
         after its cap. The two agree only while no personal line carries a stat past its class
-        cap, which holds for every enemy we author, in every mode; this keeps it that way."""
-        import glob
-        import yaml
+        cap. That holds for every enemy body of every built chapter, in every mode, and this
+        keeps it that way."""
+        import campaign_chapters
         import inject.chapter_settings
         over = []
-        pattern = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'campaigns',
-                               'rime-of-the-frostmaiden', 'chapters', 'ch*.yaml')
-        for path in sorted(glob.glob(pattern)):
-            with open(path) as f:
-                chap = yaml.safe_load(f)
-            if chap.get('status') == 'planned' or not chap.get('difficulty'):
+        for chap in campaign_chapters.load_all():
+            if chap.get('status') == 'planned':
                 continue
-            shifts = inject.chapter_settings.chapter_difficulty_shifts(chap)
+            try:
+                shifts = inject.chapter_settings.chapter_difficulty_shifts(chap)
+            except SystemExit:          # a chapter with no difficulty block is not built yet
+                continue
             for mode in ul.MODES:
                 for ed in df.chapter_roster_entries(chap):
-                    if 'class' not in ed:
-                        continue
-                    caps = ul.class_line(df._enemy_class_enum(ed['class']))[2]
-                    for u in df._entry_combatants(ed, mode=mode, shifts=shifts,
-                                                  real_article=True, drop_staff=False):
-                        over += ['%s %s %s %s' % (chap['id'], mode, ed.get('id'), f)
+                    bodies = df._entry_combatants(ed, mode=mode, shifts=shifts,
+                                                  real_article=True, drop_staff=False)
+                    for i, u in enumerate(bodies):  # a bag's bodies follow its composition
+                        cls = ed['class'] if 'class' in ed else ed['composition'][i]
+                        caps = ul.class_line(df._enemy_class_enum(cls))[2]
+                        over += ['%s %s %s %s' % (chap['id'], mode, u.name, f)
                                  for f, k in df._GROWN_FIELDS if getattr(u, f) > caps[k]]
         self.assertEqual(over, [])
 

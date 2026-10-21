@@ -1377,6 +1377,18 @@ class VanillaParty(unittest.TestCase):
             # Ch8 reunites Ephraim's band -- their real join, not the Prologue cameo (#459).
             ('Ephraim', 4, 'FE8 Ch8'), ('Forde', 6, 'FE8 Ch8'), ('Kyle', 5, 'FE8 Ch8')])
 
+    def test_a_join_order_the_player_could_change_refuses_to_guess(self):
+        """Two talk recruits neither of which recruits the other, or two that recruit each
+        other, have no slot order the decomp can give."""
+        r = lambda c: df.VanillaRecruit(c, 'CLASS_X', 1, (), 0)
+        chain = {'B': 'A', 'C': 'B'}
+        self.assertEqual([x.char for x in df._in_recruit_order([r('C'), r('B')], chain, 'x')],
+                         ['B', 'C'])
+        with self.assertRaises(ValueError):
+            df._in_recruit_order([r('B'), r('C')], {'B': 'A', 'C': 'A'}, 'x')
+        with self.assertRaises(ValueError):
+            df._in_recruit_order([r('B'), r('C')], {'B': 'C', 'C': 'B'}, 'x')
+
     def test_cutscene_loads_and_cameos_do_not_join(self):
         # The Prologue throne room stands Moulder/Vanessa up unarmed, and Ch4's armed green
         # Larachel/Dozla/Rennac have no talk recruit there.

@@ -1163,6 +1163,33 @@ class VanillaRecruit:
     fields_from: int       # VANILLA_CHAIN index of the first chapter it can be deployed in
 
 
+def _in_recruit_order(talked, talk, ref):
+    """A chapter's talk recruits in the order they can join: each after the unit that recruits
+    it. Two recruits whose order nothing fixes (neither recruits the other, directly or down a
+    chain) would join in the player's order, so that raises instead of guessing."""
+    def depth(r):                           # how many talk recruits must join before this one
+        n, actor, chain = 0, talk.get(r.char), {r.char}
+        while actor in talk:
+            if actor in chain:
+                raise ValueError('%s: talk recruits %s recruit each other' % (ref, sorted(chain)))
+            chain.add(actor)
+            n, actor = n + 1, talk.get(actor)
+        return n
+    ranked = sorted(talked, key=depth)
+    if len({depth(r) for r in ranked}) != len(ranked):
+        raise ValueError('%s: talk recruits %s are independent, so their slot order depends on '
+                         'the player' % (ref, [r.char for r in ranked]))
+    return ranked
+
+
+def _opening_udefs(stem):
+    """The UnitDefinition arrays a vanilla chapter's opening scene (`*_BeginningScene`) loads:
+    the units on the map before the player's first move."""
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    m = re.search(r'EventScr_\w+_BeginningScene\[\]\s*=\s*\{(.*?)\n\};', script, re.S)
+    return set(re.findall(r'\b(UnitDef_\w+)', m.group(1))) if m else set()
+
+
 def _talk_recruits(stem):
     """Characters a chapter's talk events recruit, {target: actor}, from each `CHAR(flag,
     script, actor, target)` in its eventinfo (Eirika->Ross, Ross->Garcia, Neimi->Colm,
@@ -1194,9 +1221,16 @@ def vanilla_udefs_named(stem, name):
 def _chapter_udefs(stem):
     """Every UnitDefinition a vanilla chapter's eventscript loads, in the order it names them,
     parsed from wherever the decomp defines them."""
+    for _name, u in _chapter_udef_pairs(stem):
+        yield u
+
+
+def _chapter_udef_pairs(stem):
+    """`_chapter_udefs`, each unit with the array it comes from: (array name, unit)."""
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     for name in dict.fromkeys(re.findall(r'\b(UnitDef_\w+)', script)):
-        yield from vanilla_udefs_named(stem, name)
+        for u in vanilla_udefs_named(stem, name):
+            yield name, u
 
 
 @functools.lru_cache(maxsize=None)
@@ -1221,28 +1255,29 @@ def vanilla_recruits():
     for index, ref in enumerate(VANILLA_CHAIN):
         stem = PARITY_REFERENCE_STEM[ref]
         talk = _talk_recruits(stem)
-        loaded, talked = [], []
-        for u in _chapter_udefs(stem):
+        opening = _opening_udefs(stem)
+        loaded, later, talked = [], [], []
+        for name, u in _chapter_udef_pairs(stem):
             char = u['charIndex']
             if (not char or char in seen or not u['items']
                     or _character_number(char) not in PLAYABLE_PIDS):
                 continue
             if u['allegiance'] == 'FACTION_ID_BLUE':
-                loaded.append(VanillaRecruit(char, u['classIndex'], u['level'],
-                                             tuple(u['items']), index))
+                (loaded if name in opening else later).append(VanillaRecruit(
+                    char, u['classIndex'], u['level'], tuple(u['items']), index))
             elif char in talk:
                 talked.append(VanillaRecruit(char, u['classIndex'], u['level'],
                                              tuple(u['items']), index + 1))
             else:
                 continue
             seen.add(char)
-
-        def depth(r):                       # how many talk recruits stand before this one
-            n, actor = 0, talk.get(r.char)
-            while actor in talk:
-                n, actor = n + 1, talk.get(actor)
-            return n
-        out.extend(loaded + sorted(talked, key=depth))
+        out.extend(loaded + later + _in_recruit_order(talked, talk, ref))
+        if later and talked:
+            # A mid-chapter arrival and a talk recruit join in whichever order the player
+            # meets them, so their slot order is not the decomp's to give.
+            raise ValueError('%s: %s arrive(s) mid-chapter and %s join(s) by talk, so their '
+                             'slot order depends on the player' % (
+                                 ref, [r.char for r in later], [r.char for r in talked]))
     return tuple(out)
 
 
