@@ -159,6 +159,33 @@ strategy: |
   to keep your units on forest tiles to avoid unnecessary hits. Visit Lonelywood for an
   [[Iron Axe]].
 
+# `strategy:` as claims (#510 step 6): each cites its line above, and tools/strategy.py's
+# docstring says what each kind means to the parity model.
+strategy_claims:
+  - kind: threat
+    vs: mogall
+    cite: "Four Mogalls hold the east side in a cluster and hit with dark magic, so keep units with low Resistance out of their combined reach and take them one at a time."
+  - kind: terrain
+    vs: all
+    tile: forest
+    cite: "Always try to keep your units on forest tiles to avoid unnecessary hits."
+  - kind: unmodelled
+    topic: fog
+    step: 7
+    cite: "This map introduces fog of war"
+  - kind: unmodelled
+    topic: recruit
+    step: 7
+    cite: "deploy Marty and talk to its leader, Lupin."
+  - kind: unmodelled
+    topic: reinforcements
+    step: 7
+    cite: "On turn 3 seven more undead (four Revenants, three Bonewalkers) appear on the east and south sides, close to where you will be by then, so be mindful that you aren't swarmed."
+  - kind: unmodelled
+    topic: villages
+    step: 8
+    cite: "Visit Lonelywood for an Iron Axe."
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   deploy_limit: 9               # vanilla FE8 Ch4 fields 9; Pick Units chooses 9 of the 10 available

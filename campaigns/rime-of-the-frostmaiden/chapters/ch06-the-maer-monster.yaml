@@ -226,6 +226,30 @@ strategy: |
   him before your cavalry gets near him to take the Horseslayer. A merfolk soldier drops an
   [[Iron Blade]], and the lamia healer in the northeast drops an [[Elixir]].
 
+# `strategy:` as claims (#510 step 6): each cites its line above, and tools/strategy.py's
+# docstring says what each kind means to the parity model.
+strategy_claims:
+  - kind: answer
+    unit: braulo
+    vs: [soldier, cavalier]
+    cite: "Most of the enemy carries lances, so Braulo's axe wins the trades"
+  - kind: unmodelled
+    topic: escort
+    step: 7
+    cite: "their crews will die without intervention."
+  - kind: unmodelled
+    topic: positioning
+    step: 7
+    cite: "keep the cavalry away from the armored guard with the Horseslayer."
+  - kind: unmodelled
+    topic: reinforcements
+    step: 7
+    cite: "On turn 4 three more shark riders enter from the west edge."
+  - kind: unmodelled
+    topic: drops
+    step: 8
+    cite: "The shark rider south of the east boat drops the last weapon in his inventory."
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   deploy_limit: 10              # D4 -- FE8 Ch6 parity (deploy 1-10); the donor map ships 11 slots

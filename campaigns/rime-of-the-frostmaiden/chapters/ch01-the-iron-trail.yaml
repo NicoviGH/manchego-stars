@@ -130,6 +130,34 @@ strategy: |
   [[Meesmickle]]'s magic or [[Prof. R.B. Geenius|R.B. Geenius]]'s bow. Afterwards, seize the
   camp.
 
+# `strategy:` as claims (#510 step 6): each cites its line above, and tools/strategy.py's
+# docstring says what each kind means to the parity model.
+strategy_claims:
+  - kind: answer
+    unit: braulo
+    vs: soldier
+    cite: "It'll be easier to train Braulo if you pit him against the three spear-carrying Soldiers near the camp due to the weapon triangle"
+  - kind: wall
+    unit: wolfram
+    vs: fighter
+    cite: "Wolfram's armor soaks the three Fighters in the middle even though the triangle is against him."
+  - kind: terrain
+    vs: all
+    tile: fort
+    cite: "The trail is dotted with forts: reduce the goblins' numbers to where your units can hold them, and heal there between fights."
+  - kind: carry
+    unit: [rootis, marty, meesmickle, prof-rbg]
+    vs: boss
+    cite: "she should fall fairly quickly to Rootis, Marty and Meesmickle's magic or R.B. Geenius's bow."
+  - kind: unmodelled
+    topic: healing
+    step: 8
+    cite: "heal there between fights."
+  - kind: unmodelled
+    topic: reinforcements
+    step: 7
+    cite: "Note that on turn 3, three reinforcement units (two Fighters and a Soldier) appear from the west edge, behind you, so leave someone sturdy at the rear."
+
 # ── Player Units ──────────────────────────────────────────────────────────────
 # Whole cast is RECRUITED (Northlook scene); the field obeys vanilla Ch1: 4 slots.
 # Pick Units (prep flow) chooses which 4; the chosen lord (#42) is force-deployed.

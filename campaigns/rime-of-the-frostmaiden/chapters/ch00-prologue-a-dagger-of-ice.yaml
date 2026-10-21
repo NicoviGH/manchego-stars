@@ -135,6 +135,26 @@ strategy: |
   Hlin's [[Hand Axe]] can chip him from two tiles away if you want to share the [[experience]].
   If Hlin is hurt, use a Goodberry to keep her [[HP]] up.
 
+# `strategy:` as claims (#510 step 6): each cites its line above, and tools/strategy.py's
+# docstring says what each kind means to the parity model.
+strategy_claims:
+  - kind: carry
+    unit: [hlin-trollbane, scramsax]
+    vs: caravan-guard
+    cite: "Together Hlin and Scramsax can take out the two caravan guards with ease."
+  - kind: answer
+    unit: hlin-trollbane
+    vs: caravan-guard
+    cite: "Hlin's axes beat the guards' Iron Lances, so she can bait them one at a time and trade with them fairly safely"
+  - kind: carry
+    unit: scramsax
+    vs: boss
+    cite: "let Scramsax finish him once the guards are down."
+  - kind: unmodelled
+    topic: healing
+    step: 8
+    cite: "If Hlin is hurt, use a Goodberry to keep her HP up."
+
 # ── Player Units ────────────────────────────────────────────────────────────────
 player_units:
   # Hlin = the FRAIL must-survive lead (our "lord" / Eirika-analog). Book p.22: old & frail.

@@ -1,0 +1,163 @@
+# The twins' Strategy sections as claims (#510 step 6). Read by tools/strategy.py, whose
+# docstring defines each kind. Each claim cites its line from the vendored page under
+# vendor/twins/ (wiki markup stripped); a citation that is not there raises.
+#
+# A line goes in only when its claim means what the kind checks. "Eirika can bait the
+# fighters and dodge their attacks fairly consistently" says she is safe enough, not that
+# she is the party's best wall, so it is not a `wall` claim.
+
+FE8 Prologue:
+  page: The_Fall_of_Renais
+  claims:
+    - kind: carry
+      unit: [eirika, seth]
+      vs: fighter
+      cite: "Together Eirika and Seth can take out the enemy Fighters with ease."
+    - kind: unmodelled
+      topic: baiting
+      step: 7
+      cite: "Eirika can bait the fighters and dodge their attacks fairly consistently."
+    - kind: unmodelled
+      topic: healing
+      step: 8
+      cite: "If Eirika is hurt use a Vulnerary to keep her HP up."
+
+FE8 Ch1:
+  page: Escape
+  claims:
+    - kind: answer
+      unit: eirika
+      vs: fighter
+      cite: "It'll be easier to train Eirika if you pit her versus the Fighters due to the weapon triangle."
+    - kind: carry
+      unit: [eirika, seth]
+      vs: boss
+      cite: "The boss should fall fairly quickly if you use Eirika's Rapier as it does bonus damage versus armored units."
+    - kind: unmodelled
+      topic: arrival
+      step: 7
+      cite: "Franz and Gilliam will join you on turn 2 and appear towards the northeastern ridge."
+    - kind: unmodelled
+      topic: reinforcements
+      step: 7
+      cite: "after you cross the middle of the map, three reinforcement units will appear from the bottom right corner."
+
+FE8 Ch2:
+  page: The_Protected
+  claims:
+    - kind: terrain
+      tile: fort
+      vs: boss
+      cite: "The fort in the south is a good place to plant a unit to defeat the boss."
+    - kind: unmodelled
+      topic: recruit escort
+      step: 7
+      cite: "You'll need to keep Ross and Garcia safe if you want to recruit them."
+    - kind: unmodelled
+      topic: enemy terrain
+      step: 7
+      cite: "Beware of the reinforcements that spawn in the mountains above the bottom village, as the mountain tiles give them good evasion."
+    - kind: unmodelled
+      topic: villages
+      step: 8
+      cite: "Feel free to visit all the villages and obtain some free items."
+    - kind: unmodelled
+      topic: shop
+      step: 8
+      cite: "This is your first chance to do any shopping."
+
+FE8 Ch3:
+  page: The_Bandits_of_Borgo
+  claims:
+    - kind: unmodelled
+      topic: recruit
+      step: 7
+      cite: "the only reinforcement is Colm on turn 2, who can immediately be recruited by talking to him with Neimi."
+    - kind: unmodelled
+      topic: range
+      step: 7
+      cite: "Garcia, Neimi, and anyone with a javelin can be used to attack the archer and hand axe wielding brigand."
+    - kind: unmodelled
+      topic: keys
+      step: 8
+      cite: "the brigand next to it will drop a Chest Key"
+    - kind: unmodelled
+      topic: steal
+      step: 8
+      cite: "Keep watch of the enemy Thief."
+    - kind: unmodelled
+      topic: drops
+      step: 8
+      cite: "The Antitoxin Mercenary and, more importantly, Pure Water Brigand can easily be lured out for Colm to claim their items before the rest of your units finish them off."
+
+FE8 Ch4:
+  page: Ancient_Horrors
+  claims:
+    - kind: answer
+      unit: artur
+      vs: mogall
+      cite: "Artur is a Monk, so he can handle the dark magic-wielding Mogalls"
+    - kind: terrain
+      tile: forest
+      vs: all
+      cite: "Always try to keep your units on forest tiles to avoid unnecessary hits."
+    - kind: unmodelled
+      topic: recruit rescue
+      step: 7
+      cite: "putting her in a nearby forest and rescuing her the next turn is recommended."
+    - kind: unmodelled
+      topic: reinforcements
+      step: 7
+      cite: "Since this is a rout map, be wary of the reinforcements that spawn near the start of the map, and be mindful that you aren't swarmed."
+
+FE8 Ch5:
+  page: The_Empires_Reach
+  claims:
+    - kind: unmodelled
+      topic: arena
+      step: 8
+      cite: "This chapter features the first arena in the game."
+    - kind: unmodelled
+      topic: recruit
+      step: 7
+      cite: "Recruiting Joshua is less intimidating than it initially appears."
+    - kind: unmodelled
+      topic: reinforcements
+      step: 7
+      cite: "Brigand reinforcements will appear near the starting location, so make sure that your squishy units aren't undefended."
+    - kind: unmodelled
+      topic: villages
+      step: 8
+      cite: "There is a free Guiding Ring if you visit all the villages."
+
+FE8 Ch6:
+  page: Victims_of_War
+  claims:
+    - kind: carry
+      unit: seth
+      vs: boss
+      cite: "making a beeline for Novala with Seth"
+    - kind: unmodelled
+      topic: escort
+      step: 7
+      cite: "Send Vanessa to the east as fast as possible to guard the civilians; they will die without intervention."
+    - kind: unmodelled
+      topic: drops
+      step: 8
+      cite: "The soldier with the Halberd will always drop the last weapon in his inventory"
+
+FE8 Ch7:
+  page: Waterside_Renvall
+  claims:
+    - kind: carry
+      unit: eirika
+      vs: boss
+      cite: "finish him off with heavy hitters like Eirika's rapier."
+    - kind: unmodelled
+      topic: steal
+      step: 8
+      cite: "If you really want the Energy Ring, bring Colm along so that he can steal it."
+    - kind: unmodelled
+      topic: range
+      step: 7
+      cite: "The ballista may be irritating, especially if you are using Vanessa, but you can easily send another unit north to take care of it."
