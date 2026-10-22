@@ -27,6 +27,7 @@ import inject.chapter_settings
 import inject.chapters.prologue
 import inject.hosting
 import inject.stats
+import unit_load
 import yaml
 
 
@@ -1297,21 +1298,16 @@ class VanillaEnemies(unittest.TestCase):
         itype = {'ITYPE_SWORD': 'sword', 'ITYPE_LANCE': 'lance', 'ITYPE_AXE': 'axe',
                  'ITYPE_BOW': 'bow', 'ITYPE_STAFF': 'staff', 'ITYPE_ANIMA': 'anima',
                  'ITYPE_LIGHT': 'light', 'ITYPE_DARK': 'dark', 'ITYPE_MONSTER': 'monster'}
-        items = inject.decomp.vanilla_decomp_text('src/data_items.c')
         checked = 0
         for key, enum in df.ITEM_ENUM.items():
             if key not in fc.W:
                 continue
-            block = re.search(r'\[%s\] = \{(.*?)\n\t\},' % enum, items, re.S)
-            self.assertIsNotNone(block, '%s: no %s entry in data_items.c' % (key, enum))
-            wtype = re.search(r'\.weaponType = (ITYPE_\w+)', block.group(1))
-            attrs = re.search(r'\.attributes = ([^,]+),', block.group(1))
+            wtype = re.search(r'\.weaponType\s*=\s*(ITYPE_\w+)', unit_load._item_block(enum))
             self.assertIsNotNone(wtype, '%s: no .weaponType' % key)
-            self.assertIsNotNone(attrs, '%s: no .attributes' % key)
             self.assertIn(wtype.group(1), itype, '%s: unmapped %s' % (key, wtype.group(1)))
             self.assertEqual(fc.W[key].kind, itype[wtype.group(1)], key)
             self.assertEqual(fc.is_magic(fc.W[key].kind),
-                             'IA_MAGIC' in re.findall(r'\w+', attrs.group(1)), key)
+                             'IA_MAGIC' in unit_load.item_attributes(enum), key)
             checked += 1
         self.assertEqual(checked, len(fc.W))
 
