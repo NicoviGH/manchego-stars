@@ -50,7 +50,10 @@ ENTRY_POINTS = ('tools/difficulty.py', 'tools/verdict_diff.py')
 WHOLE_PACKAGES = ('tools/inject/',)
 # What the read opens that is not a module (traced, 2026-10-19). The decomp is read at the
 # submodule's HEAD, and the pointer is never committed, so a PR cannot change it.
-DATA_PATTERNS = (r'campaigns/[^/]+/.*\.yaml$', r'engine/patches/')
+# The vanilla submodule as a whole: the read decodes the twin's map from its working tree
+# (layouts, tile configs, terrains.h) as well as `git show HEAD:` sources, and any move of
+# its pointer is a move of vanilla itself (#510 step 7).
+DATA_PATTERNS = (r'campaigns/[^/]+/.*\.yaml$', r'engine/patches/', r'fireemblem8u(/|$)')
 
 
 def _module_file(name):

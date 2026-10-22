@@ -17,6 +17,7 @@ The layout .bin is: byte width, byte height, then width*height little-endian u16
 each = metatile_index * 4 (verified across vanilla Prologue/Ch1/Ch5X maps).
 """
 
+import functools
 import glob
 import json
 import os
@@ -332,7 +333,20 @@ def preserved_terrain_targets(source_cells, source_terrain, target_tileset, rule
         raise ValueError('; '.join(errors))
     return targets
 def _vanilla_decomp_text(dec, relative_path):
-    """Read committed vanilla source, not build-injected worktree output."""
+    """Read committed vanilla source, not build-injected worktree output. The vanilla
+    submodule goes through `inject.decomp.vanilla_decomp_text`, the repo's one memoised HEAD
+    reader, so a parity read that decodes the twin's map does not spawn `git show` again for
+    a file the difficulty read already holds (#510 step 7, `test_decomp_read_cache`). Any
+    other root (a test's fixture tree) is memoised here per (root, path)."""
+    import inject.decomp
+    root = os.path.realpath(dec)
+    if root == os.path.realpath(inject.decomp.SUBMODULE):
+        return inject.decomp.vanilla_decomp_text(relative_path)
+    return _vanilla_decomp_text_at(root, relative_path)
+
+
+@functools.lru_cache(maxsize=64)
+def _vanilla_decomp_text_at(dec, relative_path):
     import subprocess
     # Strip inherited GIT_* vars (GIT_DIR/GIT_INDEX_FILE/GIT_WORK_TREE) so `git -C dec`
     # resolves against dec's own repo. Otherwise, when this runs inside a git hook

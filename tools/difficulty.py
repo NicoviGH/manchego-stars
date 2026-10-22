@@ -40,7 +40,6 @@ import inject.raw_pids  # noqa: E402
 import inject.stats  # noqa: E402
 import inject.villages  # noqa: E402
 import argparse
-import json
 import sys
 import ai_target
 import fe_combat as fc
@@ -908,13 +907,20 @@ def vanilla_red_units(parity_ref):
     staff-only healer contributes nothing to the threat math and everything to the map's
     shape -- vanilla Ch6 gives its Troubadour the same delayed charge as the cavalry she
     rides with, and a chapter borrowing her AI needs to find her."""
+    reds = _vanilla_red_defs(parity_ref)
+    return None if reds is None else [d for _a, _i, d in reds]
+
+
+def _vanilla_red_defs(parity_ref):
+    """(array, index in the array, UnitDefinition dict) for every RED unit in the twin's
+    curated arrays, or None if the reference isn't curated. The one walk over them."""
     spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
     if spec is None:
         return None
     relpath, arrays = spec
     text = inject.decomp.vanilla_decomp_text(relpath)
-    return [d for array_name in arrays
-            for d in vanilla_unit_defs(text, array_name)
+    return [(array_name, i, d) for array_name in arrays
+            for i, d in enumerate(vanilla_unit_defs(text, array_name))
             if d['allegiance'] == 'FACTION_ID_RED']
 
 
@@ -996,11 +1002,9 @@ def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
     The REAL ARTICLE (#285): a named vanilla unit fights as class base PLUS its own
     CharacterData line, symmetric with our side, which resolves its lines through
     unit_real_article(). `with_personal=False` reads the same unit off class base alone."""
-    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
-    if spec is None:
+    reds = _vanilla_red_defs(parity_ref)
+    if reds is None:
         return None
-    relpath, arrays = spec
-    text = inject.decomp.vanilla_decomp_text(relpath)
     shifts = vanilla_chapter_shifts(parity_ref) if mode else None
     if mode and shifts is None:
         # Silently returning an UNSHIFTED vanilla force here would compare our shifted
@@ -1010,19 +1014,16 @@ def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
                     'its difficulty numbers are unknown and a --mode read would compare '
                     'our SHIFTED force against an UNSHIFTED reference' % parity_ref)
     out = []
-    for array_name in arrays:
-        for i, d in enumerate(vanilla_unit_defs(text, array_name)):
-            if d['allegiance'] != 'FACTION_ID_RED':
-                continue
-            weapon = _weapon_from_item_enums(d['items'])
-            if weapon is None:
-                continue
-            ch = d.get('charIndex')
-            out.append((array_name, i, d, _enemy_from_enum(
-                '%s#%d[%s]' % (array_name, i, ch), d['classIndex'], d['level'], weapon,
-                vanilla_personal_line(ch) if with_personal else None,
-                mode=mode, shifts=shifts, arsenal=_weapons_from_item_enums(d['items']),
-                **_vanilla_load_kwargs(d))))
+    for array_name, i, d in reds:
+        weapon = _weapon_from_item_enums(d['items'])
+        if weapon is None:
+            continue
+        ch = d.get('charIndex')
+        out.append((array_name, i, d, _enemy_from_enum(
+            '%s#%d[%s]' % (array_name, i, ch), d['classIndex'], d['level'], weapon,
+            vanilla_personal_line(ch) if with_personal else None,
+            mode=mode, shifts=shifts, arsenal=_weapons_from_item_enums(d['items']),
+            **_vanilla_load_kwargs(d))))
     return out
 
 
@@ -1524,31 +1525,33 @@ def _entry_combatants(ed, mode=None, shifts=None, real_article=False, drop_staff
     return [u for u in units if u.weapon is not None or not drop_staff]
 
 
+ForceBody = collections.namedtuple('ForceBody', 'key entry index unit ai')
+
+
+def chapter_force(chap, mode=None, shifts=None, with_ai=True):
+    """THE our-side force walk: one `ForceBody` (roster key, entry, index in the entry,
+    real-article Combatant, the 4 AI bytes of its own position's donor) per body our chapter
+    fields, staff-only and weaponless bodies included, Difficult-only entries on every mode.
+
+    It exists as one function because it was three. `solo_contributors` once kept a copy that
+    collapsed a `composition` to its distinct classes (#285); `chapter_enemy_bodies` and
+    `danger_map.bodies` each re-walked the roster, so the board and the combat read could
+    disagree about which body was which (#510 step 7). Every our-side reader reshapes this.
+    `with_ai=False` leaves `ai` None for a reader that never asks how a body behaves, so it
+    does not demand a donor of every entry."""
+    return [ForceBody(key, ed, index, unit,
+                      tuple(enemy_ai_bytes(chap, ed, index)) if with_ai else None)
+            for key in inject.raw_pids.ENEMY_ROSTER_KEYS
+            for ed in chap.get(key) or () if isinstance(ed, dict)
+            for index, unit in enumerate(_entry_combatants(
+                ed, mode=mode, shifts=shifts, real_article=True, drop_staff=False))]
+
+
 def chapter_units(chap, mode=None, shifts=None):
-    """(enemy_def, real-article Combatant) for every BODY our chapter fields, weapons modeled.
-
-    THE our-side force builder. It exists as one function because it was two: `solo_contributors`
-    kept a second copy that expanded `count` over `enemy_combatants` -- which collapses a
-    `composition` to its DISTINCT classes -- so on ch01 it counted 6 bodies where this counts 3
-    and printed a share that contradicted the verdict directly above it (#285).
-    """
-    return [(ed, u) for ed in chapter_roster_entries(chap)
-            for u in _entry_combatants(ed, mode=mode, shifts=shifts, real_article=True)]
-
-
-def chapter_enemy_bodies(chap, mode=None, shifts=None):
-    """`chapter_units`' force, each body paired with its combat-weight table (#430 step 2b):
-    [(Combatant, table)]. A body's AI is its own position's donor, so an entry whose donors
-    run different tables (ch01) is read body by body."""
-    out = []
-    for ed in chapter_roster_entries(chap):
-        bodies = _entry_combatants(ed, mode=mode, shifts=shifts, real_article=True,
-                                   drop_staff=False)
-        for index, unit in enumerate(bodies):
-            if unit.weapon is not None:
-                out.append((unit, ai_target.combat_weight_table(
-                    enemy_ai_bytes(chap, ed, index))))
-    return out
+    """(enemy_def, real-article Combatant) for every BODY our chapter fields, weapons modeled:
+    `chapter_force` with the bodies that carry no modeled weapon left out."""
+    return [(f.entry, f.unit) for f in chapter_force(chap, mode, shifts, with_ai=False)
+            if f.unit.weapon is not None]
 
 
 def unmodeled_enemies(chap):
@@ -2371,7 +2374,8 @@ def _chapter_matchup(chap, campaign, mode):
 
 
 def arriving_fields(chap, campaign, mode=None):
-    """Both sides of a parity read: each force as [(Combatant, combat-weight table)], each
+    """Both sides of a parity read: each force as [(Combatant, combat-weight table)] and, index
+    for index, as the `danger_map.Body`s it came from ('our_bodies', 'van_bodies'), each
     ARRIVING party in join order, {unit: [Combatant]} over the careers, the deploy `cap` and
     the twin's `van_forced` units. A reader that wants one team asks `fielded_careers`. None
     for a twin off VANILLA_CHAIN or a party the exp model cannot price -- `chapter_matchup`'s
@@ -2387,14 +2391,20 @@ def arriving_fields(chap, campaign, mode=None):
     if not arriving['party'] or arriving['vanilla'] is None:
         return None
     cap = chapter_deploy_limit(chap, len(ROSTER))
-    shifts = inject.chapter_settings.chapter_difficulty_shifts(chap) if mode else None
-    our_force = chapter_enemy_bodies(chap, mode=mode, shifts=shifts)
-    van_force = [(u, ai_target.combat_weight_table(ai))
-                 for u, ai in vanilla_enemy_bodies(ref, mode)]
+    import danger_map                       # danger_map imports this module
+    # One list of bodies per side, read by the board and the combat read alike, so an index
+    # into the force is an index onto the map (#510 step 7). A body with no modeled weapon
+    # is in neither: it attacks no one and the clear-load has never counted it.
+    our_bodies = [b for b in danger_map.bodies(chap, mode, every_mode=True)
+                  if b.unit.weapon is not None]
+    van_bodies = danger_map.vanilla_bodies(ref, mode)
+    our_force = [(b.unit, ai_target.combat_weight_table(b.ai)) for b in our_bodies]
+    van_force = [(b.unit, ai_target.combat_weight_table(b.ai)) for b in van_bodies]
     our_party = fixed_roster_careers(chap) or _party_careers(campaign, arriving['party'])
     van_party = vanilla_party_careers(ref, arriving['vanilla'])
     van_forced = vanilla_forced(ref)
     return {'our_force': our_force, 'van_force': van_force,
+            'our_bodies': our_bodies, 'van_bodies': van_bodies,
             'our_party': our_party, 'van_party': van_party, 'cap': cap, 'van_forced': van_forced}
 
 

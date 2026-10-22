@@ -100,7 +100,9 @@ def strike(atk, dfn, terrain_avoid=0):
 @dataclasses.dataclass(frozen=True)
 class Body:
     """One enemy body: its tile, AI shape and ACTION byte, the turn it arrives, how it moves,
-    and one Combatant per weapon it carries (the AI equips whichever lets it attack)."""
+    and one Combatant per weapon it carries (the AI equips whichever lets it attack). `unit`
+    is the Combatant it defends as and `ai` its 4 AI bytes, the same objects the parity read
+    fights (`difficulty.arriving_fields`); a hand-built test body may leave them unset."""
     id: str
     index: int
     source: tuple
@@ -110,6 +112,8 @@ class Body:
     table: str
     mov: int
     arms: tuple
+    unit: object = dataclasses.field(default=None, compare=False)
+    ai: tuple = dataclasses.field(default=None, compare=False)
 
 
 def bodies(chapter, mode=None, every_mode=False):
@@ -120,21 +124,34 @@ def bodies(chapter, mode=None, every_mode=False):
     can say so."""
     shifts = inject.chapter_settings.chapter_difficulty_shifts(chapter) if mode else None
     out = []
-    for key in inject.raw_pids.ENEMY_ROSTER_KEYS:
-        for enemy in chapter.get(key) or ():
-            if not isinstance(enemy, dict) or (enemy.get('hard_mode_only') and not every_mode
-                                               and mode != 'difficult'):
-                continue
-            arrives = (1 if inject.raw_pids.entry_is_turn1(key, enemy) else
-                       inject.raw_pids.entry_arrival_turn(enemy))
-            units = dif._entry_combatants(enemy, mode=mode, shifts=shifts, real_article=True,
-                                          drop_staff=False)
-            for index, tile in enumerate(chapter_schema.entry_tiles(enemy)):
-                ai = dif.enemy_ai_bytes(chapter, enemy, index)
-                table, mov = _movement(enemy, index)
-                out.append(Body(enemy.get('id'), index, tuple(tile), cs.ai_shape(ai), ai[0],
-                                arrives, table, mov,
-                                fc.arms(units[min(index, len(units) - 1)])))
+    for f in dif.chapter_force(chapter, mode, shifts):
+        if f.entry.get('hard_mode_only') and not every_mode and mode != 'difficult':
+            continue
+        arrives = (1 if inject.raw_pids.entry_is_turn1(f.key, f.entry) else
+                   inject.raw_pids.entry_arrival_turn(f.entry))
+        table, mov = _movement(f.entry, f.index)
+        out.append(Body(f.entry.get('id'), f.index,
+                        tuple(chapter_schema.entry_tiles(f.entry)[f.index]),
+                        cs.ai_shape(f.ai), f.ai[0], arrives, table, mov, fc.arms(f.unit),
+                        f.unit, f.ai))
+    return out
+
+
+def vanilla_bodies(parity_ref, mode=None):
+    """The twin's red force as `Body`s, in `difficulty.vanilla_loaded_units` order: each unit
+    at the end of its REDA walk, arriving on the turn its eventscript loads its array, armed
+    with every attacking item it carries. Named units carry their personal line, as
+    `difficulty.vanilla_enemies` reads them. None when the reference is uncurated."""
+    units = dif.vanilla_loaded_units(parity_ref, mode)
+    if units is None:
+        return None
+    turns = dif._vanilla_reinforcement_turns(dif.PARITY_REFERENCE_STEM[parity_ref])
+    out = []
+    for array, i, d, unit in units:
+        table, mov = pp.class_movement(d['classIndex'][len('CLASS_'):].lower())
+        ai = tuple(d['ai'])
+        out.append(Body(array, i, tuple(d['position']), cs.ai_shape(ai), ai[0],
+                        turns.get(array, 1), table, mov, fc.arms(unit), unit, ai))
     return out
 
 

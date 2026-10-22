@@ -47,7 +47,7 @@ class TheTwinsBoard(unittest.TestCase):
                          sorted(tuple(pu['position']) for pu in chapter['player_units']))
 
     def test_the_twins_reinforcements_arrive_on_their_eventscript_turns(self):
-        waves = {b.arrives for b in tl.vanilla_bodies('FE8 Ch5')}
+        waves = {b.arrives for b in dm.vanilla_bodies('FE8 Ch5')}
         self.assertEqual(waves, {1, 2, 6, 8})
 
 
@@ -98,9 +98,29 @@ class OurBodiesMove(unittest.TestCase):
     def test_vanilla_ch2s_brigands_cross_its_peaks(self):
         # The turn-3 pair spawns on the peaks at (0,9)/(1,9); on the foot table it never moved.
         board = dm.Board(None, terrain=dif.vanilla_terrain('FE8 Ch2'),
-                         fielded=tl.vanilla_bodies('FE8 Ch2'))
+                         fielded=dm.vanilla_bodies('FE8 Ch2'))
         front = dif.vanilla_front('FE8 Ch2')
         self.assertTrue(all(tl.first_contact(board, b, front) is not None for b in board.bodies))
+
+
+class OneReaderPerForce(unittest.TestCase):
+    """#510 step 7: the board and the combat read index ONE list of bodies per side, so an
+    engagement's members are positions in `party_matchup`'s force."""
+
+    def _check(self, chapter, mode):
+        fields = dif.arriving_fields(pp.load_chapter(chapter), 'rime-of-the-frostmaiden', mode)
+        for force, bodies in (('our_force', 'our_bodies'), ('van_force', 'van_bodies')):
+            self.assertEqual(len(fields[force]), len(fields[bodies]), (chapter, mode, force))
+            for (unit, table), body in zip(fields[force], fields[bodies]):
+                self.assertIs(unit, body.unit)
+                self.assertEqual(table, dif.ai_target.combat_weight_table(body.ai))
+
+    def test_ch06_drops_its_menders_from_both_views(self):
+        self._check('ch06', 'normal')
+
+    def test_every_mode_lines_up(self):
+        for mode in (None, 'tutorial', 'difficult'):
+            self._check('ch04', mode)
 
 
 if __name__ == '__main__':
