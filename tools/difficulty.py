@@ -1966,7 +1966,7 @@ def lord_floor_delta(unit, enemies, target=3.5, def_cap=4, res_cap=4, hp_cap=12)
 
     # Binding threat sets which defence stat blunts the most damage.
     binding = min(enemies, key=lambda e: bulk_durability(unit, [e]))
-    magic = binding.weapon.kind == 'magic'
+    magic = fc.is_magic(binding.weapon.kind)
     dh = dd = dr = 0
     cap = res_cap if magic else def_cap
     while bulk_durability(with_delta(dh, dd, dr), enemies) < target and (dr if magic else dd) < cap:

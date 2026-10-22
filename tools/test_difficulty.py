@@ -27,6 +27,7 @@ import inject.chapter_settings
 import inject.chapters.prologue
 import inject.hosting
 import inject.stats
+import unit_load
 import yaml
 
 
@@ -1288,6 +1289,34 @@ class VanillaEnemies(unittest.TestCase):
                          {e: k for k, e in df.ITEM_ENUM.items() if k in fc.W})
         for key in df.ITEM_TO_WEAPON.values():
             self.assertIn(key, fc.W)
+
+    def test_every_weapon_kind_is_its_decomp_weapon_type(self):
+        # fe_combat's kind IS the item's `.weaponType` (data_items.c at HEAD): the triangle
+        # keys on it, so a tome typed by hand as one generic 'magic' kind missed
+        # anima > light > dark > anima (#510). Res vs Def is the item's IA_MAGIC attribute
+        # in the engine (`ComputeBattleUnitDefense`); is_magic must agree with it.
+        itype = {'ITYPE_SWORD': 'sword', 'ITYPE_LANCE': 'lance', 'ITYPE_AXE': 'axe',
+                 'ITYPE_BOW': 'bow', 'ITYPE_STAFF': 'staff', 'ITYPE_ANIMA': 'anima',
+                 'ITYPE_LIGHT': 'light', 'ITYPE_DARK': 'dark', 'ITYPE_MONSTER': 'monster'}
+        checked = 0
+        for key, enum in df.ITEM_ENUM.items():
+            if key not in fc.W:
+                continue
+            wtype = re.search(r'\.weaponType\s*=\s*(ITYPE_\w+)', unit_load._item_block(enum))
+            self.assertIsNotNone(wtype, '%s: no .weaponType' % key)
+            self.assertIn(wtype.group(1), itype, '%s: unmapped %s' % (key, wtype.group(1)))
+            self.assertEqual(fc.W[key].kind, itype[wtype.group(1)], key)
+            self.assertEqual(fc.is_magic(fc.W[key].kind),
+                             'IA_MAGIC' in unit_load.item_attributes(enum), key)
+            checked += 1
+        self.assertEqual(checked, len(fc.W))
+
+    def test_triangle_rules_are_the_decomps(self):
+        battle = inject.decomp.vanilla_decomp_text('src/bmbattle.c')
+        table = re.search(r'sWeaponTriangleRules\[\] = \{(.*?)\{ -1 \}', battle, re.S).group(1)
+        rows = re.findall(r'\{ ITYPE_(\w+), *ITYPE_(\w+), *([+-]\d+), *([+-]\d+) \}', table)
+        self.assertEqual(fc.TRIANGLE_RULES,
+                         {(a.lower(), d.lower()): (int(h), int(m)) for a, d, h, m in rows})
 
     def test_ch13_reference_is_the_hamill_canyon_force(self):
         # 52 armed-RED defs across the 11 curated ch13a arrays (boss squad + main force +

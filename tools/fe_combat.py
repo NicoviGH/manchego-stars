@@ -17,9 +17,10 @@ Combat model (bmbattle.c line cites):
             deals Damage x3                                 (l.1030-1039)
   Atk     = Pow + (wpnMt + triangleDmg)  (the Mt+tri HALF x3 if effective, l.527-556:
             battleAttack = Mt + tri, tripled on effectiveness, THEN += Pow)
-  Damage  = max(0, Atk - (Def | Res))                       Res for magic
+  Damage  = max(0, Atk - (Def | Res))                       Res for a tome
   Double  if (atkAS - defAS) >= 4                     (BATTLE_FOLLOWUP_SPEED_THRESHOLD)
-Triangle (GBA FE8): advantage +1 Mt / +15 Hit, disadvantage -1 Mt / -15 Hit.
+Triangle (GBA FE8, `sWeaponTriangleRules`, l.38-55): advantage +1 Mt / +15 Hit, disadvantage
+  -1 Mt / -15 Hit, for sword > axe > lance > sword AND anima > light > dark > anima.
 
 A Combatant's stats may be numpy arrays instead of ints: one unit read over many careers at
 once (difficulty.party_matchup, #510 step 4). Its weapon, tags and Con stay single values. The
@@ -79,9 +80,10 @@ def minimum(a, b):
 class Weapon:
     """name, Mt, Hit, Crit, Wt, kind, range, and what it is x3-effective against.
 
-    kind drives the triangle and the defence stat: 'magic' resolves vs Res, everything
-    else vs Def; 'bow'/'magic'/'staff' are off-triangle (neutral). effective is the set
-    of defender tags the weapon triples damage on (e.g. a rapier vs {'armor','cav'})."""
+    kind is the item's FE8 weapon type (data_items.c `.weaponType`). It drives the triangle
+    and the defence stat: a MAGIC_KINDS tome resolves vs Res, everything else vs Def;
+    'bow'/'monster'/'staff' are off-triangle (neutral). effective is the set of defender
+    tags the weapon triples damage on (e.g. a rapier vs {'armor','cav'})."""
     name: str
     mt: int
     hit: int
@@ -92,8 +94,8 @@ class Weapon:
     effective: frozenset = frozenset()
 
 
-# Canonical vanilla FE8 weapon stats (data_items.c, git HEAD). The triangle runs
-# sword > axe > lance > sword; bows/magic/staves are neutral.
+# Canonical vanilla FE8 weapon stats and types (data_items.c, git HEAD;
+# test_difficulty checks every kind against `.weaponType`).
 W = {
     'iron-sword':   Weapon('iron-sword',   5, 90,  0, 5,  'sword'),
     'rapier':       Weapon('rapier',       7, 95, 10, 5,  'sword',
@@ -110,13 +112,13 @@ W = {
     'hatchet':      Weapon('hatchet',      4, 85,  0, 5,  'axe',   rng=(1, 2)),   # Ross's
     'iron-bow':     Weapon('iron-bow',     6, 85,  0, 5,  'bow',   rng=(2, 2),
                            effective=frozenset({'flier'})),
-    'fire':         Weapon('fire',         5, 90,  0, 4,  'magic', rng=(1, 2)),
-    'lightning':    Weapon('lightning',    4, 95,  5, 6,  'magic', rng=(1, 2)),
-    'flux':         Weapon('flux',         7, 80,  0, 8,  'magic', rng=(1, 2)),
+    'fire':         Weapon('fire',         5, 90,  0, 4,  'anima', rng=(1, 2)),
+    'lightning':    Weapon('lightning',    4, 95,  5, 6,  'light', rng=(1, 2)),
+    'flux':         Weapon('flux',         7, 80,  0, 8,  'dark', rng=(1, 2)),
     # Extended vanilla weapons carried only by enemy parity-reference forces (FE8 Ch4/Ch6),
     # never by our cast. The difficulty engine maps the decomp items to these for the static
     # threat proxy (difficulty.ITEM_TO_WEAPON, derived from inject.decomp.ITEM_ENUM, #491).
-    'thunder':      Weapon('thunder',      8, 80,  5, 6,  'magic', rng=(1, 2)),
+    'thunder':      Weapon('thunder',      8, 80,  5, 6,  'anima', rng=(1, 2)),
     'iron-blade':   Weapon('iron-blade',   9, 70,  0, 12, 'sword'),
     'steel-lance':  Weapon('steel-lance',  10, 70, 0, 13, 'lance'),
     'slim-lance':   Weapon('slim-lance',   4, 85,  5, 4,  'lance'),
@@ -125,14 +127,15 @@ W = {
                            effective=frozenset({'flier'})),
     'zanbato':      Weapon('zanbato',      6, 85,  0, 11, 'sword',
                            effective=frozenset({'cav'})),
-    'elfire':       Weapon('elfire',       10, 85, 0, 10, 'magic', rng=(1, 2)),
+    'elfire':       Weapon('elfire',       10, 85, 0, 10, 'anima', rng=(1, 2)),
     'venin-axe':    Weapon('venin-axe',    4, 60,  0, 10, 'axe'),
     'venin-lance':  Weapon('venin-lance',  4, 65,  0, 8,  'lance'),
     'halberd':      Weapon('halberd',      10, 60, 0, 15, 'axe',
                            effective=frozenset({'cav'})),
     'horseslayer':  Weapon('horseslayer',  7, 70,  0, 13, 'lance',
                            effective=frozenset({'cav'})),
-    # Monster claws are plain physical might (off-triangle); Evil Eye is monster dark magic.
+    # Monster claws are plain physical might (off-triangle); Evil Eye is a dark tome
+    # (ITYPE_DARK), so it sits on the magic triangle like Flux.
     # A venin hit deals its might like any weapon AND poisons (`BattleGenerateHitEffects`,
     # bmbattle.c): 1-3 HP a phase for 5 phases. These metrics count the hit only;
     # `danger_map` adds the poison.
@@ -143,7 +146,7 @@ W = {
     # (data_classes.c: CLASS_MAUTHEDOOG.promotion = CLASS_GWYLLGI). decomp mt/hit/wt.
     'fire-fang':    Weapon('fire-fang',    5, 90, 0, 5,  'monster'),
     'hell-fang':    Weapon('hell-fang',    13, 80, 0, 8,  'monster'),
-    'evil-eye':     Weapon('evil-eye',     7, 85,  0, 6,  'magic', rng=(1, 2)),
+    'evil-eye':     Weapon('evil-eye',     7, 85,  0, 6,  'dark', rng=(1, 2)),
 }
 
 
@@ -190,18 +193,34 @@ def doubles(atk, dfn):
     return attack_speed(atk) - attack_speed(dfn) >= FOLLOWUP_THRESHOLD
 
 
-# Weapon triangle: each key beats its value (sword > axe > lance > sword). Bows,
-# magic, and staves aren't in the dict -> neutral against everything.
-_BEATS = {'sword': 'axe', 'axe': 'lance', 'lance': 'sword'}
+# The weapon types that are tomes: they resolve against Res (IA_MAGIC, bmbattle.c).
+MAGIC_KINDS = frozenset({'anima', 'light', 'dark'})
+
+
+def is_magic(kind):
+    return kind in MAGIC_KINDS
+
+
+# `sWeaponTriangleRules` (bmbattle.c l.38-55): (attacker type, defender type) -> (hit, Mt).
+# A pair it does not list is neutral: bows, monster weapons, staves, and physical vs tome.
+TRIANGLE_RULES = {
+    ('sword', 'lance'): (-15, -1), ('sword', 'axe'): (15, 1),
+    ('lance', 'axe'): (-15, -1), ('lance', 'sword'): (15, 1),
+    ('axe', 'sword'): (-15, -1), ('axe', 'lance'): (15, 1),
+    ('anima', 'dark'): (-15, -1), ('anima', 'light'): (15, 1),
+    ('light', 'anima'): (-15, -1), ('light', 'dark'): (15, 1),
+    ('dark', 'light'): (-15, -1), ('dark', 'anima'): (15, 1),
+}
 
 
 def triangle(atk_kind, def_kind):
-    """+1 advantage / -1 disadvantage / 0 neutral for atk_kind striking def_kind."""
-    if _BEATS.get(atk_kind) == def_kind:
-        return 1
-    if _BEATS.get(def_kind) == atk_kind:
-        return -1
-    return 0
+    """The Mt bonus for atk_kind striking def_kind: +1 advantage, -1 disadvantage, 0."""
+    return TRIANGLE_RULES.get((atk_kind, def_kind), (0, 0))[1]
+
+
+def triangle_hit(atk_kind, def_kind):
+    """The hit bonus for atk_kind striking def_kind: +15, -15 or 0."""
+    return TRIANGLE_RULES.get((atk_kind, def_kind), (0, 0))[0]
 
 
 def damage(atk, dfn):
@@ -217,14 +236,14 @@ def damage(atk, dfn):
     if atk.weapon.effective & dfn.tags:
         raw *= 3
     raw += atk.pow
-    defence = dfn.res if atk.weapon.kind == 'magic' else dfn.df
+    defence = dfn.res if is_magic(atk.weapon.kind) else dfn.df
     return max0(raw - defence)
 
 
 def hit_chance(atk, dfn, terrain_avoid=0):
     """Displayed hit% (0-100): atk's accuracy minus dfn's avoid, on dfn's terrain."""
-    tri = triangle(atk.weapon.kind, dfn.weapon.kind) if dfn.weapon else 0
-    accuracy = atk.skl * 2 + atk.weapon.hit + atk.lck // 2 + tri * 15
+    tri = triangle_hit(atk.weapon.kind, dfn.weapon.kind) if dfn.weapon else 0
+    accuracy = atk.skl * 2 + atk.weapon.hit + atk.lck // 2 + tri
     avoid = attack_speed(dfn) * 2 + terrain_avoid + dfn.lck
     return clamp(accuracy - avoid, 0, 100)
 
