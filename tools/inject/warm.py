@@ -37,6 +37,8 @@ PATCHED_DECOMP_FILES = ['texts/texts.txt', 'src/data_characters.c', 'src/portrai
                         'src/events/ch1-eventscript.h', 'src/events/prologue-wm.h',
                         'src/gamecontrol.c', 'src/bmio.c', 'src/bmunit.c', 'src/bmmap.c',
                         'src/bmcamadjust.c',
+                        # ADR 0362: reskin clones join their base's effectiveness lists
+                        'src/data_itemuse.c',
                         # engine patch 0016: the ext battle-anim object's link rule + placement
                         'Makefile', 'ldscript.txt',
                         'src/unit_icon_wait_data.c', 'src/unit_icon_move_data.c', 'src/mu.c',

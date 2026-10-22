@@ -312,7 +312,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0336` | [A chapter plays its vanilla twin's music](decisions/0336-a-chapter-plays-its-vanilla-twin-s-music.md) | 2026-10-09 | #26 |
 | `0338` | [Our still busts draw their top corners (engine patch 0018)](decisions/0338-still-busts-draw-their-top-corners.md) | 2026-10-10 | #471 |
 | `0341` | [ch07 rides snowy-bern; the castle it lacks is ported in from snowy-fields](decisions/0341-ch07-bremen-rides-snowy-bern-with-a-ported-castle.md) | 2026-10-11 | #27 |
-| `0362` | [A reskin plays as its base class, on every list that names it](decisions/0362-a-reskin-plays-as-its-base-class.md) | 2026-10-22 | #21 #510 |
+| `0362` | [A reskin plays as its base class](decisions/0362-a-reskin-plays-as-its-base-class.md) | 2026-10-22 | #21 #510 |
 
 ---
 
