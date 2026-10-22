@@ -36,7 +36,11 @@ generics, not against an armoured boss her Rapier triples on.
   the most summed threat.
 - ours, ch06: Braulo's axe "wins the trades" against the lances, but his fastest kill is a
   shaman.
-- twin, Ch4: Artur kills Bonewalkers faster than the Mogalls the wiki gives him.
+- twin, Ch4: Artur kills Bonewalkers faster than the Mogalls the wiki gives him. This is a
+  MODEL gap, not a finding about the strategy: `fe_combat.triangle` reads every tome as one
+  off-triangle `magic` kind, so it misses FE8's magic triangle (`sWeaponTriangleRules`, light
+  beats dark: +15 hit, +1 damage for Lightning against the Mogalls' dark magic). Fixed in its
+  own PR on #510.
 - twin, Ch6 and Ch7: Joshua out-kills the boss's named answer (Seth, Eirika), in a near tie.
 
 **The stopping rule does not read this step.** #510 stops when a step moves no verdict. This
