@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-21 (Claude, #519 open). **The parity model is being rebuilt before any party or chapter
+Refreshed 2026-10-22 (Claude, #519 open; magic triangle next). **The parity model is being rebuilt before any party or chapter
 change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
 grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
 Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
@@ -45,8 +45,25 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
    `strategy_claims:`), checked and printed by `make difficulty CH=chNN`, **never a model
    input** (Nicolas, 2026-10-21: terrain as an input took ch01 x1.10 -> x0.48 on one sentence).
    It moves no verdict by construction, so the stopping rule does not count it; findings are
-   on #510. Next: **step 7** (reach, time, AI; `unmodelled` step-7 claims list what it
-   inherits), then 8-9, each with an in-engine proof and the verdict diff.
+   on #510.
+   **NEXT, before step 7 (Nicolas, 2026-10-22): the magic triangle, then an audit.**
+   - *Magic triangle* (own PR off `main`): FE8 has `sWeaponTriangleRules` (bmbattle.c:38-55,
+     anima > light > dark > anima, ±15 hit, ±1 dmg); `fe_combat.triangle` treats every tome
+     as one off-triangle `'magic'` kind. Type each tome from `data_items.c` `.weaponType` at
+     HEAD, parse the rule table, check every `kind == 'magic'` consumer (`tools/callsites.py`
+     first), keep it array-safe, test against the table, `make verdict-diff` in the PR
+     (expect ch03-ch06 moves: Mogalls, Ravisin, the shamans), dated ADR. Found by Nicolas:
+     #519 reports vanilla Artur "kills Bonewalkers faster than Mogalls", which is this gap.
+     If #519 is unmerged, push one commit to its branch correcting that line in ADR 0359.
+   - *Audit steps 3-6* (#515-#519) for more decomp departures like it, citing the decomp:
+     the rest of bmbattle.c's math (crit-bonus classes, weapon effects, special weapon
+     stats, Silencer, support/rank bonuses), `fe_combat.W` vs `data_items.c`, `CLASS_TAGS`
+     vs the decomp's effectiveness lists, `ai_target.py` vs cp_battle.c, and spot checks of
+     #519's claim curation. Fix small, clear errors; file bigger ones on #510.
+   - **Reviews go to a SUBAGENT** (`/code-review <PR> medium`), never inline by the author
+     (Nicolas, 2026-10-22). Neither PR is merged without his "merge".
+   Then **step 7** (reach, time, AI; `unmodelled` step-7 claims list what it inherits), then
+   8-9, each with an in-engine proof and the verdict diff.
    - Verdicts OFF now: ch01 Tutorial/Normal; ch02, ch03, ch04 on Difficult (ch01 Difficult
      reads OK at its ceiling's edge). All of it waits for step 10; nothing is widened.
    - `party_matchup` reads each unit as ONE Combatant whose stats are numpy arrays over the
