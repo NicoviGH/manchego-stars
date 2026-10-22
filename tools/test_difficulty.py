@@ -1289,6 +1289,28 @@ class VanillaEnemies(unittest.TestCase):
         for key in df.ITEM_TO_WEAPON.values():
             self.assertIn(key, fc.W)
 
+    def test_every_weapon_kind_is_its_decomp_weapon_type(self):
+        # fe_combat's kind IS the item's `.weaponType` (data_items.c at HEAD): the triangle
+        # and the Res/Def choice both key on it, so a tome typed by hand as one generic
+        # 'magic' kind missed anima > light > dark > anima (#510).
+        itype = {'ITYPE_SWORD': 'sword', 'ITYPE_LANCE': 'lance', 'ITYPE_AXE': 'axe',
+                 'ITYPE_BOW': 'bow', 'ITYPE_STAFF': 'staff', 'ITYPE_ANIMA': 'anima',
+                 'ITYPE_LIGHT': 'light', 'ITYPE_DARK': 'dark', 'ITYPE_MONSTER': 'monster'}
+        items = inject.decomp.vanilla_decomp_text('src/data_items.c')
+        for key, enum in df.ITEM_ENUM.items():
+            if key not in fc.W:
+                continue
+            body = re.search(r'\[%s\] = \{(.*?)\n\t\},' % enum, items, re.S).group(1)
+            wtype = re.search(r'\.weaponType = (ITYPE_\w+)', body).group(1)
+            self.assertEqual(fc.W[key].kind, itype[wtype], key)
+
+    def test_triangle_rules_are_the_decomps(self):
+        battle = inject.decomp.vanilla_decomp_text('src/bmbattle.c')
+        table = re.search(r'sWeaponTriangleRules\[\] = \{(.*?)\{ -1 \}', battle, re.S).group(1)
+        rows = re.findall(r'\{ ITYPE_(\w+), *ITYPE_(\w+), *([+-]\d+), *([+-]\d+) \}', table)
+        self.assertEqual(fc.TRIANGLE_RULES,
+                         {(a.lower(), d.lower()): (int(h), int(m)) for a, d, h, m in rows})
+
     def test_ch13_reference_is_the_hamill_canyon_force(self):
         # 52 armed-RED defs across the 11 curated ch13a arrays (boss squad + main force +
         # Pablo wave + cav/merc/wyvern packs + Amelia); the 2 staff-only healers (sleep,

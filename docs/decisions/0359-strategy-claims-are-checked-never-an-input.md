@@ -39,8 +39,9 @@ generics, not against an armoured boss her Rapier triples on.
 - twin, Ch4: Artur kills Bonewalkers faster than the Mogalls the wiki gives him. This is a
   MODEL gap, not a finding about the strategy: `fe_combat.triangle` reads every tome as one
   off-triangle `magic` kind, so it misses FE8's magic triangle (`sWeaponTriangleRules`, light
-  beats dark: +15 hit, +1 damage for Lightning against the Mogalls' dark magic). Fixed in its
-  own PR on #510.
+  beats dark: +15 hit, +1 damage for Lightning against the Mogalls' dark magic). ADR 0360
+  added it: the Mogall kill went from 1.1 rounds to 0.92, against 0.86 for a Bonewalker, so
+  what is left is a near tie, and it is real.
 - twin, Ch6 and Ch7: Joshua out-kills the boss's named answer (Seth, Eirika), in a near tie.
 
 **The stopping rule does not read this step.** #510 stops when a step moves no verdict. This
