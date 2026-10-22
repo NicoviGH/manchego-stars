@@ -2237,6 +2237,8 @@ def report(campaign, ch, mode=None):
 
     _print_pressure(_chapter_pressure(chap, campaign=campaign))
     print_role_findings(chap, chap.get('parity_reference'), campaign, mode)
+    import strategy                         # strategy imports this module
+    strategy.print_strategy(chap, campaign, mode)
     _print_economy(chap)
     _print_dynamics(chap)
     import timeline                         # timeline imports this module (via danger_map)
@@ -2343,7 +2345,9 @@ def _chapter_matchup(chap, campaign, mode):
             'force': (ratio(ours, cross, 'threat'), ratio(ours, cross, 'clear')),
             'party': (ratio(cross, van, 'threat'), ratio(cross, van, 'clear')),
             'cross': cross,
-            'lines': {m: _median_combatant(fields['our_party'][m]) for m in ours['team']}}
+            'forces': ([b for b, _w in fields['our_force']], [b for b, _w in fields['van_force']]),
+            'lines': {m: _median_combatant(fields['our_party'][m]) for m in ours['team']},
+            'lines_vanilla': {m: _median_combatant(fields['van_party'][m]) for m in van['team']}}
 
 
 def arriving_fields(chap, campaign, mode=None):
@@ -2495,6 +2499,13 @@ _TERRAIN_CACHE = {}
 
 def _terrain_tables():
     """(id->name, name->avoid, name->defense) parsed from the decomp at HEAD."""
+    ids, by_table = _terrain_data()
+    return ids, by_table['Avo_Common'], by_table['Def_Common']
+
+
+def _terrain_data():
+    """(id->name, {'Avo_Common': {name: bonus}, ...}) for the Common and Fly avoid, defense
+    and resistance tables, parsed from the decomp at HEAD."""
     if 'tables' not in _TERRAIN_CACHE:
         ids = {int(v, 16): k for k, v in re.findall(
             r'(TERRAIN_\w+)\s*=\s*(0x[0-9A-Fa-f]+)',
@@ -2502,21 +2513,32 @@ def _terrain_tables():
         text = inject.decomp.vanilla_decomp_text('src/data_terrains.c')
 
         def table(name):
-            i = text.find('s8 %s[] = {' % name)
+            i = text.find('s8 TerrainTable_%s[] = {' % name)
             return {k: int(v) for k, v in re.findall(
                 r'\[(TERRAIN_\w+)\]\s*=\s*(-?\d+)', text[i:text.find('};', i)])}
-        _TERRAIN_CACHE['tables'] = (ids, table('TerrainTable_Avo_Common'),
-                                    table('TerrainTable_Def_Common'))
+        _TERRAIN_CACHE['tables'] = (ids, {t: table(t) for t in (
+            'Avo_Common', 'Def_Common', 'Res_Common', 'Avo_Fly', 'Def_Fly', 'Res_Fly')})
     return _TERRAIN_CACHE['tables']
+
+
+def _terrain_key(terrain_name):
+    key = str(terrain_name or '').upper()
+    return key if not key or key.startswith('TERRAIN_') else 'TERRAIN_' + key
 
 
 def terrain_bonus(terrain_name):
     """(avoid, defense) a foot unit gains on `terrain_name` (e.g. 'TERRAIN_THRONE')."""
     _ids, avo, dfn = _terrain_tables()
-    key = str(terrain_name or '').upper()
-    if key and not key.startswith('TERRAIN_'):
-        key = 'TERRAIN_' + key
+    key = _terrain_key(terrain_name)
     return avo.get(key, 0), dfn.get(key, 0)
+
+
+def terrain_cover(terrain_name, flier=False):
+    """(avoid, defense, resistance) a unit gains on `terrain_name`: the Common tables for a
+    foot or mounted unit, the Fly tables for a flier (who gets nothing from a forest)."""
+    _ids, t = _terrain_data()
+    key, kind = _terrain_key(terrain_name), 'Fly' if flier else 'Common'
+    return tuple(t['%s_%s' % (stat, kind)].get(key, 0) for stat in ('Avo', 'Def', 'Res'))
 
 
 def vanilla_terrain_at(layout_name, x, y):
@@ -2536,11 +2558,20 @@ def vanilla_terrain_at(layout_name, x, y):
 
 
 def on_terrain(combatant, terrain_name):
-    """`combatant` as it fights while standing on `terrain_name`: terrain Defense folded
-    into df (FE8 adds it to battleDefense). The avoid half is passed separately to the
-    metrics, which already accept a `terrain_avoid`."""
-    avo, dfn = terrain_bonus(terrain_name)
-    return dataclasses.replace(combatant, df=combatant.df + dfn), avo
+    """`combatant` as it fights while standing on `terrain_name`, and the tile's avoid, which
+    the metrics take as `terrain_avoid`: (combatant, avoid). The tile's Def and Res are folded
+    into df and res: FE8's `ComputeBattleUnitDefense` adds terrainDefense, or
+    terrainResistance against magic (bmbattle.c)."""
+    avo, dfn, res = terrain_cover(terrain_name, 'flier' in combatant.tags)
+    return dataclasses.replace(combatant, df=combatant.df + dfn, res=combatant.res + res), avo
+
+
+def _tile_text(tile, combatant):
+    """' on TILE (+avo/+def[/+res])', what `on_terrain` gives `combatant` there; '' off a tile."""
+    if not tile:
+        return ''
+    avo, dfn, res = terrain_cover(tile, 'flier' in combatant.tags)
+    return ' on %s (+%d avo/+%d def%s)' % (tile, avo, dfn, '/+%d res' % res if res else '')
 
 
 # ── Per-unit ROLE check (#25 post-mortem) ───────────────────────────────────────
@@ -2788,7 +2819,7 @@ def role_findings(chap, parity_ref, campaign=None, mode=None):
         # class-base-only; this is the one place the real article is compared.
         b_on, b_avo = on_terrain(b, tile)   # `b` is already the real article
         bk = fc.rounds_to_kill(YARDSTICK, b_on, b_avo)
-        where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
+        where = _tile_text(tile, b)
         if bk == float('inf'):
             out.append('boss %s%s cannot be damaged by the parity yardstick at all -- '
                        'terrain and a personal line are stacking too far' % (uid, where))
@@ -2840,10 +2871,10 @@ def _boss_durability_vs_party(entries, parity_ref, lines, mode=None, shifts=None
         if not ed.get('is_boss'):
             continue
         tile = ed.get('tile_terrain')
-        where = (' on %s (+%d avo/+%d def)' % ((tile,) + terrain_bonus(tile))) if tile else ''
         for c in _entry_combatants(ed, mode=mode, shifts=shifts, real_article=True,
                                    drop_staff=False, distinct=True):
             body, avoid = on_terrain(c, tile)
+            where = _tile_text(tile, c)
             rounds = party_rounds(body, avoid)
             if rounds == inf:
                 out.append('boss %s%s cannot be damaged by the party that meets it'

@@ -209,6 +209,30 @@ strategy: |
   [[Dragonshield]]), and there is a free [[Guiding Ring]] if you reach all four. There isn't a
   turn limit to this chapter, so take all the time you need.
 
+# `strategy:` as claims (#510 step 6): each cites its line above, and tools/strategy.py's
+# docstring says what each kind means to the parity model.
+strategy_claims:
+  - kind: unmodelled
+    topic: arena
+    step: 8
+    cite: "This chapter features the first arena in the game."
+  - kind: unmodelled
+    topic: recruit
+    step: 7
+    cite: "Recruiting Sahnar is less intimidating than it initially appears."
+  - kind: unmodelled
+    topic: objective
+    step: 7
+    cite: "Defeat her to win; her guardians and the moose do not all have to fall."
+  - kind: unmodelled
+    topic: reinforcements
+    step: 7
+    cite: "Reinforcements appear on turn 2 (two spear guards from the southeast), turn 6 (two axe reavers from the east) and turn 8 (two archers next to Ravisin), so make sure that your squishy units aren't undefended."
+  - kind: unmodelled
+    topic: niches
+    step: 7
+    cite: "the undead race to desecrate them."
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   prep_screen: true            # STANDING PROTOCOL since ch01, not a per-chapter call and NOT a

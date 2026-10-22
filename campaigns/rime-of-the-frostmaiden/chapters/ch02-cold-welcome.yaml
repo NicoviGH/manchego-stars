@@ -135,6 +135,34 @@ strategy: |
   so the only remotely pressing purchases are an Iron Lance for Pinky to conserve the Slim
   Lance, and a spare Iron Axe for [[Braulo]].
 
+# `strategy:` as claims (#510 step 6): each cites its line above, and tools/strategy.py's
+# docstring says what each kind means to the parity model.
+strategy_claims:
+  - kind: wall
+    unit: [wolfram, baxby]
+    vs: brigand
+    cite: "Every raider but one carries an axe, so lance users win the trades: Wolfram and Baxby are the best walls here."
+  - kind: unmodelled
+    topic: escort
+    step: 7
+    cite: "You'll need to keep the two green chwinga Priests safe if you want their gifts"
+  - kind: unmodelled
+    topic: range
+    step: 7
+    cite: "Keep Pinky away from the lone archer on the east side until someone has dealt with it."
+  - kind: unmodelled
+    topic: villages
+    step: 8
+    cite: "Visit the two huts beside your start for a Hand Axe and an Elixir"
+  - kind: unmodelled
+    topic: reinforcements
+    step: 7
+    cite: "Beware of the two raiders that arrive from the west edge on turn 3, behind the party."
+  - kind: unmodelled
+    topic: shop
+    step: 8
+    cite: "This is your first chance to do any shopping."
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 # Field parity (decisions.md §"Field parity", 2026-06-10): deploy_limit = vanilla Ch2's
 # player deploy-slot count = 5 (Eirika/Seth/Franz/Gilliam/Moulder). Our 8-strong cast does

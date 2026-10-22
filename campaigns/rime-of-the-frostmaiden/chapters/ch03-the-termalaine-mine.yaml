@@ -140,6 +140,37 @@ strategy: |
   for Trex to claim their items before the rest of your units finish them off. Evil Eye is
   magic, so send units with good [[Resistance]] into the Grell's reach and heal between attacks.
 
+# `strategy:` as claims (#510 step 6): each cites its line above, and tools/strategy.py's
+# docstring says what each kind means to the parity model.
+strategy_claims:
+  - kind: threat
+    vs: [brigand, mercenary, archer]
+    cite: "The Grell is a Mogall with Evil Eye and does not move, so the danger is the kobolds on the way down."
+  - kind: unmodelled
+    topic: recruit
+    step: 7
+    cite: "Trex waits in the galleries as a green unit from turn 1 and can be recruited by talking to him with any party member."
+  - kind: unmodelled
+    topic: keys
+    step: 8
+    cite: "two kobolds carry the keys: one drops a Door Key, the other a Chest Key."
+  - kind: unmodelled
+    topic: range
+    step: 7
+    cite: "The kobold throwers carry Hand Axes and hit from two tiles, and a slinger with a bow covers the middle rooms, so keep Pinky back until it falls."
+  - kind: unmodelled
+    topic: steal
+    step: 8
+    cite: "Keep watch of the enemy Thief, a svirfneblin."
+  - kind: unmodelled
+    topic: drops
+    step: 8
+    cite: "The Antitoxin kobold and, more importantly, the Pure Water kobold can easily be lured out for Trex to claim their items before the rest of your units finish them off."
+  - kind: unmodelled
+    topic: healing
+    step: 8
+    cite: "Evil Eye is magic, so send units with good Resistance into the Grell's reach and heal between attacks."
+
 # ── Deployment ──────────────────────────────────────────────────────────────────
 deployment:
   # Field parity: deploy_limit = vanilla FE8 Ch3 player deploy-slot count (decisions.md §Field parity;
