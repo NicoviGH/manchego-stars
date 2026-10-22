@@ -12,7 +12,8 @@ from inject.battle_anims import (
     VENDORED_ANIM_DIR, _class_field_symbol, append_banim_link_block, banim_append_row,
     banim_clone_conf, banim_repoint_conf)
 from inject.decomp import (
-    _find_brace_block, _replace_brace_block, _table_close_line, REPO, vanilla_decomp_text)
+    _find_brace_block, _replace_brace_block, _table_close_line, enum_values, REPO,
+    vanilla_decomp_text)
 from inject.paths import (
     BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_POINTER_H,
     BANIMCONF_C, CLASSES_C, CLASSES_H, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
@@ -47,21 +48,15 @@ def _append_table_rows(path, decl, rows):
 
 
 def _parse_class_enum_values():
-    """CLASS_X -> int value from constants/classes.h (move/class tables index by id-1)."""
-    out = {}
-    pat = re.compile(r'(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)')
+    """CLASS_X -> int value from the BUILD tree's constants/classes.h, appended slots included
+    (move/class tables index by id-1)."""
     with open(CLASSES_H, encoding='utf-8') as f:
-        for line in f:
-            m = pat.search(line)
-            if m:
-                out[m.group(1)] = int(m.group(2), 0)
-    return out
+        return enum_values(f.read(), 'CLASS_')
 
 
 def vanilla_class_values():
     """CLASS_X -> int for VANILLA FE8 only (submodule HEAD), so an appended slot never counts."""
-    return {k: int(v, 0) for k, v in re.findall(r'(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)',
-                                               vanilla_decomp_text('include/constants/classes.h'))}
+    return enum_values(vanilla_decomp_text('include/constants/classes.h'), 'CLASS_')
 
 
 def _move_table_len():

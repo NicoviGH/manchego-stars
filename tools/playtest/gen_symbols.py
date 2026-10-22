@@ -35,7 +35,7 @@ from collections import namedtuple
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
 from inject.class_ids import DEFAULT_CAMPAIGN  # noqa: E402
-from inject.decomp import DECOMP, vanilla_decomp_text  # noqa: E402  the build tree (#408, ITEM_ENUM)
+from inject.decomp import DECOMP, enum_values, vanilla_decomp_text  # noqa: E402  the build tree (#408, ITEM_ENUM)
 from yaml_loader import yaml_load  # noqa: E402
 ELF = os.environ.get('PT_ELF') or os.path.join(DECOMP, 'fireemblem8.elf')   # PT_VANILLA (run.sh)
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -355,18 +355,16 @@ def reskin_classes(campaign=DEFAULT_CAMPAIGN):
     with open(os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml'), encoding='utf-8') as f:
         reskins = (yaml_load(f) or {}).get('enemy_class_reskins') or []
     with open(os.path.join(DECOMP, 'include', 'constants', 'classes.h'), encoding='utf-8') as f:
-        enums = dict(re.findall(r'(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', f.read()))
+        enums = enum_values(f.read(), 'CLASS_')
     missing = [rk['slot'] for rk in reskins if rk['slot'] not in enums]
     if missing:
         raise KeyError('reskin slot(s) %s are not in the built classes.h' % ', '.join(missing))
-    return {rk['id']: int(enums[rk['slot']], 0) for rk in reskins}
+    return {rk['id']: enums[rk['slot']] for rk in reskins}
 
 
 def _enum_values(relpath, prefix):
     """{ENUM: int} for one vanilla decomp header (HEAD, never the patched build tree)."""
-    text = vanilla_decomp_text(relpath)
-    return {k: int(v, 0) for k, v in
-            re.findall(r'(%s[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)' % prefix, text)}
+    return enum_values(vanilla_decomp_text(relpath), prefix)
 
 
 def campaign_ids(campaign=DEFAULT_CAMPAIGN):

@@ -1282,7 +1282,8 @@ def aid_of(cls_enum, con, char_block=''):
     """FE8's GetUnitAid: con - 1 on foot; 25 - con mounted (20 - con for a female mount).
     UNIT_CATTRIBUTES is the character's attributes OR the class's, and CA_FEMALE lives on the
     character (no class carries it), so `char_block` is the pid's injected CharacterData."""
-    attrs = unit_load._class_block(cls_enum) + char_block
+    attrs = (unit_load.attributes_in(unit_load._class_block(cls_enum))
+             | unit_load.attributes_in(char_block))
     return (con - 1 if 'CA_MOUNTEDAID' not in attrs else
             (20 - con if 'CA_FEMALE' in attrs else 25 - con))
 

@@ -84,10 +84,7 @@ def class_relative_power(class_enum):
 def class_attributes(class_enum):
     """The `CA_*` flags on a class, as a frozenset. Empty for a class with no `.attributes`
     line at all (CLASS_PIRATE, CLASS_SOLDIER) -- absent means zero, not inherited."""
-    m = re.search(r'\.attributes\s*=\s*([^;]*?),\n', _class_block(class_enum))
-    if not m:
-        return frozenset()
-    return frozenset(t.strip() for t in m.group(1).split('|') if t.strip())
+    return unit_load.attributes_in(_class_block(class_enum))
 
 
 @functools.lru_cache(maxsize=None)
@@ -112,10 +109,7 @@ def character_attributes(char_enum):
         s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % char_enum, inject.paths.CHARACTERS_C)
     except SystemExit:
         return frozenset()
-    m = re.search(r'\.attributes\s*=\s*([^;]*?),\n', text[s:e])
-    if not m:
-        return frozenset()
-    return frozenset(t.strip() for t in m.group(1).split('|') if t.strip())
+    return unit_load.attributes_in(text[s:e])
 
 
 # ---------------------------------------------------------------------------------------
