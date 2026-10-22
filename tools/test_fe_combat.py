@@ -67,8 +67,22 @@ class Triangle(unittest.TestCase):
     def test_sword_neutral_vs_bow(self):
         self.assertEqual(fc.triangle('sword', 'bow'), 0)
 
-    def test_magic_off_triangle(self):
-        self.assertEqual(fc.triangle('magic', 'sword'), 0)
+    def test_light_beats_dark(self):
+        # The magic triangle runs anima > light > dark > anima (sWeaponTriangleRules).
+        self.assertEqual(fc.triangle('light', 'dark'), 1)
+        self.assertEqual(fc.triangle('dark', 'light'), -1)
+        self.assertEqual(fc.triangle('anima', 'light'), 1)
+        self.assertEqual(fc.triangle('dark', 'anima'), 1)
+
+    def test_tome_vs_physical_is_neutral(self):
+        self.assertEqual(fc.triangle('anima', 'sword'), 0)
+        self.assertEqual(fc.triangle('axe', 'dark'), 0)
+
+    def test_only_tome_kinds_are_magic(self):
+        # Which weapons are tomes is checked against the decomp in test_difficulty.
+        self.assertEqual(fc.MAGIC_KINDS, {'anima', 'light', 'dark'})
+        for kind in ('sword', 'lance', 'axe', 'bow', 'staff', 'monster'):
+            self.assertFalse(fc.is_magic(kind), kind)
 
 
 def attacker(pow_, weapon, skl=0, lck=0, con=20):
@@ -98,6 +112,11 @@ class Damage(unittest.TestCase):
         # Sclorbo's lightning vs the armored chief (Def 9, Res 0): ignores the plate.
         atk = attacker(5, fc.W['lightning'])             # 5 + 4 mt, vs Res 0
         self.assertEqual(fc.damage(atk, defender(df=9, res=0)), 9)
+
+    def test_light_vs_dark_adds_one_might(self):
+        # Vanilla Artur's Lightning vs a Mogall's Evil Eye (both tomes): light beats dark.
+        atk = attacker(5, fc.W['lightning'])             # 5 + 4 + 1, vs Res 3
+        self.assertEqual(fc.damage(atk, defender(res=3, weapon=fc.W['evil-eye'])), 7)
 
     def test_effective_weapon_triples_the_weapon_half(self):
         # Vanilla Eirika rapier (sword) vs the Armor boss with a lance (Def 9): sword
@@ -135,6 +154,13 @@ class HitChance(unittest.TestCase):
     def test_triangle_advantage_adds_fifteen_hit(self):
         atk = attacker(0, fc.W['iron-axe'])                  # axe vs lance: +15
         self.assertEqual(fc.hit_chance(atk, defender(weapon=fc.W['iron-lance'])), 90)
+
+    def test_magic_triangle_moves_hit_fifteen(self):
+        # Lightning 95 hit; vs Evil Eye +15 -> 110, clamped. Evil Eye 85 vs Lightning -15.
+        self.assertEqual(fc.hit_chance(attacker(0, fc.W['lightning']),
+                                       defender(weapon=fc.W['evil-eye'])), 100)
+        self.assertEqual(fc.hit_chance(attacker(0, fc.W['evil-eye']),
+                                       defender(weapon=fc.W['lightning'])), 70)
 
     def test_avoid_subtracts_double_as_plus_luck(self):
         # Defender AS 10 (Spd 10, bow Wt5, Con 20) + Lck 5 -> avoid 25. iron-bow 85 - 25.
