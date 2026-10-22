@@ -55,8 +55,18 @@ from inject.decomp import ITEM_ENUM   # the one item id -> ITEM_ enum table (#49
 # and 'slayer' (x3 Mt against 'monster', `IsUnitEffectiveAgainst`, bmitem.c).
 EFFECTIVENESS_LISTS = {'armor': 'Armor', 'cav': 'Horse', 'flier': 'Flier',
                        'monster': 'Monsters'}
-# `IsUnitEffectiveAgainst` switches on class ids 0x2B/0x2C, CLASS_BISHOP and CLASS_BISHOP_F.
-SLAYER_CLASSES = ('CLASS_BISHOP', 'CLASS_BISHOP_F')
+
+
+@functools.lru_cache(maxsize=None)
+def slayer_classes():
+    """The classes `IsUnitEffectiveAgainst` (bmitem.c) makes x3 against the Monsters list. It
+    switches on raw class ids (0x2B, 0x2C), named here through include/constants/classes.h."""
+    fn = re.search(r's8 IsUnitEffectiveAgainst\(.*?\n\}',
+                   inject.decomp.vanilla_decomp_text('src/bmitem.c'), re.S).group(0)
+    ids = {int(v, 16) for v in re.findall(r'case (0x[0-9A-Fa-f]+):', fn)}
+    enum = inject.decomp.vanilla_decomp_text('include/constants/classes.h')
+    return frozenset(name for name, v in re.findall(r'(CLASS_\w+)\s*=\s*(0x[0-9A-Fa-f]+)', enum)
+                     if int(v, 16) in ids)
 
 
 @functools.lru_cache(maxsize=None)
@@ -72,14 +82,13 @@ def class_tags(class_enum):
     """The fe_combat tags a unit of `class_enum` carries; see EFFECTIVENESS_LISTS."""
     lists = effectiveness_lists()
     tags = {tag for tag, name in EFFECTIVENESS_LISTS.items() if class_enum in lists[name]}
+    import exp_curve                        # exp_curve imports this module
     try:
-        block = unit_load._class_block(class_enum)
-    except KeyError:
-        block = ''
-    attrs = re.search(r'\.attributes\s*=\s*([^,]+),', block)
-    if attrs and 'CA_CRITBONUS' in re.findall(r'\w+', attrs.group(1)):
-        tags.add('critbonus')
-    if class_enum in SLAYER_CLASSES:
+        if 'CA_CRITBONUS' in exp_curve.class_attributes(class_enum):
+            tags.add('critbonus')
+    except KeyError:                        # a raw class number: no class block to read
+        pass
+    if class_enum in slayer_classes():
         tags.add('slayer')
     return frozenset(tags)
 

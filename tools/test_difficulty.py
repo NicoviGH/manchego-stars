@@ -1311,6 +1311,7 @@ class VanillaEnemies(unittest.TestCase):
         self.assertIn('critbonus', df.class_tags('CLASS_BERSERKER'))
         self.assertNotIn('critbonus', df.class_tags('CLASS_MYRMIDON'))
         self.assertEqual(df.class_tags('CLASS_BISHOP'), frozenset({'slayer'}))
+        self.assertEqual(df.slayer_classes(), frozenset({'CLASS_BISHOP', 'CLASS_BISHOP_F'}))
         self.assertEqual(df.class_tags('CLASS_MOGALL'), frozenset({'monster'}))
         self.assertEqual(df.class_tags('CLASS_RANGER'), frozenset({'cav'}))
 

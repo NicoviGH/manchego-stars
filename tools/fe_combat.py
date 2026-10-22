@@ -13,7 +13,7 @@ Combat model (bmbattle.c line cites):
   Avoid   = AS*2 + terrainAvoid + Lck                       (l.582)
   HitShown= clamp(atkHit - defAvoid, 0, 100)               (l.600-603)
   P(hit)  = Roll2RN(HitShown): floored mean of two 0-99 rolls < HitShown  (rng.c, l.1008)
-  Crit    = max(0, wpnCrit + Skl//2 - defLck), rolled on 1RN once a strike connects; a crit
+  Crit    = max(0, wpnCrit + Skl//2 [+15 crit-bonus class] - defLck), rolled on 1RN once a strike connects; a crit
             deals Damage x3                                 (l.1030-1039)
   Atk     = Pow + (wpnMt + triangleDmg)  (the Mt+tri HALF x3 if effective, l.527-556:
             battleAttack = Mt + tri, tripled on effectiveness, THEN += Pow)
@@ -159,6 +159,8 @@ class Combatant:
     lck: int
     con: int
     weapon: Weapon
+    # Class facts (difficulty.class_tags). As a DEFENDER: armor/cav/flier/monster, the
+    # effectiveness lists a weapon's `effective` names. As an ATTACKER: critbonus, slayer.
     tags: frozenset = field(default_factory=frozenset)
     # Every weapon the unit carries, in inventory order; `weapon` is the one it has equipped,
     # which is what it counters with. Empty means `weapon` alone. See `arms`.
