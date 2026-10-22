@@ -1291,18 +1291,29 @@ class VanillaEnemies(unittest.TestCase):
 
     def test_every_weapon_kind_is_its_decomp_weapon_type(self):
         # fe_combat's kind IS the item's `.weaponType` (data_items.c at HEAD): the triangle
-        # and the Res/Def choice both key on it, so a tome typed by hand as one generic
-        # 'magic' kind missed anima > light > dark > anima (#510).
+        # keys on it, so a tome typed by hand as one generic 'magic' kind missed
+        # anima > light > dark > anima (#510). Res vs Def is the item's IA_MAGIC attribute
+        # in the engine (`ComputeBattleUnitDefense`); is_magic must agree with it.
         itype = {'ITYPE_SWORD': 'sword', 'ITYPE_LANCE': 'lance', 'ITYPE_AXE': 'axe',
                  'ITYPE_BOW': 'bow', 'ITYPE_STAFF': 'staff', 'ITYPE_ANIMA': 'anima',
                  'ITYPE_LIGHT': 'light', 'ITYPE_DARK': 'dark', 'ITYPE_MONSTER': 'monster'}
         items = inject.decomp.vanilla_decomp_text('src/data_items.c')
+        checked = 0
         for key, enum in df.ITEM_ENUM.items():
             if key not in fc.W:
                 continue
-            body = re.search(r'\[%s\] = \{(.*?)\n\t\},' % enum, items, re.S).group(1)
-            wtype = re.search(r'\.weaponType = (ITYPE_\w+)', body).group(1)
-            self.assertEqual(fc.W[key].kind, itype[wtype], key)
+            block = re.search(r'\[%s\] = \{(.*?)\n\t\},' % enum, items, re.S)
+            self.assertIsNotNone(block, '%s: no %s entry in data_items.c' % (key, enum))
+            wtype = re.search(r'\.weaponType = (ITYPE_\w+)', block.group(1))
+            attrs = re.search(r'\.attributes = ([^,]+),', block.group(1))
+            self.assertIsNotNone(wtype, '%s: no .weaponType' % key)
+            self.assertIsNotNone(attrs, '%s: no .attributes' % key)
+            self.assertIn(wtype.group(1), itype, '%s: unmapped %s' % (key, wtype.group(1)))
+            self.assertEqual(fc.W[key].kind, itype[wtype.group(1)], key)
+            self.assertEqual(fc.is_magic(fc.W[key].kind),
+                             'IA_MAGIC' in re.findall(r'\w+', attrs.group(1)), key)
+            checked += 1
+        self.assertEqual(checked, len(fc.W))
 
     def test_triangle_rules_are_the_decomps(self):
         battle = inject.decomp.vanilla_decomp_text('src/bmbattle.c')

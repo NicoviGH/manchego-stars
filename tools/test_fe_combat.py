@@ -78,9 +78,11 @@ class Triangle(unittest.TestCase):
         self.assertEqual(fc.triangle('anima', 'sword'), 0)
         self.assertEqual(fc.triangle('axe', 'dark'), 0)
 
-    def test_tomes_are_magic_and_nothing_else_is(self):
-        tomes = {k for k, w in fc.W.items() if fc.is_magic(w.kind)}
-        self.assertEqual(tomes, {'fire', 'lightning', 'flux', 'thunder', 'elfire', 'evil-eye'})
+    def test_only_tome_kinds_are_magic(self):
+        # Which weapons are tomes is checked against the decomp in test_difficulty.
+        self.assertEqual(fc.MAGIC_KINDS, {'anima', 'light', 'dark'})
+        for kind in ('sword', 'lance', 'axe', 'bow', 'staff', 'monster'):
+            self.assertFalse(fc.is_magic(kind), kind)
 
 
 def attacker(pow_, weapon, skl=0, lck=0, con=20):
