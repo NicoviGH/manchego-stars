@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-21 (Claude, after #518). **The parity model is being rebuilt before any party or chapter
+Refreshed 2026-10-21 (Claude, #519 open). **The parity model is being rebuilt before any party or chapter
 change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
 grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
 Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
@@ -39,9 +39,14 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
    (`inject.cast.load_order`, proven by `ch07blueorder`); ch01 Difficult went OK at its
    residual's edge (x1.407 vs 1.41). #518 closed step 5's open item: slot order = join order on
    both sides (the twin's Moulder now sits before Ross/Garcia), `vanilla_recruits` raises on
-   any join order the player could change, and the enemy-cap invariant is a test. Next: **step 6: strategy as data** (curate each twin's wiki
-   Strategy section into per-chapter claims, used as model inputs and as checks), then 7-9, each
-   with an in-engine proof and the verdict diff. Stop when a step moves no verdict.
+   any join order the player could change, and the enemy-cap invariant is a test.
+   **Step 6 is PR #519 (ADR 0359), awaiting CI and Nicolas's "merge":** Strategy sections as
+   cited claims (the twins' in a YAML beside the wiki vendor, ours in each chapter's
+   `strategy_claims:`), checked and printed by `make difficulty CH=chNN`, **never a model
+   input** (Nicolas, 2026-10-21: terrain as an input took ch01 x1.10 -> x0.48 on one sentence).
+   It moves no verdict by construction, so the stopping rule does not count it; findings are
+   on #510. Next: **step 7** (reach, time, AI; `unmodelled` step-7 claims list what it
+   inherits), then 8-9, each with an in-engine proof and the verdict diff.
    - Verdicts OFF now: ch01 Tutorial/Normal; ch02, ch03, ch04 on Difficult (ch01 Difficult
      reads OK at its ceiling's edge). All of it waits for step 10; nothing is widened.
    - `party_matchup` reads each unit as ONE Combatant whose stats are numpy arrays over the
