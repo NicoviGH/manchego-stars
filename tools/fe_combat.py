@@ -13,7 +13,7 @@ Combat model (bmbattle.c line cites):
   Avoid   = AS*2 + terrainAvoid + Lck                       (l.582)
   HitShown= clamp(atkHit - defAvoid, 0, 100)               (l.600-603)
   P(hit)  = Roll2RN(HitShown): floored mean of two 0-99 rolls < HitShown  (rng.c, l.1008)
-  Crit    = max(0, wpnCrit + Skl//2 - defLck), rolled on 1RN once a strike connects; a crit
+  Crit    = max(0, wpnCrit + Skl//2 [+15 crit-bonus class] - defLck), rolled on 1RN once a strike connects; a crit
             deals Damage x3                                 (l.1030-1039)
   Atk     = Pow + (wpnMt + triangleDmg)  (the Mt+tri HALF x3 if effective, l.527-556:
             battleAttack = Mt + tri, tripled on effectiveness, THEN += Pow)
@@ -162,6 +162,8 @@ class Combatant:
     lck: int
     con: int
     weapon: Weapon
+    # Class facts (difficulty.class_tags). As a DEFENDER: armor/cav/flier/monster, the
+    # effectiveness lists a weapon's `effective` names. As an ATTACKER: critbonus, slayer.
     tags: frozenset = field(default_factory=frozenset)
     # Every weapon the unit carries, in inventory order; `weapon` is the one it has equipped,
     # which is what it counters with. Empty means `weapon` alone. See `arms`.
@@ -228,12 +230,13 @@ def damage(atk, dfn):
     against Res, everything else against Def; an effective weapon triples the WEAPON
     half only (Mt + triangle) -- Pow is added after, per the decomp
     (bmbattle.c ComputeBattleUnitAttack: battleAttack = Mt + tri, x3 on
-    effectiveness, then += Pow; the sacred-twins x2 special case is not modeled)."""
+    effectiveness, then += Pow; the sacred-twins x2 special case is not modeled). A
+    'slayer' attacker (a Bishop, `IsUnitEffectiveAgainst`) triples the same half on a monster."""
     if atk.weapon is None:                # a weaponless support unit can't attack
         return 0
     tri = triangle(atk.weapon.kind, dfn.weapon.kind) if dfn.weapon else 0
     raw = atk.weapon.mt + tri
-    if atk.weapon.effective & dfn.tags:
+    if atk.weapon.effective & dfn.tags or ('slayer' in atk.tags and 'monster' in dfn.tags):
         raw *= 3
     raw += atk.pow
     defence = dfn.res if is_magic(atk.weapon.kind) else dfn.df
@@ -270,10 +273,11 @@ def _true_hit(displayed):
 def crit_rate(atk, dfn):
     """`ComputeBattleUnitCritRate` less `ComputeBattleUnitEffectiveCritRate`'s dodge: weapon
     crit + Skl/2 - the defender's Lck, floored at 0. Rolled on 1RN, so the rate is the
-    probability. The +15 of a crit-bonus class is not modelled."""
+    probability. A crit-bonus class (Swordmaster, Berserker, the trainees' third tier) adds 15."""
     if atk.weapon is None:
         return 0
-    return clamp(atk.weapon.crit + atk.skl // 2 - dfn.lck, 0, 100)
+    bonus = 15 if 'critbonus' in atk.tags else 0
+    return clamp(atk.weapon.crit + atk.skl // 2 + bonus - dfn.lck, 0, 100)
 
 
 def expected_hits(atk, dfn, terrain_avoid=0):

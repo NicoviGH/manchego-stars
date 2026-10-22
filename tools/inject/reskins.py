@@ -17,6 +17,7 @@ from inject.paths import (
     BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_POINTER_H,
     BANIMCONF_C, CLASSES_C, CLASSES_H, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
     UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_S, WAIT_GFX_DIR)
+from inject.class_ids import vanilla_class_values
 from inject.sms import _write_wait_row, claim_sms_id
 from inject.stats import _set_field
 
@@ -56,12 +57,6 @@ def _parse_class_enum_values():
             if m:
                 out[m.group(1)] = int(m.group(2), 0)
     return out
-
-
-def vanilla_class_values():
-    """CLASS_X -> int for VANILLA FE8 only (submodule HEAD), so an appended slot never counts."""
-    return {k: int(v, 0) for k, v in re.findall(r'(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)',
-                                               vanilla_decomp_text('include/constants/classes.h'))}
 
 
 def _move_table_len():

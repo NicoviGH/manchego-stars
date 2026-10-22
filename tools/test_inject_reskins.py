@@ -10,6 +10,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.chapters.ch01
+import inject.class_ids
 import inject.reskins
 
 
@@ -145,7 +146,7 @@ class AppendedSlotIds(unittest.TestCase):
     def test_the_live_campaign_is_clean(self):
         self.assertEqual([], inject.reskins.slot_id_violations(
             inject.reskins.enemy_class_reskins('rime-of-the-frostmaiden'),
-            inject.reskins.vanilla_class_values()))
+            inject.class_ids.vanilla_class_values()))
 
     def test_a_new_slot_without_an_id_is_told_the_next_free_one(self):
         got = inject.reskins.slot_id_violations(

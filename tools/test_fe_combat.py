@@ -127,6 +127,14 @@ class Damage(unittest.TestCase):
         boss = defender(df=9, weapon=fc.W['iron-lance'], tags=frozenset({'armor'}))
         self.assertEqual(fc.damage(eirika, boss), 13)
 
+    def test_a_slayer_class_triples_on_a_monster(self):
+        # IsUnitEffectiveAgainst: a Bishop's weapon half x3 on a Monsters-list class.
+        bishop = fc.Combatant('b', hp=20, pow=2, skl=0, spd=0, df=0, res=0, lck=0, con=20,
+                              weapon=fc.W['lightning'], tags=frozenset({'slayer'}))
+        mogall = defender(res=3, tags=frozenset({'monster'}))
+        self.assertEqual(fc.damage(bishop, mogall), 4 * 3 + 2 - 3)
+        self.assertEqual(fc.damage(bishop, defender(res=3)), 4 + 2 - 3)
+
     def test_damage_never_negative(self):
         atk = attacker(1, fc.W['iron-sword'])            # 1 + 5 mt vs Def 20
         self.assertEqual(fc.damage(atk, defender(df=20, weapon=fc.W['iron-axe'])), 0)
@@ -223,6 +231,11 @@ class CritRate(unittest.TestCase):
     def test_weapon_crit_plus_half_skill_minus_luck(self):
         atk = attacker(0, fc.W['killing-edge'], skl=9)        # 30 + 4
         self.assertEqual(fc.crit_rate(atk, defender(lck=5)), 29)
+
+    def test_a_crit_bonus_class_adds_fifteen(self):
+        atk = fc.replace(attacker(0, fc.W['killing-edge'], skl=9),
+                         tags=frozenset({'critbonus'}))               # 30 + 4 + 15
+        self.assertEqual(fc.crit_rate(atk, defender(lck=5)), 44)
 
     def test_luck_dodge_floors_at_zero(self):
         atk = attacker(0, fc.W['iron-sword'], skl=4)          # 0 + 2

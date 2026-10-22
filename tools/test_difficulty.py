@@ -22,6 +22,7 @@ import fe_combat as fc
 import difficulty as df
 from inject.decomp import ITEM_ENUM
 import inject.cast
+import inject.class_ids
 import inject.decomp
 import inject.chapter_settings
 import inject.chapters.prologue
@@ -1289,6 +1290,30 @@ class VanillaEnemies(unittest.TestCase):
                          {e: k for k, e in df.ITEM_ENUM.items() if k in fc.W})
         for key in df.ITEM_TO_WEAPON.values():
             self.assertIn(key, fc.W)
+
+    def test_class_tags_reproduce_each_weapons_effectiveness_list(self):
+        # IsItemEffectiveAgainst is exact class-id membership in the item's list; the tags a
+        # weapon is effective on must pick out exactly that list, over every class (#510:
+        # a hand-kept table left Rangers and Troubadours off the Horse list).
+        lists = df.effectiveness_lists()
+        classes = set(re.findall(r'\.number = (CLASS_\w+),',
+                                 inject.decomp.vanilla_decomp_text('src/data_classes.c')))
+        for key, enum in df.ITEM_ENUM.items():
+            if key not in fc.W:
+                continue
+            eff = re.search(r'\.pEffectiveness\s*=\s*ItemEffectiveness_(\w+),',
+                            unit_load._item_block(enum))
+            hit = {c for c in classes if df.class_tags(c) & fc.W[key].effective}
+            self.assertEqual(hit, lists[eff.group(1)] if eff else set(), key)
+
+    def test_class_attributes_become_tags(self):
+        self.assertIn('critbonus', df.class_tags('CLASS_SWORDMASTER'))
+        self.assertIn('critbonus', df.class_tags('CLASS_BERSERKER'))
+        self.assertNotIn('critbonus', df.class_tags('CLASS_MYRMIDON'))
+        self.assertEqual(df.class_tags('CLASS_BISHOP'), frozenset({'slayer'}))
+        self.assertEqual(inject.class_ids.slayer_classes(), frozenset({'CLASS_BISHOP', 'CLASS_BISHOP_F'}))
+        self.assertEqual(df.class_tags('CLASS_MOGALL'), frozenset({'monster'}))
+        self.assertEqual(df.class_tags('CLASS_RANGER'), frozenset({'cav'}))
 
     def test_every_weapon_kind_is_its_decomp_weapon_type(self):
         # fe_combat's kind IS the item's `.weaponType` (data_items.c at HEAD): the triangle
