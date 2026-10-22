@@ -52,6 +52,15 @@ def class_display_name(token):
 
 
 @functools.lru_cache(maxsize=None)
+def vanilla_class_values():
+    """CLASS_X -> its id, for every vanilla class given a number (HEAD, as above). An alias
+    (`CLASS_OBSTACLE = CLASS_EPHRAIM_LORD`) has no number of its own and is left out."""
+    text = vanilla_decomp_text('include/constants/classes.h')
+    return {k: int(v, 0) for k, v in
+            re.findall(r'^\s*(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', text, re.M)}
+
+
+@functools.lru_cache(maxsize=None)
 def vanilla_class_enums():
     """Every enum name in vanilla FE8's class table (HEAD of the submodule, never the patched
     build tree, so a reskin's appended slot can never pass for a vanilla class)."""

@@ -64,9 +64,8 @@ def slayer_classes():
     fn = re.search(r's8 IsUnitEffectiveAgainst\(.*?\n\}',
                    inject.decomp.vanilla_decomp_text('src/bmitem.c'), re.S).group(0)
     ids = {int(v, 16) for v in re.findall(r'case (0x[0-9A-Fa-f]+):', fn)}
-    enum = inject.decomp.vanilla_decomp_text('include/constants/classes.h')
-    return frozenset(name for name, v in re.findall(r'(CLASS_\w+)\s*=\s*(0x[0-9A-Fa-f]+)', enum)
-                     if int(v, 16) in ids)
+    return frozenset(name for name, v in inject.class_ids.vanilla_class_values().items()
+                     if v in ids)
 
 
 @functools.lru_cache(maxsize=None)

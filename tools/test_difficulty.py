@@ -27,6 +27,7 @@ import inject.chapter_settings
 import inject.chapters.prologue
 import inject.hosting
 import inject.stats
+import unit_load
 import yaml
 
 
@@ -1293,16 +1294,14 @@ class VanillaEnemies(unittest.TestCase):
         # IsItemEffectiveAgainst is exact class-id membership in the item's list; the tags a
         # weapon is effective on must pick out exactly that list, over every class (#510:
         # a hand-kept table left Rangers and Troubadours off the Horse list).
-        items = inject.decomp.vanilla_decomp_text('src/data_items.c')
         lists = df.effectiveness_lists()
         classes = set(re.findall(r'\.number = (CLASS_\w+),',
                                  inject.decomp.vanilla_decomp_text('src/data_classes.c')))
         for key, enum in df.ITEM_ENUM.items():
             if key not in fc.W:
                 continue
-            block = re.search(r'\[%s\] = \{(.*?)\n\t\},' % enum, items, re.S)
-            self.assertIsNotNone(block, key)
-            eff = re.search(r'\.pEffectiveness = ItemEffectiveness_(\w+),', block.group(1))
+            eff = re.search(r'\.pEffectiveness\s*=\s*ItemEffectiveness_(\w+),',
+                            unit_load._item_block(enum))
             hit = {c for c in classes if df.class_tags(c) & fc.W[key].effective}
             self.assertEqual(hit, lists[eff.group(1)] if eff else set(), key)
 
