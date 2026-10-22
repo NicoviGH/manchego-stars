@@ -209,12 +209,13 @@ def damage(atk, dfn):
     against Res, everything else against Def; an effective weapon triples the WEAPON
     half only (Mt + triangle) -- Pow is added after, per the decomp
     (bmbattle.c ComputeBattleUnitAttack: battleAttack = Mt + tri, x3 on
-    effectiveness, then += Pow; the sacred-twins x2 special case is not modeled)."""
+    effectiveness, then += Pow; the sacred-twins x2 special case is not modeled). A
+    'slayer' attacker (a Bishop, `IsUnitEffectiveAgainst`) triples the same half on a monster."""
     if atk.weapon is None:                # a weaponless support unit can't attack
         return 0
     tri = triangle(atk.weapon.kind, dfn.weapon.kind) if dfn.weapon else 0
     raw = atk.weapon.mt + tri
-    if atk.weapon.effective & dfn.tags:
+    if atk.weapon.effective & dfn.tags or ('slayer' in atk.tags and 'monster' in dfn.tags):
         raw *= 3
     raw += atk.pow
     defence = dfn.res if atk.weapon.kind == 'magic' else dfn.df
@@ -251,10 +252,11 @@ def _true_hit(displayed):
 def crit_rate(atk, dfn):
     """`ComputeBattleUnitCritRate` less `ComputeBattleUnitEffectiveCritRate`'s dodge: weapon
     crit + Skl/2 - the defender's Lck, floored at 0. Rolled on 1RN, so the rate is the
-    probability. The +15 of a crit-bonus class is not modelled."""
+    probability. A crit-bonus class (Swordmaster, Berserker, the trainees' third tier) adds 15."""
     if atk.weapon is None:
         return 0
-    return clamp(atk.weapon.crit + atk.skl // 2 - dfn.lck, 0, 100)
+    bonus = 15 if 'critbonus' in atk.tags else 0
+    return clamp(atk.weapon.crit + atk.skl // 2 + bonus - dfn.lck, 0, 100)
 
 
 def expected_hits(atk, dfn, terrain_avoid=0):

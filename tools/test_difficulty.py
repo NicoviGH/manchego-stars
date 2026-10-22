@@ -1289,6 +1289,31 @@ class VanillaEnemies(unittest.TestCase):
         for key in df.ITEM_TO_WEAPON.values():
             self.assertIn(key, fc.W)
 
+    def test_class_tags_reproduce_each_weapons_effectiveness_list(self):
+        # IsItemEffectiveAgainst is exact class-id membership in the item's list; the tags a
+        # weapon is effective on must pick out exactly that list, over every class (#510:
+        # a hand-kept table left Rangers and Troubadours off the Horse list).
+        items = inject.decomp.vanilla_decomp_text('src/data_items.c')
+        lists = df.effectiveness_lists()
+        classes = set(re.findall(r'\.number = (CLASS_\w+),',
+                                 inject.decomp.vanilla_decomp_text('src/data_classes.c')))
+        for key, enum in df.ITEM_ENUM.items():
+            if key not in fc.W:
+                continue
+            block = re.search(r'\[%s\] = \{(.*?)\n\t\},' % enum, items, re.S)
+            self.assertIsNotNone(block, key)
+            eff = re.search(r'\.pEffectiveness = ItemEffectiveness_(\w+),', block.group(1))
+            hit = {c for c in classes if df.class_tags(c) & fc.W[key].effective}
+            self.assertEqual(hit, lists[eff.group(1)] if eff else set(), key)
+
+    def test_class_attributes_become_tags(self):
+        self.assertIn('critbonus', df.class_tags('CLASS_SWORDMASTER'))
+        self.assertIn('critbonus', df.class_tags('CLASS_BERSERKER'))
+        self.assertNotIn('critbonus', df.class_tags('CLASS_MYRMIDON'))
+        self.assertEqual(df.class_tags('CLASS_BISHOP'), frozenset({'slayer'}))
+        self.assertEqual(df.class_tags('CLASS_MOGALL'), frozenset({'monster'}))
+        self.assertEqual(df.class_tags('CLASS_RANGER'), frozenset({'cav'}))
+
     def test_ch13_reference_is_the_hamill_canyon_force(self):
         # 52 armed-RED defs across the 11 curated ch13a arrays (boss squad + main force +
         # Pablo wave + cav/merc/wyvern packs + Amelia); the 2 staff-only healers (sleep,
