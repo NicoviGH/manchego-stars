@@ -24,12 +24,10 @@ female variant without anything, and the Wyvern Lord line, Gargoyles and Mage Kn
   `ComputeBattleUnitCritRate`) and `slayer` (a Bishop's x3 against a monster,
   `IsUnitEffectiveAgainst`'s hard-coded class ids).
 
-**Scope: vanilla HEAD, not the built ROM.** A reskin is a clone class with a new id
-(`campaign.yaml` `enemy_class_reskins`: the Shark Rider on CLASS_CAVALIER, the Ironshell on
-CLASS_ARMOR_KNIGHT), and no injector adds a clone to the `ItemEffectiveness_*` lists. The
-read maps a clone to its base class (`inject.class_ids.vanilla_class_enum`), so it tags a
-Shark Rider `cav`, while in game a Horseslayer does x1 against it. Open on #510: put clones
-on their base class's lists, or read them as the ROM does.
+**A reskin reads as its base class.** The read maps a clone to its base
+(`inject.class_ids.vanilla_class_enum`), which is the intent: reskins are cosmetic and
+story-driven (Nicolas, 2026-10-22). ADR 0362 makes the ROM agree, by putting each clone on
+its base's effectiveness lists.
 
 **What it moved:** nothing (`make verdict-diff`, all three modes). No modeled effective
 weapon meets a Ranger or Troubadour in ch00-ch07, and no crit-bonus class or Bishop fights
