@@ -125,7 +125,7 @@ def _norm(token):
 
 
 def our_labels(chap, mode=None):
-    """(name, type, labels) per body of `chap`'s force, in `chapter_enemy_bodies` order. The type
+    """(name, type, labels) per body of `chap`'s force, in `difficulty.chapter_units` order. The type
     is the body's name (our ids are authored per unit type); the labels add its class,
     'boss' for a boss and 'convertible' for a convertible."""
     shifts = dif.inject.chapter_settings.chapter_difficulty_shifts(chap) if mode else None

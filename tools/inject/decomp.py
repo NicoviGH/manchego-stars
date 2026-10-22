@@ -190,6 +190,14 @@ def enum_values(text, prefix):
             re.findall(r'(%s\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)' % prefix, text)}
 
 
+def asset_table_names(text):
+    """The labels of `gChapterDataAssetTable` (data/data_8B363C.s), in order, from `text`: an
+    asset id (a chapter's `mainLayerId`, `tileConfigId`, `mapEventDataId`...) indexes this
+    list. The one parser of that table: callers pick the text, HEAD for a vanilla id, the
+    build tree for one we registered."""
+    return re.findall(r'^\s*\.word\s+(\w+)', text, re.M)
+
+
 # Bounded, not unbounded: today's readers touch ~9-22 files (~2-5 MB), but #365 proposes a
 # ROMChapterData census, and a census is exactly the caller that walks a big slice of a
 # 6,361-file decomp. 64 entries covers every real working set with room to spare and

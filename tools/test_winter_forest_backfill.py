@@ -3,12 +3,10 @@
 import hashlib
 import json
 import os
-import re
 import struct
-import subprocess
 import unittest
 
-from inject.decomp import git_env
+import map_tileset_tool
 
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -44,28 +42,10 @@ def _metatiles(path):
     return indices
 
 
-def _vanilla_decomp_text(relative_path):
-    """Read committed vanilla input, not campaign-injected build output."""
-    env = git_env()
-    return subprocess.check_output(
-        ['git', '-C', DECOMP, 'show', 'HEAD:' + relative_path],
-        encoding='utf-8', env=env)
-
-
 def _vanilla_config(layout):
-    names = []
-    for line in _vanilla_decomp_text('data/data_8B363C.s').splitlines():
-        match = re.match(r'\s*\.word\s+(\w+)', line)
-        if match:
-            names.append(match.group(1))
-    layout_id = names.index(layout)
-    settings = json.loads(_vanilla_decomp_text('src/data/chapter_settings.json'))
-    for chapter in settings['chapters']:
-        map_data = chapter.get('map') or {}
-        if map_data.get('mainLayerId') == layout_id:
-            return os.path.join(DECOMP, 'graphics/map',
-                                names[map_data['tileConfigId']] + '.bin')
-    raise AssertionError('no chapter settings select %s' % layout)
+    """The tile config vanilla's chapter settings select for `layout`, read at HEAD."""
+    names, map_data = map_tileset_tool._vanilla_layout_map(DECOMP, layout)
+    return os.path.join(DECOMP, 'graphics/map', names[map_data['tileConfigId']] + '.bin')
 
 
 class TestWinterForestBackfill(unittest.TestCase):

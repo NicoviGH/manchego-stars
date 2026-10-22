@@ -1534,7 +1534,7 @@ def chapter_force(chap, mode=None, shifts=None, with_ai=True):
     fields, staff-only and weaponless bodies included, Difficult-only entries on every mode.
 
     It exists as one function because it was three. `solo_contributors` once kept a copy that
-    collapsed a `composition` to its distinct classes (#285); `chapter_enemy_bodies` and
+    collapsed a `composition` to its distinct classes (#285); the parity read's force and
     `danger_map.bodies` each re-walked the roster, so the board and the combat read could
     disagree about which body was which (#510 step 7). Every our-side reader reshapes this.
     `with_ai=False` leaves `ai` None for a reader that never asks how a body behaves, so it
@@ -2174,9 +2174,30 @@ def _print_cast(title, roster, levels, line, profiles):
                  (' vs ' + best[1].name) if best[1] else ''))
 
 
+def _report_unwritten(chap, campaign):
+    """The per-chapter report of a chapter not written yet: its vanilla twin's numbers, the
+    target it will be written to. Its draft roster is never read (`unwritten_projection`)."""
+    bar = '=' * 80
+    ref = chap.get('parity_reference') or '?'
+    print(bar)
+    print('CH%s "%s" -- NOT WRITTEN YET (status: planned)'
+          % (chap.get('chapter_number'), chap.get('title', '?')))
+    print(bar)
+    proj = unwritten_projection(chap, campaign)
+    if proj is None:
+        print('Until it is written, its difficulty is %s\'s, which is not curated yet.' % ref)
+        return
+    print('Until it is written, its difficulty is its vanilla twin %s\'s: threat %.1f, '
+          'clear-load %.1f%s.\nThat is the target the chapter is written to; its draft YAML is '
+          'not read.' % (ref, proj['threat'], proj['clear'], proj['note']))
+
+
 def report(campaign, ch, mode=None):
     import exp_curve                        # exp_curve imports this module
     head = chapter_schema.load(chapter_path(campaign, ch))
+    if head.get('status') == 'planned':
+        _report_unwritten(head, campaign)
+        return
     number, parity_ref = int(head['chapter_number']), head.get('parity_reference')
     try:
         arriving = exp_curve.entering(campaign, number, parity_ref)
@@ -2199,10 +2220,6 @@ def report(campaign, ch, mode=None):
           % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
              if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
     print(bar)
-    if chap.get('status') == 'planned':
-        print('** PLANNED chapter -- brainstorm SEED, NOT authoritative. The enemy roster/levels'
-              '\n   below are ungrounded and will be re-grounded against vanilla + party data when'
-              '\n   this slice is built; treat the numbers as a sketch, not a parity reading. **\n')
     print('Field: deploy %d of %d cast   Enemies: %s' % (deploy_limit, len(roster),
                                                           '; '.join(labels)))
 
@@ -2392,9 +2409,9 @@ def arriving_fields(chap, campaign, mode=None):
         return None
     cap = chapter_deploy_limit(chap, len(ROSTER))
     import danger_map                       # danger_map imports this module
-    # One list of bodies per side, read by the board and the combat read alike, so an index
-    # into the force is an index onto the map (#510 step 7). A body with no modeled weapon
-    # is in neither: it attacks no one and the clear-load has never counted it.
+    # One list per side, read by the board and the combat read alike, so an index into the
+    # force is an index onto the map (#510 step 7). A body with no modeled weapon is in
+    # neither: it attacks no one and the clear-load has never counted it.
     our_bodies = [b for b in danger_map.bodies(chap, mode, every_mode=True)
                   if b.unit.weapon is not None]
     van_bodies = danger_map.vanilla_bodies(ref, mode)
@@ -2406,6 +2423,25 @@ def arriving_fields(chap, campaign, mode=None):
     return {'our_force': our_force, 'van_force': van_force,
             'our_bodies': our_bodies, 'van_bodies': van_bodies,
             'our_party': our_party, 'van_party': van_party, 'cap': cap, 'van_forced': van_forced}
+
+
+def unwritten_projection(chap, campaign):
+    """An unwritten (`status: planned`) chapter's difficulty: its vanilla twin's, as
+    {'threat', 'clear', 'note'}, or None when the twin is not curated. A chapter that is not
+    written yet does not exist for the difficulty math (Nicolas, 2026-10-22): its draft YAML is
+    never read as a force. On VANILLA_CHAIN it is the twin's force against the twin's arriving
+    party (`planned_target`); off it, the fixed yardstick (`vanilla_projection`)."""
+    target = planned_target(chap, campaign)
+    if target is not None:
+        return {'threat': target['threat'], 'clear': target['clear'], 'note': ''}
+    proj = vanilla_projection(chap.get('parity_reference'),
+                              chapter_deploy_limit(chap, len(ROSTER)))
+    if proj is None:
+        return None
+    note = (' (%d yardstick-proof units, clear-load floored)' % proj['proof']
+            if proj['proof'] else '')
+    return {'threat': proj['threat'], 'clear': proj['clearload'],
+            'note': ' [fixed YARDSTICK: off VANILLA_CHAIN]' + note}
 
 
 def planned_target(chap, campaign):
@@ -2422,7 +2458,9 @@ def planned_target(chap, campaign):
         return None
     if levels is None:
         return None
-    force = [(u, ai_target.combat_weight_table(ai)) for u, ai in vanilla_enemy_bodies(ref)]
+    import danger_map                       # danger_map imports this module
+    force = [(b.unit, ai_target.combat_weight_table(b.ai))
+             for b in danger_map.vanilla_bodies(ref)]
     return party_matchup(force, vanilla_party_careers(ref, levels),
                          chapter_deploy_limit(chap, len(ROSTER)), vanilla_forced(ref))
 
@@ -3222,7 +3260,8 @@ def chapter_event_stem(index):
     """The event-file stem of FE8 chapter `index`, through the decomp's own tables: its
     chapter_settings `mapEventDataId` indexes the chapter asset table (data_8B363C.s), whose
     word names a ChapterEventGroup, defined in exactly one events/<stem>-eventinfo.h."""
-    table = re.findall(r'\.word\s+(\w+)', inject.decomp.vanilla_decomp_text('data/data_8B363C.s'))
+    table = inject.decomp.asset_table_names(
+        inject.decomp.vanilla_decomp_text('data/data_8B363C.s'))
     chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
     chapters = chapters if isinstance(chapters, list) else chapters['chapters']
     if not 0 <= index < len(chapters):
@@ -3779,21 +3818,14 @@ def curve_report(campaign, band=0.25, mode=None, only=None):
             # computable now (#123): print the reference's own pressure as the forward
             # target the authored chapter must hit within the band. Never gates.
             ref = chap.get('parity_reference', '?') or '?'
-            target = planned_target(chap, campaign)
-            if target is not None:
-                print('  %-22s %-13s %4.1f (target)    %4.1f (target)      %-7s planned'
-                      % (label[:22], ref[:13], target['threat'], target['clear'], '--'))
-                continue
-            proj = vanilla_projection(ref, chapter_deploy_limit(chap, len(ROSTER)))
+            proj = unwritten_projection(chap, campaign)
             if proj is None:
                 print('  %-22s %-13s   -- planned (seed; reference not curated yet) --'
                       % (label[:22], ref[:13]))
             else:
-                note = (' (%d yardstick-proof units, clear-load floored)'
-                        % proj['proof']) if proj['proof'] else ''
-                note = ' [fixed YARDSTICK: off VANILLA_CHAIN]' + note
                 print('  %-22s %-13s %4.1f (target)    %4.1f (target)      %-7s planned%s'
-                      % (label[:22], ref[:13], proj['threat'], proj['clearload'], '--', note))
+                      % (label[:22], ref[:13], proj['threat'], proj['clear'], '--',
+                         proj['note']))
             continue
         p = _chapter_pressure(chap, band, mode=mode, campaign=campaign)
         ot, ol = p['ours']

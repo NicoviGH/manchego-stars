@@ -81,14 +81,14 @@ def chapter_timeline(chapter, campaign, mode=None, horizon=HORIZON):
     if fields is None:
         return None
     try:
-        # Hard-only waves ride on both sides, as `difficulty` folds them: the twin's curated
-        # force carries its Hard array unconditionally.
-        ours_board = dm.Board(chapter, mode, every_mode=True)
+        # The parity read's own bodies (`arriving_fields`), so a body here is the force's body
+        # at the same index. Hard-only waves ride on both sides, as `difficulty` folds them.
+        ours_board = dm.Board(chapter, terrain=pp.terrain_grid(chapter),
+                              fielded=fields['our_bodies'])
     except pp.MapNotCompiled:
         return None
     ref = chapter['parity_reference']
-    van_board = dm.Board(None, terrain=dif.vanilla_terrain(ref),
-                         fielded=dm.vanilla_bodies(ref, mode))
+    van_board = dm.Board(None, terrain=dif.vanilla_terrain(ref), fielded=fields['van_bodies'])
     ours_force = [u for u, _t in fields['our_force']]
     van_force = [u for u, _t in fields['van_force']]
     return {

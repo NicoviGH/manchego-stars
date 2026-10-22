@@ -3,9 +3,13 @@
 
     python3 tools/test_timeline.py
 """
+import contextlib
+import copy
+import io
 import os
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import danger_map as dm
@@ -105,22 +109,60 @@ class OurBodiesMove(unittest.TestCase):
 
 class OneReaderPerForce(unittest.TestCase):
     """#510 step 7: the board and the combat read index ONE list of bodies per side, so an
-    engagement's members are positions in `party_matchup`'s force."""
+    engagement's members are positions in `party_matchup`'s force. Each check is against a
+    reader the parity read does not go through."""
 
-    def _check(self, chapter, mode):
-        fields = dif.arriving_fields(pp.load_chapter(chapter), 'rime-of-the-frostmaiden', mode)
-        for force, bodies in (('our_force', 'our_bodies'), ('van_force', 'van_bodies')):
-            self.assertEqual(len(fields[force]), len(fields[bodies]), (chapter, mode, force))
-            for (unit, table), body in zip(fields[force], fields[bodies]):
-                self.assertIs(unit, body.unit)
-                self.assertEqual(table, dif.ai_target.combat_weight_table(body.ai))
+    CAMPAIGN = 'rime-of-the-frostmaiden'
 
-    def test_ch06_drops_its_menders_from_both_views(self):
-        self._check('ch06', 'normal')
+    def _fields(self, chapter, mode):
+        return dif.arriving_fields(pp.load_chapter(chapter), self.CAMPAIGN, mode)
 
-    def test_every_mode_lines_up(self):
-        for mode in (None, 'tutorial', 'difficult'):
-            self._check('ch04', mode)
+    @staticmethod
+    def _line(u):
+        return (u.name, u.hp, u.pow, u.skl, u.spd, u.df, u.res, u.weapon.name)
+
+    def test_the_force_is_the_mode_shifted_force(self):
+        # ch07's Difficult shift moves its lines: a force read without it would still align.
+        chapter = pp.load_chapter('ch07')
+        shifts = dif.inject.chapter_settings.chapter_difficulty_shifts(chapter)
+        fields = self._fields('ch07', 'difficult')
+        self.assertEqual([self._line(u) for u, _t in fields['our_force']],
+                         [self._line(u) for _e, u in dif.chapter_units(chapter, 'difficult',
+                                                                         shifts)])
+
+    def test_our_board_is_the_force_less_its_unarmed_bodies(self):
+        # ch06's two menders carry no modeled weapon: on the map, in neither list.
+        fields = self._fields('ch06', 'normal')
+        armed = [b for b in dm.bodies(pp.load_chapter('ch06'), 'normal', every_mode=True)
+                 if b.arms]
+        self.assertEqual([(b.id, b.index) for b in fields['our_bodies']],
+                         [(b.id, b.index) for b in armed])
+        self.assertEqual([self._line(b.unit) for b in fields['our_bodies']],
+                         [self._line(u) for u, _t in fields['our_force']])
+        self.assertEqual([t for _u, t in fields['our_force']],
+                         [dif.ai_target.combat_weight_table(b.ai) for b in armed])
+
+    def test_the_twins_board_is_its_force(self):
+        fields = self._fields('ch06', 'normal')
+        self.assertEqual([self._line(b.unit) for b in fields['van_bodies']],
+                         [self._line(u) for u, _ai in dif.vanilla_enemy_bodies('FE8 Ch6',
+                                                                                 'normal')])
+
+    def test_an_unwritten_chapter_is_read_as_its_twin_only(self):
+        # ADR 0363: a planned chapter does not exist for the difficulty math. The report
+        # prints its twin's numbers and never walks its draft roster.
+        out = io.StringIO()
+        with mock.patch.object(dif, 'chapter_force', side_effect=AssertionError('read draft')), \
+                contextlib.redirect_stdout(out):
+            dif.report('rime-of-the-frostmaiden', 'ch08')
+        self.assertIn("vanilla twin FE8 Ch8's", out.getvalue())
+
+    def test_a_written_chapter_places_every_body(self):
+        chapter = copy.deepcopy(pp.load_chapter('ch04'))
+        entry = next(e for e in chapter['enemy_units'] if e.get('count'))
+        del entry['positions']
+        with self.assertRaisesRegex(ValueError, 'no position'):
+            dm.bodies(chapter, 'normal', every_mode=True)
 
 
 if __name__ == '__main__':

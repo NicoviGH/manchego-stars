@@ -125,13 +125,19 @@ def bodies(chapter, mode=None, every_mode=False):
     shifts = inject.chapter_settings.chapter_difficulty_shifts(chapter) if mode else None
     out = []
     for f in dif.chapter_force(chapter, mode, shifts):
+        tiles = chapter_schema.entry_tiles(f.entry)
+        if f.index >= len(tiles):
+            # A written chapter places every body it fields; one that has not been written
+            # (`status: planned`) is never read as a force at all (ADR 0363).
+            raise ValueError('%s: enemy %r fields body %d with no position'
+                             % (chapter.get('id'), f.entry.get('id'), f.index))
         if f.entry.get('hard_mode_only') and not every_mode and mode != 'difficult':
             continue
         arrives = (1 if inject.raw_pids.entry_is_turn1(f.key, f.entry) else
                    inject.raw_pids.entry_arrival_turn(f.entry))
         table, mov = _movement(f.entry, f.index)
         out.append(Body(f.entry.get('id'), f.index,
-                        tuple(chapter_schema.entry_tiles(f.entry)[f.index]),
+                        tuple(tiles[f.index]),
                         cs.ai_shape(f.ai), f.ai[0], arrives, table, mov, fc.arms(f.unit),
                         f.unit, f.ai))
     return out
@@ -207,7 +213,7 @@ class Board:
     def __init__(self, chapter, mode=None, terrain=None, targets=(), spared_by=(),
                  every_mode=False, fielded=None):
         """`fielded` is a ready list of `Body` for a board that is not one of our chapters
-        (the vanilla twin's, `timeline.vanilla_bodies`); `chapter` is then None and `terrain`
+        (the vanilla twin's, `vanilla_bodies`); `chapter` is then None and `terrain`
         is required."""
         self.chapter = chapter
         self.targets = tuple(tuple(t) for t in targets)
