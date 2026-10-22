@@ -23,9 +23,12 @@ Kinds (each side's claims are read against that side's OWN party and force):
               unit survives it longest of the fielded party.
   threat      `vs`: the enemy the strategy says to fear. CHECK: it is the force's heaviest
               enemy type by summed threat, convertibles left out (they need not be fought).
+  reinforcements  no fields: the strategy warns of the waves. REPORTED: how many bodies
+              arrive after turn 1, and how many of them are in the side's heaviest
+              engagement (#510 step 7), the one its threat is read from.
   unmodelled  `topic` and `step`: play the model cannot read yet (escorts, recruits, steals,
-              shops, reinforcement timing); `step` is the #510 step that will (7 reach and
-              time, 8 kits and sustain). Recorded so the curation is complete.
+              shops); `step` is the #510 step that will (7 reach and time, 8 kits and
+              sustain). Recorded so the curation is complete.
 
 `vs` names an enemy by class (`fighter`, `armor-knight`), by our unit id or the twin's
 character (`goblin-chief`, `breguet`), or `boss`; a list means any of them. Checks are FINDINGS printed beside the
@@ -51,6 +54,7 @@ KINDS = {
     'answer': {'unit', 'vs'},
     'wall': {'unit', 'vs'},
     'threat': {'vs'},
+    'reinforcements': set(),
     'unmodelled': {'topic', 'step'},
 }
 STEPS = {7, 8}
@@ -217,16 +221,31 @@ def _units(claim):
     return [_norm(x) for x in (u if isinstance(u, list) else [u])]
 
 
-def _check(claim, bodies, per_enemy, labels, lines, tiles):
+def _reinforcement_line(side, arrivals):
+    late = [k for k, turn in enumerate(arrivals or ()) if turn > 1]
+    if not late:
+        return 'note reinforcements: none arrive after turn 1 on this side\'s board'
+    g = side.get('engagement')
+    inside = sorted(set(late) & set(g.members)) if g else []
+    where = ('' if g is None else ' (a %s on enemy phase %d)' % (g.kind, g.phase))
+    return ('note reinforcements: %d bodies arrive after turn 1 (turns %s); %d of them in the '
+            'heaviest engagement%s' % (len(late), ', '.join(str(t) for t in sorted(
+                {arrivals[k] for k in late})), len(inside), where))
+
+
+def _check(claim, bodies, per_enemy, labels, lines, tiles, side=None, arrivals=None):
     """One finding line for one modelled claim on one side, None for the rest. `bodies` is
     the side's force (mean lines), `per_enemy` its matchup row per body, `labels` its
-    (type, labels) per body, `lines` {unit: median line} for its fielded team."""
+    (type, labels) per body, `lines` {unit: median line} for its fielded team, `side` its
+    `party_matchup` read and `arrivals` the turn each body arrives (None without a board)."""
     import fe_combat as fc
     kind, vs = claim['kind'], claim.get('vs')
     if kind == 'unmodelled':
         return None
     if kind == 'terrain':
         return _terrain_line(claim, tiles)
+    if kind == 'reinforcements':
+        return _reinforcement_line(side or {}, arrivals)
     hit = [k for k, (_t, lab) in enumerate(labels) if matches(lab, vs)]
     if not hit:
         return 'MISS %s vs %s: no such enemy in the force' % (kind, vs)
@@ -291,17 +310,19 @@ def findings(chap, matchup, mode=None, campaign=campaign_chapters.CAMPAIGN):
     ref = chap.get('parity_reference')
     our_force, van_force = matchup['forces']
     out = {}
-    for key, claims, side, force, labels, lines, tiles in (
+    our_turns, van_turns = matchup['arrivals']
+    for key, claims, side, force, labels, lines, tiles, turns in (
             ('ours', our_claims(chap), matchup['ours'], our_force, our_labels(chap, mode),
-             matchup['lines'], chapter_tiles(chap, campaign)),
+             matchup['lines'], chapter_tiles(chap, campaign), our_turns),
             ('twin', twin_claims(ref), matchup['vanilla'], van_force, twin_labels(ref, mode),
-             matchup['lines_vanilla'], twin_tiles(ref))):
+             matchup['lines_vanilla'], twin_tiles(ref), van_turns)):
         # Labels come from a second walk of the force; it must be the same bodies in the
         # same order, or every check reads another unit.
         if [n for n, _t, _lab in labels] != [b.name for b in force]:
             raise ValueError('%s: the labels do not walk the force body for body' % key)
         labels = [(t, lab) for _n, t, lab in labels]
-        checked = (_check(c, force, side['per_enemy'], labels, lines, tiles) for c in claims)
+        checked = (_check(c, force, side['per_enemy'], labels, lines, tiles, side, turns)
+                   for c in claims)
         out[key] = (claims, [f for f in checked if f])
     return out
 

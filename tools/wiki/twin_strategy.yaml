@@ -37,9 +37,7 @@ FE8 Ch1:
       topic: arrival
       step: 7
       cite: "Franz and Gilliam will join you on turn 2 and appear towards the northeastern ridge."
-    - kind: unmodelled
-      topic: reinforcements
-      step: 7
+    - kind: reinforcements
       cite: "after you cross the middle of the map, three reinforcement units will appear from the bottom right corner."
 
 FE8 Ch2:
@@ -105,9 +103,7 @@ FE8 Ch4:
       topic: recruit rescue
       step: 7
       cite: "putting her in a nearby forest and rescuing her the next turn is recommended."
-    - kind: unmodelled
-      topic: reinforcements
-      step: 7
+    - kind: reinforcements
       cite: "Since this is a rout map, be wary of the reinforcements that spawn near the start of the map, and be mindful that you aren't swarmed."
 
 FE8 Ch5:
@@ -121,9 +117,7 @@ FE8 Ch5:
       topic: recruit
       step: 7
       cite: "Recruiting Joshua is less intimidating than it initially appears."
-    - kind: unmodelled
-      topic: reinforcements
-      step: 7
+    - kind: reinforcements
       cite: "Brigand reinforcements will appear near the starting location, so make sure that your squishy units aren't undefended."
     - kind: unmodelled
       topic: villages

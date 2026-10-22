@@ -182,6 +182,17 @@ def _moves_like(body):
         body.shape, 'pursuer')
 
 
+# AI_B_11 / AI_B_12 (cp_data.c): `AI_NOP_0E` for one AI turn, then `AI_SET_AI2` to pillage or
+# pursue. On that first turn only the ACTION half moves the unit, an attack within its own Mov.
+WAIT_ONE_TURN = frozenset({0x11, 0x12})
+
+
+def _waits_first(body):
+    """Turns a pursuer spends before it starts walking at the party: 1 for the after-one-turn
+    approaches, else 0. A hand-built body with no AI bytes walks at once."""
+    return 1 if body.ai and body.ai[1] in WAIT_ONE_TURN else 0
+
+
 def green_bodies(chapter):
     """The tiles that stop an enemy's walk. `MapFloodCoreStep` (bmidoten.c) refuses a cell
     whose unit's index differs from the walker's in bit 0x80, so a red walks through reds
@@ -211,16 +222,18 @@ class Board:
     unconstrained walk would have it cross the map to the east hull as well."""
 
     def __init__(self, chapter, mode=None, terrain=None, targets=(), spared_by=(),
-                 every_mode=False, fielded=None):
+                 every_mode=False, fielded=None, blocked=()):
         """`fielded` is a ready list of `Body` for a board that is not one of our chapters
         (the vanilla twin's, `vanilla_bodies`); `chapter` is then None and `terrain`
-        is required."""
+        is required. `blocked` is tiles the player holds: a red walks through reds but never
+        through a blue (`MapFloodCoreStep`), and cannot stand on one."""
         self.chapter = chapter
         self.targets = tuple(tuple(t) for t in targets)
         self.spared_by = tuple(spared_by)
         self.terrain = terrain if terrain is not None else pp.terrain_grid(chapter)
         self.bodies = fielded if fielded is not None else bodies(chapter, mode, every_mode)
-        self.blocked = green_bodies(chapter) if chapter is not None else set()
+        self.blocked = (green_bodies(chapter) if chapter is not None else set()) | {
+            tuple(c) for c in blocked}
         self.statues = {b.source for b in self.bodies
                         if _moves_like(b) == 'statue' and b.arrives <= 1}
         self._walks, self._stands, self._engaged = {}, {}, {}
@@ -232,14 +245,20 @@ class Board:
                                              cost=pp.mov_cost_row(body.table))
         return self._walks[key]
 
+    def budget(self, body, phase):
+        """The movement points `body` has spent walking by enemy phase `phase`: one turn's Mov
+        for a striker, every turn's since it started for a pursuer."""
+        if _moves_like(body) == 'striker':
+            return body.mov
+        return body.mov * max(1, phase - body.arrives + 1 - _waits_first(body))
+
     def _reach(self, body, phase):
         """Where `body` can stand on enemy phase `phase`, ignoring engagement."""
         if phase < body.arrives or not body.arms:
             return frozenset()
-        moves = _moves_like(body)
-        if moves == 'statue':
+        if _moves_like(body) == 'statue':
             return frozenset({body.source})
-        budget = body.mov * (1 if moves == 'striker' else phase - body.arrives + 1)
+        budget = self.budget(body, phase)
         return frozenset(c for c, points in self._walk(body).items()
                          if points <= budget and (c == body.source or c not in self.statues))
 

@@ -241,9 +241,7 @@ strategy_claims:
     topic: positioning
     step: 7
     cite: "keep the cavalry away from the armored guard with the Horseslayer."
-  - kind: unmodelled
-    topic: reinforcements
-    step: 7
+  - kind: reinforcements
     cite: "On turn 4 three more shark riders enter from the west edge."
   - kind: unmodelled
     topic: drops

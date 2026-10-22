@@ -171,7 +171,7 @@ difficulty_note: >
     - CONVERTIBLE Sahnar (the Joshua flip): a hostile crit-Myrmidon until Basil Talks
       her, then a +1.0 kills/round ally for the back half. Self-balancing risk→advantage.
     - REINFORCEMENT eruption: the dead arrive over turns (arrives_turn), not a turn-1 alpha —
-      so the turn-1 field is lighter than the all-turn-1 bar, on both sides.
+      so the turn-1 field is lighter than the whole force, on both sides.
       SAHNAR IS NOT ONE OF THEM (2026-08-14, #25 — Ravisin summons her in scene 3), and the
       re-price this looked like it owed turns out to be ALREADY PAID: `difficulty.py`
       (`_split_force`) buckets a `convertible: true` enemy before it ever reads `arrives_turn`,
@@ -224,9 +224,7 @@ strategy_claims:
     topic: objective
     step: 7
     cite: "Defeat her to win; her guardians and the moose do not all have to fall."
-  - kind: unmodelled
-    topic: reinforcements
-    step: 7
+  - kind: reinforcements
     cite: "Reinforcements appear on turn 2 (two spear guards from the southeast), turn 6 (two axe reavers from the east) and turn 8 (two archers next to Ravisin), so make sure that your squishy units aren't undefended."
   - kind: unmodelled
     topic: niches
