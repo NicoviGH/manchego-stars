@@ -9,15 +9,14 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-22 (Claude, #519 open; magic triangle next). **The parity model is being rebuilt before any party or chapter
-change: epic #510** (Nicolas, 2026-10-19). #490 found the model misloads units (unflagged units
-grown, no promoted bonus, no realistic levelling): it read Dorbulgruf at 63 HP where the ROM loads 37.
-Every lock was measured on that model, so **all of ch00-ch07 are under re-evaluation** and re-lock at
-the end of #510. Never widen an `accepted_residual` to get green: design or model fidelity is the fix.
-This session also merged #507 (the twin-payload reader reads every give-site: enum gifts, Ch15's
-shared-script treasures, route and either/or branches) and #509 (#508: ch03's grell rode vanilla's
-generic Mogall pid 0xb7, so ch04's Mogalls fought with its boss line; ADR 0098 now covers every
-rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
+Refreshed 2026-10-22 (Claude, #519-#524 merged; #510 step 7 next). **The parity model is being
+rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
+misloads units (unflagged units grown, no promoted bonus, no realistic levelling): it read
+Dorbulgruf at 63 HP where the ROM loads 37. Every lock was measured on that model, so **all of
+ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never widen an
+`accepted_residual` to get green: design or model fidelity is the fix.
+This session merged #519 (step 6), the magic triangle (#520), the audit's class-tag fix (#521),
+the reskin effectiveness ROM fix (#522) and a parser fold (#524). Nothing is open from it.
 
 ## In flight
 
@@ -40,28 +39,26 @@ rewritten raw-pid row, enforced by `assert_rewritten_raw_pids_are_exclusive`).
    residual's edge (x1.407 vs 1.41). #518 closed step 5's open item: slot order = join order on
    both sides (the twin's Moulder now sits before Ross/Garcia), `vanilla_recruits` raises on
    any join order the player could change, and the enemy-cap invariant is a test.
-   **Step 6 is PR #519 (ADR 0359), awaiting CI and Nicolas's "merge":** Strategy sections as
-   cited claims (the twins' in a YAML beside the wiki vendor, ours in each chapter's
-   `strategy_claims:`), checked and printed by `make difficulty CH=chNN`, **never a model
-   input** (Nicolas, 2026-10-21: terrain as an input took ch01 x1.10 -> x0.48 on one sentence).
-   It moves no verdict by construction, so the stopping rule does not count it; findings are
-   on #510.
-   **NEXT, before step 7 (Nicolas, 2026-10-22): the magic triangle, then an audit.**
-   - *Magic triangle* (own PR off `main`): FE8 has `sWeaponTriangleRules` (bmbattle.c:38-55,
-     anima > light > dark > anima, ±15 hit, ±1 dmg); `fe_combat.triangle` treats every tome
-     as one off-triangle `'magic'` kind. Type each tome from `data_items.c` `.weaponType` at
-     HEAD, parse the rule table, check every `kind == 'magic'` consumer (`tools/callsites.py`
-     first), keep it array-safe, test against the table, `make verdict-diff` in the PR
-     (expect ch03-ch06 moves: Mogalls, Ravisin, the shamans), dated ADR. Found by Nicolas:
-     #519 reports vanilla Artur "kills Bonewalkers faster than Mogalls", which is this gap.
-     If #519 is unmerged, push one commit to its branch correcting that line in ADR 0359.
-   - *Audit steps 3-6* (#515-#519) for more decomp departures like it, citing the decomp:
-     the rest of bmbattle.c's math (crit-bonus classes, weapon effects, special weapon
-     stats, Silencer, support/rank bonuses), `fe_combat.W` vs `data_items.c`, `CLASS_TAGS`
-     vs the decomp's effectiveness lists, `ai_target.py` vs cp_battle.c, and spot checks of
-     #519's claim curation. Fix small, clear errors; file bigger ones on #510.
-   - **Reviews go to a SUBAGENT** (`/code-review <PR> medium`), never inline by the author
-     (Nicolas, 2026-10-22). Neither PR is merged without his "merge".
+   **Step 6 is DONE** (#519, ADR 0359): Strategy sections as cited claims, checked and printed
+   by `make difficulty CH=chNN`, **never a model input** (Nicolas, 2026-10-21).
+   **The decomp audit of steps 3-6 is DONE** (Nicolas asked for it before step 7, 2026-10-22):
+   - #520 (ADR 0360): tomes carry their FE8 type (anima/light/dark) and sit on the magic
+     triangle (`fc.TRIANGLE_RULES`, tested against `sWeaponTriangleRules`; `fc.is_magic`).
+     No verdict moved. Twin Ch4's Artur/Mogall claim is now a real 0.06-round near tie.
+   - #521 (ADR 0361): `difficulty.class_tags` reads effectiveness tags from data_itemuse.c
+     (Rangers/Troubadours had no `cav`), plus `critbonus` (+15 crit) and `slayer` (Bishops).
+     No verdict moved.
+   - #522 (ADR 0362, Nicolas: reskins are cosmetic, they play as their base): the ROM now puts
+     each reskin on its base's effectiveness lists; the reskin step refuses a base the engine
+     tests by id. A ROM change: Shark Rider / Ironshell / Lamia / Tentacruel / Lycanroc /
+     the Mercenary reskins take effective damage as their base classes do.
+   - #524: one parser for decomp enums (`inject.decomp.enum_values`) and `.attributes` lines
+     (`unit_load.attributes_in`); vanilla class facts live in `inject.class_ids`
+     (`vanilla_class_values`, `slayer_classes`). Use those; don't add a regex.
+   - Matching the decomp: all 34 `fc.W` weapons, `ComputeBattleUnitStats`, and `ai_target` vs
+     `AiComputeCombatScore`. Not modelled (supports, S-rank, brave/magic swords/Luna, Silencer,
+     status) is logged on #510 (comment 2026-10-22); none moves ch00-ch07 today.
+   - **Reviews go to a SUBAGENT** (`/code-review <PR> medium`), never inline by the author.
    Then **step 7** (reach, time, AI; `unmodelled` step-7 claims list what it inherits), then
    8-9, each with an in-engine proof and the verdict diff.
    - Verdicts OFF now: ch01 Tutorial/Normal; ch02, ch03, ch04 on Difficult (ch01 Difficult
