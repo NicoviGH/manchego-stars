@@ -217,19 +217,28 @@ def _asset_names(decomp_root, vanilla=False):
     what it can edit must see the maps WE registered (`_register_chapter_map` appends here),
     while a lookup that resolves a VANILLA layout id must not, or our appended entries shift
     the indices it is about to match against vanilla chapter settings."""
-    names = []
+    import inject.decomp
     if vanilla:
-        source = _vanilla_decomp_text(decomp_root, 'data/data_8B363C.s').splitlines()
+        text = _vanilla_decomp_text(decomp_root, 'data/data_8B363C.s')
     else:
         # CURRENT-TREE: the editor must see the maps WE registered -- vanilla's copy would
         # not list our own chapters.
         with open(os.path.join(decomp_root, 'data/data_8B363C.s')) as fh:
-            source = fh.readlines()
-    for line in source:
-        match = re.match(r'\s*\.word\s+(\w+)', line)
-        if match:
-            names.append(match.group(1))
-    return names
+            text = fh.read()
+    return inject.decomp.asset_table_names(text)
+
+
+def _vanilla_layout_map(decomp_root, layout_name):
+    """(the asset-name table, the `map` block of the vanilla chapter whose `mainLayerId` is
+    `layout_name`), both read at HEAD. Raises ValueError when no chapter uses the layout."""
+    names = _asset_names(decomp_root, vanilla=True)
+    layout_id = names.index(layout_name)
+    settings = json.loads(_vanilla_decomp_text(decomp_root, 'src/data/chapter_settings.json'))
+    for chapter in settings['chapters']:
+        map_data = chapter.get('map') or {}
+        if map_data.get('mainLayerId') == layout_id:
+            return names, map_data
+    raise ValueError('no chapter settings use vanilla layout %r' % layout_name)
 
 
 def _vanilla_tileconfig_path(decomp_root, layout_name):
@@ -242,15 +251,9 @@ def _vanilla_tileconfig_path(decomp_root, layout_name):
         # tree, a vanilla layout name resolves against OUR repointed chapters, silently misses,
         # and falls back to TileConfiguration1 with a warning. `vanilla_layout_data` then
         # decodes metatiles against the wrong TSA. (#300)
-        names = _asset_names(decomp_root, vanilla=True)
-        layout_id = names.index(layout_name)
-        settings = json.loads(
-            _vanilla_decomp_text(decomp_root, 'src/data/chapter_settings.json'))
-        for chapter in settings['chapters']:
-            map_data = chapter.get('map') or {}
-            if map_data.get('mainLayerId') == layout_id:
-                return os.path.join(decomp_root, 'graphics/map',
-                                    names[map_data['tileConfigId']] + '.bin')
+        names, map_data = _vanilla_layout_map(decomp_root, layout_name)
+        return os.path.join(decomp_root, 'graphics/map',
+                            names[map_data['tileConfigId']] + '.bin')
     except (OSError, ValueError, KeyError, IndexError):
         pass
     sys.stderr.write('WARN: could not resolve vanilla tile config for %r; '
@@ -332,7 +335,15 @@ def preserved_terrain_targets(source_cells, source_terrain, target_tileset, rule
         raise ValueError('; '.join(errors))
     return targets
 def _vanilla_decomp_text(dec, relative_path):
-    """Read committed vanilla source, not build-injected worktree output."""
+    """Read committed vanilla source, not build-injected worktree output. The vanilla
+    submodule goes through `inject.decomp.vanilla_decomp_text`, the repo's one memoised HEAD
+    reader, so a parity read that decodes the twin's map does not spawn `git show` again for
+    a file the difficulty read already holds (#510 step 7, `test_decomp_read_cache`). Any
+    other root (the build tree, a test's fixture tree) is read fresh: a fixture may be
+    rewritten inside one process, and nothing hot reads one."""
+    import inject.decomp
+    if os.path.realpath(dec) == os.path.realpath(inject.decomp.SUBMODULE):
+        return inject.decomp.vanilla_decomp_text(relative_path)
     import subprocess
     # Strip inherited GIT_* vars (GIT_DIR/GIT_INDEX_FILE/GIT_WORK_TREE) so `git -C dec`
     # resolves against dec's own repo. Otherwise, when this runs inside a git hook
@@ -358,22 +369,10 @@ def vanilla_layout_tileset_assets(dec, layout):
     tileset instead of the nearest assets in gChapterDataAssetTable. Read both
     sources from vanilla HEAD because campaign injection dirties the decomp.
     """
-    import re
-    names = []
-    for line in _vanilla_decomp_text(dec, 'data/data_8B363C.s').splitlines():
-        match = re.match(r'\s*\.word\s+(\w+)', line)
-        if match:
-            names.append(match.group(1))
-    layout_idx = names.index(layout)
-    settings = json.loads(_vanilla_decomp_text(
-        dec, 'src/data/chapter_settings.json'))
-    for chapter in settings['chapters']:
-        chapter_map = chapter.get('map') or {}
-        if chapter_map.get('mainLayerId') == layout_idx:
-            return (names[chapter_map['obj1Id']],
-                    names[chapter_map['paletteId']],
-                    names[chapter_map['tileConfigId']])
-    raise ValueError('no chapter settings use vanilla layout %r' % layout)
+    names, chapter_map = _vanilla_layout_map(dec, layout)
+    return (names[chapter_map['obj1Id']],
+            names[chapter_map['paletteId']],
+            names[chapter_map['tileConfigId']])
 
 
 # ── FEBuilder/FE-Repo tileset import (#40) ────────────────────────────────────────

@@ -48,9 +48,12 @@ ENTRY_POINTS = ('tools/difficulty.py', 'tools/verdict_diff.py')
 # The injector loads itself whole (`inject.namespace.injector_modules` walks the package), so
 # reaching any module in it reaches all of them.
 WHOLE_PACKAGES = ('tools/inject/',)
-# What the read opens that is not a module (traced, 2026-10-19). The decomp is read at the
-# submodule's HEAD, and the pointer is never committed, so a PR cannot change it.
-DATA_PATTERNS = (r'campaigns/[^/]+/.*\.yaml$', r'engine/patches/')
+# What the read opens that is not a module (traced, 2026-10-19). Since #510 step 7 that
+# includes the vanilla submodule's own files: the read decodes the twin's map from its
+# working tree (layouts, tile configs, terrains.h). The pattern names them as inputs so the
+# trace in test_verdict_diff accounts for them; no PR diff ever matches it, because the
+# submodule pointer is never committed, so a PR cannot change vanilla.
+DATA_PATTERNS = (r'campaigns/[^/]+/.*\.yaml$', r'engine/patches/', r'fireemblem8u(/|$)')
 
 
 def _module_file(name):

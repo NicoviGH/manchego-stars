@@ -28,31 +28,14 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import chapter_status as cs                                          # noqa: E402
 import danger_map as dm                                              # noqa: E402
 import difficulty as dif                                             # noqa: E402
-import fe_combat as fc                                               # noqa: E402
-import inject.decomp                                                 # noqa: E402
 import map_placement_preview as pp                                   # noqa: E402
 
 HORIZON = 8                 # enemy phases read; FE8's early chapters are won in about this
 
 
-# ── The twin's board ──────────────────────────────────────────────────────────────
-
-def vanilla_bodies(parity_ref, mode=None):
-    """The twin's red force as `danger_map.Body`s: each unit at the end of its REDA walk,
-    arriving on the turn its eventscript loads its array, armed with every attacking item it
-    carries. Named units carry their personal line, as `difficulty.vanilla_enemies` reads
-    them."""
-    turns = dif._vanilla_reinforcement_turns(dif.PARITY_REFERENCE_STEM[parity_ref])
-    out = []
-    for array, i, d, unit in dif.vanilla_loaded_units(parity_ref, mode):
-        table, mov = pp.class_movement(d['classIndex'][len('CLASS_'):].lower())
-        out.append(dm.Body(array, i, tuple(d['position']), cs.ai_shape(d['ai']),
-                           d['ai'][0], turns.get(array, 1), table, mov, fc.arms(unit)))
-    return out
-
+# ── Our board's front ─────────────────────────────────────────────────────────────
 
 def our_front(chapter):
     deployment = chapter.get('deployment') or {}
@@ -98,14 +81,14 @@ def chapter_timeline(chapter, campaign, mode=None, horizon=HORIZON):
     if fields is None:
         return None
     try:
-        # Hard-only waves ride on both sides, as `difficulty` folds them: the twin's curated
-        # force carries its Hard array unconditionally.
-        ours_board = dm.Board(chapter, mode, every_mode=True)
+        # The parity read's own bodies (`arriving_fields`), so a body here is the force's body
+        # at the same index. Hard-only waves ride on both sides, as `difficulty` folds them.
+        ours_board = dm.Board(chapter, terrain=pp.terrain_grid(chapter),
+                              fielded=fields['our_bodies'])
     except pp.MapNotCompiled:
         return None
     ref = chapter['parity_reference']
-    van_board = dm.Board(None, terrain=dif.vanilla_terrain(ref),
-                         fielded=vanilla_bodies(ref, mode))
+    van_board = dm.Board(None, terrain=dif.vanilla_terrain(ref), fielded=fields['van_bodies'])
     ours_force = [u for u, _t in fields['our_force']]
     van_force = [u for u, _t in fields['van_force']]
     return {
