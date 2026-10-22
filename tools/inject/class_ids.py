@@ -61,6 +61,17 @@ def vanilla_class_values():
 
 
 @functools.lru_cache(maxsize=None)
+def slayer_classes():
+    """The classes `IsUnitEffectiveAgainst` (bmitem.c) makes x3 against the Monsters list. It
+    switches on raw class ids (0x2B, 0x2C), named here through include/constants/classes.h."""
+    fn = re.search(r's8 IsUnitEffectiveAgainst\(.*?\n\}',
+                   vanilla_decomp_text('src/bmitem.c'), re.S).group(0)
+    ids = {int(v, 16) for v in re.findall(r'case (0x[0-9A-Fa-f]+):', fn)}
+    return frozenset(name for name, v in vanilla_class_values().items()
+                     if v in ids)
+
+
+@functools.lru_cache(maxsize=None)
 def vanilla_class_enums():
     """Every enum name in vanilla FE8's class table (HEAD of the submodule, never the patched
     build tree, so a reskin's appended slot can never pass for a vanilla class)."""

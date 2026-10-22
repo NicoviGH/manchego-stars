@@ -58,17 +58,6 @@ EFFECTIVENESS_LISTS = {'armor': 'Armor', 'cav': 'Horse', 'flier': 'Flier',
 
 
 @functools.lru_cache(maxsize=None)
-def slayer_classes():
-    """The classes `IsUnitEffectiveAgainst` (bmitem.c) makes x3 against the Monsters list. It
-    switches on raw class ids (0x2B, 0x2C), named here through include/constants/classes.h."""
-    fn = re.search(r's8 IsUnitEffectiveAgainst\(.*?\n\}',
-                   inject.decomp.vanilla_decomp_text('src/bmitem.c'), re.S).group(0)
-    ids = {int(v, 16) for v in re.findall(r'case (0x[0-9A-Fa-f]+):', fn)}
-    return frozenset(name for name, v in inject.class_ids.vanilla_class_values().items()
-                     if v in ids)
-
-
-@functools.lru_cache(maxsize=None)
 def effectiveness_lists():
     """{list name: set of CLASS_ enums} for every `ItemEffectiveness_*` in data_itemuse.c."""
     text = inject.decomp.vanilla_decomp_text('src/data_itemuse.c')
@@ -87,7 +76,7 @@ def class_tags(class_enum):
             tags.add('critbonus')
     except KeyError:                        # a raw class number: no class block to read
         pass
-    if class_enum in slayer_classes():
+    if class_enum in inject.class_ids.slayer_classes():
         tags.add('slayer')
     return frozenset(tags)
 
