@@ -83,7 +83,7 @@ class TargetCombatant(unittest.TestCase):
 
     def test_a_class_carrying_an_effectiveness_tag_keeps_it(self):
         """`fe_combat` reads `tags` to resolve effective weapons (a Rapier vs `armor`). A
-        hand-rolled Combatant that skips `CLASS_TAGS` is invisible to that -- silently
+        hand-rolled Combatant that skips `difficulty.class_tags` is invisible to that -- silently
         wrong, not merely incomplete."""
         boat = rf.target_combatant({'id': 'hull', 'class': 'armor-knight'})
         self.assertIn('armor', boat.tags)

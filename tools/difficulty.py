@@ -47,18 +47,39 @@ import fe_combat as fc
 import unit_load
 from inject.decomp import ITEM_ENUM   # the one item id -> ITEM_ enum table (#491)
 
-# Class -> effectiveness tag a unit carries as a DEFENDER (so enemy effective weapons
-# and our rapier resolve). Only the classes our cast/enemies use need entries.
-CLASS_TAGS = {
-    'CLASS_ARMOR_KNIGHT': frozenset({'armor'}),
-    'CLASS_GENERAL': frozenset({'armor'}),
-    'CLASS_GREAT_KNIGHT': frozenset({'armor', 'cav'}),
-    'CLASS_CAVALIER': frozenset({'cav'}),
-    'CLASS_PALADIN': frozenset({'cav'}),
-    'CLASS_PEGASUS_KNIGHT': frozenset({'flier'}),
-    'CLASS_FALCON_KNIGHT': frozenset({'flier'}),
-    'CLASS_WYVERN_RIDER': frozenset({'flier'}),
-}
+# The class facts fe_combat reads, as tags (#510 audit). A DEFENDER's class sits on the
+# effectiveness lists in data_itemuse.c (`IsItemEffectiveAgainst` is exact class-id
+# membership); a weapon's `effective` tags name the lists it is effective against, so a
+# Rapier ({'armor', 'cav'}) hits ItemEffectiveness_ArmorAndHorse = Armor + Horse. An
+# ATTACKER's class gives 'critbonus' (CA_CRITBONUS, +15 crit, `ComputeBattleUnitCritRate`)
+# and 'slayer' (x3 Mt against 'monster', `IsUnitEffectiveAgainst`, bmitem.c).
+EFFECTIVENESS_LISTS = {'armor': 'Armor', 'cav': 'Horse', 'flier': 'Flier',
+                       'monster': 'Monsters'}
+
+
+@functools.lru_cache(maxsize=None)
+def effectiveness_lists():
+    """{list name: set of CLASS_ enums} for every `ItemEffectiveness_*` in data_itemuse.c."""
+    text = inject.decomp.vanilla_decomp_text('src/data_itemuse.c')
+    return {name: set(re.findall(r'CLASS_\w+', body)) - {'CLASS_NONE'}
+            for name, body in re.findall(r'ItemEffectiveness_(\w+)\[\] = \{(.*?)\};', text, re.S)}
+
+
+@functools.lru_cache(maxsize=None)
+def class_tags(class_enum):
+    """The fe_combat tags a unit of `class_enum` carries; see EFFECTIVENESS_LISTS."""
+    lists = effectiveness_lists()
+    tags = {tag for tag, name in EFFECTIVENESS_LISTS.items() if class_enum in lists[name]}
+    import exp_curve                        # exp_curve imports this module
+    try:
+        if 'CA_CRITBONUS' in exp_curve.class_attributes(class_enum):
+            tags.add('critbonus')
+    except KeyError:                        # a raw class number: no class block to read
+        pass
+    if class_enum in inject.class_ids.slayer_classes():
+        tags.add('slayer')
+    return frozenset(tags)
+
 
 # The engine models VANILLA, so every decomp read is the committed (HEAD) source, never
 # the working tree the build mutates (donor portrait slots + reskinned classes). Cached.
@@ -319,7 +340,7 @@ def _player_lines(campaign, uid, gained):
             _characters_text(), inject.stats.GROWTH_DONOR[uid])
         lines = careers(eff, growths, gained, _class_caps(class_enum))
     weapon = _player_weapon(campaign, uid)
-    return lines, weapon, CLASS_TAGS.get(class_enum, frozenset())
+    return lines, weapon, class_tags(class_enum)
 
 
 def player_combatant(campaign, uid, gained=0):
@@ -452,7 +473,7 @@ def _enemy_from_enum(name, class_enum, level, weapon, personal=None,
                                    mode or 'normal', realistic)
     stats = _project(base, growths, steps, personal_growths)
     c = _apply_personal(_stats_to_combatant(name, stats, weapon,
-                                            CLASS_TAGS.get(class_enum, frozenset())), personal)
+                                            class_tags(class_enum)), personal)
     capped = {f: min(getattr(c, f), caps[k]) for f, k in _GROWN_FIELDS
               if getattr(c, f) > caps[k]}
     if arsenal:
@@ -1141,7 +1162,7 @@ def _ally_combatant(char_enum, class_enum, weapon, level=None):
     Named off charIndex (CHARACTER_EIRIKA -> 'Eirika')."""
     return _stats_to_combatant(_ally_name(char_enum),
                                _median_line(_ally_lines(char_enum, class_enum, level)),
-                               weapon, CLASS_TAGS.get(class_enum, frozenset()))
+                               weapon, class_tags(class_enum))
 
 
 # Eirika's route up to the last twin a hosted chapter is graded against. The vanilla party at
@@ -1326,7 +1347,7 @@ def vanilla_party_careers(parity_ref, levels=None):
         return None
     levels = levels or {}
     return {_ally_name(char): [_stats_to_combatant(_ally_name(char), line, weapon,
-                                                   CLASS_TAGS.get(class_enum, frozenset()))
+                                                   class_tags(class_enum))
                                for line in _ally_lines(char, class_enum, levels.get(char))]
             for char, class_enum, weapon in members}
 
@@ -1966,7 +1987,7 @@ def lord_floor_delta(unit, enemies, target=3.5, def_cap=4, res_cap=4, hp_cap=12)
 
     # Binding threat sets which defence stat blunts the most damage.
     binding = min(enemies, key=lambda e: bulk_durability(unit, [e]))
-    magic = binding.weapon.kind == 'magic'
+    magic = fc.is_magic(binding.weapon.kind)
     dh = dd = dr = 0
     cap = res_cap if magic else def_cap
     while bulk_durability(with_delta(dh, dd, dr), enemies) < target and (dr if magic else dd) < cap:
@@ -2301,7 +2322,7 @@ def fixed_roster_careers(chap):
         stats = {f: base.get(f, 0) + line.get(f, 0) for f in inject.stats.BASE_FIELDS}
         out[pu['id']] = [_stats_to_combatant(pu['id'], stats,
                                              _weapon_for(pu.get('inventory')),
-                                             CLASS_TAGS.get(class_enum, frozenset()))]
+                                             class_tags(class_enum))]
     return out
 
 

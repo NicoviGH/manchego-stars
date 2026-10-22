@@ -18,6 +18,7 @@ from inject.paths import (
     BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_POINTER_H,
     BANIMCONF_C, CLASSES_C, CLASSES_H, ITEMUSE_C, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
     UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_S, WAIT_GFX_DIR)
+from inject.class_ids import slayer_classes, vanilla_class_values
 from inject.sms import _write_wait_row, claim_sms_id
 from inject.stats import _set_field
 
@@ -57,12 +58,6 @@ def _parse_class_enum_values():
             if m:
                 out[m.group(1)] = int(m.group(2), 0)
     return out
-
-
-def vanilla_class_values():
-    """CLASS_X -> int for VANILLA FE8 only (submodule HEAD), so an appended slot never counts."""
-    return {k: int(v, 0) for k, v in re.findall(r'(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)',
-                                               vanilla_decomp_text('include/constants/classes.h'))}
 
 
 def _move_table_len():
@@ -523,22 +518,13 @@ def class_id_tests(text):
 @functools.lru_cache(maxsize=None)
 def id_switched_classes():
     """Every class the gameplay sources test by id, read from vanilla HEAD: their ==/!=/case
-    tests, plus the raw-hex `case 0x..:` of IsUnitEffectiveAgainst (the Bishop's slayer)."""
+    tests, plus the Bishop's slayer, which IsUnitEffectiveAgainst tests by raw hex id
+    (`inject.class_ids.slayer_classes`)."""
     values = vanilla_class_values()
-    names = {}
-    for k, v in values.items():
-        names.setdefault(v, k)
-    out = set()
+    out = set(slayer_classes())
     for rel in GAMEPLAY_ID_SOURCES:
-        text = vanilla_decomp_text(rel)
-        out.update(c for c in class_id_tests(text)
+        out.update(c for c in class_id_tests(vanilla_decomp_text(rel))
                    if c in values and (rel, c) not in PLAYER_PROMOTION_ONLY)
-        fn = re.search(r's8 IsUnitEffectiveAgainst\(.*?\n\}', text, re.S)
-        for h in re.findall(r'case (0x[0-9A-Fa-f]+):', fn.group(0) if fn else ''):
-            if int(h, 16) not in names:
-                sys.exit('ERROR: %s IsUnitEffectiveAgainst names class %s, which '
-                         'constants/classes.h does not' % (rel, h))
-            out.add(names[int(h, 16)])
     return frozenset(out)
 
 
