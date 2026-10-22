@@ -15,7 +15,7 @@ from inject.decomp import (
     _find_brace_block, _replace_brace_block, _table_close_line, REPO, vanilla_decomp_text)
 from inject.paths import (
     BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_POINTER_H,
-    BANIMCONF_C, CLASSES_C, CLASSES_H, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
+    BANIMCONF_C, CLASSES_C, CLASSES_H, ITEMUSE_C, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
     UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_S, WAIT_GFX_DIR)
 from inject.sms import _write_wait_row, claim_sms_id
 from inject.stats import _set_field
@@ -265,6 +265,9 @@ def inject_enemy_class_reskins(campaign, verbose=True):
         for key in ('base', 'slot'):
             if rk[key] not in values:
                 sys.exit('ERROR: enemy_class_reskins %s: unknown class %r' % (rk['id'], rk[key]))
+        if base in id_switched_classes():
+            sys.exit('ERROR: enemy_class_reskins %s: the engine tests %s by class id, so a '
+                     'clone of it would not play as it (see ID_SWITCH_SOURCES)' % (rk['id'], base))
 
         # Donor SMS palette + geometry come from the base class's vanilla wait sheet; the
         # registry (inject.unit_art) is what the wiki draws from, so both read one answer.
@@ -480,3 +483,64 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
             f.write(ctext)
         if verbose:
             print('  %-16s = %s bound on %s' % (rk['id'], new_conf, rk['slot']))
+
+
+# A clone is its base class to the rules: same stats, same lists (Nicolas, 2026-10-22: "the
+# reskins are cosmetic and story driven"). Most of FE8 reads a unit's class DATA, which the
+# clone copies. Two kinds of rule read the class ID instead and cannot follow a copy:
+#   * data lists of class ids -- the `ItemEffectiveness_*` lists (data_itemuse.c), which
+#     `inject_reskin_effectiveness` extends with every clone of a listed base;
+#   * code that switches on an id (Sure Strike, Pierce, Great Shield, the Bishop's slayer,
+#     Silencer's exemptions, the Entombed's EXP, Phantoms, Rogues...). No reskin may clone
+#     one of those: `id_switched_classes` lists them and the reskin step refuses it.
+ID_SWITCH_SOURCES = ('src/bmbattle.c', 'src/bmitem.c', 'src/bmunit.c', 'src/bmmenu.c',
+                     'src/bmtarget.c', 'src/bmusailment.c', 'src/cpextra_80407F0.c',
+                     'src/unitinfowindow.c', 'src/mapanim.c', 'src/mapanim_spellassoc.c')
+
+
+def id_switched_classes():
+    """Every CLASS_ the gameplay sources test by id (`->number == CLASS_X`, `case CLASS_X:`,
+    `UNIT_CLASS_ID(...) != CLASS_X`), plus the raw-hex `case 0x..:` of IsUnitEffectiveAgainst,
+    read from vanilla HEAD."""
+    values = vanilla_class_values()
+    names = {v: k for k, v in values.items()}
+    out = set()
+    for rel in ID_SWITCH_SOURCES:
+        text = vanilla_decomp_text(rel)
+        for line in text.splitlines():
+            if 'pClassData->number' in line or 'UNIT_CLASS_ID' in line or 'case CLASS_' in line:
+                out.update(c for c in re.findall(r'\bCLASS_[A-Z0-9_]+', line) if c in values)
+        fn = re.search(r's8 IsUnitEffectiveAgainst\(.*?\n\}', text, re.S)
+        if fn:
+            out.update(names[int(h, 16)] for h in re.findall(r'case (0x[0-9A-Fa-f]+):', fn.group(0)))
+    return frozenset(out)
+
+
+def add_clones_to_effectiveness(text, clones):
+    """`text` (data_itemuse.c) with each clone listed after its base in every
+    `ItemEffectiveness_*` list that names the base. `clones` is [(base, slot)]."""
+    def extend(m):
+        body = m.group(2)
+        for base, slot in clones:
+            body = re.sub(r'^(\s*)%s,\n' % base,
+                          lambda b: '%s%s,\n%s%s,\n' % (b.group(1), base, b.group(1), slot),
+                          body, flags=re.M)
+        return m.group(1) + body + m.group(3)
+    return re.sub(r'(ItemEffectiveness_\w+\[\] = \{\n)(.*?)(\};)', extend, text, flags=re.S)
+
+
+def inject_reskin_effectiveness(campaign, verbose=True):
+    """Put every reskin on its base class's effectiveness lists, so a Horseslayer is as
+    effective on a Shark Rider as on the Cavalier it clones."""
+    reskins = enemy_class_reskins(campaign)
+    if not reskins:
+        return
+    with open(ITEMUSE_C, encoding='utf-8') as f:
+        text = f.read()
+    new = add_clones_to_effectiveness(text, [(rk['base'], rk['slot']) for rk in reskins])
+    with open(ITEMUSE_C, 'w', encoding='utf-8') as f:
+        f.write(new)
+    if verbose:
+        counts = [(rk['id'], len(re.findall(r'^\s*%s,$' % rk['slot'], new, re.M)))
+                  for rk in reskins]
+        print('  effectiveness lists: ' + ', '.join('%s %d' % c for c in counts if c[1]))

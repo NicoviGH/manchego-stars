@@ -167,5 +167,47 @@ class AppendedSlotIds(unittest.TestCase):
         self.assertTrue(any('without a gap' in m for m in gap), gap)
 
 
+
+class ClonesPlayAsTheirBase(unittest.TestCase):
+    """A reskin is its base class to the rules (ADR 0362): on its effectiveness lists, and
+    never a clone of a class the engine tests by id."""
+
+    ITEMUSE = ('CONST_DATA u8 ItemEffectiveness_Horse[] = {\n'
+               '    CLASS_TROUBADOUR,\n'
+               '    CLASS_CAVALIER,\n'
+               '    CLASS_NONE,\n'
+               '};\n'
+               '\n'
+               'CONST_DATA u8 ItemEffectiveness_Armor[] = {\n'
+               '    CLASS_ARMOR_KNIGHT,\n'
+               '    CLASS_NONE,\n'
+               '};\n')
+
+    def test_a_clone_joins_every_list_its_base_is_on(self):
+        out = inject.reskins.add_clones_to_effectiveness(
+            self.ITEMUSE, [('CLASS_CAVALIER', 'CLASS_CAV_SHARK_RIDER'),
+                           ('CLASS_SOLDIER', 'CLASS_SOL_MERFOLK')])
+        self.assertIn('    CLASS_CAVALIER,\n    CLASS_CAV_SHARK_RIDER,\n    CLASS_NONE,', out)
+        self.assertNotIn('CLASS_SOL_MERFOLK', out)
+        self.assertEqual(out.count('CLASS_CAV_SHARK_RIDER'), 1)
+
+    def test_a_name_that_only_starts_like_the_base_is_not_matched(self):
+        out = inject.reskins.add_clones_to_effectiveness(
+            self.ITEMUSE, [('CLASS_ARMOR', 'CLASS_X')])
+        self.assertNotIn('CLASS_X', out)
+
+    def test_id_switched_classes_include_the_combat_skills(self):
+        ids = inject.reskins.id_switched_classes()
+        for c in ('CLASS_SNIPER', 'CLASS_WYVERN_KNIGHT', 'CLASS_GENERAL', 'CLASS_BISHOP',
+                  'CLASS_ENTOUMBED', 'CLASS_MOGALL', 'CLASS_ROGUE'):
+            self.assertIn(c, ids)
+        self.assertNotIn('CLASS_CAVALIER', ids)
+
+    def test_no_declared_reskin_clones_an_id_switched_class(self):
+        ids = inject.reskins.id_switched_classes()
+        for rk in inject.reskins.enemy_class_reskins('rime-of-the-frostmaiden'):
+            self.assertNotIn(rk['base'], ids, rk['id'])
+
+
 if __name__ == '__main__':
     unittest.main()
