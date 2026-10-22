@@ -35,7 +35,7 @@ from collections import namedtuple
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(REPO, 'tools'))
 from inject.class_ids import DEFAULT_CAMPAIGN  # noqa: E402
-from inject.decomp import DECOMP, enum_values, vanilla_decomp_text  # noqa: E402  the build tree (#408, ITEM_ENUM)
+from inject.decomp import DECOMP, enum_values, vanilla_decomp_text  # noqa: E402  DECOMP is the build tree (#408); the reads are HEAD
 from yaml_loader import yaml_load  # noqa: E402
 ELF = os.environ.get('PT_ELF') or os.path.join(DECOMP, 'fireemblem8.elf')   # PT_VANILLA (run.sh)
 HERE = os.path.dirname(os.path.abspath(__file__))

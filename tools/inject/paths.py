@@ -47,6 +47,8 @@ BANIM_GFX_DIR = os.path.join(DECOMP, 'graphics', 'banim')
 
 ITEMS_C = os.path.join(DECOMP, 'src', 'data_items.c')
 
+ITEMUSE_C = os.path.join(DECOMP, 'src', 'data_itemuse.c')   # ItemEffectiveness_* lists
+
 TEXTS_TXT = os.path.join(DECOMP, 'texts', 'texts.txt')
 
 PORTRAIT_DATA_C = os.path.join(DECOMP, 'src', 'portrait_data.c')

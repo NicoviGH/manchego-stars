@@ -64,7 +64,8 @@ from inject.names import inject_item_names, inject_names
 from inject.platforms import inject_battle_platforms
 from inject.portraits import inject_portraits, patch_portrait_face_data
 from inject.raw_pids import patch_raw_pid_portraits
-from inject.reskins import inject_enemy_class_battle_anims, inject_enemy_class_reskins
+from inject.reskins import (inject_enemy_class_battle_anims, inject_enemy_class_reskins,
+                            inject_reskin_effectiveness)
 from inject.sms import sms_alloc_report, sms_alloc_reset
 from inject.stats import patch_character_data
 from inject.test_chapter import inject_test_chapter
@@ -222,6 +223,7 @@ STEPS = [
          needs=('sms-pool', 'map-sprite-sms-ids'), provides=('reskin-classes',),
          writes=UNIT_ICONS + ('include/constants/classes.h', 'src/data_classes.c')),
     Step(sms_alloc_report, needs=('map-sprite-sms-ids', 'reskin-classes')),
+    Step(inject_reskin_effectiveness, needs=('reskin-classes',), writes=('src/data_itemuse.c',)),
     # The two most expensive steps in the build (17.1s + 8.5s of a ~50s `make`, measured
     # 2026-08-23) and the two that NO boot flag reaches -- every ROM configuration pays them to
     # produce byte-identical data, and the matrix builds five for one gate. So they are cached

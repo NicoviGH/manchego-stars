@@ -25,8 +25,8 @@ HONEST LIMITS. Enemies walk through each other, as FE8's flood fill lets them, a
 the green hulls block them; the player's own units, which do block, are where the player
 puts them. Strikers that step out stay where they stepped. Every enemy is assumed to want this tile;
 the real AI picks one target. That makes a tile's reading an UPPER bound on how many attack
-it, and the matching is what keeps the bound honest. Crit-bonus classes (`CA_CRITBONUS`)
-and weapon effects other than effectiveness are not modelled.
+it, and the matching is what keeps the bound honest. Weapon effects other than
+effectiveness and poison (brave, magic swords, Luna-style) are not modelled.
 
     python3 tools/danger_map.py ch06 --boats          # each hull, phase by phase
     python3 tools/danger_map.py ch06 --unit marty --phase 2

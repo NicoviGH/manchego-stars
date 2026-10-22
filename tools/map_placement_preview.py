@@ -38,6 +38,7 @@ import map_tileset_tool as mt                                        # noqa: E40
 import campaign_chapters                                             # noqa: E402
 import chapter_schema                                                # noqa: E402
 from inject.terrain import class_movement                            # noqa: E402,F401
+from inject.decomp import enum_values                                # noqa: E402
 
 CAMPAIGN = os.path.join(ROOT, 'campaigns/rime-of-the-frostmaiden')
 MAPS = os.path.join(CAMPAIGN, 'maps')
@@ -45,11 +46,8 @@ DECOMP = os.path.join(ROOT, 'fireemblem8u')
 
 # Terrain ids by name, read from the decomp rather than restated -- the same source
 # import_map_layout validates against.
-TERRAIN = {}
-for _line in open(os.path.join(DECOMP, 'include/constants/terrains.h')):
-    _m = re.match(r'\s*(TERRAIN_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', _line)
-    if _m:
-        TERRAIN[_m.group(1)] = int(_m.group(2), 0)
+with open(os.path.join(DECOMP, 'include/constants/terrains.h')) as _f:
+    TERRAIN = enum_values(_f.read(), 'TERRAIN_')
 NAME_BY_TERRAIN = {v: k for k, v in TERRAIN.items()}
 
 def mov_cost_row(table='TerrainTable_MovCost_CommonT1Normal'):

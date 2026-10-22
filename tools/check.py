@@ -86,6 +86,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0361: class tags are read from the decomp (difficulty.class_tags)
+    r'CLASS_TAGS(\.get|\[| = \{)',
+    # retired by ADR 0360: tomes carry their FE8 type (anima/light/dark); test with fc.is_magic
+    r"\.kind\s*(==|!=|in)\s*\(?\s*['\"]magic['\"]",
     # retired by #510 step 5: the team is fielded per career (difficulty._fielded)
     r'_best_field',
     # retired by #510 step 4: the parity read rolls every enemy per career (enemy_careers)

@@ -91,9 +91,11 @@ def _item_block(item_enum):
 
 def attributes_in(block):
     """The flags on a decomp entry's `.attributes` line (a class, character or item block), as
-    a frozenset. Empty when the entry has none: absent means zero, not inherited."""
-    m = re.search(r'\.attributes\s*=\s*([^;]*?),\n', block)
-    return frozenset(t.strip() for t in (m.group(1) if m else '').split('|') if t.strip())
+    a frozenset. Empty when the entry has none, or writes `0`: absent means zero, not
+    inherited. Reads one line, so a trailing comment or CRLF cannot pull in the next field."""
+    m = re.search(r'\.attributes\s*=\s*([^,\n]+)', block)
+    return frozenset(t.strip() for t in (m.group(1) if m else '').split('|')
+                     if t.strip() and t.strip() != '0')
 
 
 def item_attributes(item_enum):

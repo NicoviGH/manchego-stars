@@ -21,11 +21,9 @@ from map_tileset_tool import (DEFAULT_TILESET, _tileset_from_dir, compile_layout
                               vanilla_layout_data)
 
 
-TERRAIN_BY_NAME = {}
-for _line in open(os.path.join(ROOT, 'fireemblem8u/include/constants/terrains.h')):
-    _m = re.match(r'\s*(TERRAIN_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', _line)
-    if _m:
-        TERRAIN_BY_NAME[_m.group(1)] = int(_m.group(2), 0)
+from inject.decomp import enum_values  # noqa: E402
+with open(os.path.join(ROOT, 'fireemblem8u/include/constants/terrains.h')) as _f:
+    TERRAIN_BY_NAME = enum_values(_f.read(), 'TERRAIN_')
 
 
 def validate_terrain_matches_vanilla(export_data, decomp_root, maps_root, declared=None):

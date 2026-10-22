@@ -4,7 +4,7 @@ import json
 import re
 import sys
 
-from inject.decomp import vanilla_decomp_text
+from inject.decomp import enum_values, vanilla_decomp_text
 from inject.hosting import _load_chapter_yaml, chapter_yaml_for
 from inject.paths import CHAPTER_SETTINGS_JSON
 
@@ -149,12 +149,13 @@ def apply_chapter_difficulty(campaign, verbose=False):
 # vanilla puts Ch5x (Unbroken Heart) at row 5, so from Ch5 on chapter N is row N+1. Only the
 # shared-route `CHAPTER_L_*` rows are named here; past the split the routes interleave, and a
 # twin there has to say which route it means.
-_ENUM_RE = re.compile(r'CHAPTER_L_(PROLOGUE|\d+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)')
+_SHARED_ROW = re.compile(r'CHAPTER_L_(PROLOGUE|\d+)$')
 
 
 def _twin_rows():
-    return {('FE8 Prologue' if n == 'PROLOGUE' else 'FE8 Ch%d' % int(n)): int(v, 0)
-            for n, v in _ENUM_RE.findall(vanilla_decomp_text('include/constants/chapters.h'))}
+    rows = enum_values(vanilla_decomp_text('include/constants/chapters.h'), 'CHAPTER_L_')
+    return {('FE8 Prologue' if m.group(1) == 'PROLOGUE' else 'FE8 Ch%d' % int(m.group(1))): v
+            for m, v in ((_SHARED_ROW.match(n), v) for n, v in rows.items()) if m}
 
 
 def twin_settings_index(chap):

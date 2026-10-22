@@ -20,7 +20,7 @@ import os
 import re
 
 from yaml_loader import yaml_load
-from inject.decomp import REPO, vanilla_decomp_text
+from inject.decomp import REPO, enum_values, vanilla_decomp_text
 
 DEFAULT_CAMPAIGN = 'rime-of-the-frostmaiden'
 
@@ -49,6 +49,24 @@ def class_display_name(token):
     t = str(token).lower().replace('_', '-')
     t = _CLASS_NAMES.get(t) or _CLASS_NAMES.get(_VARIANT.sub('', t)) or _VARIANT.sub('', t)
     return t if ' ' in t or t[:1].isupper() else ' '.join(w.capitalize() for w in t.split('-'))
+
+
+@functools.lru_cache(maxsize=None)
+def vanilla_class_values():
+    """CLASS_X -> its id, for every vanilla class given a number (HEAD, as above). An alias
+    (`CLASS_OBSTACLE = CLASS_EPHRAIM_LORD`) has no number of its own and is left out."""
+    return enum_values(vanilla_decomp_text('include/constants/classes.h'), 'CLASS_')
+
+
+@functools.lru_cache(maxsize=None)
+def slayer_classes():
+    """The classes `IsUnitEffectiveAgainst` (bmitem.c) makes x3 against the Monsters list. It
+    switches on raw class ids (0x2B, 0x2C), named here through include/constants/classes.h."""
+    fn = re.search(r's8 IsUnitEffectiveAgainst\(.*?\n\}',
+                   vanilla_decomp_text('src/bmitem.c'), re.S).group(0)
+    ids = {int(v, 16) for v in re.findall(r'case (0x[0-9A-Fa-f]+):', fn)}
+    return frozenset(name for name, v in vanilla_class_values().items()
+                     if v in ids)
 
 
 @functools.lru_cache(maxsize=None)

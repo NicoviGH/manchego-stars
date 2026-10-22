@@ -57,9 +57,8 @@ _LOAD_COMMAND = re.compile(r'\bLOAD[1-4]\(\s*[^,]+,\s*(\w+)\s*\)')
 @functools.lru_cache(maxsize=None)
 def _character_enum():
     """{CHARACTER_FOO: value} from the decomp's own header."""
-    return {m.group(1): int(m.group(2), 0) for m in re.finditer(
-        r'(CHARACTER_\w+|CHAR_EVT_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)',
-        vanilla_decomp_text('include/constants/characters.h'))}
+    text = vanilla_decomp_text('include/constants/characters.h')
+    return {**_decomp.enum_values(text, 'CHARACTER_'), **_decomp.enum_values(text, 'CHAR_EVT_')}
 
 
 def character_pid(token):

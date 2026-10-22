@@ -195,5 +195,22 @@ class EnemyCareers(unittest.TestCase):
             self.assertAlmostEqual(whole[key], sum(m[key] for m in one) / len(one), places=9)
 
 
+
+class AttributesIn(unittest.TestCase):
+    """The one reader of a decomp entry's `.attributes` line (classes, characters, items)."""
+
+    def test_flags_split_on_the_pipe(self):
+        self.assertEqual(ul.attributes_in('.attributes = IA_WEAPON | IA_MAGIC,\n'),
+                         frozenset({'IA_WEAPON', 'IA_MAGIC'}))
+
+    def test_absent_or_zero_is_empty(self):
+        self.assertEqual(ul.attributes_in('.number = X,\n'), frozenset())
+        self.assertEqual(ul.attributes_in('.attributes = 0,\n'), frozenset())
+
+    def test_a_trailing_comment_stays_on_its_line(self):
+        self.assertEqual(ul.attributes_in('.attributes = CA_BOSS, /* x */\r\n.res = 3,\n'),
+                         frozenset({'CA_BOSS'}))
+
+
 if __name__ == '__main__':
     unittest.main()

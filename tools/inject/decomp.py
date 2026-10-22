@@ -187,7 +187,7 @@ def enum_values(text, prefix):
     (`CLASS_OBSTACLE = CLASS_EPHRAIM_LORD`) has no number of its own and is left out. The one
     parser of decomp enum values: callers pick the text (HEAD or the build tree)."""
     return {k: int(v, 0) for k, v in
-            re.findall(r'(%s[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)' % prefix, text)}
+            re.findall(r'(%s\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)' % prefix, text)}
 
 
 # Bounded, not unbounded: today's readers touch ~9-22 files (~2-5 MB), but #365 proposes a

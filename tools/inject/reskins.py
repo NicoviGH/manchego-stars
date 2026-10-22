@@ -1,5 +1,6 @@
 """Enemy class reskins (#21): cloned classes with their own map sprites and battle anims.
 """
+import functools
 import os
 import re
 import sys
@@ -16,8 +17,9 @@ from inject.decomp import (
     vanilla_decomp_text)
 from inject.paths import (
     BANIM_DATA_C, BANIM_DATA_DIR, BANIM_EKRBATTLE_H, BANIM_GFX_DIR, BANIM_POINTER_H,
-    BANIMCONF_C, CLASSES_C, CLASSES_H, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
+    BANIMCONF_C, CLASSES_C, CLASSES_H, ITEMUSE_C, MOVE_GFX_DIR, UNIT_ICON_MOVE_C, UNIT_ICON_MOVE_S,
     UNIT_ICON_POINTER_H, UNIT_ICON_WAIT_S, WAIT_GFX_DIR)
+from inject.class_ids import slayer_classes, vanilla_class_values
 from inject.sms import _write_wait_row, claim_sms_id
 from inject.stats import _set_field
 
@@ -52,11 +54,6 @@ def _parse_class_enum_values():
     (move/class tables index by id-1)."""
     with open(CLASSES_H, encoding='utf-8') as f:
         return enum_values(f.read(), 'CLASS_')
-
-
-def vanilla_class_values():
-    """CLASS_X -> int for VANILLA FE8 only (submodule HEAD), so an appended slot never counts."""
-    return enum_values(vanilla_decomp_text('include/constants/classes.h'), 'CLASS_')
 
 
 def _move_table_len():
@@ -255,11 +252,15 @@ def inject_enemy_class_reskins(campaign, verbose=True):
     sprite_sms = {}        # sprite stem -> SMS id of its (shared) wait row
     sprite_move_sym = {}   # sprite stem -> move-sheet symbol
 
+    switched = id_switched_classes()
     for rk in reskins:
         base, slot, sprite = rk['base'], rk['slot'], rk['sprite']
         for key in ('base', 'slot'):
             if rk[key] not in values:
                 sys.exit('ERROR: enemy_class_reskins %s: unknown class %r' % (rk['id'], rk[key]))
+        if base in switched:
+            sys.exit('ERROR: enemy_class_reskins %s: the engine tests %s by class id, so a '
+                     'clone of it would not play as it (see GAMEPLAY_ID_SOURCES)' % (rk['id'], base))
 
         # Donor SMS palette + geometry come from the base class's vanilla wait sheet; the
         # registry (inject.unit_art) is what the wiki draws from, so both read one answer.
@@ -475,3 +476,80 @@ def inject_enemy_class_battle_anims(campaign, verbose=True):
             f.write(ctext)
         if verbose:
             print('  %-16s = %s bound on %s' % (rk['id'], new_conf, rk['slot']))
+
+
+# A clone is its base class to the rules: same stats, same lists (Nicolas, 2026-10-22: "the
+# reskins are cosmetic and story driven"). Most of FE8 reads a unit's class DATA, which the
+# clone copies. Two kinds of rule read the class ID instead and cannot follow a copy:
+#   * data lists of class ids -- the `ItemEffectiveness_*` lists (data_itemuse.c), which
+#     `inject_reskin_effectiveness` extends with every clone of a listed base;
+#   * code that tests an id (Sure Strike, Pierce, Great Shield, the Bishop's slayer,
+#     Silencer's exemptions, the Entombed's EXP, Phantoms, Rogues...). No reskin may clone
+#     one of those: `id_switched_classes` lists them and the reskin step refuses it.
+# Every decomp source and engine patch that tests a class id is in exactly one of the two
+# sets below (test_inject_reskins enforces it), so a new one has to be classified.
+GAMEPLAY_ID_SOURCES = ('src/bmbattle.c', 'src/bmitem.c', 'src/bmunit.c', 'src/bmmenu.c',
+                       'src/bmtarget.c', 'src/bmusailment.c', 'src/cpextra_80407F0.c')
+# How a unit looks or sounds (battle anims, map sprites, map animations, info windows), or
+# player-only screens (promotion). A clone differing there is the cosmetic part of a reskin.
+PRESENTATION_ID_SOURCES = (
+    'src/banim-battleparse.c', 'src/banim-efxsound.c', 'src/banim-ekrbattleintro.c',
+    'src/banim-ekrdragon-myrrh.c', 'src/banim-ekrmain.c', 'src/banim-ekrtriangle.c',
+    'src/classchg-menuselect.c', 'src/classchg-sel.c', 'src/mapanim.c',
+    'src/mapanim_spellassoc.c', 'src/mu.c', 'src/opinfo.c', 'src/statscreen.c',
+    'src/unitinfowindow.c', 'src/worldmap_mapmu.c',
+    'engine/patches/0008-patch-banim-palette-custom-guard.patch')
+# A test in a gameplay source that only a PLAYER promotion reaches: Pupil -> Shaman resets
+# the Anima rank (bmbattle.c), and nothing promotes into a clone.
+PLAYER_PROMOTION_ONLY = {('src/bmbattle.c', 'CLASS_PUPIL'), ('src/bmbattle.c', 'CLASS_SHAMAN')}
+CLASS_ID_TEST = re.compile(r'(?:==|!=)\s*(CLASS_[A-Z0-9_]+)|case (CLASS_[A-Z0-9_]+)\s*:'
+                           r'|(CLASS_[A-Z0-9_]+)\s*(?:==|!=)')
+
+
+def class_id_tests(text):
+    """The CLASS_ names `text` tests an id against (==, != or a case label)."""
+    return {a or b or c for a, b, c in CLASS_ID_TEST.findall(text)}
+
+
+@functools.lru_cache(maxsize=None)
+def id_switched_classes():
+    """Every class the gameplay sources test by id, read from vanilla HEAD: their ==/!=/case
+    tests, plus the Bishop's slayer, which IsUnitEffectiveAgainst tests by raw hex id
+    (`inject.class_ids.slayer_classes`)."""
+    values = vanilla_class_values()
+    out = set(slayer_classes())
+    for rel in GAMEPLAY_ID_SOURCES:
+        out.update(c for c in class_id_tests(vanilla_decomp_text(rel))
+                   if c in values and (rel, c) not in PLAYER_PROMOTION_ONLY)
+    return frozenset(out)
+
+
+def add_clones_to_effectiveness(text, clones):
+    """`text` (data_itemuse.c) with each clone listed after its base in every
+    `ItemEffectiveness_*` list that names the base. `clones` is [(base, slot)]."""
+    def extend(m):
+        body = m.group(2)
+        for base, slot in clones:
+            body = re.sub(r'^([ \t]*)%s,([ \t]*(?:/\*.*?\*/)?[ \t]*)\n' % base,
+                          lambda b: '%s%s,%s\n%s%s,\n' % (b.group(1), base, b.group(2),
+                                                         b.group(1), slot),
+                          body, flags=re.M)
+        return m.group(1) + body + m.group(3)
+    return re.sub(r'(ItemEffectiveness_\w+\[\] = \{\n)(.*?)(\};)', extend, text, flags=re.S)
+
+
+def inject_reskin_effectiveness(campaign, verbose=True):
+    """Put every reskin on its base class's effectiveness lists, so a Horseslayer is as
+    effective on a Shark Rider as on the Cavalier it clones. Reads the vanilla text, so the
+    step is the same however many times a build tree has run it."""
+    reskins = enemy_class_reskins(campaign)
+    if not reskins:
+        return
+    new = add_clones_to_effectiveness(vanilla_decomp_text('src/data_itemuse.c'),
+                                      [(rk['base'], rk['slot']) for rk in reskins])
+    with open(ITEMUSE_C, 'w', encoding='utf-8') as f:
+        f.write(new)
+    if verbose:
+        counts = [(rk['id'], len(re.findall(r'^\s*%s,$' % rk['slot'], new, re.M)))
+                  for rk in reskins]
+        print('  effectiveness lists: ' + ', '.join('%s %d' % c for c in counts if c[1]))

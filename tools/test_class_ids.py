@@ -78,5 +78,18 @@ class DisplayName(unittest.TestCase):
                              token)
 
 
+
+class EnumValues(unittest.TestCase):
+    """`inject.decomp.enum_values`, the one parser of a decomp header's `NAME = <int>`."""
+
+    TEXT = ('enum {\n    CLASS_NONE = 0x00,\n    CLASS_EIRIKA_LORD = 2,\n'
+            '    CHARACTER_WIGHT_CHUnk = 0x5D,\n    CLASS_OBSTACLE = CLASS_EIRIKA_LORD,\n};\n')
+
+    def test_hex_and_decimal_and_mixed_case(self):
+        from inject.decomp import enum_values
+        self.assertEqual(enum_values(self.TEXT, 'CLASS_'), {'CLASS_NONE': 0, 'CLASS_EIRIKA_LORD': 2})
+        self.assertEqual(enum_values(self.TEXT, 'CHARACTER_'), {'CHARACTER_WIGHT_CHUnk': 0x5D})
+
+
 if __name__ == '__main__':
     unittest.main()

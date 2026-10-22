@@ -10,6 +10,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import inject.chapters.ch01
+import inject.class_ids
 import inject.reskins
 
 
@@ -145,7 +146,7 @@ class AppendedSlotIds(unittest.TestCase):
     def test_the_live_campaign_is_clean(self):
         self.assertEqual([], inject.reskins.slot_id_violations(
             inject.reskins.enemy_class_reskins('rime-of-the-frostmaiden'),
-            inject.reskins.vanilla_class_values()))
+            inject.class_ids.vanilla_class_values()))
 
     def test_a_new_slot_without_an_id_is_told_the_next_free_one(self):
         got = inject.reskins.slot_id_violations(
@@ -165,6 +166,90 @@ class AppendedSlotIds(unittest.TestCase):
         gap = inject.reskins.slot_id_violations([self.rk('a', 0x80), self.rk('b', 0x82)],
                                                 self.VANILLA)
         self.assertTrue(any('without a gap' in m for m in gap), gap)
+
+
+
+class ClonesPlayAsTheirBase(unittest.TestCase):
+    """A reskin is its base class to the rules (ADR 0362): on its effectiveness lists, and
+    never a clone of a class the engine tests by id."""
+
+    ITEMUSE = ('CONST_DATA u8 ItemEffectiveness_Horse[] = {\n'
+               '    CLASS_TROUBADOUR,\n'
+               '    CLASS_CAVALIER,\n'
+               '    CLASS_NONE,\n'
+               '};\n'
+               '\n'
+               'CONST_DATA u8 ItemEffectiveness_Armor[] = {\n'
+               '    CLASS_ARMOR_KNIGHT,\n'
+               '    CLASS_NONE,\n'
+               '};\n')
+
+    def test_a_clone_joins_every_list_its_base_is_on(self):
+        out = inject.reskins.add_clones_to_effectiveness(
+            self.ITEMUSE, [('CLASS_CAVALIER', 'CLASS_CAV_SHARK_RIDER'),
+                           ('CLASS_SOLDIER', 'CLASS_SOL_MERFOLK')])
+        self.assertIn('    CLASS_CAVALIER,\n    CLASS_CAV_SHARK_RIDER,\n    CLASS_NONE,', out)
+        self.assertNotIn('CLASS_SOL_MERFOLK', out)
+        self.assertEqual(out.count('CLASS_CAV_SHARK_RIDER'), 1)
+
+    def test_a_name_that_only_starts_like_the_base_is_not_matched(self):
+        out = inject.reskins.add_clones_to_effectiveness(
+            self.ITEMUSE, [('CLASS_ARMOR', 'CLASS_X')])
+        self.assertNotIn('CLASS_X', out)
+
+    def test_a_trailing_comment_or_blank_line_keeps_the_layout(self):
+        text = ('CONST_DATA u8 ItemEffectiveness_Horse[] = {\n'
+                '\n'
+                '    CLASS_CAVALIER, /* mounted */\n'
+                '    CLASS_NONE,\n'
+                '};\n')
+        out = inject.reskins.add_clones_to_effectiveness(
+            text, [('CLASS_CAVALIER', 'CLASS_CAV_SHARK_RIDER')])
+        self.assertIn('{\n\n    CLASS_CAVALIER, /* mounted */\n    CLASS_CAV_SHARK_RIDER,\n'
+                      '    CLASS_NONE,', out)
+
+    def test_the_step_writes_from_vanilla_so_a_rebuild_adds_nothing(self):
+        # data_itemuse.c is restored every build AND the step reads HEAD, not the tree.
+        import inject.warm
+        self.assertIn('src/data_itemuse.c', inject.warm.PATCHED_DECOMP_FILES)
+        import inspect
+        self.assertIn("vanilla_decomp_text('src/data_itemuse.c')",
+                      inspect.getsource(inject.reskins.inject_reskin_effectiveness))
+
+    def test_every_source_that_tests_a_class_id_is_classified(self):
+        import subprocess
+        decomp = os.path.join(inject.reskins.REPO, 'fireemblem8u')
+        listed = subprocess.check_output(
+            ['git', '-C', decomp, 'grep', '-l', '-E',
+             r'(==|!=) *CLASS_[A-Z]|case CLASS_[A-Z]|CLASS_[A-Z0-9_]+ *(==|!=)',
+             'HEAD', '--', 'src/*.c'], encoding='utf-8')
+        found = {line.split(':', 1)[1] for line in listed.split()}
+        patches = os.path.join(inject.reskins.REPO, 'engine', 'patches')
+        for root, _, names in os.walk(patches):
+            for name in sorted(n for n in names if n.endswith('.patch')):
+                path = os.path.join(root, name)
+                with open(path, encoding='utf-8') as f:
+                    added = ''.join(l[1:] for l in f
+                                    if l.startswith('+') and not l.startswith('+++'))
+                if inject.reskins.class_id_tests(added):
+                    found.add(os.path.relpath(path, inject.reskins.REPO))
+        gameplay = set(inject.reskins.GAMEPLAY_ID_SOURCES)
+        presentation = set(inject.reskins.PRESENTATION_ID_SOURCES)
+        self.assertEqual(gameplay & presentation, set())
+        self.assertEqual(found - {'src/bmitem.c'} - gameplay - presentation, set(),
+                         'classify these in inject.reskins')
+
+    def test_id_switched_classes_include_the_combat_skills(self):
+        ids = inject.reskins.id_switched_classes()
+        for c in ('CLASS_SNIPER', 'CLASS_WYVERN_KNIGHT', 'CLASS_GENERAL', 'CLASS_BISHOP',
+                  'CLASS_ENTOUMBED', 'CLASS_MOGALL', 'CLASS_ROGUE'):
+            self.assertIn(c, ids)
+        self.assertNotIn('CLASS_CAVALIER', ids)
+
+    def test_no_declared_reskin_clones_an_id_switched_class(self):
+        ids = inject.reskins.id_switched_classes()
+        for rk in inject.reskins.enemy_class_reskins('rime-of-the-frostmaiden'):
+            self.assertNotIn(rk['base'], ids, rk['id'])
 
 
 if __name__ == '__main__':

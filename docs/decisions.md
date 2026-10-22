@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-359 decisions. Read this index, then open the two or three you need — the whole
+362 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -209,6 +209,8 @@ fresh. Don't leave it in chat or agent memory only.
 | `0357` | [The parity read rolls every enemy's stats as the engine loads them, once per career](decisions/0357-enemy-stats-are-rolled-per-career.md) | 2026-10-21 | #510 |
 | `0358` | [The parity read fields its team per career, forced units first, in the ROM's unit order](decisions/0358-the-field-is-chosen-per-career.md) | 2026-10-21 | #510 |
 | `0359` | [Strategy sections are claims the parity read checks, never an input](decisions/0359-strategy-claims-are-checked-never-an-input.md) | 2026-10-21 | #510 |
+| `0360` | [Tomes carry their FE8 weapon type and sit on the magic triangle](decisions/0360-tomes-sit-on-the-magic-triangle.md) | 2026-10-22 | #510 |
+| `0361` | [A class's combat tags are read from the decomp, never kept by hand](decisions/0361-class-tags-are-read-from-the-decomp.md) | 2026-10-22 | #510 |
 
 ---
 
@@ -312,6 +314,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0336` | [A chapter plays its vanilla twin's music](decisions/0336-a-chapter-plays-its-vanilla-twin-s-music.md) | 2026-10-09 | #26 |
 | `0338` | [Our still busts draw their top corners (engine patch 0018)](decisions/0338-still-busts-draw-their-top-corners.md) | 2026-10-10 | #471 |
 | `0341` | [ch07 rides snowy-bern; the castle it lacks is ported in from snowy-fields](decisions/0341-ch07-bremen-rides-snowy-bern-with-a-ported-castle.md) | 2026-10-11 | #27 |
+| `0362` | [A reskin plays as its base class](decisions/0362-a-reskin-plays-as-its-base-class.md) | 2026-10-22 | #21 #510 |
 
 ---
 
