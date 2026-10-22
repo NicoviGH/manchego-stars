@@ -9,7 +9,6 @@ e.g.   import_map_layout.py ch01-the-iron-trail ~/Downloads/ch01-layout.json
         any other stem has no second fallback)"""
 import json
 import os
-import re
 import sys
 
 
