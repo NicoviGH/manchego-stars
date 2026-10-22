@@ -409,8 +409,7 @@ def _character_number(token):
     global _char_numbers
     if _char_numbers is None:
         text = inject.decomp.vanilla_decomp_text('include/constants/characters.h')
-        _char_numbers = {m.group(1): int(m.group(2), 0) for m in re.finditer(
-            r'(CHARACTER_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', text)}
+        _char_numbers = inject.decomp.enum_values(text, 'CHARACTER_')
     if token in _char_numbers:
         return _char_numbers[token]
     try:

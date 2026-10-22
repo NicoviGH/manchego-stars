@@ -89,9 +89,17 @@ def _item_block(item_enum):
     return m.group(1)
 
 
+def attributes_in(block):
+    """The flags on a decomp entry's `.attributes` line (a class, character or item block), as
+    a frozenset. Empty when the entry has none, or writes `0`: absent means zero, not
+    inherited. Reads one line, so a trailing comment or CRLF cannot pull in the next field."""
+    m = re.search(r'\.attributes\s*=\s*([^,\n]+)', block)
+    return frozenset(t.strip() for t in (m.group(1) if m else '').split('|')
+                     if t.strip() and t.strip() != '0')
+
+
 def item_attributes(item_enum):
-    m = re.search(r'\.attributes\s*=\s*([^,\n]+)', _item_block(item_enum))
-    return frozenset(t.strip() for t in (m.group(1) if m else '').split('|') if t.strip())
+    return attributes_in(_item_block(item_enum))
 
 
 def can_use_weapon(item_enum, class_enum, char_block='', attributes=frozenset(), autolevel=True):

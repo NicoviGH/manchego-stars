@@ -20,7 +20,7 @@ import os
 import re
 
 from yaml_loader import yaml_load
-from inject.decomp import REPO, vanilla_decomp_text
+from inject.decomp import REPO, enum_values, vanilla_decomp_text
 
 DEFAULT_CAMPAIGN = 'rime-of-the-frostmaiden'
 
@@ -55,9 +55,7 @@ def class_display_name(token):
 def vanilla_class_values():
     """CLASS_X -> its id, for every vanilla class given a number (HEAD, as above). An alias
     (`CLASS_OBSTACLE = CLASS_EPHRAIM_LORD`) has no number of its own and is left out."""
-    text = vanilla_decomp_text('include/constants/classes.h')
-    return {k: int(v, 0) for k, v in
-            re.findall(r'^\s*(CLASS_[A-Z0-9_]+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', text, re.M)}
+    return enum_values(vanilla_decomp_text('include/constants/classes.h'), 'CLASS_')
 
 
 @functools.lru_cache(maxsize=None)

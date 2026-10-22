@@ -2,11 +2,10 @@
 """
 import glob
 import os
-import re
 import sys
 
 import chapter_schema
-from inject.decomp import ITEM_ENUM, REPO, vanilla_decomp_text
+from inject.decomp import ITEM_ENUM, REPO, enum_values, vanilla_decomp_text
 from inject.paths import EVENTCALL_H, EVENTS_UDEFS_C
 from inject.raw_pids import entry_body_levels
 
@@ -288,8 +287,8 @@ def chapter_label_constants(source=None):
     if source is None:
         source = vanilla_decomp_text('include/constants/chapters.h')
     labels = {}
-    for name, value in re.findall(r'(CHAPTER_L_\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)', source):
-        labels.setdefault(int(value, 0), name)
+    for name, value in enum_values(source, 'CHAPTER_L_').items():
+        labels.setdefault(value, name)
     return labels
 
 
