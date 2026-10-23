@@ -399,15 +399,9 @@ local function recordCutscene(o)
     return result("PASS", tag .. " cutscene recorded")
 end
 
-local function tileOccupied(x, y)
-    for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayGreen, SYM.gUnitArrayRed }) do
-        for i = 0, 23 do
-            local u = unitAt(base, i)
-            if u and not isDead(u) and u.x == x and u.y == y then return true end
-        end
-    end
-    return false
-end
+-- A live unit of any faction stands on (x, y), over the decomp's array bounds (#531: this
+-- scanned 24 slots per faction, so red 24-49 and blue 24-61 never occupied anything).
+local function tileOccupied(x, y) return BOARD.occupied(x, y) end
 
 -- Live map state used by both scenarios and the controller observer.
 local function mapUnitRow(y) return ru32(ru32(SYM.gBmMapUnit) + y * 4) end

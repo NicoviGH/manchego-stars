@@ -156,6 +156,20 @@ do
     check(#b.units, 4, "each unit appears once")
 end
 
+-- Board.occupied sees every slot the decomp has (#531: red 24-49 were invisible), and a
+-- dead unit's tile is free.
+do
+    local m = fakeMem()
+    putUnit(m, SYM.gUnitArrayRed, 30, { charId = 0x80, x = 7, y = 3 })
+    putUnit(m, SYM.gUnitArrayBlue, 40, { charId = 2, x = 1, y = 1 })
+    putUnit(m, SYM.gUnitArrayGreen, 2, { charId = 0x40, x = 4, y = 4, state = 0x4 })
+    local mem = { u8 = m.u8, s8 = m.s8, u16 = m.u16, u32 = m.u32 }
+    check(Board.occupied(mem, SYM, 7, 3), true, "red slot 30 occupies its tile")
+    check(Board.occupied(mem, SYM, 1, 1), true, "blue slot 40 occupies its tile")
+    check(Board.occupied(mem, SYM, 4, 4), false, "a dead unit's tile is free")
+    check(Board.occupied(mem, SYM, 7, 4), false, "an empty tile is free")
+end
+
 -- Header: turn, phase, map size.
 do
     local b = board(function() end)

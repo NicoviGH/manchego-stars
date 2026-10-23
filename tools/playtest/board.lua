@@ -125,6 +125,24 @@ function Board.read(mem, SYM)
     }
 end
 
+-- Is a live unit of any faction standing on (x, y)? A lean scan (pointer, state, x, y per
+-- slot) rather than Board.read, because callers ask it once per tile of a movement range.
+-- Not gBmMapUnit: under fog the engine leaves a hidden red unit OFF that map
+-- (bmmap.c RefreshUnitsOnBmMap), and a destination picker must still not walk into it.
+function Board.occupied(mem, SYM, x, y)
+    for _, f in ipairs(Board.FACTIONS) do
+        local base = SYM[f.sym]
+        for slot = 0, f.count - 1 do
+            local a = base + slot * Board.UNIT_SIZE
+            if mem.u32(a) ~= 0 and mem.s8(a + 0x10) == x and mem.s8(a + 0x11) == y
+                and (mem.u32(a + 0x0C) & Board.US_DEAD) == 0 then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 -- The first unit of `faction` with `charId`, or nil. Generics SHARE a charId: use `slot`.
 function Board.unit(board, faction, charId)
     for _, u in ipairs(board.units) do
@@ -151,6 +169,7 @@ function Board.bind(mem, SYM)
         unitAt = function(base, slot) return Board.unitAt(mem, SYM, base, slot) end,
         attackRange = function(addr) return Board.attackRange(mem, SYM, addr) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
+        occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         unit = Board.unit, live = Board.live,
         UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,
