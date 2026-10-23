@@ -320,8 +320,8 @@ end
 --     afterPre   optional cleanup fn, guaranteed after pre returns or raises
 --     post       optional fn(reachedEnd) run once after the loop (e.g. a final "title" shot)
 local controllerState, guardedInput, freezeReport
--- The #236 state inspector, as ONE table rather than three top-level locals: this file
--- is against Lua's 200-local ceiling for a main chunk, and crossing it stops the whole
+-- The #236 state inspector, as ONE table rather than three top-level locals: Lua caps a
+-- main chunk at 200 locals, this file is one main chunk, and crossing the cap stops the whole
 -- harness loading (every scenario dies at once). Hang new helpers off an existing table
 -- (INSPECT, TUNE) or put the logic in controller.lua, which has a unit suite and no such
 -- ceiling. HOW MUCH ROOM IS LEFT IS NEVER WRITTEN DOWN HERE: `check.py

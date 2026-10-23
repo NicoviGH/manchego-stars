@@ -27,6 +27,11 @@ local function fakeEmu()
     function e:clearKey(k) self.keys = self.keys & ~k end
     function e:loadStateFile(_) for k in pairs(mem) do mem[k] = nil end; return true end
     e.label = "not a method"
+    -- mGBA's memory domains: objects reached THROUGH emu, with their own read/write methods.
+    local wram = {}
+    function wram:read32(a) e.reads = e.reads + 1; return mem[a] or 0 end
+    function wram:write32(a, v) mem[a] = v end
+    e.memory = { wram = wram }
     return e, mem
 end
 local function slot(i) return BASE + i * STRIDE end
@@ -65,6 +70,11 @@ do
     check(live[2].slot, 7, "in slot order (2)")
     check(live[3].addr, slot(9), "with its address")
     check(live[3].script, A, "and its script")
+    -- The caller owns what live() returns: mutating it cannot change the next caller's view.
+    live[1].addr = 0; table.remove(live, 2); live[#live + 1] = { slot = 99 }
+    local again = procs.live()
+    check(#again, 3, "a caller mutating its list does not change the next live()")
+    check(again[1].addr, slot(3), "nor an entry in it")
 end
 
 -- An unexported symbol reads as nil; looking it up must fail loudly, not answer "no proc".
@@ -77,16 +87,20 @@ end
 
 -- One scan per frame: the second and later finds in a frame read nothing.
 do
-    local procs, _, real, mem = setup()
+    local procs, env, real, mem = setup()
     mem[slot(5)] = A
     procs.find(A)
     check(real.reads, COUNT, "the first find of a frame scans the pool once")
     for _ = 1, 30 do procs.find(B); procs.find(A); procs.live() end
     check(real.reads, COUNT, "every later find in the same frame is free")
-    -- Reads through the guard do not cost the memo: they cannot start or end a proc.
+    -- Reads THROUGH THE GUARD do not drop the memo: they cannot start or end a proc. Each
+    -- costs its own one read, and the find after them costs nothing.
     local reads = real.reads
-    _ = procs.find(A) and procs.find(A)
-    check(real.reads, reads, "no rescan without a new frame or a write")
+    env.emu:read32(slot(5)); env.emu:read8(slot(5)); env.emu:currentFrame()
+    env.emu.memory.wram:read32(slot(5))
+    check(real.reads, reads + 3, "guarded reads forward, one read each")
+    check(procs.find(A), slot(5), "and the memo still answers")
+    check(real.reads, reads + 3, "with no rescan after reads through the guard")
 end
 
 -- A new frame rescans: a proc the game started since the last frame is seen.
@@ -125,6 +139,12 @@ do
     check(procs.find(C), slot(8), "a key release drops the memo")
     env.emu:loadStateFile("x.ss")   -- the whole pool changes without the frame moving
     check(procs.find(C), nil, "a state load drops the memo")
+    -- A write through an object REACHED through the guard (a memory domain) counts too.
+    mem[slot(10)] = 0
+    check(procs.find(A), nil, "before the domain poke: A is not live")
+    env.emu.memory.wram:write32(slot(10), A)
+    check(mem[slot(10)], A, "the domain write reaches memory")
+    check(procs.find(A), slot(10), "same frame, after a domain write: the memo was dropped")
     local reads = real.reads
     check(env.emu:read32(slot(8)), 0, "a read through the guard forwards")
     procs.find(C)

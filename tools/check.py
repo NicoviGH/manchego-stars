@@ -87,9 +87,14 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
     # retired by #531: the harness's remaining local slots are MEASURED (check_lua_local_headroom),
-    # never written down; "2 slots left" / "198 locals" went stale in a dozen places at once
-    r'2 slots left', r'198 top-level locals', r"AT (?:that|Lua's) (?:200-local )?ceiling",
-    r'two remaining slots', r'two top-level\s+local slots left', r'one of the (?:last|two) (?:free|remaining) slots',
+    # never written down; "2 slots left" / "198 locals" went stale in a dozen places at once.
+    # Bounded to the retired CLAIMS: the scan is case-insensitive, so `\b` keeps "12 slots
+    # left" out, and the ceiling patterns name the harness sitting AT/AGAINST/NEAR the
+    # 200-local ceiling -- a bare "at that ceiling" is ordinary English (test_check_comment_drift).
+    r'\b2 slots left\b', r'\b2 free slots\b', r'\b198 top-level locals\b',
+    r"(?-i:\bAT (?:that|Lua's) ceiling)", r'\bsitting at that ceiling\b',
+    r"\b(?:at|against|near) (?:Lua's |the |a )?200-local ceiling",
+    r'\btwo remaining slots\b', r'\btwo top-level\s+local slots left\b', r'\bone of the (?:last|two) (?:free|remaining) slots\b',
     # retired by ADR 0363, edited in place (Nicolas, 2026-10-23): a planned chapter gets no
     # difficulty reading, so there is no projected target, its twin's or the yardstick's
     r'unwritten_projection', r'planned_target', r'vanilla_projection',
@@ -669,7 +674,7 @@ def lua_local_headroom(path, probe_max=8):
 # once this constant comes down with it.
 #
 # Why a ratchet rather than more headroom: growth was 73 infrastructure locals in one
-# quarter against 2 free slots (#327). Freezing the count redirects the next helper into a
+# quarter against the handful that were then free (#327). Freezing the count redirects the next helper into a
 # module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
 # scale; thinning the tail only makes it comfortable.
 HARNESS_TOP_LEVEL_LOCALS = 168
