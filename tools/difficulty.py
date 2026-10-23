@@ -797,7 +797,7 @@ PARITY_REFERENCE_UDEFS = {
     # ch13a-eventscript.h loads: Aias's boss squad + the 20-unit main force + Pablo's
     # reinforcement wave + cavalry/merc/wyvern packs + Amelia (armed red recruit; she
     # fights if unrecruited). Excluded: the unarmed cutscene loads (Cormag/Caellach/
-    # Aias-L9 scene arrays) per the registry rule (armed ones: _cleared_scene_udefs); 2 staff-only healers drop as intended.
+    # Aias-L9 scene arrays) per the registry rule; 2 staff-only healers drop as intended.
     'FE8 Ch13': ('src/events_udefs.c',
                  ['UnitDef_088BAA4C', 'UnitDef_088BAA74', 'UnitDef_088BAC18',
                   'UnitDef_088BACA4', 'UnitDef_088BAD80', 'UnitDef_088BADBC',
@@ -987,13 +987,15 @@ def vanilla_red_units(parity_ref):
 
 def _vanilla_red_defs(parity_ref):
     """(array, index in the array, UnitDefinition dict) for every RED unit in the twin's
-    curated arrays, or None if the reference isn't curated. The one walk over them."""
+    curated arrays, or None if the reference isn't curated. The one walk over them, so the
+    one place scene-only arrays (`_cleared_scene_udefs`) are dropped for every reader."""
     spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
     if spec is None:
         return None
     relpath, arrays = spec
     text = inject.decomp.vanilla_decomp_text(relpath)
-    return [(array_name, i, d) for array_name in arrays
+    scenes = _cleared_scene_udefs(parity_ref)
+    return [(array_name, i, d) for array_name in arrays if array_name not in scenes
             for i, d in enumerate(vanilla_unit_defs(text, array_name))
             if d['allegiance'] == 'FACTION_ID_RED']
 
@@ -1071,25 +1073,24 @@ def vanilla_enemies(parity_ref, mode=None):
 
 @functools.lru_cache(maxsize=None)
 def _cleared_scene_udefs(parity_ref):
-    """The UnitDefinition arrays the twin loads only to stage a scene: loaded by an
-    EventListScr that runs CLEE (EvtRemoveAllEimies) afterwards, which strips every enemy
-    from the map before the scene ends. Ch8's TowerFall loads Caellach this way, has him fight a
-    cutscene battle, and clears him; he is never on the player's map. The armed counterpart
-    of the unarmed-cutscene rule the curated lists apply."""
-    name = _vanilla_internal_name(parity_ref)
-    chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
-    names = [c.get('internalName') for c in chapters['chapters']]
-    stem = chapter_event_stem(names.index(name)) if name in names else None
+    """The UnitDefinition arrays the twin loads ONLY to stage a scene: every LOAD of the array
+    in the chapter's scripts sits in an EventListScr that runs CLEE (EvtRemoveAllEimies)
+    afterwards, stripping every enemy from the map before the scene ends. Ch8's TowerFall
+    loads Caellach this way, has him fight a cutscene battle, and clears him; he is never on
+    the player's map. An array that is also loaded live (after the script's last CLEE, or in a
+    script with none) stays. The armed counterpart of the unarmed-cutscene rule the curated
+    lists apply."""
+    index = _vanilla_chapter_index(parity_ref)
+    stem = None if index is None else chapter_event_stem(index)
     if stem is None:
         return frozenset()
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    out = set()
+    staged, live = set(), set()
     for block in re.split(r'CONST_DATA EventListScr', script)[1:]:
         last_clear = [m.start() for m in re.finditer(r'^\s*CLEE\b', block, re.M)][-1:]
-        if last_clear:      # a load AFTER the last clear stays (Ch8's opening clears, then loads)
-            out.update(m.group(1) for m in re.finditer(
-                r'LOAD\w*\(\s*\w+\s*,\s*(UnitDef_\w+)', block) if m.start() < last_clear[0])
-    return frozenset(out)
+        for m in re.finditer(r'LOAD\w*\(\s*\w+\s*,\s*(UnitDef_\w+)', block):
+            (staged if last_clear and m.start() < last_clear[0] else live).add(m.group(1))
+    return frozenset(staged - live)
 
 
 def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
@@ -1103,8 +1104,6 @@ def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
     reds = _vanilla_red_defs(parity_ref)
     if reds is None:
         return None
-    scenes = _cleared_scene_udefs(parity_ref)
-    reds = [r for r in reds if r[0] not in scenes]
     shifts = vanilla_chapter_shifts(parity_ref) if mode else None
     if mode and shifts is None:
         # Silently returning an UNSHIFTED vanilla force here would compare our shifted
@@ -1152,6 +1151,14 @@ def _vanilla_internal_name(parity_ref):
     return ('L%02d' if n <= 8 else 'E%02d') % n
 
 
+def _vanilla_chapter_index(parity_ref):
+    """The chapter_settings index of the vanilla chapter `parity_ref` names, else None."""
+    name = _vanilla_internal_name(parity_ref)
+    chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
+    names = [c.get('internalName') for c in chapters['chapters']]
+    return names.index(name) if name in names else None
+
+
 def vanilla_chapter_shifts(parity_ref):
     """The parity reference chapter's OWN difficulty triple, in `mode_stats` shape.
 
@@ -1176,12 +1183,9 @@ def vanilla_forced(parity_ref):
     (eventinfo.c) over `gForceDeploymentList` (data_event_trigger.c), for the common route the
     early chain runs on (prologue to Ch8) and the twin's chapter index. Eirika everywhere,
     Artur in Ch4, Natasha in Ch5. {name}, as `vanilla_party` names them."""
-    name = _vanilla_internal_name(parity_ref)
-    chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
-    names = [c.get('internalName') for c in chapters['chapters']]
-    if name not in names:
+    index = _vanilla_chapter_index(parity_ref)
+    if index is None:
         return set()
-    index = names.index(name)
     text = inject.decomp.vanilla_decomp_text('src/data_event_trigger.c')
     s, e = inject.decomp._find_brace_block(text, 'gForceDeploymentList[]',
                                            'src/data_event_trigger.c')

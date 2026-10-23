@@ -1381,6 +1381,30 @@ class VanillaLoaded(unittest.TestCase):
             self.assertEqual(38, len(units))
 
 
+    def test_only_ch8_loses_arrays_to_the_scene_filter(self):
+        for ref, (relpath, arrays) in df.PARITY_REFERENCE_UDEFS.items():
+            text = inject.decomp.vanilla_decomp_text(relpath)
+            kept = [a for a in arrays
+                    if any(d['allegiance'] == 'FACTION_ID_RED'
+                           for d in df.vanilla_unit_defs(text, a))]
+            got = list(dict.fromkeys(a for a, _i, _d in df._vanilla_red_defs(ref)))
+            if ref == 'FE8 Ch8':
+                self.assertEqual([a for a in kept if a not in self.CUTSCENE_ARRAYS], got)
+                self.assertIn('UnitDef_088B73C8', got)
+            else:
+                self.assertEqual(kept, got, ref)
+
+    def test_an_array_loaded_live_as_well_is_not_scene_only(self):
+        # 088B783C is loaded inside a scene before a CLEE and again after the last one
+        self.assertNotIn('UnitDef_088B783C', df._cleared_scene_udefs('FE8 Ch8'))
+        self.assertEqual(self.CUTSCENE_ARRAYS, df._cleared_scene_udefs('FE8 Ch8')
+                         & self.CUTSCENE_ARRAYS)
+
+    def test_every_reader_of_the_red_force_sees_the_filter(self):
+        self.assertFalse([d for d in df.vanilla_red_units('FE8 Ch8')
+                          if d.get('charIndex') == 'CHARACTER_CAELLACH'])
+
+
 class VanillaEnemies(unittest.TestCase):
     """Integration: extract a parity reference's red enemy force from the decomp (HEAD)."""
 
