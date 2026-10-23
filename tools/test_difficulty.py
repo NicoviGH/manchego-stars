@@ -11,6 +11,7 @@ import collections
 import contextlib
 import copy
 import io
+import dataclasses
 import os
 import re
 import sys
@@ -2769,6 +2770,51 @@ class PartyMatchup(unittest.TestCase):
         self.assertEqual(df.party_matchup([(enemy, 0)], party, forced={'b'})['targeted'],
                          {'b': 0.0, 'a': 1.0})
 
+    @staticmethod
+    def _engage(*groups, swung=()):
+        import timeline
+        found = [timeline.Engagement('wave', frozenset(g), 2, None) for g in groups]
+        return lambda field: {'engagements': found, 'swung': frozenset(swung)}
+
+    def test_one_engagement_of_everyone_is_the_all_at_once_read(self):
+        a = combatant('a', pow_=6, weapon='iron-lance')
+        enemies = [(combatant('e%d' % k, pow_=8 + k, weapon='iron-axe'), 0) for k in range(3)]
+        whole = df.party_matchup(enemies, {'a': [a]})
+        one = df.party_matchup(enemies, {'a': [a]}, engage=self._engage({0, 1, 2}))
+        self.assertAlmostEqual(one['threat'], whole['threat'])
+        self.assertAlmostEqual(one['clear'], whole['clear'])
+
+    def test_a_board_with_nothing_to_group_reads_all_at_once(self):
+        a = combatant('a', pow_=6, weapon='iron-lance')
+        enemies = [(combatant('e%d' % k, pow_=8 + k, weapon='iron-axe'), 0) for k in range(2)]
+        whole = df.party_matchup(enemies, {'a': [a]})
+        empty = df.party_matchup(enemies, {'a': [a]}, engage=self._engage())
+        self.assertAlmostEqual(empty['threat'], whole['threat'])
+
+    def test_threat_is_the_heaviest_engagement(self):
+        """#510 step 7: two enemies met apart threaten one at a time."""
+        a = combatant('a', hp=40, pow_=6, weapon='iron-lance')
+        light, heavy = combatant('l', pow_=6, weapon='iron-axe'), combatant('h', pow_=12,
+                                                                             weapon='iron-axe')
+        m = df.party_matchup([(light, 0), (heavy, 0)], {'a': [a]},
+                             engage=self._engage({0}, {1}))
+        self.assertAlmostEqual(m['threat'], fc.damage_per_round(heavy, a))
+        self.assertEqual(m['engagement'].members, frozenset({1}))
+
+    def test_a_wave_member_defends_with_the_weapon_it_swung(self):
+        """FE8 equips the item an AI attack used: a fighter that swung its Horseslayer at a
+        cavalier meets the counterattack holding it (ch06halberd proves it in the engine)."""
+        lance = combatant('e', hp=30, pow_=8, spd=10, con=5, weapon='iron-lance')
+        enemy = dataclasses.replace(lance, arsenal=(fc.W['iron-lance'], fc.W['horseslayer']))
+        cav = combatant('cav', pow_=10, spd=12, weapon='iron-sword', tags=frozenset({'cav'}))
+        swung = dataclasses.replace(enemy, weapon=fc.W['horseslayer'])
+        m = df.party_matchup([(enemy, 0)], {'cav': [cav]}, engage=self._engage({0}, swung={0}))
+        self.assertAlmostEqual(m['threat'], fc.damage_per_round(swung, cav))
+        self.assertAlmostEqual(m['clear'], swung.hp / fc.damage_per_round(cav, swung))
+        held = df.party_matchup([(enemy, 0)], {'cav': [cav]}, engage=self._engage({0}))
+        self.assertAlmostEqual(held['clear'], lance.hp / fc.damage_per_round(cav, lance))
+        self.assertLess(m['clear'], held['clear'])
+
     def test_our_party_reads_in_the_order_the_rom_loads_it(self):
         """`ch07blueorder` (2026-10-21) logged the ROM's blue table in slot order on the ch07
         boot: the founding join-LOAD in PORTRAIT_MAP order, then Baxby (ch01's recruit)
@@ -2862,9 +2908,21 @@ class ChapterPressureInMode(unittest.TestCase):
         read compares two tuned tables. A fixed bound on |mode - authored| tested the chapters,
         not the model (ch04 on Difficult sits 0.26 off its authored read on faithful loads,
         which is ch04's own content, logged on #510). This tests the model: zero the twin's
-        shift and the ratio must move at least as far as with both sides shifted."""
+        shift and the ratio must move at least as far as with both sides shifted.
+
+        Read all at once, not by engagement: which enemies share a pocket depends on the stats
+        a shift moves (the cheapest pull tile is priced in damage), so the heaviest engagement
+        is a discrete pick that need not move monotonically. The claim is about the shift."""
+        import timeline
         real = df.vanilla_chapter_shifts
         moved = []
+        no_board = mock.patch.object(timeline, 'matchup_engagements',
+                                     lambda chap, fields: dict.fromkeys(
+                                         ('ours', 'vanilla', 'cross')))
+        no_board.start()
+        self.addCleanup(no_board.stop)
+        self.addCleanup(df._MATCHUPS.clear)
+        df._MATCHUPS.clear()
         for chid in ('ch00', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'):
             chap = df.load_field('rime-of-the-frostmaiden', chid)[0]
             authored = df._chapter_pressure(chap)['verdict']['threat_ratio']

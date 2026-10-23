@@ -154,9 +154,7 @@ strategy_claims:
     topic: villages
     step: 8
     cite: "Visit the two huts beside your start for a Hand Axe and an Elixir"
-  - kind: unmodelled
-    topic: reinforcements
-    step: 7
+  - kind: reinforcements
     cite: "Beware of the two raiders that arrive from the west edge on turn 3, behind the party."
   - kind: unmodelled
     topic: shop

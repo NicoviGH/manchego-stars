@@ -177,9 +177,7 @@ strategy_claims:
     topic: recruit
     step: 7
     cite: "deploy Marty and talk to its leader, Lupin."
-  - kind: unmodelled
-    topic: reinforcements
-    step: 7
+  - kind: reinforcements
     cite: "On turn 3 seven more undead (four Revenants, three Bonewalkers) appear on the east and south sides, close to where you will be by then, so be mindful that you aren't swarmed."
   - kind: unmodelled
     topic: villages
@@ -681,6 +679,9 @@ playtest:
     # What the ROM loads each red unit with, per PT_DIFFICULTY: the instrument #490 and #508 hold
     # the parity model and the wiki to (the line Mogalls once loaded the grell's boss line).
     - {name: ch04redstats, proves: "every red unit's loaded stat line is logged for the mode the run picked", lua: ch04redstats}
+    # #510 step 7: the party holds its deploy tiles and nothing dies; the first phase each red
+    # unit attacks is logged against `timeline.engagements`' waves (ADR 0364).
+    - {name: ch04waves, proves: "the enemy phase each red unit first attacks the held deploy front is logged", lua: ch04waves}
     - name: ch04village
       proves: the Lonelywood village hands over its Iron Axe
       given: [on_map]

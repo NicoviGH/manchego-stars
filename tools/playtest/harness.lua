@@ -4316,6 +4316,115 @@ scenarios.ch07redstats = function()
     return INSPECT.redStats()
 end
 
+-- When each red unit first attacks while the party holds its deploy tiles (#510 step 7, the
+-- in-engine proof of `timeline.engagements`). The parity model reads a pursuer's WAVE as the
+-- enemy phase it first stands in weapon range of a deploy tile, with nobody moving and
+-- nothing dying. This plays exactly that: every deployed unit ends its turn where prep put
+-- it, every unit on both sides held at full HP every frame so nothing falls, for eight
+-- enemy phases (`timeline.HORIZON`). Each red unit is logged the phase it is first seen (its
+-- tile, the key the model's body is matched on) and the phase it first attacks, read off
+-- gAiDecision the frame the AI makes it.
+INSPECT.firstAttacks = function(phases)
+    if not bootToMap() then return result("FAIL", "never reached the map") end
+    pokeFastConfig()
+    waitFor(function() return faction() == 0 and not menuOpen()
+        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    local seen, attacked = {}, {}
+    -- Every frame, not once a phase: four attackers in one phase can drop a unit a once-a-phase
+    -- refill missed, and a weapon's Mt still counters at 0 Pow. The first run without this
+    -- lost six reds by phase 8, each freeing a tile the model's held front never frees.
+    local function hold()
+        for i = 0, 61 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if u and u.onMap and not isDead(u) then
+                emu:write8(u.addr + 0x12, 60); emu:write8(u.addr + 0x13, 60)
+                pokeHarmless(u)
+            end
+        end
+        for i = 0, 49 do
+            local u = unitAt(SYM.gUnitArrayRed, i)
+            if u and u.onMap and not isDead(u) then emu:write8(u.addr + 0x13, u.maxhp) end
+        end
+    end
+    local function look(phase)
+        for i = 0, 49 do
+            local u = unitAt(SYM.gUnitArrayRed, i)
+            if u and u.onMap and not isDead(u) and not seen[ru8(u.addr + 0x0B)] then
+                seen[ru8(u.addr + 0x0B)] = true
+                log(string.format('{"event":"red_seen","phase":%d,"unit":"0x%02x","char":"0x%02x",'
+                    .. '"x":%d,"y":%d}', phase, ru8(u.addr + 0x0B), u.charId, u.x, u.y))
+            end
+        end
+    end
+    look(1)
+    local holding = callbacks:add("frame", hold)
+    for phase = 1, phases do
+        emu:write8(SYM.gAiDecision + 0x00, 0)
+        local decided = {}
+        local watch = callbacks:add("frame", function()
+            local who, act = ru8(SYM.gAiDecision + 0x01), ru8(SYM.gAiDecision + 0x00)
+            -- struct AiDecision (cp_common.h): +00 actionId, +01 unitId, +02/+03 the tile it
+            -- moves to, +06 targetId. Every unit's decision once a phase, so a late striker
+            -- can be traced to where it stood and whom it went for.
+            if who ~= 0 and decided[who] ~= act then
+                decided[who] = act
+                log(string.format('{"event":"ai_decision","phase":%d,"unit":"0x%02x","action":%d,'
+                    .. '"x":%d,"y":%d,"target":"0x%02x"}', phase, who, act,
+                    ru8(SYM.gAiDecision + 0x02), ru8(SYM.gAiDecision + 0x03),
+                    ru8(SYM.gAiDecision + 0x06)))
+            end
+            if act == 1 and not attacked[who] then
+                attacked[who] = phase
+                log(string.format('{"event":"first_attack","phase":%d,"unit":"0x%02x",'
+                    .. '"target":"0x%02x"}', phase, who, ru8(SYM.gAiDecision + 0x06)))
+            end
+        end)
+        -- A reinforcement loads during the turn change, before the enemy acts: look again
+        -- once the phase has begun, so its first-seen tile is where it arrived.
+        local look_watch = callbacks:add("frame", function()
+            if faction() == 0x80 then look(phase) end
+        end)
+        local back = runEnemyPhase()
+        callbacks:remove(watch)
+        callbacks:remove(look_watch)
+        if back ~= "player" then
+            callbacks:remove(holding)
+            return result("FAIL", string.format("enemy phase %d returned %s", phase, tostring(back)))
+        end
+        for i = 0, 49 do
+            local u = unitAt(SYM.gUnitArrayRed, i)
+            if u and u.onMap and not isDead(u) then
+                log(string.format('{"event":"red_pos","phase":%d,"unit":"0x%02x","x":%d,"y":%d}',
+                    phase, ru8(u.addr + 0x0B), u.x, u.y))
+            end
+        end
+        for i = 0, 61 do
+            local u = unitAt(SYM.gUnitArrayBlue, i)
+            if phase == 1 and u and u.onMap and not isDead(u) then
+                log(string.format('{"event":"blue_pos","unit":"0x%02x","x":%d,"y":%d}',
+                    ru8(u.addr + 0x0B), u.x, u.y))
+            end
+        end
+    end
+    callbacks:remove(holding)
+    local n, hit, alive = 0, 0, 0
+    for _ in pairs(seen) do n = n + 1 end
+    for _ in pairs(attacked) do hit = hit + 1 end
+    for i = 0, 49 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and u.onMap and not isDead(u) then alive = alive + 1 end
+    end
+    if alive ~= n then
+        return result("FAIL", string.format("%d of %d red units died: the held front must "
+            .. "kill nothing", n - alive, n))
+    end
+    return result("PASS", string.format("%d red units seen, %d attacked within %d enemy phases",
+                                        n, hit, phases))
+end
+scenarios.ch04waves = function()
+    return INSPECT.firstAttacks(8)
+end
+
 -- The blue unit table in slot order once prep has deployed: the order FE8's AI breaks a
 -- target tie in (cp_battle.c, `>=`: the later slot wins), which SortPlayerUnitsForPrepScreen
 -- (prepscreen.c) sets to force-deployed units first, then the rest in their existing order.

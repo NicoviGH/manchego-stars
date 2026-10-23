@@ -153,9 +153,7 @@ strategy_claims:
     topic: healing
     step: 8
     cite: "heal there between fights."
-  - kind: unmodelled
-    topic: reinforcements
-    step: 7
+  - kind: reinforcements
     cite: "Note that on turn 3, three reinforcement units (two Fighters and a Soldier) appear from the west edge, behind you, so leave someone sturdy at the rear."
 
 # ── Player Units ──────────────────────────────────────────────────────────────

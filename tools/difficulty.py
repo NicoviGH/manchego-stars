@@ -1791,7 +1791,7 @@ def enemy_pressure(enemies, deploy_cap, yardstick=YARDSTICK):
     return threat, clearload
 
 
-def party_matchup(bodies, careers, deploy_cap=None, forced=()):
+def party_matchup(bodies, careers, deploy_cap=None, forced=(), engage=None):
     """Instrument v2, layer 1 (#430 step 2b): a force measured against the party that meets it.
 
     `bodies` is [(enemy Combatant, combat-weight table)], `careers` is {unit: [Combatant]} for
@@ -1799,9 +1799,14 @@ def party_matchup(bodies, careers, deploy_cap=None, forced=()):
     fields its own `deploy_cap` units, `forced` ones first (`_fielded`, #510 step 5); with no
     cap, everyone arriving fights. Per joint career:
 
-      threat/slot = sum over enemies of its damage per round against the unit FE8's AI would
-                    attack with whichever carried weapon it picks for that target
-                    (`ai_target.pick_attack`'s rule), / units fielded
+      threat/slot = the HEAVIEST ENGAGEMENT (#510 step 7, ADR 0364): over `engagements`
+                    (`timeline.engagements`, sets of indices into `bodies`), the largest sum
+                    of its members' damage per round against the unit FE8's AI would attack,
+                    with whichever carried weapon it picks for that target (`ai_target.
+                    pick_attack`'s rule), / units fielded. Taken per joint career. `engage`
+                    maps the modal field ({unit: [Combatant]}, as `fielded_careers` reads it)
+                    to {'engagements', 'swung'} (`timeline.engage`); without it
+                    every enemy is one engagement.
       clear-load  = sum over enemies of 1 / the field's COMBINED kill rate on it (the sum of
                     1 / rounds): the party-rounds the force takes to clear. Harmonic, because
                     a plain mean of rounds is dominated by whoever cannot dent the boss; a
@@ -1810,23 +1815,33 @@ def party_matchup(bodies, careers, deploy_cap=None, forced=()):
                     `metric_rounds_to_kill`'s floor, the one place the cliff it exists for
                     reappears.
 
+    `swung` is the bodies that attack before the party fights them (a wave's members): FE8
+    equips the item an AI attack used, so each DEFENDS in clear-load with the weapon it picked
+    against the target it picked, per career, not its first. Every other body defends with
+    its equipped weapon.
+
     Each side is normalised by its own field, so a twin that fields two units (vanilla's
     prologue) is not divided by our eight. Every enemy body is rolled per career (`_joint`).
     Returns {'threat', 'clear'} as averages over the joint careers, 'per_enemy': a (name,
-    threat, clear, weapon) average for each body, in order, and 'fielded': the share of
-    careers each arriving unit is fielded in."""
+    threat, clear, weapon) average for each body, in order, 'fielded': the share of careers
+    each arriving unit is fielded in, and 'engagement': the engagement that is heaviest in the
+    most careers (None without `engagements`)."""
     import numpy                            # not at the top: CI's checks job has no numpy
     names = _map_order(careers, forced)
     armed = [k for k, m in enumerate(names) if careers[m][0].weapon is not None]
     n, party, field = _joint(careers, names, [e for e, _w in bodies])
     fielded = _fielded(party, field, deploy_cap, forced)
+    team = _modal_team(names, fielded)
+    met = engage({m: careers[m] for m in team}) if engage else {}
+    engagements, swung = met.get('engagements'), met.get('swung', frozenset())
     inf = float('inf')
     per = []
     targeted = [0] * len(names)             # how often the AI picks each unit, for the record
     with numpy.errstate(divide='ignore'):
-        for body, (e, weights) in zip(field, bodies):
+        for j, (body, (e, weights)) in enumerate(zip(field, bodies)):
             arms = fc.arms(body)
-            threat = 0.0
+            threat = numpy.zeros(n)
+            defends = [(body, None)]        # (Combatant it defends as, careers it does)
             if arms and names:              # a weaponless body attacks no one
                 # The enemy ATTACKS with whichever carried weapon the AI picks against a
                 # FIELDED target (`fc.arms`, #510 step 3) and DEFENDS with its equipped one.
@@ -1838,25 +1853,41 @@ def party_matchup(bodies, careers, deploy_cap=None, forced=()):
                 scores = numpy.where(numpy.tile(fielded, (len(arms), 1)), scores, -inf)
                 picked = len(pairs) - 1 - numpy.argmax(scores[::-1], axis=0)
                 dprs = numpy.array([fc.damage_per_round(a, u) for a, u in pairs])
-                threat = float(dprs[picked, numpy.arange(n)].sum())
+                threat = dprs[picked, numpy.arange(n)]
                 for k, count in enumerate(numpy.bincount(picked % len(names),
                                                          minlength=len(names))):
                     targeted[k] += int(count)
-            rate = sum(numpy.where(fielded[k], fc.damage_per_round(party[names[k]], body)
-                                   / body.hp, 0.0) for k in armed)
-            floor = sum(numpy.where(fielded[k], 1.0 / metric_rounds_to_kill(
-                body, party[names[k]]), 0.0) for k in armed)
+                if j in swung and len(arms) > 1:
+                    weapon = picked // len(names)
+                    defends = [(a, weapon == w) for w, a in enumerate(arms)]
+
+            def summed(term):
+                return sum(term(d) if mask is None else numpy.where(mask, term(d), 0.0)
+                           for d, mask in defends)
+            rate = sum(numpy.where(fielded[k], summed(
+                lambda d: fc.damage_per_round(party[names[k]], d) / d.hp), 0.0) for k in armed)
+            floor = sum(numpy.where(fielded[k], summed(
+                lambda d: 1.0 / metric_rounds_to_kill(d, party[names[k]])), 0.0) for k in armed)
             rate = numpy.where(rate > 0, rate, floor) if armed else numpy.zeros(n)
             clear = float(numpy.where(rate > 0, 1.0 / numpy.where(rate > 0, rate, 1), inf).sum())
             per.append((threat, clear))
     slots = max(1, min(len(names), len(names) if deploy_cap is None else deploy_cap))
-    return {'threat': sum(p[0] for p in per) / n / slots,
+    heaviest = None
+    if not engagements:                     # no board, or nothing on it groups: all at once
+        worst = sum(p[0] for p in per)
+    else:
+        loads = numpy.array([sum((per[j][0] for j in g.members), numpy.zeros(n))
+                             for g in engagements])
+        worst = loads.max(axis=0)
+        heaviest = engagements[int(numpy.bincount(loads.argmax(axis=0)).argmax())]
+    return {'threat': float(numpy.sum(worst)) / n / slots,
             'clear': sum(p[1] for p in per) / n,
-            'per_enemy': [(e.name, p[0] / n, p[1] / n, e.weapon.name)
+            'per_enemy': [(e.name, float(numpy.sum(p[0])) / n, p[1] / n, e.weapon.name)
                           for (e, _t), p in zip(bodies, per)],
+            'engagement': heaviest,
             'fielded': {m: float(fielded[k].mean()) for k, m in enumerate(names)},
             'targeted': {m: targeted[k] / (n * max(1, len(bodies))) for k, m in enumerate(names)},
-            'team': _modal_team(names, fielded)}
+            'team': team}
 
 
 def _modal_team(names, fielded):
@@ -2370,12 +2401,16 @@ def _chapter_matchup(chap, campaign, mode):
     fields = arriving_fields(chap, campaign, mode)
     if fields is None:
         return None
+    import timeline                         # timeline imports this module
     cap, forced = fields['cap'], fields['van_forced']
-    ours = party_matchup(fields['our_force'], fields['our_party'], cap)
-    van = party_matchup(fields['van_force'], fields['van_party'], cap, forced)
+    # Threat is the heaviest engagement each party meets on its own board (#510 step 7).
+    met = timeline.matchup_engagements(chap, fields)
+    ours = party_matchup(fields['our_force'], fields['our_party'], cap, engage=met['ours'])
+    van = party_matchup(fields['van_force'], fields['van_party'], cap, forced,
+                        engage=met['vanilla'])
     # The twin's force against OUR party splits the headline in two: the force effect is
     # what authoring controls, the party effect is what the party brings (#430 step 3).
-    cross = party_matchup(fields['van_force'], fields['our_party'], cap)
+    cross = party_matchup(fields['van_force'], fields['our_party'], cap, engage=met['cross'])
 
     def ratio(a, b, key):
         return a[key] / b[key] if b[key] else float('inf')
@@ -2386,6 +2421,8 @@ def _chapter_matchup(chap, campaign, mode):
             'party': (ratio(cross, van, 'threat'), ratio(cross, van, 'clear')),
             'cross': cross,
             'forces': ([b for b, _w in fields['our_force']], [b for b, _w in fields['van_force']]),
+            'arrivals': ([b.arrives for b in fields['our_bodies']],
+                         [b.arrives for b in fields['van_bodies']]),
             'lines': {m: _median_combatant(fields['our_party'][m]) for m in ours['team']},
             'lines_vanilla': {m: _median_combatant(fields['van_party'][m]) for m in van['team']}}
 
@@ -2459,10 +2496,15 @@ def planned_target(chap, campaign):
     if levels is None:
         return None
     import danger_map                       # danger_map imports this module
-    force = [(b.unit, ai_target.combat_weight_table(b.ai))
-             for b in danger_map.vanilla_bodies(ref)]
-    return party_matchup(force, vanilla_party_careers(ref, levels),
-                         chapter_deploy_limit(chap, len(ROSTER)), vanilla_forced(ref))
+    import timeline                         # timeline imports this module
+    bodies = danger_map.vanilla_bodies(ref)
+    force = [(b.unit, ai_target.combat_weight_table(b.ai)) for b in bodies]
+    party, cap, forced = (vanilla_party_careers(ref, levels),
+                          chapter_deploy_limit(chap, len(ROSTER)), vanilla_forced(ref))
+    # Read as a written chapter's twin is read (#510 step 7), so the target and the verdict
+    # it becomes measure the same thing.
+    return party_matchup(force, party, cap, forced, engage=timeline.engage(
+        timeline.twin_board(ref, bodies), [u for u, _t in force]))
 
 
 def _warn_dropped(dropped, indent='  '):
@@ -2480,11 +2522,30 @@ def _heaviest(side, top=3):
     a generic's charIndex is a bare pid, so it reads by the weapon it carries."""
     load = collections.Counter()
     for name, _t, clear, weapon in side['per_enemy']:
-        label = name[name.index('[') + 1:-1] if '[' in name else name
-        load['%s generic' % weapon if label.startswith('0x') else label] += clear
+        load[_label(name, weapon)] += clear
     total = sum(load.values()) or 1.0
-    return ', '.join('%s %.0f%%' % (n.replace('CHARACTER_', '').lower(), 100 * c / total)
-                     for n, c in load.most_common(top))
+    return ', '.join('%s %.0f%%' % (n, 100 * c / total) for n, c in load.most_common(top))
+
+
+def _label(name, weapon):
+    """A body's name for the report: a named vanilla body by its charIndex
+    (`...#3[CHARACTER_SAAR]`), a vanilla generic (a bare pid) by the weapon it carries."""
+    label = name[name.index('[') + 1:-1] if '[' in name else name
+    label = '%s generic' % weapon if label.startswith('0x') else label
+    return label.replace('CHARACTER_', '').lower()
+
+
+def _engagement(side):
+    """The engagement a side's threat is read from (#510 step 7), in words."""
+    g = side.get('engagement')
+    if g is None:
+        return 'all at once (no board)'
+    names = collections.Counter(_label(side['per_enemy'][k][0], side['per_enemy'][k][3])
+                                for k in g.members)
+    where = ('wave on enemy phase %d' % g.phase if g.kind == 'wave' else
+             'pocket pulled from %s' % (g.tile,) if g.tile else 'pocket')
+    return '%s, %d bodies: %s' % (where, len(g.members), ', '.join(
+        '%s x%d' % (n, c) if c > 1 else n for n, c in sorted(names.items())))
 
 
 def _print_pressure(p):
@@ -2503,8 +2564,9 @@ def _print_pressure(p):
         mu = p['matchup']
         ours_field, van_field = mu['field']
         print('  each force against the party that meets it (instrument v2, #430): threat = '
-              'damage/round\n  on the unit FE8\'s AI targets, per unit fielded · clear-load = '
-              'party-rounds to clear')
+              'damage/round\n  on the unit FE8\'s AI targets, summed over the heaviest '
+              'engagement (#510 step 7),\n  per unit fielded · clear-load = party-rounds to '
+              'clear')
         print('  vanilla %-11s (%2d enemies vs %s): threat %4.1f · clear-load %4.1f'
               % (p['reference'], p['n_vanilla'], '/'.join(van_field), vt, vl))
         print('  ours    %-11s (%2d enemies vs %s): threat %4.1f (x%.2f %s) · '
@@ -2516,6 +2578,8 @@ def _print_pressure(p):
               'twin\'s force) -- threat / clear-load' % (mu['force'] + mu['party']))
         for tag, side in (('ours', mu['ours']), ('vanilla', mu['vanilla'])):
             print('  heaviest (%s): %s' % (tag, _heaviest(side)))
+        for tag, side in (('ours', mu['ours']), ('vanilla', mu['vanilla'])):
+            print('  engagement (%s): %s' % (tag, _engagement(side)))
     else:
         print('  vanilla %-11s (%2d enemies): threat/slot %4.1f · clear-load/slot %4.1f'
               % (p['reference'], p['n_vanilla'], vt, vl))
@@ -3719,7 +3783,8 @@ def _print_dynamics(chap):
     if van:
         row('vanilla', van)
     row('ours', ours)
-    print('  (additive -- the ENEMY-PRESSURE verdict above is still the static all-turn-1 bar)')
+    print('  (additive -- turn-1 counts the opening board; the ENEMY-PRESSURE threat above is '
+          'the heaviest engagement)')
 
 
 def curve_gate_failures(rows):

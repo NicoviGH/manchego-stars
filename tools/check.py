@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 7 (ADR 0364): threat is the heaviest engagement, not every enemy
+    # at once on turn 1
+    r'all-turn-1 bar', r'as if every enemy attacked on turn 1',
     # retired by #510 step 7 prep: one force walk (difficulty.chapter_force), and the twin's
     # Body list lives in danger_map
     r'chapter_enemy_bodies', r'timeline\.vanilla_bodies', r'tl\.vanilla_bodies',

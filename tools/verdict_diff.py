@@ -53,7 +53,11 @@ WHOLE_PACKAGES = ('tools/inject/',)
 # working tree (layouts, tile configs, terrains.h). The pattern names them as inputs so the
 # trace in test_verdict_diff accounts for them; no PR diff ever matches it, because the
 # submodule pointer is never committed, so a PR cannot change vanilla.
-DATA_PATTERNS = (r'campaigns/[^/]+/.*\.yaml$', r'engine/patches/', r'fireemblem8u(/|$)')
+# Since #510 step 7 the read also stands each force on our own map: the layouts and the
+# tilesets' terrain configs (their graphics are opened with them, so the tileset folder goes in
+# whole).
+DATA_PATTERNS = (r'campaigns/[^/]+/.*\.yaml$', r'engine/patches/', r'fireemblem8u(/|$)',
+                 r'campaigns/[^/]+/maps/')
 
 
 def _module_file(name):

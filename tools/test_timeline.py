@@ -3,8 +3,10 @@
 
     python3 tools/test_timeline.py
 """
+import collections
 import contextlib
 import copy
+import dataclasses
 import io
 import os
 import sys
@@ -68,6 +70,14 @@ class FirstContact(unittest.TestCase):
         statue = body((10, 1), shape='statue')
         self.assertIsNone(tl.first_contact(self._board([statue]), statue, [(0, 1)]))
 
+    def test_a_charge_after_one_turn_waits_its_first_turn(self):
+        # AI_B_12 (cp_data.c): AI_NOP_0E for a turn, then pursue. 12 tiles out at Mov 5: a
+        # pursuer strikes on phase 3, the waiter on phase 4.
+        plain = body((12, 1))
+        waiter = dataclasses.replace(plain, ai=(0x00, 0x12, 0x0C, 0x00))
+        self.assertEqual(tl.first_contact(self._board([plain]), plain, [(0, 1)]), 3)
+        self.assertEqual(tl.first_contact(self._board([waiter]), waiter, [(0, 1)]), 4)
+
     def test_a_reinforcement_cannot_make_contact_before_it_arrives(self):
         late = body((2, 1), arrives=4)
         self.assertEqual(tl.first_contact(self._board([late]), late, [(0, 1)]), 4)
@@ -105,6 +115,128 @@ class OurBodiesMove(unittest.TestCase):
                          fielded=dm.vanilla_bodies('FE8 Ch2'))
         front = dif.vanilla_front('FE8 Ch2')
         self.assertTrue(all(tl.first_contact(board, b, front) is not None for b in board.bodies))
+
+
+class Engagements(unittest.TestCase):
+    """#510 step 7: the sets of enemies the party faces together (ADR 0364)."""
+    FRONT = [(0, 1)]
+    REACH = (1,)
+
+    def _read(self, bodies, w=24, h=3):
+        board = dm.Board(None, terrain=plains(w, h), fielded=bodies)
+        return tl.engagements(board, self.FRONT, soldier('party'), self.REACH)
+
+    def _members(self, read, kind):
+        return sorted(sorted(e.members) for e in read if e.kind == kind)
+
+    def test_pursuers_that_reach_the_front_on_one_phase_are_one_wave(self):
+        # A front of three: 10 tiles out at Mov 5 strikes on phase 2, two of them side by
+        # side; 16 tiles out, phase 3.
+        bodies = [body((10, 0), index=0), body((10, 2), index=1), body((16, 1), index=2)]
+        board = dm.Board(None, terrain=plains(24, 3), fielded=bodies)
+        read = tl.engagements(board, [(0, 0), (0, 1), (0, 2)], soldier('party'), self.REACH)
+        self.assertEqual([(e.phase, sorted(e.members)) for e in read if e.kind == 'wave'],
+                         [(2, [0, 1]), (3, [2])])
+        self.assertEqual(self._members(read, 'pocket'), [])
+
+    def test_a_striker_without_a_free_firing_tile_waits_a_phase(self):
+        # One party tile, one tile beside it the walkers can reach on phase 2: the first in AI
+        # order takes it, and the second strikes from the next tile in on phase 3 (ch04waves).
+        bodies = [body((10, 1), index=0), body((11, 1), index=1)]
+        board = dm.Board(None, terrain=plains(24, 3), fielded=bodies, blocked=self.FRONT)
+        self.assertEqual(tl.front_contacts(board, self.FRONT), {0: 2, 1: 3})
+
+    def test_a_tie_in_ai_order_goes_to_the_unit_that_loaded_first(self):
+        # A unit's table slot is where it LOADED: a turn-3 reinforcement listed first still
+        # moves after a turn-1 unit of equal priority (vanilla Ch2's raiders and Bazba).
+        # Both can reach the one free tile beside the party, (1, 1), on phase 2.
+        late = body((5, 1), arrives=2, index=0)
+        early = body((10, 1), index=1)
+        board = dm.Board(None, terrain=plains(24, 3), fielded=[late, early], blocked=self.FRONT)
+        self.assertEqual(tl.front_contacts(board, self.FRONT, 8), {0: 3, 1: 2})
+
+    def test_ai_order_is_mov_then_reach_then_table(self):
+        # SortAiUnitList: ascending Mov + 20 melee / 40 ranged, stable on the table order.
+        slow, fast = body((0, 0), mov=4, index=0), body((0, 0), mov=6, index=1)
+        bow = body((0, 0), mov=4, weapon='iron-bow', index=2)
+        self.assertEqual(sorted([fast, bow, slow], key=tl.ai_priority), [slow, fast, bow])
+
+    def test_a_lone_waiting_enemy_is_a_fight_of_one(self):
+        read = self._read([body((12, 1), shape='striker', index=0)])
+        self.assertEqual(self._members(read, 'pocket'), [[0]])
+
+    def test_neighbours_that_cover_every_approach_are_pulled_together(self):
+        # Two strikers side by side: every tile next to either is in the other's step.
+        read = self._read([body((12, 1), shape='striker', index=0),
+                           body((13, 1), shape='striker', index=1)])
+        self.assertEqual(self._members(read, 'pocket'), [[0, 1], [0, 1]])
+
+    def test_the_party_pulls_from_the_tile_the_others_cannot_reach(self):
+        # A Mov-1 striker four tiles east of a statue: the statue's west side is out of its step.
+        read = self._read([body((10, 1), shape='statue', index=0),
+                           body((14, 1), shape='striker', mov=1, index=1)])
+        statue = next(e for e in read if 0 in e.members)
+        self.assertEqual(sorted(statue.members), [0])
+        self.assertEqual(statue.tile, (9, 1))
+
+    def test_an_unarmed_or_errand_body_is_in_nothing(self):
+        unarmed = dm.Body('e', 0, (12, 1), 'striker', 0x00, 1, FOOT, 5, ())
+        errand = body((14, 1), shape='own-errand', index=1)
+        self.assertEqual(self._read([unarmed, errand]), [])
+
+    def test_each_pocket_is_read_when_its_own_body_arrives(self):
+        # A turn-1 striker is pulled before a turn-4 one standing beside it has arrived.
+        read = self._read([body((12, 1), shape='striker', index=0),
+                           body((13, 1), shape='striker', arrives=4, index=1)])
+        first = next(e for e in read if 0 in e.members and e.phase == 1)
+        self.assertEqual(sorted(first.members), [0])
+        self.assertTrue(any(e.phase == 4 and e.members == {0, 1} for e in read))
+
+    def test_a_pull_tile_the_party_cannot_walk_to_is_no_pull_tile(self):
+        # The statue's one tile out of the striker's step, (12,2), is ringed by water, so the
+        # party can only pull from (11,1) or (12,0), both in the striker's step: a pocket of two.
+        terrain = plains(24, 3)
+        water = pp.TERRAIN['TERRAIN_WATER']
+        for x, y in ((13, 0), (13, 1), (13, 2), (11, 2)):
+            terrain[y][x] = water
+        bodies = [body((12, 1), shape='statue', index=0),
+                  body((10, 0), shape='striker', mov=1, index=1)]
+        board = dm.Board(None, terrain=terrain, fielded=bodies)
+        statue = next(e for e in tl.engagements(board, self.FRONT, soldier('party'), (1,))
+                      if 0 in e.members)
+        self.assertEqual(sorted(statue.members), [0, 1])
+
+    def test_a_pursuer_that_never_reaches_the_front_waits_to_be_fetched(self):
+        # A front it can never reach (off the map): it waits for the party to fetch it.
+        boxed = body((12, 1), mov=5, index=0)
+        board = dm.Board(None, terrain=plains(24, 3), fielded=[boxed])
+        read = tl.engagements(board, [(0, 99)], soldier('party'), self.REACH)
+        self.assertEqual([(e.kind, sorted(e.members)) for e in read], [('pocket', [0])])
+
+
+class EngagementsOnOurMaps(unittest.TestCase):
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def _read(self, chapter_id, mode='normal'):
+        chapter = pp.load_chapter(chapter_id)
+        fields = dif.arriving_fields(chapter, self.CAMPAIGN, mode)
+        board, front = tl.boards(chapter, fields)['ours']
+        return board, tl.engagements(board, front, soldier('party'), (1, 2))
+
+    def test_ch03_is_all_waiting_enemies(self):
+        # Neither ch03 nor its twin ever reaches the deploy front (ADR 0317's first reading).
+        _board, read = self._read('ch03')
+        self.assertFalse([e for e in read if e.kind == 'wave'])
+        self.assertTrue([e for e in read if e.kind == 'pocket'])
+
+    def test_ch04s_waves_are_its_pursuers_strikes_on_the_front(self):
+        board, read = self._read('ch04')
+        struck = tl.front_contacts(board, tl.our_front(pp.load_chapter('ch04')),
+                                   dm.ENGAGE_HORIZON)
+        want = collections.Counter(struck[k] for k, b in enumerate(board.bodies)
+                                   if dm._moves_like(b) == 'pursuer' and struck[k] is not None)
+        self.assertEqual({e.phase: len(e.members) for e in read if e.kind == 'wave'},
+                         dict(want))
 
 
 class OneReaderPerForce(unittest.TestCase):
