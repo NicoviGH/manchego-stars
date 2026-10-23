@@ -9,14 +9,14 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-22 (Claude, #519-#524 merged; #510 step 7 next). **The parity model is being
+Refreshed 2026-10-22 (Claude, #525 and #527 merged; #510 step 7 DONE, step 8 next). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units (unflagged units grown, no promoted bonus, no realistic levelling): it read
 Dorbulgruf at 63 HP where the ROM loads 37. Every lock was measured on that model, so **all of
 ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never widen an
 `accepted_residual` to get green: design or model fidelity is the fix.
-This session merged #519 (step 6), the magic triangle (#520), the audit's class-tag fix (#521),
-the reskin effectiveness ROM fix (#522) and a parser fold (#524). Nothing is open from it.
+This session merged #525 (one reader per force, plus the decomp-reader fold and ADR 0363) and
+#527 (step 7, ADR 0364). Nothing is open from it. Step 7's design and proof are on #510.
 
 ## In flight
 
@@ -59,19 +59,37 @@ the reskin effectiveness ROM fix (#522) and a parser fold (#524). Nothing is ope
      `AiComputeCombatScore`. Not modelled (supports, S-rank, brave/magic swords/Luna, Silencer,
      status) is logged on #510 (comment 2026-10-22); none moves ch00-ch07 today.
    - **Reviews go to a SUBAGENT** (`/code-review <PR> medium`), never inline by the author.
-   Then **step 7** (reach, time, AI; `unmodelled` step-7 claims list what it inherits), then
-   8-9, each with an in-engine proof and the verdict diff.
+   **Step 7 is DONE** (#527, ADR 0364): threat is the HEAVIEST ENGAGEMENT, not every enemy at
+   once. `timeline.engagements` reads WAVES (pursuers by the phase they first strike the held
+   deploy front, `timeline.front_contacts`) and POCKETS (each waiting enemy pulled from its
+   cheapest walkable tile: a careful player, Nicolas 2026-10-22). `party_matchup(engage=)` takes
+   the heaviest per career, and a wave member defends with the weapon it swung. In-engine proof:
+   `ch04waves` matches 20 of 23 first-attack phases. The 3 misses all strike later in the engine
+   (FE8 walks a pursuer at its chosen target), so that limit goes to step 9 (Nicolas: accept it,
+   2026-10-22). **No verdict moved against main**; ch04 Difficult threat x1.46 -> x2.19 (already
+   OFF), logged on #510.
+   - **Next: step 8** (kits and sustain: healing, shop buys, gifts, durability). Brainstorm the
+     design WITH Nicolas first and post it as a comment on #510 (designs never go in a doc file,
+     2026-10-22). `make difficulty CH=chNN` lists each side's `unmodelled, step 8` claims: that
+     is what it inherits. Then step 9 only if verdicts still move.
    - Verdicts OFF now: ch01 Tutorial/Normal; ch02, ch03, ch04 on Difficult (ch01 Difficult
      reads OK at its ceiling's edge). All of it waits for step 10; nothing is widened.
+   - **ADR 0363 (Nicolas): an unwritten (`status: planned`) chapter does not exist** for the
+     difficulty math: its difficulty is its twin's (`difficulty.unwritten_projection`), and its
+     draft YAML is never read as a force. Don't build or test around planned rosters.
    - `party_matchup` reads each unit as ONE Combatant whose stats are numpy arrays over the
      careers; `fe_combat`/`ai_target` take ints or arrays (`max0`/`clamp`/`where`). Keep new
-     combat math array-safe, or `test_ai_target.OverCareers` fails. A Normal read is ~5s.
-   - Open from step 3: the swung weapon stays equipped (#510, for step 7). The tie-order
-     question is settled by step 5.
+     combat math array-safe, or `test_ai_target.OverCareers` fails. The Normal curve is ~7s.
+   - **One force list per side** (#525): `difficulty.chapter_force` (ours) and
+     `difficulty.vanilla_loaded_units` (the twin's) are the only walks; `arriving_fields` returns
+     `our_bodies`/`van_bodies` (`danger_map.Body`, carrying `unit` and `ai`) index-aligned with
+     each force. Read those; never re-walk a roster.
    - **Findings for step 10 are logged on #510** (comment 2026-10-19), not here: not acted on
      before step 10 (Nicolas, 2026-10-19).
 3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
-   Nicolas the options. Baseline (2026-10-19, in #510): the force side is near parity, and the
+   Nicolas the options. Read the twin BOTH with Seth fielded and with Seth benched (the Let's
+   Play Archive's run benches him from Ch4); Baxby-as-Seth is back on the table as a lever and
+   Nicolas says it fits Baxby (both on #510, 2026-10-22). Baseline (2026-10-19, in #510): the force side is near parity, and the
    clear-load excess is the party, mostly vanilla's Seth. Baxby-as-Seth is a past discussion, NOT a
    decision (ADR 0342 rejected it). Nicolas wants it TIGHTER (2026-10-21, on #510): clear-load
    above x1.0 means our game is harder than vanilla, so bring party levers toward x1.0 and a
@@ -91,10 +109,22 @@ the reskin effectiveness ROM fix (#522) and a parser fold (#524). Nothing is ope
 - **#27 -- ch07** is hosted on slot 8, under re-evaluation with the rest (#510); its ending and
   the Distant Blade move wait on #486. `make chapter CH=ch07` is its state.
 - **#24 -- ch04 owes the terrain-bonus lesson** (vanilla Ch4's "stay in the woods"), a dialogue pass.
-- **#335** -- the AI audit (behavioural drift is invisible to every gate; proposes an
-  `ai_divergence:` allowlist). It feeds #510 step 7.
+- **#335** -- the AI audit is closed (ADR 0265: a donor carries its AI); its "factor AI into the
+  difficulty math" stretch is ADR 0364.
 
 ## Traps a fresh session walks into
+
+- **A tie in FE8's AI order goes to the unit that LOADED first** (`timeline.ai_priority` key,
+  ADR 0364): list order is not slot order. Breaking it on list position read ch02 OFF at x0.74
+  against a twin with the same map and enemies. When a ratio moves on a mirrored chapter, diff
+  the two sides body by body before believing it.
+- **`ch04waves` holds every unit on BOTH sides at full HP every frame** and fails if a red
+  dies: 0 Pow still counters through weapon Mt. A proof scenario where something dies is not
+  evidence of a model that kills nothing.
+- **A comment-only YAML edit leaves the ROM "up to date"** but newer than the ROM by mtime, so
+  `run.sh` refuses it. After a clean rebuild that wrote nothing, `MX_SKIP_ROM_CHECK=1` is honest.
+- **The parity read now opens our maps and the submodule's map files**, so they are parity inputs
+  (`verdict_diff.DATA_PATTERNS`); `test_verdict_diff.ParityInputs` fails if a new read is not.
 
 - **A verdict scenario may not drive the UI with raw `press()`** (`check.py`, #238): wrapping a
   `record*` scenario as a verdict fails the drift check. Run the record path once headless as
