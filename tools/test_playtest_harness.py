@@ -195,14 +195,14 @@ class TestAwaitControllerState(unittest.TestCase):
         # the one board reader (#510 step 9); harness unitAt only delegates to it.
         harness = _read_harness()
         body = _block(harness, 'local function unitAt(', '\nlocal function findUnit')
-        self.assertIn('BOARD.unitAt(base, i)', body, 'unitAt delegates to board.lua')
+        self.assertIn('BOARD.leanAt(base, i)', body, 'unitAt delegates to board.lua')
         with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
-            board = _block(fh.read(), 'function Board.unitAt(', '\nend\n')
+            board = _block(fh.read(), 'function Board.leanAt(', '\nend\n')
         self.assertIn('mem.s8(a + 0x10)', board, 'xPos is s8')
         self.assertIn('mem.s8(a + 0x11)', board, 'yPos is s8')
         self.assertNotIn('mem.u8(a + 0x10)', board, 'the unsigned read is the bug')
         live = _block(harness, 'local function liveEnemies(', '\n\n')
-        self.assertIn('onMap', live, 'a target list must not offer an off-map unit')
+        self.assertIn('onField', live, 'a target list must not offer an off-map unit (onField implies onMap)')
 
     def test_no_guard_still_compares_a_units_x_against_255(self):
         # The other half of the same change, and the one that was missed. Switching unitAt to

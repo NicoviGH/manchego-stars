@@ -170,6 +170,82 @@ do
     check(Board.occupied(mem, SYM, 7, 4), false, "an empty tile is free")
 end
 
+-- onField: on a tile AND not hidden, rescued, undeployed or dead -- each excluded on its own.
+do
+    local b = board(function(m)
+        putUnit(m, SYM.gUnitArrayBlue, 0, { charId = 1, x = 2, y = 2 })
+        putUnit(m, SYM.gUnitArrayBlue, 1, { charId = 2, x = 2, y = 3, state = 0x20 })  -- rescued
+        putUnit(m, SYM.gUnitArrayBlue, 2, { charId = 3, x = 2, y = 4, state = 0x01 })  -- hidden
+        putUnit(m, SYM.gUnitArrayBlue, 3, { charId = 4, x = 2, y = 5, state = 0x08 })  -- undeployed
+        putUnit(m, SYM.gUnitArrayBlue, 4, { charId = 5, x = -1, y = -1 })              -- off map
+        putUnit(m, SYM.gUnitArrayBlue, 5, { charId = 6, x = 2, y = 6, state = 0x02 })  -- acted
+    end)
+    check(Board.unit(b, "blue", 1).onField, true, "a plain unit on a tile is on the field")
+    check(Board.unit(b, "blue", 2).onField, false, "US_RESCUED is off the field")
+    check(Board.unit(b, "blue", 3).onField, false, "US_HIDDEN is off the field")
+    check(Board.unit(b, "blue", 4).onField, false, "US_NOT_DEPLOYED is off the field")
+    check(Board.unit(b, "blue", 5).onField, false, "x = -1 is off the field")
+    check(Board.unit(b, "blue", 6).onField, true, "having acted does not leave the field")
+end
+
+-- The lean read: position/hp/state, and NOT the item/boss reads (which it must never touch).
+do
+    local m = fakeMem()
+    defineItems(m)
+    putUnit(m, SYM.gUnitArrayRed, 3, { charId = 0x6A, charAttrs = 0x8000, x = 4, y = 5,
+        hp = 7, maxhp = 18, items = { { 1, 40 } } })
+    local reads = 0
+    local function counted(f) return function(a) reads = reads + 1; return f(a) end end
+    local mem = { u8 = counted(m.u8), s8 = counted(m.s8), u16 = counted(m.u16), u32 = counted(m.u32) }
+    local u = Board.leanAt(mem, SYM, SYM.gUnitArrayRed, 3)
+    check(u.charId, 0x6A, "lean charId")
+    check(u.x, 4, "lean x")
+    check(u.hp, 7, "lean hp")
+    check(u.maxhp, 18, "lean maxhp")
+    check(u.faction, "red", "lean faction")
+    check(u.slot, 3, "lean slot")
+    check(u.onField, true, "lean onField")
+    check(u.isBoss, nil, "lean does not read the boss attribute")
+    check(u.minRange, nil, "lean does not read the weapon")
+    check(reads, 10, "lean read is ten memory reads")
+    reads = 0
+    local full = Board.unitAt(mem, SYM, SYM.gUnitArrayRed, 3)
+    check(full.isBoss, true, "full read has the boss attribute")
+    check(full.maxRange, 1, "full read has the weapon reach")
+    check(reads > 10, true, "the full read costs more than the lean one")
+end
+
+-- Lean scans over the decomp bounds: findIn, liveCount, liveBoss, leanList.
+do
+    local m = fakeMem()
+    putUnit(m, SYM.gUnitArrayRed, 0, { charId = 0x80, x = 1, y = 1 })
+    putUnit(m, SYM.gUnitArrayRed, 30, { charId = 0x81, x = 2, y = 1 })
+    putUnit(m, SYM.gUnitArrayRed, 31, { charId = 0x82, x = 3, y = 1, state = 0x4 })  -- dead
+    putUnit(m, SYM.gUnitArrayRed, 32, { charId = 0x83, x = 4, y = 1, state = 0x20 }) -- rescued
+    putUnit(m, SYM.gUnitArrayRed, 40, { charId = 0x6A, charAttrs = 0x8000, x = 9, y = 9 })
+    putUnit(m, SYM.gUnitArrayRed, 41, { charId = 0x6B, charAttrs = 0x8000, x = -1, y = -1 })
+    local mem = { u8 = m.u8, s8 = m.s8, u16 = m.u16, u32 = m.u32 }
+    check(Board.liveCount(mem, SYM, "red"), 3, "liveCount: on-field reds at any slot")
+    check(Board.liveCount(mem, SYM, "blue"), 0, "liveCount: no blues")
+    local boss = Board.liveBoss(mem, SYM)
+    check(boss and boss.slot, 40, "liveBoss: the on-field CA_BOSS unit, past slot 23")
+    check(Board.findIn(mem, SYM, SYM.gUnitArrayRed, 50, 0x81).slot, 30, "findIn finds slot 30")
+    check(Board.findIn(mem, SYM, SYM.gUnitArrayRed, 24, 0x81), nil, "findIn honours its count")
+    check(#Board.leanList(mem, SYM, "red"), 6, "leanList returns every occupied slot")
+    check(Board.occupied(mem, SYM, 4, 1), false, "a rescued unit does not occupy its old tile")
+end
+
+-- inPhase: the player phase of the recorded turn only -- not another faction's phase, and not
+-- a LATER player phase (the guard that stops the clear loop ending a fresh turn unacted).
+do
+    check(Board.inPhase({ phase = "blue", turn = 3 }, 3), true, "same turn, player phase")
+    check(Board.inPhase({ phase = "red", turn = 3 }, 3), false, "enemy phase of the same turn")
+    check(Board.inPhase({ phase = "blue", turn = 4 }, 3), false, "the NEXT player phase")
+    local b = board(function(m) putUnit(m, SYM.gUnitArrayBlue, 7, { charId = 9 }) end)
+    check(Board.inPhase(b, 3), false, "a board read in the red phase is not our phase")
+    check(Board.at(b, "blue", 7).charId, 9, "Board.at looks up by slot")
+end
+
 -- Header: turn, phase, map size.
 do
     local b = board(function() end)
