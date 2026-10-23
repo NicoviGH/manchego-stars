@@ -1400,6 +1400,18 @@ class VanillaLoaded(unittest.TestCase):
         self.assertEqual(self.CUTSCENE_ARRAYS, df._cleared_scene_udefs('FE8 Ch8')
                          & self.CUTSCENE_ARRAYS)
 
+    def test_drops_read_the_filtered_force(self):
+        # No Ch8 scene unit carries .itemDrop today, so prove the wiring: mark a dropping
+        # array scene-only and its drops must leave vanilla_drops.
+        text = inject.decomp.vanilla_decomp_text('src/events_udefs.c')
+        arrays = df.PARITY_REFERENCE_UDEFS['FE8 Ch8'][1]
+        dropping = next(a for a in arrays if any(
+            d['allegiance'] == 'FACTION_ID_RED' and d['itemDrop'] and d['items']
+            for d in df.vanilla_unit_defs(text, a)))
+        full = df.vanilla_drops('FE8 Ch8')
+        with mock.patch.object(df, '_cleared_scene_udefs', return_value=frozenset([dropping])):
+            self.assertLess(len(df.vanilla_drops('FE8 Ch8')), len(full))
+
     def test_every_reader_of_the_red_force_sees_the_filter(self):
         self.assertFalse([d for d in df.vanilla_red_units('FE8 Ch8')
                           if d.get('charIndex') == 'CHARACTER_CAELLACH'])

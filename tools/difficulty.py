@@ -1166,16 +1166,14 @@ def vanilla_chapter_shifts(parity_ref):
     are shifted by the numbers each chapter actually carries, so a mode comparison is
     still comparing two tuned tables rather than one tuned table against a shifted one.
     None if the reference does not name a vanilla chapter."""
-    name = _vanilla_internal_name(parity_ref)
-    if name is None:
+    index = _vanilla_chapter_index(parity_ref)
+    if index is None:
         return None
-    settings = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
-    for chapter in settings['chapters']:
-        if chapter.get('internalName') == name:
-            return {'tutorial': chapter['easyModeLevelMalus'],
-                    'normal': chapter['normalModeLevelMalus'],
-                    'difficult': chapter['difficultModeLevelBonus']}
-    return None
+    chapter = json.loads(
+        inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))['chapters'][index]
+    return {'tutorial': chapter['easyModeLevelMalus'],
+            'normal': chapter['normalModeLevelMalus'],
+            'difficult': chapter['difficultModeLevelBonus']}
 
 
 def vanilla_forced(parity_ref):
@@ -3435,19 +3433,11 @@ def vanilla_drops(parity_ref):
     in the chapter's curated UnitDefinition arrays, its LAST item (US_DROP_ITEM drops the final
     inventory slot -- statscreen.c:726), valued in buy-gold. None if the reference isn't curated;
     [] if it carries no drops (the Ch4/Ch5 lock twins). The channel #170 v1 skipped (#176)."""
-    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
-    if spec is None:
+    reds = _vanilla_red_defs(parity_ref)
+    if reds is None:
         return None
-    relpath, arrays = spec
-    text = inject.decomp.vanilla_decomp_text(relpath)
-    out = []
-    for array_name in arrays:
-        for d in vanilla_unit_defs(text, array_name):
-            if d['allegiance'] != 'FACTION_ID_RED' or not d['itemDrop'] or not d['items']:
-                continue
-            item = d['items'][-1]
-            out.append((item, item_gold_value(item)))
-    return out
+    return [(d['items'][-1], item_gold_value(d['items'][-1]))
+            for _a, _i, d in reds if d['itemDrop'] and d['items']]
 
 
 def twin_event_payload(stem):
