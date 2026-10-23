@@ -154,4 +154,37 @@ end
 
 M.tileKey = tileKey
 
+-- The stall watchdog's distance (#510 step 9): the nearest field distance to the target among
+-- the units that could still be the one to finish -- on the field, and not ruled out.
+--   units:    {slot, x, y, onField} tables
+--   field:    field[y][x] = path steps to the target (the boss, or once it is dead the seize
+--             tile), or nil
+--   ruledOut: [slot] = true for a unit that stood on the seize tile with no legal Seize. It is
+--             not the lord, and without this a non-lord parked beside the throne pins the
+--             minimum while the lord's march -- the only progress left -- goes unseen.
+-- Returns math.huge when nobody qualifies or there is no field.
+function M.seizeDistance(units, field, ruledOut)
+    local best = math.huge
+    if not field then return best end
+    for _, u in ipairs(units) do
+        if u.onField and not (ruledOut and ruledOut[u.slot]) then
+            local d = field[u.y] and field[u.y][u.x]
+            if d and d < best then best = d end
+        end
+    end
+    return best
+end
+
+-- Did a turn make progress? Nearer the target, or fewer enemies. `last` holds the best
+-- {dist, enemies, key} seen so far, `now` this turn's. `key` names WHAT the distance is
+-- measured to and from (the target, and who is still a candidate): when it changes -- the boss
+-- died, a unit was ruled out -- the old best distance belonged to another question, and the
+-- change is itself progress. Without that, a non-lord's distance to the boss (4) stood as the
+-- bar the lord's march to the throne (10, then 5) had to beat, and clear_ch01 read two turns
+-- of marching as a stall.
+function M.madeProgress(last, now)
+    if last.key ~= now.key then return true end
+    return now.dist < last.dist or now.enemies < last.enemies
+end
+
 return M

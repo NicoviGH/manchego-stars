@@ -2498,22 +2498,19 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     -- title (a loss), not a win -- so this stays an honest fair-play gate (#60).
     local function won() return chapter() ~= startChapter end
     local function lost() return gameOverActive() or procActive(SYM.gProcScr_TitleScreen) end
-    -- progress = the nearest live unit's path-distance to the boss (lower is better).
-    local function nearestBossDist(field)
-        local best = math.huge
-        for _, u in ipairs(BOARD.leanList("blue")) do
-            local fd = u.onField and field and field[u.y] and field[u.y][u.x]
-            if fd and fd < best then best = fd end
-        end
-        return best
-    end
+    -- progress = the nearest candidate's path-distance to the target (lower is better): the
+    -- boss while it lives, then the seize tile. ruledOut[slot] marks units that stood on the
+    -- seize tile without a legal Seize -- not the lord -- so the lord's march still registers.
+    local ruledOut = {}
     local lastDist, lastEnemies, stall = math.huge, math.huge, 0
+    local lastKey = "boss:0"
     for t = 1, budgetTurns do
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(60) -- let the player-phase banner finish (it eats key presses)
         if not awaitControllerState("player_map_idle", 300) then return "stuck", t end
         local b = findBoss()
-        local field = b and bossDistanceField(b, maxx, maxy) or nil
+        -- The target field: the boss's tile while it lives, else the seize tile (its last tile).
+        local field = bossDistanceField(b or seizeTile, maxx, maxy)
         local claimed = {}                       -- destinations committed this phase
         -- The turn whose player phase this is. FE8 ends the phase by itself once every unit
         -- has acted, so "the map is idle" later on may be the NEXT turn's phase: everything
@@ -2580,8 +2577,9 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                         traceFailure("seize", "chapter advances after the Seize event",
                             "fail:chapter-advance-timeout", nil, "controller-seize-timeout")
                         return "stuck", t
-                    elseif not cancelUnitActionMenu() then
-                        return "stuck", t
+                    else
+                        ruledOut[u.slot] = true
+                        if not cancelUnitActionMenu() then return "stuck", t end
                     end
                 elseif ourPhase() and not won() then
                     -- The seize tile is out of this unit's reach this turn (moveUnit backed
@@ -2611,10 +2609,20 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         if phase ~= "player" then return "stuck", t end
         -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
         -- instead of grinding the full budget on a wedged bot.
-        local dist, enemies = nearestBossDist(field), BOARD.liveCount("red")
-        if dist < lastDist or enemies < lastEnemies then stall = 0 else stall = stall + 1 end
-        lastDist, lastEnemies = math.min(dist, lastDist), math.min(enemies, lastEnemies)
-        log(string.format("clear turn %d: nearestBossDist=%s enemies=%d stall=%d",
+        local dist = CLEARBOT.seizeDistance(BOARD.leanList("blue"), field, ruledOut)
+        local enemies = BOARD.liveCount("red")
+        local nRuled = 0
+        for _ in pairs(ruledOut) do nRuled = nRuled + 1 end
+        local key = (findBoss() and "boss" or "seize") .. ":" .. nRuled
+        if CLEARBOT.madeProgress({ dist = lastDist, enemies = lastEnemies, key = lastKey },
+                                 { dist = dist, enemies = enemies, key = key }) then
+            stall = 0
+        else
+            stall = stall + 1
+        end
+        if key ~= lastKey then lastDist = dist end   -- a new question starts a new best
+        lastDist, lastEnemies, lastKey = math.min(dist, lastDist), math.min(enemies, lastEnemies), key
+        log(string.format("clear turn %d: targetDist=%s enemies=%d stall=%d",
             t, dist == math.huge and "inf" or dist, enemies, stall))
         if stall >= 3 then
             -- diagnose the stall: is the boss walled off (field can't reach its neighbours), and
