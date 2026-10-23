@@ -9,15 +9,20 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-23 (Claude, #528 and #529 merged; #510 step 8 DONE, step 9 or 10 next). **The parity model is being
+Refreshed 2026-10-23 (Claude, #510 step 9 DESIGNED, plan next). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units (unflagged units grown, no promoted bonus, no realistic levelling): it read
 Dorbulgruf at 63 HP where the ROM loads 37. Every lock was measured on that model, so **all of
 ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never widen an
 `accepted_residual` to get green: design or model fidelity is the fix.
-This session merged #528 (the old "traps" list now lives in the code each trap is met in, not
-here) and #529 (step 8, ADR 0365; ADR 0363 and 0087 edited in place). Nothing is open from it.
-Step 8's design, plan and review notes are on #510.
+**Next: write the build plan for #510 step 9 from its design comment, and nothing else:**
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370450022> (agreed with
+Nicolas, 2026-10-23). The simulator plays the ACTUAL ROM under `mgba-headless`: full-game
+campaigns, per-chapter branches off chapter-start savestates, sampled play styles, all-units-
+survive rate, verdicts posted back to #510. A Python re-creation of FE8 was spiked and
+discarded (it could not play vanilla Ch3's walls/doors); do not rebuild one. Start the plan
+with the duplicate survey the comment names (board readers, `clearbot.lua`). Nothing from this
+session is committed except this file.
 
 ## In flight
 
@@ -78,8 +83,8 @@ Step 8's design, plan and review notes are on #510.
    weapon reader (fc.W, else data_items.c). It moved 5 cells to OFF, almost all from vanilla's
    second joining weapons (Seth's Silver Lance: ch01 Normal x1.41 -> x1.56); pickups move
    <=0.04. Nothing widened.
-   - **Next: ask Nicolas: step 9 (the #456 simulator) or straight to step 10?** #510's list says
-     step 9 only if verdicts still move; step 8 moved five. His call, not ours.
+   - **Step 9 chosen (Nicolas, 2026-10-23) and DESIGNED**: real-ROM Monte Carlo, design on
+     #510 (link at the top). The plan is next; step 10 waits for it.
    - Verdicts OFF now: ch01 all three modes; ch02 Difficult; ch03 and ch04 all three modes.
      ch00 and ch05-ch07 read OK. All of it waits for step 10; nothing is widened.
    - **ADR 0363 (Nicolas, edited in place 2026-10-23): an unwritten (`status: planned`)
