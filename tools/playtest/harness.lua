@@ -4721,13 +4721,13 @@ local function liftFogOntoTheGrid()
     local onGrid = function()
         local n = 0
         for i, r in BOARD.each("red") do
-            if not isDead(r) and mapUnitAt(r.x, r.y) ~= 0 then n = n + 1 end
+            if not isDead(r) and r.onMap and mapUnitAt(r.x, r.y) ~= 0 then n = n + 1 end
         end
         return n
     end
     for i, u in BOARD.each("blue") do
         if onGrid() > 0 then break end
-        if not isDead(u) and (u.state & 0x2) == 0 then
+        if u.onField and (u.state & 0x2) == 0 then
             if moveUnit(u.x, u.y, u.x, u.y) then
                 chooseWait()
                 waitFor(function() return faction() == 0 and not menuOpen() end, 300)
@@ -5906,7 +5906,7 @@ scenarios.ch03prep = function()
             i, u.charId, u.x, u.y, u.state))
     end
     local CHAR_TREX = 0x1C
-    if findUnit(SYM.gUnitArrayBlue, 20, CHAR_TREX) then
+    if blue(CHAR_TREX) then
         return result("FAIL", "Trex is on the prep roster -- he must join mid-map (green), not deploy")
     end
     log(string.format("party=%d deployed=%d turn=%d", party, deployed, turn()))
@@ -6372,10 +6372,9 @@ scenarios.ch02 = function()
     wait(90)
     -- diagnostic: dump every non-null green slot (and the blue/red char ids) so a missing-chwinga
     -- failure shows whether they are absent, on another faction, or under unexpected char ids.
-    for i = 0, 19 do
-        local g = unitAt(SYM.gUnitArrayGreen, i)
-        if g then log(string.format("green[%02d] char=0x%02X pos=(%d,%d) hp=%d state=0x%08X",
-            i, g.charId, g.x, g.y, g.hp, g.state)) end
+    for i, g in BOARD.each("green") do
+        log(string.format("green[%02d] char=0x%02X pos=(%d,%d) hp=%d state=0x%08X",
+            i, g.charId, g.x, g.y, g.hp, g.state))
     end
     local blueids, redids = {}, {}
     for _, u in BOARD.each("blue") do blueids[#blueids+1] = string.format("0x%02X", u.charId) end
@@ -6578,7 +6577,7 @@ scenarios.clear_ch02 = function()
         end
         for i, u in BOARD.each("blue") do
             if advanced() or BOARD.liveCount("red") == 0 then break end
-            if not isDead(u) and (u.state & 0x2) == 0 then
+            if u.onField and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
                 if mn and teleportToFiringTile(u, mn, mx) then
                     u = blue(u.charId)   -- refresh after the teleport relocates it
@@ -6789,7 +6788,7 @@ local function marchPartyToward(cx, cy, turns, stop, maxx, maxy)
         waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
         for i, u in BOARD.each("blue") do
             if stop() then return true end
-            if not isDead(u) and (u.state & 0x2) == 0 then
+            if u.onField and (u.state & 0x2) == 0 then
                 marchToward(u, cx, cy, maxx or 14, maxy or 14)
                 waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
             end
@@ -6873,7 +6872,7 @@ scenarios.ch04moose = function()
     local CX, CY = 11, 4                 -- the clearing's middle
     local function anyoneInClearing()
         for i, u in BOARD.each("blue") do
-            if not isDead(u) and u.x >= X1 and u.x <= X2 and u.y >= Y1 and u.y <= Y2 then
+            if u.onField and u.x >= X1 and u.x <= X2 and u.y >= Y1 and u.y <= Y2 then
                 return true
             end
         end
@@ -7135,7 +7134,7 @@ scenarios.ch04packmath = function()
     -- the counter alone found an empty field).
     if not endTurn() then return result("FAIL", "could not end turn 1") end
     if not waitFor(function()
-        return turn() >= 2 and findUnit(SYM.gUnitArrayRed, 24, CAMPAIGN.CAST.lupin) ~= nil
+        return turn() >= 2 and red(CAMPAIGN.CAST.lupin) ~= nil
     end, 5400) then
         return result("FAIL", "the wolf pack never arrived on turn 2")
     end
@@ -7174,7 +7173,7 @@ scenarios.ch04packmath = function()
         end
         wolf = firstWolf()
         for i, u in BOARD.each("blue") do
-            if not isDead(u) and (u.state & 0x2) == 0 and u.charId ~= CAMPAIGN.CAST.marty then
+            if u.onField and (u.state & 0x2) == 0 and u.charId ~= CAMPAIGN.CAST.marty then
                 local mn, mx = unitAttackRange(u)
                 if mn and mn <= 1 and teleportAdjacentTo(u, { wolf }) then
                     u = unitAt(SYM.gUnitArrayBlue, i)
@@ -9683,7 +9682,7 @@ scenarios.ch04snag = function(opts)
     -- and takes damage from anything that can reach it).
     local u
     for i, c in BOARD.each("blue") do
-        if not isDead(c) and (c.state & 0x2) == 0 and unitAttackRange(c)
+        if c.onField and (c.state & 0x2) == 0 and unitAttackRange(c)
             and (opts.pid == nil or c.charId == opts.pid) then u = c break end
     end
     if not u then return result("FAIL", "no armed blue unit to swing at the snag") end
@@ -9691,19 +9690,19 @@ scenarios.ch04snag = function(opts)
     -- so the only signal that matters is the TERRAIN flipping underneath.
     for swing = 1, 12 do
         if terrainAt(CROSS_X, CROSS_Y) == T_CROSSING then break end
-        local m = findUnit(SYM.gUnitArrayBlue, 20, u.charId)
+        local m = blue(u.charId)
         if not m then break end
         if (m.state & 0x2) ~= 0 then
             runEnemyPhase()
             waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
-            m = findUnit(SYM.gUnitArrayBlue, 20, u.charId)
+            m = blue(u.charId)
             if not m then break end
         end
         local grid = mapUnitAt(m.x, m.y)
         setMapUnit(m.x, m.y, 0)
         emu:write8(m.addr + 0x10, SNAG_X); emu:write8(m.addr + 0x11, SNAG_Y - 1)
         setMapUnit(SNAG_X, SNAG_Y - 1, grid)
-        m = findUnit(SYM.gUnitArrayBlue, 20, u.charId)
+        m = blue(u.charId)
         if not cursorTo(m.x, m.y) then break end
         if moveUnit(m.x, m.y, m.x, m.y) then
             chooseAttack(m.addr)
@@ -9779,7 +9778,7 @@ scenarios.attackprobe = function()
     if not teleportToFiringTile(u, mn, mx) then
         return result("FAIL", "no firing tile within reach of any live enemy")
     end
-    u = findUnit(SYM.gUnitArrayBlue, 20, u.charId)   -- refresh: the teleport relocated it
+    u = blue(u.charId)   -- refresh: the teleport relocated it
     if not u then return result("FAIL", "the probed unit vanished from the blue array") end
     log(string.format("engine offers an Attack row from (%d,%d): %s", u.x, u.y,
         tostring(canAttackFromHere(u, mn, mx))))
@@ -9867,7 +9866,7 @@ local function clearCh04(parley)
             tag, t, turn(), mw, mh, BOARD.liveCount("red")))
         for i, u in BOARD.each("blue") do
             if won() or BOARD.liveCount("red") == 0 then break end
-            if not isDead(u) and (u.state & 0x2) == 0 then
+            if u.onField and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
                 if not mn then
                     log(string.format("  blue[%d] pid=0x%02X (%d,%d): no weapon in slot 0 -- skipped",
