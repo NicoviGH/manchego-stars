@@ -3376,15 +3376,23 @@ def twin_event_payload(stem):
     """What a vanilla chapter's events hand out, by vehicle, read once for every consumer
     (vanilla_economy here, gen_wiki's twin payload): chest items and chest gold, scene gifts
     and scene gold, what the interlude after it gives (twin_interlude_scripts), and its shops
-    of every kind the eventinfo macros name (Armory, Vendor, SecretShop)."""
+    of every kind the eventinfo macros name (Armory, Vendor, SecretShop). `village_gifts` is
+    the part of `gifts` a Village or House script hands out: the optional half (#510 step 8)."""
     info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
     gifts = _gift_records(script)
+    village_gifts = []
+    for name in re.findall(r'(?:Village|House)\(\s*[^,]+,\s*(\w+)', info):
+        marker = 'CONST_DATA EventListScr %s[]' % name
+        if marker in script:
+            s, e = inject.decomp._find_brace_block(script, marker, stem)
+            village_gifts += [it for it, _ in _gift_records(marker + ' = ' + script[s:e] + ';')]
     out = {'chests': re.findall(r'Chest\((ITEM_\w+)', info),
            'chest_gold': [int(g) for g in re.findall(r'ChestMoney\(\s*(\d+)', info)],
            'gifts': [e for e, _ in gifts], 'gift_to': [to for _, to in gifts],
            'gift_gold': _gift_gold(script),
+           'village_gifts': village_gifts,
            'interlude_gifts': [], 'interlude_gift_to': [], 'interlude_gold': [],
            'shops': [(sym, _shoplist_items(shoptext, sym)) for sym in
                      re.findall(r'(?:Armory|Vendor|SecretShop)\(\s*(\w+)', info)],

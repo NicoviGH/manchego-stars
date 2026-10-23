@@ -81,8 +81,8 @@ ENEMY_CHARACTER_SLOT = dict(
 def _slot_table(key, campaign=DEFAULT_CAMPAIGN):
     """One of campaign.yaml's slot tables, in the order it is written (the injector walks it in
     that order, so the order is part of the build)."""
-    with open(os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml'), encoding='utf-8') as f:
-        return dict(yaml_load(f)[key])
+    import campaign_chapters
+    return dict(campaign_chapters.campaign_yaml(campaign)[key])
 
 
 # our cast bust -> the vanilla portrait slot whose graphic files we overwrite; it is also the

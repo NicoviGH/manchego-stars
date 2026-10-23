@@ -690,14 +690,10 @@ def script_wikitext(chap, prev, nxt, units, navbox=''):
 
 # ── what the ROM shows: names, icons, sprites ──────────────────────────────────
 
-_CAMPAIGN_YAML = None
-
 
 def campaign_yaml():
-    global _CAMPAIGN_YAML
-    if _CAMPAIGN_YAML is None:
-        _CAMPAIGN_YAML = load_yaml(os.path.join(CAMP, 'campaign.yaml'))
-    return _CAMPAIGN_YAML
+    import campaign_chapters
+    return campaign_chapters.campaign_yaml(CAMPAIGN)
 
 
 def rom_item_name(enum, fallback=''):
