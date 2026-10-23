@@ -90,7 +90,11 @@ def ai_priority(body):
     leader (+87); none charges the front early. A tie keeps unit-table order, which is LOAD order (a
     unit takes the first free slot as it loads), so callers break it on the arrival turn
     before the list: vanilla Ch2 lists its turn-3 raiders ahead of Bazba, who loads on turn 1. The leader's +87 and the shared leader term are left
-    out: a chapter's leader is its boss, which waits rather than charges."""
+    out: a chapter's leader is its boss, which waits rather than charges.
+
+    Breaking the tie on list position instead read ch02 OFF at x0.74 against a twin with the
+    same map and enemies. When a ratio moves on a mirrored chapter, diff the two sides body by
+    body before believing it."""
     if not body.arms:
         return body.mov + 87
     return body.mov + (40 if any(a.weapon.rng[1] > 1 for a in body.arms) else 20)

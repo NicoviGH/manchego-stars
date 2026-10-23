@@ -181,7 +181,9 @@ def reda_definition(symbol, x, y):
 
 
 # Every campaign-owned UnitDefinition table carries this prefix. It is the whole point of
-# declare_unit_table: a symbol's NAME should say whose data is in it.
+# declare_unit_table: a symbol's NAME should say whose data is in it. Our own scenes carry it
+# too (`MS_Ch05VisitEast`), so code that matches `EventScr_` must ask whether it also means
+# `MS_`: #401's walk matched only `EventScr_` and skipped 26 of 40.
 MS_TABLE_PREFIX = 'MS_'
 
 
