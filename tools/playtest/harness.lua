@@ -2583,6 +2583,17 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                     elseif not cancelUnitActionMenu() then
                         return "stuck", t
                     end
+                elseif ourPhase() and not won() then
+                    -- The seize tile is out of this unit's reach this turn (moveUnit backed
+                    -- out). Close the distance instead of standing still: a lord left far off
+                    -- when someone else killed the boss otherwise never reaches the throne,
+                    -- and clear_ch01 stalls with every enemy dead. marchToward only takes a
+                    -- REACHABLE tile, and this branch only runs when the seize tile is not
+                    -- one, so a unit that cannot seize never parks on it.
+                    if not marchToward(u, seizeTile.x, seizeTile.y, maxx, maxy)
+                        and not cancelToPlayerMap() then
+                        return "stuck", t
+                    end
                 end
             end
         end
