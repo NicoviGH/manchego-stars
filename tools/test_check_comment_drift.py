@@ -53,6 +53,29 @@ class DeadConceptPatterns(unittest.TestCase):
                      'reflows at 42 columns and buttons mid-sentence'):
             self.assertIsNotNone(DEAD_PAT.search(dead), dead)
 
+    def test_the_retired_local_slot_claims_fire_and_ordinary_wording_does_not(self):
+        """#531. The harness's free local slots are measured, never written down, so the
+        written claims are dead. The scan is case-insensitive, which made the first patterns
+        catch "12 slots left" and any "at that ceiling"; these pin them to the claims."""
+        for dead in ('There are 2 slots left, so the question is',
+                     'growth was 73 locals in one quarter against 2 free slots',
+                     'Of its 198 top-level locals, 32 are chapter-scoped',
+                     'is one ~6,700-line main chunk sitting AT that ceiling',
+                     'sitting at that ceiling with room for nothing',
+                     "this file is against Lua's 200-local ceiling for a main chunk",
+                     "harness.lua is one chunk at Lua's 200-local ceiling",
+                     'its main function sits near the 200-local ceiling',
+                     'one Lua chunk against a 200-local ceiling',
+                     'spend one of the two remaining slots',
+                     'spent one of the last free slots'):
+            self.assertIsNotNone(DEAD_PAT.search(dead), dead)
+        for ok in ('12 slots left in the deploy cap',
+                   '32 slots left in the message-id block',
+                   'the budget stops at that ceiling',
+                   "free of Lua's 200-local ceiling",
+                   'room under the 200-local ceiling'):
+            self.assertIsNone(DEAD_PAT.search(ok), ok)
+
     def test_a_COLOUR_count_is_not_a_wrap_width(self):
         """`col\\w*` reaches "colours", and a palette depth that happens to end in 28 is not a
         line width. The registry is read by people fixing real drift; a guard that cries wolf

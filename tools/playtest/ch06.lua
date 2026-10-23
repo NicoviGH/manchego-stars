@@ -1,6 +1,6 @@
 -- ch06.lua -- ch06's chapter-scoped playtest facts, in ITS OWN chunk (#314).
 --
--- Same reason ch05.lua exists: harness.lua is one chunk at Lua's 200-local ceiling, so a
+-- Same reason ch05.lua exists: harness.lua is one chunk under Lua's 200-local cap, so a
 -- chapter's facts live in a chapter chunk with its own fresh budget and are `dofile`d INSIDE
 -- the scenario that needs them (function-scoped, costing harness.lua no top-level slot).
 -- `LUA_CHUNKS` is globbed, so `check_lua_chunks_load` covers this file the day it exists.
