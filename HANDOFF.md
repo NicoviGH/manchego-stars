@@ -30,8 +30,8 @@ C4), D, E, F. Stacked PRs on D->E->F only.
 **Merging:** Nicolas pre-approved merging step 9's and #531's PRs once `/code-review` (in a
 subagent) is clean and CI is green on HEAD; every other PR still needs his "merge".
 SDD ledgers (gitignored, the recovery map): `.superpowers/sdd/step9plan/progress.md` and
-`.superpowers/sdd/plan531/progress.md`; the plan files are on the issues (the scratchpad copies
-die with the session).
+`.superpowers/sdd/plan531/progress.md`, each with its `plan.md` beside it (the files the SDD
+`task-brief` script reads; the issue comments are the published copies).
 Lessons from the 2026-10-23 build session (read before dispatching):
 - Cut feature branches from `origin/main`, never from a local `main` holding unpushed handoff
   commits: the pre-commit drift guard then sees the branch "edit" HANDOFF.md. Never `--no-verify`.
