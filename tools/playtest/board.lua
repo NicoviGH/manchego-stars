@@ -171,6 +171,23 @@ function Board.leanList(mem, SYM, faction)
     return out
 end
 
+-- Iterator over `faction`'s occupied slots at the decomp bound: `for slot, u in Board.each(...)`.
+-- LEAN and LAZY -- each unit is read when the loop reaches it, not up front -- so a scenario
+-- that kills or moves units as it goes sees the live board on the next turn of the loop, as
+-- the `for i = 0, N do unitAt(base, i)` it replaces did. Empty slots are skipped.
+function Board.each(mem, SYM, faction)
+    local f = BY_NAME[faction]
+    local base, slot = SYM[f.sym], -1
+    return function()
+        while true do
+            slot = slot + 1
+            if slot >= f.count then return nil end
+            local u = Board.leanAt(mem, SYM, base, slot)
+            if u then return slot, u end
+        end
+    end
+end
+
 -- How many of `faction`'s units are on the field (alive, on a tile, not hidden/rescued/
 -- undeployed). Leaner than leanAt: a per-frame stop condition calls it.
 function Board.liveCount(mem, SYM, faction)
@@ -294,6 +311,7 @@ function Board.bind(mem, SYM)
         header = function() return Board.header(mem, SYM) end,
         unitAt = function(base, slot) return Board.unitAt(mem, SYM, base, slot) end,
         leanAt = function(base, slot) return Board.leanAt(mem, SYM, base, slot) end,
+        each = function(faction) return Board.each(mem, SYM, faction) end,
         leanList = function(faction) return Board.leanList(mem, SYM, faction) end,
         liveCount = function(faction) return Board.liveCount(mem, SYM, faction) end,
         liveBoss = function() return Board.liveBoss(mem, SYM) end,

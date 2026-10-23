@@ -232,6 +232,19 @@ do
     check(Board.findIn(mem, SYM, SYM.gUnitArrayRed, 50, 0x81).slot, 30, "findIn finds slot 30")
     check(Board.findIn(mem, SYM, SYM.gUnitArrayRed, 24, 0x81), nil, "findIn honours its count")
     check(#Board.leanList(mem, SYM, "red"), 6, "leanList returns every occupied slot")
+    local seen, last = 0, nil
+    for slot, u in Board.each(mem, SYM, "red") do
+        seen = seen + 1; last = slot
+        check(u.slot, slot, "each yields (slot, unit)")
+    end
+    check(seen, 6, "each visits every occupied slot, past slot 23")
+    check(last, 41, "each runs to the decomp bound")
+    local visited = 0
+    for slot in Board.each(mem, SYM, "red") do
+        visited = visited + 1
+        if slot == 0 then putUnit(m, SYM.gUnitArrayRed, 5, { charId = 0x90, x = 6, y = 6 }) end
+    end
+    check(visited, 7, "each reads lazily: a unit placed mid-loop is seen")
     check(Board.occupied(mem, SYM, 4, 1), false, "a rescued unit does not occupy its old tile")
 end
 

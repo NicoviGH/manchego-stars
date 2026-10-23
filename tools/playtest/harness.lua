@@ -3063,9 +3063,8 @@ scenarios.ch01win = function()
         -- every other goblin dies to the first counter (frail) and deals no
         -- damage (harmless): the escort can't kill anyone OR bodyblock the
         -- trail for long. This run asserts seize logic, not combat survival.
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then
+        for i, r in BOARD.each("red") do
+            if r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then
                 pokeFrail(r)
                 pokeHarmless(r)
             end
@@ -3160,9 +3159,8 @@ local function leavePrepAndGrindToSeize()
     for t = 1, 18 do
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(100)
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        for i, r in BOARD.each("red") do
+            if r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         local braulo = blue(0x01)
         if isDead(braulo) then return false end
@@ -3265,9 +3263,8 @@ scenarios.lordfloor = function()
     -- advance two player phases; the floor must NOT stack (flag-gated apply-once = the same
     -- early-return that protects the carry into ch02). Enemies poked harmless so marty lives.
     for _ = 1, 2 do
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeHarmless(r) end
+        for i, r in BOARD.each("red") do
+            if not isDead(r) then pokeHarmless(r) end
         end
         if runEnemyPhase(CH01_PARK) == "gameover" then
             return result("FAIL", "unexpected game over during the floor stability check") end
@@ -4723,16 +4720,14 @@ local function liftFogOntoTheGrid()
     emu:write8(SYM.gPlaySt + 0x0D, 0)
     local onGrid = function()
         local n = 0
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and mapUnitAt(r.x, r.y) ~= 0 then n = n + 1 end
+        for i, r in BOARD.each("red") do
+            if not isDead(r) and mapUnitAt(r.x, r.y) ~= 0 then n = n + 1 end
         end
         return n
     end
-    for i = 0, 19 do
+    for i, u in BOARD.each("blue") do
         if onGrid() > 0 then break end
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and not isDead(u) and (u.state & 0x2) == 0 then
+        if not isDead(u) and (u.state & 0x2) == 0 then
             if moveUnit(u.x, u.y, u.x, u.y) then
                 chooseWait()
                 waitFor(function() return faction() == 0 and not menuOpen() end, 300)
@@ -5584,9 +5579,8 @@ local function seizeCh01ToCh02()
             return "controller"
         end
         wait(100)   -- let the player-phase banner finish (it eats key presses)
-        for i = 0, 23 do   -- the escort dies to the first counter and deals no damage
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        for i, r in BOARD.each("red") do   -- the escort dies to the first counter and deals no damage
+            if r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         local lord = blue(CAMPAIGN.CAST.braulo)
         if not lord or isDead(lord) then return "gameover" end
@@ -5640,8 +5634,8 @@ local function reachCh02Map()
     -- the party deployed, player control, no cutscene. Units/enemies/green chwinga load here -- the
     -- earlier "faction 0 + turn 1" fired during the opening cutscene, before any of them existed.
     local function partyDeployed()
-        for j = 0, 7 do local u = unitAt(SYM.gUnitArrayBlue, j)
-            if u and (u.state & 0x9) == 0 and u.onMap then return true end end
+        for _, u in BOARD.each("blue") do
+            if (u.state & 0x9) == 0 and u.onMap then return true end end
         return false
     end
     for _ = 1, 16000 do
@@ -5873,9 +5867,8 @@ scenarios.ch03talk = function()
         end
     end
     wait(30); shot("ch03talk-after")
-    for i = 0, 19 do -- dump the full blue roster so the flip is unambiguous
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u then log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d)", i, u.charId, u.x, u.y)) end
+    for i, u in BOARD.each("blue") do   -- dump the full blue roster so the flip is unambiguous
+        log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d)", i, u.charId, u.x, u.y))
     end
     local nowBlue = blueTrex() ~= nil
     local stillGreen = findUnit(SYM.gUnitArrayGreen, 12, CHAR_TREX) ~= nil
@@ -5905,15 +5898,12 @@ scenarios.ch03prep = function()
     wait(120) -- phase intro
     shot("ch03prep-map")
     local party, deployed = 0, 0
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u then
-            party = party + 1
-            -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3), real tile
-            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
-            log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
-                i, u.charId, u.x, u.y, u.state))
-        end
+    for i, u in BOARD.each("blue") do
+        party = party + 1
+        -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3), real tile
+        if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
+        log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
+            i, u.charId, u.x, u.y, u.state))
     end
     local CHAR_TREX = 0x1C
     if findUnit(SYM.gUnitArrayBlue, 20, CHAR_TREX) then
@@ -6000,9 +5990,8 @@ scenarios.ch03door = function()
     end
     -- Grab the first deployed blue unit (on the field: not US_HIDDEN|US_NOT_DEPLOYED, real tile).
     local u
-    for i = 0, 23 do
-        local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
+    for i, c in BOARD.each("blue") do
+        if (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed blue unit to open the door") end
     -- Door Key in slot 0 (0x6A, 1 use), zero the rest -> no weapon -> no Attack row.
@@ -6072,9 +6061,8 @@ scenarios.ch03chest = function()
             "chest (%d,%d) reads %d, not the closed-chest tile %d -- placement/addr wrong", CX, CY, pre, CLOSED))
     end
     local u
-    for i = 0, 23 do
-        local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
+    for i, c in BOARD.each("blue") do
+        if (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed blue unit to open the chest") end
     -- Chest Key in slot 0 (0x69, 1 use), zero the rest -> no weapon (no Attack) + free slots for the loot.
@@ -6142,9 +6130,8 @@ end
 scenarios.ch03tourmaline = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local u
-    for i = 0, 23 do
-        local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and (c.state & 0x9) == 0 and c.onMap then u = c break end
+    for i, c in BOARD.each("blue") do
+        if (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed unit to hold the Tourmaline") end
     -- items[0..2] = Tourmaline (0x76, custom pal), Blue Gem (0x75, pal 0), Goodberry/Vulnerary (0x6C, pal 0).
@@ -6391,8 +6378,8 @@ scenarios.ch02 = function()
             i, g.charId, g.x, g.y, g.hp, g.state)) end
     end
     local blueids, redids = {}, {}
-    for i = 0, 7 do local u = unitAt(SYM.gUnitArrayBlue, i); if u then blueids[#blueids+1] = string.format("0x%02X", u.charId) end end
-    for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r then redids[#redids+1] = string.format("0x%02X", r.charId) end end
+    for _, u in BOARD.each("blue") do blueids[#blueids+1] = string.format("0x%02X", u.charId) end
+    for _, r in BOARD.each("red") do redids[#redids+1] = string.format("0x%02X", r.charId) end
     log("blue=" .. table.concat(blueids, ",") .. " | red=" .. table.concat(redids, ","))
     local chwinga = 0
     for _, pid in ipairs(CAMPAIGN.CH02_CHWINGA_PIDS) do
@@ -6401,14 +6388,12 @@ scenarios.ch02 = function()
             log(string.format("chwinga 0x%02X at (%d,%d) hp=%d", pid, g.x, g.y, g.hp)) end
     end
     local deployed = 0
-    for i = 0, 7 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
+    for i, u in BOARD.each("blue") do
+        if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
     end
     local archer, boss = false, false
-    for i = 0, 23 do
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) then
+    for i, r in BOARD.each("red") do
+        if not isDead(r) then
             if ru8(ru32(r.addr + 0x04) + 0x04) == CAMPAIGN.CH02_ARCHER_CLASS then archer = true end
             if BOARD.isBoss(r.addr) then boss = true end
         end
@@ -6506,9 +6491,8 @@ scenarios.ch02baxby = function()
     -- frail+harmless (a safe enemy phase) and cycle ONE enemy phase back to player: that refresh
     -- draws Baxby's real, injected map sprite (the same one ch03 renders) so the still shows him.
     pokeFastConfig()   -- map-anim + fast so the refresh phase is quick
-    for i = 0, 23 do
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+    for i, r in BOARD.each("red") do
+        if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
     end
     cursorTo(baxby.x, baxby.y); wait(20); shot("ch02baxby-deployed-presprite")
     if runEnemyPhase(CH02_PARK) == "gameover" then
@@ -6526,9 +6510,8 @@ scenarios.ch02baxby = function()
     pokeAnimsOn()   -- full battle anim for the showcase strike
     local mn, mx = unitAttackRange(baxby)
     if not mn then return result("FAIL", "Baxby has no attacking weapon equipped") end
-    for i = 0, 23 do
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+    for i, r in BOARD.each("red") do
+        if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
     end
     local liveBefore = BOARD.liveCount("red")
     if not teleportToFiringTile(baxby, mn, mx) then
@@ -6590,14 +6573,12 @@ scenarios.clear_ch02 = function()
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(60)
         protectChwinga()
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        for i, r in BOARD.each("red") do
+            if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
-        for i = 0, 7 do
+        for i, u in BOARD.each("blue") do
             if advanced() or BOARD.liveCount("red") == 0 then break end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then
+            if not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
                 if mn and teleportToFiringTile(u, mn, mx) then
                     u = blue(u.charId)   -- refresh after the teleport relocates it
@@ -6806,10 +6787,9 @@ end
 local function marchPartyToward(cx, cy, turns, stop, maxx, maxy)
     for _ = 1, turns do
         waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
-        for i = 0, 7 do
+        for i, u in BOARD.each("blue") do
             if stop() then return true end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then
+            if not isDead(u) and (u.state & 0x2) == 0 then
                 marchToward(u, cx, cy, maxx or 14, maxy or 14)
                 waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
             end
@@ -6892,9 +6872,8 @@ scenarios.ch04moose = function()
     -- The clearing is 4+ tiles off the deploy flank, so allow a few turns to close.
     local CX, CY = 11, 4                 -- the clearing's middle
     local function anyoneInClearing()
-        for i = 0, 7 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and u.x >= X1 and u.x <= X2 and u.y >= Y1 and u.y <= Y2 then
+        for i, u in BOARD.each("blue") do
+            if not isDead(u) and u.x >= X1 and u.x <= X2 and u.y >= Y1 and u.y <= Y2 then
                 return true
             end
         end
@@ -7162,25 +7141,22 @@ scenarios.ch04packmath = function()
     end
     waitFor(function() return faction() == 0 and not menuOpen()
         and not procActive(SYM.ProcScr_StdEventEngine) end, 3600, true)
-    for i = 0, 23 do
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) then
+    for i, r in BOARD.each("red") do
+        if not isDead(r) then
             log(string.format("  red[%02d] char=0x%02X at (%d,%d)%s", i, r.charId, r.x, r.y,
                 r.charId == CAMPAIGN.CAST.lupin and "   <- LUPIN" or ""))
         end
     end
     local function packAlive()
         local n = 0
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and CAMPAIGN.CH04_PACK_PIDS[r.charId] then n = n + 1 end
+        for i, r in BOARD.each("red") do
+            if not isDead(r) and CAMPAIGN.CH04_PACK_PIDS[r.charId] then n = n + 1 end
         end
         return n
     end
     local function firstWolf()
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and CAMPAIGN.CH04_PACK_PIDS[r.charId] then return r end
+        for i, r in BOARD.each("red") do
+            if not isDead(r) and CAMPAIGN.CH04_PACK_PIDS[r.charId] then return r end
         end
         return nil
     end
@@ -7193,14 +7169,12 @@ scenarios.ch04packmath = function()
     for _ = 1, KILL do
         local wolf = firstWolf()
         if not wolf then break end
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        for i, r in BOARD.each("red") do
+            if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         wolf = firstWolf()
-        for i = 0, 19 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 and u.charId ~= CAMPAIGN.CAST.marty then
+        for i, u in BOARD.each("blue") do
+            if not isDead(u) and (u.state & 0x2) == 0 and u.charId ~= CAMPAIGN.CAST.marty then
                 local mn, mx = unitAttackRange(u)
                 if mn and mn <= 1 and teleportAdjacentTo(u, { wolf }) then
                     u = unitAt(SYM.gUnitArrayBlue, i)
@@ -7708,11 +7682,10 @@ end
 -- `VISIT.shop` an Armory or Vendor.
 function VISIT.open(x, y, choose)
     local u
-    for i = 0, 19 do
-        local c = unitAt(SYM.gUnitArrayBlue, i)
+    for i, c in BOARD.each("blue") do
         -- Deployed and on the map, not merely alive: a capped chapter leaves party members
         -- off the field at x = -1, and parking one of those writes outside the grid row.
-        if c and not isDead(c) and (c.state & 0x9) == 0 and c.onMap and (c.state & 0x2) == 0 then
+        if not isDead(c) and (c.state & 0x9) == 0 and c.onMap and (c.state & 0x2) == 0 then
             u = c break
         end
     end
@@ -8500,9 +8473,8 @@ scenarios.ch05crest = function()
         -- ...and they need a MELEE WEAPON in slot 0, or parking the boss next to them proves
         -- nothing: unitAttackRange returns nil for a staff, and ch05 deploys two healers.
         local hero, hmin, hmax = nil, nil, nil
-        for i = 0, 23 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x3) == 0 and mapUnitAt(u.x, u.y) ~= 0 then
+        for i, u in BOARD.each("blue") do
+            if not isDead(u) and (u.state & 0x3) == 0 and mapUnitAt(u.x, u.y) ~= 0 then
                 local mn, mx = unitAttackRange(u)
                 if mn and mn <= 1 and mx >= 1 then hero, hmin, hmax = u, mn, mx; break end
             end
@@ -9710,9 +9682,8 @@ scenarios.ch04snag = function(opts)
     -- Any armed unit will do; the axe is the fiction, not a requirement (a snag is an obstacle
     -- and takes damage from anything that can reach it).
     local u
-    for i = 0, 19 do
-        local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and not isDead(c) and (c.state & 0x2) == 0 and unitAttackRange(c)
+    for i, c in BOARD.each("blue") do
+        if not isDead(c) and (c.state & 0x2) == 0 and unitAttackRange(c)
             and (opts.pid == nil or c.charId == opts.pid) then u = c break end
     end
     if not u then return result("FAIL", "no armed blue unit to swing at the snag") end
@@ -9885,9 +9856,8 @@ local function clearCh04(parley)
         if won() then break end
         waitFor(function() return faction() == 0 and not menuOpen()
             and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        for i, r in BOARD.each("red") do
+            if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         -- Stage-by-stage logging (#204): a clear-bot that stalls must say WHICH stage failed --
         -- no weapon / no firing tile / no command menu / no kill. The first run of this scenario
@@ -9895,10 +9865,9 @@ local function clearCh04(parley)
         local mw, mh = mapSize()
         log(string.format("%s iter %d: gameTurn=%d map=%dx%d liveEnemies=%d",
             tag, t, turn(), mw, mh, BOARD.liveCount("red")))
-        for i = 0, 19 do
+        for i, u in BOARD.each("blue") do
             if won() or BOARD.liveCount("red") == 0 then break end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then
+            if not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
                 if not mn then
                     log(string.format("  blue[%d] pid=0x%02X (%d,%d): no weapon in slot 0 -- skipped",
