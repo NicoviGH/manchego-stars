@@ -32,6 +32,14 @@ subagent) is clean and CI is green on HEAD; every other PR still needs his "merg
 SDD ledgers (gitignored, the recovery map): `.superpowers/sdd/step9plan/progress.md` and
 `.superpowers/sdd/plan531/progress.md`; the plan files are on the issues (the scratchpad copies
 die with the session).
+Lessons from the 2026-10-23 build session (read before dispatching):
+- Cut feature branches from `origin/main`, never from a local `main` holding unpushed handoff
+  commits: the pre-commit drift guard then sees the branch "edit" HANDOFF.md. Never `--no-verify`.
+- After a matrix run the tree holds a non-canonical ROM (e.g. ch06boot): `controller_turn` refuses
+  to run, and the pre-commit hook trips. Rebuild canonical or pick a scenario that build hosts.
+- A step-9 PR's fix rounds each end in a scoped re-review; the reviews kept finding real defects
+  (DefeatBoss hang, turn skips, a `PT_VANILLA` break from a required symbol), so don't skip them.
+- `harness.lua` has ~32 free top-level locals (`check_lua_local_headroom`); the old "2 left" was stale.
 Open threads on #531: `test_check_canaries` is test-order dependent on main; a matrix run leaves
 the build tree non-canonical so the pre-commit `test_scene_actors` fails until
 `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`.
@@ -95,8 +103,8 @@ the build tree non-canonical so the pre-commit `test_scene_actors` fails until
    weapon reader (fc.W, else data_items.c). It moved 5 cells to OFF, almost all from vanilla's
    second joining weapons (Seth's Silver Lance: ch01 Normal x1.41 -> x1.56); pickups move
    <=0.04. Nothing widened.
-   - **Step 9 chosen (Nicolas, 2026-10-23) and DESIGNED**: real-ROM Monte Carlo, design on
-     #510; the plan is posted (link at the top). Step 10 waits for it.
+   - **Step 9 (real-ROM Monte Carlo) is BUILDING**: state and links at the top. Step 10 waits
+     for its vanilla baseline.
    - Verdicts OFF now: ch01 all three modes; ch02 Difficult; ch03 and ch04 all three modes.
      ch00 and ch05-ch07 read OK. All of it waits for step 10; nothing is widened.
    - **ADR 0363 (Nicolas, edited in place 2026-10-23): an unwritten (`status: planned`)
