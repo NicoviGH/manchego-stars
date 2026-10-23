@@ -1363,6 +1363,24 @@ class VanillaUnitDefParser(unittest.TestCase):
         self.assertFalse(defs[1]['itemDrop'])
 
 
+class VanillaLoaded(unittest.TestCase):
+    """`vanilla_loaded_units` is the one loader of a twin's force, so what it drops, every
+    reader drops (#510 step 9)."""
+
+    # Ch8's TowerFall scenes load Caellach and four more arrays, then CLEE them all.
+    CUTSCENE_ARRAYS = {'UnitDef_088B7964', 'UnitDef_088B798C', 'UnitDef_088B79F0',
+                       'UnitDef_088B79C8', 'UnitDef_088B7A54'}
+
+    def test_ch8_cutscene_loads_are_not_enemies(self):
+        for mode in (None, 'tutorial', 'normal', 'difficult'):
+            units = df.vanilla_loaded_units('FE8 Ch8', mode)
+            self.assertEqual([], [a for a, _i, _d, _c in units if a in self.CUTSCENE_ARRAYS])
+            self.assertFalse([1 for _a, _i, d, _c in units
+                              if d['charIndex'] == 'CHARACTER_CAELLACH'])
+            # 45 armed red loads before; the five cutscene arrays hold 1+2+2+1+1 of them
+            self.assertEqual(38, len(units))
+
+
 class VanillaEnemies(unittest.TestCase):
     """Integration: extract a parity reference's red enemy force from the decomp (HEAD)."""
 
