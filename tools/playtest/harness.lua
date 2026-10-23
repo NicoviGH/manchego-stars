@@ -39,8 +39,8 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 --   src/proc.c sProcArray: 64 procs x 0x6C; +0x00 = proc_script
 -- (Unit/Item/CharacterData reads live in board.lua, the one board reader.)
 -- Harness tuning, in ONE table rather than one local apiece: harness.lua is a single Lua
--- chunk and its main function sits near Lua's 200-local ceiling, so a handful of new
--- top-level locals stops the WHOLE FILE loading and every scenario dies at once (#232).
+-- chunk and Lua caps a function at 200 locals (`check_lua_local_headroom` measures what is
+-- left), so enough new top-level locals stop the WHOLE FILE loading and every scenario dies at once (#232).
 local TUNE = {
     -- How many times one guarded input may be re-pressed into an unchanged, still-legal
     -- state before failing closed. FE8 drops input during window fade-ins, so a single
@@ -99,8 +99,8 @@ local HOST_CHAPTER = PLAYTEST_HOST_CHAPTER or 1
 -- FE8 initialises the menu to option 0 (TUTORIAL) and the harness only pressed A, so every
 -- verdict this project produced before #303 graded the EASIEST mode while reading as
 -- general. A scenario that genuinely wants another mode names it.
--- Hung off TUNE rather than taking two top-level locals: harness.lua sits AT Lua's 200-local
--- ceiling, and the next top-level local stops the whole chunk loading (check.py guards it).
+-- Hung off TUNE rather than taking two top-level locals: a top-level local spends the chunk's
+-- shared local budget (`check_lua_local_headroom` guards it).
 TUNE.difficultyIndex = { tutorial = 0, normal = 1, difficult = 2 }
 TUNE.difficultyWant = (function()
     -- run.sh owns the default and always sends a value; this fallback only covers entry
@@ -144,9 +144,9 @@ end
 -- This is the designed split, not a workaround: a `kind: verdict` scenario asserts on
 -- MEMORY (INSPECT.units, activeMsg) and needs no pixels, while `record` and `diagnostic`
 -- scenarios stay headed precisely because their output IS the picture.
--- Read as a GLOBAL, deliberately: this file is one Lua chunk against a 200-local ceiling
--- (decisions.md -> "`harness.lua` is ONE Lua chunk, at the 200-local ceiling"), and binding
--- this to a top-level local spent one of the last free slots for no benefit.
+-- Read as a GLOBAL, deliberately: this file is one Lua chunk with a 200-local cap
+-- (decisions.md -> "`harness.lua` is ONE Lua chunk"), and binding this to a top-level local
+-- would spend a shared slot for no benefit.
 local nshot = 0
 local function shot(tag)
     nshot = nshot + 1
@@ -720,18 +720,6 @@ end
 controllerState = function(observation)
     local state, why = Controller.classify(observation or observeController())
     return state, why
-end
-local function observationEvidence(observation)
-    local state, why = controllerState(observation)
-    local cursorPart = observation.cursor and string.format(" cursor=(%d,%d) unit=0x%02X",
-        observation.cursor.x, observation.cursor.y, observation.cursor.unit or 0) or ""
-    local menuPart = ""
-    if observation.menu then
-        local ids = {}
-        for _, item in ipairs(observation.menu.items) do ids[#ids + 1] = string.format("0x%02X", item.override_id) end
-        menuPart = string.format(" menu=[%s]@%d", table.concat(ids, ","), observation.menu.current)
-    end
-    return (state or ("unsupported:" .. tostring(why))) .. cursorPart .. menuPart
 end
 local function legalNames(actions)
     local names = {}
@@ -1612,7 +1600,7 @@ end
 -- map sprite taller than its tile and offset upward, so a unit reads a row high, and the
 -- camera row has to be recovered before any pixel can be assigned a coordinate at all.
 -- Placement questions get answered from here, never off a frame (decisions.md: verify via
--- data, not pixels). Hung off INSPECT because harness.lua sits at Lua's 200-local ceiling.
+-- data, not pixels). Hung off INSPECT so it costs no top-level local (`check_lua_local_headroom`).
 INSPECT.units = function(tag)
     local factions = { { "blue", SYM.gUnitArrayBlue, 62 }, { "green", SYM.gUnitArrayGreen, 20 },
                        { "red", SYM.gUnitArrayRed, 50 } }
@@ -2182,8 +2170,8 @@ local function reachCh01(opts)
     log("in ch01 (chapter slot 2); observing post-chapter flow to Preparations")
     -- The Beat-1 Northlook scene is 29 script lines -> 67 text pages, and at normal speed
     -- it costs ~170 frames a page. Nothing here is looked at, so set gameSpeed (gPlaySt
-    -- +0x40 bit 7) and type it fast. Written inline, not as a helper: harness.lua is at
-    -- the 200-local ceiling (check_lua_local_headroom prints what is actually left -- never
+    -- +0x40 bit 7) and type it fast. Written inline, not as a helper: a helper would spend a shared
+    -- top-level slot (check_lua_local_headroom prints what is actually left -- never
     -- write that number down, it went stale in three places at once). Only gameSpeed --
     -- animationType is left alone so winCh00's combat is unaffected.
     -- DELIBERATELY NOT RESTORED: ckpt_prep/ckpt_lordpinky save AFTER this, so every record*
@@ -4669,8 +4657,8 @@ local function reachRbgCh01()
     -- fifth hand-rolled copy of the same save-menu/Northlook/lead-menu/prep walk; the blind
     -- version could not tell an input that landed from one FE8 swallowed, and its four
     -- literal DOWN presses assumed both the roster order and that the menu opened on row 0.
-    -- Function-scoped, not a new top-level `local`: harness.lua is AT Lua's 200-local
-    -- ceiling for the main chunk, and crossing it stops the whole file loading (#236).
+    -- Function-scoped, not a new top-level `local`: the main chunk's 200-local cap
+    -- (`check_lua_local_headroom`) is shared, and crossing it stops the whole file loading (#236).
     local RBG_ROW = 4
     local route = { lord = RBG_ROW }
     if not reachCh01(route) then return false, "could not reach ch01 with RBG as the lead" end
@@ -5238,7 +5226,7 @@ end
 -- (default: the first creature on the bench) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
 -- symbols.lua from the built classes.h) maps it to the class id it was built as.
 -- Named RAW-PID creatures are picked by CHARACTER, not by class (the table lives inside the
--- scenario: this chunk is at the 200-local ceiling). Their anim binds through CharacterData
+-- scenario: a top-level local would spend the chunk's shared 200-local budget). Their anim binds through CharacterData
 -- `_u25`, so the class alone does not identify them: on the sandbox the white moose is the
 -- only CLASS_GWYLLGI, but the class is what a plain Gwyllgi would ALSO match, and matching it
 -- would silently bench the stock hound. Match the pid the sandbox deploys.
@@ -7688,7 +7676,7 @@ scenarios.recordch05eruption = function()
     })
 end
 
--- THE VISIT HELPERS (one table, not five locals: harness.lua sits near Lua's 200-local cap, #327).
+-- THE VISIT HELPERS (one table, not five locals: a top-level local spends harness.lua's shared 200-local budget, #327).
 local VISIT = {}
 
 -- A visit is a unit standing on a tile and using it -- a village door, an
@@ -9561,9 +9549,8 @@ end
 -- turn 1, end it, let the eruption speak until Sahnar rises RED, then park Basil orthogonally
 -- adjacent and take Talk. The camera starts on Sahnar's "Far enough. The tomb is--" and runs to
 -- the CUSA, so the film covers the recognition, both proofs, the turn, and Basil's unanswered
--- berry question. The chain is repeated rather than shared because harness.lua has two top-level
--- local slots left under Lua's 200-local ceiling (tools/check.py measures it) and a shared driver
--- would need one; ch05recruit remains the ASSERTING gate, this one only has to film.
+-- berry question. The chain is repeated rather than shared because a shared driver would need a top-level
+-- local, and slots are shared under Lua's 200-local cap (`check_lua_local_headroom` measures it); ch05recruit remains the ASSERTING gate, this one only has to film.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05recruit (needs a CH05BOOT=1 ROM).
 scenarios.recordch05recruit = function()
     local BASIL, SAHNAR, boxes = 0x13, 0x16, 0   -- CHARACTER_ARTUR / CHARACTER_MARISA
@@ -10800,9 +10787,9 @@ end
 -- api table below is the whole interface -- cases.lua never touches emu, SYM or any global
 -- in this chunk, which is what lets test_cases.lua drive it with a fake.
 --
--- Declared INSIDE the runner coroutine, not beside it: `harness.lua` is one Lua chunk at
--- Lua's 200-local ceiling, and a top-level `local function` here would spend one of the two
--- remaining slots on the very mechanism that exists to stop chapters spending them.
+-- Declared INSIDE the runner coroutine, not beside it: `harness.lua` is one Lua chunk
+-- under Lua's 200-local cap, and a top-level `local function` here would spend a shared slot
+-- (`check_lua_local_headroom`) on the very mechanism that exists to stop chapters spending them.
 local co = coroutine.create(function()
   local function runDeclaredCase(path)
     local api = {

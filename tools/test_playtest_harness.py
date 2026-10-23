@@ -23,7 +23,7 @@ def _block(harness, start_marker, end_marker):
 class TestHarnessLoads(unittest.TestCase):
     def test_harness_lua_compiles(self):
         # #232, caught by Nicolas watching the run: harness.lua is ONE Lua chunk, and its
-        # main function sits near Lua's 200-local ceiling. A few new top-level constants
+        # main function has Lua's 200-local cap. A few new top-level constants
         # pushed it over and the whole file stopped loading -- every scenario dies at once,
         # and nothing in a source-text assertion notices. Compile it for real.
         import shutil

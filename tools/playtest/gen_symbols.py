@@ -384,8 +384,8 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     """The campaign facts scenarios read, resolved from the injector's own constants.
 
     Every value here used to be a hand-kept literal in harness.lua or a chapter chunk, each one
-    a second copy of a Python constant -- and each one a top-level local in a chunk that sits
-    at Lua's 200-local ceiling. The cast's pid is its PORTRAIT_MAP slot, never its STAT_DONOR:
+    a second copy of a Python constant -- and each one a top-level local spent from a chunk's
+    shared 200-local budget. The cast's pid is its PORTRAIT_MAP slot, never its STAT_DONOR:
     the harness's own comments warned about that trap three times over."""
     from inject.cast import _classed_cast, classed_cast, load_unit, PORTRAIT_MAP, RAW_PID_HELP
     from inject.text import help_text_body, slot_desc_text_id

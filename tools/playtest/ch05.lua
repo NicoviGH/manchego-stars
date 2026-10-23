@@ -1,8 +1,8 @@
 -- ch05.lua -- ch05's chapter-scoped playtest facts, in ITS OWN chunk (#314).
 --
--- WHY THIS FILE EXISTS. Lua caps locals at 200 per chunk and `harness.lua` is one chunk at
--- that ceiling. Of its 198 top-level locals, 32 are chapter- or cast-scoped -- ~6-7 per
--- chapter over the five built -- so a shared budget runs out during ch06, not at ch18. The
+-- WHY THIS FILE EXISTS. Lua caps locals at 200 per chunk and `harness.lua` is one chunk
+-- sharing that budget (`check_lua_local_headroom` measures what is left). A chapter costs
+-- ~6-7 top-level locals, so a shared budget would run out chapters before the last. The
 -- old escape hatch ("declare it inside the scenario that needs it") kept the harness
 -- compiling by converting the ceiling into DUPLICATION instead: 94 constant declarations
 -- inside scenario bodies, 24 names re-typed across two or three scenarios. Basil's pid was

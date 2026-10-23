@@ -86,6 +86,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #531: the harness's remaining local slots are MEASURED (check_lua_local_headroom),
+    # never written down; "2 slots left" / "198 locals" went stale in a dozen places at once
+    r'2 slots left', r'198 top-level locals', r"AT (?:that|Lua's) (?:200-local )?ceiling",
+    r'two remaining slots', r'two top-level\s+local slots left', r'one of the (?:last|two) (?:free|remaining) slots',
     # retired by ADR 0363, edited in place (Nicolas, 2026-10-23): a planned chapter gets no
     # difficulty reading, so there is no projected target, its twin's or the yardstick's
     r'unwritten_projection', r'planned_target', r'vanilla_projection',
@@ -570,7 +574,7 @@ def check_lua_chunks_load(fail):
     invisible until mGBA loads it minutes later.
 
     The specific hazard is Lua's ceiling of 200 local variables per function. harness.lua
-    is one ~6,700-line main chunk sitting AT that ceiling, so a routine edit can cross it
+    is one very large main chunk, so enough routine edits could cross it
     -- and crossing it kills every scenario simultaneously, a total outage rather than a
     single red row. #236 crossed it and caught it only by hand. How much room is actually
     left is MEASURED by check_lua_local_headroom below, never written down.
@@ -668,7 +672,7 @@ def lua_local_headroom(path, probe_max=8):
 # quarter against 2 free slots (#327). Freezing the count redirects the next helper into a
 # module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
 # scale; thinning the tail only makes it comfortable.
-HARNESS_TOP_LEVEL_LOCALS = 169
+HARNESS_TOP_LEVEL_LOCALS = 168
 
 # `[ \t]`, never `\s`: `\s` matches a NEWLINE, so `local controllerFault` followed by
 # `local function log` merged into one match and the count came out one short. A counter
@@ -698,7 +702,7 @@ def lua_top_level_locals(path):
 def check_harness_local_ratchet(fail):
     """`harness.lua`'s top-level local count may not grow (#327).
 
-    The ceiling kills every scenario at once and there are 2 slots left, so the question is
+    The ceiling kills every scenario at once, so the question is
     not "is there room today" but "where does the next helper go". Frozen here, it goes into
     a module -- the pattern harness.lua already uses for ten of them -- and module count has
     no limit. Without the freeze, the measured rate (73 infrastructure locals per quarter)

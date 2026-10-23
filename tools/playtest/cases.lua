@@ -7,10 +7,9 @@
 -- Code is the exception you NAME, not the default you copy.
 --
 -- WHY THIS IS ITS OWN CHUNK. Lua allows 200 locals per chunk and `harness.lua` is one chunk
--- sitting at that ceiling with 2 slots left (`check_lua_local_headroom` measures it). Of its
--- 198 top-level locals, 32 are chapter- or cast-scoped, so a chapter costs ~6-7 -- which
--- means the harness runs out during ch06, not at ch18. A chapter's Lua lives in its own
--- chunk with its own budget now; see decisions.md -> "A chapter costs local slots".
+-- whose slots are shared (`check_lua_local_headroom` measures what is left, so no number is
+-- written here). A chapter costs ~6-7 of them, so chapters would crowd the harness out. A
+-- chapter's Lua lives in its own chunk with its own budget; see decisions.md -> "A chapter costs local slots".
 --
 -- The driver never touches `emu`, `SYM` or any harness global: everything the game can do
 -- arrives on the `api` table. That is what lets `test_cases.lua` be a complete test double,
