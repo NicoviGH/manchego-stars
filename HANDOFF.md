@@ -14,15 +14,12 @@ rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
 
-**#510 step 9 is being built, subagent-driven** (plan
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370592835>, amendment
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6371791465>, plus Task C4:
-Wiki claims for vanilla Ch8-end <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6372204174>).
+**#510 step 9 is being built, subagent-driven.** Its plan is ONE comment, edited in place (the
+amendment and Task C4 are folded in): <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370592835>.
 The bot plays the ACTUAL ROM, never a Python re-creation. **Merged:** A #530 (Ch8 cutscene loads are
 not enemies), B #532 (`tools/playtest/board.lua`, the one board reader: `onField`, lean reads,
 `canSeize` from engine patch 0005; `gen_symbols.py` has an OPTIONAL list so `PT_VANILLA=1` works).
-**Inserted before C, at Nicolas's ask: the harness clean-up #531** (audit + plan
-<https://github.com/NicoviGH/manchego-stars/issues/531#issuecomment-6372485590>). G1 merged #533
+**Inserted before C, at Nicolas's ask: the harness clean-up #531** (its body links its plan). G1 merged #533
 (proc pool scanned once per frame, ADR 0366: `clear_ch01` 40s -> 16s; true slot comments).
 **Next: G2** (Tasks 3-6: unit scans via Board, teleport/park helper with map bounds, settle +
 dialogue helpers, chapter-local copies), then G3 (declared cases), then step 9 PR C (Tasks 3-5 +
@@ -30,8 +27,9 @@ C4), D, E, F. Stacked PRs on D->E->F only.
 **Merging:** Nicolas pre-approved merging step 9's and #531's PRs once `/code-review` (in a
 subagent) is clean and CI is green on HEAD; every other PR still needs his "merge".
 SDD ledgers (gitignored, the recovery map): `.superpowers/sdd/step9plan/progress.md` and
-`.superpowers/sdd/plan531/progress.md`, each with its `plan.md` beside it (the files the SDD
-`task-brief` script reads; the issue comments are the published copies).
+`.superpowers/sdd/plan531/progress.md`, each with a `plan.md` beside it for the SDD `task-brief`
+script. That file is a COPY of the GitHub plan comment, which is the only source: re-fetch, never edit.
+Rulings made on Nicolas's behalf are posted on #510 and #531, not only in the ledgers.
 Lessons from the 2026-10-23 build session (read before dispatching):
 - Cut feature branches from `origin/main`, never from a local `main` holding unpushed handoff
   commits: the pre-commit drift guard then sees the branch "edit" HANDOFF.md. Never `--no-verify`.
