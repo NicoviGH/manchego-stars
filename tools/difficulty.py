@@ -1864,10 +1864,14 @@ def party_matchup(bodies, careers, deploy_cap=None, forced=(), engage=None):
             def summed(term):
                 return sum(term(d) if mask is None else numpy.where(mask, term(d), 0.0)
                            for d, mask in defends)
+            # A member strikes with whichever carried weapon kills fastest (#510 step 8).
             rate = sum(numpy.where(fielded[k], summed(
-                lambda d: fc.damage_per_round(party[names[k]], d) / d.hp), 0.0) for k in armed)
+                lambda d: 1.0 / fc.best_rounds_to_kill(party[names[k]], d)), 0.0)
+                for k in armed)
             floor = sum(numpy.where(fielded[k], summed(
-                lambda d: 1.0 / metric_rounds_to_kill(d, party[names[k]])), 0.0) for k in armed)
+                lambda d: 1.0 / fc.best_rounds_to_kill(
+                    party[names[k]], d, rounds=lambda a, e: metric_rounds_to_kill(e, a))), 0.0)
+                for k in armed)
             rate = numpy.where(rate > 0, rate, floor) if armed else numpy.zeros(n)
             clear = float(numpy.where(rate > 0, 1.0 / numpy.where(rate > 0, rate, 1), inf).sum())
             per.append((threat, clear))

@@ -2718,6 +2718,18 @@ class PartyMatchup(unittest.TestCase):
         both = df.party_matchup([(enemy, 0)], {'h': [hitter], 'w': [weak]})
         self.assertAlmostEqual(both['clear'], alone['clear'])
 
+    def test_a_member_strikes_with_its_best_carried_weapon(self):
+        # #510 step 8: a careful player swaps to the weapon that kills fastest per enemy.
+        knight = fc.replace(combatant('e', hp=20, dfc=8, weapon='iron-lance'),
+                            tags=frozenset({'armor'}))
+        plain = combatant('a', pow_=6, weapon='iron-sword')
+        carried = fc.replace(plain, arsenal=(fc.W['iron-sword'], fc.W['rapier']))
+        rapier = fc.replace(plain, weapon=fc.W['rapier'])
+        m = df.party_matchup([(knight, 0)], {'a': [carried]})
+        self.assertLess(df.metric_rounds_to_kill(knight, rapier),
+                        df.metric_rounds_to_kill(knight, plain))
+        self.assertAlmostEqual(m['clear'], df.metric_rounds_to_kill(knight, rapier))
+
     def test_a_wall_nobody_dents_falls_back_to_the_floor(self):
         wall = combatant('e', hp=20, dfc=30, weapon='iron-lance')
         a = combatant('a', pow_=4)

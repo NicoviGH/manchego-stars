@@ -323,5 +323,46 @@ class CanonicalMatchup(unittest.TestCase):
         self.assertEqual(fc.kills_per_round(eirika, boss), 1.0)
 
 
+class BestRounds(unittest.TestCase):
+    """#510 step 8: a careful player strikes each enemy with the carried weapon that kills it
+    fastest. Fails if the party side keeps attacking with its equipped weapon only."""
+
+    def attacker(self, **kw):
+        return fc.Combatant('a', hp=20, pow=6, skl=8, spd=8, df=4, res=0, lck=4, con=7,
+                            weapon=fc.W['iron-sword'],
+                            arsenal=(fc.W['iron-sword'], fc.W['rapier']), **kw)
+
+    def knight(self):
+        return fc.Combatant('k', hp=20, pow=5, skl=3, spd=2, df=10, res=0, lck=0, con=12,
+                            weapon=fc.W['iron-lance'], tags=frozenset({'armor'}))
+
+    def test_takes_the_faster_weapon(self):
+        a, k = self.attacker(), self.knight()
+        rapier = fc.rounds_to_kill(fc.replace(a, weapon=fc.W['rapier']), k)
+        self.assertLess(rapier, fc.rounds_to_kill(a, k))
+        self.assertEqual(fc.best_rounds_to_kill(a, k), rapier)
+
+    def test_arrays(self):
+        import numpy
+        a = fc.replace(self.attacker(), pow=numpy.array([0, 6]))
+        k = self.knight()
+        got = fc.best_rounds_to_kill(a, k)
+        want = numpy.minimum(fc.rounds_to_kill(a, k),
+                             fc.rounds_to_kill(fc.replace(a, weapon=fc.W['rapier']), k))
+        self.assertTrue(numpy.array_equal(got, want))
+
+    def test_no_arsenal_is_weapon(self):
+        a = fc.replace(self.attacker(), arsenal=())
+        self.assertEqual(fc.best_rounds_to_kill(a, self.knight()),
+                         fc.rounds_to_kill(a, self.knight()))
+
+    def test_rounds_function_applies_per_weapon(self):
+        """The metric floor is applied per weapon, then the best taken."""
+        calls = []
+        fc.best_rounds_to_kill(self.attacker(), self.knight(),
+                               rounds=lambda atk, dfn: calls.append(atk.weapon.name) or 1.0)
+        self.assertEqual(['iron-sword', 'rapier'], calls)
+
+
 if __name__ == '__main__':
     unittest.main()

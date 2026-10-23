@@ -306,6 +306,21 @@ def rounds_to_kill(atk, dfn, terrain_avoid=0):
     return float('inf') if dpr <= 0 else dfn.hp / dpr
 
 
+def best_rounds_to_kill(atk, dfn, terrain_avoid=0, rounds=None):
+    """The fewest rounds any weapon atk carries (`arms`) needs to drop dfn: a careful player
+    swaps to the right weapon per enemy (#510 step 8). `rounds(atk, dfn)` scores one weapon
+    (default `rounds_to_kill`), so a caller's floor applies per weapon before the best is
+    taken."""
+    if rounds is None:
+        def rounds(a, d):
+            return rounds_to_kill(a, d, terrain_avoid)
+    best = None
+    for a in arms(atk) or (atk,):
+        r = rounds(a, dfn)
+        best = r if best is None else minimum(best, r)
+    return best
+
+
 def kills_per_round(atk, dfn, terrain_avoid=0):
     """Kill throughput, capped at 1.0 per unit (overkill doesn't count twice). One-
     rounding an enemy is worth exactly one kill; a two-round matchup is worth 0.5."""
