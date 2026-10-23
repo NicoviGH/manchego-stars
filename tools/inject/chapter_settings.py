@@ -152,10 +152,18 @@ def apply_chapter_difficulty(campaign, verbose=False):
 _SHARED_ROW = re.compile(r'CHAPTER_L_(PROLOGUE|\d+)$')
 
 
+def shared_route_twin(chapter_enum):
+    """'CHAPTER_L_5' -> 'FE8 Ch5' (by name: its value is 6), 'CHAPTER_L_PROLOGUE' ->
+    'FE8 Prologue'; None for any chapter off the shared route."""
+    m = _SHARED_ROW.match(chapter_enum)
+    if not m:
+        return None
+    return 'FE8 Prologue' if m.group(1) == 'PROLOGUE' else 'FE8 Ch%d' % int(m.group(1))
+
+
 def _twin_rows():
     rows = enum_values(vanilla_decomp_text('include/constants/chapters.h'), 'CHAPTER_L_')
-    return {('FE8 Prologue' if m.group(1) == 'PROLOGUE' else 'FE8 Ch%d' % int(m.group(1))): v
-            for m, v in ((_SHARED_ROW.match(n), v) for n, v in rows.items()) if m}
+    return {shared_route_twin(n): v for n, v in rows.items() if shared_route_twin(n)}
 
 
 def twin_settings_index(chap):

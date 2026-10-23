@@ -150,15 +150,13 @@ strategy_claims:
     topic: range
     step: 7
     cite: "Keep Pinky away from the lone archer on the east side until someone has dealt with it."
-  - kind: unmodelled
+  - kind: kits
     topic: villages
-    step: 8
     cite: "Visit the two huts beside your start for a Hand Axe and an Elixir"
   - kind: reinforcements
     cite: "Beware of the two raiders that arrive from the west edge on turn 3, behind the party."
-  - kind: unmodelled
+  - kind: kits
     topic: shop
-    step: 8
     cite: "This is your first chance to do any shopping."
 
 # ── Deployment ──────────────────────────────────────────────────────────────────

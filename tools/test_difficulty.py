@@ -39,6 +39,142 @@ def combatant(name='u', hp=20, pow_=0, skl=8, spd=0, dfc=0, res=0, lck=0, con=20
                         lck=lck, con=con, weapon=fc.W[weapon], tags=tags)
 
 
+class EventGroupStems(unittest.TestCase):
+    """One `git grep`, not one `git show` per eventinfo file (#510 step 8 put it on the
+    curve's path through the twin's interludes)."""
+
+    def per_file(self):
+        import re
+        info = df.inject.decomp.vanilla_decomp_text('src/events_info.c')
+        out = {}
+        for stem in re.findall(r'#include "events/(\w+)-eventinfo\.h"', info):
+            text = df.inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+            for group in re.findall(r'ChapterEventGroup\s+(\w+)', text):
+                out[group] = stem
+        return out
+
+    def test_same_map_as_reading_every_file(self):
+        df._event_group_stems.cache_clear()
+        self.assertEqual(self.per_file(), df._event_group_stems())
+
+    def test_one_spawn(self):
+        import subprocess
+        df._event_group_stems.cache_clear()
+        df.inject.decomp.vanilla_decomp_text('src/events_info.c')
+        real = subprocess.check_output
+        with mock.patch.object(subprocess, 'check_output', side_effect=real) as spawn:
+            df._event_group_stems()
+        self.assertLessEqual(spawn.call_count, 1)
+
+
+class UnwieldableRedsAreUnarmed(unittest.TestCase):
+    def test_a_red_that_wields_nothing_it_carries_is_not_in_the_force(self):
+        # A Fighter holding only a Steel Blade (a sword) attacks no one.
+        real = df._vanilla_red_defs('FE8 Ch1')
+        a, i, d = real[0]
+        doctored = [(a, i, dict(d, classIndex='CLASS_FIGHTER', items=['ITEM_BLADE_STEEL']))]
+        with mock.patch.object(df, '_vanilla_red_defs', return_value=doctored):
+            self.assertEqual([], df.vanilla_loaded_units('FE8 Ch1'))
+
+
+class KitPaths(unittest.TestCase):
+    """#510 step 8: the verdict reads the happy path; the guaranteed path is printed only."""
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def chap(self, ch):
+        return df.load_field(self.CAMPAIGN, ch)[0]
+
+    def test_happy_is_headline(self):
+        chap = self.chap('ch04')
+        a, b = df.chapter_matchup(chap, self.CAMPAIGN), df.chapter_matchup(
+            chap, self.CAMPAIGN, path='happy')
+        self.assertEqual((a['threat_ratio'], a['load_ratio']), (b['threat_ratio'], b['load_ratio']))
+
+    def test_the_paths_differ_where_pickups_arm_someone(self):
+        happy = df.arriving_fields(self.chap('ch06'), self.CAMPAIGN, path='happy')
+        sure = df.arriving_fields(self.chap('ch06'), self.CAMPAIGN, path='guaranteed')
+        width = lambda f: sum(len(fc.arms(c[0])) for c in f['van_party'].values())  # noqa: E731
+        self.assertGreater(width(happy), width(sure))
+
+    def test_eirika_fights_the_prologue_with_the_rapier(self):
+        party = df.vanilla_party_careers('FE8 Prologue', path='guaranteed')
+        self.assertEqual('rapier', party['Eirika'][0].weapon.name)
+
+    def test_a_kit_holds_only_what_the_class_can_wield(self):
+        # A weapon fc.W never listed (the shop's Slim Sword) must still pass the rank gate.
+        f = df.arriving_fields(self.chap('ch03'), self.CAMPAIGN, 'normal')
+        self.assertNotIn('sword-slim', [w.name for w in f['our_party']['marty'][0].arsenal])
+        self.assertNotIn('sword-slim', [w.name for w in f['van_party']['Neimi'][0].arsenal])
+        self.assertIn('sword-slim', [w.name for w in f['van_party']['Franz'][0].arsenal])
+
+    def test_the_kits_line_reads_the_reports_mode(self):
+        seen = []
+        real = df.chapter_matchup
+
+        def spy(chap, campaign, mode=None, path='happy'):
+            seen.append((mode, path))
+            return real(chap, campaign, mode, path)
+        with mock.patch.object(df, 'chapter_matchup', spy), \
+                contextlib.redirect_stdout(io.StringIO()):
+            df.report(self.CAMPAIGN, 'ch04', mode='difficult')
+        self.assertIn(('difficult', 'guaranteed'), seen)
+
+    def test_our_party_defaults_to_the_guaranteed_path_like_the_twins(self):
+        import exp_curve
+        party = exp_curve.entering(self.CAMPAIGN, 3)['party']
+        ours = df._party_careers(self.CAMPAIGN, party, 3)
+        self.assertEqual(['iron-axe', 'hand-axe'], [w.name for w in ours['braulo'][0].arsenal])
+
+    def test_the_chapter_report_prints_both_paths(self):
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            df._print_kit_paths(self.chap('ch06'), self.CAMPAIGN)
+        out = buf.getvalue()
+        self.assertIn('happy path (graded)', out)
+        self.assertIn('guaranteed only', out)
+        self.assertIn('world-map stock projected from the twin', out)
+
+    def test_the_curve_never_reads_the_guaranteed_path(self):
+        import kits
+        seen = set()
+        real = kits.arsenals
+
+        def spy(pickups, chapter, party, path):
+            seen.add(path)
+            return real(pickups, chapter, party, path)
+        df._MATCHUPS.clear()
+        with mock.patch.object(kits, 'arsenals', spy):
+            df.chapter_matchup(self.chap('ch03'), self.CAMPAIGN, mode='normal')
+        self.assertEqual({'happy'}, seen)
+
+
+class ItemWeapon(unittest.TestCase):
+    """#510 step 8: one item -> weapon reader. A kit can hold weapons fc.W never listed
+    (shop Slim Swords, a village Armorslayer); dropping them would undercount one side."""
+
+    def test_a_listed_weapon_is_its_fc_w_entry(self):
+        self.assertIs(fc.W['iron-sword'], df.item_weapon('ITEM_SWORD_IRON'))
+
+    def test_an_unlisted_weapon_is_read_from_data_items(self):
+        w = df.item_weapon('ITEM_SWORD_ARMORSLAYER')
+        self.assertEqual((8, 80, 0, 11, 'sword', (1, 1), frozenset({'armor'})),
+                         (w.mt, w.hit, w.crit, w.wt, w.kind, w.rng, w.effective))
+
+    def test_crit_and_range_are_read(self):
+        self.assertEqual(30, df.item_weapon('ITEM_SWORD_KILLER').crit)
+        self.assertEqual((1, 2), df.item_weapon('ITEM_AXE_HANDAXE').rng)
+
+    def test_staves_and_items_are_not_weapons(self):
+        self.assertIsNone(df.item_weapon('ITEM_STAFF_HEAL'))
+        self.assertIsNone(df.item_weapon('ITEM_VULNERARY'))
+
+    def test_enemy_kits_read_through_it(self):
+        self.assertEqual(('armorslayer',), tuple(
+            w.name for w in df._weapons_from_item_enums(['ITEM_SWORD_ARMORSLAYER'])))
+
+
 class Durability(unittest.TestCase):
     def test_is_worst_case_rounds_to_be_downed(self):
         # unit (20 HP) vs two attackers, each 100% hit and crit 4% (Skl 8 / 2), so x 1.08:
@@ -1356,29 +1492,29 @@ class VanillaEnemies(unittest.TestCase):
             self.assertIn(expected, names)
 
 
-class VanillaProjection(unittest.TestCase):
-    """Forward targets for planned chapters (#123): the vanilla reference's own pressure."""
+class PlannedChaptersAreNotRead(unittest.TestCase):
+    """Nicolas, 2026-10-23: a chapter is read as it is built. A `status: planned` chapter gets
+    no difficulty reading at all, and its twin is not opened for it."""
 
-    def test_uncurated_reference_projects_none(self):
-        self.assertIsNone(df.vanilla_projection('FE8 Ch99', 8))
+    def test_the_curve_lists_a_planned_chapter_without_reading_its_twin(self):
+        asked = []
+        import danger_map
+        real_bodies, real_party = danger_map.vanilla_bodies, df.vanilla_party_careers
 
-    def test_projection_reports_full_threat_and_finite_clearload(self):
-        proj = df.vanilla_projection('FE8 Ch13', 8)
-        self.assertEqual(proj['n'], 50)
-        self.assertGreater(proj['threat'], 0)
-        # promoted walls the early-game yardstick can't dent are EXCLUDED from
-        # clear-load (else it reads inf) and surfaced in `proof` instead
-        self.assertNotEqual(proj['clearload'], float('inf'))
-        self.assertGreater(proj['proof'], 0)
+        def bodies(ref, *a, **k):
+            asked.append(ref)
+            return real_bodies(ref, *a, **k)
 
-    def test_projection_with_no_walls_matches_enemy_pressure(self):
-        # An early reference (all dentable) must project exactly what the parity row
-        # computes -- the projection is the same bar, shown before our side exists.
-        proj = df.vanilla_projection('FE8 Ch1', 9)
-        self.assertEqual(proj['proof'], 0)
-        t, l = df.enemy_pressure(df.vanilla_enemies('FE8 Ch1'), 9)
-        self.assertAlmostEqual(proj['threat'], t)
-        self.assertAlmostEqual(proj['clearload'], l)
+        def party(ref, *a, **k):
+            asked.append(ref)
+            return real_party(ref, *a, **k)
+        out = io.StringIO()
+        with mock.patch.object(danger_map, 'vanilla_bodies', bodies), \
+                mock.patch.object(df, 'vanilla_party_careers', party), \
+                contextlib.redirect_stdout(out):
+            df.curve_report(CAMPAIGN, mode='normal', only={'ch08-the-eastway-ambush'})
+        self.assertNotIn('FE8 Ch8', asked)
+        self.assertIn('planned -- not read until it is written', out.getvalue())
 
 
 class ReportSmoke(unittest.TestCase):
@@ -1822,8 +1958,8 @@ class ItemEconomy(unittest.TestCase):
         gifts = df.twin_event_payload('ch15a')['gifts']
         self.assertIn('ITEM_DARK_GLEIPNIR', gifts)
         self.assertNotIn('ITEM_SWORD_AUDHULMA', gifts)
-        self.assertNotIn(('CHARACTER_EPHRAIM', 'ITEM_SWORD_AUDHULMA'),
-                         df._named_item_grants('ch15a'))
+        named = df.twin_event_payload('ch15a')['gift_to']
+        self.assertFalse([to for to in named if 'CHARACTER_EPHRAIM' in to])
 
     # Shared scripts that take slot 3 as something other than loot; anything else a twin sets
     # slot 3 for has to reach a give the reader counts.
@@ -2718,6 +2854,18 @@ class PartyMatchup(unittest.TestCase):
         both = df.party_matchup([(enemy, 0)], {'h': [hitter], 'w': [weak]})
         self.assertAlmostEqual(both['clear'], alone['clear'])
 
+    def test_a_member_strikes_with_its_best_carried_weapon(self):
+        # #510 step 8: a careful player swaps to the weapon that kills fastest per enemy.
+        knight = fc.replace(combatant('e', hp=20, dfc=8, weapon='iron-lance'),
+                            tags=frozenset({'armor'}))
+        plain = combatant('a', pow_=6, weapon='iron-sword')
+        carried = fc.replace(plain, arsenal=(fc.W['iron-sword'], fc.W['rapier']))
+        rapier = fc.replace(plain, weapon=fc.W['rapier'])
+        m = df.party_matchup([(knight, 0)], {'a': [carried]})
+        self.assertLess(df.metric_rounds_to_kill(knight, rapier),
+                        df.metric_rounds_to_kill(knight, plain))
+        self.assertAlmostEqual(m['clear'], df.metric_rounds_to_kill(knight, rapier))
+
     def test_a_wall_nobody_dents_falls_back_to_the_floor(self):
         wall = combatant('e', hp=20, dfc=30, weapon='iron-lance')
         a = combatant('a', pow_=4)
@@ -3084,16 +3232,16 @@ class ModeReadsAreHonestAboutScope(unittest.TestCase):
         finally:
             del df.PARITY_REFERENCE_UDEFS['FE8 Creature Campaign']
 
-    def test_only_the_planned_targets_are_reported_as_unshifted(self):
-        # Role findings read the mode since #510 step 2 (ADR 0355); the planned chapters'
-        # targets (vanilla_projection) still run on the authored table, and the banner says so.
+    def test_only_the_off_chain_fallback_is_reported_as_unshifted(self):
+        # Role findings read the mode since #510 step 2 (ADR 0355); the off-chain yardstick
+        # fallback still runs on the authored table, and the banner says so.
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             df.curve_report('rime-of-the-frostmaiden', mode='normal', only=set())
         text = out.getvalue().lower()
-        self.assertIn('planned-chapter targets', text)
+        self.assertNotIn('planned-chapter targets', text)
         self.assertIn('authored table', text)
-        self.assertIn('off\n     vanilla_chain', text)
+        self.assertIn('off vanilla_chain', text)
 
     def test_role_findings_read_the_mode(self):
         """The boss-durability arm loads our boss for the mode it is asked about."""

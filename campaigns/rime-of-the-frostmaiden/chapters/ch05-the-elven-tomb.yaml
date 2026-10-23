@@ -214,7 +214,7 @@ strategy: |
 strategy_claims:
   - kind: unmodelled
     topic: arena
-    step: 8
+    step: out
     cite: "This chapter features the first arena in the game."
   - kind: unmodelled
     topic: recruit

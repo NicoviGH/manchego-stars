@@ -308,6 +308,36 @@ def rounds_to_kill(atk, dfn, terrain_avoid=0):
     return float('inf') if dpr <= 0 else dfn.hp / dpr
 
 
+@functools.lru_cache(maxsize=None)
+def undominated(weapons):
+    """`weapons` less every one another of the same kind beats on every field a round reads
+    (Mt, Hit, Crit and effectiveness no lower, Wt no higher): it can never kill in fewer
+    rounds, so `best_rounds_to_kill` never scores it. Order kept."""
+    def beats(a, b):
+        return (a.kind == b.kind and a.mt >= b.mt and a.hit >= b.hit and a.crit >= b.crit
+                and a.wt <= b.wt and a.effective >= b.effective)
+    return tuple(w for i, w in enumerate(weapons)
+                 if not any(beats(v, w) and (not beats(w, v) or j < i)
+                            for j, v in enumerate(weapons) if j != i))
+
+
+def best_rounds_to_kill(atk, dfn, terrain_avoid=0, rounds=None):
+    """The fewest rounds any weapon atk carries (`arms`) needs to drop dfn: a careful player
+    swaps to the right weapon per enemy (#510 step 8). `rounds(atk, dfn)` scores one weapon
+    (default `rounds_to_kill`), so a caller's floor applies per weapon before the best is
+    taken."""
+    if rounds is None:
+        def rounds(a, d):
+            return rounds_to_kill(a, d, terrain_avoid)
+    best = None
+    if atk.arsenal:
+        atk = replace(atk, arsenal=undominated(atk.arsenal))
+    for a in arms(atk) or (atk,):
+        r = rounds(a, dfn)
+        best = r if best is None else minimum(best, r)
+    return best
+
+
 def kills_per_round(atk, dfn, terrain_avoid=0):
     """Kill throughput, capped at 1.0 per unit (overkill doesn't count twice). One-
     rounding an enemy is worth exactly one kill; a two-round matchup is worth 0.5."""

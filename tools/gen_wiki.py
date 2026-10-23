@@ -690,14 +690,10 @@ def script_wikitext(chap, prev, nxt, units, navbox=''):
 
 # ── what the ROM shows: names, icons, sprites ──────────────────────────────────
 
-_CAMPAIGN_YAML = None
-
 
 def campaign_yaml():
-    global _CAMPAIGN_YAML
-    if _CAMPAIGN_YAML is None:
-        _CAMPAIGN_YAML = load_yaml(os.path.join(CAMP, 'campaign.yaml'))
-    return _CAMPAIGN_YAML
+    import campaign_chapters
+    return campaign_chapters.campaign_yaml(CAMPAIGN)
 
 
 def rom_item_name(enum, fallback=''):
@@ -1205,15 +1201,10 @@ def chapter_wikitext(chap, prev, nxt, units, chs, files, navbox=''):
             c['items'].append((name, how, None))
 
     shops = []
-    data_items = inject.decomp.vanilla_decomp_text('src/data_items.c')
-    shoplists = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
     for macro, sym, _x, _y in inject.villages.chapter_shops(chap):
         stock = []
-        for enum in difficulty._shoplist_items(shoplists, sym):
-            blk = re.search(r'\[%s\]\s*=\s*\{(.*?)\n\s*\},' % re.escape(enum), data_items, re.S)
-            uses = re.search(r'\.maxUses\s*=\s*(\d+)', blk.group(1)) if blk else None
-            per = re.search(r'\.costPerUse\s*=\s*(\d+)', blk.group(1)) if blk else None
-            cost = int(per.group(1)) * max(int(uses.group(1)) if uses else 1, 1) if per else ''
+        for enum in difficulty.shop_stock(sym):
+            cost = difficulty.item_gold_value(enum) or ''
             shown = rom_item_name(enum)
             files.item(enum, shown)
             stock.append((shown, cost))

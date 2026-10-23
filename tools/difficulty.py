@@ -208,16 +208,17 @@ def _weapons_for(inventory):
         if item.get('unlock'):                    # not yet usable at base class
             continue
         key = item.get('fe_base') or item.get('id')
-        if key in fc.W:
-            out.append(fc.W[key])
+        weapon = item_weapon(ITEM_ENUM[key]) if key in ITEM_ENUM else fc.W.get(key)
+        if weapon is not None:
+            out.append(weapon)
     return tuple(out)
 
 
-def _stats_to_combatant(name, stats, weapon, tags=frozenset()):
+def _stats_to_combatant(name, stats, weapon, tags=frozenset(), arsenal=()):
     return fc.Combatant(name, hp=stats['baseHP'], pow=stats['basePow'],
                         skl=stats['baseSkl'], spd=stats['baseSpd'], df=stats['baseDef'],
                         res=stats['baseRes'], lck=stats.get('baseLck', 0),
-                        con=stats['baseCon'], weapon=weapon, tags=tags)
+                        con=stats['baseCon'], weapon=weapon, tags=tags, arsenal=arsenal)
 
 
 def _class_caps(class_enum):
@@ -354,10 +355,37 @@ def player_combatant(campaign, uid, gained=0):
     return _stats_to_combatant(uid, _median_line(lines), weapon, tags)
 
 
-def player_careers(campaign, uid, gained=0):
-    """`player_combatant`, once per simulated career (`careers`)."""
+def player_careers(campaign, uid, gained=0, arsenal=None):
+    """`player_combatant`, once per simulated career (`careers`). `arsenal`, from
+    `kits.arsenals`, is what the unit carries (#510 step 8); it equips the first."""
     lines, weapon, tags = _player_lines(campaign, uid, gained)
-    return [_stats_to_combatant(uid, line, weapon, tags) for line in lines]
+    if arsenal is not None:
+        weapon = arsenal[0] if arsenal else None
+    return [_stats_to_combatant(uid, line, weapon, tags, tuple(arsenal or ()))
+            for line in lines]
+
+
+def _can_use(class_enum, char_index):
+    """ITEM_ enum -> can a unit of `class_enum` with `char_index`'s ranks wield it (`_usable`),
+    the rank gate `kits.arsenals` hands a pickup through. Ranks do not grow (ADR 0365)."""
+    return functools.partial(_can_use_item, class_enum=class_enum, char_index=char_index)
+
+
+@functools.lru_cache(maxsize=None)
+def _can_use_item(item, class_enum, char_index):
+    weapon = item_weapon(item)
+    return weapon is not None and bool(_usable((weapon,), class_enum, char_index, False))
+
+
+def _our_kits(campaign, uids, chapter, path):
+    """{uid: arsenal} for our arriving `uids` (join order) entering `chapter` on `path`. Our
+    units' ranks are their STAT_DONOR's (`inject.stats.cast_ranks`)."""
+    import kits
+    members = [kits.Member(uid, _can_use(inject.stats.cast_loaded_line(
+                   campaign, uid, _characters_text(), _classes_text())[0],
+                   inject.stats.STAT_DONOR[uid]), tuple(inject.cast.unit_items(campaign, uid)))
+               for uid in uids]
+    return kits.arsenals(kits.our_pickups(campaign), chapter, members, path)
 
 
 _enemy_class_enum = inject.class_ids.vanilla_class_enum
@@ -561,8 +589,8 @@ def enemy_careers(unit):
 
 def _usable(weapons, class_enum, char_index, autolevel):
     """The `weapons` a unit of `class_enum` on `char_index` can wield as it loads
-    (`unit_load.can_use_weapon`), in order. A weapon with no decomp item is kept: there is
-    nothing to judge it by."""
+    (`unit_load.can_use_weapon`), in order. A weapon with no decomp item (a monster attack
+    fc.W invents) is kept: there is nothing to judge it by."""
     import exp_curve                        # exp_curve imports this module
     try:
         attributes = exp_curve.class_attributes(class_enum)
@@ -571,9 +599,18 @@ def _usable(weapons, class_enum, char_index, autolevel):
     attributes = attributes | exp_curve.character_attributes(char_index)
     block = _character_block(char_index)
     return tuple(w for w in weapons
-                 if w.name not in ITEM_ENUM
-                 or unit_load.can_use_weapon(ITEM_ENUM[w.name], class_enum, block, attributes,
+                 if weapon_item(w) is None
+                 or unit_load.can_use_weapon(weapon_item(w), class_enum, block, attributes,
                                              autolevel))
+
+
+def weapon_item(weapon):
+    """The ITEM_ enum a Weapon stands for, or None for one fc.W invents: its ITEM_ENUM entry,
+    else the enum `item_weapon` read it from (it names those `sword-slim` for ITEM_SWORD_SLIM)."""
+    if weapon.name in ITEM_ENUM:
+        return ITEM_ENUM[weapon.name]
+    enum = 'ITEM_' + weapon.name.upper().replace('-', '_')
+    return enum if item_weapon(enum) == weapon else None
 
 
 def _character_block(char_index):
@@ -689,6 +726,43 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=
 # modeled weapon and is skipped -- with a warning, see unmodeled_enemies). One table serves both
 # directions and both sides, the cast's weapons and the twins' monster/exotic ones (#491).
 ITEM_TO_WEAPON = {item: key for key, item in ITEM_ENUM.items() if key in fc.W}
+
+_ITYPE_KIND = {'ITYPE_SWORD': 'sword', 'ITYPE_LANCE': 'lance', 'ITYPE_AXE': 'axe',
+               'ITYPE_BOW': 'bow', 'ITYPE_ANIMA': 'anima', 'ITYPE_LIGHT': 'light',
+               'ITYPE_DARK': 'dark'}
+
+
+@functools.lru_cache(maxsize=None)
+def item_weapon(item_enum):
+    """The fe_combat Weapon an ITEM_ enum attacks with, or None (a staff, a consumable, a key).
+    THE item -> weapon reader: its fc.W entry when fe_combat lists it, else read off its
+    data_items.c block, so a kit can hold a weapon fc.W never needed (#510 step 8: a shop's
+    Slim Sword, a village's Armorslayer). Brave, magic-sword and other effects stay unmodelled
+    either way (logged on #510)."""
+    if item_enum in ITEM_TO_WEAPON:
+        return fc.W[ITEM_TO_WEAPON[item_enum]]
+    try:
+        block = unit_load._item_block(item_enum)
+    except KeyError:
+        return None
+    kind = re.search(r'\.weaponType\s*=\s*(\w+)', block)
+    if 'IA_WEAPON' not in unit_load.attributes_in(block) or not kind \
+            or kind.group(1) not in _ITYPE_KIND:
+        return None
+
+    def num(field):
+        m = re.search(r'\.%s\s*=\s*(\w+)' % field, block)
+        return int(m.group(1), 0) if m else 0
+    rng = num('encodedRange')
+    eff = re.search(r'\.pEffectiveness\s*=\s*ItemEffectiveness_(\w+)', block)
+    lists = effectiveness_lists()
+    hits = lists.get(eff.group(1), set()) if eff else set()
+    effective = frozenset(tag for tag, name in EFFECTIVENESS_LISTS.items()
+                          if lists[name] and lists[name] <= hits)
+    name = {e: k for k, e in ITEM_ENUM.items()}.get(
+        item_enum, item_enum[len('ITEM_'):].lower().replace('_', '-'))
+    return fc.Weapon(name, num('might'), num('hit'), num('crit'), num('weight'),
+                     _ITYPE_KIND[kind.group(1)], (rng >> 4, rng & 0xF), effective)
 
 # parity_reference -> (decomp relpath, [UnitDefinition array names]) for its red force.
 # The single curation point: which vanilla arrays ARE a chapter's fightable enemies (named
@@ -982,8 +1056,9 @@ def _weapon_from_item_enums(item_enums):
 
 
 def _weapons_from_item_enums(item_enums):
-    """Every decomp item enum that maps to a real attacking weapon, in inventory order."""
-    return tuple(fc.W[ITEM_TO_WEAPON[it]] for it in item_enums if ITEM_TO_WEAPON.get(it))
+    """Every decomp item enum that is a real attacking weapon (`item_weapon`), in inventory
+    order."""
+    return tuple(w for w in map(item_weapon, item_enums) if w is not None)
 
 
 def vanilla_enemies(parity_ref, mode=None):
@@ -1019,11 +1094,14 @@ def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
         if weapon is None:
             continue
         ch = d.get('charIndex')
-        out.append((array_name, i, d, _enemy_from_enum(
+        unit = _enemy_from_enum(
             '%s#%d[%s]' % (array_name, i, ch), d['classIndex'], d['level'], weapon,
             vanilla_personal_line(ch) if with_personal else None,
             mode=mode, shifts=shifts, arsenal=_weapons_from_item_enums(d['items']),
-            **_vanilla_load_kwargs(d))))
+            **_vanilla_load_kwargs(d))
+        if unit.weapon is None:     # it carries weapons it cannot wield (Ch8's Steel-Blade
+            continue                # Fighters): it attacks no one, like the itemless above
+        out.append((array_name, i, d, unit))
     return out
 
 
@@ -1116,24 +1194,6 @@ def vanilla_boss_bar(parity_ref):
         if val and val != float('inf'):
             rows.append((n, val, used))
     return max(rows, key=lambda r: r[1]) if rows else (None, 0.0, True)
-
-
-def vanilla_projection(parity_ref, deploy_cap):
-    """Forward target for a PLANNED chapter (#123): its vanilla reference's own pressure,
-    printed as the bar the authored chapter must land within the parity band of. Both halves
-    count the FULL force: `proof` still reports how many units the fixed YARDSTICK cannot dent,
-    because that is worth knowing about a chapter you are about to write, but they are no longer
-    SKIPPED -- metric_rounds_to_kill floors them (#285). Skipping made a chapter with a wall
-    look cheaper to clear than one without. None if the reference isn't curated. Purely
-    informational: planned chapters never gate."""
-    van = vanilla_enemies(parity_ref)
-    if van is None:
-        return None
-    cap = max(1, deploy_cap)
-    threat = sum(fc.damage_per_round(e, YARDSTICK) for e in van) / cap
-    clearload = sum(metric_rounds_to_kill(e) for e in van) / cap
-    return {'threat': threat, 'clearload': clearload, 'n': len(van),
-            'proof': sum(1 for e in van if fc.damage(YARDSTICK, e) <= 0)}
 
 
 def _ally_lines(char_enum, class_enum, level):
@@ -1302,29 +1362,21 @@ def vanilla_recruits():
     return tuple(out)
 
 
-def _named_item_grants(stem):
-    """[(CHARACTER_*, ITEM_*)] a chapter's script hands to a NAMED character -- Eirika's Rapier
-    is `SVAL(EVT_SLOT_3, ITEM_SWORD_RAPIER)` + `GIVEITEMTO(CHARACTER_EIRIKA)` in the Prologue,
-    not on her joining load. Village gifts go to whoever visits (`CHAR_EVT_ACTIVE_UNIT`), so
-    they are left out, as our own cast leaves them out. A gift either of two units gets (Ch14's
-    Audhulma: Joshua if he lives, else Eirika) goes to the first, the arm a full party runs."""
-    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    return [(to[0], item) for item, to in _gift_records(script)
-            if to and all(t.startswith('CHARACTER_') for t in to)]
-
-
-def _vanilla_members(parity_ref):
-    """(char, class_enum, weapon) for every vanilla recruit that can deploy into `parity_ref`,
-    or None for a twin off VANILLA_CHAIN."""
+def _vanilla_members(parity_ref, path='guaranteed'):
+    """(char, class_enum, arsenal) for every vanilla recruit that can deploy into `parity_ref`,
+    or None for a twin off VANILLA_CHAIN. The arsenal is `kits.arsenals` on `path`: the
+    joining load plus what the chain hands the party (#510 step 8). The guaranteed path is the
+    joining load plus the gifts a scene hands a NAMED character, like Eirika's Prologue
+    Rapier, which is not on her joining load."""
+    import kits
     if parity_ref not in VANILLA_CHAIN:
         return None
     index = VANILLA_CHAIN.index(parity_ref)
-    granted = collections.defaultdict(list)
-    for ref in VANILLA_CHAIN[:index + 1]:
-        for char, item in _named_item_grants(PARITY_REFERENCE_STEM[ref]):
-            granted[char].append(item)
-    return [(r.char, r.class_enum, _weapon_from_item_enums(r.items + tuple(granted[r.char])))
-            for r in vanilla_recruits() if r.fields_from <= index]
+    recruits = [r for r in vanilla_recruits() if r.fields_from <= index]
+    members = [kits.Member(r.char, _can_use(r.class_enum, r.char), tuple(r.items), r.char)
+               for r in recruits]
+    kit = kits.arsenals(kits.twin_pickups(index), index, members, path)
+    return [(r.char, r.class_enum, kit[r.char]) for r in recruits]
 
 
 def vanilla_party(parity_ref, levels=None):
@@ -1336,20 +1388,22 @@ def vanilla_party(parity_ref, levels=None):
     if members is None:
         return None
     levels = levels or {}
-    return [_ally_combatant(char, class_enum, weapon, levels.get(char))
-            for char, class_enum, weapon in members]
+    return [_ally_combatant(char, class_enum, arsenal[0] if arsenal else None, levels.get(char))
+            for char, class_enum, arsenal in members]
 
 
-def vanilla_party_careers(parity_ref, levels=None):
-    """`vanilla_party`, once per simulated career: {name: [Combatant]}."""
-    members = _vanilla_members(parity_ref)
+def vanilla_party_careers(parity_ref, levels=None, path='guaranteed'):
+    """`vanilla_party`, once per simulated career: {name: [Combatant]}, each carrying its
+    arsenal on `path` (#510 step 8)."""
+    members = _vanilla_members(parity_ref, path)
     if members is None:
         return None
     levels = levels or {}
-    return {_ally_name(char): [_stats_to_combatant(_ally_name(char), line, weapon,
-                                                   class_tags(class_enum))
+    return {_ally_name(char): [_stats_to_combatant(_ally_name(char), line,
+                                                   arsenal[0] if arsenal else None,
+                                                   class_tags(class_enum), arsenal)
                                for line in _ally_lines(char, class_enum, levels.get(char))]
-            for char, class_enum, weapon in members}
+            for char, class_enum, arsenal in members}
 
 
 def accept_residual(verdict, matchup, residual, band=0.25):
@@ -1864,11 +1918,18 @@ def party_matchup(bodies, careers, deploy_cap=None, forced=(), engage=None):
             def summed(term):
                 return sum(term(d) if mask is None else numpy.where(mask, term(d), 0.0)
                            for d, mask in defends)
+            # A member strikes with whichever carried weapon kills fastest (#510 step 8).
             rate = sum(numpy.where(fielded[k], summed(
-                lambda d: fc.damage_per_round(party[names[k]], d) / d.hp), 0.0) for k in armed)
-            floor = sum(numpy.where(fielded[k], summed(
-                lambda d: 1.0 / metric_rounds_to_kill(d, party[names[k]])), 0.0) for k in armed)
-            rate = numpy.where(rate > 0, rate, floor) if armed else numpy.zeros(n)
+                lambda d: 1.0 / fc.best_rounds_to_kill(party[names[k]], d)), 0.0)
+                for k in armed)
+            if armed and not numpy.all(rate > 0):   # the floor only reads where nobody dents it
+                floor = sum(numpy.where(fielded[k], summed(
+                    lambda d: 1.0 / fc.best_rounds_to_kill(
+                        party[names[k]], d, rounds=lambda a, e: metric_rounds_to_kill(e, a))),
+                    0.0) for k in armed)
+                rate = numpy.where(rate > 0, rate, floor)
+            elif not armed:
+                rate = numpy.zeros(n)
             clear = float(numpy.where(rate > 0, 1.0 / numpy.where(rate > 0, rate, 1), inf).sum())
             per.append((threat, clear))
     slots = max(1, min(len(names), len(names) if deploy_cap is None else deploy_cap))
@@ -2122,20 +2183,25 @@ def arriving_careers(campaign, ch):
     each unit once per simulated career (`player_careers`)."""
     import exp_curve                        # exp_curve imports this module
     chap = chapter_schema.load(chapter_path(campaign, ch))
-    return _party_careers(campaign,
-                          exp_curve.entering(campaign, int(chap['chapter_number']))['party'])
+    n = int(chap['chapter_number'])
+    return _party_careers(campaign, exp_curve.entering(campaign, n)['party'], n)
 
 
-def _party_careers(campaign, party):
+def _party_careers(campaign, party, chapter, path='guaranteed'):
     """{uid: careers} for an arriving party, in the order the ROM loads it
-    (`inject.cast.load_order`): the order the AI breaks a target tie in (`_map_order`)."""
+    (`inject.cast.load_order`): the order the AI breaks a target tie in (`_map_order`). Each
+    unit carries its kit entering `chapter` on `path` (`_our_kits`, #510 step 8); the default
+    is the guaranteed path, as `vanilla_party_careers`'s is, so a report compares like with
+    like. The parity read passes the path it grades."""
     order = inject.cast.load_order(campaign)
     unknown = sorted(set(party) - set(order))
     if unknown:
         sys.exit('ERROR: %s arrive(s) in the party but the build loads no such unit '
                  '(inject.cast.load_order reads PORTRAIT_MAP)' % ', '.join(unknown))
-    return {uid: player_careers(campaign, uid, party[uid][1] - party[uid][0])
-            for uid in sorted(party, key=order.index)}
+    uids = sorted(party, key=order.index)
+    kit = _our_kits(campaign, uids, chapter, path)
+    return {uid: player_careers(campaign, uid, party[uid][1] - party[uid][0], kit[uid])
+            for uid in uids}
 
 
 def _metrics(field, profiles):
@@ -2206,21 +2272,16 @@ def _print_cast(title, roster, levels, line, profiles):
 
 
 def _report_unwritten(chap, campaign):
-    """The per-chapter report of a chapter not written yet: its vanilla twin's numbers, the
-    target it will be written to. Its draft roster is never read (`unwritten_projection`)."""
+    """The per-chapter report of a chapter not written yet: there is none. A chapter is read
+    as it is built (Nicolas, 2026-10-23, ADR 0363): neither its draft nor its twin is read
+    for it until it is written."""
     bar = '=' * 80
-    ref = chap.get('parity_reference') or '?'
     print(bar)
     print('CH%s "%s" -- NOT WRITTEN YET (status: planned)'
           % (chap.get('chapter_number'), chap.get('title', '?')))
     print(bar)
-    proj = unwritten_projection(chap, campaign)
-    if proj is None:
-        print('Until it is written, its difficulty is %s\'s, which is not curated yet.' % ref)
-        return
-    print('Until it is written, its difficulty is its vanilla twin %s\'s: threat %.1f, '
-          'clear-load %.1f%s.\nThat is the target the chapter is written to; its draft YAML is '
-          'not read.' % (ref, proj['threat'], proj['clear'], proj['note']))
+    print('No difficulty reading until it is written; its draft YAML and its twin (%s) are '
+          'not read.' % (chap.get('parity_reference') or '?'))
 
 
 def report(campaign, ch, mode=None):
@@ -2255,7 +2316,7 @@ def report(campaign, ch, mode=None):
                                                           '; '.join(labels)))
 
     ours_lv = {uid: lv for uid, (_j, lv) in arriving['party'].items()} if arriving else {}
-    ours_careers = (_party_careers(campaign, arriving['party']) if arriving
+    ours_careers = (_party_careers(campaign, arriving['party'], int(num)) if arriving
                     else {u.name: [u] for u in roster})
     if guests:
         ours_careers = guests
@@ -2307,6 +2368,7 @@ def report(campaign, ch, mode=None):
               % (num, ref))
 
     _print_pressure(_chapter_pressure(chap, campaign=campaign))
+    _print_kit_paths(chap, campaign, mode)
     print_role_findings(chap, chap.get('parity_reference'), campaign, mode)
     import strategy                         # strategy imports this module
     strategy.print_strategy(chap, campaign, mode)
@@ -2376,7 +2438,7 @@ def fixed_roster_careers(chap):
     return out
 
 
-def chapter_matchup(chap, campaign, mode=None):
+def chapter_matchup(chap, campaign, mode=None, path='happy'):
     """The headline parity ratio (#430 step 2b): (our force vs our arriving party) /
     (the twin's force vs the twin's arriving party), threat and clear-load.
 
@@ -2388,17 +2450,17 @@ def chapter_matchup(chap, campaign, mode=None):
         return None
     # Keyed on the chapter's CONTENT, not its id: a test or canary that doctors a chapter
     # dict must not be served the undoctored reading.
-    key = (campaign, mode, json.dumps(chap, sort_keys=True, default=str))
+    key = (campaign, mode, path, json.dumps(chap, sort_keys=True, default=str))
     if key not in _MATCHUPS:
-        _MATCHUPS[key] = _chapter_matchup(chap, campaign, mode)
+        _MATCHUPS[key] = _chapter_matchup(chap, campaign, mode, path)
     return _MATCHUPS[key]
 
 
 _MATCHUPS = {}
 
 
-def _chapter_matchup(chap, campaign, mode):
-    fields = arriving_fields(chap, campaign, mode)
+def _chapter_matchup(chap, campaign, mode, path):
+    fields = arriving_fields(chap, campaign, mode, path)
     if fields is None:
         return None
     import timeline                         # timeline imports this module
@@ -2427,11 +2489,13 @@ def _chapter_matchup(chap, campaign, mode):
             'lines_vanilla': {m: _median_combatant(fields['van_party'][m]) for m in van['team']}}
 
 
-def arriving_fields(chap, campaign, mode=None):
+def arriving_fields(chap, campaign, mode=None, path='happy'):
     """Both sides of a parity read: each force as [(Combatant, combat-weight table)] and, index
     for index, as the `danger_map.Body`s it came from ('our_bodies', 'van_bodies'), each
     ARRIVING party in join order, {unit: [Combatant]} over the careers, the deploy `cap` and
-    the twin's `van_forced` units. A reader that wants one team asks `fielded_careers`. None
+    the twin's `van_forced` units. Each party carries its kit on `path` ('happy' graded,
+    'guaranteed' printed beside it, ADR 0365). A reader that wants one team asks
+    `fielded_careers`. None
     for a twin off VANILLA_CHAIN or a party the exp model cannot price -- `chapter_matchup`'s
     fallback."""
     import exp_curve                        # exp_curve imports this module
@@ -2454,57 +2518,14 @@ def arriving_fields(chap, campaign, mode=None):
     van_bodies = danger_map.vanilla_bodies(ref, mode)
     our_force = [(b.unit, ai_target.combat_weight_table(b.ai)) for b in our_bodies]
     van_force = [(b.unit, ai_target.combat_weight_table(b.ai)) for b in van_bodies]
-    our_party = fixed_roster_careers(chap) or _party_careers(campaign, arriving['party'])
-    van_party = vanilla_party_careers(ref, arriving['vanilla'])
+    # Each party carries its kit on `path` (#510 step 8): the verdict reads 'happy'.
+    our_party = fixed_roster_careers(chap) or _party_careers(
+        campaign, arriving['party'], int(chap['chapter_number']), path)
+    van_party = vanilla_party_careers(ref, arriving['vanilla'], path)
     van_forced = vanilla_forced(ref)
     return {'our_force': our_force, 'van_force': van_force,
             'our_bodies': our_bodies, 'van_bodies': van_bodies,
             'our_party': our_party, 'van_party': van_party, 'cap': cap, 'van_forced': van_forced}
-
-
-def unwritten_projection(chap, campaign):
-    """An unwritten (`status: planned`) chapter's difficulty: its vanilla twin's, as
-    {'threat', 'clear', 'note'}, or None when the twin is not curated. A chapter that is not
-    written yet does not exist for the difficulty math (Nicolas, 2026-10-22): its draft YAML is
-    never read as a force. On VANILLA_CHAIN it is the twin's force against the twin's arriving
-    party (`planned_target`); off it, the fixed yardstick (`vanilla_projection`)."""
-    target = planned_target(chap, campaign)
-    if target is not None:
-        return {'threat': target['threat'], 'clear': target['clear'], 'note': ''}
-    proj = vanilla_projection(chap.get('parity_reference'),
-                              chapter_deploy_limit(chap, len(ROSTER)))
-    if proj is None:
-        return None
-    note = (' (%d yardstick-proof units, clear-load floored)' % proj['proof']
-            if proj['proof'] else '')
-    return {'threat': proj['threat'], 'clear': proj['clearload'],
-            'note': ' [fixed YARDSTICK: off VANILLA_CHAIN]' + note}
-
-
-def planned_target(chap, campaign):
-    """The parity target a `status: planned` chapter must hit: its twin's force against the
-    twin's arriving party, as {'threat', 'clear'}. None off VANILLA_CHAIN or where the exp
-    model cannot place the chapter."""
-    import exp_curve                        # exp_curve imports this module
-    ref = chap.get('parity_reference')
-    if ref not in VANILLA_CHAIN:
-        return None
-    try:
-        levels = exp_curve.entering(campaign, int(chap['chapter_number']), ref)['vanilla']
-    except ValueError:
-        return None
-    if levels is None:
-        return None
-    import danger_map                       # danger_map imports this module
-    import timeline                         # timeline imports this module
-    bodies = danger_map.vanilla_bodies(ref)
-    force = [(b.unit, ai_target.combat_weight_table(b.ai)) for b in bodies]
-    party, cap, forced = (vanilla_party_careers(ref, levels),
-                          chapter_deploy_limit(chap, len(ROSTER)), vanilla_forced(ref))
-    # Read as a written chapter's twin is read (#510 step 7), so the target and the verdict
-    # it becomes measure the same thing.
-    return party_matchup(force, party, cap, forced, engage=timeline.engage(
-        timeline.twin_board(ref, bodies), [u for u, _t in force]))
 
 
 def _warn_dropped(dropped, indent='  '):
@@ -2546,6 +2567,24 @@ def _engagement(side):
              'pocket pulled from %s' % (g.tile,) if g.tile else 'pocket')
     return '%s, %d bodies: %s' % (where, len(g.members), ', '.join(
         '%s x%d' % (n, c) if c > 1 else n for n, c in sorted(names.items())))
+
+
+def _print_kit_paths(chap, campaign, mode=None):
+    """The verdict reads the HAPPY path, every pickup taken; this prints the GUARANTEED path
+    beside it (ADR 0365). A wide gap is a chapter whose difficulty hinges on optional pickups.
+    Only this report reads the guaranteed path: the curve and the verdict diff never do."""
+    happy = chapter_matchup(chap, campaign, mode)
+    sure = chapter_matchup(chap, campaign, mode, path='guaranteed')
+    if happy is None or sure is None:
+        return
+    print('  kits: happy path (graded) threat x%.2f · clear-load x%.2f;  guaranteed only '
+          'threat x%.2f · clear-load x%.2f'
+          % (happy['threat_ratio'], happy['load_ratio'], sure['threat_ratio'],
+             sure['load_ratio']))
+    import kits
+    if any(p.projected for p in kits.our_pickups(campaign)):
+        print('        (our world-map stock projected from the twin\'s until campaign.yaml '
+              'stocks a town)')
 
 
 def _print_pressure(p):
@@ -3155,8 +3194,15 @@ def _item_id_to_enum():
     return _ITEM_IDS
 
 
+def shop_stock(list_sym):
+    """The ITEM_x enums an in-map shop's ShopList_ stocks (src/events_shoplist.c, HEAD): the
+    one reader of a shop's stock, for the economy, the kits and the wiki."""
+    return _shoplist_items(inject.decomp.vanilla_decomp_text('src/events_shoplist.c'), list_sym)
+
+
 def _shoplist_items(shoplist_text, list_sym):
-    """The ITEM_x enums a ShopList_ array stocks (ITEM_NONE terminator dropped)."""
+    """The ITEM_x enums a ShopList_ (or world-map ItemList_) array stocks (ITEM_NONE
+    terminator dropped)."""
     m = re.search(re.escape(list_sym) + r'\[\]\s*=\s*\{(.*?)\}', shoplist_text, re.S)
     if not m:
         return []
@@ -3310,12 +3356,19 @@ def _gift_gold(eventscript_text):
 
 @functools.lru_cache(maxsize=None)
 def _event_group_stems():
-    """{ChapterEventGroup symbol: event-file stem}, every eventinfo the decomp includes."""
+    """{ChapterEventGroup symbol: event-file stem}, every eventinfo the decomp includes. One
+    `git grep` at HEAD, not a `git show` of each of the ~60 files: this sits on the curve's
+    path (the twin's interludes, #510 step 8)."""
+    import subprocess
     info = inject.decomp.vanilla_decomp_text('src/events_info.c')
+    included = set(re.findall(r'#include "events/(\w+)-eventinfo\.h"', info))
+    hits = subprocess.check_output(
+        ['git', '-C', inject.decomp.SUBMODULE, 'grep', '-F', 'ChapterEventGroup', 'HEAD',
+         '--', 'src/events'], encoding='utf-8', env=inject.decomp.git_env())
     out = {}
-    for stem in re.findall(r'#include "events/(\w+)-eventinfo\.h"', info):
-        text = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
-        for group in re.findall(r'ChapterEventGroup\s+(\w+)', text):
+    for stem, group in re.findall(r'^HEAD:src/events/(\w+)-eventinfo\.h:.*?ChapterEventGroup\s+(\w+)',
+                                  hits, re.M):
+        if stem in included:
             out[group] = stem
     return out
 
@@ -3372,17 +3425,33 @@ def twin_event_payload(stem):
     """What a vanilla chapter's events hand out, by vehicle, read once for every consumer
     (vanilla_economy here, gen_wiki's twin payload): chest items and chest gold, scene gifts
     and scene gold, what the interlude after it gives (twin_interlude_scripts), and its shops
-    of every kind the eventinfo macros name (Armory, Vendor, SecretShop)."""
+    of every kind the eventinfo macros name (Armory, Vendor, SecretShop). `gifts` splits into
+    `village_gifts`, what a Village or House script hands out, and `scene_gifts`, every other
+    script's (#510 step 8), each with its recipients."""
     info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
     gifts = _gift_records(script)
+    # Split by the script that gives it, never by matching items (#510 step 8): a Village or
+    # House script's gives are the visit's; every other block's are a scene's.
+    visits, scenes = [], script
+    for name in re.findall(r'(?:Village|House)\(\s*[^,]+,\s*(\w+)', info):
+        marker = 'CONST_DATA EventListScr %s[]' % name
+        if marker in scenes:
+            at = scenes.index(marker)
+            s, e = inject.decomp._find_brace_block(scenes, marker, stem)
+            end = scenes.index(';', e) + 1 if ';' in scenes[e:e + 3] else e
+            visits.append(scenes[at:end])
+            scenes = scenes[:at] + scenes[end:]
+    village = _gift_records('\n'.join(visits))
+    scene = _gift_records(scenes)
     out = {'chests': re.findall(r'Chest\((ITEM_\w+)', info),
            'chest_gold': [int(g) for g in re.findall(r'ChestMoney\(\s*(\d+)', info)],
            'gifts': [e for e, _ in gifts], 'gift_to': [to for _, to in gifts],
            'gift_gold': _gift_gold(script),
+           'village_gifts': [e for e, _ in village], 'village_gift_to': [to for _, to in village],
+           'scene_gifts': [e for e, _ in scene], 'scene_gift_to': [to for _, to in scene],
            'interlude_gifts': [], 'interlude_gift_to': [], 'interlude_gold': [],
-           'shops': [(sym, _shoplist_items(shoptext, sym)) for sym in
+           'shops': [(sym, shop_stock(sym)) for sym in
                      re.findall(r'(?:Armory|Vendor|SecretShop)\(\s*(\w+)', info)],
            'n_villages': len(re.findall(r'Village\(', info)),
            'n_houses': len(re.findall(r'House\(', info))}
@@ -3430,8 +3499,11 @@ def chapter_economy(chap):
     """
     gold = 0
     gifts, chests, drops = [], [], []
+    # (vehicle, the YAML entry) per item, `fe_base` kept: what the kits read (#510 step 8). A
+    # visit (village, boat talk) is `village`; what a scene hands out is `scene`.
+    pickups = []
 
-    def take(rewards):
+    def take(rewards, vehicle):
         """Fold one reward list into gold + gifts. Same shape wherever it is carried."""
         nonlocal gold
         for r in rewards or []:
@@ -3439,18 +3511,19 @@ def chapter_economy(chap):
                 gold += int(r.get('amount') or 0)
             elif r.get('id'):
                 gifts.append(r['id'])
+                pickups.append((vehicle, r))
 
     for v in chap.get('villages') or []:
-        take(v.get('visit_reward'))
+        take(v.get('visit_reward'), 'village')
     for boat in chap.get('rescue_boats') or []:
-        take((boat.get('talk') or {}).get('reward'))
+        take((boat.get('talk') or {}).get('reward'), 'village')
     # A green ally's gift for surviving (ch02's chwinga), handed over at the ending (#495).
     for ally in (chap.get('deployment') or {}).get('green_allies') or []:
         if ally.get('gift'):
-            gifts.append(ally['gift'])
+            take([{'id': ally['gift']}], 'scene')
     bonus = (chap.get('economy') or {}).get('save_all_bonus')
     if bonus:
-        gifts.append(bonus)
+        take([{'id': bonus}], 'scene')
     # Gold a scene pays (#495): vanilla Ch1's 5,000 after the map, Ch8's 10,000 in its ending.
     for g in (chap.get('economy') or {}).get('scene_gold') or []:
         gold += int(g['amount'])
@@ -3458,14 +3531,17 @@ def chapter_economy(chap):
         for it in c.get('contents') or []:
             if it.get('id'):
                 chests.append(it['id'])
+                pickups.append(('chest', it))
     for ed in chapter_roster_entries(chap):
         if ed.get('item_drop'):
             drops.append(ed['item_drop'])
+            pickups.append(('drop', {'id': ed['item_drop']}))
     # The in-map shops' stock lists, the same thing vanilla_economy reports for the twin. Not
     # `available_shops`: that is a world-map TOWN label, and reading it made ch02 look stocked
     # beside vanilla Ch2's Armory while ch02 had no shop at all.
     shops = [sym for _macro, sym, _x, _y in inject.villages.chapter_shops(chap)]
-    return {'gold': gold, 'gifts': gifts, 'chests': chests, 'drops': drops, 'shops': shops}
+    return {'gold': gold, 'gifts': gifts, 'chests': chests, 'drops': drops, 'shops': shops,
+            'pickups': pickups}
 
 
 def _print_economy(chap):
@@ -3854,9 +3930,8 @@ def curve_report(campaign, band=0.25, mode=None, only=None):
           % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
              if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
     if mode:
-        print('  NB planned-chapter targets below, and the role findings of a twin off'
-              '\n     VANILLA_CHAIN (the yardstick fallback), are graded on the AUTHORED table,'
-              '\n     not on %s.'
+        print('  NB the role findings of a twin off VANILLA_CHAIN (the yardstick fallback)'
+              '\n     are graded on the AUTHORED table, not on %s.'
               '\n     mirror%% is INVARIANT: a mode shifts stats, never a unit\'s class or level,'
               '\n     and the Hard-only waves are folded into both sides unconditionally.'
               % mode.upper())
@@ -3879,18 +3954,9 @@ def curve_report(campaign, band=0.25, mode=None, only=None):
         # (not added to `rows`); a planned chapter that is also balance_locked is a config error
         # caught by check.py's chapter-status lint.
         if chap.get('status') == 'planned':
-            # our side is an ungrounded seed, but the VANILLA side of the comparison is
-            # computable now (#123): print the reference's own pressure as the forward
-            # target the authored chapter must hit within the band. Never gates.
-            ref = chap.get('parity_reference', '?') or '?'
-            proj = unwritten_projection(chap, campaign)
-            if proj is None:
-                print('  %-22s %-13s   -- planned (seed; reference not curated yet) --'
-                      % (label[:22], ref[:13]))
-            else:
-                print('  %-22s %-13s %4.1f (target)    %4.1f (target)      %-7s planned%s'
-                      % (label[:22], ref[:13], proj['threat'], proj['clear'], '--',
-                         proj['note']))
+            # A chapter is read as it is built (ADR 0363): nothing, its twin included.
+            print('  %-22s %-13s   -- planned -- not read until it is written --'
+                  % (label[:22], (chap.get('parity_reference', '?') or '?')[:13]))
             continue
         p = _chapter_pressure(chap, band, mode=mode, campaign=campaign)
         ot, ol = p['ours']

@@ -89,7 +89,7 @@ strategy: |
 strategy_claims:
   - kind: unmodelled
     topic: steal
-    step: 8
+    step: out
     cite: "If you really want the Energy Ring, bring Trex along so that he can steal it from one of the three mages"
   - kind: unmodelled
     topic: range

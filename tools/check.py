@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0363, edited in place (Nicolas, 2026-10-23): a planned chapter gets no
+    # difficulty reading, so there is no projected target, its twin's or the yardstick's
+    r'unwritten_projection', r'planned_target', r'vanilla_projection',
     # retired by #510 step 7 (ADR 0364): threat is the heaviest engagement, not every enemy
     # at once on turn 1
     r'all-turn-1 bar', r'as if every enemy attacked on turn 1',
