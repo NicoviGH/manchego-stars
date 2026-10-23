@@ -198,11 +198,12 @@ def asset_table_names(text):
     return re.findall(r'^\s*\.word\s+(\w+)', text, re.M)
 
 
-# Bounded, not unbounded: today's readers touch ~9-22 files (~2-5 MB), but #365 proposes a
-# ROMChapterData census, and a census is exactly the caller that walks a big slice of a
-# 6,361-file decomp. 64 entries covers every real working set with room to spare and
-# caps what a future sweep can pin in memory.
-@functools.lru_cache(maxsize=64)
+# Bounded, not unbounded: a census (#365) is exactly the caller that walks a big slice of a
+# 6,361-file decomp, and the cap is what a sweep can pin in memory. Size it to the largest
+# real working set with room to spare: `difficulty.curve_report` reads 94 files since #510
+# step 8 (every twin chapter's event and interlude scripts for the kits, plus the world map),
+# and a set larger than the cap thrashes (test_decomp_read_cache fails).
+@functools.lru_cache(maxsize=160)
 def vanilla_decomp_text(relpath):
     """Committed (HEAD) text of a decomp source file -- immune to the working-tree patching
     the build applies to PATCHED_DECOMP_FILES (e.g. data_characters.c portrait slots get

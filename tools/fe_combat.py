@@ -306,6 +306,19 @@ def rounds_to_kill(atk, dfn, terrain_avoid=0):
     return float('inf') if dpr <= 0 else dfn.hp / dpr
 
 
+@functools.lru_cache(maxsize=None)
+def undominated(weapons):
+    """`weapons` less every one another of the same kind beats on every field a round reads
+    (Mt, Hit, Crit and effectiveness no lower, Wt no higher): it can never kill in fewer
+    rounds, so `best_rounds_to_kill` never scores it. Order kept."""
+    def beats(a, b):
+        return (a.kind == b.kind and a.mt >= b.mt and a.hit >= b.hit and a.crit >= b.crit
+                and a.wt <= b.wt and a.effective >= b.effective)
+    return tuple(w for i, w in enumerate(weapons)
+                 if not any(beats(v, w) and (not beats(w, v) or j < i)
+                            for j, v in enumerate(weapons) if j != i))
+
+
 def best_rounds_to_kill(atk, dfn, terrain_avoid=0, rounds=None):
     """The fewest rounds any weapon atk carries (`arms`) needs to drop dfn: a careful player
     swaps to the right weapon per enemy (#510 step 8). `rounds(atk, dfn)` scores one weapon
@@ -315,7 +328,8 @@ def best_rounds_to_kill(atk, dfn, terrain_avoid=0, rounds=None):
         def rounds(a, d):
             return rounds_to_kill(a, d, terrain_avoid)
     best = None
-    for a in arms(atk) or (atk,):
+    weapons = undominated(atk.arsenal) if atk.arsenal else ()
+    for a in tuple(replace(atk, weapon=w) for w in weapons) or (atk,):
         r = rounds(a, dfn)
         best = r if best is None else minimum(best, r)
     return best

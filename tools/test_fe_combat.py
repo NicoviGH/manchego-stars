@@ -356,12 +356,27 @@ class BestRounds(unittest.TestCase):
         self.assertEqual(fc.best_rounds_to_kill(a, self.knight()),
                          fc.rounds_to_kill(a, self.knight()))
 
+    def test_a_dominated_weapon_is_never_scored(self):
+        # The Rapier is at least the Iron Sword on every field the round reads.
+        kept = fc.undominated((fc.W['iron-sword'], fc.W['rapier'], fc.W['steel-sword']))
+        self.assertEqual(('rapier', 'steel-sword'), tuple(w.name for w in kept))
+
+    def test_of_two_equal_weapons_the_first_is_kept(self):
+        twin = fc.replace(fc.W['iron-sword'], name='iron-sword-2')
+        self.assertEqual(('iron-sword',), tuple(
+            w.name for w in fc.undominated((fc.W['iron-sword'], twin))))
+
+    def test_a_different_kind_is_never_dominated(self):
+        kept = fc.undominated((fc.W['iron-sword'], fc.W['iron-lance']))
+        self.assertEqual(2, len(kept))
+
     def test_rounds_function_applies_per_weapon(self):
         """The metric floor is applied per weapon, then the best taken."""
         calls = []
-        fc.best_rounds_to_kill(self.attacker(), self.knight(),
+        steel = fc.replace(self.attacker(), arsenal=(fc.W['rapier'], fc.W['steel-sword']))
+        fc.best_rounds_to_kill(steel, self.knight(),
                                rounds=lambda atk, dfn: calls.append(atk.weapon.name) or 1.0)
-        self.assertEqual(['iron-sword', 'rapier'], calls)
+        self.assertEqual(['rapier', 'steel-sword'], calls)
 
 
 if __name__ == '__main__':

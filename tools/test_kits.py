@@ -56,6 +56,12 @@ class TwinPickups(unittest.TestCase):
         self.assertNotIn(kits.Pickup('ITEM_SWORD_STEEL', 'worldmap_shop', 4), self.twin)
 
 
+class TwinReadsOnlyWhatItReaches(unittest.TestCase):
+    def test_through_stops_the_chain(self):
+        self.assertFalse([p for p in kits.twin_pickups(7) if p.chapter > 7])
+        self.assertIn(kits.Pickup('ITEM_SWORD_STEEL', 'worldmap_shop', 5), kits.twin_pickups(7))
+
+
 class OurWorldMap(unittest.TestCase):
     def test_projected_until_stocked(self):
         ours = [p for p in kits.our_pickups(CAMPAIGN) if p.vehicle == 'worldmap_shop']
@@ -102,6 +108,13 @@ class Arsenals(unittest.TestCase):
         picks = [self.P('ITEM_AXE_HANDAXE', 'village', 2)]
         party = [member('a', {'axe'}, ['ITEM_AXE_IRON'])]
         self.assertEqual(['iron-axe'], self.names(kits.arsenals(picks, 2, party, 'happy'), 'a'))
+
+    def test_a_scene_gift_is_in_hand_in_its_own_chapter(self):
+        """The Prologue's opening scene hands Eirika the Rapier; she fights the Prologue with it."""
+        picks = [self.P('ITEM_SWORD_RAPIER', 'scene', 0, ('CHARACTER_EIRIKA',))]
+        party = [member('eirika', {'sword'}, ['ITEM_VULNERARY'], 'CHARACTER_EIRIKA')]
+        self.assertEqual(['rapier'], self.names(kits.arsenals(picks, 0, party, 'guaranteed'),
+                                                'eirika'))
 
     def test_unwieldable_goes_nowhere(self):
         picks = [self.P('ITEM_LANCE_JAVELIN', 'chest', 1)]

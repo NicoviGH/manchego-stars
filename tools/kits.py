@@ -13,6 +13,7 @@ Not here, by decision (ADR 0365): healing, durability, the arena, and stat boost
 are not a vehicle at all: FE8 lets a thief take only plain items (`IsItemStealable`,
 bmitem.c), so a steal never changes what a unit fights with.
 """
+import functools
 import re
 from dataclasses import dataclass
 
@@ -55,7 +56,8 @@ def is_weapon(p):
 def arsenals(pickups, chapter, party, path):
     """{member name: (Weapon, ...)} for `party` ([Member], join order) entering `chapter` on
     `path` ('happy' or 'guaranteed'). A pickup is in hand from the chapter AFTER it is handed
-    out. A named gift goes to its recipient or to nobody; a shop item to every member who can
+    out, except a scene gift, which is in hand in its own chapter (the Prologue's opening hands
+    Eirika the Rapier she fights it with). A named gift goes to its recipient or to nobody; a shop item to every member who can
     wield it and lacks it; any other weapon to the first such member. The join kit stays
     first, in its order (its first weapon is the one equipped); past SLOTS, the highest-Mt of
     the rest are kept."""
@@ -64,7 +66,8 @@ def arsenals(pickups, chapter, party, path):
     held = {m.name: [w for w in map(difficulty.item_weapon, m.items) if w is not None]
             for m in party}
     for p in pickups:
-        if p.chapter >= chapter or (path == 'guaranteed' and p.vehicle not in GUARANTEED):
+        later = p.chapter > chapter or (p.chapter == chapter and p.vehicle != 'scene')
+        if later or (path == 'guaranteed' and p.vehicle not in GUARANTEED):
             continue
         weapon = difficulty.item_weapon(p.item)
         if weapon is None:
@@ -120,7 +123,7 @@ def _our_worldmap_pickups(campaign):
     nodes = _our_world_map(campaign)
     if not any(node.get('stock') for node in nodes):
         return [Pickup(p.item, p.vehicle, p.chapter, projected=True)
-                for p in _twin_worldmap_pickups()]
+                for p in twin_pickups() if p.vehicle == 'worldmap_shop']
     out = []
     for node in nodes:
         after = node.get('unlocks_after')
@@ -147,10 +150,14 @@ def _twin_worldmap_pickups():
     return out
 
 
-def twin_pickups():
-    """Every pickup the twin's chain hands out, by the same vehicles as ours."""
+@functools.lru_cache(maxsize=None)
+def twin_pickups(through=None):
+    """Every pickup the twin's chain hands out up to chain position `through` (all of it when
+    None), by the same vehicles as ours. A chapter's kit needs nothing past itself, so a read
+    never opens a twin chapter it has not reached. Read at HEAD, so cached; a shared tuple."""
+    chain = difficulty.VANILLA_CHAIN[:None if through is None else through + 1]
     out = []
-    for n, ref in enumerate(difficulty.VANILLA_CHAIN):
+    for n, ref in enumerate(chain):
         t = difficulty.twin_event_payload(difficulty.PARITY_REFERENCE_STEM[ref])
         village = list(t['village_gifts'])
         for item, to in zip(t['gifts'], t['gift_to']):
@@ -164,7 +171,7 @@ def twin_pickups():
         out += [Pickup(it, 'chest', n) for it in t['chests']]
         out += [Pickup(it, 'drop', n) for it, _gold in difficulty.vanilla_drops(ref) or ()]
         out += [Pickup(it, 'shop', n) for _sym, items in t['shops'] for it in items]
-    return out + _twin_worldmap_pickups()
+    return tuple(out + [p for p in _twin_worldmap_pickups() if p.chapter < len(chain)])
 
 
 def _named(to):

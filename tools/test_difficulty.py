@@ -39,6 +39,95 @@ def combatant(name='u', hp=20, pow_=0, skl=8, spd=0, dfc=0, res=0, lck=0, con=20
                         lck=lck, con=con, weapon=fc.W[weapon], tags=tags)
 
 
+class EventGroupStems(unittest.TestCase):
+    """One `git grep`, not one `git show` per eventinfo file (#510 step 8 put it on the
+    curve's path through the twin's interludes)."""
+
+    def per_file(self):
+        import re
+        info = df.inject.decomp.vanilla_decomp_text('src/events_info.c')
+        out = {}
+        for stem in re.findall(r'#include "events/(\w+)-eventinfo\.h"', info):
+            text = df.inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
+            for group in re.findall(r'ChapterEventGroup\s+(\w+)', text):
+                out[group] = stem
+        return out
+
+    def test_same_map_as_reading_every_file(self):
+        df._event_group_stems.cache_clear()
+        self.assertEqual(self.per_file(), df._event_group_stems())
+
+    def test_one_spawn(self):
+        import subprocess
+        df._event_group_stems.cache_clear()
+        df.inject.decomp.vanilla_decomp_text('src/events_info.c')
+        real = subprocess.check_output
+        with mock.patch.object(subprocess, 'check_output', side_effect=real) as spawn:
+            df._event_group_stems()
+        self.assertLessEqual(spawn.call_count, 1)
+
+
+class UnwieldableRedsAreUnarmed(unittest.TestCase):
+    def test_a_red_that_wields_nothing_it_carries_is_not_in_the_force(self):
+        # FE8 Ch8 loads two Fighters holding only a Steel Blade (a sword): they attack no one.
+        rows = df.vanilla_loaded_units('FE8 Ch8')
+        self.assertFalse([r for r in rows if r[3].weapon is None])
+
+
+class KitPaths(unittest.TestCase):
+    """#510 step 8: the verdict reads the happy path; the guaranteed path is printed only."""
+    CAMPAIGN = 'rime-of-the-frostmaiden'
+
+    def chap(self, ch):
+        return df.load_field(self.CAMPAIGN, ch)[0]
+
+    def test_happy_is_headline(self):
+        chap = self.chap('ch04')
+        a, b = df.chapter_matchup(chap, self.CAMPAIGN), df.chapter_matchup(
+            chap, self.CAMPAIGN, path='happy')
+        self.assertEqual((a['threat_ratio'], a['load_ratio']), (b['threat_ratio'], b['load_ratio']))
+
+    def test_the_paths_differ_where_pickups_arm_someone(self):
+        happy = df.arriving_fields(self.chap('ch06'), self.CAMPAIGN, path='happy')
+        sure = df.arriving_fields(self.chap('ch06'), self.CAMPAIGN, path='guaranteed')
+        width = lambda f: sum(len(fc.arms(c[0])) for c in f['van_party'].values())  # noqa: E731
+        self.assertGreater(width(happy), width(sure))
+
+    def test_eirika_fights_the_prologue_with_the_rapier(self):
+        party = df.vanilla_party_careers('FE8 Prologue', path='guaranteed')
+        self.assertEqual('rapier', party['Eirika'][0].weapon.name)
+
+    def test_a_kit_holds_only_what_the_class_can_wield(self):
+        # A weapon fc.W never listed (the shop's Slim Sword) must still pass the rank gate.
+        f = df.arriving_fields(self.chap('ch03'), self.CAMPAIGN, 'normal')
+        self.assertNotIn('sword-slim', [w.name for w in f['our_party']['marty'][0].arsenal])
+        self.assertNotIn('sword-slim', [w.name for w in f['van_party']['Neimi'][0].arsenal])
+        self.assertIn('sword-slim', [w.name for w in f['van_party']['Franz'][0].arsenal])
+
+    def test_the_chapter_report_prints_both_paths(self):
+        import contextlib
+        import io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            df._print_kit_paths(self.chap('ch06'), self.CAMPAIGN)
+        out = buf.getvalue()
+        self.assertIn('happy path (graded)', out)
+        self.assertIn('guaranteed only', out)
+
+    def test_the_curve_never_reads_the_guaranteed_path(self):
+        import kits
+        seen = set()
+        real = kits.arsenals
+
+        def spy(pickups, chapter, party, path):
+            seen.add(path)
+            return real(pickups, chapter, party, path)
+        df._MATCHUPS.clear()
+        with mock.patch.object(kits, 'arsenals', spy):
+            df.chapter_matchup(self.chap('ch03'), self.CAMPAIGN, mode='normal')
+        self.assertEqual({'happy'}, seen)
+
+
 class ItemWeapon(unittest.TestCase):
     """#510 step 8: one item -> weapon reader. A kit can hold weapons fc.W never listed
     (shop Slim Swords, a village Armorslayer); dropping them would undercount one side."""
@@ -1847,8 +1936,8 @@ class ItemEconomy(unittest.TestCase):
         gifts = df.twin_event_payload('ch15a')['gifts']
         self.assertIn('ITEM_DARK_GLEIPNIR', gifts)
         self.assertNotIn('ITEM_SWORD_AUDHULMA', gifts)
-        self.assertNotIn(('CHARACTER_EPHRAIM', 'ITEM_SWORD_AUDHULMA'),
-                         df._named_item_grants('ch15a'))
+        named = df.twin_event_payload('ch15a')['gift_to']
+        self.assertFalse([to for to in named if 'CHARACTER_EPHRAIM' in to])
 
     # Shared scripts that take slot 3 as something other than loot; anything else a twin sets
     # slot 3 for has to reach a give the reader counts.
