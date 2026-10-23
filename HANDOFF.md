@@ -9,14 +9,15 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-22 (Claude, #525 and #527 merged; #510 step 7 DONE, step 8 next). **The parity model is being
+Refreshed 2026-10-23 (Claude, #528 and #529 merged; #510 step 8 DONE, step 9 or 10 next). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units (unflagged units grown, no promoted bonus, no realistic levelling): it read
 Dorbulgruf at 63 HP where the ROM loads 37. Every lock was measured on that model, so **all of
 ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never widen an
 `accepted_residual` to get green: design or model fidelity is the fix.
-This session merged #525 (one reader per force, plus the decomp-reader fold and ADR 0363) and
-#527 (step 7, ADR 0364). Nothing is open from it. Step 7's design and proof are on #510.
+This session merged #528 (the old "traps" list now lives in the code each trap is met in, not
+here) and #529 (step 8, ADR 0365; ADR 0363 and 0087 edited in place). Nothing is open from it.
+Step 8's design, plan and review notes are on #510.
 
 ## In flight
 
@@ -68,18 +69,27 @@ This session merged #525 (one reader per force, plus the decomp-reader fold and 
    (FE8 walks a pursuer at its chosen target), so that limit goes to step 9 (Nicolas: accept it,
    2026-10-22). **No verdict moved against main**; ch04 Difficult threat x1.46 -> x2.19 (already
    OFF), logged on #510.
-   - **Next: step 8** (kits and sustain: healing, shop buys, gifts, durability). Brainstorm the
-     design WITH Nicolas first and post it as a comment on #510 (designs never go in a doc file,
-     2026-10-22). `make difficulty CH=chNN` lists each side's `unmodelled, step 8` claims: that
-     is what it inherits. Then step 9 only if verdicts still move.
-   - Verdicts OFF now: ch01 Tutorial/Normal; ch02, ch03, ch04 on Difficult (ch01 Difficult
-     reads OK at its ceiling's edge). All of it waits for step 10; nothing is widened.
+   **Step 8 is DONE** (#529, ADR 0365): each party carries its KIT (`tools/kits.py`): joining
+   load plus every pickup the chain hands out before the chapter, the same rules on both sides,
+   world-map shops included (ours projected from the twin's until `campaign.yaml` stocks a town).
+   Each unit strikes each enemy with its fastest-killing weapon. The verdict reads the HAPPY
+   path; `make difficulty CH=chNN` prints the guaranteed path beside it. Healing, durability, the
+   arena and stat boosters are OUT by decision. `difficulty.item_weapon` is the one item ->
+   weapon reader (fc.W, else data_items.c). It moved 5 cells to OFF, almost all from vanilla's
+   second joining weapons (Seth's Silver Lance: ch01 Normal x1.41 -> x1.56); pickups move
+   <=0.04. Nothing widened.
+   - **Next: ask Nicolas: step 9 (the #456 simulator) or straight to step 10?** #510's list says
+     step 9 only if verdicts still move; step 8 moved five. His call, not ours.
+   - Verdicts OFF now: ch01 all three modes; ch02 Difficult; ch03 and ch04 all three modes.
+     ch00 and ch05-ch07 read OK. All of it waits for step 10; nothing is widened.
    - **ADR 0363 (Nicolas, edited in place 2026-10-23): an unwritten (`status: planned`)
      chapter gets no difficulty reading at all** (PR #529): neither its draft YAML nor its twin
      is read for it until it is written. Don't build or test around planned rosters.
    - `party_matchup` reads each unit as ONE Combatant whose stats are numpy arrays over the
      careers; `fe_combat`/`ai_target` take ints or arrays (`max0`/`clamp`/`where`). Keep new
-     combat math array-safe, or `test_ai_target.OverCareers` fails. The Normal curve is ~7s.
+     combat math array-safe, or `test_ai_target.OverCareers` fails. The full curve is ~6.5-7s
+     on a quiet Mac; under load (2026-10-23: load average 6-9) it read 11s for BOTH main and the
+     branch. Time base and branch back to back, never against an old number.
    - **One force list per side** (#525): `difficulty.chapter_force` (ours) and
      `difficulty.vanilla_loaded_units` (the twin's) are the only walks; `arriving_fields` returns
      `our_bodies`/`van_bodies` (`danger_map.Body`, carrying `unit` and `ai`) index-aligned with
@@ -111,48 +121,6 @@ This session merged #525 (one reader per force, plus the decomp-reader fold and 
 - **#24 -- ch04 owes the terrain-bonus lesson** (vanilla Ch4's "stay in the woods"), a dialogue pass.
 - **#335** -- the AI audit is closed (ADR 0265: a donor carries its AI); its "factor AI into the
   difficulty math" stretch is ADR 0364.
-
-## Traps a fresh session walks into
-
-- **A tie in FE8's AI order goes to the unit that LOADED first** (`timeline.ai_priority` key,
-  ADR 0364): list order is not slot order. Breaking it on list position read ch02 OFF at x0.74
-  against a twin with the same map and enemies. When a ratio moves on a mirrored chapter, diff
-  the two sides body by body before believing it.
-- **`ch04waves` holds every unit on BOTH sides at full HP every frame** and fails if a red
-  dies: 0 Pow still counters through weapon Mt. A proof scenario where something dies is not
-  evidence of a model that kills nothing.
-- **A comment-only YAML edit leaves the ROM "up to date"** but newer than the ROM by mtime, so
-  `run.sh` refuses it. After a clean rebuild that wrote nothing, `MX_SKIP_ROM_CHECK=1` is honest.
-- **The parity read now opens our maps and the submodule's map files**, so they are parity inputs
-  (`verdict_diff.DATA_PATTERNS`); `test_verdict_diff.ParityInputs` fails if a new read is not.
-
-- **A verdict scenario may not drive the UI with raw `press()`** (`check.py`, #238): wrapping a
-  `record*` scenario as a verdict fails the drift check. Run the record path once headless as
-  one-off evidence instead, or write the verdict on `guardedInput`/`selectSemantic`.
-- **What the ROM loads, read off the map:** `INSPECT.redStats` (`ch04redstats`), one run per
-  `PT_DIFFICULTY`. Compare it against `unit_load.load`'s ranges before trusting either model.
-  `INSPECT.blueOrder` (`ch07blueorder`) logs the blue table in slot order after prep.
-- **Combat math takes ints OR numpy arrays** (`fe_combat.max0/clamp/where/maximum/minimum`):
-  `party_matchup` reads every unit over all its careers at once. New combat code must stay
-  array-safe, or `test_ai_target.OverCareers` fails. A full Normal read is ~5s; keep it there.
-- **Grep the campaign before proposing a name.** "Halvar", offered for a recruit, was already
-  ch02's raider captain (`npc-bench.md`'s name bank is not a list of free names).
-- **Our own scenes are named `MS_*`.** Any code that matches `EventScr_` must ask whether it
-  also means `MS_` (#401 reported 26 of 40).
-- **`make difficulty --curve` takes ~5s a mode** (1001 careers per unit, read as arrays);
-  `chapter_matchup` memoises on the chapter's CONTENT, so a doctored chapter dict still misses.
-- **The TESTCH bench seats ONE chapter's creatures** (`make TESTCH=1 BENCH=chNN`, the newest by
-  default; it was full at 14 tiles). `recordenemy` with no `PT_CHAR` films the first creature on
-  it, and a staff-only foe gets a 1-HP patient and is filmed healing on the enemy phase.
-- **The FE-Repo is not the whole community.** Search FEUniverse too before calling an asset
-  missing (`docs/fe-repo-scouting.md` says how): ch06's shark-rider anim was only there.
-- **A new `check_*` must ship a canary** in `tools/test_check_canaries.py` (ADR 0298;
-  `check_every_gate_has_a_canary` enforces it). A canary doctors a real input at `open()` and
-  names the fault; a file it doctors or reads to aim goes in `CANARY_FILES`.
-- **A guard that imports `build_campaign`, an `inject/` pass module, or `map_placement_preview` cannot run on the CI
-  `checks` job** (pyyaml only, no submodule). Read source through `inject.source` instead.
-- **Before changing a signature, or what a parameter MEANS**: `tools/callsites.py`, then diff
-  the OUTPUT (decisions.md → "We wrapped on-map talk at 29 CHARACTERS").
 
 ## Current state
 
