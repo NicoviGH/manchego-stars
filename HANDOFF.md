@@ -74,9 +74,9 @@ This session merged #525 (one reader per force, plus the decomp-reader fold and 
      is what it inherits. Then step 9 only if verdicts still move.
    - Verdicts OFF now: ch01 Tutorial/Normal; ch02, ch03, ch04 on Difficult (ch01 Difficult
      reads OK at its ceiling's edge). All of it waits for step 10; nothing is widened.
-   - **ADR 0363 (Nicolas): an unwritten (`status: planned`) chapter does not exist** for the
-     difficulty math: its difficulty is its twin's (`difficulty.unwritten_projection`), and its
-     draft YAML is never read as a force. Don't build or test around planned rosters.
+   - **ADR 0363 (Nicolas, edited in place 2026-10-23): an unwritten (`status: planned`)
+     chapter gets no difficulty reading at all** (PR #529): neither its draft YAML nor its twin
+     is read for it until it is written. Don't build or test around planned rosters.
    - `party_matchup` reads each unit as ONE Combatant whose stats are numpy arrays over the
      careers; `fe_combat`/`ai_target` take ints or arrays (`max0`/`clamp`/`where`). Keep new
      combat math array-safe, or `test_ai_target.OverCareers` fails. The Normal curve is ~7s.
