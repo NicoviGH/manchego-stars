@@ -208,8 +208,9 @@ def _weapons_for(inventory):
         if item.get('unlock'):                    # not yet usable at base class
             continue
         key = item.get('fe_base') or item.get('id')
-        if key in fc.W:
-            out.append(fc.W[key])
+        weapon = item_weapon(ITEM_ENUM[key]) if key in ITEM_ENUM else fc.W.get(key)
+        if weapon is not None:
+            out.append(weapon)
     return tuple(out)
 
 
@@ -690,6 +691,43 @@ def enemy_combatants(enemy_def, mode=None, shifts=None, base_level=1, shiftable=
 # directions and both sides, the cast's weapons and the twins' monster/exotic ones (#491).
 ITEM_TO_WEAPON = {item: key for key, item in ITEM_ENUM.items() if key in fc.W}
 
+_ITYPE_KIND = {'ITYPE_SWORD': 'sword', 'ITYPE_LANCE': 'lance', 'ITYPE_AXE': 'axe',
+               'ITYPE_BOW': 'bow', 'ITYPE_ANIMA': 'anima', 'ITYPE_LIGHT': 'light',
+               'ITYPE_DARK': 'dark'}
+
+
+@functools.lru_cache(maxsize=None)
+def item_weapon(item_enum):
+    """The fe_combat Weapon an ITEM_ enum attacks with, or None (a staff, a consumable, a key).
+    THE item -> weapon reader: its fc.W entry when fe_combat lists it, else read off its
+    data_items.c block, so a kit can hold a weapon fc.W never needed (#510 step 8: a shop's
+    Slim Sword, a village's Armorslayer). Brave, magic-sword and other effects stay unmodelled
+    either way (logged on #510)."""
+    if item_enum in ITEM_TO_WEAPON:
+        return fc.W[ITEM_TO_WEAPON[item_enum]]
+    try:
+        block = unit_load._item_block(item_enum)
+    except KeyError:
+        return None
+    kind = re.search(r'\.weaponType\s*=\s*(\w+)', block)
+    if 'IA_WEAPON' not in unit_load.attributes_in(block) or not kind \
+            or kind.group(1) not in _ITYPE_KIND:
+        return None
+
+    def num(field):
+        m = re.search(r'\.%s\s*=\s*(\w+)' % field, block)
+        return int(m.group(1), 0) if m else 0
+    rng = num('encodedRange')
+    eff = re.search(r'\.pEffectiveness\s*=\s*ItemEffectiveness_(\w+)', block)
+    lists = effectiveness_lists()
+    hits = lists.get(eff.group(1), set()) if eff else set()
+    effective = frozenset(tag for tag, name in EFFECTIVENESS_LISTS.items()
+                          if lists[name] and lists[name] <= hits)
+    name = {e: k for k, e in ITEM_ENUM.items()}.get(
+        item_enum, item_enum[len('ITEM_'):].lower().replace('_', '-'))
+    return fc.Weapon(name, num('might'), num('hit'), num('crit'), num('weight'),
+                     _ITYPE_KIND[kind.group(1)], (rng >> 4, rng & 0xF), effective)
+
 # parity_reference -> (decomp relpath, [UnitDefinition array names]) for its red force.
 # The single curation point: which vanilla arrays ARE a chapter's fightable enemies (named
 # *Enemy arrays for the decompiled-to-C early chapters; cutscene/throne-room/skirmish arrays
@@ -982,8 +1020,9 @@ def _weapon_from_item_enums(item_enums):
 
 
 def _weapons_from_item_enums(item_enums):
-    """Every decomp item enum that maps to a real attacking weapon, in inventory order."""
-    return tuple(fc.W[ITEM_TO_WEAPON[it]] for it in item_enums if ITEM_TO_WEAPON.get(it))
+    """Every decomp item enum that is a real attacking weapon (`item_weapon`), in inventory
+    order."""
+    return tuple(w for w in map(item_weapon, item_enums) if w is not None)
 
 
 def vanilla_enemies(parity_ref, mode=None):

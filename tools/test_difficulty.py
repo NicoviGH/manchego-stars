@@ -39,6 +39,31 @@ def combatant(name='u', hp=20, pow_=0, skl=8, spd=0, dfc=0, res=0, lck=0, con=20
                         lck=lck, con=con, weapon=fc.W[weapon], tags=tags)
 
 
+class ItemWeapon(unittest.TestCase):
+    """#510 step 8: one item -> weapon reader. A kit can hold weapons fc.W never listed
+    (shop Slim Swords, a village Armorslayer); dropping them would undercount one side."""
+
+    def test_a_listed_weapon_is_its_fc_w_entry(self):
+        self.assertIs(fc.W['iron-sword'], df.item_weapon('ITEM_SWORD_IRON'))
+
+    def test_an_unlisted_weapon_is_read_from_data_items(self):
+        w = df.item_weapon('ITEM_SWORD_ARMORSLAYER')
+        self.assertEqual((8, 80, 0, 11, 'sword', (1, 1), frozenset({'armor'})),
+                         (w.mt, w.hit, w.crit, w.wt, w.kind, w.rng, w.effective))
+
+    def test_crit_and_range_are_read(self):
+        self.assertEqual(30, df.item_weapon('ITEM_SWORD_KILLER').crit)
+        self.assertEqual((1, 2), df.item_weapon('ITEM_AXE_HANDAXE').rng)
+
+    def test_staves_and_items_are_not_weapons(self):
+        self.assertIsNone(df.item_weapon('ITEM_STAFF_HEAL'))
+        self.assertIsNone(df.item_weapon('ITEM_VULNERARY'))
+
+    def test_enemy_kits_read_through_it(self):
+        self.assertEqual(('armorslayer',), tuple(
+            w.name for w in df._weapons_from_item_enums(['ITEM_SWORD_ARMORSLAYER'])))
+
+
 class Durability(unittest.TestCase):
     def test_is_worst_case_rounds_to_be_downed(self):
         # unit (20 HP) vs two attackers, each 100% hit and crit 4% (Skl 8 / 2), so x 1.08:

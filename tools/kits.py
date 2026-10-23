@@ -35,8 +35,53 @@ class Pickup:
     projected: bool = False     # ours, borrowed from the twin until our data exists
 
 
+# FE8's inventory is 5 slots; the model counts weapons only (a careful player leaves the
+# vulnerary behind before a sword).
+SLOTS = 5
+
+
+@dataclass(frozen=True)
+class Member:
+    name: str                   # the careers key
+    can_use: object             # ITEM_ enum -> bool, from the side's own rank source
+    items: tuple = ()           # the join kit, ITEM_ enums in slot order
+    char: str = None            # CHARACTER_*, for a gift with a named recipient
+
+
 def is_weapon(p):
-    return p.item in difficulty.ITEM_TO_WEAPON
+    return difficulty.item_weapon(p.item) is not None
+
+
+def arsenals(pickups, chapter, party, path):
+    """{member name: (Weapon, ...)} for `party` ([Member], join order) entering `chapter` on
+    `path` ('happy' or 'guaranteed'). A pickup is in hand from the chapter AFTER it is handed
+    out. A named gift goes to its recipient or to nobody; a shop item to every member who can
+    wield it and lacks it; any other weapon to the first such member. The join kit stays
+    first, in its order (its first weapon is the one equipped); past SLOTS, the highest-Mt of
+    the rest are kept."""
+    if path not in ('happy', 'guaranteed'):
+        raise ValueError(path)
+    held = {m.name: [w for w in map(difficulty.item_weapon, m.items) if w is not None]
+            for m in party}
+    for p in pickups:
+        if p.chapter >= chapter or (path == 'guaranteed' and p.vehicle not in GUARANTEED):
+            continue
+        weapon = difficulty.item_weapon(p.item)
+        if weapon is None:
+            continue
+        takers = [m for m in party if m.can_use(p.item) and weapon not in held[m.name]
+                  and (not p.to or m.char in p.to)]
+        if p.vehicle not in ('shop', 'worldmap_shop'):
+            takers = takers[:1]
+        for m in takers:
+            held[m.name].append(weapon)
+    out = {}
+    for m in party:
+        kit = sum(1 for it in m.items if difficulty.item_weapon(it) is not None)
+        own, rest = held[m.name][:kit], held[m.name][kit:]
+        keep = sorted(rest, key=lambda w: -w.mt)[:max(0, SLOTS - len(own))]
+        out[m.name] = tuple(own + [w for w in rest if w in keep])
+    return out
 
 
 def _shop_items(sym):

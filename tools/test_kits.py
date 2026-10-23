@@ -70,5 +70,84 @@ class OurWorldMap(unittest.TestCase):
         self.assertEqual([kits.Pickup('ITEM_SWORD_IRON', 'worldmap_shop', 1)], ours)
 
 
+def member(name, kinds, items=(), char=None):
+    """A party member who can wield every weapon of `kinds`."""
+    import difficulty
+
+    def can_use(item):
+        w = difficulty.item_weapon(item)
+        return w is not None and w.kind in kinds
+    return kits.Member(name, can_use, tuple(items), char)
+
+
+class Arsenals(unittest.TestCase):
+    P = kits.Pickup
+
+    def names(self, ars, who):
+        return [w.name for w in ars[who]]
+
+    def test_join_kit_first(self):
+        ars = kits.arsenals([], 1, [member('a', {'axe'}, ['ITEM_AXE_IRON', 'ITEM_AXE_HANDAXE'])],
+                            'happy')
+        self.assertEqual(['iron-axe', 'hand-axe'], self.names(ars, 'a'))
+
+    def test_guaranteed_drops_village(self):
+        picks = [self.P('ITEM_AXE_HANDAXE', 'village', 2)]
+        party = [member('a', {'axe'}, ['ITEM_AXE_IRON'])]
+        self.assertEqual(['iron-axe'], self.names(kits.arsenals(picks, 3, party, 'guaranteed'), 'a'))
+        self.assertEqual(['iron-axe', 'hand-axe'],
+                         self.names(kits.arsenals(picks, 3, party, 'happy'), 'a'))
+
+    def test_item_waits_a_chapter(self):
+        picks = [self.P('ITEM_AXE_HANDAXE', 'village', 2)]
+        party = [member('a', {'axe'}, ['ITEM_AXE_IRON'])]
+        self.assertEqual(['iron-axe'], self.names(kits.arsenals(picks, 2, party, 'happy'), 'a'))
+
+    def test_unwieldable_goes_nowhere(self):
+        picks = [self.P('ITEM_LANCE_JAVELIN', 'chest', 1)]
+        ars = kits.arsenals(picks, 2, [member('a', {'axe'}, ['ITEM_AXE_IRON'])], 'happy')
+        self.assertEqual(['iron-axe'], self.names(ars, 'a'))
+
+    def test_named_recipient_only(self):
+        picks = [self.P('ITEM_SWORD_RAPIER', 'scene', 0, ('CHARACTER_EIRIKA',))]
+        party = [member('seth', {'sword'}, ['ITEM_SWORD_SILVER'], 'CHARACTER_SETH'),
+                 member('eirika', {'sword'}, ['ITEM_SWORD_RAPIER'], 'CHARACTER_EIRIKA')]
+        ars = kits.arsenals(picks, 1, party, 'guaranteed')
+        self.assertEqual(['sword-silver'], self.names(ars, 'seth'))
+        absent = kits.arsenals(picks, 1, party[:1], 'guaranteed')
+        self.assertEqual(['sword-silver'], self.names(absent, 'seth'))
+
+    def test_gift_goes_to_first_who_lacks_it(self):
+        picks = [self.P('ITEM_AXE_HANDAXE', 'village', 1)]
+        party = [member('a', {'axe'}, ['ITEM_AXE_HANDAXE']), member('b', {'axe'}, ['ITEM_AXE_IRON'])]
+        ars = kits.arsenals(picks, 2, party, 'happy')
+        self.assertEqual(['hand-axe'], self.names(ars, 'a'))
+        self.assertEqual(['iron-axe', 'hand-axe'], self.names(ars, 'b'))
+
+    def test_shop_steel_to_every_sword_user(self):
+        picks = [self.P('ITEM_SWORD_STEEL', 'shop', 1)]
+        party = [member('a', {'sword'}, ['ITEM_SWORD_IRON']), member('b', {'sword'}, ['ITEM_SWORD_IRON']),
+                 member('c', {'axe'}, ['ITEM_AXE_IRON'])]
+        ars = kits.arsenals(picks, 2, party, 'happy')
+        self.assertIn('steel-sword', self.names(ars, 'a'))
+        self.assertIn('steel-sword', self.names(ars, 'b'))
+        self.assertNotIn('steel-sword', self.names(ars, 'c'))
+        self.assertEqual(['iron-sword'], self.names(kits.arsenals(picks, 2, party, 'guaranteed'), 'a'))
+
+    def test_five_slot_cap(self):
+        picks = [self.P(i, 'shop', 1) for i in ('ITEM_SWORD_STEEL', 'ITEM_SWORD_SLIM',
+                                                 'ITEM_SWORD_SILVER', 'ITEM_SWORD_KILLER',
+                                                 'ITEM_SWORD_ARMORSLAYER')]
+        ars = kits.arsenals(picks, 2, [member('a', {'sword'}, ['ITEM_SWORD_IRON'])], 'happy')
+        self.assertEqual(5, len(ars['a']))
+        self.assertEqual('iron-sword', ars['a'][0].name)
+        self.assertNotIn('sword-slim', self.names(ars, 'a'))
+
+    def test_non_weapon_join_items_are_not_weapons(self):
+        ars = kits.arsenals([], 1, [member('a', {'axe'}, ['ITEM_AXE_IRON', 'ITEM_VULNERARY'])],
+                            'happy')
+        self.assertEqual(['iron-axe'], self.names(ars, 'a'))
+
+
 if __name__ == '__main__':
     unittest.main()
