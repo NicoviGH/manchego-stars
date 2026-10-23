@@ -39,10 +39,14 @@ _CACHE = {}
 _CAMPAIGN_YAML = {}
 
 
+def campaign_yaml_path(campaign=CAMPAIGN):
+    return os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+
+
 def campaign_yaml(campaign=CAMPAIGN):
     """campaign.yaml, the one reader of it, cached on mtime like `load_all`. Shared: read
     it, never mutate it."""
-    path = os.path.join(REPO, 'campaigns', campaign, 'campaign.yaml')
+    path = campaign_yaml_path(campaign)
     key = (path, os.stat(path).st_mtime_ns)
     if key not in _CAMPAIGN_YAML:
         with open(path, encoding='utf-8') as f:

@@ -32,9 +32,14 @@ Nicolas's calls:
 Claude's calls, for checking:
 - A pickup is in hand from the chapter AFTER it is handed out. The exception is a scene gift,
   which is in hand in its own chapter (the Prologue's opening hands Eirika the Rapier).
-- A named gift goes to its recipient or to nobody. A shop item goes to every unit that can
-  wield it and lacks it. Any other weapon goes to the first such unit in join order. 5 slots,
-  weapons only.
+- A gift's vehicle is how it is DELIVERED, on both sides. A visit (village, house, boat talk)
+  is `village`, the happy path. What a scene hands out (a clear bonus, a surviving ally's gift,
+  the Prologue's Rapier) is `scene`, guaranteed. The twin's gifts are split by the script block
+  that gives them, never by matching items.
+- A named gift goes to its first listed recipient who is present, or to nobody. A shop item
+  goes to every unit that can wield it and lacks it. Any other weapon goes to the first such
+  unit in join order. 5 slots, weapons only; past them, a weapon another one beats outright
+  goes first.
 - Ranks do not grow, on either side. Our units' ranks are their STAT_DONOR's.
 - Steals and keys are no vehicle: FE8 lets a thief take only plain items (`IsItemStealable`,
   bmitem.c), so neither ever changes what a unit fights with.

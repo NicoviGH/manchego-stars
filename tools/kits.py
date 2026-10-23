@@ -14,6 +14,7 @@ are not a vehicle at all: FE8 lets a thief take only plain items (`IsItemStealab
 bmitem.c), so a steal never changes what a unit fights with.
 """
 import functools
+import os
 import re
 from dataclasses import dataclass
 
@@ -69,6 +70,8 @@ def arsenals(pickups, chapter, party, path):
             continue
         takers = [m for m in party if m.can_use(p.item) and weapon not in held[m.name]
                   and (not p.to or m.char in p.to)]
+        if p.to:                    # either of two named: the first LISTED, as the script runs
+            takers.sort(key=lambda m: p.to.index(m.char))
         if p.vehicle not in ('shop', 'worldmap_shop'):
             takers = takers[:1]
         for m in takers:
@@ -85,23 +88,34 @@ def arsenals(pickups, chapter, party, path):
     return out
 
 
+def chapter_pickups(chap, n):
+    """What one of our chapters hands out, as chapter `n`: `chapter_economy`'s pickups, each
+    resolved through its own entry so a flavored item reads its `fe_base`, then its shops."""
+    econ = difficulty.chapter_economy(chap)
+    out = [Pickup(inject.decomp.fe_item_enum(entry), vehicle, n)
+           for vehicle, entry in econ['pickups']]
+    for sym in econ['shops']:
+        out += [Pickup(it, 'shop', n) for it in difficulty.shop_stock(sym)]
+    return out
+
+
 def our_pickups(campaign):
     """Every pickup our WRITTEN chapters hand out. A `status: planned` chapter does not exist
-    for the difficulty math (ADR 0363). Every gift `chapter_economy` lists is player-earned (a
-    village, a boat talk, a green ally kept alive, a save-them-all bonus), so it is `village`."""
+    for the difficulty math (ADR 0363). Cached on the chapter files' and campaign.yaml's
+    mtimes: every parity read asks for it, and an edit mid-session is still picked up."""
+    import campaign_chapters
+    files = campaign_chapters.paths(campaign) + [campaign_chapters.campaign_yaml_path(campaign)]
+    return _our_pickups(campaign, tuple((f, os.stat(f).st_mtime_ns) for f in files))
+
+
+@functools.lru_cache(maxsize=4)
+def _our_pickups(campaign, _key):
     import campaign_chapters
     out = []
     for chap in campaign_chapters.load_all(campaign):
-        if chap.get('status') == 'planned':
-            continue
-        n = int(chap['chapter_number'])
-        econ = difficulty.chapter_economy(chap)
-        for vehicle, ids in (('village', econ['gifts']), ('chest', econ['chests']),
-                             ('drop', econ['drops'])):
-            out += [Pickup(inject.decomp.fe_item_enum({'id': i}), vehicle, n) for i in ids]
-        for sym in econ['shops']:
-            out += [Pickup(it, 'shop', n) for it in difficulty.shop_stock(sym)]
-    return out + _our_worldmap_pickups(campaign)
+        if chap.get('status') != 'planned':
+            out += chapter_pickups(chap, int(chap['chapter_number']))
+    return tuple(out + _our_worldmap_pickups(campaign))
 
 
 def _our_world_map(campaign):
@@ -121,8 +135,8 @@ def _our_worldmap_pickups(campaign):
     for node in nodes:
         after = node.get('unlocks_after')
         n = int(after[2:]) if after else 0
-        out += [Pickup(inject.decomp.fe_item_enum({'id': i}), 'worldmap_shop', n)
-                for i in node.get('stock') or ()]
+        out += [Pickup(inject.decomp.fe_item_enum(i if isinstance(i, dict) else {'id': i}),
+                       'worldmap_shop', n) for i in node.get('stock') or ()]
     return out
 
 
@@ -152,13 +166,9 @@ def twin_pickups(through=None):
     out = []
     for n, ref in enumerate(chain):
         t = difficulty.twin_event_payload(difficulty.PARITY_REFERENCE_STEM[ref])
-        village = list(t['village_gifts'])
-        for item, to in zip(t['gifts'], t['gift_to']):
-            if item in village:
-                village.remove(item)
-                out.append(Pickup(item, 'village', n))
-            else:
-                out.append(Pickup(item, 'scene', n, _named(to)))
+        out += [Pickup(it, 'village', n) for it in t['village_gifts']]
+        out += [Pickup(it, 'scene', n, _named(to))
+                for it, to in zip(t['scene_gifts'], t['scene_gift_to'])]
         out += [Pickup(it, 'interlude', n, _named(to))
                 for it, to in zip(t['interlude_gifts'], t['interlude_gift_to'])]
         out += [Pickup(it, 'chest', n) for it in t['chests']]

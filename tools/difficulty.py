@@ -3425,22 +3425,31 @@ def twin_event_payload(stem):
     """What a vanilla chapter's events hand out, by vehicle, read once for every consumer
     (vanilla_economy here, gen_wiki's twin payload): chest items and chest gold, scene gifts
     and scene gold, what the interlude after it gives (twin_interlude_scripts), and its shops
-    of every kind the eventinfo macros name (Armory, Vendor, SecretShop). `village_gifts` is
-    the part of `gifts` a Village or House script hands out: the optional half (#510 step 8)."""
+    of every kind the eventinfo macros name (Armory, Vendor, SecretShop). `gifts` splits into
+    `village_gifts`, what a Village or House script hands out, and `scene_gifts`, every other
+    script's (#510 step 8), each with its recipients."""
     info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
     gifts = _gift_records(script)
-    village_gifts = []
+    # Split by the script that gives it, never by matching items (#510 step 8): a Village or
+    # House script's gives are the visit's; every other block's are a scene's.
+    visits, scenes = [], script
     for name in re.findall(r'(?:Village|House)\(\s*[^,]+,\s*(\w+)', info):
         marker = 'CONST_DATA EventListScr %s[]' % name
-        if marker in script:
-            s, e = inject.decomp._find_brace_block(script, marker, stem)
-            village_gifts += [it for it, _ in _gift_records(marker + ' = ' + script[s:e] + ';')]
+        if marker in scenes:
+            at = scenes.index(marker)
+            s, e = inject.decomp._find_brace_block(scenes, marker, stem)
+            end = scenes.index(';', e) + 1 if ';' in scenes[e:e + 3] else e
+            visits.append(scenes[at:end])
+            scenes = scenes[:at] + scenes[end:]
+    village = _gift_records('\n'.join(visits))
+    scene = _gift_records(scenes)
     out = {'chests': re.findall(r'Chest\((ITEM_\w+)', info),
            'chest_gold': [int(g) for g in re.findall(r'ChestMoney\(\s*(\d+)', info)],
            'gifts': [e for e, _ in gifts], 'gift_to': [to for _, to in gifts],
            'gift_gold': _gift_gold(script),
-           'village_gifts': village_gifts,
+           'village_gifts': [e for e, _ in village], 'village_gift_to': [to for _, to in village],
+           'scene_gifts': [e for e, _ in scene], 'scene_gift_to': [to for _, to in scene],
            'interlude_gifts': [], 'interlude_gift_to': [], 'interlude_gold': [],
            'shops': [(sym, shop_stock(sym)) for sym in
                      re.findall(r'(?:Armory|Vendor|SecretShop)\(\s*(\w+)', info)],
@@ -3490,8 +3499,11 @@ def chapter_economy(chap):
     """
     gold = 0
     gifts, chests, drops = [], [], []
+    # (vehicle, the YAML entry) per item, `fe_base` kept: what the kits read (#510 step 8). A
+    # visit (village, boat talk) is `village`; what a scene hands out is `scene`.
+    pickups = []
 
-    def take(rewards):
+    def take(rewards, vehicle):
         """Fold one reward list into gold + gifts. Same shape wherever it is carried."""
         nonlocal gold
         for r in rewards or []:
@@ -3499,18 +3511,19 @@ def chapter_economy(chap):
                 gold += int(r.get('amount') or 0)
             elif r.get('id'):
                 gifts.append(r['id'])
+                pickups.append((vehicle, r))
 
     for v in chap.get('villages') or []:
-        take(v.get('visit_reward'))
+        take(v.get('visit_reward'), 'village')
     for boat in chap.get('rescue_boats') or []:
-        take((boat.get('talk') or {}).get('reward'))
+        take((boat.get('talk') or {}).get('reward'), 'village')
     # A green ally's gift for surviving (ch02's chwinga), handed over at the ending (#495).
     for ally in (chap.get('deployment') or {}).get('green_allies') or []:
         if ally.get('gift'):
-            gifts.append(ally['gift'])
+            take([{'id': ally['gift']}], 'scene')
     bonus = (chap.get('economy') or {}).get('save_all_bonus')
     if bonus:
-        gifts.append(bonus)
+        take([{'id': bonus}], 'scene')
     # Gold a scene pays (#495): vanilla Ch1's 5,000 after the map, Ch8's 10,000 in its ending.
     for g in (chap.get('economy') or {}).get('scene_gold') or []:
         gold += int(g['amount'])
@@ -3518,14 +3531,17 @@ def chapter_economy(chap):
         for it in c.get('contents') or []:
             if it.get('id'):
                 chests.append(it['id'])
+                pickups.append(('chest', it))
     for ed in chapter_roster_entries(chap):
         if ed.get('item_drop'):
             drops.append(ed['item_drop'])
+            pickups.append(('drop', {'id': ed['item_drop']}))
     # The in-map shops' stock lists, the same thing vanilla_economy reports for the twin. Not
     # `available_shops`: that is a world-map TOWN label, and reading it made ch02 look stocked
     # beside vanilla Ch2's Armory while ch02 had no shop at all.
     shops = [sym for _macro, sym, _x, _y in inject.villages.chapter_shops(chap)]
-    return {'gold': gold, 'gifts': gifts, 'chests': chests, 'drops': drops, 'shops': shops}
+    return {'gold': gold, 'gifts': gifts, 'chests': chests, 'drops': drops, 'shops': shops,
+            'pickups': pickups}
 
 
 def _print_economy(chap):

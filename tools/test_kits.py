@@ -56,6 +56,54 @@ class TwinPickups(unittest.TestCase):
         self.assertNotIn(kits.Pickup('ITEM_SWORD_STEEL', 'worldmap_shop', 4), self.twin)
 
 
+class Vehicles(unittest.TestCase):
+    """A gift's vehicle is how it is DELIVERED, on both sides: a visit (village, house, boat
+    talk) is `village`; anything a scene hands out (a clear bonus, an ally's parting gift, the
+    Prologue's Rapier) is `scene`."""
+
+    def test_a_flavored_reward_resolves_through_its_fe_base(self):
+        chap = {'villages': [{'visit_reward': [{'id': 'frost-brand', 'fe_base': 'steel-sword'}]}]}
+        self.assertEqual([kits.Pickup('ITEM_SWORD_STEEL', 'village', 4)],
+                         kits.chapter_pickups(chap, 4))
+
+    def test_a_save_all_bonus_is_a_scene_gift_on_both_sides(self):
+        self.assertIn(kits.Pickup('ITEM_GUIDINGRING', 'scene', 5), kits.our_pickups(CAMPAIGN))
+        self.assertIn(kits.Pickup('ITEM_GUIDINGRING', 'scene', 5), kits.twin_pickups())
+
+    def test_the_twin_splits_by_script_not_by_item(self):
+        # A scene and a village both give an Iron Sword; the scene's goes to Eirika by name.
+        info = 'Village(EVFLAG_TMP(9), EventScr_V, 1, 1)\n'
+        script = ('CONST_DATA EventListScr EventScr_S[] = {\n'
+                  '    SVAL(EVT_SLOT_3, ITEM_SWORD_IRON)\n    GIVEITEMTO(CHARACTER_EIRIKA)\n'
+                  '    ENDA\n};\n'
+                  'CONST_DATA EventListScr EventScr_V[] = {\n'
+                  '    SVAL(EVT_SLOT_3, ITEM_SWORD_IRON)\n    GIVEITEMTO(CHAR_EVT_ACTIVE_UNIT)\n'
+                  '    ENDA\n};\n')
+        import difficulty
+        real = difficulty.inject.decomp.vanilla_decomp_text
+
+        def text(rel):
+            if rel.endswith('zz-eventinfo.h'):
+                return info
+            if rel.endswith('zz-eventscript.h'):
+                return script
+            return real(rel)
+        with mock.patch.object(difficulty.inject.decomp, 'vanilla_decomp_text', text):
+            t = difficulty.twin_event_payload('zz')
+        self.assertEqual([('ITEM_SWORD_IRON', ('CHARACTER_EIRIKA',))],
+                         list(zip(t['scene_gifts'], t['scene_gift_to'])))
+        self.assertEqual(['ITEM_SWORD_IRON'], t['village_gifts'])
+
+
+class OurPickupsAreCached(unittest.TestCase):
+    def test_a_second_read_does_not_walk_the_chapters_again(self):
+        import difficulty
+        kits.our_pickups(CAMPAIGN)
+        with mock.patch.object(difficulty, 'chapter_economy',
+                               side_effect=AssertionError('walked again')):
+            kits.our_pickups(CAMPAIGN)
+
+
 class TwinReadsOnlyWhatItReaches(unittest.TestCase):
     def test_through_stops_the_chain(self):
         self.assertFalse([p for p in kits.twin_pickups(7) if p.chapter > 7])
@@ -71,6 +119,8 @@ class OurWorldMap(unittest.TestCase):
 
     def test_a_stock_list_replaces_the_projection(self):
         nodes = [{'id': 'targos', 'unlocks_after': 'ch01', 'stock': ['iron-sword']}]
+        kits._our_pickups.cache_clear()
+        self.addCleanup(kits._our_pickups.cache_clear)
         with mock.patch.object(kits, '_our_world_map', return_value=nodes):
             ours = [p for p in kits.our_pickups(CAMPAIGN) if p.vehicle == 'worldmap_shop']
         self.assertEqual([kits.Pickup('ITEM_SWORD_IRON', 'worldmap_shop', 1)], ours)
@@ -129,6 +179,15 @@ class Arsenals(unittest.TestCase):
         self.assertEqual(['sword-silver'], self.names(ars, 'seth'))
         absent = kits.arsenals(picks, 1, party[:1], 'guaranteed')
         self.assertEqual(['sword-silver'], self.names(absent, 'seth'))
+
+    def test_a_gift_for_either_of_two_goes_to_the_first_named(self):
+        # Ch14's Audhulma: Joshua if he lives, else Eirika -- whatever the join order.
+        picks = [self.P('ITEM_SWORD_RAPIER', 'scene', 1, ('CHARACTER_JOSHUA', 'CHARACTER_EIRIKA'))]
+        party = [member('eirika', {'sword'}, [], 'CHARACTER_EIRIKA'),
+                 member('joshua', {'sword'}, [], 'CHARACTER_JOSHUA')]
+        ars = kits.arsenals(picks, 1, party, 'guaranteed')
+        self.assertEqual(['rapier'], self.names(ars, 'joshua'))
+        self.assertEqual([], self.names(ars, 'eirika'))
 
     def test_gift_goes_to_first_who_lacks_it(self):
         picks = [self.P('ITEM_AXE_HANDAXE', 'village', 1)]
