@@ -125,6 +125,9 @@ WANTED = [
                                 # which ch05's Talk recruit does exactly (#25). Read it WHILE a
                                 # box is up: every menu and unit name decodes through the same
                                 # function and overwrites it the moment the scene ends.
+    'gLordSelectCandidates',    # u16[] pid table ended by 0xFFFF (engine patch 0005, events_udefs.c):
+                                # with the 0xF0+i permanent flags it names the chosen lead, the one
+                                # unit CanUnitSeize allows (board.lua Board.lordPid).
     'gChapterFlagBits',         # event flags < 100, bit (flag-1) (src/eventinfo.c)
     'gPermanentFlagBits',       # event flags > 100, bit (flag-101)
     'ProcScr_GameOverScreen',   # proc script: game-over screen active

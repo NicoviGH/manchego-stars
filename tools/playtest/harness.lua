@@ -2532,6 +2532,9 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         local phaseTurn = turn()
         local function ourPhase() return BOARD.inPhase(BOARD.header(), phaseTurn) end
         local function bossDownOrWon() return won() or not findBoss() end
+        -- Who can Seize, from FE8's own rule (board.lua Board.lordPid: the chosen lead). Only
+        -- that unit marches on the throne; the ruledOut memo is the fallback when it is unknown.
+        local lordPid = BOARD.lordPid(eventFlag)
         -- The phase's roster (decomp bounds, not the first 8 slots), LEAN; each unit is judged
         -- from ONE full board snapshot taken just before it acts, since earlier actions move
         -- the board -- one read per acting unit, not one per question asked about it.
@@ -2578,9 +2581,9 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                         end, TUNE.combatFrames, true)
                         if won() then return "won", t end
                     end
-                elseif ruledOut[u.slot] then
-                    -- Shown not to be the lord: it does not march on the throne, and if it
-                    -- stands on or beside it, it clears the way.
+                elseif not BOARD.canSeize(u, lordPid, ruledOut) then
+                    -- Not the lord: it does not march on the throne, and if it stands on or
+                    -- beside it, it clears the way.
                     if CLEARBOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
                         return "stuck", t
                     end
@@ -2634,10 +2637,20 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         if phase ~= "player" then return "stuck", t end
         -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
         -- instead of grinding the full budget on a wedged bot.
-        local dist = CLEARBOT.seizeDistance(BOARD.leanList("blue"), field, ruledOut)
+        -- Once the boss is dead only a unit that can Seize is closing on anything: measure from
+        -- those (BOARD.canSeize -- the chosen lead, or the ruledOut memo when that is unknown),
+        -- or a non-lord standing near the throne masks the lord's march.
+        local blueUnits, excluded, nRuled = BOARD.leanList("blue"), {}, 0
+        if not findBoss() then
+            for _, o in ipairs(blueUnits) do
+                if not BOARD.canSeize(o, lordPid, ruledOut) then
+                    excluded[o.slot] = true
+                    nRuled = nRuled + 1
+                end
+            end
+        end
+        local dist = CLEARBOT.seizeDistance(blueUnits, field, excluded)
         local enemies = BOARD.liveCount("red")
-        local nRuled = 0
-        for _ in pairs(ruledOut) do nRuled = nRuled + 1 end
         local key = (findBoss() and "boss" or "seize") .. ":" .. nRuled
         if CLEARBOT.madeProgress({ dist = lastDist, enemies = lastEnemies, key = lastKey },
                                  { dist = dist, enemies = enemies, key = key }) then

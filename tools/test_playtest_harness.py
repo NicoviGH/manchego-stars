@@ -518,5 +518,19 @@ class TestNoBlanketEmulatorKill(unittest.TestCase):
         scenario still has to be cleared, or it holds the ROM the next run wants."""
         self.assertIn('pkill', self.source())
 
+class TestBoardLordSelectPin(unittest.TestCase):
+    def test_board_lua_lord_flag_base_is_the_injectors(self):
+        # board.lua reads the chosen lead the way LordSelect_GetPid does (permanent flag
+        # LORDSEL_FLAG_BASE + i) to know who can Seize. The base is a literal on both sides,
+        # so a move on the injector's side must fail here, not as a bot that marches the
+        # wrong unit on the throne.
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import LORDSEL_FLAG_BASE
+        with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
+            m = re.search(r'Board\.LORDSEL_FLAG_BASE = (0x[0-9A-Fa-f]+)', fh.read())
+        self.assertIsNotNone(m, 'board.lua must define Board.LORDSEL_FLAG_BASE')
+        self.assertEqual(int(m.group(1), 16), LORDSEL_FLAG_BASE)
+
+
 if __name__ == '__main__':
     unittest.main()

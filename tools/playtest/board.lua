@@ -232,6 +232,34 @@ function Board.findIn(mem, SYM, base, count, charId)
     return nil
 end
 
+-- Who can Seize. FE8's Seize command is usable only when CanUnitSeize(unit) holds
+-- (bmmenu.c UnitActionMenu_CanSeize), and our engine patch 0005 rewrites that test to
+-- `unit->pCharacterData->number == LordSelect_GetPid()` (bmdifficulty.c). LordSelect_GetPid
+-- (eventinfo.c, same patch) returns the first gLordSelectCandidates[i] -- a u16 table ended by
+-- 0xFFFF -- whose permanent flag LORDSEL_FLAG_BASE + i is set, else candidate 0. This mirrors
+-- that read. `flagSet(flag)` is the caller's event-flag test (harness eventFlag), so the flag
+-- encoding keeps one owner. nil when the build has no candidate table: then the caller can only
+-- learn who cannot Seize by trying (Board.canSeize's ruledOut memo).
+Board.LORDSEL_FLAG_BASE = 0xF0   -- tools/inject/decomp.py LORDSEL_FLAG_BASE (pinned by a test)
+local MAX_LORD_CANDIDATES = 64   -- a bound for a corrupt table, far above any cast
+function Board.lordPid(mem, SYM, flagSet)
+    local base = SYM.gLordSelectCandidates
+    if not base then return nil end
+    for i = 0, MAX_LORD_CANDIDATES - 1 do
+        local pid = mem.u16(base + i * 2)
+        if pid == 0xFFFF then break end
+        if flagSet(Board.LORDSEL_FLAG_BASE + i) then return pid end
+    end
+    return mem.u16(base)
+end
+
+-- Can `unit` Seize? Decided up front from the lord's pid when it is known; otherwise only the
+-- memo of units that stood on the tile without a Seize command (ruledOut[slot]) says no.
+function Board.canSeize(unit, lordPid, ruledOut)
+    if lordPid then return unit.charId == lordPid end
+    return not (ruledOut and ruledOut[unit.slot])
+end
+
 -- Snapshot lookups over a Board.read result.
 -- The first unit of `faction` with `charId`, or nil. Generics SHARE a charId: use Board.at.
 function Board.unit(board, faction, charId)
@@ -273,6 +301,8 @@ function Board.bind(mem, SYM)
         attackRange = function(addr) return Board.attackRange(mem, SYM, addr) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
+        lordPid = function(flagSet) return Board.lordPid(mem, SYM, flagSet) end,
+        canSeize = Board.canSeize,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,

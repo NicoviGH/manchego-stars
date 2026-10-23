@@ -246,6 +246,33 @@ do
     check(Board.at(b, "blue", 7).charId, 9, "Board.at looks up by slot")
 end
 
+-- Seize (#510 step 9): FE8's CanUnitSeize, as our engine patches it (0005, bmdifficulty.c):
+-- the unit's character is LordSelect_GetPid() -- the first gLordSelectCandidates[i] whose
+-- permanent flag 0xF0 + i is set, else candidate 0.
+do
+    local m = fakeMem()
+    local CANDS = 0x08909624
+    local pids = { 0x01, 0x03, 0x02 }
+    for i, pid in ipairs(pids) do m.w16(CANDS + (i - 1) * 2, pid) end
+    m.w16(CANDS + #pids * 2, 0xFFFF)
+    local sym = setmetatable({ gLordSelectCandidates = CANDS }, { __index = SYM })
+    local mem = { u8 = m.u8, s8 = m.s8, u16 = m.u16, u32 = m.u32 }
+    local set = {}
+    local function flag(f) return set[f] == true end
+    check(Board.lordPid(mem, sym, flag), 0x01, "no pick recorded -> the first candidate")
+    set[0xF0 + 1] = true
+    check(Board.lordPid(mem, sym, flag), 0x03, "flag 0xF1 set -> candidate 1")
+    check(Board.lordPid(mem, SYM, flag), nil, "no candidate table symbol -> unknown")
+
+    local lord = { slot = 0, charId = 0x03 }
+    local other = { slot = 1, charId = 0x02 }
+    check(Board.canSeize(lord, 0x03, {}), true, "the chosen lead can seize")
+    check(Board.canSeize(other, 0x03, {}), false,
+        "a non-lord cannot -- known up front, before it ever walks to the throne")
+    check(Board.canSeize(other, nil, {}), true, "lord unknown -> not ruled out yet")
+    check(Board.canSeize(other, nil, { [1] = true }), false, "lord unknown -> the memo rules it out")
+end
+
 -- Header: turn, phase, map size.
 do
     local b = board(function() end)
