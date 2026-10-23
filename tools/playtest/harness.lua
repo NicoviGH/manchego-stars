@@ -399,6 +399,33 @@ local function mapUnitAt(x, y) return ru8(mapUnitRow(y) + x) end
 local function setMapUnit(x, y, v) emu:write8(mapUnitRow(y) + x, v) end
 local function mapSize() return rs16(SYM.gBmMapSize), rs16(SYM.gBmMapSize + 2) end
 
+-- THE ONE PLACE A UNIT IS STOOD ON A TILE (#531 audit 4; the logic is board.lua's Board.place).
+-- Bounds come from the LIVE map size, never a literal, and an off-map tile is REFUSED: it logs,
+-- latches a controller fault (so a later PASS reports FAIL naming the tile) and returns false.
+-- Declared here, on INSPECT, because a helper hung on a table declared further down (VISIT) is
+-- out of scope in every scenario above it. `o.grid` / `o.vacate` are Board.place's.
+INSPECT.io = {
+    rs8 = function(a) return rs8(a) end, write8 = function(a, v) emu:write8(a, v) end,
+    grid = mapUnitAt, setGrid = setMapUnit,
+}
+function INSPECT.place(u, x, y, o)
+    local w, h = mapSize()
+    local ok, why = BOARD.place(INSPECT.io, u.addr, x, y, w, h, o)
+    if not ok then
+        log("place REFUSED: " .. why)
+        controllerFault = controllerFault or ("place refused: " .. why)
+    end
+    return ok
+end
+-- First tile beside `anchor` ({x, y}) in `o.order` (default E, W, S, N) that is on the map, empty
+-- in the grid and passes `o.passable(x, y)`. Returns x, y or nil.
+INSPECT.EWSN = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+function INSPECT.freeBeside(anchor, o)
+    o = o or {}
+    local w, h = mapSize()
+    return BOARD.freeBeside(INSPECT.io, anchor.x, anchor.y, o.order or INSPECT.EWSN, w, h, o.passable)
+end
+
 -- ---------------------------------------------------------------- state-driven controller
 -- Function pointers in Proc fields are Thumb pointers; nm emits the even symbol address.
 local function codeAddr(a) return a & 0xFFFFFFFE end
@@ -4668,8 +4695,7 @@ end
 -- so any in-range, grid-free, in-bounds tile works. Prefers the farthest in-range tile (e.g. a
 -- bow at exactly 2). Returns true if relocated.
 local function teleportToFiringTile(u, mn, mx)
-    local grid = mapUnitAt(u.x, u.y)        -- this unit's id in the grid (preserves faction bits)
-    if grid == 0 then
+    if mapUnitAt(u.x, u.y) == 0 then      -- this unit's id in the grid (preserves faction bits)
         log(string.format("  teleportToFiringTile: (%d,%d) not tracked in gBmMapUnit -- bailing", u.x, u.y))
         return false
     end
@@ -4682,9 +4708,7 @@ local function teleportToFiringTile(u, mn, mx)
                 for _, dy in ipairs(ady == 0 and { 0 } or { ady, -ady }) do
                     local tx, ty = e.x + dx, e.y + dy
                     if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
-                        setMapUnit(u.x, u.y, 0)                 -- vacate the old tile
-                        emu:write8(u.addr + 0x10, tx); emu:write8(u.addr + 0x11, ty)
-                        setMapUnit(tx, ty, grid)                -- occupy the new tile
+                        INSPECT.place(u, tx, ty)                -- vacate the old tile, occupy the new
                         log(string.format("  teleported to (%d,%d) [range %d of enemy (%d,%d)]", tx, ty, r, e.x, e.y))
                         return true
                     end
@@ -4766,16 +4790,13 @@ end
 -- within Heal's range of a wounded teammate. Same grid-write structure as teleportToFiringTile
 -- (#191); kept separate because the search set is allies, not liveEnemies().
 local function teleportAdjacentTo(u, targets)
-    local grid = mapUnitAt(u.x, u.y)
-    if grid == 0 then return false end
+    if mapUnitAt(u.x, u.y) == 0 then return false end
     local mw, mh = mapSize()   -- the LIVE footprint, as teleportToFiringTile (#204)
     for _, t in ipairs(targets) do
         for _, d in ipairs({ { 0, -1 }, { 0, 1 }, { 1, 0 }, { -1, 0 } }) do
             local tx, ty = t.x + d[1], t.y + d[2]
             if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
-                setMapUnit(u.x, u.y, 0)
-                emu:write8(u.addr + 0x10, tx); emu:write8(u.addr + 0x11, ty)
-                setMapUnit(tx, ty, grid)
+                INSPECT.place(u, tx, ty)
                 log(string.format("  teleported to (%d,%d) [adjacent to ally (%d,%d)]", tx, ty, t.x, t.y))
                 return true
             end
@@ -5755,19 +5776,11 @@ scenarios.ch03midmap = function()
         local leader = blue(0x01)
         pokeFrail(b)
         b = red(0xb6)
-        local bgrid = mapUnitAt(b.x, b.y)
-        local parked = false
-        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-            local tx, ty = leader.x + d[1], leader.y + d[2]
-            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
-                setMapUnit(b.x, b.y, 0)
-                emu:write8(b.addr + 0x10, tx); emu:write8(b.addr + 0x11, ty)
-                setMapUnit(tx, ty, bgrid)
-                log(string.format("turn %d: Brute parked at (%d,%d) next to braulo (%d,%d)",
-                    turn, tx, ty, leader.x, leader.y))
-                parked = true
-                break
-            end
+        local tx, ty = INSPECT.freeBeside(leader)
+        local parked = tx ~= nil and INSPECT.place(b, tx, ty)
+        if parked then
+            log(string.format("turn %d: Brute parked at (%d,%d) next to braulo (%d,%d)",
+                turn, tx, ty, leader.x, leader.y))
         end
         if not parked then return result("FAIL", "no free tile adjacent to braulo to park the Brute") end
         if moveUnit(leader.x, leader.y, leader.x, leader.y) then
@@ -5828,18 +5841,10 @@ scenarios.ch03talk = function()
     log(string.format("green Trex at (%d,%d); recruiter at (%d,%d)", trex.x, trex.y, rec.x, rec.y))
     shot("ch03talk-green")
     -- Park the recruiter on a free tile orthogonally adjacent to Trex.
-    local rgrid = mapUnitAt(rec.x, rec.y)
-    local parked = false
-    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-        local tx, ty = trex.x + d[1], trex.y + d[2]
-        if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
-            setMapUnit(rec.x, rec.y, 0)
-            emu:write8(rec.addr + 0x10, tx); emu:write8(rec.addr + 0x11, ty)
-            setMapUnit(tx, ty, rgrid)
-            log(string.format("recruiter parked at (%d,%d), adjacent to Trex (%d,%d)", tx, ty, trex.x, trex.y))
-            parked = true
-            break
-        end
+    local tx, ty = INSPECT.freeBeside(trex)
+    local parked = tx ~= nil and INSPECT.place(rec, tx, ty)
+    if parked then
+        log(string.format("recruiter parked at (%d,%d), adjacent to Trex (%d,%d)", tx, ty, trex.x, trex.y))
     end
     if not parked then return result("FAIL", "no free tile adjacent to Trex to park the recruiter") end
     -- Select the recruiter (no move) -> command menu. Parked next to ISOLATED green Trex in the
@@ -6000,17 +6005,9 @@ scenarios.ch03door = function()
     -- Park orthogonally adjacent to the door on a known-passable floor cell ((2,2) floor / (2,4) road;
     -- the door's left/right are wall frame). Vacate the old tile, occupy the new -- cursor-select
     -- reads gBmMapUnit, not xPos (cf. the ch03talk park trick).
-    local grid = mapUnitAt(u.x, u.y)
     local parked
-    for _, t in ipairs({ { DX, DY - 1 }, { DX, DY + 1 } }) do
-        if mapUnitAt(t[1], t[2]) == 0 then
-            setMapUnit(u.x, u.y, 0)
-            emu:write8(u.addr + 0x10, t[1]); emu:write8(u.addr + 0x11, t[2])
-            setMapUnit(t[1], t[2], grid)
-            parked = t
-            break
-        end
-    end
+    local tx, ty = INSPECT.freeBeside({ x = DX, y = DY }, { order = { { 0, -1 }, { 0, 1 } } })
+    if tx and INSPECT.place(u, tx, ty) then parked = { tx, ty } end
     if not parked then return result("FAIL", "no free tile adjacent to the (2,3) door to park a unit") end
     log(string.format("parked opener at (%d,%d), adjacent to the door", parked[1], parked[2]))
     shot("ch03door-before")
@@ -6070,10 +6067,8 @@ scenarios.ch03chest = function()
     for s = 1, 4 do emu:write16(u.addr + 0x1E + s * 2, 0) end
     -- Chests open from ON the tile: teleport the opener onto (6,3) (vacate old tile, occupy the chest).
     if mapUnitAt(CX, CY) ~= 0 then return result("FAIL", "the (6,3) chest tile is already occupied") end
-    setMapUnit(u.x, u.y, 0)
-    local grid = 1  -- blue army slot-1 grid marker isn't needed; any non-zero registers occupancy
-    emu:write8(u.addr + 0x10, CX); emu:write8(u.addr + 0x11, CY)
-    setMapUnit(CX, CY, grid)
+    -- grid = 1: blue army slot-1 grid marker isn't needed; any non-zero registers occupancy
+    INSPECT.place(u, CX, CY, { grid = 1 })
     shot("ch03chest-before")
     waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
     if not moveUnit(CX, CY, CX, CY) then
@@ -6143,16 +6138,13 @@ scenarios.ch03tourmaline = function()
     -- [Item, Wait] -- otherwise a nearby deployed unit adds Rescue at row 0 and A opens the wrong submenu.
     local function terr(x, y) return ru8(ru32(ru32(SYM.gBmMapTerrain) + y * 4) + x) end
     local FLOOR = { [0x01] = true, [0x02] = true, [0x17] = true, [0x2a] = true, [0x2d] = true }
-    local grid = mapUnitAt(u.x, u.y)
     local moved = false
     for y = 1, 14 do
         for x = 1, 15 do
             if FLOOR[terr(x, y)] and mapUnitAt(x, y) == 0
                 and mapUnitAt(x - 1, y) == 0 and mapUnitAt(x + 1, y) == 0
                 and mapUnitAt(x, y - 1) == 0 and mapUnitAt(x, y + 1) == 0 then
-                setMapUnit(u.x, u.y, 0)
-                emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
-                setMapUnit(x, y, grid)
+                INSPECT.place(u, x, y)
                 log(string.format("relocated the holder to the isolated tile (%d,%d)", x, y))
                 moved = true
                 break
@@ -6466,9 +6458,8 @@ scenarios.ch02baxby = function()
         emu:write32(baxby.addr + 0x0C, baxby.state & ~0x9)    -- clear US_HIDDEN | US_NOT_DEPLOYED
         local placed = false
         for _, t in ipairs({ { 0, 3 }, { 0, 4 }, { 1, 4 }, { 2, 3 }, { 1, 3 }, { 0, 5 } }) do
-            if mapUnitAt(t[1], t[2]) == 0 then
-                emu:write8(baxby.addr + 0x10, t[1]); emu:write8(baxby.addr + 0x11, t[2])
-                setMapUnit(t[1], t[2], idx); placed = true
+            if mapUnitAt(t[1], t[2]) == 0 and INSPECT.place(baxby, t[1], t[2], { grid = idx, vacate = false }) then
+                placed = true
                 log(string.format("force-deployed Baxby at (%d,%d) grid=%d", t[1], t[2], idx))
                 break
             end
@@ -7379,17 +7370,8 @@ scenarios.ch05recruit = function(opts)
         return result("FAIL", "Sahnar left the red array before the Talk -- killed by the AI, "
             .. "or she never settled on the map")
     end
-    local grid, parked = mapUnitAt(basil.x, basil.y), false
-    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-        local tx, ty = sah.x + d[1], sah.y + d[2]
-        if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
-            setMapUnit(basil.x, basil.y, 0)
-            emu:write8(basil.addr + 0x10, tx); emu:write8(basil.addr + 0x11, ty)
-            setMapUnit(tx, ty, grid)
-            parked = true
-            break
-        end
-    end
+    local tx, ty = INSPECT.freeBeside(sah)
+    local parked = tx ~= nil and INSPECT.place(basil, tx, ty)
     if not parked then return result("FAIL", "no free tile adjacent to Sahnar to park Basil") end
     basil = blueBasil()
     if not basil or not moveUnit(basil.x, basil.y, basil.x, basil.y) then
@@ -7547,18 +7529,10 @@ scenarios.ch05escort = function()
             if not spot and idx == 0 then spot = { x = tx, y = ty } end
         end
         if not spot then return nil, "no free tile adjacent to Sahnar" end
-        local grid = mapUnitAt(u.x, u.y)
-        setMapUnit(u.x, u.y, 0)
-        emu:write8(u.addr + 0x10, spot.x); emu:write8(u.addr + 0x11, spot.y)
-        setMapUnit(spot.x, spot.y, grid)
+        if not INSPECT.place(u, spot.x, spot.y) then return nil, "the free tile beside Sahnar is off the map" end
         return spot
     end
-    local function moveTo(u, x, y)
-        local grid = mapUnitAt(u.x, u.y)
-        setMapUnit(u.x, u.y, 0)
-        emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
-        setMapUnit(x, y, grid)
-    end
+    local function moveTo(u, x, y) INSPECT.place(u, x, y) end
 
     -- 1. Basil alone in reach.
     local home = { x = basil.x, y = basil.y }
@@ -7654,13 +7628,7 @@ local VISIT = {}
 -- tile->unit grid in sync, so the command check reads the new position at once (the
 -- ch03talk/parley trick). Reads the unit's position LIVE: a scenario that places the same unit
 -- twice holds a table whose x/y went stale.
-function VISIT.place(u, x, y)
-    local ox, oy = rs8(u.addr + 0x10), rs8(u.addr + 0x11)
-    local grid = mapUnitAt(ox, oy)
-    setMapUnit(ox, oy, 0)
-    emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
-    setMapUnit(x, y, grid)
-end
+function VISIT.place(u, x, y) return INSPECT.place(u, x, y) end
 
 -- Take one command off the unit menu by its semantic name ("visit", "armory", "vendor").
 function VISIT.command(semantic)
@@ -8483,19 +8451,10 @@ scenarios.ch05crest = function()
         end
         pokeFrail(boss)
         boss = red(RAVISIN)
-        local bossGrid = mapUnitAt(boss.x, boss.y)
-        local parked = false
-        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-            local tx, ty = hero.x + d[1], hero.y + d[2]
-            if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
-                setMapUnit(boss.x, boss.y, 0)
-                emu:write8(boss.addr + 0x10, tx); emu:write8(boss.addr + 0x11, ty)
-                setMapUnit(tx, ty, bossGrid)
-                parked = true
-                break
-            end
+        local tx, ty = INSPECT.freeBeside(hero)
+        if not (tx and INSPECT.place(boss, tx, ty)) then
+            return result("FAIL", "no free tile beside a blue unit to park Ravisin")
         end
-        if not parked then return result("FAIL", "no free tile beside a blue unit to park Ravisin") end
         hero = blue(hero.charId) or hero        -- re-read: parking rewrote the grid around them
         -- The engine's GRID, not our arithmetic, decides whether row 0 of the command menu is
         -- Attack (#204). Pressing it anyway opens Item and Uses a vulnerary at full HP, which
@@ -9698,10 +9657,7 @@ scenarios.ch04snag = function(opts)
             m = blue(u.charId)
             if not m then break end
         end
-        local grid = mapUnitAt(m.x, m.y)
-        setMapUnit(m.x, m.y, 0)
-        emu:write8(m.addr + 0x10, SNAG_X); emu:write8(m.addr + 0x11, SNAG_Y - 1)
-        setMapUnit(SNAG_X, SNAG_Y - 1, grid)
+        INSPECT.place(m, SNAG_X, SNAG_Y - 1)
         m = blue(u.charId)
         if not cursorTo(m.x, m.y) then break end
         if moveUnit(m.x, m.y, m.x, m.y) then
@@ -10714,10 +10670,7 @@ scenarios.ch06halberd = function()
                     end
                 end
                 if not best then return nil, name .. ": no free tile to move the target off to" end
-                local grid = mapUnitAt(m.x, m.y)
-                setMapUnit(m.x, m.y, 0)
-                emu:write8(m.addr + 0x10, bx); emu:write8(m.addr + 0x11, by)
-                setMapUnit(bx, by, grid)
+                INSPECT.place(m, bx, by)
                 return now
             end
         end

@@ -303,6 +303,48 @@ function Board.live(board, faction)
     return out
 end
 
+-- ---- placing a unit (#531 audit 4) ----------------------------------------------------
+-- Pure over `io = { rs8(a), write8(a, v), grid(x, y), setGrid(x, y, v) }` so test_board.lua runs
+-- it with no emulator. The map's size comes in as an ARGUMENT, read live by the caller: six
+-- copies of this dance carried the literal `tx <= 24 and ty <= 15` from a bigger chapter, and
+-- on ch03's 17x16 map an off-map tile reads gBmMapUnit's zero border as "empty" and was
+-- accepted.
+function Board.inMap(x, y, w, h)
+    return x >= 0 and x < w and y >= 0 and y < h
+end
+
+-- Stand the unit at `addr` on (x, y) and keep the tile->unit grid in step: vacate its old tile,
+-- write the new position, occupy the new tile. Returns true, or false + the reason when (x, y)
+-- is off the map (nothing is touched then). `o.grid` overrides the id written to the new tile
+-- (default: the id read live from the unit's old tile, which preserves faction bits);
+-- `o.vacate == false` skips clearing the old tile (a unit that was never on the grid).
+function Board.place(io, addr, x, y, w, h, o)
+    o = o or {}
+    if not Board.inMap(x, y, w, h) then
+        return false, string.format("tile (%d,%d) is off the %dx%d map", x, y, w, h)
+    end
+    local ox, oy = io.rs8(addr + 0x10), io.rs8(addr + 0x11)
+    local was = Board.inMap(ox, oy, w, h)
+    local grid = o.grid
+    if grid == nil then grid = was and io.grid(ox, oy) or 0 end
+    if o.vacate ~= false and was then io.setGrid(ox, oy, 0) end
+    io.write8(addr + 0x10, x); io.write8(addr + 0x11, y)
+    io.setGrid(x, y, grid)
+    return true
+end
+
+-- The first tile beside (ax, ay), taken in `order` (a list of { dx, dy }), that is on the map and
+-- empty in the grid and passes `ok(x, y)` when given. Returns x, y or nil.
+function Board.freeBeside(io, ax, ay, order, w, h, ok)
+    for _, d in ipairs(order) do
+        local tx, ty = ax + d[1], ay + d[2]
+        if Board.inMap(tx, ty, w, h) and io.grid(tx, ty) == 0 and (not ok or ok(tx, ty)) then
+            return tx, ty
+        end
+    end
+    return nil
+end
+
 -- The reader with its memory and symbols bound, for harness.lua: one top-level local there
 -- instead of one per helper.
 function Board.bind(mem, SYM)
@@ -321,6 +363,7 @@ function Board.bind(mem, SYM)
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         lordPid = function(flagSet) return Board.lordPid(mem, SYM, flagSet) end,
         canSeize = Board.canSeize,
+        inMap = Board.inMap, place = Board.place, freeBeside = Board.freeBeside,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,

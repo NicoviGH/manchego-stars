@@ -296,5 +296,43 @@ do
     check(#b.units, 0, "empty arrays read no units")
 end
 
+-- Placing a unit (#531 audit 4): bounds come from the map size passed in, and an off-map tile is
+-- refused with nothing touched. 17x16 is ch03's map, where the old literal 24/15 accepted x=20.
+do
+    local mem2, grid = {}, {}
+    local io = {
+        rs8 = function(a) local v = mem2[a] or 0; return v >= 0x80 and v - 0x100 or v end,
+        write8 = function(a, v) mem2[a] = v end,
+        grid = function(x, y) return grid[y * 100 + x] or 0 end,
+        setGrid = function(x, y, v) grid[y * 100 + x] = v end,
+    }
+    local A = 0x1000
+    mem2[A + 0x10], mem2[A + 0x11] = 3, 4
+    grid[4 * 100 + 3] = 0x41
+    local ok, why = Board.place(io, A, 20, 5, 17, 16)
+    check(ok, false, "place on x=20 of a 17-wide map is refused")
+    check(why ~= nil and why:find("(20,5)", 1, true) ~= nil, true, "the refusal names the tile")
+    check(mem2[A + 0x10], 3, "a refused place leaves the position")
+    check(grid[4 * 100 + 3], 0x41, "a refused place leaves the old tile occupied")
+    check(Board.place(io, A, 5, 16, 17, 16), false, "y == height is off the map")
+    check(Board.place(io, A, -1, 0, 17, 16), false, "negative x is off the map")
+    check(Board.place(io, A, 16, 15, 17, 16), true, "the far corner is on the map")
+    check(mem2[A + 0x10], 16, "x written")
+    check(grid[15 * 100 + 16], 0x41, "the old tile's id moved to the new tile")
+    check(grid[4 * 100 + 3], 0, "the old tile was vacated")
+    check(Board.place(io, A, 2, 2, 17, 16, { grid = 7, vacate = false }), true, "explicit grid id")
+    check(grid[2 * 100 + 2], 7, "o.grid is what the new tile holds")
+    check(grid[15 * 100 + 16], 0x41, "o.vacate == false leaves the old tile")
+    -- A unit parked off the map (-1,-1) has no old tile to vacate.
+    mem2[A + 0x10], mem2[A + 0x11] = 0xFF, 0xFF
+    check(Board.place(io, A, 1, 1, 17, 16), true, "an off-map unit can be placed")
+    check(grid[1 * 100 + 1], 0, "an off-map unit carries no grid id")
+    -- freeBeside honours the bounds and the occupancy grid, in order.
+    grid[0 * 100 + 1] = 5
+    local fx, fy = Board.freeBeside(io, 0, 0, { { -1, 0 }, { 1, 0 }, { 0, 1 } }, 17, 16)
+    check(fx .. "," .. fy, "0,1", "off-map and occupied neighbours are skipped")
+    check(Board.freeBeside(io, 16, 0, { { 1, 0 } }, 17, 16), nil, "a neighbour past the width is none")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
