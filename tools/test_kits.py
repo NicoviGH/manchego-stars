@@ -29,8 +29,8 @@ class OurPickups(unittest.TestCase):
     def test_pure_water_kept_but_not_weapon(self):
         water = [p for p in self.ours if p.item == 'ITEM_PUREWATER']
         self.assertTrue(water)
-        self.assertFalse(kits.is_weapon(water[0]))
-        self.assertTrue(kits.is_weapon(kits.Pickup('ITEM_AXE_HANDAXE', 'village', 2)))
+        import difficulty
+        self.assertIsNone(difficulty.item_weapon(water[0].item))
 
 
 class TwinPickups(unittest.TestCase):
@@ -147,14 +147,16 @@ class Arsenals(unittest.TestCase):
         self.assertNotIn('steel-sword', self.names(ars, 'c'))
         self.assertEqual(['iron-sword'], self.names(kits.arsenals(picks, 2, party, 'guaranteed'), 'a'))
 
-    def test_five_slot_cap(self):
-        picks = [self.P(i, 'shop', 1) for i in ('ITEM_SWORD_STEEL', 'ITEM_SWORD_SLIM',
-                                                 'ITEM_SWORD_SILVER', 'ITEM_SWORD_KILLER',
-                                                 'ITEM_SWORD_ARMORSLAYER')]
+    def test_past_five_slots_an_effective_weapon_is_kept(self):
+        # Mt alone would cut the Armorslayer for a Steel Sword the Silver Sword beats outright.
+        picks = [self.P(i, 'shop', 1) for i in ('ITEM_SWORD_STEEL', 'ITEM_SWORD_KILLER',
+                                                 'ITEM_SWORD_SILVER', 'ITEM_SWORD_BRAVE',
+                                                 'ITEM_SWORD_ARMORSLAYER', 'ITEM_SWORD_SLIM')]
         ars = kits.arsenals(picks, 2, [member('a', {'sword'}, ['ITEM_SWORD_IRON'])], 'happy')
         self.assertEqual(5, len(ars['a']))
         self.assertEqual('iron-sword', ars['a'][0].name)
-        self.assertNotIn('sword-slim', self.names(ars, 'a'))
+        self.assertIn('armorslayer', self.names(ars, 'a'))
+        self.assertNotIn('steel-sword', self.names(ars, 'a'))
 
     def test_non_weapon_join_items_are_not_weapons(self):
         ars = kits.arsenals([], 1, [member('a', {'axe'}, ['ITEM_AXE_IRON', 'ITEM_VULNERARY'])],

@@ -2183,23 +2183,24 @@ def arriving_careers(campaign, ch):
     each unit once per simulated career (`player_careers`)."""
     import exp_curve                        # exp_curve imports this module
     chap = chapter_schema.load(chapter_path(campaign, ch))
-    return _party_careers(campaign,
-                          exp_curve.entering(campaign, int(chap['chapter_number']))['party'])
+    n = int(chap['chapter_number'])
+    return _party_careers(campaign, exp_curve.entering(campaign, n)['party'], n)
 
 
-def _party_careers(campaign, party, chapter=None, path=None):
+def _party_careers(campaign, party, chapter, path='guaranteed'):
     """{uid: careers} for an arriving party, in the order the ROM loads it
-    (`inject.cast.load_order`): the order the AI breaks a target tie in (`_map_order`). With a
-    `path`, each unit carries its kit entering `chapter` (`_our_kits`, #510 step 8); without
-    one, its joining load's first weapon, as the older reports read it."""
+    (`inject.cast.load_order`): the order the AI breaks a target tie in (`_map_order`). Each
+    unit carries its kit entering `chapter` on `path` (`_our_kits`, #510 step 8); the default
+    is the guaranteed path, as `vanilla_party_careers`'s is, so a report compares like with
+    like. The parity read passes the path it grades."""
     order = inject.cast.load_order(campaign)
     unknown = sorted(set(party) - set(order))
     if unknown:
         sys.exit('ERROR: %s arrive(s) in the party but the build loads no such unit '
                  '(inject.cast.load_order reads PORTRAIT_MAP)' % ', '.join(unknown))
     uids = sorted(party, key=order.index)
-    kit = _our_kits(campaign, uids, chapter, path) if path else {}
-    return {uid: player_careers(campaign, uid, party[uid][1] - party[uid][0], kit.get(uid))
+    kit = _our_kits(campaign, uids, chapter, path)
+    return {uid: player_careers(campaign, uid, party[uid][1] - party[uid][0], kit[uid])
             for uid in uids}
 
 
@@ -2315,7 +2316,7 @@ def report(campaign, ch, mode=None):
                                                           '; '.join(labels)))
 
     ours_lv = {uid: lv for uid, (_j, lv) in arriving['party'].items()} if arriving else {}
-    ours_careers = (_party_careers(campaign, arriving['party']) if arriving
+    ours_careers = (_party_careers(campaign, arriving['party'], int(num)) if arriving
                     else {u.name: [u] for u in roster})
     if guests:
         ours_careers = guests
@@ -2367,7 +2368,7 @@ def report(campaign, ch, mode=None):
               % (num, ref))
 
     _print_pressure(_chapter_pressure(chap, campaign=campaign))
-    _print_kit_paths(chap, campaign)
+    _print_kit_paths(chap, campaign, mode)
     print_role_findings(chap, chap.get('parity_reference'), campaign, mode)
     import strategy                         # strategy imports this module
     strategy.print_strategy(chap, campaign, mode)
@@ -2580,6 +2581,10 @@ def _print_kit_paths(chap, campaign, mode=None):
           'threat x%.2f · clear-load x%.2f'
           % (happy['threat_ratio'], happy['load_ratio'], sure['threat_ratio'],
              sure['load_ratio']))
+    import kits
+    if any(p.projected for p in kits.our_pickups(campaign)):
+        print('        (our world-map stock projected from the twin\'s until campaign.yaml '
+              'stocks a town)')
 
 
 def _print_pressure(p):

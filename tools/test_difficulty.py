@@ -107,6 +107,24 @@ class KitPaths(unittest.TestCase):
         self.assertNotIn('sword-slim', [w.name for w in f['van_party']['Neimi'][0].arsenal])
         self.assertIn('sword-slim', [w.name for w in f['van_party']['Franz'][0].arsenal])
 
+    def test_the_kits_line_reads_the_reports_mode(self):
+        seen = []
+        real = df.chapter_matchup
+
+        def spy(chap, campaign, mode=None, path='happy'):
+            seen.append((mode, path))
+            return real(chap, campaign, mode, path)
+        with mock.patch.object(df, 'chapter_matchup', spy), \
+                contextlib.redirect_stdout(io.StringIO()):
+            df.report(self.CAMPAIGN, 'ch04', mode='difficult')
+        self.assertIn(('difficult', 'guaranteed'), seen)
+
+    def test_our_party_defaults_to_the_guaranteed_path_like_the_twins(self):
+        import exp_curve
+        party = exp_curve.entering(self.CAMPAIGN, 3)['party']
+        ours = df._party_careers(self.CAMPAIGN, party, 3)
+        self.assertEqual(['iron-axe', 'hand-axe'], [w.name for w in ours['braulo'][0].arsenal])
+
     def test_the_chapter_report_prints_both_paths(self):
         import contextlib
         import io
@@ -116,6 +134,7 @@ class KitPaths(unittest.TestCase):
         out = buf.getvalue()
         self.assertIn('happy path (graded)', out)
         self.assertIn('guaranteed only', out)
+        self.assertIn('world-map stock projected from the twin', out)
 
     def test_the_curve_never_reads_the_guaranteed_path(self):
         import kits

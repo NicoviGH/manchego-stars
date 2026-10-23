@@ -18,10 +18,11 @@ import re
 from dataclasses import dataclass
 
 import difficulty
+import fe_combat
 import inject.chapter_settings
 import inject.decomp
 
-GUARANTEED = frozenset({'join', 'scene', 'interlude'})
+GUARANTEED = frozenset({'scene', 'interlude'})
 
 
 
@@ -47,18 +48,14 @@ class Member:
     char: str = None            # CHARACTER_*, for a gift with a named recipient
 
 
-def is_weapon(p):
-    return difficulty.item_weapon(p.item) is not None
-
-
 def arsenals(pickups, chapter, party, path):
     """{member name: (Weapon, ...)} for `party` ([Member], join order) entering `chapter` on
     `path` ('happy' or 'guaranteed'). A pickup is in hand from the chapter AFTER it is handed
     out, except a scene gift, which is in hand in its own chapter (the Prologue's opening hands
     Eirika the Rapier she fights it with). A named gift goes to its recipient or to nobody; a shop item to every member who can
     wield it and lacks it; any other weapon to the first such member. The join kit stays
-    first, in its order (its first weapon is the one equipped); past SLOTS, the highest-Mt of
-    the rest are kept."""
+    first, in its order (its first weapon is the one equipped); past SLOTS, the rest that no
+    carried weapon beats outright are kept first, by Mt."""
     if path not in ('happy', 'guaranteed'):
         raise ValueError(path)
     held = {m.name: [w for w in map(difficulty.item_weapon, m.items) if w is not None]
@@ -80,7 +77,10 @@ def arsenals(pickups, chapter, party, path):
     for m in party:
         kit = sum(1 for it in m.items if difficulty.item_weapon(it) is not None)
         own, rest = held[m.name][:kit], held[m.name][kit:]
-        keep = sorted(rest, key=lambda w: -w.mt)[:max(0, SLOTS - len(own))]
+        # A weapon some other one beats outright goes first, then the lowest Mt: a careful
+        # player keeps the Armorslayer over a Steel Sword the Silver Sword already beats.
+        best = fe_combat.undominated(tuple(held[m.name]))
+        keep = sorted(rest, key=lambda w: (w not in best, -w.mt))[:max(0, SLOTS - len(own))]
         out[m.name] = tuple(own + [w for w in rest if w in keep])
     return out
 

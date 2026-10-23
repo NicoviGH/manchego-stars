@@ -328,8 +328,9 @@ def best_rounds_to_kill(atk, dfn, terrain_avoid=0, rounds=None):
         def rounds(a, d):
             return rounds_to_kill(a, d, terrain_avoid)
     best = None
-    weapons = undominated(atk.arsenal) if atk.arsenal else ()
-    for a in tuple(replace(atk, weapon=w) for w in weapons) or (atk,):
+    if atk.arsenal:
+        atk = replace(atk, arsenal=undominated(atk.arsenal))
+    for a in arms(atk) or (atk,):
         r = rounds(a, dfn)
         best = r if best is None else minimum(best, r)
     return best
