@@ -1873,10 +1873,8 @@ def party_matchup(bodies, careers, deploy_cap=None, forced=(), engage=None):
             per.append((threat, clear))
     slots = max(1, min(len(names), len(names) if deploy_cap is None else deploy_cap))
     heaviest = None
-    if engagements is None:
+    if not engagements:                     # no board, or nothing on it groups: all at once
         worst = sum(p[0] for p in per)
-    elif not engagements:
-        worst = numpy.zeros(n)
     else:
         loads = numpy.array([sum((per[j][0] for j in g.members), numpy.zeros(n))
                              for g in engagements])

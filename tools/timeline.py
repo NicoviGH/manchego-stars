@@ -86,11 +86,21 @@ def first_contact(board, body, front, horizon=HORIZON):
 def ai_priority(body):
     """The order FE8's AI moves a unit in: `SortAiUnitList` (cp_order.c) sorts ascending, and
     stably, on `GetUnitAiPriority`: Mov, plus 20 for a melee unit, 40 for one that can strike
-    at range, 87 for one with no weapon. The leader's +87 and the shared leader term are left
+    at range, 87 for one with no weapon. Not modelled: a staff user (72), a thief (+60) and the
+    leader (+87); none charges the front early. A tie keeps unit-table order, which is LOAD order (a
+    unit takes the first free slot as it loads), so callers break it on the arrival turn
+    before the list: vanilla Ch2 lists its turn-3 raiders ahead of Bazba, who loads on turn 1. The leader's +87 and the shared leader term are left
     out: a chapter's leader is its boss, which waits rather than charges."""
     if not body.arms:
         return body.mov + 87
     return body.mov + (40 if any(a.weapon.rng[1] > 1 for a in body.arms) else 20)
+
+
+def fights(body):
+    """Does `body` attack the party at all? An unarmed body, an inert one (`AI_A_06`) and an
+    own-errand one (it loots, flees or chews walls) do not: they hold no firing tile and are
+    in no engagement."""
+    return bool(body.arms) and body.action != dm.INERT_ACTION and body.shape != 'own-errand'
 
 
 def front_contacts(board, front, horizon=HORIZON):
@@ -100,16 +110,27 @@ def front_contacts(board, front, horizon=HORIZON):
     needs a firing tile of its own that the party is not standing on, and keeps it once it has
     struck (it stays in the fight). The AI moves units in `ai_priority` order and each takes
     the free tile nearest its own walk, not the one that leaves the most for the rest, so a
-    body that finds every tile in its reach taken waits for the next phase. Read against `ch04waves` (#510 step 7): without it, four of six Mauthe Doogs that
-    arrive beside the party's corner strike on phase 2, not all six."""
-    front = {tuple(t) for t in front}
-    first = {k: first_contact(board, b, front, horizon) for k, b in enumerate(board.bodies)}
+    body that finds every tile in its reach taken waits for the next phase. Read against
+    `ch04waves` (#510 step 7): of six Mauthe Doogs that arrive beside the party's corner, four
+    strike on phase 2, not all six. Memoised on the board: every read of one board asks it."""
+    front = frozenset(tuple(t) for t in front)
+    key = (front, horizon)
+    memo = board.__dict__.setdefault('_front_contacts', {})
+    if key not in memo:
+        memo[key] = _front_contacts(board, front, horizon)
+    return dict(memo[key])
+
+
+def _front_contacts(board, front, horizon):
+    first = {k: first_contact(board, b, front, horizon) if fights(b) else None
+             for k, b in enumerate(board.bodies)}
     out = {k: None for k in first}
     held = set()
     for phase in range(1, horizon + 1):
         for k in sorted((k for k, p in first.items()
                          if p is not None and p <= phase and out[k] is None),
-                        key=lambda k: (ai_priority(board.bodies[k]), k)):
+                        key=lambda k: (ai_priority(board.bodies[k]), board.bodies[k].arrives,
+                                       k)):
             b = board.bodies[k]
             walk = board._walk(b)
             cells = [c for c in board.stands(b, phase) & striking(front, b.arms)
@@ -152,13 +173,14 @@ def engagements(board, front, defender, reach):
         player reading FE's danger zone (Nicolas, 2026-10-22): a careless attempt ends in a
         restart, so the run that clears the chapter is the careful one.
 
-    Pockets are read once every waiting body has arrived. A wave and a pocket are never merged,
+    Each pocket is read on its body's arrival turn, from tiles the party can walk to from its
+    front. A wave and a pocket are never merged,
     and a body may sit in several pockets. Unarmed, inert and own-errand bodies are in none."""
     waves = collections.defaultdict(set)
     waiting = []
     struck = front_contacts(board, front, dm.ENGAGE_HORIZON)
     for k, b in enumerate(board.bodies):
-        if not b.arms or b.action == dm.INERT_ACTION or b.shape == 'own-errand':
+        if not fights(b):
             continue
         if dm._moves_like(b) == 'pursuer':
             phase = struck[k]
@@ -169,22 +191,23 @@ def engagements(board, front, defender, reach):
     out = [Engagement('wave', frozenset(m), p, None) for p, m in sorted(waves.items())]
     if not waiting:
         return out
-    phase = max(board.bodies[k].arrives for k in waiting)
     # Only waiting bodies are in a pocket, so their danger is read on a board of their own.
     pockets = dm.Board(board.chapter, terrain=board.terrain,
                        fielded=[board.bodies[k] for k in waiting])
     index = {id(b): k for k, b in zip(waiting, pockets.bodies)}
     taken = {b.source for b in pockets.bodies}
-    rows, cols = len(board.terrain), len(board.terrain[0])
+    # A tile the party cannot walk to from its front is no place to pull from.
+    walkable = pp.foot_reach(board.terrain, sorted(front), blocked=taken)
     for k in waiting:
         x0, y0 = board.bodies[k].source
+        # Read when this body is on the map: a turn-1 pocket is pulled before the turn-8 wave.
+        phase = board.bodies[k].arrives
         best = None
         for d in sorted(reach):
             for dx in range(-d, d + 1):
                 for dy in {d - abs(dx), abs(dx) - d}:
                     x, y = x0 + dx, y0 + dy
-                    if (not (0 <= x < cols and 0 <= y < rows) or (x, y) in taken
-                            or pp.FOOT_COST.get(board.terrain[y][x]) is None):
+                    if (x, y) not in walkable or (x, y) in taken:
                         continue
                     hits = dm.attacks_on(pockets, (x, y), defender, phase)
                     cost = dm.expected_damage(hits)

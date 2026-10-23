@@ -2784,6 +2784,13 @@ class PartyMatchup(unittest.TestCase):
         self.assertAlmostEqual(one['threat'], whole['threat'])
         self.assertAlmostEqual(one['clear'], whole['clear'])
 
+    def test_a_board_with_nothing_to_group_reads_all_at_once(self):
+        a = combatant('a', pow_=6, weapon='iron-lance')
+        enemies = [(combatant('e%d' % k, pow_=8 + k, weapon='iron-axe'), 0) for k in range(2)]
+        whole = df.party_matchup(enemies, {'a': [a]})
+        empty = df.party_matchup(enemies, {'a': [a]}, engage=self._engage())
+        self.assertAlmostEqual(empty['threat'], whole['threat'])
+
     def test_threat_is_the_heaviest_engagement(self):
         """#510 step 7: two enemies met apart threaten one at a time."""
         a = combatant('a', hp=40, pow_=6, weapon='iron-lance')
@@ -2901,9 +2908,21 @@ class ChapterPressureInMode(unittest.TestCase):
         read compares two tuned tables. A fixed bound on |mode - authored| tested the chapters,
         not the model (ch04 on Difficult sits 0.26 off its authored read on faithful loads,
         which is ch04's own content, logged on #510). This tests the model: zero the twin's
-        shift and the ratio must move at least as far as with both sides shifted."""
+        shift and the ratio must move at least as far as with both sides shifted.
+
+        Read all at once, not by engagement: which enemies share a pocket depends on the stats
+        a shift moves (the cheapest pull tile is priced in damage), so the heaviest engagement
+        is a discrete pick that need not move monotonically. The claim is about the shift."""
+        import timeline
         real = df.vanilla_chapter_shifts
         moved = []
+        no_board = mock.patch.object(timeline, 'matchup_engagements',
+                                     lambda chap, fields: dict.fromkeys(
+                                         ('ours', 'vanilla', 'cross')))
+        no_board.start()
+        self.addCleanup(no_board.stop)
+        self.addCleanup(df._MATCHUPS.clear)
+        df._MATCHUPS.clear()
         for chid in ('ch00', 'ch01', 'ch02', 'ch03', 'ch04', 'ch05'):
             chap = df.load_field('rime-of-the-frostmaiden', chid)[0]
             authored = df._chapter_pressure(chap)['verdict']['threat_ratio']

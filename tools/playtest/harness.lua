@@ -4320,7 +4320,7 @@ end
 -- in-engine proof of `timeline.engagements`). The parity model reads a pursuer's WAVE as the
 -- enemy phase it first stands in weapon range of a deploy tile, with nobody moving and
 -- nothing dying. This plays exactly that: every deployed unit ends its turn where prep put
--- it, held at 60 HP with 0 Pow so nobody falls and no counter kills an enemy, for eight
+-- it, every unit on both sides held at full HP every frame so nothing falls, for eight
 -- enemy phases (`timeline.HORIZON`). Each red unit is logged the phase it is first seen (its
 -- tile, the key the model's body is matched on) and the phase it first attacks, read off
 -- gAiDecision the frame the AI makes it.
@@ -4330,13 +4330,20 @@ INSPECT.firstAttacks = function(phases)
     waitFor(function() return faction() == 0 and not menuOpen()
         and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
     local seen, attacked = {}, {}
+    -- Every frame, not once a phase: four attackers in one phase can drop a unit a once-a-phase
+    -- refill missed, and a weapon's Mt still counters at 0 Pow. The first run without this
+    -- lost six reds by phase 8, each freeing a tile the model's held front never frees.
     local function hold()
         for i = 0, 61 do
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and u.onMap and not isDead(u) then
                 emu:write8(u.addr + 0x12, 60); emu:write8(u.addr + 0x13, 60)
-                emu:write8(u.addr + 0x14, 0)
+                pokeHarmless(u)
             end
+        end
+        for i = 0, 49 do
+            local u = unitAt(SYM.gUnitArrayRed, i)
+            if u and u.onMap and not isDead(u) then emu:write8(u.addr + 0x13, u.maxhp) end
         end
     end
     local function look(phase)
@@ -4350,8 +4357,8 @@ INSPECT.firstAttacks = function(phases)
         end
     end
     look(1)
+    local holding = callbacks:add("frame", hold)
     for phase = 1, phases do
-        hold()
         emu:write8(SYM.gAiDecision + 0x00, 0)
         local decided = {}
         local watch = callbacks:add("frame", function()
@@ -4381,6 +4388,7 @@ INSPECT.firstAttacks = function(phases)
         callbacks:remove(watch)
         callbacks:remove(look_watch)
         if back ~= "player" then
+            callbacks:remove(holding)
             return result("FAIL", string.format("enemy phase %d returned %s", phase, tostring(back)))
         end
         for i = 0, 49 do
@@ -4398,9 +4406,18 @@ INSPECT.firstAttacks = function(phases)
             end
         end
     end
-    local n, hit = 0, 0
+    callbacks:remove(holding)
+    local n, hit, alive = 0, 0, 0
     for _ in pairs(seen) do n = n + 1 end
     for _ in pairs(attacked) do hit = hit + 1 end
+    for i = 0, 49 do
+        local u = unitAt(SYM.gUnitArrayRed, i)
+        if u and u.onMap and not isDead(u) then alive = alive + 1 end
+    end
+    if alive ~= n then
+        return result("FAIL", string.format("%d of %d red units died: the held front must "
+            .. "kill nothing", n - alive, n))
+    end
     return result("PASS", string.format("%d red units seen, %d attacked within %d enemy phases",
                                         n, hit, phases))
 end

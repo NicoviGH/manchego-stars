@@ -146,6 +146,15 @@ class Engagements(unittest.TestCase):
         board = dm.Board(None, terrain=plains(24, 3), fielded=bodies, blocked=self.FRONT)
         self.assertEqual(tl.front_contacts(board, self.FRONT), {0: 2, 1: 3})
 
+    def test_a_tie_in_ai_order_goes_to_the_unit_that_loaded_first(self):
+        # A unit's table slot is where it LOADED: a turn-3 reinforcement listed first still
+        # moves after a turn-1 unit of equal priority (vanilla Ch2's raiders and Bazba).
+        # Both can reach the one free tile beside the party, (1, 1), on phase 2.
+        late = body((5, 1), arrives=2, index=0)
+        early = body((10, 1), index=1)
+        board = dm.Board(None, terrain=plains(24, 3), fielded=[late, early], blocked=self.FRONT)
+        self.assertEqual(tl.front_contacts(board, self.FRONT, 8), {0: 3, 1: 2})
+
     def test_ai_order_is_mov_then_reach_then_table(self):
         # SortAiUnitList: ascending Mov + 20 melee / 40 ranged, stable on the table order.
         slow, fast = body((0, 0), mov=4, index=0), body((0, 0), mov=6, index=1)
@@ -175,10 +184,27 @@ class Engagements(unittest.TestCase):
         errand = body((14, 1), shape='own-errand', index=1)
         self.assertEqual(self._read([unarmed, errand]), [])
 
-    def test_a_waiting_reinforcement_is_read_once_it_has_arrived(self):
+    def test_each_pocket_is_read_when_its_own_body_arrives(self):
+        # A turn-1 striker is pulled before a turn-4 one standing beside it has arrived.
         read = self._read([body((12, 1), shape='striker', index=0),
-                           body((20, 1), shape='striker', arrives=4, index=1)])
-        self.assertTrue(all(e.phase == 4 for e in read if e.kind == 'pocket'))
+                           body((13, 1), shape='striker', arrives=4, index=1)])
+        first = next(e for e in read if 0 in e.members and e.phase == 1)
+        self.assertEqual(sorted(first.members), [0])
+        self.assertTrue(any(e.phase == 4 and e.members == {0, 1} for e in read))
+
+    def test_a_pull_tile_the_party_cannot_walk_to_is_no_pull_tile(self):
+        # The statue's one tile out of the striker's step, (12,2), is ringed by water, so the
+        # party can only pull from (11,1) or (12,0), both in the striker's step: a pocket of two.
+        terrain = plains(24, 3)
+        water = pp.TERRAIN['TERRAIN_WATER']
+        for x, y in ((13, 0), (13, 1), (13, 2), (11, 2)):
+            terrain[y][x] = water
+        bodies = [body((12, 1), shape='statue', index=0),
+                  body((10, 0), shape='striker', mov=1, index=1)]
+        board = dm.Board(None, terrain=terrain, fielded=bodies)
+        statue = next(e for e in tl.engagements(board, self.FRONT, soldier('party'), (1,))
+                      if 0 in e.members)
+        self.assertEqual(sorted(statue.members), [0, 1])
 
     def test_a_pursuer_that_never_reaches_the_front_waits_to_be_fetched(self):
         # A front it can never reach (off the map): it waits for the party to fetch it.
