@@ -1127,7 +1127,7 @@ local function endTurn(tile, alreadyWon)
             return alreadyWon() or controllerState(observeController()) == "player_map_idle"
         end, 600)
         if alreadyWon() or controllerState(observeController()) ~= "player_map_idle" then
-            log("the rout fired the win directly -- no turn left to end")
+            log("the phase or the chapter already ended under the last action -- no turn left to end")
             return true
         end
     end
@@ -1150,8 +1150,10 @@ end
 -- End turn, then ride out the enemy phase. Returns "gameover" the moment the game-over
 -- screen proc appears, "player" when control comes back, "ended" if the chapter itself
 -- finished during the phase, or nil if the phase wedged (which leaves a controller fault).
-local function runEnemyPhase(tile)
-    if not endTurn(tile) then return nil end
+-- alreadyWon is endTurn's: a won-test for a caller whose last action may already have ended
+-- the phase (FE8 ends it by itself once every unit has acted) or the chapter.
+local function runEnemyPhase(tile, alreadyWon)
+    if not endTurn(tile, alreadyWon) then return nil end
     local startedIn = chapter()
     for _ = 1, TUNE.enemyPhaseFrames do
         if gameOverActive() then return "gameover" end
@@ -2355,7 +2357,7 @@ end
 -- tile; else step to the reachable tile NEAREST the boss by path distance (`field`, BFS around
 -- walls) -- falling back to Manhattan toward `goal` only where the field is unreachable. GUARANTEES
 -- it commits through a semantic Attack/Wait. Mechanical failures terminate without rescue input.
-local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy)
+local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy, stopWhen)
     -- thread the REAL map bounds through: selectAndReach defaults to a 15x10
     -- window, which clipped every reach list at x=14 on ch01's 25x16 map -- the
     -- probable root cause of the #60 stall at exactly (14,8)
@@ -2383,7 +2385,9 @@ local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy)
         return controllerState(after) == "unit_command_menu"
     end, 180) then return tile, true end
     local committed
-    if pick then committed = chooseAttack(u.addr) else committed = chooseWait() end
+    -- stopWhen: the chapter-won test. A killing blow on a DefeatBoss boss can tear the map
+    -- down before the actor ever greys out (the Sephek case chooseAttack documents).
+    if pick then committed = chooseAttack(u.addr, stopWhen) else committed = chooseWait() end
     if not committed then return tile, true end
     if claimed then claimed[CLEARBOT.tileKey(tile.x, tile.y)] = true end
     return tile, false
@@ -2507,13 +2511,24 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                         end
                     end
                     local tile, failed = clearUnitAct(u, field, b, blocked, claimed,
-                                                      maxx, maxy)
+                                                      maxx, maxy, won)
                     if failed then
                         if tile then
                             log(string.format("clear: unit (%d,%d) chose (%d,%d) but the "
                                 .. "move didn't commit", u.x, u.y, tile.x, tile.y))
                         end
                         return "stuck", t
+                    end
+                    -- The strike killed the boss. On a DefeatBoss map its death runs the
+                    -- ending straight into the post-chapter save menu, and the next thing this
+                    -- loop does (another unit, or endTurn) waits for the player map and meets
+                    -- that menu as an unexpected state. Wait out the outcome the way winCh00
+                    -- does -- chapter advanced -- or, on a Seize map, control coming back.
+                    if won() or not findBoss() then
+                        waitFor(function()
+                            return won() or controllerState() == "player_map_idle"
+                        end, TUNE.combatFrames, true)
+                        if won() then return "won", t end
                     end
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
                     -- Boss dead, not yet won: select semantic Seize when this unit owns it.
@@ -2536,7 +2551,11 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         end
         if won() then return "won", t end
         if lost() then return "gameover", t end
-        local phase = runEnemyPhase(park)
+        -- won, as endTurn's alreadyWon: when the last unit acts FE8 ends the player phase by
+        -- itself, and the boss can die on the enemy phase that follows (a counter) with the
+        -- ending running straight into the save menu. Waiting for the player map there met that
+        -- menu as an unexpected state and failed a won `clear`.
+        local phase = runEnemyPhase(park, won)
         if phase == "gameover" then return "gameover", t end
         -- "ended" = the phase carried the chapter out (a DefeatAll win fires the ending from
         -- inside it). Ask won() rather than calling it stuck: the bot did its job (#335).
