@@ -19,8 +19,10 @@ ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never widen 
 (subagent-driven recommended): <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370592835>.
 Six PRs, A-F: A Caellach out of `vanilla_loaded_units`; B one board reader; C the careful bot
 (pure Lua); D the bot plays one chapter in the ROM off FE8's danger zone + forecast; E campaigns
-with a savestate per chapter start; F the Monte Carlo runner. Four defaults await his call (end
-of the comment: +/-10pt margin, 5% bot-fault ceiling, no resets, 60-turn cap). Try GitHub's
+with a savestate per chapter start; F the Monte Carlo runner. Its closing defaults are REPLACED by
+the amendment <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6371791465>
+(no margin, stuck = repeated board, restarts kept + recorded without re-seeding, no give-up
+threshold, a feasibility check, a local-model LLM spot check). Waiting on the execution method. Try GitHub's
 native stacked PRs on D->E->F only, E stacked after D's review
 (<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370779750>). The design is
 <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370450022>; the simulator
