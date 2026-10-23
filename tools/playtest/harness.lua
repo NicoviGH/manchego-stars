@@ -25,6 +25,11 @@ dofile(PLAYTEST_DIR .. "/procscr.lua")
 -- half-written table is a total outage with a confusing error much later. Say so here.
 assert(type(PROCSCR) == "table" and next(PROCSCR) ~= nil,
     "procscr.lua defined no PROCSCR table -- regenerate it: tools/playtest/gen_symbols.py")
+-- The proc pool, read once per frame instead of once per question (procmemo.lua, #531).
+-- Installed before anything touches `emu`: from here on the global is a guard that drops the
+-- memo on every harness write, and PROCS.raw is the real emulator the hot reads bind to.
+local PROCS = dofile(PLAYTEST_DIR .. "/procmemo.lua").install(_G,
+    { base = SYM.sProcArray, stride = 0x6C, count = 64 })
 local Controller = dofile(PLAYTEST_DIR .. "/controller.lua")
 local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 
@@ -170,16 +175,17 @@ local function press(key, holdFrames)
 end
 local K = C.GBA_KEY
 
-local function ru8(a) return emu:read8(a) end
+-- Straight to the real emulator: a read cannot change the proc pool, so it skips the guard.
+local function ru8(a) return PROCS.raw:read8(a) end
 local function rs8(a)
-    local v = emu:read8(a)
+    local v = PROCS.raw:read8(a)
     if v >= 0x80 then v = v - 0x100 end
     return v
 end
-local function ru16(a) return emu:read16(a) end
-local function ru32(a) return emu:read32(a) end
+local function ru16(a) return PROCS.raw:read16(a) end
+local function ru32(a) return PROCS.raw:read32(a) end
 local function rs16(a)
-    local v = emu:read16(a)
+    local v = PROCS.raw:read16(a)
     if v >= 0x8000 then v = v - 0x10000 end
     return v
 end
@@ -189,21 +195,9 @@ local function faction() return ru8(SYM.gPlaySt + 0x0F) end
 local function turn() return ru16(SYM.gPlaySt + 0x10) end
 local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) end
 
-local function findProc(scriptAddr)
-    -- A symbol gen_symbols.py does not export reads as nil, and scanning for nil finds nothing,
-    -- which looks exactly like "the proc never started" (ch02armory's first run, #493).
-    if scriptAddr == nil then
-        error("findProc: nil proc script -- add the symbol to gen_symbols.py's export list", 2)
-    end
-    for i = 0, 63 do
-        local addr = SYM.sProcArray + i * 0x6C
-        if ru32(addr) == scriptAddr then return addr end
-    end
-    return nil
-end
-local function procActive(scriptAddr) return findProc(scriptAddr) ~= nil end
+local function procActive(scriptAddr) return PROCS.find(scriptAddr) ~= nil end
 local function anyMenuProc()
-    return findProc(SYM.sProc_MenuMain) or findProc(SYM.sProc_Menu)
+    return PROCS.find(SYM.sProc_MenuMain) or PROCS.find(SYM.sProc_Menu)
 end
 local function activeMenuProc()
     local addr = anyMenuProc()
@@ -444,7 +438,7 @@ local function callbackName(a, names)
     return (names or CALLBACK_NAMES)[a] or string.format("0x%08X", a)
 end
 local function observedProc(script, idleName)
-    local addr = findProc(script)
+    local addr = PROCS.find(script)
     if not addr then return nil end
     return { addr = addr, idle = idleName or callbackName(ru32(addr + 0x0C)) }
 end
@@ -482,7 +476,7 @@ local function observeMenu(observation)
     observation.menu = menu
 end
 local function observePrep(observation)
-    local addr = findProc(SYM.ProcScr_PrepMenu)
+    local addr = PROCS.find(SYM.ProcScr_PrepMenu)
     if not addr then return end
     local count = ru8(addr + 0x2B)
     if count == 0 or count > 8 then
@@ -516,7 +510,7 @@ local function observePrep(observation)
     observation.prep = prep
 end
 local function observeTarget(observation)
-    local addr = findProc(SYM.gProcScr_TargetSelection)
+    local addr = PROCS.find(SYM.gProcScr_TargetSelection)
     if not addr then return end
     local current = ru32(addr + 0x30)
     local routines = ru32(addr + 0x2C)
@@ -560,22 +554,19 @@ local function observeController()
         procs = {}, raw_procs = {},
         world = { chapter = chapter(), faction = faction(), turn = turn(), host_chapter = HOST_CHAPTER },
     }
-    for i = 0, 63 do
-        local addr = SYM.sProcArray + i * 0x6C
-        local script = ru32(addr)
-        if script ~= 0 then
-            observation.raw_procs[#observation.raw_procs + 1] = {
-                -- scrCur is the script command the proc sits on (include/proc.h). It is the
-                -- liveness signal the stall detector keys on: a pool whose every proc holds
-                -- the same command, idle and lock for TUNE.stallFrames is not slow, it is
-                -- waiting for an input nothing will send (#236).
-                -- sleepTime (+0x24) is in there because those three fields are CONSTANT
-                -- under PROC_REPEAT -- which is how every long-running FE8 proc is written
-                -- -- so without it a proc counting down a timed wait reads as frozen (#241).
-                slot = i, script = script, scr_cur = ru32(addr + 0x04),
-                idle = ru32(addr + 0x0C), sleep = rs16(addr + 0x24), lock = ru8(addr + 0x28),
-            }
-        end
+    for _, proc in ipairs(PROCS.live()) do
+        local addr = proc.addr
+        observation.raw_procs[#observation.raw_procs + 1] = {
+            -- scrCur is the script command the proc sits on (include/proc.h). It is the
+            -- liveness signal the stall detector keys on: a pool whose every proc holds
+            -- the same command, idle and lock for TUNE.stallFrames is not slow, it is
+            -- waiting for an input nothing will send (#236).
+            -- sleepTime (+0x24) is in there because those three fields are CONSTANT
+            -- under PROC_REPEAT -- which is how every long-running FE8 proc is written
+            -- -- so without it a proc counting down a timed wait reads as frozen (#241).
+            slot = proc.slot, script = proc.script, scr_cur = ru32(addr + 0x04),
+            idle = ru32(addr + 0x0C), sleep = rs16(addr + 0x24), lock = ru8(addr + 0x28),
+        }
     end
     local function put(name, value) if value then observation.procs[name] = value end end
     put("game_control", observedProc(SYM.gProcScr_GameControl, "game_control_root"))
@@ -1174,10 +1165,12 @@ local function runEnemyPhase(tile, alreadyWon, phaseTurn)
         -- A chapter ending under us is a normal exit, not a wedge, so it returns its own
         -- value and leaves no controller fault behind for the verdict to trip over.
         if chapter() ~= startedIn then return "ended" end
-        if faction() == 0 and not menuOpen() and controllerState() == "player_map_idle" then
+        -- One observation per frame, classified once: nothing runs between the two questions.
+        local state = controllerState()
+        if faction() == 0 and not menuOpen() and state == "player_map_idle" then
             return "player"
         end
-        if controllerState() == "dialogue_wait" then
+        if state == "dialogue_wait" then
             if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
                 return controllerState(after) ~= "dialogue_wait"
             end, 60) then return nil end
@@ -7769,7 +7762,7 @@ function VISIT.shop(x, y, kind)
     if not ok then return false, why end
     local proc
     if not waitFor(function()
-        proc = findProc(SYM.gProcScr_Shop)
+        proc = PROCS.find(SYM.gProcScr_Shop)
         return proc ~= nil
     end, 600) then return false, kind .. " command started no shop" end
     local stock = {}
