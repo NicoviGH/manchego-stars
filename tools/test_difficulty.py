@@ -1363,6 +1363,60 @@ class VanillaUnitDefParser(unittest.TestCase):
         self.assertFalse(defs[1]['itemDrop'])
 
 
+class VanillaLoaded(unittest.TestCase):
+    """`vanilla_loaded_units` is the one loader of a twin's force, so what it drops, every
+    reader drops (#510 step 9)."""
+
+    # Ch8's TowerFall scenes load Caellach and four more arrays, then CLEE them all.
+    CUTSCENE_ARRAYS = {'UnitDef_088B7964', 'UnitDef_088B798C', 'UnitDef_088B79F0',
+                       'UnitDef_088B79C8', 'UnitDef_088B7A54'}
+
+    def test_ch8_cutscene_loads_are_not_enemies(self):
+        for mode in (None, 'tutorial', 'normal', 'difficult'):
+            units = df.vanilla_loaded_units('FE8 Ch8', mode)
+            self.assertEqual([], [a for a, _i, _d, _c in units if a in self.CUTSCENE_ARRAYS])
+            self.assertFalse([1 for _a, _i, d, _c in units
+                              if d['charIndex'] == 'CHARACTER_CAELLACH'])
+            # 45 armed red loads before; the five cutscene arrays hold 1+2+2+1+1 of them
+            self.assertEqual(38, len(units))
+
+
+    def test_only_ch8_loses_arrays_to_the_scene_filter(self):
+        for ref, (relpath, arrays) in df.PARITY_REFERENCE_UDEFS.items():
+            text = inject.decomp.vanilla_decomp_text(relpath)
+            kept = [a for a in arrays
+                    if any(d['allegiance'] == 'FACTION_ID_RED'
+                           for d in df.vanilla_unit_defs(text, a))]
+            got = list(dict.fromkeys(a for a, _i, _d in df._vanilla_red_defs(ref)))
+            if ref == 'FE8 Ch8':
+                self.assertEqual([a for a in kept if a not in self.CUTSCENE_ARRAYS], got)
+                self.assertIn('UnitDef_088B73C8', got)
+            else:
+                self.assertEqual(kept, got, ref)
+
+    def test_an_array_loaded_live_as_well_is_not_scene_only(self):
+        # 088B783C is loaded inside a scene before a CLEE and again after the last one
+        self.assertNotIn('UnitDef_088B783C', df._cleared_scene_udefs('FE8 Ch8'))
+        self.assertEqual(self.CUTSCENE_ARRAYS, df._cleared_scene_udefs('FE8 Ch8')
+                         & self.CUTSCENE_ARRAYS)
+
+    def test_drops_read_the_filtered_force(self):
+        # No Ch8 scene unit carries .itemDrop today, so prove the wiring: mark a dropping
+        # array scene-only and its drops must leave vanilla_drops.
+        text = inject.decomp.vanilla_decomp_text('src/events_udefs.c')
+        arrays = df.PARITY_REFERENCE_UDEFS['FE8 Ch8'][1]
+        dropping = next(a for a in arrays if any(
+            d['allegiance'] == 'FACTION_ID_RED' and d['itemDrop'] and d['items']
+            for d in df.vanilla_unit_defs(text, a)))
+        full = df.vanilla_drops('FE8 Ch8')
+        with mock.patch.object(df, '_cleared_scene_udefs', return_value=frozenset([dropping])):
+            self.assertLess(len(df.vanilla_drops('FE8 Ch8')), len(full))
+
+    def test_every_reader_of_the_red_force_sees_the_filter(self):
+        self.assertFalse([d for d in df.vanilla_red_units('FE8 Ch8')
+                          if d.get('charIndex') == 'CHARACTER_CAELLACH'])
+
+
 class VanillaEnemies(unittest.TestCase):
     """Integration: extract a parity reference's red enemy force from the decomp (HEAD)."""
 

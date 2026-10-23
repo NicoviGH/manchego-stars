@@ -987,13 +987,15 @@ def vanilla_red_units(parity_ref):
 
 def _vanilla_red_defs(parity_ref):
     """(array, index in the array, UnitDefinition dict) for every RED unit in the twin's
-    curated arrays, or None if the reference isn't curated. The one walk over them."""
+    curated arrays, or None if the reference isn't curated. The one walk over them, so the
+    one place scene-only arrays (`_cleared_scene_udefs`) are dropped for every reader."""
     spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
     if spec is None:
         return None
     relpath, arrays = spec
     text = inject.decomp.vanilla_decomp_text(relpath)
-    return [(array_name, i, d) for array_name in arrays
+    scenes = _cleared_scene_udefs(parity_ref)
+    return [(array_name, i, d) for array_name in arrays if array_name not in scenes
             for i, d in enumerate(vanilla_unit_defs(text, array_name))
             if d['allegiance'] == 'FACTION_ID_RED']
 
@@ -1069,6 +1071,28 @@ def vanilla_enemies(parity_ref, mode=None):
     return None if bodies is None else [u for u, _ai in bodies]
 
 
+@functools.lru_cache(maxsize=None)
+def _cleared_scene_udefs(parity_ref):
+    """The UnitDefinition arrays the twin loads ONLY to stage a scene: every LOAD of the array
+    in the chapter's scripts sits in an EventListScr that runs CLEE (EvtRemoveAllEimies)
+    afterwards, stripping every enemy from the map before the scene ends. Ch8's TowerFall
+    loads Caellach this way, has him fight a cutscene battle, and clears him; he is never on
+    the player's map. An array that is also loaded live (after the script's last CLEE, or in a
+    script with none) stays. The armed counterpart of the unarmed-cutscene rule the curated
+    lists apply."""
+    index = _vanilla_chapter_index(parity_ref)
+    stem = None if index is None else chapter_event_stem(index)
+    if stem is None:
+        return frozenset()
+    script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
+    staged, live = set(), set()
+    for block in re.split(r'CONST_DATA EventListScr', script)[1:]:
+        last_clear = [m.start() for m in re.finditer(r'^\s*CLEE\b', block, re.M)][-1:]
+        for m in re.finditer(r'LOAD\w*\(\s*\w+\s*,\s*(UnitDef_\w+)', block):
+            (staged if last_clear and m.start() < last_clear[0] else live).add(m.group(1))
+    return frozenset(staged - live)
+
+
 def vanilla_loaded_units(parity_ref, mode=None, with_personal=True):
     """(array, index, UnitDefinition dict, Combatant) for every RED unit the twin fields with a
     modeled weapon, loaded as the engine loads it in `mode` (ADR 0354). None when the reference
@@ -1127,6 +1151,14 @@ def _vanilla_internal_name(parity_ref):
     return ('L%02d' if n <= 8 else 'E%02d') % n
 
 
+def _vanilla_chapter_index(parity_ref):
+    """The chapter_settings index of the vanilla chapter `parity_ref` names, else None."""
+    name = _vanilla_internal_name(parity_ref)
+    chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
+    names = [c.get('internalName') for c in chapters['chapters']]
+    return names.index(name) if name in names else None
+
+
 def vanilla_chapter_shifts(parity_ref):
     """The parity reference chapter's OWN difficulty triple, in `mode_stats` shape.
 
@@ -1134,16 +1166,14 @@ def vanilla_chapter_shifts(parity_ref):
     are shifted by the numbers each chapter actually carries, so a mode comparison is
     still comparing two tuned tables rather than one tuned table against a shifted one.
     None if the reference does not name a vanilla chapter."""
-    name = _vanilla_internal_name(parity_ref)
-    if name is None:
+    index = _vanilla_chapter_index(parity_ref)
+    if index is None:
         return None
-    settings = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
-    for chapter in settings['chapters']:
-        if chapter.get('internalName') == name:
-            return {'tutorial': chapter['easyModeLevelMalus'],
-                    'normal': chapter['normalModeLevelMalus'],
-                    'difficult': chapter['difficultModeLevelBonus']}
-    return None
+    chapter = json.loads(
+        inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))['chapters'][index]
+    return {'tutorial': chapter['easyModeLevelMalus'],
+            'normal': chapter['normalModeLevelMalus'],
+            'difficult': chapter['difficultModeLevelBonus']}
 
 
 def vanilla_forced(parity_ref):
@@ -1151,12 +1181,9 @@ def vanilla_forced(parity_ref):
     (eventinfo.c) over `gForceDeploymentList` (data_event_trigger.c), for the common route the
     early chain runs on (prologue to Ch8) and the twin's chapter index. Eirika everywhere,
     Artur in Ch4, Natasha in Ch5. {name}, as `vanilla_party` names them."""
-    name = _vanilla_internal_name(parity_ref)
-    chapters = json.loads(inject.decomp.vanilla_decomp_text('src/data/chapter_settings.json'))
-    names = [c.get('internalName') for c in chapters['chapters']]
-    if name not in names:
+    index = _vanilla_chapter_index(parity_ref)
+    if index is None:
         return set()
-    index = names.index(name)
     text = inject.decomp.vanilla_decomp_text('src/data_event_trigger.c')
     s, e = inject.decomp._find_brace_block(text, 'gForceDeploymentList[]',
                                            'src/data_event_trigger.c')
@@ -3406,19 +3433,11 @@ def vanilla_drops(parity_ref):
     in the chapter's curated UnitDefinition arrays, its LAST item (US_DROP_ITEM drops the final
     inventory slot -- statscreen.c:726), valued in buy-gold. None if the reference isn't curated;
     [] if it carries no drops (the Ch4/Ch5 lock twins). The channel #170 v1 skipped (#176)."""
-    spec = PARITY_REFERENCE_UDEFS.get(parity_ref)
-    if spec is None:
+    reds = _vanilla_red_defs(parity_ref)
+    if reds is None:
         return None
-    relpath, arrays = spec
-    text = inject.decomp.vanilla_decomp_text(relpath)
-    out = []
-    for array_name in arrays:
-        for d in vanilla_unit_defs(text, array_name):
-            if d['allegiance'] != 'FACTION_ID_RED' or not d['itemDrop'] or not d['items']:
-                continue
-            item = d['items'][-1]
-            out.append((item, item_gold_value(item)))
-    return out
+    return [(d['items'][-1], item_gold_value(d['items'][-1]))
+            for _a, _i, d in reds if d['itemDrop'] and d['items']]
 
 
 def twin_event_payload(stem):
