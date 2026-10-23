@@ -9,24 +9,32 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-23 (Claude, #510 step 9 PLANNED, awaiting review). **The parity model is being
+Refreshed 2026-10-23 late (Claude, #510 step 9 BUILDING). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
-misloads units (unflagged units grown, no promoted bonus, no realistic levelling): it read
-Dorbulgruf at 63 HP where the ROM loads 37. Every lock was measured on that model, so **all of
-ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never widen an
-`accepted_residual` to get green: design or model fidelity is the fix.
-**Next: #510 step 9's build PLAN is posted, waiting on Nicolas's review and execution method**
-(subagent-driven recommended): <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370592835>.
-Six PRs, A-F: A Caellach out of `vanilla_loaded_units`; B one board reader; C the careful bot
-(pure Lua); D the bot plays one chapter in the ROM off FE8's danger zone + forecast; E campaigns
-with a savestate per chapter start; F the Monte Carlo runner. Its closing defaults are REPLACED by
-the amendment <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6371791465>
-(no margin, stuck = repeated board, restarts kept + recorded without re-seeding, no give-up
-threshold, a feasibility check; no LLM spot check). Execution: subagent-driven (Nicolas, 2026-10-23). Try GitHub's
-native stacked PRs on D->E->F only, E stacked after D's review
-(<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370779750>). The design is
-<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370450022>; the simulator
-plays the ACTUAL ROM, never a Python re-creation.
+misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
+widen an `accepted_residual` to get green: design or model fidelity is the fix.
+
+**#510 step 9 is being built, subagent-driven** (plan
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370592835>, amendment
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6371791465>, plus Task C4:
+Wiki claims for vanilla Ch8-end <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6372204174>).
+The bot plays the ACTUAL ROM, never a Python re-creation. **Merged:** A #530 (Ch8 cutscene loads are
+not enemies), B #532 (`tools/playtest/board.lua`, the one board reader: `onField`, lean reads,
+`canSeize` from engine patch 0005; `gen_symbols.py` has an OPTIONAL list so `PT_VANILLA=1` works).
+**Inserted before C, at Nicolas's ask: the harness clean-up #531** (audit + plan
+<https://github.com/NicoviGH/manchego-stars/issues/531#issuecomment-6372485590>). G1 merged #533
+(proc pool scanned once per frame, ADR 0366: `clear_ch01` 40s -> 16s; true slot comments).
+**Next: G2** (Tasks 3-6: unit scans via Board, teleport/park helper with map bounds, settle +
+dialogue helpers, chapter-local copies), then G3 (declared cases), then step 9 PR C (Tasks 3-5 +
+C4), D, E, F. Stacked PRs on D->E->F only.
+**Merging:** Nicolas pre-approved merging step 9's and #531's PRs once `/code-review` (in a
+subagent) is clean and CI is green on HEAD; every other PR still needs his "merge".
+SDD ledgers (gitignored, the recovery map): `.superpowers/sdd/step9plan/progress.md` and
+`.superpowers/sdd/plan531/progress.md`; the plan files are on the issues (the scratchpad copies
+die with the session).
+Open threads on #531: `test_check_canaries` is test-order dependent on main; a matrix run leaves
+the build tree non-canonical so the pre-commit `test_scene_actors` fails until
+`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`.
 
 ## In flight
 
