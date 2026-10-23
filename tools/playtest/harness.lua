@@ -4414,6 +4414,8 @@ INSPECT.firstAttacks = function(phases)
         local u = unitAt(SYM.gUnitArrayRed, i)
         if u and u.onMap and not isDead(u) then alive = alive + 1 end
     end
+    -- A death is a broken hold, not the model being wrong: 0 Pow still counters through weapon
+    -- Mt, so a run where something died says nothing about a model in which nothing does.
     if alive ~= n then
         return result("FAIL", string.format("%d of %d red units died: the held front must "
             .. "kill nothing", n - alive, n))

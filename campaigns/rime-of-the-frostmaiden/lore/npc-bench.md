@@ -6,6 +6,9 @@ Kleine, DriveThru 353776 — full tables in
 Use when a scene needs a setting-true villager fast: FE house visits, shop keepers,
 one-line NPCs, side recruits. PCs and named story NPCs get real voice bibles instead.
 
+**This is a name bank, not a list of free names.** Grep the campaign before proposing one:
+"Halvar", offered for a recruit, was already ch02's raider captain.
+
 ## Four pre-generated wanderers (drop-in, hooks included)
 
 | Name | Who | Voice/quirk | Hook |

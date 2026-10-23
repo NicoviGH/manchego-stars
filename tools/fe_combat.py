@@ -26,7 +26,9 @@ A Combatant's stats may be numpy arrays instead of ints: one unit read over many
 once (difficulty.party_matchup, #510 step 4). Its weapon, tags and Con stay single values. The
 formulas below are written once for both, through the helpers that follow, so there is
 still one place that knows how a round resolves. numpy is imported only when an array arrives,
-so the pyyaml-only CI checks job can import this module.
+so the pyyaml-only CI checks job can import this module. New combat math must go through these
+helpers too (a bare `max`/`if` on a stat breaks on an array): `test_ai_target.OverCareers`
+fails when it does not, and a full Normal read stays ~5s only because it is vectorised.
 """
 import functools
 from dataclasses import dataclass, field, replace

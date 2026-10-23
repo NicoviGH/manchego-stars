@@ -5,6 +5,9 @@ them: per-unit `skin:` fields in the chapter YAMLs, and `enemy_class_reskins` in
 (wired by `inject_enemy_class_reskins` + `inject_enemy_class_battle_anims`). This file exists so the
 FE-Repo doesn't get re-scanned from scratch every time a chapter needs an undead/beast skin.
 
+**The FE-Repo is not the whole community.** Search FEUniverse too before calling an asset
+missing: ch06's shark-rider anim was only there (see below).
+
 Rationale for the whole approach — **"divorce skin from class"**: `docs/decisions.md` → the 2026-07-23
 skin-divorce refinement (put our skins on the vanilla FE8 twin's classes → parity by construction;
 the ch01 goblin-skinned Soldiers/Fighters are the precedent).

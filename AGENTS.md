@@ -127,6 +127,8 @@ cd fireemblem8u
   `tools/inject/engine_patches.py` says how to edit one) — never hand-edits to the decomp. The
   injector writes `build/fireemblem8u` (a git worktree of the submodule, restored on every build)
   and the `fireemblem8u` submodule itself stays vanilla (#408)
+- Before changing a signature, or what a parameter MEANS: `tools/callsites.py` (grep cannot bind
+  positional arguments), then diff the OUTPUT.
 - Comments say **why**; the **what** lives in code + tests. When a change retires a mechanism or term,
   register its key phrases in `tools/check.py` `DEAD_CONCEPTS` in the same commit — the drift lint scans
   docs AND hand-written code comments (`docs/decisions.md` → "Comments are testimony").

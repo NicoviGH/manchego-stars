@@ -230,7 +230,10 @@ def load(class_enum, level, personal=None, autolevel=True, base_level=1, shiftab
          shifts=None, mode='normal', realistic=False, personal_growths=None):
     """{stat: (min, max)} for one red unit loaded in `mode`. `personal` is the character's
     base line (decomp `base*` names, or the YAML's short names); `personal_growths` its growths,
-    read only on the realistic branch."""
+    read only on the realistic branch.
+
+    What the ROM actually loads is read off the map by `INSPECT.redStats` (`ch04redstats`), one
+    run per `PT_DIFFICULTY`: compare these ranges against it before trusting either."""
     base, growths, caps, promoted = class_line(class_enum)
     personal = _personal(personal)
     line = {s: (base[s] + personal.get(s, 0),) * 2 for s in STATS}
