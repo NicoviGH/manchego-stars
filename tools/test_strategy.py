@@ -93,6 +93,32 @@ class Validate(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'step 6'):
             strategy.validate([c], self.SECTION, 'x')
 
+    def test_step_8_is_done(self):
+        # #510 step 8 modelled kits (`kits` claims) and left the rest out by decision.
+        c = {'kind': 'unmodelled', 'topic': 'shop', 'step': 8,
+             'cite': "Use Eirika's rapier on the boss."}
+        with self.assertRaisesRegex(ValueError, 'step 8'):
+            strategy.validate([c], self.SECTION, 'x')
+
+    def test_a_kits_claim_needs_a_topic(self):
+        c = {'kind': 'kits', 'cite': "Use Eirika's rapier on the boss."}
+        with self.assertRaisesRegex(ValueError, 'lacks topic'):
+            strategy.validate([c], self.SECTION, 'x')
+
+
+class KitsAndOut(unittest.TestCase):
+    def test_a_kits_claim_reports_it_is_modelled(self):
+        line = strategy._check({'kind': 'kits', 'topic': 'villages'}, [], [], [], {}, {})
+        self.assertIn('kits villages', line)
+        self.assertIn('happy path', line)
+
+    def test_out_topics_print_as_not_modelled_by_decision(self):
+        claims = [{'kind': 'unmodelled', 'topic': 'healing', 'step': 'out'},
+                  {'kind': 'unmodelled', 'topic': 'recruit', 'step': 7}]
+        self.assertEqual(['    unmodelled, step 7: recruit',
+                          '    not modelled (ADR 0365): healing'],
+                         strategy.unmodelled_lines(claims))
+
 
 class Matching(unittest.TestCase):
     LABELS = frozenset({'goblin-chief', 'armor-knight', 'boss'})

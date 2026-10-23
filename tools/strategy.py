@@ -26,9 +26,13 @@ Kinds (each side's claims are read against that side's OWN party and force):
   reinforcements  no fields: the strategy warns of the waves. REPORTED: how many bodies
               arrive after turn 1, and how many of them are in the side's heaviest
               engagement (#510 step 7), the one its threat is read from.
-  unmodelled  `topic` and `step`: play the model cannot read yet (escorts, recruits, steals,
-              shops); `step` is the #510 step that will (7 reach and time, 8 kits and
-              sustain). Recorded so the curation is complete.
+  kits        `topic`: what the party picks up (villages, shops, drops). REPORTED: modelled
+              since #510 step 8 (ADR 0365): the verdict reads the happy path, every pickup
+              taken, and `make difficulty CH=` prints the guaranteed path beside it.
+  unmodelled  `topic` and `step`: play the model does not read. `step` is the #510 step that
+              will (7 reach and time), or `out`: left out by decision (ADR 0365: healing, the
+              arena, keys and steals, none of which changes what a unit fights with).
+              Recorded so the curation is complete.
 
 `vs` names an enemy by class (`fighter`, `armor-knight`), by our unit id or the twin's
 character (`goblin-chief`, `breguet`), or `boss`; a list means any of them. Checks are FINDINGS printed beside the
@@ -55,9 +59,10 @@ KINDS = {
     'wall': {'unit', 'vs'},
     'threat': {'vs'},
     'reinforcements': set(),
+    'kits': {'topic'},
     'unmodelled': {'topic', 'step'},
 }
-STEPS = {7, 8}
+STEPS = {7, 'out'}
 
 
 def plain(text):
@@ -94,7 +99,7 @@ def validate(claims, section, where):
         if missing:
             raise ValueError('%s: %s claim lacks %s' % (where, kind, ', '.join(sorted(missing))))
         if kind == 'unmodelled' and c['step'] not in STEPS:
-            raise ValueError('%s: step %r is not one of %s' % (where, c['step'], sorted(STEPS)))
+            raise ValueError('%s: step %r is not one of %s' % (where, c['step'], sorted(STEPS, key=str)))
         cite = plain(c.get('cite'))
         if not cite or cite not in body:
             raise ValueError('%s: %s claim cites a line its Strategy section does not have: %r'
@@ -242,6 +247,9 @@ def _check(claim, bodies, per_enemy, labels, lines, tiles, side=None, arrivals=N
     kind, vs = claim['kind'], claim.get('vs')
     if kind == 'unmodelled':
         return None
+    if kind == 'kits':
+        return ('note kits %s: modelled (#510 step 8) -- the verdict reads the happy path, '
+                'the guaranteed path is printed beside it' % claim['topic'])
     if kind == 'terrain':
         return _terrain_line(claim, tiles)
     if kind == 'reinforcements':
@@ -327,17 +335,21 @@ def findings(chap, matchup, mode=None, campaign=campaign_chapters.CAMPAIGN):
     return out
 
 
-def unmodelled(claims):
-    """{step: [topic]} of a side's unmodelled claims: what steps 7 and 8 inherit."""
+def unmodelled_lines(claims):
+    """The report's lines for a side's unmodelled claims: what a later #510 step inherits,
+    then what is out by decision."""
     out = {}
     for c in claims:
         if c['kind'] == 'unmodelled':
             out.setdefault(c['step'], []).append(c['topic'])
-    return out
+    return (['    unmodelled, step %d: %s' % (s, ', '.join(out[s]))
+             for s in sorted(k for k in out if k != 'out')]
+            + (['    not modelled (ADR 0365): %s' % ', '.join(out['out'])] if 'out' in out else []))
 
 
 def print_strategy(chap, campaign, mode=None):
-    """The `make difficulty` section: each side's claims, checked, and what steps 7-8 inherit."""
+    """The `make difficulty` section: each side's claims, checked, and what later steps
+    inherit."""
     print('\n-- STRATEGY CLAIMS (#510 step 6: reported, never an input) ' + '-' * 10)
     matchup = dif.chapter_matchup(chap, campaign, mode=mode)
     if matchup is None:
@@ -349,5 +361,5 @@ def print_strategy(chap, campaign, mode=None):
         print('  %s:' % label)
         for line in lines or ['(no modelled claims)']:
             print('    %s' % line)
-        for step, topics in sorted(unmodelled(claims).items()):
-            print('    unmodelled, step %d: %s' % (step, ', '.join(topics)))
+        for line in unmodelled_lines(claims):
+            print(line)

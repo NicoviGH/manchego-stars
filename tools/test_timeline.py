@@ -280,14 +280,16 @@ class OneReaderPerForce(unittest.TestCase):
                          [self._line(u) for u, _ai in dif.vanilla_enemy_bodies('FE8 Ch6',
                                                                                  'normal')])
 
-    def test_an_unwritten_chapter_is_read_as_its_twin_only(self):
-        # ADR 0363: a planned chapter does not exist for the difficulty math. The report
-        # prints its twin's numbers and never walks its draft roster.
+    def test_an_unwritten_chapter_is_not_read(self):
+        # ADR 0365: a chapter is read as it is built. The report of a planned one walks
+        # neither its draft roster nor its twin's force.
         out = io.StringIO()
         with mock.patch.object(dif, 'chapter_force', side_effect=AssertionError('read draft')), \
+                mock.patch.object(dm, 'vanilla_bodies', side_effect=AssertionError('read twin')), \
                 contextlib.redirect_stdout(out):
             dif.report('rime-of-the-frostmaiden', 'ch08')
-        self.assertIn("vanilla twin FE8 Ch8's", out.getvalue())
+        self.assertIn('NOT WRITTEN YET', out.getvalue())
+        self.assertNotIn('threat', out.getvalue())
 
     def test_a_written_chapter_places_every_body(self):
         chapter = copy.deepcopy(pp.load_chapter('ch04'))

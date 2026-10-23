@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-364 decisions. Read this index, then open the two or three you need — the whole
+365 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -211,8 +211,9 @@ fresh. Don't leave it in chat or agent memory only.
 | `0359` | [Strategy sections are claims the parity read checks, never an input](decisions/0359-strategy-claims-are-checked-never-an-input.md) | 2026-10-21 | #510 |
 | `0360` | [Tomes carry their FE8 weapon type and sit on the magic triangle](decisions/0360-tomes-sit-on-the-magic-triangle.md) | 2026-10-22 | #510 |
 | `0361` | [A class's combat tags are read from the decomp, never kept by hand](decisions/0361-class-tags-are-read-from-the-decomp.md) | 2026-10-22 | #510 |
-| `0363` | [A chapter not written yet is its vanilla twin, for the difficulty math](decisions/0363-a-chapter-not-written-yet-is-its-vanilla-twin.md) | 2026-10-22 | #510 |
+| `0363` | [A chapter not written yet gets no difficulty reading](decisions/0363-a-chapter-not-written-yet-is-its-vanilla-twin.md) | 2026-10-22 | #510 |
 | `0364` | [Threat is the heaviest engagement](decisions/0364-threat-is-the-heaviest-engagement.md) | 2026-10-22 | #510 #335 |
+| `0365` | [Kits: the happy path is graded, the guaranteed path printed beside it](decisions/0365-kits-the-happy-path-is-graded.md) | 2026-10-22 | #510 |
 
 ---
 
@@ -227,7 +228,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0084` | [Decision B needs (almost) no code — vanilla FE8 IS the spell economy (#9 delta audit).](decisions/0084-decision-b-needs-no-code-vanilla-fe8-is-the.md) | 2026-07-02 | #9 |
 | `0085` | [Iconic matchups are OUT — the vanilla principle covers item DATA, not just mechanisms (#8 reverted).](decisions/0085-iconic-matchups-are-out-the-vanilla-principle-covers-item.md) | 2026-07-02 | #8 |
 | `0086` | [Comments are testimony, code is evidence — the comment-drift guard (post-mortem of the "zeroed growths" incident).](decisions/0086-comments-are-testimony-code-is-evidence-the-comment-drift.md) | 2026-07-02 | — |
-| `0087` | [The difficulty curve projects planned chapters forward from their vanilla reference (#123).](decisions/0087-the-difficulty-curve-projects-planned-chapters-forward-from-their.md) | 2026-07-02 | #123 |
+| `0087` | [~~The difficulty curve projects planned chapters forward from their vanilla reference (#123).~~ — SUPERSEDED...](decisions/0087-the-difficulty-curve-projects-planned-chapters-forward-from-their.md) | 2026-07-02 | #123 |
 | `0088` | [MVP weapons = stock FE weapons (no custom Might); personal weapons are post-MVP](decisions/0088-mvp-weapons-stock-fe-weapons-personal-weapons-are-post.md) | 2026-05-30 | — |
 
 ---

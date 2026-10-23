@@ -179,9 +179,8 @@ strategy_claims:
     cite: "deploy Marty and talk to its leader, Lupin."
   - kind: reinforcements
     cite: "On turn 3 seven more undead (four Revenants, three Bonewalkers) appear on the east and south sides, close to where you will be by then, so be mindful that you aren't swarmed."
-  - kind: unmodelled
+  - kind: kits
     topic: villages
-    step: 8
     cite: "Visit Lonelywood for an Iron Axe."
 
 # ── Deployment ──────────────────────────────────────────────────────────────────

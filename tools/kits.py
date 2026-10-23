@@ -18,13 +18,11 @@ import re
 from dataclasses import dataclass
 
 import difficulty
+import inject.chapter_settings
 import inject.decomp
 
 GUARANTEED = frozenset({'join', 'scene', 'interlude'})
 
-# A vanilla node's chapter, read by NAME: CHAPTER_L_5 is Ch5 although its value is 6 (Ch5x
-# sits before it). Off the Eirika chain's shared stretch, a node is past what we compare.
-_CHAIN_ROW = re.compile(r'CHAPTER_L_(PROLOGUE|\d+)$')
 
 
 @dataclass(frozen=True)
@@ -87,11 +85,6 @@ def arsenals(pickups, chapter, party, path):
     return out
 
 
-def _shop_items(sym):
-    return difficulty._shoplist_items(
-        inject.decomp.vanilla_decomp_text('src/events_shoplist.c'), sym)
-
-
 def our_pickups(campaign):
     """Every pickup our WRITTEN chapters hand out. A `status: planned` chapter does not exist
     for the difficulty math (ADR 0363). Every gift `chapter_economy` lists is player-earned (a
@@ -107,7 +100,7 @@ def our_pickups(campaign):
                              ('drop', econ['drops'])):
             out += [Pickup(inject.decomp.fe_item_enum({'id': i}), vehicle, n) for i in ids]
         for sym in econ['shops']:
-            out += [Pickup(it, 'shop', n) for it in _shop_items(sym)]
+            out += [Pickup(it, 'shop', n) for it in difficulty.shop_stock(sym)]
     return out + _our_worldmap_pickups(campaign)
 
 
@@ -141,10 +134,10 @@ def _twin_worldmap_pickups():
     out = []
     for body in re.split(r'\[NODE_\w+\]\s*=', nodes)[1:]:
         ch = re.search(r'\.chapteridx_eirika\s*=\s*(\w+)', body)
-        m = ch and _CHAIN_ROW.match(ch.group(1))
-        if not m:
+        twin = ch and inject.chapter_settings.shared_route_twin(ch.group(1))
+        if twin not in difficulty.VANILLA_CHAIN:     # off the chain we compare
             continue
-        n = 0 if m.group(1) == 'PROLOGUE' else int(m.group(1))
+        n = difficulty.VANILLA_CHAIN.index(twin)
         for sym in re.findall(r'\.(?:armory|vendor|secretShop)\s*=\s*(\w+)', body):
             out += [Pickup(it, 'worldmap_shop', n) for it in difficulty._shoplist_items(stock, sym)]
     return out

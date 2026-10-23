@@ -69,9 +69,12 @@ class EventGroupStems(unittest.TestCase):
 
 class UnwieldableRedsAreUnarmed(unittest.TestCase):
     def test_a_red_that_wields_nothing_it_carries_is_not_in_the_force(self):
-        # FE8 Ch8 loads two Fighters holding only a Steel Blade (a sword): they attack no one.
-        rows = df.vanilla_loaded_units('FE8 Ch8')
-        self.assertFalse([r for r in rows if r[3].weapon is None])
+        # A Fighter holding only a Steel Blade (a sword) attacks no one.
+        real = df._vanilla_red_defs('FE8 Ch1')
+        a, i, d = real[0]
+        doctored = [(a, i, dict(d, classIndex='CLASS_FIGHTER', items=['ITEM_BLADE_STEEL']))]
+        with mock.patch.object(df, '_vanilla_red_defs', return_value=doctored):
+            self.assertEqual([], df.vanilla_loaded_units('FE8 Ch1'))
 
 
 class KitPaths(unittest.TestCase):
@@ -1470,29 +1473,29 @@ class VanillaEnemies(unittest.TestCase):
             self.assertIn(expected, names)
 
 
-class VanillaProjection(unittest.TestCase):
-    """Forward targets for planned chapters (#123): the vanilla reference's own pressure."""
+class PlannedChaptersAreNotRead(unittest.TestCase):
+    """Nicolas, 2026-10-23: a chapter is read as it is built. A `status: planned` chapter gets
+    no difficulty reading at all, and its twin is not opened for it."""
 
-    def test_uncurated_reference_projects_none(self):
-        self.assertIsNone(df.vanilla_projection('FE8 Ch99', 8))
+    def test_the_curve_lists_a_planned_chapter_without_reading_its_twin(self):
+        asked = []
+        import danger_map
+        real_bodies, real_party = danger_map.vanilla_bodies, df.vanilla_party_careers
 
-    def test_projection_reports_full_threat_and_finite_clearload(self):
-        proj = df.vanilla_projection('FE8 Ch13', 8)
-        self.assertEqual(proj['n'], 50)
-        self.assertGreater(proj['threat'], 0)
-        # promoted walls the early-game yardstick can't dent are EXCLUDED from
-        # clear-load (else it reads inf) and surfaced in `proof` instead
-        self.assertNotEqual(proj['clearload'], float('inf'))
-        self.assertGreater(proj['proof'], 0)
+        def bodies(ref, *a, **k):
+            asked.append(ref)
+            return real_bodies(ref, *a, **k)
 
-    def test_projection_with_no_walls_matches_enemy_pressure(self):
-        # An early reference (all dentable) must project exactly what the parity row
-        # computes -- the projection is the same bar, shown before our side exists.
-        proj = df.vanilla_projection('FE8 Ch1', 9)
-        self.assertEqual(proj['proof'], 0)
-        t, l = df.enemy_pressure(df.vanilla_enemies('FE8 Ch1'), 9)
-        self.assertAlmostEqual(proj['threat'], t)
-        self.assertAlmostEqual(proj['clearload'], l)
+        def party(ref, *a, **k):
+            asked.append(ref)
+            return real_party(ref, *a, **k)
+        out = io.StringIO()
+        with mock.patch.object(danger_map, 'vanilla_bodies', bodies), \
+                mock.patch.object(df, 'vanilla_party_careers', party), \
+                contextlib.redirect_stdout(out):
+            df.curve_report(CAMPAIGN, mode='normal', only={'ch08-the-eastway-ambush'})
+        self.assertNotIn('FE8 Ch8', asked)
+        self.assertIn('planned -- not read until it is written', out.getvalue())
 
 
 class ReportSmoke(unittest.TestCase):
@@ -3210,16 +3213,16 @@ class ModeReadsAreHonestAboutScope(unittest.TestCase):
         finally:
             del df.PARITY_REFERENCE_UDEFS['FE8 Creature Campaign']
 
-    def test_only_the_planned_targets_are_reported_as_unshifted(self):
-        # Role findings read the mode since #510 step 2 (ADR 0355); the planned chapters'
-        # targets (vanilla_projection) still run on the authored table, and the banner says so.
+    def test_only_the_off_chain_fallback_is_reported_as_unshifted(self):
+        # Role findings read the mode since #510 step 2 (ADR 0355); the off-chain yardstick
+        # fallback still runs on the authored table, and the banner says so.
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
             df.curve_report('rime-of-the-frostmaiden', mode='normal', only=set())
         text = out.getvalue().lower()
-        self.assertIn('planned-chapter targets', text)
+        self.assertNotIn('planned-chapter targets', text)
         self.assertIn('authored table', text)
-        self.assertIn('off\n     vanilla_chain', text)
+        self.assertIn('off vanilla_chain', text)
 
     def test_role_findings_read_the_mode(self):
         """The boss-durability arm loads our boss for the mode it is asked about."""

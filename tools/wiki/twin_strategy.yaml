@@ -19,7 +19,7 @@ FE8 Prologue:
       cite: "Eirika can bait the fighters and dodge their attacks fairly consistently."
     - kind: unmodelled
       topic: healing
-      step: 8
+      step: out
       cite: "If Eirika is hurt use a Vulnerary to keep her HP up."
 
 FE8 Ch1:
@@ -55,13 +55,11 @@ FE8 Ch2:
       topic: enemy terrain
       step: 7
       cite: "Beware of the reinforcements that spawn in the mountains above the bottom village, as the mountain tiles give them good evasion."
-    - kind: unmodelled
+    - kind: kits
       topic: villages
-      step: 8
       cite: "Feel free to visit all the villages and obtain some free items."
-    - kind: unmodelled
+    - kind: kits
       topic: shop
-      step: 8
       cite: "This is your first chance to do any shopping."
 
 FE8 Ch3:
@@ -77,15 +75,14 @@ FE8 Ch3:
       cite: "Garcia, Neimi, and anyone with a javelin can be used to attack the archer and hand axe wielding brigand."
     - kind: unmodelled
       topic: keys
-      step: 8
+      step: out
       cite: "the brigand next to it will drop a Chest Key"
     - kind: unmodelled
       topic: steal
-      step: 8
+      step: out
       cite: "Keep watch of the enemy Thief."
-    - kind: unmodelled
+    - kind: kits
       topic: drops
-      step: 8
       cite: "The Antitoxin Mercenary and, more importantly, Pure Water Brigand can easily be lured out for Colm to claim their items before the rest of your units finish them off."
 
 FE8 Ch4:
@@ -111,7 +108,7 @@ FE8 Ch5:
   claims:
     - kind: unmodelled
       topic: arena
-      step: 8
+      step: out
       cite: "This chapter features the first arena in the game."
     - kind: unmodelled
       topic: recruit
@@ -119,9 +116,8 @@ FE8 Ch5:
       cite: "Recruiting Joshua is less intimidating than it initially appears."
     - kind: reinforcements
       cite: "Brigand reinforcements will appear near the starting location, so make sure that your squishy units aren't undefended."
-    - kind: unmodelled
+    - kind: kits
       topic: villages
-      step: 8
       cite: "There is a free Guiding Ring if you visit all the villages."
 
 FE8 Ch6:
@@ -135,9 +131,8 @@ FE8 Ch6:
       topic: escort
       step: 7
       cite: "Send Vanessa to the east as fast as possible to guard the civilians; they will die without intervention."
-    - kind: unmodelled
+    - kind: kits
       topic: drops
-      step: 8
       cite: "The soldier with the Halberd will always drop the last weapon in his inventory"
 
 FE8 Ch7:
@@ -149,7 +144,7 @@ FE8 Ch7:
       cite: "finish him off with heavy hitters like Eirika's rapier."
     - kind: unmodelled
       topic: steal
-      step: 8
+      step: out
       cite: "If you really want the Energy Ring, bring Colm along so that he can steal it."
     - kind: unmodelled
       topic: range

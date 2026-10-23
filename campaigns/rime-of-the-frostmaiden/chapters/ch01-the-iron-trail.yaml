@@ -151,7 +151,7 @@ strategy_claims:
     cite: "she should fall fairly quickly to Rootis, Marty and Meesmickle's magic or R.B. Geenius's bow."
   - kind: unmodelled
     topic: healing
-    step: 8
+    step: out
     cite: "heal there between fights."
   - kind: reinforcements
     cite: "Note that on turn 3, three reinforcement units (two Fighters and a Soldier) appear from the west edge, behind you, so leave someone sturdy at the rear."

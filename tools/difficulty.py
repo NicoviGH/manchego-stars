@@ -1196,24 +1196,6 @@ def vanilla_boss_bar(parity_ref):
     return max(rows, key=lambda r: r[1]) if rows else (None, 0.0, True)
 
 
-def vanilla_projection(parity_ref, deploy_cap):
-    """Forward target for a PLANNED chapter (#123): its vanilla reference's own pressure,
-    printed as the bar the authored chapter must land within the parity band of. Both halves
-    count the FULL force: `proof` still reports how many units the fixed YARDSTICK cannot dent,
-    because that is worth knowing about a chapter you are about to write, but they are no longer
-    SKIPPED -- metric_rounds_to_kill floors them (#285). Skipping made a chapter with a wall
-    look cheaper to clear than one without. None if the reference isn't curated. Purely
-    informational: planned chapters never gate."""
-    van = vanilla_enemies(parity_ref)
-    if van is None:
-        return None
-    cap = max(1, deploy_cap)
-    threat = sum(fc.damage_per_round(e, YARDSTICK) for e in van) / cap
-    clearload = sum(metric_rounds_to_kill(e) for e in van) / cap
-    return {'threat': threat, 'clearload': clearload, 'n': len(van),
-            'proof': sum(1 for e in van if fc.damage(YARDSTICK, e) <= 0)}
-
-
 def _ally_lines(char_enum, class_enum, level):
     """Career stat lines for one vanilla ally: class base + the named character's personal
     line, grown on its OWN curve above its join level (one line when it is not above it)."""
@@ -2289,21 +2271,16 @@ def _print_cast(title, roster, levels, line, profiles):
 
 
 def _report_unwritten(chap, campaign):
-    """The per-chapter report of a chapter not written yet: its vanilla twin's numbers, the
-    target it will be written to. Its draft roster is never read (`unwritten_projection`)."""
+    """The per-chapter report of a chapter not written yet: there is none. A chapter is read
+    as it is built (Nicolas, 2026-10-23, ADR 0363): neither its draft nor its twin is read
+    for it until it is written."""
     bar = '=' * 80
-    ref = chap.get('parity_reference') or '?'
     print(bar)
     print('CH%s "%s" -- NOT WRITTEN YET (status: planned)'
           % (chap.get('chapter_number'), chap.get('title', '?')))
     print(bar)
-    proj = unwritten_projection(chap, campaign)
-    if proj is None:
-        print('Until it is written, its difficulty is %s\'s, which is not curated yet.' % ref)
-        return
-    print('Until it is written, its difficulty is its vanilla twin %s\'s: threat %.1f, '
-          'clear-load %.1f%s.\nThat is the target the chapter is written to; its draft YAML is '
-          'not read.' % (ref, proj['threat'], proj['clear'], proj['note']))
+    print('No difficulty reading until it is written; its draft YAML and its twin (%s) are '
+          'not read.' % (chap.get('parity_reference') or '?'))
 
 
 def report(campaign, ch, mode=None):
@@ -2548,51 +2525,6 @@ def arriving_fields(chap, campaign, mode=None, path='happy'):
     return {'our_force': our_force, 'van_force': van_force,
             'our_bodies': our_bodies, 'van_bodies': van_bodies,
             'our_party': our_party, 'van_party': van_party, 'cap': cap, 'van_forced': van_forced}
-
-
-def unwritten_projection(chap, campaign):
-    """An unwritten (`status: planned`) chapter's difficulty: its vanilla twin's, as
-    {'threat', 'clear', 'note'}, or None when the twin is not curated. A chapter that is not
-    written yet does not exist for the difficulty math (Nicolas, 2026-10-22): its draft YAML is
-    never read as a force. On VANILLA_CHAIN it is the twin's force against the twin's arriving
-    party (`planned_target`); off it, the fixed yardstick (`vanilla_projection`)."""
-    target = planned_target(chap, campaign)
-    if target is not None:
-        return {'threat': target['threat'], 'clear': target['clear'], 'note': ''}
-    proj = vanilla_projection(chap.get('parity_reference'),
-                              chapter_deploy_limit(chap, len(ROSTER)))
-    if proj is None:
-        return None
-    note = (' (%d yardstick-proof units, clear-load floored)' % proj['proof']
-            if proj['proof'] else '')
-    return {'threat': proj['threat'], 'clear': proj['clearload'],
-            'note': ' [fixed YARDSTICK: off VANILLA_CHAIN]' + note}
-
-
-def planned_target(chap, campaign):
-    """The parity target a `status: planned` chapter must hit: its twin's force against the
-    twin's arriving party, as {'threat', 'clear'}. None off VANILLA_CHAIN or where the exp
-    model cannot place the chapter."""
-    import exp_curve                        # exp_curve imports this module
-    ref = chap.get('parity_reference')
-    if ref not in VANILLA_CHAIN:
-        return None
-    try:
-        levels = exp_curve.entering(campaign, int(chap['chapter_number']), ref)['vanilla']
-    except ValueError:
-        return None
-    if levels is None:
-        return None
-    import danger_map                       # danger_map imports this module
-    import timeline                         # timeline imports this module
-    bodies = danger_map.vanilla_bodies(ref)
-    force = [(b.unit, ai_target.combat_weight_table(b.ai)) for b in bodies]
-    party, cap, forced = (vanilla_party_careers(ref, levels, 'happy'),
-                          chapter_deploy_limit(chap, len(ROSTER)), vanilla_forced(ref))
-    # Read as a written chapter's twin is read (#510 step 7), so the target and the verdict
-    # it becomes measure the same thing.
-    return party_matchup(force, party, cap, forced, engage=timeline.engage(
-        timeline.twin_board(ref, bodies), [u for u, _t in force]))
 
 
 def _warn_dropped(dropped, indent='  '):
@@ -3257,8 +3189,15 @@ def _item_id_to_enum():
     return _ITEM_IDS
 
 
+def shop_stock(list_sym):
+    """The ITEM_x enums an in-map shop's ShopList_ stocks (src/events_shoplist.c, HEAD): the
+    one reader of a shop's stock, for the economy, the kits and the wiki."""
+    return _shoplist_items(inject.decomp.vanilla_decomp_text('src/events_shoplist.c'), list_sym)
+
+
 def _shoplist_items(shoplist_text, list_sym):
-    """The ITEM_x enums a ShopList_ array stocks (ITEM_NONE terminator dropped)."""
+    """The ITEM_x enums a ShopList_ (or world-map ItemList_) array stocks (ITEM_NONE
+    terminator dropped)."""
     m = re.search(re.escape(list_sym) + r'\[\]\s*=\s*\{(.*?)\}', shoplist_text, re.S)
     if not m:
         return []
@@ -3485,7 +3424,6 @@ def twin_event_payload(stem):
     the part of `gifts` a Village or House script hands out: the optional half (#510 step 8)."""
     info = inject.decomp.vanilla_decomp_text('src/events/%s-eventinfo.h' % stem)
     script = inject.decomp.vanilla_decomp_text('src/events/%s-eventscript.h' % stem)
-    shoptext = inject.decomp.vanilla_decomp_text('src/events_shoplist.c')
     gifts = _gift_records(script)
     village_gifts = []
     for name in re.findall(r'(?:Village|House)\(\s*[^,]+,\s*(\w+)', info):
@@ -3499,7 +3437,7 @@ def twin_event_payload(stem):
            'gift_gold': _gift_gold(script),
            'village_gifts': village_gifts,
            'interlude_gifts': [], 'interlude_gift_to': [], 'interlude_gold': [],
-           'shops': [(sym, _shoplist_items(shoptext, sym)) for sym in
+           'shops': [(sym, shop_stock(sym)) for sym in
                      re.findall(r'(?:Armory|Vendor|SecretShop)\(\s*(\w+)', info)],
            'n_villages': len(re.findall(r'Village\(', info)),
            'n_houses': len(re.findall(r'House\(', info))}
@@ -3971,9 +3909,8 @@ def curve_report(campaign, band=0.25, mode=None, only=None):
           % ('%s (both sides shifted by their own chapter\'s numbers)' % mode.upper()
              if mode else 'AUTHORED TABLE (unshifted -- the level each side DECLARES)'))
     if mode:
-        print('  NB planned-chapter targets below, and the role findings of a twin off'
-              '\n     VANILLA_CHAIN (the yardstick fallback), are graded on the AUTHORED table,'
-              '\n     not on %s.'
+        print('  NB the role findings of a twin off VANILLA_CHAIN (the yardstick fallback)'
+              '\n     are graded on the AUTHORED table, not on %s.'
               '\n     mirror%% is INVARIANT: a mode shifts stats, never a unit\'s class or level,'
               '\n     and the Hard-only waves are folded into both sides unconditionally.'
               % mode.upper())
@@ -3996,18 +3933,9 @@ def curve_report(campaign, band=0.25, mode=None, only=None):
         # (not added to `rows`); a planned chapter that is also balance_locked is a config error
         # caught by check.py's chapter-status lint.
         if chap.get('status') == 'planned':
-            # our side is an ungrounded seed, but the VANILLA side of the comparison is
-            # computable now (#123): print the reference's own pressure as the forward
-            # target the authored chapter must hit within the band. Never gates.
-            ref = chap.get('parity_reference', '?') or '?'
-            proj = unwritten_projection(chap, campaign)
-            if proj is None:
-                print('  %-22s %-13s   -- planned (seed; reference not curated yet) --'
-                      % (label[:22], ref[:13]))
-            else:
-                print('  %-22s %-13s %4.1f (target)    %4.1f (target)      %-7s planned%s'
-                      % (label[:22], ref[:13], proj['threat'], proj['clear'], '--',
-                         proj['note']))
+            # A chapter is read as it is built (ADR 0363): nothing, its twin included.
+            print('  %-22s %-13s   -- planned -- not read until it is written --'
+                  % (label[:22], (chap.get('parity_reference', '?') or '?')[:13]))
             continue
         p = _chapter_pressure(chap, band, mode=mode, campaign=campaign)
         ot, ol = p['ours']

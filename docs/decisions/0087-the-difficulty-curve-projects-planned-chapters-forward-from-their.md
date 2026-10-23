@@ -1,12 +1,16 @@
 ---
 id: 87
-title: "The difficulty curve projects planned chapters forward from their vanilla reference (#123)."
+title: "~~The difficulty curve projects planned chapters forward from their vanilla reference (#123).~~ — SUPERSEDED 2026-10-23. A planned chapter is not read at all (ADR 0363)."
 date: "2026-07-02"
 section: "Weapon & Magic Systems"
 issues: [123]
 ---
 
-# The difficulty curve projects planned chapters forward from their vanilla reference (#123).
+# ~~The difficulty curve projects planned chapters forward from their vanilla reference (#123).~~ — SUPERSEDED 2026-10-23. A planned chapter is not read at all (ADR 0363).
+
+Nicolas, 2026-10-23: "lets run the future chapters as we build them." A chapter is read as
+it is built; a `status: planned` row prints that it is not read, and neither its draft nor its
+twin is opened for it. `vanilla_projection` is retired. The original decision follows.
 
 Nicolas (2026-07-02): "Can we not project forward based on vanilla?" We can — every chapter already
 declares its `parity_reference`, and the #48 extractor models the VANILLA side of the comparison, so a
