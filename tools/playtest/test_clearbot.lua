@@ -269,6 +269,24 @@ do
         false, "same target, same distance, same enemies = no progress")
 end
 
+-- stepOffTile: a unit that cannot Seize clears the throne's approach. From its reachable tiles,
+-- the one FARTHEST from the seize tile, never on or beside it; ties go to the shorter move.
+do
+    local seize = { x = 5, y = 5 }
+    local reach = tiles({ 5, 4 }, { 4, 4 }, { 5, 2 }, { 3, 5 }, { 5, 1 })
+    local t = C.stepOffTile(reach, { x = 5, y = 4 }, seize)
+    check(t and t.x, 5, "steps to the farthest reachable tile (x)")
+    check(t and t.y, 1, "steps to the farthest reachable tile (y)")
+    check(C.stepOffTile(tiles({ 5, 4 }, { 4, 5 }), { x = 5, y = 4 }, seize), nil,
+        "only tiles beside the throne reachable -> nil (no move that helps)")
+    -- tie on distance from the throne: the shorter move wins
+    local tie = C.stepOffTile(tiles({ 5, 8 }, { 8, 5 }), { x = 6, y = 8 }, seize)
+    check(tie and tie.x, 5, "tie on throne distance -> the nearer tile")
+    check(C.needsToStepOff({ x = 5, y = 4 }, seize), true, "beside the throne -> step off")
+    check(C.needsToStepOff({ x = 5, y = 5 }, seize), true, "on the throne -> step off")
+    check(C.needsToStepOff({ x = 5, y = 3 }, seize), false, "two away -> stay")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

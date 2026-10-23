@@ -191,8 +191,10 @@ function Board.liveBoss(mem, SYM)
     local base = SYM.gUnitArrayRed
     for slot = 0, BY_NAME.red.count - 1 do
         local a = base + slot * Board.UNIT_SIZE
-        if mem.u32(a) ~= 0 and Board.isBoss(mem, a)
-            and onFieldState(mem.u32(a + 0x0C), mem.s8(a + 0x10), mem.s8(a + 0x11)) then
+        -- On-field first: it is three reads, the boss attribute two more through a pointer.
+        if mem.u32(a) ~= 0
+            and onFieldState(mem.u32(a + 0x0C), mem.s8(a + 0x10), mem.s8(a + 0x11))
+            and Board.isBoss(mem, a) then
             return Board.leanAt(mem, SYM, base, slot)
         end
     end

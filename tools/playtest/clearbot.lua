@@ -175,6 +175,29 @@ function M.seizeDistance(units, field, ruledOut)
     return best
 end
 
+-- A unit that has shown it cannot Seize (it stood on the tile; no Seize command) must not park
+-- on or beside the throne: on a single-approach throne that body blocks the lord forever.
+function M.needsToStepOff(cur, seize)
+    return manhattan(cur.x, cur.y, seize.x, seize.y) <= 1
+end
+
+-- Where such a unit should Wait: of its reachable tiles, the one FARTHEST from the seize tile
+-- (out of the approach, not merely off the tile), never on or beside it; ties go to the
+-- shorter move. nil when every reachable tile is on or beside the throne.
+function M.stepOffTile(reachable, cur, seize)
+    local best, bestFar, bestMove
+    for _, t in ipairs(reachable) do
+        local far = manhattan(t.x, t.y, seize.x, seize.y)
+        if far >= 2 then
+            local move = manhattan(t.x, t.y, cur.x, cur.y)
+            if not best or far > bestFar or (far == bestFar and move < bestMove) then
+                best, bestFar, bestMove = t, far, move
+            end
+        end
+    end
+    return best
+end
+
 -- Did a turn make progress? Nearer the target, or fewer enemies. `last` holds the best
 -- {dist, enemies, key} seen so far, `now` this turn's. `key` names WHAT the distance is
 -- measured to and from (the target, and who is still a candidate): when it changes -- the boss

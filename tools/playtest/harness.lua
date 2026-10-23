@@ -1137,6 +1137,7 @@ local function endTurn(tile, alreadyWon, phaseTurn)
             return over() or controllerState(observeController()) == "player_map_idle"
         end, 600, true)
         if over() then return noTurnLeft() end
+        -- awaitControllerState advances dialogue itself (a classified dialogue_wait).
         if not awaitControllerState("player_map_idle", 300) then return false end
         if over() then return noTurnLeft() end
     elseif alreadyWon then
@@ -2502,6 +2503,19 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     -- boss while it lives, then the seize tile. ruledOut[slot] marks units that stood on the
     -- seize tile without a legal Seize -- not the lord -- so the lord's march still registers.
     local ruledOut = {}
+    -- Move a ruled-out unit off the throne's approach and Wait there (clearbot.stepOffTile):
+    -- parked on or beside a single-approach throne it would block the lord for good.
+    local function stepOffSeize(u)
+        local reach = selectAndReach(u, maxx, maxy)
+        if not reach then return false end
+        local tile = CLEARBOT.stepOffTile(reach, u, seizeTile)
+        if not tile then return cancelToPlayerMap() end   -- boxed in beside it: nothing helps
+        if not cursorTo(tile.x, tile.y) then return false end
+        if not guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
+            return controllerState(after) == "unit_command_menu"
+        end, 180) then return false end
+        return chooseWait()
+    end
     local lastDist, lastEnemies, stall = math.huge, math.huge, 0
     local lastKey = "boss:0"
     for t = 1, budgetTurns do
@@ -2564,6 +2578,12 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                         end, TUNE.combatFrames, true)
                         if won() then return "won", t end
                     end
+                elseif ruledOut[u.slot] then
+                    -- Shown not to be the lord: it does not march on the throne, and if it
+                    -- stands on or beside it, it clears the way.
+                    if CLEARBOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
+                        return "stuck", t
+                    end
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
                     -- Boss dead, not yet won: select semantic Seize when this unit owns it.
                     -- A non-lead unit is cancelled through two independently legal B actions.
@@ -2580,6 +2600,11 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                     else
                         ruledOut[u.slot] = true
                         if not cancelUnitActionMenu() then return "stuck", t end
+                        -- Back on the tile it started from; clear the approach if that is beside
+                        -- the throne.
+                        if CLEARBOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
+                            return "stuck", t
+                        end
                     end
                 elseif ourPhase() and not won() then
                     -- The seize tile is out of this unit's reach this turn (moveUnit backed
@@ -4676,7 +4701,7 @@ local function teleportToFiringTile(u, mn, mx)
             end
         end
     end
-    log(string.format("  teleportToFiringTile: no free tile within [%d,%d] of any of %d live enemies", mn, mx, #liveEnemies()))
+    log(string.format("  teleportToFiringTile: no free tile within [%d,%d] of any of %d live enemies", mn, mx, BOARD.liveCount("red")))
     return false
 end
 
@@ -6511,7 +6536,7 @@ scenarios.ch02baxby = function()
         local r = unitAt(SYM.gUnitArrayRed, i)
         if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
     end
-    local liveBefore = #liveEnemies()
+    local liveBefore = BOARD.liveCount("red")
     if not teleportToFiringTile(baxby, mn, mx) then
         return result("FAIL", "no free tile in Baxby's weapon range of any enemy")
     end
@@ -6524,7 +6549,7 @@ scenarios.ch02baxby = function()
     chooseAttack(baxby.addr)
     waitFor(function() return not procActive(SYM.gProc_ekrBattle) end, 600)
     wait(30)
-    local liveAfter = #liveEnemies()
+    local liveAfter = BOARD.liveCount("red")
     baxby = unitAt(SYM.gUnitArrayBlue, bidx)
     local acted = baxby and (baxby.state & 0x2) ~= 0          -- US_UNSELECTABLE = he took his action
     log(string.format("Baxby combat: liveEnemies %d -> %d (killed %d); acted=%s",
@@ -6576,7 +6601,7 @@ scenarios.clear_ch02 = function()
             if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         for i = 0, 7 do
-            if advanced() or #liveEnemies() == 0 then break end
+            if advanced() or BOARD.liveCount("red") == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -6590,8 +6615,8 @@ scenarios.clear_ch02 = function()
                 end
             end
         end
-        log(string.format("clear_ch02 turn %d: liveEnemies=%d chapter=%d", t, #liveEnemies(), chapter()))
-        if #liveEnemies() == 0 then routed = true; break end
+        log(string.format("clear_ch02 turn %d: liveEnemies=%d chapter=%d", t, BOARD.liveCount("red"), chapter()))
+        if BOARD.liveCount("red") == 0 then routed = true; break end
         if advanced() then break end
         if runEnemyPhase(CH02_PARK) == "gameover" then
             shot("clear-ch02-gameover")
@@ -6689,7 +6714,7 @@ scenarios.recordchain = function()
             if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         for i = 0, 7 do
-            if advanced() or #liveEnemies() == 0 then break end
+            if advanced() or BOARD.liveCount("red") == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -6703,8 +6728,8 @@ scenarios.recordchain = function()
                 end
             end
         end
-        log(string.format("recordchain rout turn %d: liveEnemies=%d chapter=%d", t, #liveEnemies(), chapter()))
-        if #liveEnemies() == 0 then routed = true; break end
+        log(string.format("recordchain rout turn %d: liveEnemies=%d chapter=%d", t, BOARD.liveCount("red"), chapter()))
+        if BOARD.liveCount("red") == 0 then routed = true; break end
         if advanced() then break end
         if runEnemyPhase(CH02_PARK) == "gameover" then
             return result("FAIL", string.format("game over on turn %d -- party lost before the chain", t)) end
@@ -9876,9 +9901,9 @@ local function clearCh04(parley)
         -- reported only "liveEnemies=10" for 16 turns, which named none of them.
         local mw, mh = mapSize()
         log(string.format("%s iter %d: gameTurn=%d map=%dx%d liveEnemies=%d",
-            tag, t, turn(), mw, mh, #liveEnemies()))
+            tag, t, turn(), mw, mh, BOARD.liveCount("red")))
         for i = 0, 19 do
-            if won() or #liveEnemies() == 0 then break end
+            if won() or BOARD.liveCount("red") == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -9899,26 +9924,26 @@ local function clearCh04(parley)
                     if not (u and moveUnit(u.x, u.y, u.x, u.y)) then
                         log(string.format("  blue[%d] pid=0x%02X: command menu never opened", i, u.charId))
                     else
-                        local before = #liveEnemies()
+                        local before = BOARD.liveCount("red")
                         chooseAttack(u.addr, function() return BOARD.liveCount("red") == 0 end)
                         -- Break the settle the moment the kill empties the map: DefeatAll fires
                         -- on that death and the ending starts playing at once, so a blind
                         -- 600-frame wait here spends the victory fanfare and half the treeline
                         -- scene before the capture loop below gets its first frame (#204).
-                        waitFor(function() return #liveEnemies() == 0
+                        waitFor(function() return BOARD.liveCount("red") == 0
                             or (faction() == 0 and not menuOpen()
                                 and not procActive(SYM.gProc_ekrBattle)) end, 600)
                         log(string.format("  blue[%d] pid=0x%02X attacked from (%d,%d): liveEnemies %d -> %d",
-                            i, u.charId, u.x, u.y, before, #liveEnemies()))
+                            i, u.charId, u.x, u.y, before, BOARD.liveCount("red")))
                     end
                 end
             end
         end
-        log(string.format("%s turn %d: liveEnemies=%d chapter=%d", tag, t, #liveEnemies(), chapter()))
+        log(string.format("%s turn %d: liveEnemies=%d chapter=%d", tag, t, BOARD.liveCount("red"), chapter()))
         if won() then break end
         if gameOverActive() then shot(tag .. "-gameover")
             return result("FAIL", string.format("game over on turn %d -- party lost", t)) end
-        if #liveEnemies() == 0 then break end
+        if BOARD.liveCount("red") == 0 then break end
         if runEnemyPhase() == "gameover" then shot(tag .. "-gameover")
             return result("FAIL", "game over on the enemy phase") end
     end
@@ -9952,7 +9977,7 @@ local function clearCh04(parley)
         end
     end
     log(string.format("%s: liveEnemies=%d chapter=%d (host=%d)",
-        tag, #liveEnemies(), chapter(), HOST_CHAPTER))
+        tag, BOARD.liveCount("red"), chapter(), HOST_CHAPTER))
     if not ended then
         shot(tag .. "-no-ending")
         return result("FAIL", "routed but the DefeatAll ending never advanced off the host slot")
@@ -10323,7 +10348,7 @@ scenarios.recordch02ending = function()
             if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         for i = 0, 7 do
-            if #liveEnemies() == 0 then break end
+            if BOARD.liveCount("red") == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -10337,10 +10362,10 @@ scenarios.recordch02ending = function()
                 end
             end
         end
-        if #liveEnemies() == 0 then break end
+        if BOARD.liveCount("red") == 0 then break end
         if runEnemyPhase(CH02_PARK) == "gameover" then return result("FAIL", "party lost") end
     end
-    if #liveEnemies() ~= 0 then return result("FAIL", "rout incomplete -- no ending to record") end
+    if BOARD.liveCount("red") ~= 0 then return result("FAIL", "rout incomplete -- no ending to record") end
     endTurn()   -- fire the DefeatAll win -> the ending scene
     pokeNormalConfig()   -- readable text speed for the capture
     local fr, atTitle = 0, false
