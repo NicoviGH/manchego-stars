@@ -191,12 +191,16 @@ class TestAwaitControllerState(unittest.TestCase):
         # and failed clear_ch01 with an illegal input it could never satisfy. ch02 showed the
         # same number in "teleportToFiringTile: (255,9)", which only survived because that one
         # site happened to bail. Read the field the width the struct declares, and keep an
-        # off-map unit out of the lists that drive the cursor.
+        # off-map unit out of the lists that drive the cursor. The read lives in board.lua,
+        # the one board reader (#510 step 9); harness unitAt only delegates to it.
         harness = _read_harness()
         body = _block(harness, 'local function unitAt(', '\nlocal function findUnit')
-        self.assertIn('rs8(a + 0x10)', body, 'xPos is s8')
-        self.assertIn('rs8(a + 0x11)', body, 'yPos is s8')
-        self.assertNotIn('ru8(a + 0x10)', body, 'the unsigned read is the bug')
+        self.assertIn('BOARD.unitAt(base, i)', body, 'unitAt delegates to board.lua')
+        with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
+            board = _block(fh.read(), 'function Board.unitAt(', '\nend\n')
+        self.assertIn('mem.s8(a + 0x10)', board, 'xPos is s8')
+        self.assertIn('mem.s8(a + 0x11)', board, 'yPos is s8')
+        self.assertNotIn('mem.u8(a + 0x10)', board, 'the unsigned read is the bug')
         live = _block(harness, 'local function liveEnemies(', '\n\n')
         self.assertIn('onMap', live, 'a target list must not offer an off-map unit')
 

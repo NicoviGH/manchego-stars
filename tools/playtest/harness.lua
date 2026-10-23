@@ -37,8 +37,7 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 --                    +0x14 pow, +0x16 spd, +0x17 def, +0x18 res, +0x19 lck
 --   CharacterData: +0x04 = character id (include/bmunit.h)
 --   src/proc.c sProcArray: 64 procs x 0x6C; +0x00 = proc_script
-local UNIT_SIZE = 0x48
-local US_DEAD = 4 -- include/bmunit.h (1 << 2)
+-- (Unit/Item/CharacterData reads live in board.lua, the one board reader.)
 -- Harness tuning, in ONE table rather than one local apiece: harness.lua is a single Lua
 -- chunk and its main function sits near Lua's 200-local ceiling, so a handful of new
 -- top-level locals stops the WHOLE FILE loading and every scenario dies at once (#232).
@@ -224,28 +223,13 @@ local function eventFlag(flag)
 end
 
 -- ---------------------------------------------------------------- unit access
-local function unitAt(base, i)
-    local a = base + i * UNIT_SIZE
-    local chptr = ru32(a)
-    if chptr == 0 then return nil end
-    return {
-        addr = a,
-        charId = ru8(chptr + 4),
-        -- xPos/yPos are s8 (bmunit.h), and FE8 parks a unit that is NOT on the map at -1.
-        -- Read unsigned, that unit reported x=255: the clear-bot took it for a real tile and
-        -- drove the cursor at (255,8) on a 25-wide map, an input no press could ever satisfy
-        -- (#335). `onMap` is the question every caller that drives the cursor actually means.
-        x = rs8(a + 0x10), y = rs8(a + 0x11),
-        onMap = rs8(a + 0x10) >= 0 and rs8(a + 0x11) >= 0,
-        hp = ru8(a + 0x13),
-        -- struct Unit (bmunit.h): +08 level, +12 maxHP, +14 pow, +17 def. The difficulty
-        -- shift re-projects these off class growths, so they are what a mode probe reads
-        -- (+0x13 curHP happens to match maxHP at load, but is not the field that moved).
-        level = ru8(a + 0x08),
-        maxhp = ru8(a + 0x12), pow = ru8(a + 0x14), def = ru8(a + 0x17),
-        state = ru32(a + 0x0C),
-    }
-end
+-- board.lua is the ONE board reader (#510 step 9): unitAt, the clear-bot's enemy tables and
+-- the LLM export all read through it. Bound once here so it costs one top-level local.
+local BOARD = dofile(PLAYTEST_DIR .. "/board.lua").bind(
+    { u8 = ru8, s8 = rs8, u16 = ru16, u32 = ru32 }, SYM)
+-- One array slot (board.lua's unit table: addr, charId, x, y, onMap, hp, maxhp, level, pow,
+-- def, state, dead, acted, isBoss, ...), or nil for an empty slot. ~100 callers keep this name.
+local function unitAt(base, i) return BOARD.unitAt(base, i) end
 local function findUnit(base, count, charId)
     for i = 0, count - 1 do
         local u = unitAt(base, i)
@@ -259,20 +243,11 @@ end
 -- the map. A scan bound is a property of the engine, never of the current content.
 local function blue(charId) return findUnit(SYM.gUnitArrayBlue, 62, charId) end
 local function red(charId) return findUnit(SYM.gUnitArrayRed, 50, charId) end
-local function isDead(u) return u == nil or (u.state & US_DEAD) ~= 0 end
+local function isDead(u) return u == nil or u.dead end
 
--- A unit's attack reach from its equipped (items[0]) weapon, via gItemData (include/bmitem.h:
--- attributes +0x08, encodedRange +0x19 = min<<4 | max; ItemData stride 0x24). Returns
--- (minRange, maxRange) for a real weapon, or nil for a staff / non-attacker (no IA_WEAPON).
-local ITEMDATA_STRIDE = 0x24
-local function unitAttackRange(u)
-    local item = ru16(u.addr + 0x1E) & 0xFF       -- items[0] item id (low byte; high byte = uses)
-    if item == 0 then return nil end
-    local data = SYM.gItemData + item * ITEMDATA_STRIDE
-    if (ru32(data + 0x08) & 0x1) == 0 then return nil end   -- IA_WEAPON unset -> staff/non-weapon
-    local er = ru8(data + 0x19)
-    return (er >> 4), (er & 0xF)
-end
+-- A unit's attack reach from its equipped (items[0]) weapon, read LIVE from u.addr (a caller
+-- may hold `u` across a trade): (minRange, maxRange), or nil for a staff / non-attacker.
+local function unitAttackRange(u) return BOARD.attackRange(u.addr) end
 
 local function pokeFrail(u) -- 1 HP, no def/res/spd/lck: next clean hit kills
     emu:write8(u.addr + 0x13, 1) -- curHP
@@ -1474,7 +1449,7 @@ local function hpSum()
     for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayRed }) do
         for i = 0, 23 do
             local u = unitAt(base, i)
-            if u and (u.state & US_DEAD) == 0 then s = s + u.hp end
+            if u and not u.dead then s = s + u.hp end
         end
     end
     return s
@@ -1629,7 +1604,7 @@ INSPECT.units = function(tag)
         local name, base, count = f[1], f[2], f[3]
         for i = 0, count - 1 do
             local u = unitAt(base, i)
-            if u and (u.state & US_DEAD) == 0 then
+            if u and not u.dead then
                 log(string.format(
                     '{"event":"unit","tag":"%s","faction":"%s","char":"0x%02x",'
                     .. '"x":%d,"y":%d,"hp":%d}', tag, name, u.charId, u.x, u.y, u.hp))
@@ -1649,7 +1624,7 @@ INSPECT.difficultyProbe = function(tag)
     local total = 0
     for i = 0, 49 do
         local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and (u.state & US_DEAD) == 0 then
+        if u and not u.dead then
             total = total + u.maxhp
             log(string.format(
                 '{"event":"difficulty_unit","tag":"%s","char":"0x%02x","level":%d,'
@@ -1758,7 +1733,6 @@ end
 local CLEARBOT = dofile(PLAYTEST_DIR .. "/clearbot.lua")
 local CH02 = dofile(PLAYTEST_DIR .. "/ch02check.lua")   -- pure charm-delivery check (#22)
 local PATHING = dofile(PLAYTEST_DIR .. "/pathing.lua")  -- pure BFS distance field (#60 march)
-local CA_BOSS = (1 << 15)   -- include/bmunit.h:326 (character/class attribute)
 local FUZZRNG = dofile(PLAYTEST_DIR .. "/fuzzrng.lua")   -- seeded PRNG + input policy (#49)
 
 -- Terrain ids (include/constants/terrains.h) that hard-block a foot/mounted march -- used to
@@ -1793,32 +1767,20 @@ local function bossDistanceField(boss, maxx, maxy)
     return PATHING.distanceField(w, h, isPassable, { x = boss.x, y = boss.y })
 end
 
--- A unit's character carries the CA_BOSS attribute: pCharacterData (Unit +0x00) ->
--- CharacterData.attributes (+0x28). True for named bosses (Sephek, the ch01 chief, ...).
-local function unitIsBoss(u)
-    local chptr = ru32(u.addr)
-    if chptr == 0 then return false end
-    return (ru32(chptr + 0x28) & CA_BOSS) ~= 0
-end
-
--- The live boss in the red array (the first CA_BOSS unit), or nil.
+-- The live boss in the red array (the first unit whose character carries CA_BOSS), or nil.
 local function findBoss()
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) and unitIsBoss(u) then return u end
+    for _, u in ipairs(BOARD.live(BOARD.read(), "red")) do
+        if u.isBoss then return u end
     end
     return nil
 end
 
--- Live red units as plain {x,y,hp,is_boss} tables for the pure pickTarget core.
+-- Live, on-map red units as plain {x,y,hp,is_boss} tables for the pure pickTarget core.
+-- onMap, not just alive: a live enemy still off the map is not a place to walk to.
 local function liveEnemies()
     local out = {}
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        -- onMap, not just alive: a live enemy still off the map is not a place to walk to.
-        if u and not isDead(u) and u.onMap then
-            out[#out + 1] = { x = u.x, y = u.y, hp = u.hp, is_boss = unitIsBoss(u) }
-        end
+    for _, u in ipairs(BOARD.live(BOARD.read(), "red")) do
+        if u.onMap then out[#out + 1] = { x = u.x, y = u.y, hp = u.hp, is_boss = u.isBoss } end
     end
     return out
 end
@@ -2517,12 +2479,9 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     -- progress = the nearest live unit's path-distance to the boss (lower is better).
     local function nearestBossDist(field)
         local best = math.huge
-        for i = 0, 7 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) then
-                local fd = field and field[u.y] and field[u.y][u.x]
-                if fd and fd < best then best = fd end
-            end
+        for _, u in ipairs(BOARD.live(BOARD.read(), "blue")) do
+            local fd = u.onMap and field and field[u.y] and field[u.y][u.x]
+            if fd and fd < best then best = fd end
         end
         return best
     end
@@ -2534,21 +2493,22 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         local b = findBoss()
         local field = b and bossDistanceField(b, maxx, maxy) or nil
         local claimed = {}                       -- destinations committed this phase
-        for i = 0, 7 do
+        -- The phase's roster from one board.lua read (decomp bounds, not the first 8 slots);
+        -- each unit is re-read just before it acts, since earlier actions move the board.
+        for _, slotUnit in ipairs(BOARD.live(BOARD.read(), "blue")) do
             if won() then return "won", t end
             if lost() then return "gameover", t end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
+            local u = unitAt(SYM.gUnitArrayBlue, slotUnit.slot)
             -- onMap too: an undeployed unit is alive and unacted but has no tile to select.
-            if u and not isDead(u) and u.onMap and (u.state & 0x2) == 0 then   -- live, not yet acted
+            if u and not u.dead and u.onMap and not u.acted then   -- live, not yet acted
                 b = findBoss()
                 if b then
                     seizeTile = { x = b.x, y = b.y }
                     -- other live units' CURRENT tiles are unstandable too
                     local blocked = {}
                     for k in pairs(claimed) do blocked[k] = true end
-                    for j = 0, 7 do
-                        local o = unitAt(SYM.gUnitArrayBlue, j)
-                        if o and not isDead(o) and j ~= i then
+                    for _, o in ipairs(BOARD.live(BOARD.read(), "blue")) do
+                        if o.onMap and o.slot ~= u.slot then
                             blocked[CLEARBOT.tileKey(o.x, o.y)] = true
                         end
                     end
@@ -2793,37 +2753,37 @@ local LLMDIR = (type(PLAYTEST_LLMDIR) == "string" and PLAYTEST_LLMDIR) or "/tmp/
 local LLM_RED_ID_BASE = 1000
 
 local function llmExportBoard(objective, maxx, maxy)
-    local units = {}
-    for i = 0, 7 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and not isDead(u) then
-            local canAct = (u.state & 0x2) == 0
+    -- One board.lua snapshot: selecting a unit for its reach and cancelling changes nothing
+    -- on the board. Off-map units are left out -- there is no tile to select or to attack.
+    local board, units = BOARD.read(), {}
+    for _, u in ipairs(BOARD.live(board, "blue")) do
+        if u.onMap then
+            local canAct = not u.acted
             local reach = {}
             if canAct then
                 local r = selectAndReach(u, maxx, maxy)
                 if not r then return nil, "controller could not enumerate live movement" end
-                if r and not guardedInput("cancel_selection", "B",
+                if not guardedInput("cancel_selection", "B",
                     "board export returns movement selection to player map", function(after)
                         return controllerState(after) == "player_map_idle"
                     end, 120) then return nil, "controller could not close movement selection" end
-                if r then for _, t in ipairs(r) do reach[#reach + 1] = { t.x, t.y } end end
+                for _, t in ipairs(r) do reach[#reach + 1] = { t.x, t.y } end
             end
-            local mn, mx = unitAttackRange(u)
             units[#units + 1] = {
                 id = u.charId, faction = "blue", x = u.x, y = u.y,
-                hp = u.hp, maxhp = ru8(u.addr + 0x12), can_act = canAct,
-                boss = false, reach = reach, range = mn and { mn, mx } or nil,
+                hp = u.hp, maxhp = u.maxhp, can_act = canAct,
+                boss = false, reach = reach,
+                range = u.minRange and { u.minRange, u.maxRange } or nil,
             }
         end
     end
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) then
-            local mn, mx = unitAttackRange(u)
+    for _, u in ipairs(BOARD.live(board, "red")) do
+        if u.onMap then
             units[#units + 1] = {
-                id = LLM_RED_ID_BASE + i, faction = "red", x = u.x, y = u.y,
-                hp = u.hp, maxhp = ru8(u.addr + 0x12), can_act = false,
-                boss = unitIsBoss(u), reach = {}, range = mn and { mn, mx } or nil,
+                id = LLM_RED_ID_BASE + u.slot, faction = "red", x = u.x, y = u.y,
+                hp = u.hp, maxhp = u.maxhp, can_act = false,
+                boss = u.isBoss, reach = {},
+                range = u.minRange and { u.minRange, u.maxRange } or nil,
             }
         end
     end
@@ -4296,7 +4256,7 @@ INSPECT.redStats = function()
     local n = 0
     for i = 0, 49 do
         local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and (u.state & US_DEAD) == 0 then
+        if u and not u.dead then
             n = n + 1
             log(string.format(
                 '{"event":"red_stats","mode":"%s","char":"0x%02x","class":"0x%02x","level":%d,'
@@ -6361,7 +6321,7 @@ scenarios.ch02 = function()
         local r = unitAt(SYM.gUnitArrayRed, i)
         if r and not isDead(r) then
             if ru8(ru32(r.addr + 0x04) + 0x04) == CAMPAIGN.CH02_ARCHER_CLASS then archer = true end
-            if unitIsBoss(r) then boss = true end
+            if r.isBoss then boss = true end
         end
     end
     log(string.format("ch02 entry: chwinga=%d deployed=%d archer=%s boss=%s",
@@ -7267,7 +7227,7 @@ scenarios.ch05recruit = function(opts)
             -- back on the tile grid at its old position. bmsave.c:414 writes the dead
             -- state as US_HIDDEN | US_DEAD.
             setMapUnit(wolf.x, wolf.y, 0)
-            emu:write32(wolf.addr + 0x0C, wolf.state | US_DEAD | 1)  -- ... | US_HIDDEN
+            emu:write32(wolf.addr + 0x0C, wolf.state | BOARD.US_DEAD | 1)  -- ... | US_HIDDEN
         else
             return result("FAIL", "unknown lupin state " .. tostring(opts.lupin))
         end
@@ -8967,7 +8927,7 @@ scenarios.recordch06ice = function()
             local reds = 0
             for i = 0, 49 do
                 local u = unitAt(SYM.gUnitArrayRed, i)
-                if u and u.onMap and (u.state & US_DEAD) == 0 then reds = reds + 1 end
+                if u and u.onMap and not u.dead then reds = reds + 1 end
             end
             if reds == 0 then
                 -- recordCutscene reads only the first return, so a second one would be lost and
@@ -10628,7 +10588,7 @@ scenarios.ch06halberd = function()
 
     -- The classes his second weapon is effective against: gItemData[id].pEffectiveness (+0x10),
     -- a 0-terminated class list (data_itemuse.c's ItemEffectiveness_Horse).
-    local mounted, eff = {}, ru32(SYM.gItemData + DROP * ITEMDATA_STRIDE + 0x10)
+    local mounted, eff = {}, ru32(SYM.gItemData + DROP * BOARD.ITEMDATA_STRIDE + 0x10)
     while eff ~= 0 and ru8(eff) ~= 0 do mounted[ru8(eff)] = true eff = eff + 1 end
 
     local foot, horse
@@ -10646,7 +10606,7 @@ scenarios.ch06halberd = function()
     -- One arm: park `u` beside him, hold both units, run enemy phases until he attacks, then
     -- move `u` off so the next arm's target is the only one beside him.
     local function arm(name, u)
-        local idx, home = (u.addr - SYM.gUnitArrayBlue) // UNIT_SIZE, { x = u.x, y = u.y }
+        local idx, home = (u.addr - SYM.gUnitArrayBlue) // BOARD.UNIT_SIZE, { x = u.x, y = u.y }
         local function me() return unitAt(SYM.gUnitArrayBlue, idx) end
         if not teleportAdjacentTo(u, { { x = D.x, y = D.y } }) then
             return nil, name .. ": no free tile beside him"

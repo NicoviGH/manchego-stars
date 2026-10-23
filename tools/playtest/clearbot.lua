@@ -1,10 +1,11 @@
 -- clearbot.lua -- pure target-selection for the greedy clear-bot (#60, no emulator).
 --
 -- The decision core, split from the emulator driving so it is unit-tested without mGBA
--- (tools/playtest/test_clearbot.lua). The clear scenario reads real reachability + enemy
--- state into plain tables and asks pickTarget what to hit; it owns the actual moving/
--- attacking. Boss-ness is passed in as data (is_boss), computed by the scenario from the
--- CA_BOSS character attribute -- so this stays a pure function over positions/hp.
+-- (tools/playtest/test_clearbot.lua). The clear scenario reads real reachability, and the
+-- enemy state from board.lua's Board.read (the one board reader), into plain tables and asks
+-- pickTarget what to hit; it owns the actual moving/attacking. Boss-ness is passed in as data
+-- (is_boss, board.lua's isBoss: the CA_BOSS character attribute) -- so this stays a pure
+-- function over positions/hp.
 --
 -- pickTarget(reachable, enemies, prefs) -> { target = <enemy>, tile = {x,y} } | nil
 --   reachable: list of {x,y} tiles the unit can move to this turn (its own tile included)
