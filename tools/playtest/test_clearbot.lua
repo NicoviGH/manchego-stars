@@ -233,6 +233,60 @@ do
         "off-map probes at the corner are safe")
 end
 
+-- Stall progress (#510 step 9). Distance is measured from the units that can still be the
+-- one to finish: once the boss is dead the field points at the seize tile, and a unit that
+-- stood on that tile without a legal Seize is ruled out, so the lord's march is what counts.
+do
+    -- field[y][x] = steps to the target; a 1-row map, target at x = 9.
+    local field = { [0] = {} }
+    for x = 0, 9 do field[0][x] = 9 - x end
+    local function u(slot, x) return { slot = slot, x = x, y = 0, onField = true } end
+    local ruledOut = { [2] = true }   -- slot 2 stood on the seize tile: no Seize for it
+    check(C.seizeDistance({ u(1, 3), u(2, 8) }, field, ruledOut), 6,
+        "the ruled-out unit beside the tile does not mask the lord's distance")
+    check(C.seizeDistance({ u(1, 3), { slot = 3, x = -1, y = -1, onField = false } }, field, {}), 6,
+        "an off-field unit has no distance")
+    check(C.seizeDistance({ u(2, 8) }, field, ruledOut), math.huge,
+        "nobody left who could seize -> no distance")
+    check(C.seizeDistance({ u(1, 3) }, nil, {}), math.huge, "no field -> no distance")
+
+    -- boss dead, the lord marching: its seize distance falls -> progress
+    local last = { dist = 6, enemies = 0 }
+    check(C.madeProgress(last, { dist = 3, enemies = 0 }), true,
+        "boss dead + seize distance falling = progress")
+    -- boss dead, nobody closer, no fewer enemies -> no progress
+    check(C.madeProgress(last, { dist = 6, enemies = 0 }), false,
+        "boss dead + distance unchanged + enemy count unchanged = no progress")
+    check(C.madeProgress({ dist = math.huge, enemies = 3 }, { dist = math.huge, enemies = 2 }), true,
+        "a kill is progress even with no distance")
+    check(C.madeProgress({ dist = 4, enemies = 2 }, { dist = 5, enemies = 2 }), false,
+        "moving away with no kill is not progress")
+    -- the target changed (boss died / a unit ruled out): the old best belonged to another
+    -- question, so the change counts, and a farther first reading is not a stall
+    check(C.madeProgress({ dist = 4, enemies = 0, key = "boss" }, { dist = 10, enemies = 0, key = "seize:1" }),
+        true, "a new target is progress, not a stall against the old best")
+    check(C.madeProgress({ dist = 10, enemies = 0, key = "seize:1" }, { dist = 10, enemies = 0, key = "seize:1" }),
+        false, "same target, same distance, same enemies = no progress")
+end
+
+-- stepOffTile: a unit that cannot Seize clears the throne's approach. From its reachable tiles,
+-- the one FARTHEST from the seize tile, never on or beside it; ties go to the shorter move.
+do
+    local seize = { x = 5, y = 5 }
+    local reach = tiles({ 5, 4 }, { 4, 4 }, { 5, 2 }, { 3, 5 }, { 5, 1 })
+    local t = C.stepOffTile(reach, { x = 5, y = 4 }, seize)
+    check(t and t.x, 5, "steps to the farthest reachable tile (x)")
+    check(t and t.y, 1, "steps to the farthest reachable tile (y)")
+    check(C.stepOffTile(tiles({ 5, 4 }, { 4, 5 }), { x = 5, y = 4 }, seize), nil,
+        "only tiles beside the throne reachable -> nil (no move that helps)")
+    -- tie on distance from the throne: the shorter move wins
+    local tie = C.stepOffTile(tiles({ 5, 8 }, { 8, 5 }), { x = 6, y = 8 }, seize)
+    check(tie and tie.x, 5, "tie on throne distance -> the nearer tile")
+    check(C.needsToStepOff({ x = 5, y = 4 }, seize), true, "beside the throne -> step off")
+    check(C.needsToStepOff({ x = 5, y = 5 }, seize), true, "on the throne -> step off")
+    check(C.needsToStepOff({ x = 5, y = 3 }, seize), false, "two away -> stay")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

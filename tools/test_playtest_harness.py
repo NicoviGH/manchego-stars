@@ -191,14 +191,18 @@ class TestAwaitControllerState(unittest.TestCase):
         # and failed clear_ch01 with an illegal input it could never satisfy. ch02 showed the
         # same number in "teleportToFiringTile: (255,9)", which only survived because that one
         # site happened to bail. Read the field the width the struct declares, and keep an
-        # off-map unit out of the lists that drive the cursor.
+        # off-map unit out of the lists that drive the cursor. The read lives in board.lua,
+        # the one board reader (#510 step 9); harness unitAt only delegates to it.
         harness = _read_harness()
         body = _block(harness, 'local function unitAt(', '\nlocal function findUnit')
-        self.assertIn('rs8(a + 0x10)', body, 'xPos is s8')
-        self.assertIn('rs8(a + 0x11)', body, 'yPos is s8')
-        self.assertNotIn('ru8(a + 0x10)', body, 'the unsigned read is the bug')
+        self.assertIn('BOARD.leanAt(base, i)', body, 'unitAt delegates to board.lua')
+        with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
+            board = _block(fh.read(), 'function Board.leanAt(', '\nend\n')
+        self.assertIn('mem.s8(a + 0x10)', board, 'xPos is s8')
+        self.assertIn('mem.s8(a + 0x11)', board, 'yPos is s8')
+        self.assertNotIn('mem.u8(a + 0x10)', board, 'the unsigned read is the bug')
         live = _block(harness, 'local function liveEnemies(', '\n\n')
-        self.assertIn('onMap', live, 'a target list must not offer an off-map unit')
+        self.assertIn('onField', live, 'a target list must not offer an off-map unit (onField implies onMap)')
 
     def test_no_guard_still_compares_a_units_x_against_255(self):
         # The other half of the same change, and the one that was missed. Switching unitAt to
@@ -513,6 +517,20 @@ class TestNoBlanketEmulatorKill(unittest.TestCase):
         """Scoped, not deleted: a leftover emulator from an interrupted run of the SAME
         scenario still has to be cleared, or it holds the ROM the next run wants."""
         self.assertIn('pkill', self.source())
+
+class TestBoardLordSelectPin(unittest.TestCase):
+    def test_board_lua_lord_flag_base_is_the_injectors(self):
+        # board.lua reads the chosen lead the way LordSelect_GetPid does (permanent flag
+        # LORDSEL_FLAG_BASE + i) to know who can Seize. The base is a literal on both sides,
+        # so a move on the injector's side must fail here, not as a bot that marches the
+        # wrong unit on the throne.
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import LORDSEL_FLAG_BASE
+        with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
+            m = re.search(r'Board\.LORDSEL_FLAG_BASE = (0x[0-9A-Fa-f]+)', fh.read())
+        self.assertIsNotNone(m, 'board.lua must define Board.LORDSEL_FLAG_BASE')
+        self.assertEqual(int(m.group(1), 16), LORDSEL_FLAG_BASE)
+
 
 if __name__ == '__main__':
     unittest.main()

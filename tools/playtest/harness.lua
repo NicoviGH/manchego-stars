@@ -37,8 +37,7 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 --                    +0x14 pow, +0x16 spd, +0x17 def, +0x18 res, +0x19 lck
 --   CharacterData: +0x04 = character id (include/bmunit.h)
 --   src/proc.c sProcArray: 64 procs x 0x6C; +0x00 = proc_script
-local UNIT_SIZE = 0x48
-local US_DEAD = 4 -- include/bmunit.h (1 << 2)
+-- (Unit/Item/CharacterData reads live in board.lua, the one board reader.)
 -- Harness tuning, in ONE table rather than one local apiece: harness.lua is a single Lua
 -- chunk and its main function sits near Lua's 200-local ceiling, so a handful of new
 -- top-level locals stops the WHOLE FILE loading and every scenario dies at once (#232).
@@ -224,55 +223,27 @@ local function eventFlag(flag)
 end
 
 -- ---------------------------------------------------------------- unit access
-local function unitAt(base, i)
-    local a = base + i * UNIT_SIZE
-    local chptr = ru32(a)
-    if chptr == 0 then return nil end
-    return {
-        addr = a,
-        charId = ru8(chptr + 4),
-        -- xPos/yPos are s8 (bmunit.h), and FE8 parks a unit that is NOT on the map at -1.
-        -- Read unsigned, that unit reported x=255: the clear-bot took it for a real tile and
-        -- drove the cursor at (255,8) on a 25-wide map, an input no press could ever satisfy
-        -- (#335). `onMap` is the question every caller that drives the cursor actually means.
-        x = rs8(a + 0x10), y = rs8(a + 0x11),
-        onMap = rs8(a + 0x10) >= 0 and rs8(a + 0x11) >= 0,
-        hp = ru8(a + 0x13),
-        -- struct Unit (bmunit.h): +08 level, +12 maxHP, +14 pow, +17 def. The difficulty
-        -- shift re-projects these off class growths, so they are what a mode probe reads
-        -- (+0x13 curHP happens to match maxHP at load, but is not the field that moved).
-        level = ru8(a + 0x08),
-        maxhp = ru8(a + 0x12), pow = ru8(a + 0x14), def = ru8(a + 0x17),
-        state = ru32(a + 0x0C),
-    }
-end
-local function findUnit(base, count, charId)
-    for i = 0, count - 1 do
-        local u = unitAt(base, i)
-        if u and u.charId == charId then return u end
-    end
-    return nil
-end
+-- board.lua is the ONE board reader (#510 step 9): unitAt, the clear-bot's enemy tables and
+-- the LLM export all read through it. Bound once here so it costs one top-level local.
+local BOARD = dofile(PLAYTEST_DIR .. "/board.lua").bind(
+    { u8 = ru8, s8 = rs8, u16 = ru16, u32 = ru32 }, SYM)
+-- One array slot, LEAN (board.lua's leanAt: addr, slot, charId, x, y, onMap, onField, hp,
+-- maxhp, level, pow, def, state, dead, acted), or nil for an empty slot. ~100 callers, many
+-- inside per-frame waits, so it never pays for the item/boss reads: those are BOARD.read's.
+local function unitAt(base, i) return BOARD.leanAt(base, i) end
+-- Lookup by character id is board.lua's (Board.findIn), LEAN, over `count` slots.
+local function findUnit(base, count, charId) return BOARD.findIn(base, count, charId) end
 -- Array bounds are the DECOMP's, not the roster size of the day (bmunit.h: blue[62] /
 -- red[50] / green[20]). `blue` searched 8 for as long as the cast WAS 8; the TESTCH sandbox
 -- now deploys 11, so `PT_CHAR=lupin` reported "not deployed" for a unit that was standing on
 -- the map. A scan bound is a property of the engine, never of the current content.
 local function blue(charId) return findUnit(SYM.gUnitArrayBlue, 62, charId) end
 local function red(charId) return findUnit(SYM.gUnitArrayRed, 50, charId) end
-local function isDead(u) return u == nil or (u.state & US_DEAD) ~= 0 end
+local function isDead(u) return u == nil or u.dead end
 
--- A unit's attack reach from its equipped (items[0]) weapon, via gItemData (include/bmitem.h:
--- attributes +0x08, encodedRange +0x19 = min<<4 | max; ItemData stride 0x24). Returns
--- (minRange, maxRange) for a real weapon, or nil for a staff / non-attacker (no IA_WEAPON).
-local ITEMDATA_STRIDE = 0x24
-local function unitAttackRange(u)
-    local item = ru16(u.addr + 0x1E) & 0xFF       -- items[0] item id (low byte; high byte = uses)
-    if item == 0 then return nil end
-    local data = SYM.gItemData + item * ITEMDATA_STRIDE
-    if (ru32(data + 0x08) & 0x1) == 0 then return nil end   -- IA_WEAPON unset -> staff/non-weapon
-    local er = ru8(data + 0x19)
-    return (er >> 4), (er & 0xF)
-end
+-- A unit's attack reach from its equipped (items[0]) weapon, read LIVE from u.addr (a caller
+-- may hold `u` across a trade): (minRange, maxRange), or nil for a staff / non-attacker.
+local function unitAttackRange(u) return BOARD.attackRange(u.addr) end
 
 local function pokeFrail(u) -- 1 HP, no def/res/spd/lck: next clean hit kills
     emu:write8(u.addr + 0x13, 1) -- curHP
@@ -424,15 +395,9 @@ local function recordCutscene(o)
     return result("PASS", tag .. " cutscene recorded")
 end
 
-local function tileOccupied(x, y)
-    for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayGreen, SYM.gUnitArrayRed }) do
-        for i = 0, 23 do
-            local u = unitAt(base, i)
-            if u and not isDead(u) and u.x == x and u.y == y then return true end
-        end
-    end
-    return false
-end
+-- A live unit of any faction stands on (x, y), over the decomp's array bounds (#531: this
+-- scanned 24 slots per faction, so red 24-49 and blue 24-61 never occupied anything).
+local function tileOccupied(x, y) return BOARD.occupied(x, y) end
 
 -- Live map state used by both scenarios and the controller observer.
 local function mapUnitRow(y) return ru32(ru32(SYM.gBmMapUnit) + y * 4) end
@@ -1152,13 +1117,35 @@ end
 -- MAP, so ask that rather than the chapter number -- after settling, because right after the
 -- last kill FE8 is mid-transition either way and an instant reading would skip a turn that
 -- genuinely still needs ending.
-local function endTurn(tile, alreadyWon)
-    if alreadyWon then
+--
+-- phaseTurn (optional; the clear loop passes it): the turn whose player phase the caller is
+-- ending. "The player map is idle" alone cannot tell that phase from the NEXT one, so with it
+-- the phase only still needs ending while BOARD.inPhase(header, phaseTurn) holds -- FE8 may
+-- have ended it by itself (every unit acted), and it may already be turn N+1's, which must not
+-- be ended unacted. Dialogue is advanced while waiting: an open text box is neither "ended"
+-- nor "idle". Callers without phaseTurn keep the older alreadyWon behaviour unchanged.
+local function endTurn(tile, alreadyWon, phaseTurn)
+    if phaseTurn then
+        local function over()
+            return (alreadyWon ~= nil and alreadyWon()) or not BOARD.inPhase(BOARD.header(), phaseTurn)
+        end
+        local function noTurnLeft()
+            log("the phase or the chapter already ended under the last action -- no turn left to end")
+            return true
+        end
+        waitFor(function()
+            return over() or controllerState(observeController()) == "player_map_idle"
+        end, 600, true)
+        if over() then return noTurnLeft() end
+        -- awaitControllerState advances dialogue itself (a classified dialogue_wait).
+        if not awaitControllerState("player_map_idle", 300) then return false end
+        if over() then return noTurnLeft() end
+    elseif alreadyWon then
         waitFor(function()
             return alreadyWon() or controllerState(observeController()) == "player_map_idle"
         end, 600)
         if alreadyWon() or controllerState(observeController()) ~= "player_map_idle" then
-            log("the rout fired the win directly -- no turn left to end")
+            log("the phase or the chapter already ended under the last action -- no turn left to end")
             return true
         end
     end
@@ -1181,8 +1168,13 @@ end
 -- End turn, then ride out the enemy phase. Returns "gameover" the moment the game-over
 -- screen proc appears, "player" when control comes back, "ended" if the chapter itself
 -- finished during the phase, or nil if the phase wedged (which leaves a controller fault).
-local function runEnemyPhase(tile)
-    if not endTurn(tile) then return nil end
+-- alreadyWon / phaseTurn are endTurn's, for a caller whose last action may already have
+-- ended the phase (FE8 ends it by itself once every unit has acted) or the chapter.
+local function runEnemyPhase(tile, alreadyWon, phaseTurn)
+    if not endTurn(tile, alreadyWon, phaseTurn) then return nil end
+    -- Won while endTurn waited: chapter() below would already be the NEXT chapter's, and no
+    -- player phase of this one is coming back to wait for.
+    if alreadyWon and alreadyWon() then return "ended" end
     local startedIn = chapter()
     for _ = 1, TUNE.enemyPhaseFrames do
         if gameOverActive() then return "gameover" end
@@ -1471,10 +1463,9 @@ local LIVENESS = dofile(PLAYTEST_DIR .. "/liveness.lua")
 
 local function hpSum()
     local s = 0
-    for _, base in ipairs({ SYM.gUnitArrayBlue, SYM.gUnitArrayRed }) do
-        for i = 0, 23 do
-            local u = unitAt(base, i)
-            if u and (u.state & US_DEAD) == 0 then s = s + u.hp end
+    for _, faction in ipairs({ "blue", "red" }) do
+        for _, u in ipairs(BOARD.leanList(faction)) do
+            if not u.dead then s = s + u.hp end
         end
     end
     return s
@@ -1629,7 +1620,7 @@ INSPECT.units = function(tag)
         local name, base, count = f[1], f[2], f[3]
         for i = 0, count - 1 do
             local u = unitAt(base, i)
-            if u and (u.state & US_DEAD) == 0 then
+            if u and not u.dead then
                 log(string.format(
                     '{"event":"unit","tag":"%s","faction":"%s","char":"0x%02x",'
                     .. '"x":%d,"y":%d,"hp":%d}', tag, name, u.charId, u.x, u.y, u.hp))
@@ -1649,7 +1640,7 @@ INSPECT.difficultyProbe = function(tag)
     local total = 0
     for i = 0, 49 do
         local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and (u.state & US_DEAD) == 0 then
+        if u and not u.dead then
             total = total + u.maxhp
             log(string.format(
                 '{"event":"difficulty_unit","tag":"%s","char":"0x%02x","level":%d,'
@@ -1758,7 +1749,6 @@ end
 local CLEARBOT = dofile(PLAYTEST_DIR .. "/clearbot.lua")
 local CH02 = dofile(PLAYTEST_DIR .. "/ch02check.lua")   -- pure charm-delivery check (#22)
 local PATHING = dofile(PLAYTEST_DIR .. "/pathing.lua")  -- pure BFS distance field (#60 march)
-local CA_BOSS = (1 << 15)   -- include/bmunit.h:326 (character/class attribute)
 local FUZZRNG = dofile(PLAYTEST_DIR .. "/fuzzrng.lua")   -- seeded PRNG + input policy (#49)
 
 -- Terrain ids (include/constants/terrains.h) that hard-block a foot/mounted march -- used to
@@ -1793,32 +1783,24 @@ local function bossDistanceField(boss, maxx, maxy)
     return PATHING.distanceField(w, h, isPassable, { x = boss.x, y = boss.y })
 end
 
--- A unit's character carries the CA_BOSS attribute: pCharacterData (Unit +0x00) ->
--- CharacterData.attributes (+0x28). True for named bosses (Sephek, the ch01 chief, ...).
-local function unitIsBoss(u)
-    local chptr = ru32(u.addr)
-    if chptr == 0 then return false end
-    return (ru32(chptr + 0x28) & CA_BOSS) ~= 0
-end
-
--- The live boss in the red array (the first CA_BOSS unit), or nil.
-local function findBoss()
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) and unitIsBoss(u) then return u end
+-- The on-field boss in the red array (the first unit whose character carries CA_BOSS), or
+-- nil. From `board` (a BOARD.read snapshot) when given, else a LEAN scan -- a combat wait's
+-- stop condition calls this once a frame.
+local function findBoss(board)
+    if not board then return BOARD.liveBoss() end
+    for _, u in ipairs(BOARD.live(board, "red")) do
+        if u.onField and u.isBoss then return u end
     end
     return nil
 end
 
--- Live red units as plain {x,y,hp,is_boss} tables for the pure pickTarget core.
-local function liveEnemies()
+-- On-field red units as plain {x,y,hp,is_boss} tables for the pure pickTarget core, from
+-- `board` when given. onField, not just alive: an enemy off the map, hidden or carried is not
+-- a place to walk to or a target to strike.
+local function liveEnemies(board)
     local out = {}
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        -- onMap, not just alive: a live enemy still off the map is not a place to walk to.
-        if u and not isDead(u) and u.onMap then
-            out[#out + 1] = { x = u.x, y = u.y, hp = u.hp, is_boss = unitIsBoss(u) }
-        end
+    for _, u in ipairs(BOARD.live(board or BOARD.read(), "red")) do
+        if u.onField then out[#out + 1] = { x = u.x, y = u.y, hp = u.hp, is_boss = u.isBoss } end
     end
     return out
 end
@@ -2399,14 +2381,14 @@ end
 -- tile; else step to the reachable tile NEAREST the boss by path distance (`field`, BFS around
 -- walls) -- falling back to Manhattan toward `goal` only where the field is unreachable. GUARANTEES
 -- it commits through a semantic Attack/Wait. Mechanical failures terminate without rescue input.
-local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy)
+local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy, stopWhen, enemies)
     -- thread the REAL map bounds through: selectAndReach defaults to a 15x10
     -- window, which clipped every reach list at x=14 on ch01's 25x16 map -- the
     -- probable root cause of the #60 stall at exactly (14,8)
     local reach = selectAndReach(u, maxx, maxy)
     if not reach then return nil, true end
     local mn, mx = unitAttackRange(u)
-    local enemies = liveEnemies()
+    enemies = enemies or liveEnemies()
     local pick = mn and CLEARBOT.pickTarget(reach, enemies, { range = mx, min_range = mn }) or nil
     local tile = pick and pick.tile
     if not tile then
@@ -2427,7 +2409,10 @@ local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy)
         return controllerState(after) == "unit_command_menu"
     end, 180) then return tile, true end
     local committed
-    if pick then committed = chooseAttack(u.addr) else committed = chooseWait() end
+    -- stopWhen: won, or the boss dead. A killing blow on a DefeatBoss boss tears the map down
+    -- before the actor ever greys out (the Sephek case chooseAttack documents), and without
+    -- the dead-boss half the wait runs out all of combatFrames and the loop reports stuck.
+    if pick then committed = chooseAttack(u.addr, stopWhen) else committed = chooseWait() end
     if not committed then return tile, true end
     if claimed then claimed[CLEARBOT.tileKey(tile.x, tile.y)] = true end
     return tile, false
@@ -2514,51 +2499,92 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     -- title (a loss), not a win -- so this stays an honest fair-play gate (#60).
     local function won() return chapter() ~= startChapter end
     local function lost() return gameOverActive() or procActive(SYM.gProcScr_TitleScreen) end
-    -- progress = the nearest live unit's path-distance to the boss (lower is better).
-    local function nearestBossDist(field)
-        local best = math.huge
-        for i = 0, 7 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) then
-                local fd = field and field[u.y] and field[u.y][u.x]
-                if fd and fd < best then best = fd end
-            end
-        end
-        return best
+    -- progress = the nearest candidate's path-distance to the target (lower is better): the
+    -- boss while it lives, then the seize tile. ruledOut[slot] marks units that stood on the
+    -- seize tile without a legal Seize -- not the lord -- so the lord's march still registers.
+    local ruledOut = {}
+    -- Move a ruled-out unit off the throne's approach and Wait there (clearbot.stepOffTile):
+    -- parked on or beside a single-approach throne it would block the lord for good.
+    local function stepOffSeize(u)
+        local reach = selectAndReach(u, maxx, maxy)
+        if not reach then return false end
+        local tile = CLEARBOT.stepOffTile(reach, u, seizeTile)
+        if not tile then return cancelToPlayerMap() end   -- boxed in beside it: nothing helps
+        if not cursorTo(tile.x, tile.y) then return false end
+        if not guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
+            return controllerState(after) == "unit_command_menu"
+        end, 180) then return false end
+        return chooseWait()
     end
     local lastDist, lastEnemies, stall = math.huge, math.huge, 0
+    local lastKey = "boss:0"
     for t = 1, budgetTurns do
         waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
         wait(60) -- let the player-phase banner finish (it eats key presses)
         if not awaitControllerState("player_map_idle", 300) then return "stuck", t end
         local b = findBoss()
-        local field = b and bossDistanceField(b, maxx, maxy) or nil
+        -- The target field: the boss's tile while it lives, else the seize tile (its last tile).
+        local field = bossDistanceField(b or seizeTile, maxx, maxy)
         local claimed = {}                       -- destinations committed this phase
-        for i = 0, 7 do
+        -- The turn whose player phase this is. FE8 ends the phase by itself once every unit
+        -- has acted, so "the map is idle" later on may be the NEXT turn's phase: everything
+        -- below that waits asks BOARD.inPhase against this, never the idle state alone.
+        local phaseTurn = turn()
+        local function ourPhase() return BOARD.inPhase(BOARD.header(), phaseTurn) end
+        local function bossDownOrWon() return won() or not findBoss() end
+        -- Who can Seize, from FE8's own rule (board.lua Board.lordPid: the chosen lead). Only
+        -- that unit marches on the throne; the ruledOut memo is the fallback when it is unknown.
+        local lordPid = BOARD.lordPid(eventFlag)
+        -- The phase's roster (decomp bounds, not the first 8 slots), LEAN; each unit is judged
+        -- from ONE full board snapshot taken just before it acts, since earlier actions move
+        -- the board -- one read per acting unit, not one per question asked about it.
+        for _, slotUnit in ipairs(BOARD.leanList("blue")) do
             if won() then return "won", t end
             if lost() then return "gameover", t end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            -- onMap too: an undeployed unit is alive and unacted but has no tile to select.
-            if u and not isDead(u) and u.onMap and (u.state & 0x2) == 0 then   -- live, not yet acted
-                b = findBoss()
+            if not ourPhase() then break end
+            local board = BOARD.read()
+            local u = BOARD.at(board, "blue", slotUnit.slot)
+            -- onField: an undeployed, hidden or carried unit is alive and unacted but has no
+            -- tile to select.
+            if u and u.onField and not u.acted then   -- live, on the field, not yet acted
+                b = findBoss(board)
                 if b then
                     seizeTile = { x = b.x, y = b.y }
                     -- other live units' CURRENT tiles are unstandable too
                     local blocked = {}
                     for k in pairs(claimed) do blocked[k] = true end
-                    for j = 0, 7 do
-                        local o = unitAt(SYM.gUnitArrayBlue, j)
-                        if o and not isDead(o) and j ~= i then
+                    for _, o in ipairs(BOARD.live(board, "blue")) do
+                        if o.onField and o.slot ~= u.slot then
                             blocked[CLEARBOT.tileKey(o.x, o.y)] = true
                         end
                     end
                     local tile, failed = clearUnitAct(u, field, b, blocked, claimed,
-                                                      maxx, maxy)
+                                                      maxx, maxy, bossDownOrWon,
+                                                      liveEnemies(board))
                     if failed then
                         if tile then
                             log(string.format("clear: unit (%d,%d) chose (%d,%d) but the "
                                 .. "move didn't commit", u.x, u.y, tile.x, tile.y))
                         end
+                        return "stuck", t
+                    end
+                    -- The strike killed the boss. On a DefeatBoss map its death runs the
+                    -- ending straight into the post-chapter save menu, and the next thing this
+                    -- loop does (another unit, or endTurn) waits for the player map and meets
+                    -- that menu as an unexpected state. Wait out the outcome the way winCh00
+                    -- does -- chapter advanced -- or, on a Seize map, control coming back IN
+                    -- THIS PHASE (a later phase's idle map is not ours to act in).
+                    if bossDownOrWon() then
+                        waitFor(function()
+                            return won() or not ourPhase()
+                                or controllerState() == "player_map_idle"
+                        end, TUNE.combatFrames, true)
+                        if won() then return "won", t end
+                    end
+                elseif not BOARD.canSeize(u, lordPid, ruledOut) then
+                    -- Not the lord: it does not march on the throne, and if it stands on or
+                    -- beside it, it clears the way.
+                    if CLEARBOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
                         return "stuck", t
                     end
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
@@ -2574,7 +2600,24 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                         traceFailure("seize", "chapter advances after the Seize event",
                             "fail:chapter-advance-timeout", nil, "controller-seize-timeout")
                         return "stuck", t
-                    elseif not cancelUnitActionMenu() then
+                    else
+                        ruledOut[u.slot] = true
+                        if not cancelUnitActionMenu() then return "stuck", t end
+                        -- Back on the tile it started from; clear the approach if that is beside
+                        -- the throne.
+                        if CLEARBOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
+                            return "stuck", t
+                        end
+                    end
+                elseif ourPhase() and not won() then
+                    -- The seize tile is out of this unit's reach this turn (moveUnit backed
+                    -- out). Close the distance instead of standing still: a lord left far off
+                    -- when someone else killed the boss otherwise never reaches the throne,
+                    -- and clear_ch01 stalls with every enemy dead. marchToward only takes a
+                    -- REACHABLE tile, and this branch only runs when the seize tile is not
+                    -- one, so a unit that cannot seize never parks on it.
+                    if not marchToward(u, seizeTile.x, seizeTile.y, maxx, maxy)
+                        and not cancelToPlayerMap() then
                         return "stuck", t
                     end
                 end
@@ -2582,7 +2625,11 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         end
         if won() then return "won", t end
         if lost() then return "gameover", t end
-        local phase = runEnemyPhase(park)
+        -- won, as endTurn's alreadyWon: when the last unit acts FE8 ends the player phase by
+        -- itself, and the boss can die on the enemy phase that follows (a counter) with the
+        -- ending running straight into the save menu. Waiting for the player map there met that
+        -- menu as an unexpected state and failed a won `clear`.
+        local phase = runEnemyPhase(park, won, phaseTurn)
         if phase == "gameover" then return "gameover", t end
         -- "ended" = the phase carried the chapter out (a DefeatAll win fires the ending from
         -- inside it). Ask won() rather than calling it stuck: the bot did its job (#335).
@@ -2590,10 +2637,30 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         if phase ~= "player" then return "stuck", t end
         -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
         -- instead of grinding the full budget on a wedged bot.
-        local dist, enemies = nearestBossDist(field), #liveEnemies()
-        if dist < lastDist or enemies < lastEnemies then stall = 0 else stall = stall + 1 end
-        lastDist, lastEnemies = math.min(dist, lastDist), math.min(enemies, lastEnemies)
-        log(string.format("clear turn %d: nearestBossDist=%s enemies=%d stall=%d",
+        -- Once the boss is dead only a unit that can Seize is closing on anything: measure from
+        -- those (BOARD.canSeize -- the chosen lead, or the ruledOut memo when that is unknown),
+        -- or a non-lord standing near the throne masks the lord's march.
+        local blueUnits, excluded, nRuled = BOARD.leanList("blue"), {}, 0
+        if not findBoss() then
+            for _, o in ipairs(blueUnits) do
+                if not BOARD.canSeize(o, lordPid, ruledOut) then
+                    excluded[o.slot] = true
+                    nRuled = nRuled + 1
+                end
+            end
+        end
+        local dist = CLEARBOT.seizeDistance(blueUnits, field, excluded)
+        local enemies = BOARD.liveCount("red")
+        local key = (findBoss() and "boss" or "seize") .. ":" .. nRuled
+        if CLEARBOT.madeProgress({ dist = lastDist, enemies = lastEnemies, key = lastKey },
+                                 { dist = dist, enemies = enemies, key = key }) then
+            stall = 0
+        else
+            stall = stall + 1
+        end
+        if key ~= lastKey then lastDist = dist end   -- a new question starts a new best
+        lastDist, lastEnemies, lastKey = math.min(dist, lastDist), math.min(enemies, lastEnemies), key
+        log(string.format("clear turn %d: targetDist=%s enemies=%d stall=%d",
             t, dist == math.huge and "inf" or dist, enemies, stall))
         if stall >= 3 then
             -- diagnose the stall: is the boss walled off (field can't reach its neighbours), and
@@ -2614,9 +2681,8 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                     log(string.format("  enemy (%d,%d) hp=%d boss=%s fd=%s", e.x, e.y, e.hp,
                         tostring(e.is_boss), (f[e.y] and f[e.y][e.x]) and tostring(f[e.y][e.x]) or "nil"))
                 end
-                for i = 0, 7 do
-                    local u = unitAt(SYM.gUnitArrayBlue, i)
-                    if u and not isDead(u) then log(string.format("  unit (%d,%d) fd=%s",
+                for _, u in ipairs(BOARD.leanList("blue")) do
+                    if not u.dead then log(string.format("  unit (%d,%d) fd=%s",
                         u.x, u.y, (f[u.y] and f[u.y][u.x]) and tostring(f[u.y][u.x]) or "nil")) end
                 end
             end
@@ -2787,43 +2853,44 @@ end
 local JSONF = dofile(PLAYTEST_DIR .. "/json.lua")
 local LLMDIR = (type(PLAYTEST_LLMDIR) == "string" and PLAYTEST_LLMDIR) or "/tmp/playtest-llm-handshake"
 
--- Exported unit ids must be UNIQUE and stable across the run: blue units use charId
--- (PCs are distinct), red units use 1000+slot (generics SHARE a charId, so the slot
--- disambiguates which brigand an attack order targets).
+-- Exported unit ids must be UNIQUE and stable across the run, so both factions use the
+-- ARRAY SLOT: blue = slot, red = 1000+slot. A charId is not unique -- generics share one, and
+-- over all 62 blue slots a recruited generic can repeat one too.
 local LLM_RED_ID_BASE = 1000
 
 local function llmExportBoard(objective, maxx, maxy)
-    local units = {}
-    for i = 0, 7 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and not isDead(u) then
-            local canAct = (u.state & 0x2) == 0
+    -- One board.lua snapshot: selecting a unit for its reach and cancelling changes nothing
+    -- on the board. Off-field units (off the map, hidden, carried, undeployed) are left out --
+    -- there is no tile to select or to attack.
+    local board, units = BOARD.read(), {}
+    for _, u in ipairs(BOARD.live(board, "blue")) do
+        if u.onField then
+            local canAct = not u.acted
             local reach = {}
             if canAct then
                 local r = selectAndReach(u, maxx, maxy)
                 if not r then return nil, "controller could not enumerate live movement" end
-                if r and not guardedInput("cancel_selection", "B",
+                if not guardedInput("cancel_selection", "B",
                     "board export returns movement selection to player map", function(after)
                         return controllerState(after) == "player_map_idle"
                     end, 120) then return nil, "controller could not close movement selection" end
-                if r then for _, t in ipairs(r) do reach[#reach + 1] = { t.x, t.y } end end
+                for _, t in ipairs(r) do reach[#reach + 1] = { t.x, t.y } end
             end
-            local mn, mx = unitAttackRange(u)
             units[#units + 1] = {
-                id = u.charId, faction = "blue", x = u.x, y = u.y,
-                hp = u.hp, maxhp = ru8(u.addr + 0x12), can_act = canAct,
-                boss = false, reach = reach, range = mn and { mn, mx } or nil,
+                id = u.slot, faction = "blue", x = u.x, y = u.y,
+                hp = u.hp, maxhp = u.maxhp, can_act = canAct,
+                boss = false, reach = reach,
+                range = u.minRange and { u.minRange, u.maxRange } or nil,
             }
         end
     end
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) then
-            local mn, mx = unitAttackRange(u)
+    for _, u in ipairs(BOARD.live(board, "red")) do
+        if u.onField then
             units[#units + 1] = {
-                id = LLM_RED_ID_BASE + i, faction = "red", x = u.x, y = u.y,
-                hp = u.hp, maxhp = ru8(u.addr + 0x12), can_act = false,
-                boss = unitIsBoss(u), reach = {}, range = mn and { mn, mx } or nil,
+                id = LLM_RED_ID_BASE + u.slot, faction = "red", x = u.x, y = u.y,
+                hp = u.hp, maxhp = u.maxhp, can_act = false,
+                boss = u.isBoss, reach = {},
+                range = u.minRange and { u.minRange, u.maxRange } or nil,
             }
         end
     end
@@ -2858,12 +2925,13 @@ local function llmHandshake(n, req, timeoutSecs)
     return nil, "sidecar timeout waiting for resp-" .. n .. ".json (is llm_player.py serve running?)"
 end
 
--- Resolve an exported unit id back to a live unit: blue = charId, red = 1000+slot
--- (generics share charIds; see llmExportBoard).
+-- Resolve an exported unit id back to a live unit: blue = slot, red = 1000+slot (see
+-- llmExportBoard).
 local function llmUnitById(id)
-    if type(id) ~= "number" then return nil end
+    if type(id) ~= "number" or id < 0 or id ~= math.floor(id) then return nil end
     if id >= LLM_RED_ID_BASE then return unitAt(SYM.gUnitArrayRed, id - LLM_RED_ID_BASE) end
-    return blue(id)
+    if id >= 62 then return nil end
+    return unitAt(SYM.gUnitArrayBlue, id)
 end
 
 -- Execute one validated order with the existing primitives. M2 limitation (noted in
@@ -2879,7 +2947,7 @@ local function llmExecOrder(o)
     if type(o.unit) ~= "number" or type(o.move_to) ~= "table" then
         return reject("malformed-order")
     end
-    local u = blue(o.unit)
+    local u = o.unit < LLM_RED_ID_BASE and llmUnitById(o.unit) or nil
     if not u or isDead(u) or (u.state & 0x2) ~= 0 then return reject("unit-cannot-act") end
     -- the sidecar validated against the REQUEST board; re-check what can have changed
     -- since (an earlier order killed the target) before any UI input. With no live
@@ -4296,7 +4364,7 @@ INSPECT.redStats = function()
     local n = 0
     for i = 0, 49 do
         local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and (u.state & US_DEAD) == 0 then
+        if u and not u.dead then
             n = n + 1
             log(string.format(
                 '{"event":"red_stats","mode":"%s","char":"0x%02x","class":"0x%02x","level":%d,'
@@ -4646,7 +4714,7 @@ local function teleportToFiringTile(u, mn, mx)
             end
         end
     end
-    log(string.format("  teleportToFiringTile: no free tile within [%d,%d] of any of %d live enemies", mn, mx, #liveEnemies()))
+    log(string.format("  teleportToFiringTile: no free tile within [%d,%d] of any of %d live enemies", mn, mx, BOARD.liveCount("red")))
     return false
 end
 
@@ -6361,7 +6429,7 @@ scenarios.ch02 = function()
         local r = unitAt(SYM.gUnitArrayRed, i)
         if r and not isDead(r) then
             if ru8(ru32(r.addr + 0x04) + 0x04) == CAMPAIGN.CH02_ARCHER_CLASS then archer = true end
-            if unitIsBoss(r) then boss = true end
+            if BOARD.isBoss(r.addr) then boss = true end
         end
     end
     log(string.format("ch02 entry: chwinga=%d deployed=%d archer=%s boss=%s",
@@ -6481,7 +6549,7 @@ scenarios.ch02baxby = function()
         local r = unitAt(SYM.gUnitArrayRed, i)
         if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
     end
-    local liveBefore = #liveEnemies()
+    local liveBefore = BOARD.liveCount("red")
     if not teleportToFiringTile(baxby, mn, mx) then
         return result("FAIL", "no free tile in Baxby's weapon range of any enemy")
     end
@@ -6494,7 +6562,7 @@ scenarios.ch02baxby = function()
     chooseAttack(baxby.addr)
     waitFor(function() return not procActive(SYM.gProc_ekrBattle) end, 600)
     wait(30)
-    local liveAfter = #liveEnemies()
+    local liveAfter = BOARD.liveCount("red")
     baxby = unitAt(SYM.gUnitArrayBlue, bidx)
     local acted = baxby and (baxby.state & 0x2) ~= 0          -- US_UNSELECTABLE = he took his action
     log(string.format("Baxby combat: liveEnemies %d -> %d (killed %d); acted=%s",
@@ -6546,7 +6614,7 @@ scenarios.clear_ch02 = function()
             if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         for i = 0, 7 do
-            if advanced() or #liveEnemies() == 0 then break end
+            if advanced() or BOARD.liveCount("red") == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -6560,8 +6628,8 @@ scenarios.clear_ch02 = function()
                 end
             end
         end
-        log(string.format("clear_ch02 turn %d: liveEnemies=%d chapter=%d", t, #liveEnemies(), chapter()))
-        if #liveEnemies() == 0 then routed = true; break end
+        log(string.format("clear_ch02 turn %d: liveEnemies=%d chapter=%d", t, BOARD.liveCount("red"), chapter()))
+        if BOARD.liveCount("red") == 0 then routed = true; break end
         if advanced() then break end
         if runEnemyPhase(CH02_PARK) == "gameover" then
             shot("clear-ch02-gameover")
@@ -6659,7 +6727,7 @@ scenarios.recordchain = function()
             if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         for i = 0, 7 do
-            if advanced() or #liveEnemies() == 0 then break end
+            if advanced() or BOARD.liveCount("red") == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -6673,8 +6741,8 @@ scenarios.recordchain = function()
                 end
             end
         end
-        log(string.format("recordchain rout turn %d: liveEnemies=%d chapter=%d", t, #liveEnemies(), chapter()))
-        if #liveEnemies() == 0 then routed = true; break end
+        log(string.format("recordchain rout turn %d: liveEnemies=%d chapter=%d", t, BOARD.liveCount("red"), chapter()))
+        if BOARD.liveCount("red") == 0 then routed = true; break end
         if advanced() then break end
         if runEnemyPhase(CH02_PARK) == "gameover" then
             return result("FAIL", string.format("game over on turn %d -- party lost before the chain", t)) end
@@ -7267,7 +7335,7 @@ scenarios.ch05recruit = function(opts)
             -- back on the tile grid at its old position. bmsave.c:414 writes the dead
             -- state as US_HIDDEN | US_DEAD.
             setMapUnit(wolf.x, wolf.y, 0)
-            emu:write32(wolf.addr + 0x0C, wolf.state | US_DEAD | 1)  -- ... | US_HIDDEN
+            emu:write32(wolf.addr + 0x0C, wolf.state | BOARD.US_DEAD | 1)  -- ... | US_HIDDEN
         else
             return result("FAIL", "unknown lupin state " .. tostring(opts.lupin))
         end
@@ -8967,7 +9035,7 @@ scenarios.recordch06ice = function()
             local reds = 0
             for i = 0, 49 do
                 local u = unitAt(SYM.gUnitArrayRed, i)
-                if u and u.onMap and (u.state & US_DEAD) == 0 then reds = reds + 1 end
+                if u and u.onMap and not u.dead then reds = reds + 1 end
             end
             if reds == 0 then
                 -- recordCutscene reads only the first return, so a second one would be lost and
@@ -9846,9 +9914,9 @@ local function clearCh04(parley)
         -- reported only "liveEnemies=10" for 16 turns, which named none of them.
         local mw, mh = mapSize()
         log(string.format("%s iter %d: gameTurn=%d map=%dx%d liveEnemies=%d",
-            tag, t, turn(), mw, mh, #liveEnemies()))
+            tag, t, turn(), mw, mh, BOARD.liveCount("red")))
         for i = 0, 19 do
-            if won() or #liveEnemies() == 0 then break end
+            if won() or BOARD.liveCount("red") == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -9869,26 +9937,26 @@ local function clearCh04(parley)
                     if not (u and moveUnit(u.x, u.y, u.x, u.y)) then
                         log(string.format("  blue[%d] pid=0x%02X: command menu never opened", i, u.charId))
                     else
-                        local before = #liveEnemies()
-                        chooseAttack(u.addr, function() return #liveEnemies() == 0 end)
+                        local before = BOARD.liveCount("red")
+                        chooseAttack(u.addr, function() return BOARD.liveCount("red") == 0 end)
                         -- Break the settle the moment the kill empties the map: DefeatAll fires
                         -- on that death and the ending starts playing at once, so a blind
                         -- 600-frame wait here spends the victory fanfare and half the treeline
                         -- scene before the capture loop below gets its first frame (#204).
-                        waitFor(function() return #liveEnemies() == 0
+                        waitFor(function() return BOARD.liveCount("red") == 0
                             or (faction() == 0 and not menuOpen()
                                 and not procActive(SYM.gProc_ekrBattle)) end, 600)
                         log(string.format("  blue[%d] pid=0x%02X attacked from (%d,%d): liveEnemies %d -> %d",
-                            i, u.charId, u.x, u.y, before, #liveEnemies()))
+                            i, u.charId, u.x, u.y, before, BOARD.liveCount("red")))
                     end
                 end
             end
         end
-        log(string.format("%s turn %d: liveEnemies=%d chapter=%d", tag, t, #liveEnemies(), chapter()))
+        log(string.format("%s turn %d: liveEnemies=%d chapter=%d", tag, t, BOARD.liveCount("red"), chapter()))
         if won() then break end
         if gameOverActive() then shot(tag .. "-gameover")
             return result("FAIL", string.format("game over on turn %d -- party lost", t)) end
-        if #liveEnemies() == 0 then break end
+        if BOARD.liveCount("red") == 0 then break end
         if runEnemyPhase() == "gameover" then shot(tag .. "-gameover")
             return result("FAIL", "game over on the enemy phase") end
     end
@@ -9922,7 +9990,7 @@ local function clearCh04(parley)
         end
     end
     log(string.format("%s: liveEnemies=%d chapter=%d (host=%d)",
-        tag, #liveEnemies(), chapter(), HOST_CHAPTER))
+        tag, BOARD.liveCount("red"), chapter(), HOST_CHAPTER))
     if not ended then
         shot(tag .. "-no-ending")
         return result("FAIL", "routed but the DefeatAll ending never advanced off the host slot")
@@ -10293,7 +10361,7 @@ scenarios.recordch02ending = function()
             if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         for i = 0, 7 do
-            if #liveEnemies() == 0 then break end
+            if BOARD.liveCount("red") == 0 then break end
             local u = unitAt(SYM.gUnitArrayBlue, i)
             if u and not isDead(u) and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -10307,10 +10375,10 @@ scenarios.recordch02ending = function()
                 end
             end
         end
-        if #liveEnemies() == 0 then break end
+        if BOARD.liveCount("red") == 0 then break end
         if runEnemyPhase(CH02_PARK) == "gameover" then return result("FAIL", "party lost") end
     end
-    if #liveEnemies() ~= 0 then return result("FAIL", "rout incomplete -- no ending to record") end
+    if BOARD.liveCount("red") ~= 0 then return result("FAIL", "rout incomplete -- no ending to record") end
     endTurn()   -- fire the DefeatAll win -> the ending scene
     pokeNormalConfig()   -- readable text speed for the capture
     local fr, atTitle = 0, false
@@ -10628,7 +10696,7 @@ scenarios.ch06halberd = function()
 
     -- The classes his second weapon is effective against: gItemData[id].pEffectiveness (+0x10),
     -- a 0-terminated class list (data_itemuse.c's ItemEffectiveness_Horse).
-    local mounted, eff = {}, ru32(SYM.gItemData + DROP * ITEMDATA_STRIDE + 0x10)
+    local mounted, eff = {}, ru32(SYM.gItemData + DROP * BOARD.ITEMDATA_STRIDE + 0x10)
     while eff ~= 0 and ru8(eff) ~= 0 do mounted[ru8(eff)] = true eff = eff + 1 end
 
     local foot, horse
@@ -10646,7 +10714,7 @@ scenarios.ch06halberd = function()
     -- One arm: park `u` beside him, hold both units, run enemy phases until he attacks, then
     -- move `u` off so the next arm's target is the only one beside him.
     local function arm(name, u)
-        local idx, home = (u.addr - SYM.gUnitArrayBlue) // UNIT_SIZE, { x = u.x, y = u.y }
+        local idx, home = (u.addr - SYM.gUnitArrayBlue) // BOARD.UNIT_SIZE, { x = u.x, y = u.y }
         local function me() return unitAt(SYM.gUnitArrayBlue, idx) end
         if not teleportAdjacentTo(u, { { x = D.x, y = D.y } }) then
             return nil, name .. ": no free tile beside him"
