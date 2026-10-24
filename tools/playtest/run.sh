@@ -196,9 +196,8 @@ if [ -z "${MX_SKIP_ROM_CHECK:-}" ]; then
         echo "        previous build. Newer than $ROM:" >&2
         echo "$_stale" | sed 's/^/          /' >&2
         echo "        Rebuild first, e.g.  make CAMPAIGN=<c> [FLAGS] fireemblem8.gba -j8" >&2
-        echo "        (or run it through matrix.py, which builds). MX_SKIP_ROM_CHECK=1 opts out;" >&2
-        echo "        it is honest after a clean rebuild that wrote nothing (a comment-only" >&2
-        echo "        YAML edit leaves the ROM up to date but older by mtime)." >&2
+        echo "        (or run it through matrix.py, which builds). A successful build touches" >&2
+        echo "        the ROM (Makefile), so seeing this means the last build failed or never ran." >&2
         exit 2
     fi
 fi

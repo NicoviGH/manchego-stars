@@ -3112,9 +3112,9 @@ end
 
 -- The ch01 chief-march (#531 audit 7): frail the chief, then each player phase frail+harmless
 -- the escort, attack the chief if the lord is adjacent else march toward the seize tile, and once
--- the chief is down hand the seize to `opts.onSeize`. Three headless callers (ch01win,
--- leavePrepAndGrindToSeize, seizeCh01ToCh02) differ in HOW they sync, how strictly they treat
--- a failed input and what the seize does, so those are parameters, never unified:
+-- the chief is down hand the seize to `opts.onSeize`. Its two callers (ch01win,
+-- seizeCh01ToCh02) differ in HOW they sync, how strictly they treat a failed input and what
+-- the seize does, so those are parameters, never unified:
 --   sync(t)             -> nil to go on, or a status string to return (the per-turn sync)
 --   onTurn(t)           optional, after the banner wait, before the pokes (logging)
 --   onAttack()          optional, between the in-place move and chooseAttack
@@ -3245,14 +3245,14 @@ end
 
 -- ---- CHECKPOINTS (#21): build a slow scene's lead-up ONCE at top speed (ckpt_*), then
 -- run just the scene off the save state. run.sh orchestrates: it runs the ckpt_* builder at
--- 240fps if the state is missing/stale, then the scenario that loads it. The lead-up drivers are shared here so the checkpoint
--- and a from-scratch run stay in lock-step.
+-- 240fps if the state is missing/stale, then the scenario that loads it. The lead-up drivers
+-- are shared here so the checkpoint and a from-scratch run stay in lock-step.
 
 -- Drive ch00 win -> ch01 prep screen OPEN, picking the LAST lord candidate (Pinky, not the
--- default Braulo) so the
--- convoy/force-deploy lord-select fixes can be exercised for a NON-Braulo lord. The walk
--- to the last row now counts the LIVE menu instead of the LORD_CANDIDATES constant -- the
--- old copy would silently pick the wrong lord the day the roster changed.
+-- default Braulo) so the convoy/force-deploy lord-select fixes can be exercised for a
+-- NON-Braulo lord. The walk to the last row counts the LIVE menu instead of the
+-- LORD_CANDIDATES constant -- the old copy would silently pick the wrong lord the day the
+-- roster changed.
 local function reachPrepPinky() return reachCh01({ stopAtPrep = true, lord = "last" }) end
 
 -- CKPT_LORDPINKY: fast (240fps) -- drive to the prep screen with PINKY chosen as lord,

@@ -261,10 +261,10 @@ class TestRawPidBattleAnim(unittest.TestCase):
 
     def test_the_sandbox_benches_the_moose_under_its_own_pid(self):
         # The TESTCH sandbox is "one bench for every battle animation" (the archived battle-anim
-        # recorder's docstring), and it deployed foes by CLASS alone. That is enough for a class-level reskin, but the
-        # moose's anim binds per-CHARACTER through _u25 -- so a Cavalier deployed under a
-        # generic charIndex plays the stock HORSEMAN, and the bench would prove the
-        # opposite of what it was run for. Its foe row must carry charIndex 0xb9.
+        # recorder's docstring), and it deployed foes by CLASS alone. That is enough for a
+        # class-level reskin, but the moose's anim binds per-CHARACTER through _u25 -- so a
+        # Cavalier deployed under a generic charIndex plays the stock HORSEMAN, and the bench
+        # would prove the opposite of what it was run for. Its foe row must carry charIndex 0xb9.
         body = inject.test_chapter._sandbox_foe_roster('rime-of-the-frostmaiden', 'ch05')
         self.assertIn('.charIndex = 0xb9,', body)
         moose = [b for b in body.split('    {') if '0xb9' in b]
