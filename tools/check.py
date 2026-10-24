@@ -87,7 +87,7 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
     # retired by #531: the harness's remaining local slots are MEASURED (check_lua_local_headroom),
-    # never written down; "2 slots left" / "198 locals" went stale in a dozen places at once.
+    # never written down; "2 slots left" / "198 locals" went stale everywhere it was copied.
     # Bounded to the retired CLAIMS: the scan is case-insensitive, so `\b` keeps "12 slots
     # left" out, and the ceiling patterns name the harness sitting AT/AGAINST/NEAR the
     # 200-local ceiling -- a bare "at that ceiling" is ordinary English (test_check_comment_drift).

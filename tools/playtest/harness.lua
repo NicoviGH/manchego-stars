@@ -45,7 +45,8 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 -- (Unit/Item/CharacterData reads live in board.lua, the one board reader.)
 -- Harness tuning, in ONE table rather than one local apiece: harness.lua is a single Lua
 -- chunk and Lua caps a function at 200 locals (`check_lua_local_headroom` measures what is
--- left), so enough new top-level locals stop the WHOLE FILE loading and every scenario dies at once (#232).
+-- left), so enough new top-level locals stop the WHOLE FILE loading and every scenario dies
+-- at once (#232).
 local TUNE = {
     -- How many times one guarded input may be re-pressed into an unchanged, still-legal
     -- state before failing closed. FE8 drops input during window fade-ins, so a single
@@ -196,13 +197,13 @@ local function turn() return ru16(SYM.gPlaySt + 0x10) end
 local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) end
 
 local function procActive(scriptAddr) return PROCS.find(scriptAddr) ~= nil end
-local function anyMenuProc()
 -- The menu taking input. A submenu (StartMenuAt with a parent menu: an item's Use/Equip/
 -- Trade/Discard, uimenu.c) LOCKS its parent (+0x28) and reads the keys itself, and the pool
 -- gives it whichever slot is free, so it can sit ABOVE the parent. The lowest-slot menu is
 -- then the locked parent, the observer saw "menu is locked" for as long as the submenu was up,
 -- and goodberry FAILed on a submenu that had opened on the first frame (#531, item 10). So
 -- when the lowest menu is locked, the first unlocked menu proc wins; with none, the lowest.
+local function anyMenuProc()
     local lowest = PROCS.find(SYM.sProc_MenuMain) or PROCS.find(SYM.sProc_Menu)
     if not lowest or ru8(lowest + 0x28) == 0 then return lowest end
     for _, script in ipairs({ SYM.sProc_MenuMain, SYM.sProc_Menu }) do
@@ -1442,6 +1443,10 @@ local function bootToMap(stopAtPrep, want, opts)
     -- A ckpt_* builder is excluded: it is the thing that MINTS the state, so loading it would
     -- either restore a stale one over the run that was meant to replace it, or load nothing.
     local ckpt = PLAYTEST_CHECKPOINT
+    local strict = opts and opts.strictCheckpoint
+    if strict and (not ckpt or ckpt == "") then
+        return false, "the row declares no checkpoint, and this map has no other route"
+    end
     if ckpt and ckpt ~= "" and not string.match(PLAYTEST_SCENARIO or "", "^ckpt_") then
         if loadState(ckpt) then
             wait(90)
@@ -1450,16 +1455,15 @@ local function bootToMap(stopAtPrep, want, opts)
                 shot("map-loaded")
                 return true
             end
+            local stale = string.format("checkpoint %s loaded but chapter=%d (want %d)",
+                ckpt, chapter(), want or HOST_CHAPTER)
+            if strict then return false, stale .. " -- delete it so run.sh re-mints it" end
             -- Loaded, but not where it claims to be: fall through and boot honestly rather
             -- than assert against whatever map the stale state happens to hold.
             log(stale .. " -- booting instead")
         elseif strict then
             return false, "no " .. ckpt .. " checkpoint (run.sh builds it)"
         end
-    end
-    local strict = opts and opts.strictCheckpoint
-    if strict and (not ckpt or ckpt == "") then
-        return false, "the row declares no checkpoint, and this map has no other route"
     end
     log("booting to map with observed FE8 states")
     local stalled = INSPECT.watch("boot")
@@ -1469,9 +1473,6 @@ local function bootToMap(stopAtPrep, want, opts)
     for _ = 1, TUNE.bootSteps do
         if TUNE.bootHook then TUNE.bootHook() end   -- a scenario's per-step poke (vanillagold)
         local observation = observeController()
-            local stale = string.format("checkpoint %s loaded but chapter=%d (want %d)",
-                ckpt, chapter(), want or HOST_CHAPTER)
-            if strict then return false, stale .. " -- delete it so run.sh re-mints it" end
         local state, why = controllerState(observation)
         if stalled(observation, state) then
             result("FAIL", "boot parked on an unclassified wait (see the inspect snapshot)")
@@ -3165,7 +3166,7 @@ function INSPECT.ch01MarchOnChief(opts)
         if opts.onTurn then opts.onTurn(t) end
         -- every other goblin dies to the first counter (frail) and deals no damage
         -- (harmless): the escort can't kill anyone OR bodyblock the trail for long.
-        for i, r in BOARD.each("red") do
+        for _, r in BOARD.each("red") do
             if r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then
                 pokeFrail(r)
                 pokeHarmless(r)
@@ -3393,7 +3394,7 @@ scenarios.lordfloor = function()
     -- advance two player phases; the floor must NOT stack (flag-gated apply-once = the same
     -- early-return that protects the carry into ch02). Enemies poked harmless so marty lives.
     for _ = 1, 2 do
-        for i, r in BOARD.each("red") do
+        for _, r in BOARD.each("red") do
             if not isDead(r) then pokeHarmless(r) end
         end
         if runEnemyPhase(CH01_PARK) == "gameover" then
@@ -4844,12 +4845,12 @@ local function liftFogOntoTheGrid()
     emu:write8(SYM.gPlaySt + 0x0D, 0)
     local onGrid = function()
         local n = 0
-        for i, r in BOARD.each("red") do
+        for _, r in BOARD.each("red") do
             if not isDead(r) and r.onMap and mapUnitAt(r.x, r.y) ~= 0 then n = n + 1 end
         end
         return n
     end
-    for i, u in BOARD.each("blue") do
+    for _, u in BOARD.each("blue") do
         if onGrid() > 0 then break end
         if u.onField and (u.state & 0x2) == 0 then
             if moveUnit(u.x, u.y, u.x, u.y) then
@@ -5335,10 +5336,11 @@ end
 -- (default: the first creature on the bench) by its campaign.yaml reskin id; RESKIN_CLASS (generated into
 -- symbols.lua from the built classes.h) maps it to the class id it was built as.
 -- Named RAW-PID creatures are picked by CHARACTER, not by class (the table lives inside the
--- scenario: a top-level local would spend the chunk's shared 200-local budget). Their anim binds through CharacterData
--- `_u25`, so the class alone does not identify them: on the sandbox the white moose is the
--- only CLASS_GWYLLGI, but the class is what a plain Gwyllgi would ALSO match, and matching it
--- would silently bench the stock hound. Match the pid the sandbox deploys.
+-- scenario: a top-level local would spend the chunk's shared 200-local budget). Their anim
+-- binds through CharacterData `_u25`, so the class alone does not identify them: on the
+-- sandbox the white moose is the only CLASS_GWYLLGI, but the class is what a plain Gwyllgi
+-- would ALSO match, and matching it would silently bench the stock hound. Match the pid the
+-- sandbox deploys.
 scenarios.recordenemy = function()
     if not bootToMap() then return result("FAIL", "never reached the sandbox map") end
     wait(60); pokeAnimsOn()
@@ -6071,7 +6073,7 @@ scenarios.ch03door = function()
     end
     -- Grab the first deployed blue unit (on the field: not US_HIDDEN|US_NOT_DEPLOYED, real tile).
     local u
-    for i, c in BOARD.each("blue") do
+    for _, c in BOARD.each("blue") do
         if (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed blue unit to open the door") end
@@ -6134,7 +6136,7 @@ scenarios.ch03chest = function()
             "chest (%d,%d) reads %d, not the closed-chest tile %d -- placement/addr wrong", CX, CY, pre, CLOSED))
     end
     local u
-    for i, c in BOARD.each("blue") do
+    for _, c in BOARD.each("blue") do
         if (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed blue unit to open the chest") end
@@ -6203,7 +6205,7 @@ end
 scenarios.ch03tourmaline = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local u
-    for i, c in BOARD.each("blue") do
+    for _, c in BOARD.each("blue") do
         if (c.state & 0x9) == 0 and c.onMap then u = c break end
     end
     if not u then return result("FAIL", "no deployed unit to hold the Tourmaline") end
@@ -6436,6 +6438,7 @@ end
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
 -- the field, the party deploys to the cap, and the archer + boss are present.
 scenarios.ch02 = function()
+    -- Off the row's declared checkpoint, strictly: bootToMap's opts.strictCheckpoint.
     local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
     if not booted then return result("FAIL", why or "never reached the ch02 map") end
     -- diagnostic: dump every non-null green slot (and the blue/red char ids) so a missing-chwinga
@@ -6455,11 +6458,11 @@ scenarios.ch02 = function()
             log(string.format("chwinga 0x%02X at (%d,%d) hp=%d", pid, g.x, g.y, g.hp)) end
     end
     local deployed = 0
-    for i, u in BOARD.each("blue") do
+    for _, u in BOARD.each("blue") do
         if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
     end
     local archer, boss = false, false
-    for i, r in BOARD.each("red") do
+    for _, r in BOARD.each("red") do
         if not isDead(r) then
             if ru8(ru32(r.addr + 0x04) + 0x04) == CAMPAIGN.CH02_ARCHER_CLASS then archer = true end
             if BOARD.isBoss(r.addr) then boss = true end
@@ -6491,7 +6494,6 @@ end
 -- smoke_ch02: stability net on the ch02 map -- idle-drive to a clean terminal, catching a
 -- crash / soft-lock on load or during the 5 cutscenes.
 scenarios.smoke_ch02 = function()
-    -- Off the row's declared checkpoint, strictly: bootToMap's opts.strictCheckpoint.
     local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
     if not booted then return result("FAIL", why or "never reached the ch02 map") end
     return smokeDrive(chapter())
@@ -6553,7 +6555,7 @@ scenarios.ch02baxby = function()
     -- frail+harmless (a safe enemy phase) and cycle ONE enemy phase back to player: that refresh
     -- draws Baxby's real, injected map sprite (the same one ch03 renders) so the still shows him.
     pokeFastConfig()   -- map-anim + fast so the refresh phase is quick
-    for i, r in BOARD.each("red") do
+    for _, r in BOARD.each("red") do
         if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
     end
     cursorTo(baxby.x, baxby.y); wait(20); shot("ch02baxby-deployed-presprite")
@@ -6572,7 +6574,7 @@ scenarios.ch02baxby = function()
     pokeAnimsOn()   -- full battle anim for the showcase strike
     local mn, mx = unitAttackRange(baxby)
     if not mn then return result("FAIL", "Baxby has no attacking weapon equipped") end
-    for i, r in BOARD.each("red") do
+    for _, r in BOARD.each("red") do
         if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
     end
     local liveBefore = BOARD.liveCount("red")
@@ -6634,10 +6636,10 @@ scenarios.clear_ch02 = function()
         INSPECT.settle("phase", 6000, true)
         wait(60)
         protectChwinga()
-        for i, r in BOARD.each("red") do
+        for _, r in BOARD.each("red") do
             if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
-        for i, u in BOARD.each("blue") do
+        for _, u in BOARD.each("blue") do
             if advanced() or BOARD.liveCount("red") == 0 then break end
             if u.onField and (u.state & 0x2) == 0 then
                 local mn, mx = unitAttackRange(u)
@@ -6847,7 +6849,7 @@ end
 local function marchPartyToward(cx, cy, turns, stop, maxx, maxy)
     for _ = 1, turns do
         INSPECT.settle("phase", 900, true)
-        for i, u in BOARD.each("blue") do
+        for _, u in BOARD.each("blue") do
             if stop() then return true end
             if u.onField and (u.state & 0x2) == 0 then
                 marchToward(u, cx, cy, maxx or 14, maxy or 14)
@@ -6930,7 +6932,7 @@ scenarios.ch04moose = function()
     -- The clearing is 4+ tiles off the deploy flank, so allow a few turns to close.
     local CX, CY = 11, 4                 -- the clearing's middle
     local function anyoneInClearing()
-        for i, u in BOARD.each("blue") do
+        for _, u in BOARD.each("blue") do
             if u.onField and u.x >= X1 and u.x <= X2 and u.y >= Y1 and u.y <= Y2 then
                 return true
             end
@@ -7185,13 +7187,13 @@ scenarios.ch04packmath = function()
     end
     local function packAlive()
         local n = 0
-        for i, r in BOARD.each("red") do
+        for _, r in BOARD.each("red") do
             if not isDead(r) and CAMPAIGN.CH04_PACK_PIDS[r.charId] then n = n + 1 end
         end
         return n
     end
     local function firstWolf()
-        for i, r in BOARD.each("red") do
+        for _, r in BOARD.each("red") do
             if not isDead(r) and CAMPAIGN.CH04_PACK_PIDS[r.charId] then return r end
         end
         return nil
@@ -7205,7 +7207,7 @@ scenarios.ch04packmath = function()
     for _ = 1, KILL do
         local wolf = firstWolf()
         if not wolf then break end
-        for i, r in BOARD.each("red") do
+        for _, r in BOARD.each("red") do
             if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         wolf = firstWolf()
@@ -7642,7 +7644,8 @@ scenarios.recordch05eruption = function()
     })
 end
 
--- THE VISIT HELPERS (one table, not five locals: a top-level local spends harness.lua's shared 200-local budget, #327).
+-- THE VISIT HELPERS (one table, not five locals: a top-level local spends harness.lua's
+-- shared 200-local budget, #327).
 local VISIT = {}
 
 -- A visit is a unit standing on a tile and using it -- a village door, an
@@ -8452,7 +8455,7 @@ scenarios.ch05crest = function()
         -- ...and they need a MELEE WEAPON in slot 0, or parking the boss next to them proves
         -- nothing: unitAttackRange returns nil for a staff, and ch05 deploys two healers.
         local hero, hmin, hmax = nil, nil, nil
-        for i, u in BOARD.each("blue") do
+        for _, u in BOARD.each("blue") do
             if not isDead(u) and (u.state & 0x3) == 0 and mapUnitAt(u.x, u.y) ~= 0 then
                 local mn, mx = unitAttackRange(u)
                 if mn and mn <= 1 and mx >= 1 then hero, hmin, hmax = u, mn, mx; break end
@@ -9484,8 +9487,9 @@ end
 -- turn 1, end it, let the eruption speak until Sahnar rises RED, then park Basil orthogonally
 -- adjacent and take Talk. The camera starts on Sahnar's "Far enough. The tomb is--" and runs to
 -- the CUSA, so the film covers the recognition, both proofs, the turn, and Basil's unanswered
--- berry question. The chain is repeated rather than shared because a shared driver would need a top-level
--- local, and slots are shared under Lua's 200-local cap (`check_lua_local_headroom` measures it); ch05recruit remains the ASSERTING gate, this one only has to film.
+-- berry question. The chain is repeated rather than shared because a shared driver would need
+-- a top-level local, and slots are shared under Lua's 200-local cap (`check_lua_local_headroom`
+-- measures it); ch05recruit remains the ASSERTING gate, this one only has to film.
 -- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh recordch05recruit (needs a CH05BOOT=1 ROM).
 scenarios.recordch05recruit = function()
     local BASIL, SAHNAR, boxes = 0x13, 0x16, 0   -- CHARACTER_ARTUR / CHARACTER_MARISA
@@ -9650,7 +9654,7 @@ scenarios.ch04snag = function(opts)
     -- Any armed unit will do; the axe is the fiction, not a requirement (a snag is an obstacle
     -- and takes damage from anything that can reach it).
     local u
-    for i, c in BOARD.each("blue") do
+    for _, c in BOARD.each("blue") do
         if c.onField and (c.state & 0x2) == 0 and unitAttackRange(c)
             and (opts.pid == nil or c.charId == opts.pid) then u = c break end
     end
@@ -9818,7 +9822,7 @@ local function clearCh04(parley)
     for t = 1, 16 do
         if won() then break end
         INSPECT.settle("event", 6000, true)
-        for i, r in BOARD.each("red") do
+        for _, r in BOARD.each("red") do
             if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         -- Stage-by-stage logging (#204): a clear-bot that stalls must say WHICH stage failed --
