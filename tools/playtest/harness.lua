@@ -903,14 +903,64 @@ local function waitFor(pred, frames, tapA)
     for _ = 1, frames do
         if pred() then return true end
         if tapA and controllerState() == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 60) then return false end
+            if not INSPECT.advanceDialogue(60) then return false end
         else
             yield()
         end
     end
     return false
+end
+
+-- One guarded A on a dialogue box (#238: the only way a scenario presses through a box).
+-- `frames` is the SITE's budget for the box to clear (60 / 120 / 300 are all in use and are
+-- deliberately not unified); `expected` is the trace label; `clears` is the postcondition
+-- when it is not "no longer dialogue_wait" (the arena's welcome page clears into a choice).
+function INSPECT.advanceDialogue(frames, expected, clears)
+    return guardedInput("advance_dialogue", "A", expected or "dialogue input wait clears",
+        clears or function(after) return controllerState(after) ~= "dialogue_wait" end, frames)
+end
+
+-- "FE8 is back in player control", at five strengths. `phase` is the player phase with no
+-- menu; `event` also waits out a turn/location event (StdEventEngine); `battle` also waits
+-- out a battle event (BattleEventEngine); `idle` is `event` plus the controller classing
+-- the map as player_map_idle -- a location event's tail still holds the controller when an
+-- item lands, and moving then dies as "cursor could not reach" (ch05reliquaries). `fight`
+-- is `phase` plus the battle animation proc being gone (a kill resolving).
+function INSPECT.settled(level)
+    if faction() ~= 0 or menuOpen() then return false end
+    if level == "phase" then return true end
+    if level == "fight" then return not procActive(SYM.gProc_ekrBattle) end
+    if procActive(SYM.ProcScr_StdEventEngine) then return false end
+    if level == "event" then return true end
+    if level == "battle" then return not procActive(SYM.ProcScr_BattleEventEngine) end
+    if level == "idle" then return controllerState() == "player_map_idle" end
+    error("INSPECT.settled: unknown level " .. tostring(level))
+end
+
+-- Wait for `level` for at most `frames`; `tapA` is waitFor's own flag, passed through as the
+-- site gave it (the kill-resolving `fight` waits are the sites that pass none).
+function INSPECT.settle(level, frames, tapA)
+    return waitFor(function() return INSPECT.settled(level) end, frames, tapA)
+end
+
+-- The "advance every box until done()" loop. `done` is polled each frame BEFORE the box test;
+-- `o.tick(i)` runs before `done` (shots/snaps keyed to the frame); `o.onBox()` runs on each
+-- dialogue_wait just before its press; `o.label` / `o.press` are advanceDialogue's label and
+-- budget (default 120). Returns true when `done()` held, or false, "advance" when a press
+-- did not clear its box, or false, "budget" when `budget` frames ran out.
+function INSPECT.talkUntil(done, budget, o)
+    o = o or {}
+    for i = 1, budget do
+        if o.tick then o.tick(i) end
+        if done() then return true end
+        if controllerState() == "dialogue_wait" then
+            if o.onBox then o.onBox() end
+            if not INSPECT.advanceDialogue(o.press or 120, o.label) then return false, "advance" end
+        else
+            yield()
+        end
+    end
+    return false, "budget"
 end
 
 -- Wait until FE8 reaches `want`. `frames` bounds how long we tolerate NOTHING HAPPENING;
@@ -940,9 +990,7 @@ local function awaitControllerState(want, frames)
         -- everything else, so this is the #220 contract, not the blind cadence #220
         -- retired. Without it every ch01 flow bailed on the first line of text (#232).
         if state == "dialogue_wait" and want ~= "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 60) then return false end
+            if not INSPECT.advanceDialogue(60) then return false end
         elseif state ~= "transition" then
             -- Nicolas's call, and it is how studios keep a suite moving: if we are parked
             -- somewhere the caller did not want, BACK OUT rather than die here -- a menu or
@@ -1198,9 +1246,7 @@ local function runEnemyPhase(tile, alreadyWon, phaseTurn)
             return "player"
         end
         if state == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 60) then return nil end
+            if not INSPECT.advanceDialogue(60) then return nil end
         else
             yield()
         end
@@ -1334,9 +1380,7 @@ local function advanceBootState(observation, state)
             return controllerState(after) ~= "chapter_intro_input"
         end, 600)
     elseif state == "dialogue_wait" then
-        return guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-            return controllerState(after) ~= "dialogue_wait"
-        end, 120)
+        return INSPECT.advanceDialogue(120)
     elseif state == "transition" then
         yield()
         return true
@@ -1897,9 +1941,7 @@ local function smokeDrive(startChapter)
         if state == "player_map_idle" and faction() == 0 and turn() >= 1 then
             if not endTurn() then return result("FAIL", "smoke could not end the player phase") end
         elseif state == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 120) then return result("FAIL", "smoke dialogue did not advance") end
+            if not INSPECT.advanceDialogue(120) then return result("FAIL", "smoke dialogue did not advance") end
         elseif state == "transition" then
             yield()
         else
@@ -2527,7 +2569,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     local lastDist, lastEnemies, stall = math.huge, math.huge, 0
     local lastKey = "boss:0"
     for t = 1, budgetTurns do
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        INSPECT.settle("phase", 6000, true)
         wait(60) -- let the player-phase banner finish (it eats key presses)
         if not awaitControllerState("player_map_idle", 300) then return "stuck", t end
         local b = findBoss()
@@ -2998,7 +3040,7 @@ local function llmUntilAdvance(startChapter, objective, maxx, maxy, park)
     local seed = math.floor(tonumber(PLAYTEST_SEED) or 1)
     local n = 0
     for t = 1, budgetTurns do
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        INSPECT.settle("phase", 6000, true)
         wait(60)              -- let the player-phase banner finish (it eats key presses)
         if not awaitControllerState("player_map_idle", 300) then return "controller state", t end
         n = n + 1
@@ -3081,7 +3123,7 @@ scenarios.ch01win = function()
     for t = 1, 18 do
         -- sync to the player phase; the A-taps also clear stray textboxes
         -- (road-sign AREA event, defeat quotes)
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        INSPECT.settle("phase", 6000, true)
         wait(100) -- let the PLAYER PHASE banner finish (it eats key presses)
         local b0 = blue(0x01)
         log(string.format("loop %d: turn=%d faction=0x%02X braulo=(%d,%d) chiefdead=%s",
@@ -3454,7 +3496,7 @@ scenarios.recordsupply = function()
     if braOnField then return result("FAIL", "Braulo is on the field (should be benched)") end
     if not pinkyOnField then return result("FAIL", "Pinky (lord) not deployed") end
     -- Open Pinky's action menu (select + no-move) and screenshot it to find the Supply row.
-    waitFor(function() return faction() == 0 and not menuOpen() end, 3000, true)
+    INSPECT.settle("phase", 3000, true)
     wait(60)
     local usedSupply = false
     pinky = blue(CAMPAIGN.CAST.pinky)
@@ -3493,7 +3535,7 @@ scenarios.recordsupply = function()
     -- fails on a correct engine. This scenario's own comment claimed the stronger rule; the
     -- first deployed non-lord turned out to spawn right next to Pinky, and the assertion
     -- caught the CLAIM rather than a defect (#238).
-    waitFor(function() return faction() == 0 and not menuOpen() end, 1500, true)
+    INSPECT.settle("phase", 1500, true)
     pinky = blue(CAMPAIGN.CAST.pinky)
     for i = 0, 50 do
         local u = unitAt(SYM.gUnitArrayBlue, i)
@@ -4400,8 +4442,7 @@ end
 INSPECT.firstAttacks = function(phases)
     if not bootToMap() then return result("FAIL", "never reached the map") end
     pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     local seen, attacked = {}, {}
     -- Every frame, not once a phase: four attackers in one phase can drop a unit a once-a-phase
     -- refill missed, and a weapon's Mt still counters at 0 Pow. The first run without this
@@ -4754,7 +4795,7 @@ local function liftFogOntoTheGrid()
         if u.onField and (u.state & 0x2) == 0 then
             if moveUnit(u.x, u.y, u.x, u.y) then
                 chooseWait()
-                waitFor(function() return faction() == 0 and not menuOpen() end, 300)
+                INSPECT.settle("phase", 300)
             end
         end
     end
@@ -5594,7 +5635,7 @@ local function seizeCh01ToCh02()
     log(string.format("ch01 seize: chief frail on (%d,%d); marching the lord", goal.x, goal.y))
     for t = 1, 18 do
         if chapter() ~= 2 then return "won" end
-        if not waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true) then
+        if not INSPECT.settle("phase", 6000, true) then
             traceFailure("ch01_seize", "player phase returns before the next move",
                 "fail:player-phase-timeout", nil, "ch01-seize-phase-timeout")
             return "controller"
@@ -5850,7 +5891,7 @@ scenarios.ch03talk = function()
     -- Select the recruiter (no move) -> command menu. Parked next to ISOLATED green Trex in the
     -- galleries (no enemy in weapon range), Talk is the first command row -- no Attack precedes it.
     rec = blue(0x01)
-    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    INSPECT.settle("phase", 300, true)
     if not moveUnit(rec.x, rec.y, rec.x, rec.y) then
         shot("ch03talk-no-menu")
         return result("FAIL", "could not open the recruiter's command menu")
@@ -5859,18 +5900,12 @@ scenarios.ch03talk = function()
     if not chooseTalk() then return result("FAIL", "live command menu did not expose a working Talk") end
     shot("ch03talk-dialogue-1") -- Trex's migrated talk lines rendering in-engine
     local pages = 1
-    for _ = 1, 3600 do      -- advance only when FE8 exposes TalkWaitForInput
-        if blueTrex() then break end
-        if controllerState() == "dialogue_wait" then
-            pages = pages + 1
-            if pages <= 5 then shot(string.format("ch03talk-dialogue-p%d", pages)) end
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 120) then return result("FAIL", "Talk dialogue input did not advance") end
-        else
-            yield()
-        end
-    end
+    -- advance only when FE8 exposes TalkWaitForInput
+    local _, why = INSPECT.talkUntil(blueTrex, 3600, {onBox = function()
+        pages = pages + 1
+        if pages <= 5 then shot(string.format("ch03talk-dialogue-p%d", pages)) end
+    end})
+    if why == "advance" then return result("FAIL", "Talk dialogue input did not advance") end
     wait(30); shot("ch03talk-after")
     for i, u in BOARD.each("blue") do   -- dump the full blue roster so the flip is unambiguous
         log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d)", i, u.charId, u.x, u.y))
@@ -6016,7 +6051,7 @@ scenarios.ch03door = function()
     -- DoorCommandEffect (bmmenu.c) returns MENU_ACT_END: it sets gActionData and the menu is
     -- gone, there is no target step. So the first press depended on Door happening to be the
     -- top row, and the second went into whatever the map put up next.
-    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    INSPECT.settle("phase", 300, true)
     if not moveUnit(parked[1], parked[2], parked[1], parked[2]) then
         shot("ch03door-no-menu")
         return result("FAIL", "could not open the opener's command menu")
@@ -6070,7 +6105,7 @@ scenarios.ch03chest = function()
     -- grid = 1: blue army slot-1 grid marker isn't needed; any non-zero registers occupancy
     INSPECT.place(u, CX, CY, { grid = 1 })
     shot("ch03chest-before")
-    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    INSPECT.settle("phase", 300, true)
     if not moveUnit(CX, CY, CX, CY) then
         shot("ch03chest-no-menu")
         return result("FAIL", "could not open the opener's command menu on the chest tile")
@@ -6154,7 +6189,7 @@ scenarios.ch03tourmaline = function()
     end
     if not moved then return result("FAIL", "no isolated floor tile found to open a clean Item menu") end
     u = unitAt(SYM.gUnitArrayBlue, 0) and u   -- addr stable
-    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    INSPECT.settle("phase", 300, true)
     local ux, uy = ru8(u.addr + 0x10), ru8(u.addr + 0x11)
     if not moveUnit(ux, uy, ux, uy) then
         shot("ch03tourmaline-no-menu")
@@ -6560,7 +6595,7 @@ scenarios.clear_ch02 = function()
     local routed = false
     for t = 1, 12 do
         if advanced() then break end
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        INSPECT.settle("phase", 6000, true)
         wait(60)
         protectChwinga()
         for i, r in BOARD.each("red") do
@@ -6574,8 +6609,7 @@ scenarios.clear_ch02 = function()
                     u = blue(u.charId)   -- refresh after the teleport relocates it
                     if u and moveUnit(u.x, u.y, u.x, u.y) then
                         chooseAttack(u.addr)
-                        waitFor(function() return faction() == 0 and not menuOpen()
-                            and not procActive(SYM.gProc_ekrBattle) end, 600)   -- let the kill resolve
+                        INSPECT.settle("fight", 600)   -- let the kill resolve
                     end
                 end
             end
@@ -6776,12 +6810,12 @@ end
 -- never trigger it. Returns true if `stop()` fired, false if the turn budget ran out.
 local function marchPartyToward(cx, cy, turns, stop, maxx, maxy)
     for _ = 1, turns do
-        waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
+        INSPECT.settle("phase", 900, true)
         for i, u in BOARD.each("blue") do
             if stop() then return true end
             if u.onField and (u.state & 0x2) == 0 then
                 marchToward(u, cx, cy, maxx or 14, maxy or 14)
-                waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+                INSPECT.settle("phase", 300, true)
             end
         end
         if stop() then return true end
@@ -6841,9 +6875,7 @@ scenarios.ch04moose = function()
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeFastConfig()
     if moose() then return result("FAIL", "the moose is on the map at chapter start") end
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 900, true)
+    INSPECT.settle("event", 900, true)
 
     -- 1. the negative half: idle a whole turn, monsters move, nobody of ours is in the clearing.
     if runEnemyPhase() ~= "player" then
@@ -6994,9 +7026,7 @@ local function ch04Parley(opts)
     local function redLupin() return findUnit(SYM.gUnitArrayRed, 24, LUPIN) end
     local function blueLupin() return findUnit(SYM.gUnitArrayBlue, 20, LUPIN) end
     local function snap() if opts.shots then shot(opts.shots) end end
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 900, true)
+    INSPECT.settle("event", 900, true)
     -- The pack (and Lupin) only exist from turn 2.
     if turn() < 2 then
         if not endTurn() then return false, "could not end turn 1" end
@@ -7005,9 +7035,7 @@ local function ch04Parley(opts)
         snap()
         return false, "the wolf pack never arrived on turn 2"
     end
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 3600, true)
+    INSPECT.settle("event", 3600, true)
     local marty = blue(MARTY)
     if not marty then return false, "Marty (0x02) is not deployed -- he owns the Talk" end
     -- Park Marty orthogonally adjacent to Lupin. setMapUnit keeps the engine's tile->unit grid
@@ -7026,17 +7054,10 @@ local function ch04Parley(opts)
         return false, "no live command menu for Marty"
     end
     if not chooseTalk() then return false, "Marty's live command menu did not expose Talk" end
-    for i = 1, 3600 do
+    local _, why = INSPECT.talkUntil(blueLupin, 3600, {tick = function(i)
         if i % 3 == 0 then snap() end
-        if blueLupin() then break end
-        if controllerState() == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 120) then return false, "parley dialogue input did not advance" end
-        else
-            yield()
-        end
-    end
+    end})
+    if why == "advance" then return false, "parley dialogue input did not advance" end
     if not blueLupin() then
         snap()
         return false, "Lupin never flipped blue (the CUSA did not fire)"
@@ -7106,8 +7127,7 @@ scenarios.ch04packmath = function()
     local KILL = 2      -- generic wolves to shoot before talking; Lupin (0x1D) is not one
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     if liftFogOntoTheGrid() == 0 then
         return result("FAIL", "fog lifted but no enemy reached gBmMapUnit")
     end
@@ -7120,8 +7140,7 @@ scenarios.ch04packmath = function()
     end, 5400) then
         return result("FAIL", "the wolf pack never arrived on turn 2")
     end
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 3600, true)
+    INSPECT.settle("event", 3600, true)
     for i, r in BOARD.each("red") do
         if not isDead(r) then
             log(string.format("  red[%02d] char=0x%02X at (%d,%d)%s", i, r.charId, r.x, r.y,
@@ -7162,8 +7181,7 @@ scenarios.ch04packmath = function()
                     if u and canAttackFromHere(u, mn, mx) and moveUnit(u.x, u.y, u.x, u.y) then
                         local was = packAlive()
                         chooseAttack(u.addr)
-                        waitFor(function() return faction() == 0 and not menuOpen()
-                            and not procActive(SYM.gProc_ekrBattle) end, 600)
+                        INSPECT.settle("fight", 600)
                         if packAlive() < was then killed = killed + 1 end
                         break
                     end
@@ -7235,9 +7253,7 @@ scenarios.ch05recruit = function(opts)
     local function blueSahnar() return findUnit(SYM.gUnitArrayBlue, 20, SAHNAR) end
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     pokeFastConfig()
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 6000, true)
+    INSPECT.settle("event", 6000, true)
 
     -- 0. The wolf, in whatever roster state this run is about. CHECK_ALIVE reads the ROSTER and
     --    not the field (eventscr.c:3212 -- missing OR US_DEAD gives slot C = 0, while
@@ -7327,27 +7343,17 @@ scenarios.ch05recruit = function(opts)
     --    whole witness. Wait on them, not on the counter (ch04packmath's lesson, restated).
     if not endTurn() then return result("FAIL", "could not end turn 1") end
     local eruptionBoxes = 0
-    for _ = 1, 7200 do
-        if turn() >= 2 and eruptionBoxes >= 4 then break end
-        if controllerState() == "dialogue_wait" then
-            eruptionBoxes = eruptionBoxes + 1
-            if not guardedInput("advance_dialogue", "A", "eruption dialogue wait clears",
-                function(after) return controllerState(after) ~= "dialogue_wait" end, 120) then
-                return result("FAIL", "eruption dialogue input did not advance")
-            end
-        else
-            yield()
-        end
-    end
+    local _, why = INSPECT.talkUntil(function() return turn() >= 2 and eruptionBoxes >= 4 end, 7200, {
+        onBox = function() eruptionBoxes = eruptionBoxes + 1 end,
+        label = "eruption dialogue wait clears"})
+    if why == "advance" then return result("FAIL", "eruption dialogue input did not advance") end
     if eruptionBoxes ~= 4 then
         shot("ch05recruit")
         return result("FAIL", string.format(
             "eruption warning showed %d boxes, expected the four locked Ravisin boxes",
             eruptionBoxes))
     end
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 3600, true)
+    INSPECT.settle("event", 3600, true)
 
     -- 4. The Talk. Park Basil orthogonally adjacent (setMapUnit keeps the tile->unit grid in
     --    sync, so adjacency reads with no phase cycle -- the ch03talk/ch04Parley trick); the
@@ -7382,21 +7388,14 @@ scenarios.ch05recruit = function(opts)
     -- script that had simply not reached it yet. A LOOP CAP MUST NEVER BE WHAT DECIDES FAILURE
     -- (decisions.md): hence a budget with real headroom AND, below, two distinguishable verdicts.
     local BUDGET, boxes, playedMsg = 20000, 0, nil
-    for _ = 1, BUDGET do
-        if blueSahnar() then break end
-        if controllerState() == "dialogue_wait" then
-            boxes = boxes + 1
-            -- WHICH message is on screen, sampled while the FIRST box of the scene is up.
-            -- After the scene ends every menu and unit name decodes through the same buffer
-            -- and overwrites it, so this cannot be read from the verdict at the bottom.
-            playedMsg = playedMsg or INSPECT.activeMsg()
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 120) then return result("FAIL", "recruit dialogue input did not advance") end
-        else
-            yield()
-        end
-    end
+    local _, why = INSPECT.talkUntil(blueSahnar, BUDGET, {onBox = function()
+        boxes = boxes + 1
+        -- WHICH message is on screen, sampled while the FIRST box of the scene is up.
+        -- After the scene ends every menu and unit name decodes through the same buffer
+        -- and overwrites it, so this cannot be read from the verdict at the bottom.
+        playedMsg = playedMsg or INSPECT.activeMsg()
+    end})
+    if why == "advance" then return result("FAIL", "recruit dialogue input did not advance") end
     if not blueSahnar() then
         shot("ch05recruit")
         -- Still mid-scene means the harness ran out of road; a FINISHED scene with a red Sahnar
@@ -7482,9 +7481,7 @@ scenarios.ch05escort = function()
     local function edgeUses(u) return ru16(u.addr + 0x1E) >> 8 end   -- items[0]: id | uses<<8
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     pokeFastConfig()
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 6000, true)
+    INSPECT.settle("event", 6000, true)
 
     local sah, basil = red(SAHNAR), blue(BASIL)
     if not sah then return result("FAIL", "Sahnar is not RED at turn 1") end
@@ -7669,18 +7666,11 @@ function VISIT.run(x, y, done, onBox, choose)
     local ok, why = VISIT.open(x, y, choose)
     if not ok then return false, why end
     local spoke = false
-    for _ = 1, 3600 do
-        if done() then break end
-        if controllerState() == "dialogue_wait" then
-            spoke = true
-            if onBox then onBox() end
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 120) then return false, "village dialogue input did not advance" end
-        else
-            yield()
-        end
-    end
+    local _, stopped = INSPECT.talkUntil(done, 3600, {onBox = function()
+        spoke = true
+        if onBox then onBox() end
+    end})
+    if stopped == "advance" then return false, "village dialogue input did not advance" end
     return true, nil, spoke
 end
 
@@ -7731,10 +7721,7 @@ scenarios.ch05arena = function()
     local ARENA_X, ARENA_Y, GUARD, REARM_MASK = 12, 6, 13, 0x42
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     pokeFastConfig()
-    if not waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-            and controllerState() == "player_map_idle"
-    end, 6000, true) then
+    if not INSPECT.settle("idle", 6000, true) then
         return result("FAIL", "ch05 never settled at player control")
     end
     if eventFlag(GUARD) then
@@ -7796,8 +7783,7 @@ scenarios.ch05arena = function()
                 INSPECT.units("ch05arena-tutorial")
                 shot("ch05arena")
             end
-            if not guardedInput("advance_dialogue", "A", "arena tutorial page advances",
-                function(after) return controllerState(after) ~= "dialogue_wait" end, 120) then
+            if not INSPECT.advanceDialogue(120, "arena tutorial page advances") then
                 return result("FAIL", "arena tutorial dialogue did not advance")
             end
         elseif eventFlag(GUARD) and not procActive(SYM.ProcScr_StdEventEngine)
@@ -7901,8 +7887,8 @@ scenarios.ch05arena = function()
     if wager <= 0 or wager > beforeGold then
         return result("FAIL", string.format("arena generated unusable wager %d", wager))
     end
-    if not guardedInput("advance_dialogue", "A", "welcome advances to the live wager choice",
-        function(after) return controllerState(after) == "yes_no_choice" end, 300) then
+    if not INSPECT.advanceDialogue(300, "welcome advances to the live wager choice",
+        function(after) return controllerState(after) == "yes_no_choice" end) then
         return result("FAIL", "arena welcome never reached its wager choice")
     end
     shot("ch05arena-wager")
@@ -7949,9 +7935,8 @@ scenarios.ch05arena = function()
         if observation.procs.battle then arenaFought = true break end
         if state == "dialogue_wait" then
             arenaPages = arenaPages + 1
-            if not guardedInput("advance_dialogue", "A", string.format(
-                "Arena dialogue page %d advances toward combat", arenaPages),
-                function(after) return controllerState(after) ~= "dialogue_wait" end, 300) then
+            if not INSPECT.advanceDialogue(300, string.format(
+                "Arena dialogue page %d advances toward combat", arenaPages)) then
                 log("ARENA TRAIL: " .. table.concat(arenaTrail, " -> "))
                 return result("FAIL", string.format(
                     "Arena dialogue page %d refused to advance toward combat", arenaPages))
@@ -8179,8 +8164,7 @@ scenarios.ch02raid = function()
     local VILLAGE_REGULAR, RUINS = 0x03, 0x25
     if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
     pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     for _, hut in ipairs(HUTS) do
         if terrainAt(hut.x, hut.y) ~= VILLAGE_REGULAR then
             return result("FAIL", string.format(
@@ -8281,8 +8265,7 @@ scenarios.ch05raid = function()
     local SITE_FLAG = SOUTH.flag
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     if terrainAt(SITE_X, SITE_Y) ~= VILLAGE_REGULAR then
         return result("FAIL", string.format(
             "reliquary-south (%d,%d) is terrain 0x%02X at turn 1, not a village -- nothing can "
@@ -8377,14 +8360,9 @@ scenarios.ch05crest = function()
         return false
     end
     local function settle()
-        return waitFor(function()
-            return faction() == 0 and not menuOpen()
-                and not procActive(SYM.ProcScr_StdEventEngine)
-                and controllerState() == "player_map_idle"
-        end, 3000, true)
+        return INSPECT.settle("idle", 3000, true)
     end
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     -- Save all four. Raiders are on the board now, so this is a race the scenario has to WIN;
     -- if a site falls first its flag never sets and the payout is correctly withheld, which
     -- would read here as a failure to visit rather than as a payout bug.
@@ -9544,8 +9522,7 @@ scenarios.ch04cottage = function()
     local VILLAGE_REGULAR, VILLAGE_CLOSED = 0x03, 0x04
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     local before = terrainAt(DOOR_X, DOOR_Y)
     log(string.format("ch04cottage: door (%d,%d) terrain=0x%02X before visiting",
         DOOR_X, DOOR_Y, before))
@@ -9621,8 +9598,7 @@ scenarios.ch04snag = function(opts)
     local T_CROSSING = 0x34
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     if opts.fast == false then pokeNormalConfig() else pokeFastConfig() end
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     log(string.format(tag .. ": before -- snag(%d,%d) terrain=0x%02X  crossing(%d,%d) terrain=0x%02X",
         SNAG_X, SNAG_Y, terrainAt(SNAG_X, SNAG_Y), CROSS_X, CROSS_Y, terrainAt(CROSS_X, CROSS_Y)))
     if terrainAt(CROSS_X, CROSS_Y) == T_CROSSING then
@@ -9644,7 +9620,7 @@ scenarios.ch04snag = function(opts)
         if not m then break end
         if (m.state & 0x2) ~= 0 then
             runEnemyPhase()
-            waitFor(function() return faction() == 0 and not menuOpen() end, 900, true)
+            INSPECT.settle("phase", 900, true)
             m = blue(u.charId)
             if not m then break end
         end
@@ -9653,8 +9629,7 @@ scenarios.ch04snag = function(opts)
         if not cursorTo(m.x, m.y) then break end
         if moveUnit(m.x, m.y, m.x, m.y) then
             chooseAttack(m.addr)
-            waitFor(function() return faction() == 0 and not menuOpen()
-                and not procActive(SYM.gProc_ekrBattle) end, 900)
+            INSPECT.settle("fight", 900)
         end
         log(string.format("  swing %d: crossing terrain=0x%02X", swing, terrainAt(CROSS_X, CROSS_Y)))
     end
@@ -9773,8 +9748,7 @@ local function clearCh04(parley)
     -- scenario exists to prove the win -> ending WIRING, not to play the hunt honestly, so lifting
     -- fog is the same class of shortcut as pokeFrail/pokeHarmless. The fog itself is covered by
     -- ch04moose and smoke_ch04.
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     if liftFogOntoTheGrid() == 0 then
         shot(tag .. "-fog-stuck")
         return result("FAIL", "fog lifted but no enemy reached gBmMapUnit -- nothing is attackable")
@@ -9800,8 +9774,7 @@ local function clearCh04(parley)
     end
     for t = 1, 16 do
         if won() then break end
-        waitFor(function() return faction() == 0 and not menuOpen()
-            and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+        INSPECT.settle("event", 6000, true)
         for i, r in BOARD.each("red") do
             if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
@@ -9839,8 +9812,7 @@ local function clearCh04(parley)
                         -- 600-frame wait here spends the victory fanfare and half the treeline
                         -- scene before the capture loop below gets its first frame (#204).
                         waitFor(function() return BOARD.liveCount("red") == 0
-                            or (faction() == 0 and not menuOpen()
-                                and not procActive(SYM.gProc_ekrBattle)) end, 600)
+                            or INSPECT.settled("fight") end, 600)
                         log(string.format("  blue[%d] pid=0x%02X attacked from (%d,%d): liveEnemies %d -> %d",
                             i, u.charId, u.x, u.y, before, BOARD.liveCount("red")))
                     end
@@ -9866,24 +9838,14 @@ local function clearCh04(parley)
     -- the screenshot cadence are therefore both looser than they read. That is fine for a
     -- bounded recording -- won() is what ends this, never the cap -- but do not read 5400 as
     -- a frame budget (#238).
-    local ended = false
-    for f = 1, 5400 do
+    -- Advance the ending only where FE8 is CLASSIFIED as waiting for it (#238). The
+    -- every-90-frames A this replaces was the "stray press on Press START" hazard the
+    -- comment above worries about, made structural: a cadence cannot see what is on
+    -- screen, so the guard against it was a frame count chosen to be slow enough. A
+    -- guarded input on dialogue_wait cannot fire on the title at all.
+    local ended = INSPECT.talkUntil(won, 5400, {tick = function(f)
         if f % 4 == 0 then shot(tag) end
-        if won() then ended = true break end
-        -- Advance the ending only where FE8 is CLASSIFIED as waiting for it (#238). The
-        -- every-90-frames A this replaces was the "stray press on Press START" hazard the
-        -- comment above worries about, made structural: a cadence cannot see what is on
-        -- screen, so the guard against it was a frame count chosen to be slow enough. A
-        -- guarded input on dialogue_wait cannot fire on the title at all.
-        if controllerState() == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "the ending's dialogue wait clears",
-                function(after) return controllerState(after) ~= "dialogue_wait" end, 120) then
-                break
-            end
-        else
-            yield()
-        end
-    end
+    end, label = "the ending's dialogue wait clears"})
     log(string.format("%s: liveEnemies=%d chapter=%d (host=%d)",
         tag, BOARD.liveCount("red"), chapter(), HOST_CHAPTER))
     if not ended then
@@ -10325,8 +10287,7 @@ scenarios.ch06clock = function()
     local TURNS = 12                                     -- past both declared fuses, with slack
     if not bootToMap() then return result("FAIL", "never reached the ch06 map") end
     pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
 
     local function dist(ax, ay, bx, by) return math.abs(ax - bx) + math.abs(ay - by) end
     local function indexOf(base, count, match)
@@ -10547,8 +10508,7 @@ scenarios.ch06halberd = function()
     local D, ITEMS, DROP = CH06.DROPPER, CAMPAIGN.CH06_DROPPER_ITEMS, CAMPAIGN.CH06_DROPPER_DROP
     if not bootToMap() then return result("FAIL", "never reached the ch06 map") end
     pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
 
     local function inventory(u)
         local out = {}
@@ -10710,11 +10670,7 @@ local co = coroutine.create(function()
         -- lesson ch05reliquaries paid for: a location event's tail still holds the
         -- controller when the item lands, and moving then dies as "cursor could not reach".
         settle = function(strong)
-            return waitFor(function()
-                return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine)
-                    and (not strong or controllerState() == "player_map_idle")
-            end, strong and 3000 or 6000, true)
+            return INSPECT.settle(strong and "idle" or "event", strong and 3000 or 6000, true)
         end,
         -- `done` is generic here where a hand-written scenario passed its own item test: the
         -- step does not know what the case asserts (assertions are order-free), so it stops

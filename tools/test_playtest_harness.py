@@ -97,7 +97,7 @@ class TestAwaitControllerState(unittest.TestCase):
         body = _block(_read_harness(), 'local function awaitControllerState(',
                       '\n-- Select unit at')
         self.assertIn('dialogue_wait', body)
-        self.assertIn('advance_dialogue', body)
+        self.assertIn('INSPECT.advanceDialogue(', body)   # the guarded "advance_dialogue" press
         self.assertIn('want ~= "dialogue_wait"', body,
                       'a caller that explicitly waits FOR dialogue must still get it')
         self.assertIn('fail:unexpected-state:', body,
@@ -278,8 +278,8 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('eruptionBoxes', body,
                       'the recruit gate would hang before Sahnar LOADs if it never advances '
                       'Ravisin\'s newly visible warning')
-        self.assertIn('dialogue_wait', body)
-        self.assertIn('advance_dialogue', body)
+        self.assertIn('INSPECT.talkUntil(', body)   # advances only on an observed dialogue_wait
+        self.assertIn('"advance_dialogue"', _block(harness, 'function INSPECT.advanceDialogue(', '\n\n'))
         self.assertIn('eruption warning showed %d boxes', body,
                       'the gate must distinguish the locked four-box scene from merely '
                       'reaching turn 2')
