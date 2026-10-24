@@ -231,6 +231,8 @@ do
     check(boss and boss.slot, 40, "liveBoss: the on-field CA_BOSS unit, past slot 23")
     check(Board.findIn(mem, SYM, SYM.gUnitArrayRed, 50, 0x81).slot, 30, "findIn finds slot 30")
     check(Board.findIn(mem, SYM, SYM.gUnitArrayRed, 24, 0x81), nil, "findIn honours its count")
+    check(Board.find(mem, SYM, "red", 0x81).slot, 30, "find scans the faction's whole array")
+    check(Board.find(mem, SYM, "blue", 0x81), nil, "find reads only the faction it names")
     check(#Board.leanList(mem, SYM, "red"), 6, "leanList returns every occupied slot")
     local seen, last = 0, nil
     for slot, u in Board.each(mem, SYM, "red") do

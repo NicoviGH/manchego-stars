@@ -249,6 +249,13 @@ function Board.findIn(mem, SYM, base, count, charId)
     return nil
 end
 
+-- The first unit of `faction` with `charId`, over that faction's whole decomp array, LEAN, or
+-- nil. A literal count at the call site is how a scan stopped at slot 19 or 23 (#531 audit 13).
+function Board.find(mem, SYM, faction, charId)
+    local f = BY_NAME[faction]
+    return Board.findIn(mem, SYM, SYM[f.sym], f.count, charId)
+end
+
 -- Who can Seize. FE8's Seize command is usable only when CanUnitSeize(unit) holds
 -- (bmmenu.c UnitActionMenu_CanSeize), and our engine patch 0005 rewrites that test to
 -- `unit->pCharacterData->number == LordSelect_GetPid()` (bmdifficulty.c). LordSelect_GetPid
@@ -365,6 +372,7 @@ function Board.bind(mem, SYM)
         liveCount = function(faction) return Board.liveCount(mem, SYM, faction) end,
         liveBoss = function() return Board.liveBoss(mem, SYM) end,
         findIn = function(base, count, charId) return Board.findIn(mem, SYM, base, count, charId) end,
+        find = function(faction, charId) return Board.find(mem, SYM, faction, charId) end,
         attackRange = function(addr) return Board.attackRange(mem, SYM, addr) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,

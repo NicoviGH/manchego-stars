@@ -231,8 +231,8 @@ local function findUnit(base, count, charId) return BOARD.findIn(base, count, ch
 -- red[50] / green[20]). `blue` searched 8 for as long as the cast WAS 8; the TESTCH sandbox
 -- now deploys 11, so `PT_CHAR=lupin` reported "not deployed" for a unit that was standing on
 -- the map. A scan bound is a property of the engine, never of the current content.
-local function blue(charId) return findUnit(SYM.gUnitArrayBlue, 62, charId) end
-local function red(charId) return findUnit(SYM.gUnitArrayRed, 50, charId) end
+local function blue(charId) return BOARD.find("blue", charId) end
+local function red(charId) return BOARD.find("red", charId) end
 local function isDead(u) return u == nil or u.dead end
 
 -- A unit's attack reach from its equipped (items[0]) weapon, read LIVE from u.addr (a caller
@@ -1413,7 +1413,11 @@ end
 -- `want`: the chapter slot to stop on, for a chain leg that is not the scenario's own (see
 -- inChapter). Omit it and the boot waits for HOST_CHAPTER, which is what every direct-boot
 -- scenario means.
-local function bootToMap(stopAtPrep, want)
+-- `opts.strictCheckpoint`: the row's checkpoint is the ONLY route to this map (ch02 has no
+-- debug boot), so a missing, unloadable or stale one returns false plus a reason naming it,
+-- at once, instead of falling through to a New Game boot that sits on the prologue and FAILs
+-- late and vaguely. The caller FAILs with that reason.
+local function bootToMap(stopAtPrep, want, opts)
     -- A declared CHECKPOINT is the correct route to this chapter's map, not a shortcut past
     -- it. Chapters with a debug boot (ch03-ch05) land on their map from New Game, so driving
     -- the boot IS the route; ch02 has no such boot and reaches its map only down the
@@ -1435,9 +1439,14 @@ local function bootToMap(stopAtPrep, want)
             end
             -- Loaded, but not where it claims to be: fall through and boot honestly rather
             -- than assert against whatever map the stale state happens to hold.
-            log(string.format("checkpoint %s loaded but chapter=%d (want %d) -- booting instead",
-                ckpt, chapter(), want or HOST_CHAPTER))
+            log(stale .. " -- booting instead")
+        elseif strict then
+            return false, "no " .. ckpt .. " checkpoint (run.sh builds it)"
         end
+    end
+    local strict = opts and opts.strictCheckpoint
+    if strict and (not ckpt or ckpt == "") then
+        return false, "the row declares no checkpoint, and this map has no other route"
     end
     log("booting to map with observed FE8 states")
     local stalled = INSPECT.watch("boot")
@@ -1447,6 +1456,9 @@ local function bootToMap(stopAtPrep, want)
     for _ = 1, TUNE.bootSteps do
         if TUNE.bootHook then TUNE.bootHook() end   -- a scenario's per-step poke (vanillagold)
         local observation = observeController()
+            local stale = string.format("checkpoint %s loaded but chapter=%d (want %d)",
+                ckpt, chapter(), want or HOST_CHAPTER)
+            if strict then return false, stale .. " -- delete it so run.sh re-mints it" end
         local state, why = controllerState(observation)
         if stalled(observation, state) then
             result("FAIL", "boot parked on an unclassified wait (see the inspect snapshot)")
@@ -2350,22 +2362,20 @@ scenarios.ch01 = function()
         return result("FAIL", "ch00 guests still in the party in ch01")
     end
     local party, deployed = 0, 0
-    for i = 0, 50 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u then
-            party = party + 1
-            -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3)
-            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
-        end
+    for _, u in BOARD.each("blue") do
+        party = party + 1
+        -- on the field = not US_HIDDEN (1<<0) and not US_NOT_DEPLOYED (1<<3)
+        if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
     end
     log(string.format("party=%d deployed=%d turn=%d", party, deployed, turn()))
-    for i = 0, 50 do -- blue + red unit tables for the post-run eyeball
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u then log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
-            i, u.charId, u.x, u.y, u.state)) end
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r then log(string.format("red[%02d]  char=0x%02X pos=(%d,%d) state=0x%08X",
-            i, r.charId, r.x, r.y, r.state)) end
+    -- Blue + red unit tables for the post-run eyeball, each at its own decomp bound.
+    for i, u in BOARD.each("blue") do
+        log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
+            i, u.charId, u.x, u.y, u.state))
+    end
+    for i, r in BOARD.each("red") do
+        log(string.format("red[%02d]  char=0x%02X pos=(%d,%d) state=0x%08X",
+            i, r.charId, r.x, r.y, r.state))
     end
     if deployed ~= 4 then
         return result("FAIL", string.format(
@@ -3410,9 +3420,8 @@ local function isDeployedInPrep(charId)
 end
 local function countDeployedPrep()
     local n = 0
-    for i = 0, 50 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and u.charId ~= 0 and (u.state & US_NOT_DEPLOYED) == 0 then n = n + 1 end
+    for _, u in BOARD.each("blue") do
+        if u.charId ~= 0 and (u.state & US_NOT_DEPLOYED) == 0 then n = n + 1 end
     end
     return n
 end
@@ -3510,9 +3519,8 @@ scenarios.recordsupply = function()
     local pinky = blue(CAMPAIGN.CAST.pinky)
     local pinkyOnField = pinky and (pinky.state & 0x9) == 0 and pinky.onMap
     local onField = 0
-    for i = 0, 50 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.onMap then onField = onField + 1 end
+    for _, u in BOARD.each("blue") do
+        if (u.state & 0x9) == 0 and u.onMap then onField = onField + 1 end
     end
     log(string.format("map: braulo=%s pinky=%s field=%d",
         tostring(braOnField), tostring(pinkyOnField), onField))
@@ -3560,11 +3568,10 @@ scenarios.recordsupply = function()
     -- caught the CLAIM rather than a defect (#238).
     INSPECT.settle("phase", 1500, true)
     pinky = blue(CAMPAIGN.CAST.pinky)
-    for i = 0, 50 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        local beside = pinky and u and math.abs(u.x - pinky.x) + math.abs(u.y - pinky.y) == 1
-        if u and u.charId ~= CAMPAIGN.CAST.pinky and not beside
-            and (u.state & 0x9) == 0 and u.onMap then
+    for _, u in BOARD.each("blue") do
+        local beside = pinky and math.abs(u.x - pinky.x) + math.abs(u.y - pinky.y) == 1
+        -- onField: this loop MOVES the unit, and a rescued one is not standing on a tile.
+        if u.charId ~= CAMPAIGN.CAST.pinky and not beside and u.onField then
             if moveUnit(u.x, u.y, u.x, u.y) then
                 wait(40); shot("supply")
                 -- The CONTRAST is the point of this half, so assert it rather than leaving
@@ -4047,9 +4054,8 @@ scenarios.ch01lord = function()
         return result("FAIL", "chosen lord (char 0x08) is not force-deployed")
     end
     local deployed = 0
-    for i = 0, 50 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
+    for _, u in BOARD.each("blue") do
+        if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
     end
     if deployed ~= 4 then
         return result("FAIL", string.format(
@@ -5790,7 +5796,7 @@ end
 -- the human pass, not the wiring test.
 local function protectChwinga()
     for _, pid in ipairs(CAMPAIGN.CH02_CHWINGA_PIDS) do
-        local g = findUnit(SYM.gUnitArrayGreen, 20, pid)
+        local g = BOARD.find("green", pid)
         if g and not isDead(g) then
             emu:write8(g.addr + 0x13, 60)   -- curHP
             emu:write8(g.addr + 0x17, 30)   -- def
@@ -5880,8 +5886,8 @@ scenarios.ch03talk = function()
     local CHAR_TREX = 0x1C -- CHARACTER_RENNAC (Trex rides the Rennac slot)
     -- ch03 deploys 9+ blue units, so scan the full blue array (blue() only checks the ch00
     -- 8-slot party -> a recruit at a higher index would be missed).
-    local function blueTrex() return findUnit(SYM.gUnitArrayBlue, 20, CHAR_TREX) end
-    local trex = findUnit(SYM.gUnitArrayGreen, 12, CHAR_TREX)
+    local function blueTrex() return blue(CHAR_TREX) end
+    local trex = BOARD.find("green", CHAR_TREX)
     if not trex then return result("FAIL", "green Trex (0x1C) not found in the green array") end
     if blueTrex() then return result("FAIL", "Trex is already blue before any talk") end
     local rec = blue(0x01) -- the leader is always deployed and is a recruit candidate
@@ -5918,7 +5924,7 @@ scenarios.ch03talk = function()
         log(string.format("  blue[%02d] char=0x%02X pos=(%d,%d)", i, u.charId, u.x, u.y))
     end
     local nowBlue = blueTrex() ~= nil
-    local stillGreen = findUnit(SYM.gUnitArrayGreen, 12, CHAR_TREX) ~= nil
+    local stillGreen = BOARD.find("green", CHAR_TREX) ~= nil
     log(string.format("post-talk: Trex blue=%s stillGreen=%s", tostring(nowBlue), tostring(stillGreen)))
     if not nowBlue then
         return result("FAIL", "Trex did not join the blue army after Talk -- CUSA did not fire")
@@ -6363,16 +6369,13 @@ scenarios.ch03 = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local BAXBY, TREX = 0x10, 0x1C   -- CHARACTER_FORDE (Baxby) / CHARACTER_RENNAC (Trex)
     local deployed, baxby = 0, false
-    for i = 0, 15 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u then
-            log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
-                i, u.charId, u.x, u.y, u.state))
-            if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
-            if u.charId == BAXBY and not isDead(u) then baxby = true end
-        end
+    for i, u in BOARD.each("blue") do
+        log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X",
+            i, u.charId, u.x, u.y, u.state))
+        if (u.state & 0x9) == 0 and u.onMap then deployed = deployed + 1 end
+        if u.charId == BAXBY and not isDead(u) then baxby = true end
     end
-    local trexGreen = findUnit(SYM.gUnitArrayGreen, 10, TREX)
+    local trexGreen = BOARD.find("green", TREX)
     if trexGreen then log(string.format("green Trex(0x1C) @ (%d,%d)", trexGreen.x, trexGreen.y)) end
     log(string.format("ch03 entry: bluedeployed=%d baxby(0x10)=%s trex_green=%s",
         deployed, tostring(baxby), tostring(trexGreen ~= nil)))
@@ -6405,9 +6408,8 @@ end
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
 -- the field, the party deploys to the cap, and the archer + boss are present.
 scenarios.ch02 = function()
-    -- The row declares checkpoint ch02start + host_chapter 3; bootToMap loads it and asserts
-    -- inChapter, so a stale state boots honestly instead of asserting on whatever it holds.
-    if not bootToMap() then return result("FAIL", "never reached the ch02 map off the ch02start checkpoint") end
+    local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
+    if not booted then return result("FAIL", why or "never reached the ch02 map") end
     -- diagnostic: dump every non-null green slot (and the blue/red char ids) so a missing-chwinga
     -- failure shows whether they are absent, on another faction, or under unexpected char ids.
     for i, g in BOARD.each("green") do
@@ -6420,7 +6422,7 @@ scenarios.ch02 = function()
     log("blue=" .. table.concat(blueids, ",") .. " | red=" .. table.concat(redids, ","))
     local chwinga = 0
     for _, pid in ipairs(CAMPAIGN.CH02_CHWINGA_PIDS) do
-        local g = findUnit(SYM.gUnitArrayGreen, 20, pid)
+        local g = BOARD.find("green", pid)
         if g and not isDead(g) then chwinga = chwinga + 1
             log(string.format("chwinga 0x%02X at (%d,%d) hp=%d", pid, g.x, g.y, g.hp)) end
     end
@@ -6461,9 +6463,9 @@ end
 -- smoke_ch02: stability net on the ch02 map -- idle-drive to a clean terminal, catching a
 -- crash / soft-lock on load or during the 5 cutscenes.
 scenarios.smoke_ch02 = function()
-    -- The row declares checkpoint ch02start + host_chapter 3; bootToMap loads it and asserts
-    -- inChapter, so a stale state boots honestly instead of asserting on whatever it holds.
-    if not bootToMap() then return result("FAIL", "never reached the ch02 map off the ch02start checkpoint") end
+    -- Off the row's declared checkpoint, strictly: bootToMap's opts.strictCheckpoint.
+    local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
+    if not booted then return result("FAIL", why or "never reached the ch02 map") end
     return smokeDrive(chapter())
 end
 
@@ -6476,18 +6478,14 @@ end
 -- a foe and confirm damage landed. NB the roster is 9 deep (8 founding + Baxby), so we search
 -- past blue()'s 8-slot window. Run: tools/playtest/run.sh ch02baxby (needs a normal build).
 scenarios.ch02baxby = function()
-    -- The row declares checkpoint ch02start + host_chapter 3; bootToMap loads it and asserts
-    -- inChapter, so a stale state boots honestly instead of asserting on whatever it holds.
-    if not bootToMap() then return result("FAIL", "never reached the ch02 map off the ch02start checkpoint") end
+    local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
+    if not booted then return result("FAIL", why or "never reached the ch02 map") end
     -- 1. PREP-ROSTER proof: Baxby must be a real party member. Search the whole blue array (the
-    --    roster is 9 deep: 8 founding 0x01..0x08 + Baxby), not just blue()'s first 8 slots.
+    --    roster is 9 deep: 8 founding 0x01..0x08 + Baxby), at the decomp's bound.
     local baxby, bidx
-    for i = 0, 15 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u then
-            log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X", i, u.charId, u.x, u.y, u.state))
-            if u.charId == CAMPAIGN.CAST.baxby then baxby, bidx = u, i end
-        end
+    for i, u in BOARD.each("blue") do
+        log(string.format("blue[%02d] char=0x%02X pos=(%d,%d) state=0x%08X", i, u.charId, u.x, u.y, u.state))
+        if u.charId == CAMPAIGN.CAST.baxby then baxby, bidx = u, i end
     end
     if not baxby then
         shot("ch02baxby-absent")
@@ -6587,9 +6585,8 @@ end
 -- to prove LOST). This bot never detours to a door -- it routs -- so counting three here would
 -- fail a chapter that is working exactly as designed.
 scenarios.clear_ch02 = function()
-    -- The row declares checkpoint ch02start + host_chapter 3; bootToMap loads it and asserts
-    -- inChapter, so a stale state boots honestly instead of asserting on whatever it holds.
-    if not bootToMap() then return result("FAIL", "never reached the ch02 map off the ch02start checkpoint") end
+    local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
+    if not booted then return result("FAIL", why or "never reached the ch02 map") end
     pokeFastConfig()
     local start = chapter()
     local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
@@ -6882,7 +6879,7 @@ end
 scenarios.ch04moose = function()
     local MOOSE_PID = CAMPAIGN.CH04_MOOSE_PID
     local X1, Y1, X2, Y2 = 8, 2, 14, 7   -- CH04_MOOSE_AREA
-    local function moose() return findUnit(SYM.gUnitArrayGreen, 12, MOOSE_PID) end
+    local function moose() return BOARD.find("green", MOOSE_PID) end
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
     pokeFastConfig()
     if moose() then return result("FAIL", "the moose is on the map at chapter start") end
@@ -7034,8 +7031,8 @@ end
 local function ch04Parley(opts)
     opts = opts or {}
     local LUPIN, MARTY = CAMPAIGN.CAST.lupin, CAMPAIGN.CAST.marty
-    local function redLupin() return findUnit(SYM.gUnitArrayRed, 24, LUPIN) end
-    local function blueLupin() return findUnit(SYM.gUnitArrayBlue, 20, LUPIN) end
+    local function redLupin() return red(LUPIN) end
+    local function blueLupin() return blue(LUPIN) end
     local function snap() if opts.shots then shot(opts.shots) end end
     INSPECT.settle("event", 900, true)
     -- The pack (and Lupin) only exist from turn 2.
@@ -7259,9 +7256,9 @@ scenarios.ch05recruit = function(opts)
     opts = opts or {}
     local ARM = opts.arm or CH05.MSG.RECRUIT_NO_LUPIN
     local RECRUIT_BOXES = (ARM == 0x9E8) and 16 or 17
-    local function blueBasil() return findUnit(SYM.gUnitArrayBlue, 20, BASIL) end
-    local function redSahnar() return findUnit(SYM.gUnitArrayRed, 24, SAHNAR) end
-    local function blueSahnar() return findUnit(SYM.gUnitArrayBlue, 20, SAHNAR) end
+    local function blueBasil() return blue(BASIL) end
+    local function redSahnar() return red(SAHNAR) end
+    local function blueSahnar() return blue(SAHNAR) end
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
     pokeFastConfig()
     INSPECT.settle("event", 6000, true)
@@ -7271,7 +7268,7 @@ scenarios.ch05recruit = function(opts)
     --    US_NOT_DEPLOYED is CHECK_DEPLOYED's business alone), so these two pokes are the whole
     --    experiment: a benched Lupin must still take the wolf's arm, a dead one must not.
     if opts.lupin then
-        local wolf = findUnit(SYM.gUnitArrayBlue, 62, LUPIN)
+        local wolf = blue(LUPIN)
         if not wolf then
             return result("FAIL", "no Lupin on the roster -- this scenario needs the "
                 .. "ch05lupinboot ROM, whose LOAD1 is the only thing that puts him there")
@@ -7310,7 +7307,7 @@ scenarios.ch05recruit = function(opts)
     --    which is invisible to every other scenario, so name the faction we actually found.
     local basil = blueBasil()
     if not basil then
-        local green = findUnit(SYM.gUnitArrayGreen, 20, BASIL)
+        local green = BOARD.find("green", BASIL)
         shot("ch05recruit")
         return result("FAIL", green
             and "Basil is still GREEN at turn 1 -- the opening join CUSA never fired, so she "
@@ -7518,18 +7515,21 @@ scenarios.ch05escort = function()
     -- any OTHER blue unit already stands in her reach (a sword reaches one tile, and her
     -- AI_B_03 never moves): the phase must offer her exactly one target.
     local function parkAdjacent(u)
-        local spot
-        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
+        -- The reach check reads only on-map neighbours (an off-map one has no grid cell), and
+        -- the tile comes from freeBeside, so an off-map neighbour is SKIPPED here as it is
+        -- everywhere else, never refused.
+        local w, h = mapSize()
+        for _, d in ipairs(INSPECT.EWSN) do
             local tx, ty = post.x + d[1], post.y + d[2]
-            local idx = mapUnitAt(tx, ty)
+            local idx = BOARD.inMap(tx, ty, w, h) and mapUnitAt(tx, ty) or 0
             if idx ~= 0 and idx < 0x40 and not (tx == u.x and ty == u.y) then
                 return nil, string.format("another blue unit already stands at (%d,%d)", tx, ty)
             end
-            if not spot and idx == 0 then spot = { x = tx, y = ty } end
         end
-        if not spot then return nil, "no free tile adjacent to Sahnar" end
-        if not INSPECT.place(u, spot.x, spot.y) then return nil, "the free tile beside Sahnar is off the map" end
-        return spot
+        local sx, sy = INSPECT.freeBeside(post)
+        if not sx then return nil, "no free tile adjacent to Sahnar" end
+        if not INSPECT.place(u, sx, sy) then return nil, "could not stand the unit beside Sahnar" end
+        return { x = sx, y = sy }
     end
     local function moveTo(u, x, y) return INSPECT.place(u, x, y) end
 
@@ -7566,10 +7566,9 @@ scenarios.ch05escort = function()
     -- ended in a game over. The HP poke is so the control survives the crit it is there to
     -- invite; it changes nothing about whether Sahnar picks it.
     local other
-    for i = 1, 61 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        -- On the map: a benched roster unit is US_HIDDEN | US_NOT_DEPLOYED at (-1,-1).
-        if u and u.charId ~= BASIL and not isDead(u) and (u.state & 9) == 0 then other = u; break end
+    for slot, u in BOARD.each("blue") do
+        -- On the field: a benched roster unit is US_HIDDEN | US_NOT_DEPLOYED at (-1,-1).
+        if slot >= 1 and u.charId ~= BASIL and u.onField then other = u; break end
     end
     if not other then return result("FAIL", "setup: no second blue unit for the control phase") end
     spot, why = parkAdjacent(other)
@@ -7648,10 +7647,11 @@ end
 -- `VISIT.shop` an Armory or Vendor.
 function VISIT.open(x, y, choose)
     local u
-    for i, c in BOARD.each("blue") do
-        -- Deployed and on the map, not merely alive: a capped chapter leaves party members
-        -- off the field at x = -1, and parking one of those writes outside the grid row.
-        if not isDead(c) and (c.state & 0x9) == 0 and c.onMap and (c.state & 0x2) == 0 then
+    for _, c in BOARD.each("blue") do
+        -- On the field, not merely alive (`onField`, as every other scan asks): a capped chapter
+        -- leaves party members off it at x = -1, where parking one writes outside the grid row,
+        -- and a rescued unit is carried, not standing on a tile. 0x2 = US_UNSELECTABLE (acted).
+        if c.onField and (c.state & 0x2) == 0 then
             u = c break
         end
     end
