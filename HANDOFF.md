@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-24 (Claude: #531 done, headed scenarios archived by #539; #510 step 9 BUILDING). **The parity model is being
+Refreshed 2026-10-24 (Claude: #531 raid PR #540 merged; #510 step 9 BUILDING). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -38,13 +38,9 @@ G3 #537 78105ed; the summary is on #531).
 - #531 audit #8, #11 and #12 went with the archive. #17 (chunking) stays open on #531.
 
 **Next, in order:**
-1. **The raid PR** (Nicolas, 2026-10-24: the G3 "stays Lua" calls were excuses, so clean them up).
-   - Add two `cases.lua` verbs: idle N enemy phases (optionally holding the party), and assert a site
-     was raided (terrain RUINS 0x25, its gift absent, its event flag unset).
-   - Validate them in `declared.py`, then port `ch02raid` (ch02start checkpoint) and `ch05raid` into
-     their chapter YAMLs.
-   - The site tables already live in the chapter YAML. Run those two scenarios once.
-   - File it under #531 (reopen if closed) or a new issue. It needs Nicolas's "merge".
+1. **The raid PR is DONE** (#540 f28041b): `idle`/`raided` case verbs; ch02raid/ch05raid are declared;
+   sites resolve through `CAMPAIGN.VILLAGES` (gen_symbols `village_sites`); one HP refill,
+   `INSPECT.fullHeal`; a malformed step argument is ERROR. Summary on #531.
 2. **Step 9 PR C** (Tasks 3-5 + C4), then D, E, F. Stacked PRs on D->E->F only.
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
