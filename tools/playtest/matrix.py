@@ -534,17 +534,45 @@ def export_env(scenario):
     return '\n'.join("%s='%s'" % (k, '' if v is None else v) for k, v in pairs)
 
 
+def harness_source(path=None):
+    """harness.lua's text. Always read, never cached: reading is cheap, and a check that
+    skipped the read would miss a doctored file (test_check_canaries) or a mid-run edit."""
+    return _read(path or HARNESS)
+
+
+_PARSED = {}
+
+
+def harness_functions_at(path=None):
+    """`harness_functions` of the file on disk, parsed once per distinct text: `make check`
+    asks from several checks and the parse is the cost (#531). Read-only -- every caller
+    shares the one dict."""
+    text = harness_source(path)
+    if text not in _PARSED:
+        _PARSED.clear()
+        _PARSED[text] = harness_functions(text)
+    return _PARSED[text]
+
+
 def harness_scenarios(path=None):
     """Every `scenarios.X = function()` defined in harness.lua."""
-    with open(path or HARNESS) as fh:
-        return set(_SCENARIO_DEF.findall(fh.read()))
+    return set(_SCENARIO_DEF.findall(harness_source(path)))
+
+
+# A bound entry is run as `fn()`, so an INSPECT function that declares parameters would run
+# with every one of them nil (#531: INSPECT.firstAttacks dropped its `phases` for this).
+_NO_PARAMS = re.compile(r'^[^\n]*function\s*(?:[\w.]+\s*)?\(\s*\)')
 
 
 def entry_defined(entry, scenarios, funcs):
-    """True if harness.lua's runner can find `entry` (`Scenario.entry`): a scenario, or an
-    `INSPECT` function, the only two tables it searches (#531). `scenarios` is
-    `harness_scenarios()`, `funcs` is `harness_functions()`."""
-    return entry in scenarios or (entry.startswith('INSPECT.') and entry in funcs)
+    """True if harness.lua's runner can run `entry` (`Scenario.entry`): a scenario, or an
+    `INSPECT` function that takes no parameters -- the runner searches those two tables only
+    and calls what it finds with no arguments (#531). `scenarios` is `harness_scenarios()`,
+    `funcs` is `harness_functions()`."""
+    if entry in scenarios:
+        return True
+    return (entry.startswith('INSPECT.') and entry in funcs
+            and bool(_NO_PARAMS.match(funcs[entry][0])))
 
 
 # -- reading harness.lua's shape --------------------------------------------

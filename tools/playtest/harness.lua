@@ -4284,8 +4284,8 @@ end
 -- MAPFULL: capture the WHOLE chapter map + units at their starting positions by panning the cursor
 -- over a grid of tiles and screenshotting at each camera clamp; the camera pixel-scroll (gBmSt.camera
 -- @ +0x0C/+0x0E) is baked into each frame's tag so make_gif/stitch_map.py can paste each 240x160
--- shot at its exact map offset. Fresh CH03BOOT New Game; clears the turn-1 entrance cutscene first.
--- Chapter-generic: the map decides what is in shot, and a chapter case binds it to its own ROM
+-- shot at its exact map offset. Fresh New Game on whichever ROM the row names; clears the turn-1
+-- entrance cutscene first. Chapter-generic: the map decides what is in shot, and a chapter case binds it to its own ROM
 -- (`lua: mapfull`; ch05's sixteen risen tomb-guard, #25).
 scenarios.mapfull = function()
     -- NO pokeFastConfig() here, and the absence is the note. It was added claiming to fix two
@@ -8959,23 +8959,6 @@ scenarios.recordch06messie = function()
     })
 end
 
--- recordch05openinglupin (#25): the SAME film against the ch05lupinboot ROM, which carries a
--- live Lupin, so scene 4's CHECK_ALIVE takes its ALIVE arm and box 1 is Lupin's "The trail
--- leads here" instead of Pinky's "The tracks stop here". One routine, two ROMs: the scenario
--- drives identical input either way and the ROM decides which arm plays, which is the point.
--- Measured 2026-08-14, the two films agree through scenes 1-3 (bar 2-4 frame emulator timing
--- jitter around fades) and diverge from scene 4's FIRST BOX to the end. The tail divergence is
--- not four scenes of difference: the two arms' box 1 are different lengths, so everything after
--- is time-shifted and no frame lines up again. Compare them by eye, not by frame equality.
--- Delegates rather than aliases: matrix.py attributes harness SOURCE per function for the
--- verdict cache, and a bare `= scenarios.x` assignment is a name it cannot attribute a body
--- to. The cache stays correct either way -- matrix.reaches() closes over every NAME a body
--- mentions, so recordch05opening is inside this one's closure (verified: 55 names) and an
--- edit to it does move this scenario's key.
-scenarios.recordch05openinglupin = function()
-    return scenarios.recordch05opening()
-end
-
 -- recordch05join (#25): the MOTION proof for scene 5 -- Basil trundles up, cracks the tourist
 -- joke, and JOINS. It is a SEPARATE film from recordch05opening rather than an extension of it,
 -- because the two sit on opposite sides of Preparations: the opening's terminal IS the prep
@@ -9191,8 +9174,8 @@ end
 -- rather than reading the party ("...You're none of hers."). One routine, two ROMs, and the 3 it
 -- passes is the ASSERTION that the ROM picked the arm it was built to pick: if the CH05LUPIN
 -- injection or the CHECK_ALIVE ever regresses, this ROM plays the 4-box arm and the terminal is
--- never met. Delegates rather than aliases, for the verdict-cache attribution reason recorded on
--- recordch05openinglupin.
+-- never met. A wrapper rather than a `lua:` binding because it passes that 3: a binding runs
+-- its function with no arguments.
 scenarios.recordch05joinlupin = function()
     return scenarios.recordch05join(3)
 end
@@ -10527,9 +10510,9 @@ local co = coroutine.create(function()
 
     log("scenario: " .. PLAYTEST_SCENARIO)
     -- A chapter case's `lua:` may bind a generic probe to its chapter's ROM (#531), so the
-    -- function is looked up by ENTRY. Only `scenarios` and `INSPECT` are searched: those are
-    -- the two tables matrix.py follows a closure out of, and a probe it cannot see would be
-    -- served a stale cached PASS.
+    -- function is looked up by ENTRY. Only `scenarios` and `INSPECT` are searched, and that is
+    -- a chosen scope, not a cache constraint: `INSPECT` is where chapter-generic probes live,
+    -- and `VISIT.*`-style helpers take arguments a binding cannot pass.
     local entry = (PLAYTEST_ENTRY ~= nil and PLAYTEST_ENTRY ~= "") and PLAYTEST_ENTRY
         or PLAYTEST_SCENARIO
     local probe = entry:match("^INSPECT%.([%w_]+)$")

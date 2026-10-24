@@ -28,9 +28,11 @@ chapter-generic probe (`INSPECT.redStats`, `scenarios.mapfull`) is bound to a ch
 `lua: INSPECT.redStats`, never by a one-line `scenarios.ch04redstats` wrapper. Six such wrappers
 existed only because the verdict cache keyed on the scenario's own function; it now keys on the
 row's `entry` (`lua:`, else the name), and so do the #238 gate and the runner (`MX_ENTRY` ->
-`PLAYTEST_ENTRY`). The runner searches `scenarios` and `INSPECT` only, because those are what
-`matrix.reaches` follows; `check_playtest_matrix` refuses a binding to anything else, and a
-leftover same-named scenario the binding would shadow.
+`PLAYTEST_ENTRY`). The runner searches `scenarios` and `INSPECT` only and calls what it finds with
+no arguments, so a bound `INSPECT` probe takes none (a chosen scope: `INSPECT` is where generic
+probes live). `check_playtest_matrix` refuses any other binding, from a chapter case or a
+`matrix.yaml` row, and a leftover same-named scenario the binding would shadow. A wrapper survives
+only where it passes an argument (`recordch05joinlupin`).
 
 Four things paid for while building it:
 

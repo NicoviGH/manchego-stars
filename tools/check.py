@@ -95,6 +95,9 @@ DEAD_CONCEPTS = [
     r"(?-i:\bAT (?:that|Lua's) ceiling)", r'\bsitting at that ceiling\b',
     r"\b(?:at|against|near) (?:Lua's |the |a )?200-local ceiling",
     r'\btwo remaining slots\b', r'\btwo top-level\s+local slots left\b', r'\bone of the (?:last|two) (?:free|remaining) slots\b',
+    # retired by #531 G3: the verdict cache keys on a row's `entry`, so a chapter case binds a
+    # generic function with `lua:` and no wrapper "delegates" to keep the cache attributing it
+    r'\bdelegates rather than alias', r'\bdelegate, don.t alias',
     # retired by ADR 0363, edited in place (Nicolas, 2026-10-23): a planned chapter gets no
     # difficulty reading, so there is no projected target, its twin's or the yardstick's
     r'unwritten_projection', r'planned_target', r'vanilla_projection',
@@ -2134,21 +2137,29 @@ def check_playtest_matrix(fail):
         fail.append('chapter-declared playtest cases do not load (%s)' % exc)
         bodies = {}
     declared_bodies = {n for n, c in bodies.items() if 'lua' not in c}
-    # A `lua:` case may bind a chapter-generic probe instead of a same-named scenario (#531).
-    bound = {n: c['lua'] for n, c in bodies.items() if 'lua' in c and c['lua'] != n}
+    # A row's `lua:` may bind a generic function instead of a same-named scenario (#531).
+    # Read off the RESOLVED rows, so a hand-written matrix.yaml row's binding is held to the
+    # same rules as a chapter case's.
+    bound = {}
+    for name in m.scenarios:
+        try:
+            entry = m.resolve(name).entry
+        except mx.ManifestError:
+            continue                              # reported by the resolve loop below
+        if entry != name:
+            bound[name] = entry
 
     harness = mx.harness_scenarios()
-    with open(mx.HARNESS, encoding='utf-8') as fh:
-        funcs = mx.harness_functions(fh.read())
+    funcs = mx.harness_functions_at()
     for name in sorted(harness - set(m.scenarios)):
         fail.append('harness.lua defines scenario %s with no matrix.yaml row' % name)
     for name, entry in sorted(bound.items()):
         if name in harness:
-            fail.append('%s: the chapter YAML binds `lua: %s`, so scenarios.%s in harness.lua '
-                        'never runs -- delete it' % (name, entry, name))
+            fail.append('%s binds `lua: %s`, so scenarios.%s in harness.lua never runs -- '
+                        'delete it' % (name, entry, name))
         if not mx.entry_defined(entry, harness, funcs):
-            fail.append('%s: the chapter YAML names `lua: %s`, which is neither a scenario nor '
-                        'an INSPECT function in harness.lua' % (name, entry))
+            fail.append('%s names `lua: %s`, which is neither a scenario nor a parameterless '
+                        'INSPECT function in harness.lua' % (name, entry))
     for name in sorted(set(m.scenarios) - harness - declared_bodies - set(bound)):
         if name in bodies:
             fail.append('%s: the chapter YAML names `lua: %s`, which harness.lua no longer '
@@ -2249,8 +2260,7 @@ def check_verdict_scenarios_are_guarded(fail):
         m = mx.Manifest.load()
     except Exception:                             # noqa: BLE001 -- check_playtest_matrix reports it
         return
-    with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
-        funcs = mx.harness_functions(fh.read())
+    funcs = mx.harness_functions_at()
     try:
         sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
         import declared
@@ -2371,6 +2381,7 @@ def check_declared_cases(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
     try:
         import declared
+        import matrix as mx
         cases = declared.cases()
     except Exception as exc:                      # noqa: BLE001 -- report, don't crash the lint
         fail.append('chapter-declared playtest cases do not load (%s)' % exc)
@@ -2383,8 +2394,7 @@ def check_declared_cases(fail):
             'talk': [list(b['door']) for b in (d.get('rescue_boats') or []) if b.get('door')]}
     with open(os.path.join(REPO, 'tools/playtest/cases.lua'), encoding='utf-8') as fh:
         sources = {'tools/playtest/cases.lua': fh.read()}
-    with open(os.path.join(REPO, 'tools/playtest/harness.lua'), encoding='utf-8') as fh:
-        adapter = _declared_api_adapter(fh.read())
+    adapter = _declared_api_adapter(mx.harness_source())
     if adapter is None:
         fail.append('harness.lua no longer defines runDeclaredCase, so the api table every '
                     'declared case drives the game through cannot be reviewed')

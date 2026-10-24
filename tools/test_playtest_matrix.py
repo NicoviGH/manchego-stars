@@ -491,7 +491,7 @@ class RealManifest(unittest.TestCase):
         """
         import declared
         bodies = {c['name'] for _s, c in declared.cases() if 'lua' not in c}
-        funcs = mx.harness_functions(open(mx.HARNESS).read())
+        funcs = mx.harness_functions_at()
         stale = sorted(n for n in set(self.m.scenarios) - bodies
                        if not mx.entry_defined(self.m.resolve(n).entry, self.harness, funcs))
         self.assertEqual(stale, [], 'matrix rows naming nothing runnable')
@@ -499,22 +499,43 @@ class RealManifest(unittest.TestCase):
     def test_a_bound_probe_is_reached_and_its_wrapper_is_gone(self):
         """#531 deleted the one-line wrappers that bound a probe to a chapter's ROM. The row
         must reach the probe itself (verdict cache, #238 gate), and no wrapper may survive."""
-        funcs = mx.harness_functions(open(mx.HARNESS).read())
+        funcs = mx.harness_functions_at()
         for name, probe in (('ch04redstats', 'INSPECT.redStats'),
                             ('ch04waves', 'INSPECT.firstAttacks'),
+                            ('ch07redstats', 'INSPECT.redStats'),
                             ('ch07blueorder', 'INSPECT.blueOrder'),
-                            ('mapfullch05', 'mapfull')):
+                            ('ch07titlecard', 'titlecard'),
+                            ('mapfullch05', 'mapfull'),
+                            ('recordch05openinglupin', 'recordch05opening')):
             entry = self.m.resolve(name).entry
             self.assertEqual(entry, probe)
             self.assertIn(probe, mx.reaches(entry, funcs))
             self.assertNotIn(name, self.harness)
 
     def test_entry_defined_searches_only_what_the_runner_searches(self):
-        funcs = {'INSPECT.redStats': ('', 'fn'), 'helper': ('', 'fn')}
+        funcs = {'INSPECT.redStats': ('INSPECT.redStats = function()\n', 'fn'),
+                 'INSPECT.place': ('function INSPECT.place()\n', 'fn'),
+                 'INSPECT.settle': ('function INSPECT.settle(level, frames, tapA)\n', 'fn'),
+                 'INSPECT.walk': ('INSPECT.walk = function(x)\n', 'fn'),
+                 'helper': ('local function helper()\n', 'fn')}
         self.assertTrue(mx.entry_defined('win', {'win'}, funcs))
         self.assertTrue(mx.entry_defined('INSPECT.redStats', set(), funcs))
+        self.assertTrue(mx.entry_defined('INSPECT.place', set(), funcs))
         self.assertFalse(mx.entry_defined('helper', set(), funcs))
         self.assertFalse(mx.entry_defined('INSPECT.gone', set(), funcs))
+        # The runner calls a bound entry with no arguments, so one that takes some is refused.
+        self.assertFalse(mx.entry_defined('INSPECT.settle', set(), funcs))
+        self.assertFalse(mx.entry_defined('INSPECT.walk', set(), funcs))
+
+    def test_firstattacks_reads_the_parity_models_horizon(self):
+        """`ch04waves` proves `timeline.engagements`, so its phase count is the model's."""
+        sys.path.insert(0, HERE)
+        import timeline
+        # The raw source: harness_functions strips comments, and the comment is the link.
+        m = re.search(r'INSPECT\.firstAttacks = function\(\)\n\s*local phases = (\d+) '
+                      r'-- timeline\.HORIZON\n', mx.harness_source())
+        self.assertIsNotNone(m, 'INSPECT.firstAttacks no longer names timeline.HORIZON')
+        self.assertEqual(int(m.group(1)), timeline.HORIZON)
 
     def test_a_declared_case_body_is_the_chapter_yaml_not_a_dead_row(self):
         """The complement: the three ported cases resolve, and harness.lua does NOT define
@@ -915,14 +936,12 @@ class HarnessSourceAnalysis(unittest.TestCase):
         self.assertIn('onlyRunner()', mx.harness_shared(source), 'the runner stays shared')
 
     def test_the_real_last_scenario_does_not_reach_through_the_runner(self):
-        with open(mx.HARNESS) as fh:
-            funcs = mx.harness_functions(fh.read())
+        funcs = mx.harness_functions_at()
         self.assertNotIn('runDeclaredCase', funcs['ch06halberd'][0])
         self.assertNotIn('coroutine.create', ''.join(body for body, _ in funcs.values()))
 
     def test_the_real_visit_scenarios_reach_the_helpers_visit_delegates_to(self):
-        with open(mx.HARNESS) as fh:
-            funcs = mx.harness_functions(fh.read())
+        funcs = mx.harness_functions_at()
         for scenario in ('ch04cottage', 'ch05crest'):
             reached = mx.reaches(scenario, funcs)
             for helper in ('VISIT.run', 'INSPECT.talkUntil', 'INSPECT.place'):
@@ -951,9 +970,7 @@ class HarnessSourceAnalysis(unittest.TestCase):
         self.assertIn('coroutine.yield', mx.harness_shared(HARNESS_FIXTURE))
 
     def test_the_real_harness_partitions_without_losing_a_scenario(self):
-        with open(mx.HARNESS) as fh:
-            source = fh.read()
-        funcs = mx.harness_functions(source)
+        funcs = mx.harness_functions_at()
         for name in mx.harness_scenarios():
             self.assertIn(name, funcs, '%s is defined but not attributable' % name)
 
