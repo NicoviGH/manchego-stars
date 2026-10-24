@@ -381,9 +381,6 @@ design_notes: >
 playtest:
   boot: ch07boot                  # CH07BOOT=1; host slot 8 comes from inject/hosts.py
   cases:
-    # The chapter-generic Status-screen capture, on this chapter's own boot: the title card
-    # as the ROM draws it, which is the only colour that counts (the card file holds indices).
-    - {name: ch07titlecard, proves: "the Status screen draws ch07's title card, in the ROM's own colours", lua: titlecard, kind: record}
     # What the ROM loads each red unit with, per PT_DIFFICULTY: the instrument #490 holds the
     # parity model and the wiki's load path to (Dorbulgruf is the unflagged boss they split on).
     - {name: ch07redstats, proves: "every red unit's loaded stat line is logged for the mode the run picked", lua: INSPECT.redStats}

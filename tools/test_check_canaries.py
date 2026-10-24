@@ -286,12 +286,6 @@ def c_one_reader():
         return run(check.check_injector_source_has_one_reader)
 
 
-def c_recordenemy():
-    with doctored({HARNESS: lambda t: re.sub(r'(\["[\w-]+"\]\s*=\s*)0x[0-9a-fA-F]+',
-                                             r'\g<1>0xFFFF', t)}):
-        return run(check.check_recordenemy_knows_every_raw_pid)
-
-
 def c_gate_window():
     sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
     import matrix as mx
@@ -513,7 +507,6 @@ CANARIES = {
     'check_chapter_yaml_schema': (c_yaml_schema, 'did you mean `win_condition`', None),
     'check_tile_changes_outlive_the_retarget': (c_tile_changes, 'inject_ch42', None),
     'check_injector_source_has_one_reader': (c_one_reader, 'map_donor.py', None),
-    'check_recordenemy_knows_every_raw_pid': (c_recordenemy, 'pid 0xFFFF', None),
     'check_gate_chapter_window': (c_gate_window, 'host slot 99', None),
     'check_chapter_lua_facts': (c_chapter_lua_facts, '(63,12)', None),
     'check_documented_tileset': (c_documented_tileset, 'canary-tileset', 'decomp'),

@@ -109,14 +109,6 @@ classes:
     deadline: 600
   - match: "clear_ch02"
     deadline: 600
-  - match: "recordch02ending" # routs the whole band before it films
-    deadline: 600
-  - match: "recordch05opening*" # 49 boxes across four scenes, over two BGs -- our longest cutscene
-    deadline: 900
-  - match: "recordch05join*"  # films 3-4 boxes, but replays all 49 opening boxes + prep to reach them
-    deadline: 600
-  - match: "recordch05combatquotes" # the opening AND a 16-enemy phase before its two boxes
-    deadline: 900
   - match: "llm"              # 18 turns x a 90s sidecar handshake budget
     deadline: 2100
   - match: "ckpt_*"           # the auto-build path always used 240fps / 900s
@@ -148,87 +140,19 @@ scenarios:
   ckpt_lordpinky: {}
   lordfloor: {}
   ckpt_seize: {}
-  recordprep:
-    kind: record
-    checkpoint: prep
   recordsupply:                                        # asserts bench/deploy/count/Supply
     checkpoint: lordpinky
     headless: false     # a verdict by what it ASSERTS, but it still drops frames for
                         # make_gif.py -- headless has no renderer and would strip them.
-  recordrescue:
-    kind: record
-    checkpoint: prep
-  recordtrade:
-    kind: record
-    checkpoint: prep
-  recordfix:
-    kind: record
-    checkpoint: prep
-  recordending:
-    kind: record
-    checkpoint: seize
-  recordch01trail:
-    kind: record
-  recordlord:
-    kind: record
-  recordlordfast:
-    rom: lordboot
-    kind: record
   ch01lord: {}
   ch01guide: {}
-  scenesch01:
-    kind: record
-  recordch01:
-    kind: record
-  scenes:
-    kind: record
-  record:
-    kind: record
-  bootobserve:
-    kind: diagnostic
-  # #303: the difficulty-mode oracle. A probe, not a gate -- it REPORTS the red force's
-  # stats in whichever mode PT_DIFFICULTY selected, and the comparison across the three
-  # runs is the verdict. Runs on any hosted chapter, since every one declares a triple.
-  difficulty:
-    rom: any
-    host_chapter: null
-    kind: diagnostic
-  mapshot:                                             # "any hosted chapter" by design
-    rom: any
-    host_chapter: null
-    kind: diagnostic
-  mapfull:
-    rom: ch03boot
-    host_chapter: 4
-    kind: record
-  recordopening:
-    rom: montage
-    kind: record
   titlecard: {}
   gameover: {}
   retreat: {}
-  ckpt_rbgch01: {}
-  recordrbg:
-    kind: record
-    checkpoint: rbgch01
-  recordanim:
-    rom: testch
-    kind: record
-  recordrbgtest:                                       # back-compat alias of recordanim
-    rom: testch
-    kind: record
-  recordenemy:
-    rom: testch
-    kind: record
   recordunitlist:                                      # FAILs if the SMS counters cross
     rom: testch
     headless: false     # verdict by assertion, but run.sh documents
                         # `make_gif.py recordunitlist unitlist` over its frames.
-  recordcast:                                          # PT_CHAR=<id>: bust + map sprite (#25)
-    rom: testch
-    kind: record        # a capture for a human look-test, same as recordanim -- not a machine
-                        # verdict. Its PASS is still gated on gProcScr_StatScreen actually
-                        # being live, so it cannot green-light a frame that never opened.
   casthelp:                                            # ADR 0346: R on each cast name, headless
     rom: testch
   ckpt_ch02start: {}
@@ -255,63 +179,20 @@ scenarios:
   ch03tourmaline:
     rom: ch03boot
     host_chapter: 4
-  koboldview:                                          # #23 art-review probe
-    rom: ch03boot
-    host_chapter: 4
-    kind: diagnostic
-  lzview:
-    rom: ch03boot
-    host_chapter: 4
-    kind: diagnostic
-  enemycheck:
-    rom: ch03boot
-    host_chapter: 4
-    kind: diagnostic
   ch03:
     rom: ch03boot
     host_chapter: 4
   smoke_ch03:
     rom: ch03boot
     host_chapter: 4
-  recordchain:
-    kind: record
-    checkpoint: ch02start
   ckpt_ch02intro: {}
-  recordscene:                                         # PT_STATE names the checkpoint
-    kind: record
-    checkpoint: dynamic
-  recordch02intro:
-    kind: record
-    checkpoint: ch02intro
-  recordch03open:
-    rom: ch03boot
-    host_chapter: 4
-    kind: record
-  attackprobe:                                         # reads whatever map it lands on
+  mapshot:                                             # "any hosted chapter" by design
     rom: any
     host_chapter: null
     kind: diagnostic
-  recordch03talk:
-    rom: ch03boot
-    host_chapter: 4
+  recordscene:                                         # PT_STATE names the checkpoint
     kind: record
-  recordch03win:
-    rom: ch03boot
-    host_chapter: 4
-    kind: record
-  recordch03midmap:
-    rom: ch03boot
-    host_chapter: 4
-    kind: record
-  recordch02map:
-    kind: record
-    checkpoint: ch02start
-  recordch02combat:
-    kind: record
-    checkpoint: ch02start
-  recordch02ending:
-    kind: record
-    checkpoint: ch02start
+    checkpoint: dynamic
 
 # Named selections. `gate` is what must be green before a merge; the chapter suites are
 # what you run while working one chapter (each is a single ROM build). Everything else

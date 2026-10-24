@@ -230,7 +230,7 @@ open /tmp/playtest-<scenario>/*-map-loaded.png
 ```
 
 `mapshot` (harness.lua) = the generic "boot to the map and screenshot the deployed field" scenario.
-It is one of the two deliberately chapter-generic scenarios, so it is the one case where you still
+It is deliberately chapter-generic, so it is the one case where you still
 pass `PT_HOST_CHAPTER=N` by hand (`inChapter` checks it). Every chapter-specific scenario takes its
 host slot and its ROM flag from `matrix.yaml` instead — and `run.sh` refuses outright, in 0s, if the
 tree holds a ROM that cannot host it rather than failing seven minutes later for the wrong reason.

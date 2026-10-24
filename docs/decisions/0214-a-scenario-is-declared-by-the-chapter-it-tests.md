@@ -32,7 +32,7 @@ row's `entry` (`lua:`, else the name), and so do the #238 gate and the runner (`
 no arguments, so a bound `INSPECT` probe takes none (a chosen scope: `INSPECT` is where generic
 probes live). `check_playtest_matrix` refuses any other binding, from a chapter case or a
 `matrix.yaml` row, and a leftover same-named scenario the binding would shadow. A wrapper survives
-only where it passes an argument (`recordch05joinlupin`).
+only where it passes an argument (none does since #538 archived the last one, `recordch05joinlupin`).
 
 Four things paid for while building it:
 

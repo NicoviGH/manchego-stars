@@ -190,12 +190,16 @@ class TheReport(unittest.TestCase):
         `record` scenario's output IS the picture, so it has no verdict to store -- printing
         'never run' beside twelve of them reads as a chapter in trouble when nothing is
         wrong."""
-        text = cs.report('ch05')
-        record = [r for r in cs.scenarios('ch05') if r.kind == 'record']
-        self.assertTrue(record)
-        for row in record:
-            line = next(ln for ln in text.split('\n') if row.scenario in ln)
-            self.assertNotIn('never run', line)
+        # No chapter declares a record case since #538 archived them, so one is planted.
+        real = cs.scenarios
+        def with_a_film(*a, **k):
+            return real(*a, **k) + [cs.ScenarioRow('recordplanted', 'ch05boot', 'record', '',
+                                                   None, None)]
+        from unittest import mock
+        with mock.patch.object(cs, 'scenarios', with_a_film):
+            text = cs.report('ch05')
+        line = next(ln for ln in text.split('\n') if 'recordplanted' in ln)
+        self.assertNotIn('never run', line)
 
     def test_the_report_names_every_section(self):
         text = cs.report('ch05')

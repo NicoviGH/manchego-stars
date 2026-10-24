@@ -868,6 +868,12 @@ def _build(rom, make_flags, log_dir, quiet=True, use_cache=True):
     if proc.returncode != 0:
         print('   BUILD FAILED -- see %s' % log_path)
         return False
+    # make just vouched for the ROM, but it leaves the .gba's mtime alone when the injector
+    # wrote nothing new (a comment-only YAML or build_campaign.py edit). run.sh's freshness
+    # check reads that mtime, so without this it refuses the ROM make just confirmed and
+    # every scenario on it ERRORs in 0s (#538, twice on 2026-10-24).
+    if os.path.exists(ROM_PATH):
+        os.utime(ROM_PATH)
     store_cached_rom(rom, digest)
     return True
 
@@ -999,7 +1005,7 @@ def scenario_driver_text(entry, files=None, source=None):
 # SAME run, so they must hash the same or the cache pays for it twice (#358 review).
 RUN_SH_DEFAULTS = {'PT_DIFFICULTY': 'normal', 'PT_STALL_S': '1800', 'PT_MAX_WALL_S': '7200'}
 
-PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SEED', 'PT_CHAR', 'PT_ROUNDS', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
+PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SEED', 'PT_STATE', 'PT_TAG', 'PT_UNTIL',
                      'PT_SPEED', 'PT_MAXFRAMES', 'PT_PRESSEVERY', 'PT_SHOTEVERY', 'PT_FPS',
                      'PT_DIFFICULTY',
                      # The #345 watchdog knobs. Neither should change a verdict -- they bound

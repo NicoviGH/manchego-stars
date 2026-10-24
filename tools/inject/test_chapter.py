@@ -23,7 +23,9 @@ TEST_SPAWN_POSITIONS = [(5, 4), (7, 4), (9, 4), (11, 4),
                         (3, 5), (3, 7)]              # 12th-13th: ch05's Basil + Sahnar. Left-hand
                         # column mirroring the (13,*) one, and clear of the seize tile at (2,2).
 
-# The TESTCH sandbox doubles as the SINGLE battle-anim test bench: it deploys one hostile of
+# The TESTCH sandbox doubles as the SINGLE battle-anim test bench. Its recorders (`recordanim`,
+# `recordenemy`) were archived by #538 -- restore them from the commit that ADR names when a
+# battle animation changes -- and the bench is kept so that restore costs nothing. It deploys one hostile of
 # every enemy_class_reskins slot as a foe (a row south of the cast), so `recordenemy` can bait
 # any reskinned class into a counter and capture its anim -- the enemy analogue of `recordanim`
 # for the PC cast (no chapter-specific setup, all animations tested from one New Game). Iron

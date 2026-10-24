@@ -1292,10 +1292,6 @@ playtest:
 
     # The boarding pass, from each hull's DOOR -- the one ground cell next to it -- which is the
     # open question #360 left: whether Talk fires from there at all.
-    - {name: recordch06opening, proves: "the opening's beat A in motion: card, cut, the hall", lua: recordch06opening, kind: record, deadline: 900}
-    - {name: recordch06ice, proves: "beat B on the ice, and the merfolk surfacing at its stage_cut", lua: recordch06ice, kind: record, deadline: 900}
-    - {name: recordch06nerradeath, proves: "the honest path: Nerra falls, DefeatBoss runs, and the transition into Messie's scene", lua: recordch06nerradeath, kind: record, deadline: 900}
-    - {name: recordch06messie, proves: "Messie surfaces, hauls onto the ice and cries, then his 33-box scene", lua: recordch06messie, kind: record, deadline: 900, boot: ch06endingboot}
     - name: ch06boarding
       proves: a party member boards both hulls from their doors, both crews speak, and the east
         hull hands over its Antitoxin

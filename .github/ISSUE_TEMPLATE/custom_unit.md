@@ -11,7 +11,8 @@ prose doc** — each step links its source of truth:
 - Platform how → the `inject_battle_platforms` docstring (`tools/build_campaign.py`)
 - Decisions/rationale (additive binding, platform picks, scale) → `docs/decisions.md` (Art & Audio)
 - Fast iteration → `make TESTCH=1` (boots into the Ch1 sandbox) + `inject_test_chapter` docstring;
-  capture via `tools/playtest/run.sh recordrbg` (fresh checkpoint)
+  capture with the battle-anim recorders archived by #538 (restore `recordcast`/`recordanim`/
+  `recordenemy` from commit f4ff003; ADR 0367)
 - **Principle that governs all of it: ADDITIVE, never global** — bind into free slots; never edit a
   shared vanilla class/anim/terrain in place.
 
@@ -32,8 +33,8 @@ prose doc** — each step links its source of truth:
       `CREDITS.md`**), confirm 256×32 indexed; add to `BATTLE_PLATFORMS` + the right terrain mapping;
       set the chapter's `battleTileSet` (0 = Snowdrift / 0x15 = Uneven).
 - [ ] **Build + verify** — `make TESTCH=1`, then capture all THREE parts of the art in-engine:
-      `PT_CHAR=<id> run.sh recordcast` (bust + map sprite, off the status screen) and
-      `PT_CHAR=<id> run.sh recordanim` (the battle anim; `recordenemy` for a generic).
+      `recordcast` (bust + map sprite, off the status screen) and `recordanim` (the battle anim;
+      `recordenemy` for a generic), restored from commit f4ff003 for the run (ADR 0367).
       ⚠️ **The two halves of this template bind DIFFERENTLY.** A named PC/boss keeps its PLAIN
       vanilla class and the anim rides a **private per-character AnimConf** (`_u25`). A generic
       enemy has no unique character id, so an `enemy_class_reskins` entry binds at the **CLASS**
