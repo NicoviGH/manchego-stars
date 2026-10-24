@@ -197,7 +197,8 @@ if [ -z "${MX_SKIP_ROM_CHECK:-}" ]; then
         echo "$_stale" | sed 's/^/          /' >&2
         echo "        Rebuild first, e.g.  make CAMPAIGN=<c> [FLAGS] fireemblem8.gba -j8" >&2
         echo "        (or run it through matrix.py, which builds). A successful build touches" >&2
-        echo "        the ROM (Makefile), so seeing this means the last build failed or never ran." >&2
+        echo "        the ROM (Makefile), so seeing this means no build has succeeded since those" >&2
+        echo "        files changed." >&2
         exit 2
     fi
 fi
