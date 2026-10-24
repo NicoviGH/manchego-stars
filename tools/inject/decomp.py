@@ -182,6 +182,19 @@ def git_env():
                          'GIT_ALTERNATE_OBJECT_DIRECTORIES')}
 
 
+def flag_number(token):
+    """`EVFLAG_TMP(11)` / `11` / `0xb` -> 11 (EVFLAG_TMP(flag) is (flag), event-flags.h); a
+    named flag (`EVFLAG_WIN`) stays its name."""
+    m = re.fullmatch(r'\s*(?:EVFLAG_TMP\(\s*(\w+)\s*\)|(\w+))\s*', token)
+    if not m:
+        return token.strip()
+    word = m.group(1) or m.group(2)
+    try:
+        return int(word, 0)
+    except ValueError:
+        return word
+
+
 def enum_values(text, prefix):
     """{NAME: int} for every `PREFIX..., = <int>` enumerator in a C header's `text`. An alias
     (`CLASS_OBSTACLE = CLASS_EPHRAIM_LORD`) has no number of its own and is left out. The one

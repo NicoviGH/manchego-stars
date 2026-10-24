@@ -66,6 +66,14 @@ class CampaignIds(unittest.TestCase):
         self.assertEqual([0xCA, 0xC9], self.ids['CH02_CHWINGA_PIDS'])
         self.assertEqual([0x6C, 0x6C], self.ids['CH02_CHARMS'])   # a Vulnerary each (#495)
 
+    def test_villages_carry_the_yaml_tile_the_injector_flag_and_the_gift(self):
+        # Glimmerfrost's hut pays her Pure Water on EVFLAG_TMP(9); the east hut pays its line
+        # alone, so it carries no gift and a raid there cannot be judged on one.
+        villages = self.ids['VILLAGES']
+        self.assertEqual({'x': 1, 'y': 12, 'flag': 9, 'gift': 0x6E}, villages['targos-hut-south'])
+        self.assertEqual({'x': 12, 'y': 3, 'flag': 10}, villages['targos-hut-east'])
+        self.assertEqual({'x': 12, 'y': 19, 'flag': 10, 'gift': 0x60}, villages['reliquary-south'])
+
     def test_hosts_follow_the_host_slots(self):
         # Every hosted chapter, so a film can name the slot a chain lands on; from ch01 on each
         # chapter N sits on slot N + 1.

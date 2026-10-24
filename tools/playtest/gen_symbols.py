@@ -372,13 +372,15 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
                                     PROLOGUE_HLIN_SLOT,
                                     PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
     from inject.chapters.ch01 import CH01_CHAPTER_YAML
-    from inject.chapters.ch02 import CH02_CHAPTER_YAML, CH02_CLASS_IDS
+    from inject.chapters.ch02 import CH02_CHAPTER_YAML, CH02_CLASS_IDS, CH02_VILLAGE_FLAGS
+    from inject.chapters.ch05 import CH05_CHAPTER_YAML, CH05_VILLAGE_FLAGS
     from inject.decomp import ITEM_ENUM
     from inject.chapters.ch04 import CH04_PACK_PIDS
     from inject.chapters.ch06 import CH06_CHAPTER_YAML
-    from inject.decomp import LORDSEL_FLAG_BASE
+    from inject.decomp import LORDSEL_FLAG_BASE, flag_number
     from inject.hosting import _load_chapter_yaml
     from inject.scenes import scene_gold_entries
+    from inject.villages import village_reward_id
     import inject.hosts as hosts
 
     chars = _enum_values('include/constants/characters.h', 'CHARACTER_')
@@ -401,6 +403,21 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     # ch06's dropper, whose drop flips once he swings his second weapon (#495, ch06halberd).
     dropper = {e['id']: e for e in _load_chapter_yaml(campaign, CH06_CHAPTER_YAML)['enemy_units']}
     dropper = dropper['shark-rider-horseslayer']     # the id ch06.lua's DROPPER row names
+    # Every site whose Village macro carries an event id, by its YAML id: the tile from the
+    # chapter, the flag from the injector's table, the gift through the one item table. A raid
+    # case (`raided:`) and ch05.lua's reliquaries name a site and read the rest from here.
+    villages = {}
+    for yaml_name, flags in ((CH02_CHAPTER_YAML, CH02_VILLAGE_FLAGS),
+                             (CH05_CHAPTER_YAML, CH05_VILLAGE_FLAGS)):
+        for v in _load_chapter_yaml(campaign, yaml_name)['villages']:
+            if v['id'] in villages:
+                raise SystemExit('village id %r is declared by two chapters: CAMPAIGN.VILLAGES '
+                                 'is keyed by id alone' % v['id'])
+            site = {'x': v['tile'][0], 'y': v['tile'][1], 'flag': flag_number(flags[v['id']])}
+            gift = village_reward_id(v)
+            if gift:
+                site['gift'] = items[ITEM_ENUM[gift]]
+            villages[v['id']] = site
     return {
         'CAST': cast,
         # The help text R on a unit's name must read, by pid: the message and its first line
@@ -433,6 +450,7 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
         'CH06_BOAT_PIDS': {k: int(v, 0) for k, v in CH06_BOAT_PIDS.items()},
         'CH06_DROPPER_ITEMS': [items[ITEM_ENUM[i['id']]] for i in dropper['inventory']],
         'CH06_DROPPER_DROP': items[ITEM_ENUM[dropper['item_drop']]],
+        'VILLAGES': villages,
     }
 
 

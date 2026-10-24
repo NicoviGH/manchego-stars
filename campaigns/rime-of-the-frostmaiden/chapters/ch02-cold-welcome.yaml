@@ -431,12 +431,21 @@ playtest:
 
     - name: ch02raid
       proves: >
-        a raider can SACK a Targos hut -- terrain flips to ruins, the Pure Water never
-        arrives and the event id stays unset. Nothing tested this because ch02 had no
+        a raider can SACK a Targos hut -- terrain flips to ruins, its gift never arrives
+        and its event id stays unset. Nothing tested this because ch02 had no
         villages at all until 2026-08-30; the huts are the decoy that pulls the raid off
         the chwinga, and if one cannot fall the decoy is scenery.
-      lua: ch02raid
       checkpoint: ch02start
+      given: [on_map]
+      # HELD: the party deploys in the middle of the map the raid crosses, so an honest idle
+      # is a rout (the first run died on turn 11 with the question unanswered).
+      when:
+        - idle: {phases: 12, hold: true, until: raided}
+      # All four huts, not the south one alone: the first pass watched only that one, and the
+      # band takes the EAST hut first, because six of the nine start east and (12,3) is on
+      # their doorstep.
+      then:
+        - raided: [targos-hut-south, targos-hut-east, targos-hut-west, targos-hut-north]
 
 # ── Villages ─────────────────────────────────────────────────────────────────────
 # RESTORED 2026-08-30. Vanilla Ch2 wires THREE `Village()` -- (4,2), (7,2), (1,12) -- and

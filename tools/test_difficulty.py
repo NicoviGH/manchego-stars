@@ -2210,9 +2210,9 @@ class BattlefieldDynamics(unittest.TestCase):
                                            '    CALL(EventScr_UnTriggerIfNotFaction)'))
 
     def test_flags_read_in_every_spelling(self):
-        self.assertEqual(df._flag_number('EVFLAG_TMP(11)'), 11)
-        self.assertEqual(df._flag_number('0xb'), 11)
-        self.assertEqual(df._flag_number('EVFLAG_WIN'), 'EVFLAG_WIN')
+        self.assertEqual(df.inject.decomp.flag_number('EVFLAG_TMP(11)'), 11)
+        self.assertEqual(df.inject.decomp.flag_number('0xb'), 11)
+        self.assertEqual(df.inject.decomp.flag_number('EVFLAG_WIN'), 'EVFLAG_WIN')
         self.assertFalse(df._is_flag_gated('0x0'))       # Ch1's turn-2 ally event is a fixed turn
 
     def test_only_an_opening_armed_flag_holds_a_wave_back(self):
