@@ -1263,9 +1263,7 @@ payload_deviations:
     why: "the Fighter is a Cavalier here, so the axe pair is the Iron Lance + Horseslayer, with the same equip-on-use drop flip (#497)"
 # ch06clock is the case #360 could not run because ch06 had no debug boot when it landed: the
 # pockets are a claim about the ENGINE'S pathing, and `mapshot` photographs turn 1 while the
-# question needs several enemy phases. ch06boarding proves the boarding pass. The opening is
-# filmed in two halves on either side of Preparations, ch05's split: recordch06opening (beat A,
-# to the prep screen) and recordch06ice (beat B, to a live turn 1 with the merfolk on the map).
+# question needs several enemy phases. ch06boarding proves the boarding pass.
 playtest:
   boot: ch06boot                  # CH06BOOT=1; host slot 7 comes from inject/hosts.py
   cases:

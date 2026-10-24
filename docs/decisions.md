@@ -506,7 +506,7 @@ session state. `HANDOFF.md` points here._
 | `0309` | [The fingerprint gate runs the configurations a change reaches](decisions/0309-the-fingerprint-gate-runs-the-configurations-a-change-reaches.md) | 2026-10-01 | #424 |
 | `0340` | [A chapter injector writes no copy of a shared job](decisions/0340-a-chapter-injector-writes-no-copy-of-a-shared-job.md) | 2026-10-10 | #479 #302 #27 |
 | `0366` | [The harness's emu is a write-counting guard, so a per-frame read memo cannot go stale](decisions/0366-the-harness-emu-is-a-write-counting-guard.md) | 2026-10-23 | #531 |
-| `0367` | [Headed scenarios are archived, not owed: a scene is filmed when it changes](decisions/0367-headed-scenarios-are-archived-not-owed.md) | 2026-10-24 | #538 #531 |
+| `0367` | [Record and diagnostic scenarios are archived, not owed: a scene is filmed when it changes](decisions/0367-headed-scenarios-are-archived-not-owed.md) | 2026-10-24 | #538 #531 |
 
 ---
 

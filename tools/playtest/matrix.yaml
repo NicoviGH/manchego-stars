@@ -40,6 +40,10 @@ checkpoint_deadline: 900
 # The ROM configurations, in the order the matrix builds them. Canonical first: it is
 # the cheapest to be wrong about and the one most scenarios share.
 rom_configs:
+  # Every build flag keeps a configuration even when no live scenario boots it: the injection
+  # fingerprint enumerates these to prove a refactor leaves each build's output unchanged, and
+  # a recorder restored per ADR 0367 boots its debug build from here (lordboot, montage, the
+  # ch05 moose/ending boots, ch06endingboot have no live scenario since #538).
   canonical: {}
   testch:
     TESTCH: 1
@@ -136,10 +140,8 @@ scenarios:
   llm:                                                 # needs the external sidecar
     manual: true
   ch01win: {}
-  ckpt_prep: {}
   ckpt_lordpinky: {}
   lordfloor: {}
-  ckpt_seize: {}
   recordsupply:                                        # asserts bench/deploy/count/Supply
     checkpoint: lordpinky
     headless: false     # a verdict by what it ASSERTS, but it still drops frames for

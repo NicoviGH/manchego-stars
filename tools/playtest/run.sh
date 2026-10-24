@@ -94,7 +94,7 @@
 #
 # To turn recorded frames into a GIF and show Nicolas (he can't see inline renders):
 #   tools/playtest/make_gif.py <scenario> <tag> --name <basename> --open
-#   e.g. tools/playtest/make_gif.py recordscene end --name ch01-ending --fps 15 --open
+#   e.g. tools/playtest/make_gif.py recordscene intro --name ch02-opening --fps 15 --open
 #
 # Requires the mGBA 0.11+ nightly (has --script); auto-downloads it into
 # tools/emulator/mGBA-dev.app on first run. Results land in /tmp/playtest-<scenario>/.

@@ -44,6 +44,9 @@ fireemblem8.gba:
 	python3 tools/compiled_manifest.py forget
 	$(MAKE) -C $(BUILD_TREE) fireemblem8.gba -j$(NPROC)
 	python3 tools/compiled_manifest.py record
+	@# make leaves an up-to-date ROM's mtime alone when the injector wrote nothing new (a
+	@# comment-only YAML edit), and run.sh refuses a ROM older than campaign sources (#538).
+	touch $(BUILD_TREE)/fireemblem8.gba
 
 # The interpreter this repo builds with, resolved ONCE here (the macOS shim above puts
 # Homebrew's python ahead of the system 3.9 on PATH). `tools/hooks/pre-commit` asks for it

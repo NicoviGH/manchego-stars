@@ -7,10 +7,10 @@ turns those frames into a single GIF for motion review.
 
 Standard workflow (the recording capability, so it isn't re-derived each time):
 
-    PT_STATE=seize PT_TAG=end PT_UNTIL=title PT_PRESSEVERY=72 \\
+    PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep \\
         tools/playtest/run.sh recordscene             # capture frames -> /tmp/playtest-recordscene/
-    tools/playtest/make_gif.py recordscene end \\       # frames tagged "end" -> a GIF
-        --name ch01-ending-rolling-cheddar --open
+    tools/playtest/make_gif.py recordscene intro \\     # frames tagged "intro" -> a GIF
+        --name ch02-opening --open
 
 By default, the GIF is written under docs/demo/ so it can be committed on the
 current feature branch and reviewed in the GitHub PR.

@@ -774,20 +774,13 @@ class RomCache(unittest.TestCase):
         self.assertTrue(a and b)
         self.assertNotEqual(a, b)
 
-    def test_a_build_that_wrote_nothing_still_leaves_a_fresh_rom(self):
-        """#538: make leaves an up-to-date .gba's mtime alone, and run.sh's freshness check
-        then refuses the ROM make just confirmed. A successful build must leave it fresh."""
-        from unittest import mock
-        with tempfile.TemporaryDirectory() as tmp:
-            rom = os.path.join(tmp, 'fireemblem8.gba')
-            open(rom, 'w').close()
-            os.utime(rom, (1, 1))
-            done = mock.Mock(returncode=0)
-            with mock.patch.object(mx, 'ROM_PATH', rom), \
-                    mock.patch.object(mx.subprocess, 'run', return_value=done), \
-                    mock.patch.object(mx, 'store_cached_rom'):
-                self.assertTrue(mx._build('canonical', [], tmp, use_cache=False))
-            self.assertGreater(os.stat(rom).st_mtime, 1000)
+    def test_every_build_leaves_a_fresh_rom(self):
+        """#538: make leaves an up-to-date .gba's mtime alone, and run.sh refuses a ROM older
+        than campaign sources -- so a build that wrote nothing failed every scenario in 0s.
+        The ROM rule's last step touches the ROM, for `make` and the matrix alike."""
+        with open(os.path.join(mx.REPO, 'Makefile')) as fh:
+            rule = fh.read().split('\nfireemblem8.gba:\n', 1)[1].split('\n\n', 1)[0]
+        self.assertTrue(rule.rstrip().endswith('touch $(BUILD_TREE)/fireemblem8.gba'), rule)
 
     def test_a_touched_input_changes_the_digest(self):
         target = os.path.join(mx.REPO, 'tools', 'build_campaign.py')

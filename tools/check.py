@@ -98,6 +98,10 @@ DEAD_CONCEPTS = [
     # retired by #531 G3: the verdict cache keys on a row's `entry`, so a chapter case binds a
     # generic function with `lua:` and no wrapper "delegates" to keep the cache attributing it
     r'\bdelegates rather than alias', r'\bdelegate, don.t alias',
+    # retired by #538 (ADR 0367): the battle-anim recorders' knobs and tables left with them; a
+    # line restoring one cites the ADR (DEAD_CONCEPT_CITATIONS)
+    r'\bPT_CHAR\b', r'\bPT_ROUNDS\b', r'\bPLAYTEST_CHAR\b', r'\bPLAYTEST_ROUNDS\b',
+    r'\bRESKIN_CLASS\b', r'check_recordenemy_knows_every_raw_pid',
     # retired by ADR 0363, edited in place (Nicolas, 2026-10-23): a planned chapter gets no
     # difficulty reading, so there is no projected target, its twin's or the yardstick's
     r'unwritten_projection', r'planned_target', r'vanilla_projection',
@@ -680,7 +684,7 @@ def lua_local_headroom(path, probe_max=8):
 # quarter against the handful that were then free (#327). Freezing the count redirects the next helper into a
 # module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
 # scale; thinning the tail only makes it comfortable.
-HARNESS_TOP_LEVEL_LOCALS = 158
+HARNESS_TOP_LEVEL_LOCALS = 156
 
 # `[ \t]`, never `\s`: `\s` matches a NEWLINE, so `local controllerFault` followed by
 # `local function log` merged into one match and the count came out one short. A counter
@@ -2524,6 +2528,8 @@ DEAD_CONCEPT_CITATIONS = (
     # the line wherever it breaks, and three of the four live citations put the break inside
     # the title. Matching from "talk at" is still specific to this one record.
     r'talk at 29 CHARACTERS',
+    # A line that restores something ADR 0367 archived names it on purpose.
+    r'ADR 0367',
 )
 
 

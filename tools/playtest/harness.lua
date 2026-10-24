@@ -259,7 +259,8 @@ local function unitAt(base, i) return BOARD.leanAt(base, i) end
 -- Lookup by character id is board.lua's (Board.find), LEAN, over the faction's whole array.
 -- Array bounds are the DECOMP's, not the roster size of the day (bmunit.h: blue[62] /
 -- red[50] / green[20]). `blue` searched 8 for as long as the cast WAS 8; the TESTCH sandbox
--- then deployed 11 and a unit standing on the map read as "not deployed". A scan bound is a property of the engine, never of the current content.
+-- then deployed 11 and a unit standing on the map read as "not deployed". A scan bound is a
+-- property of the engine, never of the current content.
 local function blue(charId) return BOARD.find("blue", charId) end
 local function red(charId) return BOARD.find("red", charId) end
 local function isDead(u) return u == nil or u.dead end
@@ -2231,8 +2232,8 @@ end
 --                  recomputing a row from LORD_CANDIDATES -- a scenario that assumes a roster
 --                  size asserts against a constant rather than against what it did (#241).
 --
--- One driver, every destination (#238). reachPrep, reachPrepPinky, lordfloor, ch01lord and
--- the RBG battle-anim lead-in (since archived) were five copies of this route on a blind A-cadence; a copy that mashes A
+-- One driver, every destination (#238). Two prep lead-ins, lordfloor, ch01lord and an RBG
+-- battle-anim lead-in were five copies of this route on a blind A-cadence; a copy that mashes A
 -- cannot tell "the scene advanced" from "the input was swallowed", which is how ch01win rode
 -- straight through the lord-select Yes/No prompt that cost #232 three sessions.
 local function reachCh01(opts)
@@ -2248,9 +2249,9 @@ local function reachCh01(opts)
     -- top-level slot (check_lua_local_headroom prints what is actually left -- never
     -- write that number down, it went stale in three places at once). Only gameSpeed --
     -- animationType is left alone so winCh00's combat is unaffected.
-    -- DELIBERATELY NOT RESTORED: ckpt_prep/ckpt_lordpinky save AFTER this, so every record*
-    -- scenario loading them inherits fast text. That is what we want for capture runs, but
-    -- it IS a property of those checkpoints rather than an accident (#241).
+    -- DELIBERATELY NOT RESTORED: ckpt_lordpinky saves AFTER this, so recordsupply, which
+    -- loads it, inherits fast text. That IS a property of the checkpoint rather than an
+    -- accident (#241).
     emu:write32(SYM.gPlaySt + 0x40, ru32(SYM.gPlaySt + 0x40) | (1 << 7))
     local stalled = INSPECT.watch("reach_ch01")
     for _ = 1, TUNE.bootSteps do
@@ -3243,59 +3244,16 @@ scenarios.ch01win = function()
 end
 
 -- ---- CHECKPOINTS (#21): build a slow scene's lead-up ONCE at top speed (ckpt_*), then
--- replay just the scene at viewable speed (record*, which loads the save state). run.sh
--- orchestrates: it runs the ckpt_* builder at 240fps if the state is missing/stale, then
--- the record* scenario at 60fps. The lead-up drivers are shared here so the checkpoint
+-- run just the scene off the save state. run.sh orchestrates: it runs the ckpt_* builder at
+-- 240fps if the state is missing/stale, then the scenario that loads it. The lead-up drivers are shared here so the checkpoint
 -- and a from-scratch run stay in lock-step.
 
--- Drive ch00 win -> ch01 prep screen OPEN, default lord. true at the prep proc.
-local function reachPrep() return reachCh01({ stopAtPrep = true }) end
-
--- Like reachPrep, but PICK THE LAST lord candidate (Pinky, not the default Braulo) so the
+-- Drive ch00 win -> ch01 prep screen OPEN, picking the LAST lord candidate (Pinky, not the
+-- default Braulo) so the
 -- convoy/force-deploy lord-select fixes can be exercised for a NON-Braulo lord. The walk
 -- to the last row now counts the LIVE menu instead of the LORD_CANDIDATES constant -- the
 -- old copy would silently pick the wrong lord the day the roster changed.
 local function reachPrepPinky() return reachCh01({ stopAtPrep = true, lord = "last" }) end
-
--- From the open prep screen, leave via Fight! and grind (escort poked frail+harmless) to
--- the seize-ready state: chief dead, Braulo moved ONTO the seize tile with its action
--- menu open (Seize on top). Returns true there -- the caller presses A to Seize.
-local function leavePrepAndGrindToSeize()
-    wait(180)
-    -- Leave via the live Fight callback. The B/START/A flail this replaces was guessing
-    -- at which key the prep screen would accept, and its `i % 4 == 0` A-press could
-    -- commit whatever happened to be under the cursor (#238).
-    if not driveThroughPrep() then return false end
-    if not waitFor(function()
-        return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
-    end, 1200) then return false end
-    wait(120)
-    pokeFastConfig() -- speed through the goblin grind to the seize
-    return INSPECT.ch01MarchOnChief{
-        lordId = CAMPAIGN.CAST.braulo,
-        sync = function()
-            INSPECT.settle("phase", 6000, true)
-        end,
-        onSeize = function(braulo, goal)
-            -- chief down: move Braulo onto the seize tile (menu opens, Seize on top).
-            if moveUnit(braulo.x, braulo.y, goal.x, goal.y) then
-                wait(20)
-                return "seated"
-            end
-            -- The move onto the seize tile did not open the menu; back out on enumerated
-            -- cancels rather than two blind B's and retry on the next phase (#238).
-            if not cancelToPlayerMap() then return "controller" end
-        end,
-    } == "seated"
-end
-
--- CKPT_PREP: fast (240fps) -- drive to the prep screen and snapshot it.
-scenarios.ckpt_prep = function()
-    if not reachPrep() then shot("ckpt-prep-fail"); return result("FAIL", "prep never opened") end
-    wait(60)
-    saveState("prep")
-    result("PASS", "prep checkpoint saved")
-end
 
 -- CKPT_LORDPINKY: fast (240fps) -- drive to the prep screen with PINKY chosen as lord,
 -- and snapshot it. Lets recordsupply iterate the prep-bench + map-Supply navigation fast.
@@ -3382,16 +3340,6 @@ scenarios.lordfloor = function()
     result("PASS", string.format(
         "marty floored ONCE: maxHP %d->%d (+7), def %d->%d (+4), flag 0x%X set at t1, stable across 3 player phases",
         BASE_HP, FLOOR_HP, BASE_DEF, FLOOR_DEF, APPLIED))
-end
-
--- CKPT_SEIZE: fast (240fps) -- drive to Braulo-on-the-seize-tile (menu open) and snapshot
--- BEFORE pressing Seize, so record* replays the ending fresh from ROM.
-scenarios.ckpt_seize = function()
-    if not reachPrep() then shot("ckpt-seize-noprep"); return result("FAIL", "prep never opened") end
-    if not leavePrepAndGrindToSeize() then shot("ckpt-seize-fail")
-        return result("FAIL", "could not reach the seize tile") end
-    saveState("seize")
-    result("PASS", "seize checkpoint saved (Braulo on tile, menu open)")
 end
 
 -- RECORDSUPPLY (#2/#3): with PINKY as lord, bench Braulo + deploy 3 non-Braulo in prep,
@@ -5281,7 +5229,6 @@ end
 -- pre-built save-state + a terminal condition via env vars. run.sh builds the checkpoint
 -- named by PT_STATE (builder ckpt_<PT_STATE>) if it's missing/stale. Examples:
 --   PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep                   tools/playtest/run.sh recordscene
---   PT_STATE=seize     PT_TAG=end   PT_UNTIL=title PT_PRESSEVERY=72 tools/playtest/run.sh recordscene
 scenarios.recordscene = function()
     -- Config arrives as PLAYTEST_* wrapper globals (run.sh maps PT_* -> PLAYTEST_*); mGBA's
     -- sandboxed lua has no os.getenv, so the whole harness uses injected globals, not the env.

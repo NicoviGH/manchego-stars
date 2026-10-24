@@ -40,11 +40,11 @@ prose doc** — each step links its source of truth:
       enemy has no unique character id, so an `enemy_class_reskins` entry binds at the **CLASS**
       instead — a free `slot:` (`CLASS_BLST_*_EMPTY`, …) whose `.pBattleAnimDef` is repointed
       (`decisions.md` #90). Confirm the unit fires on the right ground (unforced).
-      ⚠️ **Film several rounds — `PT_ROUNDS=4` — not one.** FE8 resolves damage in DATA whatever the
+      ⚠️ **Film several rounds — `PT_ROUNDS=4`, restored with the recorder (ADR 0367) — not one.** FE8 resolves damage in DATA whatever the
       animation does, so a broken script still kills the foe, still shows correct frames and still
       reports PASS; a one-round capture never asks for the next input that reveals a soft-lock.
       That is exactly how Sahnar's Specter shipped a hang past a green capture (#25).
-      If a round hangs, run a KNOWN-GOOD unit at the same `PT_ROUNDS` before blaming the anim —
+      If a round hangs, run a KNOWN-GOOD unit at the same round count (ADR 0367) before blaming the anim —
       that control run is what separates "my capture is wrong" from "this asset is broken".
 - [ ] **Deliver** — GIF (never MP4) to `docs/demo/`, push → Nicolas reviews on GitHub. **Render → show
       → wait for OK → then commit** the art as canonical.
