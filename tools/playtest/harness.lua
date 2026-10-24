@@ -197,7 +197,20 @@ local function cursor() return rs16(SYM.gBmSt + 0x14), rs16(SYM.gBmSt + 0x16) en
 
 local function procActive(scriptAddr) return PROCS.find(scriptAddr) ~= nil end
 local function anyMenuProc()
-    return PROCS.find(SYM.sProc_MenuMain) or PROCS.find(SYM.sProc_Menu)
+-- The menu taking input. A submenu (StartMenuAt with a parent menu: an item's Use/Equip/
+-- Trade/Discard, uimenu.c) LOCKS its parent (+0x28) and reads the keys itself, and the pool
+-- gives it whichever slot is free, so it can sit ABOVE the parent. The lowest-slot menu is
+-- then the locked parent, the observer saw "menu is locked" for as long as the submenu was up,
+-- and goodberry FAILed on a submenu that had opened on the first frame (#531, item 10). So
+-- when the lowest menu is locked, the first unlocked menu proc wins; with none, the lowest.
+    local lowest = PROCS.find(SYM.sProc_MenuMain) or PROCS.find(SYM.sProc_Menu)
+    if not lowest or ru8(lowest + 0x28) == 0 then return lowest end
+    for _, script in ipairs({ SYM.sProc_MenuMain, SYM.sProc_Menu }) do
+        for _, p in ipairs(PROCS.live()) do
+            if p.script == script and ru8(p.addr + 0x28) == 0 then return p.addr end
+        end
+    end
+    return lowest
 end
 local function activeMenuProc()
     local addr = anyMenuProc()
@@ -2159,9 +2172,9 @@ scenarios.vanillagold = function()
     return result("PASS", table.concat(seen, " | "))
 end
 
--- GOODBERRY: boot to the ch00 map, open Hlin's Item menu (she carries a Hand Axe +
--- a Goodberry, the reflavored Vulnerary), and screenshot the item list + the
--- highlighted Goodberry so the new name + blueberry icon can be eyeballed in-game.
+-- GOODBERRY: boot to the ch00 map, open Hlin's Item menu (one of her items is a Goodberry,
+-- the reflavored Vulnerary), and screenshot the item list + the highlighted Goodberry so the
+-- new name + blueberry icon can be eyeballed in-game.
 scenarios.goodberry = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     local hlin = blue(CAMPAIGN.PROLOGUE.hlin)
@@ -2184,17 +2197,32 @@ scenarios.goodberry = function()
     end
     wait(20)
     shot("item-list")
-    -- Inventory order is Hand Axe then Goodberry: one row down highlights the Goodberry and
-    -- refreshes the name/description panel. The postcondition is the live highlight moving.
-    local list = observeController().menu
-    if not (list and #list.items >= 2) then
-        return result("FAIL", "the inventory list did not come up with both of Hlin's items")
+    -- Find the Goodberry's ROW by its item id, never by its place in the bag: it was "one row
+    -- down" until ch00 gave Hlin a Killer Axe first (#430), and from then on that one DOWN
+    -- highlighted her Hand Axe and every shot below showed the wrong item (#531 item 10).
+    -- 0x6C = ITEM_VULNERARY (include/constants/items.h), which the Goodberry reflavors.
+    local GOODBERRY = 0x6C
+    local row
+    for k = 0, 4 do
+        if (ru16(hlin.addr + 0x1E + k * 2) & 0xFF) == GOODBERRY then row = k break end
     end
-    if not guardedInput("menu_next", "DOWN", "the inventory highlight moves to the Goodberry",
-        function(after)
-            return after.menu ~= nil and after.menu.current ~= list.current
-        end, 60) then
-        return result("FAIL", "could not move the inventory highlight onto the Goodberry")
+    if not row then return result("FAIL", "Hlin carries no Goodberry (item 0x6C)") end
+    local list = observeController().menu
+    if not (list and #list.items > row) then
+        return result("FAIL", "the inventory list did not come up with Hlin's Goodberry row")
+    end
+    -- Each DOWN refreshes the name/description panel; the postcondition is the live highlight
+    -- moving one row.
+    while list.current < row do
+        local from = list.current
+        if not guardedInput("menu_next", "DOWN", "the inventory highlight moves toward the Goodberry",
+            function(after)
+                return after.menu ~= nil and after.menu.current ~= from
+            end, 60) then
+            return result("FAIL", "could not move the inventory highlight onto the Goodberry")
+        end
+        list = observeController().menu
+        if not list then return result("FAIL", "the inventory list closed on the way to the Goodberry") end
     end
     wait(20)
     shot("goodberry-highlighted")

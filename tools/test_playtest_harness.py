@@ -291,6 +291,21 @@ class TestPlaytestHarness(unittest.TestCase):
                       'the gate must distinguish the locked four-box scene from merely '
                       'reaching turn 2')
 
+    def test_goodberry_finds_its_row_by_item_id_not_by_bag_position(self):
+        """One DOWN was the Goodberry until #430 gave Hlin a Killer Axe first; from then on it
+        highlighted the Hand Axe (#531 item 10, the instrumented run's item dump)."""
+        body = _block(_read_harness(), 'scenarios.goodberry = function()', '\nend\n')
+        self.assertIn('local GOODBERRY = 0x6C', body)
+        self.assertIn('while list.current < row do', body)
+
+    def test_the_observed_menu_is_the_unlocked_one_when_a_submenu_sits_above_its_parent(self):
+        """A submenu locks its parent and can take a HIGHER pool slot; the lowest-slot menu
+        was then the locked parent and the controller read 'transition' while the submenu
+        was up (goodberry's instrumented run: parent slot 7 locked, submenu slot 16)."""
+        body = _block(_read_harness(), 'local function anyMenuProc()', '\nend\n')
+        self.assertIn('if not lowest or ru8(lowest + 0x28) == 0 then return lowest end', body)
+        self.assertIn('ru8(p.addr + 0x28) == 0 then return p.addr end', body)
+
     def test_ch05recruit_names_the_message_id_it_saw_not_just_the_box_count(self):
         """The Talk recruit's two arms both recruit Sahnar and both run 21 boxes (#25), so
         every other assertion in this gate passes on either one. `sActiveMsg` is the only
