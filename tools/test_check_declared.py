@@ -94,8 +94,8 @@ class TestTheDriverStaysGuarded(unittest.TestCase):
         self.assertIn('raw press()', found[0])
 
     def test_a_raw_press_in_the_API_ADAPTER_is_reported(self):
-        """The adapter lives inside harness.lua's runner coroutine, so `harness_functions`
-        attributes it to the preceding `record` scenario and the blind-press gate skips it.
+        """The adapter lives inside harness.lua's runner coroutine, which no function owns
+        (`harness_functions` leaves it to shared text), so the blind-press gate skips it.
         It is every declared case's only route to the game, so it gets checked by name."""
         dirty = dict(CLEAN)
         dirty["harness.lua's declared-case api adapter"] += 'press(1, 4)\n'

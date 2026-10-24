@@ -2333,10 +2333,10 @@ def _declared_api_adapter(harness):
     """The `api` table harness.lua hands to cases.lua.
 
     It is declared INSIDE the runner coroutine so it costs no top-level local slot, which
-    also means `harness_functions` attributes it to whatever scenario precedes it -- a
-    `record` one, which check_verdict_scenarios_are_guarded skips. So it is carved out by
-    name here and checked directly; otherwise the one piece of code every declared case
-    drives the game through is the one piece nothing reviews.
+    also means no function owns it: `harness_functions` leaves the runner to shared text,
+    which check_verdict_scenarios_are_guarded never reads. So it is carved out by name here
+    and checked directly; otherwise the one piece of code every declared case drives the
+    game through is the one piece nothing reviews.
     """
     start = harness.find('local function runDeclaredCase')
     if start < 0:

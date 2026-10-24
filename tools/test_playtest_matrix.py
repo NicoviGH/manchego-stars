@@ -868,6 +868,27 @@ class HarnessSourceAnalysis(unittest.TestCase):
         self.assertNotIn('INSPECT.talk', mx.harness_shared(source))
         self.assertEqual(mx.reaches('gamma', funcs), {'gamma', 'VISIT.x', 'INSPECT.talk'})
 
+    def test_the_runner_is_shared_text_not_the_last_scenarios_body(self):
+        """The runner coroutine is top-level code below the last scenario. Unmarked, it was
+        charged to that scenario (ch06halberd), whose closure then reached everything the
+        runner mentions and re-ran on edits it cannot see (#531 G2 review)."""
+        source = ('local function boot()\n    return 1\nend\n'
+                  'local function onlyRunner()\n    return 2\nend\n'
+                  'scenarios.last = function()\n    return 3\nend\n'
+                  '-- runner\n'
+                  'local co = coroutine.create(function()\n'
+                  '    boot()\n    onlyRunner()\nend)\n')
+        funcs = mx.harness_functions(source)
+        self.assertNotIn('onlyRunner', funcs['last'][0])
+        self.assertEqual(mx.reaches('last', funcs), {'last'})
+        self.assertIn('onlyRunner()', mx.harness_shared(source), 'the runner stays shared')
+
+    def test_the_real_last_scenario_does_not_reach_through_the_runner(self):
+        with open(mx.HARNESS) as fh:
+            funcs = mx.harness_functions(fh.read())
+        self.assertNotIn('runDeclaredCase', funcs['ch06halberd'][0])
+        self.assertNotIn('coroutine.create', ''.join(body for body, _ in funcs.values()))
+
     def test_the_real_visit_scenarios_reach_the_helpers_visit_delegates_to(self):
         with open(mx.HARNESS) as fh:
             funcs = mx.harness_functions(fh.read())

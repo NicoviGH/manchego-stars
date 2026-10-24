@@ -554,6 +554,13 @@ LUA_FUNC_DEF = re.compile(
     r'|function (\w+\.\w+)\(|(\w+\.\w+) = function)', re.M)
 # A top-level function's body is INDENTED; only its terminator sits in column 0.
 _LUA_TOP_END = re.compile(r'^end\b')
+# The runner: top-level code, not a function, so no closure owns it. Unmarked, it fell into
+# the chunk of whichever function precedes it in the file -- the last scenario, ch06halberd --
+# and every name the runner mentions (bootToMap, INSPECT.settle, the declared-case api) was
+# charged to that scenario's closure, re-running it on edits it cannot see (#531). As a mark
+# of its own it is SHARED text from its first line to the end of the file: still hashed into
+# every scenario's key, owned by none.
+_LUA_RUNNER = re.compile(r'^local \w+ = coroutine\.create\(')
 
 
 def _strip_comments(lines):
@@ -573,6 +580,8 @@ def _harness_marks(lines):
         if m:
             marks.append((i, m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5),
                           'scenario' if m.group(2) else 'helper'))
+        elif _LUA_RUNNER.match(line):
+            marks.append((i, None, 'shared'))
     marks.append((len(lines), None, None))
     return marks
 
@@ -588,7 +597,8 @@ def harness_functions(source):
     marks = _harness_marks(lines)
     out = {}
     for (start, name, kind), (end, _, _) in zip(marks, marks[1:]):
-        out[name] = (_strip_comments(lines[start:end]), kind)
+        if kind != 'shared':
+            out[name] = (_strip_comments(lines[start:end]), kind)
     return out
 
 
@@ -629,8 +639,11 @@ def harness_shared(source):
     lines = source.split('\n')
     marks = _harness_marks(lines)
     out = [_strip_comments(lines[:marks[0][0]])]
-    for (start, _, _), (end, _, _) in zip(marks, marks[1:]):
+    for (start, _, kind), (end, _, _) in zip(marks, marks[1:]):
         chunk = lines[start:end]
+        if kind == 'shared':
+            out.append(_strip_comments(chunk))
+            continue
         term = next((j for j in range(1, len(chunk)) if _LUA_TOP_END.match(chunk[j])), None)
         out.append(_strip_comments(chunk if term is None else chunk[term + 1:]))
     return '\n'.join(out)
