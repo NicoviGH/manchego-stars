@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-24 (Claude, #531 G3 merged, so #531's plan is done; #510 step 9 BUILDING). **The parity model is being
+Refreshed 2026-10-24 (Claude: #531 done, headed scenarios archived by #539; #510 step 9 BUILDING). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -26,11 +26,26 @@ G3 #537 78105ed; the summary is on #531).
   with `lua: INSPECT.redStats` and never with a one-line wrapper. A bound `INSPECT` probe takes no
   parameters (`matrix.entry_defined`).
 - Read harness.lua in Python through `matrix.harness_source()` / `harness_functions_at()`.
-- **No headed runs are owed** (Nicolas, 2026-10-24: "I am not running 45 headed scenarios ever"). A
-  record/diagnostic scenario is run only when the scene it films changes; he wants them archived.
-- Still open on #531 by plan: audit #8, #11, #12's film loops (record-only) and #17 (chunking).
+- **Record and diagnostic scenarios are ARCHIVED** (#538, PR #539 d27f69a, ADR 0367). Nicolas: "I am
+  not running 45 headed scenarios ever." No headed run is ever owed. A scene is filmed when it changes.
+  - Use `recordscene` (any dialogue scene a checkpoint reaches) or `mapshot` for that.
+  - Otherwise restore the specific recorder from commit f4ff003; ADR 0367 lists what it needs.
+  - Kept live: `recordscene`, `mapshot`, `vanillagold` (step 9 reuses its retail boot), and
+    `recordunitlist`/`recordsupply` (verdict kind).
+  - harness.lua is ~7,500 lines with 156 top-level locals (the ratchet).
+  - The seven boot-only ROM configurations stay in matrix.yaml, because the injection fingerprint
+    enumerates them.
+- #531 audit #8, #11 and #12 went with the archive. #17 (chunking) stays open on #531.
 
-**Next: step 9 PR C** (Tasks 3-5 + C4), then D, E, F. Stacked PRs on D->E->F only.
+**Next, in order:**
+1. **The raid PR** (Nicolas, 2026-10-24: the G3 "stays Lua" calls were excuses, so clean them up).
+   - Add two `cases.lua` verbs: idle N enemy phases (optionally holding the party), and assert a site
+     was raided (terrain RUINS 0x25, its gift absent, its event flag unset).
+   - Validate them in `declared.py`, then port `ch02raid` (ch02start checkpoint) and `ch05raid` into
+     their chapter YAMLs.
+   - The site tables already live in the chapter YAML. Run those two scenarios once.
+   - File it under #531 (reopen if closed) or a new issue. It needs Nicolas's "merge".
+2. **Step 9 PR C** (Tasks 3-5 + C4), then D, E, F. Stacked PRs on D->E->F only.
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
   dropped, with evidence. Apply every review with the global `review-to-clean` skill
@@ -51,11 +66,12 @@ Lessons from the 2026-10-23 build session (read before dispatching):
   to run, and the pre-commit hook trips. Rebuild canonical or pick a scenario that build hosts.
 - A step-9 PR's fix rounds each end in a scoped re-review; the reviews kept finding real defects
   (DefeatBoss hang, turn skips, a `PT_VANILLA` break from a required symbol), so don't skip them.
-- `harness.lua` has ~32 free top-level locals (`check_lua_local_headroom`), but `check.py`
-  ratchets the COUNT (167 after G2; it may only go down). New helpers hang on `INSPECT`/`TUNE`.
+- `check.py` ratchets harness.lua's top-level local COUNT (156 after #539; it may only go down).
+  New helpers hang on `INSPECT`/`TUNE`.
 - The session scratchpad is wiped when the date rolls over: refetch the plan from its GitHub comment.
-- Don't edit any campaign file while a matrix run builds. Even a comment makes the ROM older than its
-  sources, and run.sh's stale-ROM guard then ERRORs every scenario on that ROM before it runs (G3 lost 7).
+- A matrix group that ERRORs in 0s with "the ROM is OLDER than campaign sources" was a make that
+  wrote nothing (a comment-only edit), not a mid-run edit. Fixed in #539: the Makefile touches the
+  ROM after every successful build.
 Open thread on #531: a matrix run leaves the build tree non-canonical, so the pre-commit
 `test_scene_actors` fails until `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`.
 
