@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-24 (Claude, #531 G2 merged; #510 step 9 BUILDING). **The parity model is being
+Refreshed 2026-10-24 (Claude, #531 G3 merged, so #531's plan is done; #510 step 9 BUILDING). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -19,25 +19,18 @@ amendment and Task C4 are folded in): <https://github.com/NicoviGH/manchego-star
 The bot plays the ACTUAL ROM, never a Python re-creation. **Merged:** A #530 (Ch8 cutscene loads are
 not enemies), B #532 (`tools/playtest/board.lua`, the one board reader: `onField`, lean reads,
 `canSeize` from engine patch 0005; `gen_symbols.py` has an OPTIONAL list so `PT_VANILLA=1` works).
-**Inserted before C, at Nicolas's ask: the harness clean-up #531** (its body links its plan). G1 merged #533
-(proc pool scanned once per frame, ADR 0366: `clear_ch01` 40s -> 16s; true slot comments).
-G2 merged #534 (ad2ead8): one helper per copied idiom.
-- `Board.each` scans each unit array at the decomp's bounds, and a loop that moves a unit also
-  requires `onField`.
-- `INSPECT.place`/`freeBeside` (pure `Board.place`/`inMap`) refuse an off-map tile.
-- `INSPECT.settle/settled/advanceDialogue/talkUntil/film/routCh02`, plus
-  `INSPECT.ch01MarchOnChief` (it takes the lord id as an option).
-- `matrix.py` attributes every top-level table function (`VISIT.*` too). `VISIT.shop` is in
-  `BLIND_PRESS_ALLOWED`, with its reason.
-- The record/diagnostic copies were converted but never run (Nicolas: "Convert, don't run").
-  **42 headed runs are owed to his next playtest**, listed on #531.
-- `goodberry` fixed. `anyMenuProc` now takes the unlocked submenu when it descends from the
-  locked menu, and the row is found by item id (#430 added a Killer Axe ahead of it).
-- The `test_check_canaries` order dependence is fixed.
-- Cache-off `--all`: 66/66 PASS.
+**Inserted before C, at Nicolas's ask, and now DONE: the harness clean-up #531** (G1 #533, G2 #534,
+G3 #537 78105ed; the summary is on #531).
+- Use the helpers G2 added: `Board.each`, `INSPECT.place`/`freeBeside`, `INSPECT.settle`/`advanceDialogue`/`talkUntil`.
+- A chapter case's `lua:` names the function that runs it (ADR 0214, amended). A generic probe is bound
+  with `lua: INSPECT.redStats` and never with a one-line wrapper. A bound `INSPECT` probe takes no
+  parameters (`matrix.entry_defined`).
+- Read harness.lua in Python through `matrix.harness_source()` / `harness_functions_at()`.
+- **45 headed runs are owed to Nicolas's next playtest**, listed on #531 (G2's 42 plus `ch07titlecard`,
+  `mapfullch05` and `recordch05openinglupin` from G3). They were converted, never run ("Convert, don't run").
+- Still open on #531 by plan: audit #8, #11, #12's film loops (record-only) and #17 (chunking).
 
-**Next: G3** (Task 7, declared cases), then step 9 PR C (Tasks 3-5 + C4), D, E, F. Stacked PRs
-on D->E->F only.
+**Next: step 9 PR C** (Tasks 3-5 + C4), then D, E, F. Stacked PRs on D->E->F only.
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
   dropped, with evidence. Apply every review with the global `review-to-clean` skill
@@ -61,6 +54,8 @@ Lessons from the 2026-10-23 build session (read before dispatching):
 - `harness.lua` has ~32 free top-level locals (`check_lua_local_headroom`), but `check.py`
   ratchets the COUNT (167 after G2; it may only go down). New helpers hang on `INSPECT`/`TUNE`.
 - The session scratchpad is wiped when the date rolls over: refetch the plan from its GitHub comment.
+- Don't edit any campaign file while a matrix run builds. Even a comment makes the ROM older than its
+  sources, and run.sh's stale-ROM guard then ERRORs every scenario on that ROM before it runs (G3 lost 7).
 Open thread on #531: a matrix run leaves the build tree non-canonical, so the pre-commit
 `test_scene_actors` fails until `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`.
 
