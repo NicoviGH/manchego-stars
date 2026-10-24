@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-23 late (Claude, #510 step 9 BUILDING). **The parity model is being
+Refreshed 2026-10-24 (Claude, #531 G2 merged; #510 step 9 BUILDING). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -21,9 +21,30 @@ not enemies), B #532 (`tools/playtest/board.lua`, the one board reader: `onField
 `canSeize` from engine patch 0005; `gen_symbols.py` has an OPTIONAL list so `PT_VANILLA=1` works).
 **Inserted before C, at Nicolas's ask: the harness clean-up #531** (its body links its plan). G1 merged #533
 (proc pool scanned once per frame, ADR 0366: `clear_ch01` 40s -> 16s; true slot comments).
-**Next: G2** (Tasks 3-6: unit scans via Board, teleport/park helper with map bounds, settle +
-dialogue helpers, chapter-local copies), then G3 (declared cases), then step 9 PR C (Tasks 3-5 +
-C4), D, E, F. Stacked PRs on D->E->F only.
+G2 merged #534 (ad2ead8): one helper per copied idiom.
+- `Board.each` scans each unit array at the decomp's bounds, and a loop that moves a unit also
+  requires `onField`.
+- `INSPECT.place`/`freeBeside` (pure `Board.place`/`inMap`) refuse an off-map tile.
+- `INSPECT.settle/settled/advanceDialogue/talkUntil/film/routCh02`, plus
+  `INSPECT.ch01MarchOnChief` (it takes the lord id as an option).
+- `matrix.py` attributes every top-level table function (`VISIT.*` too). `VISIT.shop` is in
+  `BLIND_PRESS_ALLOWED`, with its reason.
+- The record/diagnostic copies were converted but never run (Nicolas: "Convert, don't run").
+  **42 headed runs are owed to his next playtest**, listed on #531.
+- `goodberry` fixed. `anyMenuProc` now takes the unlocked submenu when it descends from the
+  locked menu, and the row is found by item id (#430 added a Killer Axe ahead of it).
+- The `test_check_canaries` order dependence is fixed.
+- Cache-off `--all`: 66/66 PASS.
+
+**Next: G3** (Task 7, declared cases), then step 9 PR C (Tasks 3-5 + C4), D, E, F. Stacked PRs
+on D->E->F only.
+**Standing rules from 2026-10-24 (Nicolas):**
+- **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
+  dropped, with evidence. Apply every review with the global `review-to-clean` skill
+  (`~/.claude/skills/`; the rule is also in `~/.claude/CLAUDE.md`). It overrides SDD's "minors
+  don't enter the loop".
+- **No duplicate code ever reintroduced.** A mechanical duplicate-code gate (pre-commit + CI) is
+  **#535**, not built yet; until it is, every review checks the diff for new copies.
 **Merging:** Nicolas pre-approved merging step 9's and #531's PRs once `/code-review` (in a
 subagent) is clean and CI is green on HEAD; every other PR still needs his "merge".
 SDD ledgers (gitignored, the recovery map): `.superpowers/sdd/step9plan/progress.md` and
@@ -37,10 +58,11 @@ Lessons from the 2026-10-23 build session (read before dispatching):
   to run, and the pre-commit hook trips. Rebuild canonical or pick a scenario that build hosts.
 - A step-9 PR's fix rounds each end in a scoped re-review; the reviews kept finding real defects
   (DefeatBoss hang, turn skips, a `PT_VANILLA` break from a required symbol), so don't skip them.
-- `harness.lua` has ~32 free top-level locals (`check_lua_local_headroom`); the old "2 left" was stale.
-Open threads on #531: `test_check_canaries` is test-order dependent on main; a matrix run leaves
-the build tree non-canonical so the pre-commit `test_scene_actors` fails until
-`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`.
+- `harness.lua` has ~32 free top-level locals (`check_lua_local_headroom`), but `check.py`
+  ratchets the COUNT (167 after G2; it may only go down). New helpers hang on `INSPECT`/`TUNE`.
+- The session scratchpad is wiped when the date rolls over: refetch the plan from its GitHub comment.
+Open thread on #531: a matrix run leaves the build tree non-canonical, so the pre-commit
+`test_scene_actors` fails until `make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`.
 
 ## In flight
 
