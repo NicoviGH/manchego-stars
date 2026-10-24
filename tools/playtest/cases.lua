@@ -203,7 +203,8 @@ M.WHEN.idle = function(api, arg, state)
 end
 
 -- ---------------------------------------------------------------- then
--- Assertions. Each returns ok, why.
+-- Assertions. Each returns ok, why[, verdict], as a step does; a failed one is a FAIL unless
+-- it says otherwise.
 M.THEN = {}
 
 -- The party GAINED this item during the case -- counted, not merely present. A presence
