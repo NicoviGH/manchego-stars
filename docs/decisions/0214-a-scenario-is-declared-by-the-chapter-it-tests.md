@@ -23,6 +23,17 @@ coverage. The driver refuses an empty `then` for the same reason.
 chapter, so a chapter declares everything it owns. That is the DECORATE lesson kept intact: code is
 the exception you NAME, not the default you copy.
 
+**`lua:` names the function that runs, not a copy of the case's name** (2026-10-24, #531). A
+chapter-generic probe (`INSPECT.redStats`, `scenarios.mapfull`) is bound to a chapter's ROM by
+`lua: INSPECT.redStats`, never by a one-line `scenarios.ch04redstats` wrapper. Six such wrappers
+existed only because the verdict cache keyed on the scenario's own function; it now keys on the
+row's `entry` (`lua:`, else the name), and so do the #238 gate and the runner (`MX_ENTRY` ->
+`PLAYTEST_ENTRY`). The runner searches `scenarios` and `INSPECT` only and calls what it finds with
+no arguments, so a bound `INSPECT` probe takes none (a chosen scope: `INSPECT` is where generic
+probes live). `check_playtest_matrix` refuses any other binding, from a chapter case or a
+`matrix.yaml` row, and a leftover same-named scenario the binding would shadow. A wrapper survives
+only where it passes an argument (`recordch05joinlupin`).
+
 Four things paid for while building it:
 
 **`kind` is declared and never inferred from the name, even though timing still globs on it.**

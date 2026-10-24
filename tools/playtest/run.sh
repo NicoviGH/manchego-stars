@@ -290,6 +290,7 @@ run_mgba() {
     cat > "$wrapper" <<EOF
 PLAYTEST_DIR = "$HERE"
 PLAYTEST_SCENARIO = "$scen"
+PLAYTEST_ENTRY = "$([ "$scen" = "$SCENARIO" ] && echo "${MX_ENTRY:-}")"
 PLAYTEST_LOG = "$log"
 PLAYTEST_SHOTDIR = "$out"
 PLAYTEST_STATEDIR = "$STATE_DIR"

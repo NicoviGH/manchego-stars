@@ -268,6 +268,15 @@ class ShellEnvExport(unittest.TestCase):
         self.assertEqual(env['MX_CHECKPOINT'], "''")
         self.assertEqual(env['MX_CHECKPOINT_BUILDER'], "''")
 
+    def test_the_entry_is_the_scenario_unless_a_lua_key_binds_a_probe(self):
+        """#531: a chapter case's `lua:` binds a generic probe; run.sh hands it to the runner."""
+        m = manifest(scenarios={'win': {}, 'ch04redstats': {'lua': 'INSPECT.redStats'}})
+        def entry(name):
+            return dict(line.split('=', 1) for line in
+                        mx.export_env(m.resolve(name)).splitlines())['MX_ENTRY']
+        self.assertEqual(entry('win'), "'win'")
+        self.assertEqual(entry('ch04redstats'), "'INSPECT.redStats'")
+
     def test_every_exported_value_is_single_quoted(self):
         for line in mx.export_env(manifest().resolve('win')).splitlines():
             _, value = line.split('=', 1)
@@ -482,8 +491,54 @@ class RealManifest(unittest.TestCase):
         """
         import declared
         bodies = {c['name'] for _s, c in declared.cases() if 'lua' not in c}
-        stale = sorted(set(self.m.scenarios) - self.harness - bodies)
+        funcs = mx.harness_functions_at()
+        stale = sorted(n for n in set(self.m.scenarios) - bodies
+                       if not mx.entry_defined(self.m.resolve(n).entry, self.harness, funcs))
         self.assertEqual(stale, [], 'matrix rows naming nothing runnable')
+
+    def test_a_bound_probe_is_reached_and_its_wrapper_is_gone(self):
+        """#531 deleted the one-line wrappers that bound a probe to a chapter's ROM. The row
+        must reach the probe itself (verdict cache, #238 gate), and no wrapper may survive."""
+        funcs = mx.harness_functions_at()
+        for name, probe in (('ch04redstats', 'INSPECT.redStats'),
+                            ('ch04waves', 'INSPECT.firstAttacks'),
+                            ('ch07redstats', 'INSPECT.redStats'),
+                            ('ch07blueorder', 'INSPECT.blueOrder'),
+                            ('ch07titlecard', 'titlecard'),
+                            ('mapfullch05', 'mapfull'),
+                            ('recordch05openinglupin', 'recordch05opening')):
+            entry = self.m.resolve(name).entry
+            self.assertEqual(entry, probe)
+            self.assertIn(probe, mx.reaches(entry, funcs))
+            self.assertNotIn(name, self.harness)
+
+    def test_entry_defined_searches_only_what_the_runner_searches(self):
+        funcs = {'INSPECT.redStats': ('INSPECT.redStats = function()\n', 'fn'),
+                 'INSPECT.place': ('function INSPECT.place()\n', 'fn'),
+                 'INSPECT.settle': ('function INSPECT.settle(level, frames, tapA)\n', 'fn'),
+                 'INSPECT.walk': ('INSPECT.walk = function(x)\n', 'fn'),
+                 'helper': ('local function helper()\n', 'fn')}
+        self.assertTrue(mx.entry_defined('win', {'win'}, funcs))
+        self.assertTrue(mx.entry_defined('INSPECT.redStats', set(), funcs))
+        self.assertTrue(mx.entry_defined('INSPECT.place', set(), funcs))
+        self.assertFalse(mx.entry_defined('helper', set(), funcs))
+        self.assertFalse(mx.entry_defined('INSPECT.gone', set(), funcs))
+        # The runner calls a bound entry with no arguments, so one that takes some is refused.
+        self.assertFalse(mx.entry_defined('INSPECT.settle', set(), funcs))
+        self.assertFalse(mx.entry_defined('INSPECT.walk', set(), funcs))
+        # A later `function()` on the signature line does not stand in for the signature.
+        funcs['INSPECT.wrap'] = ('INSPECT.wrap = function(a) local f = function() end\n', 'fn')
+        self.assertFalse(mx.entry_defined('INSPECT.wrap', set(), funcs))
+
+    def test_firstattacks_reads_the_parity_models_horizon(self):
+        """`ch04waves` proves `timeline.engagements`, so its phase count is the model's."""
+        sys.path.insert(0, HERE)
+        import timeline
+        # The raw source: harness_functions strips comments, and the comment is the link.
+        m = re.search(r'INSPECT\.firstAttacks = function\(\)\n\s*local phases = (\d+) '
+                      r'-- timeline\.HORIZON\n', mx.harness_source())
+        self.assertIsNotNone(m, 'INSPECT.firstAttacks no longer names timeline.HORIZON')
+        self.assertEqual(int(m.group(1)), timeline.HORIZON)
 
     def test_a_declared_case_body_is_the_chapter_yaml_not_a_dead_row(self):
         """The complement: the three ported cases resolve, and harness.lua does NOT define
@@ -884,14 +939,12 @@ class HarnessSourceAnalysis(unittest.TestCase):
         self.assertIn('onlyRunner()', mx.harness_shared(source), 'the runner stays shared')
 
     def test_the_real_last_scenario_does_not_reach_through_the_runner(self):
-        with open(mx.HARNESS) as fh:
-            funcs = mx.harness_functions(fh.read())
+        funcs = mx.harness_functions_at()
         self.assertNotIn('runDeclaredCase', funcs['ch06halberd'][0])
         self.assertNotIn('coroutine.create', ''.join(body for body, _ in funcs.values()))
 
     def test_the_real_visit_scenarios_reach_the_helpers_visit_delegates_to(self):
-        with open(mx.HARNESS) as fh:
-            funcs = mx.harness_functions(fh.read())
+        funcs = mx.harness_functions_at()
         for scenario in ('ch04cottage', 'ch05crest'):
             reached = mx.reaches(scenario, funcs)
             for helper in ('VISIT.run', 'INSPECT.talkUntil', 'INSPECT.place'):
@@ -920,9 +973,7 @@ class HarnessSourceAnalysis(unittest.TestCase):
         self.assertIn('coroutine.yield', mx.harness_shared(HARNESS_FIXTURE))
 
     def test_the_real_harness_partitions_without_losing_a_scenario(self):
-        with open(mx.HARNESS) as fh:
-            source = fh.read()
-        funcs = mx.harness_functions(source)
+        funcs = mx.harness_functions_at()
         for name in mx.harness_scenarios():
             self.assertIn(name, funcs, '%s is defined but not attributable' % name)
 
@@ -938,7 +989,7 @@ class VerdictFingerprint(unittest.TestCase):
     def fingerprint(self, rom='romdigest', harness=HARNESS_FIXTURE, driver='D',
                     scenario=None, env=None):
         return mx.scenario_fingerprint(scenario or self.alpha, rom,
-                                       harness_source=harness, driver=driver,
+                                       source=harness, driver=driver,
                                        env=env if env is not None else {})
 
     def test_the_same_four_inputs_give_the_same_key(self):
@@ -964,6 +1015,17 @@ class VerdictFingerprint(unittest.TestCase):
         self.assertNotEqual(self.fingerprint(), self.fingerprint(harness=edited))
         edited = HARNESS_FIXTURE.replace('"alpha"', '"omega"')
         self.assertNotEqual(self.fingerprint(), self.fingerprint(harness=edited))
+
+    def test_a_bound_entry_keys_on_the_function_it_runs(self):
+        """A `lua:`-bound row (#531) has no body of its own: its PASS rests on the probe it
+        runs, so editing that probe must re-run it and editing anything else must not."""
+        m = manifest(scenarios={'alpha': {}, 'gamma': {'lua': 'alpha'}})
+        gamma = m.resolve('gamma')
+        base = self.fingerprint(scenario=gamma)
+        edited = HARNESS_FIXTURE.replace('return onlyForA(1)', 'return onlyForA(9)')
+        self.assertNotEqual(base, self.fingerprint(scenario=gamma, harness=edited))
+        edited = HARNESS_FIXTURE.replace('return onlyForB(2)', 'return onlyForB(3)')
+        self.assertEqual(base, self.fingerprint(scenario=gamma, harness=edited))
 
     def test_editing_ANOTHER_scenario_is_the_SAME_key(self):
         """The whole point. harness.lua is one chunk and nearly every task edits it;
@@ -1135,7 +1197,7 @@ class ScopedFingerprint(unittest.TestCase):
 
     def fingerprint(self, scenario_manifest, rom='romdigest'):
         return mx.scenario_fingerprint(self.m.resolve('alpha'), rom,
-                                       harness_source=HARNESS_FIXTURE, driver='D', env={},
+                                       source=HARNESS_FIXTURE, driver='D', env={},
                                        scopes=scenario_manifest)
 
     def test_a_scope_it_does_not_depend_on_cannot_move_its_key(self):
@@ -1167,9 +1229,9 @@ class ScopedFingerprint(unittest.TestCase):
         """No scope can see them: we COMPILE the decomp's own sources and only patch a few,
         so a submodule bump touching an engine file no injector writes rebuilds the ROM and
         moves not one scope digest. Dropping rom_input_hash must not drop that pin."""
-        a = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', harness_source=HARNESS_FIXTURE,
+        a = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', source=HARNESS_FIXTURE,
                                     driver='D', env={}, scopes=self.MANIFEST, engine='E1')
-        b = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', harness_source=HARNESS_FIXTURE,
+        b = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', source=HARNESS_FIXTURE,
                                     driver='D', env={}, scopes=self.MANIFEST, engine='E2')
         self.assertNotEqual(a, b)
 
