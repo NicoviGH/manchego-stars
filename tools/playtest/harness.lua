@@ -435,6 +435,9 @@ INSPECT.io = {
     rs8 = function(a) return rs8(a) end, write8 = function(a, v) emu:write8(a, v) end,
     grid = mapUnitAt, setGrid = setMapUnit,
 }
+-- Refill a unit to full HP and no further: its max is what the engine and the AI read it at.
+function INSPECT.fullHeal(u) emu:write8(u.addr + 0x13, u.maxhp) end
+
 function INSPECT.place(u, x, y, o)
     local w, h = mapSize()
     local ok, why = BOARD.place(INSPECT.io, u.addr, x, y, w, h, o)
@@ -3705,7 +3708,7 @@ INSPECT.firstAttacks = function()
         end
         for i = 0, 49 do
             local u = unitAt(SYM.gUnitArrayRed, i)
-            if u and u.onMap and not isDead(u) then emu:write8(u.addr + 0x13, u.maxhp) end
+            if u and u.onMap and not isDead(u) then INSPECT.fullHeal(u) end
         end
     end
     local function look(phase)
@@ -6831,7 +6834,7 @@ scenarios.ch06clock = function()
         -- clock resolves. Never visits, never fights -- it only gives the turns back.
         for i = 0, 61 do
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) then emu:write8(u.addr + 0x13, u.maxhp) end
+            if u and not isDead(u) then INSPECT.fullHeal(u) end
         end
         local phase = runEnemyPhase()
         if phase == nil then
@@ -7167,10 +7170,11 @@ local co = coroutine.create(function()
         -- takes. A site is CAMPAIGN.VILLAGES's (gen_symbols: tile, flag and gift by YAML id).
         enemyPhase = function() return runEnemyPhase() end,
         holdParty = function()
-            -- Full HP, never past it: HP above max feeds the AI's target scoring, and the
-            -- raiders' routing is what a held raid is testing.
+            -- Full HP, never past it: the AI weighs a target by whether it can kill it, and
+            -- a unit at 60/18 is one it never can, so over-cap HP would bend the raiders'
+            -- routing, which is what a held raid is testing.
             for _, u in BOARD.each("blue") do
-                if not u.dead then emu:write8(u.addr + 0x13, u.maxhp) end
+                if not u.dead then INSPECT.fullHeal(u) end
             end
         end,
         turn = turn,

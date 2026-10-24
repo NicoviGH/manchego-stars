@@ -43,7 +43,8 @@ M.GIVEN.on_map = function(api, state)
 end
 
 -- ---------------------------------------------------------------- when
--- Steps. Each returns ok, why.
+-- Steps. Each returns ok, why[, verdict]: a step whose ARGUMENT is malformed is the author's
+-- error and says "ERROR", the same as an unknown step; anything the game did is a FAIL.
 M.WHEN = {}
 
 -- `arg.gains` is an item id this site must hand over. It rides the STEP because the gift is
@@ -59,7 +60,8 @@ M.WHEN = {}
 local function siteStep(verb, open)
     return function(api, arg, state)
         if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number" then
-            return false, string.format("a `%s` step needs a table with numeric x and y", verb)
+            return false, string.format("a `%s` step needs a table with numeric x and y", verb),
+                "ERROR"
         end
         -- Settle FIRST. A site event's tail (give-item, MapChange, EVBIT_T, ENDA) is still
         -- running when the item lands, and walking to the next site while std_event holds the
@@ -102,7 +104,8 @@ M.WHEN.visit = siteStep("visit", "visitVillage")
 M.WHEN.shop = function(api, arg, state)
     if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number"
         or (arg.kind ~= "armory" and arg.kind ~= "vendor") or type(arg.stocks) ~= "table" then
-        return false, "a `shop` step needs numeric x, y, kind: armory|vendor and a stocks list"
+        return false, "a `shop` step needs numeric x, y, kind: armory|vendor and a stocks list",
+            "ERROR"
     end
     if not api.settle(true) then
         return false, string.format("the map never returned to player control before (%d,%d)",
@@ -133,7 +136,7 @@ M.WHEN.talk = siteStep("talk", "talkFrom")
 -- #493 -- fails here, and so does a pid the build gives no help text at all.
 M.WHEN.help = function(api, arg, state)
     if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number" then
-        return false, "a `help` step needs numeric x, y"
+        return false, "a `help` step needs numeric x, y", "ERROR"
     end
     if not api.settle(true) then
         return false, string.format("the map never returned to player control before (%d,%d)",
@@ -164,17 +167,20 @@ end
 -- a site the case's `raided` assertion watches has fallen; without it every phase is spent.
 M.WHEN.idle = function(api, arg, state)
     if type(arg) ~= "table" or type(arg.phases) ~= "number" or arg.phases < 1 then
-        return false, "an `idle` step needs a positive numeric `phases`"
+        return false, "an `idle` step needs a positive numeric `phases`", "ERROR"
     end
     if arg.hold ~= nil and type(arg.hold) ~= "boolean" then
-        return false, string.format("`idle`'s `hold` is true or false, not %q", tostring(arg.hold))
+        return false, string.format("`idle`'s `hold` is true or false, not %q",
+            tostring(arg.hold)), "ERROR"
     end
     local stop = arg["until"]
     if stop ~= nil and stop ~= "raided" then
-        return false, string.format("`idle` can stop only `until: raided`, not %q", tostring(stop))
+        return false, string.format("`idle` can stop only `until: raided`, not %q",
+            tostring(stop)), "ERROR"
     end
     if stop == "raided" and #state.raidSites == 0 then
-        return false, "`idle` waits `until: raided`, but the case declares no `raided` assertion"
+        return false, "`idle` waits `until: raided`, but the case declares no `raided` assertion",
+            "ERROR"
     end
     for p = 1, arg.phases do
         if arg.hold then api.holdParty() end
@@ -315,26 +321,27 @@ M.VILLAGE, M.RUINS = 0x03, 0x25
 -- village now: nothing can raid it and nothing can visit it, so "it never fell" would blame
 -- the raiders for a tile the chapter never built. "Up" is `on_map`'s settle, the same
 -- event wait (INSPECT.settle "event", 6000) the hand-written raids opened with.
--- Returns ok, verdict, why: a malformed list or an unknown id is the AUTHOR's error (ERROR,
+-- Returns ok, why, verdict: a malformed list or an unknown id is the AUTHOR's error (ERROR,
 -- like an unknown step); a site that is not a village is the CHAPTER's (FAIL).
 function M.watchRaids(case, api, state)
     for _, entry in ipairs(case["then"] or {}) do
         local key, ids = M.pair(entry)
         if key == "raided" then
             if type(ids) ~= "table" or #ids == 0 then
-                return false, "ERROR", "`raided` takes a list of village ids"
+                return false, "`raided` takes a list of village ids", "ERROR"
             end
             for _, id in ipairs(ids) do
                 local site = api.village(id)
                 if not site then
-                    return false, "ERROR", string.format("`raided` names %q, which CAMPAIGN.VILLAGES "
-                        .. "does not carry", tostring(id))
+                    return false, string.format("`raided` names %q, which CAMPAIGN.VILLAGES "
+                        .. "does not carry", tostring(id)), "ERROR"
                 end
                 local terrain = api.terrainAt(site.x, site.y)
                 if terrain ~= M.VILLAGE then
-                    return false, "FAIL", string.format(
+                    return false, string.format(
                         "%s (%d,%d) is terrain 0x%02X before the raid, not a village -- nothing "
-                        .. "can raid it and nothing can visit it", id, site.x, site.y, terrain)
+                        .. "can raid it and nothing can visit it", id, site.x, site.y, terrain),
+                        "FAIL"
                 end
                 state.raidSites[#state.raidSites + 1] = {name = id, x = site.x, y = site.y,
                                                          flag = site.flag, gift = site.gift}
@@ -369,7 +376,7 @@ function M.run(case, api)
             return api.result("FAIL", string.format("%s: %s", name, why))
         end
     end
-    local watching, verdict, why = M.watchRaids(case, api, state)
+    local watching, why, verdict = M.watchRaids(case, api, state)
     if not watching then
         return api.result(verdict, string.format("%s: %s", name, why))
     end
@@ -385,9 +392,9 @@ function M.run(case, api)
                 "%s: unknown step %q -- the vocabulary is in cases.lua, and a case outside "
                 .. "it belongs behind the chapter's `lua:` key", name, key))
         end
-        local ok, why = fn(api, arg, state)
+        local ok, why, verdict = fn(api, arg, state)
         if not ok then
-            return api.result("FAIL", string.format("%s: %s", name, why))
+            return api.result(verdict or "FAIL", string.format("%s: %s", name, why))
         end
     end
 
@@ -411,9 +418,9 @@ function M.run(case, api)
             return api.result("ERROR", string.format(
                 "%s: unknown assertion %q -- the vocabulary is in cases.lua", name, key))
         end
-        local ok, why = fn(api, arg, state)
+        local ok, why, verdict = fn(api, arg, state)
         if not ok then
-            return api.result("FAIL", string.format("%s: %s", name, why))
+            return api.result(verdict or "FAIL", string.format("%s: %s", name, why))
         end
         proved[#proved + 1] = key
     end

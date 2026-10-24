@@ -167,7 +167,7 @@ do
     contains(api.reason, "\"west\"", "the failure names the id")
 
     api = raid({}, {phases = 2, hold = 0})
-    check(api.verdict, "FAIL", "a `hold` that is not a boolean FAILs (Lua would read 0 as true)")
+    check(api.verdict, "ERROR", "a `hold` that is not a boolean is the author's ERROR (Lua reads 0 as true)")
     check(api.held, 0, "and holds nobody")
 
     api = raid({phaseResults = {[2] = "gameover"}})
@@ -178,7 +178,7 @@ do
     C.run({name = "x", given = {"on_map"},
            ["when"] = {{idle = {phases = 2, ["until"] = "raided"}}}, ["then"] = {{spoke = true}}},
           api)
-    check(api.verdict, "FAIL", "`until: raided` with no `raided` assertion FAILs")
+    check(api.verdict, "ERROR", "`until: raided` with no `raided` assertion is an ERROR")
     check(api.phases, 0, "before spending a phase")
 end
 
@@ -402,7 +402,7 @@ do
     local api = fakeApi({})
     C.run({name = "x", given = {"on_map"}, ["when"] = {{visit = "south"}},
            ["then"] = {{spoke = true}}}, api)
-    check(api.verdict, "FAIL", "a non-table visit argument FAILs rather than crashing")
+    check(api.verdict, "ERROR", "a non-table visit argument is the author's ERROR, not a crash")
 end
 
 print(string.format("%d checks, %d failures", tests, fails))
