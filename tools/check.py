@@ -1297,9 +1297,8 @@ def check_gate_chapter_window(fail):
 
 
 # A row in a chapter Lua chunk: `{ id = "boat-east", x = 17, y = 12, doorX = 17, ... }`.
-# Only rows keyed by `id` are in scope -- ch05.lua's reliquaries are keyed by `name` against
-# YAML ids of a different shape (`north` vs `reliquary-north`), and matching those would mean
-# renaming a shipped chapter's constants rather than catching a bug.
+# Only rows keyed by `id` are in scope. ch05.lua's reliquaries carry no literal tile at all:
+# they read CAMPAIGN.VILLAGES, which gen_symbols builds from the chapter YAML.
 _LUA_ROW = re.compile(r'\{[^{}]*\bid\s*=\s*"([^"]+)"[^{}]*\}')
 # NB the hex branch comes FIRST: Python's alternation is ordered, so `-?\d+` would match the
 # leading `0` of `0x11` and the field would silently read as 0.

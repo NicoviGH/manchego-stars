@@ -136,6 +136,57 @@ class TestEscapeHatch(unittest.TestCase):
             declared.matrix_rows([doc], slots={'ch05': 6})
 
 
+class TestRaidVerbs(unittest.TestCase):
+    """`idle` and `raided` are checked against the chapter, before anything runs."""
+
+    VILLAGES = [{'id': 'reliquary-south', 'tile': [12, 19]}]
+
+    def raid(self, when=None, then=None):
+        case = {'name': 'ch05raid', 'proves': 'a raider can sack a reliquary',
+                'given': ['on_map'],
+                'when': when if when is not None else [{'idle': {'phases': 8,
+                                                                  'until': 'raided'}}],
+                'then': then if then is not None else [{'raided': ['reliquary-south']}]}
+        doc = chapter(villages=self.VILLAGES)
+        doc['playtest']['cases'] = [case]
+        return declared.cases([doc], slots={'ch05': 6})
+
+    def test_a_raid_on_a_declared_village_is_a_case(self):
+        self.assertEqual(['ch05raid'], [c['name'] for _s, c in self.raid()])
+
+    def test_a_village_the_chapter_does_not_declare_is_refused(self):
+        with self.assertRaisesRegex(declared.CaseError, 'reliquary-north'):
+            self.raid(then=[{'raided': ['reliquary-north']}])
+
+    def test_a_raid_with_no_idle_is_refused(self):
+        # No enemy phase runs, so "did a site fall" is asked of a case in which no turn passed.
+        with self.assertRaisesRegex(declared.CaseError, 'never `idle`s'):
+            self.raid(when=[{'visit': {'x': 12, 'y': 19}}])
+
+    def test_an_idle_needs_a_positive_whole_number_of_phases(self):
+        for phases in (0, -1, True, '8', None):
+            with self.assertRaises(declared.CaseError, msg=repr(phases)):
+                self.raid(when=[{'idle': {'phases': phases}}])
+
+    def test_until_raided_needs_a_raided_assertion(self):
+        with self.assertRaisesRegex(declared.CaseError, 'no `raided`'):
+            self.raid(then=[{'spoke': True}])
+
+    def test_until_names_only_raided(self):
+        with self.assertRaisesRegex(declared.CaseError, 'until: raided'):
+            self.raid(when=[{'idle': {'phases': 8, 'until': 'dawn'}}])
+
+    def test_hold_is_a_boolean(self):
+        with self.assertRaisesRegex(declared.CaseError, 'hold'):
+            self.raid(when=[{'idle': {'phases': 8, 'hold': 'yes', 'until': 'raided'}}])
+
+    def test_raided_takes_one_list_of_ids(self):
+        for then in ([{'raided': 'reliquary-south'}], [{'raided': []}],
+                     [{'raided': ['reliquary-south']}, {'raided': ['reliquary-south']}]):
+            with self.assertRaises(declared.CaseError, msg=repr(then)):
+                self.raid(then=then)
+
+
 class TestSubsumption(unittest.TestCase):
     """"Is A already covered by B" becomes computable once a case is DATA (#302 gate work).
 

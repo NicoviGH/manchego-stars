@@ -92,6 +92,56 @@ def _body_kind(case, where):
     return 'lua' if has_lua else 'declared'
 
 
+def _entries_named(case, section, verb):
+    """The arguments of every `verb` entry in a case's `when`/`then` list."""
+    return [entry[verb] for entry in case.get(section) or ()
+            if isinstance(entry, dict) and verb in entry]
+
+
+def _check_raid(case, doc, where):
+    """`idle` and `raided` are checked here, where the chapter document is in hand.
+
+    Each fails in a way the run cannot name. An `idle` with no `phases` never ends a turn, so
+    nothing can fall; a `raided` id the chapter does not declare resolves to nothing in
+    CAMPAIGN.VILLAGES; and a `raided` with no `idle` before it asks whether a site fell during
+    a case in which no turn passed.
+    """
+    idles = _entries_named(case, 'when', 'idle')
+    raids = _entries_named(case, 'then', 'raided')
+    for arg in idles:
+        if not isinstance(arg, dict):        # its keys are chapter_schema's to check
+            raise CaseError('%s: `idle` takes a mapping, got %r' % (where, arg))
+        phases = arg.get('phases')
+        if isinstance(phases, bool) or not isinstance(phases, int) or phases < 1:
+            raise CaseError('%s: `idle` needs a positive integer `phases`, got %r'
+                            % (where, phases))
+        if not isinstance(arg.get('hold', False), bool):
+            raise CaseError('%s: `idle`\'s `hold` is true or false, got %r'
+                            % (where, arg['hold']))
+        if arg.get('until', 'raided') != 'raided':
+            raise CaseError('%s: `idle` can stop only `until: raided`, got %r'
+                            % (where, arg['until']))
+        if 'until' in arg and not raids:
+            raise CaseError('%s: `idle` waits `until: raided`, but the case has no `raided` '
+                            'assertion to wait on' % where)
+    if not raids:
+        return
+    if len(raids) > 1:
+        raise CaseError('%s: declares `raided` %d times -- name every watched site in one list'
+                        % (where, len(raids)))
+    if not idles:
+        raise CaseError('%s: asserts `raided` but never `idle`s, so no enemy phase runs and '
+                        'nothing can fall' % where)
+    ids = raids[0]
+    if not isinstance(ids, list) or not ids or not all(isinstance(i, str) for i in ids):
+        raise CaseError('%s: `raided` takes a list of village ids, got %r' % (where, ids))
+    declared_ids = set(v.get('id') for v in (doc.get('villages') or ()))
+    unknown = [i for i in ids if i not in declared_ids]
+    if unknown:
+        raise CaseError('%s: `raided` names %s, which the chapter declares no village as'
+                        % (where, ', '.join(unknown)))
+
+
 def cases(docs=None, slots=None, campaign=campaign_chapters.CAMPAIGN):
     """Every declared case, validated, as (short chapter id, case dict) pairs."""
     docs = campaign_chapters.load_all(campaign) if docs is None else docs
@@ -121,7 +171,8 @@ def cases(docs=None, slots=None, campaign=campaign_chapters.CAMPAIGN):
             if not case.get('proves'):
                 raise CaseError('%s: has no `proves` -- what a case proves is the one thing '
                                 'nothing else can derive' % where)
-            _body_kind(case, where)
+            if _body_kind(case, where) == 'declared':
+                _check_raid(case, doc, where)
             if not (case.get('boot') or block.get('boot')):
                 raise CaseError('%s: no `boot`, and %s declares no chapter-wide one'
                                 % (where, short))

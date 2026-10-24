@@ -80,8 +80,9 @@ PLAYTEST_CASE = {
     'when': [{'visit': {'x': ANY, 'y': ANY, 'gains': ANY},
               'talk': {'x': ANY, 'y': ANY, 'gains': ANY},
               'shop': {'x': ANY, 'y': ANY, 'kind': ANY, 'stocks': ANY},
-              'help': {'x': ANY, 'y': ANY}}],
-    'then': [{'spoke': ANY, 'event_flag': ANY}],
+              'help': {'x': ANY, 'y': ANY},
+              'idle': {'phases': ANY, 'hold': ANY, 'until': ANY}}],
+    'then': [{'spoke': ANY, 'event_flag': ANY, 'raided': ANY}],
 }
 
 CHAPTER = {
