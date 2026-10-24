@@ -53,6 +53,8 @@ end
 
 -- Replace env.emu with the write guard and return the proc map over the REAL emulator:
 --   procs.raw         the real emulator (hot read paths bind to it, skipping the guard)
+--   procs.pool        the `pool` it was installed over ({ base, stride, count }), so a caller
+--                     can tell a proc address from any other word
 --   procs.find(s)     the address of the lowest slot whose script is s, or nil (s == 0
 --                     answers the first free slot, as the plain scan did; s == nil is an
 --                     error: it is an unexported symbol, not an absent proc)
@@ -90,6 +92,7 @@ function ProcMemo.install(env, pool)
     end
     return {
         raw = real,
+        pool = pool,
         find = function(script)
             -- A symbol gen_symbols.py does not export reads as nil, and looking for nil finds
             -- nothing, which looks exactly like "the proc never started" (ch02armory, #493).

@@ -41,6 +41,12 @@ local function setup()
     local procs = ProcMemo.install(env, { base = BASE, stride = STRIDE, count = COUNT })
     return procs, env, real, mem
 end
+-- procs.pool is the pool it was installed over (anyMenuProc bounds its parent walk by it).
+do
+    local procs = setup()
+    check(procs.pool.base, BASE, "pool.base is the installed base")
+    check(procs.pool.stride * procs.pool.count, STRIDE * COUNT, "pool spans stride * count")
+end
 -- The naive scan findProc used to be: the memo must agree with it on every pool.
 local function naive(mem, script)
     for i = 0, COUNT - 1 do if (mem[slot(i)] or 0) == script then return slot(i) end end

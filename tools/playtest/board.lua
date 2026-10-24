@@ -171,6 +171,23 @@ function Board.leanList(mem, SYM, faction)
     return out
 end
 
+-- Iterator over `faction`'s occupied slots at the decomp bound: `for slot, u in Board.each(...)`.
+-- LEAN and LAZY -- each unit is read when the loop reaches it, not up front -- so a scenario
+-- that kills or moves units as it goes sees the live board on the next turn of the loop, as
+-- the `for i = 0, N do unitAt(base, i)` it replaces did. Empty slots are skipped.
+function Board.each(mem, SYM, faction)
+    local f = BY_NAME[faction]
+    local base, slot = SYM[f.sym], -1
+    return function()
+        while true do
+            slot = slot + 1
+            if slot >= f.count then return nil end
+            local u = Board.leanAt(mem, SYM, base, slot)
+            if u then return slot, u end
+        end
+    end
+end
+
 -- How many of `faction`'s units are on the field (alive, on a tile, not hidden/rescued/
 -- undeployed). Leaner than leanAt: a per-frame stop condition calls it.
 function Board.liveCount(mem, SYM, faction)
@@ -220,7 +237,7 @@ function Board.occupied(mem, SYM, x, y)
 end
 
 -- The first unit with `charId` in the `count` slots from `base`, LEAN, or nil. The one owner
--- of live lookup by character id (harness findUnit/blue/red); Board.unit is its snapshot twin.
+-- of live lookup by character id (harness blue/red via Board.find); Board.unit is its snapshot twin.
 function Board.findIn(mem, SYM, base, count, charId)
     for slot = 0, count - 1 do
         local a = base + slot * Board.UNIT_SIZE
@@ -230,6 +247,13 @@ function Board.findIn(mem, SYM, base, count, charId)
         end
     end
     return nil
+end
+
+-- The first unit of `faction` with `charId`, over that faction's whole decomp array, LEAN, or
+-- nil. A literal count at the call site is how a scan stopped at slot 19 or 23 (#531 audit 13).
+function Board.find(mem, SYM, faction, charId)
+    local f = BY_NAME[faction]
+    return Board.findIn(mem, SYM, SYM[f.sym], f.count, charId)
 end
 
 -- Who can Seize. FE8's Seize command is usable only when CanUnitSeize(unit) holds
@@ -286,6 +310,55 @@ function Board.live(board, faction)
     return out
 end
 
+-- ---- placing a unit (#531 audit 4) ----------------------------------------------------
+-- Pure over `io = { rs8(a), write8(a, v), grid(x, y), setGrid(x, y, v) }` so test_board.lua runs
+-- it with no emulator. The map's size comes in as an ARGUMENT, read live by the caller: six
+-- copies of this dance carried the literal `tx <= 24 and ty <= 15` from a bigger chapter, and
+-- on ch03's 17x16 map an off-map tile reads gBmMapUnit's zero border as "empty" and was
+-- accepted.
+function Board.inMap(x, y, w, h)
+    return x >= 0 and x < w and y >= 0 and y < h
+end
+
+-- Stand the unit at `addr` on (x, y) and keep the tile->unit grid in step: vacate its old tile,
+-- write the new position, occupy the new tile. Returns true, or false + the reason when (x, y)
+-- is off the map (nothing is touched then). `o.grid` overrides the id written to the new tile
+-- (default: the id read live from the unit's old tile, which preserves faction bits);
+-- `o.vacate == false` skips clearing the old tile (a unit that was never on the grid).
+-- `o.tracked` also refuses, touching nothing, when the id to write is 0: the default read finds
+-- the old tile empty in the grid (or the unit off the map), so the move would leave the new tile
+-- reading "empty" and the engine unable to select the unit there. The teleports always refused
+-- that case; a site that places a unit the grid does not hold yet leaves it off.
+function Board.place(io, addr, x, y, w, h, o)
+    o = o or {}
+    if not Board.inMap(x, y, w, h) then
+        return false, string.format("tile (%d,%d) is off the %dx%d map", x, y, w, h)
+    end
+    local ox, oy = io.rs8(addr + 0x10), io.rs8(addr + 0x11)
+    local was = Board.inMap(ox, oy, w, h)
+    local grid = o.grid
+    if grid == nil then grid = was and io.grid(ox, oy) or 0 end
+    if o.tracked and grid == 0 then
+        return false, string.format("the unit at (%d,%d) is not tracked in the grid", ox, oy)
+    end
+    if o.vacate ~= false and was then io.setGrid(ox, oy, 0) end
+    io.write8(addr + 0x10, x); io.write8(addr + 0x11, y)
+    io.setGrid(x, y, grid)
+    return true
+end
+
+-- The first tile beside (ax, ay), taken in `order` (a list of { dx, dy }), that is on the map and
+-- empty in the grid and passes `ok(x, y)` when given. Returns x, y or nil.
+function Board.freeBeside(io, ax, ay, order, w, h, ok)
+    for _, d in ipairs(order) do
+        local tx, ty = ax + d[1], ay + d[2]
+        if Board.inMap(tx, ty, w, h) and io.grid(tx, ty) == 0 and (not ok or ok(tx, ty)) then
+            return tx, ty
+        end
+    end
+    return nil
+end
+
 -- The reader with its memory and symbols bound, for harness.lua: one top-level local there
 -- instead of one per helper.
 function Board.bind(mem, SYM)
@@ -294,15 +367,18 @@ function Board.bind(mem, SYM)
         header = function() return Board.header(mem, SYM) end,
         unitAt = function(base, slot) return Board.unitAt(mem, SYM, base, slot) end,
         leanAt = function(base, slot) return Board.leanAt(mem, SYM, base, slot) end,
+        each = function(faction) return Board.each(mem, SYM, faction) end,
         leanList = function(faction) return Board.leanList(mem, SYM, faction) end,
         liveCount = function(faction) return Board.liveCount(mem, SYM, faction) end,
         liveBoss = function() return Board.liveBoss(mem, SYM) end,
         findIn = function(base, count, charId) return Board.findIn(mem, SYM, base, count, charId) end,
+        find = function(faction, charId) return Board.find(mem, SYM, faction, charId) end,
         attackRange = function(addr) return Board.attackRange(mem, SYM, addr) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
         lordPid = function(flagSet) return Board.lordPid(mem, SYM, flagSet) end,
         canSeize = Board.canSeize,
+        inMap = Board.inMap, place = Board.place, freeBeside = Board.freeBeside,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
         UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,

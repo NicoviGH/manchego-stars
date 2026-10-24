@@ -87,7 +87,7 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
     # retired by #531: the harness's remaining local slots are MEASURED (check_lua_local_headroom),
-    # never written down; "2 slots left" / "198 locals" went stale in a dozen places at once.
+    # never written down; "2 slots left" / "198 locals" went stale everywhere it was copied.
     # Bounded to the retired CLAIMS: the scan is case-insensitive, so `\b` keeps "12 slots
     # left" out, and the ceiling patterns name the harness sitting AT/AGAINST/NEAR the
     # 200-local ceiling -- a bare "at that ceiling" is ordinary English (test_check_comment_drift).
@@ -677,7 +677,7 @@ def lua_local_headroom(path, probe_max=8):
 # quarter against the handful that were then free (#327). Freezing the count redirects the next helper into a
 # module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
 # scale; thinning the tail only makes it comfortable.
-HARNESS_TOP_LEVEL_LOCALS = 168
+HARNESS_TOP_LEVEL_LOCALS = 167
 
 # `[ \t]`, never `\s`: `\s` matches a NEWLINE, so `local controllerFault` followed by
 # `local function log` merged into one match and the count came out one short. A counter
@@ -2206,6 +2206,12 @@ BLIND_PRESS_ALLOWED = {
     # loop stops on the OUTCOME (combat ended, or the caller's doneFn). Same shape as
     # driveSaveSlot -- no distinguishing postcondition per press, verified on the outcome.
     'shootCombatFrames': 'observed-proc dismissal inside a combat capture; verified on the outcome',
+    # Leaving a shop: B until gProcScr_Shop is gone, then B until the controller reads
+    # player_map_idle. Each press is gated on that observation being re-read, and both loops
+    # stop on the OUTCOME. The controller classifies no shop state, so guardedInput has no
+    # legal action to authorise here. Listed when #531 made VISIT.* their own functions:
+    # before that the body sat in shared text and this gate never looked at it.
+    'VISIT.shop': 'observed-proc dismissal out of a shop; verified on the outcome (#531)',
 }
 
 # The call graph this gate scopes from lives in matrix.py (`harness_functions`/`reaches`),
@@ -2327,10 +2333,10 @@ def _declared_api_adapter(harness):
     """The `api` table harness.lua hands to cases.lua.
 
     It is declared INSIDE the runner coroutine so it costs no top-level local slot, which
-    also means `harness_functions` attributes it to whatever scenario precedes it -- a
-    `record` one, which check_verdict_scenarios_are_guarded skips. So it is carved out by
-    name here and checked directly; otherwise the one piece of code every declared case
-    drives the game through is the one piece nothing reviews.
+    also means no function owns it: `harness_functions` leaves the runner to shared text,
+    which check_verdict_scenarios_are_guarded never reads. So it is carved out by name here
+    and checked directly; otherwise the one piece of code every declared case drives the
+    game through is the one piece nothing reviews.
     """
     start = harness.find('local function runDeclaredCase')
     if start < 0:

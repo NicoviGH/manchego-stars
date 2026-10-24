@@ -97,7 +97,7 @@ class TestAwaitControllerState(unittest.TestCase):
         body = _block(_read_harness(), 'local function awaitControllerState(',
                       '\n-- Select unit at')
         self.assertIn('dialogue_wait', body)
-        self.assertIn('advance_dialogue', body)
+        self.assertIn('INSPECT.advanceDialogue(', body)   # the guarded "advance_dialogue" press
         self.assertIn('want ~= "dialogue_wait"', body,
                       'a caller that explicitly waits FOR dialogue must still get it')
         self.assertIn('fail:unexpected-state:', body,
@@ -194,7 +194,7 @@ class TestAwaitControllerState(unittest.TestCase):
         # off-map unit out of the lists that drive the cursor. The read lives in board.lua,
         # the one board reader (#510 step 9); harness unitAt only delegates to it.
         harness = _read_harness()
-        body = _block(harness, 'local function unitAt(', '\nlocal function findUnit')
+        body = _block(harness, 'local function unitAt(', '\nlocal function blue')
         self.assertIn('BOARD.leanAt(base, i)', body, 'unitAt delegates to board.lua')
         with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
             board = _block(fh.read(), 'function Board.leanAt(', '\nend\n')
@@ -278,11 +278,37 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('eruptionBoxes', body,
                       'the recruit gate would hang before Sahnar LOADs if it never advances '
                       'Ravisin\'s newly visible warning')
-        self.assertIn('dialogue_wait', body)
-        self.assertIn('advance_dialogue', body)
+        # The eruption's OWN talkUntil: it advances only on an observed dialogue_wait, stops
+        # on turn 2 AND all four boxes, and counts each box as it comes up. Any other
+        # talkUntil in the body (there are several) must not satisfy this.
+        self.assertIn('INSPECT.talkUntil(function() return turn() >= 2 and eruptionBoxes >= 4 end',
+                      body)
+        self.assertIn('onBox = function() eruptionBoxes = eruptionBoxes + 1 end', body)
+        self.assertIn('controllerState() == "dialogue_wait"',
+                      _block(harness, 'function INSPECT.talkUntil(', '\nend\n'))
+        self.assertIn('"advance_dialogue"', _block(harness, 'function INSPECT.advanceDialogue(', '\n\n'))
         self.assertIn('eruption warning showed %d boxes', body,
                       'the gate must distinguish the locked four-box scene from merely '
                       'reaching turn 2')
+
+    def test_goodberry_finds_its_row_by_item_id_not_by_bag_position(self):
+        """One DOWN was the Goodberry until #430 gave Hlin a Killer Axe first; from then on it
+        highlighted the Hand Axe (#531 item 10, the instrumented run's item dump)."""
+        body = _block(_read_harness(), 'scenarios.goodberry = function()', '\nend\n')
+        self.assertIn('local GOODBERRY = 0x6C', body)
+        self.assertIn('down and "menu_next" or "menu_previous"', body)
+        self.assertIn('if list.current ~= row then', body)
+
+    def test_the_observed_menu_is_the_unlocked_one_when_a_submenu_sits_above_its_parent(self):
+        """A submenu locks its parent and can take a HIGHER pool slot; the lowest-slot menu
+        was then the locked parent and the controller read 'transition' while the submenu
+        was up (goodberry's instrumented run: parent slot 7 locked, submenu slot 16)."""
+        body = _block(_read_harness(), 'local function anyMenuProc()', '\nend\n')
+        self.assertIn('if not lowest or ru8(lowest + 0x28) == 0 then return lowest end', body)
+        self.assertIn('ru8(p.addr + 0x28) == 0 then', body)
+        self.assertIn('off % pool.stride ~= 0', body, 'the walk stays inside the proc pool')
+        self.assertIn('if up == lowest then return p.addr end', body,
+                      'only a DESCENDANT of the locked menu may stand in for it')
 
     def test_ch05recruit_names_the_message_id_it_saw_not_just_the_box_count(self):
         """The Talk recruit's two arms both recruit Sahnar and both run 21 boxes (#25), so
