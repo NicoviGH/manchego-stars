@@ -816,8 +816,8 @@ def report(name, campaign=campaign_chapters.CAMPAIGN, cache_dir=None):
     out.append('  scenarios %s kind      verdict  when' % 'name'.ljust(width))
     for row in covering:
         # Only a `kind: verdict` scenario has a verdict to store -- a `record` one produces
-        # FRAMES, which is its whole output. "never run" beside twelve of those would read
-        # as a chapter in trouble when nothing is wrong.
+        # FRAMES, which is its whole output. "never run" beside one would read as a chapter in
+        # trouble when nothing is wrong.
         when = _age(row.stored) if row.kind == 'verdict' else 'films, no verdict'
         out.append('    %s %-9s %-8s %s'
                    % (row.scenario.ljust(width), row.kind, row.verdict or '--', when))

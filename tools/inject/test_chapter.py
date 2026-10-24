@@ -23,9 +23,11 @@ TEST_SPAWN_POSITIONS = [(5, 4), (7, 4), (9, 4), (11, 4),
                         (3, 5), (3, 7)]              # 12th-13th: ch05's Basil + Sahnar. Left-hand
                         # column mirroring the (13,*) one, and clear of the seize tile at (2,2).
 
-# The TESTCH sandbox doubles as the SINGLE battle-anim test bench: it deploys one hostile of
-# every enemy_class_reskins slot as a foe (a row south of the cast), so `recordenemy` can bait
-# any reskinned class into a counter and capture its anim -- the enemy analogue of `recordanim`
+# The TESTCH sandbox doubles as the SINGLE battle-anim test bench. Its recorders (`recordanim`,
+# `recordenemy`) were archived by #538 -- restore them from the commit that ADR names when a
+# battle animation changes -- and the bench is kept so that restore costs nothing. It deploys one hostile of
+# every enemy_class_reskins slot as a foe (a row south of the cast), so a battle-anim recorder can
+# bait any reskinned class into a counter and capture its anim -- the enemy analogue of the PC one
 # for the PC cast (no chapter-specific setup, all animations tested from one New Game). Iron
 # loadout by the reskin's BASE weapon type so the foe can actually attack/counter (anims are
 # weapon-keyed); a ranged option too, to exercise the thrown/ranged modes.
@@ -35,7 +37,7 @@ CLASS_RESKIN_FOE_WEAPON = {
     'CLASS_MERCENARY': ['ITEM_SWORD_IRON'],
     'CLASS_SOLDIER':   ['ITEM_LANCE_IRON', 'ITEM_LANCE_JAVELIN'],
     # A BOW class benches fine -- it just cannot be baited from an adjacent tile, because a bow
-    # has no range-1 attack to counter with. `recordenemy` now picks a bait whose reach overlaps
+    # has no range-1 attack to counter with. The recorder picked a bait whose reach overlaps
     # the foe's and stands at that distance, so an archer answers at range 2 exactly as RBG does
     # (Nicolas, 2026-08-20). This entry was missing on the theory that archers could not be
     # benched at all, which was the picker's limitation wearing a class's name.
@@ -45,7 +47,7 @@ CLASS_RESKIN_FOE_WEAPON = {
     'CLASS_SHAMAN':    ['ITEM_DARK_FLUX'],
     'CLASS_MAGE':      ['ITEM_ANIMA_FIRE'],
     'CLASS_BAEL':      ['ITEM_MONSTER_VENINCLW'],
-    # Healers bench too: they cannot counter, so `recordenemy` wounds a neighbour and films the
+    # Healers bench too: they cannot counter, so the recorder wounded a neighbour and filmed the
     # heal on the enemy phase instead (every standard AI action tries AiTryDoStaff first).
     'CLASS_PRIEST':    ['ITEM_STAFF_MEND'],
     'CLASS_TROUBADOUR': ['ITEM_STAFF_MEND'],
@@ -54,10 +56,10 @@ CLASS_RESKIN_FOE_WEAPON = {
 # it shipped as one anyway: the strip was extended a slot at a time as creatures joined, and
 # `_next_sandbox_tile`'s guard only catches running OUT of tiles, never a tile that does not
 # EXIST. The seventh creature (the white moose, once Ravisin took the sixth) deployed off the
-# map edge and `recordenemy` failed walking the cursor to a column the map has not got.
+# map edge and the recorder failed walking the cursor to a column the map has not got.
 # Spacing 2 is kept -- adjacent foes let the bait counter the wrong one -- so the strip starts
 # at 2 rather than running past 14.
-# The TESTCH bench: one seat per DISTINCT creature sprite, spacing 2 so `recordenemy` can always
+# The TESTCH bench: one seat per DISTINCT creature sprite, spacing 2 so a recorder can always
 # find a bait tile adjacent to ONLY its target (decisions.md -> "The TESTCH bench is bounded by
 # SMS VRAM, not by its tile row").
 #
@@ -102,13 +104,13 @@ def assert_sandbox_bench_fits(campaign):
         if not (0 <= x < w and 0 <= y < h):
             sys.exit('ERROR: sandbox bench tile (%d,%d) is outside the %dx%d sandbox map '
                      '(campaigns/%s/maps/ch-test-snowfield.json) -- a foe staged there '
-                     'cannot be reached, and recordenemy fails walking to it'
+                     'cannot be reached by a battle-anim recorder'
                      % (x, y, w, h, campaign))
 
 
 def _next_sandbox_tile(tiles, who):
     """The next free sandbox foe tile, or a loud failure. The bench is a fixed strip of
-    tiles; running out silently would stack two foes and make `recordenemy` bait the wrong
+    tiles; running out silently would stack two foes and make a recorder bait the wrong
     one, which is the failure the whole per-pid selection exists to prevent."""
     try:
         return next(tiles)
@@ -131,7 +133,7 @@ def _chapter_of(chapter_yaml):
 
 def _sandbox_foe_roster(campaign, bench=None):
     """A UnitDefinition[] body deploying one hostile of each creature ONE chapter adds, so
-    the TESTCH sandbox is the battle-anim bench (`recordenemy` baits any of them). Generic
+    the TESTCH sandbox is the battle-anim bench (a recorder can bait any of them). Generic
     autolevel monsters (charIndex 0x80), FACTION_ID_RED, HOLD ai so they stay put to be baited,
     iron loadout by the reskin's BASE weapon type. A reskin whose base has no mapped weapon is
     skipped (never a foe).
@@ -245,7 +247,7 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False, bench=None):
         udefs, 'UnitDef_Event_Ch1Ally[] =', roster, CH1_UDEFS_H)
     # Make the sandbox the single battle-anim bench: replace the Ch1 foe roster with one
     # hostile of every enemy_class_reskins slot (the begin scene already LOAD1s this symbol),
-    # so `recordenemy` can capture any reskinned class's anim without a chapter-specific setup.
+    # so a recorder can capture any reskinned class's anim without a chapter-specific setup.
     foes = _sandbox_foe_roster(campaign, bench)
     udefs = _replace_brace_block(
         udefs, 'UnitDef_Event_Ch1Enemy[] =', foes, CH1_UDEFS_H)
@@ -304,6 +306,6 @@ def inject_test_chapter(campaign, verbose=True, lord_boot=False, bench=None):
                   % (unit_id, slot, class_enum.replace('CLASS_', '')))
         foe_classes = [rk['slot'].replace('CLASS_', '') for rk in enemy_class_reskins(campaign)
                        if rk['base'] in CLASS_RESKIN_FOE_WEAPON]
-        print('  sandbox foes (recordenemy bench): %s' % ', '.join(foe_classes))
+        print('  sandbox foes (battle-anim bench): %s' % ', '.join(foe_classes))
         print('  Ch1 stripped to sandbox; boot attract + Magvel intro cut; '
               'New Game boots into Ch1')

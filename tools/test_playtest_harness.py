@@ -152,8 +152,8 @@ class TestAwaitControllerState(unittest.TestCase):
         # one of them silently keeps the bug.
         self.assertNotIn('if routed and not advanced() then endTurn()', harness,
                          'no scenario may end the turn on the chapter-number guard alone')
-        self.assertEqual(harness.count('endTurn(nil, advanced)'), 2,
-                         'clear_ch02 and recordchain must both pass the win predicate')
+        self.assertEqual(harness.count('endTurn(nil, advanced)'), 1,
+                         'clear_ch02 must pass the win predicate')
 
     def test_a_chapter_ending_mid_phase_is_an_exit_not_a_wedge(self):
         # #335. A DefeatAll win fires the ending from INSIDE the enemy phase, and from there
@@ -393,65 +393,12 @@ class TestPlaytestHarness(unittest.TestCase):
             symbols = f.read()
         self.assertIn("'gFaces'", symbols)
 
-    def test_recordch05eruption_records_only_the_turn_two_scene(self):
-        harness = _read_harness()
-        self.assertIn('scenarios.recordch05eruption = function()', harness)
-        body = _block(harness, 'scenarios.recordch05eruption = function()',
-                      '\n-- THE VISIT HELPERS')
-        self.assertIn('endTurn()', body)
-        self.assertIn('recordCutscene({', body)
-        self.assertIn('turn() >= 2', body)
-        self.assertIn('not procActive(SYM.ProcScr_StdEventEngine)', body)
-
-    def test_recordch05ravisindeath_records_one_real_boss_death_box(self):
-        harness = _read_harness()
-        self.assertIn('scenarios.recordch05ravisindeath = function()', harness)
-        body = _block(harness, 'scenarios.recordch05ravisindeath = function()',
-                      '\n-- ch04cottage')
-        self.assertIn('bootToMap()', body)
-        self.assertIn('pokeFrail(boss)', body)
-        self.assertIn('chooseAttack(', body)
-        self.assertIn('recordCutscene({', body)
-        self.assertIn('shotEvery = 1', body,
-                      'per-frame capture must preserve the death box before advancing it')
-        self.assertIn('controllerState() == "dialogue_wait"', body)
-        self.assertIn('eventFlag(2)', body,
-                      'the recorder must preserve the DefeatBoss flag as its terminal proof')
-        self.assertIn('boxes == 1', body,
-                      'the focused proof must require exactly the one locked death box')
-
-        # The row is DERIVED from ch05's chapter YAML now (#314), so this asserts the
-        # resolved row rather than matrix.yaml's text: it checks the value the runner
-        # actually uses, and it keeps holding wherever the declaration lives.
-        sys.path.insert(0, os.path.join(REPO, 'tools', 'playtest'))
-        import matrix as mx
-        row = mx.Manifest.load().resolve('recordch05ravisindeath')
-        self.assertEqual((row.rom, row.host_chapter, row.kind), ('ch05boot', 6, 'record'))
-
     def test_ch04snag_accepts_the_native_fallen_snag_crossing(self):
         harness = _read_harness()
-        body = _block(harness, 'scenarios.ch04snag = function(opts)', '\n-- recordch04snag')
+        body = _block(harness, 'scenarios.ch04snag = function()', '\n-- clear_ch04 / clear_ch04_parley')
         self.assertIn('local T_CROSSING = 0x34', body,
                       'the painted center metatile uses TERRAIN_BRIDGE_SNAG; the playtest '
                       'must not retain the old generic-bridge workaround')
-
-    def test_moose_recorder_wires_fast_setup_to_guaranteed_cleanup(self):
-        with open(HARNESS, encoding='utf-8') as source:
-            harness = source.read()
-
-        start = harness.index('scenarios.recordch04moose = function()')
-        end = harness.index('\n-- ch04moose:', start)
-        recorder = harness[start:end]
-
-        fast = recorder.index('pokeFastConfig()')
-        boot = recorder.index('bootToMap()')
-        march = recorder.index('marchPartyToward(')
-        self.assertLess(fast, boot)
-        self.assertLess(boot, march)
-        self.assertIn('return false, "never reached the ch04 map"', recorder)
-        self.assertIn('return false, "party never triggered the moose sighting"', recorder)
-        self.assertIn('afterPre = pokeNormalConfig', recorder)
-
 
 class TestDifficultyGateDefault(unittest.TestCase):
     """The playtest gate grades NORMAL unless a scenario asks otherwise (#303 follow-up).

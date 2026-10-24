@@ -424,13 +424,6 @@ class WrongRomGuard(unittest.TestCase):
         path = self.stamp(CH05BOOT=True, CH05ENDING=True)
         self.assertIsNone(mx.built_rom_config(m.rom_configs, path))
 
-    def test_the_real_manifest_gives_each_ending_arm_its_own_rom(self):
-        """The three arms must not share a ROM config, or two of them film the third."""
-        real = mx.Manifest.load()
-        roms = {real.resolve(s).rom for s in
-                ('recordch05ending', 'recordch05endingnosahnar', 'recordch05endingbasildied')}
-        self.assertEqual(3, len(roms), 'two ending scenarios share a ROM: %s' % sorted(roms))
-
     def test_matching_rom_is_allowed(self):
         m = manifest(scenarios={'ch04moose': {'rom': 'ch04boot'}})
         path = self.stamp(CH04BOOT=True)
@@ -503,10 +496,7 @@ class RealManifest(unittest.TestCase):
         for name, probe in (('ch04redstats', 'INSPECT.redStats'),
                             ('ch04waves', 'INSPECT.firstAttacks'),
                             ('ch07redstats', 'INSPECT.redStats'),
-                            ('ch07blueorder', 'INSPECT.blueOrder'),
-                            ('ch07titlecard', 'titlecard'),
-                            ('mapfullch05', 'mapfull'),
-                            ('recordch05openinglupin', 'recordch05opening')):
+                            ('ch07blueorder', 'INSPECT.blueOrder')):
             entry = self.m.resolve(name).entry
             self.assertEqual(entry, probe)
             self.assertIn(probe, mx.reaches(entry, funcs))
@@ -616,39 +606,27 @@ class RealManifest(unittest.TestCase):
             self.assertEqual(s.rom, 'ch03boot', name)
             self.assertEqual(s.host_chapter, 4, name)
 
-    def test_the_ravisin_capture_uses_the_real_ch05_map(self):
-        s = self.m.resolve('recordravisin')
-        self.assertEqual(s.rom, 'ch05boot')
-        self.assertEqual(s.host_chapter, 6)
-        self.assertEqual(s.kind, 'record')
-
     def test_the_sandbox_scenarios_need_the_testch_rom(self):
-        for name in ('recordanim', 'recordrbgtest', 'recordenemy', 'recordunitlist'):
+        for name in ('recordunitlist',):
             self.assertEqual(self.m.resolve(name).rom, 'testch', name)
 
     def test_run_sh_checkpoint_map_survived_the_port(self):
         # the exact table run.sh used to own, asserted row by row
-        expected = {'recordending': 'seize', 'recordprep': 'prep', 'recordsupply': 'lordpinky',
-                    'recordrescue': 'prep', 'recordtrade': 'prep', 'recordfix': 'prep',
-                    'recordrbg': 'rbgch01', 'ch02': 'ch02start', 'smoke_ch02': 'ch02start',
-                    'clear_ch02': 'ch02start', 'ch02baxby': 'ch02start',
-                    'recordch02map': 'ch02start', 'recordch02combat': 'ch02start',
-                    'recordch02ending': 'ch02start', 'recordchain': 'ch02start',
-                    'recordch02intro': 'ch02intro'}
+        # (its headed rows were archived by #538; the verdict rows remain)
+        expected = {'recordsupply': 'lordpinky', 'ch02': 'ch02start', 'smoke_ch02': 'ch02start',
+                    'clear_ch02': 'ch02start', 'ch02baxby': 'ch02start'}
         for name, ckpt in expected.items():
             self.assertEqual(self.m.resolve(name).checkpoint, ckpt, name)
 
     def test_run_sh_timing_policy_survived_the_port(self):
-        # record* -> 60fps/vsync/300s; smoke*|fuzz*|clear_ch02|recordch02ending -> 600s
-        self.assertEqual(self.m.resolve('recordending').fps, 60)
-        self.assertEqual(self.m.resolve('recordending').vsync, 1)
-        self.assertEqual(self.m.resolve('recordending').deadline, 300)
+        # record* -> 60fps/vsync/300s; smoke*|fuzz*|clear_ch02 -> 600s
+        self.assertEqual(self.m.resolve('recordscene').fps, 60)
+        self.assertEqual(self.m.resolve('recordscene').vsync, 1)
+        self.assertEqual(self.m.resolve('recordscene').deadline, 300)
         self.assertEqual(self.m.resolve('win').fps, 240)
         self.assertEqual(self.m.resolve('win').deadline, 420)
         for name in ('smoke', 'smoke_ch02', 'fuzz', 'clear_ch02'):
             self.assertEqual(self.m.resolve(name).deadline, 600, name)
-        self.assertEqual(self.m.resolve('recordch02ending').deadline, 600)
-        self.assertEqual(self.m.resolve('recordch02ending').fps, 60)
         self.assertEqual(self.m.resolve('llm').deadline, 2100)
 
 
@@ -795,6 +773,14 @@ class RomCache(unittest.TestCase):
         b = mx.rom_input_hash(['CH05BOOT=1'])
         self.assertTrue(a and b)
         self.assertNotEqual(a, b)
+
+    def test_every_build_leaves_a_fresh_rom(self):
+        """#538: make leaves an up-to-date .gba's mtime alone, and run.sh refuses a ROM older
+        than campaign sources -- so a build that wrote nothing failed every scenario in 0s.
+        The ROM rule's last step touches the ROM, for `make` and the matrix alike."""
+        with open(os.path.join(mx.REPO, 'Makefile')) as fh:
+            rule = fh.read().split('\nfireemblem8.gba:\n', 1)[1].split('\n\n', 1)[0]
+        self.assertTrue(rule.rstrip().endswith('touch $(BUILD_TREE)/fireemblem8.gba'), rule)
 
     def test_a_touched_input_changes_the_digest(self):
         target = os.path.join(mx.REPO, 'tools', 'build_campaign.py')
@@ -1060,7 +1046,7 @@ class VerdictFingerprint(unittest.TestCase):
         self.assertIsNone(self.fingerprint(scenario=gone))
 
     def test_a_PT_env_var_the_run_reads_is_part_of_the_key(self):
-        """run.sh passes PT_SEED/PT_CHAR/PT_ROUNDS... straight into the wrapper, so two
+        """run.sh passes PT_SEED/PT_STATE/PT_TAG... straight into the wrapper, so two
         runs of the same scenario at different seeds are different runs. Without this,
         `PT_SEED=7 matrix.py run --scenarios fuzz_ch01` collides with the seed-1 key and
         is served a cached PASS it never earned."""

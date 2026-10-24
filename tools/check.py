@@ -98,6 +98,10 @@ DEAD_CONCEPTS = [
     # retired by #531 G3: the verdict cache keys on a row's `entry`, so a chapter case binds a
     # generic function with `lua:` and no wrapper "delegates" to keep the cache attributing it
     r'\bdelegates rather than alias', r'\bdelegate, don.t alias',
+    # retired by #538 (ADR 0367): the battle-anim recorders' knobs and tables left with them; a
+    # line restoring one cites the ADR (DEAD_CONCEPT_CITATIONS)
+    r'\bPT_CHAR\b', r'\bPT_ROUNDS\b', r'\bPLAYTEST_CHAR\b', r'\bPLAYTEST_ROUNDS\b',
+    r'\bRESKIN_CLASS\b', r'check_recordenemy_knows_every_raw_pid',
     # retired by ADR 0363, edited in place (Nicolas, 2026-10-23): a planned chapter gets no
     # difficulty reading, so there is no projected target, its twin's or the yardstick's
     r'unwritten_projection', r'planned_target', r'vanilla_projection',
@@ -680,7 +684,7 @@ def lua_local_headroom(path, probe_max=8):
 # quarter against the handful that were then free (#327). Freezing the count redirects the next helper into a
 # module, and modules expand by ADDING FILES, which has no ceiling. That is what makes this
 # scale; thinning the tail only makes it comfortable.
-HARNESS_TOP_LEVEL_LOCALS = 167
+HARNESS_TOP_LEVEL_LOCALS = 156
 
 # `[ \t]`, never `\s`: `\s` matches a NEWLINE, so `local controllerFault` followed by
 # `local function log` merged into one match and the count came out one short. A counter
@@ -1239,37 +1243,6 @@ def check_injector_source_has_one_reader(fail, sources=None):
                         'rather than failing. A file that RUNS it names why in '
                         'INJECTOR_PATH_NAMERS.' % (rel, line))
     return fail
-
-
-def check_recordenemy_knows_every_raw_pid(fail):
-    """`recordenemy` is the bench for a named RAW-PID creature's battle animation, and it picks
-    the foe by PID from a table inside harness.lua -- a hand-kept copy of build_campaign's
-    RAW_PID_BATTLE_ANIMS. Two lists that must agree and nothing making them: adding the next
-    creature and forgetting the Lua half fails the bench with "unknown enemy", which reads like
-    a broken animation rather than a missing table row (it cost a run when Ravisin landed).
-    The pid also has to MATCH -- benching the wrong pid silently films the wrong unit."""
-    import re as _re
-    pids = {}
-    src = _injector().injector_source()
-    block = _re.search(r'RAW_PID_BATTLE_ANIMS = \{(.*?)\n\}', src, _re.S)
-    if not block:
-        fail.append('injector: RAW_PID_BATTLE_ANIMS not in the expected form')
-        return
-    for uid, const in _re.findall(r"'([\w-]+)':\s*\([^,]+,\s*(\w+)\)", block.group(1)):
-        m = _re.search(r'^%s\s*=\s*\'(0x[0-9a-fA-F]+)\'' % _re.escape(const), src, _re.M)
-        if m:
-            pids[uid] = int(m.group(1), 16)
-    harness = _read_text(os.path.join(REPO, 'tools', 'playtest', 'harness.lua'))
-    bench = {uid: int(pid, 16) for uid, pid
-             in _re.findall(r'\["([\w-]+)"\]\s*=\s*(0x[0-9a-fA-F]+)', harness)}
-    for uid, pid in sorted(pids.items()):
-        if uid not in bench:
-            fail.append('recordenemy cannot bench %s: RAW_PID_BATTLE_ANIMS has it, harness.lua\'s '
-                        'pid table does not (PT_CHAR=%s would report "unknown enemy")' % (uid, uid))
-        elif bench[uid] != pid:
-            fail.append('recordenemy benches %s at pid 0x%02X, but build_campaign deploys it at '
-                        '0x%02X -- the bench would film a different unit'
-                        % (uid, bench[uid], pid))
 
 
 GATE_CHAPTER_WINDOW = 2
@@ -2555,6 +2528,8 @@ DEAD_CONCEPT_CITATIONS = (
     # the line wherever it breaks, and three of the four live citations put the break inside
     # the title. Matching from "talk at" is still specific to this one record.
     r'talk at 29 CHARACTERS',
+    # A line that restores something ADR 0367 archived names it on purpose.
+    r'ADR 0367',
 )
 
 
@@ -3542,7 +3517,7 @@ CHECKS = (
     check_one_tileset_default,
     check_generated_indexes_fresh,
     check_purple_bank_blankers_known, check_engine_campaign_agnostic, check_save_layout_stable,
-    check_every_test_actually_runs, check_recordenemy_knows_every_raw_pid,
+    check_every_test_actually_runs,
     check_wrap_widths_are_pixels, check_vanilla_reads_come_from_head,
     check_build_workflow_filters_agree, check_decision_records_wellformed,
     check_decision_citations_resolve,

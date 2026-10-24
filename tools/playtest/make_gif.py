@@ -7,9 +7,10 @@ turns those frames into a single GIF for motion review.
 
 Standard workflow (the recording capability, so it isn't re-derived each time):
 
-    tools/playtest/run.sh recordending                 # capture frames -> /tmp/playtest-recordending/
-    tools/playtest/make_gif.py recordending end \\      # frames tagged "end" -> a GIF
-        --name ch01-ending-rolling-cheddar --open
+    PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep \\
+        tools/playtest/run.sh recordscene             # capture frames -> /tmp/playtest-recordscene/
+    tools/playtest/make_gif.py recordscene intro \\     # frames tagged "intro" -> a GIF
+        --name ch02-opening --open
 
 By default, the GIF is written under docs/demo/ so it can be committed on the
 current feature branch and reviewed in the GitHub PR.
@@ -61,7 +62,7 @@ def collect_frames(shotdir, tag):
 def trim_frames(frames, lo, hi):
     """Keep the frames whose shot number is within [lo, hi] (either bound optional).
 
-    A no-checkpoint recording (recordch03open, recordch04open) replays its whole
+    A no-checkpoint recording (one that boots from New Game) replays its whole
     lead-in, so hundreds of frames of logos, title and Select Mode land in front of
     the scene. Committed docs/demo GIFs live in git history forever, so trimming the
     dead head/tail is worth doing at assembly time rather than shipping it."""

@@ -50,11 +50,6 @@
 #   ch04packmath         -- the Stage 5 balance question: kill 2 of the 5 generic wolves, THEN
 #                           parley, and count the green allies. Answers whether LOAD1 brings the
 #                           full five-wolf table back regardless of who died (it does)
-#   attackprobe          -- diagnostic: why a clear-bot's blind Attack press lands on the wrong
-#                           command row. Dumps vision range, every red's grid id + fog byte, the
-#                           5x5 gBmMapUnit window, and photographs the open menu. Any hosted map
-#   recordch04open       -- the two-BG Lonelywood opening in motion (#24; PT_HOST_CHAPTER=5, CH04BOOT=1)
-#   recordch04reveal     -- the turn-2 wolf-pack reveal cutscene in motion (same ROM/host)
 #   recordch04parley     -- Marty's Talk on the wolf pack + the green swap, in motion
 #   ch04moose            -- the moose sighting is PLAYER-only: assert it skips the enemy phase
 #                           and still fires when the party walks into the clearing (same ROM/host)
@@ -78,30 +73,10 @@
 #                    Env: PT_STATE=<checkpoint> PT_TAG=<frametag> PT_UNTIL=prep|title|chapter
 #                    [PT_SPEED=normal|fast] [PT_MAXFRAMES=6000] [PT_PRESSEVERY=60] [PT_SHOTEVERY=4]
 #                      PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep tools/playtest/run.sh recordscene
-#                    ONE loop (recordCutscene in harness.lua) does the work. recordending and
-#                    recordch02intro are named PRESETS over it (a checkpoint + fixed params).
-#                    The rest are NOT cutscene recorders and stay separate: recordopening /
-#                    recordch01 replay a lead-in instead of loading a checkpoint; scenes /
-#                    record / recordch01trail / recordch02map / recordch02combat drive gameplay
-#                    (boot, unit moves, combat) -- different tools, not duplication.
-#   recordending  -- the ch01 "Rolling Cheddar" outro cutscene (frames tagged "end"); preset over recordscene
-#   recordchain   -- the ch02 -> ch03 CHAIN (#23): routs ch02 at top speed off ch02start, fires the win,
-#                    then records the ch02 ending -> MNC2(0x4) -> ch03 opening -> PREP (frames "chain").
-#                      tools/playtest/run.sh recordchain
-#                      tools/playtest/make_gif.py recordchain chain --name ch02-ch03-chain --open
-#   recordprep    -- the Preparations + Pick Units deploy screen (frames "prep")
-#   recordrbg     -- RBG's custom battle anim ("rbg"); loads the rbgch01 checkpoint
-#   recordanim    -- ANY cast member's battle anim on a `make TESTCH=1` ROM: New Game boots
-#                    STRAIGHT into the Ch1 sandbox (whole cast + foes pre-deployed), so
-#                    boot->fire ~30s, no prologue grind / lord-select / save-state. Pick the
-#                    unit with PT_CHAR=<id> (default prof-rbg): braulo marty meesmickle wolfram
-#                    prof-rbg rootis sclorbo pinky lupin baxby basil sahnar. Frames tagged <id>:
-#                      PT_CHAR=braulo tools/playtest/run.sh recordanim
-#                      tools/playtest/make_gif.py recordanim braulo --name braulo-anim --open
-#                    A staff-only unit (sclorbo) FAILs cleanly: no attack = no combat anim.
-#                    Build TESTCH=1 first. (recordrbgtest is the back-compat alias for RBG.)
-#   recordravisin -- Ravisin's live enemy status-screen portrait on the real ch05 map
-#                    (needs CH05BOOT=1; proves raw pid 0xB8 -> dressed Riev portrait binding).
+#                    ONE loop (recordCutscene in harness.lua) does the work, for any scene
+#                    a checkpoint can reach. The per-scene films were archived (#538): a scene
+#                    is filmed only when it changes, and the ADR names the commit to restore
+#                    a gameplay or battle-anim recorder from.
 #   recordunitlist -- the map-menu "Unit" screen (Character list) on a `make TESTCH=1` ROM (#218):
 #                    boots straight into the Ch1 sandbox with the whole cast deployed, opens the
 #                    list semantically off gMapMenuItems[0] (overrideId 0x6E), shoots every page,
@@ -109,22 +84,8 @@
 #                    FAILs if the two UseUnitSprite counters cross (later sprites overwrite earlier).
 #                      tools/playtest/run.sh recordunitlist
 #                      tools/playtest/make_gif.py recordunitlist unitlist --name unit-list
-#   recordenemy   -- the ENEMY analogue of recordanim on the SAME TESTCH sandbox (#90): a
-#                    reskinned enemy CLASS's battle anim, or a named RAW-PID creature's (#25).
-#                    The sandbox benches ONE chapter's creatures (BENCH=chNN, default the
-#                    newest): one hostile of each reskin that chapter dresses plus each
-#                    RAW_PID_BATTLE_ANIMS unit it owns, under its OWN pid; a harmless player
-#                    baits the chosen foe into a counter-attack (a HEALER instead gets a
-#                    1-HP patient beside it and heals on the enemy phase). Pick with
-#                    PT_CHAR=<reskin id|classid>, a creature of the benched chapter, e.g.:
-#                      make TESTCH=1 && PT_CHAR=shark-rider tools/playtest/run.sh recordenemy
-#                      tools/playtest/make_gif.py recordenemy shark-rider --name shark-anim
-#                      make TESTCH=1 BENCH=ch05 && PT_CHAR=white-moose tools/playtest/run.sh recordenemy
-#   recordch01trail / recordlord / recordlordfast / recordch01 / recordopening /
-#   record / scenes / scenesch01 / bootobserve -- other scenes (no checkpoint: these
-#   replay their full lead-in at 60fps, so they are the slowest captures)
 #
-# CHECKPOINTS (fast playtest, viewable spot-check): record scenarios load a save state
+# CHECKPOINTS (fast playtest, viewable spot-check): recordscene loads a save state
 # built ONCE at top speed (240fps) by a ckpt_* scenario, then replay JUST that section
 # at 60fps so the motion is faithful and watchable. run.sh does this automatically --
 # it builds the checkpoint (if missing or stale for this ROM build) then runs the record
@@ -133,7 +94,7 @@
 #
 # To turn recorded frames into a GIF and show Nicolas (he can't see inline renders):
 #   tools/playtest/make_gif.py <scenario> <tag> --name <basename> --open
-#   e.g. tools/playtest/make_gif.py recordending end --name ch01-ending --fps 15 --open
+#   e.g. tools/playtest/make_gif.py recordscene intro --name ch02-opening --fps 15 --open
 #
 # Requires the mGBA 0.11+ nightly (has --script); auto-downloads it into
 # tools/emulator/mGBA-dev.app on first run. Results land in /tmp/playtest-<scenario>/.
@@ -150,7 +111,7 @@ if [ "${PT_VANILLA:-0}" = "1" ]; then
     ROM="$REPO/build/vanilla-fe8/fireemblem8.gba"
     export PT_ELF="$REPO/build/vanilla-fe8/fireemblem8.elf" MX_SKIP_ROM_CHECK=1
 fi
-SCENARIO="${1:?usage: run.sh <scenario>  (see header: win|ch01win|recordending|recordprep|...)}"
+SCENARIO="${1:?usage: run.sh <scenario>  (see header: win|ch01win|recordscene|...)}"
 KEEP_OPEN="${2:-}"
 STATE_DIR="$HERE/states"
 mkdir -p "$STATE_DIR"
@@ -235,9 +196,9 @@ if [ -z "${MX_SKIP_ROM_CHECK:-}" ]; then
         echo "        previous build. Newer than $ROM:" >&2
         echo "$_stale" | sed 's/^/          /' >&2
         echo "        Rebuild first, e.g.  make CAMPAIGN=<c> [FLAGS] fireemblem8.gba -j8" >&2
-        echo "        (or run it through matrix.py, which builds). MX_SKIP_ROM_CHECK=1 opts out;" >&2
-        echo "        it is honest after a clean rebuild that wrote nothing (a comment-only" >&2
-        echo "        YAML edit leaves the ROM up to date but older by mtime)." >&2
+        echo "        (or run it through matrix.py, which builds). A successful build touches" >&2
+        echo "        the ROM (Makefile), so seeing this means no build has succeeded since those" >&2
+        echo "        files changed." >&2
         exit 2
     fi
 fi
@@ -295,8 +256,6 @@ PLAYTEST_LOG = "$log"
 PLAYTEST_SHOTDIR = "$out"
 PLAYTEST_STATEDIR = "$STATE_DIR"
 PLAYTEST_SEED = "${PT_SEED:-1}"
-PLAYTEST_CHAR = "${PT_CHAR:-}"
-PLAYTEST_ROUNDS = ${PT_ROUNDS:-1}
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-${MX_HOST_CHAPTER:-1}}
 PLAYTEST_CHECKPOINT = "${CKPT:-}"
 PLAYTEST_DIFFICULTY = "${PT_DIFFICULTY:-normal}"
@@ -480,7 +439,7 @@ fi
 FPS="$MX_FPS"; VSYNC="$MX_VSYNC"; DEADLINE_S="$MX_DEADLINE"
 # PT_FPS overrides the rate. 60fps+videoSync is only needed to capture smooth cutscene
 # FADES; verification captures of static text/boxes (sign, death quote) read fine at top
-# speed, so `PT_FPS=240 ... recordfix` runs ~4x faster.
+# speed, so `PT_FPS=240 ... recordscene` runs ~4x faster.
 if [ -n "${PT_FPS:-}" ]; then FPS="$PT_FPS"; [ "$PT_FPS" -ge 240 ] && VSYNC=0; fi
 run_mgba "$SCENARIO" "$FPS" "$VSYNC" "$DEADLINE_S" \
     "$([ "$SCENARIO_HEADLESS" = "1" ] && echo headless || echo headed)" "$MX_FPS"

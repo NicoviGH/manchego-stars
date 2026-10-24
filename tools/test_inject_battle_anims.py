@@ -260,11 +260,11 @@ class TestRawPidBattleAnim(unittest.TestCase):
             inject.battle_anims.banim_u25_marker('nobody-at-all')
 
     def test_the_sandbox_benches_the_moose_under_its_own_pid(self):
-        # The TESTCH sandbox is "one bench for every battle animation" (recordenemy's docstring),
-        # and it deployed foes by CLASS alone. That is enough for a class-level reskin, but the
-        # moose's anim binds per-CHARACTER through _u25 -- so a Cavalier deployed under a
-        # generic charIndex plays the stock HORSEMAN, and the bench would prove the
-        # opposite of what it was run for. Its foe row must carry charIndex 0xb9.
+        # The TESTCH sandbox is "one bench for every battle animation" (the archived battle-anim
+        # recorder's docstring), and it deployed foes by CLASS alone. That is enough for a
+        # class-level reskin, but the moose's anim binds per-CHARACTER through _u25 -- so a
+        # Cavalier deployed under a generic charIndex plays the stock HORSEMAN, and the bench
+        # would prove the opposite of what it was run for. Its foe row must carry charIndex 0xb9.
         body = inject.test_chapter._sandbox_foe_roster('rime-of-the-frostmaiden', 'ch05')
         self.assertIn('.charIndex = 0xb9,', body)
         moose = [b for b in body.split('    {') if '0xb9' in b]
@@ -317,7 +317,7 @@ class TestRawPidBattleAnim(unittest.TestCase):
 
         This used to sort ALL the x values flat and require a gap of 2 -- a proxy for the real
         rule that only held while the bench was ONE row, and a second row (#25) legitimately
-        shares columns. The property `recordenemy` needs is stated directly: it walks the ring
+        shares columns. The property a battle-anim recorder needs is stated directly: it walks the ring
         at the bait's distance looking for an on-map, empty tile with no OTHER foe inside the
         bait's own reach, and fails the run if there is none.
 
@@ -325,7 +325,7 @@ class TestRawPidBattleAnim(unittest.TestCase):
         WIDER ring and excludes on a wider radius, and which applies depends on the weapons the
         two units happen to be carrying at runtime -- which this cannot see. Range 1 is the
         tightest case for finding a tile and the loosest for exclusion, so passing here is
-        necessary, not sufficient. The four `recordenemy` films are what prove the rest.
+        necessary, not sufficient. A recorder's films prove the rest (restore one per ADR 0367).
         """
         tiles = inject.test_chapter.SANDBOX_FOE_POSITIONS
         self.assertEqual(len(set(tiles)), len(tiles), 'two creatures share a tile')
