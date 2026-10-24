@@ -26,8 +26,8 @@ G3 #537 78105ed; the summary is on #531).
   with `lua: INSPECT.redStats` and never with a one-line wrapper. A bound `INSPECT` probe takes no
   parameters (`matrix.entry_defined`).
 - Read harness.lua in Python through `matrix.harness_source()` / `harness_functions_at()`.
-- **45 headed runs are owed to Nicolas's next playtest**, listed on #531 (G2's 42 plus `ch07titlecard`,
-  `mapfullch05` and `recordch05openinglupin` from G3). They were converted, never run ("Convert, don't run").
+- **No headed runs are owed** (Nicolas, 2026-10-24: "I am not running 45 headed scenarios ever"). A
+  record/diagnostic scenario is run only when the scene it films changes; he wants them archived.
 - Still open on #531 by plan: audit #8, #11, #12's film loops (record-only) and #17 (chunking).
 
 **Next: step 9 PR C** (Tasks 3-5 + C4), then D, E, F. Stacked PRs on D->E->F only.
