@@ -163,8 +163,12 @@ do
     check(api.phases, 0, "and no phase is spent finding that out")
 
     api = raid({}, nil, {"south", "west"})
-    check(api.verdict, "FAIL", "a site CAMPAIGN.VILLAGES does not carry FAILs")
+    check(api.verdict, "ERROR", "a site CAMPAIGN.VILLAGES does not carry is the author's ERROR")
     contains(api.reason, "\"west\"", "the failure names the id")
+
+    api = raid({}, {phases = 2, hold = 0})
+    check(api.verdict, "FAIL", "a `hold` that is not a boolean FAILs (Lua would read 0 as true)")
+    check(api.held, 0, "and holds nobody")
 
     api = raid({phaseResults = {[2] = "gameover"}})
     check(api.verdict, "FAIL", "a party that dies while idling FAILs")

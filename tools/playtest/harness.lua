@@ -7167,8 +7167,10 @@ local co = coroutine.create(function()
         -- takes. A site is CAMPAIGN.VILLAGES's (gen_symbols: tile, flag and gift by YAML id).
         enemyPhase = function() return runEnemyPhase() end,
         holdParty = function()
+            -- Full HP, never past it: HP above max feeds the AI's target scoring, and the
+            -- raiders' routing is what a held raid is testing.
             for _, u in BOARD.each("blue") do
-                if not u.dead then emu:write8(u.addr + 0x13, 60) end
+                if not u.dead then emu:write8(u.addr + 0x13, u.maxhp) end
             end
         end,
         turn = turn,

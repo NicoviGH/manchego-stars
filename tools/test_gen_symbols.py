@@ -74,6 +74,17 @@ class CampaignIds(unittest.TestCase):
         self.assertEqual({'x': 12, 'y': 3, 'flag': 10}, villages['targos-hut-east'])
         self.assertEqual({'x': 12, 'y': 19, 'flag': 10, 'gift': 0x60}, villages['reliquary-south'])
 
+    def test_every_declared_raid_names_a_site_the_export_carries(self):
+        # declared.py checks an id against the chapter's `villages:`, but only a village whose
+        # injector arms an event id is exported; a raid on any other would ERROR at run time.
+        import declared
+        for _short, case in declared.cases():
+            for entry in case.get('then') or ():
+                for site in (entry.get('raided') or ()) if isinstance(entry, dict) else ():
+                    self.assertIn(site, self.ids['VILLAGES'],
+                                  '%s raids %s, which no CHNN_VILLAGE_FLAGS arms'
+                                  % (case['name'], site))
+
     def test_hosts_follow_the_host_slots(self):
         # Every hosted chapter, so a film can name the slot a chain lands on; from ch01 on each
         # chapter N sits on slot N + 1.

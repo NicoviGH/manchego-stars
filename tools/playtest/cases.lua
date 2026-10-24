@@ -157,7 +157,7 @@ end
 
 -- `idle: {phases, hold, until}`: give the turns back. End the player phase and ride out the
 -- enemy's, `phases` times, never acting -- how a case hands a site to the raiders. `hold: true`
--- refills every blue unit's HP before each phase, because a party deployed across the raid's
+-- refills every blue unit to full HP before each phase, because a party deployed across the raid's
 -- path is routed by an honest idle before the question is answered (ch02raid's first run died
 -- on turn 11), and whether the party SURVIVES is a balance question for `make difficulty` and
 -- the human pass, not for a wiring test. `until: raided` stops at the first phase after which
@@ -165,6 +165,9 @@ end
 M.WHEN.idle = function(api, arg, state)
     if type(arg) ~= "table" or type(arg.phases) ~= "number" or arg.phases < 1 then
         return false, "an `idle` step needs a positive numeric `phases`"
+    end
+    if arg.hold ~= nil and type(arg.hold) ~= "boolean" then
+        return false, string.format("`idle`'s `hold` is true or false, not %q", tostring(arg.hold))
     end
     local stop = arg["until"]
     if stop ~= nil and stop ~= "raided" then
@@ -310,23 +313,26 @@ M.VILLAGE, M.RUINS = 0x03, 0x25
 
 -- Resolve the case's `raided` sites once the map is up, and refuse a site that is not a
 -- village now: nothing can raid it and nothing can visit it, so "it never fell" would blame
--- the raiders for a tile the chapter never built.
+-- the raiders for a tile the chapter never built. "Up" is `on_map`'s settle, the same
+-- event wait (INSPECT.settle "event", 6000) the hand-written raids opened with.
+-- Returns ok, verdict, why: a malformed list or an unknown id is the AUTHOR's error (ERROR,
+-- like an unknown step); a site that is not a village is the CHAPTER's (FAIL).
 function M.watchRaids(case, api, state)
     for _, entry in ipairs(case["then"] or {}) do
         local key, ids = M.pair(entry)
         if key == "raided" then
             if type(ids) ~= "table" or #ids == 0 then
-                return false, "`raided` takes a list of village ids"
+                return false, "ERROR", "`raided` takes a list of village ids"
             end
             for _, id in ipairs(ids) do
                 local site = api.village(id)
                 if not site then
-                    return false, string.format("`raided` names %q, which CAMPAIGN.VILLAGES "
+                    return false, "ERROR", string.format("`raided` names %q, which CAMPAIGN.VILLAGES "
                         .. "does not carry", tostring(id))
                 end
                 local terrain = api.terrainAt(site.x, site.y)
                 if terrain ~= M.VILLAGE then
-                    return false, string.format(
+                    return false, "FAIL", string.format(
                         "%s (%d,%d) is terrain 0x%02X before the raid, not a village -- nothing "
                         .. "can raid it and nothing can visit it", id, site.x, site.y, terrain)
                 end
@@ -363,9 +369,9 @@ function M.run(case, api)
             return api.result("FAIL", string.format("%s: %s", name, why))
         end
     end
-    local watching, why = M.watchRaids(case, api, state)
+    local watching, verdict, why = M.watchRaids(case, api, state)
     if not watching then
-        return api.result("FAIL", string.format("%s: %s", name, why))
+        return api.result(verdict, string.format("%s: %s", name, why))
     end
 
     for i, entry in ipairs(case["when"] or {}) do

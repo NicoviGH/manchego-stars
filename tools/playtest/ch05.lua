@@ -37,9 +37,15 @@ return {
     -- Village macro sets, all read from CAMPAIGN.VILLAGES (gen_symbols: the chapter YAML's
     -- `villages:` block and CH05_VILLAGE_FLAGS). The flags are what the save-all payout counts.
     RELIQUARIES = (function()
+        -- The order is ch05crest's walk (north first, south last), a choice this file makes,
+        -- which is why the four are named here rather than iterated off the export.
         local out = {}
         for i, name in ipairs({ "north", "west", "east", "south" }) do
             local site = CAMPAIGN.VILLAGES["reliquary-" .. name]
+            if not site then
+                error("CAMPAIGN.VILLAGES carries no reliquary-" .. name .. " (regenerate "
+                    .. "symbols.lua, or the chapter YAML renamed it)")
+            end
             out[i] = { name = name, x = site.x, y = site.y, item = site.gift, flag = site.flag }
         end
         return out
