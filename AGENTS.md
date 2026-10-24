@@ -157,6 +157,12 @@ Rationale + long form: `docs/decisions.md` → Coordination model. The operating
   `superpowers:requesting-code-review` instead only for a STACK or where the PR needs context
   the diff cannot carry: one fresh reviewer per PR, reviewed DOWN the stack, since a fix to an
   earlier PR rebases every PR above it.
+- **Every finding gets fixed — none is skipped, parked or deferred, minors and nits included**
+  (Nicolas, 2026-10-23 on #534: "Do them all"). The only exception is a finding that turns out
+  stale or a duplicate of another, dropped with one line of evidence. A pre-existing failure the
+  work surfaces is fixed too, not only logged. This overrides any skill's "minors don't enter the
+  fix loop" rule. A finding that can only be proven at a cost Nicolas pays (a headed run) is
+  his question, never a park.
 - **Review the WRITTEN surface, not the generated or moved bulk.** When a change is mechanical
   — code moved, files split, output regenerated — and a machine gate proves the output is
   unchanged (a round-trip diff, a fingerprint of what the injector wrote, a byte-identical ROM),
