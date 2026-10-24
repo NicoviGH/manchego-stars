@@ -211,12 +211,17 @@ local function anyMenuProc()
     for _, script in ipairs({ SYM.sProc_MenuMain, SYM.sProc_Menu }) do
         for _, p in ipairs(PROCS.live()) do
             if p.script == script and ru8(p.addr + 0x28) == 0 then
-                local up = ru32(p.addr + 0x14)
+                local up, pool = ru32(p.addr + 0x14), PROCS.pool
                 for _ = 1, 4 do
                     if up == lowest then return p.addr end
-                    -- A root proc's parent is its tree index 0-7 (proc.c: `proc_parent =
-                    -- (ProcPtr) rootIndex`), not an address: stop there.
-                    if up <= 7 then break end
+                    -- Only a slot of the proc pool (src/proc.c sProcArray) is a proc to step
+                    -- up from. A root proc's parent is its tree index 0-7 (proc.c:
+                    -- `proc_parent = (ProcPtr) rootIndex`), and any other word is not ours
+                    -- to dereference: either way, not a descendant.
+                    local off = up - pool.base
+                    if off < 0 or off >= pool.count * pool.stride or off % pool.stride ~= 0 then
+                        break
+                    end
                     up = ru32(up + 0x14)
                 end
             end

@@ -306,6 +306,7 @@ class TestPlaytestHarness(unittest.TestCase):
         body = _block(_read_harness(), 'local function anyMenuProc()', '\nend\n')
         self.assertIn('if not lowest or ru8(lowest + 0x28) == 0 then return lowest end', body)
         self.assertIn('ru8(p.addr + 0x28) == 0 then', body)
+        self.assertIn('off % pool.stride ~= 0', body, 'the walk stays inside the proc pool')
         self.assertIn('if up == lowest then return p.addr end', body,
                       'only a DESCENDANT of the locked menu may stand in for it')
 
