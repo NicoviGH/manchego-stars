@@ -842,6 +842,19 @@ class HarnessSourceAnalysis(unittest.TestCase):
                                          '    return yield(onlyForB)')
         self.assertIn('onlyForB', mx.reaches('alpha', mx.harness_functions(source)))
 
+    def test_a_function_on_a_shared_table_is_its_own_function(self):
+        """`function INSPECT.place(` was charged to the function above it (mapSize), so a
+        scenario calling INSPECT.place never reached its body and an edit to it left the
+        verdict key still (#531 audit 4)."""
+        source = ('local function mapSize() return 1 end\n'
+                  'function INSPECT.place(u)\n    return u\nend\n'
+                  'INSPECT.free = function(a)\n    return INSPECT.place(a)\nend\n'
+                  'scenarios.beta = function()\n    return INSPECT.free(1)\nend\n')
+        funcs = mx.harness_functions(source)
+        self.assertIn('INSPECT.place', funcs)
+        self.assertNotIn('INSPECT.place', funcs['mapSize'][0])
+        self.assertEqual(mx.reaches('beta', funcs), {'beta', 'INSPECT.free', 'INSPECT.place'})
+
     def test_a_body_carries_no_comments(self):
         """A comment cannot change a verdict, so it must not change a fingerprint."""
         self.assertNotIn('a comment', self.funcs()['alpha'][0])

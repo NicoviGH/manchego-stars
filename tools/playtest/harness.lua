@@ -7014,17 +7014,8 @@ local function ch04Parley(opts)
     -- in sync, so Talk-adjacency reads immediately with no phase cycle (the ch03talk trick) --
     -- the point here is filming the SCENE, not pathing a cavalier across a fog map.
     local lup = redLupin()
-    local grid, parked = mapUnitAt(marty.x, marty.y), false
-    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-        local tx, ty = lup.x + d[1], lup.y + d[2]
-        if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
-            setMapUnit(marty.x, marty.y, 0)
-            emu:write8(marty.addr + 0x10, tx); emu:write8(marty.addr + 0x11, ty)
-            setMapUnit(tx, ty, grid)
-            parked = true
-            break
-        end
-    end
+    local tx, ty = INSPECT.freeBeside(lup)       -- order E, W, S, N, as before
+    local parked = tx ~= nil and INSPECT.place(marty, tx, ty)
     if not parked then return false, "no free tile adjacent to Lupin to park Marty" end
     -- Where the pack stands going IN. Sampled after the parking, before the Talk: no enemy or
     -- green phase runs between here and the conversion, so any tile that changes changed

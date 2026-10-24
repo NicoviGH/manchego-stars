@@ -544,7 +544,11 @@ def harness_scenarios(path=None):
 # below (what invalidates a scenario's PASS?).
 
 LUA_FUNC_DEF = re.compile(
-    r'^(?:local function (\w+)|scenarios\.(\w+) = function|(\w+) = function)', re.M)
+    r'^(?:local function (\w+)|scenarios\.(\w+) = function|(\w+) = function'
+    # A helper hung on INSPECT (`function INSPECT.place(`, `INSPECT.x = function`) is
+    # its own function, named QUALIFIED. Unrecognised, its body was charged to whichever
+    # function preceded it (INSPECT.place to mapSize), so a scenario calling it never reached it.
+    r'|function (INSPECT\.\w+)\(|(INSPECT\.\w+) = function)', re.M)
 # A top-level function's body is INDENTED; only its terminator sits in column 0.
 _LUA_TOP_END = re.compile(r'^end\b')
 
@@ -564,7 +568,7 @@ def _harness_marks(lines):
     for i, line in enumerate(lines):
         m = LUA_FUNC_DEF.match(line)
         if m:
-            marks.append((i, m.group(1) or m.group(2) or m.group(3),
+            marks.append((i, m.group(1) or m.group(2) or m.group(3) or m.group(4) or m.group(5),
                           'scenario' if m.group(2) else 'helper'))
     marks.append((len(lines), None, None))
     return marks
@@ -598,7 +602,8 @@ def reaches(name, funcs, seen=None):
     if name in seen or name not in funcs:
         return seen
     seen.add(name)
-    for mentioned in set(re.findall(r'\b(\w+)\b', funcs[name][0])):
+    body = funcs[name][0]
+    for mentioned in set(re.findall(r'\b(\w+)\b', body)) | set(re.findall(r'\b(\w+\.\w+)\b', body)):
         if mentioned in funcs and mentioned != name:
             reaches(mentioned, funcs, seen)
     return seen
