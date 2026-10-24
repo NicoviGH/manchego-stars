@@ -237,7 +237,7 @@ function Board.occupied(mem, SYM, x, y)
 end
 
 -- The first unit with `charId` in the `count` slots from `base`, LEAN, or nil. The one owner
--- of live lookup by character id (harness findUnit/blue/red); Board.unit is its snapshot twin.
+-- of live lookup by character id (harness blue/red via Board.find); Board.unit is its snapshot twin.
 function Board.findIn(mem, SYM, base, count, charId)
     for slot = 0, count - 1 do
         local a = base + slot * Board.UNIT_SIZE

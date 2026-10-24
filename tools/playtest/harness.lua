@@ -239,8 +239,7 @@ local BOARD = dofile(PLAYTEST_DIR .. "/board.lua").bind(
 -- maxhp, level, pow, def, state, dead, acted), or nil for an empty slot. ~100 callers, many
 -- inside per-frame waits, so it never pays for the item/boss reads: those are BOARD.read's.
 local function unitAt(base, i) return BOARD.leanAt(base, i) end
--- Lookup by character id is board.lua's (Board.findIn), LEAN, over `count` slots.
-local function findUnit(base, count, charId) return BOARD.findIn(base, count, charId) end
+-- Lookup by character id is board.lua's (Board.find), LEAN, over the faction's whole array.
 -- Array bounds are the DECOMP's, not the roster size of the day (bmunit.h: blue[62] /
 -- red[50] / green[20]). `blue` searched 8 for as long as the cast WAS 8; the TESTCH sandbox
 -- now deploys 11, so `PT_CHAR=lupin` reported "not deployed" for a unit that was standing on
@@ -386,9 +385,7 @@ local function recordCutscene(o)
         -- checking only after the guarded A press made a good four-box scene time out.
         if doneFn() then reached = true break end
         if autoAdvanceDialogue and controllerState() == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 120) then
+            if not INSPECT.advanceDialogue(120) then
                 return result("FAIL", tag .. " dialogue input postcondition failed")
             end
         end
@@ -955,6 +952,15 @@ end
 -- site gave it (the kill-resolving `fight` waits are the sites that pass none).
 function INSPECT.settle(level, frames, tapA)
     return waitFor(function() return INSPECT.settled(level) end, frames, tapA)
+end
+
+-- Film `frames` frames, one shot of `tag` every `every`th, pressing nothing: the record
+-- scenarios' one camera loop (#531 audit 12), so a cadence is an argument, not a copy.
+function INSPECT.film(frames, tag, every)
+    for f = 1, frames do
+        if f % every == 0 then shot(tag) end
+        yield()
+    end
 end
 
 -- The "advance every box until done()" loop. `done` is polled each frame BEFORE the box test;
@@ -2110,12 +2116,6 @@ scenarios.vanillagold = function()
         seen[#seen + 1] = line
         log("vanillagold: " .. line)
     end
-    local function teleport(u, x, y)
-        local grid = mapUnitAt(u.x, u.y)
-        setMapUnit(u.x, u.y, 0)
-        emu:write8(u.addr + 0x10, x); emu:write8(u.addr + 0x11, y)
-        setMapUnit(x, y, grid)
-    end
     -- Seth strikes a 1-HP boss from a free adjacent tile; `stop` is the chapter's own outcome.
     local function killBoss(pid, here)
         for t = 1, 6 do
@@ -2123,13 +2123,9 @@ scenarios.vanillagold = function()
             if isDead(boss) then return true end
             pokeFrail(boss)
             local seth = blue(SETH)
-            local spot
-            for _, d in ipairs({ { 0, 1 }, { 1, 0 }, { -1, 0 }, { 0, -1 } }) do
-                local tx, ty = boss.x + d[1], boss.y + d[2]
-                if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then spot = { x = tx, y = ty } break end
-            end
-            if not spot then return false end
-            teleport(seth, spot.x, spot.y)
+            local sx, sy = INSPECT.freeBeside(boss,
+                { order = { { 0, 1 }, { 1, 0 }, { -1, 0 }, { 0, -1 } } })
+            if not sx or not INSPECT.place(seth, sx, sy) then return false end
             seth = blue(SETH)
             if not moveUnit(seth.x, seth.y, seth.x, seth.y) then return false end
             chooseAttack(seth.addr, function() return isDead(red(pid)) or chapter() ~= here end)
@@ -2148,7 +2144,7 @@ scenarios.vanillagold = function()
     note("Ch1 map")
     if not killBoss(BREGUET, CH1) then return result("FAIL", "could not kill Breguet") end
     local eirika = blue(EIRIKA)
-    teleport(eirika, 2, 2)
+    if not INSPECT.place(eirika, 2, 2) then return result("FAIL", "could not stand Eirika on the gate") end
     eirika = blue(EIRIKA)
     if not moveUnit(eirika.x, eirika.y, eirika.x, eirika.y) then
         return result("FAIL", "no live command menu for Eirika on the gate")
@@ -3645,11 +3641,9 @@ scenarios.recordrescue = function()
     wait(30)
     if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
     wait(60)
-    for i = 1, 40 do                                       -- leave prep via Fight!
-        if not procActive(SYM.gProcScr_SALLYCURSOR) and not procActive(SYM.ProcScr_PrepUnitScreen)
-           and faction() == 0 and turn() >= 1 then break end
-        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
-        if i % 3 == 0 then press(K.A, 4); wait(20) end
+    -- Leave prep via Fight!, guarded (driveThroughPrep), not the old B/START/A flail.
+    if not driveThroughPrep() then
+        shot("rescue-no-map"); return result("FAIL", "Preparations never exited via Fight!")
     end
     if not waitFor(function()
         return faction() == 0 and turn() >= 1 and not procActive(SYM.gProcScr_SALLYCURSOR)
@@ -3671,9 +3665,8 @@ scenarios.recordrescue = function()
     local US_RESCUING = 0x10
     local function tryRescue(rescuer)
         local target
-        for i = 0, 50 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and u.charId ~= rescuer.charId and (u.state & 0x9) == 0 and u.onMap
+        for _, u in BOARD.each("blue") do
+            if u.charId ~= rescuer.charId and u.onField
                and math.abs(u.x - rescuer.x) + math.abs(u.y - rescuer.y) == 1 then target = u break end
         end
         if not target then return nil end
@@ -3683,19 +3676,18 @@ scenarios.recordrescue = function()
         press(K.A, 4); wait(16)                            -- top item -> target-select (if Rescue)
         wait(12); shot("targetsel")                        -- CAPTURE the rescue target-select
         press(K.A, 4)                                      -- pick the sole adjacent target
-        for f = 1, 80 do if f % 3 == 0 then shot("rescue") end yield() end  -- the lift animation
+        INSPECT.film(80, "rescue", 3)  -- the lift animation
         local r = blue(rescuer.charId)
         if r and (r.state & US_RESCUING) ~= 0 then return target.charId end
         press(K.B, 4); press(K.B, 4); press(K.B, 4)        -- not liftable: back fully out
-        waitFor(function() return faction() == 0 and not menuOpen() end, 150, true)
+        INSPECT.settle("phase", 150, true)
         return nil
     end
-    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    INSPECT.settle("phase", 300, true)
     wait(30)
     local rescued, rescuerId
-    for i = 0, 50 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.onMap then
+    for _, u in BOARD.each("blue") do
+        if u.onField then        -- onField: the rescuer acts, and a carried unit cannot
             rescued = tryRescue(u)
             if rescued then rescuerId = u.charId; break end
         end
@@ -3714,11 +3706,9 @@ scenarios.recordtrade = function()
     wait(30)
     if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
     wait(60)
-    for i = 1, 40 do                                       -- leave prep via Fight!
-        if not procActive(SYM.gProcScr_SALLYCURSOR) and not procActive(SYM.ProcScr_PrepUnitScreen)
-           and faction() == 0 and turn() >= 1 then break end
-        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
-        if i % 3 == 0 then press(K.A, 4); wait(20) end
+    -- Leave prep via Fight!, guarded (driveThroughPrep), not the old B/START/A flail.
+    if not driveThroughPrep() then
+        shot("trade-no-map"); return result("FAIL", "Preparations never exited via Fight!")
     end
     if not waitFor(function()
         return faction() == 0 and turn() >= 1 and not procActive(SYM.gProcScr_SALLYCURSOR)
@@ -3728,13 +3718,12 @@ scenarios.recordtrade = function()
             and not procActive(SYM.ProcScr_StdEventEngine) and not menuOpen()
     end, 3000, true) then shot("trade-no-map"); return result("FAIL", "cutscene never cleared") end
     wait(150)
-    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    INSPECT.settle("phase", 300, true)
     wait(30)
     local function tryTrade(actor)
         local target
-        for i = 0, 50 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and u.charId ~= actor.charId and (u.state & 0x9) == 0 and u.onMap
+        for _, u in BOARD.each("blue") do
+            if u.charId ~= actor.charId and u.onField
                and math.abs(u.x - actor.x) + math.abs(u.y - actor.y) == 1 then target = u break end
         end
         if not target then return nil end
@@ -3744,15 +3733,14 @@ scenarios.recordtrade = function()
         press(K.DOWN, 4); wait(6); shot("nav")             -- step 2 (Trade if order R/I/T/S/W)
         press(K.A, 4); wait(16); shot("tradesel")          -- selected -> partner-select (if Trade)
         press(K.A, 4)                                      -- pick the sole adjacent ally
-        for f = 1, 30 do if f % 4 == 0 then shot("trade") end yield() end
+        INSPECT.film(30, "trade", 4)
         press(K.B, 4); press(K.B, 4); press(K.B, 4)        -- exit (so a wrong pick backs out)
-        waitFor(function() return faction() == 0 and not menuOpen() end, 150, true)
+        INSPECT.settle("phase", 150, true)
         return target.charId
     end
     local partner
-    for i = 0, 50 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and (u.state & 0x9) == 0 and u.onMap then
+    for _, u in BOARD.each("blue") do
+        if u.onField then        -- onField: the trader acts
             partner = tryTrade(u)
             if partner then break end
         end
@@ -3772,14 +3760,9 @@ scenarios.recordfix = function()
     wait(30)
     if not loadState("prep") then return result("FAIL", "no prep checkpoint (run.sh builds it)") end
     wait(60)
-    -- Leave prep via Fight! -- press A ONLY while still in prep (to answer the confirm);
-    -- never during the turn-1 events, or the sign (first event) gets mashed past.
-    for i = 1, 30 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) and not procActive(SYM.ProcScr_PrepUnitScreen) then break end
-        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
-        if (procActive(SYM.gProcScr_SALLYCURSOR) or procActive(SYM.ProcScr_PrepUnitScreen))
-           and i % 3 == 0 then press(K.A, 4); wait(20) end
-    end
+    -- Leave prep via Fight!, guarded (driveThroughPrep): one START on observed main input, so
+    -- nothing is pressed into the turn-1 events and the sign (first event) is not mashed past.
+    if not driveThroughPrep() then return result("FAIL", "Preparations never exited via Fight!") end
     waitFor(function() return not procActive(SYM.gProcScr_SALLYCURSOR)
         and not procActive(SYM.ProcScr_PrepUnitScreen) end, 600)
     -- #5: the battle-start roadsign + body + Izobai taunt auto-play at turn 1. Slow-capture
@@ -3791,16 +3774,15 @@ scenarios.recordfix = function()
         if faction() == 0 and not menuOpen() and turn() >= 1 and f > 540 then break end
         yield()
     end
-    waitFor(function() return faction() == 0 and not menuOpen() end, 2000, true)
+    INSPECT.settle("phase", 2000, true)
     wait(30); shot("fix")
     -- #6: deterministic PC death. March a non-lord PC up to a goblin (topping up its HP so
     -- it survives the approach), then frail+harmless it and ATTACK -- the goblin's counter
     -- kills the 1-HP scout on the player phase (no enemy-AI dependency), firing its per-PC
     -- death quote with its bust. Capture the quote densely.
     local scoutId
-    for i = 0, 50 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and u.charId ~= 0x01 and (u.state & 0x9) == 0 and u.onMap then scoutId = u.charId break end
+    for _, u in BOARD.each("blue") do
+        if u.charId ~= 0x01 and u.onField then scoutId = u.charId break end
     end
     if not scoutId then return result("FAIL", "no non-lord PC deployed") end
     -- Map combat (battle anims OFF) + NORMAL speed: the per-PC death quote is a battle-quote
@@ -3814,9 +3796,8 @@ scenarios.recordfix = function()
     end
     local function nearestGoblin(s)
         local g, gd = nil, 999
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and r.onMap then
+        for _, r in BOARD.each("red") do
+            if not isDead(r) and r.onMap then
                 local d = math.abs(r.x - s.x) + math.abs(r.y - s.y)
                 if d < gd then g, gd = r, d end
             end
@@ -3829,7 +3810,7 @@ scenarios.recordfix = function()
         if not s or isDead(s) then sawDeath = isDead(blue(scoutId)); break end
         local g, gd = nearestGoblin(s)
         local ng = 0
-        for i = 0, 23 do local r = unitAt(SYM.gUnitArrayRed, i); if r and not isDead(r) and r.onMap then ng = ng + 1 end end
+        for _, r in BOARD.each("red") do if not isDead(r) and r.onMap then ng = ng + 1 end end
         log(string.format("#6 turn %d: scout 0x%02X at (%d,%d) HP=%d gobl=%d nearestGd=%s",
             t, scoutId, s.x, s.y, s.curHP or -1, ng, tostring(gd)))
         if not g then break end
@@ -3872,7 +3853,7 @@ scenarios.recordfix = function()
         local s2 = blue(scoutId); if s2 then emu:write8(s2.addr + 0x13, 40) end  -- survive approach
         endTurn(CH01_PARK)
         if waitFor(function() return faction() ~= 0 end, 300) then
-            waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+            INSPECT.settle("phase", 6000, true)
         end
         if isDead(blue(scoutId)) then sawDeath = true; break end
         if gameOverActive() then break end
@@ -3925,30 +3906,23 @@ scenarios.recordch01trail = function()
     end
     if not prep then shot("trail-no-prep"); return result("FAIL", "prep never opened") end
     wait(180)
-    for i = 1, 40 do
-        if not procActive(SYM.gProcScr_SALLYCURSOR) then break end
-        press(K.B, 4); wait(10); press(K.START, 4); wait(40)
-        if i % 4 == 0 and procActive(SYM.gProcScr_SALLYCURSOR) then press(K.A, 4) wait(20) end
-    end
+    -- Leave prep via Fight!, guarded (driveThroughPrep), not the old B/START/A flail.
+    if not driveThroughPrep() then return result("FAIL", "could not leave preparations") end
     if not waitFor(function()
         return not procActive(SYM.gProcScr_SALLYCURSOR) and faction() == 0 and turn() >= 1
     end, 1200) then return result("FAIL", "could not leave preparations") end
-    local function recwait(n, tag)
-        for f = 1, n do if f % 5 == 0 then shot(tag) end yield() end
-    end
     -- turn 1: Izobai's taunt auto-fires at the player-phase start (normal text speed
     -- so the typewriter + her face read in motion); A-tap slowly to advance it.
-    for i = 1, 12 do recwait(24, "trail"); press(K.A, 4) end
+    for i = 1, 12 do INSPECT.film(24, "trail", 5); press(K.A, 4) end
     pokeFastConfig()
     local chief = red(CAMPAIGN.CH01_CHIEF)
     if not chief then return result("FAIL", "chief not found") end
     local goal = { x = chief.x, y = chief.y }
     for t = 1, 18 do
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        INSPECT.settle("phase", 6000, true)
         wait(60)
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
+        for _, r in BOARD.each("red") do
+            if not isDead(r) then pokeFrail(r); pokeHarmless(r) end
         end
         local braulo = blue(0x01)
         if isDead(braulo) then return result("FAIL", "Braulo died on the march") end
@@ -3957,13 +3931,13 @@ scenarios.recordch01trail = function()
             if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
                 if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then
                     chooseAttack(braulo.addr)
-                    recwait(70, "trail") -- the death quote
+                    INSPECT.film(70, "trail", 5) -- the death quote
                 end
             else
                 marchToward(braulo, goal.x, goal.y + 1, 24, 15)
             end
         else
-            recwait(30, "trail")
+            INSPECT.film(30, "trail", 5)
             return result("PASS", "ch01 trail beats recorded (taunt + death)")
         end
         local phase = runEnemyPhase(CH01_PARK)
@@ -3977,12 +3951,6 @@ end
 -- typing out, Yes, and the hand-off into the prep screen. Frames tagged "lord"
 -- (every 5th frame) are assembled offline.
 scenarios.recordlord = function()
-    local function recwait(n, tag)
-        for f = 1, n do
-            if f % 5 == 0 then shot(tag) end
-            yield()
-        end
-    end
     if not winCh00() then return end
     if not waitFor(function() return chapter() == 2 end, 1800) then
         return result("FAIL", "chapter slot 2 never loaded after the ch00 win")
@@ -3995,24 +3963,24 @@ scenarios.recordlord = function()
         if menuOpen() then atMenu = true break end
         if procActive(SYM.gProcScr_SALLYCURSOR) then break end
         press(K.A, 4)
-        recwait(36, "lord")
+        INSPECT.film(36, "lord", 5)
     end
     if not atMenu then return result("FAIL", "lord-select menu never opened") end
-    recwait(90, "lord") -- linger on the freshly opened menu
+    INSPECT.film(90, "lord", 5) -- linger on the freshly opened menu
     for _ = 1, CAMPAIGN.LORD_CANDIDATES - 1 do
         press(K.DOWN, 4)
-        recwait(20, "lord") -- visible cursor walk down the cast
+        INSPECT.film(20, "lord", 5) -- visible cursor walk down the cast
     end
-    recwait(60, "lord")
+    INSPECT.film(60, "lord", 5)
     press(K.A, 4)
-    recwait(200, "lord") -- confirm text types out in full
+    INSPECT.film(200, "lord", 5) -- confirm text types out in full
     press(K.A, 4)        -- Yes
     for i = 1, 40 do
         if procActive(SYM.gProcScr_SALLYCURSOR) then break end
         press(K.A, 4)
-        recwait(36, "lord")
+        INSPECT.film(36, "lord", 5)
     end
-    recwait(300, "lord") -- a beat of the prep screen
+    INSPECT.film(300, "lord", 5) -- a beat of the prep screen
     result("PASS", "lord-select flow frames recorded")
 end
 
@@ -4021,9 +3989,6 @@ end
 -- prep proc, screenshot the card, walk the candidates, pick one. Compile-time-only
 -- iteration on the lord screen (see the debug-fast-boot convention).
 scenarios.recordlordfast = function()
-    local function recwait(n, tag)
-        for f = 1, n do if f % 5 == 0 then shot(tag) end yield() end
-    end
     -- title -> New Game -> sandbox -> BeginningScene runs the explainer + ASMCs CallLordSelectMenu
     local atPrep = false
     for _ = 1, 5000 do
@@ -4040,20 +4005,20 @@ scenarios.recordlordfast = function()
     end
     if not atPrep then shot("lordfast-noprep")
         return result("FAIL", "lord-select prep never opened on the fast-boot") end
-    recwait(50, "lordfast")            -- settle on the first candidate
+    INSPECT.film(50, "lordfast", 5)            -- settle on the first candidate
     for _ = 1, CAMPAIGN.LORD_CANDIDATES - 1 do
         press(K.DOWN, 4)
         for f = 1, 24 do yield() end   -- let the bust gfx finish streaming in (no shots)
-        recwait(26, "lordfast")        -- THEN capture the SETTLED card (no transitions)
+        INSPECT.film(26, "lordfast", 5)        -- THEN capture the SETTLED card (no transitions)
     end
-    recwait(40, "lordfast")
+    INSPECT.film(40, "lordfast", 5)
     press(K.A, 4)                      -- select the highlighted lead -> confirm box
     for f = 1, 30 do yield() end       -- let the menu tear down + confirm box open
     press(K.A, 4)                      -- fast-forward the (slow) typewriter
     for f = 1, 24 do yield() end
-    recwait(30, "lordfast-confirm")    -- capture the full "Will <name> lead the party?" [Yes/No]
+    INSPECT.film(30, "lordfast-confirm", 5)    -- capture the full "Will <name> lead the party?" [Yes/No]
     press(K.A, 4)                      -- [Yes] -> the re-pick loop exits (FADI/ENDA)
-    recwait(90, "lordfast")            -- the screen fades out + control returns
+    INSPECT.film(90, "lordfast", 5)            -- the screen fades out + control returns
     result("PASS", "lord-select prep fast-boot frames recorded")
 end
 
@@ -4156,10 +4121,7 @@ scenarios.recordch01 = function()
     local prep = false
     for i = 1, 200 do
         if procActive(SYM.gProcScr_SALLYCURSOR) then prep = true break end
-        for f = 1, 48 do
-            if f % 6 == 0 then shot("op") end
-            yield()
-        end
+        INSPECT.film(48, "op", 6)
         press(K.A, 4)
     end
     if not prep then
@@ -4217,20 +4179,14 @@ end
 -- not single mid-typewriter screenshots. A-only boot like `scenes`.
 scenarios.record = function()
     log("recording continuous video frames")
-    local function recwait(n, tag)
-        for f = 1, n do
-            if f % 5 == 0 then shot(tag) end
-            yield()
-        end
-    end
     local booted = false
     for i = 1, 200 do
         if inChapter() then booted = true; break end
-        recwait(60, "op")
+        INSPECT.film(60, "op", 5)
         press(K.A, 4)
     end
     if not booted then return result("FAIL", "never reached the map (record)") end
-    recwait(150, "op")
+    INSPECT.film(150, "op", 5)
     press(K.B); press(K.B)
     local sephek = red(CAMPAIGN.PROLOGUE.sephek)
     if not sephek then return result("FAIL", "Sephek not found in red array") end
@@ -4251,7 +4207,7 @@ scenarios.record = function()
         if chapter() ~= HOST_CHAPTER then break end
         yield()
     end
-    recwait(40, "bt")
+    INSPECT.film(40, "bt", 5)
     return result("PASS", "video frames recorded (op + bt)")
 end
 
@@ -4290,11 +4246,7 @@ scenarios.mapshot = function()
     -- diagnostic that lies, and the runbook tells people to trust this dump over a screenshot
     -- ("verify placement from INSPECT.units, never from a screenshot"), so it has to be true.
     -- Same predicate mapfull already waits on, for the same reason.
-    waitFor(function()
-        return faction() == 0 and not menuOpen()
-           and not procActive(SYM.ProcScr_StdEventEngine)
-           and not procActive(SYM.ProcScr_BattleEventEngine)
-    end, 900, true)
+    INSPECT.settle("battle", 900, true)
     INSPECT.units("mapshot")
     for i = 1, 6 do
         wait(20)
@@ -4309,11 +4261,7 @@ end
 -- shot at its exact map offset. Fresh CH03BOOT New Game; clears the turn-1 entrance cutscene first.
 scenarios.mapfull = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
-    waitFor(function()
-        return faction() == 0 and not menuOpen()
-           and not procActive(SYM.ProcScr_StdEventEngine)
-           and not procActive(SYM.ProcScr_BattleEventEngine)
-    end, 900, true)
+    INSPECT.settle("battle", 900, true)
     -- The grid is DERIVED from the map, not written down. It used to be the literals
     -- {0,8,15} x {0,8,16}, which is ch03's 17x16 -- and this scenario is described as
     -- chapter-generic, so the constants were a chapter's shape wearing a generic name. On
@@ -4868,9 +4816,9 @@ end
 -- the heal capture (#191) to find a wounded-ally target for a staff user.
 local function liveAllies(excludePid)
     local out = {}
-    for i = 0, 7 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and not isDead(u) and u.charId ~= excludePid then out[#out + 1] = u end
+    for _, u in BOARD.each("blue") do
+        -- onField: an ally here is a heal target the staff user is teleported beside.
+        if u.onField and u.charId ~= excludePid then out[#out + 1] = u end
     end
     return out
 end
@@ -4892,15 +4840,13 @@ end
 -- (#191); kept separate because the search set is allies, not liveEnemies().
 local function teleportAdjacentTo(u, targets)
     if mapUnitAt(u.x, u.y) == 0 then return false end
-    local mw, mh = mapSize()   -- the LIVE footprint, as teleportToFiringTile (#204)
+    -- INSPECT.freeBeside bounds the search by the LIVE footprint, as teleportToFiringTile (#204).
     for _, t in ipairs(targets) do
-        for _, d in ipairs({ { 0, -1 }, { 0, 1 }, { 1, 0 }, { -1, 0 } }) do
-            local tx, ty = t.x + d[1], t.y + d[2]
-            if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
-                if not INSPECT.place(u, tx, ty, { tracked = true }) then return false end
-                log(string.format("  teleported to (%d,%d) [adjacent to ally (%d,%d)]", tx, ty, t.x, t.y))
-                return true
-            end
+        local tx, ty = INSPECT.freeBeside(t, { order = { { 0, -1 }, { 0, 1 }, { 1, 0 }, { -1, 0 } } })
+        if tx then
+            if not INSPECT.place(u, tx, ty, { tracked = true }) then return false end
+            log(string.format("  teleported to (%d,%d) [adjacent to ally (%d,%d)]", tx, ty, t.x, t.y))
+            return true
         end
     end
     return false
@@ -5046,9 +4992,8 @@ local function captureHealerAnim(name, pid, cls)
     u = blue(pid)
     if u and not isDead(u) then
         emu:write8(u.addr + 0x13, ru8(u.addr + 0x12))  -- full heal: survive whatever hits him
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeHarmless(r) end  -- no death risk from any attacker
+        for _, r in BOARD.each("red") do
+            if not isDead(r) then pokeHarmless(r) end  -- no death risk from any attacker
         end
         if teleportToFiringTile(u, 1, 1) then
             shot(name .. "-defend-deploy")
@@ -5123,8 +5068,7 @@ local function captureCharAnim(name)
                 log(string.format("  round %d: could not end the phase -- stopping", i))
                 controllerFault = faultBefore; break
             end
-            if not waitFor(function() return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine) end, 5400, true) then
+            if not INSPECT.settle("event", 5400, true) then
                 log(string.format("  round %d: player phase never came back -- stopping", i))
                 controllerFault = faultBefore; break
             end
@@ -5297,11 +5241,7 @@ scenarios.recordravisin = function()
     -- scenario's 300s budget spent on a scene it does not film.
     pokeFastConfig()
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
-    if not waitFor(function()
-        return faction() == 0 and not menuOpen()
-            and not procActive(SYM.ProcScr_StdEventEngine)
-            and controllerState() == "player_map_idle"
-    end, 6000, true) then
+    if not INSPECT.settle("idle", 6000, true) then
         return result("FAIL", "ch05 never returned player control")
     end
     local u = red(pid)
@@ -5348,9 +5288,8 @@ scenarios.recordenemy = function()
     if not sel then
         -- No PT_CHAR: the first creature actually on the bench. A fixed default names one
         -- chapter's creature, and the bench now seats a single chapter (BENCH=chNN).
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then
+        for _, r in BOARD.each("red") do
+            if not isDead(r) then
                 local cls = ru8(ru32(r.addr + 0x04) + 0x04)
                 for name, id in pairs(RESKIN_CLASS) do if id == cls then sel = name end end
                 if sel then break end
@@ -5376,9 +5315,8 @@ scenarios.recordenemy = function()
     local function classOf(u) return ru8(ru32(u.addr + 0x04) + 0x04) end
     -- the chosen foe: by CHARACTER for a raw-pid creature, by CLASS for a class-level reskin
     local foe
-    for i = 0, 23 do
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) then
+    for _, r in BOARD.each("red") do
+        if not isDead(r) then
             if (wantPid and r.charId == wantPid) or (want and classOf(r) == want) then
                 foe = r; break
             end
@@ -5401,46 +5339,36 @@ scenarios.recordenemy = function()
         -- it at 1 HP and let the enemy phase play the heal (every standard AI action tries
         -- AiTryDoStaff before anything else). Filmed with captureDefend's enemy-phase loop.
         local patient
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and r.addr ~= foe.addr then patient = r; break end
+        for _, r in BOARD.each("red") do
+            -- onField: the patient is MOVED beside the healer.
+            if r.onField and r.addr ~= foe.addr then patient = r; break end
         end
         if not patient then
             return result("FAIL", "the chosen foe cannot counter and has no ally to heal") end
-        local mw, mh = mapSize()
-        local spot
-        for _, d in ipairs({ { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 } }) do
-            local tx, ty = foe.x + d[1], foe.y + d[2]
-            if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
-                spot = { tx, ty }; break
-            end
+        local sx, sy = INSPECT.freeBeside(foe, { order = { { 0, -1 }, { -1, 0 }, { 1, 0 }, { 0, 1 } } })
+        if not sx then return result("FAIL", "no free tile beside the healer for its patient") end
+        if not INSPECT.place(patient, sx, sy) then
+            return result("FAIL", "could not stand the patient beside the healer")
         end
-        if not spot then return result("FAIL", "no free tile beside the healer for its patient") end
-        local grid = mapUnitAt(patient.x, patient.y)
-        setMapUnit(patient.x, patient.y, 0)
-        emu:write8(patient.addr + 0x10, spot[1]); emu:write8(patient.addr + 0x11, spot[2])
-        setMapUnit(spot[1], spot[2], grid)
         emu:write8(patient.addr + 0x13, 1)             -- 1 HP: well under any heal threshold
         -- The heal must be the ONLY thing the enemy phase can do: the capture stops after the
         -- first battle, and the first ch06 run filmed the 1-HP patient javelining Trex instead.
         -- So every other foe, patient included, loses its inventory (Unit.items at +0x1E).
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) and r.addr ~= foe.addr then
+        for _, r in BOARD.each("red") do
+            if not isDead(r) and r.addr ~= foe.addr then
                 for s = 0, 4 do emu:write16(r.addr + 0x1E + s * 2, 0) end
             end
         end
         log(string.format("healer %s at (%d,%d): patient moved to (%d,%d) at 1 HP",
-            sel, foe.x, foe.y, spot[1], spot[2]))
+            sel, foe.x, foe.y, sx, sy))
         shot(sel .. "-deploy")
         local healed = captureDefend(sel); shot(sel .. "-after")
         if not healed then return result("FAIL", "the enemy phase never played a battle anim") end
         return result("PASS", string.format("%s heal captured (class 0x%X)", sel, want or 0))
     end
     local pl, plmn, plmx, dist
-    for i = 0, 15 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and not isDead(u) then
+    for _, u in BOARD.each("blue") do
+        if u.onField then        -- onField: the bait is moved beside the foe and attacks
             local mn, mx = unitAttackRange(u)
             if mn then
                 for d = fmin, fmax do          -- a distance BOTH can strike at
@@ -5460,11 +5388,9 @@ scenarios.recordenemy = function()
     -- cursor can land on a neighbouring foe (e.g. the sword Lizardzerker next to the axe grunt)
     -- and we'd capture the WRONG class's anim.
     local foeTiles = {}
-    for i = 0, 23 do
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) then foeTiles[r.x .. "," .. r.y] = true end
+    for _, r in BOARD.each("red") do
+        if not isDead(r) then foeTiles[r.x .. "," .. r.y] = true end
     end
-    local grid = mapUnitAt(pl.x, pl.y)
     local placed = false
     -- Every tile at Manhattan `dist` from the foe, vertical offsets first: the bench is laid
     -- out in ROWS, so a tile above or below the target has fewer foe neighbours than one
@@ -5482,34 +5408,27 @@ scenarios.recordenemy = function()
             table.insert(ring, { dx, dy })                        -- down (dy==0 -> sideways)
         end
     end
-    -- BOUNDS FROM THE MAP. The guard was `tx <= 24 and ty <= 15`, a literal from a bigger
-    -- chapter, and the sandbox is 15x10: y=10 is off the map but `mapUnitAt` reads gBmMapUnit's
-    -- zero-filled border row and answers "empty", so the tile is accepted and `cursorTo` can
-    -- then never reach it. Same class of bug as mapfull's hardcoded grid, one file over.
-    local mw, mh = mapSize()
-    for _, d in ipairs(ring) do
-        local tx, ty = foe.x + d[1], foe.y + d[2]
-        if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
-            -- No OTHER foe inside the BAIT'S OWN reach -- which is what makes the attack menu
-            -- ambiguous and lets captureAttack film the wrong creature. At melee this is the
-            -- old "nothing else orthogonally adjacent"; at range it correctly widens.
-            local clean = true
-            for key in pairs(foeTiles) do
-                local nx, ny = key:match("^(-?%d+),(-?%d+)$")
-                nx, ny = tonumber(nx), tonumber(ny)
-                if not (nx == foe.x and ny == foe.y) then
-                    local md = math.abs(nx - tx) + math.abs(ny - ty)
-                    if md >= plmn and md <= plmx then clean = false; break end
-                end
-            end
-            if clean then
-                setMapUnit(pl.x, pl.y, 0)
-                emu:write8(pl.addr + 0x10, tx); emu:write8(pl.addr + 0x11, ty)
-                setMapUnit(tx, ty, grid)
-                pl.x, pl.y = tx, ty
-                placed = true; break
+    -- BOUNDS FROM THE MAP (INSPECT.freeBeside). The guard was `tx <= 24 and ty <= 15`, a
+    -- literal from a bigger chapter, and the sandbox is 15x10: y=10 is off the map but
+    -- `mapUnitAt` reads gBmMapUnit's zero-filled border row and answers "empty", so the tile
+    -- was accepted and `cursorTo` could then never reach it.
+    -- No OTHER foe inside the BAIT'S OWN reach -- which is what makes the attack menu
+    -- ambiguous and lets captureAttack film the wrong creature. At melee this is the old
+    -- "nothing else orthogonally adjacent"; at range it correctly widens.
+    local tx, ty = INSPECT.freeBeside(foe, { order = ring, passable = function(cx, cy)
+        for key in pairs(foeTiles) do
+            local nx, ny = key:match("^(-?%d+),(-?%d+)$")
+            nx, ny = tonumber(nx), tonumber(ny)
+            if not (nx == foe.x and ny == foe.y) then
+                local md = math.abs(nx - cx) + math.abs(ny - cy)
+                if md >= plmn and md <= plmx then return false end
             end
         end
+        return true
+    end })
+    if tx and INSPECT.place(pl, tx, ty) then
+        pl.x, pl.y = tx, ty
+        placed = true
     end
     if not placed then
         return result("FAIL", string.format(
@@ -6305,23 +6224,21 @@ scenarios.koboldview = function()
     local leader = blue(0x01)
     if not leader then return result("FAIL", "leader (braulo) not deployed") end
     -- collect distinct red generic kobolds (pid 0xaa) and park a few around braulo
-    local spots, si = {}, 1
+    -- Bounds from the live map (BOARD.inMap), not the old `<= 24 / <= 15` literals: ch03 is
+    -- 17x16, and off the map mapUnitAt reads the zero border and answers "empty".
+    local spots = {}
+    local mw, mh = mapSize()
     for _, d in ipairs({ {2,0}, {3,0}, {2,-1}, {3,-1}, {2,1}, {3,1}, {4,0} }) do
         local tx, ty = leader.x + d[1], leader.y + d[2]
-        if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
+        if BOARD.inMap(tx, ty, mw, mh) and mapUnitAt(tx, ty) == 0 then
             spots[#spots + 1] = { tx, ty }
         end
     end
     local moved = 0
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) and u.charId == 0xaa and moved < #spots then
-            moved = moved + 1
-            local s = spots[moved]
-            local grid = mapUnitAt(u.x, u.y)
-            setMapUnit(u.x, u.y, 0)
-            emu:write8(u.addr + 0x10, s[1]); emu:write8(u.addr + 0x11, s[2])
-            setMapUnit(s[1], s[2], grid)
+    for _, u in BOARD.each("red") do
+        if u.onField and u.charId == 0xaa and moved < #spots then
+            local s = spots[moved + 1]
+            if INSPECT.place(u, s[1], s[2]) then moved = moved + 1 end
         end
     end
     log(string.format("parked %d kobold(s) next to braulo (%d,%d)", moved, leader.x, leader.y))
@@ -6339,24 +6256,22 @@ end
 scenarios.lzview = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local FAR_X, FAR_Y = 16, 15
-    local function stash(u) setMapUnit(u.x, u.y, 0)
-        emu:write8(u.addr + 0x10, FAR_X); emu:write8(u.addr + 0x11, FAR_Y) end
+    -- A PILE on one corner tile, so the grid there is left empty (grid = 0), as before.
+    local function stash(u) INSPECT.place(u, FAR_X, FAR_Y, { grid = 0 }) end
     -- every blue PC (braulo included) -> far corner, out of the shot
-    for i = 0, 7 do local u = unitAt(SYM.gUnitArrayBlue, i); if u then stash(u) end end
+    for _, u in BOARD.each("blue") do if u.onField then stash(u) end end
     -- find the class-0x80 enemy; every OTHER red enemy -> far corner
     local lz
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) then
+    for _, u in BOARD.each("red") do
+        if u.onField then
             if ru8(ru32(u.addr + 4) + 4) == 0x80 and not lz then lz = u
             else stash(u) end
         end
     end
     if not lz then return result("FAIL", "no class-0x80 (Lizardzerker) unit on the map") end
     local sms = ru8(ru32(lz.addr + 4) + 6)   -- unit -> pClassData -> .SMSId (offset 0x06)
-    local grid = mapUnitAt(lz.x, lz.y); setMapUnit(lz.x, lz.y, 0)
     local tx, ty = 4, 10                       -- open, camera-visible, well clear of the corner pile
-    emu:write8(lz.addr + 0x10, tx); emu:write8(lz.addr + 0x11, ty); setMapUnit(tx, ty, grid)
+    if not INSPECT.place(lz, tx, ty) then return result("FAIL", "could not stand the Lizardzerker on (4,10)") end
     log(string.format("LONE enemy Lizardzerker at (%d,%d): class=0x80 SMSId=%d "
         .. "(all PCs + other enemies swept to %d,%d)", tx, ty, sms, FAR_X, FAR_Y))
     wait(60)
@@ -6371,9 +6286,8 @@ end
 -- (lizardzerker), plain grunts SMSId 118 (wildling).
 scenarios.enemycheck = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) then
+    for i, u in BOARD.each("red") do
+        if not isDead(u) then
             local cd = ru32(u.addr + 4)
             log(string.format("red[%02d] char=0x%02X class=0x%02X SMSId=%d @ (%d,%d)",
                 i, u.charId, ru8(cd + 4), ru8(cd + 6), u.x, u.y))
@@ -6606,33 +6520,17 @@ scenarios.ch02baxby = function()
         .. "(killed a raider in melee)", bidx))
 end
 
--- clear_ch02: the completability + chain + charm-delivery proof. Rout the raider band (DefeatAll)
--- while keeping the chwinga alive, then watch the ending scene gift their charms to the leader /
--- convoy. PASS = routed, chained, and both SURVIVOR charms delivered.
---
--- TWO, not three, since 2026-08-30: Glimmerfrost moved into the (1,12) hut and pays on the
--- visit rather than at the ending, so her Pure Water is ch02visit's to prove (and ch02raid's
--- to prove LOST). This bot never detours to a door -- it routs -- so counting three here would
--- fail a chapter that is working exactly as designed.
-scenarios.clear_ch02 = function()
-    local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
-    if not booted then return result("FAIL", why or "never reached the ch02 map") end
-    pokeFastConfig()
-    local start = chapter()
-    local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
-    local best = {}
-    local function snapCharms()
-        local d = CH02.deliveredCharms(collectedItems(), CAMPAIGN.CH02_CHARMS)
-        if #d > #best then best = d end
-    end
-    -- Deterministic rout: the generic clear-bot is unreliable on ch02 (fumbles into item menus),
-    -- so each player phase we frail+harmless every enemy (1 HP, no power) and teleport a party unit
-    -- adjacent to each live foe to one-shot it via REAL combat -- the kill goes through the death
-    -- hook that fires the DefeatAll win check (a raw US_DEAD poke would NOT). clear_ch02 verifies the
-    -- win->ending->charm WIRING, not ch02 balance (that's the human pacing pass + the difficulty gate).
-    local routed = false
+-- The ch02 deterministic rout (#531 audit 10): clear_ch02's and recordchain's one copy. The
+-- generic clear-bot is unreliable on ch02 (fumbles into item menus), so each player phase frails
+-- + harmlesses every enemy (1 HP, no power) and teleports a party unit to a firing tile on each
+-- live foe to one-shot it via REAL combat -- the kill goes through the death hook that fires the
+-- DefeatAll win check (a raw US_DEAD poke would NOT). The chwinga are kept alive so their
+-- charm-gifts play in the ending. `advanced()` says the chapter has moved on; `tag` prefixes the
+-- per-turn log line; `afterEnemyPhase` (optional) runs after each enemy phase.
+-- Returns "routed" | "advanced" | "gameover" | "exhausted", and the turn it stopped on.
+function INSPECT.routCh02(advanced, tag, afterEnemyPhase)
     for t = 1, 12 do
-        if advanced() then break end
+        if advanced() then return "advanced", t end
         INSPECT.settle("phase", 6000, true)
         wait(60)
         protectChwinga()
@@ -6652,14 +6550,42 @@ scenarios.clear_ch02 = function()
                 end
             end
         end
-        log(string.format("clear_ch02 turn %d: liveEnemies=%d chapter=%d", t, BOARD.liveCount("red"), chapter()))
-        if BOARD.liveCount("red") == 0 then routed = true; break end
-        if advanced() then break end
-        if runEnemyPhase(CH02_PARK) == "gameover" then
-            shot("clear-ch02-gameover")
-            return result("FAIL", string.format("game over on turn %d -- party lost", t)) end
-        snapCharms()
+        log(string.format("%s turn %d: liveEnemies=%d chapter=%d", tag, t, BOARD.liveCount("red"), chapter()))
+        if BOARD.liveCount("red") == 0 then return "routed", t end
+        if advanced() then return "advanced", t end
+        if runEnemyPhase(CH02_PARK) == "gameover" then return "gameover", t end
+        if afterEnemyPhase then afterEnemyPhase() end
     end
+    return "exhausted", 12
+end
+
+-- clear_ch02: the completability + chain + charm-delivery proof. Rout the raider band (DefeatAll)
+-- while keeping the chwinga alive, then watch the ending scene gift their charms to the leader /
+-- convoy. PASS = routed, chained, and both SURVIVOR charms delivered.
+--
+-- TWO, not three, since 2026-08-30: Glimmerfrost moved into the (1,12) hut and pays on the
+-- visit rather than at the ending, so her Pure Water is ch02visit's to prove (and ch02raid's
+-- to prove LOST). This bot never detours to a door -- it routs -- so counting three here would
+-- fail a chapter that is working exactly as designed.
+scenarios.clear_ch02 = function()
+    local booted, why = bootToMap(nil, nil, {strictCheckpoint = true})
+    if not booted then return result("FAIL", why or "never reached the ch02 map") end
+    pokeFastConfig()
+    local start = chapter()
+    local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
+    local best = {}
+    local function snapCharms()
+        local d = CH02.deliveredCharms(collectedItems(), CAMPAIGN.CH02_CHARMS)
+        if #d > #best then best = d end
+    end
+    -- Deterministic rout (INSPECT.routCh02). clear_ch02 verifies the win->ending->charm
+    -- WIRING, not ch02 balance (that's the human pacing pass + the difficulty gate).
+    local rout, t = INSPECT.routCh02(advanced, "clear_ch02", snapCharms)
+    if rout == "gameover" then
+        shot("clear-ch02-gameover")
+        return result("FAIL", string.format("game over on turn %d -- party lost", t))
+    end
+    local routed = rout == "routed"
     shot("clear-ch02-routed")
     log(string.format("rout=%s; ending the turn to fire the DefeatAll win check", tostring(routed)))
     -- Routed: force the phase-end DefeatAll check, then FINE-GRAINED poll the ending scene so the
@@ -6740,37 +6666,11 @@ scenarios.recordchain = function()
     pokeFastConfig()
     local start = chapter()
     local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
-    local routed = false
-    for t = 1, 12 do
-        if advanced() then break end
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
-        wait(60)
-        protectChwinga()   -- keep the chwinga alive so all 3 charm-gifts play in the ending
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
-        end
-        for i = 0, 7 do
-            if advanced() or BOARD.liveCount("red") == 0 then break end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then
-                local mn, mx = unitAttackRange(u)
-                if mn and teleportToFiringTile(u, mn, mx) then
-                    u = blue(u.charId)
-                    if u and moveUnit(u.x, u.y, u.x, u.y) then
-                        chooseAttack(u.addr)
-                        waitFor(function() return faction() == 0 and not menuOpen()
-                            and not procActive(SYM.gProc_ekrBattle) end, 600)
-                    end
-                end
-            end
-        end
-        log(string.format("recordchain rout turn %d: liveEnemies=%d chapter=%d", t, BOARD.liveCount("red"), chapter()))
-        if BOARD.liveCount("red") == 0 then routed = true; break end
-        if advanced() then break end
-        if runEnemyPhase(CH02_PARK) == "gameover" then
-            return result("FAIL", string.format("game over on turn %d -- party lost before the chain", t)) end
+    local rout, t = INSPECT.routCh02(advanced, "recordchain rout")   -- clear_ch02's rout
+    if rout == "gameover" then
+        return result("FAIL", string.format("game over on turn %d -- party lost before the chain", t))
     end
+    local routed = rout == "routed"
     if not (routed or advanced()) then return result("FAIL", "could not rout ch02 -- no chain to record") end
     if routed then endTurn(nil, advanced) end   -- fire the DefeatAll win -> the ending auto-plays
     -- Record the ending -> MNC2(0x4) -> ch03 opening -> PREP from HERE (no state reload). Normal speed
@@ -6869,17 +6769,14 @@ end
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04moose (needs a CH04BOOT=1 ROM).
 scenarios.recordch04moose = function()
     local MOOSE_PID = CAMPAIGN.CH04_MOOSE_PID
-    local function moose() return findUnit(SYM.gUnitArrayGreen, 12, MOOSE_PID) end
+    local function moose() return BOARD.find("green", MOOSE_PID) end
     local reachedIt, goneFor = false, 0
     return recordCutscene({
         tag = "ch04moose", maxFrames = 5400, pressEvery = 90,
         pre = function()
             pokeFastConfig()
             if not bootToMap() then return false, "never reached the ch04 map" end
-            if not waitFor(function()
-                return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine)
-            end, 900, true) then
+            if not INSPECT.settle("event", 900, true) then
                 return false, "ch04 map never became idle"
             end
             reachedIt = marchPartyToward(11, 4, 6, function() return moose() ~= nil end)
@@ -6983,31 +6880,25 @@ end
 scenarios.ch04sprites = function()
     local LUPIN = 0x1D                  -- CHARACTER_DUESSEL (Lupin's identity slot)
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 900, true)
+    INSPECT.settle("event", 900, true)
     if not endTurn() then return result("FAIL", "could not end turn 1") end
     if not waitFor(function() return turn() >= 2 end, 5400) then
         return result("FAIL", "turn 2 never began")
     end
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 3600, true)
+    INSPECT.settle("event", 3600, true)
     -- Camera + a known blue unit calibrate tile -> screen, so the crop of Lupin's tile is
     -- computed rather than eyeballed.
     log(string.format("  camera px (%d,%d)", ru16(SYM.gBmSt + 0x0C), ru16(SYM.gBmSt + 0x0E)))
     local found = false
-    for i = 0, 23 do
-        local u = unitAt(SYM.gUnitArrayRed, i)
-        if u and not isDead(u) then
+    for i, u in BOARD.each("red") do
+        if not isDead(u) then
             log(string.format("  red[%02d] char=0x%02X at (%d,%d)%s",
                 i, u.charId, u.x, u.y, u.charId == LUPIN and "   <- LUPIN" or ""))
             if u.charId == LUPIN then found = true end
         end
     end
-    for i = 0, 7 do
-        local u = unitAt(SYM.gUnitArrayBlue, i)
-        if u and not isDead(u) then
+    for i, u in BOARD.each("blue") do
+        if not isDead(u) then
             log(string.format("  blue[%02d] char=0x%02X at (%d,%d)", i, u.charId, u.x, u.y))
         end
     end
@@ -7020,7 +6911,7 @@ scenarios.ch04sprites = function()
     -- Fog: a unit the player cannot SEE is not drawn, which is indistinguishable from a
     -- broken map sprite. Print the fog state of every pack tile.
     local fogRow = function(y) return ru32(ru32(SYM.gBmMapFog) + y * 4) end
-    local lup = findUnit(SYM.gUnitArrayRed, 24, LUPIN)
+    local lup = red(LUPIN)
     for _, t in ipairs({ {0,0}, {1,0}, {2,0}, {0,1}, {2,1}, {0,2} }) do
         log(string.format("  fog(%d,%d) = %d%s", t[1], t[2], ru8(fogRow(t[2]) + t[1]),
             (lup and lup.x == t[1] and lup.y == t[2]) and "   <- Lupin's tile" or ""))
@@ -7629,9 +7520,7 @@ scenarios.recordch05eruption = function()
     -- bootToMap drives all of it unfilmed. At readable speed that alone is ~10000 frames.
     pokeFastConfig()
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     if not endTurn() then return result("FAIL", "could not end turn 1") end
     local sawWarning = false
     return recordCutscene({
@@ -8075,18 +7964,14 @@ end
 scenarios.recordch02huts = function()
     pokeFastConfig()
     if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
     -- Teleport-and-visit, the ch04/ch05 village idiom: the WALK is not what the camera wants
     -- and pathing across seven tiles of snow is not what this is proving.
     local ok, why = VISIT.open(1, 12)          -- targos-hut-south (Glimmerfrost)
     if not ok then return result("FAIL", "south hut: " .. tostring(why)) end
     return recordCutscene({
         tag = "ch02huts", maxFrames = 3600, pressEvery = 90,
-        until_ = function()
-            return faction() == 0 and not menuOpen()
-                and not procActive(SYM.ProcScr_StdEventEngine)
-        end,
+        until_ = function() return INSPECT.settled("event") end,
     })
 end
 
@@ -8121,8 +8006,7 @@ scenarios.ch02aidiag = function()
     local VILLAGE_REGULAR, RUINS = 0x03, 0x25
     if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
     pokeFastConfig()
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+    INSPECT.settle("event", 6000, true)
 
     local function dist(ax, ay, bx, by) return math.abs(ax - bx) + math.abs(ay - by) end
 
@@ -8145,9 +8029,8 @@ scenarios.ch02aidiag = function()
     end
 
     local function dumpReds(label)
-        for i = 0, 49 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then
+        for i, r in BOARD.each("red") do
+            if not isDead(r) then
                 local ai1 = ru8(r.addr + 0x42)
                 local ai2 = ru8(r.addr + 0x44)
                 local cfg = ru16(r.addr + 0x40)
@@ -8174,9 +8057,8 @@ scenarios.ch02aidiag = function()
     -- Same conditions ch02raid ran under -- the party is kept alive -- so this explains THAT
     -- run rather than a different one. The control is the reinforcement pair, not the party.
     for t = 1, 12 do
-        for i = 0, 61 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) then emu:write8(u.addr + 0x13, 60) end
+        for _, u in BOARD.each("blue") do
+            if not isDead(u) then emu:write8(u.addr + 0x13, 60) end
         end
         log(string.format("---- turn %d (before enemy phase) ----", turn()))
         dumpReds("PRE ")
@@ -8522,18 +8404,15 @@ scenarios.recordch05ravisindeath = function()
         pre = function()
             pokeFastConfig()
             if not bootToMap() then return false, "never reached the ch05 map" end
-            if not waitFor(function()
-                return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine)
-            end, 6000, true) then
+            if not INSPECT.settle("event", 6000, true) then
                 return false, "ch05 map never became idle"
             end
             local boss = red(RAVISIN)
             if not boss then return false, "Ravisin (pid 0xb8) is not in the red array" end
             local hero, hmin, hmax
-            for i = 0, 23 do
-                local u = unitAt(SYM.gUnitArrayBlue, i)
-                if u and not isDead(u) and (u.state & 0x3) == 0
+            for _, u in BOARD.each("blue") do
+                -- onField: the attacker is the unit that moves and strikes.
+                if u.onField and (u.state & 0x3) == 0
                     and mapUnitAt(u.x, u.y) ~= 0 then
                     local mn, mx = unitAttackRange(u)
                     if mn and mn <= 1 and mx >= 1 then
@@ -8549,21 +8428,10 @@ scenarios.recordch05ravisindeath = function()
             emu:write8(hero.addr + 0x14, 30) -- deterministic might for the proof strike
             emu:write8(hero.addr + 0x15, 30) -- deterministic hit for the proof strike
             boss = red(RAVISIN)
-            local bossGrid = mapUnitAt(boss.x, boss.y)
-            local mapw, maph = mapSize()
-            local parked = false
-            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-                local tx, ty = hero.x + d[1], hero.y + d[2]
-                if tx >= 0 and tx < mapw and ty >= 0 and ty < maph
-                    and mapUnitAt(tx, ty) == 0 then
-                    setMapUnit(boss.x, boss.y, 0)
-                    emu:write8(boss.addr + 0x10, tx); emu:write8(boss.addr + 0x11, ty)
-                    setMapUnit(tx, ty, bossGrid)
-                    parked = true
-                    break
-                end
+            local tx, ty = INSPECT.freeBeside(hero)
+            if not tx or not INSPECT.place(boss, tx, ty) then
+                return false, "no free tile beside the melee attacker"
             end
-            if not parked then return false, "no free tile beside the melee attacker" end
             hero = blue(hero.charId) or hero
             if not canAttackFromHere(hero, hmin, hmax) then
                 return false, "parked Ravisin is not in the attacker's live range"
@@ -8620,10 +8488,7 @@ scenarios.recordch05platform = function()
     local function setUp()
             pokeFastConfig()
             if not bootToMap() then return false, "never reached the ch05 map" end
-            if not waitFor(function()
-                return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine)
-            end, 6000, true) then
+            if not INSPECT.settle("event", 6000, true) then
                 return false, "ch05 map never became idle"
             end
             local a = SYM.gPlaySt + 0x40
@@ -8632,18 +8497,17 @@ scenarios.recordch05platform = function()
             c = c & ~(1 << 7)                     -- gameSpeed = normal
             emu:write32(a, c)
             local hero, hmin, hmax
-            for i = 0, 61 do
-                local u = unitAt(SYM.gUnitArrayBlue, i)
-                if u and not isDead(u) and (u.state & 0x3) == 0 and mapUnitAt(u.x, u.y) ~= 0 then
+            for _, u in BOARD.each("blue") do
+                -- onField: both units below are MOVED onto the road pair.
+                if u.onField and (u.state & 0x3) == 0 and mapUnitAt(u.x, u.y) ~= 0 then
                     local mn, mx = unitAttackRange(u)
                     if mn and mn <= 1 and mx >= 1 then hero, hmin, hmax = u, mn, mx break end
                 end
             end
             if not hero then return false, "no selectable blue melee attacker" end
             local foe
-            for i = 0, 49 do
-                local r = unitAt(SYM.gUnitArrayRed, i)
-                if r and not isDead(r) and mapUnitAt(r.x, r.y) ~= 0 then foe = r break end
+            for _, r in BOARD.each("red") do
+                if r.onField and mapUnitAt(r.x, r.y) ~= 0 then foe = r break end
             end
             if not foe then return false, "no live red unit to stage the fight against" end
             pokeHarmless(foe)                     -- the fight must finish, not end the film early
@@ -8669,11 +8533,11 @@ scenarios.recordch05platform = function()
                 if ax then break end
             end
             if not ax then return false, "no adjacent pair of free ROAD tiles on the ch05 map" end
-            local hgrid, fgrid = mapUnitAt(hero.x, hero.y), mapUnitAt(foe.x, foe.y)
-            setMapUnit(hero.x, hero.y, 0); setMapUnit(foe.x, foe.y, 0)
-            emu:write8(hero.addr + 0x10, ax); emu:write8(hero.addr + 0x11, ay)
-            emu:write8(foe.addr + 0x10, bx); emu:write8(foe.addr + 0x11, by)
-            setMapUnit(ax, ay, hgrid); setMapUnit(bx, by, fgrid)
+            -- One at a time is safe: (ax,ay) is empty or the hero's own tile and (bx,by) empty
+            -- or the foe's, so neither move lands on the other unit's old tile.
+            if not (INSPECT.place(hero, ax, ay) and INSPECT.place(foe, bx, by)) then
+                return false, "could not stand the pair on the road tiles"
+            end
             log(string.format("ch05platform: %d,%d vs %d,%d -- terrain 0x%02X / 0x%02X (ROAD)",
                 ax, ay, bx, by, terrainAt(ax, ay), terrainAt(bx, by)))
             hero = blue(hero.charId) or hero
@@ -8719,8 +8583,7 @@ scenarios.recordch05platform = function()
                 l, PLAT_NAME[l] or "NOT one of ours -- vanilla ground"))
         end
         if controllerState() == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears",
-                function(after) return controllerState(after) ~= "dialogue_wait" end, 120) then
+            if not INSPECT.advanceDialogue(120) then
                 return result("FAIL", "ch05platform dialogue postcondition failed")
             end
         end
@@ -8763,10 +8626,7 @@ scenarios.recordch05combatquotes = function()
     wait(30)
     pokeFastConfig()
     if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
-    if not waitFor(function()
-        return faction() == 0 and not menuOpen()
-            and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 6000, true) then
+    if not INSPECT.settle("event", 6000, true) then
         return result("FAIL", "ch05 map never became idle")
     end
     local boss = red(RAVISIN)
@@ -8778,9 +8638,8 @@ scenarios.recordch05combatquotes = function()
     -- Only Ravisin may land a killing blow. pow=0 alone does NOT protect a 1-HP unit (weapon
     -- might still gets through), so Basil keeps her HP and takes the DEFENCE that zeroes a
     -- harmless attacker's damage; Ravisin is given power enough to cut straight through it.
-    for i = 0, 49 do
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) and r.charId ~= RAVISIN then pokeHarmless(r) end
+    for _, r in BOARD.each("red") do
+        if not isDead(r) and r.charId ~= RAVISIN then pokeHarmless(r) end
     end
     emu:write8(basil.addr + 0x17, 40)     -- def: nothing harmless can scratch her
     emu:write8(basil.addr + 0x18, 40)     -- res: Ravisin's Flux is magic, so cover both
@@ -8788,18 +8647,10 @@ scenarios.recordch05combatquotes = function()
     emu:write8(boss.addr + 0x15, 60)      -- hit: and it does not miss
     -- Park Basil orthogonally adjacent to Ravisin's guard tile, keeping the tile->unit grid in
     -- sync (recordch05recruit's idiom) so adjacency reads with no phase cycle.
-    local grid, parked = mapUnitAt(basil.x, basil.y), false
-    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-        local tx, ty = boss.x + d[1], boss.y + d[2]
-        if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
-            setMapUnit(basil.x, basil.y, 0)
-            emu:write8(basil.addr + 0x10, tx); emu:write8(basil.addr + 0x11, ty)
-            setMapUnit(tx, ty, grid)
-            parked = true
-            break
-        end
+    local tx, ty = INSPECT.freeBeside(boss)
+    if not tx or not INSPECT.place(basil, tx, ty) then
+        return result("FAIL", "no free tile beside Ravisin to park Basil")
     end
-    if not parked then return result("FAIL", "no free tile beside Ravisin to park Basil") end
     basil = blue(BASIL)
     log(string.format("ch05combatquotes: Basil (%d,%d) HP %d parked beside Ravisin (%d,%d)",
         basil.x, basil.y, ru8(basil.addr + 0x13), boss.x, boss.y))
@@ -8959,9 +8810,8 @@ scenarios.recordch06ice = function()
         until_ = function()
             if controllerState() ~= "player_map_idle" then return false end
             local reds = 0
-            for i = 0, 49 do
-                local u = unitAt(SYM.gUnitArrayRed, i)
-                if u and u.onMap and not u.dead then reds = reds + 1 end
+            for _, u in BOARD.each("red") do
+                if u.onMap and not u.dead then reds = reds + 1 end
             end
             if reds == 0 then
                 -- recordCutscene reads only the first return, so a second one would be lost and
@@ -8995,18 +8845,15 @@ scenarios.recordch06nerradeath = function()
                 return false, "never reached ch06's Preparations"
             end
             if not driveThroughPrep() then return false, "Preparations never exited via Fight!" end
-            if not waitFor(function()
-                return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine)
-            end, 6000, true) then
+            if not INSPECT.settle("event", 6000, true) then
                 return false, "ch06 map never became idle"
             end
             local boss = red(NERRA)
             if not boss then return false, "Nerra (CHARACTER_NOVALA, 0x4B) is not in the red array" end
             local hero, hmin, hmax
-            for i = 0, 23 do
-                local u = unitAt(SYM.gUnitArrayBlue, i)
-                if u and not isDead(u) and (u.state & 0x3) == 0
+            for _, u in BOARD.each("blue") do
+                -- onField: the attacker is the unit that moves and strikes.
+                if u.onField and (u.state & 0x3) == 0
                     and mapUnitAt(u.x, u.y) ~= 0 then
                     local mn, mx = unitAttackRange(u)
                     if mn and mn <= 1 and mx >= 1 then
@@ -9021,21 +8868,10 @@ scenarios.recordch06nerradeath = function()
             emu:write8(hero.addr + 0x14, 30) -- deterministic might for the proof strike
             emu:write8(hero.addr + 0x15, 30) -- deterministic hit for the proof strike
             boss = red(NERRA)
-            local bossGrid = mapUnitAt(boss.x, boss.y)
-            local mapw, maph = mapSize()
-            local parked = false
-            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-                local tx, ty = hero.x + d[1], hero.y + d[2]
-                if tx >= 0 and tx < mapw and ty >= 0 and ty < maph
-                    and mapUnitAt(tx, ty) == 0 then
-                    setMapUnit(boss.x, boss.y, 0)
-                    emu:write8(boss.addr + 0x10, tx); emu:write8(boss.addr + 0x11, ty)
-                    setMapUnit(tx, ty, bossGrid)
-                    parked = true
-                    break
-                end
+            local tx, ty = INSPECT.freeBeside(hero)
+            if not tx or not INSPECT.place(boss, tx, ty) then
+                return false, "no free tile beside the melee attacker"
             end
-            if not parked then return false, "no free tile beside the melee attacker" end
             hero = blue(hero.charId) or hero
             if not canAttackFromHere(hero, hmin, hmax) then
                 return false, "parked Nerra is not in the attacker's live range"
@@ -9213,7 +9049,7 @@ scenarios.recordch05join = function(expect)
             -- The ARM check still fires exactly at the CUSA, which is the only moment the count
             -- identifies which branch ran (Lupin 3, no-Lupin 4). Latched, because the film runs
             -- on past it now and `boxes` keeps climbing through scene 6.
-            if not joined and findUnit(SYM.gUnitArrayBlue, 20, BASIL) and boxes == expect then
+            if not joined and blue(BASIL) and boxes == expect then
                 joined = true
                 log(string.format("ch05join: Basil is BLUE after %d boxes -- the %s arm; "
                     .. "the join CUSA landed", boxes,
@@ -9235,7 +9071,7 @@ scenarios.recordch05join = function(expect)
             -- the film runs on into scene 7 it is a waypoint, and an unlatched waypoint logs
             -- the same line on every frame until the next box lands.
             if not scene6 and joined and boxes == expect + SCENE6_BOXES
-                and findUnit(SYM.gUnitArrayRed, 24, SAHNAR)
+                and red(SAHNAR)
                 and controllerState() ~= "dialogue_wait" then
                 scene6 = true
                 log(string.format("ch05join: scene 6 played its %d boxes with Sahnar RED on the "
@@ -9245,7 +9081,7 @@ scenarios.recordch05join = function(expect)
             -- Scene 7. Sample the moose EVERY frame, not at the terminal: the charge is the
             -- middle of a message and it is undone before the scene ends, so the terminal alone
             -- cannot tell a lunge that ran from one that never fired.
-            local moose = findUnit(SYM.gUnitArrayRed, 24, MOOSE)
+            local moose = red(MOOSE)
             if moose and not charged and moose.x == RUN_X and moose.y == RUN_Y then
                 charged = true
                 log(string.format("ch05join: the moose RAN the route -- corner, left along the "
@@ -9327,7 +9163,7 @@ scenarios.recordch05moose = function()
             local now = controllerState() == "dialogue_wait"
             if now and not waiting then boxes = boxes + 1 end
             waiting = now
-            local moose = findUnit(SYM.gUnitArrayRed, 24, MOOSE)
+            local moose = red(MOOSE)
             if moose and not charged and moose.x == RUN_X and moose.y == RUN_Y then
                 charged = true
                 log(string.format("ch05moose: it RAN the route -- corner, left along the rim, "
@@ -9501,13 +9337,10 @@ scenarios.recordch05recruit = function()
         pre = function()
             pokeFastConfig()
             if not bootToMap() then return false, "never reached the ch05 map" end
-            if not waitFor(function()
-                return faction() == 0 and not menuOpen()
-                    and not procActive(SYM.ProcScr_StdEventEngine)
-            end, 6000, true) then
+            if not INSPECT.settle("event", 6000, true) then
                 return false, "ch05 map never became idle"
             end
-            if not findUnit(SYM.gUnitArrayBlue, 20, BASIL) then
+            if not blue(BASIL) then
                 return false, "Basil is not BLUE at turn 1 -- the opening join CUSA never fired"
             end
             -- NO turn-end, and no eruption to sit through. Sahnar is on the arena at TURN 1
@@ -9516,28 +9349,20 @@ scenarios.recordch05recruit = function()
             -- its subject. The old chain ended turn 1 and waited on `turn() >= 2 and redSahnar()`;
             -- with her red from the start that breaks the moment the counter ticks, mid-eruption,
             -- and the Talk would have been driven while the warning was still on screen.
-            local sah = findUnit(SYM.gUnitArrayRed, 24, SAHNAR)
+            local sah = red(SAHNAR)
             if not sah then
                 return false, "Sahnar is not RED on the arena at turn 1 -- scene 6's LOAD1 "
                     .. "never fired, so there is nobody to Talk"
             end
             -- setMapUnit keeps the tile->unit grid in sync, so adjacency reads with no phase
             -- cycle: the point of this film is the scene, not a 5-MOV healer's walk.
-            local basil = findUnit(SYM.gUnitArrayBlue, 20, BASIL)
+            local basil = blue(BASIL)
             if not basil then return false, "Basil left the blue array before the Talk" end
-            local grid, parked = mapUnitAt(basil.x, basil.y), false
-            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-                local tx, ty = sah.x + d[1], sah.y + d[2]
-                if tx >= 0 and ty >= 0 and mapUnitAt(tx, ty) == 0 then
-                    setMapUnit(basil.x, basil.y, 0)
-                    emu:write8(basil.addr + 0x10, tx); emu:write8(basil.addr + 0x11, ty)
-                    setMapUnit(tx, ty, grid)
-                    parked = true
-                    break
-                end
+            local tx, ty = INSPECT.freeBeside(sah)
+            if not tx or not INSPECT.place(basil, tx, ty) then
+                return false, "no free tile adjacent to Sahnar to park Basil"
             end
-            if not parked then return false, "no free tile adjacent to Sahnar to park Basil" end
-            basil = findUnit(SYM.gUnitArrayBlue, 20, BASIL)
+            basil = blue(BASIL)
             if not basil or not moveUnit(basil.x, basil.y, basil.x, basil.y) then
                 return false, "no live command menu for Basil"
             end
@@ -9551,7 +9376,7 @@ scenarios.recordch05recruit = function()
         -- here would make the camera the thing that decides when the payoff is over.
         until_ = function()
             if controllerState() == "dialogue_wait" then boxes = boxes + 1 end
-            return findUnit(SYM.gUnitArrayBlue, 20, SAHNAR) ~= nil
+            return blue(SAHNAR) ~= nil
         end,
     })
 end
@@ -9615,8 +9440,7 @@ scenarios.recordch04cottage = function()
         pre = function()
             pokeFastConfig()
             if not bootToMap() then return false, "never reached the ch04 map" end
-            waitFor(function() return faction() == 0 and not menuOpen()
-                and not procActive(SYM.ProcScr_StdEventEngine) end, 6000, true)
+            INSPECT.settle("event", 6000, true)
             local ok, why = VISIT.open(DOOR_X, DOOR_Y)
             if not ok then return false, why end
             pokeNormalConfig()   -- film the line at real speed
@@ -9711,15 +9535,13 @@ scenarios.attackprobe = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     pokeFastConfig()
     emu:write8(SYM.gPlaySt + 0x0D, 0)   -- lift fog, exactly as the clear-bot does
-    waitFor(function() return faction() == 0 and not menuOpen()
-        and not procActive(SYM.ProcScr_StdEventEngine) end, 900, true)
+    INSPECT.settle("event", 900, true)
     local w, h = mapSize()
     local fogAt = function(x, y) return ru8(ru32(ru32(SYM.gBmMapFog) + y * 4) + x) end
     log(string.format("map=%dx%d turn=%d visionRange=%d (0 = fog off)",
         w, h, turn(), ru8(SYM.gPlaySt + 0x0D)))
-    for i = 0, 23 do
-        local r = unitAt(SYM.gUnitArrayRed, i)
-        if r and not isDead(r) then
+    for i, r in BOARD.each("red") do
+        if not isDead(r) then
             pokeFrail(r); pokeHarmless(r)
             log(string.format("  red[%02d] char=0x%02X at (%d,%d) hp=%d grid=0x%02X fog=%d",
                 i, r.charId, r.x, r.y, r.hp, mapUnitAt(r.x, r.y), fogAt(r.x, r.y)))
@@ -9734,9 +9556,8 @@ scenarios.attackprobe = function()
     -- blue[0] may have spent its action triggering the refresh; take the first unit that still
     -- has one AND carries a weapon.
     local u, mn, mx
-    for i = 0, 19 do
-        local c = unitAt(SYM.gUnitArrayBlue, i)
-        if c and not isDead(c) and (c.state & 0x2) == 0 then
+    for _, c in BOARD.each("blue") do
+        if c.onField and (c.state & 0x2) == 0 then   -- onField: it is teleported and fires
             local a, b = unitAttackRange(c)
             if a then u, mn, mx = c, a, b break end
         end
@@ -9925,9 +9746,7 @@ end
 -- Run: PT_HOST_CHAPTER=5 tools/playtest/run.sh recordch04reveal (needs a CH04BOOT=1 ROM).
 scenarios.recordch04reveal = function()
     if not bootToMap() then return result("FAIL", "never reached the ch04 map") end
-    waitFor(function()
-        return faction() == 0 and not menuOpen() and not procActive(SYM.ProcScr_StdEventEngine)
-    end, 900, true)
+    INSPECT.settle("event", 900, true)
     if not endTurn() then return result("FAIL", "could not end turn 1") end
     -- Ride turn 1's enemy phase out inside the RECORDER so the reveal itself is captured. Both
     -- paths now advance only an observed dialogue-input wait; the recorder additionally takes
@@ -9950,66 +9769,49 @@ end
 scenarios.recordch03talk = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local CHAR_TREX = 0x1C -- CHARACTER_RENNAC (Trex rides the Rennac slot)
-    local function blueTrex() return findUnit(SYM.gUnitArrayBlue, 20, CHAR_TREX) end
-    local trex = findUnit(SYM.gUnitArrayGreen, 12, CHAR_TREX)
+    local function blueTrex() return blue(CHAR_TREX) end
+    local trex = BOARD.find("green", CHAR_TREX)
     if not trex then return result("FAIL", "green Trex (0x1C) not found in the green array") end
     local rec = blue(0x01)
     if not rec then return result("FAIL", "leader (0x01) not deployed") end
-    -- Park the recruiter on a free tile orthogonally adjacent to green Trex (setMapUnit keeps the
-    -- occupancy grid in sync so Talk-adjacency reads with no phase cycle -- the ch03talk trick).
-    local rgrid = mapUnitAt(rec.x, rec.y)
-    local parked = false
-    for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-        local tx, ty = trex.x + d[1], trex.y + d[2]
-        if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
-            setMapUnit(rec.x, rec.y, 0)
-            emu:write8(rec.addr + 0x10, tx); emu:write8(rec.addr + 0x11, ty)
-            setMapUnit(tx, ty, rgrid)
-            parked = true
-            break
-        end
+    -- Park the recruiter on a free tile orthogonally adjacent to green Trex (INSPECT.place keeps
+    -- the occupancy grid in sync so Talk-adjacency reads with no phase cycle -- the ch03talk
+    -- trick). Bounds are the live map's (ch03 is 17x16), not the old `<= 24 / <= 15` literals.
+    local tx, ty = INSPECT.freeBeside(trex)
+    if not tx or not INSPECT.place(rec, tx, ty) then
+        return result("FAIL", "no free tile adjacent to Trex to park the recruiter")
     end
-    if not parked then return result("FAIL", "no free tile adjacent to Trex to park the recruiter") end
     pokeNormalConfig(); pokeAnimsOn()
     -- Clear the turn-1 entrance cutscene so we have real control (cf. recordch03win).
-    waitFor(function()
-        return faction() == 0 and not menuOpen()
-           and not procActive(SYM.ProcScr_StdEventEngine)
-           and not procActive(SYM.ProcScr_BattleEventEngine)
-    end, 900, true)
+    INSPECT.settle("battle", 900, true)
     -- 1. Frame GREEN Trex on his ledge before the talk.
     cursorTo(trex.x, trex.y)
-    for f = 1, 60 do if f % 3 == 0 then shot("ch03talk") end yield() end
+    INSPECT.film(60, "ch03talk", 3)
     -- 2. Talk through the live semantic command and target selector, then film through CUSA.
     rec = blue(0x01)
-    waitFor(function() return faction() == 0 and not menuOpen() end, 300, true)
+    INSPECT.settle("phase", 300, true)
     if not moveUnit(rec.x, rec.y, rec.x, rec.y) then
         return result("FAIL", "no command menu for the recruiter")
     end
     if not chooseTalk() then return result("FAIL", "semantic Talk did not reach dialogue input") end
     -- The migrated recruit dialogue is several pages; advance only at TalkWaitForInput.
-    for i = 1, 3600 do
-        if i % 3 == 0 then shot("ch03talk") end
-        if blueTrex() then break end
-        if controllerState() == "dialogue_wait" then
-            if not guardedInput("advance_dialogue", "A", "dialogue input wait clears", function(after)
-                return controllerState(after) ~= "dialogue_wait"
-            end, 120) then return result("FAIL", "Talk dialogue input did not advance") end
-        else yield() end
-    end
+    local _, stopped = INSPECT.talkUntil(blueTrex, 3600, {
+        tick = function(i) if i % 3 == 0 then shot("ch03talk") end end,
+    })
+    if stopped == "advance" then return result("FAIL", "Talk dialogue input did not advance") end
     if not blueTrex() then return result("FAIL", "Trex never flipped blue (CUSA did not fire)") end
-    for f = 1, 40 do if f % 3 == 0 then shot("ch03talk") end yield() end -- linger on the flip
+    INSPECT.film(40, "ch03talk", 3) -- linger on the flip
     -- 3. The CUSA changes Trex's FACTION, but his standing MAP SPRITE only redraws to the blue
     --    party palette on a RefreshUnitSprites (phase transition) -- so cycle one phase, then frame
     --    him again to SHOW the green->blue party-palette sprite (the sprite we painted).
     cursorTo(trex.x, trex.y)
-    for f = 1, 24 do if f % 3 == 0 then shot("ch03talk") end yield() end
+    INSPECT.film(24, "ch03talk", 3)
     runEnemyPhase() -- end turn -> enemy phase -> back to player: triggers the sprite refresh
     local bt = blueTrex()
     local framed
     if bt then framed = cursorTo(bt.x, bt.y) else framed = cursorTo(trex.x, trex.y) end
     if not framed then return result("FAIL", "could not frame Trex after the phase refresh") end
-    for f = 1, 90 do if f % 3 == 0 then shot("ch03talk") end yield() end -- Trex now blue on the map
+    INSPECT.film(90, "ch03talk", 3) -- Trex now blue on the map
     return result("PASS", "ch03 talk-recruit recorded (green -> blue, sprite refreshed)")
 end
 
@@ -10029,12 +9831,8 @@ scenarios.recordch03win = function()
     -- The longer opening + the turn-1 Trex ENTRANCE cutscene (TURN(1) event) hold control past
     -- bootToMap; until it clears, moveUnit can't open a command menu (the driver-pacing regression
     -- the handoff flags). Advance (tapping A) until genuine player control returns.
-    waitFor(function()
-        return faction() == 0 and not menuOpen()
-           and not procActive(SYM.ProcScr_StdEventEngine)
-           and not procActive(SYM.ProcScr_BattleEventEngine)
-    end, 900, true)
-    for f = 1, 20 do if f % 3 == 0 then shot("ch03win") end yield() end -- settle on the map
+    INSPECT.settle("battle", 900, true)
+    INSPECT.film(20, "ch03win", 3) -- settle on the map
     -- Park the frail'd grell on a free tile adjacent to the leader (no other foe near the left
     -- entrance) so the attack target is unambiguously the grell. Re-park each attempt in case a
     -- whiff or the grell's AI move disturbs it (mirrors the ch03win PASS/FAIL retry).
@@ -10042,17 +9840,8 @@ scenarios.recordch03win = function()
         local g = red(CAMPAIGN.CH03_BOSS_PID)
         if not g or isDead(g) then return false end
         pokeFrail(g); g = red(CAMPAIGN.CH03_BOSS_PID)
-        local ggrid = mapUnitAt(g.x, g.y)
-        for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-            local tx, ty = leader.x + d[1], leader.y + d[2]
-            if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0 then
-                setMapUnit(g.x, g.y, 0)
-                emu:write8(g.addr + 0x10, tx); emu:write8(g.addr + 0x11, ty)
-                setMapUnit(tx, ty, ggrid)
-                return true
-            end
-        end
-        return false
+        local tx, ty = INSPECT.freeBeside(leader)   -- live map bounds, not `<= 24 / <= 15`
+        return tx ~= nil and INSPECT.place(g, tx, ty)
     end
     -- Attack + FILM the battle anim. moveUnit lands on the command menu; then A(Attack) ->
     -- A(weapon) -> A(target) starts combat. CRUCIAL: pressing A DURING an FE8 battle anim SKIPS
@@ -10090,11 +9879,11 @@ scenarios.recordch03win = function()
         if isDead(red(CAMPAIGN.CH03_BOSS_PID)) or eventFlag(2) then break end
         if not parkGrell() then return result("FAIL", "no free tile adjacent to the leader for the grell") end
         cursorTo(leader.x, leader.y)
-        for f = 1, 30 do if f % 3 == 0 then shot("ch03win") end yield() end -- frame the standoff
+        INSPECT.film(30, "ch03win", 3) -- frame the standoff
         filmedAttack()
         if isDead(red(CAMPAIGN.CH03_BOSS_PID)) or eventFlag(2) then break end
         -- a whiff: run the enemy phase (filming) and retry next player turn
-        for f = 1, 40 do if f % 4 == 0 then shot("ch03win") end yield() end
+        INSPECT.film(40, "ch03win", 4)
         if runEnemyPhase() == "gameover" then return result("FAIL", "unexpected game over") end
     end
     if not (isDead(red(CAMPAIGN.CH03_BOSS_PID)) or eventFlag(2)) then
@@ -10125,12 +9914,8 @@ scenarios.recordch03midmap = function()
     if not leader then return result("FAIL", "leader (0x01) not deployed") end
     emu:write16(leader.addr + 0x1E, 0x2D1F) -- Iron Axe in items[0]: guaranteed in-range kill weapon
     pokeAnimsOn()
-    waitFor(function()
-        return faction() == 0 and not menuOpen()
-           and not procActive(SYM.ProcScr_StdEventEngine)
-           and not procActive(SYM.ProcScr_BattleEventEngine)
-    end, 900, true)
-    for f = 1, 20 do if f % 3 == 0 then shot("ch03midmap") end yield() end -- settle on the map
+    INSPECT.settle("battle", 900, true)
+    INSPECT.film(20, "ch03midmap", 3) -- settle on the map
     -- Bring the LEADER to the Brute (at its real central tile ~14,6) rather than dragging the Brute
     -- to the left-entrance spawn: the execution beats fire ON the kill tile, so killing centrally
     -- keeps the camera central and the on-map talk bubble on-screen (a left-edge kill anchors the
@@ -10139,26 +9924,19 @@ scenarios.recordch03midmap = function()
         local b = red(0xb6)
         if not b or isDead(b) then return false end
         pokeFrail(b); b = red(0xb6)
-        local lgrid = mapUnitAt(leader.x, leader.y)
         -- Prefer a PASSABLE (walkable) adjacent tile so the leader stands on real mine FLOOR (the
         -- stone battle platform), exactly like actual play -- an impassable wall/pillar tile is a
         -- rough terrain and would film the leader on the rock platform instead (Nicolas 2026-07-11).
-        for _, passableOnly in ipairs({ true, false }) do
-            for _, d in ipairs({ { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }) do
-                local tx, ty = b.x + d[1], b.y + d[2]
-                if tx >= 0 and tx <= 24 and ty >= 0 and ty <= 15 and mapUnitAt(tx, ty) == 0
-                   and (not passableOnly or not IMPASSABLE_TERRAIN[terrainAt(tx, ty)]) then
-                    setMapUnit(leader.x, leader.y, 0)
-                    emu:write8(leader.addr + 0x10, tx); emu:write8(leader.addr + 0x11, ty)
-                    setMapUnit(tx, ty, lgrid)
-                    leader = blue(0x01)
-                    log(string.format("leader parked at (%d,%d) terrain=%d (brute@%d,%d terrain=%d)",
-                        tx, ty, terrainAt(tx, ty), b.x, b.y, terrainAt(b.x, b.y)))
-                    return true
-                end
-            end
-        end
-        return false
+        -- Live map bounds (INSPECT.freeBeside), not the old `<= 24 / <= 15` literals.
+        local tx, ty = INSPECT.freeBeside(b, { passable = function(cx, cy)
+            return not IMPASSABLE_TERRAIN[terrainAt(cx, cy)]
+        end })
+        if not tx then tx, ty = INSPECT.freeBeside(b) end
+        if not tx or not INSPECT.place(leader, tx, ty) then return false end
+        leader = blue(0x01)
+        log(string.format("leader parked at (%d,%d) terrain=%d (brute@%d,%d terrain=%d)",
+            tx, ty, terrainAt(tx, ty), b.x, b.y, terrainAt(b.x, b.y)))
+        return true
     end
     -- Attack + film the battle anim (do NOT press once combat starts -- A skips an FE8 anim). The
     -- hit kills the frail'd Brute; film the death, then a LIGHT A-cadence clears the EXP screen
@@ -10189,10 +9967,10 @@ scenarios.recordch03midmap = function()
         if isDead(red(0xb6)) or eventFlag(10) then break end
         if not parkBrute() then return result("FAIL", "no free tile adjacent to the leader for the Brute") end
         cursorTo(leader.x, leader.y)
-        for f = 1, 30 do if f % 3 == 0 then shot("ch03midmap") end yield() end -- frame the standoff
+        INSPECT.film(30, "ch03midmap", 3) -- frame the standoff
         filmedAttack()
         if isDead(red(0xb6)) or eventFlag(10) then break end
-        for f = 1, 40 do if f % 4 == 0 then shot("ch03midmap") end yield() end
+        INSPECT.film(40, "ch03midmap", 4)
         if runEnemyPhase() == "gameover" then return result("FAIL", "unexpected game over") end
     end
     if not (isDead(red(0xb6)) or eventFlag(10)) then
@@ -10207,7 +9985,7 @@ scenarios.recordch03midmap = function()
     -- pages) covers a stray missed press + films the map resuming after the guard flag sets.
     press(K.A, 8); wait(40)                                     -- dismiss the EXP/level screen
     for _ = 1, 22 do
-        for f = 1, 70 do if f % 3 == 0 then shot("ch03midmap") end yield() end  -- page draws + holds
+        INSPECT.film(70, "ch03midmap", 3)  -- page draws + holds
         press(K.A, 8)                                                          -- advance one page (robust)
     end
     result("PASS", "ch03 Brute death + RBG-execution midmap recorded")
@@ -10224,7 +10002,7 @@ scenarios.recordch02map = function()
     local path = { { 2, 4 }, { 4, 4 }, { 6, 5 }, { 8, 6 }, { 10, 7 }, { 12, 7 }, { 13, 6 }, { 11, 8 }, { 8, 8 }, { 4, 5 }, { 3, 4 } }
     for _, p in ipairs(path) do
         cursorTo(p[1], p[2])
-        for f = 1, 18 do if f % 3 == 0 then shot("map") end yield() end
+        INSPECT.film(18, "map", 3)
     end
     result("PASS", "ch02 map pan recorded")
 end
@@ -10256,32 +10034,12 @@ scenarios.recordch02ending = function()
     wait(60)
     pokeFastConfig()
     local start = chapter()
-    for t = 1, 12 do
-        if chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) then break end
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
-        wait(60)
-        for i = 0, 23 do
-            local r = unitAt(SYM.gUnitArrayRed, i)
-            if r and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
-        end
-        for i = 0, 7 do
-            if BOARD.liveCount("red") == 0 then break end
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) and (u.state & 0x2) == 0 then
-                local mn, mx = unitAttackRange(u)
-                if mn and teleportToFiringTile(u, mn, mx) then
-                    u = blue(u.charId)
-                    if u and moveUnit(u.x, u.y, u.x, u.y) then
-                        chooseAttack(u.addr)
-                        waitFor(function() return faction() == 0 and not menuOpen()
-                            and not procActive(SYM.gProc_ekrBattle) end, 600)
-                    end
-                end
-            end
-        end
-        if BOARD.liveCount("red") == 0 then break end
-        if runEnemyPhase(CH02_PARK) == "gameover" then return result("FAIL", "party lost") end
-    end
+    -- clear_ch02's rout (INSPECT.routCh02), which also keeps the chwinga alive: the ending this
+    -- films is the one where their charm-gifts play.
+    local rout = INSPECT.routCh02(function()
+        return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen)
+    end, "recordch02ending rout")
+    if rout == "gameover" then return result("FAIL", "party lost") end
     if BOARD.liveCount("red") ~= 0 then return result("FAIL", "rout incomplete -- no ending to record") end
     endTurn()   -- fire the DefeatAll win -> the ending scene
     pokeNormalConfig()   -- readable text speed for the capture

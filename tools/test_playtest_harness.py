@@ -194,7 +194,7 @@ class TestAwaitControllerState(unittest.TestCase):
         # off-map unit out of the lists that drive the cursor. The read lives in board.lua,
         # the one board reader (#510 step 9); harness unitAt only delegates to it.
         harness = _read_harness()
-        body = _block(harness, 'local function unitAt(', '\nlocal function findUnit')
+        body = _block(harness, 'local function unitAt(', '\nlocal function blue')
         self.assertIn('BOARD.leanAt(base, i)', body, 'unitAt delegates to board.lua')
         with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
             board = _block(fh.read(), 'function Board.leanAt(', '\nend\n')
