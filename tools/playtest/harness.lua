@@ -4,6 +4,8 @@
 --   PLAYTEST_DIR      -- this directory (for dofile of symbols.lua)
 --   PLAYTEST_SCENARIO -- which `scenarios.<name>` to run (the table below is the
 --                        authoritative list; run.sh's header groups the main ones)
+--   PLAYTEST_ENTRY    -- the function that runs it, when a chapter case's `lua:` binds a
+--                        generic probe (`INSPECT.redStats`) instead of a same-named scenario
 --   PLAYTEST_LOG      -- log file path (runner polls it for "RESULT:")
 --   PLAYTEST_SHOTDIR  -- screenshot directory for milestone/debug captures
 --   PLAYTEST_STATEDIR -- save-state checkpoint dir (ckpt_*/record* scenarios)
@@ -4283,7 +4285,15 @@ end
 -- over a grid of tiles and screenshotting at each camera clamp; the camera pixel-scroll (gBmSt.camera
 -- @ +0x0C/+0x0E) is baked into each frame's tag so make_gif/stitch_map.py can paste each 240x160
 -- shot at its exact map offset. Fresh CH03BOOT New Game; clears the turn-1 entrance cutscene first.
+-- Chapter-generic: the map decides what is in shot, and a chapter case binds it to its own ROM
+-- (`lua: mapfull`; ch05's sixteen risen tomb-guard, #25).
 scenarios.mapfull = function()
+    -- NO pokeFastConfig() here, and the absence is the note. It was added claiming to fix two
+    -- timeouts, and it cannot: `bootToMap` goes through New Game, and `InitPlayConfig`
+    -- (bmio.c:936) CpuFill16s gPlaySt to zero and sets textSpeed = 1, so any config poked
+    -- before the boot is wiped. The run that passed after adding it passed for another reason
+    -- -- an earlier run had already passed WITHOUT it (22s), so the timeouts are flake or
+    -- something else, and are NOT root-caused. Do not re-add this believing it speeds the boot.
     if not bootToMap() then return result("FAIL", "never reached the map") end
     INSPECT.settle("battle", 900, true)
     -- The grid is DERIVED from the map, not written down. It used to be the literals
@@ -4327,24 +4337,6 @@ scenarios.mapfull = function()
         end
     end
     return result("PASS", "full-map grid captured (" .. n .. " tiles of " .. mw .. "x" .. mh .. ")")
-end
-
--- mapfullch05 (#25): the same pan against the ch05boot ROM, which is where the chapter's four
--- SKELETON enemy reskins can actually be judged -- sixteen risen tomb-guard standing on the
--- winter tileset, at the size and palette the player meets them at. A contact sheet of the
--- sheets cannot answer that: the enemy faction palette is applied by the ENGINE at runtime, so
--- the vendored blue is not the colour they wear, and the four have to read apart from EACH
--- OTHER at 16x16 as well as apart from the terrain.
--- One routine, two ROMs -- the pan is chapter-generic and the map decides what is in shot.
--- Delegates rather than aliases so matrix.py can attribute a body to the name (verdict cache).
-scenarios.mapfullch05 = function()
-    -- NO pokeFastConfig() here, and the absence is the note. It was added claiming to fix two
-    -- timeouts, and it cannot: `bootToMap` goes through New Game, and `InitPlayConfig`
-    -- (bmio.c:936) CpuFill16s gPlaySt to zero and sets textSpeed = 1, so any config poked
-    -- before the boot is wiped. The run that passed after adding it passed for another reason
-    -- -- an earlier run had already passed WITHOUT it (22s), so the timeouts are flake or
-    -- something else, and are NOT root-caused. Do not re-add this believing it speeds the boot.
-    return scenarios.mapfull()
 end
 
 -- RECORDOPENING: boot -> title -> START -> New Game, then record the #43 opening montage
@@ -4396,7 +4388,8 @@ end
 
 -- TITLECARD: open the map menu -> Status screen, which decompresses the
 -- chapter title card (chap_title_data[chapTitleId]) -- the artifact screenshot
--- is how a recomposed title gets eyeballed without a manual run.
+-- is how a recomposed title gets eyeballed without a manual run. Pinned to the canonical ROM;
+-- a chapter whose card is new binds it to the build that hosts it (`lua: titlecard`).
 scenarios.titlecard = function()
     if not bootToMap() then return result("FAIL", "never reached the map") end
     local tile = emptyTile()
@@ -4425,12 +4418,6 @@ scenarios.titlecard = function()
         result("FAIL", "Status screen proc never appeared")
     end
 end
--- The same capture on a chapter's own boot ROM: `titlecard` is pinned to the canonical ROM, and
--- a chapter whose card is new needs it drawn by the build that hosts it (ch07's YAML case).
-scenarios.ch07titlecard = function()
-    return scenarios.titlecard()
-end
-
 -- What the ROM loaded each red unit with: the full struct Unit stat line, so the parity model
 -- (difficulty.py) and the wiki's load path (unit_load.py) can both be held to it (#490, #508).
 -- struct Unit (bmunit.h): +04 pClassData (class number at +04), +08 level, +12 maxHP, +14 pow,
@@ -4454,12 +4441,6 @@ INSPECT.redStats = function()
     if n == 0 then return result("FAIL", "no red units on the map") end
     return result("PASS", string.format("mode=%s: %d red units logged", actual, n))
 end
-scenarios.ch04redstats = function()
-    return INSPECT.redStats()
-end
-scenarios.ch07redstats = function()
-    return INSPECT.redStats()
-end
 
 -- When each red unit first attacks while the party holds its deploy tiles (#510 step 7, the
 -- in-engine proof of `timeline.engagements`). The parity model reads a pursuer's WAVE as the
@@ -4469,7 +4450,8 @@ end
 -- enemy phases (`timeline.HORIZON`). Each red unit is logged the phase it is first seen (its
 -- tile, the key the model's body is matched on) and the phase it first attacks, read off
 -- gAiDecision the frame the AI makes it.
-INSPECT.firstAttacks = function(phases)
+INSPECT.firstAttacks = function()
+    local phases = 8 -- timeline.HORIZON
     if not bootToMap() then return result("FAIL", "never reached the map") end
     pokeFastConfig()
     INSPECT.settle("event", 6000, true)
@@ -4567,9 +4549,6 @@ INSPECT.firstAttacks = function(phases)
     return result("PASS", string.format("%d red units seen, %d attacked within %d enemy phases",
                                         n, hit, phases))
 end
-scenarios.ch04waves = function()
-    return INSPECT.firstAttacks(8)
-end
 
 -- The blue unit table in slot order once prep has deployed: the order FE8's AI breaks a
 -- target tie in (cp_battle.c, `>=`: the later slot wins), which SortPlayerUnitsForPrepScreen
@@ -4591,9 +4570,6 @@ INSPECT.blueOrder = function()
     if n == 0 then return result("FAIL", "no blue units in the table") end
     return result("PASS", string.format("%d blue units logged in slot order, %d deployed", n,
                                         deployed))
-end
-scenarios.ch07blueorder = function()
-    return INSPECT.blueOrder()
 end
 
 -- GAMEOVER: Hlin (the lord-analog) dies -> EVFLAG_GAMEOVER quote -> game over.
@@ -10550,14 +10526,23 @@ local co = coroutine.create(function()
   end
 
     log("scenario: " .. PLAYTEST_SCENARIO)
-    local fn = scenarios[PLAYTEST_SCENARIO]
+    -- A chapter case's `lua:` may bind a generic probe to its chapter's ROM (#531), so the
+    -- function is looked up by ENTRY. Only `scenarios` and `INSPECT` are searched: those are
+    -- the two tables matrix.py follows a closure out of, and a probe it cannot see would be
+    -- served a stale cached PASS.
+    local entry = (PLAYTEST_ENTRY ~= nil and PLAYTEST_ENTRY ~= "") and PLAYTEST_ENTRY
+        or PLAYTEST_SCENARIO
+    local probe = entry:match("^INSPECT%.([%w_]+)$")
+    local fn = probe and INSPECT[probe] or scenarios[entry]
+    if entry ~= PLAYTEST_SCENARIO then log("entry: " .. entry) end
     if not fn then
         if PLAYTEST_CASE ~= nil and PLAYTEST_CASE ~= "" then
             runDeclaredCase(PLAYTEST_CASE)
             log("declared case returned")
             return
         end
-        return result("ERROR", "unknown scenario " .. tostring(PLAYTEST_SCENARIO))
+        return result("ERROR", "unknown scenario " .. tostring(PLAYTEST_SCENARIO)
+            .. (entry ~= PLAYTEST_SCENARIO and (" (entry " .. entry .. ")") or ""))
     end
     fn()
     log("scenario function returned")

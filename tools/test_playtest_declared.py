@@ -115,6 +115,14 @@ class TestEscapeHatch(unittest.TestCase):
         self.assertEqual(rows['ch05arena']['rom'], 'ch05boot')
         self.assertEqual(rows['ch05arena']['host_chapter'], 6)
 
+    def test_a_lua_case_carries_the_function_it_names(self):
+        """`lua:` may bind a generic probe rather than a same-named scenario (#531)."""
+        doc = chapter()
+        doc['playtest']['cases'] = [{'name': 'ch05redstats', 'proves': 'x',
+                                     'lua': 'INSPECT.redStats'}]
+        rows = declared.matrix_rows([doc], slots={'ch05': 6})
+        self.assertEqual(rows['ch05redstats']['lua'], 'INSPECT.redStats')
+
     def test_a_case_may_not_be_both_declared_and_lua(self):
         doc = chapter()
         doc['playtest']['cases'][0]['lua'] = 'ch05village'

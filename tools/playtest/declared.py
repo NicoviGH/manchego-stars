@@ -17,6 +17,15 @@ derived here rather than hand-written a second time in `matrix.yaml`:
           proves: the arena tutorial is one-shot on EVFLAG_TMP(13)
           lua: ch05arena             # the escape hatch: only the BODY opts out
 
+        - name: ch04redstats
+          proves: every red unit's loaded stat line is logged
+          lua: INSPECT.redStats      # a generic probe, run on THIS chapter's ROM
+
+`lua:` names the harness function that runs the case: usually a scenario of the same name,
+but it may name a chapter-generic one (`INSPECT.*` or another scenario), so binding a probe
+to another chapter's ROM costs a YAML line and no Lua wrapper (#531). It reaches harness.lua
+as the row's `lua` (`MX_ENTRY`), and the verdict cache follows it there.
+
 `host_chapter` comes from `inject/hosts.py` -- the host-slot registry, which is already the
 single declaration of which vanilla slot a chapter rides. Deriving it from the chapter
 NUMBER instead would be right up to ch04 and wrong forever after: from slot 6 on, vanilla's
@@ -139,7 +148,7 @@ def matrix_rows(docs=None, slots=None, campaign=campaign_chapters.CAMPAIGN):
             'host_chapter': slots[short],
             'kind': case.get('kind', 'verdict'),
         }
-        for optional in ('headless', 'deadline', 'checkpoint', 'manual'):
+        for optional in ('headless', 'deadline', 'checkpoint', 'manual', 'lua'):
             if optional in case:
                 row[optional] = case[optional]
         rows[case['name']] = row

@@ -268,6 +268,15 @@ class ShellEnvExport(unittest.TestCase):
         self.assertEqual(env['MX_CHECKPOINT'], "''")
         self.assertEqual(env['MX_CHECKPOINT_BUILDER'], "''")
 
+    def test_the_entry_is_the_scenario_unless_a_lua_key_binds_a_probe(self):
+        """#531: a chapter case's `lua:` binds a generic probe; run.sh hands it to the runner."""
+        m = manifest(scenarios={'win': {}, 'ch04redstats': {'lua': 'INSPECT.redStats'}})
+        def entry(name):
+            return dict(line.split('=', 1) for line in
+                        mx.export_env(m.resolve(name)).splitlines())['MX_ENTRY']
+        self.assertEqual(entry('win'), "'win'")
+        self.assertEqual(entry('ch04redstats'), "'INSPECT.redStats'")
+
     def test_every_exported_value_is_single_quoted(self):
         for line in mx.export_env(manifest().resolve('win')).splitlines():
             _, value = line.split('=', 1)
@@ -482,8 +491,30 @@ class RealManifest(unittest.TestCase):
         """
         import declared
         bodies = {c['name'] for _s, c in declared.cases() if 'lua' not in c}
-        stale = sorted(set(self.m.scenarios) - self.harness - bodies)
+        funcs = mx.harness_functions(open(mx.HARNESS).read())
+        stale = sorted(n for n in set(self.m.scenarios) - bodies
+                       if not mx.entry_defined(self.m.resolve(n).entry, self.harness, funcs))
         self.assertEqual(stale, [], 'matrix rows naming nothing runnable')
+
+    def test_a_bound_probe_is_reached_and_its_wrapper_is_gone(self):
+        """#531 deleted the one-line wrappers that bound a probe to a chapter's ROM. The row
+        must reach the probe itself (verdict cache, #238 gate), and no wrapper may survive."""
+        funcs = mx.harness_functions(open(mx.HARNESS).read())
+        for name, probe in (('ch04redstats', 'INSPECT.redStats'),
+                            ('ch04waves', 'INSPECT.firstAttacks'),
+                            ('ch07blueorder', 'INSPECT.blueOrder'),
+                            ('mapfullch05', 'mapfull')):
+            entry = self.m.resolve(name).entry
+            self.assertEqual(entry, probe)
+            self.assertIn(probe, mx.reaches(entry, funcs))
+            self.assertNotIn(name, self.harness)
+
+    def test_entry_defined_searches_only_what_the_runner_searches(self):
+        funcs = {'INSPECT.redStats': ('', 'fn'), 'helper': ('', 'fn')}
+        self.assertTrue(mx.entry_defined('win', {'win'}, funcs))
+        self.assertTrue(mx.entry_defined('INSPECT.redStats', set(), funcs))
+        self.assertFalse(mx.entry_defined('helper', set(), funcs))
+        self.assertFalse(mx.entry_defined('INSPECT.gone', set(), funcs))
 
     def test_a_declared_case_body_is_the_chapter_yaml_not_a_dead_row(self):
         """The complement: the three ported cases resolve, and harness.lua does NOT define
@@ -964,6 +995,17 @@ class VerdictFingerprint(unittest.TestCase):
         self.assertNotEqual(self.fingerprint(), self.fingerprint(harness=edited))
         edited = HARNESS_FIXTURE.replace('"alpha"', '"omega"')
         self.assertNotEqual(self.fingerprint(), self.fingerprint(harness=edited))
+
+    def test_a_bound_entry_keys_on_the_function_it_runs(self):
+        """A `lua:`-bound row (#531) has no body of its own: its PASS rests on the probe it
+        runs, so editing that probe must re-run it and editing anything else must not."""
+        m = manifest(scenarios={'alpha': {}, 'gamma': {'lua': 'alpha'}})
+        gamma = m.resolve('gamma')
+        base = self.fingerprint(scenario=gamma)
+        edited = HARNESS_FIXTURE.replace('return onlyForA(1)', 'return onlyForA(9)')
+        self.assertNotEqual(base, self.fingerprint(scenario=gamma, harness=edited))
+        edited = HARNESS_FIXTURE.replace('return onlyForB(2)', 'return onlyForB(3)')
+        self.assertEqual(base, self.fingerprint(scenario=gamma, harness=edited))
 
     def test_editing_ANOTHER_scenario_is_the_SAME_key(self):
         """The whole point. harness.lua is one chunk and nearly every task edits it;

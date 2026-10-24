@@ -2069,4 +2069,7 @@ playtest:
     - {name: recordch05endingnosahnar, proves: the ending with Sahnar never recruited,         lua: recordch05endingnosahnar, kind: record, boot: ch05endingnosahnar}
     - {name: recordch05endingbasildied, proves: scene 17 -- the ending over Basil's body,      lua: recordch05endingbasildied, kind: record, boot: ch05endingbasildied}
     - {name: recordravisin,            proves: Ravisin's battle anim and map sprite,           lua: recordravisin,            kind: record}
-    - {name: mapfullch05,              proves: sixteen risen tomb-guard on the real winter map, lua: mapfullch05,             kind: record}
+    # The chapter-generic map pan on ch05's boot: the four skeleton reskins judged where the
+    # player meets them. The engine applies the enemy palette at runtime, so a sheet's colours
+    # are not what they wear, and they must read apart from each other at 16x16 (#25).
+    - {name: mapfullch05,              proves: sixteen risen tomb-guard on the real winter map, lua: mapfull,                 kind: record}

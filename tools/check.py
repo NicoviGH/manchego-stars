@@ -2134,11 +2134,22 @@ def check_playtest_matrix(fail):
         fail.append('chapter-declared playtest cases do not load (%s)' % exc)
         bodies = {}
     declared_bodies = {n for n, c in bodies.items() if 'lua' not in c}
+    # A `lua:` case may bind a chapter-generic probe instead of a same-named scenario (#531).
+    bound = {n: c['lua'] for n, c in bodies.items() if 'lua' in c and c['lua'] != n}
 
     harness = mx.harness_scenarios()
+    with open(mx.HARNESS, encoding='utf-8') as fh:
+        funcs = mx.harness_functions(fh.read())
     for name in sorted(harness - set(m.scenarios)):
         fail.append('harness.lua defines scenario %s with no matrix.yaml row' % name)
-    for name in sorted(set(m.scenarios) - harness - declared_bodies):
+    for name, entry in sorted(bound.items()):
+        if name in harness:
+            fail.append('%s: the chapter YAML binds `lua: %s`, so scenarios.%s in harness.lua '
+                        'never runs -- delete it' % (name, entry, name))
+        if not mx.entry_defined(entry, harness, funcs):
+            fail.append('%s: the chapter YAML names `lua: %s`, which is neither a scenario nor '
+                        'an INSPECT function in harness.lua' % (name, entry))
+    for name in sorted(set(m.scenarios) - harness - declared_bodies - set(bound)):
         if name in bodies:
             fail.append('%s: the chapter YAML names `lua: %s`, which harness.lua no longer '
                         'defines' % (name, bodies[name]['lua']))
@@ -2147,7 +2158,7 @@ def check_playtest_matrix(fail):
                         % name)
 
     for name in m.scenarios:
-        if name not in harness:
+        if name not in harness and name not in bound:
             continue
         try:
             s = m.resolve(name)
@@ -2257,7 +2268,9 @@ def check_verdict_scenarios_are_guarded(fail):
         # gate in silence -- renamed in Lua, still listed in the manifest, and never checked
         # again. check_playtest_matrix reports the pairing separately; this refuses to pretend
         # it reviewed something it could not find.
-        if name not in funcs:
+        # A chapter case's `lua:` may bind a generic probe (#531): review what actually runs.
+        entry = m.resolve(name).entry
+        if entry not in funcs:
             # A chapter-declared case has no function here on purpose (#314). It cannot hold
             # a raw press() at all: cases.lua drives the game only through the `api` table,
             # and every input primitive on it is a guarded one. That is asserted directly
@@ -2268,7 +2281,7 @@ def check_verdict_scenarios_are_guarded(fail):
             fail.append('verdict scenario %s has no function in harness.lua, so the '
                         'blind-press gate cannot review it (#238)' % name)
             continue
-        for reached in sorted(mx.reaches(name, funcs)):
+        for reached in sorted(mx.reaches(entry, funcs)):
             if reached in BLIND_PRESS_ALLOWED:
                 continue
             count = len(re.findall(r'\bpress\(', funcs[reached][0]))
