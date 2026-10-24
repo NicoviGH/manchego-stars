@@ -3099,6 +3099,67 @@ scenarios.llm = function()
     return llmDrive(chapter(), "DefeatBoss", 14, 9)
 end
 
+-- The ch01 chief-march (#531 audit 7): frail the chief, then each player phase frail+harmless
+-- the escort, attack the chief if Braulo is adjacent else march toward the seize tile, and once
+-- the chief is down hand the seize to `opts.onSeize`. Three headless callers (ch01win,
+-- leavePrepAndGrindToSeize, seizeCh01ToCh02) differ in HOW they sync, how strictly they treat
+-- a failed input and what the seize does, so those are parameters, never unified:
+--   sync(t)             -> nil to go on, or a status string to return (the per-turn sync)
+--   onTurn(t)           optional, after the banner wait, before the pokes (logging)
+--   onAttack()          optional, between the in-place move and chooseAttack
+--   onMarch(moved)      optional, after marchToward
+--   onSeize(lord, goal) -> nil to fall through to the enemy phase, or a status to return
+--   startLog            optional format taking the chief's x, y
+--   lordId              the unit that marches (default 0x01)
+--   strict              a failed move/attack/march or a non-"player" phase ends "controller"
+-- Returns "noboss" | "dead" | "gameover" | "controller" | "timeout" | a status from sync/onSeize.
+function INSPECT.ch01MarchOnChief(opts)
+    local chief = red(CAMPAIGN.CH01_CHIEF)
+    if not chief then return "noboss" end
+    local goal = { x = chief.x, y = chief.y } -- chief holds the seize tile
+    pokeFrail(chief)
+    if opts.startLog then log(string.format(opts.startLog, goal.x, goal.y)) end
+    for t = 1, 18 do
+        local early = opts.sync(t)
+        if early then return early end
+        wait(100) -- let the PLAYER PHASE banner finish (it eats key presses)
+        if opts.onTurn then opts.onTurn(t) end
+        -- every other goblin dies to the first counter (frail) and deals no damage
+        -- (harmless): the escort can't kill anyone OR bodyblock the trail for long.
+        for i, r in BOARD.each("red") do
+            if r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then
+                pokeFrail(r)
+                pokeHarmless(r)
+            end
+        end
+        local lord = blue(opts.lordId or 0x01)
+        if isDead(lord) then return "dead" end
+        chief = red(CAMPAIGN.CH01_CHIEF)
+        if chief and not isDead(chief) then
+            if math.abs(lord.x - chief.x) + math.abs(lord.y - chief.y) == 1 then
+                -- adjacent: attack in place (move onto own tile opens the menu)
+                if moveUnit(lord.x, lord.y, lord.x, lord.y) then
+                    if opts.onAttack then opts.onAttack() end
+                    if not chooseAttack(lord.addr) and opts.strict then return "controller" end
+                elseif opts.strict then
+                    return "controller"
+                end
+            else
+                local moved = marchToward(lord, goal.x, goal.y + 1, 24, 15)
+                if opts.onMarch then opts.onMarch(moved) end
+                if not moved and opts.strict then return "controller" end
+            end
+        else
+            local status = opts.onSeize(lord, goal)
+            if status then return status end
+        end
+        local phase = runEnemyPhase(CH01_PARK)
+        if phase == "gameover" then return "gameover" end
+        if opts.strict and phase ~= "player" then return "controller" end
+    end
+    return "timeout"
+end
+
 -- CH01WIN: the default lord (blind A-taps pick Braulo) marches on the camp,
 -- kills the chief, and SEIZES -- in-game proof of the lord-gated Seize
 -- (CanUnitSeize hook, #42) and the win hand-off (Seize macro -> EVFLAG_WIN ->
@@ -3114,47 +3175,25 @@ scenarios.ch01win = function()
     -- classify now FAILS here instead of being papered over.
     if not reachCh01Map() then return end
     pokeFastConfig() -- 10-goblin enemy phases: map combat + fast speed
-    local chief = red(CAMPAIGN.CH01_CHIEF)
-    if not chief then return result("FAIL", "chief not in the red array") end
-    local goal = { x = chief.x, y = chief.y } -- chief holds the seize tile
-    pokeFrail(chief)
-    log(string.format("chief frail on the seize tile (%d,%d); marching Braulo",
-        goal.x, goal.y))
-    for t = 1, 18 do
-        -- sync to the player phase; the A-taps also clear stray textboxes
-        -- (road-sign AREA event, defeat quotes)
-        INSPECT.settle("phase", 6000, true)
-        wait(100) -- let the PLAYER PHASE banner finish (it eats key presses)
-        local b0 = blue(0x01)
-        log(string.format("loop %d: turn=%d faction=0x%02X braulo=(%d,%d) chiefdead=%s",
-            t, turn(), faction(), b0 and b0.x or -1, b0 and b0.y or -1,
-            tostring(isDead(red(CAMPAIGN.CH01_CHIEF)))))
-        -- every other goblin dies to the first counter (frail) and deals no
-        -- damage (harmless): the escort can't kill anyone OR bodyblock the
-        -- trail for long. This run asserts seize logic, not combat survival.
-        for i, r in BOARD.each("red") do
-            if r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then
-                pokeFrail(r)
-                pokeHarmless(r)
-            end
-        end
-        local braulo = blue(0x01)
-        if isDead(braulo) then return result("FAIL", "Braulo died on the march") end
-        chief = red(CAMPAIGN.CH01_CHIEF)
-        if chief and not isDead(chief) then
-            if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
-                -- adjacent: attack in place (move onto own tile opens the menu)
-                if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then
-                    shot("ch01win-attack-chief")
-                    chooseAttack(braulo.addr)
-                end
-            else
-                local moved = marchToward(braulo, goal.x, goal.y + 1, 24, 15)
-                b0 = blue(0x01)
-                log(string.format("  march -> %s, braulo=(%d,%d)",
-                    tostring(moved), b0.x, b0.y))
-            end
-        else
+    local status = INSPECT.ch01MarchOnChief{
+        startLog = "chief frail on the seize tile (%d,%d); marching Braulo",
+        sync = function()
+            -- sync to the player phase; the A-taps also clear stray textboxes
+            -- (road-sign AREA event, defeat quotes)
+            INSPECT.settle("phase", 6000, true)
+        end,
+        onTurn = function(t)
+            local b0 = blue(0x01)
+            log(string.format("loop %d: turn=%d faction=0x%02X braulo=(%d,%d) chiefdead=%s",
+                t, turn(), faction(), b0 and b0.x or -1, b0 and b0.y or -1,
+                tostring(isDead(red(CAMPAIGN.CH01_CHIEF)))))
+        end,
+        onAttack = function() shot("ch01win-attack-chief") end,
+        onMarch = function(moved)
+            local b0 = blue(0x01)
+            log(string.format("  march -> %s, braulo=(%d,%d)", tostring(moved), b0.x, b0.y))
+        end,
+        onSeize = function(braulo, goal)
             -- chief down: Braulo onto the seize tile, then Seize by its semantic id.
             -- `press(K.A)` used to stand in for this on the assumption that Seize tops
             -- the menu -- a guess about menu ORDER, which is exactly the class of thing
@@ -3171,23 +3210,21 @@ scenarios.ch01win = function()
                 return chapter() ~= 2 or procActive(SYM.gProcScr_TitleScreen)
             end, 9000, true)
             shot("ch01win-after-seize")
-            if won then
-                return result("PASS",
-                    "Braulo seized the camp; ending + dev placeholder played -> title")
-            end
+            if won then return "won" end
             -- The seize did not end the chapter, so back out to the map on ENUMERATED
             -- cancels and retry next turn (#238). Two blind B's used to stand in for this:
             -- they could not tell how many levels deep the surprise was, so one too few left
             -- the run parked on a menu and one too many cancelled the unit selection as well.
-            if not cancelToPlayerMap() then
-                return result("FAIL", "could not back out of the post-seize screen")
-            end
-        end
-        local phase = runEnemyPhase(CH01_PARK)
-        if phase == "gameover" then
-            return result("FAIL", "unexpected game over in the win run")
-        end
+            if not cancelToPlayerMap() then return "stuck" end
+        end,
+    }
+    if status == "noboss" then return result("FAIL", "chief not in the red array") end
+    if status == "dead" then return result("FAIL", "Braulo died on the march") end
+    if status == "won" then
+        return result("PASS", "Braulo seized the camp; ending + dev placeholder played -> title")
     end
+    if status == "stuck" then return result("FAIL", "could not back out of the post-seize screen") end
+    if status == "gameover" then return result("FAIL", "unexpected game over in the win run") end
     shot("ch01win-timeout")
     result("FAIL", "could not seize the camp in 14 turns")
 end
@@ -3221,39 +3258,21 @@ local function leavePrepAndGrindToSeize()
     end, 1200) then return false end
     wait(120)
     pokeFastConfig() -- speed through the goblin grind to the seize
-    local chief = red(CAMPAIGN.CH01_CHIEF)
-    if not chief then return false end
-    local goal = { x = chief.x, y = chief.y }
-    pokeFrail(chief)
-    for t = 1, 18 do
-        waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
-        wait(100)
-        for i, r in BOARD.each("red") do
-            if r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
-        end
-        local braulo = blue(0x01)
-        if isDead(braulo) then return false end
-        chief = red(CAMPAIGN.CH01_CHIEF)
-        if chief and not isDead(chief) then
-            if math.abs(braulo.x - chief.x) + math.abs(braulo.y - chief.y) == 1 then
-                if moveUnit(braulo.x, braulo.y, braulo.x, braulo.y) then chooseAttack(braulo.addr) end
-            else
-                marchToward(braulo, goal.x, goal.y + 1, 24, 15)
-            end
-        else
+    return INSPECT.ch01MarchOnChief{
+        sync = function()
+            waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+        end,
+        onSeize = function(braulo, goal)
             -- chief down: move Braulo onto the seize tile (menu opens, Seize on top).
             if moveUnit(braulo.x, braulo.y, goal.x, goal.y) then
                 wait(20)
-                return true
+                return "seated"
             end
             -- The move onto the seize tile did not open the menu; back out on enumerated
             -- cancels rather than two blind B's and retry on the next phase (#238).
-            if not cancelToPlayerMap() then return false end
-        end
-        local phase = runEnemyPhase(CH01_PARK)
-        if phase == "gameover" then return false end
-    end
-    return false
+            if not cancelToPlayerMap() then return "controller" end
+        end,
+    } == "seated"
 end
 
 -- CKPT_PREP: fast (240fps) -- drive to the prep screen and snapshot it.
@@ -5628,56 +5647,38 @@ local CH02_PARK = { x = 0, y = 0 }                -- NW corner end-turn tile (15
 -- ch02, not fairly test ch01 balance. Returns "won" once ch01 hands off, else "timeout"/"gameover".
 local function seizeCh01ToCh02()
     pokeFastConfig()   -- 10-goblin enemy phases: map combat + fast speed
-    local chief = red(CAMPAIGN.CH01_CHIEF)
-    if not chief then return "noboss" end
-    local goal = { x = chief.x, y = chief.y }   -- the chief holds the seize tile
-    pokeFrail(chief)
-    log(string.format("ch01 seize: chief frail on (%d,%d); marching the lord", goal.x, goal.y))
-    for t = 1, 18 do
-        if chapter() ~= 2 then return "won" end
-        if not INSPECT.settle("phase", 6000, true) then
-            traceFailure("ch01_seize", "player phase returns before the next move",
-                "fail:player-phase-timeout", nil, "ch01-seize-phase-timeout")
-            return "controller"
-        end
-        wait(100)   -- let the player-phase banner finish (it eats key presses)
-        for i, r in BOARD.each("red") do   -- the escort dies to the first counter and deals no damage
-            if r.charId ~= CAMPAIGN.CH01_CHIEF and not isDead(r) then pokeFrail(r); pokeHarmless(r) end
-        end
-        local lord = blue(CAMPAIGN.CAST.braulo)
-        if not lord or isDead(lord) then return "gameover" end
-        chief = red(CAMPAIGN.CH01_CHIEF)
-        if chief and not isDead(chief) then
-            if math.abs(lord.x - chief.x) + math.abs(lord.y - chief.y) == 1 then
-                if not moveUnit(lord.x, lord.y, lord.x, lord.y) then return "controller" end
-                if not chooseAttack(lord.addr) then return "controller" end
-            else
-                if not marchToward(lord, goal.x, goal.y + 1, 24, 15) then return "controller" end
-            end
-        else
-            if moveUnit(lord.x, lord.y, goal.x, goal.y) then
-                local actions = Controller.legalActions(observeController())
-                if not Controller.findAction(actions, "seize") then
-                    traceFailure("seize", "live unit menu exposes semantic Seize",
-                        "fail:seize-not-legal", nil, "ch01-seize-missing")
-                    return "controller"
-                end
-                if not selectSemantic("seize", "Seize starts the ch01 win event", function()
-                    return procActive(SYM.ProcScr_StdEventEngine) or chapter() ~= 2
-                end, 900) then return "controller" end
-            else
+    local status = INSPECT.ch01MarchOnChief{
+        strict = true,
+        lordId = CAMPAIGN.CAST.braulo,
+        startLog = "ch01 seize: chief frail on (%d,%d); marching the lord",
+        sync = function()
+            if chapter() ~= 2 then return "won" end
+            if not INSPECT.settle("phase", 6000, true) then
+                traceFailure("ch01_seize", "player phase returns before the next move",
+                    "fail:player-phase-timeout", nil, "ch01-seize-phase-timeout")
                 return "controller"
             end
+        end,
+        onSeize = function(lord, goal)
+            if not moveUnit(lord.x, lord.y, goal.x, goal.y) then return "controller" end
+            local actions = Controller.legalActions(observeController())
+            if not Controller.findAction(actions, "seize") then
+                traceFailure("seize", "live unit menu exposes semantic Seize",
+                    "fail:seize-not-legal", nil, "ch01-seize-missing")
+                return "controller"
+            end
+            if not selectSemantic("seize", "Seize starts the ch01 win event", function()
+                return procActive(SYM.ProcScr_StdEventEngine) or chapter() ~= 2
+            end, 900) then return "controller" end
             if waitFor(function() return chapter() ~= 2 end, 9000, true) then return "won" end
             traceFailure("seize", "ch01 advances after the Seize event",
                 "fail:chapter-advance-timeout", nil, "ch01-seize-timeout")
             return "controller"
-        end
-        local phase = runEnemyPhase(CH01_PARK)
-        if phase == "gameover" then return "gameover" end
-        if phase ~= "player" then return "controller" end
-    end
-    return "timeout"
+        end,
+    }
+    -- This caller's contract names a lost/missing lord "gameover" (reachCh02Map logs the word).
+    if status == "dead" then return "gameover" end
+    return status
 end
 
 -- Reach the ch02 map off the REAL chain: clear ch00, seize ch01, then observe the ch01
@@ -6394,9 +6395,9 @@ end
 -- ch02: entry assertions on the ch02 map (mirrors scenarios.ch01). The 3 green chwinga are on
 -- the field, the party deploys to the cap, and the archer + boss are present.
 scenarios.ch02 = function()
-    wait(30)
-    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
-    wait(90)
+    -- The row declares checkpoint ch02start + host_chapter 3; bootToMap loads it and asserts
+    -- inChapter, so a stale state boots honestly instead of asserting on whatever it holds.
+    if not bootToMap() then return result("FAIL", "never reached the ch02 map off the ch02start checkpoint") end
     -- diagnostic: dump every non-null green slot (and the blue/red char ids) so a missing-chwinga
     -- failure shows whether they are absent, on another faction, or under unexpected char ids.
     for i, g in BOARD.each("green") do
@@ -6450,9 +6451,9 @@ end
 -- smoke_ch02: stability net on the ch02 map -- idle-drive to a clean terminal, catching a
 -- crash / soft-lock on load or during the 5 cutscenes.
 scenarios.smoke_ch02 = function()
-    wait(30)
-    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
-    wait(90)
+    -- The row declares checkpoint ch02start + host_chapter 3; bootToMap loads it and asserts
+    -- inChapter, so a stale state boots honestly instead of asserting on whatever it holds.
+    if not bootToMap() then return result("FAIL", "never reached the ch02 map off the ch02start checkpoint") end
     return smokeDrive(chapter())
 end
 
@@ -6465,9 +6466,9 @@ end
 -- a foe and confirm damage landed. NB the roster is 9 deep (8 founding + Baxby), so we search
 -- past blue()'s 8-slot window. Run: tools/playtest/run.sh ch02baxby (needs a normal build).
 scenarios.ch02baxby = function()
-    wait(30)
-    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
-    wait(90)
+    -- The row declares checkpoint ch02start + host_chapter 3; bootToMap loads it and asserts
+    -- inChapter, so a stale state boots honestly instead of asserting on whatever it holds.
+    if not bootToMap() then return result("FAIL", "never reached the ch02 map off the ch02start checkpoint") end
     -- 1. PREP-ROSTER proof: Baxby must be a real party member. Search the whole blue array (the
     --    roster is 9 deep: 8 founding 0x01..0x08 + Baxby), not just blue()'s first 8 slots.
     local baxby, bidx
@@ -6576,9 +6577,9 @@ end
 -- to prove LOST). This bot never detours to a door -- it routs -- so counting three here would
 -- fail a chapter that is working exactly as designed.
 scenarios.clear_ch02 = function()
-    wait(30)
-    if not loadState("ch02start") then return result("FAIL", "no ch02start checkpoint (run.sh builds it)") end
-    wait(90)
+    -- The row declares checkpoint ch02start + host_chapter 3; bootToMap loads it and asserts
+    -- inChapter, so a stale state boots honestly instead of asserting on whatever it holds.
+    if not bootToMap() then return result("FAIL", "never reached the ch02 map off the ch02start checkpoint") end
     pokeFastConfig()
     local start = chapter()
     local function advanced() return chapter() ~= start or procActive(SYM.gProcScr_TitleScreen) end
