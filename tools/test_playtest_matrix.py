@@ -526,6 +526,9 @@ class RealManifest(unittest.TestCase):
         # The runner calls a bound entry with no arguments, so one that takes some is refused.
         self.assertFalse(mx.entry_defined('INSPECT.settle', set(), funcs))
         self.assertFalse(mx.entry_defined('INSPECT.walk', set(), funcs))
+        # A later `function()` on the signature line does not stand in for the signature.
+        funcs['INSPECT.wrap'] = ('INSPECT.wrap = function(a) local f = function() end\n', 'fn')
+        self.assertFalse(mx.entry_defined('INSPECT.wrap', set(), funcs))
 
     def test_firstattacks_reads_the_parity_models_horizon(self):
         """`ch04waves` proves `timeline.engagements`, so its phase count is the model's."""
@@ -986,7 +989,7 @@ class VerdictFingerprint(unittest.TestCase):
     def fingerprint(self, rom='romdigest', harness=HARNESS_FIXTURE, driver='D',
                     scenario=None, env=None):
         return mx.scenario_fingerprint(scenario or self.alpha, rom,
-                                       harness_source=harness, driver=driver,
+                                       source=harness, driver=driver,
                                        env=env if env is not None else {})
 
     def test_the_same_four_inputs_give_the_same_key(self):
@@ -1194,7 +1197,7 @@ class ScopedFingerprint(unittest.TestCase):
 
     def fingerprint(self, scenario_manifest, rom='romdigest'):
         return mx.scenario_fingerprint(self.m.resolve('alpha'), rom,
-                                       harness_source=HARNESS_FIXTURE, driver='D', env={},
+                                       source=HARNESS_FIXTURE, driver='D', env={},
                                        scopes=scenario_manifest)
 
     def test_a_scope_it_does_not_depend_on_cannot_move_its_key(self):
@@ -1226,9 +1229,9 @@ class ScopedFingerprint(unittest.TestCase):
         """No scope can see them: we COMPILE the decomp's own sources and only patch a few,
         so a submodule bump touching an engine file no injector writes rebuilds the ROM and
         moves not one scope digest. Dropping rom_input_hash must not drop that pin."""
-        a = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', harness_source=HARNESS_FIXTURE,
+        a = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', source=HARNESS_FIXTURE,
                                     driver='D', env={}, scopes=self.MANIFEST, engine='E1')
-        b = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', harness_source=HARNESS_FIXTURE,
+        b = mx.scenario_fingerprint(self.m.resolve('alpha'), 'r', source=HARNESS_FIXTURE,
                                     driver='D', env={}, scopes=self.MANIFEST, engine='E2')
         self.assertNotEqual(a, b)
 

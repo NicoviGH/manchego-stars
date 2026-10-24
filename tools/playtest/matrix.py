@@ -543,15 +543,19 @@ def harness_source(path=None):
 _PARSED = {}
 
 
+def harness_functions_of(source):
+    """`harness_functions(source)`, parsed once per distinct text: `make check` and every
+    fingerprint ask, and the parse is the cost (#531). Read-only -- callers share the dict."""
+    if source not in _PARSED:
+        if len(_PARSED) >= 4:                     # the real file plus a few test fixtures
+            _PARSED.clear()
+        _PARSED[source] = harness_functions(source)
+    return _PARSED[source]
+
+
 def harness_functions_at(path=None):
-    """`harness_functions` of the file on disk, parsed once per distinct text: `make check`
-    asks from several checks and the parse is the cost (#531). Read-only -- every caller
-    shares the one dict."""
-    text = harness_source(path)
-    if text not in _PARSED:
-        _PARSED.clear()
-        _PARSED[text] = harness_functions(text)
-    return _PARSED[text]
+    """`harness_functions` of the file on disk (read every call, parsed once per text)."""
+    return harness_functions_of(harness_source(path))
 
 
 def harness_scenarios(path=None):
@@ -561,7 +565,7 @@ def harness_scenarios(path=None):
 
 # A bound entry is run as `fn()`, so an INSPECT function that declares parameters would run
 # with every one of them nil (#531: INSPECT.firstAttacks dropped its `phases` for this).
-_NO_PARAMS = re.compile(r'^[^\n]*function\s*(?:[\w.]+\s*)?\(\s*\)')
+_NO_PARAMS = re.compile(r'^(?:local\s+)?(?:function\s+[\w.]+|[\w.]+\s*=\s*function)\s*\(\s*\)')
 
 
 def entry_defined(entry, scenarios, funcs):
@@ -903,18 +907,18 @@ _DOFILE_BINDING = re.compile(
     r'^local\s+(\w+)\s*=\s*dofile\(PLAYTEST_DIR\s*\.\.\s*"/([\w.]+)"\)', re.M)
 
 
-def driver_modules(harness_source=None):
+def driver_modules(source=None):
     """{module filename: the local it is bound to} for every module harness.lua dofiles.
 
     A bare `dofile(...)` with no binding (the generated symbol tables) is not a module in
     this sense -- nothing can reference it selectively, and those are excluded from the key
     anyway.
     """
-    harness_source = _read(HARNESS) if harness_source is None else harness_source
-    return {mod: name for name, mod in _DOFILE_BINDING.findall(harness_source)}
+    source = harness_source() if source is None else source
+    return {mod: name for name, mod in _DOFILE_BINDING.findall(source)}
 
 
-def scenario_driver_modules(entry, harness_source=None):
+def scenario_driver_modules(entry, source=None):
     """The dofile'd modules this scenario can actually reach.
 
     A module counts as reached when its binding appears in the scenario's own closure, or
@@ -923,10 +927,10 @@ def scenario_driver_modules(entry, harness_source=None):
     top-level, so leaving it in would make every module reachable by everyone and the split
     would do precisely nothing.
     """
-    harness_source = _read(HARNESS) if harness_source is None else harness_source
-    modules = driver_modules(harness_source)
-    funcs = harness_functions(harness_source)
-    text = _DOFILE_BINDING.sub('', harness_shared(harness_source))
+    source = harness_source() if source is None else source
+    modules = driver_modules(source)
+    funcs = harness_functions_of(source)
+    text = _DOFILE_BINDING.sub('', harness_shared(source))
     for name in reaches(entry, funcs):
         text += '\n' + funcs[name][0]
     return {mod for mod, binding in modules.items()
@@ -973,10 +977,10 @@ def driver_source(here=None):
 GLOBAL_DRIVER_FILES = ('run.sh', 'gen_symbols.py')
 
 
-def scenario_driver_text(entry, files=None, harness_source=None):
+def scenario_driver_text(entry, files=None, source=None):
     """The driver text whose contents can change the verdict of the scenario `entry` runs."""
     files = driver_source() if files is None else files
-    reached = scenario_driver_modules(entry, harness_source)
+    reached = scenario_driver_modules(entry, source)
     parts = []
     for name in sorted(files):
         if not (name in GLOBAL_DRIVER_FILES or name in reached):
@@ -1125,7 +1129,7 @@ def engine_input_hash():
     return rom_input_hash([], paths=ENGINE_INPUT_PATHS)
 
 
-def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None, env=None,
+def scenario_fingerprint(scenario, rom_digest, source=None, driver=None, env=None,
                          scopes=None, engine=None, observed=None, driver_files=None):
     """The cache key, or None when this run may not be cached at all.
 
@@ -1141,14 +1145,14 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None,
     """
     if rom_digest is None:
         return None
-    harness_source = _read(HARNESS) if harness_source is None else harness_source
+    source = harness_source() if source is None else source
     if driver is None:
         files = dict(driver_source())
         # Tests (and only tests) hand in overrides for individual driver files.
         files.update(driver_files or {})
-        driver = scenario_driver_text(scenario.entry, files, harness_source)
+        driver = scenario_driver_text(scenario.entry, files, source)
     env = os.environ if env is None else env
-    funcs = harness_functions(harness_source)
+    funcs = harness_functions_of(source)
     if scenario.entry not in funcs:
         return None
     h = hashlib.sha256()
@@ -1176,7 +1180,7 @@ def scenario_fingerprint(scenario, rom_digest, harness_source=None, driver=None,
     h.update(b'driver:\n')
     h.update(driver.encode())
     h.update(b'\nshared:\n')
-    h.update(harness_shared(harness_source).encode())
+    h.update(harness_shared(source).encode())
     # A checkpoint-backed scenario replays through its `ckpt_X` builder, which run.sh
     # invokes directly -- nothing in Lua calls it, so it lands in neither the closure nor
     # the shared residue. Without this, editing ckpt_ch02start leaves ch02baxby's key still.
