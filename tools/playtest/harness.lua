@@ -202,13 +202,24 @@ local function procActive(scriptAddr) return PROCS.find(scriptAddr) ~= nil end
 -- gives it whichever slot is free, so it can sit ABOVE the parent. The lowest-slot menu is
 -- then the locked parent, the observer saw "menu is locked" for as long as the submenu was up,
 -- and goodberry FAILed on a submenu that had opened on the first frame (#531, item 10). So
--- when the lowest menu is locked, the first unlocked menu proc wins; with none, the lowest.
+-- when the lowest menu is locked, an unlocked menu proc that DESCENDS from it wins (Proc.proc_parent
+-- at +0x14, proc.h; a few hops, for a submenu of a submenu) -- never an unrelated menu that merely
+-- happens to be unlocked. With none, the lowest.
 local function anyMenuProc()
     local lowest = PROCS.find(SYM.sProc_MenuMain) or PROCS.find(SYM.sProc_Menu)
     if not lowest or ru8(lowest + 0x28) == 0 then return lowest end
     for _, script in ipairs({ SYM.sProc_MenuMain, SYM.sProc_Menu }) do
         for _, p in ipairs(PROCS.live()) do
-            if p.script == script and ru8(p.addr + 0x28) == 0 then return p.addr end
+            if p.script == script and ru8(p.addr + 0x28) == 0 then
+                local up = ru32(p.addr + 0x14)
+                for _ = 1, 4 do
+                    if up == lowest then return p.addr end
+                    -- A root proc's parent is its tree index 0-7 (proc.c: `proc_parent =
+                    -- (ProcPtr) rootIndex`), not an address: stop there.
+                    if up <= 7 then break end
+                    up = ru32(up + 0x14)
+                end
+            end
         end
     end
     return lowest
@@ -2208,11 +2219,15 @@ scenarios.goodberry = function()
     if not (list and #list.items > row) then
         return result("FAIL", "the inventory list did not come up with Hlin's Goodberry row")
     end
-    -- Each DOWN refreshes the name/description panel; the postcondition is the live highlight
-    -- moving one row.
-    while list.current < row do
+    -- Each step refreshes the name/description panel; the postcondition is the live highlight
+    -- moving one row. From either side (DOWN below, UP above), bounded by the bag's five slots,
+    -- and the row is asserted after: the shots below must show the Goodberry or the run FAILs.
+    for _ = 1, 5 do
+        if list.current == row then break end
         local from = list.current
-        if not guardedInput("menu_next", "DOWN", "the inventory highlight moves toward the Goodberry",
+        local down = from < row
+        if not guardedInput(down and "menu_next" or "menu_previous", down and "DOWN" or "UP",
+            "the inventory highlight moves toward the Goodberry",
             function(after)
                 return after.menu ~= nil and after.menu.current ~= from
             end, 60) then
@@ -2220,6 +2235,10 @@ scenarios.goodberry = function()
         end
         list = observeController().menu
         if not list then return result("FAIL", "the inventory list closed on the way to the Goodberry") end
+    end
+    if list.current ~= row then
+        return result("FAIL", string.format("the inventory highlight is on row %d, not the Goodberry's %d",
+            list.current, row))
     end
     wait(20)
     shot("goodberry-highlighted")
@@ -6256,8 +6275,10 @@ end
 scenarios.lzview = function()
     if not bootToMap() then return result("FAIL", "never reached the ch03 map") end
     local FAR_X, FAR_Y = 16, 15
-    -- A PILE on one corner tile, so the grid there is left empty (grid = 0), as before.
-    local function stash(u) INSPECT.place(u, FAR_X, FAR_Y, { grid = 0 }) end
+    -- A PILE on one corner tile. The corner's grid cell keeps what it held before the sweep
+    -- (the old code never wrote it), so every stash writes that value back.
+    local farWas = mapUnitAt(FAR_X, FAR_Y)
+    local function stash(u) INSPECT.place(u, FAR_X, FAR_Y, { grid = farWas }) end
     -- every blue PC (braulo included) -> far corner, out of the shot
     for _, u in BOARD.each("blue") do if u.onField then stash(u) end end
     -- find the class-0x80 enemy; every OTHER red enemy -> far corner
