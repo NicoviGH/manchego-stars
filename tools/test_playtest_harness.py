@@ -278,7 +278,14 @@ class TestPlaytestHarness(unittest.TestCase):
         self.assertIn('eruptionBoxes', body,
                       'the recruit gate would hang before Sahnar LOADs if it never advances '
                       'Ravisin\'s newly visible warning')
-        self.assertIn('INSPECT.talkUntil(', body)   # advances only on an observed dialogue_wait
+        # The eruption's OWN talkUntil: it advances only on an observed dialogue_wait, stops
+        # on turn 2 AND all four boxes, and counts each box as it comes up. Any other
+        # talkUntil in the body (there are several) must not satisfy this.
+        self.assertIn('INSPECT.talkUntil(function() return turn() >= 2 and eruptionBoxes >= 4 end',
+                      body)
+        self.assertIn('onBox = function() eruptionBoxes = eruptionBoxes + 1 end', body)
+        self.assertIn('controllerState() == "dialogue_wait"',
+                      _block(harness, 'function INSPECT.talkUntil(', '\nend\n'))
         self.assertIn('"advance_dialogue"', _block(harness, 'function INSPECT.advanceDialogue(', '\n\n'))
         self.assertIn('eruption warning showed %d boxes', body,
                       'the gate must distinguish the locked four-box scene from merely '

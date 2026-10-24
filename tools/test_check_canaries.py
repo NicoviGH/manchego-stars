@@ -76,11 +76,22 @@ HAS_LUA = shutil.which('lua') is not None
 
 
 def _clear_read_caches():
-    """`inject.source` memoises by mtime, and a doctored read changes no mtime."""
+    """`inject.source` memoises by mtime, and a doctored read changes no mtime.
+
+    So does `campaign_chapters` (`load_all`, `campaign_yaml`), and that one is ORDER
+    dependent: run alone, nothing has loaded the chapters yet and the doctored ch02 is read;
+    run after test_playtest_matrix, its Manifest.load() -> declared.cases() has already
+    cached the real ch02 on its mtime, the doctored text is never read, and
+    check_declared_cases "stays silent" (#531). Cleared via sys.modules so it reaches the
+    module whichever path imported it."""
     for fn in (source._read, source._parse, source._lines, source._code_text,
                source._definitions):
         fn.cache_clear()
     hosts._literal_cache.clear()
+    chapters = sys.modules.get('campaign_chapters')
+    if chapters is not None:
+        chapters._CACHE.clear()
+        chapters._CAMPAIGN_YAML.clear()
 
 
 @contextlib.contextmanager
