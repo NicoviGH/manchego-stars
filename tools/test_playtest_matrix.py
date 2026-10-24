@@ -855,6 +855,27 @@ class HarnessSourceAnalysis(unittest.TestCase):
         self.assertNotIn('INSPECT.place', funcs['mapSize'][0])
         self.assertEqual(mx.reaches('beta', funcs), {'beta', 'INSPECT.free', 'INSPECT.place'})
 
+    def test_a_function_on_ANY_top_level_table_is_its_own_function(self):
+        """`function VISIT.run(` was not a mark, so its body sat in shared text, and
+        reaches() never follows names out of shared text: a scenario calling VISIT.run never
+        reached the INSPECT.talkUntil it delegates to (#531 G2 review)."""
+        source = ('function INSPECT.talk(n)\n    return n\nend\n'
+                  'function VISIT.x(n)\n    return INSPECT.talk(n)\nend\n'
+                  'scenarios.gamma = function()\n    return VISIT.x(1)\nend\n')
+        funcs = mx.harness_functions(source)
+        self.assertEqual(funcs['VISIT.x'][1], 'helper')
+        self.assertEqual(funcs['gamma'][1], 'scenario')
+        self.assertNotIn('INSPECT.talk', mx.harness_shared(source))
+        self.assertEqual(mx.reaches('gamma', funcs), {'gamma', 'VISIT.x', 'INSPECT.talk'})
+
+    def test_the_real_visit_scenarios_reach_the_helpers_visit_delegates_to(self):
+        with open(mx.HARNESS) as fh:
+            funcs = mx.harness_functions(fh.read())
+        for scenario in ('ch04cottage', 'ch05crest'):
+            reached = mx.reaches(scenario, funcs)
+            for helper in ('VISIT.run', 'INSPECT.talkUntil', 'INSPECT.place'):
+                self.assertIn(helper, reached, '%s does not reach %s' % (scenario, helper))
+
     def test_a_body_carries_no_comments(self):
         """A comment cannot change a verdict, so it must not change a fingerprint."""
         self.assertNotIn('a comment', self.funcs()['alpha'][0])

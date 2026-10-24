@@ -318,6 +318,10 @@ end
 -- is off the map (nothing is touched then). `o.grid` overrides the id written to the new tile
 -- (default: the id read live from the unit's old tile, which preserves faction bits);
 -- `o.vacate == false` skips clearing the old tile (a unit that was never on the grid).
+-- `o.tracked` also refuses, touching nothing, when the id to write is 0: the default read finds
+-- the old tile empty in the grid (or the unit off the map), so the move would leave the new tile
+-- reading "empty" and the engine unable to select the unit there. The teleports always refused
+-- that case; a site that places a unit the grid does not hold yet leaves it off.
 function Board.place(io, addr, x, y, w, h, o)
     o = o or {}
     if not Board.inMap(x, y, w, h) then
@@ -327,6 +331,9 @@ function Board.place(io, addr, x, y, w, h, o)
     local was = Board.inMap(ox, oy, w, h)
     local grid = o.grid
     if grid == nil then grid = was and io.grid(ox, oy) or 0 end
+    if o.tracked and grid == 0 then
+        return false, string.format("the unit at (%d,%d) is not tracked in the grid", ox, oy)
+    end
     if o.vacate ~= false and was then io.setGrid(ox, oy, 0) end
     io.write8(addr + 0x10, x); io.write8(addr + 0x11, y)
     io.setGrid(x, y, grid)

@@ -3100,7 +3100,7 @@ scenarios.llm = function()
 end
 
 -- The ch01 chief-march (#531 audit 7): frail the chief, then each player phase frail+harmless
--- the escort, attack the chief if Braulo is adjacent else march toward the seize tile, and once
+-- the escort, attack the chief if the lord is adjacent else march toward the seize tile, and once
 -- the chief is down hand the seize to `opts.onSeize`. Three headless callers (ch01win,
 -- leavePrepAndGrindToSeize, seizeCh01ToCh02) differ in HOW they sync, how strictly they treat
 -- a failed input and what the seize does, so those are parameters, never unified:
@@ -3110,10 +3110,11 @@ end
 --   onMarch(moved)      optional, after marchToward
 --   onSeize(lord, goal) -> nil to fall through to the enemy phase, or a status to return
 --   startLog            optional format taking the chief's x, y
---   lordId              the unit that marches (default 0x01)
+--   lordId              the unit that marches (required: the caller names it, from CAMPAIGN.CAST)
 --   strict              a failed move/attack/march or a non-"player" phase ends "controller"
 -- Returns "noboss" | "dead" | "gameover" | "controller" | "timeout" | a status from sync/onSeize.
 function INSPECT.ch01MarchOnChief(opts)
+    assert(opts.lordId, "INSPECT.ch01MarchOnChief: opts.lordId is required")
     local chief = red(CAMPAIGN.CH01_CHIEF)
     if not chief then return "noboss" end
     local goal = { x = chief.x, y = chief.y } -- chief holds the seize tile
@@ -3132,7 +3133,7 @@ function INSPECT.ch01MarchOnChief(opts)
                 pokeHarmless(r)
             end
         end
-        local lord = blue(opts.lordId or 0x01)
+        local lord = blue(opts.lordId)
         if isDead(lord) then return "dead" end
         chief = red(CAMPAIGN.CH01_CHIEF)
         if chief and not isDead(chief) then
@@ -3145,7 +3146,8 @@ function INSPECT.ch01MarchOnChief(opts)
                     return "controller"
                 end
             else
-                local moved = marchToward(lord, goal.x, goal.y + 1, 24, 15)
+                local mw, mh = mapSize()
+                local moved = marchToward(lord, goal.x, goal.y + 1, mw - 1, mh - 1)
                 if opts.onMarch then opts.onMarch(moved) end
                 if not moved and opts.strict then return "controller" end
             end
@@ -3176,6 +3178,7 @@ scenarios.ch01win = function()
     if not reachCh01Map() then return end
     pokeFastConfig() -- 10-goblin enemy phases: map combat + fast speed
     local status = INSPECT.ch01MarchOnChief{
+        lordId = CAMPAIGN.CAST.braulo,
         startLog = "chief frail on the seize tile (%d,%d); marching Braulo",
         sync = function()
             -- sync to the player phase; the A-taps also clear stray textboxes
@@ -3259,8 +3262,9 @@ local function leavePrepAndGrindToSeize()
     wait(120)
     pokeFastConfig() -- speed through the goblin grind to the seize
     return INSPECT.ch01MarchOnChief{
+        lordId = CAMPAIGN.CAST.braulo,
         sync = function()
-            waitFor(function() return faction() == 0 and not menuOpen() end, 6000, true)
+            INSPECT.settle("phase", 6000, true)
         end,
         onSeize = function(braulo, goal)
             -- chief down: move Braulo onto the seize tile (menu opens, Seize on top).
@@ -4768,7 +4772,9 @@ local function teleportToFiringTile(u, mn, mx)
                 for _, dy in ipairs(ady == 0 and { 0 } or { ady, -ady }) do
                     local tx, ty = e.x + dx, e.y + dy
                     if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
-                        INSPECT.place(u, tx, ty)                -- vacate the old tile, occupy the new
+                        -- vacate the old tile, occupy the new; `tracked` keeps the bail above
+                        -- true at the moment of the write, which reads the LIVE old tile
+                        if not INSPECT.place(u, tx, ty, { tracked = true }) then return false end
                         log(string.format("  teleported to (%d,%d) [range %d of enemy (%d,%d)]", tx, ty, r, e.x, e.y))
                         return true
                     end
@@ -4856,7 +4862,7 @@ local function teleportAdjacentTo(u, targets)
         for _, d in ipairs({ { 0, -1 }, { 0, 1 }, { 1, 0 }, { -1, 0 } }) do
             local tx, ty = t.x + d[1], t.y + d[2]
             if tx >= 0 and tx < mw and ty >= 0 and ty < mh and mapUnitAt(tx, ty) == 0 then
-                INSPECT.place(u, tx, ty)
+                if not INSPECT.place(u, tx, ty, { tracked = true }) then return false end
                 log(string.format("  teleported to (%d,%d) [adjacent to ally (%d,%d)]", tx, ty, t.x, t.y))
                 return true
             end
@@ -6104,7 +6110,9 @@ scenarios.ch03chest = function()
     -- Chests open from ON the tile: teleport the opener onto (6,3) (vacate old tile, occupy the chest).
     if mapUnitAt(CX, CY) ~= 0 then return result("FAIL", "the (6,3) chest tile is already occupied") end
     -- grid = 1: blue army slot-1 grid marker isn't needed; any non-zero registers occupancy
-    INSPECT.place(u, CX, CY, { grid = 1 })
+    if not INSPECT.place(u, CX, CY, { grid = 1 }) then
+        return result("FAIL", "could not stand the opener on the (6,3) chest tile")
+    end
     shot("ch03chest-before")
     INSPECT.settle("phase", 300, true)
     if not moveUnit(CX, CY, CX, CY) then
@@ -6180,7 +6188,9 @@ scenarios.ch03tourmaline = function()
             if FLOOR[terr(x, y)] and mapUnitAt(x, y) == 0
                 and mapUnitAt(x - 1, y) == 0 and mapUnitAt(x + 1, y) == 0
                 and mapUnitAt(x, y - 1) == 0 and mapUnitAt(x, y + 1) == 0 then
-                INSPECT.place(u, x, y)
+                if not INSPECT.place(u, x, y) then
+                    return result("FAIL", string.format("could not relocate the holder to (%d,%d)", x, y))
+                end
                 log(string.format("relocated the holder to the isolated tile (%d,%d)", x, y))
                 moved = true
                 break
@@ -7521,7 +7531,7 @@ scenarios.ch05escort = function()
         if not INSPECT.place(u, spot.x, spot.y) then return nil, "the free tile beside Sahnar is off the map" end
         return spot
     end
-    local function moveTo(u, x, y) INSPECT.place(u, x, y) end
+    local function moveTo(u, x, y) return INSPECT.place(u, x, y) end
 
     -- 1. Basil alone in reach.
     local home = { x = basil.x, y = basil.y }
@@ -7551,7 +7561,7 @@ scenarios.ch05escort = function()
         .. "beside her", after))
 
     -- 2. Control: Basil goes home, another blue unit takes her tile.
-    moveTo(basil, home.x, home.y)
+    if not moveTo(basil, home.x, home.y) then return result("FAIL", "could not send Basil home") end
     -- Not slot 0, the lord: the first run of this control lost her to the Killing Edge and
     -- ended in a game over. The HP poke is so the control survives the crit it is there to
     -- invite; it changes nothing about whether Sahnar picks it.
@@ -7646,7 +7656,7 @@ function VISIT.open(x, y, choose)
         end
     end
     if not u then return false, "no unexhausted deployed blue unit to send" end
-    VISIT.place(u, x, y)
+    if not VISIT.place(u, x, y) then return false, "could not stand the unit on the site" end
     if not cursorTo(x, y) then return false, "cursor could not reach the site" end
     if not moveUnit(x, y, x, y) then
         return false, "could not select the unit standing on the site"
@@ -7740,7 +7750,9 @@ scenarios.ch05arena = function()
     end
     local hero = blue(0x01)
     if not hero then return result("FAIL", "leader (0x01) is not deployed") end
-    VISIT.place(hero, ARENA_X, ARENA_Y)
+    if not VISIT.place(hero, ARENA_X, ARENA_Y) then
+        return result("FAIL", "could not stand the leader on the arena tile")
+    end
     if not cursorTo(ARENA_X, ARENA_Y)
         or not guardedInput("select_unit", "A", "arena staging reach map is generated", function(after)
             return controllerState(after) == "unit_selected"
@@ -7759,7 +7771,9 @@ scenarios.ch05arena = function()
         return result("FAIL", "could not close the arena staging reach map")
     end
     if not fromX then return result("FAIL", "no reachable empty tile beside the arena") end
-    VISIT.place(hero, fromX, fromY)
+    if not VISIT.place(hero, fromX, fromY) then
+        return result("FAIL", "could not stand the leader beside the arena")
+    end
     -- Raw placement updates the unit/grid but not FE8's standing-map-sprite pool. Make the
     -- engine select and cancel the staged unit once so PlayerPhase's normal cancel path calls
     -- RefreshUnitSprites before the proof frame; otherwise the old SMS and the live MU can both
@@ -9625,7 +9639,7 @@ scenarios.ch04snag = function(opts)
             m = blue(u.charId)
             if not m then break end
         end
-        INSPECT.place(m, SNAG_X, SNAG_Y - 1)
+        if not INSPECT.place(m, SNAG_X, SNAG_Y - 1) then break end
         m = blue(u.charId)
         if not cursorTo(m.x, m.y) then break end
         if moveUnit(m.x, m.y, m.x, m.y) then
@@ -10622,7 +10636,9 @@ scenarios.ch06halberd = function()
                     end
                 end
                 if not best then return nil, name .. ": no free tile to move the target off to" end
-                INSPECT.place(m, bx, by)
+                if not INSPECT.place(m, bx, by) then
+                    return nil, name .. ": could not move the target off its tile"
+                end
                 return now
             end
         end

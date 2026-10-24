@@ -545,10 +545,13 @@ def harness_scenarios(path=None):
 
 LUA_FUNC_DEF = re.compile(
     r'^(?:local function (\w+)|scenarios\.(\w+) = function|(\w+) = function'
-    # A helper hung on INSPECT (`function INSPECT.place(`, `INSPECT.x = function`) is
-    # its own function, named QUALIFIED. Unrecognised, its body was charged to whichever
-    # function preceded it (INSPECT.place to mapSize), so a scenario calling it never reached it.
-    r'|function (INSPECT\.\w+)\(|(INSPECT\.\w+) = function)', re.M)
+    # A helper hung on ANY top-level table (`function INSPECT.place(`, `VISIT.x = function`)
+    # is its own function, named QUALIFIED. Unrecognised, its body was charged to whichever
+    # function preceded it (INSPECT.place to mapSize) or fell into the shared residue (the
+    # VISIT.* bodies), and reaches() follows names out of neither -- so a scenario calling
+    # VISIT.run never reached the INSPECT.talkUntil it delegates to (#531).
+    # `scenarios.X = function` is tried first, so a scenario still classifies as one.
+    r'|function (\w+\.\w+)\(|(\w+\.\w+) = function)', re.M)
 # A top-level function's body is INDENTED; only its terminator sits in column 0.
 _LUA_TOP_END = re.compile(r'^end\b')
 

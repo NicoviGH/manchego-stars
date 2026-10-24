@@ -327,6 +327,20 @@ do
     mem2[A + 0x10], mem2[A + 0x11] = 0xFF, 0xFF
     check(Board.place(io, A, 1, 1, 17, 16), true, "an off-map unit can be placed")
     check(grid[1 * 100 + 1], 0, "an off-map unit carries no grid id")
+    -- o.tracked: the teleports' refusal. A unit whose old tile reads 0 (or that is off the map)
+    -- is refused with nothing touched, instead of writing 0 under it and reporting success.
+    mem2[A + 0x10], mem2[A + 0x11] = 0xFF, 0xFF
+    local tok, twhy = Board.place(io, A, 6, 6, 17, 16, { tracked = true })
+    check(tok, false, "tracked: an off-map unit has no grid id to carry, so it is refused")
+    check(twhy ~= nil and twhy:find("not tracked", 1, true) ~= nil, true, "tracked: the refusal says why")
+    check(mem2[A + 0x10], 0xFF, "tracked: a refused place leaves the position")
+    mem2[A + 0x10], mem2[A + 0x11] = 1, 1          -- on the map, but its tile reads 0
+    check(Board.place(io, A, 6, 6, 17, 16, { tracked = true }), false, "tracked: an untracked tile is refused")
+    check(mem2[A + 0x10], 1, "tracked: nothing written on refusal")
+    grid[1 * 100 + 1] = 0x42
+    check(Board.place(io, A, 6, 6, 17, 16, { tracked = true }), true, "tracked: a tracked unit moves")
+    check(grid[6 * 100 + 6], 0x42, "tracked: its id moved with it")
+    check(grid[1 * 100 + 1], 0, "tracked: the old tile was vacated")
     -- freeBeside honours the bounds and the occupancy grid, in order.
     grid[0 * 100 + 1] = 5
     local fx, fy = Board.freeBeside(io, 0, 0, { { -1, 0 }, { 1, 0 }, { 0, 1 } }, 17, 16)

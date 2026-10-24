@@ -2206,6 +2206,12 @@ BLIND_PRESS_ALLOWED = {
     # loop stops on the OUTCOME (combat ended, or the caller's doneFn). Same shape as
     # driveSaveSlot -- no distinguishing postcondition per press, verified on the outcome.
     'shootCombatFrames': 'observed-proc dismissal inside a combat capture; verified on the outcome',
+    # Leaving a shop: B until gProcScr_Shop is gone, then B until the controller reads
+    # player_map_idle. Each press is gated on that observation being re-read, and both loops
+    # stop on the OUTCOME. The controller classifies no shop state, so guardedInput has no
+    # legal action to authorise here. Listed when #531 made VISIT.* their own functions:
+    # before that the body sat in shared text and this gate never looked at it.
+    'VISIT.shop': 'observed-proc dismissal out of a shop; verified on the outcome (#531)',
 }
 
 # The call graph this gate scopes from lives in matrix.py (`harness_functions`/`reaches`),
