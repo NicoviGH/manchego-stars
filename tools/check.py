@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #531's raid PR: the raids are declared cases (`idle`/`raided`), ch05.lua's
+    # reliquaries read CAMPAIGN.VILLAGES, and the flag parser is inject.decomp.flag_number
+    r'scenarios\.ch0[25]raid\b', r'reliquaries are keyed by .name.', r'\b_flag_number\b',
     # retired by #531: the harness's remaining local slots are MEASURED (check_lua_local_headroom),
     # never written down; "2 slots left" / "198 locals" went stale everywhere it was copied.
     # Bounded to the retired CLAIMS: the scan is case-insensitive, so `\b` keeps "12 slots
@@ -1297,9 +1300,8 @@ def check_gate_chapter_window(fail):
 
 
 # A row in a chapter Lua chunk: `{ id = "boat-east", x = 17, y = 12, doorX = 17, ... }`.
-# Only rows keyed by `id` are in scope -- ch05.lua's reliquaries are keyed by `name` against
-# YAML ids of a different shape (`north` vs `reliquary-north`), and matching those would mean
-# renaming a shipped chapter's constants rather than catching a bug.
+# Only rows keyed by `id` are in scope. ch05.lua's reliquaries carry no literal tile at all:
+# they read CAMPAIGN.VILLAGES, which gen_symbols builds from the chapter YAML.
 _LUA_ROW = re.compile(r'\{[^{}]*\bid\s*=\s*"([^"]+)"[^{}]*\}')
 # NB the hex branch comes FIRST: Python's alternation is ordered, so `-?\d+` would match the
 # leading `0` of `0x11` and the field would silently read as 0.

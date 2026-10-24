@@ -66,6 +66,25 @@ class CampaignIds(unittest.TestCase):
         self.assertEqual([0xCA, 0xC9], self.ids['CH02_CHWINGA_PIDS'])
         self.assertEqual([0x6C, 0x6C], self.ids['CH02_CHARMS'])   # a Vulnerary each (#495)
 
+    def test_villages_carry_the_yaml_tile_the_injector_flag_and_the_gift(self):
+        # Glimmerfrost's hut pays her Pure Water on EVFLAG_TMP(9); the east hut pays its line
+        # alone, so it carries no gift and a raid there cannot be judged on one.
+        villages = self.ids['VILLAGES']
+        self.assertEqual({'x': 1, 'y': 12, 'flag': 9, 'gift': 0x6E}, villages['targos-hut-south'])
+        self.assertEqual({'x': 12, 'y': 3, 'flag': 10}, villages['targos-hut-east'])
+        self.assertEqual({'x': 12, 'y': 19, 'flag': 10, 'gift': 0x60}, villages['reliquary-south'])
+
+    def test_every_declared_raid_names_a_site_the_export_carries(self):
+        # declared.py checks an id against the chapter's `villages:`, but only a village whose
+        # injector arms an event id is exported; a raid on any other would ERROR at run time.
+        import declared
+        for _short, case in declared.cases():
+            for entry in case.get('then') or ():
+                for site in (entry.get('raided') or ()) if isinstance(entry, dict) else ():
+                    self.assertIn(site, self.ids['VILLAGES'],
+                                  '%s raids %s, which no CHNN_VILLAGE_FLAGS arms'
+                                  % (case['name'], site))
+
     def test_hosts_follow_the_host_slots(self):
         # Every hosted chapter, so a film can name the slot a chain lands on; from ch01 on each
         # chapter N sits on slot N + 1.

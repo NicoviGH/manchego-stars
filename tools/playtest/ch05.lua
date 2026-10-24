@@ -34,15 +34,22 @@ return {
     },
 
     -- The four reliquary doors: where they are, what each hands over, and the event id its
-    -- Village macro sets. The tiles are the chapter YAML's `villages:` block
-    -- (`check_declared_cases` proves a declared case cannot drift from it); the flags are
-    -- CH05_VILLAGE_FLAGS in build_campaign, and they are what the save-all payout counts.
-    RELIQUARIES = {
-        { name = "north", x = 5,  y = 1,  item = 0x70, flag = 12 },   -- Torch
-        { name = "west",  x = 5,  y = 6,  item = 0x5D, flag = 11 },   -- Secret Book
-        { name = "east",  x = 12, y = 10, item = 0x0E, flag = 9  },   -- Armorslayer
-        { name = "south", x = 12, y = 19, item = 0x60, flag = 10 },   -- Dracoshield
-    },
+    -- Village macro sets, all read from CAMPAIGN.VILLAGES (gen_symbols: the chapter YAML's
+    -- `villages:` block and CH05_VILLAGE_FLAGS). The flags are what the save-all payout counts.
+    RELIQUARIES = (function()
+        -- The order is ch05crest's walk (north first, south last), a choice this file makes,
+        -- which is why the four are named here rather than iterated off the export.
+        local out = {}
+        for i, name in ipairs({ "north", "west", "east", "south" }) do
+            local site = CAMPAIGN.VILLAGES["reliquary-" .. name]
+            if not site then
+                error("CAMPAIGN.VILLAGES carries no reliquary-" .. name .. " (regenerate "
+                    .. "symbols.lua, or the chapter YAML renamed it)")
+            end
+            out[i] = { name = name, x = site.x, y = site.y, item = site.gift, flag = site.flag }
+        end
+        return out
+    end)(),
 
     -- The save-all reward, paid only when all four flags above are set.
     REWARD = { GUIDING_RING = 0x68 },

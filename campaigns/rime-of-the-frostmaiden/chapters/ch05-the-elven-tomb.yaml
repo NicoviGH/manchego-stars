@@ -2041,12 +2041,21 @@ playtest:
       then:
         - spoke: true
 
+    - name: ch05raid
+      proves: a raider can SACK a reliquary -- terrain flips to ruins and its event id stays unset
+      given: [on_map]
+      # Not held: the party sits at the WEST spawn and the site is south-EAST, so idling does
+      # not contest the race.
+      when:
+        - idle: {phases: 8, until: raided}
+      then:
+        - raided: [reliquary-south]
+
     # Still hand-written Lua. Each names WHY it is the exception rather than the default.
     - {name: ch05arena,        proves: the arena tutorial is one-shot on EVFLAG_TMP(13),        lua: ch05arena}
     - {name: ch05recruit,      proves: the Talk recruit converts Sahnar on both CHECK_ALIVE arms, lua: ch05recruit}
     - {name: ch05lupinbenched, proves: the recruit's no-Lupin arm plays with Lupin BENCHED,     lua: ch05lupinbenched, boot: ch05lupinboot}
     - {name: ch05lupinkilled,  proves: the recruit's no-Lupin arm plays with Lupin DEAD,        lua: ch05lupinkilled,  boot: ch05lupinboot}
     - {name: ch05escort,       proves: Sahnar spares Basil as Joshua spares Natasha (AI_A_07's list), lua: ch05escort}
-    - {name: ch05raid,         proves: a raider can SACK a reliquary -- terrain flips to ruins and its event id stays unset, lua: ch05raid}
     - {name: ch05crest,        proves: saving all four reliquaries pays out the Guiding Ring,   lua: ch05crest}
 

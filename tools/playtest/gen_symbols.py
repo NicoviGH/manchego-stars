@@ -358,6 +358,43 @@ def _enum_values(relpath, prefix):
     return enum_values(vanilla_decomp_text(relpath), prefix)
 
 
+def village_sites(campaign, items):
+    """{village id: {x, y, flag, gift?}} for every site whose Village macro carries an event id.
+
+    The tile is the chapter YAML's, the flag the chapter injector's `CHNN_VILLAGE_FLAGS`, the
+    gift `inject.villages.village_reward_item`'s. A chapter is in it when its injector
+    defines that table, found by name over the host registry, so the next chapter to wire
+    one needs no edit here. A raid case (`raided:`) and ch05.lua's reliquaries name a site
+    and read the rest from this."""
+    import importlib
+    import inject.hosts as hosts
+    from inject.decomp import flag_number
+    from inject.hosting import _load_chapter_yaml
+    from inject.villages import village_reward_item
+    sites = {}
+    for chapter in hosts.hosted_chapters():
+        module = importlib.import_module('inject.chapters.' + chapter.name)
+        prefix = chapter.name.upper()
+        flags = getattr(module, prefix + '_VILLAGE_FLAGS', None)
+        if flags is None:
+            continue
+        chap = _load_chapter_yaml(campaign, getattr(module, prefix + '_CHAPTER_YAML'))
+        for v in chap['villages']:
+            if v['id'] in sites:
+                raise SystemExit('village id %r is declared by two chapters: CAMPAIGN.VILLAGES '
+                                 'is keyed by id alone' % v['id'])
+            flag = flag_number(flags[v['id']])
+            if not isinstance(flag, int):
+                raise SystemExit('village %r sets the named flag %r, not a numbered one -- '
+                                 'eventFlag() reads a number' % (v['id'], flag))
+            site = {'x': v['tile'][0], 'y': v['tile'][1], 'flag': flag}
+            gift = village_reward_item(v)
+            if gift:
+                site['gift'] = items[gift]
+            sites[v['id']] = site
+    return sites
+
+
 def campaign_ids(campaign=DEFAULT_CAMPAIGN):
     """The campaign facts scenarios read, resolved from the injector's own constants.
 
@@ -373,10 +410,9 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
                                     PROLOGUE_SCRAMSAX_SLOT, PROLOGUE_SEPHEK_SLOT)
     from inject.chapters.ch01 import CH01_CHAPTER_YAML
     from inject.chapters.ch02 import CH02_CHAPTER_YAML, CH02_CLASS_IDS
-    from inject.decomp import ITEM_ENUM
     from inject.chapters.ch04 import CH04_PACK_PIDS
     from inject.chapters.ch06 import CH06_CHAPTER_YAML
-    from inject.decomp import LORDSEL_FLAG_BASE
+    from inject.decomp import ITEM_ENUM, LORDSEL_FLAG_BASE
     from inject.hosting import _load_chapter_yaml
     from inject.scenes import scene_gold_entries
     import inject.hosts as hosts
@@ -433,6 +469,7 @@ def campaign_ids(campaign=DEFAULT_CAMPAIGN):
         'CH06_BOAT_PIDS': {k: int(v, 0) for k, v in CH06_BOAT_PIDS.items()},
         'CH06_DROPPER_ITEMS': [items[ITEM_ENUM[i['id']]] for i in dropper['inventory']],
         'CH06_DROPPER_DROP': items[ITEM_ENUM[dropper['item_drop']]],
+        'VILLAGES': village_sites(campaign, items),
     }
 
 

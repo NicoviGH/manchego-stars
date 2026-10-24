@@ -3665,19 +3665,6 @@ _ZONE_HORIZON = 30          # turns walked before a zone counts as unreachable
 _UNPLACED_TURN = 2          # a wave whose trigger the walk cannot place: still not turn 1
 
 
-def _flag_number(token):
-    """`EVFLAG_TMP(11)` / `11` / `0xb` -> 11 (EVFLAG_TMP(flag) is (flag), event-flags.h); a
-    named flag (`EVFLAG_WIN`) stays its name."""
-    m = re.fullmatch(r'\s*(?:EVFLAG_TMP\(\s*(\w+)\s*\)|(\w+))\s*', token)
-    if not m:
-        return token.strip()
-    word = m.group(1) or m.group(2)
-    try:
-        return int(word, 0)
-    except ValueError:
-        return word
-
-
 def _area_events(info):
     """[(script, (x1, y1, x2, y2))] for every AREA entry of an eventinfo."""
     return [(m.group(1), tuple(int(v, 0) for v in m.group(2, 3, 4, 5)))
@@ -3721,7 +3708,7 @@ def _is_flag_gated(eid):
     """A turn event with a flag fires only while that flag is CLEAR, and sets it when it runs.
     The twins set it in the opening scene and an AREA script clears it, so a flag-gated turn
     event is a zone-triggered wave, not a turn-1 spawn. `0` / EVFLAG_NONE mean unconditional."""
-    return _flag_number(eid) not in (0, 'EVFLAG_NONE')
+    return inject.decomp.flag_number(eid) not in (0, 'EVFLAG_NONE')
 
 
 def _player_turn_events(info):
@@ -3753,12 +3740,12 @@ def _vanilla_reinforcement_turns(stem):
     ref = {v: k for k, v in PARITY_REFERENCE_STEM.items()}[stem]
     areas = [(box, _event_block(script, scr)) for scr, box in _area_events(info)]
     opening = re.search(r'\.beginningSceneEvents\s*=\s*(\w+)', info)
-    armed = {_flag_number(f) for f in re.findall(r'ENUT\(\s*([^)]*\)?)\s*\)',
-                                                    _event_block(script, opening.group(1))
-                                                    if opening else '')}
+    opened = _event_block(script, opening.group(1)) if opening else ''
+    armed = {inject.decomp.flag_number(f)
+             for f in re.findall(r'ENUT\(\s*([^)]*\)?)\s*\)', opened)}
 
     def clears(block, flag):
-        return any(_flag_number(f) == flag
+        return any(inject.decomp.flag_number(f) == flag
                    for f in re.findall(r'ENUF\(\s*([^)]*\)?)\s*\)', block))
 
     def entry(box, block):
@@ -3766,7 +3753,7 @@ def _vanilla_reinforcement_turns(stem):
 
     out = {}
     for eid, scr, turn in _player_turn_events(info):
-        flag = _flag_number(eid)
+        flag = inject.decomp.flag_number(eid)
         if _is_flag_gated(eid) and flag in armed:
             # dormant until an AREA clears its flag: it loads the player phase after the entry
             opens = [t + 1 for t in (entry(box, block) for box, block in areas

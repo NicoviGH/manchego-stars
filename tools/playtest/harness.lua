@@ -435,6 +435,9 @@ INSPECT.io = {
     rs8 = function(a) return rs8(a) end, write8 = function(a, v) emu:write8(a, v) end,
     grid = mapUnitAt, setGrid = setMapUnit,
 }
+-- Refill a unit to full HP and no further: its max is what the engine and the AI read it at.
+function INSPECT.fullHeal(u) emu:write8(u.addr + 0x13, u.maxhp) end
+
 function INSPECT.place(u, x, y, o)
     local w, h = mapSize()
     local ok, why = BOARD.place(INSPECT.io, u.addr, x, y, w, h, o)
@@ -3705,7 +3708,7 @@ INSPECT.firstAttacks = function()
         end
         for i = 0, 49 do
             local u = unitAt(SYM.gUnitArrayRed, i)
-            if u and u.onMap and not isDead(u) then emu:write8(u.addr + 0x13, u.maxhp) end
+            if u and u.onMap and not isDead(u) then INSPECT.fullHeal(u) end
         end
     end
     local function look(phase)
@@ -6330,193 +6333,6 @@ scenarios.ch05arena = function()
         wager))
 end
 
--- ch02raid (#26): can the party LOSE a Targos hut? ch02 spent its whole life unable to --
--- it declared no villages at all, so the two village-terrain cells its retile kept from
--- vanilla Ch2 backed nothing, and six raiders that vanilla points AT the huts had nowhere to
--- go but the protected chwinga. The huts are the decoy that buys the player time to cross;
--- if one cannot actually fall, the decoy is scenery and the pillage AI is decoration.
---
--- Same verdict shape as ch05raid, and for the same reason: the TERRAIN is what FE8 reads.
--- CanUnitVisit (bmmenu.c) and gTerrainList_LootableVillages (cp_utility.c) both decide from
--- it, so a hut that has become RUINS_REGULAR is one the player cannot enter and a second
--- raider will not revisit. Its event id staying UNSET is the other half -- TILE_COMMAND_20
--- changes the tile and sets nothing -- and here that is what costs Glimmerfrost her charm.
--- Run: PT_HOST_CHAPTER=3 tools/playtest/run.sh ch02raid (needs a CH02BOOT=1 ROM).
-scenarios.ch02raid = function()
-    -- targos-hut-south: the contested one. The rear raiders spawn at (0,6)/(0,7) on turn 3
-    -- with pillage AI and it is the nearest lootable terrain to them.
-    -- BOTH huts. The first pass watched only the south one on the reasoning that the turn-3
-    -- rear raiders spawn beside it -- and the run showed the band takes the EAST hut first,
-    -- because six of the nine start east and (12,3) is on their doorstep. Which hut falls is
-    -- a real design answer, so the test reports it rather than presuming it.
-    -- The two NORTHERN huts are vanilla's (4,2)/(7,2) villages, ruins in our retile until #495.
-    local HUTS = {
-        { name = "targos-hut-south", x = 1,  y = 12, flag = 9,  item = 0x6E },
-        { name = "targos-hut-east",  x = 12, y = 3,  flag = 10, item = nil  },
-        { name = "targos-hut-west",  x = 4,  y = 2,  flag = 11, item = 0x28 },
-        { name = "targos-hut-north", x = 7,  y = 2,  flag = 12, item = 0x6D },
-    }
-    local VILLAGE_REGULAR, RUINS = 0x03, 0x25
-    if not bootToMap() then return result("FAIL", "never reached the ch02 map") end
-    pokeFastConfig()
-    INSPECT.settle("event", 6000, true)
-    for _, hut in ipairs(HUTS) do
-        if terrainAt(hut.x, hut.y) ~= VILLAGE_REGULAR then
-            return result("FAIL", string.format(
-                "%s (%d,%d) is terrain 0x%02X at turn 1, not a village -- nothing can raid it "
-                .. "and nothing can visit it", hut.name, hut.x, hut.y,
-                terrainAt(hut.x, hut.y)))
-        end
-    end
-    -- Count each hut's gift BEFORE: an absolute "the party holds no Elixir" would fail the
-    -- moment the chapter ships one anywhere else (ch05raid's lesson, kept).
-    local function held(item)
-        local n = 0
-        for _, got in ipairs(collectedItems()) do if got == item then n = n + 1 end end
-        return n
-    end
-    local before = {}
-    for _, hut in ipairs(HUTS) do if hut.item then before[hut.name] = held(hut.item) end end
-    -- Hand the huts to the raiders: never visit one, just give the turns back.
-    --
-    -- The party is KEPT ALIVE while we wait, the way protectChwinga keeps the greens up for
-    -- the gift path. ch05raid can simply idle because its party spawns west of a south-east
-    -- site; ours deploys in the middle of the map the raid crosses, so an honest idle is a
-    -- rout -- the first run died on turn 11 with the question still unanswered. What is under
-    -- test is whether a RAIDER REACHES A HUT, and the party's survival is a balance question
-    -- for the human pass, not a precondition of this one.
-    for t = 1, 12 do
-        for i = 0, 61 do
-            local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) then emu:write8(u.addr + 0x13, 60) end
-        end
-        local phase = runEnemyPhase()
-        if phase == nil then
-            return result("FAIL", string.format("the enemy phase never returned on turn %d", t))
-        end
-        if phase == "gameover" then
-            shot("ch02raid-gameover")
-            return result("FAIL", string.format(
-                "the party died on turn %d even while being kept alive", t))
-        end
-        local fell
-        for _, hut in ipairs(HUTS) do
-            if terrainAt(hut.x, hut.y) == RUINS then fell = hut break end
-        end
-        if fell then
-            local SITE_X, SITE_Y, SITE_FLAG = fell.x, fell.y, fell.flag
-            -- Camera on the hut before the shot: the verdict is a terrain byte, and a terrain
-            -- byte has been right while the tiles it names drew wrong (ch05raid's note).
-            cursorTo(SITE_X, SITE_Y)
-            wait(90)
-            shot("ch02raid")
-            log(string.format("ch02raid: %s fell on turn %d", fell.name, turn()))
-            if fell.item and held(fell.item) > before[fell.name] then
-                return result("FAIL", string.format(
-                    "%s was sacked but its gift 0x%02X reached the party anyway (%d -> %d) -- "
-                    .. "a lost hut must cost its gift", fell.name, fell.item,
-                    before[fell.name], held(fell.item)))
-            end
-            if eventFlag(SITE_FLAG) then
-                return result("FAIL", string.format(
-                    "%s was RAIDED but its event id %d is set -- a sacked hut would still pay "
-                    .. "out", fell.name, SITE_FLAG))
-            end
-            return result("PASS", string.format(
-                "%s was sacked on turn %d: terrain 0x%02X -> 0x%02X, no gift, flag %d unset",
-                fell.name, turn(), VILLAGE_REGULAR, RUINS, SITE_FLAG))
-        end
-    end
-    shot("ch02raid-unraided")
-    local standing = {}
-    for _, hut in ipairs(HUTS) do
-        standing[#standing + 1] = string.format("%s 0x%02X", hut.name, terrainAt(hut.x, hut.y))
-    end
-    return result("FAIL", string.format(
-        "twelve turns and every hut still stands (%s) -- no raider reached one, so the decoy "
-        .. "the chapter is built on does not exist", table.concat(standing, ", ")))
-end
-
--- ch05raid (#25): can the party LOSE a reliquary? The chapter has declared a village-raid race
--- since #196 -- "the eruption's dead race the party for the spread reward-sites" -- and for that
--- whole time nothing on the map could reach one: every wave was `aggressive`, no site carried an
--- event id, and ch05 registered no MapChange at all, so all four were safe for the whole chapter
--- and ch05village/ch05reliquaries passed anyway. They only ever walk a unit to a door.
---
--- The verdict here is the TERRAIN, because terrain is what FE8 itself reads: CanUnitVisit
--- (bmmenu.c) and gTerrainList_LootableVillages (cp_utility.c) both decide from it, so a site that
--- has become RUINS_REGULAR is one the player cannot enter and a second raider will not revisit.
--- Its event id staying UNSET is the other half -- TILE_COMMAND_20 changes the tile and sets
--- nothing (eventinfo.c), which is exactly why a sacked site cannot count toward the save-all.
--- Run: PT_HOST_CHAPTER=6 tools/playtest/run.sh ch05raid (needs a CH05BOOT=1 ROM).
-scenarios.ch05raid = function()
-    -- reliquary-south, from the chapter chunk: its tile, its gift and its event id were
-    -- three literals here and three more in ch05crest (#314). VILLAGE_REGULAR and RUINS
-    -- stay literals -- they are FE8's terrain ids, not ch05's.
-    local CH05 = dofile(PLAYTEST_DIR .. "/ch05.lua")
-    local SOUTH = CH05.RELIQUARIES[4]
-    local SITE_X, SITE_Y = SOUTH.x, SOUTH.y
-    local VILLAGE_REGULAR, RUINS, DRACOSHIELD = 0x03, 0x25, SOUTH.item
-    local SITE_FLAG = SOUTH.flag
-    if not bootToMap() then return result("FAIL", "never reached the ch05 map") end
-    pokeFastConfig()
-    INSPECT.settle("event", 6000, true)
-    if terrainAt(SITE_X, SITE_Y) ~= VILLAGE_REGULAR then
-        return result("FAIL", string.format(
-            "reliquary-south (%d,%d) is terrain 0x%02X at turn 1, not a village -- nothing can "
-            .. "raid it and nothing can visit it", SITE_X, SITE_Y, terrainAt(SITE_X, SITE_Y)))
-    end
-    -- Count the gift BEFORE, like ch04village/ch05village do. An absolute "the party holds no
-    -- Dracoshield" would fail the moment the chapter ships one anywhere else on the map.
-    local function shields()
-        local n = 0
-        for _, got in ipairs(collectedItems()) do if got == DRACOSHIELD then n = n + 1 end end
-        return n
-    end
-    local before = shields()
-    -- Hand the site to the raiders: never visit it, just give the turns back. The party sits at
-    -- the WEST spawn and the site is south-EAST, so idling does not contest the race.
-    for t = 1, 8 do
-        local phase = runEnemyPhase()
-        if phase == nil then
-            return result("FAIL", string.format("the enemy phase never returned on turn %d", t))
-        end
-        if phase == "gameover" then
-            shot("ch05raid-gameover")
-            return result("FAIL", string.format(
-                "the party died on turn %d before any raider reached a reliquary", t))
-        end
-        if terrainAt(SITE_X, SITE_Y) == RUINS then
-            -- Put the CAMERA on the site before the shot. The verdict below is a terrain byte,
-            -- and a terrain byte has been right while the tiles it names drew wrong; the frame
-            -- is the only thing that shows the ruin actually replaced the building.
-            cursorTo(SITE_X, SITE_Y)
-            wait(90)                -- the map scrolls to the cursor; capturing before it
-                                    -- arrives photographs wherever the fight happened to be
-            shot("ch05raid")
-            log(string.format("ch05raid: reliquary-south fell on turn %d", turn()))
-            if shields() > before then
-                return result("FAIL", string.format(
-                    "the site was sacked but its Dracoshield reached the party anyway "
-                    .. "(%d -> %d) -- a lost site must cost the player its gift",
-                    before, shields()))
-            end
-            if eventFlag(SITE_FLAG) then
-                return result("FAIL", string.format(
-                    "reliquary-south was RAIDED but its event id %d is set -- a sacked site "
-                    .. "would count toward the save-all payout", SITE_FLAG))
-            end
-            return result("PASS", string.format(
-                "reliquary-south was desecrated on turn %d: terrain 0x%02X -> 0x%02X, no gift, "
-                .. "flag %d unset", turn(), VILLAGE_REGULAR, RUINS, SITE_FLAG))
-        end
-    end
-    shot("ch05raid-unraided")
-    return result("FAIL", string.format(
-        "eight turns and reliquary-south still stands (terrain 0x%02X) -- no raider reached it, "
-        .. "so the race the chapter declares does not exist", terrainAt(SITE_X, SITE_Y)))
-end
-
 -- ch05crest (#25): the other half of the race -- saving all four PAYS OUT. Vanilla Ch5 gates a
 -- Guiding Ring on four CHECK_EVENTIDs at its ending and hands it to the player leader, outside
 -- the Village macro, because no single tile knows about the other three. ch05 awarded nothing at
@@ -7018,7 +6834,7 @@ scenarios.ch06clock = function()
         -- clock resolves. Never visits, never fights -- it only gives the turns back.
         for i = 0, 61 do
             local u = unitAt(SYM.gUnitArrayBlue, i)
-            if u and not isDead(u) then emu:write8(u.addr + 0x13, u.maxhp) end
+            if u and not isDead(u) then INSPECT.fullHeal(u) end
         end
         local phase = runEnemyPhase()
         if phase == nil then
@@ -7349,6 +7165,24 @@ local co = coroutine.create(function()
             local unit = id ~= 0 and ru32(SYM.gUnitLookup + id * 4) or 0
             local character = unit ~= 0 and ru32(unit) or 0
             return character ~= 0 and ru8(character + 4) or nil
+        end,
+        -- `idle` and `raided`: give the turns back, hold the party, and read the sites a raid
+        -- takes. A site is CAMPAIGN.VILLAGES's (gen_symbols: tile, flag and gift by YAML id).
+        enemyPhase = function() return runEnemyPhase() end,
+        holdParty = function()
+            -- Full HP, never past it: the AI weighs a target by whether it can kill it, and
+            -- a unit at 60/18 is one it never can, so over-cap HP would bend the raiders'
+            -- routing, which is what a held raid is testing.
+            for _, u in BOARD.each("blue") do
+                if not u.dead then INSPECT.fullHeal(u) end
+            end
+        end,
+        turn = turn,
+        terrainAt = terrainAt,
+        village = function(id) return CAMPAIGN.VILLAGES[id] end,
+        showTile = function(x, y)
+            cursorTo(x, y)
+            wait(90)    -- the map scrolls to the cursor; a shot before it arrives misses the site
         end,
         -- `shop`: the visit path with Armory/Vendor as the command; returns the stock it opened.
         shopAt = function(x, y, kind)

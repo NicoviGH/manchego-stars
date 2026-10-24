@@ -70,6 +70,16 @@ declares a village at. Resolving the tile FROM the village id is the obvious nex
 taken here: item ids resolve through `build_campaign.py`, which imports Pillow, and CI's lightweight
 `checks` job cannot import it. That wants an item-id registry that does not drag the art pipeline.
 
+**A raid names its sites by village id** (2026-10-24, #531). `ch02raid` and `ch05raid` became
+declared cases: `when: idle: {phases, hold, until: raided}` gives the enemy phases back, and
+`then: raided: [village id, ...]` asserts one of those sites fell (terrain RUINS, its gift absent,
+its event id unset). The id resolves at RUN time, through `CAMPAIGN.VILLAGES` (gen_symbols: the
+chapter's tile, the injector's `CHnn_VILLAGE_FLAGS`, the gift through `ITEM_ENUM`), so the case
+copies no tile, flag or gift and CI's `checks` job still imports nothing heavy. `declared.py`
+refuses an id the chapter does not declare and a `raided` with no `idle` to pass a turn.
+`ch05.lua`'s reliquaries read the same table. A site is watched from right after `given`, and
+one that is not a village then FAILs as that, not as "nothing fell".
+
 **How the port was gated**, and both gates were required. First, free: all **111 scenario rows
 resolved byte-identical** before and after, so the derivation reproduces the hand-written table
 rather than merely resembling it. Second, real: the three ported scenarios ran in mGBA and **every

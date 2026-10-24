@@ -43,7 +43,8 @@ M.GIVEN.on_map = function(api, state)
 end
 
 -- ---------------------------------------------------------------- when
--- Steps. Each returns ok, why.
+-- Steps. Each returns ok, why[, verdict]: a step whose ARGUMENT is malformed is the author's
+-- error and says "ERROR", the same as an unknown step; anything the game did is a FAIL.
 M.WHEN = {}
 
 -- `arg.gains` is an item id this site must hand over. It rides the STEP because the gift is
@@ -59,7 +60,8 @@ M.WHEN = {}
 local function siteStep(verb, open)
     return function(api, arg, state)
         if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number" then
-            return false, string.format("a `%s` step needs a table with numeric x and y", verb)
+            return false, string.format("a `%s` step needs a table with numeric x and y", verb),
+                "ERROR"
         end
         -- Settle FIRST. A site event's tail (give-item, MapChange, EVBIT_T, ENDA) is still
         -- running when the item lands, and walking to the next site while std_event holds the
@@ -102,7 +104,8 @@ M.WHEN.visit = siteStep("visit", "visitVillage")
 M.WHEN.shop = function(api, arg, state)
     if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number"
         or (arg.kind ~= "armory" and arg.kind ~= "vendor") or type(arg.stocks) ~= "table" then
-        return false, "a `shop` step needs numeric x, y, kind: armory|vendor and a stocks list"
+        return false, "a `shop` step needs numeric x, y, kind: armory|vendor and a stocks list",
+            "ERROR"
     end
     if not api.settle(true) then
         return false, string.format("the map never returned to player control before (%d,%d)",
@@ -133,7 +136,7 @@ M.WHEN.talk = siteStep("talk", "talkFrom")
 -- #493 -- fails here, and so does a pid the build gives no help text at all.
 M.WHEN.help = function(api, arg, state)
     if type(arg) ~= "table" or type(arg.x) ~= "number" or type(arg.y) ~= "number" then
-        return false, "a `help` step needs numeric x, y"
+        return false, "a `help` step needs numeric x, y", "ERROR"
     end
     if not api.settle(true) then
         return false, string.format("the map never returned to player control before (%d,%d)",
@@ -155,8 +158,53 @@ M.WHEN.help = function(api, arg, state)
     return true
 end
 
+-- `idle: {phases, hold, until}`: give the turns back. End the player phase and ride out the
+-- enemy's, `phases` times, never acting -- how a case hands a site to the raiders. `hold: true`
+-- refills every blue unit to full HP before each phase, because a party deployed across the raid's
+-- path is routed by an honest idle before the question is answered (ch02raid's first run died
+-- on turn 11), and whether the party SURVIVES is a balance question for `make difficulty` and
+-- the human pass, not for a wiring test. `until: raided` stops at the first phase after which
+-- a site the case's `raided` assertion watches has fallen; without it every phase is spent.
+M.WHEN.idle = function(api, arg, state)
+    if type(arg) ~= "table" or type(arg.phases) ~= "number" or arg.phases < 1 then
+        return false, "an `idle` step needs a positive numeric `phases`", "ERROR"
+    end
+    if arg.hold ~= nil and type(arg.hold) ~= "boolean" then
+        return false, string.format("`idle`'s `hold` is true or false, not %q",
+            tostring(arg.hold)), "ERROR"
+    end
+    local stop = arg["until"]
+    if stop ~= nil and stop ~= "raided" then
+        return false, string.format("`idle` can stop only `until: raided`, not %q",
+            tostring(stop)), "ERROR"
+    end
+    if stop == "raided" and #state.raidSites == 0 then
+        return false, "`idle` waits `until: raided`, but the case declares no `raided` assertion",
+            "ERROR"
+    end
+    for p = 1, arg.phases do
+        if arg.hold then api.holdParty() end
+        local phase = api.enemyPhase()
+        if phase == nil then
+            return false, string.format("the enemy phase never returned (idle phase %d)", p)
+        end
+        if phase == "gameover" then
+            api.shot("idle-gameover")
+            return false, string.format("the party died on turn %d%s", api.turn(),
+                arg.hold and " even while held" or "")
+        end
+        if phase == "ended" then
+            return false, string.format("the chapter ended during idle phase %d", p)
+        end
+        state.idled = state.idled + 1
+        if stop == "raided" and M.fallen(api, state)[1] then return true end
+    end
+    return true
+end
+
 -- ---------------------------------------------------------------- then
--- Assertions. Each returns ok, why.
+-- Assertions. Each returns ok, why[, verdict], as a step does; a failed one is a FAIL unless
+-- it says otherwise.
 M.THEN = {}
 
 -- The party GAINED this item during the case -- counted, not merely present. A presence
@@ -195,6 +243,54 @@ M.THEN.event_flag = function(api, id, state)
         .. "nothing can count it toward a save-all payout", id)
 end
 
+-- `raided: [village id, ...]`: a raider SACKED one of these sites. At least one must have
+-- fallen, and every one that did must have cost its gift and left its event id unset. Which
+-- one falls is a real design answer (ch02's band took the east hut, not the south one the
+-- first draft presumed), so the case names every site it accepts and the log says which.
+--
+-- The verdict is the TERRAIN, because terrain is what FE8 itself reads: CanUnitVisit
+-- (bmmenu.c) and gTerrainList_LootableVillages (cp_utility.c) both decide from it, so a site
+-- that has become RUINS is one the player cannot enter and a second raider will not revisit.
+-- The event id staying UNSET is the other half: TILE_COMMAND_20 changes the tile and sets
+-- nothing (eventinfo.c), which is why a sacked site cannot count toward a save-all payout.
+-- The sites are resolved and checked to be villages right after `given` (M.watchRaids), so
+-- a site that never stood fails as that rather than as "nothing fell".
+M.THEN.raided = function(api, _ids, state)
+    local fell = M.fallen(api, state)
+    if not fell[1] then
+        api.shot("raided-unraided")
+        local standing = {}
+        for _, site in ipairs(state.raidSites) do
+            standing[#standing + 1] = string.format("%s 0x%02X", site.name,
+                api.terrainAt(site.x, site.y))
+        end
+        return false, string.format(
+            "%d enemy phase(s) and every watched site still stands (%s) -- no raider reached "
+            .. "one, so the raid the chapter declares does not exist", state.idled,
+            table.concat(standing, ", "))
+    end
+    -- Camera on the site before the shot: the verdict is a terrain byte, and a terrain byte has
+    -- been right while the tiles it names drew wrong. The frame shows the ruin replaced it.
+    api.showTile(fell[1].x, fell[1].y)
+    api.shot("raided")
+    local now = M.tally(api.collectedItems())
+    for _, site in ipairs(fell) do
+        api.log(string.format("raided: %s fell by turn %d", site.name, api.turn()))
+        local before = state.itemsAtStart[site.gift or -1] or 0
+        if site.gift and (now[site.gift] or 0) > before then
+            return false, string.format(
+                "%s was sacked but its gift 0x%02X reached the party anyway (%d -> %d) -- a "
+                .. "lost site must cost its gift", site.name, site.gift, before, now[site.gift])
+        end
+        if api.eventFlag(site.flag) then
+            return false, string.format(
+                "%s was RAIDED but its event id %d is set -- a sacked site would still pay out",
+                site.name, site.flag)
+        end
+    end
+    return true
+end
+
 -- ---------------------------------------------------------------- driver
 
 function M.tally(list)
@@ -219,8 +315,55 @@ function M.pair(entry)
     return k, v
 end
 
+-- FE8's own terrain ids (terrains.h), not any chapter's: a raid turns a VILLAGE into RUINS.
+M.VILLAGE, M.RUINS = 0x03, 0x25
+
+-- Resolve the case's `raided` sites once the map is up, and refuse a site that is not a
+-- village now: nothing can raid it and nothing can visit it, so "it never fell" would blame
+-- the raiders for a tile the chapter never built. "Up" is `on_map`'s settle, the same
+-- event wait (INSPECT.settle "event", 6000) the hand-written raids opened with.
+-- Returns ok, why, verdict: a malformed list or an unknown id is the AUTHOR's error (ERROR,
+-- like an unknown step); a site that is not a village is the CHAPTER's (FAIL).
+function M.watchRaids(case, api, state)
+    for _, entry in ipairs(case["then"] or {}) do
+        local key, ids = M.pair(entry)
+        if key == "raided" then
+            if type(ids) ~= "table" or #ids == 0 then
+                return false, "`raided` takes a list of village ids", "ERROR"
+            end
+            for _, id in ipairs(ids) do
+                local site = api.village(id)
+                if not site then
+                    return false, string.format("`raided` names %q, which CAMPAIGN.VILLAGES "
+                        .. "does not carry", tostring(id)), "ERROR"
+                end
+                local terrain = api.terrainAt(site.x, site.y)
+                if terrain ~= M.VILLAGE then
+                    return false, string.format(
+                        "%s (%d,%d) is terrain 0x%02X before the raid, not a village -- nothing "
+                        .. "can raid it and nothing can visit it", id, site.x, site.y, terrain),
+                        "FAIL"
+                end
+                state.raidSites[#state.raidSites + 1] = {name = id, x = site.x, y = site.y,
+                                                         flag = site.flag, gift = site.gift}
+            end
+        end
+    end
+    return true
+end
+
+-- The watched sites that are RUINS now, in the order the case named them.
+function M.fallen(api, state)
+    local out = {}
+    for _, site in ipairs(state.raidSites) do
+        if api.terrainAt(site.x, site.y) == M.RUINS then out[#out + 1] = site end
+    end
+    return out
+end
+
 function M.run(case, api)
-    local state = {visits = 0, silent = {}, itemsAtStart = {}, asserted = 0}
+    local state = {visits = 0, silent = {}, itemsAtStart = {}, asserted = 0, raidSites = {},
+                   idled = 0}
     local name = case.name or "?"
 
     for _, want in ipairs(case.given or {}) do
@@ -234,6 +377,10 @@ function M.run(case, api)
             return api.result("FAIL", string.format("%s: %s", name, why))
         end
     end
+    local watching, why, verdict = M.watchRaids(case, api, state)
+    if not watching then
+        return api.result(verdict, string.format("%s: %s", name, why))
+    end
 
     for i, entry in ipairs(case["when"] or {}) do
         local key, arg, err = M.pair(entry)
@@ -246,9 +393,9 @@ function M.run(case, api)
                 "%s: unknown step %q -- the vocabulary is in cases.lua, and a case outside "
                 .. "it belongs behind the chapter's `lua:` key", name, key))
         end
-        local ok, why = fn(api, arg, state)
+        local ok, why, verdict = fn(api, arg, state)
         if not ok then
-            return api.result("FAIL", string.format("%s: %s", name, why))
+            return api.result(verdict or "FAIL", string.format("%s: %s", name, why))
         end
     end
 
@@ -272,9 +419,9 @@ function M.run(case, api)
             return api.result("ERROR", string.format(
                 "%s: unknown assertion %q -- the vocabulary is in cases.lua", name, key))
         end
-        local ok, why = fn(api, arg, state)
+        local ok, why, verdict = fn(api, arg, state)
         if not ok then
-            return api.result("FAIL", string.format("%s: %s", name, why))
+            return api.result(verdict or "FAIL", string.format("%s: %s", name, why))
         end
         proved[#proved + 1] = key
     end

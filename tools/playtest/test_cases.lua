@@ -62,6 +62,23 @@ local function fakeApi(opts)
         if opts.helpRead == false then return false, "help never opened" end
         return true, opts.helpRead
     end
+    -- `idle`/`raided`: enemy phase n returns `opts.phaseResults[n]` ("player" by default), then
+    -- every "x,y" in `opts.raze[n]` is RUINS and every id in `opts.loot[n]` reached the party.
+    -- An unlisted tile is a village.
+    local terrain = {}
+    for k, v in pairs(opts.terrain or {}) do terrain[k] = v end
+    a.phases, a.held = 0, 0
+    a.enemyPhase = function()
+        a.phases = a.phases + 1
+        for _, key in ipairs((opts.raze or {})[a.phases] or {}) do terrain[key] = 0x25 end
+        for _, id in ipairs((opts.loot or {})[a.phases] or {}) do items[#items + 1] = id end
+        return (opts.phaseResults or {})[a.phases] or "player"
+    end
+    a.holdParty = function() a.held = a.held + 1 end
+    a.turn = function() return a.phases + 1 end
+    a.terrainAt = function(x, y) return terrain[x .. "," .. y] or 0x03 end
+    a.village = function(id) return (opts.villages or {})[id] end
+    a.showTile = function(x, y) a.shown = x .. "," .. y end
     return a
 end
 
@@ -106,6 +123,63 @@ do
            ["when"] = {{shop = {x = 5, y = 7, kind = "armory", stocks = stock}}}}, api)
     check(api.verdict, "FAIL", "a tile with no Armory command FAILs")
     contains(api.reason, "did not expose armory", "the failure says the command was missing")
+end
+
+-- `idle` + `raided`: ch02raid's shape. Two huts watched, the second falls on phase 3.
+local HUTS = {south = {x = 1, y = 12, flag = 9, gift = 0x6E}, east = {x = 12, y = 3, flag = 10}}
+local function raid(opts, idle, watched)
+    opts.villages = opts.villages or HUTS
+    local api = fakeApi(opts)
+    C.run({name = "ch02raid", given = {"on_map"},
+           ["when"] = {{idle = idle or {phases = 12, hold = true, ["until"] = "raided"}}},
+           ["then"] = {{raided = watched or {"south", "east"}}}}, api)
+    return api
+end
+do
+    local api = raid({raze = {[3] = {"12,3"}}})
+    check(api.verdict, "PASS", "a watched site that falls PASSes")
+    check(api.phases, 3, "`until: raided` stops at the phase the site fell")
+    check(api.held, 3, "`hold` refills the party before every phase")
+    check(api.shown, "12,3", "the camera goes to the site that fell")
+    contains(table.concat(api.logged, "\n"), "east fell", "the log names the site that fell")
+
+    api = raid({}, {phases = 4})
+    check(api.verdict, "FAIL", "a raid where nothing falls FAILs")
+    check(api.phases, 4, "without `until` every phase is spent")
+    check(api.held, 0, "an unheld idle never touches the party")
+    contains(api.reason, "still stands", "the failure says every site stood")
+
+    api = raid({raze = {[2] = {"1,12"}}, loot = {[2] = {0x6E}}})
+    check(api.verdict, "FAIL", "a sacked site whose gift still arrived FAILs")
+    contains(api.reason, "0x6E reached the party", "the failure names the gift")
+
+    api = raid({raze = {[2] = {"1,12"}}, flags = {[9] = true}})
+    check(api.verdict, "FAIL", "a sacked site whose event id is set FAILs")
+    contains(api.reason, "event id 9 is set", "the failure names the flag")
+
+    api = raid({terrain = {["1,12"] = 0x25}})
+    check(api.verdict, "FAIL", "a watched site that is not a village before the raid FAILs")
+    contains(api.reason, "not a village", "the failure says nothing could raid it")
+    check(api.phases, 0, "and no phase is spent finding that out")
+
+    api = raid({}, nil, {"south", "west"})
+    check(api.verdict, "ERROR", "a site CAMPAIGN.VILLAGES does not carry is the author's ERROR")
+    contains(api.reason, "\"west\"", "the failure names the id")
+
+    api = raid({}, {phases = 2, hold = 0})
+    check(api.verdict, "ERROR", "a `hold` that is not a boolean is the author's ERROR (Lua reads 0 as true)")
+    check(api.held, 0, "and holds nobody")
+
+    api = raid({phaseResults = {[2] = "gameover"}})
+    check(api.verdict, "FAIL", "a party that dies while idling FAILs")
+    contains(api.reason, "even while held", "the failure says it was held")
+
+    api = fakeApi({})
+    C.run({name = "x", given = {"on_map"},
+           ["when"] = {{idle = {phases = 2, ["until"] = "raided"}}}, ["then"] = {{spoke = true}}},
+          api)
+    check(api.verdict, "ERROR", "`until: raided` with no `raided` assertion is an ERROR")
+    check(api.phases, 0, "before spending a phase")
 end
 
 -- The happy path: ch05village's shape end to end.
@@ -328,7 +402,7 @@ do
     local api = fakeApi({})
     C.run({name = "x", given = {"on_map"}, ["when"] = {{visit = "south"}},
            ["then"] = {{spoke = true}}}, api)
-    check(api.verdict, "FAIL", "a non-table visit argument FAILs rather than crashing")
+    check(api.verdict, "ERROR", "a non-table visit argument is the author's ERROR, not a crash")
 end
 
 print(string.format("%d checks, %d failures", tests, fails))

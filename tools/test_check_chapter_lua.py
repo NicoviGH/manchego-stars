@@ -89,9 +89,8 @@ class TestChapterLuaFacts(unittest.TestCase):
         self.assertEqual(len(run(bad)), 2, run(bad))
 
     def test_a_row_without_an_id_is_out_of_scope_rather_than_a_crash(self):
-        # ch05.lua's reliquaries are keyed by `name`, not `id`, and its chapter YAML calls
-        # them `reliquary-north`. Matching those would mean renaming a shipped chapter's
-        # constants, so they are deliberately not in scope -- and must not raise here.
+        # A row keyed by `name` is not a placed thing the scan can look up in the chapter
+        # YAML by id, so it is out of scope -- and must not raise here.
         self.assertEqual(run('return { X = { { name = "north", x = 5, y = 1 } } }'), [])
 
     def test_a_chunk_with_no_coordinate_rows_is_clean(self):
