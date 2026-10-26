@@ -90,3 +90,32 @@ are in bot.lua's header.
   per true.
 - `Bot.route(options, style)`: `style.route` validated as an index into `options` (it raises on
   anything else). `route` joins `Bot.STYLES` as an axis the runner samples, 50/50 per campaign.
+
+**Claims become behaviours (PR C3).** A Strategy claim (`tools/strategy.py`'s kinds) reaches the
+bot RESOLVED by the runner (PR D/F), which reads the YAML and maps every name: `{ id, kind,
+unit = {charIds}, vs = {classIds} | "boss" | "all", tile = terrain id, turns = {arrival turns} }`,
+each kind with the fields it uses. The bot maps no name and reads no YAML. Each behaviour,
+`Bot.CLAIM_BEHAVIOURS[kind](claim, style)`, returns a NEW style with its entry added (the given
+style is never edited, because the runner samples one style and may apply claims to it more than
+once), and `Bot.decide` reads those entries:
+- `carry`: the units join `style.deploy` (deduped, for `Bot.prep`), and after the sure kills and
+  before the most-threatened rule they attack an enemy `vs` names when one can.
+- `answer`: those units rank an enemy `vs` names above every other target, a sure kill elsewhere
+  included.
+- `wall`: at the same point, a wall attacks an enemy `vs` names, else ends on its approach (the
+  gate-allowed wait tile nearest that enemy among the tiles it reaches), else takes the normal
+  pick: a wall that dies is not a wall. Every other unit marches only to tiles no nearer that
+  enemy than the nearest wall, when any such tile is left; attacks are not held back.
+- `terrain`: while an enemy `vs` names is on the field, the march keeps to gate-allowed tiles of
+  that terrain when any is in reach. It reads the new optional `sight.terrain(x, y)` (PR D, from
+  game memory); without it the claim is a no-op. No avoid bonus is coded: the gate already reads
+  what the terrain does through the game's own forecast.
+- `reinforcements`: on the turn before any cited arrival turn the march holds (the no-goal rule:
+  the allowed tile with the smallest worst case, its own tile first). Attacks are still made: a
+  strike from a safe tile is not an advance. It reads the new `sight.turn`, and decide raises
+  when that is missing.
+A claim missing a field its kind needs raises, naming the claim id; nothing is skipped silently.
+`Bot.applyClaims(claims, style)` folds them in order, and `Bot.unplayed(claims)` returns the id of
+every claim whose kind has no behaviour (`threat`, `kits`, `unmodelled`, any unknown kind), so a
+run reports what it did not play. Greedy ignores every claim field in `decide` (only `deploy`
+reaches `Bot.prep`): the clear scenarios' picks are unchanged.

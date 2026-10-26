@@ -9,9 +9,10 @@
 --   board: Board.read's shape (board.lua). Blue units on the field that have not acted are the
 --          ones that can act; on-field reds are the enemies.
 --   style: { aggression = "careful"|"even"|"bold"|"greedy", deploy = {charIds},
---            claims = {claim ids}, route = 1|2 }. Bot.STYLES lists the sampled axes; "greedy" is
---          not sampled -- it is the clear scenarios' old bot and ignores `sight` except reach and
---          the objective.
+--            claims = {claim ids}, route = 1|2 }, plus the fields the claim behaviours add
+--          (Claims, below). Bot.STYLES lists the sampled axes; "greedy" is not sampled -- it is
+--          the clear scenarios' old bot and ignores `sight` except reach and the objective, and
+--          every claim field but `deploy`.
 --   sight: { danger(x, y) -> how many enemies reach (x, y), the game's danger zone;
 --            forecast(unit, target, x, y, slot) -> { hit, dmg, crit, hits, takenHit, takenDmg,
 --              takenCrit, takenHits, killsTarget, diesWorst };
@@ -31,7 +32,11 @@
 --              reads more than the pair: support bonuses from allies in range, and the held
 --              weapon. So a hit is only ever the same board asked again (a re-decide after a
 --              cancelled input); any action that moves, hurts or spends a weapon misses.
---              Reach and worst case are per call only. }
+--              Reach and worst case are per call only.
+--            terrain(x, y) -> FE8 terrain id, OPTIONAL: read from the game's map by the caller.
+--              Only a terrain claim reads it; without it that claim is a no-op.
+--            turn = n, the current turn: required while a reinforcements claim is in the
+--              style (decide raises without it). }
 --          Who may Seize is board.lua's Board.canSeize(unit, lord, ruledOut): `lord` is
 --          Board.lordPid; without it, anyone not in the ruledOut memo may try.
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
@@ -59,15 +64,37 @@
 -- None of these was chosen by a survival rate (ADR 0368).
 --
 -- Who acts: the lord seizes when it can reach the seize tile (the chapter ends there, so no
--- enemy phase follows and no gate applies); else the unit with an allowed sure kill; else the
--- unit whose own tile has the largest worst case (more reaching enemies breaks a tie); else
--- slot order. Greedy keeps the old order: seize, then slot order.
+-- enemy phase follows and no gate applies); else the unit with an allowed sure kill; else a
+-- claimed unit's move (a carry's attack, then a wall's attack or approach); else the unit
+-- whose own tile has the largest worst case (more reaching enemies breaks a tie); else slot
+-- order. Greedy keeps the old order: seize, then slot order.
 --
--- What it does: attack when an allowed attack exists -- a sure kill first, then the likeliest
--- kill, then the most expected damage, then the boss, then the lowest HP -- else march toward
--- the objective (its tile, the boss, or the nearest enemy) over allowed tiles. With none
--- allowed, or nothing to march to (survive), it ends where the worst case is smallest, its own
--- tile first on a tie.
+-- What it does: attack when an allowed attack exists -- an answered class first, then a sure
+-- kill, then the likeliest kill, then the most expected damage, then the boss, then the lowest
+-- HP -- else march toward the objective (its tile, the boss, or the nearest enemy) over
+-- allowed tiles. With none allowed, or nothing to march to (survive, or a reinforcements
+-- hold), it ends where the worst case is smallest, its own tile first on a tie.
+--
+-- ── Claims: Bot.CLAIM_BEHAVIOURS[kind](claim, style) -> a NEW style (the given one is kept) ──
+-- A claim reaches the bot RESOLVED by the runner, which reads the Strategy YAML (the kinds are
+-- tools/strategy.py's): { id, kind, unit = {charIds}, vs = {classIds}|"boss"|"all",
+-- tile = terrain id, turns = {arrival turns} }, each kind with the fields it uses. The bot
+-- maps no name; a claim missing a field its kind needs raises, naming its id.
+--   carry {unit, vs}:   its units join style.deploy (deduped; Bot.prep reads it) and, ahead of
+--                       the most-threatened rule, attack an enemy `vs` names when one can.
+--   answer {unit, vs}:  those units rank an enemy `vs` names above every other target.
+--   wall {unit, vs}:    ahead of the most-threatened rule a wall attacks an enemy `vs` names,
+--                       else ends on its approach -- the allowed wait tile nearest that enemy
+--                       among those it reaches -- else takes the normal pick. Every other unit
+--                       marches only to tiles no nearer that enemy than the nearest wall (when
+--                       any is left); its attacks are not held.
+--   terrain {tile, vs}: while an enemy `vs` names is on the field, the march keeps to allowed
+--                       tiles of that terrain when any is in reach. Needs sight.terrain.
+--   reinforcements {turns}: on the turn before any of `turns` the march holds (the no-goal
+--                       rule above); attacks are still made. Needs sight.turn.
+-- Bot.applyClaims(claims, style) folds them in order. Bot.unplayed(claims) -> the ids of every
+-- claim whose kind has no behaviour (threat, kits, unmodelled, an unknown kind), so a run
+-- reports what it did not play instead of dropping it.
 --
 -- The throne: a unit that cannot Seize never ends on the seize tile, nor on or beside it
 -- (needsToStepOff) -- to wait or to attack -- unless its target stands ON the seize tile (the
@@ -344,7 +371,7 @@ end
 local function context(board, sight)
     local cache = sight.cache or {}
     cache.forecasts = cache.forecasts or {}
-    local ctx = { sight = sight, actors = {}, enemies = {}, standing = {},
+    local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   forecasts = cache.forecasts, reaches = {}, worsts = {}, fields = {},
                   signature = M.boardSignature(board) }
     local o = sight.objective
@@ -352,6 +379,7 @@ local function context(board, sight)
     for _, u in ipairs(board.units) do
         if u.onField then
             ctx.standing[tileKey(u.x, u.y)] = u
+            if u.faction == "blue" then ctx.blues[#ctx.blues + 1] = u end
             if u.faction == "blue" and not u.acted then ctx.actors[#ctx.actors + 1] = u end
             if u.faction == "red" then ctx.enemies[#ctx.enemies + 1] = u end
         end
@@ -442,6 +470,36 @@ local function reaches(ctx, e, x, y)
     return false
 end
 
+local function listed(list, v)
+    for _, x in ipairs(list) do
+        if x == v then return true end
+    end
+    return false
+end
+
+-- A resolved claim's `vs` against an enemy on the board.
+local function matchesVs(vs, e)
+    if vs == "all" then return true end
+    if vs == "boss" then return e.isBoss end
+    return listed(vs, e.classId)
+end
+
+local function anyEnemy(ctx, vs)
+    for _, e in ipairs(ctx.enemies) do
+        if matchesVs(vs, e) then return true end
+    end
+    return false
+end
+
+-- The style's claim entries in `field` that name `u` (a carry, answer or wall's units).
+local function claimsOn(ctx, field, u)
+    local out = {}
+    for _, c in ipairs(ctx.style[field] or {}) do
+        if listed(c.units, u.charId) then out[#out + 1] = c end
+    end
+    return out
+end
+
 -- The enemy phase's worst case for `u` ending on (x, y): {sum, max} of each reaching enemy's
 -- damage, `spared` (a sure kill's target) left out.
 local function worstCase(ctx, u, x, y, spared)
@@ -480,8 +538,10 @@ local function action(u, tile, act, target)
              target = target and target.charId, targetId = target and target.id, weapon = nil }
 end
 
--- True if attack candidate c beats b: sure kill, kill chance, expected damage, boss, low HP.
+-- True if attack candidate c beats b: an answered class, sure kill, kill chance, expected
+-- damage, boss, low HP.
 local function betterAttack(c, b)
+    if c.answered ~= b.answered then return c.answered end
     if c.sure ~= b.sure then return c.sure end
     if c.killChance ~= b.killChance then return c.killChance > b.killChance end
     if c.expected ~= b.expected then return c.expected > b.expected end
@@ -489,16 +549,22 @@ local function betterAttack(c, b)
     return c.target.hp < b.target.hp
 end
 
-local function bestAttack(ctx, u, gate)
+-- `only`, a resolved `vs`, limits the targets to that enemy (a carry's or a wall's).
+local function bestAttack(ctx, u, gate, only)
     if not u.minRange then return nil end
+    local answers = claimsOn(ctx, "answers", u)
     local best
     for _, e in ipairs(ctx.enemies) do
-        for _, t in ipairs(strikeTiles(ctx, u, e)) do
+        local answered = false
+        for _, c in ipairs(answers) do
+            if matchesVs(c.vs, e) then answered = true end
+        end
+        for _, t in ipairs((not only or matchesVs(only, e)) and strikeTiles(ctx, u, e) or {}) do
             if inRange(t.x, t.y, e.x, e.y, u.minRange, u.maxRange) then
                 local f = forecast(ctx, u, e, t.x, t.y)
                 local sure = isSureKill(f)
                 if not f.diesWorst and gate(ctx, u, t.x, t.y, sure and e or nil) then
-                    local c = { tile = t, target = e, sure = sure,
+                    local c = { tile = t, target = e, sure = sure, answered = answered,
                                 killChance = f.killsTarget and f.hit or 0,
                                 expected = f.dmg * f.hits * f.hit }
                     if not best or betterAttack(c, best) then best = c end
@@ -523,15 +589,75 @@ local function goalFor(ctx, u, objective)
     return best
 end
 
+-- A wall's line: of `tiles`, those no nearer any walled enemy than the nearest of that claim's
+-- walls on the field. A unit that is itself one of the claim's walls is not held by it. When
+-- no tile is behind the line the unit is not held (it is already past it).
+local function behindWalls(ctx, u, tiles)
+    local kept = tiles
+    for _, c in ipairs(ctx.style.walls or {}) do
+        if not listed(c.units, u.charId) then
+            for _, e in ipairs(ctx.enemies) do
+                local line
+                for _, w in ipairs(matchesVs(c.vs, e) and ctx.blues or {}) do
+                    local d = manhattan(w.x, w.y, e.x, e.y)
+                    if listed(c.units, w.charId) and (not line or d < line) then line = d end
+                end
+                if line then
+                    local behind = {}
+                    for _, t in ipairs(kept) do
+                        if manhattan(t.x, t.y, e.x, e.y) >= line then behind[#behind + 1] = t end
+                    end
+                    kept = behind
+                end
+            end
+        end
+    end
+    return #kept > 0 and kept or tiles
+end
+
+-- A terrain claim: of the allowed `tiles`, those of the first claimed terrain that has any
+-- (while an enemy it is held against is on the field); all of them when none does. Without
+-- sight.terrain this is a no-op: the bot never guesses a tile's terrain.
+local function onTerrain(ctx, tiles)
+    local terrainAt = ctx.sight.terrain
+    if not terrainAt then return tiles end
+    for _, c in ipairs(ctx.style.terrains or {}) do
+        if anyEnemy(ctx, c.vs) then
+            local on = {}
+            for _, t in ipairs(tiles) do
+                if terrainAt(t.x, t.y) == c.tile then on[#on + 1] = t end
+            end
+            if #on > 0 then return on end
+        end
+    end
+    return tiles
+end
+
+-- A reinforcements claim: the turn before any cited arrival, the march holds.
+local function holding(ctx)
+    local arrivals = ctx.style.arrivals
+    if not arrivals or #arrivals == 0 then return false end
+    local turn = ctx.sight.turn
+    if not turn then error("bot.lua: a reinforcements claim needs sight.turn") end
+    for _, turns in ipairs(arrivals) do
+        for _, t in ipairs(turns) do
+            if turn == t - 1 then return true end
+        end
+    end
+    return false
+end
+
 local function march(ctx, u, gate, objective)
-    local tiles, allowed = waitTiles(ctx, u), {}
+    local tiles, allowed = behindWalls(ctx, u, waitTiles(ctx, u)), {}
     for _, t in ipairs(tiles) do
         if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
     end
-    local goal = goalFor(ctx, u, objective)
+    allowed = onTerrain(ctx, allowed)
+    local goal = nil
+    if not holding(ctx) then goal = goalFor(ctx, u, objective) end
     if #allowed == 0 or not goal then
-        -- nowhere is safe enough, or nothing to march to: end where the worst case is
-        -- smallest, the unit's own tile first on a tie (holding costs nothing)
+        -- nowhere is safe enough, or nothing to march to (or a hold): end where the worst
+        -- case is smallest, the unit's own tile first on a tie (holding costs nothing)
         local pool = #allowed > 0 and allowed or tiles
         local best, bestSum = nil, nil
         for _, t in ipairs(pool) do
@@ -544,6 +670,43 @@ local function march(ctx, u, gate, objective)
     -- no enemies passed: pickMove's cork fallback pushes at a foe when the march is jammed,
     -- and over tiles the style allowed that push is the greedy bot's charge, not this one's
     return M.pickMove(allowed, { cur = u, goal = goal, field = fieldFor(ctx, goal) })
+end
+
+-- A wall's approach: of the wait tiles the gate allows, one a walled enemy reaches, the
+-- nearest that enemy; nil when there is none (then the wall takes the normal pick).
+local function approach(ctx, u, gate, vs)
+    local best, bestD
+    for _, t in ipairs(waitTiles(ctx, u)) do
+        if gate(ctx, u, t.x, t.y, nil) then
+            for _, e in ipairs(ctx.enemies) do
+                local d = manhattan(t.x, t.y, e.x, e.y)
+                if matchesVs(vs, e) and (not bestD or d < bestD)
+                    and reaches(ctx, e, t.x, t.y) then
+                    best, bestD = t, d
+                end
+            end
+        end
+    end
+    return best
+end
+
+-- The claimed units' move, before the most-threatened rule: a carry's units attack the
+-- carried enemy, then a wall's attack the walled enemy or stand on its approach. Claim order,
+-- then slot order; nil when no claimed unit has such a move.
+local function claimedMove(ctx, gate)
+    for _, field in ipairs({ "carries", "walls" }) do
+        for _, c in ipairs(ctx.style[field] or {}) do
+            for _, u in ipairs(ctx.actors) do
+                if listed(c.units, u.charId) then
+                    local a = bestAttack(ctx, u, gate, c.vs)
+                    if a then return action(u, a.tile, "attack", a.target) end
+                    local t = field == "walls" and approach(ctx, u, gate, c.vs)
+                    if t then return action(u, t, "wait") end
+                end
+            end
+        end
+    end
+    return nil
 end
 
 local function seize(ctx)
@@ -586,6 +749,7 @@ function M.decide(board, sight, style)
         error("bot.lua: unknown aggression " .. tostring(aggression))
     end
     local ctx = context(board, sight)
+    ctx.style = style
     if #ctx.actors == 0 then return nil end
     local objective = sight.objective
     local s = seize(ctx)
@@ -598,6 +762,8 @@ function M.decide(board, sight, style)
         attacks[u] = a
         if a and a.sure then return action(u, a.tile, "attack", a.target) end
     end
+    local claimed = claimedMove(ctx, gate)
+    if claimed then return claimed end
     -- the most threatened: the largest worst case where it stands, then the most enemies
     local u, most, count = ctx.actors[1], 0, 0
     for _, c in ipairs(ctx.actors) do
@@ -609,7 +775,85 @@ function M.decide(board, sight, style)
     return action(u, march(ctx, u, gate, objective), "wait")
 end
 
--- ── Between chapters ───────────────────────────────────────────────────────────
+-- ── Claims ───────────────────────────────────────────────────────────────────────────────
+
+local function malformed(claim, what)
+    error("bot.lua: claim " .. tostring(claim.id) .. " (" .. tostring(claim.kind) .. ") "
+        .. what, 3)
+end
+
+local function needList(claim, field, what)
+    local v = claim[field]
+    if type(v) ~= "table" or #v == 0 then
+        malformed(claim, "needs " .. field .. " = " .. what)
+    end
+    return v
+end
+
+local function needVs(claim)
+    local vs = claim.vs
+    if vs == "boss" or vs == "all" then return vs end
+    return needList(claim, "vs", '{classIds}, "boss" or "all"')
+end
+
+-- A copy of `style` with `entry` appended to its list `field`; the given style is not edited
+-- (the runner samples one style and may apply claims to it more than once).
+local function withEntry(style, field, entry)
+    local out = {}
+    for k, v in pairs(style) do out[k] = v end
+    local list = {}
+    for i, v in ipairs(style[field] or {}) do list[i] = v end
+    list[#list + 1] = entry
+    out[field] = list
+    return out
+end
+
+local function byUnit(field)
+    return function(claim, style)
+        return withEntry(style, field, { units = needList(claim, "unit", "{charIds}"),
+                                         vs = needVs(claim) })
+    end
+end
+
+M.CLAIM_BEHAVIOURS = {
+    carry = function(claim, style)
+        local out = byUnit("carries")(claim, style)
+        local deploy = {}
+        for i, c in ipairs(style.deploy or {}) do deploy[i] = c end
+        for _, c in ipairs(claim.unit) do
+            if not listed(deploy, c) then deploy[#deploy + 1] = c end
+        end
+        out.deploy = deploy
+        return out
+    end,
+    answer = byUnit("answers"),
+    wall = byUnit("walls"),
+    terrain = function(claim, style)
+        if type(claim.tile) ~= "number" then malformed(claim, "needs tile = a terrain id") end
+        return withEntry(style, "terrains", { tile = claim.tile, vs = needVs(claim) })
+    end,
+    reinforcements = function(claim, style)
+        return withEntry(style, "arrivals", needList(claim, "turns", "{arrival turns}"))
+    end,
+}
+
+function M.applyClaims(claims, style)
+    for _, c in ipairs(claims) do
+        local behaviour = M.CLAIM_BEHAVIOURS[c.kind]
+        if behaviour then style = behaviour(c, style) end
+    end
+    return style
+end
+
+function M.unplayed(claims)
+    local ids = {}
+    for _, c in ipairs(claims) do
+        if not M.CLAIM_BEHAVIOURS[c.kind] then ids[#ids + 1] = c.id end
+    end
+    return ids
+end
+
+-- ── Between chapters ─────────────────────────────────────────────────────────────────────
 
 local PROMOTE_LEVEL = 10   -- FE8: a unit may use a promotion item from level 10
 
@@ -700,7 +944,8 @@ function M.promoteOrder(units) return byLevel(units) end
 function M.route(options, style)
     local r = style.route
     if type(r) ~= "number" or r < 1 or r > #options or r % 1 ~= 0 then
-        error("bot.lua: route " .. tostring(r) .. " is not an index into " .. #options .. " options")
+        error("bot.lua: route " .. tostring(r) .. " is not an index into " .. #options
+            .. " options")
     end
     return r
 end

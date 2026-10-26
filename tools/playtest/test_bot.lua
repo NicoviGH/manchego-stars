@@ -301,7 +301,7 @@ local function unit(o)
         onMap = true, onField = o.onField ~= false, dead = false, acted = o.acted or false,
         minRange = o.minRange == nil and 1 or o.minRange or nil,
         maxRange = o.maxRange == nil and 1 or o.maxRange or nil,
-        isBoss = o.isBoss or false,
+        isBoss = o.isBoss or false, classId = o.classId,
     }
 end
 local function blue(id, slot, x, y, o)
@@ -324,6 +324,8 @@ local function sightOf(o)
         objective = o.objective or { kind = "rout" },
         field = o.field,
         cache = o.cache,
+        terrain = o.terrain,
+        turn = o.turn,
         danger = function(x, y) return (o.danger or {})[x .. "," .. y] or 0 end,
         reach = function(u) return (o.reach or {})[u.id] or { { x = u.x, y = u.y } } end,
         forecast = function(u, t, x, y, slot)
@@ -732,6 +734,196 @@ do
         "1,2", "survive, own tile in reach: steps to the safest tile")
 end
 
+-- ── claims: what a Strategy claim makes the bot do (#510 step 9 C3) ──────────────
+-- Claims arrive RESOLVED by the runner: unit = {charIds}, vs = {classIds} | "boss" | "all",
+-- tile = a terrain id, turns = {arrival turns}. Each test goes through decide and shows the
+-- claim changes the pick against the same board without it.
+
+local function csv(list) return table.concat(list, ",") end
+local CLS_A, CLS_B = 0x10, 0x20   -- two enemy classes; ids only, no class is named here
+local function claimed(aggression, ...)
+    return B.applyClaims({ ... }, style(aggression))
+end
+
+-- test_carry_deploys_and_attacks_the_named_class: A and C can both hit E; with no claim A
+-- acts (slot order, nobody threatened). Carry C vs E's class: C is deployed and acts on E.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local C = blue(0x02, 1, 4, 0)
+    local E = red(0x81, 2, 0, { hp = 30, classId = CLS_A })
+    local sight = sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 4, 0 }, { 3, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 80, dmg = 5, hits = 1 } } },
+               [0x02] = { [0x81] = { ["3,0"] = fc { hit = 80, dmg = 5, hits = 1 } } } },
+    }
+    local board = boardOf(A, C, E)
+    check(B.decide(board, sight, style("careful")).unit, 0x01, "no claim: A acts first")
+    local base = style("careful")
+    base.deploy = { 0x02 }
+    local carry = { id = "c1", kind = "carry", unit = { 0x02, 0x03 }, vs = { CLS_A } }
+    local st = B.CLAIM_BEHAVIOURS.carry(carry, base)
+    check(csv(st.deploy), "2,3", "carry: its units join deploy, a repeat once")
+    check(csv(base.deploy), "2", "carry: the style it was given is not edited")
+    local a = B.decide(board, sight, st)
+    check(a and a.unit, 0x02, "carry: C acts first on the named class")
+    check(a and a.target, 0x81, "carry: C's target is E")
+    check(at(a), "3,0", "carry: from C's strike tile")
+    -- a carry against another class leaves the pick alone
+    local other = B.CLAIM_BEHAVIOURS.carry({ id = "c2", kind = "carry", unit = { 0x02 },
+                                             vs = { CLS_B } }, style("careful"))
+    check(B.decide(board, sight, other).unit, 0x01, "carry vs another class: A acts")
+end
+
+-- test_answer_targets_the_named_class_first: A out-damages on E2, so with no claim it hits
+-- E2; answering E1's class it hits E1.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E1 = red(0x81, 1, 0, { hp = 30, classId = CLS_A })
+    local E2 = red(0x82, 0, 1, { hp = 30, classId = CLS_B })
+    local sight = sightOf {
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 80, dmg = 3, hits = 1 } },
+                          [0x82] = { ["0,0"] = fc { hit = 80, dmg = 10, hits = 1 } } } },
+    }
+    local board = boardOf(A, E1, E2)
+    check(B.decide(board, sight, style("careful")).target, 0x82, "no claim: the bigger hit")
+    local st = claimed("careful", { id = "a1", kind = "answer", unit = { 0x01 }, vs = { CLS_A } })
+    check(B.decide(board, sight, st).target, 0x81, "answer: the named class first")
+    st = claimed("careful", { id = "a2", kind = "answer", unit = { 0x05 }, vs = { CLS_A } })
+    check(B.decide(board, sight, st).target, 0x82, "answer for another unit: unchanged")
+    -- "boss" and "all" resolve against the board, not a class
+    E1.isBoss = true
+    st = claimed("careful", { id = "a3", kind = "answer", unit = { 0x01 }, vs = "boss" })
+    check(B.decide(board, sight, st).target, 0x81, "answer vs boss: the boss first")
+end
+
+-- test_wall_ends_on_the_approach_and_others_hold_behind: on survive W would hold on its own
+-- tile; walling E's class it steps to the tile E reaches, when careful allows it there.
+do
+    local W = blue(0x01, 0, 0, 0, { hp = 20 })
+    local O = blue(0x02, 1, 0, 2)
+    local E = red(0x81, 6, 0, { classId = CLS_A })
+    local function sightWith(taken, objective)
+        return sightOf {
+            objective = objective,
+            danger = { ["3,0"] = 1 },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }, { 3, 0 }),
+                      [0x02] = tiles({ 0, 2 }, { 2, 2 }, { 6, 2 }),
+                      [0x81] = tiles({ 6, 0 }, { 5, 0 }, { 4, 0 }) },
+            fc = { [0x01] = { [0x81] = { ["3,0"] = fc { takenHit = 70, takenDmg = taken,
+                                                         takenHits = 1 } } } },
+        }
+    end
+    local survive = { kind = "survive", turnsLeft = 3 }
+    local board = boardOf(W, O, E)
+    local wall = { id = "w1", kind = "wall", unit = { 0x01 }, vs = { CLS_A } }
+    local st = claimed("careful", wall)
+    check(at(B.decide(board, sightWith(5, survive), style("careful"))), "0,0",
+        "no claim: W holds on survive")
+    local a = B.decide(board, sightWith(5, survive), st)
+    check(a and a.unit, 0x01, "wall: the wall acts first")
+    check(at(a), "3,0", "wall: ends on the tile E reaches")
+    check(at(B.decide(board, sightWith(25, survive), st)), "0,0",
+        "wall: no safe approach -> the normal pick (a wall that dies is not a wall)")
+    -- O, after the wall stood at (3,0): on rout it would march to (6,2), nearer E than W
+    local moved = boardOf(blue(0x01, 0, 3, 0, { acted = true }), O, E)
+    local rout = { kind = "rout" }
+    check(at(B.decide(moved, sightWith(5, rout), style("careful"))), "6,2",
+        "no claim: O marches past the wall's line")
+    check(at(B.decide(moved, sightWith(5, rout), st)), "2,2",
+        "wall: O holds behind it")
+    -- a wall that can strike the walled enemy does, ahead of the slot order
+    local first = blue(0x02, 0, 0, 5)
+    local W2 = blue(0x01, 1, 5, 4)
+    local E2 = red(0x81, 5, 5, { classId = CLS_A })
+    local strike = sightOf {
+        reach = { [0x02] = tiles({ 0, 5 }, { 4, 5 }), [0x01] = tiles({ 5, 4 }) },
+        fc = { [0x02] = { [0x81] = { ["4,5"] = fc { hit = 80, dmg = 5, hits = 1 } } },
+               [0x01] = { [0x81] = { ["5,4"] = fc { hit = 80, dmg = 5, hits = 1 } } } },
+    }
+    check(B.decide(boardOf(first, W2, E2), strike, style("careful")).unit, 0x02,
+        "no claim: slot order strikes")
+    local a2 = B.decide(boardOf(first, W2, E2), strike, st)
+    check(a2 and a2.unit == 0x01 and a2.act == "attack", true, "wall: strikes the walled enemy")
+end
+
+-- test_terrain_prefers_the_named_tile: a march to (2,0) stops on (1,0), the named terrain.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 9, 0, { isBoss = true })
+    local FORT = 0x1E
+    local function sightWith(terrain)
+        return sightOf { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+                         terrain = terrain }
+    end
+    local map = function(x, y) return (x == 1 and y == 0) and FORT or 1 end
+    local board = boardOf(A, E)
+    check(at(B.decide(board, sightWith(map), style("careful"))), "2,0", "no claim: marches on")
+    local st = claimed("careful", { id = "t1", kind = "terrain", tile = FORT, vs = "boss" })
+    check(at(B.decide(board, sightWith(map), st)), "1,0", "terrain: ends on the named tile")
+    check(at(B.decide(board, sightWith(nil), st)), "2,0",
+        "terrain without sight.terrain: a no-op")
+    st = claimed("careful", { id = "t2", kind = "terrain", tile = FORT, vs = { CLS_B } })
+    check(at(B.decide(board, sightWith(map), st)), "2,0",
+        "terrain vs a class not on the map: a no-op")
+end
+
+-- test_reinforcements_hold_the_turn_before: arrival on turn 3 holds the march on turn 2.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 9, 0)
+    local function sightAt(turn)
+        return sightOf { turn = turn, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) } }
+    end
+    local board = boardOf(A, E)
+    local st = claimed("careful", { id = "r1", kind = "reinforcements", turns = { 3, 7 } })
+    check(at(B.decide(board, sightAt(2), style("careful"))), "2,0", "no claim: marches")
+    check(at(B.decide(board, sightAt(2), st)), "0,0", "reinforcements: holds the turn before")
+    check(at(B.decide(board, sightAt(6), st)), "0,0", "reinforcements: before each arrival")
+    check(at(B.decide(board, sightAt(3), st)), "2,0", "reinforcements: marches on arrival")
+    check(pcall(B.decide, board, sightAt(nil), st), false,
+        "reinforcements without sight.turn raise")
+end
+
+-- test_unmodelled_is_reported_not_dropped: every claim with no behaviour comes back by id.
+do
+    local claims = {
+        { id = "k1", kind = "carry", unit = { 0x01 }, vs = "all" },
+        { id = "k2", kind = "threat", vs = { CLS_A } },
+        { id = "k3", kind = "kits", topic = "villages" },
+        { id = "k4", kind = "unmodelled", topic = "healing", step = "out" },
+        { id = "k5", kind = "mystery" },
+    }
+    check(csv(B.unplayed(claims)), "k2,k3,k4,k5", "unplayed: threat, kits, unmodelled, unknown")
+    check(B.CLAIM_BEHAVIOURS.threat, nil, "threat has no behaviour")
+end
+
+-- A claim missing what its behaviour needs raises, naming the claim; it is never skipped.
+do
+    local bad = {
+        { id = "m1", kind = "carry", vs = { CLS_A } },
+        { id = "m2", kind = "answer", unit = { 0x01 } },
+        { id = "m3", kind = "wall", unit = {}, vs = "boss" },
+        { id = "m4", kind = "terrain", vs = "all" },
+        { id = "m5", kind = "reinforcements" },
+        { id = "m6", kind = "answer", unit = { 0x01 }, vs = "fighter" },
+    }
+    for _, c in ipairs(bad) do
+        local ok, err = pcall(B.CLAIM_BEHAVIOURS[c.kind], c, style("careful"))
+        check(ok, false, c.id .. ": a malformed claim raises")
+        check(tostring(err):find(c.id, 1, true) ~= nil, true, c.id .. ": the error names it")
+    end
+end
+
+-- Greedy ignores claims in decide: the clear-bot's pick, claim or no claim.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E1 = red(0x81, 1, 0, { hp = 30, classId = CLS_A })
+    local E2 = red(0x82, 0, 1, { hp = 5, classId = CLS_B })
+    local board = boardOf(A, E1, E2)
+    local st = claimed("greedy", { id = "g1", kind = "answer", unit = { 0x01 }, vs = { CLS_A } })
+    check(B.decide(board, sightOf {}, st).target, 0x82, "greedy: lowest HP, the claim ignored")
+end
+
 -- ── between chapters: prep, shop, promote, route ────────────────────────────────
 
 local function unitOf(id, charId, level, extra)
@@ -739,7 +931,6 @@ local function unitOf(id, charId, level, extra)
     for k, v in pairs(extra or {}) do u[k] = v end
     return u
 end
-local function csv(list) return table.concat(list, ",") end
 
 local function test_prep_forced_first()
     local roster = { unitOf(1, 0x01, 3), unitOf(2, 0x02, 9), unitOf(3, 0x03, 5, { forced = true }),
