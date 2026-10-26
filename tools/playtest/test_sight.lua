@@ -1,6 +1,6 @@
--- Tests for sight.lua's pure parts (#510 step 9 PR D): the sandbox over a fake CPU, the
--- forecast assembled from two simulated sides, and the enemy's strike tile. What the ROM's
--- own functions return is proven by the `sightprobe` scenario, not here.
+-- Tests for sight.lua's pure parts (#510 step 9 PR D): the sandbox over a fake CPU, our attack
+-- and the enemy's strike as read off their simulations, turns left and the turn-event scan.
+-- What the ROM's own functions return is proven by the `sightprobe` scenario, not here.
 -- Run: lua tools/playtest/test_sight.lua
 local here = (arg[0]:match("(.*/)")) or "./"
 local Sight = dofile(here .. "sight.lua")
@@ -77,67 +77,68 @@ do
     check(wrote[1][2], 0xFFFFFFFF, "BU_ISLOT_AUTO (-1) as a 32-bit word")
 end
 
--- assemble: the counter and the enemy-phase strike are separate reads.
+-- attackOf / strikeOf: our attack (with the enemy's counter) and the enemy's own strike are
+-- separate reads.
 local hitter = { hit = 80, crit = 5, dmg = 6, hits = 2, armed = true }
-local striker = { hit = 60, crit = 0, dmg = 9, hits = 1, armed = true, slot = 1,
-                  tile = { x = 4, y = 4 } }
 do
-    local ours = { hit = 70, crit = 0, dmg = 5, hits = 1, armed = true, counter = hitter }
-    local f = Sight.assemble(ours, striker, 20, 5)
-    check(f.counters, true, "in range, armed: the enemy counters")
-    check(f.counterDmg, 6, "the counter is the held weapon's answer")
+    local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 1, armed = true, counter = hitter }, 5)
+    check(f.counters, true, "armed: the enemy counters")
+    check(f.counterDmg, 6, "the counter's damage")
     check(f.counterHits, 2, "with its blows")
-    check(f.takenDmg, 9, "taken is the AI's own strike on its phase, not the counter")
-    check(f.takenSlot, 1, "with the slot the AI chose")
-    check(f.takenTile.x .. "," .. f.takenTile.y, "4,4", "and the tile")
+    check(f.counterCrit, 5, "and its crit")
     check(f.killsTarget, true, "5 x 1 kills a 5 HP enemy")
-    check(f.diesWorst, true, "the counter's 6 x 2, x3 on its 5% crit = 36 >= 20 HP")
 end
 
 do
-    local ours = { hit = 70, crit = 0, dmg = 5, hits = 1, armed = true, counter = hitter }
-    local f = Sight.assemble(ours, striker, 37, 9)
-    check(f.diesWorst, false, "36 worst case against 37 HP survives")
+    local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 1, armed = true,
+                               counter = { hit = 0, crit = 0, dmg = 0, hits = 0, armed = false } }, 9)
+    check(f.counters, false, "an unarmed answer is no counter")
+    check(f.counterDmg, 0, "so no counter damage")
     check(f.killsTarget, false, "5 x 1 does not kill 9")
 end
 
 do
-    local ours = { hit = 70, crit = 0, dmg = 5, hits = 1, armed = true,
-                   counter = { hit = 0, crit = 0, dmg = 0, hits = 0, armed = false } }
-    local f = Sight.assemble(ours, striker, 10, 30)
-    check(f.counters, false, "an unarmed answer is no counter")
-    check(f.counterDmg, 0, "so no counter damage")
-    check(f.takenDmg, 9, "the enemy's strike on its phase is still read")
-    check(f.diesWorst, false, "and the exchange alone cannot kill us")
+    local t = Sight.strikeOf({ hit = 60, crit = 0, dmg = 9, hits = 1, armed = true, slot = 1,
+                               tile = { x = 4, y = 4 } })
+    check(t.takenDmg, 9, "the AI's strike")
+    check(t.takenSlot, 1, "with the slot it chose")
+    check(t.takenTile.x .. "," .. t.takenTile.y, "4,4", "and the tile")
+    local none = Sight.strikeOf(nil)
+    check(none.takenHit, 0, "an enemy whose AI does not strike us strikes nothing")
+    check(none.takenSlot, nil, "and chose no slot")
 end
 
+-- turnsLeft: the goal window's last turn is End - 1 (player_interface.c), so End - turn are left.
+check(Sight.turnsLeft(11, 1), 10, "turn 1 of a map whose goal window says 10 turns")
+check(Sight.turnsLeft(11, 10), 1, "the last turn: one left")
+
+-- firstNewEvent: a script available now (a repeating event) is no change.
 do
-    local f = Sight.assemble(nil, striker, 10, 30)
-    check(f.hit, 0, "out of range: no attack of ours")
-    check(f.killsTarget, false, "so no kill")
-    check(f.counters, false, "and no counter")
-    check(f.takenHit, 60, "the enemy's strike is still read")
+    local now = { [0xA] = true }
+    check(Sight.firstNewEvent(now, { { turn = 4, scripts = { [0xA] = true } },
+                                     { turn = 5, scripts = { [0xA] = true, [0xB] = true } } }), 5,
+        "the first turn offering a new script")
+    check(Sight.firstNewEvent(now, { { turn = 4, scripts = { [0xA] = true } } }), nil,
+        "only the repeating event ahead: no change")
 end
 
+-- The sandbox puts the CPU in System mode BEFORE it reads sp: sp is banked.
 do
-    local f = Sight.assemble(nil, nil, 10, 30)
-    check(f.takenHit, 0, "an enemy whose AI finds no way to strike us strikes nothing")
-    check(f.takenSlot, nil, "and chose no slot")
+    local cpu = fakeCpu(1)
+    local order = {}
+    local read, write = cpu.read, cpu.write
+    cpu.read = function(r) order[#order + 1] = "r:" .. r; return read(r) end
+    cpu.write = function(r, v) order[#order + 1] = "w:" .. r; return write(r, v) end
+    Sight.machine(cpu)(function(call) return call(0x08001000, { 1, 2 }) end)
+    local cpsrAt, spAt
+    for i, o in ipairs(order) do
+        if o == "w:cpsr" and not cpsrAt then cpsrAt = i end
+        if o == "r:sp" and cpsrAt and i > cpsrAt and not spAt then spAt = i end
+    end
+    check(cpsrAt ~= nil and spAt ~= nil, true, "sp is read after cpsr is switched")
 end
 
--- aiPick: FE8's AI weapon choice -- the best score, a tie to the later slot, skips left out.
-do
-    local p = Sight.aiPick({ { slot = 0, score = 40 }, { slot = 1, score = 90 }, { slot = 2, score = 60 } })
-    check(p.slot, 1, "the best-scoring slot")
-    p = Sight.aiPick({ { slot = 0, score = 50 }, { slot = 1, score = 50 } })
-    check(p.slot, 1, "a tie goes to the later slot, as cp_battle.c's >= does")
-    p = Sight.aiPick({ { slot = 0, skip = true }, { slot = 1, score = 0 } })
-    check(p.slot, 1, "a skipped slot never wins, even over a zero score")
-    check(Sight.aiPick({ { slot = 0, skip = true } }), nil, "no usable weapon, no strike")
-    check(Sight.aiPick({}), nil, "an empty hand, no strike")
-end
-
--- The AI's scratch struct fits between the forecast proc and the return loop.
+-- The scratch the forecast proc and EventInfo share fits below the return loop.
 check(Sight.SCRATCH_SIZE <= 0x70, true, "scratch ends before the loop at +0x80 (scratch at +0x10)")
 
 print(string.format("%d tests, %d failures", tests, fails))

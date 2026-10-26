@@ -255,6 +255,8 @@ run_mgba() {
     fi
     local wrapper="$out/wrapper.lua"
     cat > "$wrapper" <<EOF
+-- PT_STYLE / PT_CLAIMS are JSON: read from the environment, never spliced into this source,
+-- where a nested array's "]]" would close a Lua long string early.
 PLAYTEST_DIR = "$HERE"
 PLAYTEST_SCENARIO = "$scen"
 PLAYTEST_ENTRY = "$([ "$scen" = "$SCENARIO" ] && echo "${MX_ENTRY:-}")"
@@ -262,8 +264,8 @@ PLAYTEST_LOG = "$log"
 PLAYTEST_SHOTDIR = "$out"
 PLAYTEST_STATEDIR = "$STATE_DIR"
 PLAYTEST_SEED = "${PT_SEED:-1}"
-PLAYTEST_STYLE = [[${PT_STYLE:-}]]
-PLAYTEST_CLAIMS = [[${PT_CLAIMS:-}]]
+PLAYTEST_STYLE = os.getenv("PT_STYLE") or ""
+PLAYTEST_CLAIMS = os.getenv("PT_CLAIMS") or ""
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-${MX_HOST_CHAPTER:-1}}

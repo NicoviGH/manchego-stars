@@ -11,57 +11,55 @@
 --   style: { aggression = "careful"|"even"|"bold"|"greedy", deploy = {charIds},
 --            claims = {claim ids}, route = 1|2 }, plus the fields the claim behaviours add
 --          (Claims, below). Bot.STYLES lists the sampled axes; "greedy" is not sampled -- it is
---          the clear scenarios' old bot and ignores `sight` except reach and the objective, and
---          every claim field but `deploy`.
---   sight: { danger(x, y) -> the game's danger zone at (x, y): 0 when no enemy reaches it,
+--          the clear scenarios' old bot and ignores `sight` except reach, range and the
+--          objective, and every claim field but `deploy`.
+--   sight: every answer FE8's own code gives (sight.lua's contract; ADR 0369) --
+--          { danger(x, y) -> the game's danger zone at (x, y): 0 when no enemy reaches it,
 --              else gBmMapRange's coverage (1 per tile an enemy could strike it from);
---            forecast(unit, target, x, y, slot) -> { hit, dmg, crit, hits, counterHit,
---              counterDmg, counterCrit, counterHits, takenHit, takenDmg, takenCrit, takenHits,
---              counters, killsTarget, diesWorst }; counter* is `target`'s answer to this
---              attack (0 with counters = false when it has none); taken* is `target`'s own
---              strike on `unit` standing on (x, y), on its phase, as FE8's AI would make it,
---              0 when it cannot strike there (sight.lua's contract);
---            threat(enemy) -> function(x, y) -> n, the game's danger zone of that ONE enemy,
---              every weapon it can use: 0 = it cannot strike (x, y) this turn;
+--            threat(enemy) -> function(x, y) -> n, the game's danger zone of that ONE enemy:
+--              0 = it cannot strike (x, y) this turn;
+--            attack(unit, target, x, y, slot) -> { hit, dmg, crit, hits, counters, counterHit,
+--              counterDmg, counterCrit, counterHits, killsTarget } | nil (out of range): our
+--              attack from (x, y) and `target`'s counter to it (counters = false, counter* 0,
+--              when it has none);
+--            strike(unit, enemy, x, y) -> { takenHit, takenDmg, takenCrit, takenHits }: the
+--              enemy's own strike on `unit` standing on (x, y), on its phase, as its AI makes it;
+--              0 when it does not strike there;
 --            reach(unit) -> {{x,y}...}, the tiles the unit can move to this phase;
---            objective = { kind = "rout"|"boss"|"seize"|"defend"|"escape"|"survive",
---                          tile = {x,y}|nil, turnsLeft = n|nil };
---            range(unit) -> { min, max }|nil, the reach of the weapon FE8 has equipped
---              (GetUnitEquippedWeapon);
---            canSeize(unit) -> bool, the game's own CanUnitSeize (bmdifficulty.c; the Seize
---              command's usability check);
+--            range(unit) -> { min, max }|nil, the reach of the weapon FE8 has equipped;
+--            canSeize(unit) -> bool, the game's CanUnitSeize;
+--            objective = { kind = "rout"|"boss"|"seize"|"survive"|"special",
+--                          tile = {x,y}|nil, turnsLeft = n|nil } (a Defense map is "survive");
 --            field(goal) -> dist|nil, OPTIONAL: dist[y][x] = the distance from `goal` to
---              (x, y), lower nearer (nil = unreached); sight.lua reads FE8's own march map
---              (GenerateExtendedMovementMap). A function of the goal because the bot chooses the goal (the
---              boss, the nearest enemy). Without it the march falls back to Manhattan, which
---              strands a unit against a wall (#60).
---            cache = {}|nil, OPTIONAL: a table the caller keeps for ONE player phase and
---              replaces at the next. Forecasts are kept in it across decide calls, keyed by
---              the exchange AND the whole board (every on-field unit's id, tile, HP, held item
---              and uses): the enemy's strike is its AI's pick, which any unit's position can
---              change. Reach and worst case are per call only.
---            terrain(x, y) -> FE8 terrain id, OPTIONAL: read from the game's map by the caller.
---              Only a terrain claim reads it; without it that claim is a no-op. }
+--              (x, y), lower nearer (nil = unreached); FE8's own march map. A function of the
+--              goal because the bot chooses the goal (the boss, the nearest enemy). Without it
+--              the march falls back to Manhattan, which strands a unit against a wall (#60).
+--            cache = {}|nil, OPTIONAL: a table the caller keeps for the run. Attacks are kept
+--              in it keyed by what FE8's simulation reads -- both fighters (id, HP, held item
+--              and uses), both tiles, and every other unit within support range (3,
+--              bmreliance.h) of either; strikes keyed by the exchange AND the whole board,
+--              because the AI's pick of weapon and tile can be changed by any unit anywhere.
+--              Reach and worst case are per call only.
+--            terrain(x, y) -> FE8 terrain id, OPTIONAL: only a terrain claim reads it; without
+--              it that claim is a no-op. }
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, weapon = nil }.
 --   `unitId`/`targetId` are Board's index byte: generics share a charId, the id is unique.
---   `weapon` is nil = the weapon the unit holds; the board knows the reach of that one only.
+--   `weapon` is nil = the weapon FE8 has equipped, the one sight.range describes.
 --   "talk", "visit" and "staff" are acts the claim behaviours add; nothing here emits them.
 --
--- ONE forecast call. `sight.forecast` is always asked about OUR unit on (x, y) and one enemy:
--- its hit/dmg/counter* fields are our attack from there, its taken* fields that enemy's own
--- strike on us there on its phase -- forecast(ourUnit, enemy, x, y, nil) for both.
---
 -- Worst case on an end tile = the sum, over every enemy that reaches it, of that enemy's
--- takenDmg x takenHits, x3 when takenCrit > 0 (FE8 triples a crit: bmbattle.c
--- BattleGenerateHitAttributes); an enemy with takenHit 0 adds nothing. An enemy "reaches" the
--- tile when sight.threat(enemy) covers it; danger(x, y) = 0 skips the walk. The target of a SURE kill (killsTarget at hit >= 100) is left out: it is dead
--- before the enemy phase. Each style gates an action on it:
---   careful: no diesWorst, and the worst case < the unit's HP after its own attack's
---            worst-case counter (none for a sure kill on the first blow)
---   even:    no diesWorst, and no SINGLE enemy's worst case >= that same HP
---   bold:    no diesWorst (the exchange alone)
+-- strike: takenDmg x takenHits, x3 when takenCrit > 0 (FE8 triples a crit: bmbattle.c
+-- BattleGenerateHitAttributes); a strike with takenHit 0 adds nothing. An enemy "reaches" the
+-- tile when sight.threat(enemy) covers it; danger(x, y) = 0 skips the walk. The target of a
+-- SURE kill (killsTarget at hit >= 100) is left out: it is dead before the enemy phase.
+-- An attack's own counter is its worst case too, nothing when the enemy cannot answer or the
+-- first blow is a sure kill (the attacker strikes first: bmbattle.c BattleUnwind). An attack
+-- whose counter alone can kill the unit is refused by every style but greedy; then:
+--   careful: the worst case < the unit's HP after that counter
+--   even:    no SINGLE enemy's worst case >= that same HP
+--   bold:    nothing more (the exchange alone)
 --   greedy:  nothing
 -- None of these was chosen by a survival rate (ADR 0368).
 --
@@ -154,9 +152,7 @@ local M = {}
 local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
     or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "board.lua"))
 
-local function manhattan(ax, ay, bx, by)
-    return math.abs(ax - bx) + math.abs(ay - by)
-end
+local manhattan = Board.distance   -- FE8's RECT_DISTANCE
 
 local function inRange(ax, ay, bx, by, minRange, maxRange)
     local d = manhattan(ax, ay, bx, by)
@@ -294,19 +290,19 @@ end
 M.tileKey = tileKey
 
 -- The stall watchdog's distance (#510 step 9): the nearest field distance to the target among
--- the units that could still be the one to finish -- on the field, and not ruled out.
+-- the units that could still be the one to finish -- on the field, and not excluded.
 --   units:    {slot, x, y, onField} tables
---   field:    field[y][x] = path steps to the target (the boss, or once it is dead the seize
+--   field:    field[y][x] = distance to the target (the boss, or once it is dead the seize
 --             tile), or nil
---   ruledOut: [slot] = true for a unit that stood on the seize tile with no legal Seize. It is
---             not the lord, and without this a non-lord parked beside the throne pins the
---             minimum while the lord's march -- the only progress left -- goes unseen.
+--   excluded: [slot] = true for a unit the game says cannot Seize (CanUnitSeize). Without it
+--             a non-lord parked beside the throne pins the minimum while the lord's march --
+--             the only progress left -- goes unseen.
 -- Returns math.huge when nobody qualifies or there is no field.
-function M.seizeDistance(units, field, ruledOut)
+function M.seizeDistance(units, field, excluded)
     local best = math.huge
     if not field then return best end
     for _, u in ipairs(units) do
-        if u.onField and not (ruledOut and ruledOut[u.slot]) then
+        if u.onField and not (excluded and excluded[u.slot]) then
             local d = field[u.y] and field[u.y][u.x]
             if d and d < best then best = d end
         end
@@ -362,6 +358,7 @@ M.STYLES = {
 
 local CRIT_MULTIPLIER = 3   -- bmbattle.c: gBattleStats.damage * 3 on a critical hit
 local SURE_HIT = 100
+local SUPPORT_RANGE = 3     -- bmreliance.h SUPPORT_BONUSES_MAX_DISTANCE, RECT_DISTANCE
 
 
 local function isSureKill(f) return f.killsTarget and f.hit >= SURE_HIT end
@@ -396,15 +393,14 @@ local function unitKey(u)
     return table.concat({ u.id, u.hp, held and held.id or "-", held and held.uses or "-" }, ":")
 end
 
--- One decide call's view: the board split by role, and memos so a forecast or a reach the
--- caller pays for (an emulator round trip, in the ROM) is asked for once per call.
+-- One decide call's view: the board split by role, and memos so an attack, a strike or a reach
+-- the caller pays for (an emulator round trip, in the ROM) is asked for once.
 local function context(board, sight)
     local cache = sight.cache or {}
-    cache.forecasts = cache.forecasts or {}
+    cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
-                  onField = {}, forecasts = cache.forecasts, reaches = {}, worsts = {},
-                  threats = {}, seizers = {}, ranges = {},
-                  fields = {}, options = {} }
+                  onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
+                  worsts = {}, fields = {}, options = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
@@ -420,12 +416,23 @@ local function context(board, sight)
     return ctx
 end
 
--- A forecast's key: the exchange (both fighters, the strike tile, the enemy's tile) and the
--- WHOLE board -- every unit on the field, its tile, HP, held item and uses. The enemy's strike
--- is its AI's own pick of weapon and tile (sight.lua), and any unit anywhere can block or open
--- the enemy's path, so nothing narrower is a correct key. A board unchanged between decide
--- calls (the same question asked twice) is answered from the cache.
-local function forecastKey(ctx, u, e, x, y)
+-- An attack's key: what FE8's simulation reads for it -- both fighters (id, HP, held item and
+-- uses), our tile, the enemy's tile, and every other unit within support range of either
+-- fighter (support bonuses move with them). An action elsewhere leaves it standing.
+local function attackKey(ctx, u, e, x, y)
+    local parts = { unitKey(u), x, y, unitKey(e), e.x, e.y, "near" }
+    for _, o in ipairs(ctx.onField) do
+        if o ~= u and o ~= e and (manhattan(o.x, o.y, x, y) <= SUPPORT_RANGE
+                or manhattan(o.x, o.y, e.x, e.y) <= SUPPORT_RANGE) then
+            parts[#parts + 1] = o.id .. "@" .. tileKey(o.x, o.y)
+        end
+    end
+    return table.concat(parts, ";")
+end
+
+-- A strike's key: the exchange and the WHOLE board. The strike is the enemy AI's own pick of
+-- weapon and tile (sight.lua), and any unit anywhere can block or open its path.
+local function strikeKey(ctx, u, e, x, y)
     local parts = { unitKey(u), x, y, unitKey(e), e.x, e.y, "board" }
     for _, o in ipairs(ctx.onField) do
         parts[#parts + 1] = unitKey(o) .. "@" .. tileKey(o.x, o.y)
@@ -433,14 +440,23 @@ local function forecastKey(ctx, u, e, x, y)
     return table.concat(parts, ";")
 end
 
-local function forecast(ctx, u, e, x, y)
-    local k = forecastKey(ctx, u, e, x, y)
-    local f = ctx.forecasts[k]
-    if not f then
-        f = ctx.sight.forecast(u, e, x, y, nil)
-        ctx.forecasts[k] = f
+local function remembered(memo, k, ask)
+    local v = memo[k]
+    if v == nil then
+        v = ask() or false
+        memo[k] = v
     end
-    return f
+    return v or nil
+end
+
+-- Our attack from (x, y) on `e` (nil when out of range) and `e`'s own strike on `u` there.
+local function attack(ctx, u, e, x, y)
+    return remembered(ctx.attacks, attackKey(ctx, u, e, x, y),
+        function() return ctx.sight.attack(u, e, x, y, nil) end)
+end
+local function strike(ctx, u, e, x, y)
+    return remembered(ctx.strikes, strikeKey(ctx, u, e, x, y),
+        function() return ctx.sight.strike(u, e, x, y) end)
 end
 
 -- sight.reach, with the unit's own tile always in it (attacking or waiting where it stands).
@@ -458,16 +474,7 @@ local function reachOf(ctx, u)
     return r
 end
 
--- sight.range: the game's equipped weapon's reach, once per unit per call.
-local function rangeOf(ctx, u)
-    if ctx.ranges[u.id] == nil then ctx.ranges[u.id] = ctx.sight.range(u) or false end
-    return ctx.ranges[u.id] or nil
-end
-
-local function canSeize(ctx, u)
-    if ctx.seizers[u.id] == nil then ctx.seizers[u.id] = ctx.sight.canSeize(u) and true or false end
-    return ctx.seizers[u.id]
-end
+local function canSeize(ctx, u) return ctx.sight.canSeize(u) end
 
 -- The tiles `u` can end on: its reach, less every tile another unit stands on, and less the
 -- seize tile for a unit that cannot Seize there -- unless it already stands on it: its own
@@ -515,14 +522,7 @@ local function fieldFor(ctx, goal)
     return ctx.fields[k] or nil
 end
 
-local function reaches(ctx, e, x, y)
-    local t = ctx.threats[e.id]
-    if not t then
-        t = ctx.sight.threat(e)
-        ctx.threats[e.id] = t
-    end
-    return t(x, y) > 0
-end
+local function reaches(ctx, e, x, y) return ctx.sight.threat(e)(x, y) > 0 end
 
 local function listed(list, v)
     for _, x in ipairs(list) do
@@ -570,7 +570,7 @@ local function worstCase(ctx, u, x, y, spared)
     if ctx.sight.danger(x, y) > 0 then
         for _, e in ipairs(ctx.enemies) do
             if e ~= spared and reaches(ctx, e, x, y) then
-                local dmg = takenWorst(forecast(ctx, u, e, x, y))
+                local dmg = takenWorst(strike(ctx, u, e, x, y))
                 w.sum, w.max = w.sum + dmg, math.max(w.max, dmg)
             end
         end
@@ -590,8 +590,8 @@ end
 
 -- Whether a style lets `u` end its move on (x, y), `spared` left out of the worst case and
 -- `spent` (the attack's own counter, counterWorst) already off its HP. An attack whose
--- forecast says diesWorst is refused before any gate is asked (every style but greedy).
--- bold's gate never weighs the enemy phase, so it asks for no forecast to do so.
+-- counter alone can kill is refused before any gate is asked (every style but greedy).
+-- bold's gate never weighs the enemy phase, so it asks for no strike to do so.
 local GATES = {
     careful = function(ctx, u, x, y, spared, spent)
         return worstCase(ctx, u, x, y, spared).sum < u.hp - (spent or 0)
@@ -625,7 +625,7 @@ local function attackOptions(ctx, u, gate)
     if opts then return opts end
     opts = {}
     local answers = claimsOn(ctx, "answers", u)
-    local r = rangeOf(ctx, u)
+    local r = ctx.sight.range(u)
     for _, e in ipairs(r and ctx.enemies or {}) do
         local answered = false
         for _, c in ipairs(answers) do
@@ -633,10 +633,10 @@ local function attackOptions(ctx, u, gate)
         end
         for _, t in ipairs(strikeTiles(ctx, u, e)) do
             if inRange(t.x, t.y, e.x, e.y, r.min, r.max) then
-                local f = forecast(ctx, u, e, t.x, t.y)
-                local sure = isSureKill(f)
-                if not f.diesWorst and gate(ctx, u, t.x, t.y, sure and e or nil,
-                                            counterWorst(f, e)) then
+                local f = attack(ctx, u, e, t.x, t.y)
+                local sure = f and isSureKill(f)
+                local spent = f and counterWorst(f, e)
+                if f and spent < u.hp and gate(ctx, u, t.x, t.y, sure and e or nil, spent) then
                     opts[#opts + 1] = { tile = t, target = e, sure = sure, answered = answered,
                                         killChance = killChance(f, e),
                                         expected = f.dmg * f.hits * f.hit }
@@ -809,8 +809,9 @@ local function greedy(ctx, objective)
         targets[#targets + 1] = { x = e.x, y = e.y, hp = e.hp, is_boss = e.isBoss, unit = e }
     end
     -- tilesFor gives the strike tiles per target, so no shared reach is passed
-    local pick = u.minRange and M.pickTarget(nil, targets,
-        { range = u.maxRange, min_range = u.minRange,
+    local r = ctx.sight.range(u)
+    local pick = r and M.pickTarget(nil, targets,
+        { range = r.max, min_range = r.min,
           tilesFor = function(t) return strikeTiles(ctx, u, t.unit) end })
     if pick then return action(u, pick.tile, "attack", pick.target.unit) end
     local goal = goalFor(ctx, u, objective)

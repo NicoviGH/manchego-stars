@@ -4,6 +4,7 @@
 local here = (arg[0]:match("(.*/)")) or "./"
 local Botrun = dofile(here .. "botrun.lua")
 local Json = dofile(here .. "json.lua")
+local Bot = dofile(here .. "bot.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -53,27 +54,39 @@ local function fakeGame(o)
         return out
     end
     g.api = {
+        Bot = Bot, Json = Json,
         info = { game = "fake", rom_hash = "abc", chapter = 1, mode = "normal", seed = 7 },
         style = { aggression = o.aggression or "careful", deploy = {}, claims = {} },
         claims = o.claims,
         seed = function(s) g.seeded = s end,
         board = copy,
         sight = function()
-            return {
+            g.sights = (g.sights or 0) + 1
+            local s = {
                 cache = {},
-                objective = { kind = o.kind or "rout", turnsLeft = g.turnsLeft },
+                objective = { kind = o.kind or "rout" },
                 danger = function() return 0 end,
                 threat = function() return function() return 0 end end,
                 range = function(u) return { min = u.minRange, max = u.maxRange } end,
                 canSeize = function() return true end,
                 reach = function(u) return within(u, u.faction == "blue" and (o.move or 3) or 0) end,
-                forecast = function(u, e)
+                attack = function(u, e)
                     local dmg = o.hit or 5
-                    return { hit = 100, dmg = dmg, crit = 0, hits = 1, takenHit = 0, takenDmg = 0,
-                             takenCrit = 0, takenHits = 0, counters = false,
-                             killsTarget = dmg >= e.hp, diesWorst = false }
+                    return { hit = 100, dmg = dmg, crit = 0, hits = 1, counters = false,
+                             counterHit = 0, counterDmg = 0, counterCrit = 0, counterHits = 0,
+                             killsTarget = dmg >= e.hp }
+                end,
+                strike = function() return { takenHit = 0, takenDmg = 0, takenCrit = 0, takenHits = 0 } end,
+                nextTurnEvent = function(turn)
+                    g.eventAsks = (g.eventAsks or 0) + 1
+                    return o.eventTurn and o.eventTurn > turn and o.eventTurn or nil
                 end,
             }
+            s.refresh = function()
+                g.refreshes = (g.refreshes or 0) + 1
+                s.objective.turnsLeft = g.turnsLeft
+            end
+            return s
         end,
         act = function(a)
             local u = find(a.unitId)
@@ -206,6 +219,72 @@ do
     local r = recordOf(g)
     check(r.claims_unplayed[1], "t1", "the unplayed claim is in the record")
     check(#r.claims_played, 0, "and not among the played")
+end
+
+-- One sight for the run, refreshed at every phase and after every action.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    Botrun.run(g.api)
+    check(g.sights, 1, "the sight is built once per run")
+    check(g.refreshes >= 4, true, "and refreshed at each phase and after each action")
+end
+
+-- A Lua error anywhere in the run -- a sight call that never returned -- is a crash, and the
+-- record is still emitted.
+do
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    local sight = g.api.sight
+    g.api.sight = function()
+        local s = sight()
+        s.attack = function() error("sight: call 0x08001000 did not return in 600 frames") end
+        return s
+    end
+    local ok = Botrun.run(g.api)
+    check(ok, false, "a Lua error is not a finished run")
+    local r = recordOf(g)
+    check(r.outcome, "crashed", "it is recorded as crashed")
+end
+
+-- A repeated board with a turn event still to fire waits for it instead of ending stuck.
+do
+    local g = fakeGame { move = 0, eventTurn = 4,
+        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 9, 9, 10) } }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.outcome, "stuck", "still stuck once the event's turn has passed with nothing changed")
+    -- a turn event fires at the phase change, so turn 4's board already shows what it did
+    check(r.turns, 4, "but only once turn 4's event has had its turn, not at the first repeat (2)")
+    check(g.eventAsks, 2, "the game's turn-event check is asked at the repeat and after the event")
+end
+
+-- A claimed reinforcement arrival is part of what decide reads: the turns to it change the hash.
+do
+    check(Botrun.nextArrival({ { 3, 6 }, { 5 } }, 2), 1, "turn 3 is the next arrival after turn 2")
+    check(Botrun.nextArrival({ { 3 } }, 3), nil, "none left after the last")
+    local b = { turn = 2, units = {} }
+    check(Botrun.boardHash(b, nil, { { 5 } }) ~= Botrun.boardHash({ turn = 3, units = {} }, nil,
+        { { 5 } }), true, "the same board, a turn nearer an arrival, hashes differently")
+end
+
+-- An enemy phase that ends the game still carries the deaths the watcher missed.
+do
+    local g = fakeGame {
+        hit = 1,
+        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 1, 1, 20),
+                  unit(0x81, 0, "red", 5, 5, 30) },
+        enemy = function(g, find)
+            for _, id in ipairs({ 0x01, 0x02 }) do
+                local a = find(id)
+                a.hp, a.dead, a.onField = 0, true, false
+            end
+            g.over = true
+            return { { id = 0x01, charId = 0x01, faction = "blue", killer = 0x81 } }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.outcome, "lost", "game over is a loss")
+    check(#r.deaths, 2, "the watched death and the one it missed are both recorded")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

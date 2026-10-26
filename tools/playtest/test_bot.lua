@@ -238,18 +238,18 @@ end
 
 -- Stall progress (#510 step 9). Distance is measured from the units that can still be the
 -- one to finish: once the boss is dead the field points at the seize tile, and a unit that
--- stood on that tile without a legal Seize is ruled out, so the lord's march is what counts.
+-- the game says cannot Seize is excluded, so the lord's march is what counts.
 do
     -- field[y][x] = steps to the target; a 1-row map, target at x = 9.
     local field = { [0] = {} }
     for x = 0, 9 do field[0][x] = 9 - x end
     local function u(slot, x) return { slot = slot, x = x, y = 0, onField = true } end
-    local ruledOut = { [2] = true }   -- slot 2 stood on the seize tile: no Seize for it
-    check(B.seizeDistance({ u(1, 3), u(2, 8) }, field, ruledOut), 6,
-        "the ruled-out unit beside the tile does not mask the lord's distance")
+    local excluded = { [2] = true }   -- slot 2: CanUnitSeize says no
+    check(B.seizeDistance({ u(1, 3), u(2, 8) }, field, excluded), 6,
+        "the excluded unit beside the tile does not mask the lord's distance")
     check(B.seizeDistance({ u(1, 3), { slot = 3, x = -1, y = -1, onField = false } }, field, {}), 6,
         "an off-field unit has no distance")
-    check(B.seizeDistance({ u(2, 8) }, field, ruledOut), math.huge,
+    check(B.seizeDistance({ u(2, 8) }, field, excluded), math.huge,
         "nobody left who could seize -> no distance")
     check(B.seizeDistance({ u(1, 3) }, nil, {}), math.huge, "no field -> no distance")
 
@@ -317,13 +317,20 @@ local function boardOf(...)
     return { turn = 1, phase = "blue", map = { w = 15, h = 10 }, units = { ... } }
 end
 
--- A fake sight. danger["x,y"] = count; reach[id] = tile list; fc[uid][tid]["x,y"] = forecast
--- (a missing entry is a harmless exchange: nothing dealt, nothing taken).
+-- A fake sight. danger["x,y"] = count; reach[id] = tile list; fc[uid][tid]["x,y"] = one entry
+-- holding both reads of that exchange -- our attack (hit, dmg, counter*...) and the enemy's
+-- strike (taken*) -- which sight.attack and sight.strike each return (a missing entry is a
+-- harmless exchange: nothing dealt, nothing taken).
 local QUIET = { hit = 0, dmg = 0, crit = 0, hits = 0, counters = false, counterHit = 0,
                 counterDmg = 0, counterCrit = 0, counterHits = 0, takenHit = 0, takenDmg = 0,
-                takenCrit = 0, takenHits = 0, killsTarget = false, diesWorst = false }
+                takenCrit = 0, takenHits = 0, killsTarget = false }
 local function sightOf(o)
-    local calls = 0
+    local attacks, strikes = 0, 0
+    local function entry(u, t, x, y)
+        local byT = (o.fc or {})[u.id]
+        local byTile = byT and byT[t.id]
+        return (byTile and byTile[x .. "," .. y]) or QUIET
+    end
     local s = {
         objective = o.objective or { kind = "rout" },
         field = o.field,
@@ -351,14 +358,18 @@ local function sightOf(o)
                 return n
             end
         end,
-        forecast = function(u, t, x, y, slot)
-            calls = calls + 1
-            local byT = (o.fc or {})[u.id]
-            local byTile = byT and byT[t.id]
-            return (byTile and byTile[x .. "," .. y]) or QUIET
+        attack = function(u, t, x, y)
+            attacks = attacks + 1
+            return entry(u, t, x, y)
+        end,
+        strike = function(u, t, x, y)
+            strikes = strikes + 1
+            return entry(u, t, x, y)
         end,
     }
-    s.calls = function() return calls end
+    s.attacks = function() return attacks end
+    s.strikes = function() return strikes end
+    s.calls = function() return attacks + strikes end
     return s
 end
 local function fc(o)
@@ -439,8 +450,8 @@ do
     -- An enemy that cannot answer this attack (out of its weapon's range) takes nothing off
     -- first: no counter*, and its taken* -- its own strike on its phase -- is weighed there.
     local unanswered = sightWith(15)
-    local quiet = unanswered.forecast
-    unanswered.forecast = function(...)
+    local quiet = unanswered.attack
+    unanswered.attack = function(...)
         local f = quiet(...)
         if f.dmg > 0 then
             local g = {}
@@ -619,8 +630,8 @@ do
     check(B.decide(board, sight, style("careful")).unit, 0x01, "an 80% kill is not a sure kill")
 end
 
--- test_never_attacks_when_forecast_says_dies: diesWorst refuses the attack in every style
--- but greedy, which never reads a forecast.
+-- test_never_attacks_when_the_counter_kills: a counter whose worst case reaches the unit's HP
+-- refuses the attack in every style but greedy, which never reads one.
 do
     local A = blue(0x01, 0, 0, 0)
     local E1 = red(0x81, 1, 0, { hp = 30 })
@@ -628,16 +639,31 @@ do
     local sight = sightOf {
         reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) },
         fc = { [0x01] = { [0x81] = {
-            ["0,0"] = fc { hit = 90, dmg = 10, hits = 1, diesWorst = true } } } },
+            ["0,0"] = fc { hit = 90, dmg = 10, hits = 1, counters = true, counterHit = 50,
+                           counterDmg = 20, counterHits = 1 } } } },
     }
     for _, aggr in ipairs({ "careful", "even", "bold" }) do
-        check(B.decide(board, sight, style(aggr)).act, "wait", aggr .. ": diesWorst refuses")
+        check(B.decide(board, sight, style(aggr)).act, "wait", aggr .. ": a lethal counter refuses")
     end
     local fresh = sightOf {
         reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) },
         fc = { [0x01] = { [0x81] = {
-            ["0,0"] = fc { hit = 90, dmg = 10, hits = 1, diesWorst = true } } } },
+            ["0,0"] = fc { hit = 90, dmg = 10, hits = 1, counters = true, counterHit = 50,
+                           counterDmg = 20, counterHits = 1 } } } },
     }
+    -- A SURE kill on the first blow draws no counter (the attacker strikes first), however lethal
+    -- the counter would be: every style takes it.
+    local weak = red(0x81, 1, 0, { hp = 8 })
+    local sure = sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) },
+        fc = { [0x01] = { [0x81] = {
+            ["0,0"] = fc { hit = 100, dmg = 10, hits = 1, killsTarget = true, counters = true,
+                           counterHit = 50, counterCrit = 30, counterDmg = 20, counterHits = 1 } } } },
+    }
+    for _, aggr in ipairs({ "careful", "even", "bold" }) do
+        check(B.decide(boardOf(A, weak), sure, style(aggr)).act, "attack",
+            aggr .. ": a sure first-blow kill is never refused for its counter")
+    end
     local g = B.decide(board, fresh, style("greedy"))
     check(g.act, "attack", "greedy attacks whatever the forecast says")
     check(fresh.calls(), 0, "greedy reads no forecast")
@@ -791,7 +817,9 @@ do
         "greedy marches over the field too")
 end
 
--- sight.cache carries forecasts across decide calls in one phase: once per pair and tile.
+-- sight.cache keeps attacks and strikes across decide calls. An attack is keyed on what the
+-- simulation reads (the fighters, their tiles, units within support range); a strike on the
+-- whole board, since the enemy AI's pick can change with any unit anywhere.
 do
     local A = blue(0x01, 0, 0, 0)
     local Bu = blue(0x02, 1, 5, 0)
@@ -803,35 +831,30 @@ do
         fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 80, dmg = 5, hits = 1 } } } },
     }
     local sight = sightOf(o)
+    local function counts() return sight.attacks() .. "/" .. sight.strikes() end
     B.decide(boardOf(A, Bu, E), sight, style("careful"))
-    local first = sight.calls()
+    check(counts(), "1/1", "one attack and one strike for the one pair and tile")
     B.decide(boardOf(A, Bu, E), sight, style("careful"))
-    check(first, 1, "one forecast for the one pair and tile")
-    check(sight.calls(), 1, "the second call reads it from the cache")
-    -- the enemy's HP changed (it was hit): a different exchange, asked again
+    check(counts(), "1/1", "the second call reads both from the cache")
     local hurt = red(0x81, 1, 0, { hp = 25 })
     B.decide(boardOf(A, Bu, hurt), sight, style("careful"))
-    check(sight.calls(), 2, "a changed HP is a new forecast")
-    -- ANY unit moving, however far from the fighters, is a new board: the enemy's strike is
-    -- its AI's pick, and a unit anywhere can block or open its path
+    check(counts(), "2/2", "a changed HP is a new attack and a new strike")
     local far = blue(0x02, 1, 6, 0)
     B.decide(boardOf(A, far, hurt), sight, style("careful"))
-    check(sight.calls(), 3, "a far ally that moved is a new forecast")
+    check(counts(), "2/3", "an ally moving out of support range: the attack stands, the strike does not")
     local moved = blue(0x02, 1, 0, 2)
     B.decide(boardOf(A, moved, hurt), sight, style("careful"))
-    check(sight.calls(), 4, "and so is one that moved near")
-    -- and a spent weapon use too
+    check(counts(), "3/4", "an ally moving into support range: both asked again")
     local spent = blue(0x01, 0, 0, 0)
     A.items, spent.items = { { id = 1, uses = 40 } }, { { id = 1, uses = 39 } }
     B.decide(boardOf(A, moved, hurt), sight, style("careful"))
-    local before = sight.calls()
+    local before = sight.attacks()
     B.decide(boardOf(spent, moved, hurt), sight, style("careful"))
-    check(sight.calls(), before + 1, "a spent weapon use is a new forecast")
-    -- no cache: every call asks again
+    check(sight.attacks(), before + 1, "a spent weapon use is a new attack")
     local bare = sightOf { danger = o.danger, reach = o.reach, fc = o.fc }
     B.decide(boardOf(A, Bu, E), bare, style("careful"))
     B.decide(boardOf(A, Bu, E), bare, style("careful"))
-    check(bare.calls(), 2, "without a cache each call asks for itself")
+    check(bare.attacks(), 2, "without a cache each call asks for itself")
 end
 
 -- Every unit has acted (or is off the field): nil, the phase is over.

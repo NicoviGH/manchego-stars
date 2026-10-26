@@ -21,9 +21,11 @@ were deleted. Greedy is the fourth aggression, `"greedy"`: it reads no forecast 
 the clear scenarios keep calling its functions directly through harness.lua's `BOT` binding,
 picking exactly as before (every old test case is ported unchanged).
 
-**One forecast direction.** `sight.forecast(unit, target, x, y, slot)` is always our unit's attack
-from (x, y). The enemy phase is read from the `taken*` fields of the forecast our unit would get
-against each threatening enemy; there is no enemy-side call.
+**One forecast direction** (superseded by ADR 0369: our attack and the enemy's own strike are two
+reads, `sight.attack` and `sight.strike`, and the strike is the enemy AI's own decision).
+`sight.forecast(unit, target, x, y, slot)` was always our unit's attack from (x, y). The enemy phase
+was read from the `taken*` fields of the forecast our unit would get against each threatening
+enemy; there was no enemy-side call.
 
 **Worst case on an end tile** = the sum, over every enemy that reaches the tile (some tile of
 `sight.reach(enemy)` within its weapon range; `danger(x, y) = 0` skips the walk), of
@@ -31,7 +33,9 @@ against each threatening enemy; there is no enemy-side call.
 `takenHit = 0`. A sure kill's target (`killsTarget` at hit 100) is left out: it dies before the
 enemy phase.
 
-**The styles are gates, not weights:**
+**The styles are gates, not weights** (ADR 0369 moved `diesWorst` into the bot: an attack is
+refused when its own counter's worst case, which is nothing for a sure first-blow kill, reaches
+the unit's HP):
 - `careful`: no `diesWorst`, and the worst case is below the unit's HP after its own attack's
   worst-case counter (none when the first blow is a sure kill), so an exchange plus an enemy
   phase that kill together are refused;

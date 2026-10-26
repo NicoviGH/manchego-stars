@@ -105,18 +105,24 @@ do
     check(Board.unit(b, "red", 0x80).slot, 1, "slot is the 0-based array index")
 end
 
--- A staff-only unit has no attack reach; a bow reads 2-2; a sword 1-1.
+-- Board.itemRange: a staff has no attack reach; a bow reads 2-2; a sword 1-1. Which item a unit
+-- attacks with is the game's answer (sight.lua), so the board read carries no reach.
 do
     local b = board(function(m)
         putUnit(m, SYM.gUnitArrayBlue, 0, { charId = 1, items = { { 3, 30 } } })
         putUnit(m, SYM.gUnitArrayBlue, 1, { charId = 2, items = { { 2, 45 }, { 3, 1 } } })
         putUnit(m, SYM.gUnitArrayBlue, 2, { charId = 3, items = { { 1, 46 } } })
     end)
-    check(Board.unit(b, "blue", 1).minRange, nil, "staff-only minRange nil")
-    check(Board.unit(b, "blue", 1).maxRange, nil, "staff-only maxRange nil")
-    check(Board.unit(b, "blue", 2).minRange, 2, "bow minRange")
-    check(Board.unit(b, "blue", 2).maxRange, 2, "bow maxRange")
-    check(Board.unit(b, "blue", 3).maxRange, 1, "sword maxRange")
+    local m = fakeMem()
+    defineItems(m)
+    local mem = { u8 = m.u8, s8 = m.s8, u16 = m.u16, u32 = m.u32 }
+    check(Board.itemRange(mem, SYM, 3), nil, "a staff has no attack reach")
+    local mn, mx = Board.itemRange(mem, SYM, 2)
+    check(mn .. "-" .. mx, "2-2", "a bow reads 2-2")
+    mn, mx = Board.itemRange(mem, SYM, 1 | (46 << 8))
+    check(mn .. "-" .. mx, "1-1", "a sword reads 1-1, the uses byte ignored")
+    check(Board.itemRange(mem, SYM, 0), nil, "no item, no reach")
+    check(Board.unit(b, "blue", 2).minRange, nil, "the board read carries no reach")
     local items = Board.unit(b, "blue", 2).items
     check(#items, 2, "items lists only the held slots")
     check(items[1].id, 2, "item id")
@@ -206,12 +212,10 @@ do
     check(u.slot, 3, "lean slot")
     check(u.onField, true, "lean onField")
     check(u.isBoss, nil, "lean does not read the boss attribute")
-    check(u.minRange, nil, "lean does not read the weapon")
     check(reads, 10, "lean read is ten memory reads")
     reads = 0
     local full = Board.unitAt(mem, SYM, SYM.gUnitArrayRed, 3)
     check(full.isBoss, true, "full read has the boss attribute")
-    check(full.maxRange, 1, "full read has the weapon reach")
     check(reads > 10, true, "the full read costs more than the lean one")
 end
 
@@ -261,32 +265,9 @@ do
     check(Board.at(b, "blue", 7).charId, 9, "Board.at looks up by slot")
 end
 
--- Seize (#510 step 9): FE8's CanUnitSeize, as our engine patches it (0005, bmdifficulty.c):
--- the unit's character is LordSelect_GetPid() -- the first gLordSelectCandidates[i] whose
--- permanent flag 0xF0 + i is set, else candidate 0.
-do
-    local m = fakeMem()
-    local CANDS = 0x08909624
-    local pids = { 0x01, 0x03, 0x02 }
-    for i, pid in ipairs(pids) do m.w16(CANDS + (i - 1) * 2, pid) end
-    m.w16(CANDS + #pids * 2, 0xFFFF)
-    local sym = setmetatable({ gLordSelectCandidates = CANDS }, { __index = SYM })
-    local mem = { u8 = m.u8, s8 = m.s8, u16 = m.u16, u32 = m.u32 }
-    local set = {}
-    local function flag(f) return set[f] == true end
-    check(Board.lordPid(mem, sym, flag), 0x01, "no pick recorded -> the first candidate")
-    set[0xF0 + 1] = true
-    check(Board.lordPid(mem, sym, flag), 0x03, "flag 0xF1 set -> candidate 1")
-    check(Board.lordPid(mem, SYM, flag), nil, "no candidate table symbol -> unknown")
-
-    local lord = { slot = 0, charId = 0x03 }
-    local other = { slot = 1, charId = 0x02 }
-    check(Board.canSeize(lord, 0x03, {}), true, "the chosen lead can seize")
-    check(Board.canSeize(other, 0x03, {}), false,
-        "a non-lord cannot -- known up front, before it ever walks to the throne")
-    check(Board.canSeize(other, nil, {}), true, "lord unknown -> not ruled out yet")
-    check(Board.canSeize(other, nil, { [1] = true }), false, "lord unknown -> the memo rules it out")
-end
+-- Board.distance is FE8's RECT_DISTANCE.
+check(Board.distance(1, 2, 4, 0), 5, "|dx| + |dy|")
+check(Board.distance(3, 3, 3, 3), 0, "a tile is 0 from itself")
 
 -- Header: turn, phase, map size.
 do

@@ -49,6 +49,8 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 -- left), so enough new top-level locals stop the WHOLE FILE loading and every scenario dies
 -- at once (#232).
 local TUNE = {
+    sandboxFrames = 0,        -- frames sight.lua's sandbox ran (its loads rewind the counter)
+    sandboxHeartbeat = 600,   -- a log line every this many of them: a long think shows progress
     -- How many times one guarded input may be re-pressed into an unchanged, still-legal
     -- state before failing closed. FE8 drops input during window fade-ins, so a single
     -- press can be lost outright -- see guardedInput.
@@ -134,7 +136,9 @@ end)()
 local logfile = io.open(PLAYTEST_LOG, "w")
 local controllerFault
 local function log(s)
-    logfile:write(string.format("[f%06d] %s\n", emu:currentFrame(), s))
+    -- The sight sandbox rewinds the frame counter after each call; TUNE.sandboxFrames adds back
+    -- what it ran, so the stamps run.sh watches for progress only ever rise.
+    logfile:write(string.format("[f%06d] %s\n", emu:currentFrame() + TUNE.sandboxFrames, s))
     logfile:flush()
 end
 local function result(verdict, why)
@@ -265,9 +269,11 @@ local function blue(charId) return BOARD.find("blue", charId) end
 local function red(charId) return BOARD.find("red", charId) end
 local function isDead(u) return u == nil or u.dead end
 
--- A unit's attack reach from its equipped (items[0]) weapon, read LIVE from u.addr (a caller
--- may hold `u` across a trade): (minRange, maxRange), or nil for a staff / non-attacker.
-local function unitAttackRange(u) return BOARD.attackRange(u.addr) end
+-- A unit's attack reach, read LIVE from u.addr (a caller may hold `u` across a trade): the
+-- weapon FE8 has equipped (GetUnitEquippedWeapon, run in sight.lua's sandbox) and its range,
+-- as (minRange, maxRange), or nil for a staff / non-attacker. TUNE.attackRange is filled in
+-- below, beside the sandbox's api (INSPECT.sightApi): this line is above where INSPECT exists.
+local function unitAttackRange(u) return TUNE.attackRange(u) end
 
 local function pokeFrail(u) -- 1 HP, no def/res/spd/lck: next clean hit kills
     emu:write8(u.addr + 0x13, 1) -- curHP
@@ -2591,10 +2597,8 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     local function won() return chapter() ~= startChapter end
     local lost = INSPECT.chapterLost
     -- progress = the nearest candidate's path-distance to the target (lower is better): the
-    -- boss while it lives, then the seize tile. ruledOut[slot] marks units that stood on the
-    -- seize tile without a legal Seize -- not the lord -- so the lord's march still registers.
-    local ruledOut = {}
-    -- Move a ruled-out unit off the throne's approach and Wait there (BOT.stepOffTile):
+    -- boss while it lives, then the seize tile, measured only from units the game lets Seize.
+    -- Move a unit that cannot Seize off the throne's approach and Wait there (BOT.stepOffTile):
     -- parked on or beside a single-approach throne it would block the lord for good.
     local function stepOffSeize(u)
         local reach = selectAndReach(u, maxx, maxy)
@@ -2623,9 +2627,6 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         local phaseTurn = turn()
         local function ourPhase() return BOARD.inPhase(BOARD.header(), phaseTurn) end
         local function bossDownOrWon() return won() or not findBoss() end
-        -- Who can Seize, from FE8's own rule (board.lua Board.lordPid: the chosen lead). Only
-        -- that unit marches on the throne; the ruledOut memo is the fallback when it is unknown.
-        local lordPid = BOARD.lordPid(eventFlag)
         -- The phase's roster (decomp bounds, not the first 8 slots), LEAN; each unit is judged
         -- from ONE full board snapshot taken just before it acts, since earlier actions move
         -- the board -- one read per acting unit, not one per question asked about it.
@@ -2672,15 +2673,15 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                         end, TUNE.combatFrames, true)
                         if won() then return "won", t end
                     end
-                elseif not BOARD.canSeize(u, lordPid, ruledOut) then
-                    -- Not the lord: it does not march on the throne, and if it stands on or
-                    -- beside it, it clears the way.
+                elseif not INSPECT.canSeize(u) then
+                    -- The game's CanUnitSeize says no: it does not march on the throne, and if
+                    -- it stands on or beside it, it clears the way.
                     if BOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
                         return "stuck", t
                     end
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
-                    -- Boss dead, not yet won: select semantic Seize when this unit owns it.
-                    -- A non-lead unit is cancelled through two independently legal B actions.
+                    -- Boss dead, not yet won: this unit may Seize (CanUnitSeize), so the menu
+                    -- offers it on the seize tile.
                     shot("clear-seize-try")
                     local actions = Controller.legalActions(observeController())
                     if Controller.findAction(actions, "seize") then
@@ -2692,13 +2693,11 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                             "fail:chapter-advance-timeout", nil, "controller-seize-timeout")
                         return "stuck", t
                     else
-                        ruledOut[u.slot] = true
-                        if not cancelUnitActionMenu() then return "stuck", t end
-                        -- Back on the tile it started from; clear the approach if that is beside
-                        -- the throne.
-                        if BOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
-                            return "stuck", t
-                        end
+                        -- The game's CanUnitSeize allowed it and the menu offers no Seize: this
+                        -- tile is not the seize tile (the boss's tile is this loop's guess).
+                        traceFailure("seize", "the menu offers Seize to a unit CanUnitSeize allows",
+                            "fail:no-seize-command", nil, "controller-no-seize-command")
+                        return "stuck", t
                     end
                 elseif ourPhase() and not won() then
                     -- The seize tile is out of this unit's reach this turn (moveUnit backed
@@ -2729,12 +2728,12 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         -- stall watchdog: bail cleanly if no progress (nearer the boss OR fewer foes) for 3 turns,
         -- instead of grinding the full budget on a wedged bot.
         -- Once the boss is dead only a unit that can Seize is closing on anything: measure from
-        -- those (BOARD.canSeize -- the chosen lead, or the ruledOut memo when that is unknown),
-        -- or a non-lord standing near the throne masks the lord's march.
+        -- those (the game's CanUnitSeize), or a non-lord standing near the throne masks the
+        -- lord's march.
         local blueUnits, excluded, nRuled = BOARD.leanList("blue"), {}, 0
         if not findBoss() then
             for _, o in ipairs(blueUnits) do
-                if not BOARD.canSeize(o, lordPid, ruledOut) then
+                if not INSPECT.canSeize(o) then
                     excluded[o.slot] = true
                     nRuled = nRuled + 1
                 end
@@ -2819,29 +2818,40 @@ end
 -- ---- the bot plays the game (#510 step 9 PR D). botrun.lua and sight.lua are their own
 -- chunks; everything here is the `api` they talk over (ADR 0369), built on the drivers above.
 -- The sandbox's CPU. A call runs as ordinary emulation: `frames` yields this coroutine a frame
--- at a time until the call is back in its loop. Save and load go through the memo guard
--- (`emu`): a load rewinds the frame counter, so the proc-pool memo must be dropped with it.
+-- at a time until the call is back in its loop. Every write, save and load goes through the
+-- memo guard (`emu`, procmemo.lua, ADR 0366): a load rewinds the frame counter, and a write may
+-- land anywhere, so the proc-pool memo is dropped with each. Register reads/writes are the
+-- CPU's, never memory, and go to the real emulator.
 INSPECT.sightApi = function()
     local raw = PROCS.raw
+    TUNE.Sight = TUNE.Sight or dofile(PLAYTEST_DIR .. "/sight.lua")
+    TUNE.Board = TUNE.Board or dofile(PLAYTEST_DIR .. "/board.lua")
     return {
         mem = { u8 = ru8, s8 = rs8, u16 = ru16, s16 = rs16, u32 = ru32 },
-        write8 = function(a, v) raw:write8(a, v) end,
-        write16 = function(a, v) raw:write16(a, v) end,
-        write32 = function(a, v) raw:write32(a, v) end,
+        write8 = function(a, v) emu:write8(a, v) end,
+        write16 = function(a, v) emu:write16(a, v) end,
+        write32 = function(a, v) emu:write32(a, v) end,
         SYM = SYM,
+        Board = TUNE.Board,
         cpu = {
             read = function(r) return raw:readRegister(r) end,
             write = function(r, v) raw:writeRegister(r, v) end,
             save = function() return emu:saveStateBuffer() end,
             load = function(st) emu:loadStateBuffer(st) end,
-            write16 = function(a, v) raw:write16(a, v) end,
-            write32 = function(a, v) raw:write32(a, v) end,
+            write16 = function(a, v) emu:write16(a, v) end,
+            write32 = function(a, v) emu:write32(a, v) end,
             -- Each frame a call runs is real emulation, though the load rewinds the counter:
-            -- INSPECT.sandboxFrames keeps it, so a run's cost includes what its sight spent.
+            -- TUNE.sandboxFrames keeps it, and log() stamps lines with it added, so a run's
+            -- cost, run.sh's frame budget and its stall watch all see what the sight spent. A
+            -- heartbeat line every TUNE.sandboxHeartbeat frames keeps a long think visible.
             frames = function(done, max)
                 for _ = 1, max do
                     yield()
-                    INSPECT.sandboxFrames = (INSPECT.sandboxFrames or 0) + 1
+                    TUNE.sandboxFrames = TUNE.sandboxFrames + 1
+                    if TUNE.sandboxFrames % TUNE.sandboxHeartbeat == 0 then
+                        log(string.format("sight: %d frames of game code run so far",
+                            TUNE.sandboxFrames))
+                    end
                     if done() then return true end
                 end
                 return false
@@ -2853,6 +2863,16 @@ INSPECT.sightApi = function()
         board = BOARD.read,
     }
 end
+
+-- The game's answers the hand-written scenarios ask outside a bot run: a unit's attack reach
+-- (unitAttackRange, far above) and who may Seize (the clear loop).
+TUNE.attackRange = function(u)
+    local api = INSPECT.sightApi()
+    local r = TUNE.Sight.range(api, u)
+    if r then return r.min, r.max end
+    return nil
+end
+INSPECT.canSeize = function(u) return TUNE.Sight.canSeize(INSPECT.sightApi(), u) end
 
 -- Every unit that falls during an enemy phase, with the fighter it fell to: a frame callback
 -- for the phase's length that watches both arrays (lean) and, the frame one goes down, reads
@@ -2884,7 +2904,8 @@ end
 -- Botrun's api over this harness. `info.game` is "ours" or "vanilla".
 INSPECT.botApi = function(game)
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
-    local Sight = dofile(PLAYTEST_DIR .. "/sight.lua")
+    local sightApi = INSPECT.sightApi()
+    local Sight = TUNE.Sight
     local start = chapter()
     local function won() return chapter() ~= start end
     local lost = INSPECT.chapterLost
@@ -2894,6 +2915,7 @@ INSPECT.botApi = function(game)
     end
     local style = decode(PLAYTEST_STYLE, { aggression = "careful", deploy = {}, claims = {} })
     local api = {
+        Bot = BOT, Json = Json,
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, chapter = start,
                  mode = TUNE.difficultyName[TUNE.difficultyWant],
                  seed = tonumber(PLAYTEST_SEED) or 1 },
@@ -2903,11 +2925,10 @@ INSPECT.botApi = function(game)
         won = won,
         lost = lost,
         -- Emulated frames, the sandbox's included (sightApi's cpu.frames counts them).
-        frames = function() return emu:currentFrame() + (INSPECT.sandboxFrames or 0) end,
+        frames = function() return emu:currentFrame() + TUNE.sandboxFrames end,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
     }
-    local sightApi = INSPECT.sightApi()
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
     -- One action of Bot.decide's: move, then attack the chosen enemy, wait, or Seize.
@@ -2971,19 +2992,18 @@ scenarios.bot = function()
 end
 
 -- sightprobe: what the sight reads at the chapter's start, printed for a check by eye against
--- the map (#510 step 9 PR D, Task 6): the danger grid, the objective, the lord's reach, and
--- one forecast against the boss (else the nearest enemy) from the lord's own tile, with that
--- enemy's strike on the lord where it stands. Ours: ch01. PT_VANILLA=1: the retail Prologue,
--- the first map New Game reaches (Ch1 is only reached by playing it, which `bot` does).
+-- the map (#510 step 9 PR D): the danger grid, the objective, the lead's reach, every enemy's
+-- own strike on the lead (its AI's pick of weapon and tile), and one attack of ours in range.
+-- Ours: ch01. PT_VANILLA=1: the retail Prologue, the first map New Game reaches (Ch1 is only
+-- reached by playing it, which `bot` does).
 scenarios.sightprobe = function()
     if PLAYTEST_VANILLA == "1" then
         INSPECT.retailFastText()
         if not bootToMap(nil, 0) then return result("FAIL", "never reached the Prologue map") end
     elseif not reachCh01Map() then return end
     INSPECT.settle("phase", 6000, true)
-    local Sight = dofile(PLAYTEST_DIR .. "/sight.lua")
     local sapi = INSPECT.sightApi()
-    local sight = Sight.new(sapi)
+    local sight = TUNE.Sight.new(sapi)
     local w, h = mapSize()
     for y = 0, h - 1 do
         local row = {}
@@ -2993,7 +3013,6 @@ scenarios.sightprobe = function()
     local o = sight.objective
     log(string.format("objective kind=%s tile=%s turnsLeft=%s", tostring(o.kind),
         o.tile and (o.tile.x .. "," .. o.tile.y) or "-", tostring(o.turnsLeft)))
-    local board = BOARD.read()
     local lead = sight.fieldUnit()
     if not lead then return result("FAIL", "no blue unit on the field") end
     local reach = sight.reach(lead)
@@ -3001,71 +3020,54 @@ scenarios.sightprobe = function()
     for _, t in ipairs(reach) do tiles[#tiles + 1] = t.x .. "," .. t.y end
     log(string.format("reach of 0x%02X at (%d,%d): %d tiles: %s", lead.charId, lead.x, lead.y,
         #reach, table.concat(tiles, " ")))
-    local foe, best
-    for _, e in ipairs(BOARD.live(board, "red")) do
-        if e.onField then
-            local d = math.abs(e.x - lead.x) + math.abs(e.y - lead.y)
-            if e.isBoss then foe = e; break end
-            if not best or d < best then foe, best = e, d end
+    -- Neither probed map fields an enemy with two weapons, so on retail the probe hands the boss
+    -- a Steel Axe, a Silver Axe and a Hand Axe behind its own (constants/items.h 0x20, 0x21,
+    -- 0x28; 20 uses): its AI's pick is then a real choice of weapon and tile.
+    local board = BOARD.read()
+    local boss = BOARD.liveBoss()
+    if PLAYTEST_VANILLA == "1" and boss then
+        for i, item in ipairs({ 0x20, 0x21, 0x28 }) do
+            sapi.write16(boss.addr + 0x1E + i * 2, item | (20 << 8))
         end
-    end
-    if not foe then return result("FAIL", "no enemy on the field") end
-    local f = sight.forecast(lead, foe, lead.x, lead.y, nil)
-    log(string.format("forecast 0x%02X@(%d,%d) vs 0x%02X@(%d,%d) hp=%d: hit=%d dmg=%d crit=%d "
-        .. "hits=%d | next phase hit=%d dmg=%d crit=%d hits=%d | counters=%s kills=%s dies=%s",
-        lead.charId, lead.x, lead.y, foe.charId, foe.x, foe.y, foe.hp, f.hit, f.dmg, f.crit,
-        f.hits, f.takenHit, f.takenDmg, f.takenCrit, f.takenHits, tostring(f.counters),
-        tostring(f.killsTarget), tostring(f.diesWorst)))
-    -- Every enemy's own strike on the lead where it stands, with the slot its AI chose and what
-    -- it weighed. Neither probed map fields an enemy with two weapons, so on retail the probe
-    -- hands the boss a Steel Axe, a Silver Axe and a Hand Axe behind its own
-    -- (constants/items.h 0x20, 0x21, 0x28; 20 uses): the pick is then a real choice, a weapon
-    -- its rank forbids must be skipped, and the Hand Axe's tile shows the AI weighing range.
-    if PLAYTEST_VANILLA == "1" and foe.isBoss then
-        sapi.write16(foe.addr + 0x1E + 2, 0x20 | (20 << 8))
-        sapi.write16(foe.addr + 0x1E + 4, 0x21 | (20 << 8))
-        sapi.write16(foe.addr + 0x1E + 6, 0x28 | (20 << 8))
         board = BOARD.read()
-        foe = BOARD.unit(board, "red", foe.charId) or foe
-        sight = Sight.new(sapi)
+        sight.refresh()
     end
-    -- Each asked on the tile of the lead's reach nearest the enemy that its own threat covers
-    -- (else where the lead stands): a strike the enemy cannot make this turn has no pick.
+    -- Each enemy's strike, asked on the tile of the lead's reach nearest it that its own threat
+    -- covers (else where the lead stands): an enemy that cannot strike there has no pick.
+    local foe
     for _, e in ipairs(BOARD.live(board, "red")) do
         if e.onField then
             local covers, at, best = sight.threat(e), { x = lead.x, y = lead.y }, nil
             for _, t in ipairs(reach) do
-                local d = math.abs(t.x - e.x) + math.abs(t.y - e.y)
+                local d = BOARD.distance(t.x, t.y, e.x, e.y)
                 if covers(t.x, t.y) > 0 and (not best or d < best) then at, best = t, d end
             end
-            local g = sight.forecast(lead, e, at.x, at.y, nil)
+            local g = sight.strike(lead, e, at.x, at.y)
             local items = {}
             for _, it in ipairs(e.items or {}) do items[#items + 1] = string.format("%02X", it.id) end
-            local weighed = {}
-            for _, c in ipairs(g.takenCandidates or {}) do
-                weighed[#weighed + 1] = c.skip and (c.slot .. ":skip")
-                    or string.format("%d:%d@(%d,%d)", c.slot, c.score, c.x, c.y)
-            end
-            log(string.format("strike 0x%02X@(%d,%d) on lead@(%d,%d) items=%s weighed=[%s] -> "
-                .. "slot %s: hit=%d dmg=%d crit=%d hits=%d", e.charId, e.x, e.y, at.x, at.y,
-                table.concat(items, ","),
-                table.concat(weighed, " "), tostring(g.takenSlot), g.takenHit, g.takenDmg,
-                g.takenCrit, g.takenHits))
+            log(string.format("strike 0x%02X@(%d,%d) on lead@(%d,%d) items=%s -> slot %s from %s: "
+                .. "hit=%d dmg=%d crit=%d hits=%d", e.charId, e.x, e.y, at.x, at.y,
+                table.concat(items, ","), tostring(g.takenSlot),
+                g.takenTile and (g.takenTile.x .. "," .. g.takenTile.y) or "-",
+                g.takenHit, g.takenDmg, g.takenCrit, g.takenHits))
+            if e.isBoss or not foe then foe = e end
         end
     end
-    -- And the same exchange where an attack is in range: the lord beside the enemy.
+    if not foe then return result("FAIL", "no enemy on the field") end
+    -- One attack of ours where it is in range, with the enemy's counter to it.
+    local r = sight.range(lead)
     for _, t in ipairs(reach) do
-        local d = math.abs(t.x - foe.x) + math.abs(t.y - foe.y)
-        if lead.minRange and d >= lead.minRange and d <= lead.maxRange then
-            local g = sight.forecast(lead, foe, t.x, t.y, nil)
-            log(string.format("in range from (%d,%d): hit=%d dmg=%d crit=%d hits=%d | counter "
-                .. "hit=%d dmg=%d crit=%d hits=%d (counters=%s) | next phase hit=%d dmg=%d "
-                .. "crit=%d hits=%d slot=%s", t.x, t.y, g.hit, g.dmg, g.crit, g.hits,
-                g.counterHit, g.counterDmg, g.counterCrit, g.counterHits, tostring(g.counters),
-                g.takenHit, g.takenDmg, g.takenCrit, g.takenHits, tostring(g.takenSlot)))
+        local d = BOARD.distance(t.x, t.y, foe.x, foe.y)
+        if r and d >= r.min and d <= r.max then
+            local g = sight.attack(lead, foe, t.x, t.y, nil)
+            log(string.format("attack 0x%02X from (%d,%d) on 0x%02X: hit=%d dmg=%d crit=%d hits=%d "
+                .. "kills=%s | counter hit=%d dmg=%d crit=%d hits=%d (counters=%s)", lead.charId,
+                t.x, t.y, foe.charId, g.hit, g.dmg, g.crit, g.hits, tostring(g.killsTarget),
+                g.counterHit, g.counterDmg, g.counterCrit, g.counterHits, tostring(g.counters)))
             break
         end
     end
+    log(string.format("canSeize 0x%02X = %s", lead.charId, tostring(sight.canSeize(lead))))
     return result("PASS", "sight read; check the log by eye against the map")
 end
 

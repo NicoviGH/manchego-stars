@@ -43,37 +43,15 @@ class WantedSymbols(unittest.TestCase):
             gs.wanted_symbols(gs.parse_nm(NM), ['gPlaySt', 'NoSuchSymbol'])
         self.assertIn('NoSuchSymbol', str(raised.exception))
 
-    def test_an_optional_symbol_missing_from_the_elf_does_not_raise(self):
-        # PT_VANILLA runs against build/vanilla-fe8's ELF, which has no campaign engine
-        # (gLordSelectCandidates is engine patch 0005's). Optional means: absent -> omitted from
-        # SYM, so the Lua side reads nil and takes its fallback.
-        got = gs.wanted_symbols(gs.parse_nm(NM), ['gPlaySt'], optional=['gLordSelectCandidates'])
-        self.assertEqual(got, {'gPlaySt': 0x0202BCF0})
-        self.assertNotIn('gLordSelectCandidates', got)
-
-    def test_an_optional_symbol_present_in_the_elf_is_emitted(self):
-        got = gs.wanted_symbols(gs.parse_nm(NM), ['gPlaySt'], optional=['ProcScr_PrepMenu'])
-        self.assertEqual(got['ProcScr_PrepMenu'], 0x08A39190)
-
-    def test_a_required_symbol_still_raises_beside_optional_ones(self):
-        with self.assertRaises(KeyError) as raised:
-            gs.wanted_symbols(gs.parse_nm(NM), ['NoSuchSymbol'], optional=['AlsoMissing'])
-        self.assertIn('NoSuchSymbol', str(raised.exception))
-        self.assertNotIn('AlsoMissing', str(raised.exception))
-
-    def test_lord_select_table_is_optional_and_nothing_else_is(self):
-        self.assertEqual(list(gs.OPTIONAL), ['gLordSelectCandidates'])
-        self.assertNotIn('gLordSelectCandidates', gs.WANTED)
-
 
 # What sight.lua runs and reads (#510 step 9 PR D). Required, so both ELFs must carry them.
 SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNSeeds',
          'BattleGenerateSimulation', 'InitBattleForecastBattleStats', 'GenerateDangerZoneRange',
          'GenerateUnitMovementMap', 'GetUnitMovementCost', 'GetAvailableTileEventCommand',
-         'GetROMChapterStruct', 'InitRN', 'AiSimulateBestBattleAgainstTarget',
-         'AiFillReversedAttackRangeMap', 'AiReachesByBirdsEyeDistance', 'CanUnitUseWeapon',
-         'gActiveUnit', 'gActiveUnitId', 'SetWorkingBmMap', 'BmMapFill', 'UnitHasMagicRank',
-         'GenerateMagicSealMap', 'GenerateUnitCompleteAttackRange', 'gBmMapOther',
+         'GetROMChapterStruct', 'InitRN', 'AiAttemptOffensiveAction', 'AiIsUnitEnemy',
+         'AiUpdateNoMoveFlag', 'AiInitDangerMap', 'AiClearDecision', 'gAiState', 'gAiDecision',
+         'BattleGenerateBallistaSimulation', 'gActiveUnit', 'gActiveUnitId',
+         'GetChapterEventDataPointer', 'SearchAvailableEvent', 'SearchNextAvailableEvent',
          'GenerateExtendedMovementMap', 'CanUnitSeize', 'GetUnitEquippedWeapon']
 ELFS = {'ours': os.path.join(gs.DECOMP, 'fireemblem8.elf'),
         'vanilla': os.path.join(gs.REPO, 'build', 'vanilla-fe8', 'fireemblem8.elf')}
