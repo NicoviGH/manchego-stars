@@ -89,11 +89,9 @@ strategy: |
 strategy_claims:
   - kind: unmodelled
     topic: steal
-    step: out
     cite: "If you really want the Energy Ring, bring Trex along so that he can steal it from one of the three mages"
   - kind: unmodelled
     topic: range
-    step: 7
     cite: "The two archers flanking the door and the harpooner on the east pier may be irritating, especially if you are using Pinky, so keep him back until they fall."
 
 # ── Deployment ──────────────────────────────────────────────────────────────────

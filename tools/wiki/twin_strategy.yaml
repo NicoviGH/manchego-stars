@@ -15,11 +15,9 @@ FE8 Prologue:
       cite: "Together Eirika and Seth can take out the enemy Fighters with ease."
     - kind: unmodelled
       topic: baiting
-      step: 7
       cite: "Eirika can bait the fighters and dodge their attacks fairly consistently."
     - kind: unmodelled
       topic: healing
-      step: out
       cite: "If Eirika is hurt use a Vulnerary to keep her HP up."
 
 FE8 Ch1:
@@ -35,7 +33,6 @@ FE8 Ch1:
       cite: "The boss should fall fairly quickly if you use Eirika's Rapier as it does bonus damage versus armored units."
     - kind: unmodelled
       topic: arrival
-      step: 7
       cite: "Franz and Gilliam will join you on turn 2 and appear towards the northeastern ridge."
     - kind: reinforcements
       cite: "after you cross the middle of the map, three reinforcement units will appear from the bottom right corner."
@@ -48,12 +45,10 @@ FE8 Ch2:
       vs: boss
       cite: "The fort in the south is a good place to plant a unit to defeat the boss."
     - kind: unmodelled
-      topic: recruit escort
-      step: 7
+      topic: recruit
       cite: "You'll need to keep Ross and Garcia safe if you want to recruit them."
     - kind: unmodelled
-      topic: enemy terrain
-      step: 7
+      topic: enemy-cover
       cite: "Beware of the reinforcements that spawn in the mountains above the bottom village, as the mountain tiles give them good evasion."
     - kind: kits
       topic: villages
@@ -67,19 +62,15 @@ FE8 Ch3:
   claims:
     - kind: unmodelled
       topic: recruit
-      step: 7
       cite: "the only reinforcement is Colm on turn 2, who can immediately be recruited by talking to him with Neimi."
     - kind: unmodelled
       topic: range
-      step: 7
       cite: "Garcia, Neimi, and anyone with a javelin can be used to attack the archer and hand axe wielding brigand."
     - kind: unmodelled
       topic: keys
-      step: out
       cite: "the brigand next to it will drop a Chest Key"
     - kind: unmodelled
       topic: steal
-      step: out
       cite: "Keep watch of the enemy Thief."
     - kind: kits
       topic: drops
@@ -97,8 +88,7 @@ FE8 Ch4:
       vs: all
       cite: "Always try to keep your units on forest tiles to avoid unnecessary hits."
     - kind: unmodelled
-      topic: recruit rescue
-      step: 7
+      topic: recruit
       cite: "putting her in a nearby forest and rescuing her the next turn is recommended."
     - kind: reinforcements
       cite: "Since this is a rout map, be wary of the reinforcements that spawn near the start of the map, and be mindful that you aren't swarmed."
@@ -108,11 +98,9 @@ FE8 Ch5:
   claims:
     - kind: unmodelled
       topic: arena
-      step: out
       cite: "This chapter features the first arena in the game."
     - kind: unmodelled
       topic: recruit
-      step: 7
       cite: "Recruiting Joshua is less intimidating than it initially appears."
     - kind: reinforcements
       cite: "Brigand reinforcements will appear near the starting location, so make sure that your squishy units aren't undefended."
@@ -129,7 +117,6 @@ FE8 Ch6:
       cite: "making a beeline for Novala with Seth"
     - kind: unmodelled
       topic: escort
-      step: 7
       cite: "Send Vanessa to the east as fast as possible to guard the civilians; they will die without intervention."
     - kind: kits
       topic: drops
@@ -144,9 +131,382 @@ FE8 Ch7:
       cite: "finish him off with heavy hitters like Eirika's rapier."
     - kind: unmodelled
       topic: steal
-      step: out
       cite: "If you really want the Energy Ring, bring Colm along so that he can steal it."
     - kind: unmodelled
       topic: range
-      step: 7
       cite: "The ballista may be irritating, especially if you are using Vanessa, but you can easily send another unit north to take care of it."
+
+# Ch5x and Ch8 to the end (#510 step 9, Task C4): bot-behaviour data for the vanilla baseline
+# ONLY. ADR 0363: our chapters past ch07 are unwritten, so nothing in the parity model reads
+# these (strategy.findings refuses a planned chapter). Chapters 9-14 are split by route
+# (`FE8 ChN` is Eirika's, `FE8 ChN Ephraim` is Ephraim's, as gen_wiki.VANILLA names them);
+# Ch15 on is one page for both routes. Village of Silence (Eirika's Ch12) has an empty
+# Strategy section, and Lagdou Ruins / Tower of Valni have none: none of them is curated.
+
+FE8 Ch5x:
+  page: Unbroken_Heart
+  claims:
+    - kind: carry
+      unit: [forde, kyle]
+      vs: all
+      cite: "Use Forde and Kyle to take out enemy units while traveling north"
+    - kind: carry
+      unit: ephraim
+      vs: boss
+      cite: "Ephraim can easily take out the boss with Reginleif"
+    - kind: kits
+      topic: chests
+      cite: "to grab chest items."
+    - kind: unmodelled
+      topic: trade
+      cite: "At the start, trade Orson's Silver Sword over to one of your other three units"
+    - kind: unmodelled
+      topic: hold
+      cite: "you can either remain idle and defend (station units at the front of each flank) or charge down the enemies."
+
+FE8 Ch8:
+  page: Its_a_Trap
+  claims:
+    - kind: carry
+      unit: [franz, gilliam]
+      vs: [armor-knight, mercenary]
+      cite: "use Franz and Gilliam to kill the knights and mercenaries."
+    - kind: carry
+      unit: [ross, lute, artur]
+      vs: [soldier, shaman]
+      cite: "Use Ross, Lute, and Artur to take out the soldiers and shamans (through the wall)."
+    - kind: carry
+      unit: [seth, gilliam, artur, ross, lute]
+      vs: armor-knight
+      cite: "use Seth, Gilliam, Artur, Ross, and Lute to take out the armored knights"
+    - kind: carry
+      unit: ephraim
+      vs: boss
+      cite: "Ephraim can ORKO (or OHKO with a critical hit) him."
+    - kind: kits
+      topic: chests
+      cite: "Use Colm to get two useful items"
+    - kind: unmodelled
+      topic: talk
+      cite: "if you want to unlock her conversation with Ephraim"
+
+FE8 Ch9:
+  page: Distant_Blade
+  claims:
+    - kind: carry
+      unit: seth
+      vs: sniper
+      cite: "bring someone strong like Seth to take care of him."
+    - kind: unmodelled
+      topic: site-race
+      cite: "You will want to move quickly, likely with help from mounted units if you intend to save the western Village"
+    - kind: kits
+      topic: villages
+      cite: "saving both will net you an Angelic Robe."
+    - kind: unmodelled
+      topic: baiting
+      cite: "Pirate Ross can bait out the Pirate"
+    - kind: unmodelled
+      topic: recruit
+      cite: "If aiming to recruit, an Eirika positioned six spaces away once the coast is clear, can talk to Amelia from outside of her range."
+    - kind: unmodelled
+      topic: steal
+      cite: "If not looking to recruit Amelia at all, Colm can Steal it."
+    - kind: reinforcements
+      cite: "Binks is easy to beat once the Mercenaries and reinforcements are dealt with."
+    - kind: unmodelled
+      topic: rescue
+      cite: "attack uncounterably, Rescue the attacker away to safety using a mounted unit's Canto"
+
+FE8 Ch10:
+  page: Revolt_at_Carcino
+  claims:
+    - kind: unmodelled
+      topic: recruit
+      cite: "recruit Innes's squad before their AI gets them killed"
+    - kind: reinforcements
+      cite: "fend off the reinforcements."
+    - kind: unmodelled
+      topic: range
+      cite: "Be sure to also avoid the enemy Ballista range with any fliers you bring."
+    - kind: unmodelled
+      topic: siege
+      cite: "Innes can use the Ballista along with a second attack from Tethys's Dance to address this issue."
+    - kind: wall
+      unit: [seth, innes]
+      vs: boss
+      cite: "Seth and Innes, who have high Luck, may face 0 Crit"
+    - kind: unmodelled
+      topic: hold
+      cite: "just choke a point with him or Gerik until you've already beaten Pablo."
+
+FE8 Ch11:
+  page: Creeping_Darkness
+  claims:
+    - kind: carry
+      unit: seth
+      vs: all
+      cite: "It is highly recommended to deploy promoted units such as Seth, or mounted units for this chapter."
+    - kind: unmodelled
+      topic: recruit
+      cite: "This also makes recruiting L'Arachel very hard due to her low durability."
+
+FE8 Ch13:
+  page: Hamill_Canyon
+  claims:
+    - kind: unmodelled
+      topic: recruit
+      cite: "don't get impatient and kill Aias before Turn 5"
+    - kind: terrain
+      tile: fort
+      vs: all
+      cite: "Reduce their numbers to where your units can capture the forts"
+    - kind: unmodelled
+      topic: baiting
+      cite: "if he is baited to equip said tome"
+    - kind: kits
+      topic: drops
+      cite: "To get the Swordslayer, position a grounded lance unit in a nearby forest to get the Warrior to equip his Hand Axe"
+    - kind: unmodelled
+      topic: steal
+      cite: "so that it can then be stolen."
+
+FE8 Ch14:
+  page: Queen_of_White_Dunes
+  claims:
+    - kind: unmodelled
+      topic: recruit
+      cite: "he won't try to run away and steal treasure until his room is opened"
+    - kind: reinforcements
+      cite: "The Cavalier reinforcements can urge the player to hurry up"
+    - kind: unmodelled
+      topic: hold
+      cite: "placing a strong unit in one of the doorways as a chokepoint"
+    - kind: unmodelled
+      topic: range
+      cite: "fighting him at range reduces his damage by half as per the Wind Sword's mechanics"
+
+FE8 Ch9 Ephraim:
+  page: Fort_Rigwald
+  claims:
+    - kind: unmodelled
+      topic: deploy-order
+      cite: "the AI prefers to target characters at the bottom of the unit list"
+    - kind: unmodelled
+      topic: baiting
+      cite: "enemies can safely baited out of position until it is safe to advance."
+    - kind: reinforcements
+      cite: "Entering the top corridor triggers reinforcements"
+    - kind: unmodelled
+      topic: recruit
+      cite: "The easiest way to recruit Amelia is to exploit her lower movement range than the units around her"
+    - kind: unmodelled
+      topic: steal
+      cite: "a Red Gem that needs to be stolen"
+    - kind: unmodelled
+      topic: rescue
+      cite: "using Rescue to remove 1 range attackers before he can retaliate."
+
+FE8 Ch10 Ephraim:
+  page: Turning_Traitor
+  claims:
+    - kind: terrain
+      tile: forest
+      vs: soldier
+      cite: "putting a unit on the forest tile to their right and sticking everyone else just outside of range."
+    - kind: unmodelled
+      topic: escort
+      cite: "The first priority is to reach the green units as soon as possible."
+    - kind: reinforcements
+      cite: "a large wave of mounted reinforcements will show up from where you started on turn 6."
+    - kind: wall
+      unit: [ephraim, franz, seth]
+      vs: mercenary
+      cite: "on average Ephraim, Franz, and possibly Seth can do this at a reasonable level"
+    - kind: unmodelled
+      topic: baiting
+      cite: "this will generally require baiting it to expend its ammo first"
+    - kind: unmodelled
+      topic: objective
+      cite: "Being a survival chapter, it is not required to kill Beran"
+    - kind: unmodelled
+      topic: recruit
+      cite: "speaking with Duessel or even deploying Tana is key to recruiting him."
+
+FE8 Ch11 Ephraim:
+  page: Phantom_Ship
+  claims:
+    - kind: carry
+      unit: [seth, duessel]
+      vs: all
+      cite: "It is highly recommended to deploy promoted units such as Seth and Duessel for this chapter."
+    - kind: unmodelled
+      topic: recruit
+      cite: "This also makes recruiting L'Arachel very hard due to her low durability."
+
+FE8 Ch12 Ephraim:
+  page: Landing_at_Taizel
+  claims:
+    - kind: unmodelled
+      topic: hold
+      cite: "the player can just stay on the docks, or even the ship, and let the aggressive enemies kill themselves"
+    - kind: reinforcements
+      cite: "the Gargoyles that spawn at the end of turn 1 are the only reinforcements that don't cleanly spawn on the enemy side"
+    - kind: unmodelled
+      topic: recruit
+      cite: "lure her out with a bulky unit that has no weapons to counter attack with"
+
+FE8 Ch13 Ephraim:
+  page: Fluorspars_Oath
+  claims:
+    - kind: reinforcements
+      cite: "the brigands who will spawn on turn 3+4 at the mountain in the lower right corner"
+    - kind: unmodelled
+      topic: site-race
+      cite: "the pirates who will spawn in the lower left corner on turn 7+8 and attack the left village"
+    - kind: terrain
+      tile: forest
+      vs: boss
+      cite: "place a unit with both 2 range and high Resistance and/or evade on one of the forests directly above Selena"
+    - kind: unmodelled
+      topic: baiting
+      cite: "which makes it easy to exhaust the durability of her Bolting with bait."
+
+FE8 Ch14 Ephraim:
+  page: Father_and_Son
+  claims:
+    - kind: unmodelled
+      topic: recruit
+      cite: "The only source of time pressure on this map is recruiting Rennac before he flees"
+    - kind: unmodelled
+      topic: deploy-order
+      cite: "the enemy AI strongly favors those lower on the list for determining who to target with these staffs."
+    - kind: unmodelled
+      topic: healing
+      cite: "both sides should be equipped with a Restore staff user near the top of the deployment order"
+    - kind: reinforcements
+      cite: "Beware unlocking the treasure room and (on Difficult mode) the throne room causes reinforcements to spawn."
+
+FE8 Ch15:
+  page: Scorched_Sand
+  claims:
+    - kind: unmodelled
+      topic: escort
+      cite: "the main pressure is getting the other lord’s party to safety before they are overwhelmed by the aggressive enemies."
+    - kind: unmodelled
+      topic: deploy-order
+      cite: "manipulate deployment order to place the units you prefer be targeted at the bottom of the unit list."
+    - kind: reinforcements
+      cite: "the initial attack on the southern front and the turn 8 reinforcements occur on a large swath of grass tiles."
+    - kind: carry
+      unit: [duessel, lute]
+      vs: all
+      cite: "Powerful mounted units like Duessel, any of the other Cavaliers if they've been promoted, or Mage Knight Lute should still be deployed."
+    - kind: unmodelled
+      topic: steal
+      cite: "he has enough speed at base to steal both boss's items on normal mode"
+
+FE8 Ch16:
+  page: Ruled_by_Madness
+  claims:
+    - kind: reinforcements
+      cite: "The main time pressure on this map is the thieves that spawn as reinforcements."
+    - kind: unmodelled
+      topic: healing
+      cite: "Once again stats staffs are present so don’t forget to take Restores."
+    - kind: terrain
+      tile: forest
+      vs: all
+      cite: "The forest leading up to the back door is however a fine place to station a unit for dealing with the reinforcements"
+    - kind: unmodelled
+      topic: range
+      cite: "he is easily dealt with by placing a magic user at 2 range"
+
+FE8 Ch17:
+  page: River_of_Regrets
+  claims:
+    - kind: unmodelled
+      topic: escort
+      cite: "The enemies attacking the civilians are the obvious bottleneck here."
+    - kind: reinforcements
+      cite: "many waves of cavalry and wyverns will spawn from the left and top-left corner (respectively)."
+    - kind: unmodelled
+      topic: hold
+      cite: "The Heroes must go across the river in single file and can easily be blocked by a single unit"
+    - kind: terrain
+      tile: mountain
+      vs: all
+      cite: "the mountains will greatly improve the defense of whoever goes to this area."
+    - kind: unmodelled
+      topic: healing
+      cite: "Be sure to stock up on Physic staffs during the battle."
+
+FE8 Ch18:
+  page: Two_Faces_of_Evil
+  claims:
+    - kind: unmodelled
+      topic: tempo
+      cite: "Otherwise just move fast and crush as many eggs as possible."
+    - kind: unmodelled
+      topic: healing
+      cite: "This chapter has a lot of enemies with Stone, however inaccurate they are, so bring Restore staves."
+    - kind: reinforcements
+      cite: "Difficult mode adds reinforcements, but these are all trigger based"
+
+FE8 Ch19:
+  page: Last_Hope
+  claims:
+    - kind: unmodelled
+      topic: fog
+      cite: "This chapter contains fog of war so it's best to bring along a Torch, Torch Staff or a unit with enhanced visibility."
+    - kind: unmodelled
+      topic: hold
+      cite: "the interior of the map can safely be ignored entirely if these are plugged by durable units fast enough."
+    - kind: kits
+      topic: chests
+      cite: "Be sure to have the chests emptied by then"
+    - kind: reinforcements
+      cite: "A small group of units can then be sent to the southeast interior to deal with the reinforcements that begin to spawn there on turn 9."
+    - kind: unmodelled
+      topic: escort
+      cite: "If you manage to keep at least six NPC units alive at the end of the chapter you'll receive a Light Brand"
+
+FE8 Ch20:
+  page: Darkling_Woods
+  claims:
+    - kind: unmodelled
+      topic: durability
+      cite: "make sure you are well stocked on expendable, high durability, weapons"
+    - kind: reinforcements
+      cite: "As long as you don't advance too fast you have reinforcements spawn within your ranks"
+    - kind: unmodelled
+      topic: baiting
+      cite: "Letting him attack first is essentially mandatory without relying on luck to carry the day."
+    - kind: unmodelled
+      topic: rescue
+      cite: "it may be possible to have a flying unit start next to them and carry them across the map for a speedy victory"
+
+FE8 Final:
+  page: Sacred_Stone_part_1
+  claims:
+    - kind: unmodelled
+      topic: baiting
+      cite: "The necrodragons are best handled by exploiting their low range to get them away from other units"
+    - kind: reinforcements
+      cite: "Save yourself the trouble of fighting 30 wights by never stepping on the staircase below Lyon."
+    - kind: kits
+      topic: chests
+      cite: "Take an extra chest key or two to save needing to skip a chest or bring a thief."
+
+FE8 Final 2:
+  page: Sacred_Stone_part_2
+  claims:
+    - kind: carry
+      unit: [eirika, ephraim, seth, larachel]
+      vs: boss
+      cite: "He is close enough that Eirika, Ephraim, Seth, and a promoted L'Arachel will be able to reach him and attack him on the first turn."
+    - kind: reinforcements
+      cite: "Fomortiis will summon more if the fight drags on"
+    - kind: unmodelled
+      topic: hold
+      cite: "If the player finds they cannot kill him on turn 2, is best to fall back and await the assault from the summoned monsters."

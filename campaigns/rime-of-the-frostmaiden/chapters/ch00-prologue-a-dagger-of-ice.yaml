@@ -152,7 +152,6 @@ strategy_claims:
     cite: "let Scramsax finish him once the guards are down."
   - kind: unmodelled
     topic: healing
-    step: out
     cite: "If Hlin is hurt, use a Goodberry to keep her HP up."
 
 # ── Player Units ────────────────────────────────────────────────────────────────

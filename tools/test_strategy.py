@@ -42,6 +42,45 @@ class EveryClaimCitesItsSection(unittest.TestCase):
                 with self.subTest(ch=chap.get('id')):
                     strategy.our_claims(chap)
 
+    def test_every_story_chapter_has_claims(self):
+        """Every vendored twin page with a Strategy section is curated (#510 step 9, C4): the
+        vanilla baseline's bot reads them. Lagdou Ruins and Tower of Valni have no section,
+        and Village of Silence's is empty, so none of them can be."""
+        curated = {e['page'] for e in strategy._twin_file().values()}
+        for name in sorted(os.listdir(strategy.TWIN_PAGES)):
+            page = name[:-len('.wiki')]
+            try:
+                body = strategy.plain(strategy.twin_section(page))
+            except ValueError:
+                continue                            # no ==Strategy== section
+            if body:
+                with self.subTest(page=page):
+                    self.assertIn(page, curated)
+
+    def test_every_twin_claim_names_a_real_character_or_class(self):
+        """The bot's runner resolves `unit`/`vs` to the game's ids; a name the decomp does not
+        have would raise there, hours into a run. Catch it here."""
+        import inject.decomp as decomp
+        names = {'all', 'boss'}
+        for header, prefix in (('characters.h', 'CHARACTER_'), ('classes.h', 'CLASS_')):
+            text = decomp.vanilla_decomp_text('include/constants/' + header)
+            names |= {strategy._norm(n) for n in decomp.enum_values(text, prefix)}
+        for ref in strategy._twin_file():
+            for c in strategy.twin_claims(ref):
+                for field in ('unit', 'vs'):
+                    vals = c.get(field)
+                    for v in (vals if isinstance(vals, list) else [vals] if vals else []):
+                        with self.subTest(ref=ref, field=field, name=v):
+                            self.assertIn(strategy._norm(v), names)
+
+    def test_late_claims_not_read_by_parity(self):
+        """ADR 0363: a planned chapter gets no strategy reading, so the claims curated past Ch7
+        (bot data for the vanilla baseline) never reach our parity model."""
+        planned = [c for c in campaign_chapters.load_all(CAMPAIGN) if c.get('status') == 'planned']
+        self.assertTrue(planned)
+        with self.assertRaisesRegex(ValueError, 'ADR 0363'):
+            strategy.findings(planned[0], None)
+
     def test_every_hosted_twin_is_curated(self):
         for ch in HOSTED:
             with self.subTest(ch=ch):
@@ -67,6 +106,9 @@ class Validate(unittest.TestCase):
         return dict({'kind': 'carry', 'unit': 'eirika', 'vs': 'boss',
                      'cite': "Use Eirika's rapier on the boss."}, **kw)
 
+    def test_plain_drops_a_comment_left_open(self):
+        self.assertEqual('Use the forts.', strategy.plain('Use the forts. <!-- trailing'))
+
     def test_plain_strips_wiki_markup(self):
         self.assertEqual(strategy.plain(self.SECTION), "Use Eirika's rapier on the boss.")
 
@@ -87,18 +129,29 @@ class Validate(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'lacks vs'):
             strategy.validate([c], self.SECTION, 'x')
 
-    def test_an_unmodelled_claim_names_a_later_step(self):
-        c = {'kind': 'unmodelled', 'topic': 'shop', 'step': 6,
+    def test_an_unmodelled_topic_must_be_in_the_taxonomy(self):
+        c = {'kind': 'unmodelled', 'topic': 'village race',
              'cite': "Use Eirika's rapier on the boss."}
-        with self.assertRaisesRegex(ValueError, 'step 6'):
+        with self.assertRaisesRegex(ValueError, 'not in the taxonomy'):
             strategy.validate([c], self.SECTION, 'x')
 
-    def test_step_8_is_done(self):
-        # #510 step 8 modelled kits (`kits` claims) and left the rest out by decision.
-        c = {'kind': 'unmodelled', 'topic': 'shop', 'step': 8,
-             'cite': "Use Eirika's rapier on the boss."}
-        with self.assertRaisesRegex(ValueError, 'step 8'):
+    def test_a_kits_topic_must_be_in_the_taxonomy(self):
+        c = {'kind': 'kits', 'topic': 'loot', 'cite': "Use Eirika's rapier on the boss."}
+        with self.assertRaisesRegex(ValueError, 'kits topic'):
             strategy.validate([c], self.SECTION, 'x')
+
+    def test_a_claim_carries_no_step(self):
+        """The topic fixes the step; a second copy in the claim could disagree with it."""
+        c = {'kind': 'unmodelled', 'topic': 'recruit', 'step': 7,
+             'cite': "Use Eirika's rapier on the boss."}
+        with self.assertRaisesRegex(ValueError, 'carries no step'):
+            strategy.validate([c], self.SECTION, 'x')
+
+    def test_every_topic_has_a_step_and_a_meaning(self):
+        for topic, (step, meaning) in strategy.TOPICS.items():
+            with self.subTest(topic=topic):
+                self.assertIn(step, (7, 'out'))
+                self.assertTrue(meaning)
 
     def test_a_kits_claim_needs_a_topic(self):
         c = {'kind': 'kits', 'cite': "Use Eirika's rapier on the boss."}
@@ -113,8 +166,8 @@ class KitsAndOut(unittest.TestCase):
         self.assertIn('happy path', line)
 
     def test_out_topics_print_as_not_modelled_by_decision(self):
-        claims = [{'kind': 'unmodelled', 'topic': 'healing', 'step': 'out'},
-                  {'kind': 'unmodelled', 'topic': 'recruit', 'step': 7}]
+        claims = [{'kind': 'unmodelled', 'topic': 'healing'},
+                  {'kind': 'unmodelled', 'topic': 'recruit'}]
         self.assertEqual(['    unmodelled, step 7: recruit',
                           '    not modelled (ADR 0365): healing'],
                          strategy.unmodelled_lines(claims))

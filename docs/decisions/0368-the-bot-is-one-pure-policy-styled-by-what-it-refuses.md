@@ -125,3 +125,21 @@ A claim without a string `id` and `kind` raises before dispatch, in `applyClaims
 every claim whose kind has no behaviour (`threat`, `kits`, `unmodelled`, any unknown kind), so a
 run reports what it did not play. Greedy ignores every claim field in `decide` (only `deploy`
 reaches `Bot.prep`): the clear scenarios' picks are unchanged.
+
+**The twin's claims run to the end, and topics are one taxonomy (2026-10-26, C4; Nicolas: semantic
+judgement over keyword matching, a shared tagging taxonomy).** `tools/wiki/twin_strategy.yaml`
+now covers every vanilla page with a Strategy section: Ch5x, Ch8, Ch9-14 on both routes (`FE8 ChN`
+is Eirika's, `FE8 ChN Ephraim` Ephraim's, as `gen_wiki.VANILLA` names them), Ch15-20, and both
+final maps (`FE8 Final`, and `FE8 Final 2` for the second map, which had no key). Village of
+Silence's section is empty, and Lagdou Ruins and Tower of Valni have none, so they get no entry.
+These claims are bot data for the vanilla baseline ONLY. ADR 0363 stands: `strategy.findings`
+raises on a planned chapter, so they never reach the parity model. `make verdict-diff`: 0 cells
+moved. A line is tagged by what it MEANS, not by a word it uses. "Rangers are not that much
+stronger" is no `threat` claim, and a Cormag line whose target class the page does not name became
+`baiting`, not a guessed `vs`. `unmodelled` and `kits` topics come from ONE taxonomy in
+`strategy.py` (`TOPICS`, each with its meaning and its #510 step; `KIT_TOPICS`), shared by our
+claims, the twin's and the bot. A topic outside it raises, and a claim no longer carries a `step`:
+the topic fixes it, so the two can no longer disagree. Our YAML was re-tagged onto it: ch05's
+"niches" and the twin's "village race" are the same play (`site-race`); "chokepoint" is `hold`;
+"recruit rescue"/"recruit escort" are `recruit`. A test checks every twin `unit`/`vs` against the
+decomp's CHARACTER_/CLASS_ names, so the runner's resolver cannot meet an unknown name mid-run.
