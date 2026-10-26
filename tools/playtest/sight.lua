@@ -20,7 +20,7 @@
 -- range, which is what it does on its phase (ADR 0369).
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
--- api: { mem = { u8, s8, u16, s16, u32 }, write8, write32, SYM, cpu (Sight.machine's),
+-- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
 --        map = function() -> w, h, chapter = function() -> index, turn = function() -> n,
 --        lordPid = function() -> charId|nil, fieldUnit = function() -> board unit|nil (the
 --        lord, else the first deployed unit), distanceField = pathing.lua's }
@@ -37,9 +37,13 @@
 --                             the target's battleDefense, floored at 0; hits = hitCountA).
 --     taken*                  what `e` does to `u` on (x, y). When (x, y) is in our weapon's
 --                             range of `e` and `e` can answer, its COUNTER in this exchange;
---                             otherwise `e` as the ACTOR, striking `u` placed on (x, y) from a
---                             tile at its own weapon's minimum range (that tile's terrain only
---                             moves `e`'s avoid and defence, which no taken field reads).
+--                             otherwise `e` as the ACTOR, striking `u` placed on (x, y) with
+--                             the weapon FE8's AI would choose against `u` (aiStrike, below),
+--                             from a tile at that weapon's minimum range (that tile's terrain
+--                             only moves `e`'s avoid and defence, which no taken field reads).
+--     takenSlot               the item slot `e` strikes with on its phase (nil for a counter,
+--                             which is the weapon it holds, as FE8's counters are).
+--     takenCandidates         every slot the AI weighed: { slot, score } or { slot, skip }.
 --     counters                `e` answers this attack (false when out of range of it, or it
 --                             cannot counter): the attack's own counter is then nothing.
 --     killsTarget             dmg x hits >= e's HP, from our side of an attack in range.
@@ -65,6 +69,12 @@ M.CHAPTER_GOAL, M.CHAPTER_GOAL_TURN = 0x8C, 0x8D
 -- struct BattleUnit (include/bmbattle.h) and BattleForecastProc (include/bksel.h) offsets.
 local BU = { weapon = 0x48, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A }
 local PROC_HITS_A, PROC_HITS_B, PROC_SIZE = 0x50, 0x51, 0x54
+-- struct AiCombatSimulationSt (include/cp_common.h): xMove, yMove, targetId, u16 itemSlot +4,
+-- u32 score +8. It sits in scratch after the forecast proc.
+local ST, ST_SLOT, ST_SCORE = PROC_SIZE + 4, 0x04, 0x08
+M.SCRATCH_SIZE = ST + 0x0C
+M.ITEM_SLOTS, M.UNIT_ITEMS = 5, 0x1E   -- bmunit.h UNIT_ITEM_COUNT; struct Unit +1E u16 items[5]
+M.ITEM_NIGHTMARE = 0xA6                -- constants/items.h
 local UNIT_X, UNIT_Y = 0x10, 0x11
 local CRIT_MULTIPLIER = 3   -- bmbattle.c BattleGenerateHitAttributes
 
@@ -75,8 +85,8 @@ local REGS = { "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10"
 -- write32(addr, v), save() -> state, load(state), frames(done, max) -> bool (run emulated frames
 -- until done() or `max` have passed) }. sandbox(fn) runs fn(call, scratch) between a save and a
 -- load and returns what fn returns; call(addr, args) runs one game function and returns its r0.
--- Above the call's stack sit `scratch` (PROC_SIZE free bytes for the caller) and the return
--- loop; the load puts back whatever was there.
+-- `scratch` is SCRATCH_SIZE free bytes for the caller.
+-- Above the call's stack sit `scratch` and the return loop; the load puts back whatever was there.
 local THUMB_B_SELF = 0xE7FE
 function M.machine(cpu)
     return function(fn)
@@ -84,7 +94,7 @@ function M.machine(cpu)
         local saved = {}
         for _, r in ipairs(REGS) do saved[r] = cpu.read(r) end
         local top = (saved.sp - 0x100) & ~7
-        local scratch, loop = top + 0x10, top + 0x80
+        local scratch, loop = top + 0x10, top + 0x80   -- SCRATCH_SIZE fits between them
         local function returned()
             local pc = cpu.read("pc")
             return pc >= loop and pc <= loop + 8
@@ -127,6 +137,21 @@ function M.side(mem, me, other, proc, hitsAt)
              armed = mem.u16(me + BU.weapon) ~= 0 }
 end
 
+-- The AI's weapon for one target, FE8's own way (cp_battle.c AiAttemptOffensiveAction): each
+-- item slot in order, stopping at an empty one; Nightmare skipped -- compared as the WHOLE item
+-- word, uses byte included, exactly as the game does, so only a used-up one is ever skipped;
+-- a weapon CanUnitUseWeapon rejects skipped; each left scored by
+-- AiSimulateBattleAgainstTargetAtPosition from a tile at its minimum range, the best kept and
+-- a tie going to the later slot (`>=`). `slots` is { {slot, score}|{slot, skip=true} } in slot
+-- order; returns the chosen entry or nil. Pure, so test_sight.lua pins the order and the tie.
+function M.aiPick(slots)
+    local best
+    for _, c in ipairs(slots) do
+        if not c.skip and (best == nil or c.score >= best.score) then best = c end
+    end
+    return best
+end
+
 -- A tile `d` from (x, y) inside the map, for the enemy to strike from. Its terrain moves only
 -- the striker's own avoid and defence, so any one will do; nil when none fits (d = 0).
 function M.strikeTile(x, y, d, w, h)
@@ -146,7 +171,8 @@ function M.assemble(ours, theirs, uHp, eHp)
     local t = counters and ours.counter or theirs
     local f = { hit = 0, dmg = 0, crit = 0, hits = 0, counters = counters,
                 takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
-                takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0 }
+                takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
+                takenSlot = t and t.slot or nil, takenCandidates = t and t.candidates or nil }
     if ours then
         f.hit, f.dmg, f.crit, f.hits = ours.hit, ours.dmg, ours.crit, ours.hits
     end
@@ -220,6 +246,31 @@ function M.new(api)
         end)
     end
 
+    -- Inside a sandbox, with `u` already standing on (x, y): the slot and tile M.aiPick chooses,
+    -- each candidate scored by the AI's own call with `e` as the active unit.
+    local function aiStrike(call, st, u, e, x, y)
+        api.write32(S.gActiveUnit, e.addr)
+        api.write8(S.gActiveUnitId, e.id)
+        local slots = {}
+        for i = 0, M.ITEM_SLOTS - 1 do
+            local item = mem.u16(e.addr + M.UNIT_ITEMS + i * 2)
+            if item == 0 then break end
+            local c = { slot = i, skip = true }
+            if item ~= M.ITEM_NIGHTMARE and call(S.CanUnitUseWeapon, { e.addr, item }) ~= 0 then
+                c.x, c.y = M.strikeTile(x, y, call(S.GetItemMinRange, { item }), w, h)
+                if c.x then
+                    api.write8(st, c.x); api.write8(st + 1, c.y); api.write8(st + 2, u.id)
+                    api.write16(st + ST_SLOT, i); api.write32(st + ST_SCORE, 0)
+                    if call(S.AiSimulateBattleAgainstTargetAtPosition, { st }) ~= 0 then
+                        c.skip, c.score = false, mem.u32(st + ST_SCORE)
+                    end
+                end
+            end
+            slots[#slots + 1] = c
+        end
+        return M.aiPick(slots), slots
+    end
+
     function s.forecast(u, e, x, y, slot)
         local inRange = u.minRange and manhattan(x, y, e.x, e.y) >= u.minRange
             and manhattan(x, y, e.x, e.y) <= u.maxRange
@@ -232,13 +283,14 @@ function M.new(api)
                 a.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B)
                 if a.counter.armed then return a, nil end
             end
-            local sx, sy = M.strikeTile(x, y, e.minRange, w, h)
-            if sx then
-                api.write8(u.addr + UNIT_X, x)
-                api.write8(u.addr + UNIT_Y, y)
-                call(S.BattleGenerateSimulation, { e.addr, u.addr, sx, sy, M.ISLOT_AUTO })
+            api.write8(u.addr + UNIT_X, x)
+            api.write8(u.addr + UNIT_Y, y)
+            local pick, slots = aiStrike(call, proc + ST, u, e, x, y)
+            if pick then
+                call(S.BattleGenerateSimulation, { e.addr, u.addr, pick.x, pick.y, pick.slot })
                 call(S.InitBattleForecastBattleStats, { proc })
                 t = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
+                t.slot, t.candidates = pick.slot, slots
             end
             return a, t
         end)

@@ -2826,6 +2826,8 @@ INSPECT.sightApi = function()
     return {
         mem = { u8 = ru8, s8 = rs8, u16 = ru16, s16 = rs16, u32 = ru32 },
         write8 = function(a, v) raw:write8(a, v) end,
+        write16 = function(a, v) raw:write16(a, v) end,
+        write32 = function(a, v) raw:write32(a, v) end,
         SYM = SYM,
         cpu = {
             read = function(r) return raw:readRegister(r) end,
@@ -3020,6 +3022,32 @@ scenarios.sightprobe = function()
         lead.charId, lead.x, lead.y, foe.charId, foe.x, foe.y, foe.hp, f.hit, f.dmg, f.crit,
         f.hits, f.takenHit, f.takenDmg, f.takenCrit, f.takenHits, tostring(f.counters),
         tostring(f.killsTarget), tostring(f.diesWorst)))
+    -- Every enemy's own strike on the lead where it stands, with the slot its AI chose and what
+    -- it weighed. Neither probed map fields an enemy with two weapons, so on retail the probe
+    -- hands the boss a Steel Axe and a Silver Axe behind its own (constants/items.h 0x20, 0x21;
+    -- 20 uses): the pick is then a real choice, and a weapon its rank forbids must be skipped.
+    if PLAYTEST_VANILLA == "1" and foe.isBoss then
+        sapi.write16(foe.addr + 0x1E + 2, 0x20 | (20 << 8))
+        sapi.write16(foe.addr + 0x1E + 4, 0x21 | (20 << 8))
+        board = BOARD.read()
+        foe = BOARD.unit(board, "red", foe.charId) or foe
+        sight = Sight.new(sapi)
+    end
+    for _, e in ipairs(BOARD.live(board, "red")) do
+        if e.onField then
+            local g = sight.forecast(lead, e, lead.x, lead.y, nil)
+            local items = {}
+            for _, it in ipairs(e.items or {}) do items[#items + 1] = string.format("%02X", it.id) end
+            local weighed = {}
+            for _, c in ipairs(g.takenCandidates or {}) do
+                weighed[#weighed + 1] = c.skip and (c.slot .. ":skip") or (c.slot .. ":" .. c.score)
+            end
+            log(string.format("strike 0x%02X@(%d,%d) items=%s weighed=[%s] -> slot %s: hit=%d "
+                .. "dmg=%d crit=%d hits=%d", e.charId, e.x, e.y, table.concat(items, ","),
+                table.concat(weighed, " "), tostring(g.takenSlot), g.takenHit, g.takenDmg,
+                g.takenCrit, g.takenHits))
+        end
+    end
     -- And the same exchange where an attack is in range: the lord beside the enemy.
     for _, t in ipairs(reach) do
         local d = math.abs(t.x - foe.x) + math.abs(t.y - foe.y)

@@ -70,7 +70,8 @@ class WantedSymbols(unittest.TestCase):
 SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNSeeds',
          'BattleGenerateSimulation', 'InitBattleForecastBattleStats', 'GenerateDangerZoneRange',
          'GenerateUnitMovementMap', 'GetUnitMovementCost', 'GetAvailableTileEventCommand',
-         'GetROMChapterStruct', 'InitRN']
+         'GetROMChapterStruct', 'InitRN', 'AiSimulateBattleAgainstTargetAtPosition',
+         'CanUnitUseWeapon', 'GetItemMinRange', 'gActiveUnit', 'gActiveUnitId']
 ELFS = {'ours': os.path.join(gs.DECOMP, 'fireemblem8.elf'),
         'vanilla': os.path.join(gs.REPO, 'build', 'vanilla-fe8', 'fireemblem8.elf')}
 

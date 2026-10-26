@@ -118,6 +118,21 @@ do
     check(f.takenHit, 0, "an enemy with no weapon reach strikes nothing")
 end
 
+-- aiPick: FE8's AI weapon choice -- the best score, a tie to the later slot, skips left out.
+do
+    local p = Sight.aiPick({ { slot = 0, score = 40 }, { slot = 1, score = 90 }, { slot = 2, score = 60 } })
+    check(p.slot, 1, "the best-scoring slot")
+    p = Sight.aiPick({ { slot = 0, score = 50 }, { slot = 1, score = 50 } })
+    check(p.slot, 1, "a tie goes to the later slot, as cp_battle.c's >= does")
+    p = Sight.aiPick({ { slot = 0, skip = true }, { slot = 1, score = 0 } })
+    check(p.slot, 1, "a skipped slot never wins, even over a zero score")
+    check(Sight.aiPick({ { slot = 0, skip = true } }), nil, "no usable weapon, no strike")
+    check(Sight.aiPick({}), nil, "an empty hand, no strike")
+end
+
+-- The AI's scratch struct fits between the forecast proc and the return loop.
+check(Sight.SCRATCH_SIZE <= 0x70, true, "scratch ends before the loop at +0x80 (scratch at +0x10)")
+
 -- strikeTile: a tile at the enemy's own range, inside the map.
 do
     local x, y = Sight.strikeTile(0, 0, 1, 10, 10)

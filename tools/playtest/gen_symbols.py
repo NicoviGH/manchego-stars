@@ -273,6 +273,12 @@ WANTED = [
     'GetAvailableTileEventCommand',  # a tile's location event; Seize = 0x11 (eventinfo.c)
     'GetROMChapterStruct',      # chapter data: the goal window type +0x8C, its turn +0x8D
     'InitRN',                   # the game's own RNG seeding (rng.c)
+    # The enemy's weapon against a target, chosen the way its AI chooses it (cp_battle.c).
+    'AiSimulateBattleAgainstTargetAtPosition',  # one slot's simulation + AiComputeCombatScore
+    'CanUnitUseWeapon',         # the AI's per-slot filter (bmitem.c)
+    'GetItemMinRange',          # where a slot strikes from (bmitem.c)
+    'gActiveUnit',              # struct Unit *: the AI scores for THIS unit
+    'gActiveUnitId',            # u8, its index; read beside gActiveUnit by the AI
 ]
 
 

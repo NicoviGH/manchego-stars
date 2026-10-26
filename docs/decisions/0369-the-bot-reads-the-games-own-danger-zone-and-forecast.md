@@ -43,9 +43,17 @@ no counter, and bot.lua's `counterWorst` takes nothing off for it. Without that,
 sword-wielder at range 2 was charged the sword's strike twice.
 
 **Rulings made here, each with its cost if wrong:**
-- **The enemy strikes with the weapon it holds** (`BU_ISLOT_AUTO`), not the one the AI would pick
-  for that target. FE8's AI equips its choice before it attacks, so this misses only a unit carrying
-  two weapons whose second suits the target better. The danger zone has the same limit.
+- **The enemy strikes with the weapon its AI would choose against that unit** (Nicolas, 2026-10-26:
+  the per-target pick is vanilla AI, so the sandbox runs it rather than assume the held weapon).
+  FE8's own loop (cp_battle.c `AiAttemptOffensiveAction`) is followed slot by slot: stop at an empty
+  slot, skip Nightmare (compared as the whole item word, uses included, as the game does), skip
+  what `CanUnitUseWeapon` rejects, score each left with `AiSimulateBattleAgainstTargetAtPosition`
+  (enemy as `gActiveUnit`, from a tile at that weapon's `GetItemMinRange`), keep the best, a tie to
+  the later slot. The strike is then simulated with that slot. The AI also picks its TILE by
+  `AiGetCombatPositionScore`; that is not followed, since the tile only moves the enemy's own avoid
+  and defence. Cost if wrong: a score component that reads AI-phase state (`gAiState`, its danger
+  map) could rank two weapons differently from the real enemy phase. A COUNTER stays the held
+  weapon, because FE8's counters are (`SetBattleUnitWeapon(target, BU_ISLOT_AUTO)`).
 - **`field(goal)` uses one unit's movement costs** (the lord's, else the first deployed unit's).
   A field only steers the march; each unit's real reach comes from `reach()`. A flier marching
   behind a foot unit's field takes a longer heading than it needs.
