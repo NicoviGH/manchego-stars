@@ -260,15 +260,18 @@ do
     -- boss dead, nobody closer, no fewer enemies -> no progress
     check(B.madeProgress(last, { dist = 6, enemies = 0 }), false,
         "boss dead + distance unchanged + enemy count unchanged = no progress")
-    check(B.madeProgress({ dist = math.huge, enemies = 3 }, { dist = math.huge, enemies = 2 }), true,
+    check(B.madeProgress({ dist = math.huge, enemies = 3 },
+                         { dist = math.huge, enemies = 2 }), true,
         "a kill is progress even with no distance")
     check(B.madeProgress({ dist = 4, enemies = 2 }, { dist = 5, enemies = 2 }), false,
         "moving away with no kill is not progress")
     -- the target changed (boss died / a unit ruled out): the old best belonged to another
     -- question, so the change counts, and a farther first reading is not a stall
-    check(B.madeProgress({ dist = 4, enemies = 0, key = "boss" }, { dist = 10, enemies = 0, key = "seize:1" }),
+    check(B.madeProgress({ dist = 4, enemies = 0, key = "boss" },
+                         { dist = 10, enemies = 0, key = "seize:1" }),
         true, "a new target is progress, not a stall against the old best")
-    check(B.madeProgress({ dist = 10, enemies = 0, key = "seize:1" }, { dist = 10, enemies = 0, key = "seize:1" }),
+    check(B.madeProgress({ dist = 10, enemies = 0, key = "seize:1" },
+                         { dist = 10, enemies = 0, key = "seize:1" }),
         false, "same target, same distance, same enemies = no progress")
 end
 
@@ -325,7 +328,6 @@ local function sightOf(o)
         field = o.field,
         cache = o.cache,
         terrain = o.terrain,
-        turn = o.turn,
         danger = function(x, y) return (o.danger or {})[x .. "," .. y] or 0 end,
         reach = function(u) return (o.reach or {})[u.id] or { { x = u.x, y = u.y } } end,
         forecast = function(u, t, x, y, slot)
@@ -357,7 +359,8 @@ do
     local board = boardOf(A, E1, E2)
     local sight = sightOf {
         danger = { ["2,0"] = 1 },
-        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }), [0x82] = tiles({ 2, 3 }, { 2, 1 }) },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }),
+                  [0x82] = tiles({ 2, 3 }, { 2, 1 }) },
         fc = { [0x01] = {
             [0x81] = { ["2,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } },
             [0x82] = { ["2,0"] = fc { takenHit = 70, takenDmg = 12, takenHits = 2 } },
@@ -448,7 +451,8 @@ do
         reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 6, 0 }) },
         fc = {
             [0x01] = { [0x81] = { ["0,0"] = fc { hit = 95, dmg = 14, hits = 2 } } },
-            [0x02] = { [0x82] = { ["6,0"] = fc { hit = 100, dmg = 4, hits = 1, killsTarget = true } },
+            [0x02] = { [0x82] = { ["6,0"] = fc { hit = 100, dmg = 4, hits = 1,
+                                                 killsTarget = true } },
                        [0x83] = { ["6,0"] = fc { hit = 95, dmg = 15, hits = 2 } } },
         },
     }
@@ -462,7 +466,8 @@ do
         reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 6, 0 }) },
         fc = {
             [0x01] = { [0x81] = { ["0,0"] = fc { hit = 95, dmg = 14, hits = 2 } } },
-            [0x02] = { [0x82] = { ["6,0"] = fc { hit = 80, dmg = 4, hits = 1, killsTarget = true } } },
+            [0x02] = { [0x82] = { ["6,0"] = fc { hit = 80, dmg = 4, hits = 1,
+                                                 killsTarget = true } } },
         },
     }
     check(B.decide(board, sight, style("careful")).unit, 0x01, "an 80% kill is not a sure kill")
@@ -502,8 +507,10 @@ do
     local board = boardOf(L, O, E1, Bo)
     local sight = sightOf {
         objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
-        reach = { [0x01] = tiles({ 2, 2 }, { 3, 3 }, { 4, 4 }), [0x02] = tiles({ 4, 3 }, { 4, 4 }) },
-        fc = { [0x02] = { [0x82] = { ["4,4"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+        reach = { [0x01] = tiles({ 2, 2 }, { 3, 3 }, { 4, 4 }),
+                  [0x02] = tiles({ 4, 3 }, { 4, 4 }) },
+        fc = { [0x02] = { [0x82] = { ["4,4"] = fc { hit = 100, dmg = 9, hits = 1,
+                                                    killsTarget = true } } } },
     }
     for _, aggr in ipairs({ "careful", "even", "bold", "greedy" }) do
         local a = B.decide(board, sight, style(aggr))
@@ -517,7 +524,8 @@ do
     sight = sightOf {
         objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
         reach = { [0x02] = tiles({ 4, 4 }, { 4, 3 }, { 4, 1 }) },
-        fc = { [0x02] = { [0x82] = { ["4,4"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+        fc = { [0x02] = { [0x82] = { ["4,4"] = fc { hit = 100, dmg = 9, hits = 1,
+                                                    killsTarget = true } } } },
     }
     for _, aggr in ipairs({ "careful", "bold", "greedy" }) do
         local a = B.decide(boardOf(Ld, O, E1, Bo), sight, style(aggr))
@@ -593,7 +601,8 @@ do
         danger = { ["5,5"] = 2 },
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 5, 5 }, { 4, 5 }),
                   [0x81] = tiles({ 6, 5 }) },
-        fc = { [0x02] = { [0x81] = { ["5,5"] = fc { takenHit = 60, takenDmg = 15, takenHits = 2 } } } },
+        fc = { [0x02] = { [0x81] = { ["5,5"] = fc { takenHit = 60, takenDmg = 15,
+                                                    takenHits = 2 } } } },
     }
     local a = B.decide(board, sight, style("careful"))
     check(a.unit, 0x02, "the threatened unit acts first")
@@ -762,7 +771,7 @@ do
     base.deploy = { 0x02 }
     local carry = { id = "c1", kind = "carry", unit = { 0x02, 0x03 }, vs = { CLS_A } }
     local st = B.CLAIM_BEHAVIOURS.carry(carry, base)
-    check(csv(st.deploy), "2,3", "carry: its units join deploy, a repeat once")
+    check(csv(st.deploy), "2,3", "carry: its units lead deploy, a repeat once")
     check(csv(base.deploy), "2", "carry: the style it was given is not edited")
     local a = B.decide(board, sight, st)
     check(a and a.unit, 0x02, "carry: C acts first on the named class")
@@ -846,13 +855,15 @@ do
     check(a2 and a2.unit == 0x01 and a2.act == "attack", true, "wall: strikes the walled enemy")
 end
 
--- test_terrain_prefers_the_named_tile: a march to (2,0) stops on (1,0), the named terrain.
+-- test_terrain_prefers_the_named_tile: the boss reaches both (1,0) and (2,0); a march to
+-- (2,0) holds on (1,0), the named terrain, against it.
 do
     local A = blue(0x01, 0, 0, 0)
-    local E = red(0x81, 9, 0, { isBoss = true })
+    local E = red(0x81, 9, 0, { isBoss = true, maxRange = 2 })
     local FORT = 0x1E
-    local function sightWith(terrain)
-        return sightOf { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+    local function sightWith(terrain, bossReach)
+        return sightOf { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }),
+                                   [0x81] = bossReach or tiles({ 9, 0 }, { 3, 0 }) },
                          terrain = terrain }
     end
     local map = function(x, y) return (x == 1 and y == 0) and FORT or 1 end
@@ -862,26 +873,33 @@ do
     check(at(B.decide(board, sightWith(map), st)), "1,0", "terrain: ends on the named tile")
     check(at(B.decide(board, sightWith(nil), st)), "2,0",
         "terrain without sight.terrain: a no-op")
+    check(at(B.decide(board, sightWith(map, tiles({ 9, 0 })), st)), "2,0",
+        "terrain: a fort out of every named enemy's reach holds nothing, the march goes on")
     st = claimed("careful", { id = "t2", kind = "terrain", tile = FORT, vs = { CLS_B } })
     check(at(B.decide(board, sightWith(map), st)), "2,0",
         "terrain vs a class not on the map: a no-op")
 end
 
--- test_reinforcements_hold_the_turn_before: arrival on turn 3 holds the march on turn 2.
+-- test_reinforcements_hold_the_turn_before: arrival on turn 3 holds the march on turn 2. The
+-- turn is the board's (Board.read's), the one source for it.
 do
     local A = blue(0x01, 0, 0, 0)
     local E = red(0x81, 9, 0)
-    local function sightAt(turn)
-        return sightOf { turn = turn, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) } }
+    local sight = sightOf { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) } }
+    local function boardAt(turn)
+        local b = boardOf(A, E)
+        b.turn = turn
+        return b
     end
-    local board = boardOf(A, E)
     local st = claimed("careful", { id = "r1", kind = "reinforcements", turns = { 3, 7 } })
-    check(at(B.decide(board, sightAt(2), style("careful"))), "2,0", "no claim: marches")
-    check(at(B.decide(board, sightAt(2), st)), "0,0", "reinforcements: holds the turn before")
-    check(at(B.decide(board, sightAt(6), st)), "0,0", "reinforcements: before each arrival")
-    check(at(B.decide(board, sightAt(3), st)), "2,0", "reinforcements: marches on arrival")
-    check(pcall(B.decide, board, sightAt(nil), st), false,
-        "reinforcements without sight.turn raise")
+    check(at(B.decide(boardAt(2), sight, style("careful"))), "2,0", "no claim: marches")
+    check(at(B.decide(boardAt(2), sight, st)), "0,0", "reinforcements: holds the turn before")
+    check(at(B.decide(boardAt(6), sight, st)), "0,0", "reinforcements: before each arrival")
+    check(at(B.decide(boardAt(3), sight, st)), "2,0", "reinforcements: marches on arrival")
+    local ok, err = pcall(B.decide, boardAt(nil), sight, st)
+    check(ok, false, "reinforcements without board.turn raise")
+    check(tostring(err):find("a reinforcements claim needs board.turn", 1, true) ~= nil, true,
+        "the error says what is missing")
 end
 
 -- test_unmodelled_is_reported_not_dropped: every claim with no behaviour comes back by id.
@@ -906,12 +924,46 @@ do
         { id = "m4", kind = "terrain", vs = "all" },
         { id = "m5", kind = "reinforcements" },
         { id = "m6", kind = "answer", unit = { 0x01 }, vs = "fighter" },
+        { id = "m7", kind = "carry", unit = { "some-name" }, vs = { CLS_A } },
+        { id = "m8", kind = "wall", unit = { 0x01 }, vs = { "fighter" } },
+        { id = "m9", kind = "reinforcements", turns = { "3" } },
+        { id = "m10", kind = "terrain", tile = "fort", vs = "all" },
     }
     for _, c in ipairs(bad) do
         local ok, err = pcall(B.CLAIM_BEHAVIOURS[c.kind], c, style("careful"))
         check(ok, false, c.id .. ": a malformed claim raises")
         check(tostring(err):find(c.id, 1, true) ~= nil, true, c.id .. ": the error names it")
     end
+end
+
+-- A claim with no string id or kind raises before dispatch: it could be neither played nor
+-- reported.
+do
+    for _, c in ipairs({ { kind = "carry", unit = { 1 }, vs = "all" }, { id = "n2" },
+                         { id = 7, kind = "kits" } }) do
+        local ok, err = pcall(B.applyClaims, { c }, style("careful"))
+        check(ok, false, "applyClaims: a claim without a string id and kind raises")
+        check(tostring(err):find("needs a string id and kind", 1, true) ~= nil, true,
+            "applyClaims: the error says so")
+        check(pcall(B.unplayed, { c }), false, "unplayed: the same claim raises")
+    end
+end
+
+-- test_answer_beats_a_sure_kill: A has a sure kill on E2, and a chip on E1; answering E1's
+-- class it takes the chip.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E1 = red(0x81, 1, 0, { hp = 30, classId = CLS_A })
+    local E2 = red(0x82, 0, 1, { hp = 4, classId = CLS_B })
+    local sight = sightOf {
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 80, dmg = 3, hits = 1 } },
+                          [0x82] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1,
+                                                    killsTarget = true } } } },
+    }
+    local board = boardOf(A, E1, E2)
+    check(B.decide(board, sight, style("careful")).target, 0x82, "no claim: the sure kill")
+    local st = claimed("careful", { id = "a4", kind = "answer", unit = { 0x01 }, vs = { CLS_A } })
+    check(B.decide(board, sight, st).target, 0x81, "answer: the named class above a sure kill")
 end
 
 -- Greedy ignores claims in decide: the clear-bot's pick, claim or no claim.
@@ -932,6 +984,19 @@ local function unitOf(id, charId, level, extra)
     return u
 end
 
+-- test_carry_survives_a_full_deploy: the sampled deploy fills the cap; the carried unit is
+-- still fielded, because carry puts it first.
+local function test_carry_survives_a_full_deploy()
+    local roster = { unitOf(1, 0x01, 9), unitOf(2, 0x02, 1), unitOf(3, 0x03, 8) }
+    local sampled = style("careful")
+    sampled.deploy = { 0x01, 0x03 }
+    local st = B.CLAIM_BEHAVIOURS.carry({ id = "c3", kind = "carry", unit = { 0x02 },
+                                          vs = "all" }, sampled)
+    check(csv(st.deploy), "2,1,3", "carry: carried first, then the sampled list")
+    check(csv(B.prep(roster, 2, st).deploy), "2,1", "prep: a full sampled list keeps the carry")
+end
+test_carry_survives_a_full_deploy()
+
 local function test_prep_forced_first()
     local roster = { unitOf(1, 0x01, 3), unitOf(2, 0x02, 9), unitOf(3, 0x03, 5, { forced = true }),
                      unitOf(4, 0x04, 7), unitOf(5, 0x05, 7), unitOf(6, 0x06, 1, { forced = true }) }
@@ -939,7 +1004,8 @@ local function test_prep_forced_first()
     check(csv(p.deploy), "3,6,2,4", "forced (slot order), then highest level, ties by slot")
     check(#p.give, 0, "no transfer rule decided: give is empty")
     p = B.prep(roster, 4, { deploy = { 0x01, 0x99, 0x01, 0x03 } })
-    check(csv(p.deploy), "3,6,1,2", "style.deploy next; unknown charId skipped, duplicate not doubled")
+    check(csv(p.deploy), "3,6,1,2",
+        "style.deploy next; unknown charId skipped, duplicate not doubled")
     p = B.prep(roster, 5, { deploy = { 0x04 } })
     check(csv(p.deploy), "3,6,4,2,5", "cap 5: forced, style, then level")
     p = B.prep(roster, 1, { deploy = { 0x04 } })
@@ -971,7 +1037,8 @@ local function test_shop_stops_at_gold()
         "gold runs out after the vulneraries: 100 left buys no 400+ sword")
     local Cu0 = unitOf(3, 0x03, 1, { ranks = { axe = 1, sword = 2 } })
     check(flat(B.shop(1000, stock, { Bu, Cu0 })), "108x2,33x1",
-        "skip then continue: the lance (700) is skipped at 400 gold, the axe (100) after it is bought")
+        "skip then continue: the lance (700) is skipped at 400 gold, "
+            .. "the axe (100) after it is bought")
     A.items = { { id = 0x10, type = "sword", rank = 1 } }
     check(flat(B.shop(10000, stock, { A, Bu })), "108x2,32x1", "a unit holding its type buys none")
     local Cu = unitOf(3, 0x03, 1, { ranks = { axe = 1, sword = 2 } })
@@ -980,7 +1047,8 @@ local function test_shop_stops_at_gold()
     check(flat(B.shop(450, stock, { Cu })), "108x1,33x1",
         "the sword (400) is skipped at 50 gold, the buying stops there")
     check(flat(B.shop(0, stock, { A })), "", "no gold, nothing")
-    check(flat(B.shop(10000, { stock[2] }, { A })), "", "no Vulnerary in stock and sword held: nothing")
+    check(flat(B.shop(10000, { stock[2] }, { A })), "",
+        "no Vulnerary in stock and sword held: nothing")
 end
 test_shop_stops_at_gold()
 
