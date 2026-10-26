@@ -9,12 +9,14 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-24 (Claude: #531 raid PR #540 merged; #510 step 9 BUILDING). **The parity model is being
+Refreshed 2026-10-26 (Claude: #510 step 9 PR C #541 merged; next PR D). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
 
-**#510 step 9 is being built, subagent-driven.** Its plan is ONE comment, edited in place (the
+**#510 step 9 is being built, INLINE (Nicolas, 2026-10-26: subagent-driven development is too
+token-hungry; write the code in the main session, a subagent only for `/code-review` and its
+scoped re-reviews).** Its plan is ONE comment, edited in place (the
 amendment and Task C4 are folded in): <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6370592835>.
 The bot plays the ACTUAL ROM, never a Python re-creation. **Merged:** A #530 (Ch8 cutscene loads are
 not enemies), B #532 (`tools/playtest/board.lua`, the one board reader: `onField`, lean reads,
@@ -38,10 +40,14 @@ G3 #537 78105ed; the summary is on #531).
 - #531 audit #8, #11 and #12 went with the archive. #17 (chunking) stays open on #531.
 
 **Next, in order:**
-1. **The raid PR is DONE** (#540 f28041b): `idle`/`raided` case verbs; ch02raid/ch05raid are declared;
-   sites resolve through `CAMPAIGN.VILLAGES` (gen_symbols `village_sites`); one HP refill,
-   `INSPECT.fullHeal`; a malformed step argument is ERROR. Summary on #531.
-2. **Step 9 PR C** (Tasks 3-5 + C4), then D, E, F. Stacked PRs on D->E->F only.
+1. **PR C is DONE** (#541 4dc5e73): `tools/playtest/bot.lua` is the pure careful bot (the old clear bot folded in),
+   ADR 0368. `twin_strategy.yaml` runs to the final map (bot data only; ADR 0363 guard in
+   `strategy.findings`). Claims are tagged by MEANING from one shared taxonomy, `strategy.TOPICS`
+   (Nicolas, 2026-10-26); a claim carries no `step`. Summary, rulings and **what PR D must supply**:
+   <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6425325716>.
+2. **Step 9 PR D** (Tasks 6-8, inline), then E, F. Stacked PRs on D->E->F only. PR D's sharpest
+   open item: `forecast(our, enemy, x, y)` must give the enemy's strike on us even outside our
+   range, which FE8's forecast window does not show.
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
   dropped, with evidence. Apply every review with the global `review-to-clean` skill
@@ -51,9 +57,9 @@ G3 #537 78105ed; the summary is on #531).
   **#535**, not built yet; until it is, every review checks the diff for new copies.
 **Merging:** Nicolas pre-approved merging step 9's and #531's PRs once `/code-review` (in a
 subagent) is clean and CI is green on HEAD; every other PR still needs his "merge".
-SDD ledgers (gitignored, the recovery map): `.superpowers/sdd/step9plan/progress.md` and
-`.superpowers/sdd/plan531/progress.md`. No plan file is kept locally: the SDD `task-brief` script
-gets the plan fetched fresh from its GitHub comment into the session scratchpad (the ledger says how).
+Ledgers (gitignored, the recovery map): `.superpowers/sdd/step9plan/progress.md` and
+`.superpowers/sdd/plan531/progress.md`. No plan file is kept locally: fetch the plan fresh from its
+GitHub comment (`gh api repos/NicoviGH/manchego-stars/issues/comments/6370592835 --jq .body`).
 Rulings made on Nicolas's behalf are posted on #510 and #531, not only in the ledgers.
 Lessons from the 2026-10-23 build session (read before dispatching):
 - Cut feature branches from `origin/main`, never from a local `main` holding unpushed handoff
