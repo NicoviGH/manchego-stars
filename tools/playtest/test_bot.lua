@@ -732,6 +732,91 @@ do
         "1,2", "survive, own tile in reach: steps to the safest tile")
 end
 
+-- ── between chapters: prep, shop, promote, route ────────────────────────────────
+
+local function unitOf(id, charId, level, extra)
+    local u = { id = id, charId = charId, level = level, ranks = {}, items = {} }
+    for k, v in pairs(extra or {}) do u[k] = v end
+    return u
+end
+local function csv(list) return table.concat(list, ",") end
+
+local function test_prep_forced_first()
+    local roster = { unitOf(1, 0x01, 3), unitOf(2, 0x02, 9), unitOf(3, 0x03, 5, { forced = true }),
+                     unitOf(4, 0x04, 7), unitOf(5, 0x05, 7), unitOf(6, 0x06, 1, { forced = true }) }
+    local p = B.prep(roster, 4, { deploy = {} })
+    check(csv(p.deploy), "3,6,2,4", "forced (slot order), then highest level, ties by slot")
+    check(#p.give, 0, "no transfer rule decided: give is empty")
+    p = B.prep(roster, 4, { deploy = { 0x01, 0x99, 0x01, 0x03 } })
+    check(csv(p.deploy), "3,6,1,2", "style.deploy next; unknown charId skipped, duplicate not doubled")
+    p = B.prep(roster, 5, { deploy = { 0x04 } })
+    check(csv(p.deploy), "3,6,4,2,5", "cap 5: forced, style, then level")
+    p = B.prep(roster, 1, { deploy = { 0x04 } })
+    check(csv(p.deploy), "3,6", "forced alone exceed the cap: all forced still go, nothing else")
+    p = B.prep(roster, 10, { deploy = {} })
+    check(#p.deploy, 6, "cap above the roster: everyone")
+end
+test_prep_forced_first()
+
+local function test_shop_stops_at_gold()
+    local stock = {
+        { item = 0x6C, price = 300, kind = "vulnerary" },
+        { item = 0x10, price = 500, type = "sword", rank = 1 },
+        { item = 0x11, price = 400, type = "sword", rank = 1 },
+        { item = 0x12, price = 900, type = "sword", rank = 3 },
+        { item = 0x20, price = 700, type = "lance", rank = 1 },
+        { item = 0x21, price = 100, type = "axe", rank = 1 },
+    }
+    local A = unitOf(1, 0x01, 1, { ranks = { sword = 2 } })
+    local Bu = unitOf(2, 0x02, 1, { ranks = { lance = 1 } })
+    local function flat(r)
+        local t = {}
+        for _, e in ipairs(r) do t[#t + 1] = e.item .. "x" .. e.qty end
+        return csv(t)
+    end
+    check(flat(B.shop(10000, stock, { A, Bu })), "108x2,17x1,32x1",
+        "vulneraries per unit first, then the cheapest in-rank weapon each lacks")
+    check(flat(B.shop(700, stock, { A, Bu })), "108x2",
+        "gold runs out after the vulneraries: 100 left buys no 400+ sword")
+    check(flat(B.shop(1000, stock, { A, Bu })), "108x2,17x1",
+        "skips the lance it cannot afford (700 > 400 left), nothing after it fits")
+    A.items = { { id = 0x10, type = "sword", rank = 1 } }
+    check(flat(B.shop(10000, stock, { A, Bu })), "108x2,32x1", "a unit holding its type buys none")
+    local Cu = unitOf(3, 0x03, 1, { ranks = { axe = 1, sword = 2 } })
+    check(flat(B.shop(10000, stock, { Cu })), "108x1,33x1,17x1",
+        "skip-and-continue: gold 710 buys vuln 300, axe 100, sword 400 in order")
+    check(flat(B.shop(450, stock, { Cu })), "108x1,33x1",
+        "the sword (400) is skipped at 50 gold, the buying stops there")
+    check(flat(B.shop(0, stock, { A })), "", "no gold, nothing")
+    check(flat(B.shop(10000, { stock[2] }, { A })), "", "no Vulnerary in stock and sword held: nothing")
+end
+test_shop_stops_at_gold()
+
+local function test_promote_needs_level_10()
+    local seal = { { id = 0x82, promotes = true } }
+    check(B.promote(unitOf(1, 1, 10), seal), true, "level 10 with a seal promotes")
+    check(B.promote(unitOf(1, 1, 9), seal), false, "level 9 does not")
+    check(B.promote(unitOf(1, 1, 15), {}), false, "no seal, no promotion")
+    check(B.promote(unitOf(1, 1, 15), { { id = 0x82, promotes = false } }), false,
+        "a seal that does not promote this unit is not one")
+    local o = B.promoteOrder({ unitOf(1, 0x01, 8), unitOf(2, 0x02, 12), unitOf(3, 0x03, 12),
+                               unitOf(4, 0x04, 15) })
+    local ids = {}
+    for _, u in ipairs(o) do ids[#ids + 1] = u.id end
+    check(csv(ids), "4,2,3,1", "promote order: highest level first, ties by slot")
+end
+test_promote_needs_level_10()
+
+local function test_route_follows_style()
+    local opts = { "a", "b", "c" }
+    check(B.route(opts, { route = 1 }), 1, "route 1")
+    check(B.route(opts, { route = 2 }), 2, "route 2")
+    check(pcall(B.route, opts, { route = 4 }), false, "out-of-range route raises")
+    check(pcall(B.route, opts, {}), false, "missing route raises")
+    check(#B.STYLES.route, 2, "route is a sampled axis, two options")
+end
+test_route_follows_style()
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else

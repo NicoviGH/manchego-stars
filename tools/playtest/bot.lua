@@ -9,7 +9,7 @@
 --   board: Board.read's shape (board.lua). Blue units on the field that have not acted are the
 --          ones that can act; on-field reds are the enemies.
 --   style: { aggression = "careful"|"even"|"bold"|"greedy", deploy = {charIds},
---            claims = {claim ids} }. Bot.STYLES lists the sampled aggressions; "greedy" is not
+--            claims = {claim ids}, route = 1|2 }. Bot.STYLES lists the sampled aggressions; "greedy" is not
 --          sampled -- it is the clear scenarios' old bot and ignores `sight` except reach and
 --          the objective.
 --   sight: { danger(x, y) -> how many enemies reach (x, y), the game's danger zone;
@@ -73,6 +73,27 @@
 -- (needsToStepOff) -- to wait or to attack -- unless its target stands ON the seize tile (the
 -- boss on the throne is struck from its approach). A body there blocks a single-approach
 -- throne for the lord.
+--
+-- ── Between chapters (ADR 0368): pure rules over plain tables the caller reads from memory ──
+-- roster entry (a unit, slot order): { id, charId, level, forced = bool|nil,
+--   ranks = {[weaponType] = rank number}, items = {{ id, type = weaponType|nil, rank,
+--   promotes = bool|nil }...} }. `promotes` is set by the caller only on a seal that promotes
+--   THIS unit; the bot never knows which seal fits which class.
+-- stock entry: { item, price, type = weaponType|nil, rank, kind = "vulnerary"|nil }; the caller
+--   says which stock item is the Vulnerary, so no item id lives here.
+-- Bot.prep(roster, cap, style) -> { deploy = {charIds}, give = {} }: forced units (slot order),
+--   then style.deploy (listed order; a charId not in the roster is skipped, a repeat counts
+--   once), then the highest level (ties by slot order), up to `cap`. Forced units all go even
+--   when they alone exceed the cap. No transfer rule is decided yet, so `give` is always empty.
+-- Bot.shop(gold, stock, party) -> {{ item, qty }...}: party is the deployed roster entries, in
+--   deploy order. One Vulnerary (the cheapest) per unit first, then for each unit and each
+--   weapon type it has a rank in (type names in order) it holds none of, the cheapest stock
+--   weapon of that type at or under its rank. A purchase gold cannot cover is skipped and the
+--   later ones are still tried.
+-- Bot.promote(unit, items) -> bool: level 10 or above and a promoting seal held.
+-- Bot.promoteOrder(units) -> units, highest level first (ties by slot order): the order a
+--   caller spends seals in.
+-- Bot.route(options, style) -> style.route, validated as an index into options.
 --
 -- ── The greedy core (the clear scenarios drive these directly) ─────────────────────────────
 -- pickTarget(reachable, enemies, prefs) -> { target = <enemy>, tile = {x,y} } | nil
@@ -298,6 +319,7 @@ M.STYLES = {
     aggression = { "careful", "even", "bold" },
     deploy = {},   -- charIds the runner chooses to field
     claims = {},   -- Strategy claim ids the run follows
+    route = { 1, 2 },   -- which of a chapter's two routes (1-based) the run takes
 }
 
 local CRIT_MULTIPLIER = 3   -- bmbattle.c: gBattleStats.damage * 3 on a critical hit
@@ -585,6 +607,103 @@ function M.decide(board, sight, style)
     local a = attacks[u]
     if a then return action(u, a.tile, "attack", a.target) end
     return action(u, march(ctx, u, gate, objective), "wait")
+end
+
+-- ── Between chapters ───────────────────────────────────────────────────────────
+
+local PROMOTE_LEVEL = 10   -- FE8: a unit may use a promotion item from level 10
+
+-- Slot order is roster order; table.sort is not stable, so order carries its index.
+local function byLevel(units)
+    local order = {}
+    for i, u in ipairs(units) do order[i] = { u = u, i = i } end
+    table.sort(order, function(a, b)
+        if a.u.level ~= b.u.level then return a.u.level > b.u.level end
+        return a.i < b.i
+    end)
+    local out = {}
+    for i, o in ipairs(order) do out[i] = o.u end
+    return out
+end
+
+function M.prep(roster, cap, style)
+    local deploy, taken = {}, {}
+    local function take(u)
+        if taken[u] then return end
+        taken[u] = true
+        deploy[#deploy + 1] = u.charId
+    end
+    for _, u in ipairs(roster) do
+        if u.forced then take(u) end
+    end
+    local forced = #deploy
+    for _, charId in ipairs(style.deploy or {}) do
+        for _, u in ipairs(roster) do
+            if u.charId == charId and #deploy < math.max(cap, forced) then take(u) break end
+        end
+    end
+    for _, u in ipairs(byLevel(roster)) do
+        if #deploy >= cap then break end
+        take(u)
+    end
+    return { deploy = deploy, give = {} }
+end
+
+local function cheapest(stock, want)
+    local best
+    for _, s in ipairs(stock) do
+        if want(s) and (not best or s.price < best.price) then best = s end
+    end
+    return best
+end
+
+function M.shop(gold, stock, party)
+    local bought, order = {}, {}
+    local function buy(s)
+        if not s or s.price > gold then return end
+        gold = gold - s.price
+        if not bought[s.item] then bought[s.item] = 0; order[#order + 1] = s.item end
+        bought[s.item] = bought[s.item] + 1
+    end
+    local vuln = cheapest(stock, function(s) return s.kind == "vulnerary" end)
+    for _ in ipairs(party) do buy(vuln) end
+    for _, u in ipairs(party) do
+        local types = {}
+        for t in pairs(u.ranks) do types[#types + 1] = t end
+        table.sort(types)
+        for _, t in ipairs(types) do
+            local holds = false
+            for _, it in ipairs(u.items) do
+                if it.type == t then holds = true end
+            end
+            if not holds then
+                buy(cheapest(stock, function(s)
+                    return s.type == t and s.rank <= u.ranks[t]
+                end))
+            end
+        end
+    end
+    local out = {}
+    for _, item in ipairs(order) do out[#out + 1] = { item = item, qty = bought[item] } end
+    return out
+end
+
+function M.promote(unit, items)
+    if unit.level < PROMOTE_LEVEL then return false end
+    for _, it in ipairs(items) do
+        if it.promotes then return true end
+    end
+    return false
+end
+
+function M.promoteOrder(units) return byLevel(units) end
+
+function M.route(options, style)
+    local r = style.route
+    if type(r) ~= "number" or r < 1 or r > #options or r % 1 ~= 0 then
+        error("bot.lua: route " .. tostring(r) .. " is not an index into " .. #options .. " options")
+    end
+    return r
 end
 
 return M

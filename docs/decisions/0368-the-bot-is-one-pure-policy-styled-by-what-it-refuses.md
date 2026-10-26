@@ -70,3 +70,23 @@ standing ON the seize tile (the boss on the throne), which it strikes from the a
   case are per call only.
 - The action carries `unitId` and `targetId` (Board's unique index byte) beside the charIds,
   because generics share a charId and the ROM layer has to know which body to act on.
+
+**Between chapters (PR C2): four pure rules, fixed now from the Wiki's general strategy.** Same
+contract as `decide`: plain tables in, no memory read, no character id, chapter number or item id
+in the Lua (the caller marks the Vulnerary with `kind = "vulnerary"` and a seal that promotes THIS
+unit with `promotes = true`; the bot never knows which seal fits which class). The input shapes
+are in bot.lua's header.
+- `Bot.prep(roster, cap, style)`: forced units in slot order, then `style.deploy` in listed order
+  (a charId not in the roster is skipped, a repeat counts once), then the highest level, ties by
+  slot order, up to the cap. The cap is never exceeded except by forced units: when they alone
+  exceed it, all of them still go and nothing else does. `give` is always `{}`: no transfer rule
+  is decided yet.
+- `Bot.shop(gold, stock, party)`: one cheapest Vulnerary per deployed unit, then, per unit in
+  deploy order and per weapon type it has a rank in, the cheapest stock weapon at or under that
+  rank when the unit holds none of the type. A purchase gold cannot cover is skipped and later
+  ones are still tried; the result is aggregated `{{item, qty}}`.
+- `Bot.promote(unit, items)`: level 10 or above with a promoting seal held. The order is
+  `Bot.promoteOrder(units)` (highest level first, ties by slot order); the caller spends a seal
+  per true.
+- `Bot.route(options, style)`: `style.route` validated as an index into `options` (it raises on
+  anything else). `route` joins `Bot.STYLES` as an axis the runner samples, 50/50 per campaign.
