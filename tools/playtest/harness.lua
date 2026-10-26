@@ -1816,8 +1816,9 @@ scenarios.controller_turn = function()
 end
 
 -- ---- greedy clear-bot (#60): real-combat chapter completion. Generic boss detection
--- (no hardcoded char ids) + the pure pickTarget core; the scenario owns the driving.
-local CLEARBOT = dofile(PLAYTEST_DIR .. "/clearbot.lua")
+-- (no hardcoded char ids) + bot.lua's pure greedy core (pickTarget/pickMove); the scenario owns
+-- the driving.
+local BOT = dofile(PLAYTEST_DIR .. "/bot.lua")
 local CH02 = dofile(PLAYTEST_DIR .. "/ch02check.lua")   -- pure charm-delivery check (#22)
 local PATHING = dofile(PLAYTEST_DIR .. "/pathing.lua")  -- pure BFS distance field (#60 march)
 local FUZZRNG = dofile(PLAYTEST_DIR .. "/fuzzrng.lua")   -- seeded PRNG + input policy (#49)
@@ -2453,13 +2454,13 @@ local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy, stopWh
     if not reach then return nil, true end
     local mn, mx = unitAttackRange(u)
     enemies = enemies or liveEnemies()
-    local pick = mn and CLEARBOT.pickTarget(reach, enemies, { range = mx, min_range = mn }) or nil
+    local pick = mn and BOT.pickTarget(reach, enemies, { range = mx, min_range = mn }) or nil
     local tile = pick and pick.tile
     if not tile then
         -- no target in range: march (pure decision core -- field-first with a
         -- Manhattan tiebreak, claimed-tile avoidance, and the chokepoint-jam
         -- fallback that pushes at the nearest enemy cork; #60 last-mile breach)
-        tile = CLEARBOT.pickMove(reach, { field = field, cur = { x = u.x, y = u.y },
+        tile = BOT.pickMove(reach, { field = field, cur = { x = u.x, y = u.y },
                                           goal = goal, blocked = blocked,
                                           enemies = enemies })
     end
@@ -2478,7 +2479,7 @@ local function clearUnitAct(u, field, goal, blocked, claimed, maxx, maxy, stopWh
     -- the dead-boss half the wait runs out all of combatFrames and the loop reports stuck.
     if pick then committed = chooseAttack(u.addr, stopWhen) else committed = chooseWait() end
     if not committed then return tile, true end
-    if claimed then claimed[CLEARBOT.tileKey(tile.x, tile.y)] = true end
+    if claimed then claimed[BOT.tileKey(tile.x, tile.y)] = true end
     return tile, false
 end
 
@@ -2567,12 +2568,12 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     -- boss while it lives, then the seize tile. ruledOut[slot] marks units that stood on the
     -- seize tile without a legal Seize -- not the lord -- so the lord's march still registers.
     local ruledOut = {}
-    -- Move a ruled-out unit off the throne's approach and Wait there (clearbot.stepOffTile):
+    -- Move a ruled-out unit off the throne's approach and Wait there (BOT.stepOffTile):
     -- parked on or beside a single-approach throne it would block the lord for good.
     local function stepOffSeize(u)
         local reach = selectAndReach(u, maxx, maxy)
         if not reach then return false end
-        local tile = CLEARBOT.stepOffTile(reach, u, seizeTile)
+        local tile = BOT.stepOffTile(reach, u, seizeTile)
         if not tile then return cancelToPlayerMap() end   -- boxed in beside it: nothing helps
         if not cursorTo(tile.x, tile.y) then return false end
         if not guardedInput("confirm_move", "A", "live unit command menu opens", function(after)
@@ -2619,7 +2620,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                     for k in pairs(claimed) do blocked[k] = true end
                     for _, o in ipairs(BOARD.live(board, "blue")) do
                         if o.onField and o.slot ~= u.slot then
-                            blocked[CLEARBOT.tileKey(o.x, o.y)] = true
+                            blocked[BOT.tileKey(o.x, o.y)] = true
                         end
                     end
                     local tile, failed = clearUnitAct(u, field, b, blocked, claimed,
@@ -2648,7 +2649,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                 elseif not BOARD.canSeize(u, lordPid, ruledOut) then
                     -- Not the lord: it does not march on the throne, and if it stands on or
                     -- beside it, it clears the way.
-                    if CLEARBOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
+                    if BOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
                         return "stuck", t
                     end
                 elseif moveUnit(u.x, u.y, seizeTile.x, seizeTile.y) then
@@ -2669,7 +2670,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                         if not cancelUnitActionMenu() then return "stuck", t end
                         -- Back on the tile it started from; clear the approach if that is beside
                         -- the throne.
-                        if CLEARBOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
+                        if BOT.needsToStepOff(u, seizeTile) and not stepOffSeize(u) then
                             return "stuck", t
                         end
                     end
@@ -2713,10 +2714,10 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
                 end
             end
         end
-        local dist = CLEARBOT.seizeDistance(blueUnits, field, excluded)
+        local dist = BOT.seizeDistance(blueUnits, field, excluded)
         local enemies = BOARD.liveCount("red")
         local key = (findBoss() and "boss" or "seize") .. ":" .. nRuled
-        if CLEARBOT.madeProgress({ dist = lastDist, enemies = lastEnemies, key = lastKey },
+        if BOT.madeProgress({ dist = lastDist, enemies = lastEnemies, key = lastKey },
                                  { dist = dist, enemies = enemies, key = key }) then
             stall = 0
         else
@@ -3960,7 +3961,7 @@ end
 -- when Attack will not appear; chooseAttack independently resolves the live semantic command.
 local function canAttackFromHere(u, mn, mx)
     local w, h = mapSize()
-    return CLEARBOT.gridHostileInReach(function(x, y)
+    return BOT.gridHostileInReach(function(x, y)
         if x < 0 or x >= w or y < 0 or y >= h then return nil end
         return mapUnitAt(x, y)
     end, u.x, u.y, mn, mx)

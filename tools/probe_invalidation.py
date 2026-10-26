@@ -117,7 +117,7 @@ CASES = [
      rewrite(mx.HARNESS, 'guardedInput = function(intention, key, expected, predicate, frames)',
              'guardedInput = function(intention, key, expected, predicate, frames)\n    local probe = 1'),
      False, ['ch01win', 'ch05arena', 'ch04moose'], []),
-    ('clearbot', append_line(os.path.join(HERE, 'playtest', 'clearbot.lua'), '\n-- probe\n'),
+    ('bot', append_line(os.path.join(HERE, 'playtest', 'bot.lua'), '\n-- probe\n'),
      False, ['clear_ch04_parley'], ['ch05arena', 'ch01win', 'win']),
     ('controller', append_line(os.path.join(HERE, 'playtest', 'controller.lua'), '\n-- probe\n'),
      False, ['ch01win', 'ch05arena', 'ch04moose'], []),

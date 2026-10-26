@@ -1,5 +1,5 @@
 -- ch02check.lua -- pure helpers for the ch02 structural load-test (#22), kept free of any
--- emulator dependency so they unit-test without a ROM (cf. clearbot.lua). The harness reads
+-- emulator dependency so they unit-test without a ROM (cf. bot.lua). The harness reads
 -- the bytes (leader inventory + convoy) and hands this module a flat list of item ids.
 local M = {}
 

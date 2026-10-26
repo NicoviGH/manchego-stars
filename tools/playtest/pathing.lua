@@ -1,5 +1,5 @@
--- pathing.lua -- pure BFS distance field for the clear-bot's march-to-boss (#60), kept free of
--- any emulator dependency so it unit-tests without a ROM (cf. clearbot.lua / ch02check.lua). The
+-- pathing.lua -- pure BFS distance field for the greedy bot's march-to-boss (#60), kept free of
+-- any emulator dependency so it unit-tests without a ROM (cf. bot.lua / ch02check.lua). The
 -- harness reads terrain into a passability predicate; this turns it into a path-distance field so
 -- a unit can route AROUND walls/peaks toward a held boss instead of greedily minimizing Manhattan
 -- distance (which strands a unit against an obstacle).
