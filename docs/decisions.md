@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-367 decisions. Read this index, then open the two or three you need — the whole
+368 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -214,6 +214,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0363` | [A chapter not written yet gets no difficulty reading](decisions/0363-a-chapter-not-written-yet-is-its-vanilla-twin.md) | 2026-10-22 | #510 |
 | `0364` | [Threat is the heaviest engagement](decisions/0364-threat-is-the-heaviest-engagement.md) | 2026-10-22 | #510 #335 |
 | `0365` | [Kits: the happy path is graded, the guaranteed path printed beside it](decisions/0365-kits-the-happy-path-is-graded.md) | 2026-10-22 | #510 |
+| `0368` | [The step-9 bot is one pure policy, styled by what it refuses to end its move on](decisions/0368-the-bot-is-one-pure-policy-styled-by-what-it-refuses.md) | 2026-10-26 | #510 |
 
 ---
 

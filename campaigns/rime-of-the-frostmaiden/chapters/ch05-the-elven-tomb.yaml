@@ -214,21 +214,17 @@ strategy: |
 strategy_claims:
   - kind: unmodelled
     topic: arena
-    step: out
     cite: "This chapter features the first arena in the game."
   - kind: unmodelled
     topic: recruit
-    step: 7
     cite: "Recruiting Sahnar is less intimidating than it initially appears."
   - kind: unmodelled
     topic: objective
-    step: 7
     cite: "Defeat her to win; her guardians and the moose do not all have to fall."
   - kind: reinforcements
     cite: "Reinforcements appear on turn 2 (two spear guards from the southeast), turn 6 (two axe reavers from the east) and turn 8 (two archers next to Ravisin), so make sure that your squishy units aren't undefended."
   - kind: unmodelled
-    topic: niches
-    step: 7
+    topic: site-race
     cite: "the undead race to desecrate them."
 
 # ── Deployment ──────────────────────────────────────────────────────────────────

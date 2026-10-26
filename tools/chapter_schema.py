@@ -95,7 +95,7 @@ CHAPTER = {
     'forest_composition': ANY, 'win_condition': ANY, 'lose_condition': ANY,
     # `strategy:` as claims the parity model uses and checks (#510 step 6, tools/strategy.py)
     'strategy_claims': [{'kind': ANY, 'unit': ANY, 'vs': ANY, 'tile': ANY, 'topic': ANY,
-                         'step': ANY, 'cite': ANY}],
+                         'cite': ANY}],
     'signature_moments': [{'pc': ANY, 'trigger': ANY}],
     'introduces': [{'concept': ANY, 'coverage': ANY, 'status': ANY, 'where': ANY}],
     # the campaign plan (#486): what a planned chapter is for, and every question still open on

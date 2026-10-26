@@ -144,11 +144,9 @@ strategy_claims:
     cite: "Every raider but one carries an axe, so lance users win the trades: Wolfram and Baxby are the best walls here."
   - kind: unmodelled
     topic: escort
-    step: 7
     cite: "You'll need to keep the two green chwinga Priests safe if you want their gifts"
   - kind: unmodelled
     topic: range
-    step: 7
     cite: "Keep Pinky away from the lone archer on the east side until someone has dealt with it."
   - kind: kits
     topic: villages

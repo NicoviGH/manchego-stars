@@ -1,9 +1,10 @@
 -- board.lua -- the ONE reader of FE8's board state (#510 step 9).
 --
 -- Before this file the board had three shapes: harness.lua's unitAt, the clear scenario's
--- enemy tables (fed to clearbot.lua) and llmExportBoard (fed to llm_player.py), each with its
--- own scan bounds and its own copy of the item/boss reads. The bots built on top of it need
--- one answer to "what is on the map", so it is read here, once, into plain tables.
+-- enemy tables (fed to the greedy core, now in bot.lua) and llmExportBoard (fed to
+-- llm_player.py), each with its own scan bounds and its own copy of the item/boss reads. The
+-- bots built on top of it need one answer to "what is on the map", so it is read here, once,
+-- into plain tables.
 --
 -- Pure: memory comes in as `mem = { u8, s8, u16, u32 }` (address -> value), so
 -- test_board.lua runs it over a table-backed fake with no emulator. Addresses come from SYM.

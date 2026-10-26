@@ -26,13 +26,19 @@ Kinds (each side's claims are read against that side's OWN party and force):
   reinforcements  no fields: the strategy warns of the waves. REPORTED: how many bodies
               arrive after turn 1, and how many of them are in the side's heaviest
               engagement (#510 step 7), the one its threat is read from.
-  kits        `topic`: what the party picks up (villages, shops, drops). REPORTED: modelled
-              since #510 step 8 (ADR 0365): the verdict reads the happy path, every pickup
-              taken, and `make difficulty CH=` prints the guaranteed path beside it.
-  unmodelled  `topic` and `step`: play the model does not read. `step` is the #510 step that
-              will (7 reach and time), or `out`: left out by decision (ADR 0365: healing, the
-              arena, keys and steals, none of which changes what a unit fights with).
-              Recorded so the curation is complete.
+  kits        `topic` (one of KIT_TOPICS): what the party picks up. REPORTED: modelled since
+              #510 step 8 (ADR 0365): the verdict reads the happy path, every pickup taken,
+              and `make difficulty CH=` prints the guaranteed path beside it.
+  unmodelled  `topic` (one of TOPICS): play the model does not read. The topic fixes the
+              #510 step that will (7: reach and time), or `out`: left out by decision
+              (ADR 0365: healing, the arena, keys and steals, none of which changes what a
+              unit fights with). Recorded so the curation is complete.
+
+Topics are ONE shared taxonomy (TOPICS, KIT_TOPICS) for ours, the twin's and the step-9 bot,
+so the same play carries the same tag on both sides: a line is tagged by what it MEANS, never
+by a word it happens to use ("the undead race to desecrate them" and "save the western
+Village" are both `site-race`). A topic outside the taxonomy raises; a new tag is added here,
+with its meaning, before any claim uses it.
 
 `vs` names an enemy by class (`fighter`, `armor-knight`), by our unit id or the twin's
 character (`goblin-chief`, `breguet`), or `boss`; a list means any of them. Checks are FINDINGS printed beside the
@@ -60,9 +66,39 @@ KINDS = {
     'threat': {'vs'},
     'reinforcements': set(),
     'kits': {'topic'},
-    'unmodelled': {'topic', 'step'},
+    'unmodelled': {'topic'},
 }
-STEPS = {7, 'out'}
+# topic -> (the #510 step that reads it, what the play is). Step 7 = reach and time; 'out' =
+# left out by decision (ADR 0365).
+TOPICS = {
+    'recruit': (7, 'talk an enemy or green unit over, or keep a recruit alive until talked to'),
+    'talk': (7, 'a conversation between party members (not a recruit)'),
+    'arrival': (7, 'allies who join mid-map, and where'),
+    'escort': (7, 'keep allied, green or NPC units alive'),
+    'site-race': (7, 'reach a village, niche or treasure before the enemy destroys or loots it'),
+    'tempo': (7, 'move fast because the board worsens with time (eggs hatch, waves build)'),
+    'objective': (7, 'a win condition other than rout (defeat the boss, survive, seize)'),
+    'baiting': (7, 'draw an enemy out of position, or let it strike first on a chosen tile'),
+    'hold': (7, 'stay put and let the enemy come, a chokepoint blocked or a line held'),
+    'range': (7, "fight from outside an enemy's reach, or keep a unit out of one enemy's"),
+    'rescue': (7, 'Rescue, Canto or a flier to carry a unit in or out'),
+    'deploy-order': (7, 'the enemy AI picks staff targets by unit-list order'),
+    'fog': (7, 'fog of war: torches, vision'),
+    'siege': (7, 'use a map siege weapon (a ballista)'),
+    'enemy-cover': (7, 'enemies hold evasive terrain'),
+    'healing': ('out', 'staves, Vulneraries, Restore, Physic'),
+    'steal': ('out', 'steal an item'),
+    'arena': ('out', 'the arena'),
+    'keys': ('out', 'door and chest keys'),
+    'trade': ('out', 'move items between units'),
+    'durability': ('out', 'weapon uses'),
+}
+KIT_TOPICS = {'villages', 'chests', 'drops', 'shop'}
+
+
+def step_of(claim):
+    """The #510 step an unmodelled claim waits on (7) or 'out', from its topic."""
+    return TOPICS[claim['topic']][0]
 
 
 def plain(text):
@@ -73,6 +109,7 @@ def plain(text):
     text = re.sub(r'\{\{[^}]*\}\}', '', text)
     text = re.sub(r"'{2,}", '', text)
     text = re.sub(r'<!--.*?-->', '', text, flags=re.S)
+    text = re.sub(r'<!--.*', '', text, flags=re.S)      # a comment left open to the end
     return ' '.join(text.split())
 
 
@@ -98,8 +135,13 @@ def validate(claims, section, where):
         missing = KINDS[kind] - set(c)
         if missing:
             raise ValueError('%s: %s claim lacks %s' % (where, kind, ', '.join(sorted(missing))))
-        if kind == 'unmodelled' and c['step'] not in STEPS:
-            raise ValueError('%s: step %r is not one of %s' % (where, c['step'], sorted(STEPS, key=str)))
+        if 'step' in c:
+            raise ValueError('%s: a claim carries no step: its topic fixes it (TOPICS)' % where)
+        if kind == 'unmodelled' and c['topic'] not in TOPICS:
+            raise ValueError('%s: topic %r is not in the taxonomy (TOPICS)' % (where, c['topic']))
+        if kind == 'kits' and c['topic'] not in KIT_TOPICS:
+            raise ValueError('%s: kits topic %r is not one of %s'
+                             % (where, c['topic'], sorted(KIT_TOPICS)))
         cite = plain(c.get('cite'))
         if not cite or cite not in body:
             raise ValueError('%s: %s claim cites a line its Strategy section does not have: %r'
@@ -315,6 +357,10 @@ def findings(chap, matchup, mode=None, campaign=campaign_chapters.CAMPAIGN):
     """{'ours': ([claim], [line]), 'twin': (...)}: each side's validated claims, and every
     modelled one checked against that side's own read in `matchup`
     (`difficulty.chapter_matchup`)."""
+    if chap.get('status') == 'planned':
+        # ADR 0363: an unwritten chapter gets no reading, and the claims curated for the
+        # vanilla baseline past Ch7 are bot data only.
+        raise ValueError('%s is planned: no strategy reading (ADR 0363)' % chap.get('id'))
     ref = chap.get('parity_reference')
     our_force, van_force = matchup['forces']
     out = {}
@@ -341,7 +387,7 @@ def unmodelled_lines(claims):
     out = {}
     for c in claims:
         if c['kind'] == 'unmodelled':
-            out.setdefault(c['step'], []).append(c['topic'])
+            out.setdefault(step_of(c), []).append(c['topic'])
     return (['    unmodelled, step %d: %s' % (s, ', '.join(out[s]))
              for s in sorted(k for k in out if k != 'out')]
             + (['    not modelled (ADR 0365): %s' % ', '.join(out['out'])] if 'out' in out else []))

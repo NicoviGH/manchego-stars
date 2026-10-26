@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9 PR C (ADR 0368): the greedy clear-bot core moved whole into bot.lua
+    # (aggression "greedy"); harness.lua binds it as BOT
+    r'\bclearbot\b', r'test_clearbot',
     # retired by #531's raid PR: the raids are declared cases (`idle`/`raided`), ch05.lua's
     # reliquaries read CAMPAIGN.VILLAGES, and the flag parser is inject.decomp.flag_number
     r'scenarios\.ch0[25]raid\b', r'reliquaries are keyed by .name.', r'\b_flag_number\b',

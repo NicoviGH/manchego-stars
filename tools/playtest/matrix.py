@@ -923,7 +923,7 @@ def scenario_driver_modules(entry, source=None):
 
     A module counts as reached when its binding appears in the scenario's own closure, or
     in harness.lua's shared text. The BINDING LINES are stripped out of the shared text
-    first, and that detail is the whole feature: `local CLEARBOT = dofile(...)` is
+    first, and that detail is the whole feature: `local BOT = dofile(...)` is
     top-level, so leaving it in would make every module reachable by everyone and the split
     would do precisely nothing.
     """
@@ -941,7 +941,7 @@ def driver_source(here=None):
     """Everything OUTSIDE harness.lua that decides what a scenario does.
 
     `controller.lua` classifies every state a guarded input is authorised against;
-    `symbols.lua`/`procscr.lua` name the memory it reads; `clearbot`/`pathing`/`liveness`
+    `symbols.lua`/`procscr.lua` name the memory it reads; `bot`/`pathing`/`liveness`
     and friends are dofile'd straight into the run; and `run.sh` chooses the fps, the
     deadline, the checkpoint handling and the wrapper the emulator actually loads. Any of
     them can turn a PASS into a FAIL without harness.lua changing a byte.

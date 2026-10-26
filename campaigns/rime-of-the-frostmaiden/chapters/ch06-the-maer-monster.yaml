@@ -235,11 +235,9 @@ strategy_claims:
     cite: "Most of the enemy carries lances, so Braulo's axe wins the trades"
   - kind: unmodelled
     topic: escort
-    step: 7
     cite: "their crews will die without intervention."
   - kind: unmodelled
-    topic: positioning
-    step: 7
+    topic: range
     cite: "keep the cavalry away from the armored guard with the Horseslayer."
   - kind: reinforcements
     cite: "On turn 4 three more shark riders enter from the west edge."
