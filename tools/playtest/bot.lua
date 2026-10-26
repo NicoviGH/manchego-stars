@@ -17,8 +17,20 @@
 --              takenCrit, takenHits, killsTarget, diesWorst };
 --            reach(unit) -> {{x,y}...}, the tiles the unit can move to this phase;
 --            objective = { kind = "rout"|"boss"|"seize"|"defend"|"escape"|"survive",
---                          tile = {x,y}|nil, turnsLeft = n|nil, lord = charId|nil } }
---          `lord` is who may Seize (board.lua's Board.lordPid); without it nobody seizes.
+--                          tile = {x,y}|nil, turnsLeft = n|nil, lord = charId|nil,
+--                          ruledOut = {[slot] = true}|nil };
+--            field(goal) -> dist|nil, OPTIONAL: pathing.distanceField's shape (dist[y][x] =
+--              steps to `goal` over the map's passable tiles), built by the caller from the
+--              game's terrain. A function of the goal because the bot chooses the goal (the
+--              boss, the nearest enemy). Without it the march falls back to Manhattan, which
+--              strands a unit against a wall (#60).
+--            cache = {}|nil, OPTIONAL: a table the caller keeps for ONE player phase and
+--              replaces at the next. Forecasts are kept in it across decide calls, keyed by
+--              everything a player-phase action can change about the pair (both HPs, the
+--              enemy's tile). Reach and worst case are NOT kept across calls: they depend on
+--              where every unit stands, which each action changes. }
+--          Who may Seize is board.lua's Board.canSeize(unit, lord, ruledOut): `lord` is
+--          Board.lordPid; without it, anyone not in the ruledOut memo may try.
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, weapon = nil }.
@@ -45,7 +57,9 @@
 --
 -- Who acts: the lord seizes when it can reach the seize tile (the chapter ends there, so no
 -- enemy phase follows and no gate applies); else the unit with an allowed sure kill; else the
--- unit standing in the most danger; else slot order. Greedy keeps the old order: seize, then
+-- unit whose own tile has the largest worst case (more reaching enemies breaks a tie); else
+-- slot order. A unit that cannot Seize never ends on the seize tile, and never WAITS on or
+-- beside it (needsToStepOff): a body there blocks a single-approach throne for the lord. Greedy keeps the old order: seize, then
 -- slot order. A unit attacks when an allowed attack exists -- a sure kill first, then the
 -- likeliest kill, then the most expected damage, then the boss, then the lowest HP -- and else
 -- marches toward the objective (its tile, the boss, or the nearest enemy) over allowed tiles.
@@ -65,6 +79,11 @@
 --   then the lowest-HP enemy (likeliest kill).
 
 local M = {}
+
+-- board.lua is pure too. In a run the wrapper's PLAYTEST_DIR names this directory (run.sh);
+-- under plain `lua` (test_bot.lua) it is read off this chunk's own path.
+local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
+    or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "board.lua"))
 
 local function manhattan(ax, ay, bx, by)
     return math.abs(ax - bx) + math.abs(ay - by)
@@ -262,8 +281,13 @@ end
 
 -- ── Bot.decide ─────────────────────────────────────────────────────────────────────────────
 
--- The aggressions the runner samples. deploy and claims are open lists the runner fills.
-M.STYLES = { aggression = { "careful", "even", "bold" } }
+-- The axes a run's style is sampled on. aggression is a closed set; deploy and claims are
+-- lists the runner fills per run, empty until it does.
+M.STYLES = {
+    aggression = { "careful", "even", "bold" },
+    deploy = {},   -- charIds the runner chooses to field
+    claims = {},   -- Strategy claim ids the run follows
+}
 
 local CRIT_MULTIPLIER = 3   -- bmbattle.c: gBattleStats.damage * 3 on a critical hit
 local SURE_HIT = 100
@@ -273,8 +297,12 @@ local function isSureKill(f) return f.killsTarget and f.hit >= SURE_HIT end
 -- One decide call's view: the board split by role, and memos so a forecast or a reach the
 -- caller pays for (an emulator round trip, in the ROM) is asked for once per call.
 local function context(board, sight)
+    local cache = sight.cache or {}
+    cache.forecasts = cache.forecasts or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, standing = {},
-                  forecasts = {}, reaches = {}, worsts = {} }
+                  forecasts = cache.forecasts, reaches = {}, worsts = {}, fields = {} }
+    local o = sight.objective
+    if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
         if u.onField then
             ctx.standing[tileKey(u.x, u.y)] = u
@@ -287,7 +315,7 @@ local function context(board, sight)
 end
 
 local function forecast(ctx, u, e, x, y)
-    local k = u.id .. ">" .. e.id .. "@" .. tileKey(x, y)
+    local k = table.concat({ u.id, u.hp, e.id, e.hp, e.x, e.y, x, y, "held" }, ",")
     local f = ctx.forecasts[k]
     if not f then
         f = ctx.sight.forecast(u, e, x, y, nil)
@@ -311,14 +339,45 @@ local function reachOf(ctx, u)
     return r
 end
 
--- The tiles `u` can end on: its reach, less every tile another unit stands on.
+local function canSeize(ctx, u)
+    local o = ctx.sight.objective
+    return Board.canSeize(u, o.lord, o.ruledOut)
+end
+
+-- The tiles `u` can end on: its reach, less every tile another unit stands on, and less the
+-- seize tile for a unit that cannot Seize there.
 local function endTiles(ctx, u)
+    local s = ctx.seizeTile
+    local barred = s and not canSeize(ctx, u)
     local out = {}
     for _, t in ipairs(reachOf(ctx, u)) do
         local there = ctx.standing[tileKey(t.x, t.y)]
-        if not there or there == u then out[#out + 1] = t end
+        if (not there or there == u) and not (barred and t.x == s.x and t.y == s.y) then
+            out[#out + 1] = t
+        end
     end
     return out
+end
+
+-- Where `u` may Wait: its end tiles, and for a unit that cannot Seize none on or beside the
+-- seize tile (needsToStepOff) while any other is left -- it aims at the throne, it does not
+-- stand in the lord's way to it.
+local function waitTiles(ctx, u)
+    local tiles, s = endTiles(ctx, u), ctx.seizeTile
+    if not s or canSeize(ctx, u) then return tiles end
+    local clear = {}
+    for _, t in ipairs(tiles) do
+        if not M.needsToStepOff(t, s) then clear[#clear + 1] = t end
+    end
+    return #clear > 0 and clear or tiles
+end
+
+-- sight.field for `goal`, asked once per goal per call; nil when the caller has none.
+local function fieldFor(ctx, goal)
+    if not (goal and ctx.sight.field) then return nil end
+    local k = tileKey(goal.x, goal.y)
+    if ctx.fields[k] == nil then ctx.fields[k] = ctx.sight.field(goal) or false end
+    return ctx.fields[k] or nil
 end
 
 local function reaches(ctx, e, x, y)
@@ -410,7 +469,7 @@ local function goalFor(ctx, u, objective)
 end
 
 local function march(ctx, u, gate, objective)
-    local tiles, allowed = endTiles(ctx, u), {}
+    local tiles, allowed = waitTiles(ctx, u), {}
     for _, t in ipairs(tiles) do
         if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
     end
@@ -427,17 +486,16 @@ local function march(ctx, u, gate, objective)
         end
         return best
     end
-    -- no enemies passed: pickMove's cork fallback is a field-jam rule, and there is no field
-    return M.pickMove(allowed, { cur = u, goal = goal })
+    -- no enemies passed: pickMove's cork fallback pushes at a foe when the march is jammed,
+    -- and over tiles the style allowed that push is the greedy bot's charge, not this one's
+    return M.pickMove(allowed, { cur = u, goal = goal, field = fieldFor(ctx, goal) })
 end
 
-local function seize(ctx, objective)
-    if not (objective and objective.kind == "seize" and objective.tile and objective.lord) then
-        return nil
-    end
-    local s = objective.tile
+local function seize(ctx)
+    local s = ctx.seizeTile
+    if not s then return nil end
     for _, u in ipairs(ctx.actors) do
-        if u.charId == objective.lord then
+        if canSeize(ctx, u) then
             for _, t in ipairs(endTiles(ctx, u)) do
                 if t.x == s.x and t.y == s.y then return action(u, t, "seize") end
             end
@@ -447,8 +505,8 @@ local function seize(ctx, objective)
 end
 
 -- The old clear-bot through decide: the first unit in slot order, pickTarget's pick, else
--- pickMove toward the goal. With no BFS field here pickMove's cork rule sends it at the
--- nearest enemy, which is the charge the greedy bot has always made.
+-- pickMove toward the goal over sight.field when there is one. With no field pickMove's cork
+-- rule sends it at the nearest enemy, which is the charge the greedy bot has always made.
 local function greedy(ctx, objective)
     local u = ctx.actors[1]
     local tiles = endTiles(ctx, u)
@@ -459,8 +517,9 @@ local function greedy(ctx, objective)
     local pick = u.minRange and M.pickTarget(tiles, targets,
         { range = u.maxRange, min_range = u.minRange })
     if pick then return action(u, pick.tile, "attack", pick.target.unit) end
-    local tile = M.pickMove(tiles, { cur = u, goal = goalFor(ctx, u, objective),
-                                     enemies = targets })
+    local goal = goalFor(ctx, u, objective)
+    local tile = M.pickMove(waitTiles(ctx, u), { cur = u, goal = goal,
+                                                 field = fieldFor(ctx, goal), enemies = targets })
     return action(u, tile, "wait")
 end
 
@@ -473,7 +532,7 @@ function M.decide(board, sight, style)
     local ctx = context(board, sight)
     if #ctx.actors == 0 then return nil end
     local objective = sight.objective
-    local s = seize(ctx, objective)
+    local s = seize(ctx)
     if s then return s end
     if not gate then return greedy(ctx, objective) end
 
@@ -483,10 +542,11 @@ function M.decide(board, sight, style)
         attacks[u] = a
         if a and a.sure then return action(u, a.tile, "attack", a.target) end
     end
-    local u, most = ctx.actors[1], 0
+    -- the most threatened: the largest worst case where it stands, then the most enemies
+    local u, most, count = ctx.actors[1], 0, 0
     for _, c in ipairs(ctx.actors) do
-        local d = sight.danger(c.x, c.y)
-        if d > most then u, most = c, d end
+        local w, d = worstCase(ctx, c, c.x, c.y, nil).sum, sight.danger(c.x, c.y)
+        if w > most or (w == most and d > count) then u, most, count = c, w, d end
     end
     local a = attacks[u]
     if a then return action(u, a.tile, "attack", a.target) end

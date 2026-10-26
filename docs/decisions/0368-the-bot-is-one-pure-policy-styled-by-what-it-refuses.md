@@ -42,13 +42,27 @@ None of these gates or the attack ranking was chosen by looking at a survival ra
 
 **Order within a turn:** the lord seizes when it can reach the seize tile, whatever the danger
 (seizing ends the chapter, so no enemy phase follows); then the unit with an allowed sure kill;
-then the unit standing in the most danger; then slot order. Greedy keeps its old order: seize,
+then the unit whose own tile has the largest worst case (the threat measure is the worst case
+everywhere; the number of reaching enemies only breaks a tie); then slot order. Greedy keeps its old order: seize,
 then slot order. A unit attacks when an allowed attack exists (sure kill, then kill chance, then
 expected damage, then the boss, then the lowest HP), else it marches toward the objective (its
 tile, the boss, or the nearest enemy; it holds on `survive`) over allowed tiles, and with none
-allowed it ends where the worst case is smallest.
+allowed (or nothing to march to) it ends where the worst case is smallest.
 
-**Two fields the interface did not name.** `objective.lord` (who may Seize, from Board.lordPid):
-without it the bot cannot tell who seizes, and nobody does. The action carries `unitId` and
-`targetId` (Board's unique index byte) beside the charIds, because generics share a charId and
-the ROM layer has to know which body to act on.
+**A unit that cannot Seize never blocks the throne.** Who may Seize is `Board.canSeize(unit,
+objective.lord, objective.ruledOut)`, its one owner: with no lord pid, anyone not in the ruledOut
+memo may try. A unit that cannot never ends on the seize tile, and never waits on or beside it
+(`needsToStepOff`) while another tile is left; it attacks from beside it, as the clear bot did.
+
+**What PR D supplies beyond the first interface:**
+- `objective.lord` (Board.lordPid) and `objective.ruledOut` (the slots that stood on the tile with
+  no Seize command), so Board.canSeize answers who may Seize.
+- `sight.field(goal)`, optional: a pathing.distanceField-shaped field toward `goal`, from the
+  game's terrain. A function of the goal because the bot picks the goal. Without it the march is
+  Manhattan, which strands a unit against a wall (#60).
+- `sight.cache`, optional: one table per player phase. Forecasts are kept in it across decide
+  calls, keyed by both units, both HPs, the enemy's tile and the strike tile, so an action that
+  changes one exchange only re-asks that one. Reach and worst case are not kept across calls: they
+  depend on where every unit stands, and each action moves one.
+- The action carries `unitId` and `targetId` (Board's unique index byte) beside the charIds,
+  because generics share a charId and the ROM layer has to know which body to act on.

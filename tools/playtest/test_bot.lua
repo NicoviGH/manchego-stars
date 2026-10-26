@@ -322,6 +322,8 @@ local function sightOf(o)
     local calls = 0
     local s = {
         objective = o.objective or { kind = "rout" },
+        field = o.field,
+        cache = o.cache,
         danger = function(x, y) return (o.danger or {})[x .. "," .. y] or 0 end,
         reach = function(u) return (o.reach or {})[u.id] or { { x = u.x, y = u.y } } end,
         forecast = function(u, t, x, y, slot)
@@ -478,9 +480,14 @@ do
     for _, aggr in ipairs({ "careful", "even", "bold" }) do
         check(B.decide(board, sight, style(aggr)).act, "wait", aggr .. ": diesWorst refuses")
     end
-    local g = B.decide(board, sight, style("greedy"))
+    local fresh = sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) },
+        fc = { [0x01] = { [0x81] = {
+            ["0,0"] = fc { hit = 90, dmg = 10, hits = 1, diesWorst = true } } } },
+    }
+    local g = B.decide(board, fresh, style("greedy"))
     check(g.act, "attack", "greedy attacks whatever the forecast says")
-    check(sight.calls(), 3, "greedy reads no forecast (the three calls are the other styles')")
+    check(fresh.calls(), 0, "greedy reads no forecast")
 end
 
 -- test_objective_seize: the lord with the seize tile in reach and danger 0 there seizes,
@@ -502,14 +509,44 @@ do
         check(a and a.unit, 0x0F, aggr .. ": it is the lord who seizes")
         check(at(a), "4,4", aggr .. ": on the seize tile")
     end
-    -- the lord cannot reach it: the other unit takes its sure kill, it does not seize
+    -- the lord has acted; the other unit's only kill is from the throne. It does not seize,
+    -- and it does not end on the throne either -- not to attack, not to wait.
+    local Ld = blue(0x01, 0, 2, 2, { charId = 0x0F, acted = true })
     sight = sightOf {
         objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
-        reach = { [0x01] = tiles({ 2, 2 }), [0x02] = tiles({ 4, 3 }, { 4, 4 }) },
+        reach = { [0x02] = tiles({ 4, 4 }, { 4, 3 }, { 4, 1 }) },
         fc = { [0x02] = { [0x82] = { ["4,4"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
     }
+    for _, aggr in ipairs({ "careful", "bold", "greedy" }) do
+        local a = B.decide(boardOf(Ld, O, E1, Bo), sight, style(aggr))
+        check(a.act ~= "seize", true, aggr .. ": a non-lord does not seize")
+        check(at(a), "4,1", aggr .. ": a non-lord ends off the throne and out of its approach")
+    end
+    -- the seize tile in reach and in lethal danger: the lord still seizes (no enemy phase follows)
+    sight = sightOf {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+        danger = { ["4,4"] = 3 },
+        reach = { [0x01] = tiles({ 2, 2 }, { 4, 4 }), [0x82] = tiles({ 4, 5 }) },
+        fc = { [0x01] = { [0x82] = { ["4,4"] = fc { takenHit = 90, takenDmg = 30, takenHits = 2,
+                                                    takenCrit = 10 } } } },
+    }
     local a = B.decide(board, sight, style("careful"))
-    check(a.act, "attack", "a non-lord on reach of the throne does not seize")
+    check(a.act, "seize", "careful seizes even where the worst case is lethal")
+    -- no lord pid (a build without the candidate table): Board.canSeize lets anyone not
+    -- ruled out try, and a ruled-out unit is barred like any non-lord
+    sight = sightOf {
+        objective = { kind = "seize", tile = { x = 4, y = 4 } },
+        reach = { [0x01] = tiles({ 2, 2 }), [0x02] = tiles({ 4, 3 }, { 4, 4 }, { 4, 1 }) },
+    }
+    a = B.decide(boardOf(Ld, O, E1, Bo), sight, style("careful"))
+    check(a.act, "seize", "no lord pid: an unruled unit tries the Seize")
+    check(a.unitId, 0x02, "no lord pid: the unit on reach of the throne tries")
+    sight = sightOf {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, ruledOut = { [1] = true } },
+        reach = { [0x01] = tiles({ 2, 2 }), [0x02] = tiles({ 4, 3 }, { 4, 4 }, { 4, 1 }) },
+    }
+    a = B.decide(boardOf(Ld, O, E1, Bo), sight, style("careful"))
+    check(a.act ~= "seize" and at(a), "4,1", "no lord pid, ruled out: off the throne's approach")
 end
 
 -- The most threatened unit acts before the rest; with no threat, slot order.
@@ -529,6 +566,74 @@ do
     check(at(a), "4,5", "and steps out of reach")
     check(B.decide(boardOf(A, Bu, E), sightOf {}, style("careful")).unit, 0x01,
         "no threat anywhere: slot order")
+end
+
+-- Threat is the worst case, not the head count: one lethal enemy outranks two that chip.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local Bu = blue(0x02, 1, 9, 9, { hp = 20 })
+    local C1, C2 = red(0x81, 0, 2), red(0x82, 2, 0)
+    local L1 = red(0x83, 9, 7)
+    local sight = sightOf {
+        danger = { ["0,0"] = 2, ["9,9"] = 1 },
+        reach = { [0x81] = tiles({ 0, 1 }), [0x82] = tiles({ 1, 0 }), [0x83] = tiles({ 9, 8 }) },
+        fc = {
+            [0x01] = { [0x81] = { ["0,0"] = fc { takenHit = 50, takenDmg = 3, takenHits = 1 } },
+                       [0x82] = { ["0,0"] = fc { takenHit = 50, takenDmg = 3, takenHits = 1 } } },
+            [0x02] = { [0x83] = { ["9,9"] = fc { takenHit = 80, takenDmg = 12, takenHits = 2 } } },
+        },
+    }
+    check(B.decide(boardOf(A, Bu, C1, C2, L1), sight, style("careful")).unit, 0x02,
+        "the unit facing one lethal enemy acts before the one facing two chips")
+end
+
+-- sight.field routes the march around a wall; without it the march is Manhattan.
+do
+    local P = dofile(here .. "pathing.lua")
+    -- a wall at x = 2 for y = 0..1; the way past it is y = 2
+    local wall = { ["2,0"] = true, ["2,1"] = true }
+    local function passable(x, y) return not wall[x .. "," .. y] end
+    local A = blue(0x01, 0, 0, 1)
+    local E = red(0x81, 4, 1)
+    local reach = { [0x01] = tiles({ 1, 0 }, { 1, 2 }) }  -- both 4 from E by Manhattan
+    local asked
+    local withField = sightOf { reach = reach, field = function(goal)
+        asked = goal; return P.distanceField(6, 4, passable, goal) end }
+    local a = B.decide(boardOf(A, E), withField, style("careful"))
+    check(at(a), "1,2", "the field's march takes the way around the wall")
+    check(asked and asked.x == 4 and asked.y == 1, true, "the field is asked for the bot's goal")
+    check(at(B.decide(boardOf(A, E), sightOf { reach = reach }, style("careful"))), "1,0",
+        "no field: Manhattan (first of the tied tiles)")
+    check(at(B.decide(boardOf(A, E), withField, style("greedy"))), "1,2",
+        "greedy marches over the field too")
+end
+
+-- sight.cache carries forecasts across decide calls in one phase: once per pair and tile.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local Bu = blue(0x02, 1, 5, 0)
+    local E = red(0x81, 1, 0, { hp = 30 })
+    local o = {
+        cache = {},
+        danger = { ["0,0"] = 1, ["5,0"] = 0 },
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 5, 0 }), [0x81] = tiles({ 1, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 80, dmg = 5, hits = 1 } } } },
+    }
+    local sight = sightOf(o)
+    B.decide(boardOf(A, Bu, E), sight, style("careful"))
+    local first = sight.calls()
+    B.decide(boardOf(A, Bu, E), sight, style("careful"))
+    check(first, 1, "one forecast for the one pair and tile")
+    check(sight.calls(), 1, "the second call reads it from the cache")
+    -- the enemy's HP changed (it was hit): a different exchange, asked again
+    local hurt = red(0x81, 1, 0, { hp = 25 })
+    B.decide(boardOf(A, Bu, hurt), sight, style("careful"))
+    check(sight.calls(), 2, "a changed HP is a new forecast")
+    -- no cache: every call asks again
+    local bare = sightOf { danger = o.danger, reach = o.reach, fc = o.fc }
+    B.decide(boardOf(A, Bu, E), bare, style("careful"))
+    B.decide(boardOf(A, Bu, E), bare, style("careful"))
+    check(bare.calls(), 2, "without a cache each call asks for itself")
 end
 
 -- Every unit has acted (or is off the field): nil, the phase is over.
