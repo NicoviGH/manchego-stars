@@ -778,13 +778,14 @@ local function test_shop_stops_at_gold()
         "vulneraries per unit first, then the cheapest in-rank weapon each lacks")
     check(flat(B.shop(700, stock, { A, Bu })), "108x2",
         "gold runs out after the vulneraries: 100 left buys no 400+ sword")
-    check(flat(B.shop(1000, stock, { A, Bu })), "108x2,17x1",
-        "skips the lance it cannot afford (700 > 400 left), nothing after it fits")
+    local Cu0 = unitOf(3, 0x03, 1, { ranks = { axe = 1, sword = 2 } })
+    check(flat(B.shop(1000, stock, { Bu, Cu0 })), "108x2,33x1",
+        "skip then continue: the lance (700) is skipped at 400 gold, the axe (100) after it is bought")
     A.items = { { id = 0x10, type = "sword", rank = 1 } }
     check(flat(B.shop(10000, stock, { A, Bu })), "108x2,32x1", "a unit holding its type buys none")
     local Cu = unitOf(3, 0x03, 1, { ranks = { axe = 1, sword = 2 } })
-    check(flat(B.shop(10000, stock, { Cu })), "108x1,33x1,17x1",
-        "skip-and-continue: gold 710 buys vuln 300, axe 100, sword 400 in order")
+    check(flat(B.shop(800, stock, { Cu })), "108x1,33x1,17x1",
+        "skip-and-continue: exact fit, gold 800 buys vuln 300, axe 100, sword 400 in order")
     check(flat(B.shop(450, stock, { Cu })), "108x1,33x1",
         "the sword (400) is skipped at 50 gold, the buying stops there")
     check(flat(B.shop(0, stock, { A })), "", "no gold, nothing")

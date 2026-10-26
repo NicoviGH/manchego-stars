@@ -9,8 +9,8 @@
 --   board: Board.read's shape (board.lua). Blue units on the field that have not acted are the
 --          ones that can act; on-field reds are the enemies.
 --   style: { aggression = "careful"|"even"|"bold"|"greedy", deploy = {charIds},
---            claims = {claim ids}, route = 1|2 }. Bot.STYLES lists the sampled aggressions; "greedy" is not
---          sampled -- it is the clear scenarios' old bot and ignores `sight` except reach and
+--            claims = {claim ids}, route = 1|2 }. Bot.STYLES lists the sampled axes; "greedy" is
+--          not sampled -- it is the clear scenarios' old bot and ignores `sight` except reach and
 --          the objective.
 --   sight: { danger(x, y) -> how many enemies reach (x, y), the game's danger zone;
 --            forecast(unit, target, x, y, slot) -> { hit, dmg, crit, hits, takenHit, takenDmg,
@@ -636,10 +636,9 @@ function M.prep(roster, cap, style)
     for _, u in ipairs(roster) do
         if u.forced then take(u) end
     end
-    local forced = #deploy
     for _, charId in ipairs(style.deploy or {}) do
         for _, u in ipairs(roster) do
-            if u.charId == charId and #deploy < math.max(cap, forced) then take(u) break end
+            if u.charId == charId and #deploy < cap then take(u) break end
         end
     end
     for _, u in ipairs(byLevel(roster)) do
