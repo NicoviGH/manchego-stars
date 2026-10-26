@@ -362,6 +362,10 @@ local controllerState, guardedInput, freezeReport
 -- ~7400) is out of scope in any scenario written above that line, which is why the shared
 -- R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
 local INSPECT = {}
+-- A loss: the game-over screen, or the title it falls back to without the chapter advancing.
+INSPECT.chapterLost = function()
+    return gameOverActive() or procActive(SYM.gProcScr_TitleScreen)
+end
 local function recordCutscene(o)
     o = o or {}
     local tag = o.tag or "scene"
@@ -1111,7 +1115,9 @@ end
 -- structures. `stopWhen` is an optional second exit for the combat wait. A kill that ENDS the
 -- chapter starts the win event on the spot, which can keep the actor from ever being greyed out.
 -- Dialogue advances only at TalkWaitForInput; a combat timeout fails closed without rescue input.
-local function chooseAttack(actorAddr, stopWhen)
+-- `targetId` (optional) is the enemy's unit index byte: the selector is stepped to it first, so
+-- a caller that chose its target strikes that one and not the selector's first.
+local function chooseAttack(actorAddr, stopWhen, targetId)
     if not selectSemantic("attack", "Attack opens the live weapon menu", function(after)
         return controllerState(after) == "weapon_menu"
     end, 300) then return false end
@@ -1119,6 +1125,22 @@ local function chooseAttack(actorAddr, stopWhen)
         return controllerState(after) == "target_selection"
             and after.target and after.target.kind == "attack"
     end, 300) then return false end
+    -- At most one step per target the selector can hold (bmunit.h: red[50]); a target it
+    -- never reaches is a fault.
+    for _ = 1, 50 do
+        local now = observeController().target
+        if not targetId or (now and now.uid == targetId) then break end
+        if not guardedInput("next_target", "RIGHT", "the selector steps to its next target",
+            function(after, before)
+                return after.target ~= nil and before.target ~= nil
+                    and after.target.uid ~= before.target.uid
+            end, 30) then return false end
+    end
+    if targetId and observeController().target.uid ~= targetId then
+        traceFailure("select_target", string.format("the selector reaches unit 0x%02X", targetId),
+            "fail:target-not-offered", nil, "controller-target-not-offered")
+        return false
+    end
     -- Commit proof has to be mode-agnostic. procs.battle is gProc_ekrBattle, the battle
     -- ANIMATION proc: a scenario that called pokeFastConfig() runs MAP combat, where it
     -- never spawns, so requiring it alone fails an attack that in fact resolved (#232 --
@@ -2071,15 +2093,19 @@ end
 -- 5,000 inside chapter 0x38 (Castle Frelia, the decomp's `lordsplit`), so Ch2 starts at 5,000. Prologue: Seth kills a 1-HP O'Neill (DefeatBoss). Ch1: Seth
 -- kills a 1-HP Breguet off the gate and Eirika seizes (2,2). Vanilla's own chapter indices,
 -- Prologue 0, Ch1 1, Ch2 2 -- never our hosting slots (inject/hosts.py), which are ours.
-scenarios.vanillagold = function()
-    local PROLOGUE, CH1, CH2 = 0, 1, 2
-    -- Retail boots at text speed 1 (bmio.c:950); our build plays its scenes at max. Hold
-    -- textSpeed 3 (no typewriter delay, GetTextDisplaySpeed) and gameSpeed fast, or the
-    -- Prologue's narration outlasts TUNE.bootSteps. New Game rewrites the config, hence every step.
+-- Retail boots at text speed 1 (bmio.c:950); our build plays its scenes at max. Hold
+-- textSpeed 3 (no typewriter delay, GetTextDisplaySpeed) and gameSpeed fast, or the
+-- Prologue's narration outlasts TUNE.bootSteps. New Game rewrites the config, hence every step.
+INSPECT.retailFastText = function()
     TUNE.bootHook = function()
         local a = SYM.gPlaySt + 0x40
         emu:write32(a, (ru32(a) & ~(3 << 5)) | (3 << 5) | (1 << 7))
     end
+end
+
+scenarios.vanillagold = function()
+    local PROLOGUE, CH1, CH2 = 0, 1, 2
+    INSPECT.retailFastText()
     local EIRIKA, SETH, ONEILL, BREGUET = 0x01, 0x02, 0x68, 0x46
     local function gold() return ru32(SYM.gPlaySt + 0x08) end
     local seen = {}
@@ -2563,7 +2589,7 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
     -- A real win ADVANCES the chapter. The title screen WITHOUT an advance means game-over ->
     -- title (a loss), not a win -- so this stays an honest fair-play gate (#60).
     local function won() return chapter() ~= startChapter end
-    local function lost() return gameOverActive() or procActive(SYM.gProcScr_TitleScreen) end
+    local lost = INSPECT.chapterLost
     -- progress = the nearest candidate's path-distance to the target (lower is better): the
     -- boss while it lives, then the seize tile. ruledOut[slot] marks units that stood on the
     -- seize tile without a legal Seize -- not the lord -- so the lord's march still registers.
@@ -2788,6 +2814,224 @@ scenarios.clear_ch01 = function()
     if not reachCh01Map() then return end
     pokeFastConfig() -- many-combat enemy phases: map-anim battles + fast speed
     return clearDrive(chapter(), 24, 15, CH01_PARK)
+end
+
+-- ---- the bot plays the game (#510 step 9 PR D). botrun.lua and sight.lua are their own
+-- chunks; everything here is the `api` they talk over (ADR 0369), built on the drivers above.
+-- The sandbox's CPU. A call runs as ordinary emulation: `frames` yields this coroutine a frame
+-- at a time until the call is back in its loop. Save and load go through the memo guard
+-- (`emu`): a load rewinds the frame counter, so the proc-pool memo must be dropped with it.
+INSPECT.sightApi = function()
+    local raw = PROCS.raw
+    return {
+        mem = { u8 = ru8, s8 = rs8, u16 = ru16, s16 = rs16, u32 = ru32 },
+        write8 = function(a, v) raw:write8(a, v) end,
+        SYM = SYM,
+        cpu = {
+            read = function(r) return raw:readRegister(r) end,
+            write = function(r, v) raw:writeRegister(r, v) end,
+            save = function() return emu:saveStateBuffer() end,
+            load = function(st) emu:loadStateBuffer(st) end,
+            write16 = function(a, v) raw:write16(a, v) end,
+            write32 = function(a, v) raw:write32(a, v) end,
+            frames = function(done, max)
+                for _ = 1, max do
+                    yield()
+                    if done() then return true end
+                end
+                return false
+            end,
+        },
+        map = mapSize,
+        chapter = chapter,
+        turn = turn,
+        lordPid = function() return BOARD.lordPid(eventFlag) end,
+        fieldUnit = function()
+            local lord = BOARD.lordPid(eventFlag)
+            local first
+            for _, u in ipairs(BOARD.live(BOARD.read(), "blue")) do
+                if u.onField and u.charId == lord then return u end
+                first = first or (u.onField and u or nil)
+            end
+            return first
+        end,
+        distanceField = PATHING.distanceField,
+    }
+end
+
+-- Every unit that falls during an enemy phase, with the fighter it fell to: a frame callback
+-- for the phase's length that watches both arrays (lean) and, the frame one goes down, reads
+-- who is fighting -- gBattleActor/gBattleTarget +0x0B is the unit index, +0x00 the character.
+INSPECT.watchDeaths = function()
+    local alive, deaths = {}, {}
+    for _, f in ipairs({ "blue", "red" }) do
+        for _, u in ipairs(BOARD.leanList(f)) do
+            if u.onField then alive[ru8(u.addr + 0x0B)] = { charId = u.charId, faction = f } end
+        end
+    end
+    local function charOf(bu) return ru8(ru32(bu) + 4) end
+    local id = callbacks:add("frame", function()
+        for uid, who in pairs(alive) do
+            local addr = ru32(SYM.gUnitLookup + uid * 4)
+            if addr == 0 or ru8(addr + 0x13) == 0 or (ru32(addr + 0x0C) & BOARD.US_DEAD) ~= 0 then
+                local killer
+                if ru8(SYM.gBattleActor + 0x0B) == uid then killer = charOf(SYM.gBattleTarget)
+                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then killer = charOf(SYM.gBattleActor) end
+                deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
+                                        killer = killer }
+                alive[uid] = nil
+            end
+        end
+    end)
+    return function() callbacks:remove(id); return deaths end
+end
+
+-- Botrun's api over this harness. `info.game` is "ours" or "vanilla".
+INSPECT.botApi = function(game)
+    local Json = dofile(PLAYTEST_DIR .. "/json.lua")
+    local Sight = dofile(PLAYTEST_DIR .. "/sight.lua")
+    local start = chapter()
+    local function won() return chapter() ~= start end
+    local lost = INSPECT.chapterLost
+    local function decode(s, default)
+        if s == nil or s == "" then return default end
+        return Json.decode(s)
+    end
+    local style = decode(PLAYTEST_STYLE, { aggression = "careful", deploy = {}, claims = {} })
+    local api = {
+        info = { game = game, rom_hash = PLAYTEST_ROMHASH, chapter = start,
+                 mode = TUNE.difficultyName[TUNE.difficultyWant],
+                 seed = tonumber(PLAYTEST_SEED) or 1 },
+        style = style,
+        claims = decode(PLAYTEST_CLAIMS, {}),
+        board = BOARD.read,
+        won = won,
+        lost = lost,
+        frames = function() return emu:currentFrame() end,
+        emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
+        log = log,
+    }
+    local sightApi = INSPECT.sightApi()
+    api.seed = function(s) return Sight.seed(sightApi, s) end
+    api.sight = function() return Sight.new(sightApi) end
+    -- One action of Bot.decide's: move, then attack the chosen enemy, wait, or Seize.
+    api.act = function(a)
+        local u = BOARD.find("blue", a.unit)
+        if not u or not moveUnit(u.x, u.y, a.move.x, a.move.y) then return false end
+        if a.act == "attack" then
+            -- The actor can die in its own attack: a dead unit is never greyed out, so its
+            -- death is an exit of the combat wait too.
+            return chooseAttack(u.addr, function()
+                return won() or lost() or (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0
+            end, a.targetId)
+        elseif a.act == "seize" then
+            if not Controller.findAction(Controller.legalActions(observeController()), "seize") then
+                return cancelUnitActionMenu() and "noseize"
+            end
+            if not selectSemantic("seize", "Seize starts the chapter win event", function()
+                return won() or procActive(SYM.ProcScr_StdEventEngine)
+            end, 900) then return false end
+            return waitFor(won, 9000, true)
+        end
+        return chooseWait()
+    end
+    api.endPhase = function()
+        local phaseTurn = turn()
+        local stop = INSPECT.watchDeaths()
+        local phase = runEnemyPhase(nil, won, phaseTurn)
+        local deaths = stop()
+        if phase == "player" then INSPECT.settle("phase", 6000, true); wait(60) end
+        return phase, deaths
+    end
+    return api
+end
+
+-- bot: the bot plays one chapter, seeded by PT_SEED, styled by PT_STYLE (JSON), following
+-- PT_CLAIMS (JSON, resolved). Ours: ch01 (reached as clear_ch01 reaches it). PT_VANILLA=1:
+-- retail Ch1, reached by the bot playing the Prologue first (its record is emitted too). The
+-- verdict is PASS for any finished run (won, lost, stuck): the record IS the result.
+scenarios.bot = function()
+    local Botrun = dofile(PLAYTEST_DIR .. "/botrun.lua")
+    local function play(game)
+        pokeFastConfig()
+        INSPECT.settle("phase", 6000, true)
+        wait(60)
+        return Botrun.run(INSPECT.botApi(game))
+    end
+    if PLAYTEST_VANILLA == "1" then
+        INSPECT.retailFastText()
+        if not bootToMap(nil, 0) then return result("FAIL", "never reached the Prologue map") end
+        local ok, why, rec = play("vanilla")
+        if not ok or rec.outcome ~= "won" then
+            return result("FAIL", "the bot did not win the Prologue on the way to Ch1: " .. why)
+        end
+        if not bootToMap(nil, 1) then return result("FAIL", "never reached Ch1's map") end
+        ok, why, rec = play("vanilla")
+        return result(ok and "PASS" or "FAIL", string.format("Ch1 %s: %s", rec.outcome, why))
+    end
+    if not reachCh01Map() then return end
+    local ok, why, rec = play("ours")
+    return result(ok and "PASS" or "FAIL", string.format("ch01 %s: %s", rec.outcome, why))
+end
+
+-- sightprobe: what the sight reads at the chapter's start, printed for a check by eye against
+-- the map (#510 step 9 PR D, Task 6): the danger grid, the objective, the lord's reach, and
+-- one forecast against the boss (else the nearest enemy) from the lord's own tile, with that
+-- enemy's strike on the lord where it stands. Ours: ch01. PT_VANILLA=1: the retail Prologue,
+-- the first map New Game reaches (Ch1 is only reached by playing it, which `bot` does).
+scenarios.sightprobe = function()
+    if PLAYTEST_VANILLA == "1" then
+        INSPECT.retailFastText()
+        if not bootToMap(nil, 0) then return result("FAIL", "never reached the Prologue map") end
+    elseif not reachCh01Map() then return end
+    INSPECT.settle("phase", 6000, true)
+    local Sight = dofile(PLAYTEST_DIR .. "/sight.lua")
+    local sapi = INSPECT.sightApi()
+    local sight = Sight.new(sapi)
+    local w, h = mapSize()
+    for y = 0, h - 1 do
+        local row = {}
+        for x = 0, w - 1 do row[#row + 1] = tostring(sight.danger(x, y)) end
+        log(string.format("danger y=%02d %s", y, table.concat(row, "")))
+    end
+    local o = sight.objective
+    log(string.format("objective kind=%s tile=%s turnsLeft=%s lord=%s", tostring(o.kind),
+        o.tile and (o.tile.x .. "," .. o.tile.y) or "-", tostring(o.turnsLeft), tostring(o.lord)))
+    local board = BOARD.read()
+    local lead = sapi.fieldUnit()
+    if not lead then return result("FAIL", "no blue unit on the field") end
+    local reach = sight.reach(lead)
+    local tiles = {}
+    for _, t in ipairs(reach) do tiles[#tiles + 1] = t.x .. "," .. t.y end
+    log(string.format("reach of 0x%02X at (%d,%d): %d tiles: %s", lead.charId, lead.x, lead.y,
+        #reach, table.concat(tiles, " ")))
+    local foe, best
+    for _, e in ipairs(BOARD.live(board, "red")) do
+        if e.onField then
+            local d = math.abs(e.x - lead.x) + math.abs(e.y - lead.y)
+            if e.isBoss then foe = e; break end
+            if not best or d < best then foe, best = e, d end
+        end
+    end
+    if not foe then return result("FAIL", "no enemy on the field") end
+    local f = sight.forecast(lead, foe, lead.x, lead.y, nil)
+    log(string.format("forecast 0x%02X@(%d,%d) vs 0x%02X@(%d,%d) hp=%d: hit=%d dmg=%d crit=%d "
+        .. "hits=%d | taken hit=%d dmg=%d crit=%d hits=%d | counters=%s kills=%s dies=%s",
+        lead.charId, lead.x, lead.y, foe.charId, foe.x, foe.y, foe.hp, f.hit, f.dmg, f.crit,
+        f.hits, f.takenHit, f.takenDmg, f.takenCrit, f.takenHits, tostring(f.counters),
+        tostring(f.killsTarget), tostring(f.diesWorst)))
+    -- And the same exchange where an attack is in range: the lord beside the enemy.
+    for _, t in ipairs(reach) do
+        local d = math.abs(t.x - foe.x) + math.abs(t.y - foe.y)
+        if lead.minRange and d >= lead.minRange and d <= lead.maxRange then
+            local g = sight.forecast(lead, foe, t.x, t.y, nil)
+            log(string.format("in range from (%d,%d): hit=%d dmg=%d crit=%d hits=%d | taken "
+                .. "hit=%d dmg=%d crit=%d hits=%d | counters=%s", t.x, t.y, g.hit, g.dmg, g.crit,
+                g.hits, g.takenHit, g.takenDmg, g.takenCrit, g.takenHits, tostring(g.counters)))
+            break
+        end
+    end
+    return result("PASS", "sight read; check the log by eye against the map")
 end
 
 -- ---- stability fuzzer (#49): SEEDED random inputs over the same I/O layer, hunting the
@@ -3050,7 +3294,7 @@ end
 -- sidecar, execute the orders, end the turn. Same terminal detection as the clear-bot.
 local function llmUntilAdvance(startChapter, objective, maxx, maxy, park)
     local function won() return chapter() ~= startChapter end
-    local function lost() return gameOverActive() or procActive(SYM.gProcScr_TitleScreen) end
+    local lost = INSPECT.chapterLost
     local budgetTurns = 18
     local seed = math.floor(tonumber(PLAYTEST_SEED) or 1)
     local n = 0

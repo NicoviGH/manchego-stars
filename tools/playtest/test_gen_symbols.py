@@ -66,6 +66,33 @@ class WantedSymbols(unittest.TestCase):
         self.assertNotIn('gLordSelectCandidates', gs.WANTED)
 
 
+# What sight.lua runs and reads (#510 step 9 PR D). Required, so both ELFs must carry them.
+SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNSeeds',
+         'BattleGenerateSimulation', 'InitBattleForecastBattleStats', 'GenerateDangerZoneRange',
+         'GenerateUnitMovementMap', 'GetUnitMovementCost', 'GetAvailableTileEventCommand',
+         'GetROMChapterStruct', 'InitRN']
+ELFS = {'ours': os.path.join(gs.DECOMP, 'fireemblem8.elf'),
+        'vanilla': os.path.join(gs.REPO, 'build', 'vanilla-fe8', 'fireemblem8.elf')}
+
+
+class SightSymbols(unittest.TestCase):
+    def test_every_sight_symbol_is_required(self):
+        for name in SIGHT:
+            self.assertIn(name, gs.WANTED, name)
+
+    def test_both_elfs_carry_every_sight_symbol(self):
+        # gRNSeeds is file-static in rng.c: nm lists it as a LOCAL ('b'), and it must still
+        # resolve. Skipped where a ROM has not been built (CI's tests job has no ELF).
+        import subprocess
+        for game, elf in ELFS.items():
+            if not os.path.exists(elf):
+                self.skipTest('%s ELF not built: %s' % (game, elf))
+            nm = subprocess.run(['arm-none-eabi-nm', elf], capture_output=True, text=True,
+                                check=True).stdout
+            got = gs.wanted_symbols(gs.parse_nm(nm), SIGHT)
+            self.assertEqual(sorted(got), sorted(SIGHT), game)
+
+
 class ProcScripts(unittest.TestCase):
     """The #236 defect: proc identity came from the PROC_NAME string at proc+0x10, and
     the decomp reuses those (E_FACE twice, bmenu three times). Script ADDRESSES are

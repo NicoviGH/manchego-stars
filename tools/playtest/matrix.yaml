@@ -129,6 +129,11 @@ scenarios:
   # A MEASUREMENT of retail, not a gate: kind diagnostic, because the world-map interlude it
   # crosses is a state the controller does not classify, so it presses through it raw.
   vanillagold: {rom: any, manual: true, kind: diagnostic, deadline: 900}
+  # #510 step 9 PR D: the bot plays one chapter (ours ch01; PT_VANILLA=1 retail Ch1 after the
+  # Prologue) and emits a BOTRUN record; sightprobe prints what sight.lua reads, for a check
+  # by eye. Both headless (memory only), both run by hand -- never in a suite.
+  bot: {rom: any, manual: true, deadline: 1800}
+  sightprobe: {rom: any, manual: true, deadline: 900}
   goodberry: {}
   ch01: {}
   smoke_ch01: {}

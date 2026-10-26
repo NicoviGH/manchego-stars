@@ -491,6 +491,8 @@ check(a and a.target, 0x81, "target confirmation records the live unit id")
 -- recovery a legal observed action rather than a guessed key.
 a = action(attackTarget, "cancel_target")
 check(a and a.key, "B", "a live target selector can be backed out of")
+a = action(attackTarget, "next_target")
+check(a and a.key, "RIGHT", "a live target selector steps to its next target")
 
 local frozenTarget = {
     procs = proc("target_selection", "target_selection_input"),
@@ -499,6 +501,7 @@ local frozenTarget = {
 classify(frozenTarget, "transition", "frozen target selector is passive")
 check(action(frozenTarget, "confirm_target"), nil, "frozen target exposes no input")
 check(action(frozenTarget, "cancel_target"), nil, "a frozen selector exposes no escape either")
+check(action(frozenTarget, "next_target"), nil, "nor a step to its next target")
 
 -- The battle forecast is display-only. TargetSelection_Loop owns confirmation; the
 -- forecast's callbacks must be observed as passive transitions and never expose a

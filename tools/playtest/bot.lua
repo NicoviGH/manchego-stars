@@ -13,9 +13,13 @@
 --          (Claims, below). Bot.STYLES lists the sampled axes; "greedy" is not sampled -- it is
 --          the clear scenarios' old bot and ignores `sight` except reach and the objective, and
 --          every claim field but `deploy`.
---   sight: { danger(x, y) -> how many enemies reach (x, y), the game's danger zone;
+--   sight: { danger(x, y) -> the game's danger zone at (x, y): 0 when no enemy reaches it,
+--              else gBmMapRange's coverage (1 per tile an enemy could strike it from);
 --            forecast(unit, target, x, y, slot) -> { hit, dmg, crit, hits, takenHit, takenDmg,
---              takenCrit, takenHits, killsTarget, diesWorst };
+--              takenCrit, takenHits, counters, killsTarget, diesWorst }; taken* is what
+--              `target` does to `unit` on (x, y) -- its counter when it can answer this
+--              attack, else its own strike on its phase -- and counters == false says the
+--              attack has no counter (nil reads as one; sight.lua's contract);
 --            reach(unit) -> {{x,y}...}, the tiles the unit can move to this phase;
 --            objective = { kind = "rout"|"boss"|"seize"|"defend"|"escape"|"survive",
 --                          tile = {x,y}|nil, turnsLeft = n|nil, lord = charId|nil,
@@ -63,7 +67,7 @@
 -- Who acts: the lord seizes when it can reach the seize tile (the chapter ends there, so no
 -- enemy phase follows and no gate applies); else the unit with an allowed sure kill; else a
 -- claimed unit's move (a carry's attack, then a wall's attack or approach); else the unit
--- whose own tile has the largest worst case (more reaching enemies breaks a tie); else slot
+-- whose own tile has the largest worst case (more danger-zone coverage breaks a tie); else slot
 -- order. Greedy keeps the old order: seize, then slot order.
 --
 -- What it does: attack when an allowed attack exists -- an answered class first, then a sure
@@ -564,8 +568,10 @@ local function worstCase(ctx, u, x, y, spared)
 end
 
 -- What our own attack's counter can take before the enemy phase: its worst case, nothing when
--- the first blow is a sure kill (the target is dead before it can answer).
+-- the target cannot answer this attack (counters == false) or the first blow is a sure kill
+-- (the target is dead before it can answer).
 local function counterWorst(f, e)
+    if f.counters == false then return 0 end
     if f.hit >= SURE_HIT and f.dmg >= e.hp then return 0 end
     return takenWorst(f)
 end
@@ -826,7 +832,7 @@ function M.decide(board, sight, style)
     end
     local claimed = claimedMove(ctx, gate)
     if claimed then return claimed end
-    -- the most threatened: the largest worst case where it stands, then the most enemies
+    -- the most threatened: the largest worst case where it stands, then the most coverage
     local u, most, count = ctx.actors[1], 0, 0
     for _, c in ipairs(ctx.actors) do
         local w, d = worstCase(ctx, c, c.x, c.y, nil).sum, sight.danger(c.x, c.y)

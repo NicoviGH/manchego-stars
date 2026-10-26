@@ -414,6 +414,22 @@ do
         "careful: counter 15 + enemy phase 10 >= 20 refuses the strike")
     check(B.decide(board, sightWith(15), style("even")).act, "wait",
         "even: 10 < 20 - 15 fails too")
+    -- An enemy that cannot answer this attack (out of its weapon's range) takes nothing off
+    -- first: its taken* fields are its strike on its own phase (sight.lua), weighed there.
+    local unanswered = sightWith(15)
+    local quiet = unanswered.forecast
+    unanswered.forecast = function(...)
+        local f = quiet(...)
+        if f.dmg > 0 then
+            local g = {}
+            for k, v in pairs(f) do g[k] = v end
+            g.counters = false
+            return g
+        end
+        return f
+    end
+    check(B.decide(board, unanswered, style("even")).act, "attack",
+        "even: no counter, and no single enemy's 10 or 15 reaches 20")
     -- E1 survives the strike and swings again on the enemy phase: 3 + (10 + 3) = 16 < 20
     check(B.decide(board, sightWith(3), style("careful")).act, "attack",
         "a 3 counter leaves room for the enemy phase: the strike is allowed")

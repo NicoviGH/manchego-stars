@@ -261,6 +261,18 @@ WANTED = [
     'gpEkrBattleUnitLeft',      # struct BattleUnit * -- the LEFT screen side of the animation
     'gpEkrBattleUnitRight',     # struct BattleUnit * -- ...and the RIGHT. Which one maps to the
                                 # actor depends on faction, so print both to read a freeze.
+    # sight.lua (#510 step 9 PR D) runs these game functions in a saved-and-restored state and
+    # reads what they write, so the bot sees what FE8 computes and nothing re-created.
+    'gBmMapRange',              # u8** range map GenerateDangerZoneRange fills (bmidoten.c)
+    'gRNSeeds',                 # u16[3], FILE-STATIC in rng.c (nm: local 'b'); InitRN seeds it
+    'BattleGenerateSimulation',      # the forecast's simulation (bmbattle.c)
+    'InitBattleForecastBattleStats', # the forecast window's hit counts (bksel.c)
+    'GenerateDangerZoneRange',  # the player phase's danger zone (bmidoten.c, playerphase.c)
+    'GenerateUnitMovementMap',  # a unit's reach into gBmMapMovement (bmidoten.c)
+    'GetUnitMovementCost',      # a unit's terrain cost table, -1 = impassable (bmunit.c)
+    'GetAvailableTileEventCommand',  # a tile's location event; Seize = 0x11 (eventinfo.c)
+    'GetROMChapterStruct',      # chapter data: the goal window type +0x8C, its turn +0x8D
+    'InitRN',                   # the game's own RNG seeding (rng.c)
 ]
 
 

@@ -45,7 +45,7 @@ None of these gates or the attack ranking was chosen by looking at a survival ra
 **Order within a turn:** the lord seizes when it can reach the seize tile, whatever the danger
 (seizing ends the chapter, so no enemy phase follows); then the unit with an allowed sure kill;
 then the unit whose own tile has the largest worst case (the threat measure is the worst case
-everywhere; the number of reaching enemies only breaks a tie); then slot order. Greedy keeps its old order: seize,
+everywhere; the danger zone's coverage only breaks a tie -- not an enemy count, ADR 0369); then slot order. Greedy keeps its old order: seize,
 then slot order. A unit attacks when an allowed attack exists (sure kill, then kill chance, then
 expected damage, then the boss, then the lowest HP), else it marches toward the objective (its
 tile, the boss, or the nearest enemy; it holds on `survive`) over allowed tiles, and with none
