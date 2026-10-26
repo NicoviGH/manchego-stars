@@ -23,12 +23,13 @@
 --   board()            Board.read
 --   sight()            a fresh Sight.new for this phase
 --   act(action)        perform Bot.decide's action: true; "noseize" when the menu offered no
---                      Seize (that unit goes in the ruledOut memo); false on a controller fault
+--                      Seize (a crash: the game's CanUnitSeize had allowed it); false on a
+--                      controller fault
 --   endPhase()         "player" | "gameover" | "ended" | nil, and the deaths it saw:
 --                      { { id, charId, faction, killer } } (id = Board's unit index byte,
 --                      killer = the other fighter's charId)
 --   won(), lost()      the chapter advanced / the game-over screen is up
---   frames()           the emulator's frame counter
+--   frames()           emulated frames so far, every frame sight's sandbox ran included
 --   emit(line)         print one line to stdout
 --   log(s)
 -- Botrun.run(api) -> ok, why, record. It emits the record as ONE stdout line, `BOTRUN <json>`.
@@ -93,7 +94,7 @@ function M.run(api)
                   deployed = {}, bot_faults = {} }
     local startFrame = api.frames()
     api.seed(api.info.seed)
-    local seen, ruledOut, turn = {}, {}, 0
+    local seen, turn = {}, 0
 
     local function record(list, phase)
         for _, d in ipairs(list) do
@@ -126,7 +127,6 @@ function M.run(api)
             end
         end
         local sight = api.sight()
-        sight.objective.ruledOut = ruledOut
         local h = M.boardHash(board, sight.objective)
         if seen[h] then return finish("stuck", "a player phase began on a board seen before") end
         seen[h] = true
@@ -140,10 +140,9 @@ function M.run(api)
             local after = api.board()
             local actor = byId(after)[action.unitId]
             if done == "noseize" then
-                if ruledOut[actor.slot] then
-                    return finish("crashed", "Seize refused twice for one unit")
-                end
-                ruledOut[actor.slot] = true
+                -- The bot only seizes with a unit the game's CanUnitSeize allows, on the tile its
+                -- location event names: a menu without Seize there is the two disagreeing.
+                return finish("crashed", "CanUnitSeize allowed it, but the menu offered no Seize")
             elseif actor and actor.onField and not actor.acted and after.turn == turn
                 and after.phase == "blue" and not api.won() then
                 -- The bot decides from the board, so an action that leaves its unit able to act

@@ -15,30 +15,33 @@
 --          every claim field but `deploy`.
 --   sight: { danger(x, y) -> the game's danger zone at (x, y): 0 when no enemy reaches it,
 --              else gBmMapRange's coverage (1 per tile an enemy could strike it from);
---            forecast(unit, target, x, y, slot) -> { hit, dmg, crit, hits, takenHit, takenDmg,
---              takenCrit, takenHits, counters, killsTarget, diesWorst }; taken* is what
---              `target` does to `unit` on (x, y) -- its counter when it can answer this
---              attack, else its own strike on its phase -- and counters == false says the
---              attack has no counter (nil reads as one; sight.lua's contract);
+--            forecast(unit, target, x, y, slot) -> { hit, dmg, crit, hits, counterHit,
+--              counterDmg, counterCrit, counterHits, takenHit, takenDmg, takenCrit, takenHits,
+--              counters, killsTarget, diesWorst }; counter* is `target`'s answer to this
+--              attack (0 with counters = false when it has none); taken* is `target`'s own
+--              strike on `unit` standing on (x, y), on its phase, as FE8's AI would make it,
+--              0 when it cannot strike there (sight.lua's contract);
+--            threat(enemy) -> function(x, y) -> n, the game's danger zone of that ONE enemy,
+--              every weapon it can use: 0 = it cannot strike (x, y) this turn;
 --            reach(unit) -> {{x,y}...}, the tiles the unit can move to this phase;
 --            objective = { kind = "rout"|"boss"|"seize"|"defend"|"escape"|"survive",
---                          tile = {x,y}|nil, turnsLeft = n|nil, lord = charId|nil,
---                          ruledOut = {[slot] = true}|nil };
---            field(goal) -> dist|nil, OPTIONAL: pathing.distanceField's shape (dist[y][x] =
---              steps to `goal` over the map's passable tiles), built by the caller from the
---              game's terrain. A function of the goal because the bot chooses the goal (the
+--                          tile = {x,y}|nil, turnsLeft = n|nil };
+--            range(unit) -> { min, max }|nil, the reach of the weapon FE8 has equipped
+--              (GetUnitEquippedWeapon);
+--            canSeize(unit) -> bool, the game's own CanUnitSeize (bmdifficulty.c; the Seize
+--              command's usability check);
+--            field(goal) -> dist|nil, OPTIONAL: dist[y][x] = the distance from `goal` to
+--              (x, y), lower nearer (nil = unreached); sight.lua reads FE8's own march map
+--              (GenerateExtendedMovementMap). A function of the goal because the bot chooses the goal (the
 --              boss, the nearest enemy). Without it the march falls back to Manhattan, which
 --              strands a unit against a wall (#60).
 --            cache = {}|nil, OPTIONAL: a table the caller keeps for ONE player phase and
 --              replaces at the next. Forecasts are kept in it across decide calls, keyed by
---              what FE8's forecast reads for that exchange: both fighters (id, HP, held item
---              and its uses), the strike tile, the enemy's tile, and every other unit within
---              support range (3, bmreliance.h) of either fighter. An action elsewhere on the
---              board leaves the entry standing. Reach and worst case are per call only.
+--              the exchange AND the whole board (every on-field unit's id, tile, HP, held item
+--              and uses): the enemy's strike is its AI's pick, which any unit's position can
+--              change. Reach and worst case are per call only.
 --            terrain(x, y) -> FE8 terrain id, OPTIONAL: read from the game's map by the caller.
 --              Only a terrain claim reads it; without it that claim is a no-op. }
---          Who may Seize is board.lua's Board.canSeize(unit, lord, ruledOut): `lord` is
---          Board.lordPid; without it, anyone not in the ruledOut memo may try.
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, weapon = nil }.
@@ -46,16 +49,14 @@
 --   `weapon` is nil = the weapon the unit holds; the board knows the reach of that one only.
 --   "talk", "visit" and "staff" are acts the claim behaviours add; nothing here emits them.
 --
--- ONE forecast direction. `sight.forecast` is always OUR unit's attack on `target` from (x, y).
--- For the enemy phase the bot reads the taken* fields of the forecast our unit would get
--- against each threatening enemy -- forecast(ourUnit, enemy, x, y, nil) -- as what that enemy
--- does to us there. There is no enemy-side call.
+-- ONE forecast call. `sight.forecast` is always asked about OUR unit on (x, y) and one enemy:
+-- its hit/dmg/counter* fields are our attack from there, its taken* fields that enemy's own
+-- strike on us there on its phase -- forecast(ourUnit, enemy, x, y, nil) for both.
 --
 -- Worst case on an end tile = the sum, over every enemy that reaches it, of that enemy's
 -- takenDmg x takenHits, x3 when takenCrit > 0 (FE8 triples a crit: bmbattle.c
 -- BattleGenerateHitAttributes); an enemy with takenHit 0 adds nothing. An enemy "reaches" the
--- tile when some tile of sight.reach(enemy) is within its weapon range of it; danger(x, y) = 0
--- skips the walk. The target of a SURE kill (killsTarget at hit >= 100) is left out: it is dead
+-- tile when sight.threat(enemy) covers it; danger(x, y) = 0 skips the walk. The target of a SURE kill (killsTarget at hit >= 100) is left out: it is dead
 -- before the enemy phase. Each style gates an action on it:
 --   careful: no diesWorst, and the worst case < the unit's HP after its own attack's
 --            worst-case counter (none for a sure kill on the first blow)
@@ -109,11 +110,14 @@
 -- throne for the lord.
 --
 -- ── Between chapters (ADR 0368): pure rules over plain tables the caller reads from memory ──
+-- Every game rule here is the GAME's answer, read by the caller and handed in: the bot weighs
+-- no rank, level or class (ADR 0369).
 -- roster entry (a unit, slot order): { id, charId, level, forced = bool|nil,
---   ranks = {[weaponType] = rank number}, items = {{ id, type = weaponType|nil, rank,
---   kind = "vulnerary"|nil, promotes = bool|nil }...} }. `promotes` is set by the caller only
---   on a seal that promotes THIS unit; the bot never knows which seal fits which class.
--- stock entry: { item, price, type = weaponType|nil, rank, kind = "vulnerary"|nil }; the caller
+--   canUse = {[item] = true}, items = {{ id, type = weaponType|nil, kind = "vulnerary"|nil,
+--   promotes = bool|nil }...} }. `canUse` is the game's CanUnitUseWeapon for this unit over the
+--   stock; `promotes` is the game's own promotion-item check for THIS unit (class and level),
+--   set on a seal it would accept.
+-- stock entry: { item, price, type = weaponType|nil, kind = "vulnerary"|nil }; the caller
 --   says which stock item is the Vulnerary, so no item id lives here.
 -- Bot.prep(roster, cap, style) -> { deploy = {charIds}, give = {} }: forced units (slot order),
 --   then style.deploy (listed order; a charId not in the roster is skipped, a repeat counts
@@ -121,10 +125,10 @@
 --   when they alone exceed the cap. No transfer rule is decided yet, so `give` is always empty.
 -- Bot.shop(gold, stock, party) -> {{ item, qty }...}: party is the deployed roster entries, in
 --   deploy order. One Vulnerary (the cheapest) per unit holding none first, then for each unit
---   and each weapon type it has a rank in (type names in order) it holds none of, the cheapest
---   stock weapon of that type at or under its rank. A purchase gold cannot cover is skipped and the
---   later ones are still tried.
--- Bot.promote(unit, items) -> bool: level 10 or above and a promoting seal held.
+--   and each weapon type among the stock it can use (type names in order) it holds none of, the
+--   cheapest stock weapon of that type it can use. A purchase gold cannot cover is skipped and
+--   the later ones are still tried.
+-- Bot.promote(unit, items) -> bool: a seal the game says promotes this unit is held.
 -- Bot.promoteOrder(units) -> units, highest level first (ties by slot order): the order a
 --   caller spends seals in.
 -- Bot.route(options, style) -> style.route, validated as an index into options.
@@ -359,15 +363,17 @@ M.STYLES = {
 local CRIT_MULTIPLIER = 3   -- bmbattle.c: gBattleStats.damage * 3 on a critical hit
 local SURE_HIT = 100
 
-local SUPPORT_RANGE = 3     -- bmreliance.h SUPPORT_BONUSES_MAX_DISTANCE, RECT_DISTANCE (Manhattan)
 
 local function isSureKill(f) return f.killsTarget and f.hit >= SURE_HIT end
 
--- An exchange's worst case for our unit: the taken side's damage x hits, x3 on a crit.
+-- A strike's worst case for our unit: its damage x hits, x3 on a crit; nothing when it cannot
+-- hit. `taken` is the enemy's own strike on its phase, `counter` its answer to our attack.
+local function strikeWorst(hit, dmg, hits, crit)
+    if (hit or 0) <= 0 then return 0 end
+    return dmg * hits * ((crit or 0) > 0 and CRIT_MULTIPLIER or 1)
+end
 local function takenWorst(f)
-    if (f.takenHit or 0) <= 0 then return 0 end
-    local crit = (f.takenCrit or 0) > 0 and CRIT_MULTIPLIER or 1
-    return f.takenDmg * f.takenHits * crit
+    return strikeWorst(f.takenHit, f.takenDmg, f.takenHits, f.takenCrit)
 end
 
 -- The chance that the attack kills: the hit rate once per blow the kill needs, crits not
@@ -397,6 +403,7 @@ local function context(board, sight)
     cache.forecasts = cache.forecasts or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, forecasts = cache.forecasts, reaches = {}, worsts = {},
+                  threats = {}, seizers = {}, ranges = {},
                   fields = {}, options = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
@@ -413,17 +420,15 @@ local function context(board, sight)
     return ctx
 end
 
--- A forecast's key: what FE8's forecast reads for this exchange -- both fighters (id, HP, held
--- item and its uses), the strike tile, the enemy's tile, and every other unit within support
--- range of either fighter (support bonuses move with them). An action elsewhere on the board
--- leaves it standing, so a phase's cache keeps paying across decide calls.
+-- A forecast's key: the exchange (both fighters, the strike tile, the enemy's tile) and the
+-- WHOLE board -- every unit on the field, its tile, HP, held item and uses. The enemy's strike
+-- is its AI's own pick of weapon and tile (sight.lua), and any unit anywhere can block or open
+-- the enemy's path, so nothing narrower is a correct key. A board unchanged between decide
+-- calls (the same question asked twice) is answered from the cache.
 local function forecastKey(ctx, u, e, x, y)
-    local parts = { unitKey(u), x, y, unitKey(e), e.x, e.y, "held" }
+    local parts = { unitKey(u), x, y, unitKey(e), e.x, e.y, "board" }
     for _, o in ipairs(ctx.onField) do
-        if o ~= u and o ~= e and (manhattan(o.x, o.y, x, y) <= SUPPORT_RANGE
-                or manhattan(o.x, o.y, e.x, e.y) <= SUPPORT_RANGE) then
-            parts[#parts + 1] = o.id .. "@" .. tileKey(o.x, o.y)
-        end
+        parts[#parts + 1] = unitKey(o) .. "@" .. tileKey(o.x, o.y)
     end
     return table.concat(parts, ";")
 end
@@ -453,9 +458,15 @@ local function reachOf(ctx, u)
     return r
 end
 
+-- sight.range: the game's equipped weapon's reach, once per unit per call.
+local function rangeOf(ctx, u)
+    if ctx.ranges[u.id] == nil then ctx.ranges[u.id] = ctx.sight.range(u) or false end
+    return ctx.ranges[u.id] or nil
+end
+
 local function canSeize(ctx, u)
-    local o = ctx.sight.objective
-    return Board.canSeize(u, o.lord, o.ruledOut)
+    if ctx.seizers[u.id] == nil then ctx.seizers[u.id] = ctx.sight.canSeize(u) and true or false end
+    return ctx.seizers[u.id]
 end
 
 -- The tiles `u` can end on: its reach, less every tile another unit stands on, and less the
@@ -505,11 +516,12 @@ local function fieldFor(ctx, goal)
 end
 
 local function reaches(ctx, e, x, y)
-    if not e.minRange then return false end
-    for _, r in ipairs(reachOf(ctx, e)) do
-        if inRange(r.x, r.y, x, y, e.minRange, e.maxRange) then return true end
+    local t = ctx.threats[e.id]
+    if not t then
+        t = ctx.sight.threat(e)
+        ctx.threats[e.id] = t
     end
-    return false
+    return t(x, y) > 0
 end
 
 local function listed(list, v)
@@ -568,12 +580,12 @@ local function worstCase(ctx, u, x, y, spared)
 end
 
 -- What our own attack's counter can take before the enemy phase: its worst case, nothing when
--- the target cannot answer this attack (counters == false) or the first blow is a sure kill
--- (the target is dead before it can answer).
+-- the target cannot answer this attack or the first blow is a sure kill (the target is dead
+-- before it can answer).
 local function counterWorst(f, e)
-    if f.counters == false then return 0 end
+    if not f.counters then return 0 end
     if f.hit >= SURE_HIT and f.dmg >= e.hp then return 0 end
-    return takenWorst(f)
+    return strikeWorst(f.counterHit, f.counterDmg, f.counterHits, f.counterCrit)
 end
 
 -- Whether a style lets `u` end its move on (x, y), `spared` left out of the worst case and
@@ -613,13 +625,14 @@ local function attackOptions(ctx, u, gate)
     if opts then return opts end
     opts = {}
     local answers = claimsOn(ctx, "answers", u)
-    for _, e in ipairs(u.minRange and ctx.enemies or {}) do
+    local r = rangeOf(ctx, u)
+    for _, e in ipairs(r and ctx.enemies or {}) do
         local answered = false
         for _, c in ipairs(answers) do
             if matchesVs(c.vs, e) then answered = true end
         end
         for _, t in ipairs(strikeTiles(ctx, u, e)) do
-            if inRange(t.x, t.y, e.x, e.y, u.minRange, u.maxRange) then
+            if inRange(t.x, t.y, e.x, e.y, r.min, r.max) then
                 local f = forecast(ctx, u, e, t.x, t.y)
                 local sure = isSureKill(f)
                 if not f.diesWorst and gate(ctx, u, t.x, t.y, sure and e or nil,
@@ -943,7 +956,6 @@ end
 
 -- ── Between chapters ─────────────────────────────────────────────────────────────────────
 
-local PROMOTE_LEVEL = 10   -- FE8: a unit may use a promotion item from level 10
 
 -- Slot order is roster order; table.sort is not stable, so order carries its index.
 local function byLevel(units)
@@ -1008,14 +1020,15 @@ function M.shop(gold, stock, party)
         if not holdsAny(u, function(it) return it.kind == "vulnerary" end) then buy(vuln) end
     end
     for _, u in ipairs(party) do
-        local types = {}
-        for t in pairs(u.ranks) do types[#types + 1] = t end
+        local usable = function(s) return s.type ~= nil and (u.canUse or {})[s.item] end
+        local types, seen = {}, {}
+        for _, s in ipairs(stock) do
+            if usable(s) and not seen[s.type] then seen[s.type] = true; types[#types + 1] = s.type end
+        end
         table.sort(types)
         for _, t in ipairs(types) do
             if not holdsAny(u, function(it) return it.type == t end) then
-                buy(cheapest(stock, function(s)
-                    return s.type == t and s.rank <= u.ranks[t]
-                end))
+                buy(cheapest(stock, function(s) return usable(s) and s.type == t end))
             end
         end
     end
@@ -1025,7 +1038,6 @@ function M.shop(gold, stock, party)
 end
 
 function M.promote(unit, items)
-    if unit.level < PROMOTE_LEVEL then return false end
     for _, it in ipairs(items) do
         if it.promotes then return true end
     end

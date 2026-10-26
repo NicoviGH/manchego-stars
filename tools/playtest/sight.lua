@@ -22,8 +22,7 @@
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
 --        map = function() -> w, h, chapter = function() -> index, turn = function() -> n,
---        lordPid = function() -> charId|nil, fieldUnit = function() -> board unit|nil (the
---        lord, else the first deployed unit), distanceField = pathing.lua's }
+--        board = Board.read }
 -- The sight is for ONE player phase: build a new one after the enemy phase. Its danger grid
 -- and objective are read once, at the first question.
 --   danger(x, y)             gBmMapRange after GenerateDangerZoneRange(FALSE), fog and roofs as
@@ -35,30 +34,42 @@
 --   forecast(u, e, x, y, slot) our unit `u` from (x, y) against enemy `e` where it stands:
 --     hit, dmg, crit, hits    our side, as the forecast window shows it (dmg = battleAttack -
 --                             the target's battleDefense, floored at 0; hits = hitCountA).
---     taken*                  what `e` does to `u` on (x, y). When (x, y) is in our weapon's
---                             range of `e` and `e` can answer, its COUNTER in this exchange;
---                             otherwise `e` as the ACTOR, striking `u` placed on (x, y) with
---                             the weapon FE8's AI would choose against `u` (aiStrike, below),
---                             from a tile at that weapon's minimum range (that tile's terrain
---                             only moves `e`'s avoid and defence, which no taken field reads).
---     takenSlot               the item slot `e` strikes with on its phase (nil for a counter,
---                             which is the weapon it holds, as FE8's counters are).
---     takenCandidates         every slot the AI weighed: { slot, score } or { slot, skip }.
---     counters                `e` answers this attack (false when out of range of it, or it
---                             cannot counter): the attack's own counter is then nothing.
+--     counter*                `e`'s COUNTER to that attack (counterHit, counterDmg, counterCrit,
+--                             counterHits), with the weapon it holds, as FE8's counters are;
+--     counters                false (and counter* 0) when (x, y) is out of our range of `e` or
+--                             `e` cannot answer at that range.
+--     taken*                  `e`'s own strike on `u` standing on (x, y), on its phase: FE8's AI
+--                             routine for one target run as the game runs it (aiStrike, below)
+--                             -- it picks the weapon AND the tile together, from where `e` can
+--                             really move -- then simulated. All 0 when `e` cannot strike `u`
+--                             there this turn.
+--     takenSlot, takenTile    the slot and tile the AI chose (nil when it cannot strike).
+--     takenCandidates         every slot the AI weighed: { slot, score, x, y } or { slot, skip }.
 --     killsTarget             dmg x hits >= e's HP, from our side of an attack in range.
---     diesWorst               `e` counters and its worst case (x3 on any crit) >= u's HP.
---   objective                { kind, tile, turnsLeft, lord, ruledOut } -- see objective().
---   field(goal)              BFS steps to `goal` (pathing.lua) over tiles the lord's movement
---                            cost table can enter (GetUnitMovementCost, -1 = impassable).
+--     diesWorst               `e` counters and the counter's worst case (x3 on any crit) >= u's HP.
+--   threat(e) -> function(x, y) -> coverage: ONE enemy's danger zone, every weapon it can use --
+--                            the calls GenerateDangerZoneRange makes per unit, for `e` alone.
+--                            Read once per enemy per sight.
+--   objective                { kind, tile, turnsLeft } -- see objective().
+--   canSeize(unit)           the game's CanUnitSeize for that unit.
+--   range(unit)              { min, max } of the weapon FE8 has equipped, or nil (none).
+--   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
+--                            GenerateExtendedMovementMap with fieldUnit()'s costs (nil = unreached).
 --   terrain(x, y)            gBmMapTerrain[y][x].
 --   cache                    {} for the phase (bot.lua keeps its forecasts there).
 -- Sight.seed(api, s)         InitRN(s): the game's own seeding, written into gRNSeeds.
 
 local M = {}
 
+local function here()
+    local src = debug.getinfo(1, "S").source
+    return (src:sub(1, 1) == "@" and src:sub(2):match("(.*/)")) or "./"
+end
+local Board = dofile(here() .. "board.lua")
+
 M.FRAME_BUDGET = 600         -- frames one call may run; a full map's danger zone takes a few
 M.MOVE_LIMIT = 120           -- include/bmmap.h: a movement-map cost at or above it is unreachable
+M.UNREACHED = 0xFF           -- GenerateMovementMap fills its map with -1 before it floods
 M.ISLOT_AUTO = -1            -- include/bmbattle.h BU_ISLOT_AUTO
 M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
@@ -140,10 +151,11 @@ end
 -- The AI's weapon for one target, FE8's own way (cp_battle.c AiAttemptOffensiveAction): each
 -- item slot in order, stopping at an empty one; Nightmare skipped -- compared as the WHOLE item
 -- word, uses byte included, exactly as the game does, so only a used-up one is ever skipped;
--- a weapon CanUnitUseWeapon rejects skipped; each left scored by
--- AiSimulateBattleAgainstTargetAtPosition from a tile at its minimum range, the best kept and
--- a tie going to the later slot (`>=`). `slots` is { {slot, score}|{slot, skip=true} } in slot
--- order; returns the chosen entry or nil. Pure, so test_sight.lua pins the order and the tie.
+-- a weapon CanUnitUseWeapon rejects, or one AiReachesByBirdsEyeDistance rules out, skipped;
+-- each left scored by AiSimulateBestBattleAgainstTarget (which picks its tile; no tile = skip),
+-- the best kept and a tie going to the later slot (`>=`). `slots` is
+-- { {slot, score, x, y}|{slot, skip=true} } in slot order; returns the chosen entry or nil.
+-- Pure, so test_sight.lua pins the order and the tie.
 function M.aiPick(slots)
     local best
     for _, c in ipairs(slots) do
@@ -152,33 +164,27 @@ function M.aiPick(slots)
     return best
 end
 
--- A tile `d` from (x, y) inside the map, for the enemy to strike from. Its terrain moves only
--- the striker's own avoid and defence, so any one will do; nil when none fits (d = 0).
-function M.strikeTile(x, y, d, w, h)
-    if not d or d < 1 then return nil end
-    for _, o in ipairs({ { 0, -d }, { d, 0 }, { 0, d }, { -d, 0 } }) do
-        local sx, sy = x + o[1], y + o[2]
-        if sx >= 0 and sy >= 0 and sx < w and sy < h then return sx, sy end
-    end
-    return nil
-end
-
--- A forecast from the two sides read off the simulations: `ours` from our attack (nil when
--- (x, y) is out of our range of the enemy), `theirs` from the enemy's own strike (nil when
--- the counter already answered it). Pure, so test_sight.lua builds every case.
+-- A forecast from what the simulations read: `ours` from our attack (nil when (x, y) is out of
+-- our range of the enemy), with `ours.counter` the enemy's answer to it; `theirs` the enemy's
+-- own strike on its phase (nil when it cannot strike us there). Pure, so test_sight.lua builds
+-- every case.
 function M.assemble(ours, theirs, uHp, eHp)
-    local counters = ours ~= nil and ours.counter ~= nil and ours.counter.armed
-    local t = counters and ours.counter or theirs
+    local c = ours and ours.counter
+    local counters = c ~= nil and c.armed
+    local t = theirs
     local f = { hit = 0, dmg = 0, crit = 0, hits = 0, counters = counters,
+                counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
+                counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
                 takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
                 takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
-                takenSlot = t and t.slot or nil, takenCandidates = t and t.candidates or nil }
+                takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil,
+                takenCandidates = t and t.candidates or nil }
     if ours then
         f.hit, f.dmg, f.crit, f.hits = ours.hit, ours.dmg, ours.crit, ours.hits
     end
     f.killsTarget = ours ~= nil and f.hits > 0 and f.dmg * f.hits >= eHp
-    local worst = f.takenDmg * f.takenHits * (f.takenCrit > 0 and CRIT_MULTIPLIER or 1)
-    f.diesWorst = counters and f.takenHit > 0 and worst >= uHp or false
+    local worst = f.counterDmg * f.counterHits * (f.counterCrit > 0 and CRIT_MULTIPLIER or 1)
+    f.diesWorst = counters and f.counterHit > 0 and worst >= uHp or false
     return f
 end
 
@@ -190,7 +196,7 @@ function M.objective(api, sandbox)
     return sandbox(function(call)
         local data = call(S.GetROMChapterStruct, { api.chapter() })
         local kind = M.GOALS[api.mem.u8(data + M.CHAPTER_GOAL)]
-        local o = { kind = kind or "special", lord = api.lordPid(), ruledOut = {} }
+        local o = { kind = kind or "special" }
         if kind == "survive" then
             o.turnsLeft = api.mem.u8(data + M.CHAPTER_GOAL_TURN) - api.turn() + 1
         elseif kind == "seize" then
@@ -206,28 +212,53 @@ function M.objective(api, sandbox)
     end)
 end
 
-local function grid(mem, base, x, y) return mem.u8(mem.u32(mem.u32(base) + y * 4) + x) end
+local function cell(mem, base, x, y) return mem.u32(mem.u32(base) + y * 4) + x end
+local function grid(mem, base, x, y) return mem.u8(cell(mem, base, x, y)) end
+local function readGrid(mem, base, w, h)
+    local g = {}
+    for y = 0, h - 1 do
+        g[y] = {}
+        for x = 0, w - 1 do g[y][x] = grid(mem, base, x, y) end
+    end
+    return g
+end
 
 function M.new(api)
     local mem, S = api.mem, api.SYM
     local sandbox = M.machine(api.cpu)
     local w, h = api.map()
     local s = { cache = {} }
-    local dangerGrid, fields, costs = nil, {}, nil
+    local dangerGrid, threats, fields = nil, {}, {}
 
     function s.danger(x, y)
         if not dangerGrid then
             dangerGrid = sandbox(function(call)
                 call(S.GenerateDangerZoneRange, { 0 })
-                local g = {}
-                for yy = 0, h - 1 do
-                    g[yy] = {}
-                    for xx = 0, w - 1 do g[yy][xx] = grid(mem, S.gBmMapRange, xx, yy) end
-                end
-                return g
+                return readGrid(mem, S.gBmMapRange, w, h)
             end)
         end
         return dangerGrid[y] and dangerGrid[y][x] or 0
+    end
+
+    -- GenerateDangerZoneRange's body (bmidoten.c) for one unit: its movement map, itself lifted
+    -- off gBmMapUnit, the magic seal map for a magic user, then its complete attack range.
+    function s.threat(e)
+        if not threats[e.id] then
+            threats[e.id] = sandbox(function(call)
+                call(S.BmMapFill, { mem.u32(S.gBmMapRange), 0 })
+                call(S.GenerateUnitMovementMap, { e.addr })
+                api.write8(cell(mem, S.gBmMapUnit, e.x, e.y), 0)
+                if call(S.UnitHasMagicRank, { e.addr }) ~= 0 then
+                    call(S.BmMapFill, { mem.u32(S.gBmMapOther), 0 })
+                    call(S.GenerateMagicSealMap, { 1 })
+                end
+                call(S.SetWorkingBmMap, { mem.u32(S.gBmMapRange) })
+                call(S.GenerateUnitCompleteAttackRange, { e.addr })
+                return readGrid(mem, S.gBmMapRange, w, h)
+            end)
+        end
+        local g = threats[e.id]
+        return function(x, y) return g[y] and g[y][x] or 0 end
     end
 
     function s.reach(u)
@@ -246,24 +277,37 @@ function M.new(api)
         end)
     end
 
-    -- Inside a sandbox, with `u` already standing on (x, y): the slot and tile M.aiPick chooses,
-    -- each candidate scored by the AI's own call with `e` as the active unit.
+    -- Inside a sandbox: FE8's AI choosing how `e` strikes `u` on (x, y), run as
+    -- AiAttemptOffensiveAction runs it for one target (cp_battle.c): `u` is moved onto (x, y) on
+    -- the unit grid as well as in its struct, so movement and blocking see it there; `e` becomes
+    -- the active unit; its movement map, magic seal map and working map are set up as the AI
+    -- sets them; then each slot is filtered and scored as the AI scores it.
     local function aiStrike(call, st, u, e, x, y)
+        if mem.u8(cell(mem, S.gBmMapUnit, u.x, u.y)) == u.id then
+            api.write8(cell(mem, S.gBmMapUnit, u.x, u.y), 0)
+        end
+        api.write8(cell(mem, S.gBmMapUnit, x, y), u.id)
+        api.write8(u.addr + UNIT_X, x)
+        api.write8(u.addr + UNIT_Y, y)
         api.write32(S.gActiveUnit, e.addr)
         api.write8(S.gActiveUnitId, e.id)
+        call(S.GenerateUnitMovementMap, { e.addr })
+        if call(S.UnitHasMagicRank, { e.addr }) ~= 0 then call(S.GenerateMagicSealMap, { -1 }) end
+        call(S.SetWorkingBmMap, { mem.u32(S.gBmMapRange) })
         local slots = {}
         for i = 0, M.ITEM_SLOTS - 1 do
             local item = mem.u16(e.addr + M.UNIT_ITEMS + i * 2)
             if item == 0 then break end
             local c = { slot = i, skip = true }
-            if item ~= M.ITEM_NIGHTMARE and call(S.CanUnitUseWeapon, { e.addr, item }) ~= 0 then
-                c.x, c.y = M.strikeTile(x, y, call(S.GetItemMinRange, { item }), w, h)
-                if c.x then
-                    api.write8(st, c.x); api.write8(st + 1, c.y); api.write8(st + 2, u.id)
-                    api.write16(st + ST_SLOT, i); api.write32(st + ST_SCORE, 0)
-                    if call(S.AiSimulateBattleAgainstTargetAtPosition, { st }) ~= 0 then
-                        c.skip, c.score = false, mem.u32(st + ST_SCORE)
-                    end
+            if item ~= M.ITEM_NIGHTMARE and call(S.CanUnitUseWeapon, { e.addr, item }) ~= 0
+                and call(S.AiReachesByBirdsEyeDistance, { e.addr, u.addr, item }) ~= 0 then
+                call(S.AiFillReversedAttackRangeMap, { u.addr, item })
+                api.write8(st + 2, u.id)
+                api.write16(st + ST_SLOT, i)
+                api.write32(st + ST_SCORE, 0)
+                if call(S.AiSimulateBestBattleAgainstTarget, { st }) ~= 0 then
+                    c.skip, c.score = false, mem.u32(st + ST_SCORE)
+                    c.x, c.y = mem.u8(st), mem.u8(st + 1)
                 end
             end
             slots[#slots + 1] = c
@@ -271,9 +315,23 @@ function M.new(api)
         return M.aiPick(slots), slots
     end
 
+    -- Our unit's reach: the weapon FE8 has equipped (GetUnitEquippedWeapon -- the first one
+    -- CanUnitUseWeapon accepts, which BU_ISLOT_AUTO strikes with), and that item's range.
+    -- { min, max } or false when it has none. Per unit, once.
+    local ranges = {}
+    function s.range(u)
+        if ranges[u.id] == nil then
+            local item = sandbox(function(call) return call(S.GetUnitEquippedWeapon, { u.addr }) end)
+            local mn, mx = Board.itemRange(mem, S, item)
+            ranges[u.id] = mn and { min = mn, max = mx } or false
+        end
+        return ranges[u.id] or nil
+    end
+
     function s.forecast(u, e, x, y, slot)
-        local inRange = u.minRange and manhattan(x, y, e.x, e.y) >= u.minRange
-            and manhattan(x, y, e.x, e.y) <= u.maxRange
+        local r = s.range(u)
+        local d = manhattan(x, y, e.x, e.y)
+        local inRange = r and d >= r.min and d <= r.max
         local ours, theirs = sandbox(function(call, proc)
             local a, t
             if inRange then
@@ -281,16 +339,15 @@ function M.new(api)
                 call(S.InitBattleForecastBattleStats, { proc })
                 a = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
                 a.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B)
-                if a.counter.armed then return a, nil end
             end
-            api.write8(u.addr + UNIT_X, x)
-            api.write8(u.addr + UNIT_Y, y)
             local pick, slots = aiStrike(call, proc + ST, u, e, x, y)
             if pick then
                 call(S.BattleGenerateSimulation, { e.addr, u.addr, pick.x, pick.y, pick.slot })
                 call(S.InitBattleForecastBattleStats, { proc })
                 t = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
-                t.slot, t.candidates = pick.slot, slots
+                t.slot, t.tile, t.candidates = pick.slot, { x = pick.x, y = pick.y }, slots
+            else
+                t = { armed = false, candidates = slots }   -- no strike, but what was weighed
             end
             return a, t
         end)
@@ -299,28 +356,52 @@ function M.new(api)
 
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
 
-    -- The lord's (else the first deployed unit's) movement costs, read once: a field is a
-    -- march heading, and each unit's real reach still comes from reach().
-    function s.field(goal)
-        local k = goal.x .. "," .. goal.y
-        if fields[k] then return fields[k] end
-        if not costs then
-            local unit = api.fieldUnit()
-            costs = {}
-            if unit then
-                sandbox(function(call)
-                    local table_ = call(S.GetUnitMovementCost, { unit.addr })
-                    for t = 0, 0xFF do costs[t] = mem.s8(table_ + t) end
-                end)
+    -- The game's own Seize check (bmdifficulty.c CanUnitSeize, which the Seize command's
+    -- usability calls; engine patch 0005 makes it the chosen lead in our build). Per unit, once.
+    local seizers = {}
+    function s.canSeize(u)
+        if seizers[u.id] == nil then
+            seizers[u.id] = sandbox(function(call) return call(S.CanUnitSeize, { u.addr }) ~= 0 end)
+        end
+        return seizers[u.id]
+    end
+
+    -- Whose movement costs a march field uses: the first deployed unit that can Seize, else the
+    -- first deployed unit (slot order).
+    function s.fieldUnit()
+        local first
+        for _, u in ipairs(api.board().units) do
+            if u.faction == "blue" and u.onField then
+                if s.canSeize(u) then return u end
+                first = first or u
             end
         end
-        local function passable(x, y)
-            if x < 0 or y < 0 or x >= w or y >= h then return false end
-            local c = costs[s.terrain(x, y)]
-            return c ~= nil and c >= 0
+        return first
+    end
+
+    -- FE8's own march distance: GenerateExtendedMovementMap from the goal, out to
+    -- MAP_MOVEMENT_EXTENDED, with the lord's (else the first deployed unit's) movement costs --
+    -- the map its AI heads for a far target over (cp_0803E2F4.c). Units do not block it, as they
+    -- do not block the AI's. A field is a march heading; each unit's real reach is reach()'s.
+    function s.field(goal)
+        local k = goal.x .. "," .. goal.y
+        if fields[k] == nil then
+            local unit = s.fieldUnit()
+            fields[k] = unit and sandbox(function(call)
+                local costs = call(S.GetUnitMovementCost, { unit.addr })
+                call(S.GenerateExtendedMovementMap, { goal.x, goal.y, costs })
+                local dist = {}
+                for y = 0, h - 1 do
+                    dist[y] = {}
+                    for x = 0, w - 1 do
+                        local v = grid(mem, S.gBmMapMovement, x, y)
+                        if v ~= M.UNREACHED then dist[y][x] = v end
+                    end
+                end
+                return dist
+            end) or false
         end
-        fields[k] = api.distanceField(w, h, passable, goal)
-        return fields[k]
+        return fields[k] or nil
     end
 
     s.objective = M.objective(api, sandbox)

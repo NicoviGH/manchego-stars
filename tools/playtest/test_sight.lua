@@ -77,21 +77,26 @@ do
     check(wrote[1][2], 0xFFFFFFFF, "BU_ISLOT_AUTO (-1) as a 32-bit word")
 end
 
--- assemble: the four shapes an exchange takes.
+-- assemble: the counter and the enemy-phase strike are separate reads.
 local hitter = { hit = 80, crit = 5, dmg = 6, hits = 2, armed = true }
+local striker = { hit = 60, crit = 0, dmg = 9, hits = 1, armed = true, slot = 1,
+                  tile = { x = 4, y = 4 } }
 do
     local ours = { hit = 70, crit = 0, dmg = 5, hits = 1, armed = true, counter = hitter }
-    local f = Sight.assemble(ours, nil, 20, 5)
+    local f = Sight.assemble(ours, striker, 20, 5)
     check(f.counters, true, "in range, armed: the enemy counters")
-    check(f.takenDmg, 6, "taken is the counter")
-    check(f.takenHits, 2, "with its blows")
+    check(f.counterDmg, 6, "the counter is the held weapon's answer")
+    check(f.counterHits, 2, "with its blows")
+    check(f.takenDmg, 9, "taken is the AI's own strike on its phase, not the counter")
+    check(f.takenSlot, 1, "with the slot the AI chose")
+    check(f.takenTile.x .. "," .. f.takenTile.y, "4,4", "and the tile")
     check(f.killsTarget, true, "5 x 1 kills a 5 HP enemy")
-    check(f.diesWorst, true, "6 x 2, x3 on its 5% crit = 36 >= 20 HP")
+    check(f.diesWorst, true, "the counter's 6 x 2, x3 on its 5% crit = 36 >= 20 HP")
 end
 
 do
     local ours = { hit = 70, crit = 0, dmg = 5, hits = 1, armed = true, counter = hitter }
-    local f = Sight.assemble(ours, nil, 37, 9)
+    local f = Sight.assemble(ours, striker, 37, 9)
     check(f.diesWorst, false, "36 worst case against 37 HP survives")
     check(f.killsTarget, false, "5 x 1 does not kill 9")
 end
@@ -99,23 +104,25 @@ end
 do
     local ours = { hit = 70, crit = 0, dmg = 5, hits = 1, armed = true,
                    counter = { hit = 0, crit = 0, dmg = 0, hits = 0, armed = false } }
-    local f = Sight.assemble(ours, hitter, 10, 30)
+    local f = Sight.assemble(ours, striker, 10, 30)
     check(f.counters, false, "an unarmed answer is no counter")
-    check(f.takenDmg, 6, "taken is the enemy's own strike on its phase")
+    check(f.counterDmg, 0, "so no counter damage")
+    check(f.takenDmg, 9, "the enemy's strike on its phase is still read")
     check(f.diesWorst, false, "and the exchange alone cannot kill us")
 end
 
 do
-    local f = Sight.assemble(nil, hitter, 10, 30)
+    local f = Sight.assemble(nil, striker, 10, 30)
     check(f.hit, 0, "out of range: no attack of ours")
     check(f.killsTarget, false, "so no kill")
     check(f.counters, false, "and no counter")
-    check(f.takenHit, 80, "the enemy's strike is still read")
+    check(f.takenHit, 60, "the enemy's strike is still read")
 end
 
 do
     local f = Sight.assemble(nil, nil, 10, 30)
-    check(f.takenHit, 0, "an enemy with no weapon reach strikes nothing")
+    check(f.takenHit, 0, "an enemy whose AI finds no way to strike us strikes nothing")
+    check(f.takenSlot, nil, "and chose no slot")
 end
 
 -- aiPick: FE8's AI weapon choice -- the best score, a tie to the later slot, skips left out.
@@ -132,16 +139,6 @@ end
 
 -- The AI's scratch struct fits between the forecast proc and the return loop.
 check(Sight.SCRATCH_SIZE <= 0x70, true, "scratch ends before the loop at +0x80 (scratch at +0x10)")
-
--- strikeTile: a tile at the enemy's own range, inside the map.
-do
-    local x, y = Sight.strikeTile(0, 0, 1, 10, 10)
-    check(x .. "," .. y, "1,0", "the corner's first in-map tile at range 1")
-    x, y = Sight.strikeTile(5, 5, 2, 10, 10)
-    check(x .. "," .. y, "5,3", "range 2 from the middle")
-    check(Sight.strikeTile(5, 5, nil, 10, 10), nil, "no weapon reach, no tile")
-    check(Sight.strikeTile(0, 0, 3, 2, 2), nil, "no tile at that range inside a 2x2 map")
-end
 
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

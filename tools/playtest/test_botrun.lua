@@ -63,6 +63,9 @@ local function fakeGame(o)
                 cache = {},
                 objective = { kind = o.kind or "rout", turnsLeft = g.turnsLeft },
                 danger = function() return 0 end,
+                threat = function() return function() return 0 end end,
+                range = function(u) return { min = u.minRange, max = u.maxRange } end,
+                canSeize = function() return true end,
                 reach = function(u) return within(u, u.faction == "blue" and (o.move or 3) or 0) end,
                 forecast = function(u, e)
                     local dmg = o.hit or 5

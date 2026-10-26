@@ -65,15 +65,22 @@ local function onFieldState(state, x, y)
     return x >= 0 and y >= 0 and (state & OFF_FIELD) == 0
 end
 
--- Attack reach from the item in items[0] -- FE8 keeps the equipped weapon there -- as
--- (minRange, maxRange), or nil for a staff / non-weapon (IA_WEAPON unset) or empty hand.
-function Board.attackRange(mem, SYM, addr)
-    local item = mem.u16(addr + 0x1E) & 0xFF
+-- An item's attack reach, (minRange, maxRange), as bmitem.c GetItemMinRange/GetItemMaxRange read
+-- it (encodedRange >> 4 and & 0xF; both are inline, so no symbol to call), or nil for a staff /
+-- non-weapon (IA_WEAPON unset) or no item.
+function Board.itemRange(mem, SYM, item)
+    item = item & 0xFF
     if item == 0 then return nil end
     local data = SYM.gItemData + item * Board.ITEMDATA_STRIDE
     if (mem.u32(data + 0x08) & IA_WEAPON) == 0 then return nil end
     local er = mem.u8(data + 0x19)
     return er >> 4, er & 0xF
+end
+
+-- Attack reach from the item in items[0] -- FE8 keeps the equipped weapon there. A read without
+-- the game: sight.lua's range() asks FE8 which weapon is equipped (the first usable one).
+function Board.attackRange(mem, SYM, addr)
+    return Board.itemRange(mem, SYM, mem.u16(addr + 0x1E))
 end
 
 -- The unit's CHARACTER carries CA_BOSS (named bosses). The class attribute is not read:

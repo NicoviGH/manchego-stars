@@ -2836,9 +2836,12 @@ INSPECT.sightApi = function()
             load = function(st) emu:loadStateBuffer(st) end,
             write16 = function(a, v) raw:write16(a, v) end,
             write32 = function(a, v) raw:write32(a, v) end,
+            -- Each frame a call runs is real emulation, though the load rewinds the counter:
+            -- INSPECT.sandboxFrames keeps it, so a run's cost includes what its sight spent.
             frames = function(done, max)
                 for _ = 1, max do
                     yield()
+                    INSPECT.sandboxFrames = (INSPECT.sandboxFrames or 0) + 1
                     if done() then return true end
                 end
                 return false
@@ -2847,17 +2850,7 @@ INSPECT.sightApi = function()
         map = mapSize,
         chapter = chapter,
         turn = turn,
-        lordPid = function() return BOARD.lordPid(eventFlag) end,
-        fieldUnit = function()
-            local lord = BOARD.lordPid(eventFlag)
-            local first
-            for _, u in ipairs(BOARD.live(BOARD.read(), "blue")) do
-                if u.onField and u.charId == lord then return u end
-                first = first or (u.onField and u or nil)
-            end
-            return first
-        end,
-        distanceField = PATHING.distanceField,
+        board = BOARD.read,
     }
 end
 
@@ -2909,7 +2902,8 @@ INSPECT.botApi = function(game)
         board = BOARD.read,
         won = won,
         lost = lost,
-        frames = function() return emu:currentFrame() end,
+        -- Emulated frames, the sandbox's included (sightApi's cpu.frames counts them).
+        frames = function() return emu:currentFrame() + (INSPECT.sandboxFrames or 0) end,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
     }
@@ -2997,10 +2991,10 @@ scenarios.sightprobe = function()
         log(string.format("danger y=%02d %s", y, table.concat(row, "")))
     end
     local o = sight.objective
-    log(string.format("objective kind=%s tile=%s turnsLeft=%s lord=%s", tostring(o.kind),
-        o.tile and (o.tile.x .. "," .. o.tile.y) or "-", tostring(o.turnsLeft), tostring(o.lord)))
+    log(string.format("objective kind=%s tile=%s turnsLeft=%s", tostring(o.kind),
+        o.tile and (o.tile.x .. "," .. o.tile.y) or "-", tostring(o.turnsLeft)))
     local board = BOARD.read()
-    local lead = sapi.fieldUnit()
+    local lead = sight.fieldUnit()
     if not lead then return result("FAIL", "no blue unit on the field") end
     local reach = sight.reach(lead)
     local tiles = {}
@@ -3018,32 +3012,43 @@ scenarios.sightprobe = function()
     if not foe then return result("FAIL", "no enemy on the field") end
     local f = sight.forecast(lead, foe, lead.x, lead.y, nil)
     log(string.format("forecast 0x%02X@(%d,%d) vs 0x%02X@(%d,%d) hp=%d: hit=%d dmg=%d crit=%d "
-        .. "hits=%d | taken hit=%d dmg=%d crit=%d hits=%d | counters=%s kills=%s dies=%s",
+        .. "hits=%d | next phase hit=%d dmg=%d crit=%d hits=%d | counters=%s kills=%s dies=%s",
         lead.charId, lead.x, lead.y, foe.charId, foe.x, foe.y, foe.hp, f.hit, f.dmg, f.crit,
         f.hits, f.takenHit, f.takenDmg, f.takenCrit, f.takenHits, tostring(f.counters),
         tostring(f.killsTarget), tostring(f.diesWorst)))
     -- Every enemy's own strike on the lead where it stands, with the slot its AI chose and what
     -- it weighed. Neither probed map fields an enemy with two weapons, so on retail the probe
-    -- hands the boss a Steel Axe and a Silver Axe behind its own (constants/items.h 0x20, 0x21;
-    -- 20 uses): the pick is then a real choice, and a weapon its rank forbids must be skipped.
+    -- hands the boss a Steel Axe, a Silver Axe and a Hand Axe behind its own
+    -- (constants/items.h 0x20, 0x21, 0x28; 20 uses): the pick is then a real choice, a weapon
+    -- its rank forbids must be skipped, and the Hand Axe's tile shows the AI weighing range.
     if PLAYTEST_VANILLA == "1" and foe.isBoss then
         sapi.write16(foe.addr + 0x1E + 2, 0x20 | (20 << 8))
         sapi.write16(foe.addr + 0x1E + 4, 0x21 | (20 << 8))
+        sapi.write16(foe.addr + 0x1E + 6, 0x28 | (20 << 8))
         board = BOARD.read()
         foe = BOARD.unit(board, "red", foe.charId) or foe
         sight = Sight.new(sapi)
     end
+    -- Each asked on the tile of the lead's reach nearest the enemy that its own threat covers
+    -- (else where the lead stands): a strike the enemy cannot make this turn has no pick.
     for _, e in ipairs(BOARD.live(board, "red")) do
         if e.onField then
-            local g = sight.forecast(lead, e, lead.x, lead.y, nil)
+            local covers, at, best = sight.threat(e), { x = lead.x, y = lead.y }, nil
+            for _, t in ipairs(reach) do
+                local d = math.abs(t.x - e.x) + math.abs(t.y - e.y)
+                if covers(t.x, t.y) > 0 and (not best or d < best) then at, best = t, d end
+            end
+            local g = sight.forecast(lead, e, at.x, at.y, nil)
             local items = {}
             for _, it in ipairs(e.items or {}) do items[#items + 1] = string.format("%02X", it.id) end
             local weighed = {}
             for _, c in ipairs(g.takenCandidates or {}) do
-                weighed[#weighed + 1] = c.skip and (c.slot .. ":skip") or (c.slot .. ":" .. c.score)
+                weighed[#weighed + 1] = c.skip and (c.slot .. ":skip")
+                    or string.format("%d:%d@(%d,%d)", c.slot, c.score, c.x, c.y)
             end
-            log(string.format("strike 0x%02X@(%d,%d) items=%s weighed=[%s] -> slot %s: hit=%d "
-                .. "dmg=%d crit=%d hits=%d", e.charId, e.x, e.y, table.concat(items, ","),
+            log(string.format("strike 0x%02X@(%d,%d) on lead@(%d,%d) items=%s weighed=[%s] -> "
+                .. "slot %s: hit=%d dmg=%d crit=%d hits=%d", e.charId, e.x, e.y, at.x, at.y,
+                table.concat(items, ","),
                 table.concat(weighed, " "), tostring(g.takenSlot), g.takenHit, g.takenDmg,
                 g.takenCrit, g.takenHits))
         end
@@ -3053,9 +3058,11 @@ scenarios.sightprobe = function()
         local d = math.abs(t.x - foe.x) + math.abs(t.y - foe.y)
         if lead.minRange and d >= lead.minRange and d <= lead.maxRange then
             local g = sight.forecast(lead, foe, t.x, t.y, nil)
-            log(string.format("in range from (%d,%d): hit=%d dmg=%d crit=%d hits=%d | taken "
-                .. "hit=%d dmg=%d crit=%d hits=%d | counters=%s", t.x, t.y, g.hit, g.dmg, g.crit,
-                g.hits, g.takenHit, g.takenDmg, g.takenCrit, g.takenHits, tostring(g.counters)))
+            log(string.format("in range from (%d,%d): hit=%d dmg=%d crit=%d hits=%d | counter "
+                .. "hit=%d dmg=%d crit=%d hits=%d (counters=%s) | next phase hit=%d dmg=%d "
+                .. "crit=%d hits=%d slot=%s", t.x, t.y, g.hit, g.dmg, g.crit, g.hits,
+                g.counterHit, g.counterDmg, g.counterCrit, g.counterHits, tostring(g.counters),
+                g.takenHit, g.takenDmg, g.takenCrit, g.takenHits, tostring(g.takenSlot)))
             break
         end
     end

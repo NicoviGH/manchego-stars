@@ -273,12 +273,23 @@ WANTED = [
     'GetAvailableTileEventCommand',  # a tile's location event; Seize = 0x11 (eventinfo.c)
     'GetROMChapterStruct',      # chapter data: the goal window type +0x8C, its turn +0x8D
     'InitRN',                   # the game's own RNG seeding (rng.c)
-    # The enemy's weapon against a target, chosen the way its AI chooses it (cp_battle.c).
-    'AiSimulateBattleAgainstTargetAtPosition',  # one slot's simulation + AiComputeCombatScore
+    # An enemy's strike on one target, chosen the way its AI chooses it (cp_battle.c
+    # AiAttemptOffensiveAction), and one enemy's danger zone (bmidoten.c).
+    'AiSimulateBestBattleAgainstTarget',  # picks the tile, simulates, AiComputeCombatScore
+    'AiFillReversedAttackRangeMap',  # the tiles a weapon strikes the target from
+    'AiReachesByBirdsEyeDistance',   # the AI's per-target distance filter (cp_utility.c)
     'CanUnitUseWeapon',         # the AI's per-slot filter (bmitem.c)
-    'GetItemMinRange',          # where a slot strikes from (bmitem.c)
     'gActiveUnit',              # struct Unit *: the AI scores for THIS unit
     'gActiveUnitId',            # u8, its index; read beside gActiveUnit by the AI
+    'SetWorkingBmMap',          # where MapAddInBoundedRange writes (bmidoten.c)
+    'BmMapFill',                # clears a map grid (bmmap.c)
+    'UnitHasMagicRank',         # magic users get the magic seal map (bmunit.c)
+    'GenerateMagicSealMap',     # bmidoten.c
+    'GenerateUnitCompleteAttackRange',  # one unit's attack range, every weapon (bmidoten.c)
+    'gBmMapOther',              # u8** the magic seal map's grid
+    'GenerateExtendedMovementMap',  # the AI's march distance to a far goal (bmidoten.c)
+    'CanUnitSeize',             # who may Seize: the Seize command's own check (bmdifficulty.c)
+    'GetUnitEquippedWeapon',    # the weapon BU_ISLOT_AUTO strikes with: first usable (bmitem.c)
 ]
 
 
