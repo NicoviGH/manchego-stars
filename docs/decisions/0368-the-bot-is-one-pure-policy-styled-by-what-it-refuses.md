@@ -70,8 +70,9 @@ standing ON the seize tile (the boss on the throne), which it strikes from the a
   every action, so in the ROM each decide would have re-paid a full sweep of emulator round trips;
   a pair-only key returned a stale forecast after an ally moved. Reach and worst case are per call
   only, and each unit's allowed attacks are worked out once per call. A supporter that is rescued
-or hidden leaves the on-field list, so it leaves the key too; the chapter-wide flag that lifts the
-support range check (gameStateBits 0x40) does not change within a phase, the cache's lifetime.
+or hidden leaves the on-field list, so it leaves the key too; the flag that lifts the support range
+check (gameStateBits 0x40, BM_FLAG_LINKARENA: link arena and debug only) never changes within a
+phase, the cache's lifetime.
 - The action carries `unitId` and `targetId` (Board's unique index byte) beside the charIds,
   because generics share a charId and the ROM layer has to know which body to act on.
 
@@ -151,7 +152,8 @@ names, so the runner's resolver cannot meet an unknown name mid-run.
 
 **PR C review fixes (2026-10-26).** A unit always keeps its own tile, so one that cannot Seize and
 is boxed in on the throne waits there instead of having no tile. The kill chance is the hit rate
-once per blow the kill needs (a doubling 70% that needs both blows is 49%). The shop buys a
+once per blow the kill needs (a doubling 70% that needs both blows is 49%), kept as an exact
+integer so equal chances tie exactly. The shop buys a
 Vulnerary only for a unit holding none (a held item can carry `kind = "vulnerary"`); the plan's
 order, Vulneraries before weapons, stands. Claim tags that were folded too far by keyword went
 back to what their lines mean: "keep Ross and Garcia safe if you want to recruit them" is

@@ -446,6 +446,15 @@ do
     }
     check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
         "60% in one blow beats 70% needed twice")
+    -- 4% once and 20% twice are the SAME chance: the tie goes on to expected damage (E2's)
+    s = sightOf {
+        fc = { [0x01] = {
+            [0x81] = { ["0,0"] = fc { hit = 20, dmg = 5, hits = 2, killsTarget = true } },
+            [0x82] = { ["0,0"] = fc { hit = 4, dmg = 60, hits = 1, killsTarget = true } },
+        } },
+    }
+    check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
+        "equal kill chances tie exactly; expected damage (60 x 4 > 5 x 2 x 20) decides")
 end
 
 -- even weighs each enemy on its own: two enemies at 12 each (24 together) kill A only

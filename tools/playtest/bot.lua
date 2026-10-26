@@ -366,11 +366,18 @@ local function takenWorst(f)
     return f.takenDmg * f.takenHits * crit
 end
 
--- The chance (0-100) that the attack kills: the hit rate once per blow the kill needs, crits
--- not counted. A doubling attack that needs both blows is hit^2, not hit.
+-- The chance that the attack kills: the hit rate once per blow the kill needs, crits not
+-- counted. A doubling attack that needs both blows is hit^2, not hit. Kept as an exact integer
+-- over a fixed 100^MAX_BLOWS (hit^n x 100^(MAX_BLOWS-n)), so equal chances compare equal: as a
+-- float, 4% once and 20% twice differed in the last bit and the tie went to whichever rounded up.
+local MAX_BLOWS = 4     -- a brave weapon doubling: 2 rounds x 2 strikes
 local function killChance(f, e)
     if not f.killsTarget or f.dmg <= 0 then return 0 end
-    return (f.hit / 100) ^ math.ceil(e.hp / f.dmg) * 100
+    local need = (e.hp + f.dmg - 1) // f.dmg
+    if need > MAX_BLOWS then return 0 end
+    local chance = 1
+    for i = 1, MAX_BLOWS do chance = chance * (i <= need and f.hit or 100) end
+    return chance
 end
 
 local function unitKey(u)
