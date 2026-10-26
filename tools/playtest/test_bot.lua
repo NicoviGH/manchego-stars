@@ -549,6 +549,38 @@ do
     check(a.act ~= "seize" and at(a), "4,1", "no lord pid, ruled out: off the throne's approach")
 end
 
+-- A unit that cannot Seize strikes from the throne's approach only at a target ON the throne.
+do
+    local Ld = blue(0x01, 0, 0, 0, { charId = 0x0F, acted = true })
+    local O = blue(0x02, 1, 5, 1)
+    local seizeAt = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F }
+    -- (a) X at (5,3) is reachable from (4,3), beside the throne, and from (6,3): (6,3) it is
+    local X = red(0x81, 5, 3, { hp = 30 })
+    local chip = fc { hit = 80, dmg = 5, hits = 1 }
+    local sight = sightOf {
+        objective = seizeAt,
+        reach = { [0x02] = tiles({ 4, 3 }, { 6, 3 }) },
+        fc = { [0x02] = { [0x81] = { ["4,3"] = chip, ["6,3"] = chip } } },
+    }
+    for _, aggr in ipairs({ "careful", "greedy" }) do
+        local a = B.decide(boardOf(Ld, O, X), sight, style(aggr))
+        check(a.act, "attack", aggr .. ": (a) attacks X")
+        check(at(a), "6,3", aggr .. ": (a) from the tile out of the throne's approach")
+    end
+    -- (b) the boss ON the throne: struck from its approach
+    local Bo = red(0x82, 4, 4, { hp = 30, isBoss = true })
+    sight = sightOf {
+        objective = seizeAt,
+        reach = { [0x02] = tiles({ 4, 3 }, { 5, 1 }) },
+        fc = { [0x02] = { [0x82] = { ["4,3"] = chip } } },
+    }
+    for _, aggr in ipairs({ "careful", "greedy" }) do
+        local a = B.decide(boardOf(Ld, O, Bo), sight, style(aggr))
+        check(a.act, "attack", aggr .. ": (b) attacks the boss on the throne")
+        check(at(a), "4,3", aggr .. ": (b) from the approach")
+    end
+end
+
 -- The most threatened unit acts before the rest; with no threat, slot order.
 do
     local A = blue(0x01, 0, 0, 0)
@@ -629,6 +661,17 @@ do
     local hurt = red(0x81, 1, 0, { hp = 25 })
     B.decide(boardOf(A, Bu, hurt), sight, style("careful"))
     check(sight.calls(), 2, "a changed HP is a new forecast")
+    -- the same exchange after an ally moved (supports change with position): asked again
+    local moved = blue(0x02, 1, 6, 0)
+    B.decide(boardOf(A, moved, hurt), sight, style("careful"))
+    check(sight.calls(), 3, "an ally that moved is a new forecast")
+    -- and a spent weapon use too
+    local spent = blue(0x01, 0, 0, 0)
+    A.items, spent.items = { { id = 1, uses = 40 } }, { { id = 1, uses = 39 } }
+    B.decide(boardOf(A, moved, hurt), sight, style("careful"))
+    local before = sight.calls()
+    B.decide(boardOf(spent, moved, hurt), sight, style("careful"))
+    check(sight.calls(), before + 1, "a spent weapon use is a new forecast")
     -- no cache: every call asks again
     local bare = sightOf { danger = o.danger, reach = o.reach, fc = o.fc }
     B.decide(boardOf(A, Bu, E), bare, style("careful"))

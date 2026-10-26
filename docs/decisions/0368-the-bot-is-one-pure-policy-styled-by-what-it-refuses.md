@@ -51,8 +51,9 @@ allowed (or nothing to march to) it ends where the worst case is smallest.
 
 **A unit that cannot Seize never blocks the throne.** Who may Seize is `Board.canSeize(unit,
 objective.lord, objective.ruledOut)`, its one owner: with no lord pid, anyone not in the ruledOut
-memo may try. A unit that cannot never ends on the seize tile, and never waits on or beside it
-(`needsToStepOff`) while another tile is left; it attacks from beside it, as the clear bot did.
+memo may try. A unit that cannot never ends on the seize tile, nor on or beside it
+(`needsToStepOff`) while another tile is left, to wait or to attack. The one exception is a target
+standing ON the seize tile (the boss on the throne), which it strikes from the approach.
 
 **What PR D supplies beyond the first interface:**
 - `objective.lord` (Board.lordPid) and `objective.ruledOut` (the slots that stood on the tile with
@@ -61,8 +62,11 @@ memo may try. A unit that cannot never ends on the seize tile, and never waits o
   game's terrain. A function of the goal because the bot picks the goal. Without it the march is
   Manhattan, which strands a unit against a wall (#60).
 - `sight.cache`, optional: one table per player phase. Forecasts are kept in it across decide
-  calls, keyed by both units, both HPs, the enemy's tile and the strike tile, so an action that
-  changes one exchange only re-asks that one. Reach and worst case are not kept across calls: they
-  depend on where every unit stands, and each action moves one.
+  calls, keyed by the board signature (every unit's id, tile, HP, and held item with its uses,
+  built once per call) plus the exchange (attacker, target, strike tile, weapon slot). FE8's
+  forecast reads more than the pair: support bonuses from allies in range, and the held weapon. A
+  narrower key returned a stale forecast after an ally moved. Correctness over savings: a hit is
+  only the same board asked again, such as a re-decide after a cancelled input. Reach and worst
+  case are per call only.
 - The action carries `unitId` and `targetId` (Board's unique index byte) beside the charIds,
   because generics share a charId and the ROM layer has to know which body to act on.

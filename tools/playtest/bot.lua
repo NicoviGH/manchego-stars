@@ -26,9 +26,12 @@
 --              strands a unit against a wall (#60).
 --            cache = {}|nil, OPTIONAL: a table the caller keeps for ONE player phase and
 --              replaces at the next. Forecasts are kept in it across decide calls, keyed by
---              everything a player-phase action can change about the pair (both HPs, the
---              enemy's tile). Reach and worst case are NOT kept across calls: they depend on
---              where every unit stands, which each action changes. }
+--              the BOARD SIGNATURE (every unit's id, tile, HP and held item with its uses)
+--              plus the exchange (attacker, target, strike tile, weapon slot). FE8's forecast
+--              reads more than the pair: support bonuses from allies in range, and the held
+--              weapon. So a hit is only ever the same board asked again (a re-decide after a
+--              cancelled input); any action that moves, hurts or spends a weapon misses.
+--              Reach and worst case are per call only. }
 --          Who may Seize is board.lua's Board.canSeize(unit, lord, ruledOut): `lord` is
 --          Board.lordPid; without it, anyone not in the ruledOut memo may try.
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
@@ -58,13 +61,18 @@
 -- Who acts: the lord seizes when it can reach the seize tile (the chapter ends there, so no
 -- enemy phase follows and no gate applies); else the unit with an allowed sure kill; else the
 -- unit whose own tile has the largest worst case (more reaching enemies breaks a tie); else
--- slot order. A unit that cannot Seize never ends on the seize tile, and never WAITS on or
--- beside it (needsToStepOff): a body there blocks a single-approach throne for the lord. Greedy keeps the old order: seize, then
--- slot order. A unit attacks when an allowed attack exists -- a sure kill first, then the
--- likeliest kill, then the most expected damage, then the boss, then the lowest HP -- and else
--- marches toward the objective (its tile, the boss, or the nearest enemy) over allowed tiles.
--- With none allowed, or nothing to march to (survive), it ends where the worst case is
--- smallest, its own tile first on a tie.
+-- slot order. Greedy keeps the old order: seize, then slot order.
+--
+-- What it does: attack when an allowed attack exists -- a sure kill first, then the likeliest
+-- kill, then the most expected damage, then the boss, then the lowest HP -- else march toward
+-- the objective (its tile, the boss, or the nearest enemy) over allowed tiles. With none
+-- allowed, or nothing to march to (survive), it ends where the worst case is smallest, its own
+-- tile first on a tie.
+--
+-- The throne: a unit that cannot Seize never ends on the seize tile, nor on or beside it
+-- (needsToStepOff) -- to wait or to attack -- unless its target stands ON the seize tile (the
+-- boss on the throne is struck from its approach). A body there blocks a single-approach
+-- throne for the lord.
 --
 -- ── The greedy core (the clear scenarios drive these directly) ─────────────────────────────
 -- pickTarget(reachable, enemies, prefs) -> { target = <enemy>, tile = {x,y} } | nil
@@ -74,6 +82,8 @@
 --   prefs.min_range: weapon MIN reach (default 1); 2 for a bow, which CANNOT hit an adjacent
 --                    foe -- striking from range 1 leaves no Attack command, so the strike
 --                    tile must sit at min_range..range, not 1..range.
+--   prefs.tilesFor:  optional function(enemy) -> tiles, the strike tiles for THAT enemy in
+--                    place of `reachable` (decide's throne rule); absent = `reachable`.
 --   Returns the best attackable enemy + the reachable tile to strike from, or nil if no
 --   enemy sits within [min_range, range] of any reachable tile. Preference: the boss first,
 --   then the lowest-HP enemy (likeliest kill).
@@ -114,7 +124,8 @@ function M.pickTarget(reachable, enemies, prefs)
     local minRange = (prefs and prefs.min_range) or 1
     local best, bestTile
     for _, e in ipairs(enemies) do
-        local tile = attackTileFor(reachable, e, range, minRange)
+        local from = prefs and prefs.tilesFor and prefs.tilesFor(e) or reachable
+        local tile = attackTileFor(from, e, range, minRange)
         if tile and (not best or preferred(e, best)) then
             best, bestTile = e, tile
         end
@@ -294,13 +305,26 @@ local SURE_HIT = 100
 
 local function isSureKill(f) return f.killsTarget and f.hit >= SURE_HIT end
 
+-- Everything on the board a forecast can depend on, as one string: each unit's id, tile, HP
+-- and held item (items[1], FE8's equipped slot) with its uses. Built once per decide call.
+function M.boardSignature(board)
+    local parts = {}
+    for _, u in ipairs(board.units) do
+        local held = u.items and u.items[1]
+        parts[#parts + 1] = table.concat({ u.id, u.x, u.y, u.hp,
+            held and held.id or "-", held and held.uses or "-" }, ":")
+    end
+    return table.concat(parts, ";")
+end
+
 -- One decide call's view: the board split by role, and memos so a forecast or a reach the
 -- caller pays for (an emulator round trip, in the ROM) is asked for once per call.
 local function context(board, sight)
     local cache = sight.cache or {}
     cache.forecasts = cache.forecasts or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, standing = {},
-                  forecasts = cache.forecasts, reaches = {}, worsts = {}, fields = {} }
+                  forecasts = cache.forecasts, reaches = {}, worsts = {}, fields = {},
+                  signature = M.boardSignature(board) }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
@@ -315,7 +339,7 @@ local function context(board, sight)
 end
 
 local function forecast(ctx, u, e, x, y)
-    local k = table.concat({ u.id, u.hp, e.id, e.hp, e.x, e.y, x, y, "held" }, ",")
+    local k = table.concat({ ctx.signature, u.id, e.id, x, y, "held" }, ",")
     local f = ctx.forecasts[k]
     if not f then
         f = ctx.sight.forecast(u, e, x, y, nil)
@@ -372,6 +396,14 @@ local function waitTiles(ctx, u)
     return #clear > 0 and clear or tiles
 end
 
+-- The tiles `u` may strike `e` from: anywhere it may end when `e` stands on the seize tile
+-- (the boss on the throne is reached from its approach), else only where it may wait.
+local function strikeTiles(ctx, u, e)
+    local s = ctx.seizeTile
+    if s and e.x == s.x and e.y == s.y then return endTiles(ctx, u) end
+    return waitTiles(ctx, u)
+end
+
 -- sight.field for `goal`, asked once per goal per call; nil when the caller has none.
 local function fieldFor(ctx, goal)
     if not (goal and ctx.sight.field) then return nil end
@@ -401,7 +433,8 @@ local function worstCase(ctx, u, x, y, spared)
                 local f = forecast(ctx, u, e, x, y)
                 local dmg = 0
                 if (f.takenHit or 0) > 0 then
-                    dmg = f.takenDmg * f.takenHits * ((f.takenCrit or 0) > 0 and CRIT_MULTIPLIER or 1)
+                    local crit = (f.takenCrit or 0) > 0 and CRIT_MULTIPLIER or 1
+                    dmg = f.takenDmg * f.takenHits * crit
                 end
                 w.sum, w.max = w.sum + dmg, math.max(w.max, dmg)
             end
@@ -437,8 +470,8 @@ end
 local function bestAttack(ctx, u, gate)
     if not u.minRange then return nil end
     local best
-    for _, t in ipairs(endTiles(ctx, u)) do
-        for _, e in ipairs(ctx.enemies) do
+    for _, e in ipairs(ctx.enemies) do
+        for _, t in ipairs(strikeTiles(ctx, u, e)) do
             if inRange(t.x, t.y, e.x, e.y, u.minRange, u.maxRange) then
                 local f = forecast(ctx, u, e, t.x, t.y)
                 local sure = isSureKill(f)
@@ -515,7 +548,8 @@ local function greedy(ctx, objective)
         targets[#targets + 1] = { x = e.x, y = e.y, hp = e.hp, is_boss = e.isBoss, unit = e }
     end
     local pick = u.minRange and M.pickTarget(tiles, targets,
-        { range = u.maxRange, min_range = u.minRange })
+        { range = u.maxRange, min_range = u.minRange,
+          tilesFor = function(t) return strikeTiles(ctx, u, t.unit) end })
     if pick then return action(u, pick.tile, "attack", pick.target.unit) end
     local goal = goalFor(ctx, u, objective)
     local tile = M.pickMove(waitTiles(ctx, u), { cur = u, goal = goal,
