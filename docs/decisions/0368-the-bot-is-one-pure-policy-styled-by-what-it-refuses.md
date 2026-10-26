@@ -69,7 +69,9 @@ standing ON the seize tile (the boss on the throne), which it strikes from the a
   either fighter (`SUPPORT_BONUSES_MAX_DISTANCE` = 3, bmreliance.h). A whole-board key missed on
   every action, so in the ROM each decide would have re-paid a full sweep of emulator round trips;
   a pair-only key returned a stale forecast after an ally moved. Reach and worst case are per call
-  only, and each unit's allowed attacks are worked out once per call.
+  only, and each unit's allowed attacks are worked out once per call. A supporter that is rescued
+or hidden leaves the on-field list, so it leaves the key too; the chapter-wide flag that lifts the
+support range check (gameStateBits 0x40) does not change within a phase, the cache's lifetime.
 - The action carries `unitId` and `targetId` (Board's unique index byte) beside the charIds,
   because generics share a charId and the ROM layer has to know which body to act on.
 
@@ -143,8 +145,9 @@ stronger" is no `threat` claim, and a Cormag line whose target class the page do
 claims, the twin's and the bot. A topic outside it raises, and a claim no longer carries a `step`:
 the topic fixes it, so the two can no longer disagree. Our YAML was re-tagged onto it: ch05's
 "niches" and the twin's "village race" are the same play (`site-race`); "chokepoint" is `hold`;
-"recruit rescue"/"recruit escort" are `recruit`. A test checks every twin `unit`/`vs` against the
-decomp's CHARACTER_/CLASS_ names, so the runner's resolver cannot meet an unknown name mid-run.
+"recruit rescue" is `rescue` and "recruit escort" is `escort` (what those lines ask the player to
+do). A test checks every twin `unit`/`vs`/`tile` against the decomp's CHARACTER_/CLASS_/TERRAIN_
+names, so the runner's resolver cannot meet an unknown name mid-run.
 
 **PR C review fixes (2026-10-26).** A unit always keeps its own tile, so one that cannot Seize and
 is boxed in on the throne waits there instead of having no tile. The kill chance is the hit rate
