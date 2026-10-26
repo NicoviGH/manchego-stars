@@ -374,6 +374,7 @@ local MAX_BLOWS = 4     -- a brave weapon doubling: 2 rounds x 2 strikes
 local function killChance(f, e)
     if not f.killsTarget or f.dmg <= 0 then return 0 end
     local need = (e.hp + f.dmg - 1) // f.dmg
+    -- more blows than any exchange lands: the forecast's kill needs a crit, which is not counted
     if need > MAX_BLOWS then return 0 end
     local chance = 1
     for i = 1, MAX_BLOWS do chance = chance * (i <= need and f.hit or 100) end

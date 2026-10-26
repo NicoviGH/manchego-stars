@@ -455,6 +455,15 @@ do
     }
     check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
         "equal kill chances tie exactly; expected damage (60 x 4 > 5 x 2 x 20) decides")
+    -- a kill only a crit lands (10 HP at 2 a blow, 2 blows) ranks as no kill chance at all
+    s = sightOf {
+        fc = { [0x01] = {
+            [0x81] = { ["0,0"] = fc { hit = 90, dmg = 2, hits = 2, killsTarget = true } },
+            [0x82] = { ["0,0"] = fc { hit = 30, dmg = 10, hits = 1, killsTarget = true } },
+        } },
+    }
+    check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
+        "a crit-only kill (5 blows needed) loses to a 30% plain kill")
 end
 
 -- even weighs each enemy on its own: two enemies at 12 each (24 together) kill A only
