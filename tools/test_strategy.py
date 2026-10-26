@@ -57,14 +57,16 @@ class EveryClaimCitesItsSection(unittest.TestCase):
                 with self.subTest(page=page):
                     self.assertIn(page, curated)
 
-    def test_every_twin_claim_names_a_real_character_or_class(self):
-        """The bot's runner resolves `unit`/`vs` to the game's ids; a name the decomp does not
+    def test_every_twin_claim_names_a_real_character_class_or_terrain(self):
+        """The bot's runner resolves `unit`/`vs`/`tile` to the game's ids; a name the decomp does not
         have would raise there, hours into a run. Catch it here."""
         import inject.decomp as decomp
         names = {'all', 'boss'}
         for header, prefix in (('characters.h', 'CHARACTER_'), ('classes.h', 'CLASS_')):
             text = decomp.vanilla_decomp_text('include/constants/' + header)
             names |= {strategy._norm(n) for n in decomp.enum_values(text, prefix)}
+        terrains = set(decomp.enum_values(
+            decomp.vanilla_decomp_text('include/constants/terrains.h'), 'TERRAIN_'))
         for ref in strategy._twin_file():
             for c in strategy.twin_claims(ref):
                 for field in ('unit', 'vs'):
@@ -72,6 +74,9 @@ class EveryClaimCitesItsSection(unittest.TestCase):
                     for v in (vals if isinstance(vals, list) else [vals] if vals else []):
                         with self.subTest(ref=ref, field=field, name=v):
                             self.assertIn(strategy._norm(v), names)
+                if 'tile' in c:
+                    with self.subTest(ref=ref, field='tile', name=c['tile']):
+                        self.assertIn(dif._terrain_key(c['tile']), terrains)
 
     def test_late_claims_not_read_by_parity(self):
         """ADR 0363: a planned chapter gets no strategy reading, so the claims curated past Ch7

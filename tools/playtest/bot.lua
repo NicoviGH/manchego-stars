@@ -27,12 +27,10 @@
 --              strands a unit against a wall (#60).
 --            cache = {}|nil, OPTIONAL: a table the caller keeps for ONE player phase and
 --              replaces at the next. Forecasts are kept in it across decide calls, keyed by
---              the BOARD SIGNATURE (every unit's id, tile, HP and held item with its uses)
---              plus the exchange (attacker, target, strike tile, weapon slot). FE8's forecast
---              reads more than the pair: support bonuses from allies in range, and the held
---              weapon. So a hit is only ever the same board asked again (a re-decide after a
---              cancelled input); any action that moves, hurts or spends a weapon misses.
---              Reach and worst case are per call only.
+--              what FE8's forecast reads for that exchange: both fighters (id, HP, held item
+--              and its uses), the strike tile, the enemy's tile, and every other unit within
+--              support range (3, bmreliance.h) of either fighter. An action elsewhere on the
+--              board leaves the entry standing. Reach and worst case are per call only.
 --            terrain(x, y) -> FE8 terrain id, OPTIONAL: read from the game's map by the caller.
 --              Only a terrain claim reads it; without it that claim is a no-op. }
 --          Who may Seize is board.lua's Board.canSeize(unit, lord, ruledOut): `lord` is
@@ -55,8 +53,9 @@
 -- tile when some tile of sight.reach(enemy) is within its weapon range of it; danger(x, y) = 0
 -- skips the walk. The target of a SURE kill (killsTarget at hit >= 100) is left out: it is dead
 -- before the enemy phase. Each style gates an action on it:
---   careful: no diesWorst, and the worst case < the unit's current HP
---   even:    no diesWorst, and no SINGLE enemy's worst case >= the unit's current HP
+--   careful: no diesWorst, and the worst case < the unit's HP after its own attack's
+--            worst-case counter (none for a sure kill on the first blow)
+--   even:    no diesWorst, and no SINGLE enemy's worst case >= that same HP
 --   bold:    no diesWorst (the exchange alone)
 --   greedy:  nothing
 -- None of these was chosen by a survival rate (ADR 0368).
@@ -68,10 +67,11 @@
 -- order. Greedy keeps the old order: seize, then slot order.
 --
 -- What it does: attack when an allowed attack exists -- an answered class first, then a sure
--- kill, then the likeliest kill, then the most expected damage, then the boss, then the lowest
--- HP -- else march toward the objective (its tile, the boss, or the nearest enemy) over
--- allowed tiles. With none allowed, or nothing to march to (survive, or a reinforcements
--- hold), it ends where the worst case is smallest, its own tile first on a tie.
+-- kill, then the likeliest kill (the hit rate once per blow it needs), then the most expected
+-- damage, then the boss, then the lowest HP -- else march toward the objective (its tile, the
+-- boss, or the nearest enemy) over allowed tiles. With none allowed, or nothing to march to
+-- (survive, or a reinforcements hold), it ends where the worst case is smallest, its own tile
+-- first on a tie.
 --
 -- ── Claims: Bot.CLAIM_BEHAVIOURS[kind](claim, style) -> a NEW style (the given one is kept) ──
 -- A claim reaches the bot RESOLVED by the runner, which reads the Strategy YAML (the kinds are
@@ -107,8 +107,8 @@
 -- ── Between chapters (ADR 0368): pure rules over plain tables the caller reads from memory ──
 -- roster entry (a unit, slot order): { id, charId, level, forced = bool|nil,
 --   ranks = {[weaponType] = rank number}, items = {{ id, type = weaponType|nil, rank,
---   promotes = bool|nil }...} }. `promotes` is set by the caller only on a seal that promotes
---   THIS unit; the bot never knows which seal fits which class.
+--   kind = "vulnerary"|nil, promotes = bool|nil }...} }. `promotes` is set by the caller only
+--   on a seal that promotes THIS unit; the bot never knows which seal fits which class.
 -- stock entry: { item, price, type = weaponType|nil, rank, kind = "vulnerary"|nil }; the caller
 --   says which stock item is the Vulnerary, so no item id lives here.
 -- Bot.prep(roster, cap, style) -> { deploy = {charIds}, give = {} }: forced units (slot order),
@@ -116,9 +116,9 @@
 --   once), then the highest level (ties by slot order), up to `cap`. Forced units all go even
 --   when they alone exceed the cap. No transfer rule is decided yet, so `give` is always empty.
 -- Bot.shop(gold, stock, party) -> {{ item, qty }...}: party is the deployed roster entries, in
---   deploy order. One Vulnerary (the cheapest) per unit first, then for each unit and each
---   weapon type it has a rank in (type names in order) it holds none of, the cheapest stock
---   weapon of that type at or under its rank. A purchase gold cannot cover is skipped and the
+--   deploy order. One Vulnerary (the cheapest) per unit holding none first, then for each unit
+--   and each weapon type it has a rank in (type names in order) it holds none of, the cheapest
+--   stock weapon of that type at or under its rank. A purchase gold cannot cover is skipped and the
 --   later ones are still tried.
 -- Bot.promote(unit, items) -> bool: level 10 or above and a promoting seal held.
 -- Bot.promoteOrder(units) -> units, highest level first (ties by slot order): the order a
@@ -355,18 +355,27 @@ M.STYLES = {
 local CRIT_MULTIPLIER = 3   -- bmbattle.c: gBattleStats.damage * 3 on a critical hit
 local SURE_HIT = 100
 
+local SUPPORT_RANGE = 3     -- bmreliance.h SUPPORT_BONUSES_MAX_DISTANCE, RECT_DISTANCE (Manhattan)
+
 local function isSureKill(f) return f.killsTarget and f.hit >= SURE_HIT end
 
--- Everything on the board a forecast can depend on, as one string: each unit's id, tile, HP
--- and held item (items[1], FE8's equipped slot) with its uses. Built once per decide call.
-function M.boardSignature(board)
-    local parts = {}
-    for _, u in ipairs(board.units) do
-        local held = u.items and u.items[1]
-        parts[#parts + 1] = table.concat({ u.id, u.x, u.y, u.hp,
-            held and held.id or "-", held and held.uses or "-" }, ":")
-    end
-    return table.concat(parts, ";")
+-- An exchange's worst case for our unit: the taken side's damage x hits, x3 on a crit.
+local function takenWorst(f)
+    if (f.takenHit or 0) <= 0 then return 0 end
+    local crit = (f.takenCrit or 0) > 0 and CRIT_MULTIPLIER or 1
+    return f.takenDmg * f.takenHits * crit
+end
+
+-- The chance (0-100) that the attack kills: the hit rate once per blow the kill needs, crits
+-- not counted. A doubling attack that needs both blows is hit^2, not hit.
+local function killChance(f, e)
+    if not f.killsTarget or f.dmg <= 0 then return 0 end
+    return (f.hit / 100) ^ math.ceil(e.hp / f.dmg) * 100
+end
+
+local function unitKey(u)
+    local held = u.items and u.items[1]          -- items[1] is FE8's equipped slot
+    return table.concat({ u.id, u.hp, held and held.id or "-", held and held.uses or "-" }, ":")
 end
 
 -- One decide call's view: the board split by role, and memos so a forecast or a reach the
@@ -375,12 +384,13 @@ local function context(board, sight)
     local cache = sight.cache or {}
     cache.forecasts = cache.forecasts or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
-                  forecasts = cache.forecasts, reaches = {}, worsts = {}, fields = {},
-                  signature = M.boardSignature(board) }
+                  onField = {}, forecasts = cache.forecasts, reaches = {}, worsts = {},
+                  fields = {}, options = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
         if u.onField then
+            ctx.onField[#ctx.onField + 1] = u
             ctx.standing[tileKey(u.x, u.y)] = u
             if u.faction == "blue" then ctx.blues[#ctx.blues + 1] = u end
             if u.faction == "blue" and not u.acted then ctx.actors[#ctx.actors + 1] = u end
@@ -391,8 +401,23 @@ local function context(board, sight)
     return ctx
 end
 
+-- A forecast's key: what FE8's forecast reads for this exchange -- both fighters (id, HP, held
+-- item and its uses), the strike tile, the enemy's tile, and every other unit within support
+-- range of either fighter (support bonuses move with them). An action elsewhere on the board
+-- leaves it standing, so a phase's cache keeps paying across decide calls.
+local function forecastKey(ctx, u, e, x, y)
+    local parts = { unitKey(u), x, y, unitKey(e), e.x, e.y, "held" }
+    for _, o in ipairs(ctx.onField) do
+        if o ~= u and o ~= e and (manhattan(o.x, o.y, x, y) <= SUPPORT_RANGE
+                or manhattan(o.x, o.y, e.x, e.y) <= SUPPORT_RANGE) then
+            parts[#parts + 1] = o.id .. "@" .. tileKey(o.x, o.y)
+        end
+    end
+    return table.concat(parts, ";")
+end
+
 local function forecast(ctx, u, e, x, y)
-    local k = table.concat({ ctx.signature, u.id, e.id, x, y, "held" }, ",")
+    local k = forecastKey(ctx, u, e, x, y)
     local f = ctx.forecasts[k]
     if not f then
         f = ctx.sight.forecast(u, e, x, y, nil)
@@ -422,14 +447,16 @@ local function canSeize(ctx, u)
 end
 
 -- The tiles `u` can end on: its reach, less every tile another unit stands on, and less the
--- seize tile for a unit that cannot Seize there.
+-- seize tile for a unit that cannot Seize there -- unless it already stands on it: its own
+-- tile is always left, so a unit boxed in on the throne still has somewhere to wait.
 local function endTiles(ctx, u)
     local s = ctx.seizeTile
     local barred = s and not canSeize(ctx, u)
     local out = {}
     for _, t in ipairs(reachOf(ctx, u)) do
         local there = ctx.standing[tileKey(t.x, t.y)]
-        if (not there or there == u) and not (barred and t.x == s.x and t.y == s.y) then
+        local own = t.x == u.x and t.y == u.y
+        if (not there or there == u) and (own or not (barred and t.x == s.x and t.y == s.y)) then
             out[#out + 1] = t
         end
     end
@@ -519,12 +546,7 @@ local function worstCase(ctx, u, x, y, spared)
     if ctx.sight.danger(x, y) > 0 then
         for _, e in ipairs(ctx.enemies) do
             if e ~= spared and reaches(ctx, e, x, y) then
-                local f = forecast(ctx, u, e, x, y)
-                local dmg = 0
-                if (f.takenHit or 0) > 0 then
-                    local crit = (f.takenCrit or 0) > 0 and CRIT_MULTIPLIER or 1
-                    dmg = f.takenDmg * f.takenHits * crit
-                end
+                local dmg = takenWorst(forecast(ctx, u, e, x, y))
                 w.sum, w.max = w.sum + dmg, math.max(w.max, dmg)
             end
         end
@@ -533,12 +555,24 @@ local function worstCase(ctx, u, x, y, spared)
     return w
 end
 
--- Whether a style lets `u` end its move on (x, y), `spared` left out of the worst case. An
--- attack whose forecast says diesWorst is refused before any gate is asked (every style but
--- greedy). bold's gate never weighs the enemy phase, so it asks for no forecast to do so.
+-- What our own attack's counter can take before the enemy phase: its worst case, nothing when
+-- the first blow is a sure kill (the target is dead before it can answer).
+local function counterWorst(f, e)
+    if f.hit >= SURE_HIT and f.dmg >= e.hp then return 0 end
+    return takenWorst(f)
+end
+
+-- Whether a style lets `u` end its move on (x, y), `spared` left out of the worst case and
+-- `spent` (the attack's own counter, counterWorst) already off its HP. An attack whose
+-- forecast says diesWorst is refused before any gate is asked (every style but greedy).
+-- bold's gate never weighs the enemy phase, so it asks for no forecast to do so.
 local GATES = {
-    careful = function(ctx, u, x, y, spared) return worstCase(ctx, u, x, y, spared).sum < u.hp end,
-    even = function(ctx, u, x, y, spared) return worstCase(ctx, u, x, y, spared).max < u.hp end,
+    careful = function(ctx, u, x, y, spared, spent)
+        return worstCase(ctx, u, x, y, spared).sum < u.hp - (spent or 0)
+    end,
+    even = function(ctx, u, x, y, spared, spent)
+        return worstCase(ctx, u, x, y, spared).max < u.hp - (spent or 0)
+    end,
     bold = function() return true end,
 }
 
@@ -558,27 +592,41 @@ local function betterAttack(c, b)
     return c.target.hp < b.target.hp
 end
 
--- `only`, a resolved `vs`, limits the targets to that enemy (a carry's or a wall's).
-local function bestAttack(ctx, u, gate, only)
-    if not u.minRange then return nil end
+-- Every attack the gate allows `u` this call, worked out once (decide's pass and a claim's
+-- filtered pass read the same list).
+local function attackOptions(ctx, u, gate)
+    local opts = ctx.options[u]
+    if opts then return opts end
+    opts = {}
     local answers = claimsOn(ctx, "answers", u)
-    local best
-    for _, e in ipairs(ctx.enemies) do
+    for _, e in ipairs(u.minRange and ctx.enemies or {}) do
         local answered = false
         for _, c in ipairs(answers) do
             if matchesVs(c.vs, e) then answered = true end
         end
-        for _, t in ipairs((not only or matchesVs(only, e)) and strikeTiles(ctx, u, e) or {}) do
+        for _, t in ipairs(strikeTiles(ctx, u, e)) do
             if inRange(t.x, t.y, e.x, e.y, u.minRange, u.maxRange) then
                 local f = forecast(ctx, u, e, t.x, t.y)
                 local sure = isSureKill(f)
-                if not f.diesWorst and gate(ctx, u, t.x, t.y, sure and e or nil) then
-                    local c = { tile = t, target = e, sure = sure, answered = answered,
-                                killChance = f.killsTarget and f.hit or 0,
-                                expected = f.dmg * f.hits * f.hit }
-                    if not best or betterAttack(c, best) then best = c end
+                if not f.diesWorst and gate(ctx, u, t.x, t.y, sure and e or nil,
+                                            counterWorst(f, e)) then
+                    opts[#opts + 1] = { tile = t, target = e, sure = sure, answered = answered,
+                                        killChance = killChance(f, e),
+                                        expected = f.dmg * f.hits * f.hit }
                 end
             end
+        end
+    end
+    ctx.options[u] = opts
+    return opts
+end
+
+-- `only`, a resolved `vs`, limits the targets to that enemy (a carry's or a wall's).
+local function bestAttack(ctx, u, gate, only)
+    local best
+    for _, c in ipairs(attackOptions(ctx, u, gate)) do
+        if (not only or matchesVs(only, c.target)) and (not best or betterAttack(c, best)) then
+            best = c
         end
     end
     return best
@@ -729,12 +777,12 @@ end
 -- rule sends it at the nearest enemy, which is the charge the greedy bot has always made.
 local function greedy(ctx, objective)
     local u = ctx.actors[1]
-    local tiles = endTiles(ctx, u)
     local targets = {}
     for _, e in ipairs(ctx.enemies) do
         targets[#targets + 1] = { x = e.x, y = e.y, hp = e.hp, is_boss = e.isBoss, unit = e }
     end
-    local pick = u.minRange and M.pickTarget(tiles, targets,
+    -- tilesFor gives the strike tiles per target, so no shared reach is passed
+    local pick = u.minRange and M.pickTarget(nil, targets,
         { range = u.maxRange, min_range = u.minRange,
           tilesFor = function(t) return strikeTiles(ctx, u, t.unit) end })
     if pick then return action(u, pick.tile, "attack", pick.target.unit) end
@@ -926,6 +974,13 @@ local function cheapest(stock, want)
     return best
 end
 
+local function holdsAny(u, want)
+    for _, it in ipairs(u.items) do
+        if want(it) then return true end
+    end
+    return false
+end
+
 function M.shop(gold, stock, party)
     local bought, order = {}, {}
     local function buy(s)
@@ -935,17 +990,15 @@ function M.shop(gold, stock, party)
         bought[s.item] = bought[s.item] + 1
     end
     local vuln = cheapest(stock, function(s) return s.kind == "vulnerary" end)
-    for _ in ipairs(party) do buy(vuln) end
+    for _, u in ipairs(party) do
+        if not holdsAny(u, function(it) return it.kind == "vulnerary" end) then buy(vuln) end
+    end
     for _, u in ipairs(party) do
         local types = {}
         for t in pairs(u.ranks) do types[#types + 1] = t end
         table.sort(types)
         for _, t in ipairs(types) do
-            local holds = false
-            for _, it in ipairs(u.items) do
-                if it.type == t then holds = true end
-            end
-            if not holds then
+            if not holdsAny(u, function(it) return it.type == t end) then
                 buy(cheapest(stock, function(s)
                     return s.type == t and s.rank <= u.ranks[t]
                 end))

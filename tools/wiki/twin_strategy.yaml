@@ -45,7 +45,7 @@ FE8 Ch2:
       vs: boss
       cite: "The fort in the south is a good place to plant a unit to defeat the boss."
     - kind: unmodelled
-      topic: recruit
+      topic: escort
       cite: "You'll need to keep Ross and Garcia safe if you want to recruit them."
     - kind: unmodelled
       topic: enemy-cover
@@ -88,7 +88,7 @@ FE8 Ch4:
       vs: all
       cite: "Always try to keep your units on forest tiles to avoid unnecessary hits."
     - kind: unmodelled
-      topic: recruit
+      topic: rescue
       cite: "putting her in a nearby forest and rescuing her the next turn is recommended."
     - kind: reinforcements
       cite: "Since this is a rout map, be wary of the reinforcements that spawn near the start of the map, and be mindful that you aren't swarmed."

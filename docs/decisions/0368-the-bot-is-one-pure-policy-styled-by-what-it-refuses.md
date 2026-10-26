@@ -32,9 +32,11 @@ against each threatening enemy; there is no enemy-side call.
 enemy phase.
 
 **The styles are gates, not weights:**
-- `careful`: no `diesWorst`, and the worst case is below the unit's current HP;
-- `even`: no `diesWorst`, and no single enemy's worst case reaches the unit's current HP (it takes
-  one fight at a time, not a gang);
+- `careful`: no `diesWorst`, and the worst case is below the unit's HP after its own attack's
+  worst-case counter (none when the first blow is a sure kill), so an exchange plus an enemy
+  phase that kill together are refused;
+- `even`: no `diesWorst`, and no single enemy's worst case reaches that same HP (it takes one
+  fight at a time, not a gang);
 - `bold`: no `diesWorst`; the enemy phase is not weighed;
 - `greedy`: nothing.
 
@@ -62,12 +64,12 @@ standing ON the seize tile (the boss on the throne), which it strikes from the a
   game's terrain. A function of the goal because the bot picks the goal. Without it the march is
   Manhattan, which strands a unit against a wall (#60).
 - `sight.cache`, optional: one table per player phase. Forecasts are kept in it across decide
-  calls, keyed by the board signature (every unit's id, tile, HP, and held item with its uses,
-  built once per call) plus the exchange (attacker, target, strike tile, weapon slot). FE8's
-  forecast reads more than the pair: support bonuses from allies in range, and the held weapon. A
-  narrower key returned a stale forecast after an ally moved. Correctness over savings: a hit is
-  only the same board asked again, such as a re-decide after a cancelled input. Reach and worst
-  case are per call only.
+  calls, keyed by what FE8's forecast reads for that exchange: both fighters (id, HP, held item
+  and its uses), the strike tile, the enemy's tile, and every other unit within support range of
+  either fighter (`SUPPORT_BONUSES_MAX_DISTANCE` = 3, bmreliance.h). A whole-board key missed on
+  every action, so in the ROM each decide would have re-paid a full sweep of emulator round trips;
+  a pair-only key returned a stale forecast after an ally moved. Reach and worst case are per call
+  only, and each unit's allowed attacks are worked out once per call.
 - The action carries `unitId` and `targetId` (Board's unique index byte) beside the charIds,
   because generics share a charId and the ROM layer has to know which body to act on.
 
@@ -143,3 +145,11 @@ the topic fixes it, so the two can no longer disagree. Our YAML was re-tagged on
 "niches" and the twin's "village race" are the same play (`site-race`); "chokepoint" is `hold`;
 "recruit rescue"/"recruit escort" are `recruit`. A test checks every twin `unit`/`vs` against the
 decomp's CHARACTER_/CLASS_ names, so the runner's resolver cannot meet an unknown name mid-run.
+
+**PR C review fixes (2026-10-26).** A unit always keeps its own tile, so one that cannot Seize and
+is boxed in on the throne waits there instead of having no tile. The kill chance is the hit rate
+once per blow the kill needs (a doubling 70% that needs both blows is 49%). The shop buys a
+Vulnerary only for a unit holding none (a held item can carry `kind = "vulnerary"`); the plan's
+order, Vulneraries before weapons, stands. Claim tags that were folded too far by keyword went
+back to what their lines mean: "keep Ross and Garcia safe if you want to recruit them" is
+`escort`, "putting her in a nearby forest and rescuing her" is `rescue`.

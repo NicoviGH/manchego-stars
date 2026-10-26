@@ -375,6 +375,79 @@ do
     check(at(bold), "2,0", "bold: strikes from (2,0)")
 end
 
+-- A unit that cannot Seize, boxed in ON the seize tile, still has its own tile: it waits there
+-- rather than finding no tile at all.
+do
+    local L = blue(0x01, 0, 0, 0, { charId = 0x0F, acted = true })
+    local O = blue(0x02, 1, 4, 4, { minRange = false, maxRange = false })
+    local sight = sightOf {
+        objective = { kind = "seize", tile = { x = 4, y = 4 }, lord = 0x0F },
+        reach = { [0x02] = tiles({ 4, 4 }) },
+    }
+    for _, aggr in ipairs({ "careful", "even", "bold", "greedy" }) do
+        local ok, a = pcall(B.decide, boardOf(L, O, red(0x81, 9, 9)), sight, style(aggr))
+        check(ok, true, aggr .. ": a boxed-in non-lord on the throne does not crash")
+        check(ok and at(a), "4,4", aggr .. ": it waits where it stands")
+    end
+end
+
+-- The attack's own counter comes off HP before the enemy phase is weighed: A (hp 20) takes a
+-- 15 counter striking E1, then the enemy phase (E2's 10, E1's 15 again). Without the counter
+-- careful read 25 against 20; even read 15 < 20 and struck. 15 off the HP refuses both.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 20 })
+    local E1 = red(0x81, 3, 0, { hp = 30 })
+    local E2 = red(0x82, 2, 3)
+    local board = boardOf(A, E1, E2)
+    local function sightWith(counter)
+        return sightOf {
+            danger = { ["2,0"] = 1 },
+            reach = { [0x01] = tiles({ 0, 0 }, { 2, 0 }), [0x82] = tiles({ 2, 1 }) },
+            fc = { [0x01] = {
+                [0x81] = { ["2,0"] = fc { hit = 80, dmg = 5, hits = 1, takenHit = 90,
+                                          takenDmg = counter, takenHits = 1 } },
+                [0x82] = { ["2,0"] = fc { takenHit = 70, takenDmg = 10, takenHits = 1 } },
+            } },
+        }
+    end
+    check(B.decide(board, sightWith(15), style("careful")).act, "wait",
+        "careful: counter 15 + enemy phase 10 >= 20 refuses the strike")
+    check(B.decide(board, sightWith(15), style("even")).act, "wait",
+        "even: 10 < 20 - 15 fails too")
+    -- E1 survives the strike and swings again on the enemy phase: 3 + (10 + 3) = 16 < 20
+    check(B.decide(board, sightWith(3), style("careful")).act, "attack",
+        "a 3 counter leaves room for the enemy phase: the strike is allowed")
+    -- a sure first-blow kill takes no counter
+    local weak = red(0x81, 3, 0, { hp = 5 })
+    local s = sightOf {
+        danger = { ["2,0"] = 1 },
+        reach = { [0x01] = tiles({ 0, 0 }, { 2, 0 }), [0x82] = tiles({ 2, 1 }) },
+        fc = { [0x01] = {
+            [0x81] = { ["2,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true,
+                                      takenHit = 90, takenDmg = 15, takenHits = 1 } },
+            [0x82] = { ["2,0"] = fc { takenHit = 70, takenDmg = 10, takenHits = 1 } },
+        } },
+    }
+    check(B.decide(boardOf(A, weak, E2), s, style("careful")).act, "attack",
+        "a sure kill on the first blow is never countered")
+end
+
+-- The kill chance counts every blow the kill needs: a doubling 70% that needs both (49%)
+-- loses to a single 60% blow.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E1 = red(0x81, 1, 0, { hp = 10 })
+    local E2 = red(0x82, 0, 1, { hp = 10 })
+    local s = sightOf {
+        fc = { [0x01] = {
+            [0x81] = { ["0,0"] = fc { hit = 70, dmg = 5, hits = 2, killsTarget = true } },
+            [0x82] = { ["0,0"] = fc { hit = 60, dmg = 10, hits = 1, killsTarget = true } },
+        } },
+    }
+    check(B.decide(boardOf(A, E1, E2), s, style("careful")).target, 0x82,
+        "60% in one blow beats 70% needed twice")
+end
+
 -- even weighs each enemy on its own: two enemies at 12 each (24 together) kill A only
 -- together, so careful refuses the tile and even takes it.
 do
@@ -672,10 +745,14 @@ do
     local hurt = red(0x81, 1, 0, { hp = 25 })
     B.decide(boardOf(A, Bu, hurt), sight, style("careful"))
     check(sight.calls(), 2, "a changed HP is a new forecast")
-    -- the same exchange after an ally moved (supports change with position): asked again
-    local moved = blue(0x02, 1, 6, 0)
+    -- an ally moving outside support range of both fighters changes nothing: still cached
+    local far = blue(0x02, 1, 6, 0)
+    B.decide(boardOf(A, far, hurt), sight, style("careful"))
+    check(sight.calls(), 2, "an ally moving out of support range keeps the forecast")
+    -- an ally moving within support range (3) of a fighter changes it: asked again
+    local moved = blue(0x02, 1, 0, 2)
     B.decide(boardOf(A, moved, hurt), sight, style("careful"))
-    check(sight.calls(), 3, "an ally that moved is a new forecast")
+    check(sight.calls(), 3, "an ally that moved into support range is a new forecast")
     -- and a spent weapon use too
     local spent = blue(0x01, 0, 0, 0)
     A.items, spent.items = { { id = 1, uses = 40 } }, { { id = 1, uses = 39 } }
@@ -1046,6 +1123,9 @@ local function test_shop_stops_at_gold()
         "skip-and-continue: exact fit, gold 800 buys vuln 300, axe 100, sword 400 in order")
     check(flat(B.shop(450, stock, { Cu })), "108x1,33x1",
         "the sword (400) is skipped at 50 gold, the buying stops there")
+    A.items = { { id = 0x10, type = "sword", rank = 1 }, { id = 0x6C, kind = "vulnerary" } }
+    check(flat(B.shop(10000, stock, { A, Bu })), "108x1,32x1",
+        "a unit already holding a Vulnerary buys none")
     check(flat(B.shop(0, stock, { A })), "", "no gold, nothing")
     check(flat(B.shop(10000, { stock[2] }, { A })), "",
         "no Vulnerary in stock and sword held: nothing")
