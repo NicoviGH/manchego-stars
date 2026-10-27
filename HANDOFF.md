@@ -9,8 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR D #542 built and reviewed three rounds; 8 minors
-open, then merge). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR D #542 merged 70e01bb; next PR E). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -46,27 +45,19 @@ G3 #537 78105ed; the summary is on #531).
 **Next, in order:**
 1. **PR C is DONE** (#541 4dc5e73): `bot.lua`, the pure careful bot, ADR 0368. Summary:
    <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6425325716>.
-2. **PR D is OPEN: #542** (`feat/510-step9-pr-d`, HEAD 5478d01, pushed). The bot plays one chapter
-   of the real ROM, headless, and emits a `BOTRUN <json>` record. Record: ADR 0369.
-   - **How it reads the game:** sight.lua (on the PR branch) runs FE8's own functions in a sandbox:
-     save state, set registers, run frames until the call returns to a scratch `b .` loop, read,
-     load back. NEVER `emu:step()` (it deadlocks across a frame end). The enemy's strike is
-     `AiAttemptOffensiveAction` itself after cp_decide.c's per-unit setup; `threat` is
-     `GenerateDangerZoneRange` with the other enemies marked under a roof; Seize = `CanUnitSeize`,
-     reach = `GetUnitEquippedWeapon` -- one owner each, the clear loop and every
-     `unitAttackRange` caller included. botrun.lua is the drive loop.
-   - **Review:** `/code-review 542 high` via `review-to-clean`, then 3 scoped re-reviews; every
-     finding fixed so far. **8 minor items are OPEN**, listed on the PR:
-     <https://github.com/NicoviGH/manchego-stars/pull/542#issuecomment-6443237337>. Fix them all,
-     run ONE more scoped re-review of the fix diff (5478d01..new HEAD), then merge on clean review
-     + green CI for HEAD (pre-approved for step 9).
-   - **Proven in game at 5478d01 (round 3, after the roof-bit fix):** our ch01 won t9 all alive
-     (23,910 frames, sandbox included); retail Prologue t2 + Ch1 t5 all alive; both sightprobes
-     PASS; the 9 scenarios the change touches PASS in 2m43s (clear, clear_ch01, ch02baxby,
-     ch04packmath, ch04snag, clear_ch04, clear_ch04_parley, ch05crest, ch06clock). The 8 open items
-     are docs/comments/tests plus two harness edge cases (`sandboxAt` set before the save; the
-     state bits' one owner): re-run that set ONCE after fixing them, then rebuild canonical.
-3. **Then PR E, F** (stacked D->E->F only). PR E's caller hands bot.lua `promotes` and `canUse`
+2. **PR D is DONE** (#542 70e01bb): the bot plays one chapter of the real ROM, headless, and
+   emits a `BOTRUN <json>` record. Record: ADR 0369.
+   - **How it reads the game:** sight.lua runs FE8's own functions in a sandbox: save state, set
+     registers, run frames until the call returns to a scratch `b .` loop, read, load back. NEVER
+     `emu:step()` (it deadlocks across a frame end). The enemy's strike is
+     `AiAttemptOffensiveAction` itself; `threat` is `GenerateDangerZoneRange` with the other
+     enemies marked under a roof; Seize = `CanUnitSeize`, reach = `GetUnitEquippedWeapon`.
+     botrun.lua is the drive loop. Unit state bits have ONE owner, `Board.US_*` in board.lua,
+     pinned against bmunit.h by `TestUnitStateBits`.
+   - Run by hand: `tools/playtest/run.sh bot` / `sightprobe` (ours ch01), and with `PT_VANILLA=1`
+     (retail Prologue + Ch1). At 70e01bb's last fix: ours ch01 won t9 all alive (23,910 frames);
+     retail won both, all alive. The review summary is on the PR.
+3. **Next: PR E, then F** (stack E->F only). PR E's caller hands bot.lua `promotes` and `canUse`
    from the game's own checks (ADR 0369: no level or rank rule in the bot).
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
