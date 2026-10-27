@@ -153,6 +153,7 @@ local INSPECT = {}
 -- the stamp holds at the frame it started from (INSPECT.sandboxAt). run.sh's progress and frame
 -- budget read these stamps. On INSPECT, declared here for it: log() is the first reader.
 INSPECT.sandboxFrames = 0
+INSPECT.costs = { calls = 0, save = 0, load = 0, run = 0 }   -- the sandbox's spend (botApi costs)
 INSPECT.framesRun = function()
     return (INSPECT.sandboxAt or emu:currentFrame()) + INSPECT.sandboxFrames
 end
@@ -2944,14 +2945,18 @@ INSPECT.sightApi = function()
             -- once the state is taken and the load clears it first, so a save or load that
             -- raises cannot leave the stamps frozen.
             save = function()
-                local at = emu:currentFrame()
+                local at, t0 = emu:currentFrame(), os.clock()
                 local st = emu:saveStateBuffer()
                 INSPECT.sandboxAt = at
+                INSPECT.costs.calls = INSPECT.costs.calls + 1
+                INSPECT.costs.save = INSPECT.costs.save + os.clock() - t0
                 return st
             end,
             load = function(st)
+                local t0 = os.clock()
                 INSPECT.sandboxAt = nil
                 emu:loadStateBuffer(st)
+                INSPECT.costs.load = INSPECT.costs.load + os.clock() - t0
             end,
             write16 = function(a, v) emu:write16(a, v) end,
             write32 = function(a, v) emu:write32(a, v) end,
@@ -2960,6 +2965,8 @@ INSPECT.sightApi = function()
             -- cost, run.sh's frame budget and its stall watch all see what the sight spent. A
             -- heartbeat line every TUNE.sandboxHeartbeat frames keeps a long think visible.
             frames = function(done, max)
+                local t0 = os.clock()
+                local function spent() INSPECT.costs.run = INSPECT.costs.run + os.clock() - t0 end
                 for _ = 1, max do
                     yield()
                     INSPECT.sandboxFrames = INSPECT.sandboxFrames + 1
@@ -2967,8 +2974,9 @@ INSPECT.sightApi = function()
                         log(string.format("sight: %d frames of game code run so far",
                             INSPECT.sandboxFrames))
                     end
-                    if done() then return true end
+                    if done() then spent() return true end
                 end
+                spent()
                 return false
             end,
         },
@@ -3043,6 +3051,21 @@ INSPECT.botApi = function(game)
         lost = lost,
         -- Emulated frames, the sandbox's included (sightApi's cpu.frames counts them).
         frames = INSPECT.framesRun,
+        -- What the run spent, for the record: CPU seconds in all, and in the sandbox's saves,
+        -- loads and game frames, with its call count (os.clock: CPU time, the cost that
+        -- matters on a busy machine).
+        costs = function()
+            local c = INSPECT.costs
+            local names, by = {}, {}
+            for name, addr in pairs(SYM) do
+                if type(addr) == "number" then names[addr & ~1] = name end
+            end
+            for addr, n in pairs(INSPECT.Sight.calls) do
+                by[names[addr & ~1] or string.format("0x%08X", addr)] = n
+            end
+            return { cpu_s = os.clock(), sandbox_calls = c.calls, save_s = c.save,
+                     load_s = c.load, run_s = c.run, game_calls = by }
+        end,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
     }

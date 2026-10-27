@@ -44,6 +44,40 @@ local function fakeCpu(cost)
     return cpu, function() return loads, ram end
 end
 
+-- test_batch_is_one_round_trip_and_reads_do_not_leak: three reads inside one batch load the
+-- state once; each read's journaled writes are undone when it returns, so the next sees the
+-- byte as it was; the result of each call still comes back.
+do
+    local cpu, seen = fakeCpu(1)
+    local bytes = { [0x100] = 7 }
+    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
+                                       u16 = function(a) return bytes[a] or 0 end,
+                                       u32 = function(a) return bytes[a] or 0 end },
+                    write8 = function(a, v) bytes[a] = v end,
+                    write16 = function(a, v) bytes[a] = v end,
+                    write32 = function(a, v) bytes[a] = v end }
+    local sandbox, api = Sight.batching(outer)
+    local before = { bytes[0x100] }
+    local sums = sandbox(function()
+        local out = {}
+        for i = 1, 3 do
+            out[i] = sandbox(function(call)
+                before[#before + 1] = bytes[0x100]
+                api.write8(0x100, 99)
+                return call(0x08001000, { i, 10 })
+            end)
+        end
+        return out
+    end)
+    check(select(1, seen()), 1, "batch: one load for three reads")
+    check(table.concat(sums, ","), "11,12,13", "batch: each read's answer")
+    check(table.concat(before, ","), "7,7,7,7", "batch: no read sees another's write")
+    check(bytes[0x100], 7, "batch: the write is undone")
+    -- an unbatched read is its own round trip, as before
+    sandbox(function(call) return call(0x08001000, { 1, 1 }) end)
+    check(select(1, seen()), 2, "unbatched: its own load")
+end
+
 -- A KEPT call (PR E): what it wrote stays, the registers come back as they were, pc through a
 -- write that lands one instruction ahead (mGBA's pipeline refill, measured).
 do

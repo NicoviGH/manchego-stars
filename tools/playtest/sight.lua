@@ -55,6 +55,8 @@
 --                            the call, so it can only choose `u`. Its decision is simulated:
 --                            takenHit, takenDmg, takenCrit, takenHits, takenSlot, takenTile.
 --                            All 0 (slot/tile nil) when the AI does not strike `u` there.
+--   batch(fn)                fn's reads in one save/load: one decision's worth of questions
+--                            cost one state round trip, not one each.
 --   objective                { kind, tile, turnsLeft } -- see objective().
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
 --                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
@@ -108,6 +110,7 @@
 
 local M = {}
 
+M.calls = {}                 -- game calls made, by function address (the run's cost record)
 M.FRAME_BUDGET = 600         -- frames one call may run; a full map's danger zone takes a few
 M.MOVE_LIMIT = 120           -- include/bmmap.h: a movement-map cost at or above it is unreachable
 M.UNREACHED = 0xFF           -- GenerateMovementMap fills its map with -1 before it floods
@@ -204,6 +207,7 @@ function M.machine(cpu, keep)
             return pc >= loop and pc <= loop + 8
         end
         local function call(addr, args)
+            M.calls[addr] = (M.calls[addr] or 0) + 1
             for i, a in ipairs(args) do
                 if i <= 4 then cpu.write("r" .. (i - 1), a & 0xFFFFFFFF)
                 else cpu.write32(top + (i - 5) * 4, a & 0xFFFFFFFF) end
@@ -351,12 +355,64 @@ local function readGrid(mem, base, w, h)
     return g
 end
 
-function M.new(api)
+-- Sight.batching(outer) -> sandbox, api: Sight.machine made re-entrant (the planner's cost,
+-- #510 step 9) over `outer` (Sight.new's api), and an api whose writes it journals.
+function M.batching(outer)
+    -- The outermost sandbox() saves the state and loads it back at the end, as Sight.machine
+    -- always did; a call made inside it (s.batch, or one read calling another) runs within
+    -- that save, and every byte it wrote through `api` is put back when it returns, so one
+    -- read cannot leak into the next. A game function's own writes (a movement map, the
+    -- battle structs, the AI's decision) are not journaled: each read that depends on one
+    -- makes it fresh first.
+    local mem0 = outer.mem
+    local journal
+    local function journaled(read, write)
+        return function(addr, v)
+            if journal then journal[#journal + 1] = { addr, read(addr), write } end
+            write(addr, v)
+        end
+    end
+    local api = setmetatable({
+        write8 = journaled(mem0.u8, outer.write8),
+        write16 = journaled(mem0.u16, outer.write16),
+        write32 = journaled(mem0.u32, outer.write32),
+    }, { __index = outer })
+    local machine = M.machine(api.cpu)
+    local depth, outerCall, outerScratch = 0, nil, nil
+    local function sandbox(fn)
+        if depth == 0 then
+            depth, journal = 1, {}
+            local ok, a, b = pcall(machine, function(call, scratch)
+                outerCall, outerScratch = call, scratch
+                return fn(call, scratch)
+            end)
+            depth, journal, outerCall, outerScratch = 0, nil, nil, nil
+            if not ok then error(a, 0) end
+            return a, b
+        end
+        local mark = #journal
+        depth = depth + 1
+        local ok, a, b = pcall(fn, outerCall, outerScratch)
+        depth = depth - 1
+        for k = #journal, mark + 1, -1 do
+            local e = journal[k]
+            e[3](e[1], e[2])
+            journal[k] = nil
+        end
+        if not ok then error(a, 0) end
+        return a, b
+    end
+    return sandbox, api
+end
+
+function M.new(outer)
+    local sandbox, api = M.batching(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
-    local sandbox = M.machine(api.cpu)
     local w, h = api.map()
     local s = { cache = {} }
+    -- Every read `fn` makes, in ONE save and load (see sandbox above).
+    function s.batch(fn) return sandbox(function() return fn() end) end
     local seen   -- this board's answers, dropped by refresh()
 
     -- The chapter's goal and tile commands, read once: its kind, the Defense map's end turn,
@@ -441,8 +497,25 @@ function M.new(api)
         error("sight.lua: unknown demand kind " .. tostring(d.kind), 2)
     end
 
+    -- A unit's own answers (its weapon's reach, Seize, staves, Vulnerary, keys) depend on the
+    -- unit alone -- class, level, HP, status, items -- never on where anyone stands, so they
+    -- outlive refresh(): keyed by those facts, a changed unit is simply a new key.
+    local own = {}
+    local function mine(kind, u, ask)
+        local parts = { kind, u.id, u.classId or "-", u.level or "-", u.hp, u.status or "-" }
+        for _, it in ipairs(u.items or {}) do parts[#parts + 1] = it.id .. "x" .. it.uses end
+        local k = table.concat(parts, ":")
+        local v = own[k]
+        if v == nil then
+            v = ask()
+            if v == nil then v = false end
+            own[k] = v
+        end
+        return v or nil
+    end
+
     function s.refresh()
-        seen = { threats = {}, ranges = {}, seizers = {}, fields = {}, staves = {} }
+        seen = { threats = {}, fields = {} }
         s.objective.turnsLeft = goal.kind == "survive" and M.turnsLeft(goal.endTurn, api.turn())
             or nil
     end
@@ -497,13 +570,11 @@ function M.new(api)
     end
 
     function s.range(u)
-        if seen.ranges[u.id] == nil then seen.ranges[u.id] = M.range(api, u, sandbox) or false end
-        return seen.ranges[u.id] or nil
+        return mine("range", u, function() return M.range(api, u, sandbox) end)
     end
 
     function s.canSeize(u)
-        if seen.seizers[u.id] == nil then seen.seizers[u.id] = M.canSeize(api, u, sandbox) end
-        return seen.seizers[u.id]
+        return mine("seize", u, function() return M.canSeize(api, u, sandbox) end) or false
     end
 
     function s.attack(u, e, x, y, slot)
@@ -595,9 +666,9 @@ function M.new(api)
     local function itemOf(it) return it.id | (it.uses << 8) end
 
     function s.opens(u, terrain)
-        return sandbox(function(call)
+        return mine("opens" .. terrain, u, function() return sandbox(function(call)
             return s32(call(S.GetUnitKeyItemSlotForTerrain, { u.addr, terrain })) >= 0
-        end)
+        end) end) or false
     end
 
     function s.opensDoor(u) return s.opens(u, M.TERRAIN_DOOR) end
@@ -622,8 +693,8 @@ function M.new(api)
     end
 
     function s.staves(u)
-        if seen.staves[u.id] == nil then
-            seen.staves[u.id] = sandbox(function(call)
+        return mine("staves", u, function()
+            return sandbox(function(call)
                 local out = {}
                 for i, it in ipairs(u.items) do
                     if call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) ~= 0
@@ -634,8 +705,7 @@ function M.new(api)
                 end
                 return out
             end)
-        end
-        return seen.staves[u.id]
+        end)
     end
 
     function s.heals(u, x, y)
@@ -661,7 +731,7 @@ function M.new(api)
     end
 
     function s.mend(u)
-        return sandbox(function(call)
+        return mine("mend", u, function() return sandbox(function(call)
             for i, it in ipairs(u.items) do
                 local amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) })
                 if amount > 0 and call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) == 0
@@ -670,7 +740,7 @@ function M.new(api)
                 end
             end
             return nil
-        end)
+        end) end)
     end
 
     function s.obstacles()

@@ -38,6 +38,8 @@
 --                      killer = the other fighter's charId)
 --   won(), lost()      the chapter advanced / the game-over screen is up
 --   frames()           emulated frames so far, every frame sight's sandbox ran included
+--   costs()            OPTIONAL: { cpu_s, sandbox_calls, save_s, load_s, run_s } so far; the
+--                      record carries what the run itself spent
 --   emit(line)         print one line to stdout
 --   log(s)
 -- Botrun.run(api) -> ok, why, record. It emits the record as ONE stdout line, `BOTRUN <json>`.
@@ -97,6 +99,7 @@ function M.run(api)
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {} }
     local startFrame = api.frames()
+    local startCosts = api.costs and api.costs() or {}
     local turn = 0
 
     local function record(list, phase)
@@ -114,6 +117,19 @@ function M.run(api)
         rec.outcome, rec.turns = outcome, turn
         rec.all_alive = outcome == "won" and #rec.deaths == 0
         rec.frames = api.frames() - startFrame
+        if api.costs then
+            -- what the run spent: each figure the difference since it started
+            local now = api.costs()
+            rec.costs = {}
+            for k, v in pairs(now) do
+                if type(v) == "table" then
+                    rec.costs[k] = {}
+                    for n, c in pairs(v) do rec.costs[k][n] = c - ((startCosts[k] or {})[n] or 0) end
+                else
+                    rec.costs[k] = v - (startCosts[k] or 0)
+                end
+            end
+        end
         api.emit(M.PREFIX .. Json.encode(rec))
         api.log(string.format("botrun: %s on turn %d (%s)", outcome, turn, why))
         return outcome == "won" or outcome == "lost" or outcome == "stuck", why, rec
@@ -149,7 +165,10 @@ function M.run(api)
             end
             seen[h] = true
             while true do
-                local action = Bot.decide(board, sight, style)
+                -- one decision's reads in one save/load (sight.batch), when the sight batches
+                local function decide() return Bot.decide(board, sight, style) end
+                local action
+                if sight.batch then action = sight.batch(decide) else action = decide() end
                 if not action then break end
                 local done = api.act(action)
                 if done == false then
