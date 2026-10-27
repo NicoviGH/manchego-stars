@@ -145,7 +145,8 @@ local controllerFault
 -- Most fields are assigned further down, next to the proc-pool reader they build on (the
 -- frame counters right below). Declared this early so every scenario can reach it: a helper
 -- hung on a table declared LATER (VISIT, line ~7400) is out of scope in any scenario written
--- above that line, which is why the shared R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
+-- above that line, which is why the shared R-on-a-name reader is INSPECT.helpAt and not
+-- VISIT.help (#493).
 local INSPECT = {}
 -- Frames emulated so far, the sight sandbox's included, and never going back: a sandbox's load
 -- rewinds the counter, so its frames are counted into INSPECT.sandboxFrames, and while one runs
