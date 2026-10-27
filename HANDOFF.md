@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E: the bot is now a planner, `feat/510-step9-e-campaigns` 6b03624, no PR yet; next: planner exposure + speed). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E: the bot is now a planner, `feat/510-step9-e-campaigns` 020864d, no PR yet; exposure done, next: replan on surprise + speed). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -95,21 +95,21 @@ G3 #537 78105ed; the summary is on #531).
        - A unit's own facts are cached until its items, HP, level or class change.
        - Every BOTRUN records `costs` (CPU seconds, sandbox calls, save/load/frame time, game
          calls per function). Report timings on every change.
-     - **State:** the planner wins ch03 in 8-14 turns in every style but loses 1-3 units per
-       attempt. The instrumented run (`plan:` lines in the log) shows the enemy simulation foresees
-       the killing strikes. The planner gets cornered by its own earlier acts: one-phase horizon,
-       PER_UNIT=4.
+     - **State (020864d):** each act carries its end tile's exposure, and every unit gets a
+       safe retreat. The beam pays each moved unit's death chance; the judge uses the AI's actual
+       phase. ch03 alone (one run): careful won on attempt 1, turn 13, all alive. Before, it
+       lost 1-3 units every attempt. Cost: 37.9 CPU s, 137 sandbox calls. Even and bold were not
+       exercised. Finding: #510 comment 6455059685.
      - **NEXT, in order:**
-       1. Score each end tile's standing exposure (what can reach it next phase), and add safe
-          retreats to each unit's menu.
-       2. Replan only on a surprise. Each attempt costs ~33 CPU s now, half of it judging.
-       3. Parallel attempts from the saved chapter start (PR F's pool, built now).
-       4. Remaining game-call cost: each call rounds up to a whole frame (~0.9 ms; `run_s` in
+       1. Replan only on a surprise. Each attempt costs ~38 CPU s now, about half of it judging.
+       2. Parallel attempts from the saved chapter start (PR F's pool, built now).
+       3. Remaining game-call cost: each call rounds up to a whole frame (~0.9 ms; `run_s` in
           the costs). A call list run in one frame is the next lever.
-       5. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
+       4. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
           claims, then the PR and `/code-review <PR> medium` in a subagent.
-     - Fast loop: `PT_CAMPAIGN` = an env with `from: 4, last: [4]` (ch03 alone, ~35 s per
-       attempt). The saved starts live in `references/sim/ours/9405eea0cb9f/states/e1-ours-ch07/`
+     - Fast loop: `PT_CAMPAIGN` = an env with `from: 4, last: [4]` (ch03 alone, ~38 s per
+       attempt). PT_CAMPAIGN holds the JSON ITSELF, not a path:
+       `PT_CAMPAIGN="$(cat env.json)"`. A path is silently ignored, and a New Game runs. The saved starts live in `references/sim/ours/9405eea0cb9f/states/e1-ours-ch07/`
        (4 = ch03, 5 = ch04). Editing a chapter YAML needs a `make` before run.sh will start.
    - How to run: build PT_CAMPAIGN with `campaign_env.py` (ours needs `--store` of a vanilla
      campaign through Ch8 for its shops; until one exists, pass `shops: {}` and `last: [host]` by
