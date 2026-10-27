@@ -28,7 +28,9 @@ retried, so it cannot hide behind a restart. The route (1 or 2) is drawn once pe
 | step | how |
 |---|---|
 | world map | the game's free cursor (`WorldMap_Loop`): L moves the cursor to the next open node until it is on `GetNextUnclearedNode` (run in the sandbox), A walks the lord there, A again enters the chapter. It never enters any other node, so never a skirmish, the Tower or the Ruins |
-| deploy | the Pick Units screen: the cap is its own `max_counter`; `Bot.prep`'s list is picked row by row (benching first, so the cap never blocks), then Fight! |
+| deploy | the Pick Units screen: the cap is its own `max_counter`; `Bot.team`'s list is picked row by row (benching first, so the cap never blocks), then Fight! The roster is the game's own `MakePrepUnitList`, run in the sandbox (`gPrepUnitList` is an EWRAM overlay other prep screens reuse), while `ProcScr_AtMenu` owns Preparations |
+| team | `Bot.team` over what the map asks (`Sight.demands`, read once per chapter start) and how each unit answers it (`Sight.answer`: the forecast, `GetUnitKeyItemSlotForTerrain`, `GetUnitFogViewRange`, `CanUnitUseStaff`, `GenerateExtendedMovementMap` for villages); each unit's group from `team_groups.py`; the cleared team carried to the next chapter. The record names each pick's reason |
+| lead | ours: ADR 0062's ch01 menu answered with the campaign's `lord` row (`INSPECT.pickLead`, shared with `reachCh01`), then its Yes. Vanilla's route is the campaign's `route` setting, never drawn |
 | shops | `StartShopScreen(unit, stock, type, the player phase)` as a **kept** call (sight.lua's sandbox with the registers put back and the RAM kept), then the shop's own list, prompts and exit by their keys, one purchase per opening. Priced by `GetItemPurchasePrice` on the map, never during prep (it charges half again while `BM_FLAG_PREPSCREEN` is set). Which units may wield what is `CanUnitUseWeapon` |
 | seals | the unit's Item command, the seal's row, Use; who a seal promotes is `CanUnitUsePromotionItem`. A branched promotion takes the first class the game's menu offers |
 

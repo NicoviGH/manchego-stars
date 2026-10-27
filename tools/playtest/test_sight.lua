@@ -208,5 +208,42 @@ end
 -- The scratch the forecast proc and EventInfo share fits below the return loop.
 check(Sight.SCRATCH_SIZE <= 0x70, true, "scratch ends before the loop at +0x80 (scratch at +0x10)")
 
+-- answerOf: kills in one round AND outlives the counter at its worst; strength = expected damage.
+do
+    local a = { hit = 80, dmg = 6, hits = 2, killsTarget = true, counterDmg = 5, counterHits = 2 }
+    local ok, strength = Sight.answerOf(a, 11)
+    check(ok, true, "answerOf: kills, and 10 counter damage < 11 HP")
+    check(strength, 9.6, "answerOf: strength = 6 x 2 x 80%")
+    check((Sight.answerOf(a, 10)), false, "answerOf: a counter that can kill is no answer")
+    a.killsTarget = false
+    check((Sight.answerOf(a, 99)), false, "answerOf: no kill this round is no answer")
+end
+
+-- demandsOf: one per red class (need = its count, rep = the first), villages each, chests and
+-- doors once, fog only with fog, sustain always; blue and off-field units ask nothing.
+do
+    local units = {
+        { faction = "red", onField = true, classId = 9, id = 0x81 },
+        { faction = "red", onField = true, classId = 7, id = 0x82 },
+        { faction = "red", onField = true, classId = 9, id = 0x83 },
+        { faction = "red", onField = false, classId = 5, id = 0x84 },
+        { faction = "blue", onField = true, classId = 9, id = 0x01 },
+    }
+    local cmds = { { x = 1, y = 2, cmd = Sight.TILE_COMMAND_CHEST },
+                   { x = 3, y = 4, cmd = Sight.TILE_COMMAND_CHEST },
+                   { x = 5, y = 6, cmd = Sight.TILE_COMMAND_VISIT },
+                   { x = 7, y = 8, cmd = Sight.TILE_COMMAND_SEIZE } }
+    local ids = {}
+    local d = Sight.demandsOf(units, cmds, 0)
+    for _, x in ipairs(d) do ids[#ids + 1] = x.id .. "/" .. x.need end
+    check(table.concat(ids, " "), "enemy:9/2 enemy:7/1 chests/1 village:5,6/1 sustain/1",
+        "demandsOf: classes, chests once, the village, sustain; no fog, no Seize demand")
+    check(d[1].rep.id, 0x81, "demandsOf: the class's first unit stands for it")
+    d = Sight.demandsOf({}, { { x = 0, y = 0, cmd = Sight.TILE_COMMAND_DOOR } }, 3)
+    ids = {}
+    for _, x in ipairs(d) do ids[#ids + 1] = x.id end
+    check(table.concat(ids, " "), "doors fog sustain", "demandsOf: doors, fog when the range is set")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

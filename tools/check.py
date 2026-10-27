@@ -86,6 +86,9 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9 PR E: the team is Bot.team's pick over the map's demands, never a
+    # level-ordered fill or a shuffled deploy, and the route is a campaign setting, never drawn
+    r'Bot\.prep\b', r'STYLES\.route', r'\broute 50/50\b',
     # retired by #510 step 9 PR D (ADR 0369): who may Seize and a unit's reach are the game's
     # answers (CanUnitSeize, GetUnitEquippedWeapon) read through sight.lua, never board.lua's
     # copies; the enemy's strike is AiAttemptOffensiveAction itself, not a copy of its slot loop

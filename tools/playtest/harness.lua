@@ -2280,6 +2280,51 @@ scenarios.goodberry = function()
     result("PASS", "Goodberry item menu captured (see screenshots)")
 end
 
+-- The lead menu (ADR 0062, ch01): commit row `want` -- "default" (the highlighted lead), "last"
+-- (the final candidate) or a NUMBER (that row of the LIVE menu, 0-based). Returns the row it
+-- committed on, or nil, why. No row is guessed and no candidate count is assumed: the walk
+-- counts the live item list, and the landing is asserted, because nothing downstream re-checks
+-- which lead was taken (#241). reachCh01 and the campaign's arrive both answer the menu here.
+INSPECT.pickLead = function(want, observation)
+    local rows = observation.menu and #observation.menu.items or 0
+    if want == "last" then want = rows - 1 end
+    if type(want) == "number" then
+        if want < 0 or want >= rows then
+            return nil, string.format("lead row %d is not in the live menu of %d candidates", want, rows)
+        end
+        -- Walk off the LIVE cursor and stop when it ARRIVES, rather than pressing a fixed
+        -- count: a fixed count reaches the wanted row only if the menu opened on row 0, which
+        -- nothing guarantees, and FE8 menus WRAP -- so being wrong picks a different lead and
+        -- passes anyway.
+        for _ = 1, rows do
+            local at = observeController()
+            if at.menu and at.menu.current == want then break end
+            if not guardedInput("menu_next", "DOWN", "the lead menu selection moves",
+                function(after, before)
+                    return after.menu ~= nil and before.menu ~= nil
+                        and after.menu.current ~= before.menu.current
+                end, 60) then
+                return nil, "could not walk the lead menu to the chosen candidate"
+            end
+        end
+        local landed = observeController()
+        if not (landed.menu and landed.menu.current == want) then
+            shot("ch01-lord-walk-lost")
+            return nil, string.format("lead menu walk landed on row %s of %d, not row %d",
+                tostring(landed.menu and landed.menu.current), rows, want)
+        end
+    end
+    local committing = observeController().menu
+    local picked = committing and committing.current or want
+    if not guardedInput("select_current_menu_item", "A", "lead menu selection closes", function(after)
+        return after.menu == nil
+    end, 300) then
+        return nil, "could not choose the highlighted lead"
+    end
+    log(string.format("lead committed on menu row %s of %d", tostring(picked), rows))
+    return picked
+end
+
 -- Reach ch01: ride the ch00 win into chapter slot 2, drive the post-chapter save + Beat-1
 -- scene + lord select on OBSERVED state, then Fight! into the phase. Returns true at the
 -- destination; false with its own FAIL logged otherwise.
@@ -2338,53 +2383,9 @@ local function reachCh01(opts)
             end
             yield()
         elseif state == "generic_menu" then
-            -- Scenario policy: which lead to take. The controller owns the live menu
-            -- callback and the guarded input either way; no row is guessed and no
-            -- candidate count is assumed -- the walk counts the LIVE item list.
-            local rows = observation.menu and #observation.menu.items or 0
-            local want = opts.lord
-            if want == "last" then want = rows - 1 end
-            if type(want) == "number" then
-                if want < 0 or want >= rows then
-                    result("FAIL", string.format(
-                        "lead row %d is not in the live menu of %d candidates", want, rows))
-                    return false
-                end
-                -- Walk off the LIVE cursor and stop when it ARRIVES, rather than pressing a
-                -- fixed count: a fixed count reaches the wanted row only if the menu opened
-                -- on row 0, which nothing guarantees, and FE8 menus WRAP -- so being wrong
-                -- picks a different lead and passes anyway. The landing is asserted below
-                -- either way, because nothing downstream re-checks which lead was taken
-                -- (ckpt_lordpinky just saves the state) (#241).
-                for _ = 1, rows do
-                    local at = observeController()
-                    if at.menu and at.menu.current == want then break end
-                    if not guardedInput("menu_next", "DOWN", "the lead menu selection moves",
-                        function(after, before)
-                            return after.menu ~= nil and before.menu ~= nil
-                                and after.menu.current ~= before.menu.current
-                        end, 60) then
-                        result("FAIL", "could not walk the lead menu to the chosen candidate")
-                        return false
-                    end
-                end
-                local landed = observeController()
-                if not (landed.menu and landed.menu.current == want) then
-                    result("FAIL", string.format(
-                        "lead menu walk landed on row %s of %d, not row %d",
-                        tostring(landed.menu and landed.menu.current), rows, want))
-                    shot("ch01-lord-walk-lost")
-                    return false
-                end
-            end
-            local committing = observeController().menu
-            opts.picked = committing and committing.current or want
-            if not guardedInput("select_current_menu_item", "A", "lead menu selection closes", function(after)
-                return after.menu == nil
-            end, 300) then
-                result("FAIL", "could not choose the highlighted lead"); return false
-            end
-            log(string.format("lead committed on menu row %s of %d", tostring(opts.picked), rows))
+            local picked, why = INSPECT.pickLead(opts.lord, observation)
+            if picked == nil then result("FAIL", why); return false end
+            opts.picked = picked
         elseif state == "yes_no_choice" then
             -- Lord select confirms the pick with "Will <lead> lead the party?". Same
             -- scenario policy as the menu above -- accept the default -- and Yes is the
@@ -3087,7 +3088,7 @@ INSPECT.campaignApi = function(game)
     local mode = TUNE.difficultyName[TUNE.difficultyWant]
     local id = cfg.id or string.format("%s-s%d", mode, seed)
     local dir = PLAYTEST_SIMDIR .. "/states/" .. id
-    local states, played, shops = {}, nil, nil
+    local states, played, shops, leadPicked = {}, nil, nil, nil
     math.randomseed(seed)
     local function gold() return ru32(SYM.gPlaySt + C.PLAY_GOLD) end
 
@@ -3112,16 +3113,26 @@ INSPECT.campaignApi = function(game)
         end
         return list
     end
-    -- The units the player could field: the Pick Units list while the prep screen is up,
-    -- else the blue units on the field.
+    -- The units the player could field: the Pick Units list while Preparations is up (its
+    -- owner, ProcScr_AtMenu, which stays alive under Pick Units; the command list's proc does
+    -- not), else the blue units on the field. gPrepUnitList is an EWRAM overlay other prep
+    -- screens reuse, so it is built here, in the sandbox, by the game's own MakePrepUnitList
+    -- (what Pick Units runs when it opens).
     local function units()
         local all, out = BOARD.read().units, {}
-        if PROCS.find(SYM.ProcScr_PrepMenu) then
+        if PROCS.find(SYM.ProcScr_AtMenu) then
             local byAddr = {}
             for _, u in ipairs(all) do byAddr[u.addr] = u end
-            for i = 0, ru32(SYM.gPrepUnitList + C.PREP_COUNT) - 1 do
-                local u = byAddr[ru32(SYM.gPrepUnitList + i * 4)]
-                if u then out[#out + 1] = u end
+            local listed = INSPECT.gameCalls(function(call)
+                call(SYM.MakePrepUnitList, {})
+                local addrs = {}
+                for i = 0, ru32(SYM.gPrepUnitList + C.PREP_COUNT) - 1 do
+                    addrs[#addrs + 1] = ru32(SYM.gPrepUnitList + i * 4)
+                end
+                return addrs
+            end)
+            for _, a in ipairs(listed) do
+                if byAddr[a] then out[#out + 1] = byAddr[a] end
             end
             return out
         end
@@ -3132,7 +3143,8 @@ INSPECT.campaignApi = function(game)
     end
 
     local api = { Bot = BOT, Json = Json,
-        info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id },
+        info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id,
+                 route = cfg.route },
         random = math.random,
         gold = gold,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
@@ -3158,7 +3170,8 @@ INSPECT.campaignApi = function(game)
         return INSPECT.gameCalls(function(call)
             local out = {}
             for _, u in ipairs(us) do
-                local e = { id = u.id, charId = u.charId, level = u.level, canUse = {}, items = {},
+                local e = { id = u.id, charId = u.charId, classId = u.classId, level = u.level,
+                            canUse = {}, items = {},
                             forced = call(SYM.IsCharacterForceDeployed, { u.charId }) ~= 0 }
                 for _, s in ipairs(stock) do
                     if call(SYM.CanUnitUseWeapon, { u.addr, call(SYM.MakeNewItem, { s.item }) }) ~= 0 then
@@ -3176,6 +3189,26 @@ INSPECT.campaignApi = function(game)
             return out
         end)
     end
+
+    -- What the map asks of a team and how each roster unit answers it, read at the prep screen
+    -- by sight.lua (the game's own checks). A demand's `rep` (a board unit) is dropped before it
+    -- is returned: the record keeps the demand's id.
+    api.needs = function(roster)
+        local sight = INSPECT.Sight.new(INSPECT.sightApi())
+        local demands, byChar = sight.demands(), {}
+        for _, u in ipairs(units()) do byChar[u.charId] = u end
+        local answers, strength = {}, {}
+        for _, e in ipairs(roster) do
+            answers[e.charId], strength[e.charId] = {}, {}
+            for _, d in ipairs(demands) do
+                answers[e.charId][d.id], strength[e.charId][d.id] = sight.answer(byChar[e.charId], d)
+            end
+        end
+        for _, d in ipairs(demands) do d.rep = nil end
+        return { demands = demands, answers = answers, strength = strength }
+    end
+    -- The team caps (team_groups.py, carried in PT_CAMPAIGN): class id -> group, and maxima.
+    api.teamGroups = function() return cfg.groups or {}, cfg.maxima or {} end
 
     -- Ride the game to the next chapter's start: its prep screen, else its first player phase.
     -- The world map walks the lord to the game's next story node (GetNextUnclearedNode) by its
@@ -3221,6 +3254,19 @@ INSPECT.campaignApi = function(game)
                         function(after) return controllerState(after) ~= "world_map_idle" end, 120)
                 end
                 if not ok then return nil, "the world map refused its input (see the trace)" end
+            elseif state == "generic_menu" and game == "ours" then
+                -- ch01's lead menu (ADR 0062): the campaign's `lord` row, else the highlighted lead.
+                local picked, pwhy = INSPECT.pickLead(cfg.lord or "default", obs)
+                if picked == nil then return nil, "lead menu: " .. pwhy end
+                leadPicked = picked
+            elseif state == "yes_no_choice" and leadPicked ~= nil then
+                -- the pick's confirmation, "Will <lead> lead the party?"
+                if not selectSemantic("answer_yes", "the lead prompt takes Yes", function(after)
+                    return controllerState(after) ~= "yes_no_choice"
+                end, 120) then
+                    return nil, "the lead prompt refused Yes"
+                end
+                leadPicked = nil
             elseif state ~= "player_map_idle" then
                 local advanced = advanceBootState(obs, state)
                 if advanced == false then return nil, "a guarded input failed in " .. tostring(state) end
@@ -3316,7 +3362,13 @@ INSPECT.campaignApi = function(game)
                     local was = fielded(addr)
                     if not guardedInput("toggle_deploy", "A", "the unit's deploy flips", function()
                         return fielded(addr) ~= was
-                    end, 60) then return nil, "row " .. i .. " would not toggle" end
+                    end, 60) then
+                        local pid = ru8(ru32(addr) + 4)
+                        return nil, string.format("row %d (char 0x%02X, game says forced=%s) would not toggle",
+                            i, pid, tostring(INSPECT.gameCalls(function(call)
+                                return call(SYM.IsCharacterForceDeployed, { pid }) ~= 0
+                            end)))
+                    end
                 end
             end
         end

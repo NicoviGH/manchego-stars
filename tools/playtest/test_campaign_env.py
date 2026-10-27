@@ -22,7 +22,25 @@ class VanillaIndex(unittest.TestCase):
         self.assertEqual(got, [0, 1, 2, 3, 4, 6, 7, 8, 9])
 
     def test_vanilla_ends_after_either_routes_last_chapter(self):
-        self.assertEqual(ce.vanilla_env(), {'last': [0x16, 0x23]})
+        env = ce.vanilla_env()
+        self.assertEqual(env['last'], [0x16, 0x23])
+        self.assertEqual(env['route'], 1, 'Eirika unless the campaign says otherwise')
+        self.assertEqual(ce.vanilla_env(2)['route'], 2)
+
+    def test_both_games_carry_the_team_caps(self):
+        self.assertEqual(ce.vanilla_env()['maxima']['armour'], 1)
+        self.assertEqual(ce.vanilla_env()['groups'][str(0x05)], 'mounted')
+
+
+class LeadRow(unittest.TestCase):
+    def test_a_pc_is_its_menu_row(self):
+        lords = [u for u, *_ in ce.inject.cast._classed_cast(campaign_chapters.CAMPAIGN,
+                                                              available_at=1)[0]]
+        self.assertEqual(ce.lead_row(lords[-1]), len(lords) - 1)
+
+    def test_a_unit_not_offered_raises(self):
+        with self.assertRaises(ValueError):
+            ce.lead_row('lupin')
 
 
 class Ours(unittest.TestCase):

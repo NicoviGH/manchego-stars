@@ -283,6 +283,11 @@ WANTED = [
     'GenerateExtendedMovementMap',  # the AI's march distance to a far goal (bmidoten.c)
     'CanUnitSeize',             # who may Seize: the Seize command's own check (bmdifficulty.c)
     'GetUnitEquippedWeapon',    # the weapon BU_ISLOT_AUTO strikes with: first usable (bmitem.c)
+    # Bot.team's demands (#510 step 9 PR E): what each unit answers, by the game's own checks.
+    'GetUnitKeyItemSlotForTerrain',  # a key or lockpick for a chest/door (Chest/DoorCommandUsability)
+    'GetUnitFogViewRange',      # how far a unit sees in fog: a thief's +5, a torch (bmunit.c)
+    'CanUnitUseStaff',          # whether a unit can use a staff it holds (bmitem.c)
+    'MakePrepUnitList',         # the Pick Units roster, rebuilt into its EWRAM overlay (prepscreen.c)
     # campaign.lua (#510 step 9 PR E): between chapters, the game's own shop, rules and world map.
     'StartShopScreen',          # opens the Armory/Vendor screen for a unit over a stock list
     'Shop_Loop_BuyKeyHandler',  # the shop's item list key handler (bmshop.c)

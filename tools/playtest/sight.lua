@@ -65,6 +65,20 @@
 --                            not already firing now (SearchAvailableEvent over the chapter's
 --                            turnBasedEvents, the turn and phase set to each), or nil.
 --   cache                    {} for ONE player phase (bot.lua keeps attacks and strikes there).
+--   demands()                what the map asks of a team (M.demandsOf), at the prep screen:
+--                            the board's red units and the chapter's tile commands (read once,
+--                            with the Seize tile), fog from gPlaySt.chapterVisionRange.
+--   answer(u, d) -> answered, strength: how `u` answers demand `d`, by the game's own checks.
+--                            enemy: attack() on d.rep from r.max away (N, E, S, W, the first on
+--                            the map), answered when it kills in one round and outlives the
+--                            counter (M.answerOf); strength = its expected damage that round.
+--                            chests/doors: GetUnitKeyItemSlotForTerrain finds a key or lockpick
+--                            (ChestCommandUsability, DoorCommandUsability). fog: GetUnitFogViewRange
+--                            sees past the chapter's range (a thief, a torch). sustain: a held
+--                            staff CanUnitUseStaff accepts. village: it reaches the tile, from
+--                            fieldUnit()'s tile, in no more turns than the fastest red unit
+--                            from its own (GenerateExtendedMovementMap on each one's costs,
+--                            turns = cost / UNIT_MOV rounded up).
 -- Sight.seed(api, s)         InitRN(s): the game's own seeding, written into gRNSeeds.
 
 local M = {}
@@ -74,6 +88,8 @@ M.MOVE_LIMIT = 120           -- include/bmmap.h: a movement-map cost at or above
 M.UNREACHED = 0xFF           -- GenerateMovementMap fills its map with -1 before it floods
 M.ISLOT_AUTO = -1            -- include/bmbattle.h BU_ISLOT_AUTO
 M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
+M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x14
+M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
 M.ITEM_MONSTER_STONE = 0xB5  -- constants/items.h
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
@@ -102,8 +118,10 @@ local DEC_ACTION, DEC_X, DEC_Y, DEC_TARGET, DEC_SLOT = 0x00, 0x02, 0x03, 0x06, 0
 local AI_ACTION_COMBAT, BALLISTA_SLOT = 1, 0xFF
 -- struct EventInfo (include/eventinfo.h): +00 listScript, +04 script; 0x1C bytes.
 local EVENT_INFO_SIZE, EVENT_SCRIPT = 0x1C, 0x04
--- struct PlaySt: +0F faction, +10 u16 chapterTurnNumber.
-local PLAY_FACTION, PLAY_TURN = 0x0F, 0x10
+-- struct PlaySt: +0D chapterVisionRange (0 = no fog), +0F faction, +10 u16 chapterTurnNumber.
+local PLAY_VISION, PLAY_FACTION, PLAY_TURN = 0x0D, 0x0F, 0x10
+-- UNIT_MOV (bmunit.h): struct Unit +04 pClassData, +1D s8 movBonus; struct ClassData +12 baseMov.
+local UNIT_CLASS, UNIT_MOV_BONUS, CLASS_MOV = 0x04, 0x1D, 0x12
 
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), write16(addr, v),
 -- write32(addr, v), save() -> state, load(state), frames(done, max) -> bool (run emulated frames
@@ -188,6 +206,7 @@ function M.machine(cpu, keep)
 end
 
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
+local function s32(v) return v >= 0x80000000 and v - 0x100000000 or v end
 
 -- One side of a simulated exchange, as the forecast window reads it (bksel.c): hit, crit,
 -- damage against the other side's defence, how many blows (the proc's hit count for that side),
@@ -222,6 +241,45 @@ function M.strikeOf(t)
     return { takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
              takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
              takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil }
+end
+
+-- Whether our attack ANSWERS its target, and how hard: it kills in one round and outlives
+-- the counter at its worst (every blow lands); strength = the round's expected damage. Pure.
+function M.answerOf(a, hp)
+    return a.killsTarget and a.counterDmg * a.counterHits < hp, a.dmg * a.hits * a.hit / 100
+end
+
+-- What the map asks of a team, for Bot.team (#510 plan comment, "Party selection"). Pure, so
+-- test_sight.lua builds every case. units = Board.read's; commands = {{ x, y, cmd }...} the
+-- chapter's tile commands; fog = gPlaySt.chapterVisionRange. One demand per red class on the
+-- field (need = how many stand there, rep = the first), one per village tile, one for chests
+-- and one for doors when there are any, fog when the chapter has it, and sustain always.
+function M.demandsOf(units, commands, fog)
+    local out, byClass, once = {}, {}, {}
+    for _, u in ipairs(units) do
+        if u.faction == "red" and u.onField and u.classId then
+            local d = byClass[u.classId]
+            if not d then
+                d = { id = "enemy:" .. u.classId, kind = "enemy", need = 0, rep = u }
+                byClass[u.classId] = d
+                out[#out + 1] = d
+            end
+            d.need = d.need + 1
+        end
+    end
+    local kinds = { [M.TILE_COMMAND_CHEST] = "chests", [M.TILE_COMMAND_DOOR] = "doors" }
+    for _, c in ipairs(commands) do
+        if c.cmd == M.TILE_COMMAND_VISIT then
+            out[#out + 1] = { id = string.format("village:%d,%d", c.x, c.y), kind = "village",
+                              need = 1, tile = { x = c.x, y = c.y } }
+        elseif kinds[c.cmd] and not once[c.cmd] then
+            once[c.cmd] = true
+            out[#out + 1] = { id = kinds[c.cmd], kind = kinds[c.cmd], need = 1 }
+        end
+    end
+    if fog > 0 then out[#out + 1] = { id = "fog", kind = "fog", need = 1 } end
+    out[#out + 1] = { id = "sustain", kind = "sustain", need = 1 }
+    return out
 end
 
 -- Turns left on a Defense map on turn `turn`: End - turn (the goal window's last turn is
@@ -272,24 +330,90 @@ function M.new(api)
     local s = { cache = {} }
     local seen   -- this board's answers, dropped by refresh()
 
-    -- The chapter's goal, read once: its kind, the Defense map's end turn, the Seize tile (the
-    -- one location event whose command is Seize, as bmcommanddbg.c finds it).
+    -- The chapter's goal and tile commands, read once: its kind, the Defense map's end turn,
+    -- every tile's location event, and the Seize tile (the one whose command is Seize, as
+    -- bmcommanddbg.c finds it).
+    local commands = {}
     local goal = sandbox(function(call)
         local data = call(S.GetROMChapterStruct, { api.chapter() })
         local g = { kind = M.GOALS[mem.u8(data + M.CHAPTER_GOAL)] or "special",
                     endTurn = mem.u8(data + M.CHAPTER_GOAL_TURN) }
-        if g.kind == "seize" then
-            for y = 0, h - 1 do
-                for x = 0, w - 1 do
-                    if call(S.GetAvailableTileEventCommand, { x, y }) == M.TILE_COMMAND_SEIZE then
-                        g.tile = { x = x, y = y }
-                    end
+        for y = 0, h - 1 do
+            for x = 0, w - 1 do
+                local cmd = call(S.GetAvailableTileEventCommand, { x, y })
+                if cmd ~= 0 then commands[#commands + 1] = { x = x, y = y, cmd = cmd } end
+                if g.kind == "seize" and cmd == M.TILE_COMMAND_SEIZE then
+                    g.tile = { x = x, y = y }
                 end
             end
         end
         return g
     end)
     s.objective = { kind = goal.kind, tile = goal.tile }
+
+    function s.demands()
+        return M.demandsOf(api.board().units, commands, mem.u8(S.gPlaySt + PLAY_VISION))
+    end
+
+    -- Turns `unit` needs from `at` to `tile` on its own movement costs, nil = never.
+    local function turnsTo(unit, tile, at)
+        local cost = sandbox(function(call)
+            local costs = call(S.GetUnitMovementCost, { unit.addr })
+            call(S.GenerateExtendedMovementMap, { tile.x, tile.y, costs })
+            return grid(mem, S.gBmMapMovement, at.x, at.y)
+        end)
+        if cost == M.UNREACHED then return nil end
+        local mov = mem.s8(unit.addr + UNIT_MOV_BONUS) + mem.s8(mem.u32(unit.addr + UNIT_CLASS) + CLASS_MOV)
+        return math.ceil(cost / mov)
+    end
+    local raced = {}   -- village id -> the fastest red unit's turns (false: none reaches)
+    local SIDES = { { 0, -1 }, { 1, 0 }, { 0, 1 }, { -1, 0 } }
+
+    function s.answer(u, d)
+        if d.kind == "enemy" then
+            local e, r = d.rep, s.range(u)
+            if not r then return false, 0 end
+            for _, o in ipairs(SIDES) do
+                local x, y = e.x + o[1] * r.max, e.y + o[2] * r.max
+                if x >= 0 and y >= 0 and x < w and y < h then
+                    local a = s.attack(u, e, x, y)
+                    if a then return M.answerOf(a, u.hp) end
+                end
+            end
+            return false, 0
+        elseif d.kind == "chests" or d.kind == "doors" then
+            local terrain = d.kind == "chests" and M.TERRAIN_CHEST_FULL or M.TERRAIN_DOOR
+            return sandbox(function(call)
+                return s32(call(S.GetUnitKeyItemSlotForTerrain, { u.addr, terrain })) >= 0
+            end), 0
+        elseif d.kind == "fog" then
+            return sandbox(function(call)
+                return call(S.GetUnitFogViewRange, { u.addr })
+            end) > mem.u8(S.gPlaySt + PLAY_VISION), 0
+        elseif d.kind == "sustain" then
+            return sandbox(function(call)
+                for _, it in ipairs(u.items) do
+                    if call(S.CanUnitUseStaff, { u.addr, it.id }) ~= 0 then return true end
+                end
+                return false
+            end), 0
+        elseif d.kind == "village" then
+            if raced[d.id] == nil then
+                local best = false
+                for _, e in ipairs(api.board().units) do
+                    if e.faction == "red" and e.onField then
+                        local n = turnsTo(e, d.tile, e)
+                        if n and (not best or n < best) then best = n end
+                    end
+                end
+                raced[d.id] = best
+            end
+            local from = s.fieldUnit()
+            local n = from and turnsTo(u, d.tile, from)
+            return n ~= nil and (raced[d.id] == false or n <= raced[d.id]), 0
+        end
+        error("sight.lua: unknown demand kind " .. tostring(d.kind), 2)
+    end
 
     function s.refresh()
         seen = { threats = {}, ranges = {}, seizers = {}, fields = {} }

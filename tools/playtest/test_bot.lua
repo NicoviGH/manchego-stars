@@ -1170,27 +1170,122 @@ local function test_carry_survives_a_full_deploy()
     local st = B.CLAIM_BEHAVIOURS.carry({ id = "c3", kind = "carry", unit = { 0x02 },
                                           vs = "all" }, sampled)
     check(csv(st.deploy), "2,1,3", "carry: carried first, then the sampled list")
-    check(csv(B.prep(roster, 2, st).deploy), "2,1", "prep: a full sampled list keeps the carry")
+    for _, u in ipairs(roster) do u.group = "magic" end
+    check(csv(B.team({ roster = roster, cap = 2, maxima = {}, demands = {}, answers = {},
+                       carried = {}, style = st }).deploy), "2,1",
+        "team: a full claim list keeps the carry")
 end
 test_carry_survives_a_full_deploy()
 
-local function test_prep_forced_first()
-    local roster = { unitOf(1, 0x01, 3), unitOf(2, 0x02, 9), unitOf(3, 0x03, 5, { forced = true }),
-                     unitOf(4, 0x04, 7), unitOf(5, 0x05, 7), unitOf(6, 0x06, 1, { forced = true }) }
-    local p = B.prep(roster, 4, { deploy = {} })
-    check(csv(p.deploy), "3,6,2,4", "forced (slot order), then highest level, ties by slot")
-    check(#p.give, 0, "no transfer rule decided: give is empty")
-    p = B.prep(roster, 4, { deploy = { 0x01, 0x99, 0x01, 0x03 } })
-    check(csv(p.deploy), "3,6,1,2",
-        "style.deploy next; unknown charId skipped, duplicate not doubled")
-    p = B.prep(roster, 5, { deploy = { 0x04 } })
-    check(csv(p.deploy), "3,6,4,2,5", "cap 5: forced, style, then level")
-    p = B.prep(roster, 1, { deploy = { 0x04 } })
-    check(csv(p.deploy), "3,6", "forced alone exceed the cap: all forced still go, nothing else")
-    p = B.prep(roster, 10, { deploy = {} })
-    check(#p.deploy, 6, "cap above the roster: everyone")
+-- Bot.team: forced, then a followed claim's units, then the demands, then fill. g = the group.
+local function teamUnit(id, charId, group, extra)
+    return unitOf(id, charId, 1, (function()
+        local e = { group = group }
+        for k, v in pairs(extra or {}) do e[k] = v end
+        return e
+    end)())
 end
-test_prep_forced_first()
+local function team(t)
+    t.maxima = t.maxima or {}
+    t.demands = t.demands or {}
+    t.answers = t.answers or {}
+    t.carried = t.carried or {}
+    t.style = t.style or { deploy = {} }
+    return B.team(t)
+end
+
+local function test_team_forced_past_the_ceiling_claims_under_it()
+    local roster = { teamUnit(1, 0x01, "armour", { forced = true }), teamUnit(2, 0x02, "armour"),
+                     teamUnit(3, 0x03, "armour", { forced = true }), teamUnit(4, 0x04, "magic") }
+    local p = team({ roster = roster, cap = 4, maxima = { armour = 1 },
+                     style = { deploy = { 0x02, 0x04 } } })
+    check(csv(p.deploy), "1,3,4", "forced both (past armour 1); claim's armour 2 capped; magic in")
+    check(p.reasons[0x01].why, "forced", "reason: forced")
+    check(p.reasons[0x04].why, "claim", "reason: a followed claim")
+    check(#p.give, 0, "no transfer rule decided: give is empty")
+end
+test_team_forced_past_the_ceiling_claims_under_it()
+
+local function test_team_covers_the_most_demand_first()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "thief"),
+                     teamUnit(3, 0x03, "healer") }
+    local demands = { { id = "chests", need = 1 }, { id = "fog", need = 1 },
+                      { id = "sustain", need = 1 } }
+    local answers = { [0x01] = { fog = true }, [0x02] = { chests = true, fog = true },
+                      [0x03] = { sustain = true } }
+    local p = team({ roster = roster, cap = 2, demands = demands, answers = answers })
+    check(csv(p.deploy), "2,3", "thief covers two, then the healer covers what is left")
+    check(table.concat(p.reasons[0x02].demands, ","), "chests,fog", "reason names the demands")
+end
+test_team_covers_the_most_demand_first()
+
+local function test_team_ties_carried_then_earlier_joiner()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "magic"),
+                     teamUnit(3, 0x03, "magic") }
+    local demands = { { id = "sustain", need = 1 } }
+    local answers = { [0x01] = { sustain = true }, [0x02] = { sustain = true }, [0x03] = { sustain = true } }
+    local p = team({ roster = roster, cap = 1, demands = demands, answers = answers,
+                     carried = { [0x03] = true } })
+    check(csv(p.deploy), "3", "equal cover: the carried unit")
+    check(p.reasons[0x03].carried, true, "reason says it won as carried")
+    p = team({ roster = roster, cap = 1, demands = demands, answers = answers })
+    check(csv(p.deploy), "1", "equal cover, none carried: the earlier joiner (slot order)")
+end
+test_team_ties_carried_then_earlier_joiner()
+
+local function test_team_carried_never_beats_an_uncovered_demand()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "thief") }
+    local p = team({ roster = roster, cap = 1, demands = { { id = "chests", need = 1 } },
+                     answers = { [0x02] = { chests = true } }, carried = { [0x01] = true } })
+    check(csv(p.deploy), "2", "a carried unit covering nothing loses to the chest opener")
+end
+test_team_carried_never_beats_an_uncovered_demand()
+
+local function test_team_a_full_group_benches_the_later_joiner()
+    local roster = { teamUnit(1, 0x01, "flier"), teamUnit(2, 0x02, "flier"),
+                     teamUnit(3, 0x03, "flier") }
+    local demands = { { id = "villages", need = 3 } }
+    local answers = { [0x01] = { villages = true }, [0x02] = { villages = true },
+                      [0x03] = { villages = true } }
+    local p = team({ roster = roster, cap = 3, maxima = { flier = 2 }, demands = demands,
+                     answers = answers })
+    check(csv(p.deploy), "1,2", "flier 2: the third flier stays benched, its slot stays empty")
+end
+test_team_a_full_group_benches_the_later_joiner()
+
+local function test_team_an_enemy_class_needs_an_answer_each()
+    local roster = { teamUnit(1, 0x01, "axe"), teamUnit(2, 0x02, "axe"),
+                     teamUnit(3, 0x03, "magic"), teamUnit(4, 0x04, "sword") }
+    local demands = { { id = "enemy:9", need = 2 }, { id = "sustain", need = 1 } }
+    local answers = { [0x01] = { ["enemy:9"] = true }, [0x02] = { ["enemy:9"] = true },
+                      [0x04] = { ["enemy:9"] = true } }
+    local p = team({ roster = roster, cap = 2, demands = demands, answers = answers })
+    check(csv(p.deploy), "1,2", "two enemies of the class: two answerers")
+end
+test_team_an_enemy_class_needs_an_answer_each()
+
+local function test_team_fill_is_the_best_answer_to_the_biggest_class()
+    local roster = { teamUnit(1, 0x01, "magic"), teamUnit(2, 0x02, "axe"),
+                     teamUnit(3, 0x03, "sword"), teamUnit(4, 0x04, "sword") }
+    local demands = { { id = "enemy:9", need = 1 }, { id = "enemy:7", need = 1 } }
+    local answers = { [0x01] = { ["enemy:9"] = true }, [0x02] = { ["enemy:7"] = true },
+                      [0x03] = { ["enemy:9"] = true }, [0x04] = { ["enemy:9"] = true } }
+    local strength = { [0x03] = { ["enemy:9"] = 2 }, [0x04] = { ["enemy:9"] = 5 } }
+    local p = team({ roster = roster, cap = 4, demands = demands, answers = answers,
+                     strength = strength })
+    check(csv(p.deploy), "1,2,4,3", "covered by the first answerers, then fill: highest strength first")
+    check(p.reasons[0x04].why, "fill", "reason: fill")
+end
+test_team_fill_is_the_best_answer_to_the_biggest_class()
+
+local function test_team_ungrouped_class_raises_and_absent_carried_is_ignored()
+    local ok = pcall(team, { roster = { unitOf(1, 0x01, 1) }, cap = 1 })
+    check(ok, false, "a unit with no group raises: there is no default group")
+    local p = team({ roster = { teamUnit(1, 0x01, "magic") }, cap = 3,
+                     carried = { [0x09] = true } })
+    check(csv(p.deploy), "1", "a carried unit no longer on the roster (dead, departed) drops out")
+end
+test_team_ungrouped_class_raises_and_absent_carried_is_ignored()
 
 local function test_shop_stops_at_gold()
     local stock = {
@@ -1257,7 +1352,6 @@ local function test_route_follows_style()
     check(B.route(opts, { route = 2 }), 2, "route 2")
     check(pcall(B.route, opts, { route = 4 }), false, "out-of-range route raises")
     check(pcall(B.route, opts, {}), false, "missing route raises")
-    check(#B.STYLES.route, 2, "route is a sampled axis, two options")
 end
 test_route_follows_style()
 

@@ -84,7 +84,7 @@
 -- maps no name: every unit, class and turn must be an integer, and a claim missing a field
 -- its kind needs, or holding a name, raises naming its id (one with no string id or kind
 -- raises before dispatch).
---   carry {unit, vs}:   its units go AHEAD of style.deploy (deduped; Bot.prep fills its cap in
+--   carry {unit, vs}:   its units go AHEAD of style.deploy (deduped; Bot.team fills its cap in
 --                       that order, so a full sampled list never cuts them) and, ahead of
 --                       the most-threatened rule, attack an enemy `vs` names when one can.
 --   answer {unit, vs}:  those units rank an enemy `vs` names above every other target.
@@ -118,10 +118,20 @@
 --   set on a seal it would accept.
 -- stock entry: { item, price, type = weaponType|nil, kind = "vulnerary"|nil }; the caller
 --   says which stock item is the Vulnerary, so no item id lives here.
--- Bot.prep(roster, cap, style) -> { deploy = {charIds}, give = {} }: forced units (slot order),
---   then style.deploy (listed order; a charId not in the roster is skipped, a repeat counts
---   once), then the highest level (ties by slot order), up to `cap`. Forced units all go even
---   when they alone exceed the cap. No transfer rule is decided yet, so `give` is always empty.
+-- Bot.team(t) -> { deploy = {charIds}, reasons = {[charId] = reason}, give = {} }: whom the
+--   prep screen fields (#510 plan comment, "Party selection"). t = { roster, cap,
+--   maxima = {[group] = n}, demands = {{ id, need }...}, answers = {[charId] = {[demandId] =
+--   true}}, strength = {[charId] = {[demandId] = n}}, carried = {[charId] = true}, style }. Each roster entry carries `group`, the
+--   caller's read of team_groups.py (the bot weighs no class); a unit without one raises.
+--   A demand is what the map asks (an enemy class, chests, fog...), `need` how many answerers
+--   cover it; `answers` and `strength` are measured by the caller in the game. In order:
+--   forced units (slot order, past every ceiling); then style.deploy, a followed claim's units;
+--   then, while a demand still needs answerers, the unit answering the most of them (ties: a
+--   carried unit, then the earlier joiner = slot order); then fill: the highest strength on
+--   the biggest demand (largest need, first listed), same ties. Everything after the forced units
+--   obeys `maxima`: a full group benches the later joiner, even if a slot stays empty.
+--   reason = { why = "forced"|"claim"|"covers"|"fill", demands = {ids} (covers),
+--   carried = bool }. No transfer rule is decided yet, so `give` is always empty.
 -- Bot.shop(gold, stock, party) -> {{ unit = charId, item }...}, one entry per purchase in the
 --   order made, each naming the unit it is for (FE8's shop screen buys into the inventory of
 --   the unit that opened it, bmshop.c StartShopScreen). party is the deployed roster entries,
@@ -349,13 +359,12 @@ end
 
 -- ── Bot.decide ─────────────────────────────────────────────────────────────────────────────
 
--- The axes a run's style is sampled on. aggression is a closed set; deploy and claims are
--- lists the runner fills per run, empty until it does.
+-- The axes a run's style is sampled on: aggression, a closed set, and the claims a run follows
+-- (the runner's list). The team is not an axis: Bot.team picks it from the map and the claims.
+-- The route is not one either: a campaign SETTING (#510 plan comment, "Lords").
 M.STYLES = {
     aggression = { "careful", "even", "bold" },
-    deploy = {},   -- charIds the runner chooses to field
     claims = {},   -- Strategy claim ids the run follows
-    route = { 1, 2 },   -- which of a chapter's two routes (1-based) the run takes
 }
 
 local CRIT_MULTIPLIER = 3   -- bmbattle.c: gBattleStats.damage * 3 on a critical hit
@@ -926,8 +935,8 @@ local function byUnit(field)
 end
 
 M.CLAIM_BEHAVIOURS = {
-    -- the carried units go AHEAD of the sampled deploy: Bot.prep fills the cap in list order,
-    -- so appended they were cut whenever the sampled list already filled it
+    -- the carried units go AHEAD of any other claim's: Bot.team takes style.deploy in list
+    -- order, so appended they were cut whenever an earlier list already filled the cap
     carry = function(claim, style)
         local out = byUnit("carries")(claim, style)
         local deploy = copyList(claim.unit)
@@ -980,26 +989,94 @@ local function byLevel(units)
     return out
 end
 
-function M.prep(roster, cap, style)
-    local deploy, taken = {}, {}
-    local function take(u)
-        if taken[u] then return end
-        taken[u] = true
-        deploy[#deploy + 1] = u.charId
-    end
+function M.team(t)
+    local roster, cap, maxima = t.roster, t.cap, t.maxima
+    local deploy, reasons, taken, count = {}, {}, {}, {}
     for _, u in ipairs(roster) do
-        if u.forced then take(u) end
-    end
-    for _, charId in ipairs(style.deploy or {}) do
-        for _, u in ipairs(roster) do
-            if u.charId == charId and #deploy < cap then take(u) break end
+        if u.group == nil then
+            error(string.format("bot.lua: unit 0x%02X has no team group", u.charId), 2)
         end
     end
-    for _, u in ipairs(byLevel(roster)) do
-        if #deploy >= cap then break end
-        take(u)
+    local function fits(u)
+        return not taken[u.charId] and #deploy < cap
+            and (maxima[u.group] == nil or (count[u.group] or 0) < maxima[u.group])
     end
-    return { deploy = deploy, give = {} }
+    local function take(u, reason)
+        taken[u.charId] = true
+        count[u.group] = (count[u.group] or 0) + 1
+        deploy[#deploy + 1] = u.charId
+        reason.carried = t.carried[u.charId] == true
+        reasons[u.charId] = reason
+    end
+    local left = {}
+    for _, d in ipairs(t.demands) do left[d.id] = d.need end
+    local function answers(u, id)
+        return (t.answers[u.charId] or {})[id] == true
+    end
+    local function settle(u)
+        for _, d in ipairs(t.demands) do
+            if answers(u, d.id) and left[d.id] > 0 then left[d.id] = left[d.id] - 1 end
+        end
+    end
+    -- the best unit by `key` (higher wins), ties to a carried unit, then slot order
+    local function best(key)
+        local top, topKey
+        for _, u in ipairs(roster) do
+            if fits(u) then
+                local k = key(u)
+                if k > 0 and (not top or k > topKey
+                        or (k == topKey and t.carried[u.charId] and not t.carried[top.charId])) then
+                    top, topKey = u, k
+                end
+            end
+        end
+        return top
+    end
+
+    for _, u in ipairs(roster) do
+        if u.forced and not taken[u.charId] then
+            take(u, { why = "forced" })
+            settle(u)
+        end
+    end
+    for _, charId in ipairs(t.style.deploy or {}) do
+        for _, u in ipairs(roster) do
+            if u.charId == charId and fits(u) then
+                take(u, { why = "claim" })
+                settle(u)
+                break
+            end
+        end
+    end
+    while true do
+        local u = best(function(c)
+            local n = 0
+            for _, d in ipairs(t.demands) do
+                if left[d.id] > 0 and answers(c, d.id) then n = n + 1 end
+            end
+            return n
+        end)
+        if not u then break end
+        local covered = {}
+        for _, d in ipairs(t.demands) do
+            if left[d.id] > 0 and answers(u, d.id) then covered[#covered + 1] = d.id end
+        end
+        take(u, { why = "covers", demands = covered })
+        settle(u)
+    end
+    local biggest
+    for _, d in ipairs(t.demands) do
+        if not biggest or d.need > biggest.need then biggest = d end
+    end
+    while true do
+        local u = best(function(c)
+            -- every unit fills; its strength on the biggest demand ranks it
+            return 1 + (biggest and ((t.strength or {})[c.charId] or {})[biggest.id] or 0)
+        end)
+        if not u then break end
+        take(u, { why = "fill" })
+    end
+    return { deploy = deploy, reasons = reasons, give = {} }
 end
 
 local function cheapest(stock, want)

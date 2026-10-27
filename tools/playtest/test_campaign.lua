@@ -26,21 +26,23 @@ end
 
 local function roster()
     return {
-        { id = 1, charId = 0x01, level = 5, forced = true, canUse = {}, items = {} },
-        { id = 2, charId = 0x02, level = 3, canUse = { [0x10] = true }, items = {} },
-        { id = 3, charId = 0x03, level = 9, canUse = {}, items = {} },
-        { id = 4, charId = 0x04, level = 1, canUse = {}, items = {} },
+        { id = 1, charId = 0x01, classId = 2, level = 5, forced = true, canUse = {}, items = {} },
+        { id = 2, charId = 0x02, classId = 5, level = 3, canUse = { [0x10] = true }, items = {} },
+        { id = 3, charId = 0x03, classId = 0x26, level = 9, canUse = {}, items = {} },
+        { id = 4, charId = 0x04, classId = 5, level = 1, canUse = {}, items = {} },
     }
 end
 
 -- A fake game. o.chapters = { { id, outcomes = { "won"|"lost"|"dead"|"stuck"|"crashed"... },
--- options = n (a route split before it) } }; "dead" is a win with a death.
+-- options = n (a route split before it), needs = Bot.team's demands/answers/strength } };
+-- "dead" is a win with a death. o.route = the campaign's route setting.
 local function fakeGame(o)
     local g = { at = 0, saved = {}, loads = 0, deployed = {}, bought = {}, promoted = {},
                 plays = {}, emitted = {}, seeds = {}, routeAsked = nil, attempt = 0 }
     g.api = {
         Bot = Bot, Json = Json,
-        info = { game = "fake", rom_hash = "abc", mode = "normal", seed = 7, campaign = "c1" },
+        info = { game = "fake", rom_hash = "abc", mode = "normal", seed = 7, campaign = "c1",
+                 route = o.route },
         random = o.random or cycle({ 0.1, 0.6, 0.3, 0.9, 0.5 }),
         arrive = function(route)
             g.at = g.at + 1
@@ -55,6 +57,13 @@ local function fakeGame(o)
         load = function() g.loads = g.loads + 1; return true end,
         roster = roster,
         cap = function() return o.cap end,
+        teamGroups = function()
+            return { ["2"] = "lord", ["5"] = "mounted", ["38"] = "healer" }, { mounted = 3 }
+        end,
+        needs = function()
+            g.needsAsked = (g.needsAsked or 0) + 1
+            return o.chapters[g.at].needs or { demands = {}, answers = {}, strength = {} }
+        end,
         deploy = function(ids) g.deployed[#g.deployed + 1] = ids; return true end,
         gold = function() return o.gold or 0 end,
         stock = function() return o.stock or {} end,
@@ -132,19 +141,17 @@ local function test_state_written_per_chapter_start()
 end
 test_state_written_per_chapter_start()
 
-local function test_route_follows_style()
-    -- The first draw picks the route: 0.1 -> route 1; 0.6 -> route 2.
-    for _, case in ipairs({ { 0.1, 1 }, { 0.6, 2 } }) do
-        local g = fakeGame({ random = cycle({ case[1], 0.3 }),
-                             chapters = { { id = 1 }, { id = 2, options = 2 } } })
-        Campaign.run(g.api)
-        check(g.routeAsked, case[2], "the split takes the campaign's route")
-        for _, p in ipairs(g.plays) do
-            check(p.style.route, case[2], "every attempt's style carries it")
-        end
-    end
+local function test_route_is_the_campaign_setting()
+    local g = fakeGame({ route = 2, chapters = { { id = 1 }, { id = 2, options = 2 } } })
+    Campaign.run(g.api)
+    check(g.routeAsked, 2, "the split takes the campaign's route setting")
+    for _, p in ipairs(g.plays) do check(p.style.route, 2, "every attempt's style carries it") end
+    g = fakeGame({ chapters = { { id = 1 }, { id = 2, options = 2 } } })
+    local ok, why = Campaign.run(g.api)
+    check(ok, false, "a split with no route set stops the campaign: the route is never drawn")
+    check(why:find("route") ~= nil, true, "naming the route")
 end
-test_route_follows_style()
+test_route_is_the_campaign_setting()
 
 local function test_crash_is_never_retried()
     local g = fakeGame({ chapters = { { id = 1, outcomes = { "crashed", "won" } }, { id = 2 } } })
@@ -169,7 +176,9 @@ test_arrive_failure_is_a_crash()
 local function test_infeasible_after_max_attempts()
     local saved = Campaign.MAX_ATTEMPTS
     Campaign.MAX_ATTEMPTS = 4
-    local g = fakeGame({ chapters = { { id = 5, outcomes = { "lost", "lost", "lost", "lost",
+    -- One claim: 3 aggressions x 2 = 6 styles, so the allowance (4) is what stops it.
+    local g = fakeGame({ claims = { { id = "a", kind = "carry", unit = { 1 }, vs = "all" } },
+                         chapters = { { id = 5, outcomes = { "lost", "lost", "lost", "lost",
                                                               "won" } }, { id = 6 } } })
     local ok, why = Campaign.run(g.api)
     Campaign.MAX_ATTEMPTS = saved
@@ -186,8 +195,10 @@ test_infeasible_after_max_attempts()
 local function test_between_deploys_shops_promotes()
     local stock = { { item = 0x6C, price = 300, kind = "vulnerary" },
                     { item = 0x10, price = 500, type = "sword" } }
+    local needs = { demands = { { id = "sustain", need = 1 } },
+                    answers = { [0x03] = { sustain = true } }, strength = {} }
     local g = fakeGame({ cap = 2, gold = 10000, stock = stock, random = cycle({ 0.1 }),
-                         chapters = { { id = 1 } } })
+                         chapters = { { id = 1, needs = needs } } })
     -- Unit 3 holds a seal the game accepts; the roster re-read after the shop still has it.
     local base = g.api.roster
     g.api.roster = function()
@@ -197,17 +208,15 @@ local function test_between_deploys_shops_promotes()
     end
     Campaign.run(g.api)
     local d = g.deployed[1]
-    check(#d, 2, "the prep screen gets the cap")
-    check(d[1], 0x01, "the forced unit first")
+    check(table.concat(d, ","), "1,3", "forced first, then the unit answering the map's demand")
+    check(g.needsAsked, 1, "the needs are read once per chapter start")
     local who = {}
     for _, p in ipairs(g.bought) do who[#who + 1] = string.format("%d:%d", p.unit, p.item) end
-    local fielded = d[2]
-    local want = { "1:108", fielded .. ":108" }
-    if fielded == 0x02 then want[#want + 1] = "2:16" end
-    check(table.concat(who, ","), table.concat(want, ","),
-        "the shop buys for the deployed units only")
-    check(table.concat(g.promoted, ","), fielded == 0x03 and "3" or "",
-        "a fielded unit holding a seal it accepts is promoted")
+    check(table.concat(who, ","), "1:108,3:108", "the shop buys for the deployed units only")
+    check(table.concat(g.promoted, ","), "3", "a fielded unit holding a seal it accepts is promoted")
+    local ls = lines(g)
+    check(ls[1].team.reasons[2].why, "covers", "the record says why each unit was fielded")
+    check(ls[1].demands[1].id, "sustain", "and what the map asked")
 end
 test_between_deploys_shops_promotes()
 
@@ -232,14 +241,45 @@ local function test_claims_followed_are_passed()
 end
 test_claims_followed_are_passed()
 
-local function test_draw_style_keeps_forced_out_of_the_shuffle()
-    local style = Campaign.drawStyle(Bot, cycle({ 0.99, 0.0, 0.5 }), roster(), {}, 1)
-    for _, id in ipairs(style.deploy) do
-        check(id ~= 0x01, true, "the forced unit is Bot.prep's, never the shuffle's")
+local function test_draw_style_never_repeats_and_runs_out()
+    local tried, keys = {}, {}
+    for _ = 1, 3 do
+        local style = Campaign.drawStyle(Bot, cycle({ 0.0, 0.0, 0.5, 0.99 }), {}, 1, tried)
+        keys[#keys + 1] = style.aggression
     end
-    check(#style.deploy, 3, "every non-forced unit is in the order")
+    table.sort(keys)
+    check(table.concat(keys, ","), "bold,careful,even", "three draws, three different styles")
+    check(Campaign.drawStyle(Bot, cycle({ 0.0 }), {}, 1, tried), nil, "every style tried: nil")
 end
-test_draw_style_keeps_forced_out_of_the_shuffle()
+test_draw_style_never_repeats_and_runs_out()
+
+local function test_cleared_team_is_carried()
+    -- Units 2 and 4 both answer chapter 2's demand; 4 is carried from chapter 1, so it wins
+    -- over the earlier joiner.
+    local ch1 = { demands = { { id = "d1", need = 1 } }, answers = { [0x04] = { d1 = true } },
+                  strength = {} }
+    local ch2 = { demands = { { id = "d2", need = 1 } },
+                  answers = { [0x02] = { d2 = true }, [0x04] = { d2 = true } }, strength = {} }
+    local g = fakeGame({ cap = 2, chapters = { { id = 1, needs = ch1 }, { id = 2, needs = ch2 } } })
+    Campaign.run(g.api)
+    check(table.concat(g.deployed[1], ","), "1,4", "chapter 1 fields its answerer")
+    check(table.concat(g.deployed[2], ","), "1,4", "chapter 2 keeps it: carried wins the tie")
+end
+test_cleared_team_is_carried()
+
+local function test_ungrouped_class_stops_the_campaign()
+    local g = fakeGame({ cap = 2, chapters = { { id = 1 } } })
+    local base = g.api.roster
+    g.api.roster = function()
+        local r = base()
+        r[2].classId = 0x7E
+        return r
+    end
+    local ok, why = Campaign.run(g.api)
+    check(ok, false, "a class with no team group stops the campaign")
+    check(why:find("no team group") ~= nil, true, "and says so")
+end
+test_ungrouped_class_stops_the_campaign()
 
 print(string.format("%s -- %d assertions", fails == 0 and "ok" or (fails .. " FAILED"), tests))
 os.exit(fails == 0 and 0 or 1)

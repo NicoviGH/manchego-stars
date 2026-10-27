@@ -6,25 +6,31 @@
 --
 -- The loop, per chapter: ride the game to the chapter's start (arrive: the scenes, the world
 -- map's walk to its next story node, the route split), save a state there, then attempt it.
--- An attempt draws a NEW style, picks the deploy (Bot.prep), buys at the shops the world map
--- has open (Bot.shop, through the game's own shop screen), spends seals (Bot.promote), and
--- plays the chapter (botrun.lua). A clear with everyone alive moves on; anything else loads the
--- chapter-start state back and attempts again, at most MAX_ATTEMPTS times. The RNG is never
+-- An attempt draws a style never tried at this chapter start (drawStyle), picks the team
+-- (Bot.team, over what the map asks: api.needs, read once per chapter start since every attempt
+-- starts from the same state), buys at the shops the world map has open (Bot.shop, through the
+-- game's own shop screen), spends seals (Bot.promote), and plays the chapter (botrun.lua). A
+-- clear with everyone alive moves on and its team is CARRIED into the next chapter's pick;
+-- anything else loads the chapter-start state back and attempts again, at most MAX_ATTEMPTS
+-- times. The team follows from the claims a style follows (a carry claim's units), so two
+-- attempts differ by the style alone; when every style has been tried, the chapter stops. The RNG is never
 -- re-seeded on a restart: FE8 seeds it once at power-on and a suspend save stores it, so a
 -- restart differs from the last only by the bot's new style and the game's RNG follows from
 -- that different play (the amendment, #510).
 -- A campaign stops when:
 --   done        the game has no next chapter (arrive says "end")
---   infeasible  a chapter used MAX_ATTEMPTS without a clean clear: no later chapter is reached
---               by a clean run, so none is played
+--   infeasible  a chapter used MAX_ATTEMPTS, or every style, without a clean clear: no later
+--               chapter is reached by a clean run, so none is played
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
 --               between chapters. A crash is the harness failing, never the bot: it is never
 --               retried, so it cannot hide behind a restart.
 --
 -- api (harness.lua builds it; test_campaign.lua fakes it):
 --   Bot, Json             bot.lua and json.lua
---   info = { game, rom_hash, mode, seed, campaign }
---   random()              a float in [0, 1): the campaign's own draws (route, styles)
+--   info = { game, rom_hash, mode, seed, campaign, route }: route = which branch of a route
+--                         split (vanilla's Ch8) the campaign takes, a SETTING, never drawn (#510
+--                         plan comment, "Lords"); a split with none set raises in Bot.route
+--   random()              a float in [0, 1): the campaign's own draws (styles)
 --   arrive(route)         ride the game to the next chapter's start; at a route split the
 --                         harness calls route(options) -> index. Returns { chapter = n } |
 --                         "end" | nil, why
@@ -32,7 +38,10 @@
 --                         items); true | nil, why
 --   load(chapter)         load that state back; true | nil, why
 --   roster()              bot.lua's roster entries: every unit the player could field this
---                         chapter, in slot order
+--                         chapter, in slot order, each with its classId
+--   teamGroups()          groups, maxima: class id (string) -> team group, and each group's
+--                         most fielded (team_groups.py)
+--   needs(roster)         { demands, answers, strength } for Bot.team, read at the prep screen
 --   cap()                 the prep screen's deploy cap, or nil when the chapter has no prep
 --                         screen (the game fields its own list; nothing is picked)
 --   deploy(charIds)       pick exactly these on the prep screen; true | nil, why
@@ -53,27 +62,31 @@ M.MAX_ATTEMPTS = 300
 
 local function pick(random, list) return list[math.floor(random() * #list) + 1] end
 
--- A style for one attempt: the aggression uniform over Bot.STYLES; the deploy a uniform shuffle
--- of the roster's non-forced units (Bot.prep cuts it at the cap, after the forced ones); each
--- claim followed with p = 0.5; the campaign's route. Returns the style and the claims followed.
-function M.drawStyle(Bot, random, roster, claims, route)
-    local deploy = {}
-    for _, u in ipairs(roster) do
-        if not u.forced then deploy[#deploy + 1] = u.charId end
-    end
-    for i = #deploy, 2, -1 do
-        local j = math.floor(random() * i) + 1
-        deploy[i], deploy[j] = deploy[j], deploy[i]
-    end
-    local followed, ids = {}, {}
-    for _, c in ipairs(claims) do
-        if random() < 0.5 then
-            followed[#followed + 1] = c
-            ids[#ids + 1] = c.id
+-- A style for one attempt, never one already tried at this chapter start: the aggression
+-- uniform over Bot.STYLES, each claim followed with p = 0.5, the campaign's route. `tried` is
+-- the keys drawn so far. Returns the style and the claims followed, or nil when every style has
+-- been tried.
+local function styleKey(aggression, ids) return aggression .. "|" .. table.concat(ids, ",") end
+
+function M.drawStyle(Bot, random, claims, route, tried)
+    local total, n = #Bot.STYLES.aggression * 2 ^ #claims, 0
+    for _ in pairs(tried) do n = n + 1 end
+    if n >= total then return nil end
+    while true do
+        local followed, ids = {}, {}
+        for _, c in ipairs(claims) do
+            if random() < 0.5 then
+                followed[#followed + 1] = c
+                ids[#ids + 1] = c.id
+            end
+        end
+        local aggression = pick(random, Bot.STYLES.aggression)
+        local key = styleKey(aggression, ids)
+        if not tried[key] then
+            tried[key] = true
+            return { aggression = aggression, claims = ids, route = route }, followed
         end
     end
-    return { aggression = pick(random, Bot.STYLES.aggression), deploy = deploy, claims = ids,
-             route = route }, followed
 end
 
 local function byCharId(roster)
@@ -82,19 +95,36 @@ local function byCharId(roster)
     return out
 end
 
--- Between the chapter's start and its first move: the deploy, the shops, the seals. nil, why
--- when the harness could not do a step.
-local function between(api, style)
+-- Between the chapter's start and its first move: the team, the shops, the seals. `need` is
+-- the chapter's api.needs (nil without a prep screen); `carried` the last cleared team. Returns
+-- the team ({ deploy, reasons }; deploy = the units fielded) or nil, why when the harness could
+-- not do a step.
+local function between(api, style, followed, need, carried)
     local Bot = api.Bot
     local roster, cap = api.roster(), api.cap()
-    local party = roster
+    local team = { deploy = {}, reasons = {} }
+    local party = {}
     if cap then
-        local plan = Bot.prep(roster, cap, style)
-        local ok, why = api.deploy(plan.deploy)
+        local groups, maxima = api.teamGroups()
+        for _, u in ipairs(roster) do u.group = groups[tostring(u.classId)] end
+        team = Bot.team({ roster = roster, cap = cap, maxima = maxima, demands = need.demands,
+                          answers = need.answers, strength = need.strength, carried = carried,
+                          style = Bot.applyClaims(followed, { deploy = {} }) })
+        local said = {}
+        for _, u in ipairs(roster) do
+            local r = team.reasons[u.charId]
+            said[#said + 1] = string.format("0x%02X %s%s%s=%s", u.charId, tostring(u.group),
+                u.forced and " forced" or "", carried[u.charId] and " carried" or "",
+                r and r.why or "benched")
+        end
+        api.log("campaign: team (cap " .. cap .. "): " .. table.concat(said, ", "))
+        local ok, why = api.deploy(team.deploy)
         if not ok then return nil, "deploy: " .. tostring(why) end
         local by = byCharId(roster)
-        party = {}
-        for _, charId in ipairs(plan.deploy) do party[#party + 1] = by[charId] end
+        for _, charId in ipairs(team.deploy) do party[#party + 1] = by[charId] end
+    else
+        party = roster
+        for _, u in ipairs(roster) do team.deploy[#team.deploy + 1] = u.charId end
     end
     for _, p in ipairs(Bot.shop(api.gold(), api.stock(), party)) do
         local ok, why = api.buy(p)
@@ -110,12 +140,12 @@ local function between(api, style)
             if not ok then return nil, "promote: " .. tostring(why) end
         end
     end
-    return true
+    return team
 end
 
 function M.run(api)
     local Bot, Json, info = api.Bot, api.Json, api.info
-    local route = pick(api.random, Bot.STYLES.route)
+    local route = info.route
     local chapters = {}
     local function line(t)
         t.campaign, t.game, t.rom_hash, t.mode, t.seed =
@@ -130,6 +160,7 @@ function M.run(api)
     end
 
     local function play()
+        local carried = {}
         while true do
             local at, why = api.arrive(function(options)
                 return Bot.route(options, { route = route })
@@ -142,11 +173,20 @@ function M.run(api)
             local claims = api.claims(ch) or {}
             local entry = { chapter = ch, attempts = 0, failures = {} }
             chapters[#chapters + 1] = entry
+            local need = api.cap() and api.needs(api.roster()) or nil
+            entry.demands = need and need.demands or nil
+            local tried = {}
             while true do
+                local style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
+                if not style then
+                    entry.outcome = "infeasible"
+                    line(entry)
+                    return "infeasible", string.format(
+                        "chapter %d: no clean clear in all %d styles", ch, entry.attempts)
+                end
                 entry.attempts = entry.attempts + 1
-                local style, followed = M.drawStyle(Bot, api.random, api.roster(), claims, route)
-                local bok, bwhy = between(api, style)
-                if not bok then
+                local team, bwhy = between(api, style, followed, need, carried)
+                if not team then
                     entry.outcome = "crashed"
                     line(entry)
                     return "crashed", string.format("chapter %d attempt %d: %s", ch,
@@ -155,10 +195,18 @@ function M.run(api)
                 local rec = api.play(style, followed, entry.attempts)
                 if rec.outcome == "won" and rec.all_alive then
                     entry.outcome, entry.turns = "cleared", rec.turns
+                    entry.team = { deploy = team.deploy, reasons = {} }
+                    for _, charId in ipairs(team.deploy) do
+                        local r = team.reasons[charId] or { why = "fielded" }
+                        r.charId = charId
+                        entry.team.reasons[#entry.team.reasons + 1] = r
+                    end
+                    carried = {}
+                    for _, charId in ipairs(team.deploy) do carried[charId] = true end
                     break
                 end
                 entry.failures[#entry.failures + 1] = { attempt = entry.attempts, style = style,
-                    outcome = rec.outcome, deaths = rec.deaths }
+                    team = team.deploy, outcome = rec.outcome, deaths = rec.deaths }
                 if rec.outcome == "crashed" then
                     entry.outcome = "crashed"
                     line(entry)
