@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E party selection built, `feat/510-step9-e-campaigns` 20afe94, no PR yet; next: two bot faults). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E: the bot is now a planner, `feat/510-step9-e-campaigns` 6b03624, no PR yet; next: planner exposure + speed). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -75,11 +75,42 @@ G3 #537 78105ed; the summary is on #531).
      then ours runs one lead (the default) only to prove E and F.
    - **Runs (logged on #510, comment 2026-10-27):** ours New Game -> ch02 cleared all alive (71 s
      wall); retail Prologue + Ch1 clear.
-   - **NEXT (Nicolas, 2026-10-27): fix two play-bot faults IN PR E before opening it, so both runs
-     reach Ch4:** (a) ours ch03 (the mine, host 4) ends `stuck` in all three styles (10-16 turns;
-     bold also lost 0x03 t3 and 0x02 t9 to enemy 0x96); (b) vanilla Ch2 loses Vanessa (0x06) on
-     turn 2 in every attempt. One INSTRUMENTED run per fault, never one per guess. Then the runs to
-     Ch4, then the PR and `/code-review <PR> medium` in a subagent.
+   - **The bot is now a PLANNER (Nicolas, 2026-10-27: "why can we not have it be truly
+     strategic?").** Design: the plan comment's section "The planner" (link at the top), READ IT
+     FIRST. Branch at **6b03624** (pushed). Findings: #510 comments 6452418548, 6452623595,
+     6454290610.
+     - Built this session:
+       - The bot breaks walls, heals (staff and Vulnerary), ends Canto, uses Talk and doors, and
+         ignores enemies hidden in fog.
+       - `unmodelled` claims became played kinds: recruit, keys, heal, avoid, priority
+         (`strategy.py`); ch03 and twin Ch3 are converted.
+       - `campaign_env.py` resolves every claim to game ids (both routes) and takes
+         `--id X --from N` to resume at a saved chapter start.
+       - `Bot.candidates` proposes acts; `sight.enemyPhase` runs the game's own AI order and
+         decisions in one batch; `planner.lua` does a beam search, then judges the best plans
+         (two-roll hit odds, death chances, fog risk).
+       - Research record 0020 covers fog movement.
+     - **Speed (Nicolas: "keep that up"):**
+       - `Sight.batching`: one save/load per decision; 7,700 round trips became 277.
+       - A unit's own facts are cached until its items, HP, level or class change.
+       - Every BOTRUN records `costs` (CPU seconds, sandbox calls, save/load/frame time, game
+         calls per function). Report timings on every change.
+     - **State:** the planner wins ch03 in 8-14 turns in every style but loses 1-3 units per
+       attempt. The instrumented run (`plan:` lines in the log) shows the enemy simulation foresees
+       the killing strikes. The planner gets cornered by its own earlier acts: one-phase horizon,
+       PER_UNIT=4.
+     - **NEXT, in order:**
+       1. Score each end tile's standing exposure (what can reach it next phase), and add safe
+          retreats to each unit's menu.
+       2. Replan only on a surprise. Each attempt costs ~33 CPU s now, half of it judging.
+       3. Parallel attempts from the saved chapter start (PR F's pool, built now).
+       4. Remaining game-call cost: each call rounds up to a whole frame (~0.9 ms; `run_s` in
+          the costs). A call list run in one frame is the next lever.
+       5. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
+          claims, then the PR and `/code-review <PR> medium` in a subagent.
+     - Fast loop: `PT_CAMPAIGN` = an env with `from: 4, last: [4]` (ch03 alone, ~35 s per
+       attempt). The saved starts live in `references/sim/ours/9405eea0cb9f/states/e1-ours-ch07/`
+       (4 = ch03, 5 = ch04). Editing a chapter YAML needs a `make` before run.sh will start.
    - How to run: build PT_CAMPAIGN with `campaign_env.py` (ours needs `--store` of a vanilla
      campaign through Ch8 for its shops; until one exists, pass `shops: {}` and `last: [host]` by
      hand, as `team_groups.env()` + `last` + `id`). Ours: `PT_CAMPAIGN=... tools/playtest/run.sh
