@@ -113,11 +113,44 @@ local PLAY_FACTION, PLAY_TURN = 0x0F, 0x10
 -- sp and lr are banked, so they are read and written in the mode the call runs in -- a frame
 -- that ends inside an IRQ or SWI would otherwise hand out that mode's registers. Above the
 -- call's stack sit `scratch` and the return loop; the load puts back whatever was there.
+--
+-- Sight.machine(cpu, true) is the same call KEPT (#510 step 9 PR E): what the game function
+-- wrote stays -- a shop proc it started runs on the next frame -- and only the registers are put
+-- back, so the game resumes where the frame left it. They are read and written in the mode the
+-- frame ended in, System's sp and lr too (the call's own mode). pc is put back through a
+-- measured write: mGBA's pc write refills the pipeline, so it reads one instruction past what
+-- was written (measured 2026-10-27 at a frame boundary, the BIOS halt loop, ARM: +4).
 local THUMB_B_SELF = 0xE7FE
 local SYSTEM_THUMB_NOIRQ = 0x1F | 0x20 | 0x80   -- CPSR mode System, T, I
-function M.machine(cpu)
+local GPRS = { "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11", "r12",
+               "sp", "lr" }
+local function readRegisters(cpu)
+    local regs = { cpsr = cpu.read("cpsr"), pc = cpu.read("pc") }
+    for _, r in ipairs(GPRS) do regs[r] = cpu.read(r) end
+    cpu.write("cpsr", (regs.cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+    regs.systemSp, regs.systemLr = cpu.read("sp"), cpu.read("lr")
+    cpu.write("cpsr", regs.cpsr)
+    return regs
+end
+local function writeRegisters(cpu, regs)
+    cpu.write("cpsr", (regs.cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+    cpu.write("sp", regs.systemSp)
+    cpu.write("lr", regs.systemLr)
+    cpu.write("cpsr", regs.cpsr)
+    for _, r in ipairs(GPRS) do cpu.write(r, regs[r]) end
+    cpu.write("pc", regs.pc)
+    local ahead = cpu.read("pc") - regs.pc
+    if ahead ~= 0 then cpu.write("pc", regs.pc - ahead) end
+    if cpu.read("pc") ~= regs.pc then
+        error(string.format("sight: pc reads 0x%08X after it was put back at 0x%08X",
+            cpu.read("pc"), regs.pc))
+    end
+end
+function M.machine(cpu, keep)
     return function(fn)
-        local state = cpu.save()   -- the load puts every register back; only cpsr is kept here
+        -- The load puts every register back; only cpsr is kept here. A kept call loads
+        -- nothing, so it reads every register first.
+        local state = keep and readRegisters(cpu) or cpu.save()
         local cpsr, top, scratch, loop
         local function returned()
             local pc = cpu.read("pc")
@@ -148,7 +181,7 @@ function M.machine(cpu)
             scratch, loop = top + 0x10, top + 0x80   -- SCRATCH_SIZE fits between them
             return fn(call, scratch)
         end)
-        cpu.load(state)
+        if keep then writeRegisters(cpu, state) else cpu.load(state) end
         if not ok then error(a, 0) end
         return a, b
     end

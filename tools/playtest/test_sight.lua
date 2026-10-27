@@ -44,6 +44,28 @@ local function fakeCpu(cost)
     return cpu, function() return loads, ram end
 end
 
+-- A KEPT call (PR E): what it wrote stays, the registers come back as they were, pc through a
+-- write that lands one instruction ahead (mGBA's pipeline refill, measured).
+do
+    local cpu, seen = fakeCpu(2)
+    local write = cpu.write
+    function cpu.write(r, v)
+        if r == "pc" and v < 0x08000000 then v = v + 4 end   -- the refill, at the BIOS loop
+        write(r, v)
+    end
+    local before = {}
+    for _, r in ipairs({ "r0", "r4", "sp", "lr", "pc", "cpsr" }) do before[r] = cpu.read(r) end
+    local got = Sight.machine(cpu, true)(function(call)
+        local _, ram = seen(); ram.marker = "kept"
+        return call(0x08001001, { 2, 40 })
+    end)
+    check(got, 42, "a kept call returns the function's r0")
+    local loads, ram = seen()
+    check(loads, 0, "a kept call loads no state")
+    check(ram.marker, "kept", "and what it wrote stays")
+    for r, v in pairs(before) do check(cpu.read(r), v, "register " .. r .. " is put back") end
+end
+
 do
     local cpu, seen = fakeCpu(3)
     local loop

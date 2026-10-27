@@ -1004,6 +1004,8 @@ PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SEED', 'PT_STATE', 'PT_TAG', 'P
                      'PT_DIFFICULTY',
                      # The bot's play style and the Strategy claims it follows (#510 step 9).
                      'PT_STYLE', 'PT_CLAIMS',
+                     # The campaign's config and where it writes its states (PR E).
+                     'PT_CAMPAIGN', 'PT_SIMDIR',
                      # The #345 watchdog knobs. Neither should change a verdict -- they bound
                      # how patient run.sh is, not what the scenario proves -- but the guard
                      # that keeps this list honest cannot tell, and a run killed early by a

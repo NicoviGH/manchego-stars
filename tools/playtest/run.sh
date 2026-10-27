@@ -58,6 +58,10 @@
 #   bot                  -- #510 step 9: the bot plays our ch01 (botrun.lua, sight.lua) and
 #                           prints one `BOTRUN <json>` record. PT_SEED=N seeds the game's RNG,
 #                           PT_STYLE / PT_CLAIMS are JSON (bot.lua's style, resolved claims).
+#   campaign             -- #510 step 9 PR E: the bot plays chapter to chapter from New Game
+#                           (campaign.lua), restarting a chapter until a clean clear; PT_CAMPAIGN
+#                           is JSON (id, last, shops, claims; harness.lua's scenario says), and
+#                           states land in PT_SIMDIR (references/sim/<game>/<rom-hash>).
 #                           PT_VANILLA=1: retail Ch1, after the bot plays the Prologue
 #   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
 #                           for a check by eye: danger grid, objective, reach, a forecast
@@ -255,7 +259,7 @@ run_mgba() {
     fi
     local wrapper="$out/wrapper.lua"
     cat > "$wrapper" <<EOF
--- PT_STYLE / PT_CLAIMS are JSON: read from the environment, never spliced into this source,
+-- PT_STYLE / PT_CLAIMS / PT_CAMPAIGN are JSON: read from the environment, never spliced in,
 -- where a nested array's "]]" would close a Lua long string early.
 PLAYTEST_DIR = "$HERE"
 PLAYTEST_SCENARIO = "$scen"
@@ -266,6 +270,8 @@ PLAYTEST_STATEDIR = "$STATE_DIR"
 PLAYTEST_SEED = "${PT_SEED:-1}"
 PLAYTEST_STYLE = os.getenv("PT_STYLE") or ""
 PLAYTEST_CLAIMS = os.getenv("PT_CLAIMS") or ""
+PLAYTEST_CAMPAIGN = os.getenv("PT_CAMPAIGN") or ""
+PLAYTEST_SIMDIR = "${PT_SIMDIR:-$REPO/references/sim/$([ "${PT_VANILLA:-0}" = 1 ] && echo vanilla || echo ours)/$ROMHASH}"
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-${MX_HOST_CHAPTER:-1}}

@@ -283,6 +283,23 @@ WANTED = [
     'GenerateExtendedMovementMap',  # the AI's march distance to a far goal (bmidoten.c)
     'CanUnitSeize',             # who may Seize: the Seize command's own check (bmdifficulty.c)
     'GetUnitEquippedWeapon',    # the weapon BU_ISLOT_AUTO strikes with: first usable (bmitem.c)
+    # campaign.lua (#510 step 9 PR E): between chapters, the game's own shop, rules and world map.
+    'StartShopScreen',          # opens the Armory/Vendor screen for a unit over a stock list
+    'Shop_Loop_BuyKeyHandler',  # the shop's item list key handler (bmshop.c)
+    'sShopState',               # struct ShopState: head_loc +00, hand_loc +06, px_per_line +08,
+                                # bg2_off +0C (IsShopPageScrolling compares the last two)
+    'GetItemPurchasePrice',     # what the shop charges this unit for an item (Silver Card included)
+    'CanUnitUseWeapon',         # whether a unit can wield an item (bmitem.c)
+    'CanUnitUsePromotionItem',  # whether a seal promotes this unit now: class and level (bmitemuse.c)
+    'ProcScr_WorldMapMain',     # the world map's main proc (worldmap_main.c)
+    'WorldMap_Loop',            # its free-cursor loop: L, A and the D-pad
+    'gGMData',                  # struct GMapData: cursor ix/iy +08/+0C (<<8), units[0].location
+                                # +11 (the lord), nodes[] state +30 (bit 0 open, 4 bytes each)
+    'gWMNodeData',              # struct GMapNodeData[] (stride 0x20): armory +0C, vendor +10,
+                                # secretShop +14, x +18, y +1A
+    'GetNextUnclearedNode',     # the node of the next story chapter (worldmap_path.c)
+    'MakeNewItem',              # an item at full uses, as the shop makes its stock (bmitem.c)
+    'IsCharacterForceDeployed', # the prep screen's forced-unit check (prep_unitselect.c)
 ]
 
 

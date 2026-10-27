@@ -498,6 +498,8 @@ local CALLBACK_NAMES = {
     [SYM.PrepItemSupply_Loop_GiveTakeKeyHandler] = "supply_input",
     [SYM.StatScreen_OnIdle] = "stat_screen_input",
     [SYM.HbMoveCtrl_OnIdle] = "help_box_input",
+    [SYM.Shop_Loop_BuyKeyHandler] = "shop_buy_input",
+    [SYM.WorldMap_Loop] = "world_map_input",
 }
 local PREP_CALLBACK_NAMES = {
     [SYM.PrepScreenMenu_OnStartPress] = "prep_main_fight",
@@ -707,6 +709,20 @@ local function observeController()
         }
     end
     put("supply_screen", observedProc(SYM.ProcScr_BmSupplyScreen))
+    local shop = observedProc(SYM.gProcScr_Shop)
+    put("shop", shop)
+    if shop then
+        -- struct ShopState (bmshop.h): the list's hand is head_loc; IsShopPageScrolling is
+        -- bg2_off ~= hand_loc * px_per_line. ProcShop.shopItemCount is +0x5A.
+        local st = SYM.sShopState
+        observation.shop = {
+            cursor = ru16(st), count = ru8(shop.addr + 0x5A),
+            scrolling = ru16(st + 0x0C) ~= ru16(st + 0x06) * ru16(st + 0x08),
+        }
+    end
+    local worldMap = observedProc(SYM.ProcScr_WorldMapMain)
+    put("world_map", worldMap)
+    if worldMap then observation.world_map = INSPECT.worldMap() end
     put("stat_screen", observedProc(SYM.gProcScr_StatScreen))
     local helpBox = observedProc(SYM.gProcScr_HelpBoxMoveCtrl)
     put("help_box", helpBox)
@@ -2982,6 +2998,474 @@ INSPECT.botApi = function(game)
     return api
 end
 
+-- ---- the bot plays chapter to chapter (#510 step 9 PR E). campaign.lua is its own chunk;
+-- this is its api over the drivers above (ADR 0370). Every rule is the game's: the Pick Units
+-- screen, the shop screen (StartShopScreen, a kept call), the world map's own cursor, and the
+-- game's checks run in sight.lua's sandbox -- CanUnitUseWeapon, CanUnitUsePromotionItem,
+-- IsCharacterForceDeployed, MakeNewItem + GetItemPurchasePrice, GetNextUnclearedNode.
+INSPECT.CAMPAIGN = {
+    VULNERARY = 0x6C,                           -- constants/items.h ITEM_VULNERARY
+    SHOP_TYPE = { armory = 0, vendor = 1 },     -- bmshop.h SHOP_TYPE_ARMORY / _VENDOR
+    -- worldmap.h: GMapData ix/iy +08/+0C (<<8), units[0].location +11, nodes[0x1C] +30 (bit 0
+    -- GM_NODE_STATE_VALID; a GMNode is padded to 4 bytes: the next field sits at +A0);
+    -- GMapNodeData stride 0x20, armory +0C, vendor +10, x +18, y +1A.
+    NODES = 0x1C, NODE_OPEN = 1, GM_IX = 0x08, GM_IY = 0x0C, GM_LORD = 0x11, GM_NODES = 0x30,
+    GM_NODE_STRIDE = 4,
+    NODE_STRIDE = 0x20, NODE_SHOP = { armory = 0x0C, vendor = 0x10 }, NODE_X = 0x18, NODE_Y = 0x1A,
+    SHOP_LIST_MAX = 20,                         -- bmshop.h SHOP_ITEMS_MAX_AMT + 1
+    -- bmitem.h ItemData +07 weaponType, +08 attributes; IA_WEAPON. The type is a name only so
+    -- bot.lua can group by it.
+    ITEM_TYPE = 0x07, ITEM_ATTRIBUTES = 0x08, IA_WEAPON = 1,
+    WEAPON_TYPES = { [0] = "sword", "lance", "axe", "bow", "staff", "anima", "light", "dark" },
+    PREP_COUNT = 0x100,                         -- PrepUnitList.max_num, after units[0x40]
+    PLAY_GOLD = 0x08,                           -- PlaySt +08 partyGoldAmount
+    shopSteps = 4000,                           -- frames one purchase may take, fades included
+}
+
+-- The world map's cursor and lord, for the observer: the open nodes, the node the cursor sits
+-- on (sub_80B961C, the L jump, puts ix/iy exactly on a node's x/y << 8), the lord's node.
+INSPECT.worldMap = function()
+    local C, gm = INSPECT.CAMPAIGN, SYM.gGMData
+    local cx, cy = ru32(gm + C.GM_IX) >> 8, ru32(gm + C.GM_IY) >> 8
+    local wm = { lord_node = ru8(gm + C.GM_LORD), open = {} }
+    for n = 0, C.NODES - 1 do
+        if (ru8(gm + C.GM_NODES + n * C.GM_NODE_STRIDE) & C.NODE_OPEN) ~= 0 then
+            wm.open[#wm.open + 1] = n
+            local node = SYM.gWMNodeData + n * C.NODE_STRIDE
+            if rs16(node + C.NODE_X) == cx and rs16(node + C.NODE_Y) == cy then wm.cursor_node = n end
+        end
+    end
+    return wm
+end
+
+-- Run game functions in sight.lua's sandbox (keep = false: everything is loaded back) or kept
+-- (keep = true: what they wrote stays, the registers are put back).
+INSPECT.gameCalls = function(fn, keep)
+    local api = INSPECT.sightApi()
+    return INSPECT.Sight.machine(api.cpu, keep)(fn)
+end
+
+-- An item's facts for bot.lua: the weapon type of a weapon, and which item is the Vulnerary.
+INSPECT.itemFacts = function(id)
+    local C = INSPECT.CAMPAIGN
+    local data = SYM.gItemData + id * BOARD.ITEMDATA_STRIDE
+    local facts = { id = id }
+    if (ru32(data + C.ITEM_ATTRIBUTES) & C.IA_WEAPON) ~= 0 then
+        facts.type = C.WEAPON_TYPES[ru8(data + C.ITEM_TYPE)]
+    end
+    if id == C.VULNERARY then facts.kind = "vulnerary" end
+    return facts
+end
+
+-- The shops a set of world map nodes holds: { node, kind, list (the stock's address), items }.
+INSPECT.nodeShops = function(nodes)
+    local C, out = INSPECT.CAMPAIGN, {}
+    for _, n in ipairs(nodes) do
+        local node = SYM.gWMNodeData + n * C.NODE_STRIDE
+        for _, kind in ipairs({ "armory", "vendor" }) do
+            local list = ru32(node + C.NODE_SHOP[kind])
+            local items = {}
+            for i = 0, C.SHOP_LIST_MAX - 1 do
+                local it = list ~= 0 and ru16(list + i * 2) or 0
+                if it == 0 then break end
+                items[#items + 1] = it
+            end
+            if #items > 0 then out[#out + 1] = { node = n, kind = kind, list = list, items = items } end
+        end
+    end
+    return out
+end
+
+-- Campaign.run's api (campaign.lua's contract). `game` is "ours" or "vanilla".
+INSPECT.campaignApi = function(game)
+    local C = INSPECT.CAMPAIGN
+    local Json = dofile(PLAYTEST_DIR .. "/json.lua")
+    local Botrun = dofile(PLAYTEST_DIR .. "/botrun.lua")
+    local cfg = (PLAYTEST_CAMPAIGN ~= nil and PLAYTEST_CAMPAIGN ~= "") and Json.decode(PLAYTEST_CAMPAIGN)
+        or {}
+    local seed = tonumber(PLAYTEST_SEED) or 1
+    local mode = TUNE.difficultyName[TUNE.difficultyWant]
+    local id = cfg.id or string.format("%s-s%d", mode, seed)
+    local dir = PLAYTEST_SIMDIR .. "/states/" .. id
+    local states, played, shops = {}, nil, nil
+    math.randomseed(seed)
+    local function gold() return ru32(SYM.gPlaySt + C.PLAY_GOLD) end
+
+    -- The world map shops open now: vanilla's from its own world map; ours has none yet, so
+    -- the twin's at the same point, as the vanilla campaign recorded them (cfg.shops).
+    local function openNodes(ch)
+        if game == "vanilla" then return INSPECT.worldMap().open end
+        return (cfg.shops or {})[tostring(ch)] or {}
+    end
+    -- The stock of every open shop; an item two shops sell is bought at the first. Unpriced:
+    -- api.stock prices it.
+    local function stockItems(ch)
+        local list, seen = {}, {}
+        for _, shop in ipairs(INSPECT.nodeShops(openNodes(ch))) do
+            for _, it in ipairs(shop.items) do
+                if not seen[it] then
+                    seen[it] = true
+                    local e = INSPECT.itemFacts(it)
+                    list[#list + 1] = { item = it, type = e.type, kind = e.kind, shop = shop }
+                end
+            end
+        end
+        return list
+    end
+    -- The units the player could field: the Pick Units list while the prep screen is up,
+    -- else the blue units on the field.
+    local function units()
+        local all, out = BOARD.read().units, {}
+        if PROCS.find(SYM.ProcScr_PrepMenu) then
+            local byAddr = {}
+            for _, u in ipairs(all) do byAddr[u.addr] = u end
+            for i = 0, ru32(SYM.gPrepUnitList + C.PREP_COUNT) - 1 do
+                local u = byAddr[ru32(SYM.gPrepUnitList + i * 4)]
+                if u then out[#out + 1] = u end
+            end
+            return out
+        end
+        for _, u in ipairs(all) do
+            if u.faction == "blue" and u.onField then out[#out + 1] = u end
+        end
+        return out
+    end
+
+    local api = { Bot = BOT, Json = Json,
+        info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id },
+        random = math.random,
+        gold = gold,
+        emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
+        log = log,
+    }
+    api.claims = function(ch) return (cfg.claims or {})[tostring(ch)] or {} end
+    -- Priced by the game for the first fielded unit, on the map: GetItemPurchasePrice charges
+    -- half again while BM_FLAG_PREPSCREEN is set, and the bot buys on the map.
+    api.stock = function()
+        if shops then return shops end
+        local lord = BOARD.read().units[1]
+        local list = stockItems(chapter())
+        INSPECT.gameCalls(function(call)
+            for _, s in ipairs(list) do
+                s.price = call(SYM.GetItemPurchasePrice, { lord.addr, call(SYM.MakeNewItem, { s.item }) })
+            end
+        end)
+        shops = list
+        return shops
+    end
+    api.roster = function()
+        local us, stock = units(), stockItems(chapter())
+        return INSPECT.gameCalls(function(call)
+            local out = {}
+            for _, u in ipairs(us) do
+                local e = { id = u.id, charId = u.charId, level = u.level, canUse = {}, items = {},
+                            forced = call(SYM.IsCharacterForceDeployed, { u.charId }) ~= 0 }
+                for _, s in ipairs(stock) do
+                    if call(SYM.CanUnitUseWeapon, { u.addr, call(SYM.MakeNewItem, { s.item }) }) ~= 0 then
+                        e.canUse[s.item] = true
+                    end
+                end
+                for _, held in ipairs(u.items) do
+                    local f = INSPECT.itemFacts(held.id)
+                    f.promotes = call(SYM.CanUnitUsePromotionItem,
+                        { u.addr, held.id | (held.uses << 8) }) ~= 0 or nil
+                    e.items[#e.items + 1] = f
+                end
+                out[#out + 1] = e
+            end
+            return out
+        end)
+    end
+
+    -- Ride the game to the next chapter's start: its prep screen, else its first player phase.
+    -- The world map walks the lord to the game's next story node (GetNextUnclearedNode) by its
+    -- own L and A; it never enters any other node.
+    api.arrive = function(route)
+        for _, last in ipairs(cfg.last or {}) do
+            if played == last then return "end" end
+        end
+        shops = nil
+        local stalled = INSPECT.watch("arrive")
+        for _ = 1, TUNE.bootSteps do
+            if TUNE.bootHook then TUNE.bootHook() end
+            local obs = observeController()
+            local state, why = controllerState(obs)
+            if stalled(obs, state) then
+                return nil, "parked on an unclassified wait (see the inspect snapshot)"
+            end
+            local ch = chapter()
+            if ch ~= played and (state == "prep_main"
+                    or (state == "player_map_idle" and inChapter(ch))) then
+                if played == nil then
+                    local sapi = INSPECT.sightApi()
+                    INSPECT.Sight.seed(sapi, seed)
+                end
+                played = ch
+                log(string.format("campaign: chapter %d starts (%s)", ch, state))
+                return { chapter = ch }
+            end
+            if state == "world_map_idle" then
+                local target = INSPECT.gameCalls(function(call)
+                    return call(SYM.GetNextUnclearedNode, { SYM.gGMData })
+                end)
+                if target >= 0x80 then return nil, "the world map has no next story node" end
+                local wm = obs.world_map
+                local ok
+                if wm.cursor_node ~= target then
+                    ok = guardedInput("wm_next_node", "L", "the cursor moves to another open node",
+                        function(after)
+                            return after.world_map == nil or after.world_map.cursor_node ~= wm.cursor_node
+                        end, 120)
+                else
+                    ok = guardedInput("wm_select", "A", "A on the story node walks or enters",
+                        function(after) return controllerState(after) ~= "world_map_idle" end, 120)
+                end
+                if not ok then return nil, "the world map refused its input (see the trace)" end
+            elseif state ~= "player_map_idle" then
+                local advanced = advanceBootState(obs, state)
+                if advanced == false then return nil, "a guarded input failed in " .. tostring(state) end
+                if advanced == nil then
+                    return nil, "unsupported state between chapters: " .. tostring(state or why)
+                end
+            else
+                yield()
+            end
+        end
+        return nil, "no chapter start within the boot allowance"
+    end
+
+    -- The chapter-start state, kept in memory for the restarts and written beside what the game
+    -- gave (party, gold, items, the open shop nodes) under references/sim.
+    api.save = function(ch)
+        local st = emu:saveStateBuffer()
+        states[ch] = st
+        os.execute(string.format('mkdir -p "%s"', dir))
+        local f = io.open(string.format("%s/%d.ss", dir, ch), "wb")
+        if not f then return nil, "cannot write " .. dir end
+        f:write(st)
+        f:close()
+        local party = {}
+        for _, u in ipairs(units()) do
+            local items = {}
+            for _, it in ipairs(u.items) do items[#items + 1] = it.id end
+            party[#party + 1] = { charId = u.charId, classId = u.classId, level = u.level, items = items }
+        end
+        f = io.open(string.format("%s/%d.json", dir, ch), "w")
+        if not f then return nil, "cannot write " .. dir end
+        f:write(Json.encode({ game = game, chapter = ch, gold = gold(), party = party,
+                              shops = openNodes(ch) }))
+        f:close()
+        return true
+    end
+    api.load = function(ch)
+        if not states[ch] then return nil, "no state for chapter " .. ch end
+        emu:loadStateBuffer(states[ch])
+        shops = nil
+        wait(2)
+        return true
+    end
+
+    -- The prep screen's cap, read off Pick Units itself (ProcPrepUnit.max_counter): opening it
+    -- is the first half of the deploy, which follows at once. nil = no prep screen.
+    api.cap = function()
+        local state = controllerState()
+        if state == "prep_main" then
+            if not guardedInput("pick_units", "A", "Pick Units opens", function(after)
+                return controllerState(after) ~= "prep_main"
+            end, 120) then return nil end
+            if not awaitControllerState("prep_pick_units", 900) then return nil end
+        elseif state ~= "prep_pick_units" then
+            return nil
+        end
+        return observeController().prep_units.cap
+    end
+
+    -- Pick exactly `ids` on Pick Units (bench the others first, so the cap is never in the way),
+    -- then Fight!, then the first player phase.
+    api.deploy = function(ids)
+        local want = {}
+        for _, c in ipairs(ids) do want[c] = true end
+        local function moveTo(i)
+            for _ = 1, 80 do
+                local o = observeController()
+                if controllerState(o) == "prep_pick_units" then
+                    local c, cr, tr = o.prep_units.cursor, o.prep_units.cursor // 2, i // 2
+                    if c == i then return true end
+                    local intention, key
+                    if c % 2 == 1 and i % 2 == 0 then intention, key = "pick_left", "LEFT"
+                    elseif cr < tr then intention, key = "pick_next", "DOWN"
+                    elseif cr > tr then intention, key = "pick_previous", "UP"
+                    else intention, key = "pick_right", "RIGHT" end
+                    if not guardedInput(intention, key, "the deploy cursor moves", function(after)
+                        return after.prep_units ~= nil and after.prep_units.cursor ~= c
+                    end, 60) then return false end
+                else
+                    yield()
+                end
+            end
+            return false
+        end
+        local function fielded(addr) return (ru32(addr + 0x0C) & BOARD.US_NOT_DEPLOYED) == 0 end
+        for pass = 1, 2 do
+            for i = 0, ru32(SYM.gPrepUnitList + C.PREP_COUNT) - 1 do
+                local addr = ru32(SYM.gPrepUnitList + i * 4)
+                local should = want[ru8(ru32(addr) + 4)] == true
+                if (pass == 1 and fielded(addr) and not should)
+                    or (pass == 2 and not fielded(addr) and should) then
+                    if not moveTo(i) then return nil, "the deploy cursor never reached row " .. i end
+                    local was = fielded(addr)
+                    if not guardedInput("toggle_deploy", "A", "the unit's deploy flips", function()
+                        return fielded(addr) ~= was
+                    end, 60) then return nil, "row " .. i .. " would not toggle" end
+                end
+            end
+        end
+        if not guardedInput("cancel_pick", "B", "Pick Units closes", function(after)
+            return controllerState(after) ~= "prep_pick_units"
+        end, 120) or not awaitControllerState("prep_main", 900) then
+            return nil, "Pick Units never handed back the prep menu"
+        end
+        if not driveThroughPrep() then return nil, "Fight! did not leave the prep screen" end
+        if not INSPECT.settle("idle", 9000, true) then return nil, "no player phase after Fight!" end
+        return true
+    end
+
+    -- One purchase through the game's own shop screen: StartShopScreen(unit, the shop's stock,
+    -- its type, the player phase) as a kept call, then its list, prompts and exit by their keys.
+    api.buy = function(p)
+        local s
+        for _, e in ipairs(api.stock()) do if e.item == p.item then s = e end end
+        local u = s and BOARD.find("blue", p.unit)
+        if not u then return nil, string.format("no stock entry or unit for %d:%d", p.unit, p.item) end
+        local phase = PROCS.find(SYM.gProcScr_PlayerPhase)
+        if not phase then return nil, "no player phase to open the shop from" end
+        local row
+        for i, it in ipairs(s.shop.items) do if it == p.item then row = i - 1 end end
+        local startGold = gold()
+        INSPECT.gameCalls(function(call)
+            call(SYM.StartShopScreen, { u.addr, s.shop.list, C.SHOP_TYPE[s.shop.kind], phase })
+        end, true)
+        local stalled = INSPECT.watch("shop")
+        for _ = 1, C.shopSteps do
+            local obs = observeController()
+            local state = controllerState(obs)
+            if stalled(obs, state) then return nil, "the shop stalled (see the inspect snapshot)" end
+            local bought = gold() < startGold
+            local ok = true
+            if state == "player_map_idle" and not PROCS.find(SYM.gProcScr_Shop) then
+                if bought then return true end
+                return nil, "the shop closed before the purchase"
+            elseif state == "dialogue_wait" then
+                ok = INSPECT.advanceDialogue(120)
+            elseif state == "yes_no_choice" then
+                -- Before the purchase every prompt is a yes: Buy, the price, send to storage.
+                -- After it, the greeting's B leaves.
+                if bought then
+                    ok = guardedInput("cancel_choice", "B", "the shop's prompt closes", function(after)
+                        return controllerState(after) ~= "yes_no_choice"
+                    end, 120)
+                elseif obs.choice.current ~= "yes" then
+                    ok = guardedInput("select_yes", "LEFT", "Yes is highlighted", function(after)
+                        return after.choice ~= nil and after.choice.current == "yes"
+                    end, 60)
+                else
+                    ok = guardedInput("answer_yes", "A", "the prompt takes Yes", function(after)
+                        return controllerState(after) ~= "yes_no_choice"
+                    end, 120)
+                end
+            elseif state == "shop_buy" then
+                local c = obs.shop.cursor
+                if bought then
+                    ok = guardedInput("shop_leave", "B", "the list closes", function(after)
+                        return controllerState(after) ~= "shop_buy"
+                    end, 120)
+                elseif c ~= row then
+                    local down = c < row
+                    ok = guardedInput(down and "shop_next" or "shop_previous", down and "DOWN" or "UP",
+                        "the hand moves", function(after)
+                            return after.shop ~= nil and after.shop.cursor ~= c
+                        end, 60)
+                else
+                    ok = guardedInput("shop_buy", "A", "the price is asked", function(after)
+                        return controllerState(after) ~= "shop_buy"
+                    end, 120)
+                end
+            else
+                yield()
+            end
+            if not ok then return nil, "the shop refused an input in " .. tostring(state) end
+        end
+        return nil, "the purchase did not finish within its allowance"
+    end
+
+    -- Spend a seal as the player does: the unit's Item command, the seal's row, Use. A branched
+    -- promotion takes the first class the game's menu offers, and every prompt after it a yes;
+    -- done when the unit's class has changed and the map is back.
+    api.promote = function(entry)
+        local slot
+        for i, it in ipairs(entry.items) do
+            if it.promotes then slot = i - 1; break end
+        end
+        local u = BOARD.find("blue", entry.charId)
+        if not (slot and u) then return nil, "no seal or no unit for 0x" .. entry.charId end
+        local function classOf() return ru8(ru32(u.addr + 4) + 4) end
+        local before = classOf()
+        if not moveUnit(u.x, u.y, u.x, u.y) then return nil, "no command menu for the unit" end
+        if not selectSemantic("open_items", "the Item command opens the inventory", function(after)
+            return controllerState(after) == "item_list"
+        end, 120) then return nil, "no Item command" end
+        for _ = 1, 8 do
+            local o = observeController()
+            if controllerState(o) ~= "item_list" then return nil, "the inventory closed" end
+            local cur = o.menu.current
+            if cur == slot then break end
+            if not guardedInput("menu_next", "DOWN", "the inventory cursor moves", function(after)
+                return after.menu ~= nil and after.menu.current ~= cur
+            end, 30) then return nil, "the inventory cursor would not move" end
+        end
+        if not guardedInput("select_item", "A", "the seal's submenu opens", function(after)
+            return controllerState(after) == "item_submenu"
+        end, 120) then return nil, "the seal offered no submenu" end
+        if not selectSemantic("use_item", "Use starts the promotion", function(after)
+            return controllerState(after) ~= "item_submenu"
+        end, 120) then return nil, "the seal could not be used" end
+        local stalled = INSPECT.watch("promote")
+        for _ = 1, TUNE.bootSteps do
+            local obs = observeController()
+            local state = controllerState(obs)
+            if stalled(obs, state) then return nil, "the promotion stalled (see the inspect snapshot)" end
+            local ok = true
+            if state == "player_map_idle" and classOf() ~= before then return true
+            elseif state == "dialogue_wait" then ok = INSPECT.advanceDialogue(120)
+            elseif state == "yes_no_choice" then
+                ok = selectSemantic("answer_yes", "the promotion's prompt takes Yes", function(after)
+                    return controllerState(after) ~= "yes_no_choice"
+                end, 120)
+            elseif state == "generic_menu" then
+                ok = guardedInput("select_current_menu_item", "A", "the first class is chosen",
+                    function(after) return controllerState(after) ~= "generic_menu" end, 120)
+            else
+                yield()
+            end
+            if not ok then return nil, "the promotion refused an input in " .. tostring(state) end
+        end
+        return nil, "the promotion did not finish within its allowance"
+    end
+
+    api.play = function(style, claims, attempt)
+        local b = INSPECT.botApi(game)
+        b.style, b.claims = style, claims
+        b.info.campaign, b.info.attempt = id, attempt
+        b.seed = function() end   -- seeded once, at the first chapter: FE8 never re-seeds
+        pokeFastConfig()
+        INSPECT.settle("phase", 6000, true)
+        wait(60)
+        local _, _, rec = Botrun.run(b)
+        return rec
+    end
+    return api
+end
+
 -- bot: the bot plays one chapter, seeded by PT_SEED, styled by PT_STYLE (JSON), following
 -- PT_CLAIMS (JSON, resolved). Ours: ch01 (reached as clear_ch01 reaches it). PT_VANILLA=1:
 -- retail Ch1, reached by the bot playing the Prologue first (its record is emitted too). The
@@ -3008,6 +3492,19 @@ scenarios.bot = function()
     if not reachCh01Map() then return end
     local ok, why, rec = play("ours")
     return result(ok and "PASS" or "FAIL", string.format("ch01 %s: %s", rec.outcome, why))
+end
+
+-- campaign: the bot plays chapter to chapter (campaign.lua), from New Game, restarting a chapter
+-- from its start state until it clears with everyone alive. PT_SEED seeds the game's RNG once;
+-- PT_CAMPAIGN is JSON (campaign_env.py builds it): { id, last = {chapter indices it ends after},
+-- shops = { [chapter] = {world map nodes} } (ours: the twin's, from the vanilla campaign's
+-- record), claims = { [chapter] = resolved claims } }. Each chapter prints a `CAMPAIGN <json>` line and each
+-- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.
+scenarios.campaign = function()
+    local Campaign = dofile(PLAYTEST_DIR .. "/campaign.lua")
+    if PLAYTEST_VANILLA == "1" then INSPECT.retailFastText() end
+    local ok, why = Campaign.run(INSPECT.campaignApi(PLAYTEST_VANILLA == "1" and "vanilla" or "ours"))
+    return result(ok and "PASS" or "FAIL", why)
 end
 
 -- sightprobe: what the sight reads at the chapter's start, printed for a check by eye against
