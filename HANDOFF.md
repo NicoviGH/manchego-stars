@@ -59,6 +59,8 @@ G3 #537 78105ed; the summary is on #531).
      retail won both, all alive. The review summary is on the PR.
 3. **Next: PR E, then F** (stack E->F only). PR E's caller hands bot.lua `promotes` and `canUse`
    from the game's own checks (ADR 0369: no level or rank rule in the bot).
+   Ours has no world map yet: our campaign uses VANILLA's world map between chapters (the twin's
+   shops and stock at the same point, via the game's shop screen; Nicolas 2026-10-27, in the plan's E1).
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
   dropped, with evidence. Apply every review with the global `review-to-clean` skill
