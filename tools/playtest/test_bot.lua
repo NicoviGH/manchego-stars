@@ -3,6 +3,7 @@
 -- Run: lua tools/playtest/test_bot.lua
 local here = (arg[0]:match("(.*/)")) or "./"
 local B = dofile(here .. "bot.lua")
+local Board = dofile(here .. "board.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -265,7 +266,7 @@ do
         "a kill is progress even with no distance")
     check(B.madeProgress({ dist = 4, enemies = 2 }, { dist = 5, enemies = 2 }), false,
         "moving away with no kill is not progress")
-    -- the target changed (boss died / a unit ruled out): the old best belonged to another
+    -- the target changed (the boss died): the old best belonged to another
     -- question, so the change counts, and a farther first reading is not a stall
     check(B.madeProgress({ dist = 4, enemies = 0, key = "boss" },
                          { dist = 10, enemies = 0, key = "seize:1" }),
@@ -352,7 +353,7 @@ local function sightOf(o)
                 if not e.minRange then return 0 end
                 local n = 0
                 for _, t in ipairs(tiles) do
-                    local d = math.abs(t.x - x) + math.abs(t.y - y)
+                    local d = Board.distance(t.x, t.y, x, y)
                     if d >= e.minRange and d <= e.maxRange then n = n + 1 end
                 end
                 return n
@@ -845,6 +846,13 @@ do
     local moved = blue(0x02, 1, 0, 2)
     B.decide(boardOf(A, moved, hurt), sight, style("careful"))
     check(counts(), "3/4", "an ally moving into support range: both asked again")
+    -- a level-up mid-phase changes the unit's stats: a new attack
+    local leveled = blue(0x01, 0, 0, 0)
+    A.level, leveled.level = 1, 2
+    B.decide(boardOf(A, moved, hurt), sight, style("careful"))
+    local was = sight.attacks()
+    B.decide(boardOf(leveled, moved, hurt), sight, style("careful"))
+    check(sight.attacks(), was + 1, "a level-up is a new attack")
     local spent = blue(0x01, 0, 0, 0)
     A.items, spent.items = { { id = 1, uses = 40 } }, { { id = 1, uses = 39 } }
     B.decide(boardOf(A, moved, hurt), sight, style("careful"))

@@ -5,7 +5,8 @@
 -- test_botrun.lua drives it with a fake api and no emulator.
 --
 -- The loop: one sight for the run (sight.lua), refreshed whenever the board may have changed
--- -- at each player phase and after every action. At a phase's start the board is hashed; then
+-- -- after every action -- and given a fresh phase (newPhase: its caches too) at each player
+-- phase. At a phase's start the board is hashed; then
 -- Bot.decide is asked for one action at a time until it returns nil; then the phase ends and the
 -- enemy phase is ridden out. The run ends:
 --   won      the chapter advanced (api.won)
@@ -44,28 +45,16 @@ local M = {}
 
 M.PREFIX = "BOTRUN "
 
--- The turns until the next arrival `arrivals` (a style's reinforcements claims) cites after
--- `turn`, or nil. Bot.decide holds the march on the turn before one, so it is board state.
-function M.nextArrival(arrivals, turn)
-    local best
-    for _, turns in ipairs(arrivals or {}) do
-        for _, t in ipairs(turns) do
-            if t > turn and (not best or t < best) then best = t end
-        end
-    end
-    return best and best - turn or nil
-end
-
 -- What Bot.decide reads at a player phase's start, as one string: who stands where with what
 -- HP, the objective's turns left, and the turns until the next claimed arrival.
-function M.boardHash(board, objective, arrivals)
+function M.boardHash(Bot, board, objective, arrivals)
     local parts = {}
     for _, u in ipairs(board.units) do
         if u.onField then parts[#parts + 1] = string.format("%d@%d,%d:%d", u.id, u.x, u.y, u.hp) end
     end
     table.sort(parts)
     parts[#parts + 1] = "left=" .. tostring(objective and objective.turnsLeft or "-")
-    parts[#parts + 1] = "arrive=" .. tostring(M.nextArrival(arrivals, board.turn) or "-")
+    parts[#parts + 1] = "arrive=" .. tostring(Bot.nextArrival(arrivals, board.turn) or "-")
     return table.concat(parts, ";")
 end
 
@@ -137,13 +126,13 @@ function M.run(api)
             if api.lost() then return "lost", "game over" end
             local board = api.board()
             turn = board.turn
-            sight.refresh()
+            sight.newPhase()
             if #rec.deployed == 0 then
                 for _, u in ipairs(board.units) do
                     if u.faction == "blue" and u.onField then rec.deployed[#rec.deployed + 1] = u.charId end
                 end
             end
-            local h = M.boardHash(board, sight.objective, style.arrivals)
+            local h = M.boardHash(Bot, board, sight.objective, style.arrivals)
             if seen[h] and not (waitUntil and turn < waitUntil) then
                 waitUntil = sight.nextTurnEvent(turn)
                 if not waitUntil then

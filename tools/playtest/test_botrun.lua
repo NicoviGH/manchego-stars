@@ -5,6 +5,7 @@ local here = (arg[0]:match("(.*/)")) or "./"
 local Botrun = dofile(here .. "botrun.lua")
 local Json = dofile(here .. "json.lua")
 local Bot = dofile(here .. "bot.lua")
+local Board = dofile(here .. "board.lua")
 
 local tests, fails = 0, 0
 local function check(got, want, msg)
@@ -48,7 +49,7 @@ local function fakeGame(o)
         local out = {}
         for y = 0, 9 do
             for x = 0, 9 do
-                if math.abs(x - u.x) + math.abs(y - u.y) <= r then out[#out + 1] = { x = x, y = y } end
+                if Board.distance(x, y, u.x, u.y) <= r then out[#out + 1] = { x = x, y = y } end
             end
         end
         return out
@@ -85,6 +86,11 @@ local function fakeGame(o)
             s.refresh = function()
                 g.refreshes = (g.refreshes or 0) + 1
                 s.objective.turnsLeft = g.turnsLeft
+            end
+            s.newPhase = function()
+                g.phases = (g.phases or 0) + 1
+                s.refresh()
+                s.cache = {}
             end
             return s
         end,
@@ -226,7 +232,8 @@ do
     local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
     Botrun.run(g.api)
     check(g.sights, 1, "the sight is built once per run")
-    check(g.refreshes >= 4, true, "and refreshed at each phase and after each action")
+    check(g.phases, 2, "given a fresh phase (and cache) at each of the two player phases")
+    check(g.refreshes >= 4, true, "and refreshed after each action too")
 end
 
 -- A Lua error anywhere in the run -- a sight call that never returned -- is a crash, and the
@@ -259,11 +266,11 @@ end
 
 -- A claimed reinforcement arrival is part of what decide reads: the turns to it change the hash.
 do
-    check(Botrun.nextArrival({ { 3, 6 }, { 5 } }, 2), 1, "turn 3 is the next arrival after turn 2")
-    check(Botrun.nextArrival({ { 3 } }, 3), nil, "none left after the last")
+    check(Bot.nextArrival({ { 3, 6 }, { 5 } }, 2), 1, "turn 3 is the next arrival after turn 2")
+    check(Bot.nextArrival({ { 3 } }, 3), nil, "none left after the last")
     local b = { turn = 2, units = {} }
-    check(Botrun.boardHash(b, nil, { { 5 } }) ~= Botrun.boardHash({ turn = 3, units = {} }, nil,
-        { { 5 } }), true, "the same board, a turn nearer an arrival, hashes differently")
+    check(Botrun.boardHash(Bot, b, nil, { { 5 } }) ~= Botrun.boardHash(Bot, { turn = 3, units = {} },
+        nil, { { 5 } }), true, "the same board, a turn nearer an arrival, hashes differently")
 end
 
 -- An enemy phase that ends the game still carries the deaths the watcher missed.

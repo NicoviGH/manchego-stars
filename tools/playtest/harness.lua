@@ -50,6 +50,7 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 -- at once (#232).
 local TUNE = {
     sandboxFrames = 0,        -- frames sight.lua's sandbox ran (its loads rewind the counter)
+    sandboxAt = nil,          -- the frame a sandbox is running from, while it runs
     sandboxHeartbeat = 600,   -- a log line every this many of them: a long think shows progress
     -- How many times one guarded input may be re-pressed into an unchanged, still-legal
     -- state before failing closed. FE8 drops input during window fade-ins, so a single
@@ -135,10 +136,14 @@ end)()
 
 local logfile = io.open(PLAYTEST_LOG, "w")
 local controllerFault
+-- Frames emulated so far, the sight sandbox's included, and never going back: a sandbox's load
+-- rewinds the counter, so its frames are counted into TUNE.sandboxFrames, and while one runs the
+-- stamp holds at the frame it started from. run.sh's progress and budget read these stamps.
+TUNE.framesRun = function()
+    return (TUNE.sandboxAt or emu:currentFrame()) + TUNE.sandboxFrames
+end
 local function log(s)
-    -- The sight sandbox rewinds the frame counter after each call; TUNE.sandboxFrames adds back
-    -- what it ran, so the stamps run.sh watches for progress only ever rise.
-    logfile:write(string.format("[f%06d] %s\n", emu:currentFrame() + TUNE.sandboxFrames, s))
+    logfile:write(string.format("[f%06d] %s\n", TUNE.framesRun(), s))
     logfile:flush()
 end
 local function result(verdict, why)
@@ -269,11 +274,29 @@ local function blue(charId) return BOARD.find("blue", charId) end
 local function red(charId) return BOARD.find("red", charId) end
 local function isDead(u) return u == nil or u.dead end
 
+-- The #236 state inspector, as ONE table rather than three top-level locals: Lua caps a
+-- main chunk at 200 locals, this file is one main chunk, and crossing the cap stops the whole
+-- harness loading (every scenario dies at once). Hang new helpers off an existing table
+-- (INSPECT, TUNE) or put the logic in controller.lua, which has a unit suite and no such
+-- ceiling. HOW MUCH ROOM IS LEFT IS NEVER WRITTEN DOWN HERE: `check.py
+-- check_lua_local_headroom` measures it and prints it on every `make check`, because the
+-- hand-maintained number said "two free slots" in three files at once and was wrong in
+-- all three within one PR (#241). `check_lua_chunks_load` fails the build on a crossing.
+-- Fields are assigned further down, next to the proc-pool reader they build on. Declared this
+-- early so every scenario can reach it: a helper hung on a table declared LATER (VISIT, line
+-- ~7400) is out of scope in any scenario written above that line, which is why the shared
+-- R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
+local INSPECT = {}
+-- A loss: the game-over screen, or the title it falls back to without the chapter advancing.
+INSPECT.chapterLost = function()
+    return gameOverActive() or procActive(SYM.gProcScr_TitleScreen)
+end
+
 -- A unit's attack reach, read LIVE from u.addr (a caller may hold `u` across a trade): the
 -- weapon FE8 has equipped (GetUnitEquippedWeapon, run in sight.lua's sandbox) and its range,
--- as (minRange, maxRange), or nil for a staff / non-attacker. TUNE.attackRange is filled in
--- below, beside the sandbox's api (INSPECT.sightApi): this line is above where INSPECT exists.
-local function unitAttackRange(u) return TUNE.attackRange(u) end
+-- as (minRange, maxRange), or nil for a staff / non-attacker. INSPECT.attackRange is filled in
+-- below, beside the sandbox's api (INSPECT.sightApi).
+local function unitAttackRange(u) return INSPECT.attackRange(u) end
 
 local function pokeFrail(u) -- 1 HP, no def/res/spd/lck: next clean hit kills
     emu:write8(u.addr + 0x13, 1) -- curHP
@@ -355,23 +378,6 @@ end
 --     afterPre   optional cleanup fn, guaranteed after pre returns or raises
 --     post       optional fn(reachedEnd) run once after the loop (e.g. a final "title" shot)
 local controllerState, guardedInput, freezeReport
--- The #236 state inspector, as ONE table rather than three top-level locals: Lua caps a
--- main chunk at 200 locals, this file is one main chunk, and crossing the cap stops the whole
--- harness loading (every scenario dies at once). Hang new helpers off an existing table
--- (INSPECT, TUNE) or put the logic in controller.lua, which has a unit suite and no such
--- ceiling. HOW MUCH ROOM IS LEFT IS NEVER WRITTEN DOWN HERE: `check.py
--- check_lua_local_headroom` measures it and prints it on every `make check`, because the
--- hand-maintained number said "two free slots" in three files at once and was wrong in
--- all three within one PR (#241). `check_lua_chunks_load` fails the build on a crossing.
--- Fields are assigned further down, next to the proc-pool reader they build on. Declared this
--- early so every scenario can reach it: a helper hung on a table declared LATER (VISIT, line
--- ~7400) is out of scope in any scenario written above that line, which is why the shared
--- R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
-local INSPECT = {}
--- A loss: the game-over screen, or the title it falls back to without the chapter advancing.
-INSPECT.chapterLost = function()
-    return gameOverActive() or procActive(SYM.gProcScr_TitleScreen)
-end
 local function recordCutscene(o)
     o = o or {}
     local tag = o.tag or "scene"
@@ -1192,7 +1198,7 @@ local function marchToward(u, tx, ty, maxx, maxy)
         for x = 0, maxx do
             if reachCost(x, y) < 120 and not tileOccupied(x, y)
                 and not (x == u.x and y == u.y) then
-                local d = math.abs(tx - x) + math.abs(ty - y)
+                local d = BOARD.distance(tx, ty, x, y)
                 if d < bestd then best, bestd = { x = x, y = y }, d end
             end
         end
@@ -2730,18 +2736,17 @@ local function clearUntilAdvance(startChapter, maxx, maxy, park)
         -- Once the boss is dead only a unit that can Seize is closing on anything: measure from
         -- those (the game's CanUnitSeize), or a non-lord standing near the throne masks the
         -- lord's march.
-        local blueUnits, excluded, nRuled = BOARD.leanList("blue"), {}, 0
+        local blueUnits, excluded = BOARD.leanList("blue"), {}
         if not findBoss() then
             for _, o in ipairs(blueUnits) do
                 if not INSPECT.canSeize(o) then
                     excluded[o.slot] = true
-                    nRuled = nRuled + 1
                 end
             end
         end
         local dist = BOT.seizeDistance(blueUnits, field, excluded)
         local enemies = BOARD.liveCount("red")
-        local key = (findBoss() and "boss" or "seize") .. ":" .. nRuled
+        local key = findBoss() and "boss" or "seize"   -- what the distance is measured to
         if BOT.madeProgress({ dist = lastDist, enemies = lastEnemies, key = lastKey },
                                  { dist = dist, enemies = enemies, key = key }) then
             stall = 0
@@ -2824,20 +2829,29 @@ end
 -- CPU's, never memory, and go to the real emulator.
 INSPECT.sightApi = function()
     local raw = PROCS.raw
-    TUNE.Sight = TUNE.Sight or dofile(PLAYTEST_DIR .. "/sight.lua")
-    TUNE.Board = TUNE.Board or dofile(PLAYTEST_DIR .. "/board.lua")
+    INSPECT.Sight = INSPECT.Sight or dofile(PLAYTEST_DIR .. "/sight.lua")
     return {
         mem = { u8 = ru8, s8 = rs8, u16 = ru16, s16 = rs16, u32 = ru32 },
         write8 = function(a, v) emu:write8(a, v) end,
         write16 = function(a, v) emu:write16(a, v) end,
         write32 = function(a, v) emu:write32(a, v) end,
         SYM = SYM,
-        Board = TUNE.Board,
+        -- board.lua's two pure helpers sight.lua uses, from the one bound BOARD (no second load)
+        Board = { itemRange = function(_, _, item) return BOARD.itemRange(item) end,
+                  distance = BOARD.distance },
         cpu = {
             read = function(r) return raw:readRegister(r) end,
             write = function(r, v) raw:writeRegister(r, v) end,
-            save = function() return emu:saveStateBuffer() end,
-            load = function(st) emu:loadStateBuffer(st) end,
+            -- The frame a sandbox starts from holds log()'s stamps still while it runs (the
+            -- calls' frames are counted into TUNE.sandboxFrames instead), and the load clears it.
+            save = function()
+                TUNE.sandboxAt = emu:currentFrame()
+                return emu:saveStateBuffer()
+            end,
+            load = function(st)
+                emu:loadStateBuffer(st)
+                TUNE.sandboxAt = nil
+            end,
             write16 = function(a, v) emu:write16(a, v) end,
             write32 = function(a, v) emu:write32(a, v) end,
             -- Each frame a call runs is real emulation, though the load rewinds the counter:
@@ -2866,13 +2880,13 @@ end
 
 -- The game's answers the hand-written scenarios ask outside a bot run: a unit's attack reach
 -- (unitAttackRange, far above) and who may Seize (the clear loop).
-TUNE.attackRange = function(u)
+INSPECT.attackRange = function(u)
     local api = INSPECT.sightApi()
-    local r = TUNE.Sight.range(api, u)
+    local r = INSPECT.Sight.range(api, u)
     if r then return r.min, r.max end
     return nil
 end
-INSPECT.canSeize = function(u) return TUNE.Sight.canSeize(INSPECT.sightApi(), u) end
+INSPECT.canSeize = function(u) return INSPECT.Sight.canSeize(INSPECT.sightApi(), u) end
 
 -- Every unit that falls during an enemy phase, with the fighter it fell to: a frame callback
 -- for the phase's length that watches both arrays (lean) and, the frame one goes down, reads
@@ -2905,7 +2919,7 @@ end
 INSPECT.botApi = function(game)
     local Json = dofile(PLAYTEST_DIR .. "/json.lua")
     local sightApi = INSPECT.sightApi()
-    local Sight = TUNE.Sight
+    local Sight = INSPECT.Sight
     local start = chapter()
     local function won() return chapter() ~= start end
     local lost = INSPECT.chapterLost
@@ -2925,7 +2939,7 @@ INSPECT.botApi = function(game)
         won = won,
         lost = lost,
         -- Emulated frames, the sandbox's included (sightApi's cpu.frames counts them).
-        frames = function() return emu:currentFrame() + TUNE.sandboxFrames end,
+        frames = TUNE.framesRun,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
     }
@@ -3003,7 +3017,7 @@ scenarios.sightprobe = function()
     elseif not reachCh01Map() then return end
     INSPECT.settle("phase", 6000, true)
     local sapi = INSPECT.sightApi()
-    local sight = TUNE.Sight.new(sapi)
+    local sight = INSPECT.Sight.new(sapi)
     local w, h = mapSize()
     for y = 0, h - 1 do
         local row = {}
@@ -3433,7 +3447,7 @@ function INSPECT.ch01MarchOnChief(opts)
         if isDead(lord) then return "dead" end
         chief = red(CAMPAIGN.CH01_CHIEF)
         if chief and not isDead(chief) then
-            if math.abs(lord.x - chief.x) + math.abs(lord.y - chief.y) == 1 then
+            if BOARD.distance(lord.x, lord.y, chief.x, chief.y) == 1 then
                 -- adjacent: attack in place (move onto own tile opens the menu)
                 if moveUnit(lord.x, lord.y, lord.x, lord.y) then
                     if opts.onAttack then opts.onAttack() end
@@ -3786,7 +3800,7 @@ scenarios.recordsupply = function()
     INSPECT.settle("phase", 1500, true)
     pinky = blue(CAMPAIGN.CAST.pinky)
     for _, u in BOARD.each("blue") do
-        local beside = pinky and math.abs(u.x - pinky.x) + math.abs(u.y - pinky.y) == 1
+        local beside = pinky and BOARD.distance(u.x, u.y, pinky.x, pinky.y) == 1
         -- onField: this loop MOVES the unit, and a rescued one is not standing on a tile.
         if u.charId ~= CAMPAIGN.CAST.pinky and not beside and u.onField then
             if moveUnit(u.x, u.y, u.x, u.y) then
@@ -5515,8 +5529,8 @@ end
 -- named by PT_STATE (builder ckpt_<PT_STATE>) if it's missing/stale. Examples:
 --   PT_STATE=ch02intro PT_TAG=intro PT_UNTIL=prep                   tools/playtest/run.sh recordscene
 scenarios.recordscene = function()
-    -- Config arrives as PLAYTEST_* wrapper globals (run.sh maps PT_* -> PLAYTEST_*); mGBA's
-    -- sandboxed lua has no os.getenv, so the whole harness uses injected globals, not the env.
+    -- Config arrives as PLAYTEST_* wrapper globals (run.sh maps PT_* -> PLAYTEST_*), so the
+    -- harness reads one place; the wrapper itself takes the JSON knobs from os.getenv.
     local function g(v) return (v ~= nil and v ~= "") and v or nil end
     return recordCutscene({
         state = g(PLAYTEST_STATE),
@@ -6699,7 +6713,7 @@ scenarios.ch05crest = function()
         -- (eventinfo.c), so that unit is on the grid and in the array and cannot be selected.
         -- Pressing A on it is an illegal input, which fails the run even though the payout it
         -- was driving toward lands correctly -- exactly what the first two runs reported.
-        -- ...and they need a MELEE WEAPON in slot 0, or parking the boss next to them proves
+        -- ...and they need an equipped MELEE WEAPON, or parking the boss next to them proves
         -- nothing: unitAttackRange returns nil for a staff, and ch05 deploys two healers.
         local hero, hmin, hmax = nil, nil, nil
         for _, u in BOARD.each("blue") do
@@ -7039,7 +7053,7 @@ scenarios.ch06clock = function()
     pokeFastConfig()
     INSPECT.settle("event", 6000, true)
 
-    local function dist(ax, ay, bx, by) return math.abs(ax - bx) + math.abs(ay - by) end
+    local dist = BOARD.distance
     local function indexOf(base, count, match)
         for i = 0, count - 1 do
             local u = unitAt(base, i)
@@ -7365,8 +7379,8 @@ scenarios.ch06halberd = function()
                 local best, bx, by
                 for y = 0, mh - 1 do
                     for x = 0, mw - 1 do
-                        local d = math.abs(x - home.x) + math.abs(y - home.y)
-                        if mapUnitAt(x, y) == 0 and math.abs(x - D.x) + math.abs(y - D.y) > 1
+                        local d = BOARD.distance(x, y, home.x, home.y)
+                        if mapUnitAt(x, y) == 0 and BOARD.distance(x, y, D.x, D.y) > 1
                             and (not best or d < best) then best, bx, by = d, x, y end
                     end
                 end

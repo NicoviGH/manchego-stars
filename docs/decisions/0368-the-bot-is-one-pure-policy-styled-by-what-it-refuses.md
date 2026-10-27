@@ -27,8 +27,9 @@ reads, `sight.attack` and `sight.strike`, and the strike is the enemy AI's own d
 was read from the `taken*` fields of the forecast our unit would get against each threatening
 enemy; there was no enemy-side call.
 
-**Worst case on an end tile** = the sum, over every enemy that reaches the tile (some tile of
-`sight.reach(enemy)` within its weapon range; `danger(x, y) = 0` skips the walk), of
+**Worst case on an end tile** = the sum, over every enemy that reaches the tile (first written as
+some tile of `sight.reach(enemy)` within its held weapon's range; ADR 0369 made it the game's own
+one-enemy danger zone, `sight.threat`; `danger(x, y) = 0` skips the walk), of
 `takenDmg x takenHits`, tripled when `takenCrit > 0` (FE8 triples a crit), zero when
 `takenHit = 0`. A sure kill's target (`killsTarget` at hit 100) is left out: it dies before the
 enemy phase.

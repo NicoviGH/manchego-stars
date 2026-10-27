@@ -122,6 +122,35 @@ do
         "only the repeating event ahead: no change")
 end
 
+-- side: the forecast window marks only the ACTOR's Monster Stone 0xFF (damage and crit); a
+-- target's is read as it is.
+do
+    local bytes = {}
+    local mem = {
+        u16 = function(a) return bytes[a] or 0 end,
+        s8 = function(a) local v = bytes[a] or 0; return v >= 0x80 and v - 0x100 or v end,
+    }
+    local A, T, P = 0x100, 0x200, 0x300
+    bytes[A + 0x48] = 0xB5        -- weapon: the Monster Stone (uses 0)
+    bytes[A + 0x5A], bytes[T + 0x5C] = 12, 4
+    bytes[A + 0x64], bytes[A + 0x6A] = 70, 0
+    bytes[P + 0x50] = 1
+    local actor = Sight.side(mem, A, T, P, 0x50, true)
+    check(actor.dmg .. "/" .. actor.crit, "255/255", "the actor's Monster Stone: 0xFF damage and crit")
+    local target = Sight.side(mem, A, T, P, 0x50, false)
+    check(target.dmg .. "/" .. target.crit, "8/0", "the same stone on the target's side: as it is")
+end
+
+-- eventOrder: the check runs at a player phase's start, so this turn's green and red phases are
+-- still ahead, before every phase of the turns after it.
+do
+    local o = Sight.eventOrder(4)
+    check(o[1].turn .. ":" .. o[1].phase, "4:64", "first: this turn's green phase")
+    check(o[2].turn .. ":" .. o[2].phase, "4:128", "then this turn's red phase")
+    check(o[3].turn .. ":" .. o[3].phase, "5:0", "then the next turn's player phase")
+    check(o[#o].turn, Sight.LAST_EVENT_TURN, "out to the last turn an event can name")
+end
+
 -- The sandbox puts the CPU in System mode BEFORE it reads sp: sp is banked.
 do
     local cpu = fakeCpu(1)

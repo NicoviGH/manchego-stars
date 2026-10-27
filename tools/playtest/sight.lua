@@ -23,14 +23,17 @@
 -- calls whenever the board may have changed (after every action, at every phase); the chapter's
 -- goal and Seize tile are read once.
 --   refresh()                drop every board answer; recount the objective's turns left.
+--   newPhase()               refresh(), and a fresh `cache` for the phase: what changes between
+--                            phases (levels, an AI an event rewrote) is in no cache key.
 --   danger(x, y)             gBmMapRange after GenerateDangerZoneRange(FALSE), fog and roofs as
 --                            the game shows them: 0 when no enemy reaches (x, y), else its
 --                            COVERAGE -- GenerateUnitCompleteAttackRange adds 1 for every tile
 --                            an enemy could strike it from, so it is not an enemy count.
 --   threat(e) -> function(x, y) -> coverage: GenerateDangerZoneRange itself, every other enemy
---                            made invalid for the call (pCharacterData 0, UNIT_IS_VALID false)
---                            so it walks `e` alone; the others still stand on gBmMapUnit and
---                            block it as they do. Fog, roofs, magic: all the game's.
+--                            marked US_UNDER_A_ROOF for the call -- the one state its loop skips
+--                            a unit for and nothing else reads -- so it walks `e` alone while
+--                            the others stay valid units: they block it on gBmMapUnit and a
+--                            Magic Seal still seals (GenerateMagicSealMap). Fog: the game's.
 --   reach(unit)              tiles with gBmMapMovement < 120 after GenerateUnitMovementMap,
 --                            less those another unit stands on (gBmMapUnit). Either faction.
 --   range(unit)              { min, max } of the weapon FE8 has equipped (GetUnitEquippedWeapon,
@@ -59,7 +62,7 @@
 --   nextTurnEvent(turn)      the first later turn at which a turn event the game would fire is
 --                            not already firing now (SearchAvailableEvent over the chapter's
 --                            turnBasedEvents, the turn and phase set to each), or nil.
---   cache                    {} for the run (bot.lua keeps its forecasts there).
+--   cache                    {} for ONE player phase (bot.lua keeps attacks and strikes there).
 -- Sight.seed(api, s)         InitRN(s): the game's own seeding, written into gRNSeeds.
 
 local M = {}
@@ -85,8 +88,8 @@ local PROC_HITS_A, PROC_HITS_B = 0x50, 0x51
 M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the same bytes
 -- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
 -- +40 u16 ai_config. US_HIDDEN = bit 0.
-local UNIT_CHAR, UNIT_STATE, UNIT_X, UNIT_Y, UNIT_AI_CONFIG = 0x00, 0x0C, 0x10, 0x11, 0x40
-local US_HIDDEN = 1 << 0
+local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_AI_CONFIG = 0x0C, 0x10, 0x11, 0x40
+local US_HIDDEN, US_UNDER_A_ROOF = 1 << 0, 1 << 30   -- include/bmunit.h
 -- struct AiState (include/cp_common.h): +7A dangerMapFilled, +7D combatWeightTableId; the
 -- weight table comes from ai_config bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*), written by
 -- cp_decide.c's per-unit loop as one field assignment, which is copied here as it stands.
@@ -101,9 +104,6 @@ local EVENT_INFO_SIZE, EVENT_SCRIPT = 0x1C, 0x04
 -- struct PlaySt: +0F faction, +10 u16 chapterTurnNumber.
 local PLAY_FACTION, PLAY_TURN = 0x0F, 0x10
 
-local REGS = { "r0", "r1", "r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11",
-               "r12", "sp", "lr", "pc", "cpsr" }
-
 -- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), write16(addr, v),
 -- write32(addr, v), save() -> state, load(state), frames(done, max) -> bool (run emulated frames
 -- until done() or `max` have passed) }. sandbox(fn) runs fn(call, scratch) between a save and a
@@ -116,10 +116,9 @@ local THUMB_B_SELF = 0xE7FE
 local SYSTEM_THUMB_NOIRQ = 0x1F | 0x20 | 0x80   -- CPSR mode System, T, I
 function M.machine(cpu)
     return function(fn)
-        local state = cpu.save()
-        local saved = {}
-        for _, r in ipairs(REGS) do saved[r] = cpu.read(r) end
-        cpu.write("cpsr", (saved.cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+        local state = cpu.save()   -- the load puts every register back; only cpsr is kept here
+        local cpsr = cpu.read("cpsr")
+        cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
         local top = (cpu.read("sp") - 0x100) & ~7
         local scratch, loop = top + 0x10, top + 0x80   -- SCRATCH_SIZE fits between them
         local function returned()
@@ -132,7 +131,7 @@ function M.machine(cpu)
                 else cpu.write32(top + (i - 5) * 4, a & 0xFFFFFFFF) end
             end
             cpu.write16(loop, THUMB_B_SELF)
-            cpu.write("cpsr", (saved.cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+            cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
             cpu.write("sp", top)
             cpu.write("lr", loop | 1)
             cpu.write("pc", addr & ~1)
@@ -152,12 +151,17 @@ end
 local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
 
 -- One side of a simulated exchange, as the forecast window reads it (bksel.c): hit, crit,
--- damage against the other side's defence (0xFF for a Monster Stone), how many blows (the
--- proc's hit count for that side), and whether it is armed (a weapon, or one that broke).
-function M.side(mem, me, other, proc, hitsAt)
+-- damage against the other side's defence, how many blows (the proc's hit count for that side),
+-- and whether it is armed (a weapon, or one that broke). `actor` is gBattleActor's side: the
+-- window marks an ACTOR's Monster Stone with 0xFF for damage and crit ("--", its damage is not
+-- shown), and so does this -- a worst case then reads it as lethal, never as harmless.
+function M.side(mem, me, other, proc, hitsAt, actor)
     local dmg = s16(mem.u16(me + BU.attack)) - s16(mem.u16(other + BU.defense))
-    if (mem.u16(me + BU.weapon) & 0xFF) == M.ITEM_MONSTER_STONE then dmg = 0xFF end
-    return { hit = s16(mem.u16(me + BU.hit)), crit = s16(mem.u16(me + BU.crit)),
+    local crit = s16(mem.u16(me + BU.crit))
+    if actor and (mem.u16(me + BU.weapon) & 0xFF) == M.ITEM_MONSTER_STONE then
+        dmg, crit = 0xFF, 0xFF
+    end
+    return { hit = s16(mem.u16(me + BU.hit)), crit = crit,
              dmg = dmg > 0 and dmg or 0, hits = mem.s8(proc + hitsAt),
              armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0 }
 end
@@ -187,6 +191,20 @@ function M.turnsLeft(endTurn, turn) return endTurn - turn end
 
 -- Of a turn-event scan, the first later turn whose available scripts include one not available
 -- now. `now` is a set of scripts; `later` a list of {turn, scripts}. Pure.
+--
+-- What "later" is: the check runs at the START of a player phase, when only (turn, blue) has
+-- fired. So `now` is (turn, blue) alone, and the scan goes (turn, green), (turn, red), then every
+-- phase of each later turn -- M.eventOrder. An event due in this turn's enemy phase is ahead.
+function M.eventOrder(turn)
+    local out = {}
+    for _, phase in ipairs(M.PHASES) do
+        if phase ~= M.PHASES[1] then out[#out + 1] = { turn = turn, phase = phase } end
+    end
+    for t = turn + 1, M.LAST_EVENT_TURN do
+        for _, phase in ipairs(M.PHASES) do out[#out + 1] = { turn = t, phase = phase } end
+    end
+    return out
+end
 function M.firstNewEvent(now, later)
     for _, at in ipairs(later) do
         for script in pairs(at.scripts) do
@@ -240,6 +258,11 @@ function M.new(api)
     end
     s.refresh()
 
+    function s.newPhase()
+        s.refresh()
+        s.cache = {}
+    end
+
     function s.danger(x, y)
         if not seen.danger then
             seen.danger = sandbox(function(call)
@@ -254,7 +277,9 @@ function M.new(api)
         if not seen.threats[e.id] then
             seen.threats[e.id] = sandbox(function(call)
                 for _, o in ipairs(api.board().units) do
-                    if o.faction == "red" and o.id ~= e.id then api.write32(o.addr + UNIT_CHAR, 0) end
+                    if o.faction == "red" and o.id ~= e.id then
+                        api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_UNDER_A_ROOF)
+                    end
                 end
                 call(S.GenerateDangerZoneRange, { 0 })
                 return readGrid(mem, S.gBmMapRange, w, h)
@@ -297,23 +322,26 @@ function M.new(api)
         local ours = sandbox(function(call, proc)
             call(S.BattleGenerateSimulation, { u.addr, e.addr, x, y, slot or M.ISLOT_AUTO })
             call(S.InitBattleForecastBattleStats, { proc })
-            local a = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
-            a.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B)
+            local a = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
+            a.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B, false)
             return a
         end)
         return M.attackOf(ours, e.hp)
     end
 
-    -- Moves `u` onto (x, y) -- its struct and gBmMapUnit, so movement and blocking see it
-    -- there -- and hides every other unit the AI could choose, so its own routine can only pick
-    -- `u`. Hidden units keep their gBmMapUnit entries: they still block as they do.
-    local function standAlone(u, x, y)
+    -- Moves `u` onto (x, y): its struct and gBmMapUnit, so movement and blocking see it there.
+    local function standOn(u, x, y)
         if mem.u8(cell(mem, S.gBmMapUnit, u.x, u.y)) == u.id then
             api.write8(cell(mem, S.gBmMapUnit, u.x, u.y), 0)
         end
         api.write8(cell(mem, S.gBmMapUnit, x, y), u.id)
         api.write8(u.addr + UNIT_X, x)
         api.write8(u.addr + UNIT_Y, y)
+    end
+
+    -- Hides every other unit the AI could choose, so its own routine can only pick `u`. Hidden
+    -- units keep their gBmMapUnit entries: they still block as they do.
+    local function onlyTarget(u)
         for _, o in ipairs(api.board().units) do
             if o.faction ~= "red" and o.id ~= u.id and o.onField then
                 api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)
@@ -323,8 +351,12 @@ function M.new(api)
 
     function s.strike(u, e, x, y)
         local t = sandbox(function(call, proc)
-            standAlone(u, x, y)
-            -- cp_decide.c's per-unit setup, in its order, then the offensive routine itself.
+            standOn(u, x, y)
+            -- cp_decide.c's per-unit setup, in its order, with every player unit still visible:
+            -- the AI's danger map (AiFillDangerMap) is their threat, and its tile choice reads it.
+            -- Left out: RefreshEntityBmMaps/RenderBmMap/RefreshUnitSprites (they would rebuild
+            -- gBmMapUnit from the structs, which is already what it holds, and draw) and
+            -- gAiState.unk7C = 0 (read only by cp_staff.c, the staff AI).
             api.write32(S.gActiveUnit, e.addr)
             api.write8(S.gActiveUnitId, e.id)
             call(S.AiUpdateNoMoveFlag, { e.addr })
@@ -332,6 +364,8 @@ function M.new(api)
                 (mem.u16(e.addr + UNIT_AI_CONFIG) & AI_WEIGHT_MASK) >> AI_WEIGHT_SHIFT)
             api.write8(S.gAiState + AI_DANGER_FILLED, 0)
             call(S.AiInitDangerMap, {})
+            -- Only now is `u` made the one target: AiAttemptOffensiveAction skips hidden units.
+            onlyTarget(u)
             call(S.AiClearDecision, {})
             call(S.AiAttemptOffensiveAction, { S.AiIsUnitEnemy | 1 })
             local D = S.gAiDecision
@@ -345,7 +379,7 @@ function M.new(api)
                 call(S.BattleGenerateSimulation, { e.addr, u.addr, sx, sy, slot })
             end
             call(S.InitBattleForecastBattleStats, { proc })
-            local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A)
+            local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
             side.slot, side.tile = slot, { x = sx, y = sy }
             return side
         end)
@@ -391,30 +425,31 @@ function M.new(api)
     end
 
     -- The game's turn-event check (eventinfo.c: the phase-change hook searches turnBasedEvents
-    -- with SearchAvailableEvent), asked at each later turn and phase. A script already available
-    -- now (a repeating event) is no change; the first turn offering a new one is.
+    -- with SearchAvailableEvent), asked at each later turn and phase (M.eventOrder). A script
+    -- already available now (a repeating event) is no change; the first turn offering a new one
+    -- is. Cost: a frame or more per call, ~765 for a full scan to turn 255 -- paid only when a
+    -- board repeats, against a chapter's tens of thousands.
     function s.nextTurnEvent(turn)
         return sandbox(function(call, info)
             local events = call(S.GetChapterEventDataPointer, { api.chapter() })
             local list = mem.u32(events)
-            local function scriptsAt(t)
+            local function scriptsAt(t, phase)
                 local out = {}
-                for _, phase in ipairs(M.PHASES) do
-                    api.write16(S.gPlaySt + PLAY_TURN, t)
-                    api.write8(S.gPlaySt + PLAY_FACTION, phase)
-                    for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
-                    api.write32(info, list)
-                    local found = call(S.SearchAvailableEvent, { info })
-                    while found ~= 0 do
-                        out[mem.u32(info + EVENT_SCRIPT)] = true
-                        found = call(S.SearchNextAvailableEvent, { info })
-                    end
+                api.write16(S.gPlaySt + PLAY_TURN, t)
+                api.write8(S.gPlaySt + PLAY_FACTION, phase)
+                for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
+                api.write32(info, list)
+                local found = call(S.SearchAvailableEvent, { info })
+                while found ~= 0 do
+                    out[mem.u32(info + EVENT_SCRIPT)] = true
+                    found = call(S.SearchNextAvailableEvent, { info })
                 end
                 return out
             end
-            local now = scriptsAt(turn)
-            for t = turn + 1, M.LAST_EVENT_TURN do
-                local found = M.firstNewEvent(now, { { turn = t, scripts = scriptsAt(t) } })
+            local now = scriptsAt(turn, M.PHASES[1])
+            for _, at in ipairs(M.eventOrder(turn)) do
+                local found = M.firstNewEvent(now, { { turn = at.turn,
+                                                       scripts = scriptsAt(at.turn, at.phase) } })
                 if found then return found end
             end
             return nil

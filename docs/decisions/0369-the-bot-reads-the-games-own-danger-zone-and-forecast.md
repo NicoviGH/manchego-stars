@@ -17,15 +17,15 @@ close, not a ruling to record.
 | sight | FE8 code it runs (decomp) | read from |
 |---|---|---|
 | `danger(x, y)` | `GenerateDangerZoneRange(FALSE)` (bmidoten.c, the player phase's danger zone) | `gBmMapRange`: 0 = no enemy reaches; otherwise COVERAGE, 1 per tile an enemy could strike from (`GenerateUnitCompleteAttackRange`), not an enemy count |
-| `threat(enemy)` | `GenerateDangerZoneRange` itself, every OTHER enemy made invalid for the call (`pCharacterData` 0, so `UNIT_IS_VALID` fails) while still standing on `gBmMapUnit` and blocking as it does: fog, roofs and magic all the game's | `gBmMapRange` |
+| `threat(enemy)` | `GenerateDangerZoneRange` itself, every OTHER enemy marked `US_UNDER_A_ROOF` for the call (the one state its loop skips a unit for, and nothing else in it reads), so it walks this enemy alone while the others stay valid units: they block it on `gBmMapUnit` and a Magic Seal still seals (`GenerateMagicSealMap`); fog is the game's | `gBmMapRange` |
 | `reach(unit)` | `GenerateUnitMovementMap` (either faction) | `gBmMapMovement` < 120, less occupied tiles (`gBmMapUnit`) |
 | `range(unit)` | `GetUnitEquippedWeapon` (the first weapon `CanUnitUseWeapon` accepts, which `BU_ISLOT_AUTO` strikes with), then that item's range byte as `GetItemMinRange`/`GetItemMaxRange` read it (both inline: no symbol to call) | `gItemData` |
 | `canSeize(unit)` | `CanUnitSeize` (bmdifficulty.c), the Seize command's own usability check; patch 0005 makes it the chosen lead in our build | its return |
-| `attack(u, e, x, y)`: our attack and `e`'s counter | `BattleGenerateSimulation` + `InitBattleForecastBattleStats` (the forecast window's two calls) | `gBattleActor`/`gBattleTarget`, the forecast proc's hit counts; Monster Stone and broken weapons as bksel.c reads them |
+| `attack(u, e, x, y)`: our attack and `e`'s counter | `BattleGenerateSimulation` + `InitBattleForecastBattleStats` (the forecast window's two calls) | `gBattleActor`/`gBattleTarget`, the forecast proc's hit counts; a broken weapon still armed, and the ACTOR's Monster Stone marked 0xFF damage and crit, as bksel.c marks it (a worst case reads it as lethal) |
 | `strike(u, e, x, y)`: `e`'s own strike on its phase | the enemy phase's per-unit setup (cp_decide.c: `AiUpdateNoMoveFlag`, the combat weight table from `ai_config`, `AiInitDangerMap`, `AiClearDecision`), then `AiAttemptOffensiveAction(AiIsUnitEnemy)` itself, then the decision simulated (`BattleGenerateSimulation`, or `BattleGenerateBallistaSimulation` for slot 0xFF) | `gAiDecision`, then `gBattleActor` |
 | `objective` | `GetROMChapterStruct` (goal window type +0x8C, its end turn +0x8D, whose last turn the goal window shows as End − 1, so turns left = End − turn); `GetAvailableTileEventCommand` per tile for the Seize tile (as bmcommanddbg.c finds it) | the chapter data |
 | `field(goal)` | `GenerateExtendedMovementMap` from the goal, out to `MAP_MOVEMENT_EXTENDED`, with the movement costs (`GetUnitMovementCost`) of the first deployed unit that can Seize, else the first deployed: the map FE8's AI heads for a far target over (cp_0803E2F4.c) | `gBmMapMovement` |
-| `nextTurnEvent(turn)` | `SearchAvailableEvent`/`SearchNextAvailableEvent` over `GetChapterEventDataPointer(ch)->turnBasedEvents` (the phase change's own turn-event check, eventinfo.c), the turn and phase set to each later turn | the first turn offering a script not already available now |
+| `nextTurnEvent(turn)` | `SearchAvailableEvent`/`SearchNextAvailableEvent` over `GetChapterEventDataPointer(ch)->turnBasedEvents` (the phase change's own turn-event check, eventinfo.c), the turn and phase set to each later one: this turn's green and red phases first (the check runs at a player phase's start, when only this turn's blue phase has fired), then every phase to turn 255 | the first turn offering a script not already available now; a full scan costs ~765 frames, paid only when a board repeats |
 | `Sight.seed(s)` | `InitRN(s)` | `gRNSeeds` (file-static in rng.c; nm lists it) |
 
 **How the game's code is run.** `Sight.machine` saves the emulator state and puts the CPU in System
@@ -38,7 +38,8 @@ mGBA's frame callback deadlocks when a call crosses the end of a frame. ch01's d
 the retail Prologue's happened not to, which is how a first single-stepping version passed on retail
 and hung on ours. Every frame a call runs is counted (`TUNE.sandboxFrames`): the load rewinds the
 frame counter, so log stamps, a run's `frames` and run.sh's frame budget and stall watch add it back,
-and a heartbeat line every 600 of them keeps a long think visible.
+and a heartbeat line every 600 of them keeps a long think visible. While a sandbox runs, the stamp
+holds at the frame it started from, so the stamps never go back and never count a frame twice.
 
 **Why not drive the forecast window.** The window cannot answer the enemy phase. FE8 zeroes the
 weapon of a target outside its weapon's range (`SetBattleUnitWeapon`, `BattleInitTargetCanCounter`),
@@ -50,7 +51,10 @@ question.
 (x, y), in its struct and on `gBmMapUnit`, hides every other unit the AI could choose (`US_HIDDEN`:
 `AiAttemptOffensiveAction` skips them as targets; they keep their `gBmMapUnit` entries and still
 block), makes the enemy the active unit, runs the decide loop's per-unit setup and then the offensive
-routine itself. Its STAY, ballista and thief branches all come with it: a no-move unit strikes only
+routine itself. The hiding comes AFTER the setup: the AI's danger map (`AiFillDangerMap`) is the
+player units' threat, its tile choice subtracts it, and it skips hidden units. Left out of the setup,
+on purpose: `RefreshEntityBmMaps` and the draws (they would rebuild `gBmMapUnit` from the structs,
+which is what it already holds) and `gAiState.unk7C = 0` (read only by the staff AI). Its STAY, ballista and thief branches all come with it: a no-move unit strikes only
 from where it stands, a thief with room steals instead. The AI picks the weapon AND the tile together,
 only from where it can move, and "no combat decision on our unit" means it cannot strike us there this
 turn (`taken*` all 0). Proven on retail: asked how O'Neill, handed Iron, Steel, Silver and Hand Axes,
@@ -66,10 +70,11 @@ alone can kill is the bot's (`counterWorst` ≥ HP, nothing for a sure first-blo
 lives in one place.
 
 **Caches.** One sight per run; its board answers (danger, threats, ranges, Seize, fields) are dropped
-by `refresh()`, which the drive loop calls after every action and at every phase, because one unit
-moving can open or close another's path. bot.lua keeps attacks keyed on what the simulation reads
-(the fighters, their tiles, the units within support range) and strikes keyed on the whole board,
-since the AI's pick can change with any unit anywhere.
+by `refresh()`, which the drive loop calls after every action, and `newPhase()` at every player phase
+also gives bot.lua a fresh cache, because what changes between phases (a level, an AI a turn event
+rewrote) is in no key. Within a phase bot.lua keeps attacks keyed on what the simulation reads (the
+fighters' id, HP, level and every item with its uses, their tiles, the units within support range)
+and strikes keyed on the whole board, since the AI's pick can change with any unit anywhere.
 
 **The bot asks the game for every game rule; only the player's choices are its own.** A review of
 bot.lua against that rule replaced each re-created rule with the game's answer:

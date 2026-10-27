@@ -34,7 +34,8 @@
 --              (x, y), lower nearer (nil = unreached); FE8's own march map. A function of the
 --              goal because the bot chooses the goal (the boss, the nearest enemy). Without it
 --              the march falls back to Manhattan, which strands a unit against a wall (#60).
---            cache = {}|nil, OPTIONAL: a table the caller keeps for the run. Attacks are kept
+--            cache = {}|nil, OPTIONAL: a table the caller keeps for ONE player phase (what
+--              changes between phases -- levels, an AI a turn event rewrote -- is in no key). Attacks are kept
 --              in it keyed by what FE8's simulation reads -- both fighters (id, HP, held item
 --              and uses), both tiles, and every other unit within support range (3,
 --              bmreliance.h) of either; strikes keyed by the exchange AND the whole board,
@@ -207,8 +208,7 @@ function M.gridHostileInReach(gridAt, x, y, minRange, maxRange)
     for dx = -maxRange, maxRange do
         local slack = maxRange - math.abs(dx)
         for dy = -slack, slack do
-            local d = math.abs(dx) + math.abs(dy)
-            if d >= minRange then
+            if manhattan(0, 0, dx, dy) >= minRange then
                 local id = gridAt(x + dx, y + dy)
                 if id and id > FACTION_RED then return true end
             end
@@ -335,8 +335,8 @@ end
 
 -- Did a turn make progress? Nearer the target, or fewer enemies. `last` holds the best
 -- {dist, enemies, key} seen so far, `now` this turn's. `key` names WHAT the distance is
--- measured to and from (the target, and who is still a candidate): when it changes -- the boss
--- died, a unit was ruled out -- the old best distance belonged to another question, and the
+-- measured to (the boss, or the seize tile once it is dead): when it changes the old best
+-- distance belonged to another question, and the
 -- change is itself progress. Without that, a non-lord's distance to the boss (4) stood as the
 -- bar the lord's march to the throne (10, then 5) had to beat, and clear_ch01 read two turns
 -- of marching as a stall.
@@ -388,9 +388,13 @@ local function killChance(f, e)
     return chance
 end
 
+-- A unit as an attack or strike reads it within a phase: id, HP, level (a level-up mid-phase
+-- changes its stats) and every item with its uses (which one is equipped is the game's call:
+-- GetUnitEquippedWeapon, the first usable, not a fixed slot).
 local function unitKey(u)
-    local held = u.items and u.items[1]          -- items[1] is FE8's equipped slot
-    return table.concat({ u.id, u.hp, held and held.id or "-", held and held.uses or "-" }, ":")
+    local parts = { u.id, u.hp, u.level or "-" }
+    for _, it in ipairs(u.items or {}) do parts[#parts + 1] = it.id .. "x" .. it.uses end
+    return table.concat(parts, ":")
 end
 
 -- One decide call's view: the board split by role, and memos so an attack, a strike or a reach
@@ -400,7 +404,7 @@ local function context(board, sight)
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
-                  worsts = {}, fields = {}, options = {} }
+                  worsts = {}, options = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
@@ -514,12 +518,10 @@ local function strikeTiles(ctx, u, e)
     return waitTiles(ctx, u)
 end
 
--- sight.field for `goal`, asked once per goal per call; nil when the caller has none.
+-- sight.field for `goal` (sight keeps it for the board); nil when the caller has none.
 local function fieldFor(ctx, goal)
     if not (goal and ctx.sight.field) then return nil end
-    local k = tileKey(goal.x, goal.y)
-    if ctx.fields[k] == nil then ctx.fields[k] = ctx.sight.field(goal) or false end
-    return ctx.fields[k] or nil
+    return ctx.sight.field(goal)
 end
 
 local function reaches(ctx, e, x, y) return ctx.sight.threat(e)(x, y) > 0 end
@@ -718,16 +720,21 @@ local function onTerrain(ctx, tiles)
     return tiles
 end
 
--- A reinforcements claim: the turn before any cited arrival, the march holds. The turn is
--- board.turn (decide has checked it is there).
-local function holding(ctx)
-    for _, turns in ipairs(ctx.style.arrivals or {}) do
+-- The turns from `turn` to the next arrival `arrivals` (a style's reinforcements claims) cites,
+-- or nil when none is left. botrun hashes it too: it is part of what decide reads.
+function M.nextArrival(arrivals, turn)
+    local best
+    for _, turns in ipairs(arrivals or {}) do
         for _, t in ipairs(turns) do
-            if ctx.turn == t - 1 then return true end
+            if t > turn and (not best or t < best) then best = t end
         end
     end
-    return false
+    return best and best - turn or nil
 end
+
+-- A reinforcements claim: the turn before any cited arrival, the march holds. The turn is
+-- board.turn (decide has checked it is there).
+local function holding(ctx) return M.nextArrival(ctx.style.arrivals, ctx.turn) == 1 end
 
 local function march(ctx, u, gate, objective)
     local tiles, allowed = behindWalls(ctx, u, waitTiles(ctx, u)), {}
