@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E: the bot is now a planner, `feat/510-step9-e-campaigns` 020864d, no PR yet; exposure done, next: replan on surprise + speed). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E: the bot is now a planner, `feat/510-step9-e-campaigns` fb207ae, no PR yet; exposure + replan-on-surprise done, next: parallel attempts). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -100,14 +100,18 @@ G3 #537 78105ed; the summary is on #531).
        phase. ch03 alone (one run): careful won on attempt 1, turn 13, all alive. Before, it
        lost 1-3 units every attempt. Cost: 37.9 CPU s, 137 sandbox calls. Even and bold were not
        exercised. Finding: #510 comment 6455059685.
+     - **Replan on surprise (fb207ae):** a plan's next act is played unless `Planner.surprise`
+       finds the board off the plan's per-act expectation. It also fixed a heal fault: the beam
+       planned heals on units it had moved, and the game's heal list never covered that (a Staff
+       crash). ch03 alone: careful won, turn 13, all alive, 19.5 CPU s (was 37.9), 28 plans for
+       141 acts. Finding: #510 comment 6455470495.
      - **NEXT, in order:**
-       1. Replan only on a surprise. Each attempt costs ~38 CPU s now, about half of it judging.
-       2. Parallel attempts from the saved chapter start (PR F's pool, built now).
-       3. Remaining game-call cost: each call rounds up to a whole frame (~0.9 ms; `run_s` in
+       1. Parallel attempts from the saved chapter start (PR F's pool, built now).
+       2. Remaining game-call cost: each call rounds up to a whole frame (~0.9 ms; `run_s` in
           the costs). A call list run in one frame is the next lever.
-       4. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
+       3. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
           claims, then the PR and `/code-review <PR> medium` in a subagent.
-     - Fast loop: `PT_CAMPAIGN` = an env with `from: 4, last: [4]` (ch03 alone, ~38 s per
+     - Fast loop: `PT_CAMPAIGN` = an env with `from: 4, last: [4]` (ch03 alone, ~20 CPU s per
        attempt). PT_CAMPAIGN holds the JSON ITSELF, not a path:
        `PT_CAMPAIGN="$(cat env.json)"`. A path is silently ignored, and a New Game runs. The saved starts live in `references/sim/ours/9405eea0cb9f/states/e1-ours-ch07/`
        (4 = ch03, 5 = ch04). Editing a chapter YAML needs a `make` before run.sh will start.
