@@ -109,12 +109,14 @@ G3 #537 78105ed; the summary is on #531).
         over traces, ours beside the twin's. Plan Task 13 has the spec. Build the trace FIRST:
         the report reads it.
      2b. **Where runs live (plan Task 16, F5, SETTLED; Nicolas: give them "a good home in the
-        repo"):** per sweep, a committed record `sim/<id>-<slug>/` (`RUN.md` with full YAML
-        frontmatter of inputs and cost, plain verdicts, `runs.jsonl.gz`), indexed by
-        gen_decisions_index as a third collection (the index file is to be built). The bulk traces go in a GitHub Release asset per
-        sweep, sha256 in the frontmatter, fetched by `montecarlo.py fetch`. Save states stay
-        local. Runs are reused by cell key; `--fresh` re-runs. The repo is PUBLIC, so releases
-        are too.
+        repo"):** ONE home each (Nicolas: no copies). The WRITE-UP is a committed record per
+        sweep, `sim/<id>-<slug>/RUN.md`: full YAML frontmatter of inputs and cost, plus the plain
+        verdicts. It is indexed by gen_decisions_index as a third collection (the index file is
+        to be built). The DATA is every run's trace, in one GitHub Release asset per sweep, sha256
+        in the frontmatter, fetched by `montecarlo.py fetch`. No run data is kept in git:
+        summaries are read from the traces. The local `references/sim` is only a cache (fetched
+        traces, save states). Runs are reused by cell key; `--fresh` re-runs. The repo is
+        PUBLIC, so releases are too.
      3. **The planner barely reads claims:** two ch03 attempts differing only in claims
         (`avoid` vs `kits`) played identically. The plan says claims become goal and weight
         terms; build that.
