@@ -101,7 +101,9 @@ G3 #537 78105ed; the summary is on #531).
      1. Finish F2: `sample_style` (with its forced-units test), reading vanilla pairs from the
         kept store, and the cell driver that runs a cell's pairs to its looks with the pool.
      2. F3: the report (plain sentences first), bot faults, feasibility, attempts buckets,
-        `--post`.
+        `--post`. Every HARDER/EASIER cell explains itself with "what kills us" against the
+        twin: killers' share by enemy and turn, death tiles. BOTRUN deaths must gain the TILE
+        and the killer's class first (plan Task 13).
      3. **The planner barely reads claims:** two ch03 attempts differing only in claims
         (`avoid` vs `kits`) played identically. The plan says claims become goal and weight
         terms; build that.
