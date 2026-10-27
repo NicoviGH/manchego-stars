@@ -113,6 +113,30 @@ local function test_restart_redraws_style_not_seed()
 end
 test_restart_redraws_style_not_seed()
 
+-- api.only = k plays the style the loop plays at attempt k after k - 1 failures, and only
+-- it: no state saved, no chapter after it, and a k past the styles there are says so.
+local function test_one_attempt_alone_is_the_loops_kth()
+    local seq = fakeGame({ chapters = { { id = 3, outcomes = { "lost", "dead", "won" } } } })
+    Campaign.run(seq.api)
+    local alone = fakeGame({ chapters = { { id = 3 }, { id = 4 } } })
+    alone.api.only = 3
+    local ok, why = Campaign.run(alone.api)
+    check(ok, true, "one attempt played is a finished run")
+    check(#alone.plays, 1, "only the one attempt is played")
+    check(Json.encode(alone.plays[1].style), Json.encode(seq.plays[3].style),
+          "attempt 3 alone plays the loop's third style")
+    check(alone.plays[1].attempt, 3, "and is numbered 3")
+    check(#alone.saved, 0, "it writes no chapter-start state")
+    check(why, "chapter 3 attempt 3: won", "and stops after it")
+    local none = fakeGame({ chapters = { { id = 3 } } })
+    none.api.only = 99
+    local nok, nwhy = Campaign.run(none.api)
+    check(nok, true, "a k past every style is an answer, not a crash")
+    check(#none.plays, 0, "nothing is played")
+    check(nwhy:match("has %d+ styles, not 99") ~= nil, true, "it says how many there are")
+end
+test_one_attempt_alone_is_the_loops_kth()
+
 local function test_attempts_recorded()
     local g = fakeGame({ chapters = { { id = 3, outcomes = { "lost", "stuck", "won" } },
                                       { id = 4, outcomes = { "won" } } } })

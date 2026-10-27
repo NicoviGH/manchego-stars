@@ -1023,7 +1023,11 @@ PLAYTEST_ENV_KEYS = ('PT_VANILLA', 'PT_ELF', 'PT_SEED', 'PT_STATE', 'PT_TAG', 'P
                      # harness.lua skips under mgba-headless. Serving a headed PASS for a
                      # headless run -- or the reverse -- would cache across two different
                      # execution paths, which is precisely what this key exists to prevent.
-                     'PT_HEADED')
+                     'PT_HEADED',
+                     # PT_RUN_TAG (montecarlo.py's pool) moves the run to its own dir and ROM
+                     # copy. It proves nothing different, and the matrix never sets it; it is
+                     # keyed for the reason PT_SOUND is.
+                     'PT_RUN_TAG')
 
 
 # -- what a scenario can possibly depend on (#255 phase 2) ------------------

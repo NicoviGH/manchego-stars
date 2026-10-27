@@ -123,6 +123,17 @@ if [ "${PT_VANILLA:-0}" = "1" ]; then
 fi
 SCENARIO="${1:?usage: run.sh <scenario>  (see header: win|ch01win|recordscene|...)}"
 KEEP_OPEN="${2:-}"
+# PT_RUN_TAG=<tag>: one of several copies of THIS scenario running at once (montecarlo.py's
+# pool, #510 step 9 PR F). Its run dir is /tmp/playtest-<scenario>@<tag>, the leftover kill
+# below reaches only that dir, and it boots its own copy of the ROM there, so the save mGBA
+# keeps beside the ROM is its own: untagged, every run deletes and shares one .sav.
+RUN_TAG=""
+if [ -n "${PT_RUN_TAG:-}" ]; then
+    case "$PT_RUN_TAG" in
+        *[!A-Za-z0-9_-]*) echo "run.sh: PT_RUN_TAG must be letters, digits, _ or -" >&2; exit 2 ;;
+    esac
+    RUN_TAG="@$PT_RUN_TAG"
+fi
 STATE_DIR="$HERE/states"
 mkdir -p "$STATE_DIR"
 
@@ -221,7 +232,7 @@ python3 "$HERE/gen_symbols.py"
 # that way in one gate (ch01, ch04moose, ch04packmath), each at the exact second the pool
 # started the next scenario, and each reported `mGBA exited early` as though the ROM were
 # broken.
-pkill -9 -f "/tmp/playtest-(ckpt_)?$SCENARIO/" 2>/dev/null || true
+pkill -9 -f "/tmp/playtest-(ckpt_)?$SCENARIO$RUN_TAG/" 2>/dev/null || true
 ROMHASH=$(shasum "$ROM" | cut -c1-12)
 
 # Did the last run_mgba PASS? Classify in ONE place. This was four copies of a glob, and
@@ -243,9 +254,12 @@ run_mgba() {
     # checkpoint builder silently inheriting the headless engine is exactly the bug this
     # line makes impossible to miss (#308).
     echo "engine: $mode ($(basename "$app"))"
-    local out="/tmp/playtest-$scen" log
+    local out="/tmp/playtest-$scen" log rom="$ROM"
+    # the tag names copies of the scenario asked for, never a checkpoint builder it needs
+    if [ "$scen" = "$SCENARIO" ]; then out="$out$RUN_TAG"; fi
     log="$out/playtest.log"
     rm -rf "$out" && mkdir -p "$out"
+    if [ "$out" != "/tmp/playtest-$scen" ]; then rom="$out/$(basename "$ROM")"; cp "$ROM" "$rom"; fi
     # A DECLARED case (#314) has no function in harness.lua: its chapter YAML declares what
     # it proves and declared.py emits it here, fresh, for every run. Generated into the run
     # directory rather than committed -- a generated file in the tree is a second copy of the
@@ -289,7 +303,7 @@ PLAYTEST_HEADLESS = "$hl"
 PLAYTEST_CASE = "$case"
 dofile("$HERE/harness.lua")
 EOF
-    rm -f "$REPO/build/fireemblem8u/fireemblem8.sav"   # fresh save: New Game is the default path
+    rm -f "${rom%.gba}.sav"   # fresh save: New Game is the default path
     # Muted by DEFAULT and deliberately: a scenario is watched, often many times, and at
     # 240fps the audio is a screech. `PT_SOUND=1` unmutes for the runs where the SOUND is the
     # thing under review (ch05's moose bellow was the first, 2026-08-15) -- and it pins
@@ -305,7 +319,7 @@ EOF
     # ~1GB over a 600s scenario, all of it captured into mgba-stdout.log and none of it read.
     "$app" --script "$wrapper" -l 0 \
         -C mute=$mute -C fpsTarget="$fps" -C audioSync=$async -C videoSync="$vsync" \
-        "$ROM" >"$out/mgba-stdout.log" 2>&1 &
+        "$rom" >"$out/mgba-stdout.log" 2>&1 &
     local pid=$!
     echo "running '$scen' (pid $pid, ${fps}fps); polling $log"
     # The work is FRAME-bound; the deadline used to be WALL-clock, and that mismatch is what

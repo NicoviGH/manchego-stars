@@ -17,8 +17,16 @@
 -- re-seeded on a restart: FE8 seeds it once at power-on and a suspend save stores it, so a
 -- restart differs from the last only by the bot's new style and the game's RNG follows from
 -- that different play (the amendment, #510).
+-- One attempt alone (api.only = k, montecarlo.py's pool, #510 step 9 PR F): the k-th style
+-- this chapter start would draw is played, and nothing else. Every attempt loads the same
+-- start state, the game's RNG in it, and the draws never read a result, so attempt k plays
+-- exactly as it would after k - 1 failures: k workers side by side find what the loop finds,
+-- the lowest k that clears clean. It saves no state (the workers share the start's files) and
+-- moves on to no chapter.
 -- A campaign stops when:
 --   done        the game has no next chapter (arrive says "end")
+--   played      api.only: its attempt was played (whatever the record says)
+--   no_style    api.only: this chapter start has fewer than k styles
 --   infeasible  a chapter used MAX_ATTEMPTS, or every style, without a clean clear: no later
 --               chapter is reached by a clean run, so none is played
 --   crashed     an attempt crashed (botrun's outcome), or the harness could not do a step
@@ -51,6 +59,7 @@
 --   promote(entry)        spend the seal the game accepts for this roster entry; true | nil, why
 --   claims(chapter)       that chapter's resolved claims (bot.lua's Claims)
 --   play(style, claims, attempt) -> botrun's record (it emits its own BOTRUN line)
+--   only                  OPTIONAL: the one attempt to play (see above)
 --   emit(line), log(s)
 -- Campaign.run(api) -> ok, why, chapters. Each chapter emits ONE stdout line,
 -- `CAMPAIGN <json>`, and the campaign a last one with `chapter = nil`.
@@ -156,7 +165,7 @@ function M.run(api)
         line({ outcome = outcome, why = why, route = route, chapters = #chapters })
         api.log(string.format("campaign: %s after %d chapters (%s)", outcome, #chapters,
             tostring(why)))
-        return outcome == "done", why, chapters
+        return outcome == "done" or outcome == "played" or outcome == "no_style", why, chapters
     end
 
     local function play()
@@ -168,8 +177,10 @@ function M.run(api)
             if at == "end" then return "done", "the game has no next chapter" end
             if not at then return "crashed", "arrive: " .. tostring(why) end
             local ch = at.chapter
-            local ok, swhy = api.save(ch)
-            if not ok then return "crashed", "save: " .. tostring(swhy) end
+            if not api.only then
+                local ok, swhy = api.save(ch)
+                if not ok then return "crashed", "save: " .. tostring(swhy) end
+            end
             local claims = api.claims(ch) or {}
             local entry = { chapter = ch, attempts = 0, failures = {} }
             chapters[#chapters + 1] = entry
@@ -178,6 +189,17 @@ function M.run(api)
             local tried = {}
             while true do
                 local style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
+                -- one attempt alone: the styles before it are drawn, never played
+                while style and api.only and entry.attempts + 1 < api.only do
+                    entry.attempts = entry.attempts + 1
+                    style, followed = M.drawStyle(Bot, api.random, claims, route, tried)
+                end
+                if not style and api.only then
+                    entry.outcome = "no_style"
+                    line(entry)
+                    return "no_style", string.format("chapter %d has %d styles, not %d", ch,
+                        entry.attempts, api.only)
+                end
                 if not style then
                     entry.outcome = "infeasible"
                     line(entry)
@@ -193,6 +215,12 @@ function M.run(api)
                         entry.attempts, bwhy)
                 end
                 local rec = api.play(style, followed, entry.attempts)
+                if api.only then
+                    entry.outcome, entry.turns = rec.outcome, rec.turns
+                    line(entry)
+                    return "played", string.format("chapter %d attempt %d: %s", ch,
+                        entry.attempts, tostring(rec.outcome))
+                end
                 if rec.outcome == "won" and rec.all_alive then
                     entry.outcome, entry.turns = "cleared", rec.turns
                     entry.team = { deploy = team.deploy, reasons = {} }

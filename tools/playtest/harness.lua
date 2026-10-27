@@ -3273,6 +3273,11 @@ INSPECT.campaignApi = function(game)
         log = log,
     }
     api.claims = function(ch) return (cfg.claims or {})[tostring(ch)] or {} end
+    -- cfg.attempt: play that one attempt from cfg.from's start and stop (campaign.lua; the pool)
+    if cfg.attempt ~= nil and not (cfg.from and math.type(cfg.attempt) == "integer" and cfg.attempt >= 1) then
+        error("PT_CAMPAIGN: attempt must be an integer >= 1, with from")
+    end
+    api.only = cfg.attempt
     -- Priced by the game for the first fielded unit, on the map: GetItemPurchasePrice charges
     -- half again while BM_FLAG_PREPSCREEN is set, and the bot buys on the map.
     api.stock = function()
@@ -3673,7 +3678,8 @@ end
 -- PT_CAMPAIGN is JSON (campaign_env.py builds it): { id, last = {chapter indices it ends after},
 -- shops = { [chapter] = {world map nodes} } (ours: the twin's, from the vanilla campaign's
 -- record), claims = { [chapter] = resolved claims }, from = a chapter index to resume at, from
--- the start state this id saved }. Each chapter prints a `CAMPAIGN <json>` line and each
+-- the start state this id saved, attempt = k: only the k-th attempt from `from`'s start (the
+-- pool, campaign.lua) }. Each chapter prints a `CAMPAIGN <json>` line and each
 -- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.
 scenarios.campaign = function()
     local Campaign = dofile(PLAYTEST_DIR .. "/campaign.lua")
