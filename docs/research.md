@@ -6,7 +6,7 @@
 > **This file is GENERATED.** Each record is one file under `docs/research/`; add or
 > edit one, then regenerate: `python3 tools/gen_decisions_index.py`.
 
-20 records. Search the titles and tags here, then open the ones you need.
+22 records. Search the titles and tags here, then open the ones you need.
 
 **Contents:** [Playtesting bots](#playtesting-bots) · [FE8: between battles](#fe8-between-battles) · [FE8: building the party](#fe8-building-the-party) · [FE8: whom guides field, by chapter](#fe8-whom-guides-field-by-chapter)
 
@@ -17,6 +17,8 @@
 | | record | date | issues | tags |
 |---|---|---|---|---|
 | `0001` | [Playtesting bots count attempts as independent draws from a varied policy; none learns between attempts](research/0001-playtesting-bots-count-attempts-as-independent-draws-from-a-varied-pol.md) | 2026-10-27 | #510 | retries, attempts, pass-rate, reinforcement-learning, personas, fairness |
+| `0021` | [Planning a turn of many units: portfolio search and online evolution are the known methods; emulator save-state pools...](research/0021-planning-a-multi-unit-turn-portfolio-search-and-online-evolution.md) | 2026-10-27 | #510 | planner, search, beam, portfolio, evolution, mcts, enemy-phase, parallel, save-states |
+| `0022` | [Monte Carlo comparisons: stopping when the interval excludes 0 inflates false findings; binary rates need Wilson or...](research/0022-monte-carlo-comparisons-stopping-intervals-and-pairing.md) | 2026-10-27 | #510 | monte-carlo, stopping-rule, sequential-testing, confidence-interval, wilson, mcnemar, common-random-numbers, pairing |
 
 ---
 
