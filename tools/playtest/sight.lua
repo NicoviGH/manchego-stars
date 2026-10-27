@@ -89,12 +89,8 @@ local BU = { weapon = 0x48, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x
 local PROC_HITS_A, PROC_HITS_B = 0x50, 0x51
 M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the same bytes
 -- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
--- +40 u16 ai_config. US_HIDDEN = bit 0.
+-- +40 u16 ai_config. Its state bits are board.lua's (Board.US_*).
 local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_AI_CONFIG = 0x0C, 0x10, 0x11, 0x40
--- include/bmunit.h state bits, pinned against it by test_playtest_harness.
-M.US_HIDDEN = 1 << 0
-M.US_UNDER_A_ROOF = 1 << 7
-local US_HIDDEN, US_UNDER_A_ROOF = M.US_HIDDEN, M.US_UNDER_A_ROOF
 -- struct AiState (include/cp_common.h): +7A dangerMapFilled, +7D combatWeightTableId; the
 -- weight table comes from ai_config bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*), written by
 -- cp_decide.c's per-unit loop as one field assignment, which is copied here as it stands.
@@ -237,6 +233,7 @@ end
 
 function M.new(api)
     local mem, S, Board = api.mem, api.SYM, api.Board
+    local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local sandbox = M.machine(api.cpu)
     local w, h = api.map()
     local s = { cache = {} }

@@ -233,8 +233,7 @@ end
 
 -- A claim kind the bot has no behaviour for is reported, never dropped.
 do
-    local g = fakeGame { claims = { { id = "t1", kind = "threat" } },
-        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    local g = fakeGame { claims = { { id = "t1", kind = "threat" } }, units = rout() }
     Botrun.run(g.api)
     local r = recordOf(g)
     check(r.claims_unplayed[1], "t1", "the unplayed claim is in the record")

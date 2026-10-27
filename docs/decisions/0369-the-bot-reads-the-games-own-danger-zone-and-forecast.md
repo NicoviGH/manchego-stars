@@ -36,7 +36,7 @@ then yields frames until the CPU sits in that loop, the caller reads what it nee
 loaded back: RAM, registers and RNG exactly as they were. It never single-steps. `emu:step()` from
 inside mGBA's frame callback deadlocks when a call crosses the end of a frame. ch01's danger zone
 does, and the retail Prologue's happened not to, which is how a first single-stepping version passed
-on retail and hung on ours. Every frame a call runs is counted (`TUNE.sandboxFrames`): the load
+on retail and hung on ours. Every frame a call runs is counted (`INSPECT.sandboxFrames`): the load
 rewinds the frame counter, so log stamps, a run's `frames` and run.sh's frame budget and stall watch
 add it back, and a heartbeat line every 600 of them keeps a long think visible. While a sandbox
 runs, the stamp holds at the frame it started from, so the stamps never go back and never count a
@@ -73,10 +73,10 @@ lives in one place.
 
 **Caches.** One sight per run; its board answers (danger, threats, ranges, Seize, fields) are
 dropped by `refresh()`, which the drive loop calls after every action, and `newPhase()` at every
-player phase also gives bot.lua a fresh cache, because what changes between phases (a level, an AI a
-turn event rewrote) is in no key. Within a phase bot.lua keeps attacks keyed on what the simulation
-reads (the fighters' id, HP, level and every item with its uses, their tiles, the units within
-support range) and strikes keyed on the whole board, since the AI's pick can change with any unit
+player phase also gives bot.lua a fresh cache, because an AI a turn event rewrote changes between
+phases and is in no key. Within a phase bot.lua keeps attacks keyed on what the simulation reads
+(the fighters' id, HP, level and every item with its uses, their tiles, the units within support
+range) and strikes keyed on the whole board, since the AI's pick can change with any unit
 anywhere.
 
 **The bot asks the game for every game rule; only the player's choices are its own.** A review of

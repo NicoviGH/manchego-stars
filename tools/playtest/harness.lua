@@ -49,7 +49,7 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 -- left), so enough new top-level locals stop the WHOLE FILE loading and every scenario dies
 -- at once (#232).
 local TUNE = {
-    sandboxHeartbeat = 600,   -- a log line every this many sandbox frames: a long think shows
+    sandboxHeartbeat = 600,   -- a log line every this many sandbox frames: a long think shows progress
     -- How many times one guarded input may be re-pressed into an unchanged, still-legal
     -- state before failing closed. FE8 drops input during window fade-ins, so a single
     -- press can be lost outright -- see guardedInput.
@@ -136,16 +136,16 @@ local logfile = io.open(PLAYTEST_LOG, "w")
 local controllerFault
 -- The #236 state inspector, as ONE table rather than three top-level locals: Lua caps a
 -- main chunk at 200 locals, this file is one main chunk, and crossing the cap stops the whole
--- harness loading (every scenario dies at once). Hang new helpers off an existing table
--- (INSPECT, TUNE) or put the logic in controller.lua, which has a unit suite and no such
--- ceiling. HOW MUCH ROOM IS LEFT IS NEVER WRITTEN DOWN HERE: `check.py
+-- harness loading (every scenario dies at once). Hang new helpers and runtime state off
+-- INSPECT (TUNE holds tuning knobs only) or put the logic in controller.lua, which has a
+-- unit suite and no such ceiling. HOW MUCH ROOM IS LEFT IS NEVER WRITTEN DOWN HERE: `check.py
 -- check_lua_local_headroom` measures it and prints it on every `make check`, because the
 -- hand-maintained number said "two free slots" in three files at once and was wrong in
 -- all three within one PR (#241). `check_lua_chunks_load` fails the build on a crossing.
--- Fields are assigned further down, next to the proc-pool reader they build on. Declared this
--- early so every scenario can reach it: a helper hung on a table declared LATER (VISIT, line
--- ~7400) is out of scope in any scenario written above that line, which is why the shared
--- R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
+-- Most fields are assigned further down, next to the proc-pool reader they build on (the
+-- frame counters right below). Declared this early so every scenario can reach it: a helper
+-- hung on a table declared LATER (VISIT, line ~7400) is out of scope in any scenario written
+-- above that line, which is why the shared R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
 local INSPECT = {}
 -- Frames emulated so far, the sight sandbox's included, and never going back: a sandbox's load
 -- rewinds the counter, so its frames are counted into INSPECT.sandboxFrames, and while one runs
@@ -2841,11 +2841,14 @@ INSPECT.sightApi = function()
             read = function(r) return raw:readRegister(r) end,
             write = function(r, v) raw:writeRegister(r, v) end,
             -- The frame a sandbox starts from holds log()'s stamps still while it runs (the
-            -- calls' frames are counted into INSPECT.sandboxFrames instead); the load clears it
-            -- first, so a load that raises cannot leave the stamps frozen.
+            -- calls' frames are counted into INSPECT.sandboxFrames instead). The save sets it only
+            -- once the state is taken and the load clears it first, so a save or load that
+            -- raises cannot leave the stamps frozen.
             save = function()
-                INSPECT.sandboxAt = emu:currentFrame()
-                return emu:saveStateBuffer()
+                local at = emu:currentFrame()
+                local st = emu:saveStateBuffer()
+                INSPECT.sandboxAt = at
+                return st
             end,
             load = function(st)
                 INSPECT.sandboxAt = nil

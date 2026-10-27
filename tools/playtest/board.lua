@@ -42,6 +42,7 @@ Board.US_UNSELECTABLE = 1 << 1  -- "has acted this phase"
 Board.US_DEAD = 1 << 2
 Board.US_NOT_DEPLOYED = 1 << 3
 Board.US_RESCUED = 1 << 5
+Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
 local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_DEAD
 Board.CA_BOSS = 1 << 15         -- include/bmunit.h, a CHARACTER attribute here
 Board.ITEMDATA_STRIDE = 0x24
@@ -358,7 +359,8 @@ function Board.bind(mem, SYM)
         distance = Board.distance, inMap = Board.inMap, place = Board.place,
         freeBeside = Board.freeBeside,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
-        UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD,
+        UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
+        US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,
     }
 end
