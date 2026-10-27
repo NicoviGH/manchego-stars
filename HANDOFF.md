@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E: the bot is now a planner, `feat/510-step9-e-campaigns` fb207ae, no PR yet; exposure + replan-on-surprise done, next: parallel attempts). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E: the bot is now a planner, `feat/510-step9-e-campaigns` 00bface, no PR yet; planner exposure, replan-on-surprise and the F1 pool done; F2's stopping rule awaits Nicolas). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -106,11 +106,13 @@ G3 #537 78105ed; the summary is on #531).
        crash). ch03 alone: careful won, turn 13, all alive, 19.5 CPU s (was 37.9), 28 plans for
        141 acts. Finding: #510 comment 6455470495.
      - **NEXT, in order:**
-       1. **Parallel attempts: READ #510 comment 6455515239 FIRST.** Parallel attempts equal
-          sequential ones: each attempt loads the same start state, RNG included. run.sh is not
-          safe for two copies of one scenario: a shared run dir, a pkill, `fireemblem8.sav` and
-          `symbols.lua`. The comment proposes `PT_RUN_TAG`, a campaign `attempt: k`, and the
-          `montecarlo.py` pool. Then: Parallel attempts from the saved chapter start (PR F's pool, built now).
+       1. **The F1 pool is BUILT (9993947):** `montecarlo.py attempts --env <env> --attempts N
+          --jobs J`, run.sh `PT_RUN_TAG`, and the campaign env's `attempt: k`. ch03 attempts 1-3
+          took 23 s wall; attempt 1 matched the sequential run exactly. #510 comment 6455756984.
+          **Open for Nicolas:** research record 0022 says F2's stopping rule ("stop when the
+          interval excludes 0") is optional stopping, and that pass rates need Wilson/McNemar, not
+          a normal interval. Amend F2 or keep it? Also: the planner barely reads claims (two
+          attempts differing only in claims played identically). Then: Parallel attempts from the saved chapter start (PR F's pool, built now).
        2. Remaining game-call cost: each call rounds up to a whole frame (~0.9 ms; `run_s` in
           the costs). A call list run in one frame is the next lever.
        3. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
