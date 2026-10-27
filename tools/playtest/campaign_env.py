@@ -6,6 +6,7 @@ open before each chapter.
     python3 tools/playtest/campaign_env.py vanilla --route 1
     python3 tools/playtest/campaign_env.py ours --store references/sim/vanilla/<hash>/states/<id> \
         [--lord <pc id>]
+    ... [--id <campaign id> --from <chapter index>]
 
 The route (vanilla's Ch8 split, 1 = Eirika, 2 = Ephraim) and the lead (ours, ADR 0062's ch01
 menu) are campaign SETTINGS, never drawn (#510 plan comment, "Lords"). A lead is passed as its
@@ -18,6 +19,10 @@ a `status: planned` chapter is never played) and has no world map yet, so before
 it gets the twin's: the nodes the vanilla campaign found open at the twin's start, read from
 that campaign's `<chapter>.json` records (Nicolas, 2026-10-27). The twin of our chapter N is
 difficulty.VANILLA_CHAIN[N], the chain the kit model already reads (ADR 0365).
+
+--from N resumes at chapter index N's start as an earlier run of the same --id saved it
+(references/sim/<game>/<rom-hash>/states/<id>/N.ss), so a fault in a late chapter is studied
+without replaying the chapters before it. It needs --id: the default id names no earlier run.
 """
 import argparse
 import json
@@ -94,12 +99,18 @@ def main(argv=None):
     ap.add_argument('--route', type=int, choices=(1, 2), default=1,
                     help="vanilla: the Ch8 split's route (1 Eirika, 2 Ephraim)")
     ap.add_argument('--lord', help='ours: the lead, a PC id (default: the highlighted lead)')
+    ap.add_argument('--from', dest='start', type=int,
+                    help='resume at this chapter index, from the start state --id saved')
     args = ap.parse_args(argv)
+    if args.start is not None and not args.id:
+        ap.error('--from needs --id: the states it resumes from are filed under the campaign id')
     if args.game == 'ours' and not args.store:
         ap.error('ours needs --store: its shops are the vanilla campaign\'s')
     env = vanilla_env(args.route) if args.game == 'vanilla' else ours_env(args.store, args.lord)
     if args.id:
         env['id'] = args.id
+    if args.start is not None:
+        env['from'] = args.start
     print(json.dumps(env, sort_keys=True))
 
 

@@ -123,7 +123,10 @@ local function fakeGame(o)
         lost = function() return g.over == true end,
         frames = function() g.frame = g.frame + 100; return g.frame end,
         emit = function(line) g.emitted[#g.emitted + 1] = line end,
-        log = function() end,
+        log = function(l)
+            g.logs = g.logs or {}
+            g.logs[#g.logs + 1] = l
+        end,
     }
     return g
 end
@@ -193,6 +196,17 @@ do
     local r = recordOf(g)
     check(r.outcome, "stuck", "a repeated board ends the run")
     check(r.turns, 2, "at the first repeat")
+    local said = {}
+    for _, l in ipairs(g.logs) do
+        if l:find("^stuck: ") then said[#said + 1] = l end
+    end
+    check(#said > 0 and said[1]:find("objective rout", 1, true) ~= nil, true,
+          "a stuck run logs why the bot held, objective first")
+    local blue = false
+    for _, l in ipairs(said) do
+        if l:find("blue char", 1, true) and l:find("wait 1 allowed 1", 1, true) then blue = true end
+    end
+    check(blue, true, "each blue unit's wait tiles and what the gate allows")
 end
 
 -- test_survive_map_waiting_is_not_stuck: the same board, but the turns left fall each phase.

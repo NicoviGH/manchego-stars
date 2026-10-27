@@ -175,6 +175,7 @@ WANTED = [
     'TargetSelection_Loop',     # exact target-selector input callback
     'gSelectInfo_Attack',       # distinguishes attack targets from other selectors
     'gSelectInfo_Talk',         # distinguishes Talk targets from other selectors
+    'gSelectInfo_Heal',         # distinguishes a healing staff's targets (bmitemuse.c)
     'gProcScr_BKSEL',           # passive battle-forecast panel owner; SelectTargetProc, not
                                 # this display proc, owns the target-confirmation input
     'BattleForecast_LoopDisplay', # exact stable forecast display callback (still no legal input)
@@ -287,6 +288,11 @@ WANTED = [
     'GetUnitKeyItemSlotForTerrain',  # a key or lockpick for a chest/door (Chest/DoorCommandUsability)
     'GetUnitFogViewRange',      # how far a unit sees in fog: a thief's +5, a torch (bmunit.c)
     'CanUnitUseStaff',          # whether a unit can use a staff it holds (bmitem.c)
+    # The bot's heals (#510 step 9 PR E): what a staff or a Vulnerary would do, by the game.
+    'CanUnitUseItem',           # usable now; for a staff it builds the targets (bmitemuse.c)
+    'GetUnitItemHealAmount',    # the HP an item restores for this unit (bmitem.c)
+    'GetSelectTargetCount',     # the target list the last builder made (uiselecttarget.c)
+    'GetTarget',                # one entry of it: struct SelectTarget { x, y, uid, extra }
     'MakePrepUnitList',         # the Pick Units roster, rebuilt into its EWRAM overlay (prepscreen.c)
     # campaign.lua (#510 step 9 PR E): between chapters, the game's own shop, rules and world map.
     'StartShopScreen',          # opens the Armory/Vendor screen for a unit over a stock list

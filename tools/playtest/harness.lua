@@ -597,6 +597,7 @@ local function observeTarget(observation)
     local kind
     if routines == SYM.gSelectInfo_Attack then kind = "attack"
     elseif routines == SYM.gSelectInfo_Talk then kind = "talk"
+    elseif routines == SYM.gSelectInfo_Heal then kind = "heal"
     else kind = string.format("0x%08X", routines) end
     observation.target = {
         kind = kind,
@@ -1140,56 +1141,71 @@ local function chooseTalk()
     end, 600)
 end
 
--- Select Attack, an enabled weapon, and the current engine-selected target from live semantic
--- structures. `stopWhen` is an optional second exit for the combat wait. A kill that ENDS the
--- chapter starts the win event on the spot, which can keep the actor from ever being greyed out.
--- Dialogue advances only at TalkWaitForInput; a combat timeout fails closed without rescue input.
--- `targetId` (optional) is the enemy's unit index byte: the selector is stepped to it first, so
--- a caller that chose its target strikes that one and not the selector's first.
-local function chooseAttack(actorAddr, stopWhen, targetId)
-    if not selectSemantic("attack", "Attack opens the live weapon menu", function(after)
-        return controllerState(after) == "weapon_menu"
-    end, 300) then return false end
-    if not selectSemantic("select_weapon", "weapon opens the live attack target selector", function(after)
-        return controllerState(after) == "target_selection"
-            and after.target and after.target.kind == "attack"
-    end, 300) then return false end
-    -- At most one step per target the selector can hold (bmunit.h: red[50]); a target it
-    -- never reaches is a fault.
+-- The open target selector stepped to the wanted target: `targetId` a unit's index byte, or
+-- `targetTile` an obstacle by its tile (bmtarget.c TryAddTrapsToTargetList lists it with uid 0);
+-- neither = the selector's first. At most one step per target the selector can hold (bmunit.h:
+-- red[50]); a target it never reaches is a fault.
+INSPECT.stepTarget = function(targetId, targetTile)
+    local function wanted(t)
+        if targetTile then return t ~= nil and t.x == targetTile.x and t.y == targetTile.y end
+        return not targetId or (t ~= nil and t.uid == targetId)
+    end
     for _ = 1, 50 do
-        local now = observeController().target
-        if not targetId or (now and now.uid == targetId) then break end
+        if wanted(observeController().target) then return true end
         if not guardedInput("next_target", "RIGHT", "the selector steps to its next target",
             function(after, before)
                 return after.target ~= nil and before.target ~= nil
-                    and after.target.uid ~= before.target.uid
+                    and (after.target.uid ~= before.target.uid or after.target.x ~= before.target.x
+                         or after.target.y ~= before.target.y)
             end, 30) then return false end
     end
-    if targetId and observeController().target.uid ~= targetId then
-        traceFailure("select_target", string.format("the selector reaches unit 0x%02X", targetId),
-            "fail:target-not-offered", nil, "controller-target-not-offered")
-        return false
-    end
-    -- Commit proof has to be mode-agnostic. procs.battle is gProc_ekrBattle, the battle
-    -- ANIMATION proc: a scenario that called pokeFastConfig() runs MAP combat, where it
-    -- never spawns, so requiring it alone fails an attack that in fact resolved (#232 --
-    -- it took out ch04packmath/ch04snag/clear_ch04 while the attacks all landed). The
-    -- target selector closing is the signal common to both modes; the combat wait below
-    -- is what proves the attack actually resolved, so this stays honest.
-    if not guardedInput("confirm_target", "A", "target selection commits the attack", function(after)
+    if wanted(observeController().target) then return true end
+    traceFailure("select_target", targetTile
+        and string.format("the selector reaches the obstacle at (%d,%d)", targetTile.x, targetTile.y)
+        or string.format("the selector reaches unit 0x%02X", targetId),
+        "fail:target-not-offered", nil, "controller-target-not-offered")
+    return false
+end
+
+-- Confirm the selector's target, then wait until the act resolved: the actor greyed out, or
+-- `stopWhen`. Commit proof has to be mode-agnostic. procs.battle is gProc_ekrBattle, the battle
+-- ANIMATION proc: a scenario that called pokeFastConfig() runs MAP combat, where it never
+-- spawns, so requiring it alone fails an attack that in fact resolved (#232 -- it took out
+-- ch04packmath/ch04snag/clear_ch04 while the attacks all landed). The target selector closing
+-- is the signal common to both modes; the wait below is what proves the act resolved.
+INSPECT.commitTarget = function(actorAddr, stopWhen, what)
+    if not guardedInput("confirm_target", "A", "target selection commits the " .. what, function(after)
         return after.procs.battle ~= nil or controllerState(after) ~= "target_selection"
     end, 300) then return false end
-    -- Combat (with battle anims) ends when the actor is greyed out. The budget has to fit
-    -- an animation NOBODY IS SKIPPING: the old 1200 was sized when waitFor still mashed A
-    -- on a 50-frame cadence, which advanced the in-battle quote text. #220 retired that
-    -- cadence on principle, and the ch00 boss animation then measured 1238 frames -- 38
-    -- over, so every ch00/ch01 combat scenario timed out on a fight it had already won
-    -- (#232). Vanilla's real worst cases are far longer than one clean round (crit, a
-    -- double, a level-up, a promotion), so size this for those, not for the measurement.
-    local done = waitFor(function()
+    return INSPECT.awaitActed(actorAddr, stopWhen)
+end
+
+-- An act (combat, a staff, an item) ends when the actor is greyed out. The budget has to fit
+-- an animation NOBODY IS SKIPPING: the old 1200 was sized when waitFor still mashed A on a
+-- 50-frame cadence, which advanced the in-battle quote text. #220 retired that cadence on
+-- principle, and the ch00 boss animation then measured 1238 frames -- 38 over, so every
+-- ch00/ch01 combat scenario timed out on a fight it had already won (#232). Vanilla's real
+-- worst cases are far longer than one clean round (crit, a double, a level-up, a promotion),
+-- so size this for those, not for the measurement.
+-- A unit with Canto gets its move back after any act but combat and a staff (playerphase.c
+-- PlayPhaseForceActiveUnitCanto): the game is back in move selection, and the act is only done
+-- once that move is spent. It is spent where the unit stands -- A on its own tile, then Wait
+-- if the command menu opens -- since nothing the bot decided asks it to move again.
+INSPECT.awaitActed = function(actorAddr, stopWhen)
+    local function acted()
         return (ru32(actorAddr + 0x0C) & 0x2) ~= 0 -- US_UNSELECTABLE
             or (stopWhen ~= nil and stopWhen())
+    end
+    local done = waitFor(function()
+        return acted() or controllerState() == "unit_selected"
     end, TUNE.combatFrames, true)
+    if done and not acted() then
+        if not guardedInput("confirm_move", "A", "Canto ends where the unit stands", function(after)
+            return controllerState(after) ~= "unit_selected"
+        end, 120) then return false end
+        if controllerState() == "unit_command_menu" and not chooseWait() then return false end
+        done = waitFor(acted, TUNE.combatFrames, true)
+    end
     if not done then
         traceFailure("await_combat", "actor becomes unavailable or scenario terminal fires",
             "fail:combat-timeout", nil, "controller-combat-timeout")
@@ -1197,6 +1213,69 @@ local function chooseAttack(actorAddr, stopWhen, targetId)
         return false
     end
     wait(30)
+    return true
+end
+
+-- Select Attack, an enabled weapon, and the current engine-selected target from live semantic
+-- structures. `stopWhen` is an optional second exit for the combat wait. A kill that ENDS the
+-- chapter starts the win event on the spot, which can keep the actor from ever being greyed out.
+-- Dialogue advances only at TalkWaitForInput; a combat timeout fails closed without rescue input.
+-- `targetId` / `targetTile` (optional): INSPECT.stepTarget's, so a caller that chose its target
+-- strikes that one and not the selector's first.
+local function chooseAttack(actorAddr, stopWhen, targetId, targetTile)
+    if not selectSemantic("attack", "Attack opens the live weapon menu", function(after)
+        return controllerState(after) == "weapon_menu"
+    end, 300) then return false end
+    if not selectSemantic("select_weapon", "weapon opens the live attack target selector", function(after)
+        return controllerState(after) == "target_selection"
+            and after.target and after.target.kind == "attack"
+    end, 300) then return false end
+    if not INSPECT.stepTarget(targetId, targetTile) then return false end
+    return INSPECT.commitTarget(actorAddr, stopWhen, "attack")
+end
+
+-- From the open menu `state`, the row whose override id is `id`: DOWN until it is current.
+INSPECT.menuTo = function(state, id)
+    for _ = 1, 8 do
+        local o = observeController()
+        if controllerState(o) ~= state then return false end
+        local cur = o.menu.current
+        for _, item in ipairs(o.menu.items) do
+            if item.slot == cur and item.override_id == id then return true end
+        end
+        if not guardedInput("menu_next", "DOWN", "the menu cursor moves", function(after)
+            return after.menu ~= nil and after.menu.current ~= cur
+        end, 30) then return false end
+    end
+    return false
+end
+
+-- Staff -> the staff in inventory `slot` (0-based; gStaffItemSelectMenuItems lists it as row
+-- 0x3E + slot) -> the heal selector, stepped to unit `targetId` -> commit, until it resolved.
+INSPECT.chooseStaff = function(actorAddr, slot, targetId, stopWhen)
+    if not selectSemantic("staff", "Staff opens the staff list", function(after)
+        return controllerState(after) == "staff_menu"
+    end, 120) then return false end
+    if not INSPECT.menuTo("staff_menu", INSPECT.MENU_STAFF_SLOT + slot) then return false end
+    if not selectSemantic("select_staff", "the staff opens its target selector", function(after)
+        return controllerState(after) == "target_selection"
+    end, 300) then return false end
+    if not INSPECT.stepTarget(targetId, nil) then return false end
+    return INSPECT.commitTarget(actorAddr, stopWhen, "staff")
+end
+INSPECT.MENU_STAFF_SLOT, INSPECT.MENU_ITEM_SLOT = 0x3E, 0x43   -- menu_def.c, slot 0's row
+
+-- Item -> inventory `slot` (0-based; gItemSelectMenuItems row 0x43 + slot) -> its submenu.
+INSPECT.itemSubmenu = function(slot)
+    if not selectSemantic("open_items", "the Item command opens the inventory", function(after)
+        return controllerState(after) == "item_list"
+    end, 120) then return nil, "no Item command" end
+    if not INSPECT.menuTo("item_list", INSPECT.MENU_ITEM_SLOT + slot) then
+        return nil, "the inventory never reached slot " .. slot
+    end
+    if not guardedInput("select_item", "A", "the item's submenu opens", function(after)
+        return controllerState(after) == "item_submenu"
+    end, 120) then return nil, "the item offered no submenu" end
     return true
 end
 
@@ -2976,7 +3055,16 @@ INSPECT.botApi = function(game)
             -- death is an exit of the combat wait too.
             return chooseAttack(u.addr, function()
                 return won() or lost() or (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0
-            end, a.targetId)
+            end, a.targetId, a.obstacle)
+        elseif a.act == "staff" then
+            return INSPECT.chooseStaff(u.addr, a.slot, a.targetId, function() return won() or lost() end)
+        elseif a.act == "item" then
+            local opened = INSPECT.itemSubmenu(a.slot)
+            if not opened then return false end
+            if not selectSemantic("use_item", "Use starts the item's effect", function(after)
+                return controllerState(after) ~= "item_submenu"
+            end, 120) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
         elseif a.act == "seize" then
             if not Controller.findAction(Controller.legalActions(observeController()), "seize") then
                 return cancelUnitActionMenu() and "noseize"
@@ -3218,6 +3306,19 @@ INSPECT.campaignApi = function(game)
             if played == last then return "end" end
         end
         shops = nil
+        -- cfg.from: resume at that chapter's start as an earlier run of this campaign id saved
+        -- it, rather than replaying every chapter before it. The state holds the game's RNG, so
+        -- nothing is seeded; no team is carried (a resumed pick has no last clear to keep).
+        if played == nil and cfg.from then
+            local f = io.open(string.format("%s/%d.ss", dir, cfg.from), "rb")
+            if not f then return nil, string.format("no saved start for chapter %d in %s", cfg.from, dir) end
+            emu:loadStateBuffer(f:read("a"))
+            f:close()
+            wait(2)
+            played = cfg.from
+            log(string.format("campaign: chapter %d resumes (%s)", played, controllerState()))
+            return { chapter = played }
+        end
         local stalled = INSPECT.watch("arrive")
         for _ = 1, TUNE.bootSteps do
             if TUNE.bootHook then TUNE.bootHook() end
@@ -3463,21 +3564,8 @@ INSPECT.campaignApi = function(game)
         local function classOf() return ru8(ru32(u.addr + 4) + 4) end
         local before = classOf()
         if not moveUnit(u.x, u.y, u.x, u.y) then return nil, "no command menu for the unit" end
-        if not selectSemantic("open_items", "the Item command opens the inventory", function(after)
-            return controllerState(after) == "item_list"
-        end, 120) then return nil, "no Item command" end
-        for _ = 1, 8 do
-            local o = observeController()
-            if controllerState(o) ~= "item_list" then return nil, "the inventory closed" end
-            local cur = o.menu.current
-            if cur == slot then break end
-            if not guardedInput("menu_next", "DOWN", "the inventory cursor moves", function(after)
-                return after.menu ~= nil and after.menu.current ~= cur
-            end, 30) then return nil, "the inventory cursor would not move" end
-        end
-        if not guardedInput("select_item", "A", "the seal's submenu opens", function(after)
-            return controllerState(after) == "item_submenu"
-        end, 120) then return nil, "the seal offered no submenu" end
+        local opened, why = INSPECT.itemSubmenu(slot)
+        if not opened then return nil, why end
         if not selectSemantic("use_item", "Use starts the promotion", function(after)
             return controllerState(after) ~= "item_submenu"
         end, 120) then return nil, "the seal could not be used" end
@@ -3550,7 +3638,8 @@ end
 -- from its start state until it clears with everyone alive. PT_SEED seeds the game's RNG once;
 -- PT_CAMPAIGN is JSON (campaign_env.py builds it): { id, last = {chapter indices it ends after},
 -- shops = { [chapter] = {world map nodes} } (ours: the twin's, from the vanilla campaign's
--- record), claims = { [chapter] = resolved claims } }. Each chapter prints a `CAMPAIGN <json>` line and each
+-- record), claims = { [chapter] = resolved claims }, from = a chapter index to resume at, from
+-- the start state this id saved }. Each chapter prints a `CAMPAIGN <json>` line and each
 -- attempt its `BOTRUN <json>`. PASS = the campaign reached its end.
 scenarios.campaign = function()
     local Campaign = dofile(PLAYTEST_DIR .. "/campaign.lua")

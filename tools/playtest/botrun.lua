@@ -140,6 +140,7 @@ function M.run(api)
             if seen[h] and not (waitUntil and turn < waitUntil) then
                 waitUntil = sight.nextTurnEvent(turn)
                 if not waitUntil then
+                    for _, l in ipairs(Bot.explain(board, sight, style)) do api.log("stuck: " .. l) end
                     return "stuck", "a player phase began on a board seen before, and no turn "
                         .. "event is left to change it"
                 end

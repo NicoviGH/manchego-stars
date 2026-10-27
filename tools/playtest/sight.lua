@@ -61,6 +61,20 @@
 --                            unreached.
 --   fieldUnit()              the first deployed unit that can Seize, else the first deployed.
 --   terrain(x, y)            gBmMapTerrain[y][x].
+--   staves(u)                the inventory slots (0-based) of the staves `u` can heal with:
+--                            CanUnitUseStaff, and GetUnitItemHealAmount > 0.
+--   heals(u, x, y)           what `u` could heal standing on (x, y): per staff in staves(u)
+--                            that CanUnitUseItem allows there -- which builds vanilla's own heal
+--                            target list -- { slot, amount = GetUnitItemHealAmount, targets =
+--                            { unit index bytes } }.
+--   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff,
+--                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
+--                            { slot, amount }, the first in the inventory; nil.
+--   obstacles()              every obstacle the Attack command can strike, as
+--                            TryAddTrapsToTargetList (bmtarget.c) lists them from the trap pool:
+--                            a TRAP_OBSTACLE's damaged wall at its tile, or the tile below where
+--                            two are stacked (InitMapObstacles traps the top one only), or its
+--                            snag. { x, y, hp } -- hp = the trap's `extra`.
 --   nextTurnEvent(turn)      the first later turn at which a turn event the game would fire is
 --                            not already firing now (SearchAvailableEvent over the chapter's
 --                            turnBasedEvents, the turn and phase set to each), or nil.
@@ -90,6 +104,10 @@ M.ISLOT_AUTO = -1            -- include/bmbattle.h BU_ISLOT_AUTO
 M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
 M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x14
 M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
+M.TERRAIN_WALL_DAMAGED, M.TERRAIN_SNAG = 0x1B, 0x33
+-- bmtrick.h: struct Trap { u8 xPos, yPos, type, extra; s8 data[4] } in sTrapPool, ended by
+-- TRAP_NONE; TRAP_OBSTACLE = walls and snags.
+M.TRAP_SIZE, M.TRAP_MAX, M.TRAP_OBSTACLE = 8, 64, 2
 M.ITEM_MONSTER_STONE = 0xB5  -- constants/items.h
 -- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
 -- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
@@ -416,7 +434,7 @@ function M.new(api)
     end
 
     function s.refresh()
-        seen = { threats = {}, ranges = {}, seizers = {}, fields = {} }
+        seen = { threats = {}, ranges = {}, seizers = {}, fields = {}, staves = {} }
         s.objective.turnsLeft = goal.kind == "survive" and M.turnsLeft(goal.endTurn, api.turn())
             or nil
     end
@@ -552,6 +570,81 @@ function M.new(api)
     end
 
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
+
+    local function itemOf(it) return it.id | (it.uses << 8) end
+
+    function s.staves(u)
+        if seen.staves[u.id] == nil then
+            seen.staves[u.id] = sandbox(function(call)
+                local out = {}
+                for i, it in ipairs(u.items) do
+                    if call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) ~= 0
+                        and call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }) > 0 then
+                        out[#out + 1] = i - 1
+                    end
+                end
+                return out
+            end)
+        end
+        return seen.staves[u.id]
+    end
+
+    function s.heals(u, x, y)
+        local slots = s.staves(u)
+        if #slots == 0 then return {} end
+        return sandbox(function(call)
+            standOn(u, x, y)
+            local out = {}
+            for _, slot in ipairs(slots) do
+                local item = itemOf(u.items[slot + 1])
+                if call(S.CanUnitUseItem, { u.addr, item }) ~= 0 then
+                    local targets = {}
+                    for k = 0, call(S.GetSelectTargetCount, {}) - 1 do
+                        targets[#targets + 1] = mem.u8(call(S.GetTarget, { k }) + 2)
+                    end
+                    out[#out + 1] = { slot = slot, targets = targets,
+                                      amount = call(S.GetUnitItemHealAmount, { u.addr, item }) }
+                end
+            end
+            return out
+        end)
+    end
+
+    function s.mend(u)
+        return sandbox(function(call)
+            for i, it in ipairs(u.items) do
+                local amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) })
+                if amount > 0 and call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) == 0
+                    and call(S.CanUnitUseItem, { u.addr, itemOf(it) }) ~= 0 then
+                    return { slot = i - 1, amount = amount }
+                end
+            end
+            return nil
+        end)
+    end
+
+    function s.obstacles()
+        if not seen.obstacles then
+            local out = {}
+            for i = 0, M.TRAP_MAX - 1 do
+                local t = S.sTrapPool + i * M.TRAP_SIZE
+                local kind = mem.u8(t + 2)
+                if kind == 0 then break end
+                if kind == M.TRAP_OBSTACLE then
+                    local x, y, hp = mem.u8(t), mem.u8(t + 1), mem.u8(t + 3)
+                    local here = s.terrain(x, y)
+                    if here == M.TERRAIN_WALL_DAMAGED or here == M.TERRAIN_SNAG then
+                        out[#out + 1] = { x = x, y = y, hp = hp }
+                    end
+                    if y + 1 < h and s.terrain(x, y + 1) == M.TERRAIN_WALL_DAMAGED then
+                        out[#out + 1] = { x = x, y = y + 1, hp = hp }
+                    end
+                end
+            end
+            seen.obstacles = out
+        end
+        return seen.obstacles
+    end
 
     function s.fieldUnit()
         local first

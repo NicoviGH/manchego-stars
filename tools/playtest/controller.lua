@@ -21,6 +21,7 @@ local MENU_ARMORY = 0x5F   -- the shop commands on an Armory / Vendor tile (menu
 local MENU_VENDOR = 0x60
 local MENU_ARENA = 0x62
 local MENU_ITEM = 0x67
+local MENU_STAFF = 0x51
 local MENU_SUPPLY = 0x69
 local MENU_WAIT = 0x6B
 -- The two arms of ConvoyMenuProc_StarMenu (convoymenu.c), which is raised whenever a unit is
@@ -33,6 +34,9 @@ local MENU_CONVOY_SEND_LAST = 0x2F
 -- (menu_def.c).
 local MENU_ITEM_USE = 0x34
 local MENU_ITEM_SUB_LAST = 0x37
+-- gStaffItemSelectMenuItems: the Staff command's list, one row per staff slot (menu_def.c).
+local MENU_STAFF_SLOT_FIRST = 0x3E
+local MENU_STAFF_SLOT_LAST = 0x42
 -- gItemSelectMenuItems: one row per inventory slot (menu_def.c).
 local MENU_ITEM_SLOT_FIRST = 0x43
 local MENU_ITEM_SLOT_LAST = 0x47
@@ -68,7 +72,7 @@ local function menuKinds(observation)
             or item.override_id == MENU_BALLISTA_ATTACK
             or item.override_id == MENU_TALK or item.override_id == MENU_CHEST
             or item.override_id == MENU_DOOR or item.override_id == MENU_ARENA
-            or item.override_id == MENU_ITEM
+            or item.override_id == MENU_ITEM or item.override_id == MENU_STAFF
             or item.override_id == MENU_SUPPLY or item.override_id == MENU_WAIT then unit = true end
         if item.override_id == MENU_END_PHASE then map = true end
     end
@@ -205,7 +209,8 @@ local RULES = {
             if observation.target.frozen then
                 return matched("transition", "target_selection is frozen")
             end
-            if observation.target.kind ~= "attack" and observation.target.kind ~= "talk" then
+            local kind = observation.target.kind
+            if kind ~= "attack" and kind ~= "talk" and kind ~= "heal" then
                 return unsupported("unsupported target selection kind")
             end
             return matched("target_selection", "target_selection in its input loop")
@@ -252,6 +257,12 @@ local RULES = {
                 if item.override_id >= MENU_ITEM_SLOT_FIRST
                     and item.override_id <= MENU_ITEM_SLOT_LAST then
                     return matched("item_list", "menu rows are inventory slots")
+                end
+            end
+            for _, item in ipairs(observation.menu.items) do
+                if item.override_id >= MENU_STAFF_SLOT_FIRST
+                    and item.override_id <= MENU_STAFF_SLOT_LAST then
+                    return matched("staff_menu", "menu rows are the Staff command's staves")
                 end
             end
             for _, item in ipairs(observation.menu.items) do
@@ -757,6 +768,7 @@ function M.legalActions(observation)
         addMenuCommand(actions, observation, MENU_ARMORY, "armory")
         addMenuCommand(actions, observation, MENU_VENDOR, "vendor")
         addMenuCommand(actions, observation, MENU_ITEM, "open_items")
+        addMenuCommand(actions, observation, MENU_STAFF, "staff")
         addMenuCommand(actions, observation, MENU_SUPPLY, "open_supply")
         addMenuCommand(actions, observation, MENU_WAIT, "wait")
     elseif state == "map_command_menu" then
@@ -769,6 +781,14 @@ function M.legalActions(observation)
         for _, item in ipairs(enabledMenuItems(observation)) do
             if item.override_id >= MENU_WEAPON_FIRST and item.override_id <= MENU_WEAPON_LAST then
                 add(actions, "select_weapon", observation.menu.current == item.slot and "A" or nil,
+                    string.format("menu.override_id=0x%02X", item.override_id), item.slot)
+            end
+        end
+    elseif state == "staff_menu" then
+        addMenuNavigation(actions, observation)
+        for _, item in ipairs(enabledMenuItems(observation)) do
+            if observation.menu.current == item.slot then
+                add(actions, "select_staff", "A",
                     string.format("menu.override_id=0x%02X", item.override_id), item.slot)
             end
         end

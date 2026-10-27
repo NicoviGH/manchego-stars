@@ -48,8 +48,11 @@ class TestChooseAttackContract(unittest.TestCase):
         # scenario that called pokeFastConfig() runs map combat, where it never spawns
         # -- so a postcondition of `after.procs.battle ~= nil` alone can never hold and
         # the attack fails despite having resolved (ch04packmath/ch04snag/clear_ch04).
-        body = _block(_read_harness(), 'local function chooseAttack(',
-                      '-- March a unit toward')
+        # The commit is INSPECT.commitTarget's, shared by the Attack and Staff paths.
+        harness = _read_harness()
+        self.assertIn('return INSPECT.commitTarget(actorAddr, stopWhen, "attack")',
+                      _block(harness, 'local function chooseAttack(', '-- March a unit toward'))
+        body = _block(harness, 'INSPECT.commitTarget = function(', 'INSPECT.awaitActed = ')
         self.assertIn('confirm_target', body)
         commit = body[body.index('"confirm_target"'):]
         commit = commit[:commit.index('end,')]

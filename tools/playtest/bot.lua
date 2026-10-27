@@ -415,7 +415,7 @@ local function context(board, sight)
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
-                  worsts = {}, options = {} }
+                  worsts = {}, options = {}, breaches = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
@@ -592,6 +592,18 @@ local function worstCase(ctx, u, x, y, spared)
     return w
 end
 
+-- Of `tiles`, the one with the smallest worst case, the unit's own tile first on a tie (holding
+-- costs nothing).
+local function safest(ctx, u, tiles)
+    local best, bestSum = nil, nil
+    for _, t in ipairs(tiles) do
+        local sum = worstCase(ctx, u, t.x, t.y, nil).sum
+        local own = t.x == u.x and t.y == u.y
+        if not bestSum or sum < bestSum or (sum == bestSum and own) then best, bestSum = t, sum end
+    end
+    return best
+end
+
 -- What our own attack's counter can take before the enemy phase: its worst case, nothing when
 -- the target cannot answer this attack or the first blow is a sure kill (the target is dead
 -- before it can answer).
@@ -686,6 +698,58 @@ local function goalFor(ctx, u, objective)
     return best
 end
 
+-- The obstacle that opens `u`'s way to `goal` when no walk reaches it: sight.field(goal) is
+-- known and leaves u's tile unreached. Of the obstacles the Attack command can strike
+-- (sight.obstacles), one beside a tile the goal's field reaches, and whose own field reaches u,
+-- the nearest u by that field. nil when u is not cut off, or nothing opens the way -- a door
+-- wants a key, which no rule here spends (#510).
+local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+local function breachFor(ctx, u, goal)
+    if not (goal and ctx.sight.obstacles) then return nil end
+    local k = u.id .. ">" .. tileKey(goal.x, goal.y)
+    local b = ctx.breaches[k]
+    if b ~= nil then return b or nil end
+    b = false
+    local field = fieldFor(ctx, goal)
+    if field and not (field[u.y] and field[u.y][u.x]) then
+        local bestD
+        for _, o in ipairs(ctx.sight.obstacles()) do
+            local opens = false
+            for _, d in ipairs(SIDES) do
+                local y = field[o.y + d[2]]
+                if y and y[o.x + d[1]] then opens = true end
+            end
+            local of = opens and fieldFor(ctx, o)
+            local d = of and of[u.y] and of[u.y][u.x]
+            if d and (not bestD or d < bestD) then b, bestD = o, d end
+        end
+    end
+    ctx.breaches[k] = b
+    return b or nil
+end
+
+-- Where `u` marches: its goal, or the obstacle that opens the way to it.
+local function marchGoal(ctx, u, objective)
+    local goal = goalFor(ctx, u, objective)
+    return breachFor(ctx, u, goal) or goal
+end
+
+-- A cut-off unit's strike on its breach, from the wait tile the gate allows nearest it; nil
+-- when it has no weapon or no such tile is in range this turn.
+local function breach(ctx, u, gate, objective)
+    local b = breachFor(ctx, u, goalFor(ctx, u, objective))
+    local r = b and ctx.sight.range(u)
+    if not r then return nil end
+    for _, t in ipairs(waitTiles(ctx, u)) do
+        if inRange(t.x, t.y, b.x, b.y, r.min, r.max) and gate(ctx, u, t.x, t.y, nil) then
+            local a = action(u, t, "attack", nil)
+            a.obstacle = { x = b.x, y = b.y }
+            return a
+        end
+    end
+    return nil
+end
+
 -- A wall's line: of `tiles`, those no nearer any walled enemy than the nearest of that claim's
 -- walls on the field. A unit that is itself one of the claim's walls is not held by it. When
 -- no tile is behind the line the unit is not held (it is already past it).
@@ -754,18 +818,11 @@ local function march(ctx, u, gate, objective)
     end
     allowed = onTerrain(ctx, allowed)
     local goal = nil
-    if not holding(ctx) then goal = goalFor(ctx, u, objective) end
+    if not holding(ctx) then goal = marchGoal(ctx, u, objective) end
     if #allowed == 0 or not goal then
         -- nowhere is safe enough, or nothing to march to (or a hold): end where the worst
         -- case is smallest, the unit's own tile first on a tie (holding costs nothing)
-        local pool = #allowed > 0 and allowed or tiles
-        local best, bestSum = nil, nil
-        for _, t in ipairs(pool) do
-            local s = worstCase(ctx, u, t.x, t.y, nil).sum
-            local own = t.x == u.x and t.y == u.y
-            if not bestSum or s < bestSum or (s == bestSum and own) then best, bestSum = t, s end
-        end
-        return best
+        return safest(ctx, u, #allowed > 0 and allowed or tiles)
     end
     -- no enemies passed: pickMove's cork fallback pushes at a foe when the march is jammed,
     -- and over tiles the style allowed that push is the greedy bot's charge, not this one's
@@ -817,6 +874,65 @@ local function seize(ctx)
     return nil
 end
 
+-- A healer's staff, once the fighters have acted: of the heals the game offers (sight.heals) from wait
+-- tiles the gate allows, the one restoring the most HP -- the ally's missing HP up to the
+-- staff's amount -- then the most wounded ally, then the safest tile. Slot order picks among
+-- healers. nil when no ally is wounded or no healer reaches one.
+local function staffHeal(ctx, gate)
+    local missing, any = {}, false
+    for _, b in ipairs(ctx.blues) do
+        if b.maxhp and b.hp < b.maxhp then missing[b.id], any = b.maxhp - b.hp, true end
+    end
+    if not (any and ctx.sight.heals) then return nil end
+    local best
+    for _, u in ipairs(ctx.actors) do
+        if #ctx.sight.staves(u) > 0 then
+            for _, t in ipairs(waitTiles(ctx, u)) do
+                if gate(ctx, u, t.x, t.y, nil) then
+                    for _, h in ipairs(ctx.sight.heals(u, t.x, t.y)) do
+                        for _, id in ipairs(h.targets) do
+                            local gain = math.min(missing[id] or 0, h.amount)
+                            local c = { u = u, tile = t, slot = h.slot, id = id, gain = gain,
+                                        left = -(missing[id] or 0),
+                                        worst = worstCase(ctx, u, t.x, t.y, nil).sum }
+                            if gain > 0 and (not best or c.gain > best.gain
+                                    or (c.gain == best.gain and (c.left < best.left
+                                        or (c.left == best.left and c.worst < best.worst)))) then
+                                best = c
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        if best then break end
+    end
+    if not best then return nil end
+    local a = action(best.u, best.tile, "staff", nil)
+    a.slot, a.targetId = best.slot, best.id
+    for _, b in ipairs(ctx.blues) do
+        if b.id == best.id then a.target = b.charId end
+    end
+    return a
+end
+
+-- A unit with no attack its style allows heals itself (sight.mend: a Vulnerary) on the safest
+-- tile the gate allows, when it is down at least the item's whole amount -- no HP of it is
+-- wasted. nil otherwise.
+local function mend(ctx, u, gate)
+    if not (ctx.sight.mend and u.maxhp) then return nil end
+    local m = ctx.sight.mend(u)
+    if not (m and u.maxhp - u.hp >= m.amount) then return nil end
+    local allowed = {}
+    for _, t in ipairs(waitTiles(ctx, u)) do
+        if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
+    end
+    local tile = safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u))
+    local a = action(u, tile, "item", nil)
+    a.slot = m.slot
+    return a
+end
+
 -- The old clear-bot through decide: the first unit in slot order, pickTarget's pick, else
 -- pickMove toward the goal over sight.field when there is one. With no field pickMove's cork
 -- rule sends it at the nearest enemy, which is the charge the greedy bot has always made.
@@ -832,7 +948,9 @@ local function greedy(ctx, objective)
         { range = r.max, min_range = r.min,
           tilesFor = function(t) return strikeTiles(ctx, u, t.unit) end })
     if pick then return action(u, pick.tile, "attack", pick.target.unit) end
-    local goal = goalFor(ctx, u, objective)
+    local b = breach(ctx, u, function() return true end, objective)
+    if b then return b end
+    local goal = marchGoal(ctx, u, objective)
     local tile = M.pickMove(waitTiles(ctx, u), { cur = u, goal = goal,
                                                  field = fieldFor(ctx, goal), enemies = targets })
     return action(u, tile, "wait")
@@ -864,15 +982,98 @@ function M.decide(board, sight, style)
     end
     local claimed = claimedMove(ctx, gate)
     if claimed then return claimed end
-    -- the most threatened: the largest worst case where it stands, then the most coverage
-    local u, most, count = ctx.actors[1], 0, 0
+    -- Healers act after the fighters, as a player heals after the attacks: the staff then
+    -- covers what this phase's counters cost, before the enemy phase.
+    local fighters = {}
     for _, c in ipairs(ctx.actors) do
+        if not (sight.staves and #sight.staves(c) > 0) then fighters[#fighters + 1] = c end
+    end
+    if #fighters == 0 then
+        local healed = staffHeal(ctx, gate)
+        if healed then return healed end
+    end
+    -- the most threatened: the largest worst case where it stands, then the most coverage
+    local pool = #fighters > 0 and fighters or ctx.actors
+    local u, most, count = pool[1], 0, 0
+    for _, c in ipairs(pool) do
         local w, d = worstCase(ctx, c, c.x, c.y, nil).sum, sight.danger(c.x, c.y)
         if w > most or (w == most and d > count) then u, most, count = c, w, d end
     end
     local a = attacks[u]
     if a then return action(u, a.tile, "attack", a.target) end
-    return action(u, march(ctx, u, gate, objective), "wait")
+    return mend(ctx, u, gate) or breach(ctx, u, gate, objective)
+        or action(u, march(ctx, u, gate, objective), "wait")
+end
+
+-- Why decide holds, as log lines, for a run that ends `stuck`: the objective, every enemy, and
+-- per blue unit what decide weighs -- its wait tiles and how many the style's gate allows, the
+-- march goal, the obstacle that opens the way to it when it is cut off, and the field distance
+-- from the goal (where it stands, the best wait tile, the best allowed one), and per enemy it can strike, the tiles in range, how many the gate allows, and
+-- the best (largest-margin) exchange: our hit/damage and its counter against our HP.
+function M.explain(board, sight, style)
+    local ctx = context(board, sight)
+    ctx.style, ctx.turn = style, board.turn
+    local gate = GATES[style.aggression] or GATES.bold
+    local o = sight.objective or {}
+    local function at(t) return t and tileKey(t.x, t.y) or "-" end
+    local lines = { string.format("objective %s tile %s, turn %s", tostring(o.kind), at(o.tile),
+                                  tostring(board.turn)) }
+    for _, e in ipairs(ctx.enemies) do
+        lines[#lines + 1] = string.format("  red id %d char 0x%02X class 0x%02X @%s hp %d%s",
+            e.id, e.charId, e.classId or 0, at(e), e.hp, e.isBoss and " BOSS" or "")
+    end
+    for _, u in ipairs(ctx.blues) do
+        local tiles, allowed = waitTiles(ctx, u), {}
+        for _, t in ipairs(tiles) do
+            if gate(ctx, u, t.x, t.y, nil) then allowed[#allowed + 1] = t end
+        end
+        local goal = goalFor(ctx, u, o)
+        local field = fieldFor(ctx, goal)
+        local function fd(t) return field and field[t.y] and field[t.y][t.x] end
+        local function nearest(list)
+            local best
+            for _, t in ipairs(list) do
+                local d = fd(t)
+                if d and (not best or d < best) then best = d end
+            end
+            return best
+        end
+        lines[#lines + 1] = string.format(
+            "  blue char 0x%02X @%s hp %d%s: wait %d allowed %d, goal %s, breach %s, field here "
+            .. "%s best wait %s best allowed %s, worst here %d", u.charId, at(u), u.hp,
+            u.acted and " acted" or "", #tiles, #allowed, at(goal), at(breachFor(ctx, u, goal)),
+            tostring(fd(u)),
+            tostring(nearest(tiles)), tostring(nearest(allowed)),
+            worstCase(ctx, u, u.x, u.y, nil).sum)
+        local r = ctx.sight.range(u)
+        for _, e in ipairs(r and ctx.enemies or {}) do
+            local n, pass, best = 0, 0, nil
+            for _, t in ipairs(strikeTiles(ctx, u, e)) do
+                if inRange(t.x, t.y, e.x, e.y, r.min, r.max) then
+                    local f = attack(ctx, u, e, t.x, t.y)
+                    if f then
+                        n = n + 1
+                        local spent = counterWorst(f, e)
+                        if spent < u.hp and gate(ctx, u, t.x, t.y, isSureKill(f) and e or nil,
+                                                 spent) then
+                            pass = pass + 1
+                        end
+                        if not best or u.hp - spent > best.margin then
+                            best = { margin = u.hp - spent, f = f, spent = spent, t = t }
+                        end
+                    end
+                end
+            end
+            if n > 0 then
+                local f = best.f
+                lines[#lines + 1] = string.format(
+                    "    vs 0x%02X: %d tiles, %d allowed; best @%s hit %d dmg %dx%d, counter "
+                    .. "worst %d of hp %d", e.charId, n, pass, at(best.t), f.hit, f.dmg, f.hits,
+                    best.spent, u.hp)
+            end
+        end
+    end
+    return lines
 end
 
 -- ── Claims ───────────────────────────────────────────────────────────────────────────────

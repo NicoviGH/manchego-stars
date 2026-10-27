@@ -69,5 +69,24 @@ class Ours(unittest.TestCase):
                 ce.ours_env(store)
 
 
+class Resume(unittest.TestCase):
+    def run_main(self, argv):
+        import contextlib
+        import io
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            ce.main(argv)
+        return json.loads(out.getvalue())
+
+    def test_from_resumes_the_named_campaign(self):
+        env = self.run_main(['vanilla', '--id', 'probe', '--from', '2'])
+        self.assertEqual((env['id'], env['from']), ('probe', 2))
+        self.assertNotIn('from', self.run_main(['vanilla']))
+
+    def test_from_without_an_id_is_refused(self):
+        with self.assertRaises(SystemExit):
+            ce.main(['vanilla', '--from', '2'])
+
+
 if __name__ == '__main__':
     unittest.main()

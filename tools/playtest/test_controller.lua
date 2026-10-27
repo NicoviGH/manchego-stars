@@ -522,6 +522,28 @@ a = action(weaponMenu, "select_weapon")
 check(a and a.key, "A", "selected enabled weapon is confirmable")
 check(a and a.target, 1, "weapon selection records the live item slot")
 
+-- The Staff command: its list of staves (menu_def.c gStaffItemSelectMenuItems, 0x3E-0x42),
+-- then the heal selector.
+local staffCommand = {
+    procs = proc("menu", "menu_input"),
+    menu = { current = 1, items = { { slot = 0, override_id = 0x51, availability = 1 },
+                                    { slot = 1, override_id = 0x6B, availability = 1 } } },
+}
+classify(staffCommand, "unit_command_menu", "a menu offering Staff is the unit's command menu")
+check(action(staffCommand, "staff") ~= nil, true, "Staff resolves from semantic id 0x51")
+local staffMenu = {
+    procs = proc("menu", "menu_input"),
+    menu = { current = 0, items = { { slot = 0, override_id = 0x3E, availability = 1 } } },
+}
+classify(staffMenu, "staff_menu", "the staff list is identified by its semantic slot ids")
+a = action(staffMenu, "select_staff")
+check(a and a.key, "A", "the highlighted staff is confirmable")
+local healTarget = {
+    procs = proc("target_selection", "target_selection_input"),
+    target = { kind = "heal", x = 3, y = 4, uid = 0x02, frozen = false },
+}
+classify(healTarget, "target_selection", "live heal target selector")
+
 local attackTarget = {
     procs = proc("target_selection", "target_selection_input"),
     target = { kind = "attack", x = 7, y = 5, uid = 0x81, frozen = false },
