@@ -64,7 +64,7 @@ G3 #537 78105ed; the summary is on #531).
      DEMANDS (red classes, chests, doors, villages, fog, sustain) read at the prep screen by
      `Sight.demands`/`Sight.answer` (sight.lua; the game's forecast, GetUnitKeyItemSlotForTerrain,
      GetUnitFogViewRange, CanUnitUseStaff, GenerateExtendedMovementMap). Ties: carried unit, then
-     earlier joiner. Group caps = `tools/playtest/team_groups.py` (explicit FE8 class -> group
+     earlier joiner. Group caps = `team_groups.py` on the branch (explicit FE8 class -> group
      TABLE, Nicolas: never inferred from attributes; a missing player class raises). campaign.lua
      carries the cleared team, records each pick's reason, never repeats a style. Route is a
      campaign SETTING (`campaign_env.py vanilla --route N`); ours' ch01 lead menu is answered by
