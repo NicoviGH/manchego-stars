@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E in progress on `feat/510-step9-e-campaigns`, 33ad9e8, no PR yet). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E party selection built, `feat/510-step9-e-campaigns` 20afe94, no PR yet; next: two bot faults). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -58,28 +58,32 @@ G3 #537 78105ed; the summary is on #531).
      (retail Prologue + Ch1). At 70e01bb's last fix: ours ch01 won t9 all alive (23,910 frames);
      retail won both, all alive. The review summary is on the PR.
 3. **NOW: PR E (campaigns), then F** (stack E->F only). Branch `feat/510-step9-e-campaigns`
-   (pushed, a4af19f, no PR yet). Everything settled + the open proposal is in the plan comment's
-   "E1 as built and settled" block (link at the top): READ IT FIRST.
-   - **Built:** `campaign.lua` (pure loop, `test_campaign.lua`), `INSPECT.campaignApi` + scenario
-     `campaign` in harness.lua (world map by its own L/A to `GetNextUnclearedNode`; Pick Units;
-     shops via `StartShopScreen` as a KEPT sandbox call, `Sight.machine(cpu, true)`; seals via
-     Item > Use), controller states `shop_buy`/`world_map_idle`/`item_submenu`,
-     `campaign_env.py` (PT_CAMPAIGN), ADR 0370 drafted. Retail ran New Game -> Prologue -> Ch1
-     -> world map -> Ch2 (`PT_VANILLA=1 PT_CAMPAIGN='{"id":"probe","last":[3]}'
-     tools/playtest/run.sh campaign`, ~40k frames to Ch2). Shop and seals NOT yet exercised.
-   - **Finding that reshaped E:** a restart with the same style replays the identical game (the
-     RNG is in the state). Settled with Nicolas after web research: varied draws, never
-     repeated; same budget/rule both games; role-covering team where Preparations exists;
-     Formation is its own later PR.
-   - **Party selection is being redesigned (Nicolas rejected the role-tag draw, 2026-10-27):**
-     explicit FE8 class choices, a party that builds up over the campaign like a player's,
-     a rule for duplicate classes, informed by the twin Strategy claims and guides. The
-     research is on the PR E branch as research records (ADR 0371, records 0001-0019; their
-     index is generated beside the decisions index). Records 0012-0019 are
-     the per-chapter "whom guides field" research. **Next:** brainstorm the party design with
-     Nicolas one decision at a time, then implement, run retail to Ch4+ and ours, PR.
-   - Every Ch2 attempt loses Vanessa (0x06) on turn 2: a bot-fault candidate for F's list, not
-     tuned here.
+   (pushed, **20afe94**, no PR yet). The design is the plan comment's "Party selection, SETTLED"
+   and "Lords, SETTLED" blocks (link at the top): READ THEM FIRST.
+   - **Built (20afe94):** `Bot.team` (bot.lua) replaced `Bot.prep`: the team covers the map's
+     DEMANDS (red classes, chests, doors, villages, fog, sustain) read at the prep screen by
+     `Sight.demands`/`Sight.answer` (sight.lua; the game's forecast, GetUnitKeyItemSlotForTerrain,
+     GetUnitFogViewRange, CanUnitUseStaff, GenerateExtendedMovementMap). Ties: carried unit, then
+     earlier joiner. Group caps = `tools/playtest/team_groups.py` (explicit FE8 class -> group
+     TABLE, Nicolas: never inferred from attributes; a missing player class raises). campaign.lua
+     carries the cleared team, records each pick's reason, never repeats a style. Route is a
+     campaign SETTING (`campaign_env.py vanilla --route N`); ours' ch01 lead menu is answered by
+     `INSPECT.pickLead` (shared with reachCh01; `campaign_env.py ours --lord <pc>`). The prep
+     roster is the game's `MakePrepUnitList` in the sandbox, while `ProcScr_AtMenu` is up.
+   - **Lords (Nicolas):** each of our 8 leads will be its own settled cell, but that sweep runs on
+     the lord classes of #543 "MVP lord class", built AFTER the runner as a step-10 option. Until
+     then ours runs one lead (the default) only to prove E and F.
+   - **Runs (logged on #510, comment 2026-10-27):** ours New Game -> ch02 cleared all alive (71 s
+     wall); retail Prologue + Ch1 clear.
+   - **NEXT (Nicolas, 2026-10-27): fix two play-bot faults IN PR E before opening it, so both runs
+     reach Ch4:** (a) ours ch03 (the mine, host 4) ends `stuck` in all three styles (10-16 turns;
+     bold also lost 0x03 t3 and 0x02 t9 to enemy 0x96); (b) vanilla Ch2 loses Vanessa (0x06) on
+     turn 2 in every attempt. One INSTRUMENTED run per fault, never one per guess. Then the runs to
+     Ch4, then the PR and `/code-review <PR> medium` in a subagent.
+   - How to run: build PT_CAMPAIGN with `campaign_env.py` (ours needs `--store` of a vanilla
+     campaign through Ch8 for its shops; until one exists, pass `shops: {}` and `last: [host]` by
+     hand, as `team_groups.env()` + `last` + `id`). Ours: `PT_CAMPAIGN=... tools/playtest/run.sh
+     campaign`; retail: add `PT_VANILLA=1`. Each prints `campaign: team (cap N): ...` per pick.
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
   dropped, with evidence. Apply every review with the global `review-to-clean` skill
