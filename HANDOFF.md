@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E in progress on `feat/510-step9-e-campaigns`, a4af19f, no PR yet). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E in progress on `feat/510-step9-e-campaigns`, 33ad9e8, no PR yet). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -71,11 +71,13 @@ G3 #537 78105ed; the summary is on #531).
      RNG is in the state). Settled with Nicolas after web research: varied draws, never
      repeated; same budget/rule both games; role-covering team where Preparations exists;
      Formation is its own later PR.
-   - **Waiting on Nicolas:** OK of "design section 1" (the draw: action-order tie-break axis,
-     aggression, claims p=.5, role team healer/flier/armored/armor-killer/dancer read from game
-     class data, route per campaign). Ask him first thing; then implement it in bot.lua
-     (order axis) + campaign.lua (never-repeat, role draw), run retail to Ch4+ (vanilla prep
-     starts at Ch4) and ours ch00-ch07, finish ADR 0370, PR, `/code-review <PR> medium`.
+   - **Party selection is being redesigned (Nicolas rejected the role-tag draw, 2026-10-27):**
+     explicit FE8 class choices, a party that builds up over the campaign like a player's,
+     a rule for duplicate classes, informed by the twin Strategy claims and guides. The
+     research is on the PR E branch as research records (ADR 0371, records 0001-0012; their
+     index is generated beside the decisions index). Record 0012 is
+     the per-chapter "whom guides field" research. **Next:** brainstorm the party design with
+     Nicolas one decision at a time, then implement, run retail to Ch4+ and ours, PR.
    - Every Ch2 attempt loses Vanessa (0x06) on turn 2: a bot-fault candidate for F's list, not
      tuned here.
 **Standing rules from 2026-10-24 (Nicolas):**
