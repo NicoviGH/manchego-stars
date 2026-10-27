@@ -141,6 +141,10 @@ whose `RearUp`/`Attack`/`Charge` supply the three poses `inject_battle_anims` ne
     battle sprites shown on boss pages come from the wiki's class pages
     (`tools/wiki/vendor/classes/`, `tools/wiki/vendor/files/`). Our wiki's text derived from
     theirs is under the same GFDL 1.3.
+- **Research records** (`docs/research/`, #510): paraphrased findings, each cited by URL, from
+  community guides and forums (GameFAQs, Serenes Forest, r/fireemblem, the Let's Play Archive,
+  IGN, the Fire Emblem Wiki) and from the papers they name. No source text is reproduced beyond
+  short attributed phrases.
 
 ## AI-generated art (disclose)
 - **The PCs' HD artwork** (`campaigns/.../portraits/hd/`, shown on the wiki's character pages) is AI-generated with Google **Gemini** (prompt-run by Nicolas).

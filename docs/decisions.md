@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-370 decisions. Read this index, then open the two or three you need — the whole
+371 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -51,6 +51,7 @@ set is ~197,000 tokens and no session has ever needed all of it at once.
 | `0289` | [campaign.yaml declares what the BUILD reads, and it is scanned like any other doc](decisions/0289-campaign-yaml-declares-what-the-build-reads.md) | 2026-09-17 | #30 |
 | `0347` | [The wiki is a GitHub Pages site CI deploys from main](decisions/0347-the-wiki-is-a-github-pages-site-ci-deploys-from-main.md) | 2026-10-15 | #486 #493 |
 | `0348` | [A chapter is complete when Nicolas signs it off](decisions/0348-a-chapter-is-complete-when-nicolas-signs-it-off.md) | 2026-10-15 | #493 |
+| `0371` | [Research is kept as records under docs/research/, indexed like the decisions](decisions/0371-research-is-records-indexed-like-decisions.md) | 2026-10-27 | #510 |
 
 ---
 

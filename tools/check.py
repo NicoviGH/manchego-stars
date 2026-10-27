@@ -2581,15 +2581,18 @@ def check_generated_indexes_fresh(fail):
     import gen_chapter_index
     import gen_class_index
     import gen_decisions_index
-    for mod, rel in ((gen_chapter_index, 'docs/CHAPTERS.md'),
-                     (gen_class_index, 'docs/CLASSES.md'),
-                     (gen_decisions_index, 'docs/decisions.md')):
+    research = functools.partial(gen_decisions_index.generate, gen_decisions_index.RESEARCH)
+    for gen, rel, tool in ((gen_chapter_index.generate, 'docs/CHAPTERS.md', 'gen_chapter_index'),
+                           (gen_class_index.generate, 'docs/CLASSES.md', 'gen_class_index'),
+                           (gen_decisions_index.generate, 'docs/decisions.md',
+                            'gen_decisions_index'),
+                           (research, 'docs/research.md', 'gen_decisions_index')):
         path = os.path.join(REPO, rel)
-        want = mod.generate()[0]
+        want = gen()[0]
         have = _read_text(path) if os.path.isfile(path) else None
         if have != want:
-            fail.append('%s is stale vs the YAML -- regenerate: python3 tools/%s.py'
-                        % (rel, mod.__name__))
+            fail.append('%s is stale vs its sources -- regenerate: python3 tools/%s.py'
+                        % (rel, tool))
 
 
 # ── Engine campaign-agnosticism (the Engine/Content Boundary Rule, mechanized) ─────
@@ -3395,7 +3398,8 @@ def check_build_workflow_filters_agree(fail):
 
 
 def check_decision_records_wellformed(fail):
-    """Every docs/decisions/ file parses, and its id is unique and matches its filename.
+    """Every docs/decisions/ and docs/research/ file parses, and its id is unique and matches
+    its filename.
 
     The corpus is the source of truth now, so a malformed ADR is a decision that silently
     stops being indexed -- the same failure as a check that is defined but never registered.
@@ -3405,11 +3409,17 @@ def check_decision_records_wellformed(fail):
     sys.path.insert(0, os.path.join(REPO, 'tools'))
     import gen_decisions_index as gen
 
+    for coll in (gen.DECISIONS, gen.RESEARCH):
+        _records_wellformed(fail, gen, coll)
+
+
+def _records_wellformed(fail, gen, coll):
+    """check_decision_records_wellformed for one indexed folder (docs/decisions/, docs/research/)."""
     seen = {}
     try:
-        records = gen.adrs()
+        records = gen.adrs(coll)
     except Exception as exc:
-        fail.append('docs/decisions/: an ADR could not be parsed -- %s' % exc)
+        fail.append('docs/%s/: a record could not be parsed -- %s' % (coll.name, exc))
         return
     for rec in records:
         name = rec['path'].split('/')[-1]
@@ -3428,12 +3438,12 @@ def check_decision_records_wellformed(fail):
             fail.append('id %d is used by both %s and %s' % (ident, seen[ident], name))
         seen[ident] = name
 
-    notes = gen.section_notes()
-    known = set(gen.SECTION_ORDER) | {r.get('section') for r in records}
+    notes = gen.section_notes(coll)
+    known = set(coll.sections) | {r.get('section') for r in records}
     for section in notes:
         if section not in known:
-            fail.append('a section note claims section %r, which no decision uses and '
-                        'SECTION_ORDER does not name' % section)
+            fail.append('a section note claims section %r, which no %s uses and its '
+                        'section list does not name' % (section, coll.column))
 
 
 def check_decision_citations_resolve(fail):
