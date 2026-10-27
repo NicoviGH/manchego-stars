@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR D #542 merged 70e01bb; next PR E). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E in progress on `feat/510-step9-e-campaigns`, a4af19f, no PR yet). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -57,10 +57,27 @@ G3 #537 78105ed; the summary is on #531).
    - Run by hand: `tools/playtest/run.sh bot` / `sightprobe` (ours ch01), and with `PT_VANILLA=1`
      (retail Prologue + Ch1). At 70e01bb's last fix: ours ch01 won t9 all alive (23,910 frames);
      retail won both, all alive. The review summary is on the PR.
-3. **Next: PR E, then F** (stack E->F only). PR E's caller hands bot.lua `promotes` and `canUse`
-   from the game's own checks (ADR 0369: no level or rank rule in the bot).
-   Ours has no world map yet: our campaign uses VANILLA's world map between chapters (the twin's
-   shops and stock at the same point, via the game's shop screen; Nicolas 2026-10-27, in the plan's E1).
+3. **NOW: PR E (campaigns), then F** (stack E->F only). Branch `feat/510-step9-e-campaigns`
+   (pushed, a4af19f, no PR yet). Everything settled + the open proposal is in the plan comment's
+   "E1 as built and settled" block (link at the top): READ IT FIRST.
+   - **Built:** `campaign.lua` (pure loop, `test_campaign.lua`), `INSPECT.campaignApi` + scenario
+     `campaign` in harness.lua (world map by its own L/A to `GetNextUnclearedNode`; Pick Units;
+     shops via `StartShopScreen` as a KEPT sandbox call, `Sight.machine(cpu, true)`; seals via
+     Item > Use), controller states `shop_buy`/`world_map_idle`/`item_submenu`,
+     `campaign_env.py` (PT_CAMPAIGN), ADR 0370 drafted. Retail ran New Game -> Prologue -> Ch1
+     -> world map -> Ch2 (`PT_VANILLA=1 PT_CAMPAIGN='{"id":"probe","last":[3]}'
+     tools/playtest/run.sh campaign`, ~40k frames to Ch2). Shop and seals NOT yet exercised.
+   - **Finding that reshaped E:** a restart with the same style replays the identical game (the
+     RNG is in the state). Settled with Nicolas after web research: varied draws, never
+     repeated; same budget/rule both games; role-covering team where Preparations exists;
+     Formation is its own later PR.
+   - **Waiting on Nicolas:** OK of "design section 1" (the draw: action-order tie-break axis,
+     aggression, claims p=.5, role team healer/flier/armored/armor-killer/dancer read from game
+     class data, route per campaign). Ask him first thing; then implement it in bot.lua
+     (order axis) + campaign.lua (never-repeat, role draw), run retail to Ch4+ (vanilla prep
+     starts at Ch4) and ours ch00-ch07, finish ADR 0370, PR, `/code-review <PR> medium`.
+   - Every Ch2 attempt loses Vanessa (0x06) on turn 2: a bot-fault candidate for F's list, not
+     tuned here.
 **Standing rules from 2026-10-24 (Nicolas):**
 - **Never skip a review finding.** Minors and nits get fixed too; only a stale or duplicate one is
   dropped, with evidence. Apply every review with the global `review-to-clean` skill
