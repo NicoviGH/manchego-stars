@@ -321,5 +321,34 @@ do
     check(#r.deaths, 2, "the watched death and the one it missed are both recorded")
 end
 
+-- test_a_kept_plan_is_played_without_replanning: the planner plans A's and C's waits at
+-- once; A's goes as expected, so C's is played from the same plan, and only the played-out
+-- plan asks for a new one (which finds no one left to act).
+do
+    local Planner = dofile(here .. "planner.lua")
+    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x02, 1, "blue", 0, 5, 20),
+                                   unit(0x81, 0, "red", 9, 9, 10) } }
+    local asked = 0
+    g.api.Planner = {
+        surprise = Planner.surprise,
+        plan = function(_, board)
+            asked = asked + 1
+            for _, u in ipairs(board.units) do
+                if u.faction == "blue" and u.acted then return nil end
+            end
+            if board.turn > 1 then return nil end
+            local acts = { { unit = 0x01, unitId = 0x01, act = "wait", move = { x = 1, y = 0 } },
+                           { unit = 0x02, unitId = 0x02, act = "wait", move = { x = 1, y = 5 } } }
+            return acts[1], { acts = acts, expect = { { hp = 20 }, { hp = 20 } },
+                              enemies = { [0x81] = true } }
+        end,
+    }
+    Botrun.run(g.api)
+    local r = recordOf(g)
+    check(r.plans.kept, 1, "C's wait is played from A's plan")
+    check(asked, r.plans.made, "every plan asked for is counted")
+    check(asked, 3, "turn 1: the plan and the played-out ask; turn 2: one ask, then stuck")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

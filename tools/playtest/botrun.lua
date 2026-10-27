@@ -25,7 +25,9 @@
 --
 -- api (harness.lua builds it; test_botrun.lua fakes it):
 --   Bot, Json          bot.lua and json.lua, loaded by the caller
---   Planner            OPTIONAL: planner.lua; when given it plays every style but greedy
+--   Planner            OPTIONAL: planner.lua; when given it plays every style but greedy, and
+--                      a plan's acts are played in turn until Planner.surprise calls for a new
+--                      one (the record's `plans`: made, and acts played from a kept one)
 --   info = { game, rom_hash, chapter, mode, seed, campaign, attempt }  what the record names
 --                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
@@ -98,7 +100,7 @@ function M.run(api)
                   mode = api.info.mode, seed = api.info.seed, campaign = api.info.campaign,
                   attempt = api.info.attempt, style = api.style,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
-                  deployed = {}, bot_faults = {} }
+                  deployed = {}, bot_faults = {}, plans = { made = 0, kept = 0 } }
     local startFrame = api.frames()
     local startCosts = api.costs and api.costs() or {}
     local turn = 0
@@ -141,6 +143,9 @@ function M.run(api)
         local sight = api.sight()
         local seen, waitUntil = {}, nil
         local lastPlan
+        -- the plan being played this phase: its next act's index, and the board before the
+        -- last act it played (Planner.surprise compares the two)
+        local playing, nextAct, before
         while true do
             if api.won() then return "won", "the chapter advanced" end
             if api.lost() then return "lost", "game over" end
@@ -166,13 +171,29 @@ function M.run(api)
                     .. "turn %d", turn, waitUntil))
             end
             seen[h] = true
+            playing = nil
             while true do
                 -- one decision's reads in one save/load (sight.batch), when the sight batches
                 -- the planner plays every style but greedy, the old clear bot (bot.lua)
                 local function decide()
                     if api.Planner and style.aggression ~= "greedy" then
+                        if playing then
+                            local why = api.Planner.surprise(playing, nextAct - 1, before, board,
+                                                             sight.visible)
+                            if not why then
+                                local a = playing.acts[nextAct]
+                                nextAct = nextAct + 1
+                                rec.plans.kept = rec.plans.kept + 1
+                                api.log(string.format("plan: keep 0x%02X %s @%d,%d", a.unit, a.act,
+                                    a.move.x, a.move.y))
+                                return a
+                            end
+                            api.log("plan: replan, " .. why)
+                        end
                         local a, plan = api.Planner.plan(Bot, board, sight, style)
                         lastPlan = plan
+                        rec.plans.made = rec.plans.made + 1
+                        playing, nextAct = a and plan, 2
                         if plan and a then
                             local said = {}
                             for _, x in ipairs(plan.strikes or {}) do
@@ -195,6 +216,7 @@ function M.run(api)
                 end
                 local after = api.board()
                 sight.refresh()
+                before = board
                 local actor = byId(after)[action.unitId]
                 record(fallen(board, after, action), "player")
                 if done == "noseize" then

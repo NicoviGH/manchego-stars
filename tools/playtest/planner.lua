@@ -17,14 +17,20 @@
 --      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
 --      for each unit's chance to die there, its expected damage, and a fog risk for a fragile
 --      unit left beside ground it cannot see.
---   4. The best plan's first act is returned.
+--   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
+--      next act after each one unless M.surprise finds the board off what the plan expected
+--      (a miss, a kill, a death, a newly seen enemy), and only then plans again. Judging is
+--      most of a plan's cost, and an act that went as expected leaves the plan as good as it
+--      was.
 -- Honesty: outcomes are odds (Sight.hitChance: FE8's two-roll hit; crits one roll), never the
 -- game's next random numbers; an enemy the player cannot see is in no plan (Bot.candidates and
 -- sight.enemyPhase skip it); the enemy's choices are the game's own AI.
 -- Styles are weights (M.WEIGHTS): how much a unit's death costs against progress.
 --
 -- api: Planner.plan(Bot, board, sight, style) -> the first act of the best plan (bot.lua's
--- action shape) or nil when no unit can act, and the plan's record { score, acts, judged }.
+-- action shape) or nil when no unit can act, and the plan's record { score, acts, expect,
+-- enemies, judged }. Planner.surprise(plan, k, before, after, visible) -> why the board after
+-- its k-th act calls for a new plan, or nil to play act k + 1.
 
 local M = {}
 
@@ -174,8 +180,20 @@ function M.plan(Bot, board, sight, style)
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
-    local start = { score = 0, base = 0, acts = {}, used = {}, tiles = {}, gone = {},
-                    enemyHp = {}, hp = {}, objective = objective }
+    local start = { score = 0, base = 0, acts = {}, expect = {}, used = {}, tiles = {},
+                    gone = {}, enemyHp = {}, hp = {}, objective = objective }
+
+    -- Whether `id` ends an earlier act of the plan off the tile it stands on now. The game
+    -- was asked which heals reach whom with every unit where it stands (sight.heals), so a
+    -- heal on a unit the plan has moved has no answer behind it: the Staff command may not
+    -- be there at all (ch03, 2026-10-27).
+    local function moved(st, id)
+        local u = byId[id]
+        for _, x in ipairs(st.acts) do
+            if x.unitId == id then return not u or x.move.x ~= u.x or x.move.y ~= u.y end
+        end
+        return false
+    end
 
     -- the beam's exposure term, memoised: the same act, HP and kills recur across the beam
     local risks = {}
@@ -231,14 +249,22 @@ function M.plan(Bot, board, sight, style)
                         local tile = a.move.x .. "," .. a.move.y
                         local blocked = st.tiles[tile]
                             or (a.targetId and st.gone[a.targetId])
+                            or (a.act == "staff" and moved(st, a.targetId))
                         if not blocked then
                             local v, fx = score(a, st, W, style, hitChance)
                             if fx.blocked then goto skip end
                             local n = { base = st.base + v, acts = copy(st.acts),
+                                        expect = copy(st.expect),
                                         used = copy(st.used), tiles = copy(st.tiles),
                                         gone = copy(st.gone), enemyHp = copy(st.enemyHp),
                                         hp = copy(st.hp), objective = objective }
                             n.acts[#n.acts + 1] = a
+                            -- what the board should show after it (M.surprise): a Talk takes
+                            -- its target off the enemy side as a kill does
+                            n.expect[#n.acts] = { hp = fx.hp, gone = fx.gone
+                                                      or (a.act == "talk" and a.targetId or nil),
+                                                  targetHp = fx.enemyHp and fx.enemyHp.hp,
+                                                  heals = fx.heals }
                             n.used[m.unit.id], n.tiles[tile] = true, true
                             n.hp[m.unit.id] = fx.hp
                             if fx.gone then n.gone[fx.gone] = true end
@@ -318,7 +344,59 @@ function M.plan(Bot, board, sight, style)
         if not best or judged > best.judged then best = st end
     end
     if not best or #best.acts == 0 then return nil end
+    best.enemies = {}
+    for _, e in ipairs(ctx.enemies) do best.enemies[e.id] = true end
     return best.acts[1], best
+end
+
+-- Why the board `after` the plan's k-th act (played from `before`) is off what the plan
+-- expected, so the rest of it was planned for a board that is not there; nil when act k + 1
+-- may be played as planned. `visible(x, y)` is the player's sight after the act (fog).
+-- Taking LESS from a counter, or dealing more without a kill, is no surprise: the plan
+-- reckoned with worse.
+function M.surprise(plan, k, before, after, visible)
+    local a, x, nxt = plan.acts[k], plan.expect[k], plan.acts[k + 1]
+    if not (a and x and nxt) then return "the plan is played out" end
+    local now = {}
+    for _, u in ipairs(after.units) do
+        if u.onField and not u.dead then now[u.id] = u end
+    end
+    for _, u in ipairs(before.units) do
+        if u.faction == "blue" and u.onField and not u.dead and not now[u.id] then
+            return "a unit of ours fell"
+        end
+    end
+    local actor = now[a.unitId]
+    if actor and (actor.x ~= a.move.x or actor.y ~= a.move.y) then return "the move ended short" end
+    if actor and x.hp and actor.hp < x.hp then return "the counter took more than expected" end
+    -- the enemy side: the plan's enemies, less every kill and Talk it expected by now
+    local gone = {}
+    for i = 1, k do
+        if plan.expect[i].gone then gone[plan.expect[i].gone] = true end
+    end
+    for _, u in pairs(now) do
+        if u.faction == "red" and not plan.enemies[u.id] and (not visible or visible(u.x, u.y)) then
+            return "an enemy came into sight"
+        end
+    end
+    for id in pairs(plan.enemies) do
+        local e = now[id]
+        local alive = e ~= nil and e.faction == "red"
+        if gone[id] and alive then return "the kill missed" end
+        if not gone[id] and not alive then return "an unexpected kill" end
+    end
+    local t = a.act == "attack" and now[a.targetId]
+    if t and x.targetHp and t.hp > x.targetHp + 0.5 then return "a blow missed" end
+    local h = x.heals and now[x.heals.id]
+    if h and h.hp < x.heals.hp then return "the heal fell short" end
+    -- the next act must still be there to play
+    local u = now[nxt.unitId]
+    if not u or u.acted then return "the next unit cannot act" end
+    if nxt.targetId and not now[nxt.targetId] then return "the next target is gone" end
+    -- the game offers Staff only on someone hurt: a counter that missed leaves none
+    local t2 = nxt.act == "staff" and nxt.targetId and now[nxt.targetId]
+    if t2 and t2.hp >= (t2.maxhp or t2.hp) then return "the heal's target is not hurt" end
+    return nil
 end
 
 return M

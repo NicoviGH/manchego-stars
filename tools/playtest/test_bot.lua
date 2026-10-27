@@ -1595,9 +1595,10 @@ end
 
 -- test_planner_heals_between_attacks: the grell pattern. A's attack draws a 12 counter and the
 -- enemy phase strikes 10 more: 22 of A's 20. H's heal after the attack (+10) keeps A alive,
--- so careful attacks and heals; without H it does not attack.
+-- so careful attacks and heals; without H it does not attack. A strikes from where it
+-- stands: the heals the game lists were read with it there.
 do
-    local A = blue(0x01, 0, 0, 0)
+    local A = blue(0x01, 0, 1, 0)
     local H = blue(0x02, 1, 0, 1, { minRange = false })
     local E = red(0x81, 2, 0, { isBoss = true, hp = 40 })
     local o = {
@@ -1627,6 +1628,14 @@ do
     -- no healer: the counter and the strike together kill A, so careful does not attack
     local alone = Planner.plan(B, boardOf(A, E), sightOf(o), st)
     check(alone and alone.act ~= "attack", true, "planner: no heal, no attack")
+    -- A starting at (0,0) must move to strike: the heal was read with A at (0,0), so it is
+    -- no heal for A at (1,0), and careful does not attack
+    local _, moved = Planner.plan(B, boardOf(blue(0x01, 0, 0, 0), H, E), sightOf(o), st)
+    local heals = 0
+    for _, a in ipairs(moved and moved.acts or {}) do
+        if a.act == "staff" then heals = heals + 1 end
+    end
+    check(heals, 0, "planner: no heal on a unit the plan has moved")
 end
 
 -- test_planner_prices_standing_exposure: the march to (1,0) gains 20 steps but X reaches it
@@ -1670,6 +1679,52 @@ do
         if a.unitId == 0x02 then moved = at(a) end
     end
     check(moved, "2,2", "planner: a killed enemy threatens no one")
+end
+
+-- test_planner_surprise: A attacks X from (1,0) expecting X at 10 HP and itself at 20; C
+-- moves next. The plan plays on only while the board is what it expected.
+do
+    local function plan(o)
+        o = o or {}
+        return { acts = { { unitId = 0x01, act = "attack", targetId = 0x81, move = { x = 1, y = 0 } },
+                          { unitId = 0x02, act = "wait", move = { x = 0, y = 2 } } },
+                 expect = { { hp = 20, gone = o.gone, targetHp = 10 } },
+                 enemies = { [0x81] = true } }
+    end
+    local function A(o) return blue(0x01, 0, 1, 0, o) end
+    local function C(o) return blue(0x02, 1, 0, 1, o) end
+    local before = boardOf(blue(0x01, 0, 0, 0), C(), red(0x81, 2, 0, { hp = 20 }))
+    local function after(...) return boardOf(...) end
+    local S = Planner.surprise
+    check(S(plan(), 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }))), nil,
+          "surprise: as expected, play on")
+    check(S(plan(), 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 4 }))), nil,
+          "surprise: more dealt than expected is no surprise")
+    check(S(plan(), 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 20 }))),
+          "a blow missed", "surprise: a miss")
+    check(S(plan(), 1, before, after(A { acted = true, hp = 12 }, C(), red(0x81, 2, 0, { hp = 10 }))),
+          "the counter took more than expected", "surprise: a heavier counter")
+    check(S(plan(), 1, before, after(C(), red(0x81, 2, 0, { hp = 10 }))), "a unit of ours fell",
+          "surprise: a death")
+    check(S(plan(), 1, before, after(A { acted = true }, C())), "an unexpected kill",
+          "surprise: a kill the plan did not count on")
+    check(S(plan { gone = 0x81 }, 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 3 }))),
+          "the kill missed", "surprise: an expected kill that did not land")
+    local seen = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }), red(0x82, 5, 5))
+    check(S(plan(), 1, before, seen), "an enemy came into sight", "surprise: a new enemy")
+    check(S(plan(), 1, before, seen, function(x, y) return not (x == 5 and y == 5) end), nil,
+          "surprise: an enemy still in fog is no news")
+    check(S(plan(), 1, before, after(A { acted = true }, C { acted = true }, red(0x81, 2, 0, { hp = 10 }))),
+          "the next unit cannot act", "surprise: the next act is gone")
+    check(S(plan(), 2, before, before), "the plan is played out", "surprise: nothing left to play")
+    -- C means to heal A, but the counter missed: A is whole and the game offers no Staff
+    local healing = plan()
+    healing.acts[2] = { unitId = 0x02, act = "staff", targetId = 0x01, move = { x = 0, y = 1 } }
+    check(S(healing, 1, before, after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }))),
+          "the heal's target is not hurt", "surprise: nothing to heal")
+    check(S(healing, 1, before, after(A { acted = true, hp = 25, maxhp = 30 }, C(),
+                                      red(0x81, 2, 0, { hp = 10 }))), nil,
+          "surprise: a hurt target is healed as planned")
 end
 
 if fails > 0 then
