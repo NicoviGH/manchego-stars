@@ -1,0 +1,501 @@
+-- sight.lua -- what the bot SEES, read from the game itself (#510 step 9, PR D).
+--
+-- bot.lua decides from a `sight` table and re-creates nothing; this file builds that table
+-- from the running ROM. Every answer is computed by FE8's own code, run as the game runs it --
+-- never a rule written here (Nicolas, 2026-10-26: "we need not reinvent vanilla AI behavior,
+-- it's all there"; ADR 0369).
+--
+-- HOW THE GAME'S CODE IS RUN. Sight.machine(cpu) is a sandbox: it saves the emulator's state,
+-- points the CPU at a game function (args in r0-r3 and on the stack, IRQs masked, lr at a
+-- two-byte `b .` it writes into scratch RAM), lets the emulator run frames until the CPU sits
+-- in that loop, reads what the caller asks for, and loads the state back -- registers, RAM and
+-- RNG exactly as they were. It never single-steps: a call long enough to cross the end of a
+-- frame (ch01's danger zone) deadlocks mGBA's emu:step() inside its frame callback, so the
+-- call runs as ordinary emulation, between frames. The forecast WINDOW cannot answer the enemy
+-- phase: FE8 zeroes the weapon of a target outside its range (SetBattleUnitWeapon,
+-- BattleInitTargetCanCounter), so it never shows an enemy's strike on a tile it is not beside.
+--
+-- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
+-- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
+--        Board (board.lua's bound reader, Board.bind: itemRange(item), distance(ax, ay, bx, by)),
+--        map = function() -> w, h, chapter = function() -> index,
+--        turn = function() -> n, board = Board.read }
+-- ONE sight per run. Its answers about the board are kept until refresh(), which the caller
+-- calls whenever the board may have changed (after every action, at every phase); the chapter's
+-- goal and Seize tile are read once.
+--   refresh()                drop every board answer; recount the objective's turns left.
+--   newPhase()               refresh(), and a fresh `cache` for the phase: an AI a turn event
+--                            rewrote between phases is in no cache key.
+--   danger(x, y)             gBmMapRange after GenerateDangerZoneRange(FALSE), fog and roofs as
+--                            the game shows them: 0 when no enemy reaches (x, y), else its
+--                            COVERAGE -- GenerateUnitCompleteAttackRange adds 1 for every tile
+--                            an enemy could strike it from, so it is not an enemy count.
+--   threat(e) -> function(x, y) -> coverage: GenerateDangerZoneRange itself, every other enemy
+--                            marked US_UNDER_A_ROOF for the call -- the one state its loop skips
+--                            a unit for and nothing else reads -- so it walks `e` alone while
+--                            the others stay valid units: they block it on gBmMapUnit and a
+--                            Magic Seal still seals (GenerateMagicSealMap). Fog: the game's.
+--   reach(unit)              tiles with gBmMapMovement < 120 after GenerateUnitMovementMap,
+--                            less those another unit stands on (gBmMapUnit). Either faction.
+--   range(unit)              { min, max } of the weapon FE8 has equipped (GetUnitEquippedWeapon,
+--                            the first CanUnitUseWeapon accepts, which BU_ISLOT_AUTO strikes
+--                            with), read as GetItemMinRange/GetItemMaxRange read it; nil = none.
+--   canSeize(unit)           the game's CanUnitSeize (bmdifficulty.c), the Seize command's check.
+--   attack(u, e, x, y, slot) our unit from (x, y) on enemy `e` where it stands, as the forecast
+--                            window computes it (BattleGenerateSimulation +
+--                            InitBattleForecastBattleStats): hit, dmg, crit, hits; `e`'s
+--                            counter* (counterHit, counterDmg, counterCrit, counterHits) and
+--                            `counters` (false, counter* 0, when it cannot answer); killsTarget
+--                            = dmg x hits >= e's HP. nil when (x, y) is out of our range.
+--   strike(u, e, x, y)       `e`'s own strike on `u` standing on (x, y), on its phase: the
+--                            enemy phase's per-unit setup (cp_decide.c: AiUpdateNoMoveFlag, the
+--                            combat weight table, AiInitDangerMap, AiClearDecision), then
+--                            AiAttemptOffensiveAction(AiIsUnitEnemy) itself -- STAY, ballista
+--                            and thief branches included -- with every other target hidden for
+--                            the call, so it can only choose `u`. Its decision is simulated:
+--                            takenHit, takenDmg, takenCrit, takenHits, takenSlot, takenTile.
+--                            All 0 (slot/tile nil) when the AI does not strike `u` there.
+--   objective                { kind, tile, turnsLeft } -- see objective().
+--   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
+--                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
+--                            unreached.
+--   fieldUnit()              the first deployed unit that can Seize, else the first deployed.
+--   terrain(x, y)            gBmMapTerrain[y][x].
+--   nextTurnEvent(turn)      the first later turn at which a turn event the game would fire is
+--                            not already firing now (SearchAvailableEvent over the chapter's
+--                            turnBasedEvents, the turn and phase set to each), or nil.
+--   cache                    {} for ONE player phase (bot.lua keeps attacks and strikes there).
+-- Sight.seed(api, s)         InitRN(s): the game's own seeding, written into gRNSeeds.
+
+local M = {}
+
+M.FRAME_BUDGET = 600         -- frames one call may run; a full map's danger zone takes a few
+M.MOVE_LIMIT = 120           -- include/bmmap.h: a movement-map cost at or above it is unreachable
+M.UNREACHED = 0xFF           -- GenerateMovementMap fills its map with -1 before it floods
+M.ISLOT_AUTO = -1            -- include/bmbattle.h BU_ISLOT_AUTO
+M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
+M.ITEM_MONSTER_STONE = 0xB5  -- constants/items.h
+-- include/types.h goal window types, chapter data +0x8C (goalWindowDataType); +0x8D is
+-- goalWindowEndTurnNumber, whose LAST turn the game's own goal window shows as End - 1
+-- (player_interface.c), so the turns left on turn T are End - T.
+M.GOALS = { [0] = "seize", [1] = "rout", [2] = "survive", [3] = "boss", [4] = "special" }
+M.CHAPTER_GOAL, M.CHAPTER_GOAL_TURN = 0x8C, 0x8D
+M.LAST_EVENT_TURN = 0xFF     -- eventinfo.c EvCheck02_TURN: turns are a byte (0xFF = open-ended)
+M.PHASES = { 0x00, 0x40, 0x80 }   -- gPlaySt.faction: blue, green, red
+
+-- struct BattleUnit (include/bmbattle.h) and BattleForecastProc (include/bksel.h) offsets.
+local BU = { weapon = 0x48, attack = 0x5A, defense = 0x5C, hit = 0x64, crit = 0x6A,
+             weaponBroke = 0x7D }
+local PROC_HITS_A, PROC_HITS_B = 0x50, 0x51
+M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the same bytes
+-- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
+-- +40 u16 ai_config. Its state bits are board.lua's (Board.US_*).
+local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_AI_CONFIG = 0x0C, 0x10, 0x11, 0x40
+-- struct AiState (include/cp_common.h): +7A dangerMapFilled, +7D combatWeightTableId; the
+-- weight table comes from ai_config bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*), written by
+-- cp_decide.c's per-unit loop as one field assignment, which is copied here as it stands.
+local AI_DANGER_FILLED, AI_WEIGHT_TABLE = 0x7A, 0x7D
+local AI_WEIGHT_SHIFT, AI_WEIGHT_MASK = 3, 0x1F << 3
+-- struct AiDecision: +00 actionId, +02/+03 xMove/yMove, +06 targetId, +07 itemSlot (0xFF = the
+-- ballista, AiAttemptBallistaCombat's -1). AI_ACTION_COMBAT = 1.
+local DEC_ACTION, DEC_X, DEC_Y, DEC_TARGET, DEC_SLOT = 0x00, 0x02, 0x03, 0x06, 0x07
+local AI_ACTION_COMBAT, BALLISTA_SLOT = 1, 0xFF
+-- struct EventInfo (include/eventinfo.h): +00 listScript, +04 script; 0x1C bytes.
+local EVENT_INFO_SIZE, EVENT_SCRIPT = 0x1C, 0x04
+-- struct PlaySt: +0F faction, +10 u16 chapterTurnNumber.
+local PLAY_FACTION, PLAY_TURN = 0x0F, 0x10
+
+-- Sight.machine(cpu) -> sandbox(fn): cpu = { read(reg), write(reg, v), write16(addr, v),
+-- write32(addr, v), save() -> state, load(state), frames(done, max) -> bool (run emulated frames
+-- until done() or `max` have passed) }. sandbox(fn) runs fn(call, scratch) between a save and a
+-- load and returns what fn returns; call(addr, args) runs one game function and returns its r0.
+-- `scratch` is SCRATCH_SIZE free bytes for the caller. The CPU is put in System mode FIRST:
+-- sp and lr are banked, so they are read and written in the mode the call runs in -- a frame
+-- that ends inside an IRQ or SWI would otherwise hand out that mode's registers. Above the
+-- call's stack sit `scratch` and the return loop; the load puts back whatever was there.
+local THUMB_B_SELF = 0xE7FE
+local SYSTEM_THUMB_NOIRQ = 0x1F | 0x20 | 0x80   -- CPSR mode System, T, I
+function M.machine(cpu)
+    return function(fn)
+        local state = cpu.save()   -- the load puts every register back; only cpsr is kept here
+        local cpsr, top, scratch, loop
+        local function returned()
+            local pc = cpu.read("pc")
+            return pc >= loop and pc <= loop + 8
+        end
+        local function call(addr, args)
+            for i, a in ipairs(args) do
+                if i <= 4 then cpu.write("r" .. (i - 1), a & 0xFFFFFFFF)
+                else cpu.write32(top + (i - 5) * 4, a & 0xFFFFFFFF) end
+            end
+            cpu.write16(loop, THUMB_B_SELF)
+            cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+            cpu.write("sp", top)
+            cpu.write("lr", loop | 1)
+            cpu.write("pc", addr & ~1)
+            if not cpu.frames(returned, M.FRAME_BUDGET) then
+                error(string.format("sight: call 0x%08X did not return in %d frames (pc 0x%08X)",
+                    addr, M.FRAME_BUDGET, cpu.read("pc")))
+            end
+            return cpu.read("r0")
+        end
+        -- Everything after the save is inside the pcall, the mode switch included: whatever
+        -- raises, the state is loaded back.
+        local ok, a, b = pcall(function()
+            cpsr = cpu.read("cpsr")
+            cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+            top = (cpu.read("sp") - 0x100) & ~7
+            scratch, loop = top + 0x10, top + 0x80   -- SCRATCH_SIZE fits between them
+            return fn(call, scratch)
+        end)
+        cpu.load(state)
+        if not ok then error(a, 0) end
+        return a, b
+    end
+end
+
+local function s16(v) return v >= 0x8000 and v - 0x10000 or v end
+
+-- One side of a simulated exchange, as the forecast window reads it (bksel.c): hit, crit,
+-- damage against the other side's defence, how many blows (the proc's hit count for that side),
+-- and whether it is armed (a weapon, or one that broke). `actor` is gBattleActor's side: the
+-- window marks an ACTOR's Monster Stone with 0xFF for damage and crit ("--", its damage is not
+-- shown), and so does this -- a worst case then reads it as lethal, never as harmless.
+function M.side(mem, me, other, proc, hitsAt, actor)
+    local dmg = s16(mem.u16(me + BU.attack)) - s16(mem.u16(other + BU.defense))
+    local crit = s16(mem.u16(me + BU.crit))
+    if actor and (mem.u16(me + BU.weapon) & 0xFF) == M.ITEM_MONSTER_STONE then
+        dmg, crit = 0xFF, 0xFF
+    end
+    return { hit = s16(mem.u16(me + BU.hit)), crit = crit,
+             dmg = dmg > 0 and dmg or 0, hits = mem.s8(proc + hitsAt),
+             armed = mem.u16(me + BU.weapon) ~= 0 or mem.s8(me + BU.weaponBroke) ~= 0 }
+end
+
+-- Our attack read off its simulation: `ours` is our side with `ours.counter` the enemy's.
+-- Pure, so test_sight.lua builds every case.
+function M.attackOf(ours, eHp)
+    local c = ours.counter
+    local counters = c ~= nil and c.armed
+    return { hit = ours.hit, dmg = ours.dmg, crit = ours.crit, hits = ours.hits,
+             counters = counters,
+             counterHit = counters and c.hit or 0, counterDmg = counters and c.dmg or 0,
+             counterCrit = counters and c.crit or 0, counterHits = counters and c.hits or 0,
+             killsTarget = ours.hits > 0 and ours.dmg * ours.hits >= eHp }
+end
+
+-- The enemy's strike read off its simulation, or none (nil) when its AI does not strike.
+function M.strikeOf(t)
+    return { takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
+             takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
+             takenSlot = t and t.slot or nil, takenTile = t and t.tile or nil }
+end
+
+-- Turns left on a Defense map on turn `turn`: End - turn (the goal window's last turn is
+-- End - 1). Pure.
+function M.turnsLeft(endTurn, turn) return endTurn - turn end
+
+-- Of a turn-event scan, the first later turn whose available scripts include one not available
+-- now. `now` is a set of scripts; `later` a list of {turn, scripts}. Pure.
+--
+-- What "later" is: the check runs at the START of a player phase, when only (turn, blue) has
+-- fired. So `now` is (turn, blue) alone, and the scan goes (turn, green), (turn, red), then every
+-- phase of each later turn -- M.eventOrder. An event due in this turn's enemy phase is ahead.
+function M.eventOrder(turn)
+    local out = {}
+    for _, phase in ipairs(M.PHASES) do
+        if phase ~= M.PHASES[1] then out[#out + 1] = { turn = turn, phase = phase } end
+    end
+    for t = turn + 1, M.LAST_EVENT_TURN do
+        for _, phase in ipairs(M.PHASES) do out[#out + 1] = { turn = t, phase = phase } end
+    end
+    return out
+end
+function M.firstNewEvent(now, later)
+    for _, at in ipairs(later) do
+        for script in pairs(at.scripts) do
+            if not now[script] then return at.turn end
+        end
+    end
+    return nil
+end
+
+local function cell(mem, base, x, y) return mem.u32(mem.u32(base) + y * 4) + x end
+local function grid(mem, base, x, y) return mem.u8(cell(mem, base, x, y)) end
+local function readGrid(mem, base, w, h)
+    local g = {}
+    for y = 0, h - 1 do
+        g[y] = {}
+        for x = 0, w - 1 do g[y][x] = grid(mem, base, x, y) end
+    end
+    return g
+end
+
+function M.new(api)
+    local mem, S, Board = api.mem, api.SYM, api.Board
+    local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
+    local sandbox = M.machine(api.cpu)
+    local w, h = api.map()
+    local s = { cache = {} }
+    local seen   -- this board's answers, dropped by refresh()
+
+    -- The chapter's goal, read once: its kind, the Defense map's end turn, the Seize tile (the
+    -- one location event whose command is Seize, as bmcommanddbg.c finds it).
+    local goal = sandbox(function(call)
+        local data = call(S.GetROMChapterStruct, { api.chapter() })
+        local g = { kind = M.GOALS[mem.u8(data + M.CHAPTER_GOAL)] or "special",
+                    endTurn = mem.u8(data + M.CHAPTER_GOAL_TURN) }
+        if g.kind == "seize" then
+            for y = 0, h - 1 do
+                for x = 0, w - 1 do
+                    if call(S.GetAvailableTileEventCommand, { x, y }) == M.TILE_COMMAND_SEIZE then
+                        g.tile = { x = x, y = y }
+                    end
+                end
+            end
+        end
+        return g
+    end)
+    s.objective = { kind = goal.kind, tile = goal.tile }
+
+    function s.refresh()
+        seen = { threats = {}, ranges = {}, seizers = {}, fields = {} }
+        s.objective.turnsLeft = goal.kind == "survive" and M.turnsLeft(goal.endTurn, api.turn())
+            or nil
+    end
+    s.refresh()
+
+    function s.newPhase()
+        s.refresh()
+        s.cache = {}
+    end
+
+    function s.danger(x, y)
+        if not seen.danger then
+            seen.danger = sandbox(function(call)
+                call(S.GenerateDangerZoneRange, { 0 })
+                return readGrid(mem, S.gBmMapRange, w, h)
+            end)
+        end
+        return seen.danger[y] and seen.danger[y][x] or 0
+    end
+
+    function s.threat(e)
+        if not seen.threats[e.id] then
+            seen.threats[e.id] = sandbox(function(call)
+                for _, o in ipairs(api.board().units) do
+                    if o.faction == "red" and o.id ~= e.id then
+                        local st = mem.u32(o.addr + UNIT_STATE)
+                        api.write32(o.addr + UNIT_STATE, st | US_UNDER_A_ROOF)
+                    end
+                end
+                call(S.GenerateDangerZoneRange, { 0 })
+                return readGrid(mem, S.gBmMapRange, w, h)
+            end)
+        end
+        local g = seen.threats[e.id]
+        return function(x, y) return g[y] and g[y][x] or 0 end
+    end
+
+    function s.reach(u)
+        return sandbox(function(call)
+            call(S.GenerateUnitMovementMap, { u.addr })
+            local out = {}
+            for y = 0, h - 1 do
+                for x = 0, w - 1 do
+                    if grid(mem, S.gBmMapMovement, x, y) < M.MOVE_LIMIT
+                        and ((x == u.x and y == u.y) or grid(mem, S.gBmMapUnit, x, y) == 0) then
+                        out[#out + 1] = { x = x, y = y }
+                    end
+                end
+            end
+            return out
+        end)
+    end
+
+    function s.range(u)
+        if seen.ranges[u.id] == nil then seen.ranges[u.id] = M.range(api, u, sandbox) or false end
+        return seen.ranges[u.id] or nil
+    end
+
+    function s.canSeize(u)
+        if seen.seizers[u.id] == nil then seen.seizers[u.id] = M.canSeize(api, u, sandbox) end
+        return seen.seizers[u.id]
+    end
+
+    function s.attack(u, e, x, y, slot)
+        local r = s.range(u)
+        local d = Board.distance(x, y, e.x, e.y)
+        if not (r and d >= r.min and d <= r.max) then return nil end
+        local ours = sandbox(function(call, proc)
+            call(S.BattleGenerateSimulation, { u.addr, e.addr, x, y, slot or M.ISLOT_AUTO })
+            call(S.InitBattleForecastBattleStats, { proc })
+            local a = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
+            a.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B, false)
+            return a
+        end)
+        return M.attackOf(ours, e.hp)
+    end
+
+    -- Moves `u` onto (x, y): its struct and gBmMapUnit, so movement and blocking see it there.
+    local function standOn(u, x, y)
+        if mem.u8(cell(mem, S.gBmMapUnit, u.x, u.y)) == u.id then
+            api.write8(cell(mem, S.gBmMapUnit, u.x, u.y), 0)
+        end
+        api.write8(cell(mem, S.gBmMapUnit, x, y), u.id)
+        api.write8(u.addr + UNIT_X, x)
+        api.write8(u.addr + UNIT_Y, y)
+    end
+
+    -- Hides every other unit the AI could choose, so its own routine can only pick `u`. Hidden
+    -- units keep their gBmMapUnit entries: they still block as they do.
+    local function onlyTarget(u)
+        for _, o in ipairs(api.board().units) do
+            if o.faction ~= "red" and o.id ~= u.id and o.onField then
+                api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_HIDDEN)
+            end
+        end
+    end
+
+    function s.strike(u, e, x, y)
+        local t = sandbox(function(call, proc)
+            standOn(u, x, y)
+            -- cp_decide.c's per-unit setup, in its order, with every player unit still visible:
+            -- the AI's danger map (AiFillDangerMap) is their threat, and its tile choice reads it.
+            -- Left out: RefreshEntityBmMaps/RenderBmMap/RefreshUnitSprites (they would rebuild
+            -- gBmMapUnit from the structs, which is already what it holds, and draw) and
+            -- gAiState.unk7C = 0 (read only by cp_staff.c, the staff AI).
+            api.write32(S.gActiveUnit, e.addr)
+            api.write8(S.gActiveUnitId, e.id)
+            call(S.AiUpdateNoMoveFlag, { e.addr })
+            api.write8(S.gAiState + AI_WEIGHT_TABLE,
+                (mem.u16(e.addr + UNIT_AI_CONFIG) & AI_WEIGHT_MASK) >> AI_WEIGHT_SHIFT)
+            api.write8(S.gAiState + AI_DANGER_FILLED, 0)
+            call(S.AiInitDangerMap, {})
+            -- Only now is `u` made the one target: AiAttemptOffensiveAction skips hidden units.
+            onlyTarget(u)
+            call(S.AiClearDecision, {})
+            call(S.AiAttemptOffensiveAction, { S.AiIsUnitEnemy | 1 })
+            local D = S.gAiDecision
+            if mem.u8(D + DEC_ACTION) ~= AI_ACTION_COMBAT or mem.u8(D + DEC_TARGET) ~= u.id then
+                return nil
+            end
+            local sx, sy, slot = mem.u8(D + DEC_X), mem.u8(D + DEC_Y), mem.u8(D + DEC_SLOT)
+            if slot == BALLISTA_SLOT then
+                call(S.BattleGenerateBallistaSimulation, { e.addr, u.addr, sx, sy })
+            else
+                call(S.BattleGenerateSimulation, { e.addr, u.addr, sx, sy, slot })
+            end
+            call(S.InitBattleForecastBattleStats, { proc })
+            local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
+            side.slot, side.tile = slot, { x = sx, y = sy }
+            return side
+        end)
+        return M.strikeOf(t)
+    end
+
+    function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
+
+    function s.fieldUnit()
+        local first
+        for _, u in ipairs(api.board().units) do
+            if u.faction == "blue" and u.onField then
+                if s.canSeize(u) then return u end
+                first = first or u
+            end
+        end
+        return first
+    end
+
+    -- FE8's own march distance: GenerateExtendedMovementMap from the goal, out to
+    -- MAP_MOVEMENT_EXTENDED -- the map its AI heads for a far target over (cp_0803E2F4.c).
+    -- Units do not block it, as they do not block the AI's. A field is a march heading; each
+    -- unit's real reach is reach()'s.
+    function s.field(goalTile)
+        local k = goalTile.x .. "," .. goalTile.y
+        if seen.fields[k] == nil then
+            local unit = s.fieldUnit()
+            seen.fields[k] = unit and sandbox(function(call)
+                local costs = call(S.GetUnitMovementCost, { unit.addr })
+                call(S.GenerateExtendedMovementMap, { goalTile.x, goalTile.y, costs })
+                local dist = {}
+                for y = 0, h - 1 do
+                    dist[y] = {}
+                    for x = 0, w - 1 do
+                        local v = grid(mem, S.gBmMapMovement, x, y)
+                        if v ~= M.UNREACHED then dist[y][x] = v end
+                    end
+                end
+                return dist
+            end) or false
+        end
+        return seen.fields[k] or nil
+    end
+
+    -- The game's turn-event check (eventinfo.c: the phase-change hook searches turnBasedEvents
+    -- with SearchAvailableEvent), asked at each later turn and phase (M.eventOrder). A script
+    -- already available now (a repeating event) is no change; the first turn offering a new one
+    -- is. Cost: a frame or more per call, ~765 for a full scan to turn 255 -- paid only when a
+    -- board repeats, against a chapter's tens of thousands.
+    function s.nextTurnEvent(turn)
+        return sandbox(function(call, info)
+            local events = call(S.GetChapterEventDataPointer, { api.chapter() })
+            local list = mem.u32(events)
+            local function scriptsAt(t, phase)
+                local out = {}
+                api.write16(S.gPlaySt + PLAY_TURN, t)
+                api.write8(S.gPlaySt + PLAY_FACTION, phase)
+                for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
+                api.write32(info, list)
+                local found = call(S.SearchAvailableEvent, { info })
+                while found ~= 0 do
+                    out[mem.u32(info + EVENT_SCRIPT)] = true
+                    found = call(S.SearchNextAvailableEvent, { info })
+                end
+                return out
+            end
+            local now = scriptsAt(turn, M.PHASES[1])
+            for _, at in ipairs(M.eventOrder(turn)) do
+                local found = M.firstNewEvent(now, { { turn = at.turn,
+                                                       scripts = scriptsAt(at.turn, at.phase) } })
+                if found then return found end
+            end
+            return nil
+        end)
+    end
+
+    return s
+end
+
+-- A unit's attack reach without a whole sight (harness.lua's unitAttackRange): the weapon FE8
+-- has equipped (GetUnitEquippedWeapon) and its range, { min, max } or nil. `sandbox` is
+-- optional (a sight passes its own).
+function M.range(api, u, sandbox)
+    local S = api.SYM
+    local item = (sandbox or M.machine(api.cpu))(function(call)
+        return call(S.GetUnitEquippedWeapon, { u.addr })
+    end)
+    local mn, mx = api.Board.itemRange(item)
+    return mn and { min = mn, max = mx } or nil
+end
+
+-- The game's CanUnitSeize for `u` without a whole sight (harness.lua's clear loop).
+function M.canSeize(api, u, sandbox)
+    return (sandbox or M.machine(api.cpu))(function(call)
+        return call(api.SYM.CanUnitSeize, { u.addr }) ~= 0
+    end)
+end
+
+-- InitRN(seed) run in the sandbox, its three seeds then written into the live game: the run's
+-- whole RNG stream is the game's own function of `seed`.
+function M.seed(api, seed)
+    local S = api.SYM
+    local words = M.machine(api.cpu)(function(call)
+        call(S.InitRN, { seed })
+        return { api.mem.u16(S.gRNSeeds), api.mem.u16(S.gRNSeeds + 2), api.mem.u16(S.gRNSeeds + 4) }
+    end)
+    for i, v in ipairs(words) do api.write16(S.gRNSeeds + (i - 1) * 2, v) end
+    return words
+end
+
+return M

@@ -86,6 +86,12 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by #510 step 9 PR D (ADR 0369): who may Seize and a unit's reach are the game's
+    # answers (CanUnitSeize, GetUnitEquippedWeapon) read through sight.lua, never board.lua's
+    # copies; the enemy's strike is AiAttemptOffensiveAction itself, not a copy of its slot loop
+    r'Board\.canSeize', r'Board\.lordPid', r'Board\.attackRange', r'LORDSEL_FLAG_BASE \+ i\) to know',
+    r'\bruledOut memo\b', r'\baiPick\b', r'\btakenCandidates\b', r'\bdiesWorst\b',
+    r'sight\.forecast\b',
     # retired by #510 step 9 PR C (ADR 0368): the greedy clear-bot core moved whole into bot.lua
     # (aggression "greedy"); harness.lua binds it as BOT
     r'\bclearbot\b', r'test_clearbot',

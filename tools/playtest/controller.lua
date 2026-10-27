@@ -732,6 +732,9 @@ function M.legalActions(observation)
         -- lets a driver RECOVER from a selector it cannot commit instead of wedging
         -- there for the rest of the run (#232).
         add(actions, "cancel_target", "B", "target.selection")
+        -- RIGHT steps to the next target in range (uiselecttarget.c TargetSelection_Loop:
+        -- DPAD_RIGHT | DPAD_DOWN), so a driver can reach a CHOSEN enemy, not only the first.
+        add(actions, "next_target", "RIGHT", "target.cycle")
     elseif state == "player_map_idle" then
         addCursorActions(actions, observation.cursor)
         if observation.cursor then

@@ -21,17 +21,22 @@ were deleted. Greedy is the fourth aggression, `"greedy"`: it reads no forecast 
 the clear scenarios keep calling its functions directly through harness.lua's `BOT` binding,
 picking exactly as before (every old test case is ported unchanged).
 
-**One forecast direction.** `sight.forecast(unit, target, x, y, slot)` is always our unit's attack
-from (x, y). The enemy phase is read from the `taken*` fields of the forecast our unit would get
-against each threatening enemy; there is no enemy-side call.
+**One forecast direction** (superseded by ADR 0369: our attack and the enemy's own strike are two
+reads, `sight.attack` and `sight.strike`, and the strike is the enemy AI's own decision).
+`sight.forecast(unit, target, x, y, slot)` was always our unit's attack from (x, y). The enemy phase
+was read from the `taken*` fields of the forecast our unit would get against each threatening
+enemy; there was no enemy-side call.
 
-**Worst case on an end tile** = the sum, over every enemy that reaches the tile (some tile of
-`sight.reach(enemy)` within its weapon range; `danger(x, y) = 0` skips the walk), of
+**Worst case on an end tile** = the sum, over every enemy that reaches the tile (first written as
+some tile of `sight.reach(enemy)` within its held weapon's range; ADR 0369 made it the game's own
+one-enemy danger zone, `sight.threat`; `danger(x, y) = 0` skips the walk), of
 `takenDmg x takenHits`, tripled when `takenCrit > 0` (FE8 triples a crit), zero when
 `takenHit = 0`. A sure kill's target (`killsTarget` at hit 100) is left out: it dies before the
 enemy phase.
 
-**The styles are gates, not weights:**
+**The styles are gates, not weights** (ADR 0369 moved `diesWorst` into the bot: an attack is
+refused when its own counter's worst case, which is nothing for a sure first-blow kill, reaches
+the unit's HP):
 - `careful`: no `diesWorst`, and the worst case is below the unit's HP after its own attack's
   worst-case counter (none when the first blow is a sure kill), so an exchange plus an enemy
   phase that kill together are refused;
@@ -45,52 +50,48 @@ None of these gates or the attack ranking was chosen by looking at a survival ra
 **Order within a turn:** the lord seizes when it can reach the seize tile, whatever the danger
 (seizing ends the chapter, so no enemy phase follows); then the unit with an allowed sure kill;
 then the unit whose own tile has the largest worst case (the threat measure is the worst case
-everywhere; the number of reaching enemies only breaks a tie); then slot order. Greedy keeps its old order: seize,
+everywhere; the danger zone's coverage only breaks a tie -- not an enemy count, ADR 0369); then slot order. Greedy keeps its old order: seize,
 then slot order. A unit attacks when an allowed attack exists (sure kill, then kill chance, then
 expected damage, then the boss, then the lowest HP), else it marches toward the objective (its
 tile, the boss, or the nearest enemy; it holds on `survive`) over allowed tiles, and with none
 allowed (or nothing to march to) it ends where the worst case is smallest.
 
-**A unit that cannot Seize never blocks the throne.** Who may Seize is `Board.canSeize(unit,
-objective.lord, objective.ruledOut)`, its one owner: with no lord pid, anyone not in the ruledOut
-memo may try. A unit that cannot never ends on the seize tile, nor on or beside it
+**A unit that cannot Seize never blocks the throne.** Who may Seize is the game's own
+`CanUnitSeize`, read through `sight.canSeize` (amended by ADR 0369; this record first named
+`Board.canSeize` with a lord pid and a memo of refused units). A unit that cannot never ends on the seize tile, nor on or beside it
 (`needsToStepOff`) while another tile is left, to wait or to attack. The one exception is a target
 standing ON the seize tile (the boss on the throne), which it strikes from the approach.
 
 **What PR D supplies beyond the first interface:**
-- `objective.lord` (Board.lordPid) and `objective.ruledOut` (the slots that stood on the tile with
-  no Seize command), so Board.canSeize answers who may Seize.
-- `sight.field(goal)`, optional: a pathing.distanceField-shaped field toward `goal`, from the
-  game's terrain. A function of the goal because the bot picks the goal. Without it the march is
+- `sight.canSeize(unit)`, the game's `CanUnitSeize` (ADR 0369 replaced the lord pid + memo
+  first named here).
+- `sight.field(goal)`, optional: a distance field toward `goal` (ADR 0369: FE8's own extended
+  movement map). A function of the goal because the bot picks the goal. Without it the march is
   Manhattan, which strands a unit against a wall (#60).
-- `sight.cache`, optional: one table per player phase. Forecasts are kept in it across decide
-  calls, keyed by what FE8's forecast reads for that exchange: both fighters (id, HP, held item
-  and its uses), the strike tile, the enemy's tile, and every other unit within support range of
-  either fighter (`SUPPORT_BONUSES_MAX_DISTANCE` = 3, bmreliance.h). A whole-board key missed on
-  every action, so in the ROM each decide would have re-paid a full sweep of emulator round trips;
-  a pair-only key returned a stale forecast after an ally moved. Reach and worst case are per call
-  only, and each unit's allowed attacks are worked out once per call. A supporter that is rescued
-or hidden leaves the on-field list, so it leaves the key too; the flag that lifts the support range
-check (gameStateBits 0x40, BM_FLAG_LINKARENA: link arena and debug only) never changes within a
-phase, the cache's lifetime.
+- `sight.cache`, optional: one table per player phase, forecasts kept across decide calls. The
+  key is the exchange and the WHOLE board (ADR 0369: the enemy's strike is its AI's own pick of
+  weapon and tile, which any unit can change; this record first keyed it on the units within
+  support range, which was right only for the forecast window). Reach and worst case are per
+  call only, and each unit's allowed attacks are worked out once per call.
 - The action carries `unitId` and `targetId` (Board's unique index byte) beside the charIds,
   because generics share a charId and the ROM layer has to know which body to act on.
 
 **Between chapters (PR C2): four pure rules, fixed now from the Wiki's general strategy.** Same
 contract as `decide`: plain tables in, no memory read, no character id, chapter number or item id
 in the Lua (the caller marks the Vulnerary with `kind = "vulnerary"` and a seal that promotes THIS
-unit with `promotes = true`; the bot never knows which seal fits which class). The input shapes
-are in bot.lua's header.
+unit with `promotes = true`; the bot never knows which seal fits which class). ADR 0369 removed
+the game rules this record first put here (a level-10 check, a rank comparison): `promotes` and
+`canUse` are the game's own checks, read by the caller. The input shapes are in bot.lua's header.
 - `Bot.prep(roster, cap, style)`: forced units in slot order, then `style.deploy` in listed order
   (a charId not in the roster is skipped, a repeat counts once), then the highest level, ties by
   slot order, up to the cap. The cap is never exceeded except by forced units: when they alone
   exceed it, all of them still go and nothing else does. `give` is always `{}`: no transfer rule
   is decided yet.
 - `Bot.shop(gold, stock, party)`: one cheapest Vulnerary per deployed unit, then, per unit in
-  deploy order and per weapon type it has a rank in, the cheapest stock weapon at or under that
-  rank when the unit holds none of the type. A purchase gold cannot cover is skipped and later
+  deploy order and per weapon type among the stock it can use (`canUse`, the game's
+  `CanUnitUseWeapon`), the cheapest one it can use when it holds none of the type. A purchase gold cannot cover is skipped and later
   ones are still tried; the result is aggregated `{{item, qty}}`.
-- `Bot.promote(unit, items)`: level 10 or above with a promoting seal held. The order is
+- `Bot.promote(unit, items)`: a seal the game accepts for this unit is held. The order is
   `Bot.promoteOrder(units)` (highest level first, ties by slot order); the caller spends a seal
   per true.
 - `Bot.route(options, style)`: `style.route` validated as an index into `options` (it raises on

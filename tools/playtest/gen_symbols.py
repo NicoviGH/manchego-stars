@@ -190,9 +190,6 @@ WANTED = [
                                 # class and stat line; the controller classifies it.
     'gProcScr_TitleScreen',     # proc script: the title screen (src/titlescreen.c).
                                 # Active after the dev placeholder's MNTS return.
-    'gProcScr_OpSubtitle',      # proc script: the opening subtitle crawl (src/opsubtitle.c).
-                                # In a --montage build this carries the #43 lore crawl, so a
-                                # live instance == the montage opener actually played.
     'ProcScr_PrepUnitScreen',   # proc script: the prep "Pick Units" screen (deploy/bench).
     'gPrepUnitList',            # struct PrepUnitList (include/prepscreen.h): units[0x40] then
                                 # max_num at +0x100 -- PrepGetUnitAmount(). It is what
@@ -244,11 +241,6 @@ WANTED = [
     'gBanimTerrain',            # u8[2] terrain ids the battle animation resolved for the two
                                 # sides (POS_L/POS_R; src/banim-ekrbattleintro.c). These are what
                                 # GetBanimTerrainGround/GetBanimBackgroundIndex are indexed with.
-    'gBanimFloorfx',            # s16[2] -- the ANSWER those lookups gave: the battle_terrain_table
-                                # INDEX each side is standing on (src/banim-ekrbattleintro.c).
-                                # Terrain says what tile they are on; this says which platform the
-                                # engine drew, which is a different question and the one #65 got
-                                # wrong for two months while every terrain assertion passed.
     'gBanimDoneFlag',           # u32[2] -- the EXACT soft-lock condition. ekrBattleInRoundIdle
                                 # (src/banim-ekrbattle.c) spins until both sides' flags are set,
                                 # so a battle anim that never signals done wedges the whole proc
@@ -261,17 +253,36 @@ WANTED = [
     'gpEkrBattleUnitLeft',      # struct BattleUnit * -- the LEFT screen side of the animation
     'gpEkrBattleUnitRight',     # struct BattleUnit * -- ...and the RIGHT. Which one maps to the
                                 # actor depends on faction, so print both to read a freeze.
-]
-
-
-# Symbols the harness can do WITHOUT. Absent -> left out of SYM (Lua reads nil and falls back),
-# with one log line. Everything in WANTED stays required: a missing one is a total outage.
-# A name belongs here only when one of the ELFs run.sh targets genuinely lacks it --
-# PT_VANILLA's build/vanilla-fe8 has no campaign engine patches.
-OPTIONAL = [
-    'gLordSelectCandidates',    # u16[] pid table ended by 0xFFFF (engine patch 0005, events_udefs.c):
-                                # with the 0xF0+i permanent flags it names the chosen lead, the one
-                                # unit CanUnitSeize allows (board.lua Board.lordPid). Vanilla has none.
+    # sight.lua (#510 step 9 PR D) runs these game functions in a saved-and-restored state and
+    # reads what they write, so the bot sees what FE8 computes and nothing re-created.
+    'gBmMapRange',              # u8** range map GenerateDangerZoneRange fills (bmidoten.c)
+    'gRNSeeds',                 # u16[3], FILE-STATIC in rng.c (nm: local 'b'); InitRN seeds it
+    'BattleGenerateSimulation',      # the forecast's simulation (bmbattle.c)
+    'InitBattleForecastBattleStats', # the forecast window's hit counts (bksel.c)
+    'GenerateDangerZoneRange',  # the player phase's danger zone (bmidoten.c, playerphase.c)
+    'GenerateUnitMovementMap',  # a unit's reach into gBmMapMovement (bmidoten.c)
+    'GetUnitMovementCost',      # a unit's terrain cost table, -1 = impassable (bmunit.c)
+    'GetAvailableTileEventCommand',  # a tile's location event; Seize = 0x11 (eventinfo.c)
+    'GetROMChapterStruct',      # chapter data: the goal window type +0x8C, its turn +0x8D
+    'InitRN',                   # the game's own RNG seeding (rng.c)
+    # An enemy's strike on one target: the enemy phase's per-unit setup (cp_decide.c) and its
+    # offensive routine itself (cp_battle.c AiAttemptOffensiveAction).
+    'AiAttemptOffensiveAction', # the AI's whole attack decision for the active unit
+    'AiIsUnitEnemy',            # the "is enemy" test the AI script passes it (cp_script.c)
+    'AiUpdateNoMoveFlag',       # sets AI_FLAG_STAY from the unit's ai_config
+    'AiInitDangerMap',          # the AI's danger map, which its tile choice reads
+    'AiClearDecision',          # empties gAiDecision before a decision
+    'gAiState',                 # struct AiState: dangerMapFilled +7A, combatWeightTableId +7D
+    'BattleGenerateBallistaSimulation',  # a ballista's strike (bmbattle.c)
+    'gActiveUnit',              # struct Unit *: the AI decides for THIS unit
+    'gActiveUnitId',            # u8, its index; read beside gActiveUnit by the AI
+    # Turn events still to come (eventinfo.c): botrun's "nothing can change this board".
+    'GetChapterEventDataPointer',   # the chapter's event lists; turnBasedEvents at +00
+    'SearchAvailableEvent',     # the turn-event check the phase change runs
+    'SearchNextAvailableEvent', # and its continuation
+    'GenerateExtendedMovementMap',  # the AI's march distance to a far goal (bmidoten.c)
+    'CanUnitSeize',             # who may Seize: the Seize command's own check (bmdifficulty.c)
+    'GetUnitEquippedWeapon',    # the weapon BU_ISLOT_AUTO strikes with: first usable (bmitem.c)
 ]
 
 
@@ -290,10 +301,9 @@ def parse_nm(text):
     return out
 
 
-def wanted_symbols(symbols, wanted, optional=()):
-    """The named symbols, or KeyError naming every REQUIRED one the ELF does not have.
-    `optional` names are included when present and simply absent otherwise."""
-    names = set(wanted) | set(optional)
+def wanted_symbols(symbols, wanted):
+    """The named symbols, or KeyError naming every one the ELF does not have."""
+    names = set(wanted)
     found = {s.name: s.addr for s in symbols if s.name in names}
     missing = [w for w in wanted if w not in found]
     if missing:
@@ -525,10 +535,7 @@ def main():
     nm = subprocess.run(['arm-none-eabi-nm', ELF], capture_output=True, text=True, check=True)
     symbols = parse_nm(nm.stdout)
     try:
-        addrs = wanted_symbols(symbols, WANTED, OPTIONAL)
-        for name in OPTIONAL:
-            if name not in addrs:
-                print('optional symbol %s not in %s -- SYM.%s is nil' % (name, ELF, name))
+        addrs = wanted_symbols(symbols, WANTED)
         link_map = os.path.splitext(ELF)[0] + '.map'
         if os.path.exists(link_map):        # a PT_ELF build may ship no map; SYM then lacks them
             with open(link_map, encoding='utf-8') as fh:
@@ -539,7 +546,7 @@ def main():
     write_atomic(OUT, ''.join(
         ['-- generated by gen_symbols.py from fireemblem8.elf; do not edit\n', 'SYM = {\n']
         + ['    %s = 0x%08X,\n' % (name, addrs[name])
-           for name in WANTED + OPTIONAL + list(STATIC_EWRAM) if name in addrs]
+           for name in WANTED + list(STATIC_EWRAM) if name in addrs]
         + ['}\n', 'CAMPAIGN = %s\n' % lua_literal(facts)]))
     print('wrote %s (%d symbols)' % (OUT, len(addrs)))
 

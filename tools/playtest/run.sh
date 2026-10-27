@@ -55,6 +55,12 @@
 #                           and still fires when the party walks into the clearing (same ROM/host)
 #   fuzz  | fuzz_ch01    -- SEEDED random-input soak (#49); set PT_SEED=N (default 1) to
 #                           pick the seed; a FAIL prints the seed so PT_SEED=N replays it
+#   bot                  -- #510 step 9: the bot plays our ch01 (botrun.lua, sight.lua) and
+#                           prints one `BOTRUN <json>` record. PT_SEED=N seeds the game's RNG,
+#                           PT_STYLE / PT_CLAIMS are JSON (bot.lua's style, resolved claims).
+#                           PT_VANILLA=1: retail Ch1, after the bot plays the Prologue
+#   sightprobe           -- what sight.lua reads at ch01's start (retail: the Prologue), logged
+#                           for a check by eye: danger grid, objective, reach, a forecast
 #   llm                  -- LLM-player commander on the prologue (#63): the harness
 #                           handshakes with an EXTERNAL sidecar over PT_LLM_DIR (default
 #                           /tmp/playtest-llm-handshake). Start the sidecar first:
@@ -249,6 +255,8 @@ run_mgba() {
     fi
     local wrapper="$out/wrapper.lua"
     cat > "$wrapper" <<EOF
+-- PT_STYLE / PT_CLAIMS are JSON: read from the environment, never spliced into this source,
+-- where a nested array's "]]" would close a Lua long string early.
 PLAYTEST_DIR = "$HERE"
 PLAYTEST_SCENARIO = "$scen"
 PLAYTEST_ENTRY = "$([ "$scen" = "$SCENARIO" ] && echo "${MX_ENTRY:-}")"
@@ -256,6 +264,10 @@ PLAYTEST_LOG = "$log"
 PLAYTEST_SHOTDIR = "$out"
 PLAYTEST_STATEDIR = "$STATE_DIR"
 PLAYTEST_SEED = "${PT_SEED:-1}"
+PLAYTEST_STYLE = os.getenv("PT_STYLE") or ""
+PLAYTEST_CLAIMS = os.getenv("PT_CLAIMS") or ""
+PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
+PLAYTEST_ROMHASH = "$ROMHASH"
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-${MX_HOST_CHAPTER:-1}}
 PLAYTEST_CHECKPOINT = "${CKPT:-}"
 PLAYTEST_DIFFICULTY = "${PT_DIFFICULTY:-normal}"

@@ -464,6 +464,27 @@ class TestDifficultyGateDefault(unittest.TestCase):
 RUN_SH = os.path.join(REPO, 'tools/playtest/run.sh')
 
 
+class TestUnitStateBits(unittest.TestCase):
+    def test_board_lua_state_bits_are_the_decomps(self):
+        # board.lua owns the unit state bits; sight.lua sets them to steer FE8's own code
+        # (US_HIDDEN keeps a unit out of the AI's target loop, US_UNDER_A_ROOF out of the danger
+        # zone's). A wrong bit is silent: `1 << 30` for the roof made threat(e) every enemy's
+        # danger zone. So each `Board.US_* = 1 << N` is read against include/bmunit.h, and a bit
+        # written any other way fails rather than going unchecked.
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import enum_values, vanilla_decomp_text
+        decomp = enum_values(vanilla_decomp_text('include/bmunit.h'), 'US_')
+        with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
+            text = fh.read()
+        named = re.findall(r'^Board\.(US_\w+)\s*=', text, re.M)
+        bits = dict(re.findall(r'^Board\.(US_\w+) = 1 << (\d+)\b', text, re.M))
+        self.assertIn('US_UNDER_A_ROOF', named, 'board.lua names no US_UNDER_A_ROOF')
+        self.assertEqual(sorted(named), sorted(bits),
+                         'a Board.US_* bit not written as `1 << N` goes unchecked')
+        for name, shift in bits.items():
+            self.assertEqual(1 << int(shift), decomp.get(name), name)
+
+
 class TestNoBlanketEmulatorKill(unittest.TestCase):
     """Scenarios run FOUR AT A TIME by default since #310, so anything run.sh kills by name
     kills its siblings."""
@@ -490,19 +511,6 @@ class TestNoBlanketEmulatorKill(unittest.TestCase):
         """Scoped, not deleted: a leftover emulator from an interrupted run of the SAME
         scenario still has to be cleared, or it holds the ROM the next run wants."""
         self.assertIn('pkill', self.source())
-
-class TestBoardLordSelectPin(unittest.TestCase):
-    def test_board_lua_lord_flag_base_is_the_injectors(self):
-        # board.lua reads the chosen lead the way LordSelect_GetPid does (permanent flag
-        # LORDSEL_FLAG_BASE + i) to know who can Seize. The base is a literal on both sides,
-        # so a move on the injector's side must fail here, not as a bot that marches the
-        # wrong unit on the throne.
-        sys.path.insert(0, os.path.join(REPO, 'tools'))
-        from inject.decomp import LORDSEL_FLAG_BASE
-        with open(os.path.join(REPO, 'tools/playtest/board.lua'), encoding='utf-8') as fh:
-            m = re.search(r'Board\.LORDSEL_FLAG_BASE = (0x[0-9A-Fa-f]+)', fh.read())
-        self.assertIsNotNone(m, 'board.lua must define Board.LORDSEL_FLAG_BASE')
-        self.assertEqual(int(m.group(1), 16), LORDSEL_FLAG_BASE)
 
 
 if __name__ == '__main__':

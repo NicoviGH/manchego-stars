@@ -33,7 +33,9 @@ Three things worth keeping:
    first `recordch05platform` asserted *terrain*, filmed, and PASSED while the fighters stood on
    the wrong platform — terrain says which tile, and the ground is the answer to a different
    question. It now reads `gBanimFloorfx`, the engine's own resolved table index, and names the
-   row. *A scenario's verdict only covers what it READS* has now cost us twice.
+   row. *A scenario's verdict only covers what it READS* has now cost us twice. (ADR 0367
+   archived the recorder, and PR #542 dropped `gBanimFloorfx` from `gen_symbols.py` WANTED since
+   nothing read it: restoring the recorder restores that symbol too.)
 2. **The plausible wrong answer is the dangerous one.** Grass under snow got reported by eye in a
    day. The drift-instead-of-rough error survived two months because the wrong platform was
    still snow. Where a defect's failure mode is "looks fine", an assertion is the only detector.

@@ -12,15 +12,15 @@
 -- Board.read(mem, SYM) -> {
 --   turn, phase = "blue"|"green"|"red", map = { w, h },
 --   units = { { id, slot, faction, charId, classId, x, y, onMap, onField, hp, maxhp, level,
---               state, dead, acted, items = { {id, uses}... }, minRange, maxRange, isBoss,
+--               state, dead, acted, items = { {id, uses}... }, isBoss,
 --               addr, pow, def }... } }
 -- `slot` is the 0-based index into the faction's array; `id` is the unit's own index byte
 -- (struct Unit +0x0B: blue 0x01.., green 0x41.., red 0x81..), unique across factions.
 -- `onMap` = a real tile (FE8 parks an off-map unit at -1); `onField` = onMap AND not hidden,
 -- rescued or undeployed AND not dead -- a body that stands on its tile and can be fought.
 --
--- Two read widths, on purpose. Board.read / Board.unitAt are the FULL read (items, weapon
--- reach, boss attribute): a snapshot a decision is made from. Board.leanAt and the scans built
+-- Two read widths, on purpose. Board.read / Board.unitAt are the FULL read (items, boss
+-- attribute): a snapshot a decision is made from. Board.leanAt and the scans built
 -- on it read only position/hp/state, because harness.lua calls them from per-frame waits and
 -- per-tile loops, where the full read multiplied by every frame is what made tooling slow.
 --
@@ -42,6 +42,7 @@ Board.US_UNSELECTABLE = 1 << 1  -- "has acted this phase"
 Board.US_DEAD = 1 << 2
 Board.US_NOT_DEPLOYED = 1 << 3
 Board.US_RESCUED = 1 << 5
+Board.US_UNDER_A_ROOF = 1 << 7  -- the danger zone's loop skips it (bmidoten.c)
 local OFF_FIELD = Board.US_HIDDEN | Board.US_NOT_DEPLOYED | Board.US_RESCUED | Board.US_DEAD
 Board.CA_BOSS = 1 << 15         -- include/bmunit.h, a CHARACTER attribute here
 Board.ITEMDATA_STRIDE = 0x24
@@ -65,15 +66,22 @@ local function onFieldState(state, x, y)
     return x >= 0 and y >= 0 and (state & OFF_FIELD) == 0
 end
 
--- Attack reach from the item in items[0] -- FE8 keeps the equipped weapon there -- as
--- (minRange, maxRange), or nil for a staff / non-weapon (IA_WEAPON unset) or empty hand.
-function Board.attackRange(mem, SYM, addr)
-    local item = mem.u16(addr + 0x1E) & 0xFF
+-- An item's attack reach, (minRange, maxRange), as bmitem.c GetItemMinRange/GetItemMaxRange read
+-- it (encodedRange >> 4 and & 0xF; both are inline, so no symbol to call), or nil for a staff /
+-- non-weapon (IA_WEAPON unset) or no item. WHICH item a unit attacks with is the game's answer
+-- (sight.lua range(): GetUnitEquippedWeapon), never read off a slot here.
+function Board.itemRange(mem, SYM, item)
+    item = item & 0xFF
     if item == 0 then return nil end
     local data = SYM.gItemData + item * Board.ITEMDATA_STRIDE
     if (mem.u32(data + 0x08) & IA_WEAPON) == 0 then return nil end
     local er = mem.u8(data + 0x19)
     return er >> 4, er & 0xF
+end
+
+-- Tile distance, FE8's RECT_DISTANCE (include/bmmap.h): |dx| + |dy|. The one owner of it here.
+function Board.distance(ax, ay, bx, by)
+    return math.abs(ax - bx) + math.abs(ay - by)
 end
 
 -- The unit's CHARACTER carries CA_BOSS (named bosses). The class attribute is not read:
@@ -115,7 +123,7 @@ function Board.leanAt(mem, SYM, base, slot)
     }
 end
 
--- FULL: the lean read plus index, class, items, weapon reach and boss attribute.
+-- FULL: the lean read plus index, class, items and boss attribute.
 function Board.unitAt(mem, SYM, base, slot)
     local u = Board.leanAt(mem, SYM, base, slot)
     if not u then return nil end
@@ -129,7 +137,6 @@ function Board.unitAt(mem, SYM, base, slot)
     u.id = mem.u8(a + 0x0B)
     u.classId = clptr ~= 0 and mem.u8(clptr + 0x04) or nil
     u.items = items
-    u.minRange, u.maxRange = Board.attackRange(mem, SYM, a)
     u.isBoss = Board.isBoss(mem, a)
     return u
 end
@@ -257,34 +264,6 @@ function Board.find(mem, SYM, faction, charId)
     return Board.findIn(mem, SYM, SYM[f.sym], f.count, charId)
 end
 
--- Who can Seize. FE8's Seize command is usable only when CanUnitSeize(unit) holds
--- (bmmenu.c UnitActionMenu_CanSeize), and our engine patch 0005 rewrites that test to
--- `unit->pCharacterData->number == LordSelect_GetPid()` (bmdifficulty.c). LordSelect_GetPid
--- (eventinfo.c, same patch) returns the first gLordSelectCandidates[i] -- a u16 table ended by
--- 0xFFFF -- whose permanent flag LORDSEL_FLAG_BASE + i is set, else candidate 0. This mirrors
--- that read. `flagSet(flag)` is the caller's event-flag test (harness eventFlag), so the flag
--- encoding keeps one owner. nil when the build has no candidate table: then the caller can only
--- learn who cannot Seize by trying (Board.canSeize's ruledOut memo).
-Board.LORDSEL_FLAG_BASE = 0xF0   -- tools/inject/decomp.py LORDSEL_FLAG_BASE (pinned by a test)
-local MAX_LORD_CANDIDATES = 64   -- a bound for a corrupt table, far above any cast
-function Board.lordPid(mem, SYM, flagSet)
-    local base = SYM.gLordSelectCandidates
-    if not base then return nil end
-    for i = 0, MAX_LORD_CANDIDATES - 1 do
-        local pid = mem.u16(base + i * 2)
-        if pid == 0xFFFF then break end
-        if flagSet(Board.LORDSEL_FLAG_BASE + i) then return pid end
-    end
-    return mem.u16(base)
-end
-
--- Can `unit` Seize? Decided up front from the lord's pid when it is known; otherwise only the
--- memo of units that stood on the tile without a Seize command (ruledOut[slot]) says no.
-function Board.canSeize(unit, lordPid, ruledOut)
-    if lordPid then return unit.charId == lordPid end
-    return not (ruledOut and ruledOut[unit.slot])
-end
-
 -- Snapshot lookups over a Board.read result.
 -- The first unit of `faction` with `charId`, or nil. Generics SHARE a charId: use Board.at.
 function Board.unit(board, faction, charId)
@@ -374,14 +353,14 @@ function Board.bind(mem, SYM)
         liveBoss = function() return Board.liveBoss(mem, SYM) end,
         findIn = function(base, count, charId) return Board.findIn(mem, SYM, base, count, charId) end,
         find = function(faction, charId) return Board.find(mem, SYM, faction, charId) end,
-        attackRange = function(addr) return Board.attackRange(mem, SYM, addr) end,
+        itemRange = function(item) return Board.itemRange(mem, SYM, item) end,
         isBoss = function(addr) return Board.isBoss(mem, addr) end,
         occupied = function(x, y) return Board.occupied(mem, SYM, x, y) end,
-        lordPid = function(flagSet) return Board.lordPid(mem, SYM, flagSet) end,
-        canSeize = Board.canSeize,
-        inMap = Board.inMap, place = Board.place, freeBeside = Board.freeBeside,
+        distance = Board.distance, inMap = Board.inMap, place = Board.place,
+        freeBeside = Board.freeBeside,
         unit = Board.unit, at = Board.at, live = Board.live, inPhase = Board.inPhase,
-        UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD,
+        UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
+        US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE,
     }
 end

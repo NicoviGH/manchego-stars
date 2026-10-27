@@ -43,27 +43,36 @@ class WantedSymbols(unittest.TestCase):
             gs.wanted_symbols(gs.parse_nm(NM), ['gPlaySt', 'NoSuchSymbol'])
         self.assertIn('NoSuchSymbol', str(raised.exception))
 
-    def test_an_optional_symbol_missing_from_the_elf_does_not_raise(self):
-        # PT_VANILLA runs against build/vanilla-fe8's ELF, which has no campaign engine
-        # (gLordSelectCandidates is engine patch 0005's). Optional means: absent -> omitted from
-        # SYM, so the Lua side reads nil and takes its fallback.
-        got = gs.wanted_symbols(gs.parse_nm(NM), ['gPlaySt'], optional=['gLordSelectCandidates'])
-        self.assertEqual(got, {'gPlaySt': 0x0202BCF0})
-        self.assertNotIn('gLordSelectCandidates', got)
 
-    def test_an_optional_symbol_present_in_the_elf_is_emitted(self):
-        got = gs.wanted_symbols(gs.parse_nm(NM), ['gPlaySt'], optional=['ProcScr_PrepMenu'])
-        self.assertEqual(got['ProcScr_PrepMenu'], 0x08A39190)
+# What sight.lua runs and reads (#510 step 9 PR D). Required, so both ELFs must carry them.
+SIGHT = ['gBmMapRange', 'gBmMapMovement', 'gBattleActor', 'gBattleTarget', 'gRNSeeds',
+         'BattleGenerateSimulation', 'InitBattleForecastBattleStats', 'GenerateDangerZoneRange',
+         'GenerateUnitMovementMap', 'GetUnitMovementCost', 'GetAvailableTileEventCommand',
+         'GetROMChapterStruct', 'InitRN', 'AiAttemptOffensiveAction', 'AiIsUnitEnemy',
+         'AiUpdateNoMoveFlag', 'AiInitDangerMap', 'AiClearDecision', 'gAiState', 'gAiDecision',
+         'BattleGenerateBallistaSimulation', 'gActiveUnit', 'gActiveUnitId',
+         'GetChapterEventDataPointer', 'SearchAvailableEvent', 'SearchNextAvailableEvent',
+         'GenerateExtendedMovementMap', 'CanUnitSeize', 'GetUnitEquippedWeapon']
+ELFS = {'ours': os.path.join(gs.DECOMP, 'fireemblem8.elf'),
+        'vanilla': os.path.join(gs.REPO, 'build', 'vanilla-fe8', 'fireemblem8.elf')}
 
-    def test_a_required_symbol_still_raises_beside_optional_ones(self):
-        with self.assertRaises(KeyError) as raised:
-            gs.wanted_symbols(gs.parse_nm(NM), ['NoSuchSymbol'], optional=['AlsoMissing'])
-        self.assertIn('NoSuchSymbol', str(raised.exception))
-        self.assertNotIn('AlsoMissing', str(raised.exception))
 
-    def test_lord_select_table_is_optional_and_nothing_else_is(self):
-        self.assertEqual(list(gs.OPTIONAL), ['gLordSelectCandidates'])
-        self.assertNotIn('gLordSelectCandidates', gs.WANTED)
+class SightSymbols(unittest.TestCase):
+    def test_every_sight_symbol_is_required(self):
+        for name in SIGHT:
+            self.assertIn(name, gs.WANTED, name)
+
+    def test_both_elfs_carry_every_sight_symbol(self):
+        # gRNSeeds is file-static in rng.c: nm lists it as a LOCAL ('b'), and it must still
+        # resolve. Skipped where a ROM has not been built (CI's tests job has no ELF).
+        import subprocess
+        for game, elf in ELFS.items():
+            if not os.path.exists(elf):
+                self.skipTest('%s ELF not built: %s' % (game, elf))
+            nm = subprocess.run(['arm-none-eabi-nm', elf], capture_output=True, text=True,
+                                check=True).stdout
+            got = gs.wanted_symbols(gs.parse_nm(nm), SIGHT)
+            self.assertEqual(sorted(got), sorted(SIGHT), game)
 
 
 class ProcScripts(unittest.TestCase):
