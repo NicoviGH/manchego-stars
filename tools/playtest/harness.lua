@@ -1131,11 +1131,13 @@ local function chooseWait()
     end, 120)
 end
 
-local function chooseTalk()
+-- `targetId` (optional): the unit to talk to, the selector stepped to it (INSPECT.stepTarget).
+local function chooseTalk(targetId)
     if not selectSemantic("talk", "Talk opens its live target selector", function(after)
         return controllerState(after) == "target_selection"
             and after.target and after.target.kind == "talk"
     end, 300) then return false end
+    if not INSPECT.stepTarget(targetId, nil) then return false end
     return guardedInput("confirm_target", "A", "Talk reaches FE8's dialogue input wait", function(after)
         return controllerState(after) == "dialogue_wait"
     end, 600)
@@ -3056,6 +3058,14 @@ INSPECT.botApi = function(game)
             return chooseAttack(u.addr, function()
                 return won() or lost() or (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0
             end, a.targetId, a.obstacle)
+        elseif a.act == "talk" then
+            if not chooseTalk(a.targetId) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+        elseif a.act == "door" then
+            if not selectSemantic("open_door", "the Door command opens the door", function(after)
+                return after.menu == nil
+            end, 120) then return false end
+            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
         elseif a.act == "staff" then
             return INSPECT.chooseStaff(u.addr, a.slot, a.targetId, function() return won() or lost() end)
         elseif a.act == "item" then

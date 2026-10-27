@@ -415,7 +415,8 @@ local function context(board, sight)
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
-                  worsts = {}, options = {}, breaches = {} }
+                  worsts = {}, options = {}, breaches = {}, keyed = {}, talks = {},
+                  openers = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
     for _, u in ipairs(board.units) do
@@ -424,7 +425,10 @@ local function context(board, sight)
             ctx.standing[tileKey(u.x, u.y)] = u
             if u.faction == "blue" then ctx.blues[#ctx.blues + 1] = u end
             if u.faction == "blue" and not u.acted then ctx.actors[#ctx.actors + 1] = u end
-            if u.faction == "red" then ctx.enemies[#ctx.enemies + 1] = u end
+            -- the enemies a player knows of: none it cannot see in fog (sight.visible)
+            if u.faction == "red" and (not sight.visible or sight.visible(u.x, u.y)) then
+                ctx.enemies[#ctx.enemies + 1] = u
+            end
         end
     end
     table.sort(ctx.actors, function(a, b) return a.slot < b.slot end)
@@ -491,50 +495,6 @@ end
 
 local function canSeize(ctx, u) return ctx.sight.canSeize(u) end
 
--- The tiles `u` can end on: its reach, less every tile another unit stands on, and less the
--- seize tile for a unit that cannot Seize there -- unless it already stands on it: its own
--- tile is always left, so a unit boxed in on the throne still has somewhere to wait.
-local function endTiles(ctx, u)
-    local s = ctx.seizeTile
-    local barred = s and not canSeize(ctx, u)
-    local out = {}
-    for _, t in ipairs(reachOf(ctx, u)) do
-        local there = ctx.standing[tileKey(t.x, t.y)]
-        local own = t.x == u.x and t.y == u.y
-        if (not there or there == u) and (own or not (barred and t.x == s.x and t.y == s.y)) then
-            out[#out + 1] = t
-        end
-    end
-    return out
-end
-
--- Where `u` may Wait: its end tiles, and for a unit that cannot Seize none on or beside the
--- seize tile (needsToStepOff) while any other is left -- it aims at the throne, it does not
--- stand in the lord's way to it.
-local function waitTiles(ctx, u)
-    local tiles, s = endTiles(ctx, u), ctx.seizeTile
-    if not s or canSeize(ctx, u) then return tiles end
-    local clear = {}
-    for _, t in ipairs(tiles) do
-        if not M.needsToStepOff(t, s) then clear[#clear + 1] = t end
-    end
-    return #clear > 0 and clear or tiles
-end
-
--- The tiles `u` may strike `e` from: anywhere it may end when `e` stands on the seize tile
--- (the boss on the throne is reached from its approach), else only where it may wait.
-local function strikeTiles(ctx, u, e)
-    local s = ctx.seizeTile
-    if s and e.x == s.x and e.y == s.y then return endTiles(ctx, u) end
-    return waitTiles(ctx, u)
-end
-
--- sight.field for `goal` (sight keeps it for the board); nil when the caller has none.
-local function fieldFor(ctx, goal)
-    if not (goal and ctx.sight.field) then return nil end
-    return ctx.sight.field(goal)
-end
-
 local function reaches(ctx, e, x, y) return ctx.sight.threat(e)(x, y) > 0 end
 
 local function listed(list, v)
@@ -562,6 +522,69 @@ local function nearestReaching(ctx, vs, x, y)
         end
     end
     return best, bestD
+end
+
+-- The tiles `u` can end on: its reach, less every tile another unit stands on, and less the
+-- seize tile for a unit that cannot Seize there -- unless it already stands on it: its own
+-- tile is always left, so a unit boxed in on the throne still has somewhere to wait.
+local function endTiles(ctx, u)
+    local s = ctx.seizeTile
+    local barred = s and not canSeize(ctx, u)
+    local out = {}
+    for _, t in ipairs(reachOf(ctx, u)) do
+        local there = ctx.standing[tileKey(t.x, t.y)]
+        local own = t.x == u.x and t.y == u.y
+        if (not there or there == u) and (own or not (barred and t.x == s.x and t.y == s.y)) then
+            out[#out + 1] = t
+        end
+    end
+    return out
+end
+
+-- Where `u` may Wait: its end tiles, and for a unit that cannot Seize none on or beside the
+-- seize tile (needsToStepOff) while any other is left -- it aims at the throne, it does not
+-- stand in the lord's way to it.
+-- An avoid claim on `u` keeps it off every tile an enemy its `vs` names reaches, while any
+-- other is left.
+local function outOfReach(ctx, u, tiles)
+    local vs = {}
+    for _, c in ipairs(ctx.style.avoids or {}) do
+        if listed(c.units, u.charId) then vs[#vs + 1] = c.vs end
+    end
+    if #vs == 0 then return tiles end
+    local clear = {}
+    for _, t in ipairs(tiles) do
+        local safe = true
+        for _, v in ipairs(vs) do
+            if nearestReaching(ctx, v, t.x, t.y) then safe = false end
+        end
+        if safe then clear[#clear + 1] = t end
+    end
+    return #clear > 0 and clear or tiles
+end
+
+local function waitTiles(ctx, u)
+    local tiles, s = outOfReach(ctx, u, endTiles(ctx, u)), ctx.seizeTile
+    if not s or canSeize(ctx, u) then return tiles end
+    local clear = {}
+    for _, t in ipairs(tiles) do
+        if not M.needsToStepOff(t, s) then clear[#clear + 1] = t end
+    end
+    return #clear > 0 and clear or tiles
+end
+
+-- The tiles `u` may strike `e` from: anywhere it may end when `e` stands on the seize tile
+-- (the boss on the throne is reached from its approach), else only where it may wait.
+local function strikeTiles(ctx, u, e)
+    local s = ctx.seizeTile
+    if s and e.x == s.x and e.y == s.y then return endTiles(ctx, u) end
+    return waitTiles(ctx, u)
+end
+
+-- sight.field for `goal` (sight keeps it for the board); nil when the caller has none.
+local function fieldFor(ctx, goal)
+    if not (goal and ctx.sight.field) then return nil end
+    return ctx.sight.field(goal)
 end
 
 -- The style's claim entries in `field` that name `u` (a carry, answer or wall's units).
@@ -632,15 +655,53 @@ local function action(u, tile, act, target)
              target = target and target.charId, targetId = target and target.id, weapon = nil }
 end
 
--- True if attack candidate c beats b: an answered class, sure kill, kill chance, expected
--- damage, boss, low HP.
+-- True if attack candidate c beats b: a priority target, an answered class, sure kill, kill
+-- chance, expected damage, boss, low HP.
 local function betterAttack(c, b)
+    if c.first ~= b.first then return c.first end
     if c.answered ~= b.answered then return c.answered end
     if c.sure ~= b.sure then return c.sure end
     if c.killChance ~= b.killChance then return c.killChance > b.killChance end
     if c.expected ~= b.expected then return c.expected > b.expected end
     if c.target.isBoss ~= b.target.isBoss then return c.target.isBoss end
     return c.target.hp < b.target.hp
+end
+
+-- A priority claim's enemy, or under a keys claim one the game says holds a key or lockpick
+-- (sight.holdsKey): struck before the rest.
+local function isPriority(ctx, e)
+    for _, c in ipairs(ctx.style.priorities or {}) do
+        if matchesVs(c.vs, e) then return true end
+    end
+    if ctx.style.keys and ctx.sight.holdsKey then
+        if ctx.keyed[e.id] == nil then ctx.keyed[e.id] = ctx.sight.holdsKey(e) end
+        return ctx.keyed[e.id]
+    end
+    return false
+end
+
+-- Under a heal claim against `e`: the most HP a healer that has not acted can give `u` after
+-- it strikes from `t` -- a staff the healer holds (sight.staves), a tile of its reach beside
+-- `t` (the adjacent staves; a Physic's reach is not counted). 0 otherwise.
+local function healCredit(ctx, u, e, t)
+    local claimed = false
+    for _, c in ipairs(ctx.style.heals or {}) do
+        if matchesVs(c.vs, e) then claimed = true end
+    end
+    if not (claimed and ctx.sight.staves) then return 0 end
+    local best = 0
+    for _, h in ipairs(ctx.actors) do
+        if h ~= u then
+            for _, st in ipairs(ctx.sight.staves(h)) do
+                if st.amount > best then
+                    for _, r in ipairs(endTiles(ctx, h)) do
+                        if manhattan(r.x, r.y, t.x, t.y) == 1 then best = st.amount break end
+                    end
+                end
+            end
+        end
+    end
+    return best
 end
 
 -- Every attack the gate allows `u` this call, worked out once (decide's pass and a claim's
@@ -656,13 +717,18 @@ local function attackOptions(ctx, u, gate)
         for _, c in ipairs(answers) do
             if matchesVs(c.vs, e) then answered = true end
         end
+        local first = isPriority(ctx, e)
         for _, t in ipairs(strikeTiles(ctx, u, e)) do
             if inRange(t.x, t.y, e.x, e.y, r.min, r.max) then
                 local f = attack(ctx, u, e, t.x, t.y)
                 local sure = f and isSureKill(f)
                 local spent = f and counterWorst(f, e)
-                if f and spent < u.hp and gate(ctx, u, t.x, t.y, sure and e or nil, spent) then
+                -- what the counter leaves before the enemy phase, a heal claim's heal counted
+                local left = f and math.max(u.hp - (u.maxhp or u.hp),
+                                            spent - healCredit(ctx, u, e, t))
+                if f and spent < u.hp and gate(ctx, u, t.x, t.y, sure and e or nil, left) then
                     opts[#opts + 1] = { tile = t, target = e, sure = sure, answered = answered,
+                                        first = first,
                                         killChance = killChance(f, e),
                                         expected = f.dmg * f.hits * f.hit }
                 end
@@ -685,10 +751,20 @@ local function bestAttack(ctx, u, gate, only)
 end
 
 -- Where the march heads: the objective's tile, the boss, or the nearest enemy; nil = hold.
+-- With no enemy in sight (fog), the nearest tile the party cannot see: a player knows no more
+-- than the fog shows, so it pushes the fog back.
 local function goalFor(ctx, u, objective)
     local kind = objective and objective.kind
     if objective and objective.tile then return objective.tile end
     if kind == "survive" then return nil end
+    if #ctx.enemies == 0 and ctx.sight.unseen then
+        local best, bestD
+        for _, t in ipairs(ctx.sight.unseen()) do
+            local d = manhattan(u.x, u.y, t.x, t.y)
+            if not bestD or d < bestD then best, bestD = t, d end
+        end
+        return best
+    end
     local best, bestD
     for _, e in ipairs(ctx.enemies) do
         local d = manhattan(u.x, u.y, e.x, e.y)
@@ -704,6 +780,15 @@ end
 -- the nearest u by that field. nil when u is not cut off, or nothing opens the way -- a door
 -- wants a key, which no rule here spends (#510).
 local SIDES = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
+
+-- `u` holds a key or lockpick for doors (sight.opens, the Door command's own check).
+local function opener(ctx, u)
+    if ctx.openers[u.id] == nil then
+        ctx.openers[u.id] = ctx.sight.opensDoor ~= nil and ctx.sight.opensDoor(u) or false
+    end
+    return ctx.openers[u.id]
+end
+
 local function breachFor(ctx, u, goal)
     if not (goal and ctx.sight.obstacles) then return nil end
     local k = u.id .. ">" .. tileKey(goal.x, goal.y)
@@ -712,16 +797,28 @@ local function breachFor(ctx, u, goal)
     b = false
     local field = fieldFor(ctx, goal)
     if field and not (field[u.y] and field[u.y][u.x]) then
-        local bestD
-        for _, o in ipairs(ctx.sight.obstacles()) do
-            local opens = false
-            for _, d in ipairs(SIDES) do
-                local y = field[o.y + d[2]]
-                if y and y[o.x + d[1]] then opens = true end
+        -- a unit that can open doors takes a door first: opening costs one act, a wall its HP
+        local lists = { ctx.sight.obstacles() }
+        if opener(ctx, u) and ctx.sight.doors then
+            local doors = {}
+            for _, d in ipairs(ctx.sight.doors()) do
+                doors[#doors + 1] = { x = d.x, y = d.y, door = true }
             end
-            local of = opens and fieldFor(ctx, o)
-            local d = of and of[u.y] and of[u.y][u.x]
-            if d and (not bestD or d < bestD) then b, bestD = o, d end
+            table.insert(lists, 1, doors)
+        end
+        for _, list in ipairs(lists) do
+            local bestD
+            for _, o in ipairs(list) do
+                local opens = false
+                for _, d in ipairs(SIDES) do
+                    local y = field[o.y + d[2]]
+                    if y and y[o.x + d[1]] then opens = true end
+                end
+                local of = opens and fieldFor(ctx, o)
+                local d = of and of[u.y] and of[u.y][u.x]
+                if d and (not bestD or d < bestD) then b, bestD = o, d end
+            end
+            if b then break end
         end
     end
     ctx.breaches[k] = b
@@ -738,13 +835,83 @@ end
 -- when it has no weapon or no such tile is in range this turn.
 local function breach(ctx, u, gate, objective)
     local b = breachFor(ctx, u, goalFor(ctx, u, objective))
-    local r = b and ctx.sight.range(u)
+    if not b then return nil end
+    -- a door opens from beside it (the Door command's own adjacency); a wall is struck in range
+    local r = b.door and { min = 1, max = 1 } or ctx.sight.range(u)
     if not r then return nil end
     for _, t in ipairs(waitTiles(ctx, u)) do
         if inRange(t.x, t.y, b.x, b.y, r.min, r.max) and gate(ctx, u, t.x, t.y, nil) then
+            if b.door then return action(u, t, "door", nil) end
             local a = action(u, t, "attack", nil)
             a.obstacle = { x = b.x, y = b.y }
             return a
+        end
+    end
+    return nil
+end
+
+-- Whether the game lets `u` Talk to `t` (sight.canTalk), asked once per pair per decide.
+local function talks(ctx, u, t)
+    local k = u.id .. ">" .. t.id
+    if ctx.talks[k] == nil then
+        ctx.talks[k] = ctx.sight.canTalk ~= nil and ctx.sight.canTalk(u, t) or false
+    end
+    return ctx.talks[k]
+end
+
+-- A Talk from a wait tile the gate allows beside `t`; nil when `u` cannot reach one.
+local function talkFrom(ctx, u, t, gate)
+    local beside = {}
+    for _, tile in ipairs(waitTiles(ctx, u)) do
+        if manhattan(tile.x, tile.y, t.x, t.y) == 1 then beside[#beside + 1] = tile end
+    end
+    if #beside == 0 or not talks(ctx, u, t) then return nil end
+    for _, tile in ipairs(beside) do
+        if gate(ctx, u, tile.x, tile.y, nil) then return action(u, tile, "talk", t) end
+    end
+    return nil
+end
+
+-- A recruit claim, before anything else: a talker it names (any the game lets, when it names
+-- none) talks the recruit over when it can reach it, else the nearest such talker (by the
+-- field from the recruit) marches on it.
+local function recruitFirst(ctx, gate)
+    for _, c in ipairs(ctx.style.recruits or {}) do
+        for _, t in ipairs(ctx.onField) do
+            if t.faction ~= "blue" and listed(c.units, t.charId) then
+                local field, near, nearD = fieldFor(ctx, t), nil, nil
+                for _, u in ipairs(ctx.actors) do
+                    if (not c.by or listed(c.by, u.charId)) and talks(ctx, u, t) then
+                        local a = talkFrom(ctx, u, t, gate)
+                        if a then return a end
+                        local d = field and field[u.y] and field[u.y][u.x]
+                                  or manhattan(u.x, u.y, t.x, t.y) + OFFFIELD
+                        if not nearD or d < nearD then near, nearD = u, d end
+                    end
+                end
+                if near then
+                    local allowed = {}
+                    for _, tile in ipairs(waitTiles(ctx, near)) do
+                        if gate(ctx, near, tile.x, tile.y, nil) then allowed[#allowed + 1] = tile end
+                    end
+                    local tile = #allowed > 0 and M.pickMove(allowed, { cur = near, goal = t,
+                                                                        field = field })
+                    return action(near, tile or { x = near.x, y = near.y }, "wait")
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- A habit, no claim needed: any Talk the game offers to a unit not on our side is taken.
+local function talkHabit(ctx, gate)
+    for _, u in ipairs(ctx.actors) do
+        for _, t in ipairs(ctx.onField) do
+            if t.faction ~= "blue" then
+                local a = talkFrom(ctx, u, t, gate)
+                if a then return a end
+            end
         end
     end
     return nil
@@ -973,6 +1140,8 @@ function M.decide(board, sight, style)
     local s = seize(ctx)
     if s then return s end
     if not gate then return greedy(ctx, objective) end
+    local recruit = recruitFirst(ctx, gate)
+    if recruit then return recruit end
 
     local attacks = {}
     for _, u in ipairs(ctx.actors) do
@@ -980,6 +1149,8 @@ function M.decide(board, sight, style)
         attacks[u] = a
         if a and a.sure then return action(u, a.tile, "attack", a.target) end
     end
+    local talk = talkHabit(ctx, gate)
+    if talk then return talk end
     local claimed = claimedMove(ctx, gate)
     if claimed then return claimed end
     -- Healers act after the fighters, as a player heals after the attacks: the staff then
@@ -1155,6 +1326,22 @@ M.CLAIM_BEHAVIOURS = {
     end,
     reinforcements = function(claim, style)
         return withEntry(style, "arrivals", needIds(claim, "turns", "{arrival turns}"))
+    end,
+    recruit = function(claim, style)
+        local by = claim.by ~= nil and needIds(claim, "by", "{charIds}") or nil
+        return withEntry(style, "recruits", { units = needIds(claim, "unit", "{charIds}"),
+                                              by = by })
+    end,
+    keys = function(_claim, style)
+        local out = {}
+        for k, v in pairs(style) do out[k] = v end
+        out.keys = true
+        return out
+    end,
+    heal = function(claim, style) return withEntry(style, "heals", { vs = needVs(claim) }) end,
+    avoid = byUnit("avoids"),
+    priority = function(claim, style)
+        return withEntry(style, "priorities", { vs = needVs(claim) })
     end,
 }
 

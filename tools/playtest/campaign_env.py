@@ -20,11 +20,20 @@ it gets the twin's: the nodes the vanilla campaign found open at the twin's star
 that campaign's `<chapter>.json` records (Nicolas, 2026-10-27). The twin of our chapter N is
 difficulty.VANILLA_CHAIN[N], the chain the kit model already reads (ADR 0365).
 
+Each env also carries `claims`: {chapter index: [claim]}, every Strategy claim of that chapter
+(ours: the chapter YAML's `strategy_claims`; vanilla: `twin_strategy.yaml`, the route's keys)
+RESOLVED to game ids for the bot, which maps no name (bot.lua, Claims): a unit to its
+character id, a class to its id and every reskin built on it (a reskin plays as its base, ADR
+0362), one of our enemy ids to its class's, a terrain name to its TERRAIN_ id. A name that
+resolves to nothing raises. A claim whose fields need a model the runner has not got
+(`reinforcements`' arrival turns) goes as kind `unresolved`, so the run reports it unplayed.
+
 --from N resumes at chapter index N's start as an earlier run of the same --id saved it
 (references/sim/<game>/<rom-hash>/states/<id>/N.ss), so a fault in a late chapter is studied
 without replaying the chapters before it. It needs --id: the default id names no earlier run.
 """
 import argparse
+import functools
 import json
 import os
 import sys
@@ -33,6 +42,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 
 import campaign_chapters  # noqa: E402
+import strategy  # noqa: E402
+from inject import class_ids, reskins  # noqa: E402
+from inject.scene_actors import character_pid  # noqa: E402
 import difficulty  # noqa: E402
 import inject.cast  # noqa: E402
 import inject.decomp  # noqa: E402
@@ -55,9 +67,113 @@ def vanilla_index(ref):
     return _chapter_enum()[name]
 
 
+def twin_index(ref, route):
+    """The vanilla chapter a twin_strategy key names on `route` (1 Eirika, 2 Ephraim), or None
+    when that key belongs to the other route. Up to Ch8 the routes share chapters
+    (vanilla_index); a plain `FE8 ChN` with an `FE8 ChN Ephraim` twin is Eirika's own, one
+    without is shared; `Final` / `Final 2` are Ch21 / Ch21x."""
+    enum = _chapter_enum()
+    tail = ref.split(' ', 1)[1]
+    side = 'E' if route == 1 else 'I'
+    if tail.endswith(' Ephraim'):
+        return enum['CHAPTER_I_' + tail[2:-len(' Ephraim')]] if route == 2 else None
+    if tail in ('Final', 'Final 2'):
+        return enum['CHAPTER_%s_21%s' % (side, 'X' if tail == 'Final 2' else '')]
+    if tail == 'Prologue' or 'CHAPTER_L_' + tail[2:].upper() in enum:
+        return enum['CHAPTER_L_PROLOGUE' if tail == 'Prologue' else 'CHAPTER_L_' + tail[2:].upper()]
+    if route == 2 and ref + ' Ephraim' in strategy._twin_file():
+        return None
+    return enum['CHAPTER_%s_%s' % (side, tail[2:])]
+
+
+def _names(v):
+    return list(v) if isinstance(v, list) else [v]
+
+
+@functools.lru_cache(maxsize=None)
+def _terrains():
+    return inject.decomp.enum_values(
+        inject.decomp.vanilla_decomp_text('include/constants/terrains.h'), 'TERRAIN_')
+
+
+def class_ids_of(token, game, campaign=campaign_chapters.CAMPAIGN):
+    """A class token's ids on the board: the vanilla class, and for ours every reskin whose base
+    it is. None when `token` is no vanilla class."""
+    values = class_ids.vanilla_class_values()
+    enum = class_ids.vanilla_class_enum(token)
+    if enum not in values:
+        return None
+    out = {values[enum]}
+    if game == 'ours':
+        for rk in reskins.enemy_class_reskins(campaign):
+            if rk['base'] == enum:
+                out.add(int(str(rk['slot_id']), 0) if rk.get('slot_id') is not None
+                        else values[rk['slot']])
+    return sorted(out)
+
+
+def _unit_id(name, game, campaign):
+    if game == 'ours':
+        slot = (inject.cast.PORTRAIT_MAP.get(name) or inject.cast.GUEST_PORTRAIT_MAP.get(name))
+        pid = slot and character_pid(inject.cast.char_symbol(slot))
+    else:
+        pid = character_pid('CHARACTER_' + name.upper().replace('-', '_'))
+    if pid is None:
+        raise ValueError('claim unit %r names no %s character' % (name, game))
+    return pid
+
+
+def _vs(v, game, chap, campaign):
+    if v in ('boss', 'all'):
+        return v
+    out = set()
+    for name in _names(v):
+        ids = class_ids_of(name, game, campaign)
+        if ids is None and chap is not None:
+            # one of our enemy ids: the class it is written with (deploy_class only dresses it)
+            for e in chap.get('enemy_units') or []:
+                if e.get('id') == name:
+                    ids = class_ids_of(e['class'], game, campaign)
+        if ids is None:
+            raise ValueError('claim vs %r is no class%s' % (
+                name, ' and no enemy of %s' % chap.get('id') if chap else ''))
+        out.update(ids)
+    return sorted(out)
+
+
+def resolve(claim, key, game, chap=None, campaign=campaign_chapters.CAMPAIGN):
+    """One claim as bot.lua takes it (its Claims section): id `key`, game ids for every name."""
+    kind = claim['kind']
+    out = {'id': key, 'kind': kind}
+    if kind == 'reinforcements':
+        return {'id': key, 'kind': 'unresolved', 'was': kind}
+    for field in ('unit', 'by'):
+        if field in claim:
+            out[field] = [_unit_id(n, game, campaign) for n in _names(claim[field])]
+    if 'vs' in claim:
+        out['vs'] = _vs(claim['vs'], game, chap, campaign)
+    if 'tile' in claim:
+        out['tile'] = _terrains()['TERRAIN_' + claim['tile'].upper()]
+    if 'topic' in claim:
+        out['topic'] = claim['topic']
+    return out
+
+
+def twin_claims_env(route):
+    """{vanilla chapter index (str): [resolved claim]} for every twin key on `route`."""
+    out = {}
+    for ref in strategy._twin_file():
+        index = twin_index(ref, route)
+        if index is not None:
+            out[str(index)] = [resolve(c, '%s#%d' % (ref, i), 'vanilla')
+                               for i, c in enumerate(strategy.twin_claims(ref))]
+    return out
+
+
 def vanilla_env(route=1):
     enum = _chapter_enum()
-    return dict(team_groups.env(), last=[enum[n] for n in VANILLA_LAST], route=route)
+    return dict(team_groups.env(), last=[enum[n] for n in VANILLA_LAST], route=route,
+                claims=twin_claims_env(route))
 
 
 def lead_row(uid, campaign=campaign_chapters.CAMPAIGN):
@@ -85,7 +201,14 @@ def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
                                     '%d -- run the vanilla campaign first' % (path, twin, number))
         with open(path) as f:
             shops[str(host)] = json.load(f)['shops']
-    env = dict(team_groups.env(), last=[hosts[max(hosts)]], shops=shops)
+    claims = {}
+    for chap in campaign_chapters.load_all(campaign):
+        number = int(chap['chapter_number'])
+        if number in hosts:
+            claims[str(hosts[number])] = [
+                resolve(c, '%s#%d' % (chap['id'], i), 'ours', chap, campaign)
+                for i, c in enumerate(strategy.our_claims(chap))]
+    env = dict(team_groups.env(), last=[hosts[max(hosts)]], shops=shops, claims=claims)
     if lord is not None:
         env['lord'] = lead_row(lord, campaign)
     return env

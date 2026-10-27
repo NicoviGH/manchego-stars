@@ -6,7 +6,7 @@
 > **This file is GENERATED.** Each record is one file under `docs/research/`; add or
 > edit one, then regenerate: `python3 tools/gen_decisions_index.py`.
 
-19 records. Search the titles and tags here, then open the ones you need.
+20 records. Search the titles and tags here, then open the ones you need.
 
 **Contents:** [Playtesting bots](#playtesting-bots) · [FE8: between battles](#fe8-between-battles) · [FE8: building the party](#fe8-building-the-party) · [FE8: whom guides field, by chapter](#fe8-whom-guides-field-by-chapter)
 
@@ -56,3 +56,4 @@
 | `0017` | [FE8 Chapters 15 to Final (shared): whom guides field](research/0017-fe8-chapters-15-to-final-shared-whom-guides-field.md) | 2026-10-27 | #510 | deploy, ch15, ch16, ch17, ch18, ch19, ch20, final |
 | `0018` | [FE8 promotion branches per unit, as walkthroughs pick them](research/0018-fe8-promotion-branches-per-unit-as-walkthroughs-pick-them.md) | 2026-10-27 | #510 | promotion, branches, classes, seals |
 | `0019` | [FE8 per-chapter deploy: where the sources disagree](research/0019-fe8-per-chapter-deploy-where-the-sources-disagree.md) | 2026-10-27 | #510 | contested, deploy, promotion |
+| `0020` | [How players move through FE8 fog-of-war maps](research/0020-how-players-move-through-fe8-fog-of-war-maps.md) | 2026-10-27 | #510 | fog, vision, thief, torch, formation, chokepoint, baiting, chapters |

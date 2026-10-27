@@ -60,17 +60,18 @@ FE8 Ch2:
 FE8 Ch3:
   page: The_Bandits_of_Borgo
   claims:
-    - kind: unmodelled
-      topic: recruit
+    - kind: recruit
+      unit: colm
+      by: neimi
       cite: "the only reinforcement is Colm on turn 2, who can immediately be recruited by talking to him with Neimi."
-    - kind: unmodelled
-      topic: range
+    - kind: carry
+      unit: [garcia, neimi]
+      vs: [archer, brigand]
       cite: "Garcia, Neimi, and anyone with a javelin can be used to attack the archer and hand axe wielding brigand."
-    - kind: unmodelled
-      topic: keys
+    - kind: keys
       cite: "the brigand next to it will drop a Chest Key"
-    - kind: unmodelled
-      topic: steal
+    - kind: priority
+      vs: thief
       cite: "Keep watch of the enemy Thief."
     - kind: kits
       topic: drops

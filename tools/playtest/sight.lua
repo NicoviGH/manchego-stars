@@ -61,8 +61,19 @@
 --                            unreached.
 --   fieldUnit()              the first deployed unit that can Seize, else the first deployed.
 --   terrain(x, y)            gBmMapTerrain[y][x].
---   staves(u)                the inventory slots (0-based) of the staves `u` can heal with:
+--   visible(x, y)            the player sees (x, y): no fog (chapterVisionRange 0) or gBmMapFog
+--                            set there -- bmtarget.c's own test; a red unit in fog is no target.
+--   unseen()                 every tile the fog hides now ({} without fog).
+--   staves(u)                the staves `u` can heal with, { slot (0-based), amount }:
 --                            CanUnitUseStaff, and GetUnitItemHealAmount > 0.
+--   canTalk(u, t)            the Talk command's own pair check, CheckForCharacterEvents (what
+--                            MakeTalkTargetList adds a neighbour by).
+--   opens(u, terrain)        `u` holds what opens that terrain (TERRAIN_DOOR, TERRAIN_CHEST_FULL):
+--                            GetUnitKeyItemSlotForTerrain, a key or a thief's lockpick.
+--   opensDoor(u), holdsKey(u)  opens() for a door; for a door or a chest (what a keys claim
+--                            hunts: an enemy carrying a key, or a thief's lockpick).
+--   doors()                  the door tiles still closed: a tile whose command is Door
+--                            (read with the Seize tile) and whose terrain is still a door.
 --   heals(u, x, y)           what `u` could heal standing on (x, y): per staff in staves(u)
 --                            that CanUnitUseItem allows there -- which builds vanilla's own heal
 --                            target list -- { slot, amount = GetUnitItemHealAmount, targets =
@@ -400,10 +411,7 @@ function M.new(api)
             end
             return false, 0
         elseif d.kind == "chests" or d.kind == "doors" then
-            local terrain = d.kind == "chests" and M.TERRAIN_CHEST_FULL or M.TERRAIN_DOOR
-            return sandbox(function(call)
-                return s32(call(S.GetUnitKeyItemSlotForTerrain, { u.addr, terrain })) >= 0
-            end), 0
+            return s.opens(u, d.kind == "chests" and M.TERRAIN_CHEST_FULL or M.TERRAIN_DOOR), 0
         elseif d.kind == "fog" then
             return sandbox(function(call)
                 return call(S.GetUnitFogViewRange, { u.addr })
@@ -570,8 +578,48 @@ function M.new(api)
     end
 
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
+    function s.visible(x, y)
+        return mem.u8(S.gPlaySt + PLAY_VISION) == 0 or grid(mem, S.gBmMapFog, x, y) ~= 0
+    end
+    function s.unseen()
+        local out = {}
+        if mem.u8(S.gPlaySt + PLAY_VISION) == 0 then return out end
+        for y = 0, h - 1 do
+            for x = 0, w - 1 do
+                if grid(mem, S.gBmMapFog, x, y) == 0 then out[#out + 1] = { x = x, y = y } end
+            end
+        end
+        return out
+    end
 
     local function itemOf(it) return it.id | (it.uses << 8) end
+
+    function s.opens(u, terrain)
+        return sandbox(function(call)
+            return s32(call(S.GetUnitKeyItemSlotForTerrain, { u.addr, terrain })) >= 0
+        end)
+    end
+
+    function s.opensDoor(u) return s.opens(u, M.TERRAIN_DOOR) end
+    function s.holdsKey(u)
+        return s.opens(u, M.TERRAIN_DOOR) or s.opens(u, M.TERRAIN_CHEST_FULL)
+    end
+
+    function s.canTalk(u, t)
+        return sandbox(function(call)
+            return call(S.CheckForCharacterEvents, { u.charId, t.charId }) & 0xFF ~= 0
+        end)
+    end
+
+    function s.doors()
+        local out = {}
+        for _, c in ipairs(commands) do
+            if c.cmd == M.TILE_COMMAND_DOOR and s.terrain(c.x, c.y) == M.TERRAIN_DOOR then
+                out[#out + 1] = { x = c.x, y = c.y }
+            end
+        end
+        return out
+    end
 
     function s.staves(u)
         if seen.staves[u.id] == nil then
@@ -580,7 +628,8 @@ function M.new(api)
                 for i, it in ipairs(u.items) do
                     if call(S.CanUnitUseStaff, { u.addr, itemOf(it) }) ~= 0
                         and call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }) > 0 then
-                        out[#out + 1] = i - 1
+                        out[#out + 1] = { slot = i - 1,
+                            amount = call(S.GetUnitItemHealAmount, { u.addr, itemOf(it) }) }
                     end
                 end
                 return out
@@ -590,12 +639,13 @@ function M.new(api)
     end
 
     function s.heals(u, x, y)
-        local slots = s.staves(u)
-        if #slots == 0 then return {} end
+        local staves = s.staves(u)
+        if #staves == 0 then return {} end
         return sandbox(function(call)
             standOn(u, x, y)
             local out = {}
-            for _, slot in ipairs(slots) do
+            for _, st in ipairs(staves) do
+                local slot = st.slot
                 local item = itemOf(u.items[slot + 1])
                 if call(S.CanUnitUseItem, { u.addr, item }) ~= 0 then
                     local targets = {}

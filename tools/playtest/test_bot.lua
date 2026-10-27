@@ -368,6 +368,18 @@ local function sightOf(o)
             return entry(u, t, x, y)
         end,
     }
+    -- The game reads PR E added (each optional, as in sight.lua's callers): obstacles, doors,
+    -- staves/heals/mend, the Talk check, key holders, and fog.
+    for _, k in ipairs({ "obstacles", "doors", "unseen" }) do
+        if o[k] then s[k] = function() return o[k] end end
+    end
+    if o.staves then s.staves = function(u) return o.staves[u.id] or {} end end
+    if o.heals then s.heals = function(u, x, y) return (o.heals[u.id] or {})[x .. "," .. y] or {} end end
+    if o.mend then s.mend = function(u) return o.mend[u.id] end end
+    if o.talk then s.canTalk = function(u, t) return (o.talk[u.id] or {})[t.id] == true end end
+    if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
+    if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
+    if o.hidden then s.visible = function(x, y) return not o.hidden[x .. "," .. y] end end
     s.attacks = function() return attacks end
     s.strikes = function() return strikes end
     s.calls = function() return attacks + strikes end
@@ -1354,6 +1366,178 @@ local function test_route_follows_style()
     check(pcall(B.route, opts, {}), false, "missing route raises")
 end
 test_route_follows_style()
+
+-- ── PR E: breaching, doors, healing, Talk, keys, avoid, fog ────────────────────────────
+
+-- A field per goal tile: fields["x,y"] = { "x,y" = dist }.
+local function fieldsOf(fields)
+    return function(g)
+        local f = fields[g.x .. "," .. g.y]
+        if not f then return nil end
+        local out = {}
+        for k, d in pairs(f) do
+            local x, y = k:match("(%d+),(%d+)")
+            x, y = tonumber(x), tonumber(y)
+            out[y] = out[y] or {}
+            out[y][x] = d
+        end
+        return out
+    end
+end
+local BOSS_SIDE = { ["3,0"] = 1, ["4,0"] = 0 }
+local FROM_WALL = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1, ["4,0"] = 2 }
+
+-- test_breach_strikes_the_wall_that_cuts_off_the_goal: the boss's field never reaches A, the
+-- wall at (2,0) sits beside it, so A strikes the wall from (1,0); without the wall it marches.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local sight = sightOf {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        obstacles = { { x = 2, y = 0, hp = 20 } },
+    }
+    local a = B.decide(boardOf(A, E), sight, style("careful"))
+    check(a and a.act, "attack", "breach: the cut-off unit attacks")
+    check(a and a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y), "2,0", "breach: the wall")
+    check(at(a), "1,0", "breach: from beside it")
+end
+
+-- test_a_key_holder_opens_the_door_before_a_wall: the same cut, a door at (2,0) as well as a
+-- wall: the opener uses Door; a unit with no key still strikes the wall.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+    local o = {
+        objective = { kind = "boss" }, reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = FROM_WALL },
+        obstacles = { { x = 2, y = 0, hp = 20 } }, doors = { { x = 2, y = 0 } },
+        openers = { [0x01] = true },
+    }
+    check(B.decide(boardOf(A, E), sightOf(o), style("careful")).act, "door", "door: opener")
+    o.openers = {}
+    check(B.decide(boardOf(A, E), sightOf(o), style("careful")).act, "attack",
+          "door: no key, the wall")
+end
+
+-- test_healers_act_after_the_fighters: H heals A only once A has acted; until then A moves.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 10, maxhp = 20, minRange = false })
+    local H = blue(0x02, 1, 1, 0, { minRange = false })
+    local o = {
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        heals = { [0x02] = { ["1,0"] = { { slot = 0, amount = 10, targets = { 0x01 } } } } },
+        reach = { [0x02] = tiles({ 1, 0 }) },
+    }
+    local a = B.decide(boardOf(A, H), sightOf(o), style("careful"))
+    check(a and a.unit, 0x01, "heal: the fighter acts first")
+    A.acted = true
+    a = B.decide(boardOf(A, H), sightOf(o), style("careful"))
+    check(a and a.act, "staff", "heal: then the healer heals")
+    check(a and a.targetId, 0x01, "heal: the wounded ally")
+    check(a and a.slot, 0, "heal: with its staff's slot")
+end
+
+-- test_mend_uses_a_vulnerary_when_down_its_whole_amount: no attack, 15 HP down, a 10-HP
+-- Vulnerary in slot 1: used. Only 5 down: kept.
+do
+    local A = blue(0x01, 0, 0, 0, { hp = 5, maxhp = 20 })
+    local o = { mend = { [0x01] = { slot = 1, amount = 10 } } }
+    local a = B.decide(boardOf(A), sightOf(o), style("careful"))
+    check(a and a.act, "item", "mend: a wounded unit with nothing to strike uses it")
+    check(a and a.slot, 1, "mend: that slot")
+    A.hp = 15
+    check(B.decide(boardOf(A), sightOf(o), style("careful")).act, "wait", "mend: not for 5 HP")
+end
+
+-- test_recruit_claim_talks_first_and_marches_when_out_of_reach: green T talkable by A.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local T = blue(0x30, 5, 3, 0, { faction = "green" })
+    local E = red(0x81, 9, 9, { hp = 1 })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+                talk = { [0x01] = { [0x30] = true } } }
+    local st = claimed("careful", { id = "r1", kind = "recruit", unit = { 0x30 } })
+    local a = B.decide(boardOf(A, T, E), sightOf(o), st)
+    check(a and a.act, "talk", "recruit: talks")
+    check(a and a.targetId, 0x30, "recruit: to the recruit")
+    check(at(a), "2,0", "recruit: from beside it")
+    -- no claim: the habit still takes the offered Talk
+    check(B.decide(boardOf(A, T, E), sightOf(o), style("careful")).act, "talk", "talk habit")
+    -- out of reach: the claim marches the talker on the recruit
+    o.reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) }
+    a = B.decide(boardOf(A, T, E), sightOf(o), st)
+    check(a and a.act, "wait", "recruit: marches when it cannot reach")
+    check(at(a), "1,0", "recruit: toward the recruit")
+end
+
+-- test_keys_and_priority_rank_their_target_first: A deals more to E1, but E2 holds a key
+-- (keys claim) or is a priority claim's class.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E1 = red(0x81, 1, 0, { hp = 30, classId = CLS_A })
+    local E2 = red(0x82, 0, 1, { hp = 30, classId = CLS_B })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }) }, keys = { [0x82] = true },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 90, dmg = 9, hits = 1 } },
+                          [0x82] = { ["0,0"] = fc { hit = 90, dmg = 3, hits = 1 } } } },
+    }
+    local board = boardOf(A, E1, E2)
+    check(B.decide(board, sightOf(o), style("careful")).targetId, 0x81, "no claim: the bigger hit")
+    check(B.decide(board, sightOf(o), claimed("careful", { id = "k", kind = "keys" })).targetId,
+          0x82, "keys: the key holder first")
+    check(B.decide(board, sightOf(o), claimed("careful", { id = "p", kind = "priority",
+                                                         vs = { CLS_B } })).targetId,
+          0x82, "priority: the named class first")
+end
+
+-- test_avoid_keeps_the_unit_out_of_reach: P marches right; (2,0) is in the archer's reach.
+do
+    local P = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 4, 0, { classId = CLS_A, minRange = 2, maxRange = 2 })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) } }
+    check(at(B.decide(boardOf(P, X), sightOf(o), style("bold"))), "2,0", "no claim: as far as it goes")
+    local st = claimed("bold", { id = "v", kind = "avoid", unit = { 0x01 }, vs = { CLS_A } })
+    check(at(B.decide(boardOf(P, X), sightOf(o), st)), "1,0", "avoid: short of the reach")
+end
+
+-- test_heal_claim_counts_the_heal_before_the_enemy_phase: careful A (20 HP) on the boss:
+-- counter 12 + the boss's strike 10 kills; a healer beside the attack tile gives 10 back.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local E = red(0x81, 2, 0, { isBoss = true, hp = 40 })
+    local o = {
+        objective = { kind = "boss" }, danger = { ["1,0"] = 1 },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 80, dmg = 5, hits = 1, counters = true,
+                                                    counterHit = 80, counterDmg = 12,
+                                                    counterHits = 1, takenHit = 80,
+                                                    takenDmg = 10, takenHits = 1 } } } },
+    }
+    local a = B.decide(boardOf(A, H, E), sightOf(o), style("careful"))
+    check(a and a.act ~= "attack", true, "no claim: careful refuses the boss")
+    a = B.decide(boardOf(A, H, E), sightOf(o),
+                 claimed("careful", { id = "h", kind = "heal", vs = "boss" }))
+    check(a and a.act, "attack", "heal claim: the heal is counted")
+end
+
+-- test_fog_hides_targets_and_marches_on_the_unseen: E stands in fog: no attack on it, and
+-- the march heads for the nearest unseen tile, not for E.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E = red(0x81, 1, 0, { hp = 1 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) }, hidden = { ["1,0"] = true },
+        unseen = { { x = 0, y = 3 } },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1,
+                                                    killsTarget = true } } } },
+    }
+    local a = B.decide(boardOf(A, E), sightOf(o), style("bold"))
+    check(a and a.act, "wait", "fog: no target it cannot see")
+    check(at(a), "0,1", "fog: toward the unseen, not the hidden enemy")
+end
 
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
