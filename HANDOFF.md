@@ -74,8 +74,8 @@ G3 #537 78105ed; the summary is on #531).
    - **Party selection is being redesigned (Nicolas rejected the role-tag draw, 2026-10-27):**
      explicit FE8 class choices, a party that builds up over the campaign like a player's,
      a rule for duplicate classes, informed by the twin Strategy claims and guides. The
-     research is on the PR E branch as research records (ADR 0371, records 0001-0012; their
-     index is generated beside the decisions index). Record 0012 is
+     research is on the PR E branch as research records (ADR 0371, records 0001-0019; their
+     index is generated beside the decisions index). Records 0012-0019 are
      the per-chapter "whom guides field" research. **Next:** brainstorm the party design with
      Nicolas one decision at a time, then implement, run retail to Ch4+ and ours, PR.
    - Every Ch2 attempt loses Vanessa (0x06) on turn 2: a bot-fault candidate for F's list, not
