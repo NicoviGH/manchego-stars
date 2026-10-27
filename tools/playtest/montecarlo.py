@@ -17,10 +17,15 @@ leftover kill or save (run.sh). Its records are read from the emulator's own std
 of one line on an O_APPEND descriptor, so writers never interleave. A worker that leaves no
 BOTRUN record is recorded as `crashed` with its run dir, or as `no_style` when its campaign
 says the chapter start has fewer styles than the attempt asked for.
+
+`paired_verdict` says where one chapter-and-mode cell stands from its ours/vanilla pairs: looked
+at only at planned sizes, tested on the pairs that disagree, with score intervals (research
+record 0022; the #510 plan's Task 12, amended 2026-10-27).
 """
 import argparse
 import concurrent.futures
 import json
+import math
 import os
 import re
 import subprocess
@@ -142,6 +147,97 @@ def first_clean(records):
     """The lowest attempt that cleared with everyone alive, or None."""
     clean = [r['attempt'] for r in records if r.get('all_alive') and r.get('attempt')]
     return min(clean) if clean else None
+
+
+# ---- the paired verdict (PR F2; the #510 plan comment's Task 12, amended 2026-10-27) ----
+# Research record 0022: a cell is looked at only at planned sizes (Haybittle-Peto), never
+# after every run; the difference is tested on the discordant pairs (exact McNemar); rates
+# and the difference carry score intervals, never a normal one.
+
+LOOKS = (50, 100, 200)      # pairs; the last look always settles
+EARLY_P = 0.001             # an early look settles only on a gap this clear
+FINAL_P = 0.05
+Z95 = 1.959963984540054     # the two-sided 95% normal quantile
+
+
+def wilson(k, n, z=Z95):
+    """Wilson's score interval for k successes in n: (lo, hi), inside [0, 1] even at 0/n."""
+    if n == 0:
+        return 0.0, 1.0
+    p = k / n
+    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
+    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
+    return max(0.0, centre - half), min(1.0, centre + half)
+
+
+def mcnemar_exact(b, c):
+    """Two-sided exact McNemar p: the discordant pairs split as a fair coin would."""
+    m = b + c
+    if m == 0:
+        return 1.0
+    tail = sum(math.comb(m, i) for i in range(min(b, c) + 1)) / 2 ** m
+    return min(1.0, 2 * tail)
+
+
+def square_and_add(k1, n1, k2, n2, phi=0.0, z=Z95):
+    """Newcombe's interval for p1 - p2: each rate's Wilson interval, combined. phi = 0 is
+    two independent rates (Newcombe 1998a, method 10); the paired form passes the pairs'
+    correlation (1998b, method 10)."""
+    p1, p2 = k1 / n1, k2 / n2
+    l1, u1 = wilson(k1, n1, z)
+    l2, u2 = wilson(k2, n2, z)
+    delta = p1 - p2
+    lo = delta - math.sqrt(max(0.0, (p1 - l1) ** 2 - 2 * phi * (p1 - l1) * (u2 - p2) + (u2 - p2) ** 2))
+    hi = delta + math.sqrt(max(0.0, (u1 - p1) ** 2 - 2 * phi * (u1 - p1) * (p2 - l2) + (p2 - l2) ** 2))
+    return max(-1.0, lo), min(1.0, hi)
+
+
+def newcombe_paired(a, b, c, d, z=Z95):
+    """The paired score interval for p1 - p2 from the cells -- a both clean, b only the first,
+    c only the second, d neither (Newcombe 1998b, method 10)."""
+    n = a + b + c + d
+    if n == 0:
+        return -1.0, 1.0
+    den = math.sqrt((a + b) * (c + d) * (a + c) * (b + d))
+    return square_and_add(a + b, n, a + c, n, (a * d - b * c) / den if den else 0.0, z)
+
+
+def paired_verdict(pairs):
+    """Where a cell stands, from its pairs (ours_all_alive, vanilla_all_alive) in run order.
+
+    It is judged at the largest planned look its pairs reach, on that many pairs only: a pair
+    past the look waits for the next one. Settled at an early look when exact McNemar p <
+    EARLY_P, and always at the last. `differs` only when settled at p < its look's bar.
+    """
+    reached = [k for k in LOOKS if k <= len(pairs)]
+    if not reached:
+        return {'n': len(pairs), 'look': None, 'settled': False, 'differs': False,
+                'reason': 'no look yet: the first is at %d pairs' % LOOKS[0]}
+    look = reached[-1]
+    used = [(bool(x), bool(y)) for x, y in pairs[:look]]
+    a = sum(1 for x, y in used if x and y)
+    b = sum(1 for x, y in used if x and not y)
+    c = sum(1 for x, y in used if y and not x)
+    d = look - a - b - c
+    p = mcnemar_exact(b, c)
+    final = look == LOOKS[-1]
+    bar = FINAL_P if final else EARLY_P
+    den = math.sqrt((a + b) * (c + d) * (a + c) * (b + d))
+    lo, hi = newcombe_paired(a, b, c, d)
+    out = {'n': len(pairs), 'look': look, 'p': p, 'diff': (b - c) / look, 'lo': lo, 'hi': hi,
+           'ours': (a + b) / look, 'ours_ci': wilson(a + b, look),
+           'vanilla': (a + c) / look, 'vanilla_ci': wilson(a + c, look),
+           'discordant': b + c, 'corr': (a * d - b * c) / den if den else None,
+           'differs': p < bar, 'settled': final or p < bar}
+    if final:
+        out['reason'] = 'the last look (%d pairs): %s' % (
+            look, 'differs, p = %.3g' % p if p < bar else 'no clear difference, p = %.3g' % p)
+    elif p < bar:
+        out['reason'] = 'settled early at %d pairs: a clear gap, p = %.3g' % (look, p)
+    else:
+        out['reason'] = 'not settled at %d pairs (p = %.3g); the next look is at %d' % (
+            look, p, LOOKS[LOOKS.index(look) + 1])
+    return out
 
 
 def main(argv=None):

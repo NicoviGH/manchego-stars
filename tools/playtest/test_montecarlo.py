@@ -112,5 +112,63 @@ class Attempts(unittest.TestCase):
         self.assertIsNone(mc.first_clean([{'attempt': 1, 'all_alive': False}]))
 
 
+class Verdict(unittest.TestCase):
+    """paired_verdict: the #510 plan's Task 12 rule as amended 2026-10-27 (record 0022)."""
+
+    def test_identical_runs_run_to_cap(self):
+        pairs = [(True, True)] * 200
+        self.assertFalse(mc.paired_verdict(pairs[:50])['settled'], 'no gap settles nothing early')
+        self.assertFalse(mc.paired_verdict(pairs[:199])['settled'])
+        v = mc.paired_verdict(pairs)
+        self.assertTrue(v['settled'])
+        self.assertFalse(v['differs'])
+        self.assertEqual(v['diff'], 0)
+        self.assertEqual(v['look'], 200)
+
+    def test_large_gap_settles_early(self):
+        v = mc.paired_verdict([(True, False)] * 30 + [(True, True)] * 20)
+        self.assertTrue(v['settled'])
+        self.assertTrue(v['differs'])
+        self.assertEqual(v['look'], 50)
+        self.assertAlmostEqual(v['diff'], 0.6)
+        self.assertLess(v['lo'], 0.6)
+        self.assertGreater(v['lo'], 0)
+
+    def test_close_call_runs_to_cap(self):
+        # ours clean 3 more times in every 50: a real but small gap
+        block = [(True, False)] * 6 + [(False, True)] * 3 + [(True, True)] * 41
+        for n in (50, 100):
+            self.assertFalse(mc.paired_verdict(block * (n // 50))['settled'], n)
+        v = mc.paired_verdict(block * 4)
+        self.assertTrue(v['settled'])
+        self.assertEqual(v['discordant'], 36)
+
+    def test_no_look_between_planned_ones(self):
+        # 70 pairs: the last 20 are a wall of ours-only clears, but the look is at 50, on the
+        # first 50 alone, and those are even
+        pairs = [(True, False), (False, True)] * 25 + [(True, False)] * 20
+        v = mc.paired_verdict(pairs)
+        self.assertEqual(v['look'], 50)
+        self.assertFalse(v['settled'])
+        self.assertEqual(v['diff'], 0)
+        self.assertIn('next look is at 100', v['reason'])
+        self.assertIsNone(mc.paired_verdict(pairs[:49])['look'])
+
+    def test_intervals_match_published_values(self):
+        lo, hi = mc.wilson(0, 10)              # the score interval's 0/n case: z^2 / (n + z^2)
+        self.assertEqual(lo, 0.0)
+        self.assertAlmostEqual(hi, 0.2775, places=4)
+        # Newcombe 1998a's worked example, 56/70 vs 48/80 (method 10): 0.0524 to 0.3339
+        lo, hi = mc.square_and_add(56, 70, 48, 80)
+        self.assertAlmostEqual(lo, 0.0524, places=4)
+        self.assertAlmostEqual(hi, 0.3339, places=4)
+        self.assertAlmostEqual(mc.mcnemar_exact(0, 6), 2 / 64)   # all six discordant one way
+        self.assertEqual(mc.mcnemar_exact(0, 0), 1.0)
+        lo, hi = mc.newcombe_paired(10, 4, 4, 12)
+        self.assertLess(lo, 0)
+        self.assertGreater(hi, 0)
+        self.assertAlmostEqual(lo, -hi)
+
+
 if __name__ == '__main__':
     unittest.main()
