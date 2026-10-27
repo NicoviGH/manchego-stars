@@ -3,6 +3,8 @@
 -- Run: lua tools/playtest/test_bot.lua
 local here = (arg[0]:match("(.*/)")) or "./"
 local B = dofile(here .. "bot.lua")
+local Planner = dofile(here .. "planner.lua")
+local Sight = dofile(here .. "sight.lua")
 local Board = dofile(here .. "board.lua")
 
 local tests, fails = 0, 0
@@ -380,6 +382,8 @@ local function sightOf(o)
     if o.keys then s.holdsKey = function(u) return o.keys[u.id] == true end end
     if o.openers then s.opensDoor = function(u) return o.openers[u.id] == true end end
     if o.hidden then s.visible = function(x, y) return not o.hidden[x .. "," .. y] end end
+    s.hitChance = Sight.hitChance
+    if o.enemyPhase then s.enemyPhase = o.enemyPhase end
     s.attacks = function() return attacks end
     s.strikes = function() return strikes end
     s.calls = function() return attacks + strikes end
@@ -1537,6 +1541,92 @@ do
     local a = B.decide(boardOf(A, E), sightOf(o), style("bold"))
     check(a and a.act, "wait", "fog: no target it cannot see")
     check(at(a), "0,1", "fog: toward the unseen, not the hidden enemy")
+end
+
+-- ── The planner ─────────────────────────────────────────────────────────────────────────
+
+-- test_planner_odds: one sure blow of 10 kills 10 HP; two coin-flip blows of 6 kill 10 HP a
+-- quarter of the time; a crit triples.
+do
+    local sure = { { p = 1, c = 0, dmg = 10 } }
+    check(Planner.odds(sure, 10), 1, "odds: a sure blow kills")
+    local flip = { { p = 0.5, c = 0, dmg = 6 }, { p = 0.5, c = 0, dmg = 6 } }
+    check(Planner.odds(flip, 10), 0.25, "odds: both must land")
+    check(Planner.odds({ { p = 1, c = 1, dmg = 4 } }, 10), 1, "odds: a crit triples")
+end
+
+-- test_planner_takes_the_sure_kill: E1 dies to A's blow, E2 only takes a chip.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local E1 = red(0x81, 1, 0, { hp = 5 })
+    local E2 = red(0x82, 0, 1, { hp = 30 })
+    local sight = sightOf {
+        reach = { [0x01] = tiles({ 0, 0 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } },
+                          [0x82] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1 } } } },
+    }
+    local a = Planner.plan(B, boardOf(A, E1, E2), sight, style("careful"))
+    check(a and a.targetId, 0x81, "planner: the kill")
+end
+
+-- test_planner_weighs_the_enemy_phase: marching to (1,0) gains 20 steps of the field, but the
+-- AI would strike A there for its whole HP. careful holds; bold takes the ground.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 25, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))), "0,0",
+          "planner: careful holds out of the strike")
+    check(at(Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))), "1,0",
+          "planner: bold takes the ground")
+end
+
+-- test_planner_heals_between_attacks: the grell pattern. A's attack draws a 12 counter and the
+-- enemy phase strikes 10 more: 22 of A's 20. H's heal after the attack (+10) keeps A alive,
+-- so careful attacks and heals; without H it does not attack.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local H = blue(0x02, 1, 0, 1, { minRange = false })
+    local E = red(0x81, 2, 0, { isBoss = true, hp = 40 })
+    local o = {
+        objective = { kind = "boss" },
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 1 }, { 1, 1 }) },
+        staves = { [0x02] = { { slot = 0, amount = 10 } } },
+        heals = { [0x02] = { ["1,1"] = { { slot = 0, amount = 10, targets = { 0x01 } } } } },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 5, hits = 1, counters = true,
+                                                    counterHit = 100, counterDmg = 12,
+                                                    counterHits = 1 } } } },
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.unit.id == 0x01 and b.x == 1 then
+                    return { { target = 0x01, takenHit = 100, takenDmg = 10, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local st = style("careful")
+    local first, plan = Planner.plan(B, boardOf(A, H, E), sightOf(o), st)
+    local acts = {}
+    for _, a in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = a.act end
+    check(table.concat(acts, ","), "attack,staff", "planner: attack, then heal the attacker")
+    check(first and first.act, "attack", "planner: the attack first")
+    -- no healer: the counter and the strike together kill A, so careful does not attack
+    local alone = Planner.plan(B, boardOf(A, E), sightOf(o), st)
+    check(alone and alone.act ~= "attack", true, "planner: no heal, no attack")
 end
 
 if fails > 0 then

@@ -25,6 +25,7 @@
 --
 -- api (harness.lua builds it; test_botrun.lua fakes it):
 --   Bot, Json          bot.lua and json.lua, loaded by the caller
+--   Planner            OPTIONAL: planner.lua; when given it plays every style but greedy
 --   info = { game, rom_hash, chapter, mode, seed, campaign, attempt }  what the record names
 --                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
@@ -139,6 +140,7 @@ function M.run(api)
         api.seed(api.info.seed)
         local sight = api.sight()
         local seen, waitUntil = {}, nil
+        local lastPlan
         while true do
             if api.won() then return "won", "the chapter advanced" end
             if api.lost() then return "lost", "game over" end
@@ -166,7 +168,24 @@ function M.run(api)
             seen[h] = true
             while true do
                 -- one decision's reads in one save/load (sight.batch), when the sight batches
-                local function decide() return Bot.decide(board, sight, style) end
+                -- the planner plays every style but greedy, the old clear bot (bot.lua)
+                local function decide()
+                    if api.Planner and style.aggression ~= "greedy" then
+                        local a, plan = api.Planner.plan(Bot, board, sight, style)
+                        lastPlan = plan
+                        if plan and a then
+                            local said = {}
+                            for _, x in ipairs(plan.strikes or {}) do
+                                said[#said + 1] = string.format("%X>%X", x.enemy, x.target)
+                            end
+                            api.log(string.format("plan: 0x%02X %s @%d,%d judged %.0f of %d; strikes %s",
+                                a.unit, a.act, a.move.x, a.move.y, plan.judged or 0, #(plan.acts or {}),
+                                table.concat(said, " ")))
+                        end
+                        return a
+                    end
+                    return Bot.decide(board, sight, style)
+                end
                 local action
                 if sight.batch then action = sight.batch(decide) else action = decide() end
                 if not action then break end
@@ -194,7 +213,17 @@ function M.run(api)
                 if board.phase ~= "blue" or board.turn ~= turn then break end
             end
             local before = api.board()
+            -- what the last plan expected of this enemy phase, beside what it did
+            for _, p in ipairs(lastPlan and lastPlan.predict or {}) do
+                if p.blows > 0 then
+                    api.log(string.format("plan: 0x%02X @%d,%d hp %d: %d blows, die %.2f, taken %.1f",
+                        p.charId, p.x, p.y, p.hp, p.blows, p.die, p.taken))
+                end
+            end
             local phase, deaths = api.endPhase()
+            for _, d in ipairs(deaths or {}) do
+                api.log(string.format("plan: died 0x%02X to 0x%02X", d.charId or 0, d.killer or 0))
+            end
             record(deaths or {}, "enemy")
             -- A unit seen on the field before the phase and dead after it, that the watcher
             -- missed -- read before any return, so a lost run carries every death.

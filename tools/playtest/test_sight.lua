@@ -44,6 +44,16 @@ local function fakeCpu(cost)
     return cpu, function() return loads, ram end
 end
 
+-- test_hit_chance_is_the_two_roll_rule: Roll2RN's true odds (rng.c), the published 2RN table:
+-- the ends pull outward (a displayed 70 lands 82.3% of the time, a 30 only 18.3%).
+do
+    check(Sight.hitChance(0), 0, "2RN: 0 never")
+    check(Sight.hitChance(100), 1, "2RN: 100 always")
+    check(Sight.hitChance(50), 0.505, "2RN: 50 lands 50.5%")
+    check(Sight.hitChance(70), 0.823, "2RN: 70 lands 82.3%")
+    check(Sight.hitChance(30), 0.183, "2RN: 30 lands 18.3%")
+end
+
 -- test_batch_is_one_round_trip_and_reads_do_not_leak: three reads inside one batch load the
 -- state once; each read's journaled writes are undone when it returns, so the next sees the
 -- byte as it was; the result of each call still comes back.

@@ -57,6 +57,15 @@
 --                            All 0 (slot/tile nil) when the AI does not strike `u` there.
 --   batch(fn)                fn's reads in one save/load: one decision's worth of questions
 --                            cost one state round trip, not one each.
+--   enemyPhase(plan)         the enemy phase the AI would play against a planned board, in
+--                            one batch. plan = { blues = { { unit, x, y, hp } }, gone =
+--                            { [enemy id] = true } }: our units stand where the plan leaves
+--                            them with its HP, the gone are off the map, the game builds its
+--                            own turn order (BuildAiUnitList, SortAiUnitList), and each enemy
+--                            in it the player can see makes its own decision (the setup
+--                            strike() uses, every target open). A strike moves the enemy to
+--                            its tile and takes its expected damage off the target before the
+--                            next decides. -> { { enemy, target, taken* as strike() } }.
 --   objective                { kind, tile, turnsLeft } -- see objective().
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
 --                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
@@ -76,10 +85,11 @@
 --                            hunts: an enemy carrying a key, or a thief's lockpick).
 --   doors()                  the door tiles still closed: a tile whose command is Door
 --                            (read with the Seize tile) and whose terrain is still a door.
---   heals(u, x, y)           what `u` could heal standing on (x, y): per staff in staves(u)
+--   heals(u, x, y, hurt)     what `u` could heal standing on (x, y): per staff in staves(u)
 --                            that CanUnitUseItem allows there -- which builds vanilla's own heal
 --                            target list -- { slot, amount = GetUnitItemHealAmount, targets =
---                            { unit index bytes } }.
+--                            { unit index bytes } }. `hurt` (optional, units): allies read as
+--                            one HP short, for a heal the planner means to follow a blow.
 --   mend(u)                  an item that heals `u` itself (a Vulnerary): not a staff,
 --                            GetUnitItemHealAmount > 0, CanUnitUseItem (its HP is short) --
 --                            { slot, amount }, the first in the inventory; nil.
@@ -138,7 +148,8 @@ local PROC_HITS_A, PROC_HITS_B = 0x50, 0x51
 M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the same bytes
 -- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
 -- +40 u16 ai_config. Its state bits are board.lua's (Board.US_*).
-local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_AI_CONFIG = 0x0C, 0x10, 0x11, 0x40
+local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_MAXHP, UNIT_HP, UNIT_AI_CONFIG =
+    0x0C, 0x10, 0x11, 0x12, 0x13, 0x40
 -- struct AiState (include/cp_common.h): +7A dangerMapFilled, +7D combatWeightTableId; the
 -- weight table comes from ai_config bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*), written by
 -- cp_decide.c's per-unit loop as one field assignment, which is copied here as it stands.
@@ -270,6 +281,23 @@ function M.attackOf(ours, eHp)
 end
 
 -- The enemy's strike read off its simulation, or none (nil) when its AI does not strike.
+-- The chance a displayed hit rate lands. FE8 rolls a hit with Roll2RN (rng.c): the average
+-- of two 0-99 draws, rounded down, below the rate. Crits roll once (Roll1RN): rate / 100.
+local HIT_CHANCE = {}
+function M.hitChance(rate)
+    rate = math.max(0, math.min(100, rate or 0))
+    if HIT_CHANCE[rate] == nil then
+        local n = 0
+        for a = 0, 99 do
+            for b = 0, 99 do
+                if (a + b) // 2 < rate then n = n + 1 end
+            end
+        end
+        HIT_CHANCE[rate] = n / 10000
+    end
+    return HIT_CHANCE[rate]
+end
+
 function M.strikeOf(t)
     return { takenHit = t and t.armed and t.hit or 0, takenDmg = t and t.dmg or 0,
              takenCrit = t and t.crit or 0, takenHits = t and t.hits or 0,
@@ -410,7 +438,7 @@ function M.new(outer)
     local mem, S, Board = api.mem, api.SYM, api.Board
     local US_HIDDEN, US_UNDER_A_ROOF = Board.US_HIDDEN, Board.US_UNDER_A_ROOF
     local w, h = api.map()
-    local s = { cache = {} }
+    local s = { cache = {}, hitChance = M.hitChance }
     -- Every read `fn` makes, in ONE save and load (see sandbox above).
     function s.batch(fn) return sandbox(function() return fn() end) end
     local seen   -- this board's answers, dropped by refresh()
@@ -611,41 +639,94 @@ function M.new(outer)
         end
     end
 
+    -- Enemy `e`'s own offensive decision on the board as it stands, inside a sandbox:
+    -- cp_decide.c's per-unit setup, in its order, with every player unit still visible: the
+    -- AI's danger map (AiFillDangerMap) is their threat, and its tile choice reads it. Left
+    -- out: RefreshEntityBmMaps/RenderBmMap/RefreshUnitSprites (they would rebuild gBmMapUnit
+    -- from the structs, which is already what it holds, and draw) and gAiState.unk7C = 0 (read
+    -- only by cp_staff.c, the staff AI). `before` runs just ahead of the decision (strike()
+    -- narrows the targets there). -> the struck unit's id and the strike as the forecast
+    -- reads it (M.side, with slot and tile), or nil when the AI does not attack.
+    local function aiDecide(call, proc, e, before)
+        api.write32(S.gActiveUnit, e.addr)
+        api.write8(S.gActiveUnitId, e.id)
+        call(S.AiUpdateNoMoveFlag, { e.addr })
+        api.write8(S.gAiState + AI_WEIGHT_TABLE,
+            (mem.u16(e.addr + UNIT_AI_CONFIG) & AI_WEIGHT_MASK) >> AI_WEIGHT_SHIFT)
+        api.write8(S.gAiState + AI_DANGER_FILLED, 0)
+        call(S.AiInitDangerMap, {})
+        if before then before() end
+        call(S.AiClearDecision, {})
+        call(S.AiAttemptOffensiveAction, { S.AiIsUnitEnemy | 1 })
+        local D = S.gAiDecision
+        if mem.u8(D + DEC_ACTION) ~= AI_ACTION_COMBAT then return nil end
+        local target = mem.u8(D + DEC_TARGET)
+        local addr = mem.u32(S.gUnitLookup + target * 4)
+        local sx, sy, slot = mem.u8(D + DEC_X), mem.u8(D + DEC_Y), mem.u8(D + DEC_SLOT)
+        if slot == BALLISTA_SLOT then
+            call(S.BattleGenerateBallistaSimulation, { e.addr, addr, sx, sy })
+        else
+            call(S.BattleGenerateSimulation, { e.addr, addr, sx, sy, slot })
+        end
+        call(S.InitBattleForecastBattleStats, { proc })
+        local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
+        side.slot, side.tile = slot, { x = sx, y = sy }
+        return target, side
+    end
+
     function s.strike(u, e, x, y)
         local t = sandbox(function(call, proc)
             standOn(u, x, y)
-            -- cp_decide.c's per-unit setup, in its order, with every player unit still visible:
-            -- the AI's danger map (AiFillDangerMap) is their threat, and its tile choice reads it.
-            -- Left out: RefreshEntityBmMaps/RenderBmMap/RefreshUnitSprites (they would rebuild
-            -- gBmMapUnit from the structs, which is already what it holds, and draw) and
-            -- gAiState.unk7C = 0 (read only by cp_staff.c, the staff AI).
-            api.write32(S.gActiveUnit, e.addr)
-            api.write8(S.gActiveUnitId, e.id)
-            call(S.AiUpdateNoMoveFlag, { e.addr })
-            api.write8(S.gAiState + AI_WEIGHT_TABLE,
-                (mem.u16(e.addr + UNIT_AI_CONFIG) & AI_WEIGHT_MASK) >> AI_WEIGHT_SHIFT)
-            api.write8(S.gAiState + AI_DANGER_FILLED, 0)
-            call(S.AiInitDangerMap, {})
-            -- Only now is `u` made the one target: AiAttemptOffensiveAction skips hidden units.
-            onlyTarget(u)
-            call(S.AiClearDecision, {})
-            call(S.AiAttemptOffensiveAction, { S.AiIsUnitEnemy | 1 })
-            local D = S.gAiDecision
-            if mem.u8(D + DEC_ACTION) ~= AI_ACTION_COMBAT or mem.u8(D + DEC_TARGET) ~= u.id then
-                return nil
-            end
-            local sx, sy, slot = mem.u8(D + DEC_X), mem.u8(D + DEC_Y), mem.u8(D + DEC_SLOT)
-            if slot == BALLISTA_SLOT then
-                call(S.BattleGenerateBallistaSimulation, { e.addr, u.addr, sx, sy })
-            else
-                call(S.BattleGenerateSimulation, { e.addr, u.addr, sx, sy, slot })
-            end
-            call(S.InitBattleForecastBattleStats, { proc })
-            local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
-            side.slot, side.tile = slot, { x = sx, y = sy }
+            -- `u` is made the one target only after the danger map: AiAttemptOffensiveAction
+            -- skips hidden units.
+            local target, side = aiDecide(call, proc, e, function() onlyTarget(u) end)
+            if target ~= u.id then return nil end
             return side
         end)
         return M.strikeOf(t)
+    end
+
+    function s.enemyPhase(plan)
+        return sandbox(function(call, proc)
+            local byId = {}
+            for _, o in ipairs(api.board().units) do byId[o.id] = o end
+            for _, b in ipairs(plan.blues) do
+                standOn(b.unit, b.x, b.y)
+                api.write8(b.unit.addr + UNIT_HP, b.hp)
+            end
+            for id in pairs(plan.gone or {}) do
+                local e = byId[id]
+                if e and mem.u8(cell(mem, S.gBmMapUnit, e.x, e.y)) == id then
+                    api.write8(cell(mem, S.gBmMapUnit, e.x, e.y), 0)
+                end
+                if e then api.write32(e.addr + UNIT_STATE, mem.u32(e.addr + UNIT_STATE) | US_HIDDEN) end
+            end
+            -- the game's own turn order, built as on its phase (cp_order.c)
+            api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
+            local n = call(S.BuildAiUnitList, {})
+            if n > 0 then call(S.SortAiUnitList, { n }) end
+            local order = {}
+            for i = 0, n - 1 do order[#order + 1] = mem.u8(S.gAiState + i) end
+            local out = {}
+            for _, id in ipairs(order) do
+                local e = byId[id]
+                if e and not (plan.gone or {})[id] and s.visible(e.x, e.y) then
+                    local target, side = aiDecide(call, proc, e)
+                    if target then
+                        local t = M.strikeOf(side)
+                        t.enemy, t.target = id, target
+                        out[#out + 1] = t
+                        standOn(e, side.tile.x, side.tile.y)
+                        local hit = M.hitChance(t.takenHit)
+                        local addr = mem.u32(S.gUnitLookup + target * 4)
+                        local left = mem.u8(addr + UNIT_HP)
+                            - math.floor(hit * t.takenDmg * t.takenHits + 0.5)
+                        api.write8(addr + UNIT_HP, math.max(0, left))
+                    end
+                end
+            end
+            return out
+        end)
     end
 
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
@@ -708,11 +789,17 @@ function M.new(outer)
         end)
     end
 
-    function s.heals(u, x, y)
+    function s.heals(u, x, y, hurt)
         local staves = s.staves(u)
         if #staves == 0 then return {} end
         return sandbox(function(call)
             standOn(u, x, y)
+            -- a planned heal: these allies read as wounded, so the game's list offers them
+            for _, o in ipairs(hurt or {}) do
+                if mem.u8(o.addr + UNIT_HP) >= mem.u8(o.addr + UNIT_MAXHP) then
+                    api.write8(o.addr + UNIT_HP, mem.u8(o.addr + UNIT_MAXHP) - 1)
+                end
+            end
             local out = {}
             for _, st in ipairs(staves) do
                 local slot = st.slot

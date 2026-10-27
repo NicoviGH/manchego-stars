@@ -728,7 +728,7 @@ local function attackOptions(ctx, u, gate)
                                             spent - healCredit(ctx, u, e, t))
                 if f and spent < u.hp and gate(ctx, u, t.x, t.y, sure and e or nil, left) then
                     opts[#opts + 1] = { tile = t, target = e, sure = sure, answered = answered,
-                                        first = first,
+                                        first = first, f = f, spent = spent,
                                         killChance = killChance(f, e),
                                         expected = f.dmg * f.hits * f.hit }
                 end
@@ -1045,14 +1045,14 @@ end
 -- tiles the gate allows, the one restoring the most HP -- the ally's missing HP up to the
 -- staff's amount -- then the most wounded ally, then the safest tile. Slot order picks among
 -- healers. nil when no ally is wounded or no healer reaches one.
-local function staffHeal(ctx, gate)
+local function staffHeal(ctx, gate, only)
     local missing, any = {}, false
     for _, b in ipairs(ctx.blues) do
         if b.maxhp and b.hp < b.maxhp then missing[b.id], any = b.maxhp - b.hp, true end
     end
     if not (any and ctx.sight.heals) then return nil end
     local best
-    for _, u in ipairs(ctx.actors) do
+    for _, u in ipairs(only and { only } or ctx.actors) do
         if #ctx.sight.staves(u) > 0 then
             for _, t in ipairs(waitTiles(ctx, u)) do
                 if gate(ctx, u, t.x, t.y, nil) then
@@ -1076,7 +1076,7 @@ local function staffHeal(ctx, gate)
     end
     if not best then return nil end
     local a = action(best.u, best.tile, "staff", nil)
-    a.slot, a.targetId = best.slot, best.id
+    a.slot, a.targetId, a.gain = best.slot, best.id, best.gain
     for _, b in ipairs(ctx.blues) do
         if b.id == best.id then a.target = b.charId end
     end
@@ -1096,7 +1096,7 @@ local function mend(ctx, u, gate)
     end
     local tile = safest(ctx, u, #allowed > 0 and allowed or waitTiles(ctx, u))
     local a = action(u, tile, "item", nil)
-    a.slot = m.slot
+    a.slot, a.gain = m.slot, math.min(u.maxhp - u.hp, m.amount)
     return a
 end
 
@@ -1245,6 +1245,103 @@ function M.explain(board, sight, style)
         end
     end
     return lines
+end
+
+-- The planner's proposals (#510 step 9, the planner): per unit still able to act, the acts the
+-- rules above would consider, with no style gate -- the planner weighs the risk itself. Per
+-- target, the attack betterAttack ranks first and the one from the safest tile; a breach,
+-- every Talk the game offers, its best heal, a Vulnerary, the march and the hold, and a Seize.
+-- Each act carries `why`; an attack its forecast (`f`) and counter worst case (`spent`).
+-- -> { { unit, acts } }, ctx (the planner scores with the same view).
+function M.candidates(board, sight, style)
+    local ctx = context(board, sight)
+    ctx.style, ctx.turn = style, board.turn
+    local open = function() return true end
+    local objective = sight.objective
+    local out = {}
+    for _, u in ipairs(ctx.actors) do
+        local acts, seen = {}, {}
+        local function add(a, why)
+            if not a then return end
+            local k = a.act .. "@" .. a.move.x .. "," .. a.move.y .. ">" .. tostring(a.targetId)
+                .. (a.obstacle and (a.obstacle.x .. "," .. a.obstacle.y) or "")
+            if seen[k] then return end
+            seen[k] = true
+            a.why = why
+            acts[#acts + 1] = a
+        end
+        local s = ctx.seizeTile
+        if s and canSeize(ctx, u) then
+            for _, t in ipairs(endTiles(ctx, u)) do
+                if t.x == s.x and t.y == s.y then add(action(u, t, "seize"), "seize") end
+            end
+        end
+        local best, safe = {}, {}
+        for _, c in ipairs(attackOptions(ctx, u, open)) do
+            local e = c.target
+            if not best[e] or betterAttack(c, best[e]) then best[e] = c end
+            c.worst = worstCase(ctx, u, c.tile.x, c.tile.y, c.sure and e or nil).sum
+            if not safe[e] or c.worst < safe[e].worst then safe[e] = c end
+        end
+        for _, e in ipairs(ctx.enemies) do      -- board order: a plan never depends on `pairs`
+            for _, list in ipairs({ best, safe }) do
+                local c = list[e]
+                if c then
+                    local a = action(u, c.tile, "attack", e)
+                    a.f, a.spent, a.first = c.f, c.spent, c.first
+                    add(a, "attack")
+                end
+            end
+        end
+        add(breach(ctx, u, open, objective), "breach")
+        for _, t in ipairs(ctx.onField) do
+            if t.faction ~= "blue" then add(talkFrom(ctx, u, t, open), "talk") end
+        end
+        add(staffHeal(ctx, open, u), "heal")
+        -- a heal the plan may need after its blows land: per ally the game would let `u`
+        -- heal were it hurt, from the safest tile that reaches it
+        if ctx.sight.heals and ctx.sight.staves and #ctx.sight.staves(u) > 0 then
+            local others, best = {}, {}
+            for _, b in ipairs(ctx.blues) do
+                if b ~= u then others[#others + 1] = b end
+            end
+            for _, t in ipairs(waitTiles(ctx, u)) do
+                local w = worstCase(ctx, u, t.x, t.y, nil).sum
+                for _, h in ipairs(ctx.sight.heals(u, t.x, t.y, others)) do
+                    for _, id in ipairs(h.targets) do
+                        if not best[id] or w < best[id].w then
+                            best[id] = { w = w, tile = t, slot = h.slot, amount = h.amount }
+                        end
+                    end
+                end
+            end
+            for _, b in ipairs(others) do
+                local c = best[b.id]
+                if c then
+                    local a = action(u, c.tile, "staff", b)
+                    a.slot, a.amount = c.slot, c.amount
+                    add(a, "heal")
+                end
+            end
+        end
+        add(mend(ctx, u, open), "mend")
+        add(action(u, march(ctx, u, open, objective), "wait"), "march")
+        add(action(u, safest(ctx, u, waitTiles(ctx, u)), "wait"), "hold")
+        -- progress: how much nearer its march goal (the game's field to it) each act ends it
+        local goal = marchGoal(ctx, u, objective)
+        local field = fieldFor(ctx, goal)
+        local function fd(x, y)
+            if field then return field[y] and field[y][x] end
+            return goal and manhattan(x, y, goal.x, goal.y)
+        end
+        local here = fd(u.x, u.y)
+        for _, a in ipairs(acts) do
+            local there = fd(a.move.x, a.move.y)
+            a.progress = (here and there) and (here - there) or 0
+        end
+        out[#out + 1] = { unit = u, acts = acts }
+    end
+    return out, ctx
 end
 
 -- ── Claims ───────────────────────────────────────────────────────────────────────────────

@@ -1952,6 +1952,7 @@ end
 -- (no hardcoded char ids) + bot.lua's pure greedy core (pickTarget/pickMove); the scenario owns
 -- the driving.
 local BOT = dofile(PLAYTEST_DIR .. "/bot.lua")
+INSPECT.Planner = dofile(PLAYTEST_DIR .. "/planner.lua")   -- the bot's planner (#510 step 9)
 local CH02 = dofile(PLAYTEST_DIR .. "/ch02check.lua")   -- pure charm-delivery check (#22)
 local PATHING = dofile(PLAYTEST_DIR .. "/pathing.lua")  -- pure BFS distance field (#60 march)
 local FUZZRNG = dofile(PLAYTEST_DIR .. "/fuzzrng.lua")   -- seeded PRNG + input policy (#49)
@@ -3040,7 +3041,7 @@ INSPECT.botApi = function(game)
     end
     local style = decode(PLAYTEST_STYLE, { aggression = "careful", deploy = {}, claims = {} })
     local api = {
-        Bot = BOT, Json = Json,
+        Bot = BOT, Json = Json, Planner = INSPECT.Planner,
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, chapter = start,
                  mode = TUNE.difficultyName[TUNE.difficultyWant],
                  seed = tonumber(PLAYTEST_SEED) or 1 },
