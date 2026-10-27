@@ -6,9 +6,9 @@
 > **This file is GENERATED.** Each record is one file under `docs/research/`; add or
 > edit one, then regenerate: `python3 tools/gen_decisions_index.py`.
 
-11 records. Search the titles and tags here, then open the ones you need.
+19 records. Search the titles and tags here, then open the ones you need.
 
-**Contents:** [Playtesting bots](#playtesting-bots) · [FE8: between battles](#fe8-between-battles) · [FE8: building the party](#fe8-building-the-party)
+**Contents:** [Playtesting bots](#playtesting-bots) · [FE8: between battles](#fe8-between-battles) · [FE8: building the party](#fe8-building-the-party) · [FE8: whom guides field, by chapter](#fe8-whom-guides-field-by-chapter)
 
 ---
 
@@ -41,3 +41,18 @@
 | `0009` | [FE8 promotion branches players pick, mostly for movement](research/0009-fe8-promotion-branches-players-pick-mostly-for-movement.md) | 2026-10-27 | #510 | promotion, branches, classes, seals |
 | `0010` | [FE8 EXP habits: feed growing units, Seth softens, the Tower of Valni to catch up](research/0010-fe8-exp-habits-feed-growing-units-seth-softens-the-tower-of-valni-to-c.md) | 2026-10-27 | #510 | exp, kills, training, tower-of-valni, seth |
 | `0011` | [FE8 party building: the strongest cross-source patterns and the contested points](research/0011-fe8-party-building-the-strongest-cross-source-patterns-and-the-contest.md) | 2026-10-27 | #510 | summary, contested, team-building |
+
+---
+
+## FE8: whom guides field, by chapter
+
+| | record | date | issues | tags |
+|---|---|---|---|---|
+| `0012` | [Sources for the FE8 per-chapter deploy research](research/0012-sources-for-the-fe8-per-chapter-deploy-research.md) | 2026-10-27 | #510 | sources, deploy, chapters |
+| `0013` | [FE8 deploy rules of thumb across chapters, and the deploy count per chapter](research/0013-fe8-deploy-rules-of-thumb-across-chapters-and-the-deploy-count-per-cha.md) | 2026-10-27 | #510 | deploy, deploy-cap, preparations, forced-units, thief, fog, fliers |
+| `0014` | [FE8 Prologue to Chapter 8 (shared route): whom guides field, chapter by chapter](research/0014-fe8-prologue-to-chapter-8-shared-route-whom-guides-field-chapter-by-ch.md) | 2026-10-27 | #510 | deploy, prologue, ch1, ch2, ch3, ch4, ch5, ch5x, ch6, ch7, ch8 |
+| `0015` | [FE8 Eirika's route, Chapters 9-14: whom guides field](research/0015-fe8-eirika-s-route-chapters-9-14-whom-guides-field.md) | 2026-10-27 | #510 | deploy, eirika-route, ch9, ch10, ch11, ch12, ch13, ch14 |
+| `0016` | [FE8 Ephraim's route, Chapters 9-14 (brief): whom guides field](research/0016-fe8-ephraim-s-route-chapters-9-14-brief-whom-guides-field.md) | 2026-10-27 | #510 | deploy, ephraim-route, ch9, ch10, ch11, ch12, ch13, ch14 |
+| `0017` | [FE8 Chapters 15 to Final (shared): whom guides field](research/0017-fe8-chapters-15-to-final-shared-whom-guides-field.md) | 2026-10-27 | #510 | deploy, ch15, ch16, ch17, ch18, ch19, ch20, final |
+| `0018` | [FE8 promotion branches per unit, as walkthroughs pick them](research/0018-fe8-promotion-branches-per-unit-as-walkthroughs-pick-them.md) | 2026-10-27 | #510 | promotion, branches, classes, seals |
+| `0019` | [FE8 per-chapter deploy: where the sources disagree](research/0019-fe8-per-chapter-deploy-where-the-sources-disagree.md) | 2026-10-27 | #510 | contested, deploy, promotion |

@@ -69,7 +69,8 @@ DECISIONS = Collection(
     ], 'decision', False)
 RESEARCH = Collection(
     'research', os.path.join(REPO, 'docs', 'research'), os.path.join(REPO, 'docs', 'research.md'),
-    ['Playtesting bots', 'FE8: between battles', 'FE8: building the party'], [
+    ['Playtesting bots', 'FE8: between battles', 'FE8: building the party',
+     'FE8: whom guides field, by chapter'], [
         '# Research — Manchego Stars',
         '',
         '> Reference research: what sources say, each claim cited. **Evidence, not decisions:**',
