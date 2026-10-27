@@ -25,7 +25,8 @@
 --
 -- api (harness.lua builds it; test_botrun.lua fakes it):
 --   Bot, Json          bot.lua and json.lua, loaded by the caller
---   info = { game, rom_hash, chapter, mode, seed }    what the record names the run by
+--   info = { game, rom_hash, chapter, mode, seed, campaign, attempt }  what the record names
+--                      the run by; campaign and attempt only when campaign.lua plays it
 --   style = Bot.STYLES-shaped table, claims = resolved claims (bot.lua's Claims)
 --   seed(s)            seed the game's RNG (Sight.seed)
 --   board()            Board.read
@@ -91,7 +92,8 @@ function M.run(api)
         if not skipped[c.id] then played[#played + 1] = c.id end
     end
     local rec = { game = api.info.game, rom_hash = api.info.rom_hash, chapter = api.info.chapter,
-                  mode = api.info.mode, seed = api.info.seed, style = api.style,
+                  mode = api.info.mode, seed = api.info.seed, campaign = api.info.campaign,
+                  attempt = api.info.attempt, style = api.style,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
                   deployed = {}, bot_faults = {} }
     local startFrame = api.frames()

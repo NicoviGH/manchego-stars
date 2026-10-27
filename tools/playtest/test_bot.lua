@@ -1206,26 +1206,26 @@ local function test_shop_stops_at_gold()
     local Bu = unitOf(2, 0x02, 1, { canUse = { [0x20] = true } })
     local function flat(r)
         local t = {}
-        for _, e in ipairs(r) do t[#t + 1] = e.item .. "x" .. e.qty end
+        for _, e in ipairs(r) do t[#t + 1] = e.unit .. ":" .. e.item end
         return csv(t)
     end
-    check(flat(B.shop(10000, stock, { A, Bu })), "108x2,17x1,32x1",
-        "vulneraries per unit first, then the cheapest usable weapon each lacks")
-    check(flat(B.shop(700, stock, { A, Bu })), "108x2",
+    check(flat(B.shop(10000, stock, { A, Bu })), "1:108,2:108,1:17,2:32",
+        "vulneraries per unit first, then the cheapest usable weapon each lacks, each for its unit")
+    check(flat(B.shop(700, stock, { A, Bu })), "1:108,2:108",
         "gold runs out after the vulneraries: 100 left buys no 400+ sword")
     local Cu0 = unitOf(3, 0x03, 1, { canUse = { [0x21] = true, [0x10] = true, [0x11] = true } })
-    check(flat(B.shop(1000, stock, { Bu, Cu0 })), "108x2,33x1",
+    check(flat(B.shop(1000, stock, { Bu, Cu0 })), "2:108,3:108,3:33",
         "skip then continue: the lance (700) is skipped at 400 gold, "
             .. "the axe (100) after it is bought")
     A.items = { { id = 0x10, type = "sword", rank = 1 } }
-    check(flat(B.shop(10000, stock, { A, Bu })), "108x2,32x1", "a unit holding its type buys none")
+    check(flat(B.shop(10000, stock, { A, Bu })), "1:108,2:108,2:32", "a unit holding its type buys none")
     local Cu = unitOf(3, 0x03, 1, { canUse = { [0x21] = true, [0x10] = true, [0x11] = true } })
-    check(flat(B.shop(800, stock, { Cu })), "108x1,33x1,17x1",
+    check(flat(B.shop(800, stock, { Cu })), "3:108,3:33,3:17",
         "skip-and-continue: exact fit, gold 800 buys vuln 300, axe 100, sword 400 in order")
-    check(flat(B.shop(450, stock, { Cu })), "108x1,33x1",
+    check(flat(B.shop(450, stock, { Cu })), "3:108,3:33",
         "the sword (400) is skipped at 50 gold, the buying stops there")
     A.items = { { id = 0x10, type = "sword", rank = 1 }, { id = 0x6C, kind = "vulnerary" } }
-    check(flat(B.shop(10000, stock, { A, Bu })), "108x1,32x1",
+    check(flat(B.shop(10000, stock, { A, Bu })), "2:108,2:32",
         "a unit already holding a Vulnerary buys none")
     check(flat(B.shop(0, stock, { A })), "", "no gold, nothing")
     check(flat(B.shop(10000, { stock[2] }, { A })), "",

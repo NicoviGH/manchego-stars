@@ -122,11 +122,13 @@
 --   then style.deploy (listed order; a charId not in the roster is skipped, a repeat counts
 --   once), then the highest level (ties by slot order), up to `cap`. Forced units all go even
 --   when they alone exceed the cap. No transfer rule is decided yet, so `give` is always empty.
--- Bot.shop(gold, stock, party) -> {{ item, qty }...}: party is the deployed roster entries, in
---   deploy order. One Vulnerary (the cheapest) per unit holding none first, then for each unit
---   and each weapon type among the stock it can use (type names in order) it holds none of, the
---   cheapest stock weapon of that type it can use. A purchase gold cannot cover is skipped and
---   the later ones are still tried.
+-- Bot.shop(gold, stock, party) -> {{ unit = charId, item }...}, one entry per purchase in the
+--   order made, each naming the unit it is for (FE8's shop screen buys into the inventory of
+--   the unit that opened it, bmshop.c StartShopScreen). party is the deployed roster entries,
+--   in deploy order. One Vulnerary (the cheapest) per unit holding none first, then for each
+--   unit and each weapon type among the stock it can use (type names in order) it holds none
+--   of, the cheapest stock weapon of that type it can use. A purchase gold cannot cover is
+--   skipped and the later ones are still tried.
 -- Bot.promote(unit, items) -> bool: a seal the game says promotes this unit is held.
 -- Bot.promoteOrder(units) -> units, highest level first (ties by slot order): the order a
 --   caller spends seals in.
@@ -1016,16 +1018,15 @@ local function holdsAny(u, want)
 end
 
 function M.shop(gold, stock, party)
-    local bought, order = {}, {}
-    local function buy(s)
+    local out = {}
+    local function buy(u, s)
         if not s or s.price > gold then return end
         gold = gold - s.price
-        if not bought[s.item] then bought[s.item] = 0; order[#order + 1] = s.item end
-        bought[s.item] = bought[s.item] + 1
+        out[#out + 1] = { unit = u.charId, item = s.item }
     end
     local vuln = cheapest(stock, function(s) return s.kind == "vulnerary" end)
     for _, u in ipairs(party) do
-        if not holdsAny(u, function(it) return it.kind == "vulnerary" end) then buy(vuln) end
+        if not holdsAny(u, function(it) return it.kind == "vulnerary" end) then buy(u, vuln) end
     end
     for _, u in ipairs(party) do
         local usable = function(s) return s.type ~= nil and (u.canUse or {})[s.item] end
@@ -1039,12 +1040,10 @@ function M.shop(gold, stock, party)
         table.sort(types)
         for _, t in ipairs(types) do
             if not holdsAny(u, function(it) return it.type == t end) then
-                buy(cheapest(stock, function(s) return usable(s) and s.type == t end))
+                buy(u, cheapest(stock, function(s) return usable(s) and s.type == t end))
             end
         end
     end
-    local out = {}
-    for _, item in ipairs(order) do out[#out + 1] = { item = item, qty = bought[item] } end
     return out
 end
 

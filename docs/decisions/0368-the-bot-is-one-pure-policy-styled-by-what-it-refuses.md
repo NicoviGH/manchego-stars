@@ -90,7 +90,9 @@ the game rules this record first put here (a level-10 check, a rank comparison):
 - `Bot.shop(gold, stock, party)`: one cheapest Vulnerary per deployed unit, then, per unit in
   deploy order and per weapon type among the stock it can use (`canUse`, the game's
   `CanUnitUseWeapon`), the cheapest one it can use when it holds none of the type. A purchase gold cannot cover is skipped and later
-  ones are still tried; the result is aggregated `{{item, qty}}`.
+  ones are still tried; the result is one `{unit, item}` per purchase, in the order made (PR E:
+  FE8's shop screen buys into the inventory of the unit that opened it, so each purchase names
+  its unit; it was an aggregated `{{item, qty}}` until then).
 - `Bot.promote(unit, items)`: a seal the game accepts for this unit is held. The order is
   `Bot.promoteOrder(units)` (highest level first, ties by slot order); the caller spends a seal
   per true.
