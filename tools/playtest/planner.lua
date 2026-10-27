@@ -1,17 +1,22 @@
 -- planner.lua -- the bot plans each player phase (#510 step 9; the plan comment's "The
--- planner"). Its own chunk, pure: no emu, SYM or harness global, so test_planner.lua drives it
+-- planner"). Its own chunk, pure: no emu, SYM or harness global, so test_bot.lua drives it
 -- with a fake sight.
 --
 -- One call plans the phase from the board as it stands (botrun calls it again after every act:
 -- a receding horizon, so a miss, a kill or a newly seen enemy is planned around at once):
 --   1. Propose: Bot.candidates -- per unit its attacks, breach, Talks, heal, Vulnerary, march,
---      hold, Seize, each read from the game.
+--      hold, retreat, Seize, each read from the game, each with its end tile's exposure.
 --   2. Search: a beam over which unit acts next and how. A partial plan is scored by expected
 --      values from the game's forecasts: damage dealt, the chance to kill, the counter's chance
---      to kill our unit, HP healed, a recruit, ground gained toward the goal.
+--      to kill our unit, HP healed, a recruit, ground gained toward the goal -- less each moved
+--      unit's standing exposure: its chance to die and the HP it loses if every enemy that
+--      reaches its tile strikes it (an enemy the plan kills does not; the HP is the plan's).
+--      Without it the beam ranked only what a unit does, and every plan it kept was the
+--      exposed one: the judge then had nothing safe to pick (ch03, 2026-10-27).
 --   3. Judge: the best FINAL complete plans each meet the enemy phase the game's own AI would
---      play against them (sight.enemyPhase), and pay for each unit's chance to die there, its
---      expected damage, and a fog risk for a fragile unit left beside ground it cannot see.
+--      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
+--      for each unit's chance to die there, its expected damage, and a fog risk for a fragile
+--      unit left beside ground it cannot see.
 --   4. The best plan's first act is returned.
 -- Honesty: outcomes are odds (Sight.hitChance: FE8's two-roll hit; crits one roll), never the
 -- game's next random numbers; an enemy the player cannot see is in no plan (Bot.candidates and
@@ -24,7 +29,8 @@
 local M = {}
 
 M.BEAM = 6         -- partial plans kept at each depth
-M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam tries
+M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam tries (and its
+                   -- hold and retreat, always: the way out survives the cut)
 M.FINAL = 4        -- complete plans judged against the enemy phase
 M.FOG_REACH = 6    -- unseen ground this close to a unit may hide what can strike it
 M.BOSS_WORTH = 5   -- damage on a Defeat Boss map's boss, per point, against any other's
@@ -85,6 +91,21 @@ function M.odds(blows, hp)
         mean = mean + d * p
     end
     return dead, mean
+end
+
+-- `act`'s standing exposure for a unit at `hp`, the enemies in `gone` left out: the chance
+-- it dies and the HP it loses if each enemy that reaches its tile strikes it.
+local function exposed(act, hp, gone, hitChance)
+    local blows = {}
+    for _, s in ipairs(act.exposure or {}) do
+        if not gone[s.id] then
+            for _, b in ipairs(M.blows(s.hit, s.dmg, s.hits, s.crit, hitChance)) do
+                blows[#blows + 1] = b
+            end
+        end
+    end
+    if #blows == 0 then return 0, 0 end
+    return M.odds(blows, hp)
 end
 
 -- An act's own score, given the partial plan `st` before it (enemy HP already taken, enemies
@@ -153,8 +174,25 @@ function M.plan(Bot, board, sight, style)
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
     local objective = sight.objective and sight.objective.kind
-    local start = { score = 0, acts = {}, used = {}, tiles = {}, gone = {}, enemyHp = {},
-                    hp = {}, objective = objective }
+    local start = { score = 0, base = 0, acts = {}, used = {}, tiles = {}, gone = {},
+                    enemyHp = {}, hp = {}, objective = objective }
+
+    -- the beam's exposure term, memoised: the same act, HP and kills recur across the beam
+    local risks = {}
+    local function risk(a, hp, gone)
+        local ids = {}
+        for _, s in ipairs(a.exposure or {}) do
+            if gone[s.id] then ids[#ids + 1] = s.id end
+        end
+        local k = key(a) .. "#" .. hp .. "#" .. table.concat(ids, ",")
+        local r = risks[k]
+        if not r then
+            local die, taken = exposed(a, hp, gone, hitChance)
+            r = W.death * die + W.taken * taken
+            risks[k] = r
+        end
+        return r
+    end
 
     -- each unit's acts, its own best first, PER_UNIT of them
     local menus = {}
@@ -163,7 +201,8 @@ function M.plan(Bot, board, sight, style)
         for _, a in ipairs(c.acts) do
             a.unitHp = c.unit.hp
             a.targetUnit = a.targetId and byId[a.targetId]
-            scored[#scored + 1] = { a = a, v = (score(a, start, W, style, hitChance)) }
+            local v, fx = score(a, start, W, style, hitChance)
+            scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, fx.gone and { [fx.gone] = true } or {}) }
         end
         table.sort(scored, function(x, y)
             if x.v ~= y.v then return x.v > y.v end
@@ -173,7 +212,10 @@ function M.plan(Bot, board, sight, style)
         -- nothing until a blow earlier in the plan gives it someone to restore
         local menu = {}
         for i, x in ipairs(scored) do
-            if i <= M.PER_UNIT or (x.a.act == "staff" and x.a.amount) then menu[#menu + 1] = x.a end
+            if i <= M.PER_UNIT or (x.a.act == "staff" and x.a.amount)
+                    or x.a.why == "hold" or x.a.why == "retreat" then
+                menu[#menu + 1] = x.a
+            end
         end
         menus[#menus + 1] = { unit = c.unit, acts = menu }
     end
@@ -192,7 +234,7 @@ function M.plan(Bot, board, sight, style)
                         if not blocked then
                             local v, fx = score(a, st, W, style, hitChance)
                             if fx.blocked then goto skip end
-                            local n = { score = st.score + v, acts = copy(st.acts),
+                            local n = { base = st.base + v, acts = copy(st.acts),
                                         used = copy(st.used), tiles = copy(st.tiles),
                                         gone = copy(st.gone), enemyHp = copy(st.enemyHp),
                                         hp = copy(st.hp), objective = objective }
@@ -202,6 +244,12 @@ function M.plan(Bot, board, sight, style)
                             if fx.gone then n.gone[fx.gone] = true end
                             if fx.enemyHp then n.enemyHp[fx.enemyHp.id] = fx.enemyHp.hp end
                             if fx.heals then n.hp[fx.heals.id] = fx.heals.hp end
+                            -- every moved unit's exposure, again: a later kill or heal in
+                            -- the plan changes an earlier unit's
+                            n.score = n.base
+                            for _, x in ipairs(n.acts) do
+                                n.score = n.score - risk(x, n.hp[x.unitId] or x.unitHp, n.gone)
+                            end
                             -- in order: a heal after a blow is not the heal before it
                             local sig = {}
                             for _, x in ipairs(n.acts) do sig[#sig + 1] = key(x) end
@@ -246,7 +294,7 @@ function M.plan(Bot, board, sight, style)
                 table.insert(onUnit[s.target], b)
             end
         end
-        local judged = st.score
+        local judged = st.base
         st.predict = {}
         for _, p in ipairs(planned) do
             local die, taken = M.odds(onUnit[p.unit.id] or {}, p.hp)

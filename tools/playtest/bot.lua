@@ -415,7 +415,7 @@ local function context(board, sight)
     cache.attacks, cache.strikes = cache.attacks or {}, cache.strikes or {}
     local ctx = { sight = sight, actors = {}, enemies = {}, blues = {}, standing = {},
                   onField = {}, attacks = cache.attacks, strikes = cache.strikes, reaches = {},
-                  worsts = {}, options = {}, breaches = {}, keyed = {}, talks = {},
+                  worsts = {}, exposures = {}, options = {}, breaches = {}, keyed = {}, talks = {},
                   openers = {} }
     local o = sight.objective
     if o and o.kind == "seize" and o.tile then ctx.seizeTile = o.tile end
@@ -596,6 +596,22 @@ local function claimsOn(ctx, field, u)
     return out
 end
 
+-- What can strike `u` next enemy phase if it ends on (x, y): per visible enemy that reaches
+-- the tile, that enemy (`by`) and its own strike there (sight.strike: the AI's weapon).
+local function exposure(ctx, u, x, y)
+    local k = u.id .. "@" .. tileKey(x, y)
+    local list = ctx.exposures[k]
+    if list then return list end
+    list = {}
+    if ctx.sight.danger(x, y) > 0 then
+        for _, e in ipairs(ctx.enemies) do
+            if reaches(ctx, e, x, y) then list[#list + 1] = { by = e, f = strike(ctx, u, e, x, y) } end
+        end
+    end
+    ctx.exposures[k] = list
+    return list
+end
+
 -- The enemy phase's worst case for `u` ending on (x, y): {sum, max} of each reaching enemy's
 -- damage, `spared` (a sure kill's target) left out.
 local function worstCase(ctx, u, x, y, spared)
@@ -603,12 +619,10 @@ local function worstCase(ctx, u, x, y, spared)
     local w = ctx.worsts[k]
     if w then return w end
     w = { sum = 0, max = 0 }
-    if ctx.sight.danger(x, y) > 0 then
-        for _, e in ipairs(ctx.enemies) do
-            if e ~= spared and reaches(ctx, e, x, y) then
-                local dmg = takenWorst(strike(ctx, u, e, x, y))
-                w.sum, w.max = w.sum + dmg, math.max(w.max, dmg)
-            end
+    for _, s in ipairs(exposure(ctx, u, x, y)) do
+        if s.by ~= spared then
+            local dmg = takenWorst(s.f)
+            w.sum, w.max = w.sum + dmg, math.max(w.max, dmg)
         end
     end
     ctx.worsts[k] = w
@@ -1250,8 +1264,10 @@ end
 -- The planner's proposals (#510 step 9, the planner): per unit still able to act, the acts the
 -- rules above would consider, with no style gate -- the planner weighs the risk itself. Per
 -- target, the attack betterAttack ranks first and the one from the safest tile; a breach,
--- every Talk the game offers, its best heal, a Vulnerary, the march and the hold, and a Seize.
--- Each act carries `why`; an attack its forecast (`f`) and counter worst case (`spent`).
+-- every Talk the game offers, its best heal, a Vulnerary, the march, the hold, the retreat and
+-- a Seize. Each act carries `why`, its `progress` and its end tile's `exposure` (each enemy
+-- that can strike it there next phase); an attack its forecast (`f`) and counter worst case
+-- (`spent`).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view).
 function M.candidates(board, sight, style)
     local ctx = context(board, sight)
@@ -1335,9 +1351,29 @@ function M.candidates(board, sight, style)
             return goal and manhattan(x, y, goal.x, goal.y)
         end
         local here = fd(u.x, u.y)
+        local function gain(x, y)
+            local there = fd(x, y)
+            return (here and there) and (here - there) or 0
+        end
+        -- the retreat: the safest tile that still gains ground, the most ground on a tie, so a
+        -- unit has a way forward that is not the march's exposed front
+        local retreat, rw, rg
+        for _, t in ipairs(waitTiles(ctx, u)) do
+            local g = gain(t.x, t.y)
+            if g > 0 then
+                local w = worstCase(ctx, u, t.x, t.y, nil).sum
+                if not rw or w < rw or (w == rw and g > rg) then retreat, rw, rg = t, w, g end
+            end
+        end
+        if retreat then add(action(u, retreat, "wait"), "retreat") end
         for _, a in ipairs(acts) do
-            local there = fd(a.move.x, a.move.y)
-            a.progress = (here and there) and (here - there) or 0
+            a.progress = gain(a.move.x, a.move.y)
+            -- what can strike it there next phase, each enemy's own strike (the planner's odds)
+            a.exposure = {}
+            for _, s in ipairs(exposure(ctx, u, a.move.x, a.move.y)) do
+                a.exposure[#a.exposure + 1] = { id = s.by.id, hit = s.f.takenHit, dmg = s.f.takenDmg,
+                                                hits = s.f.takenHits, crit = s.f.takenCrit }
+            end
         end
         out[#out + 1] = { unit = u, acts = acts }
     end

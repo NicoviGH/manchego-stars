@@ -1629,6 +1629,49 @@ do
     check(alone and alone.act ~= "attack", true, "planner: no heal, no attack")
 end
 
+-- test_planner_prices_standing_exposure: the march to (1,0) gains 20 steps but X reaches it
+-- for 25 of A's 20; (0,1) gains 10 and nothing reaches it. Only the beam's top plan is
+-- judged (FINAL = 1), so the pick is the beam's own: its exposure term keeps the retreat
+-- first, where before it ranked the march first and the judge had nothing safe to choose.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 3, 0)
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }), [0x81] = tiles({ 2, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 }, [1] = { [0] = 30 } } end,
+        danger = { ["1,0"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["1,0"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+    }
+    local final = Planner.FINAL
+    Planner.FINAL = 1
+    local a = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.FINAL = final
+    check(at(a), "0,1", "planner: careful takes the safe ground")
+    check(a and a.why, "retreat", "planner: it is the retreat")
+end
+
+-- test_planner_exposure_spares_the_killed: A's sure kill removes X, the only enemy that
+-- reaches (2,2), so B's march there costs nothing -- whichever unit the beam moves first.
+do
+    local A = blue(0x01, 0, 0, 0)
+    local Bu = blue(0x02, 1, 0, 2, { minRange = false })
+    local X = red(0x81, 1, 0, { hp = 5 })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 0, 2 }, { 2, 2 }),
+                  [0x81] = tiles({ 1, 0 }, { 2, 1 }) },
+        field = function() return { [0] = { [0] = 50 }, [2] = { [0] = 40, [2] = 20 } } end,
+        danger = { ["2,2"] = 1 },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } },
+               [0x02] = { [0x81] = { ["2,2"] = fc { takenHit = 100, takenDmg = 25, takenHits = 1 } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(A, Bu, X), sightOf(o), style("careful"))
+    local moved
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.unitId == 0x02 then moved = at(a) end
+    end
+    check(moved, "2,2", "planner: a killed enemy threatens no one")
+end
+
 if fails > 0 then
     print(string.format("\n%d/%d FAILED", fails, tests)); os.exit(1)
 else
