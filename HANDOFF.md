@@ -106,7 +106,11 @@ G3 #537 78105ed; the summary is on #531).
        crash). ch03 alone: careful won, turn 13, all alive, 19.5 CPU s (was 37.9), 28 plans for
        141 acts. Finding: #510 comment 6455470495.
      - **NEXT, in order:**
-       1. Parallel attempts from the saved chapter start (PR F's pool, built now).
+       1. **Parallel attempts: READ #510 comment 6455515239 FIRST.** Parallel attempts equal
+          sequential ones: each attempt loads the same start state, RNG included. run.sh is not
+          safe for two copies of one scenario: a shared run dir, a pkill, `fireemblem8.sav` and
+          `symbols.lua`. The comment proposes `PT_RUN_TAG`, a campaign `attempt: k`, and the
+          `montecarlo.py` pool. Then: Parallel attempts from the saved chapter start (PR F's pool, built now).
        2. Remaining game-call cost: each call rounds up to a whole frame (~0.9 ms; `run_s` in
           the costs). A call list run in one frame is the next lever.
        3. ch04 (fog), vanilla Ch2's Vanessa fault, convert the other chapters' `unmodelled`
