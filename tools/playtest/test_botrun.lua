@@ -70,14 +70,18 @@ local function fakeGame(o)
                 threat = function() return function() return 0 end end,
                 range = function(u) return { min = u.minRange, max = u.maxRange } end,
                 canSeize = function() return true end,
-                reach = function(u) return within(u, u.faction == "blue" and (o.move or 3) or 0) end,
+                reach = function(u)
+                    return within(u, u.faction == "blue" and (o.move or 3) or 0)
+                end,
                 attack = function(u, e)
                     local dmg = o.hit or 5
                     return { hit = 100, dmg = dmg, crit = 0, hits = 1, counters = false,
                              counterHit = 0, counterDmg = 0, counterCrit = 0, counterHits = 0,
                              killsTarget = dmg >= e.hp }
                 end,
-                strike = function() return { takenHit = 0, takenDmg = 0, takenCrit = 0, takenHits = 0 } end,
+                strike = function()
+                    return { takenHit = 0, takenDmg = 0, takenCrit = 0, takenHits = 0 }
+                end,
                 nextTurnEvent = function(turn)
                     g.eventAsks = (g.eventAsks or 0) + 1
                     return o.eventTurn and o.eventTurn > turn and o.eventTurn or nil
@@ -124,6 +128,16 @@ local function fakeGame(o)
     return g
 end
 
+-- The two-unit rout most cases play: A beside an enemy it kills in two blows.
+local function rout()
+    return { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) }
+end
+
+-- A and an enemy out of each other's reach for good: nothing either does changes the board.
+local function standoff()
+    return { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 9, 9, 10) }
+end
+
 local function recordOf(g)
     local line = g.emitted[#g.emitted]
     check(line and line:sub(1, #Botrun.PREFIX), Botrun.PREFIX, "one BOTRUN line is emitted")
@@ -132,7 +146,7 @@ end
 
 -- test_two_turn_rout_ends_won: A strikes E for 5 a turn; E has 10 HP.
 do
-    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    local g = fakeGame { units = rout() }
     local ok, why = Botrun.run(g.api)
     check(ok, true, "a won run is a finished run")
     local r = recordOf(g)
@@ -173,7 +187,7 @@ end
 -- (reach 0), so turn 2 begins on turn 1's board.
 do
     local g = fakeGame { move = 0,
-        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 9, 9, 10) } }
+        units = standoff() }
     local ok = Botrun.run(g.api)
     check(ok, true, "stuck is a finished run, not a crash")
     local r = recordOf(g)
@@ -184,7 +198,7 @@ end
 -- test_survive_map_waiting_is_not_stuck: the same board, but the turns left fall each phase.
 do
     local g = fakeGame { move = 0, kind = "survive", turnsLeft = 3,
-        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 9, 9, 10) } }
+        units = standoff() }
     Botrun.run(g.api)
     local r = recordOf(g)
     check(r.outcome, "won", "holding until the turns run out wins")
@@ -193,7 +207,7 @@ end
 
 -- An action the harness cannot perform is a crash, never a hang.
 do
-    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    local g = fakeGame { units = rout() }
     g.api.act = function() return false end
     local ok = Botrun.run(g.api)
     check(ok, false, "a controller fault is not a finished run")
@@ -202,7 +216,7 @@ end
 
 -- An action that leaves its unit able to act would be asked for again forever.
 do
-    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    local g = fakeGame { units = rout() }
     g.api.act = function() return true end
     Botrun.run(g.api)
     check(recordOf(g).outcome, "crashed", "a no-op action ends the run")
@@ -211,7 +225,7 @@ end
 -- An enemy phase that never hands control back is a crash.
 do
     local g = fakeGame { move = 0,
-        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 9, 9, 10) } }
+        units = standoff() }
     g.api.endPhase = function() return nil, {} end
     Botrun.run(g.api)
     check(recordOf(g).outcome, "crashed", "a wedged enemy phase is recorded as crashed")
@@ -229,7 +243,7 @@ end
 
 -- One sight for the run, refreshed at every phase and after every action.
 do
-    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    local g = fakeGame { units = rout() }
     Botrun.run(g.api)
     check(g.sights, 1, "the sight is built once per run")
     check(g.phases, 2, "given a fresh phase (and cache) at each of the two player phases")
@@ -239,7 +253,7 @@ end
 -- A Lua error anywhere in the run -- a sight call that never returned -- is a crash, and the
 -- record is still emitted.
 do
-    local g = fakeGame { units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 1, 0, 10) } }
+    local g = fakeGame { units = rout() }
     local sight = g.api.sight
     g.api.sight = function()
         local s = sight()
@@ -255,7 +269,7 @@ end
 -- A repeated board with a turn event still to fire waits for it instead of ending stuck.
 do
     local g = fakeGame { move = 0, eventTurn = 4,
-        units = { unit(0x01, 0, "blue", 0, 0, 20), unit(0x81, 0, "red", 9, 9, 10) } }
+        units = standoff() }
     Botrun.run(g.api)
     local r = recordOf(g)
     check(r.outcome, "stuck", "still stuck once the event's turn has passed with nothing changed")
@@ -268,9 +282,9 @@ end
 do
     check(Bot.nextArrival({ { 3, 6 }, { 5 } }, 2), 1, "turn 3 is the next arrival after turn 2")
     check(Bot.nextArrival({ { 3 } }, 3), nil, "none left after the last")
-    local b = { turn = 2, units = {} }
-    check(Botrun.boardHash(Bot, b, nil, { { 5 } }) ~= Botrun.boardHash(Bot, { turn = 3, units = {} },
-        nil, { { 5 } }), true, "the same board, a turn nearer an arrival, hashes differently")
+    local turn2 = Botrun.boardHash(Bot, { turn = 2, units = {} }, nil, { { 5 } })
+    local turn3 = Botrun.boardHash(Bot, { turn = 3, units = {} }, nil, { { 5 } })
+    check(turn2 ~= turn3, true, "the same board, a turn nearer an arrival, hashes differently")
 end
 
 -- An enemy phase that ends the game still carries the deaths the watcher missed.

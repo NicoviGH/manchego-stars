@@ -17,14 +17,15 @@
 --
 -- ── Sight.new(api) -> sight (bot.lua's contract) ────────────────────────────────────────────
 -- api: { mem = { u8, s8, u16, s16, u32 }, write8, write16, write32, SYM, cpu (Sight.machine's),
---        Board (board.lua), map = function() -> w, h, chapter = function() -> index,
+--        Board (board.lua's bound reader, Board.bind: itemRange(item), distance(ax, ay, bx, by)),
+--        map = function() -> w, h, chapter = function() -> index,
 --        turn = function() -> n, board = Board.read }
 -- ONE sight per run. Its answers about the board are kept until refresh(), which the caller
 -- calls whenever the board may have changed (after every action, at every phase); the chapter's
 -- goal and Seize tile are read once.
 --   refresh()                drop every board answer; recount the objective's turns left.
---   newPhase()               refresh(), and a fresh `cache` for the phase: what changes between
---                            phases (levels, an AI an event rewrote) is in no cache key.
+--   newPhase()               refresh(), and a fresh `cache` for the phase: an AI a turn event
+--                            rewrote between phases is in no cache key.
 --   danger(x, y)             gBmMapRange after GenerateDangerZoneRange(FALSE), fog and roofs as
 --                            the game shows them: 0 when no enemy reaches (x, y), else its
 --                            COVERAGE -- GenerateUnitCompleteAttackRange adds 1 for every tile
@@ -56,7 +57,8 @@
 --                            All 0 (slot/tile nil) when the AI does not strike `u` there.
 --   objective                { kind, tile, turnsLeft } -- see objective().
 --   field(goal)              dist[y][x] = the movement cost from `goal` to (x, y), FE8's
---                            GenerateExtendedMovementMap with fieldUnit()'s costs (nil = unreached).
+--                            GenerateExtendedMovementMap with fieldUnit()'s costs; nil =
+--                            unreached.
 --   fieldUnit()              the first deployed unit that can Seize, else the first deployed.
 --   terrain(x, y)            gBmMapTerrain[y][x].
 --   nextTurnEvent(turn)      the first later turn at which a turn event the game would fire is
@@ -89,7 +91,10 @@ M.SCRATCH_SIZE = 0x54        -- the forecast proc; EventInfo (0x1C) reuses the s
 -- struct Unit (include/bmunit.h): +00 pCharacterData, +0C state, +10/+11 xPos/yPos,
 -- +40 u16 ai_config. US_HIDDEN = bit 0.
 local UNIT_STATE, UNIT_X, UNIT_Y, UNIT_AI_CONFIG = 0x0C, 0x10, 0x11, 0x40
-local US_HIDDEN, US_UNDER_A_ROOF = 1 << 0, 1 << 30   -- include/bmunit.h
+-- include/bmunit.h state bits, pinned against it by test_playtest_harness.
+M.US_HIDDEN = 1 << 0
+M.US_UNDER_A_ROOF = 1 << 7
+local US_HIDDEN, US_UNDER_A_ROOF = M.US_HIDDEN, M.US_UNDER_A_ROOF
 -- struct AiState (include/cp_common.h): +7A dangerMapFilled, +7D combatWeightTableId; the
 -- weight table comes from ai_config bits 3..7 (AI_UNIT_CONFIG_COMBATWEIGHT_*), written by
 -- cp_decide.c's per-unit loop as one field assignment, which is copied here as it stands.
@@ -117,10 +122,7 @@ local SYSTEM_THUMB_NOIRQ = 0x1F | 0x20 | 0x80   -- CPSR mode System, T, I
 function M.machine(cpu)
     return function(fn)
         local state = cpu.save()   -- the load puts every register back; only cpsr is kept here
-        local cpsr = cpu.read("cpsr")
-        cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
-        local top = (cpu.read("sp") - 0x100) & ~7
-        local scratch, loop = top + 0x10, top + 0x80   -- SCRATCH_SIZE fits between them
+        local cpsr, top, scratch, loop
         local function returned()
             local pc = cpu.read("pc")
             return pc >= loop and pc <= loop + 8
@@ -141,7 +143,15 @@ function M.machine(cpu)
             end
             return cpu.read("r0")
         end
-        local ok, a, b = pcall(fn, call, scratch)
+        -- Everything after the save is inside the pcall, the mode switch included: whatever
+        -- raises, the state is loaded back.
+        local ok, a, b = pcall(function()
+            cpsr = cpu.read("cpsr")
+            cpu.write("cpsr", (cpsr & ~0xFF) | SYSTEM_THUMB_NOIRQ)
+            top = (cpu.read("sp") - 0x100) & ~7
+            scratch, loop = top + 0x10, top + 0x80   -- SCRATCH_SIZE fits between them
+            return fn(call, scratch)
+        end)
         cpu.load(state)
         if not ok then error(a, 0) end
         return a, b
@@ -278,7 +288,8 @@ function M.new(api)
             seen.threats[e.id] = sandbox(function(call)
                 for _, o in ipairs(api.board().units) do
                     if o.faction == "red" and o.id ~= e.id then
-                        api.write32(o.addr + UNIT_STATE, mem.u32(o.addr + UNIT_STATE) | US_UNDER_A_ROOF)
+                        local st = mem.u32(o.addr + UNIT_STATE)
+                        api.write32(o.addr + UNIT_STATE, st | US_UNDER_A_ROOF)
                     end
                 end
                 call(S.GenerateDangerZoneRange, { 0 })
@@ -467,7 +478,7 @@ function M.range(api, u, sandbox)
     local item = (sandbox or M.machine(api.cpu))(function(call)
         return call(S.GetUnitEquippedWeapon, { u.addr })
     end)
-    local mn, mx = api.Board.itemRange(api.mem, S, item)
+    local mn, mx = api.Board.itemRange(item)
     return mn and { min = mn, max = mx } or nil
 end
 

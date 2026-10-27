@@ -464,6 +464,22 @@ class TestDifficultyGateDefault(unittest.TestCase):
 RUN_SH = os.path.join(REPO, 'tools/playtest/run.sh')
 
 
+class TestSightStateBits(unittest.TestCase):
+    def test_sight_lua_state_bits_are_the_decomps(self):
+        # sight.lua sets unit state bits to steer FE8's own code (US_HIDDEN keeps a unit out of
+        # the AI's target loop, US_UNDER_A_ROOF out of the danger zone's). A wrong bit is silent:
+        # `1 << 30` for the roof made threat(e) every enemy's danger zone. So each `M.US_* = 1 << N`
+        # in sight.lua is read against include/bmunit.h.
+        sys.path.insert(0, os.path.join(REPO, 'tools'))
+        from inject.decomp import enum_values, vanilla_decomp_text
+        decomp = enum_values(vanilla_decomp_text('include/bmunit.h'), 'US_')
+        with open(os.path.join(REPO, 'tools/playtest/sight.lua'), encoding='utf-8') as fh:
+            bits = re.findall(r'^M\.(US_\w+) = 1 << (\d+)', fh.read(), re.M)
+        self.assertTrue(bits, 'sight.lua names no M.US_* state bit')
+        for name, shift in bits:
+            self.assertEqual(1 << int(shift), decomp.get(name), name)
+
+
 class TestNoBlanketEmulatorKill(unittest.TestCase):
     """Scenarios run FOUR AT A TIME by default since #310, so anything run.sh kills by name
     kills its siblings."""

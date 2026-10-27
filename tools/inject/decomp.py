@@ -196,11 +196,15 @@ def flag_number(token):
 
 
 def enum_values(text, prefix):
-    """{NAME: int} for every `PREFIX..., = <int>` enumerator in a C header's `text`. An alias
-    (`CLASS_OBSTACLE = CLASS_EPHRAIM_LORD`) has no number of its own and is left out. The one
-    parser of decomp enum values: callers pick the text (HEAD or the build tree)."""
-    return {k: int(v, 0) for k, v in
-            re.findall(r'(%s\w+)\s*=\s*(0x[0-9A-Fa-f]+|\d+)' % prefix, text)}
+    """{NAME: int} for every `PREFIX..., = <int>` or `= (1 << N)` enumerator in a C header's
+    `text` (bmunit.h's state bits are the second form). An alias (`CLASS_OBSTACLE =
+    CLASS_EPHRAIM_LORD`) has no number of its own and is left out. The one parser of decomp enum
+    values: callers pick the text (HEAD or the build tree)."""
+    out = {}
+    for k, v, shift in re.findall(r'(%s\w+)\s*=\s*(?:(0x[0-9A-Fa-f]+|\d+)|\(\s*1\s*<<\s*(\d+)\s*\))'
+                                  % prefix, text):
+        out[k] = int(v, 0) if v else 1 << int(shift)
+    return out
 
 
 def asset_table_names(text):

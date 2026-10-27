@@ -49,9 +49,7 @@ local Recorder = dofile(PLAYTEST_DIR .. "/recorder.lua")
 -- left), so enough new top-level locals stop the WHOLE FILE loading and every scenario dies
 -- at once (#232).
 local TUNE = {
-    sandboxFrames = 0,        -- frames sight.lua's sandbox ran (its loads rewind the counter)
-    sandboxAt = nil,          -- the frame a sandbox is running from, while it runs
-    sandboxHeartbeat = 600,   -- a log line every this many of them: a long think shows progress
+    sandboxHeartbeat = 600,   -- a log line every this many sandbox frames: a long think shows
     -- How many times one guarded input may be re-pressed into an unchanged, still-legal
     -- state before failing closed. FE8 drops input during window fade-ins, so a single
     -- press can be lost outright -- see guardedInput.
@@ -136,14 +134,29 @@ end)()
 
 local logfile = io.open(PLAYTEST_LOG, "w")
 local controllerFault
+-- The #236 state inspector, as ONE table rather than three top-level locals: Lua caps a
+-- main chunk at 200 locals, this file is one main chunk, and crossing the cap stops the whole
+-- harness loading (every scenario dies at once). Hang new helpers off an existing table
+-- (INSPECT, TUNE) or put the logic in controller.lua, which has a unit suite and no such
+-- ceiling. HOW MUCH ROOM IS LEFT IS NEVER WRITTEN DOWN HERE: `check.py
+-- check_lua_local_headroom` measures it and prints it on every `make check`, because the
+-- hand-maintained number said "two free slots" in three files at once and was wrong in
+-- all three within one PR (#241). `check_lua_chunks_load` fails the build on a crossing.
+-- Fields are assigned further down, next to the proc-pool reader they build on. Declared this
+-- early so every scenario can reach it: a helper hung on a table declared LATER (VISIT, line
+-- ~7400) is out of scope in any scenario written above that line, which is why the shared
+-- R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
+local INSPECT = {}
 -- Frames emulated so far, the sight sandbox's included, and never going back: a sandbox's load
--- rewinds the counter, so its frames are counted into TUNE.sandboxFrames, and while one runs the
--- stamp holds at the frame it started from. run.sh's progress and budget read these stamps.
-TUNE.framesRun = function()
-    return (TUNE.sandboxAt or emu:currentFrame()) + TUNE.sandboxFrames
+-- rewinds the counter, so its frames are counted into INSPECT.sandboxFrames, and while one runs
+-- the stamp holds at the frame it started from (INSPECT.sandboxAt). run.sh's progress and frame
+-- budget read these stamps. On INSPECT, declared here for it: log() is the first reader.
+INSPECT.sandboxFrames = 0
+INSPECT.framesRun = function()
+    return (INSPECT.sandboxAt or emu:currentFrame()) + INSPECT.sandboxFrames
 end
 local function log(s)
-    logfile:write(string.format("[f%06d] %s\n", TUNE.framesRun(), s))
+    logfile:write(string.format("[f%06d] %s\n", INSPECT.framesRun(), s))
     logfile:flush()
 end
 local function result(verdict, why)
@@ -274,19 +287,6 @@ local function blue(charId) return BOARD.find("blue", charId) end
 local function red(charId) return BOARD.find("red", charId) end
 local function isDead(u) return u == nil or u.dead end
 
--- The #236 state inspector, as ONE table rather than three top-level locals: Lua caps a
--- main chunk at 200 locals, this file is one main chunk, and crossing the cap stops the whole
--- harness loading (every scenario dies at once). Hang new helpers off an existing table
--- (INSPECT, TUNE) or put the logic in controller.lua, which has a unit suite and no such
--- ceiling. HOW MUCH ROOM IS LEFT IS NEVER WRITTEN DOWN HERE: `check.py
--- check_lua_local_headroom` measures it and prints it on every `make check`, because the
--- hand-maintained number said "two free slots" in three files at once and was wrong in
--- all three within one PR (#241). `check_lua_chunks_load` fails the build on a crossing.
--- Fields are assigned further down, next to the proc-pool reader they build on. Declared this
--- early so every scenario can reach it: a helper hung on a table declared LATER (VISIT, line
--- ~7400) is out of scope in any scenario written above that line, which is why the shared
--- R-on-a-name reader is INSPECT.helpAt and not VISIT.help (#493).
-local INSPECT = {}
 -- A loss: the game-over screen, or the title it falls back to without the chapter advancing.
 INSPECT.chapterLost = function()
     return gameOverActive() or procActive(SYM.gProcScr_TitleScreen)
@@ -2836,35 +2836,34 @@ INSPECT.sightApi = function()
         write16 = function(a, v) emu:write16(a, v) end,
         write32 = function(a, v) emu:write32(a, v) end,
         SYM = SYM,
-        -- board.lua's two pure helpers sight.lua uses, from the one bound BOARD (no second load)
-        Board = { itemRange = function(_, _, item) return BOARD.itemRange(item) end,
-                  distance = BOARD.distance },
+        Board = BOARD,
         cpu = {
             read = function(r) return raw:readRegister(r) end,
             write = function(r, v) raw:writeRegister(r, v) end,
             -- The frame a sandbox starts from holds log()'s stamps still while it runs (the
-            -- calls' frames are counted into TUNE.sandboxFrames instead), and the load clears it.
+            -- calls' frames are counted into INSPECT.sandboxFrames instead); the load clears it
+            -- first, so a load that raises cannot leave the stamps frozen.
             save = function()
-                TUNE.sandboxAt = emu:currentFrame()
+                INSPECT.sandboxAt = emu:currentFrame()
                 return emu:saveStateBuffer()
             end,
             load = function(st)
+                INSPECT.sandboxAt = nil
                 emu:loadStateBuffer(st)
-                TUNE.sandboxAt = nil
             end,
             write16 = function(a, v) emu:write16(a, v) end,
             write32 = function(a, v) emu:write32(a, v) end,
             -- Each frame a call runs is real emulation, though the load rewinds the counter:
-            -- TUNE.sandboxFrames keeps it, and log() stamps lines with it added, so a run's
+            -- INSPECT.sandboxFrames keeps it, and log() stamps lines with it added, so a run's
             -- cost, run.sh's frame budget and its stall watch all see what the sight spent. A
             -- heartbeat line every TUNE.sandboxHeartbeat frames keeps a long think visible.
             frames = function(done, max)
                 for _ = 1, max do
                     yield()
-                    TUNE.sandboxFrames = TUNE.sandboxFrames + 1
-                    if TUNE.sandboxFrames % TUNE.sandboxHeartbeat == 0 then
+                    INSPECT.sandboxFrames = INSPECT.sandboxFrames + 1
+                    if INSPECT.sandboxFrames % TUNE.sandboxHeartbeat == 0 then
                         log(string.format("sight: %d frames of game code run so far",
-                            TUNE.sandboxFrames))
+                            INSPECT.sandboxFrames))
                     end
                     if done() then return true end
                 end
@@ -2905,7 +2904,9 @@ INSPECT.watchDeaths = function()
             if addr == 0 or ru8(addr + 0x13) == 0 or (ru32(addr + 0x0C) & BOARD.US_DEAD) ~= 0 then
                 local killer
                 if ru8(SYM.gBattleActor + 0x0B) == uid then killer = charOf(SYM.gBattleTarget)
-                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then killer = charOf(SYM.gBattleActor) end
+                elseif ru8(SYM.gBattleTarget + 0x0B) == uid then
+                    killer = charOf(SYM.gBattleActor)
+                end
                 deaths[#deaths + 1] = { id = uid, charId = who.charId, faction = who.faction,
                                         killer = killer }
                 alive[uid] = nil
@@ -2939,7 +2940,7 @@ INSPECT.botApi = function(game)
         won = won,
         lost = lost,
         -- Emulated frames, the sandbox's included (sightApi's cpu.frames counts them).
-        frames = TUNE.framesRun,
+        frames = INSPECT.framesRun,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
     }
@@ -3058,7 +3059,9 @@ scenarios.sightprobe = function()
             end
             local g = sight.strike(lead, e, at.x, at.y)
             local items = {}
-            for _, it in ipairs(e.items or {}) do items[#items + 1] = string.format("%02X", it.id) end
+            for _, it in ipairs(e.items or {}) do
+                items[#items + 1] = string.format("%02X", it.id)
+            end
             log(string.format("strike 0x%02X@(%d,%d) on lead@(%d,%d) items=%s -> slot %s from %s: "
                 .. "hit=%d dmg=%d crit=%d hits=%d", e.charId, e.x, e.y, at.x, at.y,
                 table.concat(items, ","), tostring(g.takenSlot),

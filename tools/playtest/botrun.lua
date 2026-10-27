@@ -129,7 +129,9 @@ function M.run(api)
             sight.newPhase()
             if #rec.deployed == 0 then
                 for _, u in ipairs(board.units) do
-                    if u.faction == "blue" and u.onField then rec.deployed[#rec.deployed + 1] = u.charId end
+                    if u.faction == "blue" and u.onField then
+                        rec.deployed[#rec.deployed + 1] = u.charId
+                    end
                 end
             end
             local h = M.boardHash(Bot, board, sight.objective, style.arrivals)

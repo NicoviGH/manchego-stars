@@ -90,6 +90,12 @@ class EnumValues(unittest.TestCase):
         self.assertEqual(enum_values(self.TEXT, 'CLASS_'), {'CLASS_NONE': 0, 'CLASS_EIRIKA_LORD': 2})
         self.assertEqual(enum_values(self.TEXT, 'CHARACTER_'), {'CHARACTER_WIGHT_CHUnk': 0x5D})
 
+    def test_a_shift_enumerator_is_its_bit(self):
+        # bmunit.h writes unit state bits as `US_UNDER_A_ROOF = (1 << 7),`.
+        from inject.decomp import enum_values
+        text = 'enum {\n    US_HIDDEN       = (1 << 0),\n    US_UNDER_A_ROOF = (1 << 7),\n};\n'
+        self.assertEqual(enum_values(text, 'US_'), {'US_HIDDEN': 1, 'US_UNDER_A_ROOF': 0x80})
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -167,7 +167,7 @@ do
         for dy = -MOVE, MOVE do
             for dx = -MOVE, MOVE do
                 local x, y = u.x + dx, u.y + dy
-                if math.abs(dx) + math.abs(dy) <= MOVE and x >= 0 and y >= 0
+                if Board.distance(0, 0, dx, dy) <= MOVE and x >= 0 and y >= 0
                     and x < W and y < H and passable(x, y)
                     and not blocked[B.tileKey(x, y)] then
                     r[#r + 1] = { x = x, y = y }
@@ -269,10 +269,10 @@ do
     -- the target changed (the boss died): the old best belonged to another
     -- question, so the change counts, and a farther first reading is not a stall
     check(B.madeProgress({ dist = 4, enemies = 0, key = "boss" },
-                         { dist = 10, enemies = 0, key = "seize:1" }),
+                         { dist = 10, enemies = 0, key = "seize" }),
         true, "a new target is progress, not a stall against the old best")
-    check(B.madeProgress({ dist = 10, enemies = 0, key = "seize:1" },
-                         { dist = 10, enemies = 0, key = "seize:1" }),
+    check(B.madeProgress({ dist = 10, enemies = 0, key = "seize" },
+                         { dist = 10, enemies = 0, key = "seize" }),
         false, "same target, same distance, same enemies = no progress")
 end
 
@@ -659,7 +659,8 @@ do
         reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }) },
         fc = { [0x01] = { [0x81] = {
             ["0,0"] = fc { hit = 100, dmg = 10, hits = 1, killsTarget = true, counters = true,
-                           counterHit = 50, counterCrit = 30, counterDmg = 20, counterHits = 1 } } } },
+                           counterHit = 50, counterCrit = 30, counterDmg = 20,
+                           counterHits = 1 } } } },
     }
     for _, aggr in ipairs({ "careful", "even", "bold" }) do
         check(B.decide(boardOf(A, weak), sure, style(aggr)).act, "attack",
@@ -842,7 +843,8 @@ do
     check(counts(), "2/2", "a changed HP is a new attack and a new strike")
     local far = blue(0x02, 1, 6, 0)
     B.decide(boardOf(A, far, hurt), sight, style("careful"))
-    check(counts(), "2/3", "an ally moving out of support range: the attack stands, the strike does not")
+    check(counts(), "2/3",
+        "an ally moving out of support range: the attack stands, the strike does not")
     local moved = blue(0x02, 1, 0, 2)
     B.decide(boardOf(A, moved, hurt), sight, style("careful"))
     check(counts(), "3/4", "an ally moving into support range: both asked again")

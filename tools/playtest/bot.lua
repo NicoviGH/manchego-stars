@@ -34,10 +34,10 @@
 --              (x, y), lower nearer (nil = unreached); FE8's own march map. A function of the
 --              goal because the bot chooses the goal (the boss, the nearest enemy). Without it
 --              the march falls back to Manhattan, which strands a unit against a wall (#60).
---            cache = {}|nil, OPTIONAL: a table the caller keeps for ONE player phase (what
---              changes between phases -- levels, an AI a turn event rewrote -- is in no key). Attacks are kept
---              in it keyed by what FE8's simulation reads -- both fighters (id, HP, held item
---              and uses), both tiles, and every other unit within support range (3,
+--            cache = {}|nil, OPTIONAL: a table the caller keeps for ONE player phase (an
+--              AI a turn event rewrote between phases is in no key). Attacks are kept in it
+--              keyed by what FE8's simulation reads -- both fighters (id, HP, level, every item
+--              and its uses), both tiles, and every other unit within support range (3,
 --              bmreliance.h) of either; strikes keyed by the exchange AND the whole board,
 --              because the AI's pick of weapon and tile can be changed by any unit anywhere.
 --              Reach and worst case are per call only.
@@ -420,9 +420,9 @@ local function context(board, sight)
     return ctx
 end
 
--- An attack's key: what FE8's simulation reads for it -- both fighters (id, HP, held item and
--- uses), our tile, the enemy's tile, and every other unit within support range of either
--- fighter (support bonuses move with them). An action elsewhere leaves it standing.
+-- An attack's key: what FE8's simulation reads for it -- both fighters (unitKey), our tile, the
+-- enemy's tile, and every other unit within support range of either fighter (support bonuses
+-- move with them). An action elsewhere leaves it standing.
 local function attackKey(ctx, u, e, x, y)
     local parts = { unitKey(u), x, y, unitKey(e), e.x, e.y, "near" }
     for _, o in ipairs(ctx.onField) do
@@ -1031,7 +1031,10 @@ function M.shop(gold, stock, party)
         local usable = function(s) return s.type ~= nil and (u.canUse or {})[s.item] end
         local types, seen = {}, {}
         for _, s in ipairs(stock) do
-            if usable(s) and not seen[s.type] then seen[s.type] = true; types[#types + 1] = s.type end
+            if usable(s) and not seen[s.type] then
+                seen[s.type] = true
+                types[#types + 1] = s.type
+            end
         end
         table.sort(types)
         for _, t in ipairs(types) do

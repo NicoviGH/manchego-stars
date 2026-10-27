@@ -26,7 +26,10 @@ local function fakeCpu(cost)
     function cpu.write16(a, v) ram[a] = v end
     function cpu.write32(a, v) ram[a] = v end
     function cpu.save() return { pc = regs.pc, sp = regs.sp, marker = ram.marker } end
-    function cpu.load(st) loads = loads + 1; regs.pc, regs.sp, ram.marker = st.pc, st.sp, st.marker end
+    function cpu.load(st)
+        loads = loads + 1
+        regs.pc, regs.sp, ram.marker = st.pc, st.sp, st.marker
+    end
     function cpu.frames(done, max)
         for _ = 1, max do
             ran = ran + 1
@@ -68,6 +71,16 @@ do
 end
 
 do
+    -- A raise anywhere after the save -- the mode switch included -- still loads the state back.
+    local cpu, seen = fakeCpu(1)
+    local read = cpu.read
+    cpu.read = function(r) if r == "sp" then error("banked sp unreadable") end return read(r) end
+    local ok = pcall(Sight.machine(cpu), function(call) return call(0x08001000, {}) end)
+    check(ok, false, "a raise in the mode switch is raised")
+    check((seen()), 1, "and the state is still loaded back")
+end
+
+do
     -- The fifth argument rides the stack, as the ARM calling convention puts it.
     local cpu = fakeCpu(1)
     local wrote = {}
@@ -81,7 +94,8 @@ end
 -- separate reads.
 local hitter = { hit = 80, crit = 5, dmg = 6, hits = 2, armed = true }
 do
-    local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 1, armed = true, counter = hitter }, 5)
+    local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 1, armed = true,
+                               counter = hitter }, 5)
     check(f.counters, true, "armed: the enemy counters")
     check(f.counterDmg, 6, "the counter's damage")
     check(f.counterHits, 2, "with its blows")
@@ -91,7 +105,8 @@ end
 
 do
     local f = Sight.attackOf({ hit = 70, crit = 0, dmg = 5, hits = 1, armed = true,
-                               counter = { hit = 0, crit = 0, dmg = 0, hits = 0, armed = false } }, 9)
+                               counter = { hit = 0, crit = 0, dmg = 0, hits = 0,
+                                           armed = false } }, 9)
     check(f.counters, false, "an unarmed answer is no counter")
     check(f.counterDmg, 0, "so no counter damage")
     check(f.killsTarget, false, "5 x 1 does not kill 9")
@@ -136,7 +151,8 @@ do
     bytes[A + 0x64], bytes[A + 0x6A] = 70, 0
     bytes[P + 0x50] = 1
     local actor = Sight.side(mem, A, T, P, 0x50, true)
-    check(actor.dmg .. "/" .. actor.crit, "255/255", "the actor's Monster Stone: 0xFF damage and crit")
+    check(actor.dmg .. "/" .. actor.crit, "255/255",
+        "the actor's Monster Stone: 0xFF damage and crit")
     local target = Sight.side(mem, A, T, P, 0x50, false)
     check(target.dmg .. "/" .. target.crit, "8/0", "the same stone on the target's side: as it is")
 end
