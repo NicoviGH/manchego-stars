@@ -21,6 +21,9 @@
 --      a combination the beam's per-unit cut never tries), and on a stalled board
 --      (opts.stalled) each unit's best act that changes the board, of which the best is
 --      played: a careful player that has stopped making progress takes the least it must.
+--      The enemy phase is played every way it can go where a counter may kill a striker
+--      (its tile freed for the next). Last, the best plan is mended: each unit it may lose
+--      tries its other acts, the rest of the plan kept, and those are judged too.
 --   4. The best plan's first act is returned, and the plan with it: botrun plays the plan's
 --      next act after each one unless M.surprise finds the board off what the plan expected
 --      (a miss, a kill, a death, a newly seen enemy), and only then plans again. Judging is
@@ -33,9 +36,9 @@
 --
 -- api: Planner.plan(Bot, board, sight, style, opts) -> the first act of the best plan
 -- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts,
--- expect, enemies, judged, predict, kind = "beam"|"assault"|"unstall", considered = every plan
--- judged, best first: { judged, acts, kind }, opts = { stalled = bool, sent, explored (both
--- Bot.candidates') } | nil,
+-- expect, enemies, judged, predict, kind = "beam"|"assault"|"unstall"|"mend", considered =
+-- every plan judged, best first: { judged, acts, kind }, opts = { stalled = bool, sent,
+-- explored (both Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the village or chest
 -- each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, visible, legal)
@@ -358,8 +361,22 @@ function M.plan(Bot, board, sight, style, opts)
             if x.score ~= y.score then return x.score > y.score end
             return key(x.acts[1]) < key(y.acts[1])
         end)
+        -- the same acts in another order end on the same board: only the best order is kept,
+        -- or the permutations of one plan fill the beam (ch02 turn 5: all four plans judged
+        -- were one plan, and the only one left Marty to two Brigands)
         beam = {}
-        for i = 1, math.min(M.BEAM, #nxt) do beam[i] = nxt[i] end
+        local seenSet = {}
+        for _, n in ipairs(nxt) do
+            if #beam == M.BEAM then break end
+            local set = {}
+            for _, x in ipairs(n.acts) do set[#set + 1] = key(x) end
+            table.sort(set)
+            set = table.concat(set, "|")
+            if not seenSet[set] then
+                seenSet[set] = true
+                beam[#beam + 1] = n
+            end
+        end
     end
 
     -- `st` with every unit it does not move holding: its safest hold tile still free
@@ -457,6 +474,16 @@ function M.plan(Bot, board, sight, style, opts)
 
     -- judge one complete plan against the enemy phase the AI would play
     local unseen = sight.unseen and sight.unseen() or {}
+    -- the chance a striker falls to its target's counter, priced as score() prices ours: the
+    -- counter's chance to kill it, as likely as the target living through the strike
+    local function felled(t)
+        if not t.counterHits or t.counterHits == 0 then return 0 end
+        local kill = M.odds(M.blows(t.counterHit, t.counterDmg, t.counterHits, t.counterCrit,
+                                    hitChance), t.strikerHp)
+        local first = M.odds(M.blows(t.takenHit, t.takenDmg, t.takenHits, t.takenCrit,
+                                     hitChance), t.targetHp)
+        return kill * (1 - first)
+    end
     local function judge(st)
         local planned, at = {}, {}
         for _, a in ipairs(st.acts) do at[a.unitId] = a end
@@ -465,42 +492,57 @@ function M.plan(Bot, board, sight, style, opts)
             planned[#planned + 1] = { unit = u, x = a and a.move.x or u.x, y = a and a.move.y or u.y,
                                       hp = st.hp[u.id] or u.hp }
         end
-        local strikes = sight.enemyPhase and sight.enemyPhase({ blues = planned, gone = st.gone })
+        local reds = {}
+        for id, hp in pairs(st.enemyHp) do reds[id] = math.max(1, math.floor(hp + 0.5)) end
+        local strikes = sight.enemyPhase and sight.enemyPhase({ blues = planned, gone = st.gone,
+                                                                reds = reds, branch = felled })
             or {}
-        local onUnit = {}
-        for _, s in ipairs(strikes) do
-            onUnit[s.target] = onUnit[s.target] or {}
-            for _, b in ipairs(M.blows(s.takenHit, s.takenDmg, s.takenHits, s.takenCrit, hitChance)) do
-                table.insert(onUnit[s.target], b)
+        -- each unit's chance to die, HP lost and blows, over every way the phase went
+        local judged = st.base
+        local die, taken, short, blows = {}, {}, {}, {}
+        for _, o in ipairs(strikes.outcomes or { { p = 1, strikes = strikes } }) do
+            local onUnit = {}
+            for _, s in ipairs(o.strikes) do
+                onUnit[s.target] = onUnit[s.target] or {}
+                for _, b in ipairs(M.blows(s.takenHit, s.takenDmg, s.takenHits, s.takenCrit,
+                                           hitChance)) do
+                    table.insert(onUnit[s.target], b)
+                end
+            end
+            for _, p in ipairs(planned) do
+                local id = p.unit.id
+                local phase = onUnit[id] or {}
+                local d, t = M.odds(phase, p.hp)
+                local back = st.counter[id]
+                local sh = ((p.unit.maxhp or p.hp) - p.hp) + t
+                if back then
+                    -- the counter and the phase as one chain on the HP the unit had (and any
+                    -- heal the plan gives it): the phase's share of the death is the chain's
+                    -- less the counter's own, which score() already paid
+                    local chain = {}
+                    for _, b in ipairs(back) do chain[#chain + 1] = b end
+                    for _, b in ipairs(phase) do chain[#chain + 1] = b end
+                    local hp0 = p.unit.hp + (st.healed[id] or 0)
+                    local all, lost = M.odds(chain, hp0)
+                    d = math.max(0, all - (M.odds(back, hp0)))
+                    sh = ((p.unit.maxhp or p.hp) - hp0) + lost
+                end
+                die[id] = (die[id] or 0) + o.p * d
+                taken[id] = (taken[id] or 0) + o.p * t
+                short[id] = (short[id] or 0) + o.p * sh
+                blows[id] = math.max(blows[id] or 0, #phase)
             end
         end
-        local judged = st.base
         st.predict = {}
         for _, p in ipairs(planned) do
             local id = p.unit.id
-            local phase = onUnit[id] or {}
-            local die, taken = M.odds(phase, p.hp)
-            local back = st.counter[id]
-            local short = ((p.unit.maxhp or p.hp) - p.hp) + taken
-            if back then
-                -- the counter and the phase as one chain on the HP the unit had (and any heal
-                -- the plan gives it): the phase's share of the death is the chain's less the
-                -- counter's own, which score() already paid
-                local chain = {}
-                for _, b in ipairs(back) do chain[#chain + 1] = b end
-                for _, b in ipairs(phase) do chain[#chain + 1] = b end
-                local hp0 = p.unit.hp + (st.healed[id] or 0)
-                local all, lost = M.odds(chain, hp0)
-                die = math.max(0, all - (M.odds(back, hp0)))
-                short = ((p.unit.maxhp or p.hp) - hp0) + lost
-            end
             st.predict[#st.predict + 1] = { id = id, charId = p.unit.charId, x = p.x,
-                                            y = p.y, hp = p.hp, die = die, taken = taken,
-                                            blows = #phase }
+                                            y = p.y, hp = p.hp, die = die[id], taken = taken[id],
+                                            blows = blows[id] }
             -- the HP the phase leaves it short: the plan's own deficit, then the enemy's
-            judged = judged - W.death * die - W.taken * short
+            judged = judged - W.death * die[id] - W.taken * short[id]
             -- the no-risk rule, against the phase as the AI plays it
-            if st.explored[p.unit.id] and die > 0 then judged = judged - W.recruit end
+            if st.explored[id] and die[id] > 0 then judged = judged - W.recruit end
             if W.fog > 0 then
                 for _, t in ipairs(unseen) do
                     if math.abs(t.x - p.x) + math.abs(t.y - p.y) <= M.FOG_REACH then
@@ -537,14 +579,45 @@ function M.plan(Bot, board, sight, style, opts)
     local best
     -- every plan judged, for the run's trace: its acts, its score and where it came from
     local considered = {}
-    for _, f in ipairs(finals) do
-        local st = f.st
+    local function consider(st, kind)
         judge(st)
-        st.kind = f.kind
+        st.kind = kind
         local keys = {}
         for _, x in ipairs(st.acts) do keys[#keys + 1] = key(x) end
-        considered[#considered + 1] = { judged = st.judged, acts = keys, kind = f.kind }
+        considered[#considered + 1] = { judged = st.judged, acts = keys, kind = kind }
         if (not stalled or changes(st)) and (not best or st.judged > best.judged) then best = st end
+    end
+    for _, f in ipairs(finals) do consider(f.st, f.kind) end
+    -- the best plan judged, mended where the judge finds it may lose someone: each such unit,
+    -- the likeliest to die first, tries every other act of its menu, the rest of the plan kept
+    -- where it still fits. The beam ranks acts by their own score, so a plan where one unit
+    -- steps elsewhere for its own sake can lose to that unit's best act in every slot (ch02
+    -- turn 5: the four plans judged all left Marty to two Brigands).
+    if best then
+        local base, menuOf, risky = best, {}, {}
+        for _, m in ipairs(menus) do menuOf[m.unit.id] = m.acts end
+        for _, p in ipairs(base.predict) do
+            if p.die > 0 then risky[#risky + 1] = p end
+        end
+        table.sort(risky, function(x, y)
+            if x.die ~= y.die then return x.die > y.die end
+            return x.id < y.id
+        end)
+        for _, p in ipairs(risky) do
+            local mine
+            for _, a in ipairs(base.acts) do
+                if a.unitId == p.id then mine = key(a) end
+            end
+            for _, a in ipairs(menuOf[p.id] or {}) do
+                local st = key(a) ~= mine and extend(start, a, p.id)
+                if st then
+                    for _, x in ipairs(base.acts) do
+                        if x.unitId ~= p.id then st = extend(st, x, x.unitId) or st end
+                    end
+                    consider(complete(st), "mend")
+                end
+            end
+        end
     end
     if not best or #best.acts == 0 then return nil end
     table.sort(considered, function(x, y) return x.judged > y.judged end)

@@ -1809,6 +1809,98 @@ do
           "planner: bold takes the ground")
 end
 
+-- test_planner_mends_a_plan_that_loses_a_unit: A's Vulnerary at (1,0) is its best act by its
+-- own score, and the beam (BEAM = 1) keeps only that; the enemy phase kills A there. The
+-- mend tries A's other acts and finds the hold at (0,0), where nothing strikes it.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false, hp = 10, maxhp = 20 })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    return { { target = b.unit.id, takenHit = 100, takenDmg = 99, takenHits = 1,
+                               takenCrit = 0 } }
+                end
+            end
+            return {}
+        end,
+    }
+    local beam = Planner.BEAM
+    Planner.BEAM = 1
+    local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("careful"))
+    Planner.BEAM = beam
+    check(at(a) .. " " .. tostring(plan and plan.kind), "0,0 mend",
+          "planner: the mend keeps A out of the strike")
+end
+
+-- test_planner_beam_keeps_one_order: two units, two tiles each, nothing to fight. The beam
+-- reaches each pair of tiles in both orders; the plans judged are each a different board.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local C = blue(0x02, 1, 0, 2, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 0, 2 }, { 1, 2 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 }, [2] = { [0] = 40, [1] = 20 } } end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, C, X), sightOf(o), style("careful"))
+    local seen, twice = {}, false
+    for _, c in ipairs(plan and plan.considered or {}) do
+        local set = {}
+        for _, k in ipairs(c.acts) do set[#set + 1] = k end
+        table.sort(set)
+        set = table.concat(set, "|")
+        if seen[set] then twice = true end
+        seen[set] = true
+    end
+    check(plan ~= nil and #plan.considered > 1 and not twice, true,
+          "planner: no plan judged twice in another order")
+end
+
+-- test_planner_judges_every_way_the_phase_goes: at (1,0) X strikes A for nothing, and A's
+-- counter (a 50 to hit, 20 against X's 10 HP) may kill X. If it does, Y takes X's tile and
+-- kills A. The judge asks the planner's own chance of that kill (plan.branch) and pays A's
+-- death in that outcome only: die = the chance the counter kills X, not 0 and not 1.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local asked
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        field = function() return { [0] = { [0] = 40, [1] = 20 } } end,
+        enemyPhase = function(plan)
+            for _, b in ipairs(plan.blues) do
+                if b.x == 1 then
+                    local x = { enemy = 0x81, target = b.unit.id, takenHit = 0, takenDmg = 0,
+                                takenHits = 1, takenCrit = 0, counterHit = 50, counterDmg = 20,
+                                counterHits = 1, counterCrit = 0, strikerHp = 10,
+                                targetHp = b.hp }
+                    local y = { enemy = 0x82, target = b.unit.id, takenHit = 100, takenDmg = 99,
+                                takenHits = 1, takenCrit = 0 }
+                    local q = plan.branch(x)
+                    asked = q
+                    local out = { x }
+                    out.outcomes = { { p = 1 - q, strikes = { x } }, { p = q, strikes = { x, y } } }
+                    return out
+                end
+            end
+            return {}
+        end,
+    }
+    local _, plan = Planner.plan(B, boardOf(A, X), sightOf(o), style("bold"))
+    check(asked ~= nil and math.abs(asked - Sight.hitChance(50)) < 1e-9, true,
+          "planner: the branch is the counter's chance to kill the striker")
+    local die
+    for _, p in ipairs(plan and plan.predict or {}) do
+        if p.id == 0x01 and p.x == 1 then die = p.die end
+    end
+    check(die ~= nil and math.abs(die - Sight.hitChance(50)) < 1e-9, true,
+          "planner: A dies only in the outcome where X falls")
+end
+
 -- test_planner_heals_between_attacks: the grell pattern. A's attack draws a 12 counter and the
 -- enemy phase strikes 10 more: 22 of A's 20. H's heal after the attack (+10) keeps A alive,
 -- so careful attacks and heals; without H it does not attack. A strikes from where it

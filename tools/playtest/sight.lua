@@ -65,7 +65,15 @@
 --                            in it the player can see makes its own decision (the setup
 --                            strike() uses, every target open). A strike moves the enemy to
 --                            its tile and takes its expected damage off the target before the
---                            next decides. -> { { enemy, target, taken* as strike() } }.
+--                            next decides. plan.reds = { [enemy id] = hp } (optional): the HP
+--                            the plan leaves an enemy. plan.branch(strike) (optional) -> the
+--                            chance the target's counter kills the striker; above 0 the rest
+--                            of the phase is played both ways, the striker's tile freed in
+--                            the second (ch02: a Brigand Marty killed let the next one in).
+--                            -> { { enemy, target, taken* as strike(), counter* (absent when
+--                            the target cannot answer), strikerHp, targetHp } }: the likeliest
+--                            outcome's strikes, with .outcomes = { { p, strikes } } (p sums
+--                            to 1) for every way the phase went.
 --   objective                { kind, tile, turnsLeft, boss } -- see objective(); boss = on a
 --                            Defeat Boss map, the charId whose death quote raises
 --                            EVFLAG_DEFEAT_BOSS (GetDefeatTalkEntry), read at the start.
@@ -743,6 +751,7 @@ function M.new(outer)
         end
         call(S.InitBattleForecastBattleStats, { proc })
         local side = M.side(mem, S.gBattleActor, S.gBattleTarget, proc, PROC_HITS_A, true)
+        side.counter = M.side(mem, S.gBattleTarget, S.gBattleActor, proc, PROC_HITS_B, false)
         side.slot, side.tile = slot, { x = sx, y = sy }
         return target, side
     end
@@ -767,12 +776,17 @@ function M.new(outer)
                 standOn(b.unit, b.x, b.y)
                 api.write8(b.unit.addr + UNIT_HP, b.hp)
             end
-            for id in pairs(plan.gone or {}) do
-                local e = byId[id]
-                if e and mem.u8(cell(mem, S.gBmMapUnit, e.x, e.y)) == id then
-                    api.write8(cell(mem, S.gBmMapUnit, e.x, e.y), 0)
+            for id, hp in pairs(plan.reds or {}) do
+                if byId[id] then api.write8(byId[id].addr + UNIT_HP, hp) end
+            end
+            local function remove(e, x, y)
+                if mem.u8(cell(mem, S.gBmMapUnit, x, y)) == e.id then
+                    api.write8(cell(mem, S.gBmMapUnit, x, y), 0)
                 end
-                if e then api.write32(e.addr + UNIT_STATE, mem.u32(e.addr + UNIT_STATE) | US_HIDDEN) end
+                api.write32(e.addr + UNIT_STATE, mem.u32(e.addr + UNIT_STATE) | US_HIDDEN)
+            end
+            for id in pairs(plan.gone or {}) do
+                if byId[id] then remove(byId[id], byId[id].x, byId[id].y) end
             end
             -- the game's own turn order, built as on its phase (cp_order.c)
             api.write8(S.gPlaySt + PLAY_FACTION, M.PHASES[3])
@@ -780,24 +794,64 @@ function M.new(outer)
             if n > 0 then call(S.SortAiUnitList, { n }) end
             local order = {}
             for i = 0, n - 1 do order[#order + 1] = mem.u8(S.gAiState + i) end
-            local out = {}
-            for _, id in ipairs(order) do
-                local e = byId[id]
-                if e and not (plan.gone or {})[id] and s.visible(e.x, e.y) then
-                    local target, side = aiDecide(call, proc, e)
-                    if target then
-                        local t = M.strikeOf(side)
-                        t.enemy, t.target = id, target
-                        out[#out + 1] = t
-                        standOn(e, side.tile.x, side.tile.y)
-                        local hit = M.hitChance(t.takenHit)
-                        local addr = mem.u32(S.gUnitLookup + target * 4)
-                        local left = mem.u8(addr + UNIT_HP)
-                            - math.floor(hit * t.takenDmg * t.takenHits + 0.5)
-                        api.write8(addr + UNIT_HP, math.max(0, left))
+            -- the phase from order[i] on, after `done`'s strikes -> its outcomes. A striker
+            -- the counter may kill splits it: the enemies after it decide once with it
+            -- standing and once with its tile free (each in a nested sandbox, so neither
+            -- sees the other's board), the second as likely as plan.branch says.
+            local function play(i, done)
+                for k = i, #order do
+                    local id = order[k]
+                    local e = byId[id]
+                    if e and not (plan.gone or {})[id] and s.visible(e.x, e.y) then
+                        local target, side = aiDecide(call, proc, e)
+                        if target then
+                            local t = M.strikeOf(side)
+                            t.enemy, t.target = id, target
+                            local addr = mem.u32(S.gUnitLookup + target * 4)
+                            local c = side.counter
+                            if c.armed then
+                                t.counterHit, t.counterDmg = c.hit, c.dmg
+                                t.counterHits, t.counterCrit = c.hits, c.crit
+                            end
+                            t.strikerHp, t.targetHp = mem.u8(e.addr + UNIT_HP), mem.u8(addr + UNIT_HP)
+                            local now = {}
+                            for x = 1, #done do now[x] = done[x] end
+                            now[#now + 1] = t
+                            done = now
+                            standOn(e, side.tile.x, side.tile.y)
+                            local hit = M.hitChance(t.takenHit)
+                            api.write8(addr + UNIT_HP, math.max(0,
+                                t.targetHp - math.floor(hit * t.takenDmg * t.takenHits + 0.5)))
+                            local q = plan.branch and plan.branch(t) or 0
+                            if q > 0 then
+                                local out = {}
+                                local stood = sandbox(function() return play(k + 1, done) end)
+                                local fell = sandbox(function()
+                                    remove(e, side.tile.x, side.tile.y)
+                                    return play(k + 1, done)
+                                end)
+                                for _, o in ipairs(stood) do
+                                    out[#out + 1] = { p = o.p * (1 - q), strikes = o.strikes }
+                                end
+                                for _, o in ipairs(fell) do
+                                    out[#out + 1] = { p = o.p * q, strikes = o.strikes }
+                                end
+                                return out
+                            end
+                        end
                     end
                 end
+                return { { p = 1, strikes = done } }
             end
+            local outcomes = play(1, {})
+            -- the list is the likeliest outcome's strikes; every outcome rides on it
+            local top = outcomes[1]
+            for _, o in ipairs(outcomes) do
+                if o.p > top.p then top = o end
+            end
+            local out = {}
+            for x, t in ipairs(top.strikes) do out[x] = t end
+            out.outcomes = outcomes
             return out
         end)
     end
