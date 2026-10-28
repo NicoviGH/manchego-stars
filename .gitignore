@@ -43,6 +43,8 @@ tools/playtest/symbols.lua
 # every ROM code symbol for inspect.py (#236). Regenerated after every make.
 tools/playtest/procscr.lua
 tools/playtest/symbols.json
+# the same three for retail FE8 (PT_VANILLA=1; run.sh's PT_SYMDIR)
+tools/playtest/vanilla-symbols/
 # local session scratch tool (HANDOFF references it; intentionally unversioned)
 tools/key_magenta.py
 # mGBA save-state checkpoints (per-ROM-build, regenerated) -- inline comments don't work

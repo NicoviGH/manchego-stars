@@ -36,9 +36,13 @@ from inject.class_ids import DEFAULT_CAMPAIGN  # noqa: E402
 from inject.decomp import DECOMP, enum_values, vanilla_decomp_text  # noqa: E402  DECOMP is the build tree (#408); the reads are HEAD
 ELF = os.environ.get('PT_ELF') or os.path.join(DECOMP, 'fireemblem8.elf')   # PT_VANILLA (run.sh)
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, 'symbols.lua')
-OUT_PROCSCR = os.path.join(HERE, 'procscr.lua')
-OUT_JSON = os.path.join(HERE, 'symbols.json')
+# PT_SYMDIR: where the tables go. run.sh gives retail FE8 its own (PT_VANILLA): one shared
+# set let an ours run started beside a vanilla one overwrite vanilla's addresses before its
+# emulator loaded them, and the vanilla run hung in our IsCharacterForceDeployed (2026-10-29).
+OUT_DIR = os.environ.get('PT_SYMDIR') or HERE
+OUT = os.path.join(OUT_DIR, 'symbols.lua')
+OUT_PROCSCR = os.path.join(OUT_DIR, 'procscr.lua')
+OUT_JSON = os.path.join(OUT_DIR, 'symbols.json')
 
 ROM_START = 0x08000000
 ROM_END = 0x0A000000
@@ -583,6 +587,7 @@ def write_atomic(path, text):
 def main():
     if not os.path.exists(ELF):
         sys.exit('ERROR: %s not built (run make first)' % ELF)
+    os.makedirs(OUT_DIR, exist_ok=True)
     nm = subprocess.run(['arm-none-eabi-nm', ELF], capture_output=True, text=True, check=True)
     symbols = parse_nm(nm.stdout)
     try:

@@ -120,6 +120,8 @@ ROM="$REPO/build/fireemblem8u/fireemblem8.gba"   # the build tree (#408)
 if [ "${PT_VANILLA:-0}" = "1" ]; then
     ROM="$REPO/build/vanilla-fe8/fireemblem8.gba"
     export PT_ELF="$REPO/build/vanilla-fe8/fireemblem8.elf" MX_SKIP_ROM_CHECK=1
+    # its own symbol tables: a run of ours at the same time rewrites tools/playtest's (#510)
+    export PT_SYMDIR="$HERE/vanilla-symbols"
 fi
 # Where this game's runs and chapter-start states live for a ROM hash: references/sim/<game>/
 # <hash>, or PT_SIMDIR. `run.sh --simdir` prints it for the current ROM and exits (montecarlo.py
@@ -284,6 +286,7 @@ run_mgba() {
 -- PT_STYLE / PT_CLAIMS / PT_CAMPAIGN are JSON: read from the environment, never spliced in,
 -- where a nested array's "]]" would close a Lua long string early.
 PLAYTEST_DIR = "$HERE"
+PLAYTEST_SYMDIR = "${PT_SYMDIR:-$HERE}"
 PLAYTEST_SCENARIO = "$scen"
 PLAYTEST_ENTRY = "$([ "$scen" = "$SCENARIO" ] && echo "${MX_ENTRY:-}")"
 PLAYTEST_LOG = "$log"

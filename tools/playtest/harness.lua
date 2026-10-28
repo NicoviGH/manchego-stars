@@ -1,7 +1,8 @@
 -- Automated FE8 playtest harness for mGBA 0.11+ (--script).
 --
 -- Launched by run.sh via a generated wrapper that sets:
---   PLAYTEST_DIR      -- this directory (for dofile of symbols.lua)
+--   PLAYTEST_DIR      -- this directory
+--   PLAYTEST_SYMDIR   -- where gen_symbols.py wrote symbols.lua and procscr.lua (PT_SYMDIR)
 --   PLAYTEST_SCENARIO -- which `scenarios.<name>` to run (the table below is the
 --                        authoritative list; run.sh's header groups the main ones)
 --   PLAYTEST_ENTRY    -- the function that runs it, when a chapter case's `lua:` binds a
@@ -17,11 +18,11 @@
 -- Asserts read the decomp's own structs; UI is driven only where the event
 -- engine demands real combat (deaths must go through battle, not HP pokes).
 
-dofile(PLAYTEST_DIR .. "/symbols.lua")
+dofile(PLAYTEST_SYMDIR .. "/symbols.lua")
 -- PROCSCR: proc-script address -> exact symbol. Proc identity must never come from the
 -- PROC_NAME string at proc+0x10 -- the decomp reuses those (E_FACE twice, bmenu three
 -- times), which is why freeze reports could not say which proc was waiting (#236).
-dofile(PLAYTEST_DIR .. "/procscr.lua")
+dofile(PLAYTEST_SYMDIR .. "/procscr.lua")
 -- It is generated (gitignored, written by gen_symbols.py from the ELF), so a stale or
 -- half-written table is a total outage with a confusing error much later. Say so here.
 assert(type(PROCSCR) == "table" and next(PROCSCR) ~= nil,
