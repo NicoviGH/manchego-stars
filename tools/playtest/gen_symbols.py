@@ -327,6 +327,7 @@ WANTED = [
     'sShopState',               # struct ShopState: head_loc +00, hand_loc +06, px_per_line +08,
                                 # bg2_off +0C (IsShopPageScrolling compares the last two)
     'GetItemPurchasePrice',     # what the shop charges this unit for an item (Silver Card included)
+    'GetPartyGoldAmount',       # what the party may spend: 0 in Ch5x (bmgold.c)
     'CanUnitUseWeapon',         # whether a unit can wield an item (bmitem.c)
     'CanUnitUsePromotionItem',  # whether a seal promotes this unit now: class and level (bmitemuse.c)
     'ProcScr_WorldMapMain',     # the world map's main proc (worldmap_main.c)

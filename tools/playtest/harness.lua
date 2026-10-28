@@ -3480,7 +3480,11 @@ INSPECT.campaignApi = function(game)
         info = { game = game, rom_hash = PLAYTEST_ROMHASH, mode = mode, seed = seed, campaign = id,
                  route = cfg.route },
         random = math.random,
-        gold = gold,
+        -- What the party may spend is the game's answer, not the PlaySt field: GetPartyGoldAmount
+        -- is 0 in Ch5x (bmgold.c), where the shop refuses every purchase.
+        gold = function()
+            return INSPECT.gameCalls(function(call) return call(SYM.GetPartyGoldAmount, {}) end)
+        end,
         emit = function(line) log(line); io.stdout:write(line .. "\n"); io.stdout:flush() end,
         log = log,
     }
