@@ -535,7 +535,7 @@ enemy_units:
     positions: [[11, 2], [13, 3], [9, 4], [9, 9]]   # vanilla's four Soldier destinations: two
                                 # screening Ravisin's rim, two holding the eastern lane
     class: soldier              # CLASS_SOLDIER (vanilla Ch5's core infantry) — parity backbone
-    level: 5
+    levels: [6, 6, 5, 5]   # vanilla Ch5's level per post (ADR 0373)
     autolevel: true
     inventory:
       - id: elven-spear
@@ -563,7 +563,7 @@ enemy_units:
                                 # The eight spread across BOTH approach lanes, so the axe pressure
                                 # the twin applies is applied wherever the party climbs out.
     class: fighter              # CLASS_FIGHTER (axe infantry; Fighters not Brigands — no peak pathing)
-    level: 5
+    levels: [5, 5, 5, 5, 4, 5, 4, 5]   # vanilla Ch5's level per post (ADR 0373)
     autolevel: true
     inventory:
       - id: rusted-greataxe
@@ -631,7 +631,7 @@ enemy_units:
     name: "Risen Spear-Guard"
     count: 2
     class: soldier
-    level: 5
+    levels: [4, 4]   # vanilla Ch5's level per post (ADR 0373)
     autolevel: true
     arrives_turn: 2             # the eruption's first wave, not a turn-1 alpha
     positions: [[14, 16], [14, 15]]   # vanilla's turn-2 pair — the south-east edge, behind the party
@@ -650,7 +650,7 @@ enemy_units:
     name: "Tomb Reaver"
     count: 2
     class: fighter
-    level: 5
+    levels: [5, 5]   # vanilla Ch5's level per post (ADR 0373)
     autolevel: true
     arrives_turn: 6
     positions: [[14, 8], [14, 6]]     # vanilla's mid-east pair — astride the eastern lane
@@ -668,7 +668,7 @@ enemy_units:
     name: "Bone Archer"
     count: 2
     class: archer
-    level: 5
+    levels: [6, 6]   # vanilla Ch5's level per post (ADR 0373)
     autolevel: true
     arrives_turn: 8             # the last wave races the far reliquary reward-sites
     positions: [[13, 0], [14, 1]]     # vanilla's north-east pair — they spawn on the rim, a short

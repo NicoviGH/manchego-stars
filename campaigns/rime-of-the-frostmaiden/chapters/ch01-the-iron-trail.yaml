@@ -4,8 +4,8 @@
 #
 # FIELD PARITY (decisions.md §Field parity, 2026-06-10): this chapter mirrors vanilla
 # FE8 Ch1 "Escape!" 1:1 on the field — 4 player units fielded, 7 initial enemies + 3
-# reinforcements, lv1 line enemies + lv4 boss, Seize, lose = lord falls. Vanilla data
-# decoded from fireemblem8u git HEAD src/events/ch1-eventudefs.h.
+# reinforcements, lv2-3 line enemies (lv1-2 reinforcements) + lv4 boss, Seize, lose = lord
+# falls. Vanilla data decoded from fireemblem8u git HEAD src/events/ch1-eventudefs.h.
 
 id: ch01-the-iron-trail
 title: "The Iron Trail"
@@ -106,7 +106,8 @@ lose_condition: lord_defeated            # the chosen lord falls = game over (va
 # ── Difficulty ─────────────────────────────────────────────────────────────────
 difficulty_note: >
   Vanilla Ch1 parity: 4 fielded PCs vs 7 initial enemies (+3 reinforcements).
-  Line goblins are lv1 autoleveled with iron weapons; the chief is lv4 on the
+  Line goblins are vanilla's lv2-3, autoleveled, with iron weapons (they read lv1 until
+  ADR 0373 checked them against ch1-eventudefs.h); the chief is lv4 on the
   seize tile. Enemy mix (3 spears / 3 axes) carries the triangle lesson our
   lordless cast can actually have: Braulo's axe beats the spear goblins and the
   spear chief; Wolfram tanks the axe goblins on the wrong end of the triangle;
@@ -182,7 +183,7 @@ enemy_units:
     count: 3
     positions: [[19,7],[19,9],[20,10]]   # holding the camp approach
     class: soldier
-    level: 1
+    levels: [2, 2, 3]   # vanilla Ch1's levels (ADR 0373)
     autolevel: true
     inventory:
       - id: iron-lance
@@ -195,7 +196,7 @@ enemy_units:
     count: 3
     positions: [[14,8],[13,6],[15,10]]   # mid-trail pursuers ((15,6) became peak in the paint)
     class: fighter
-    level: 1
+    levels: [2, 2, 2]   # vanilla Ch1's levels (ADR 0373)
     autolevel: true
     inventory:
       - id: iron-axe
@@ -230,7 +231,7 @@ enemy_units:
     name: "Goblin Raider"
     count: 3                    # vanilla: 2 Fighters + 1 Soldier from the player-start side
     composition: [fighter, fighter, soldier]
-    level: 1
+    levels: [1, 1, 2]   # vanilla Ch1's levels (ADR 0373)
     autolevel: true
     arrives_turn: 3
     spawn_edge: west            # behind the party, same side as vanilla

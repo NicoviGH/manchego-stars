@@ -217,7 +217,7 @@ enemy_units:
     count: 4
     positions: [[11,6],[13,7],[12,8],[13,11]]
     class: mogall               # CLASS_MOGALL — floating eye; Evil Eye = ranged magic (hits RES)
-    level: 1                    # vanilla Ch4 Mogalls: L1×3 + L2×1 → L1 representative
+    levels: [1, 2, 1, 1]        # vanilla Ch4 Mogalls: L1×3 + L2×1, the L2 on (13,7) (ADR 0373)
     autolevel: true
     inventory:
       - id: evil-eye
@@ -245,7 +245,7 @@ enemy_units:
     count: 3
     positions: [[1,14],[5,13],[8,14]]
     class: bonewalker           # CLASS_BONEWALKER — MELEE skeleton (iron sword/lance), per the twin
-    level: 3                    # vanilla line Bonewalkers L2/3/3 → L3 representative
+    levels: [2, 3, 3]           # vanilla line Bonewalkers L2/3/3, by donor post (ADR 0373)
     autolevel: true
     inventory:
       - id: iron-sword

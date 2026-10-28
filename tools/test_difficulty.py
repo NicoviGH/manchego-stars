@@ -1064,8 +1064,13 @@ class MirrorShareOnRealChapters(unittest.TestCase):
         self.assertEqual((m['shared'], m['pct']), (22, 100.0 * 22 / 27))
 
     def test_a_composed_chapter_reads_well_under_a_copy(self):
-        # ch01 fields ten units against a ten-unit twin and mirrors three of them.
-        self.assertEqual(self._mirror('ch01')['shared'], 3)
+        # ch05 stands 23 units on its twin's 23 posts, at its twin's levels (ADR 0373), and
+        # mirrors 12: the rest carry the classes its YAML re-chose (the axe block is Fighters).
+        self.assertEqual(self._mirror('ch05')['shared'], 12)
+
+    def test_a_chapter_on_vanilla_classes_and_levels_is_a_copy(self):
+        # ch01 mirrored 3 of 10 while its goblins sat at L1; at vanilla's levels it is all 10.
+        self.assertEqual(self._mirror('ch01')['shared'], 10)
 
 
 class MirrorInTheCurveReport(unittest.TestCase):
