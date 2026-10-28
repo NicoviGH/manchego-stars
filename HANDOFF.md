@@ -10,7 +10,7 @@ live in GitHub issues. Before a context rollover, warn Nicolas, refresh this fil
 fresh instance — don't rely on auto-compaction.
 
 Refreshed 2026-10-28, late night (Claude). **#510 step 9 is on `feat/510-step9-e-campaigns` at
-8c9f6d1, PUSHED (no PR yet).** The fix list in #510 comment 6478205562 is DONE (974e921, e27ff56),
+b9e99bd, PUSHED (no PR yet).** The fix list in #510 comment 6478205562 is DONE (974e921, e27ff56),
 and ours ch03 careful's stall turned out to be four bot faults, fixed (c742425, 8c9f6d1). Read
 today's two summaries: <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6478944227>
 (items 1-5, with the Mogall's fights read as a pair) and
@@ -19,18 +19,13 @@ faults, the vanilla regression, the Seth-benched experiment, and the weights rul
 - **Ch3 attempts 1-8 at 8c9f6d1:** vanilla 8/8 won all alive; ours careful 2/2 won t13 all alive,
   even 3/3 won (Trex to a Grunt t7), bold 3/3 won (2 to the Mogall). Same-style attempts replay
   identically (one saved start, RNG included): ~3 distinct games per side, not 8.
-- **Bot vs level (Nicolas's question):** ch03 is winnable clean by the bot; every failure traced
-  was a bot fault. **Validate the bot on vanilla first** (if vanilla clears and the bot is sound, a
-  failure on ours is the level), but vanilla only exercises vanilla's situations, so when ours
-  fails, read the trace for a move a human would have seen. No cell run for ch03 now: the lord
-  class and Baxby-as-Seth changes are coming (Nicolas).
-- **Weights: no value to declare** (Nicolas): the styles ARE the variation (death 1000/300/60);
-  adjust only if verdicts or traces show the spread is off.
-- **Regression check after every planner change: vanilla Ch3 attempts 1-8** (~50 s wall, the env
-  recipe in comment 6478205562). It caught 8c9f6d1's fault.
+- **Rulings, recorded on the branch (b9e99bd):** ADR 0374 (read every bot result beside vanilla;
+  prove the bot on vanilla first, then read ours' traces before calling a failure the level;
+  vanilla Ch3 attempts 1-8 after every planner change) and ADR 0375 (a style's risk tolerance is
+  not a declared value). No ch03 cell run now: the lord class and Baxby-as-Seth changes are coming.
 - Fixed but not proven in the ROM: `sight.legal` refusing an act (it refused none in ~40 runs; the
   refusal path is unit-tested only).
-**Read every result as a pair, ours beside vanilla (Nicolas, 2026-10-28).** Saved starts: vanilla
+Saved starts: vanilla
 Ch3 `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/3.ss`; ours ch03
 `references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/4.ss` (ch02 = `3.ss`).
 #546's pre-merge `SUITE=gate` run is still DEFERRED to #510 step 10 (ch01's goblins L1 -> L2-3,
@@ -84,7 +79,7 @@ G3 #537 78105ed; the summary is on #531).
      (retail Prologue + Ch1). At 70e01bb's last fix: ours ch01 won t9 all alive (23,910 frames);
      retail won both, all alive. The review summary is on the PR.
 3. **NOW: PR E (campaigns) and PR F (the runner), one branch: `feat/510-step9-e-campaigns`**
-   (pushed, **8c9f6d1**, NO PR yet). Read in the plan comment (link at the top): "Party
+   (pushed, **b9e99bd**, NO PR yet). Read in the plan comment (link at the top): "Party
    selection, SETTLED", "Lords, SETTLED", "The planner", and Tasks 11-13 (F1-F3; F2 and F3
    were amended 2026-10-27).
    - **Built, E:** `Bot.team` picks the team by the map's DEMANDS, read at the prep screen
