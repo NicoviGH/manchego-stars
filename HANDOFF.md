@@ -9,20 +9,24 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-28, evening (Claude). **#545 is DONE: PR #546 merged (b3a9383).** Every
-chapter boss's row carries CA_BOSS (ADR 0372), and every line enemy in ch00-ch07 now sits at
-the level of the vanilla unit it mirrors (ADR 0373, "vanilla levels as the foundation"; ch04's
-wolf pack included). No parity verdict changed. Its pre-merge `SUITE=gate` run was DEFERRED by
-Nicolas to #510 step 10, which tracks it: ch01's goblins went L1 -> L2-3 and `lordfloor` now
-expects +10 HP, and neither has run in the emulator yet.
-**NOW, in a fresh session, step 1: push the step-9 WIP** so it stops living only on this machine:
-`git push -u origin feat/510-step9-e-campaigns` (b243941 has never been pushed; no PR yet).
-**Step 2: resume #510 step 9** on `feat/510-step9-e-campaigns`, at **b243941, a
-LOCAL WIP commit (not pushed)**: villages/chests, the full-bag rule, the boss assault + stall rule
-(below, "NEXT"). **That branch predates #546: merge `origin/main` into it first** (it changes
-ch00/ch01/ch03/ch04/ch05 enemies, so the bot's ch03 and ch01 runs read differently from the notes
-below), then rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`; the
-checkout also touches the chapter YAMLs' mtimes). **The parity model is being
+Refreshed 2026-10-28, night (Claude). **#510 step 9 is on `feat/510-step9-e-campaigns` at
+76c3a33, PUSHED (no PR yet), with main (#546) merged in.** **NOW, in a fresh session: work the
+fix list in #510 comment 6478205562** (<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6478205562>),
+in its order:
+1. the enemy-phase full-bag chooser (`runEnemyPhase` does not answer `send_to_convoy`): it crashes
+   6 of 8 vanilla Ch3 attempts at turn 7;
+2. **the game-legality check for every kept act**, which replaces the hand-kept surprise list
+   (Nicolas: the crashes show "the rigidness of our bot's plans"; a kept act is played on the plan's
+   word, not the game's), folding in 76c3a33's wall/door check and the heal-target one;
+3. wall HP in the planner; 4. ch03 careful's stall after the 4th chest; 5. the destroyed-village
+   label; 6. ch03 attempts 1-8 on BOTH ROMs, then the step-9 list below.
+**Read every result as a pair, ours beside vanilla (Nicolas, 2026-10-28).** Vanilla had never been
+played past Ch1 until today. Its Ch3 start is now saved (`references/sim/vanilla/c25b145e3745/states/
+e1-vanilla-ch3/3.ss`), and ours ch03's is regenerated on the #546 ROM
+(`references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/4.ss`). How to run both: the comment above.
+#546's pre-merge `SUITE=gate` run is still DEFERRED to #510 step 10 (ch01's goblins L1 -> L2-3,
+`lordfloor` +10 HP, not yet run in the emulator).
+**The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -71,7 +75,7 @@ G3 #537 78105ed; the summary is on #531).
      (retail Prologue + Ch1). At 70e01bb's last fix: ours ch01 won t9 all alive (23,910 frames);
      retail won both, all alive. The review summary is on the PR.
 3. **NOW: PR E (campaigns) and PR F (the runner), one branch: `feat/510-step9-e-campaigns`**
-   (pushed, **5add902**, NO PR yet). Read in the plan comment (link at the top): "Party
+   (pushed, **76c3a33**, NO PR yet). Read in the plan comment (link at the top): "Party
    selection, SETTLED", "Lords, SETTLED", "The planner", and Tasks 11-13 (F1-F3; F2 and F3
    were amended 2026-10-27).
    - **Built, E:** `Bot.team` picks the team by the map's DEMANDS, read at the prep screen
@@ -131,16 +135,20 @@ G3 #537 78105ed; the summary is on #531).
         reseed). A run without a game result stops the cell and is reported in its own words.
         Enemy acts follow `gActionData` as vanilla writes it. The stamp hashes the whole env.
         `test_inject_unit_art`'s shared-temp-dir race is fixed.
-        **Built since, in b243941 (WIP, local; #510 comments 6459066722, 6473075402):**
+        **Built since (b243941 + 2026-10-28: 2026147, 6d68721, 76c3a33; #510 comments 6459066722,
+        6473075402, 6478205562):**
         - **Villages and chests, under Nicolas's NO-RISK RULE** (he rejected the made-up
           `explore = 200`; the rule is ON TRIAL, not locked):
           - `sight.explorable`/`canExplore` run the unit menu's own Visit/Chest checks.
-          - Each open tile sends its nearest able unit marching to it.
+          - Each open tile sends its nearest able unit marching to it, and the send STICKS while
+            the tile is open and reachable; a unit cut off by a door or wall is sent through it
+            (`breachFor`). A tile we explored is never offered again (vanilla Ch1's Houses).
           - The planner credits a visit only at zero chance to die, in both the beam and the
             judged phase. The credit (the recruit's 200) only orders a SAFE visit.
-          - The record's `explore` says what became of each tile.
-          - Ours ch02: 2 of 4 villages taken at zero risk; careful never marched through the
-            bandits to the other two.
+          - The record's `explore` says what became of each tile; a won run that leaves a usable
+            tile open records a `left_open` bot fault.
+          - Ours ch02 careful: 3 of 4 villages, won t9 all alive; the 4th was razed on turn 8.
+            Ours ch03: careful and bold now open 4/4 chests (the 4th is behind a door).
         - **The full-bag rule (Nicolas, 2026-10-28), `Bot.fullBag`:** it answers FE8's own
           send-to-convoy / discard chooser, and the record has `bag`. Ours ch03: all 4 chests
           opened, and a duplicate Iron Sword went to the convoy.
@@ -153,26 +161,16 @@ G3 #537 78105ed; the summary is on #531).
             every boss carries it now, and the goal read stays).
           - The judge CHAINS the counter with the enemy phase. Averaging it had let the lord
             strike the grell alone and die.
-        - **Where it stands (ours ch03 attempt 1, `PT_CAMPAIGN` with `attempt: 1`):** the control
-          (exploring off) wins t13, all alive. The latest run had no stuck and no deaths, but it
-          CRASHED on turn 16: "the harness could not perform item" (a Vulnerary-type act).
-          Unexamined.
-        **The env, without a vanilla campaign:** point `campaign_env.py ours --store <dir>` at a
-        dir of `0.json..25.json`, each `{"shops": []}`, with `--id e1-ours-ch07 --from 4`. Then
-        set `last: [4]`, `shops: {}` and `attempt: 1` in the JSON. That plays ch03 alone, from
-        the saved start.
-        **NEXT, in order:**
-        1. The item crash: read the trace first; spend one instrumented run, never one per guess.
-        2. The stall rule can CYCLE: a unit steps into the boss's 2-range, is hit, retreats, and
-           the board comes back with other HP, so each repeat is "new" (one run: 6 stalls to turn
-           40). Watch for it once the assault fires.
-        3. The exploring trip itself: careful re-picks the sent unit at every decision, so no one
-           commits to a far village. Each open tile's unit is re-chosen per decision.
-        4. A kept plan's attack can find no Attack command (a target changed under it; the
-           surprise check missed it). Seen once in ch03 attempt 4; that trace was lost.
-        5. Nicolas: **use convoy items before buying anything** (between chapters; drive the prep
-           Supply screen). And: promote at level 10, between chapters, configured separately.
-           Seals found in battle go to the convoy for now.
+        **The NEXT list is #510 comment 6478205562** (see the top of this file). Done today from the
+        old list: the item crash (a heal priced on the start board), the exploring trip (sticky
+        sends), and the kept-plan attack crash (a broken wall; the general fix is the legality
+        check). Still owed from it:
+        - The stall rule can CYCLE: a unit steps into the boss's 2-range, is hit, retreats, and the
+          board comes back with other HP, so each repeat is "new". ch03 careful now stalls after
+          the 4th chest (#510 fix list item 4).
+        - Nicolas: **use convoy items before buying anything** (between chapters; drive the prep
+          Supply screen). And: promote at level 10, between chapters, configured separately.
+          Seals found in battle go to the convoy for now.
         **Then F3's rest:** the report (one plain sentence per cell first; Task 13), "what kills
         us" as a query over traces, bot faults, feasibility, attempts buckets, `--post`.
      2b. **Where runs live (plan Task 16, F5, SETTLED; Nicolas: give them "a good home in the
