@@ -34,12 +34,13 @@
 -- api: Planner.plan(Bot, board, sight, style, opts) -> the first act of the best plan
 -- (bot.lua's action shape) or nil when no unit can act, and the plan's record { score, acts,
 -- expect, enemies, judged, predict, kind = "beam"|"assault"|"unstall", considered = every plan
--- judged, best first: { judged, acts, kind }, opts = { stalled = bool, sent = the last plan's
--- goals } | nil,
+-- judged, best first: { judged, acts, kind }, opts = { stalled = bool, sent, explored (both
+-- Bot.candidates') } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
 -- to die), played, judgedDie (the judged phase's, when played) }, goals = the village or chest
 -- each unit was sent to: { id, x, y } }. Planner.surprise(plan, k, before, after, visible) -> why the board after
--- its k-th act calls for a new plan, or nil to play act k + 1.
+-- its k-th act calls for a new plan, or nil to play act k + 1. standing (optional) = the walls and
+-- doors now, { obstacles, doors } (sight's): a broken wall or opened door ends the plan.
 
 local M = {}
 
@@ -209,7 +210,7 @@ function M.plan(Bot, board, sight, style, opts)
     local W = M.WEIGHTS[style.aggression]
     if not W then error("planner.lua: no weights for style " .. tostring(style.aggression)) end
     local hitChance = sight.hitChance
-    local cands, ctx = Bot.candidates(board, sight, style, opts and opts.sent)
+    local cands, ctx = Bot.candidates(board, sight, style, opts)
     if #cands == 0 then return nil end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
@@ -541,7 +542,7 @@ end
 -- may be played as planned. `visible(x, y)` is the player's sight after the act (fog).
 -- Taking LESS from a counter, or dealing more without a kill, is no surprise: the plan
 -- reckoned with worse.
-function M.surprise(plan, k, before, after, visible)
+function M.surprise(plan, k, before, after, visible, standing)
     local a, x, nxt = plan.acts[k], plan.expect[k], plan.acts[k + 1]
     if not (a and x and nxt) then return "the plan is played out" end
     local now = {}
@@ -583,6 +584,22 @@ function M.surprise(plan, k, before, after, visible)
     -- the game offers Staff only on someone hurt: a counter that missed leaves none
     local t2 = nxt.act == "staff" and nxt.targetId and now[nxt.targetId]
     if t2 and t2.hp >= (t2.maxhp or t2.hp) then return "the heal's target is not hurt" end
+    -- a wall an earlier blow broke, or a door already opened, leaves the act nothing to do
+    -- (vanilla Ch3: two units planned on one wall, the first broke it, the second crashed)
+    if standing and nxt.obstacle then
+        local stands = false
+        for _, o in ipairs(standing.obstacles or {}) do
+            if o.x == nxt.obstacle.x and o.y == nxt.obstacle.y then stands = true end
+        end
+        if not stands then return "the next wall is broken" end
+    end
+    if standing and nxt.act == "door" then
+        local shut = false
+        for _, d in ipairs(standing.doors or {}) do
+            if math.abs(d.x - nxt.move.x) + math.abs(d.y - nxt.move.y) == 1 then shut = true end
+        end
+        if not shut then return "the next door is open" end
+    end
     return nil
 end
 

@@ -194,6 +194,7 @@ end
 --                      "failed" | "closed" | "skipped" (offered, never played) | "unreached"
 --                      (never offered), by, tried (the unit that failed), turn, offers, die =
 --                      the lowest chance it was offered at }
+--   explored()         the "x,y" tiles we visited or opened (Bot.candidates offers them no more)
 --   leftOpen()         bot faults: each tile never explored that a unit could still use at the
 --                      last read, { kind = "left_open", x, y, tile, offers }. ch03's chest behind
 --                      a door went unopened in every attempt, silently, as "unreached"
@@ -232,6 +233,13 @@ function M.exploreLog()
     function log.failed(a, turn)
         local e = tiles[key(a.move.x, a.move.y)]
         if e then e.failed, e.turn = a.unit, turn end
+    end
+    function log.explored()
+        local out = {}
+        for k, e in pairs(tiles) do
+            if e.by then out[k] = true end
+        end
+        return out
     end
     function log.leftOpen()
         local out = {}
@@ -412,7 +420,9 @@ function M.run(api)
                         local why
                         if playing then
                             why = api.Planner.surprise(playing, nextAct - 1, before, board,
-                                                             sight.visible)
+                                sight.visible, {
+                                    obstacles = sight.obstacles and sight.obstacles() or {},
+                                    doors = sight.doors and sight.doors() or {} })
                             if not why then
                                 local a = playing.acts[nextAct]
                                 nextAct = nextAct + 1
@@ -426,8 +436,8 @@ function M.run(api)
                         end
                         local replan = playing and why
                         local a, plan = api.Planner.plan(Bot, board, sight, style,
-                                                         { stalled = stalled,
-                                                           sent = sent })
+                                                         { stalled = stalled, sent = sent,
+                                                           explored = explore.explored() })
                         stalled = false   -- one changed act is the change; the rest plans freely
                         lastPlan = plan
                         if plan then sent = plan.goals end

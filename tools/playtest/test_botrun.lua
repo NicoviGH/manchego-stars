@@ -172,6 +172,9 @@ do
     check(by[3].offers, 2, "explore log: how often")
     check(by[3].die, 0.1, "explore log: the lowest chance it was offered at")
     check(by[4].status, "unreached", "explore log: never offered")
+    local done = log.explored()
+    check(done["1,1"], true, "explore log: ours is explored")
+    check(done["3,3"], nil, "explore log: an offer alone is not")
     log.failed({ unit = 0x1C, move = { x = 4, y = 4 } }, 3)
     by = {}
     for _, e in ipairs(log.summary()) do by[e.x] = e end

@@ -1234,6 +1234,17 @@ end
 -- A unit cut off from the tile is sent when breachFor finds the door or wall that opens the
 -- way (the march then opens it, as for any goal): ch03's (6,12) chest sits behind a door,
 -- and pairing only the units a path reached left it unopened in every attempt.
+-- The villages and chests still worth a trip: what the game offers (sight.explorable) less
+-- the tiles this run has already explored (ctx.explored). A House keeps its Visit for good
+-- (eventinfo House(0, ...)): vanilla Ch1's two held Seth and Eirika for nine turns.
+local function openTiles(ctx)
+    local out = {}
+    for _, t in ipairs(ctx.sight.explorable()) do
+        if not ctx.explored[tileKey(t.x, t.y)] then out[#out + 1] = t end
+    end
+    return out
+end
+
 local function exploring(ctx, sent)
     ctx.exploreGoal = {}
     if not ctx.sight.explorable then return end
@@ -1256,7 +1267,7 @@ local function exploring(ctx, sent)
         return d and (u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)) and d
     end
     local open, blues = {}, {}
-    for _, t in ipairs(ctx.sight.explorable()) do open[tileKey(t.x, t.y)] = t end
+    for _, t in ipairs(openTiles(ctx)) do open[tileKey(t.x, t.y)] = t end
     for _, u in ipairs(ctx.blues) do blues[u.id] = u end
     for _, g in ipairs(sent or {}) do
         local t, u = open[tileKey(g.x, g.y)], blues[g.id]
@@ -1265,7 +1276,7 @@ local function exploring(ctx, sent)
             taken[tileKey(t.x, t.y)], ctx.exploreGoal[u.id] = true, { x = t.x, y = t.y }
         end
     end
-    for _, t in ipairs(ctx.sight.explorable()) do
+    for _, t in ipairs(openTiles(ctx)) do
         for _, u in ipairs(ctx.actors) do
             local d = reaches(u, t)
             if d then pairs_[#pairs_ + 1] = { t = t, u = u, d = d } end
@@ -1359,12 +1370,15 @@ end
 -- hold, the retreat and a Seize. Each act carries `why`, its `progress` and its end tile's `exposure` (each enemy
 -- that can strike it there next phase); an attack its forecast (`f`) and counter worst case
 -- (`spent`).
--- `sent`: the last plan's goals, the tiles units were already sent to (exploring keeps them).
+-- opts (botrun's memory of the run, nil for none): `sent`, the last plan's goals, the tiles
+-- units were already sent to (exploring keeps them); `explored`, the "x,y" tiles this run
+-- has visited or opened (never offered again).
 -- -> { { unit, acts } }, ctx (the planner scores with the same view).
-function M.candidates(board, sight, style, sent)
+function M.candidates(board, sight, style, opts)
     local ctx = context(board, sight)
     ctx.style, ctx.turn = style, board.turn
-    exploring(ctx, sent)
+    ctx.explored = opts and opts.explored or {}
+    exploring(ctx, opts and opts.sent)
     local open = function() return true end
     local objective = sight.objective
     local out = {}
@@ -1439,7 +1453,7 @@ function M.candidates(board, sight, style, sent)
         if ctx.sight.explorable then
             local ends = {}
             for _, t in ipairs(endTiles(ctx, u)) do ends[tileKey(t.x, t.y)] = true end
-            for _, t in ipairs(ctx.sight.explorable()) do
+            for _, t in ipairs(openTiles(ctx)) do
                 if ends[tileKey(t.x, t.y)] and ctx.sight.canExplore(u, t.x, t.y, t.kind) then
                     add(action(u, t, t.kind), "explore")
                 end

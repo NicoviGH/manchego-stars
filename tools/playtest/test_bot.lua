@@ -1474,6 +1474,31 @@ do
           "door: no key, the wall")
 end
 
+-- test_a_visited_tile_is_not_offered_again: a House (eventinfo House(0, ...), flag 0) keeps
+-- its Visit for good, so the game offers it every turn. Once we have visited it, it is no one's
+-- goal and no Visit is proposed there: vanilla Ch1's two houses held Seth and Eirika on them
+-- for nine turns, every style stuck.
+do
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local E = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }) },
+        explorable = { { x = 1, y = 0, kind = "visit" } },
+        canExplore = { [0x01] = { ["1,0"] = "visit" } },
+    }
+    local function visits(opts)
+        local n = 0
+        for _, c in ipairs(B.candidates(boardOf(A, E), sightOf(o), style("careful"), opts)) do
+            for _, a in ipairs(c.acts) do
+                if a.act == "visit" then n = n + 1 end
+            end
+        end
+        return n
+    end
+    check(visits(nil), 1, "visited: an unvisited house is offered")
+    check(visits({ explored = { ["1,0"] = true } }), 0, "visited: not offered again")
+end
+
 -- test_exploring_opens_the_door_to_a_chest: the chest at (4,0) sits behind the door at (2,0),
 -- so no path reaches A. A can open both, so it is sent to the chest and its first act is the
 -- Door. Pairing only units the path reached left ch03's (6,12) chest, behind the door at
@@ -1923,7 +1948,7 @@ do
     -- per decision left ch02's (12,3) handed between two units and never reached.)
     local function sentMarches(sent, ...)
         local out = {}
-        for _, c in ipairs(B.candidates(boardOf(...), sightOf(o), style("careful"), sent)) do
+        for _, c in ipairs(B.candidates(boardOf(...), sightOf(o), style("careful"), { sent = sent })) do
             for _, a in ipairs(c.acts) do
                 if a.why == "march" then out[c.unit.id] = at(a) end
             end
@@ -1945,7 +1970,7 @@ do
     local s = sightOf(o)
     local inner = s.canExplore
     s.canExplore = function(u, ...) asked[#asked + 1] = u.id; return inner(u, ...) end
-    B.candidates(boardOf(acted, Bu, X), s, style("careful"), sentA)
+    B.candidates(boardOf(acted, Bu, X), s, style("careful"), { sent = sentA })
     local askedA = 0
     for _, id in ipairs(asked) do
         if id == 0x01 then askedA = askedA + 1 end
@@ -2117,6 +2142,23 @@ do
     check(S(healing, 1, before, after(A { acted = true, hp = 25, maxhp = 30 }, C(),
                                       red(0x81, 2, 0, { hp = 10 }))), nil,
           "surprise: a hurt target is healed as planned")
+    -- C means to strike the wall at (0,2), but A's blow broke it: no Attack to play (vanilla
+    -- Ch3, every crash at turn 6). Likewise a door already opened.
+    local walling = plan()
+    walling.acts[2] = { unitId = 0x02, act = "attack", obstacle = { x = 0, y = 2 },
+                        move = { x = 0, y = 1 } }
+    local played = after(A { acted = true }, C(), red(0x81, 2, 0, { hp = 10 }))
+    check(S(walling, 1, before, played, nil, { obstacles = {}, doors = {} }),
+          "the next wall is broken", "surprise: the wall is gone")
+    check(S(walling, 1, before, played, nil, { obstacles = { { x = 0, y = 2, hp = 10 } },
+                                               doors = {} }), nil,
+          "surprise: the wall stands, strike it")
+    local opening = plan()
+    opening.acts[2] = { unitId = 0x02, act = "door", move = { x = 0, y = 1 } }
+    check(S(opening, 1, before, played, nil, { obstacles = {}, doors = {} }),
+          "the next door is open", "surprise: no door left beside the opener")
+    check(S(opening, 1, before, played, nil, { obstacles = {}, doors = { { x = 0, y = 2 } } }),
+          nil, "surprise: the door is still shut")
 end
 
 if fails > 0 then

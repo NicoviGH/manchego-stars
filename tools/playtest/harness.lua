@@ -3162,9 +3162,10 @@ INSPECT.botApi = function(game)
         if a.act == "attack" then
             -- The actor can die in its own attack: a dead unit is never greyed out, so its
             -- death is an exit of the combat wait too.
-            return chooseAttack(u.addr, function()
+            if chooseAttack(u.addr, function()
                 return won() or lost() or (ru32(u.addr + 0x0C) & BOARD.US_DEAD) ~= 0
-            end, a.targetId, a.obstacle)
+            end, a.targetId, a.obstacle) then return true end
+            return false, a.obstacle and "the strike on the wall did not play out" or "the attack did not play out"
         elseif a.act == "talk" then
             if not chooseTalk(a.targetId) then return false end
             return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
