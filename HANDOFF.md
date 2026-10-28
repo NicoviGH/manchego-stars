@@ -9,14 +9,18 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-28 (Claude). **FIRST, in a fresh session: fix #545** (bosses on raw character
-slots lack CA_BOSS; Nicolas: fix it first, then resume step 9). Cut `feat/545-...` from `origin/main`.
-The issue body has the decomp evidence, the effects (+40 kill exp, map marker, status screen,
-Silencer, camera) and the fix with its test. Check Ravisin (ch05); run `make verdict-diff`.
-**Then resume #510 step 9** on `feat/510-step9-e-campaigns`, at **b243941, a LOCAL WIP commit (not
-pushed)**: villages/chests, the full-bag rule, the boss assault + stall rule (below, "NEXT").
-After switching back to it, rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`):
-the checkout touches the chapter YAMLs' mtimes. **The parity model is being
+Refreshed 2026-10-28, evening (Claude). **#545 is DONE: PR #546 merged (b3a9383).** Every
+chapter boss's row carries CA_BOSS (ADR 0372), and every line enemy in ch00-ch07 now sits at
+the level of the vanilla unit it mirrors (ADR 0373, "vanilla levels as the foundation"; ch04's
+wolf pack included). No parity verdict changed. Its pre-merge `SUITE=gate` run was DEFERRED by
+Nicolas to #510 step 10, which tracks it: ch01's goblins went L1 -> L2-3 and `lordfloor` now
+expects +10 HP, and neither has run in the emulator yet.
+**NOW, in a fresh session: resume #510 step 9** on `feat/510-step9-e-campaigns`, at **b243941, a
+LOCAL WIP commit (not pushed)**: villages/chests, the full-bag rule, the boss assault + stall rule
+(below, "NEXT"). **That branch predates #546: merge `origin/main` into it first** (it changes
+ch00/ch01/ch03/ch04/ch05 enemies, so the bot's ch03 and ch01 runs read differently from the notes
+below), then rebuild the ROM (`make CAMPAIGN=rime-of-the-frostmaiden fireemblem8.gba`; the
+checkout also touches the chapter YAMLs' mtimes). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -143,7 +147,8 @@ G3 #537 78105ed; the summary is on #531).
           - A repeated board is first a STALL: the planner must play a plan that changes it, and
             only a repeat after that is stuck. The record has `stalls`.
           - The boss is read from the game's own Defeat Boss goal (`GetDefeatTalkEntry`, flag 2),
-            not CA_BOSS (#545: the grell has none, so the bot saw no boss at all).
+            not CA_BOSS (before #545's fix the grell had none, so the bot saw no boss at all;
+            every boss carries it now, and the goal read stays).
           - The judge CHAINS the counter with the enemy phase. Averaging it had let the lord
             strike the grell alone and die.
         - **Where it stands (ours ch03 attempt 1, `PT_CAMPAIGN` with `attempt: 1`):** the control
@@ -154,7 +159,7 @@ G3 #537 78105ed; the summary is on #531).
         dir of `0.json..25.json`, each `{"shops": []}`, with `--id e1-ours-ch07 --from 4`. Then
         set `last: [4]`, `shops: {}` and `attempt: 1` in the JSON. That plays ch03 alone, from
         the saved start.
-        **NEXT, in order (after #545):**
+        **NEXT, in order:**
         1. The item crash: read the trace first; spend one instrumented run, never one per guess.
         2. The stall rule can CYCLE: a unit steps into the boss's 2-range, is hit, retreats, and
            the board comes back with other HP, so each repeat is "new" (one run: 6 stalls to turn
@@ -307,9 +312,12 @@ Open thread on #531: a matrix run leaves the build tree non-canonical, so the pr
 3. **#510 step 10: re-evaluate.** Re-run the party-lever survey in all three modes and bring
    Nicolas the options. Read the twin BOTH with Seth fielded and with Seth benched (the Let's
    Play Archive's run benches him from Ch4); Baxby-as-Seth is back on the table as a lever and
-   Nicolas says it fits Baxby (both on #510, 2026-10-22). Baseline (2026-10-19, in #510): the force side is near parity, and the
-   clear-load excess is the party, mostly vanilla's Seth. Baxby-as-Seth is a past discussion, NOT a
-   decision (ADR 0342 rejected it). Nicolas wants it TIGHTER (2026-10-21, on #510): clear-load
+   Nicolas says it fits Baxby (both on #510, 2026-10-22). Baseline (2026-10-19, in #510): the
+   force side is near parity, and the clear-load excess is the party, mostly vanilla's Seth.
+   **The party decisions are tracked in GitHub, not here:** #510 step 10's checklist, and the
+   tree under #459 (Roster parity): #547 (Cavaliers: Baxby as Seth, Lupin as Franz, joins
+   levelled to their chapter) and #526 (Lord system), whose #543 is built FIRST in step 10.
+   #459 is marked blocked by #510. Nicolas wants it TIGHTER (2026-10-21, on #510): clear-load
    above x1.0 means our game is harder than vanilla, so bring party levers toward x1.0 and a
    narrower band as options.
 4. **#493 -- the wiki's remaining findings** (navbox, #490's stat ranges, supports after #494), and
