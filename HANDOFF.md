@@ -9,7 +9,7 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-27 (Claude: #510 step 9 PR E+F on `feat/510-step9-e-campaigns` c0382b3, no PR yet; planner, F1 pool and F2 (verdict + cell driver) built; next: F3, the trace first). **The parity model is being
+Refreshed 2026-10-27 (Claude: #510 step 9 PR E+F on `feat/510-step9-e-campaigns` 909e9ef, no PR yet; planner, F1 pool, F2 and F3's trace built; next: F3's report). **The parity model is being
 rebuilt before any party or chapter change: epic #510** (Nicolas, 2026-10-19). #490 found the model
 misloads units; **all of ch00-ch07 are under re-evaluation** and re-lock at the end of #510. Never
 widen an `accepted_residual` to get green: design or model fidelity is the fix.
@@ -105,14 +105,17 @@ G3 #537 78105ed; the summary is on #531).
         again. A crash's pair is left out and replaced by a new seed. `sample_style` IS
         `Campaign.drawStyle` + `Bot.team` (no Python copy). The rulings are on #510 (comment
         6457132394). `make sim` is not written yet (F4 needs it).
-     2. F3: the report (plain sentences first), bot faults, feasibility, attempts buckets,
-        `--post`. **Every run keeps a full playtest log (a TRACE, Nicolas: "I want to be able
-        to understand everything about how it went")**: every player and enemy act with the
-        game's forecast and actual outcome (read from the game's battle hit array), the planner's
-        reasoning, board snapshots each phase, and chapter events, as gzipped JSONL beside
-        BOTRUN. `montecarlo.py story <run>` reads one run as plain text; analyses are queries
-        over traces, ours beside the twin's. Plan Task 13 has the spec. Build the trace FIRST:
-        the report reads it.
+     2. **F3's trace is DONE** (909e9ef; #510 comment 6457580533). Every run keeps a gzipped JSONL
+        trace in the store (`traces/<campaign>/...`, named in the record). It holds the start,
+        unit snapshots, plans (score, the others judged, predict, replan reasons), each act of
+        both sides with the game's battle record (`Board.battle`: forecast hit/crit, can-counter,
+        every blow), arrivals, recruits and items, and the record last. `montecarlo.py story
+        <trace>` tells one run in plain text. The trace costs no measurable CPU. A Talk recruit
+        no longer counts as a kill. Not traced: map-tile events (chests and villages show only
+        as items).
+        **NEXT, F3's rest:** the report (one plain sentence per cell first; Task 13), "what kills
+        us" as a query over traces (killer share by enemy and turn, death tiles, ours beside the
+        twin's), bot faults, feasibility, attempts buckets, `--post`.
      2b. **Where runs live (plan Task 16, F5, SETTLED; Nicolas: give them "a good home in the
         repo"):** ONE home each (Nicolas: no copies). The WRITE-UP is a committed record per
         sweep, `sim/<id>-<slug>/RUN.md`: full YAML frontmatter of inputs and cost, plus the plain
