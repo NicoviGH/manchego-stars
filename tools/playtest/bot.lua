@@ -552,8 +552,9 @@ end
 -- seize tile for a unit that cannot Seize there -- unless it already stands on it: its own
 -- tile is always left, so a unit boxed in on the throne still has somewhere to wait.
 -- A tile an ally who has yet to act stands on is left in: the plan may move that ally first
--- (vacated, below; the planner holds the act until it has). Ours ch03: the corner's safe
--- tiles held our lightest hitters, and Braulo, the heaviest, never reached the boss.
+-- (vacated, below; the planner holds the act until it has), unless ctx.freeOnly is set
+-- (candidates' second march and retreat). Ours ch03: the corner's safe tiles held our
+-- lightest hitters, and Braulo, the heaviest, never reached the boss.
 local function vacated(ctx, u, x, y)
     local there = ctx.standing[tileKey(x, y)]
     if there and there ~= u and there.faction == "blue" and not there.acted then return there end
@@ -567,7 +568,7 @@ local function endTiles(ctx, u)
     for _, t in ipairs(reachOf(ctx, u)) do
         local there = ctx.standing[tileKey(t.x, t.y)]
         local own = t.x == u.x and t.y == u.y
-        if (not there or there == u or vacated(ctx, u, t.x, t.y))
+        if (not there or there == u or (not ctx.freeOnly and vacated(ctx, u, t.x, t.y)))
             and (own or not (barred and t.x == s.x and t.y == s.y)) then
             out[#out + 1] = t
         end
@@ -1488,7 +1489,13 @@ function M.candidates(board, sight, style, opts)
                 end
             end
         end
+        -- the march over every tile, and over free tiles only: a tile an ally may vacate is
+        -- an extra way forward, never the only one (vanilla Ch3: Eirika held behind the army
+        -- for five turns, the throne open, every forward tile an ally's who stayed put)
         add(action(u, march(ctx, u, open, objective), "wait"), "march")
+        ctx.freeOnly = true
+        add(action(u, march(ctx, u, open, objective), "wait"), "march")
+        ctx.freeOnly = nil
         local holds = bySafety(ctx, u, waitTiles(ctx, u))
         add(holds[1] and action(u, holds[1], "wait"), "hold")
         -- progress: how much nearer its march goal (the game's field to it) each act ends it
@@ -1505,14 +1512,22 @@ function M.candidates(board, sight, style, opts)
         end
         -- the retreat: the safest tile that still gains ground, the most ground on a tie, so a
         -- unit has a way forward that is not the march's exposed front
-        local retreat, rw, rg
-        for _, t in ipairs(waitTiles(ctx, u)) do
-            local g = gain(t.x, t.y)
-            if g > 0 then
-                local w = worstCase(ctx, u, t.x, t.y, nil).sum
-                if not rw or w < rw or (w == rw and g > rg) then retreat, rw, rg = t, w, g end
+        local function retreatOver(tiles)
+            local retreat, rw, rg
+            for _, t in ipairs(tiles) do
+                local g = gain(t.x, t.y)
+                if g > 0 then
+                    local w = worstCase(ctx, u, t.x, t.y, nil).sum
+                    if not rw or w < rw or (w == rw and g > rg) then retreat, rw, rg = t, w, g end
+                end
             end
+            return retreat
         end
+        local retreat = retreatOver(waitTiles(ctx, u))
+        if retreat then add(action(u, retreat, "wait"), "retreat") end
+        ctx.freeOnly = true
+        retreat = retreatOver(waitTiles(ctx, u))
+        ctx.freeOnly = nil
         if retreat then add(action(u, retreat, "wait"), "retreat") end
         -- the next safest holds too: another unit the plan moves first may take the safest,
         -- and with one hold the unit had only exposed tiles left (ours ch03: Braulo, at 16 HP,

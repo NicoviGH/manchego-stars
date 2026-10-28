@@ -1546,6 +1546,25 @@ do
     check(table.concat(order, " "), "2@2,0 1@1,0", "vacate: B steps on, then A takes its tile")
 end
 
+-- test_a_unit_still_advances_when_the_ally_ahead_stays: F holds (2,0), A's nearest tile to
+-- the goal, and has nowhere else to go; A's safest holds are its own tile and two behind it.
+-- A still advances to the free (1,0): a tile an ally
+-- may vacate is an extra way forward, never the only one (vanilla Ch3: Eirika held at (13,8)
+-- behind the army for five turns, the throne open).
+do
+    local A = blue(0x01, 0, 0, 0)
+    local F = blue(0x02, 1, 2, 0)
+    local E = red(0x81, 6, 0, { minRange = false })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }, { 1, 0 }, { 2, 0 }),
+                          [0x02] = tiles({ 2, 0 }) },
+                field = fieldsOf { ["6,0"] = { ["0,0"] = 6, ["0,1"] = 7, ["0,2"] = 8, ["1,0"] = 5,
+                                               ["2,0"] = 4 } } }
+    local _, plan = Planner.plan(B, boardOf(A, F, E), sightOf(o), style("careful"))
+    local where = {}
+    for _, a in ipairs(plan and plan.acts or {}) do where[a.unitId] = at(a) end
+    check(where[0x01], "1,0", "vacate: with the ally ahead staying, A takes the free tile")
+end
+
 -- test_a_unit_whose_safest_tile_is_taken_holds_on_the_next: X reaches (0,0) for 25 of A's 20;
 -- (0,1) and (0,2) are safe, (0,1) the safest by board order. C marches onto (0,1). A must
 -- still end safe, on (0,2) -- with one hold it was left the exposed (0,0) (ours ch03: Braulo
