@@ -173,6 +173,36 @@ class GenericPidsCloneTheirDonor(unittest.TestCase):
                              '%s is not a clone of %s' % (pid, donor))
         self.assertEqual(self._fields(text, '0xb7'), self._fields(vanilla, '0xb7'))
 
+    def test_every_boss_row_carries_CA_BOSS(self):
+        """#545: every `is_boss` unit's built row carries CA_BOSS, raw pid or vanilla slot, so
+        the engine pays its +40 kill exp, marks it on the map and loads it as a boss."""
+        import unit_load
+        import exp_curve
+        text = inject.raw_pids.stamp_boss_attributes(
+            inject.decomp.vanilla_decomp_text('src/data_characters.c'))
+        bosses = 0
+        for chapter in inject.raw_pids.CHAPTER_ENEMY_PIDS:
+            chap = exp_curve.load_chapter('rime-of-the-frostmaiden', chapter)
+            for ed in inject.raw_pids.chapter_roster_entries(chap):
+                if not ed.get('is_boss'):
+                    continue
+                pid = inject.raw_pids.enemy_pid(chapter, ed)
+                s, e = inject.decomp._find_brace_block(text, '[%s - 1]' % pid, 'data_characters.c')
+                self.assertIn('CA_BOSS', unit_load.attributes_in(text[s:e]),
+                              '%s %s rides %s' % (chapter, ed['id'], pid))
+                bosses += 1
+        self.assertGreaterEqual(bosses, 7)
+
+    def test_stamping_CA_BOSS_keeps_a_rows_other_flags(self):
+        import unit_load
+        vanilla = inject.decomp.vanilla_decomp_text('src/data_characters.c')
+        s, e = inject.decomp._find_brace_block(vanilla, '[0xbf - 1]', 'data_characters.c')
+        flagged = vanilla[:s] + vanilla[s:e].replace(
+            '.growthLck = 0,\n', '.growthLck = 0,\n        .attributes = CA_FEMALE,\n') + vanilla[e:]
+        text = inject.raw_pids.stamp_boss_attributes(flagged)
+        s, e = inject.decomp._find_brace_block(text, '[0xbf - 1]', 'data_characters.c')
+        self.assertEqual({'CA_BOSS', 'CA_FEMALE'}, unit_load.attributes_in(text[s:e]))
+
     def test_every_row_the_pass_changes_is_a_declared_rewrite(self):
         """The exclusivity guard (assert_rewritten_raw_pids_are_exclusive) only sees the pids
         `rewritten_raw_pids` lists, so a writer it does not know would let #508 happen again.

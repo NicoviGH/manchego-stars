@@ -217,14 +217,20 @@ enemy_units:
     level: 8
     autolevel: true
     personal:                   # FE8's OWN boss mechanism: a named boss is class base PLUS a
-      baseHP: 17                # personal line. Modelled on the decomp's only defensive monster
-      basePow: 5                # boss, Maelduin (data_characters.c [CHARACTER_MAELDUIN_CHUnk - 1]:
-      baseDef: 5                # HP+15/Pow+6/Def+4), and read against the party that meets it
-                                # (ADR 0316): Pow+5 hits that party for 14.1 a round, Bazba's 14.0,
-                                # where a bare line hit for 9.7 and the kobold slinger's 13.6 led
-                                # the force. HP+17/Def+5 keep 36 HP/Def 8 at L8, just inside
-                                # Ravisin's 37/10 two chapters later, so the boss curve stays
-                                # monotonic. A naked L12 mogall folded in 1.1 rounds (#284).
+      baseHP: 21                # personal line that is its WHOLE line at its level. Its row
+      basePow: 8                # carries CA_BOSS and baseLevel 8, so LoadUnit's realistic branch
+      baseSkl: 2                # grows it zero levels, as it does vanilla's bosses (#545).
+      baseSpd: 2                # Modelled on the decomp's only defensive monster boss, Maelduin
+      baseDef: 6                # (data_characters.c [CHARACTER_MAELDUIN_CHUnk - 1]: HP+15/Pow+6/
+      baseRes: 2                # Def+4), and read against the party that meets it (ADR 0316):
+      baseLck: 2                # 10 Pow hits that party for 14.1 a round, Bazba's 14.0, where a
+                                # bare line hit for 9.7 and the kobold slinger's 13.6 led the
+                                # force. 36 HP/Def 8 at L8 sit just inside Ravisin's 37/10 two
+                                # chapters later, so the boss curve stays monotonic. A naked L12
+                                # mogall folded in 1.1 rounds (#284). Until #545 the line was
+                                # HP+17/Pow+5/Def+5 plus 7 autolevelled class levels; this folds
+                                # those levels in at the model's rounded means, so the line is
+                                # unchanged.
     inventory:
       - id: evil-eye            # the mogall's innate ranged magic gaze (hits RES); flavor = lightning tentacle
     donor: [14, 1]     # vanilla Bazba, the seize-tile boss -- GuardTileAI + the GuardTile bit

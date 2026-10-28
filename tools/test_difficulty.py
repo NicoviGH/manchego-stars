@@ -2292,6 +2292,22 @@ class BattlefieldDynamics(unittest.TestCase):
                          (2, 3, 1))
 
 
+# An is_boss unit carries CA_BOSS, so an autolevelled one loads "realistically" from its
+# baseLevel (= its level): zero levels, as vanilla's bosses do (#545). Its personal line is its
+# WHOLE line at its level. These are the class levels the role-check fixtures below used to
+# autolevel, at the model's rounded means, written as that line.
+ARMOR_KNIGHT_L8_LEVELS = {'baseHP': 6, 'basePow': 3, 'baseSkl': 2, 'baseSpd': 1, 'baseDef': 2,
+                          'baseRes': 1, 'baseLck': 2}
+DRUID_L7_LEVELS = {'baseHP': 7, 'basePow': 8, 'baseSkl': 5, 'baseSpd': 4, 'baseDef': 2,
+                   'baseRes': 5, 'baseLck': 3}
+DRUID_L9_LEVELS = {'baseHP': 8, 'basePow': 9, 'baseSkl': 5, 'baseSpd': 4, 'baseDef': 2,
+                   'baseRes': 6, 'baseLck': 4}
+
+
+def _plus(line, **more):
+    return {k: line.get(k, 0) + more.get(k, 0) for k in set(line) | set(more)}
+
+
 class RoleCheck(unittest.TestCase):
     """The per-unit role check (#25 post-mortem): the aggregate parity verdict hides a
     single monstrous unit and a boss that folds, because threat/slot averages both away."""
@@ -2308,6 +2324,7 @@ class RoleCheck(unittest.TestCase):
             {'id': 'grunt', 'class': 'soldier', 'level': 5, 'autolevel': True, 'count': 6,
              'inventory': [{'id': 'iron-lance', 'fe_base': 'iron-lance'}]},
             {'id': 'boss', 'class': 'armor-knight', 'level': 8, 'autolevel': True, 'is_boss': True,
+             'personal': ARMOR_KNIGHT_L8_LEVELS,
              'inventory': [{'id': 'slim-lance', 'fe_base': 'slim-lance'}]},
         ])
         self.assertEqual(df.role_findings(chap, self.REF), [])
@@ -2455,7 +2472,7 @@ class RoleCheck(unittest.TestCase):
         open ground but survives 5.9 on a throne (+30 avo/+3 def), clearing half of Saar's
         11.3."""
         squishy = {'id': 'boss', 'class': 'druid', 'level': 9, 'autolevel': True, 'is_boss': True,
-                   'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+                   'personal': DRUID_L9_LEVELS, 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         self.assertTrue(any('rounds to kill' in f
                             for f in df.role_findings(self._chap([squishy]), self.REF)))
         throned = dict(squishy, tile_terrain='throne')
@@ -2504,10 +2521,10 @@ class PersonalBossLine(unittest.TestCase):
 
     def test_personal_line_lifts_the_boss_in_the_role_check(self):
         plain = {'id': 'boss', 'class': 'druid', 'level': 7, 'autolevel': True, 'is_boss': True,
-                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
+                 'personal': DRUID_L7_LEVELS, 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         self.assertTrue(any('rounds' in f for f in df.role_findings({'enemy_units': [plain]},
                                                                    self.REF)))
-        strong = dict(plain, personal={'baseHP': 15, 'baseDef': 5})
+        strong = dict(plain, personal=_plus(DRUID_L7_LEVELS, baseHP=15, baseDef=5))
         found = df.role_findings({'enemy_units': [strong]}, self.REF)
         self.assertFalse(any('fold too fast' in f for f in found), found)
 
@@ -2553,7 +2570,7 @@ class PersonalBossLine(unittest.TestCase):
     def test_stacking_terrain_onto_a_boss_line_is_flagged(self):
         """Personal Def and terrain stack; together they can make a boss undentable."""
         boss = {'id': 'boss', 'class': 'druid', 'level': 7, 'autolevel': True, 'is_boss': True,
-                'tile_terrain': 'throne', 'personal': {'baseHP': 15, 'baseDef': 5},
+                'tile_terrain': 'throne', 'personal': _plus(DRUID_L7_LEVELS, baseHP=15, baseDef=5),
                 'inventory': [{'id': 'flux', 'fe_base': 'flux'}]}
         found = df.role_findings({'enemy_units': [boss]}, self.REF)
         self.assertTrue(any('cannot be damaged' in f for f in found), found)

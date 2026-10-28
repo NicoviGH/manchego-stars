@@ -123,6 +123,40 @@ def clone_generic_rows(text):
     return text
 
 
+def boss_rows():
+    """Every chapter boss's gCharacterData row marker, whether it rides a vanilla slot or a raw
+    pid (CHAPTER_ENEMY_PIDS)."""
+    return sorted({'[%s - 1]' % pids['boss'] for pids in CHAPTER_ENEMY_PIDS.values()
+                   if 'boss' in pids})
+
+
+def stamp_boss_attributes(text):
+    """Give every chapter boss's row CA_BOSS (#545). A vanilla boss slot already carries it; a
+    raw pid's row (a cloned generic, or a gap) does not, and without it the engine withholds
+    everything it hangs on the bit: the +40 kill exp (bmbattle.c), the map's boss marker
+    (bmudisp.c), the chapter status listing, the Silencer rate and the opening camera pan. It
+    also sends an autolevelled boss down LoadUnit's UnitAutolevelRealistic branch, so a boss's
+    `personal:` line is its whole line at its level, as vanilla's are."""
+    import unit_load
+    for marker in boss_rows():
+        s, e = _find_brace_block(text, marker, CHARACTERS_C)
+        block = text[s:e]
+        flags = unit_load.attributes_in(block)
+        if 'CA_BOSS' in flags:
+            continue
+        if flags:
+            block = _set_field(block, 'attributes', ' | '.join(sorted(flags | {'CA_BOSS'})),
+                               CHARACTERS_C, marker)
+        else:
+            block, n = re.subn(r'(?m)^(\s*)(\.growthLck\s*=\s*[^,\n]+,\s*\n)',
+                               r'\1\2\1.attributes = CA_BOSS,\n', block, count=1)
+            if n != 1:
+                sys.exit('ERROR: .growthLck insertion point not found in %s entry %s'
+                         % (CHARACTERS_C, marker))
+        text = text[:s] + block + text[e:]
+    return text
+
+
 def slot_personal_data(text, campaign):
     """Write each SLOT_PERSONAL_SOURCES boss's authored line over its vanilla slot's own."""
     for slot, (chapter_yaml, unit_id) in sorted(SLOT_PERSONAL_SOURCES.items()):
@@ -158,6 +192,7 @@ def patch_raw_pid_portraits(campaign, verbose=True):
         text = f.read()
     text = raw_pid_portrait_data(text, campaign)
     text = slot_personal_data(text, campaign)
+    text = stamp_boss_attributes(text)
     with open(CHARACTERS_C, 'w', encoding='utf-8') as f:
         f.write(text)
     if verbose:
