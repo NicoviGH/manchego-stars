@@ -424,13 +424,14 @@ function M.run(api)
                 local action
                 if sight.batch then action = sight.batch(decide) else action = decide() end
                 if not action then break end
-                local done = api.act(action)
+                local done, why = api.act(action)
                 bagged()
                 if done == false and (action.act == "visit" or action.act == "chest") then
                     explore.failed(action, turn)
                 end
                 if done == false then
                     return "crashed", "the harness could not perform " .. action.act
+                        .. (why and (": " .. why) or "")
                 end
                 if action.act == "visit" or action.act == "chest" then
                     explore.visited(action, turn)

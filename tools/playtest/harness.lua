@@ -3152,11 +3152,13 @@ INSPECT.botApi = function(game)
     end
     api.seed = function(s) return Sight.seed(sightApi, s) end
     api.sight = function() return Sight.new(sightApi) end
+    -- A failed act returns false and, where the driver knows it, why (the crash record says it).
     -- One action of Bot.decide's or the planner's: move, then attack the chosen enemy, wait,
     -- Talk, open a door, heal, use an item, Visit, open a chest, or Seize.
     api.act = function(a)
         local u = BOARD.find("blue", a.unit)
-        if not u or not moveUnit(u.x, u.y, a.move.x, a.move.y) then return false end
+        if not u then return false, "the unit is not on the board" end
+        if not moveUnit(u.x, u.y, a.move.x, a.move.y) then return false, "the move failed" end
         if a.act == "attack" then
             -- The actor can die in its own attack: a dead unit is never greyed out, so its
             -- death is an exit of the combat wait too.
@@ -3182,12 +3184,13 @@ INSPECT.botApi = function(game)
         elseif a.act == "staff" then
             return INSPECT.chooseStaff(u.addr, a.slot, a.targetId, function() return won() or lost() end)
         elseif a.act == "item" then
-            local opened = INSPECT.itemSubmenu(a.slot)
-            if not opened then return false end
+            local opened, why = INSPECT.itemSubmenu(a.slot)
+            if not opened then return false, why end
             if not selectSemantic("use_item", "Use starts the item's effect", function(after)
                 return controllerState(after) ~= "item_submenu"
-            end, 120) then return false end
-            return INSPECT.awaitActed(u.addr, function() return won() or lost() end)
+            end, 120) then return false, "the item's submenu offered no Use" end
+            if INSPECT.awaitActed(u.addr, function() return won() or lost() end) then return true end
+            return false, "the unit never finished using the item"
         elseif a.act == "seize" then
             if not Controller.findAction(Controller.legalActions(observeController()), "seize") then
                 return cancelUnitActionMenu() and "noseize"
