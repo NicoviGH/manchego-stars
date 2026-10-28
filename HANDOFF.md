@@ -9,21 +9,30 @@ and gets deleted from here. Operating rules live in `CLAUDE.md`/`AGENTS.md`; sco
 live in GitHub issues. Before a context rollover, warn Nicolas, refresh this file, and start a
 fresh instance — don't rely on auto-compaction.
 
-Refreshed 2026-10-28, night (Claude). **#510 step 9 is on `feat/510-step9-e-campaigns` at
-76c3a33, PUSHED (no PR yet), with main (#546) merged in.** **NOW, in a fresh session: work the
-fix list in #510 comment 6478205562** (<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6478205562>),
-in its order:
-1. the enemy-phase full-bag chooser (`runEnemyPhase` does not answer `send_to_convoy`): it crashes
-   6 of 8 vanilla Ch3 attempts at turn 7;
-2. **the game-legality check for every kept act**, which replaces the hand-kept surprise list
-   (Nicolas: the crashes show "the rigidness of our bot's plans"; a kept act is played on the plan's
-   word, not the game's), folding in 76c3a33's wall/door check and the heal-target one;
-3. wall HP in the planner; 4. ch03 careful's stall after the 4th chest; 5. the destroyed-village
-   label; 6. ch03 attempts 1-8 on BOTH ROMs, then the step-9 list below.
-**Read every result as a pair, ours beside vanilla (Nicolas, 2026-10-28).** Vanilla had never been
-played past Ch1 until today. Its Ch3 start is now saved (`references/sim/vanilla/c25b145e3745/states/
-e1-vanilla-ch3/3.ss`), and ours ch03's is regenerated on the #546 ROM
-(`references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/4.ss`). How to run both: the comment above.
+Refreshed 2026-10-28, late night (Claude). **#510 step 9 is on `feat/510-step9-e-campaigns` at
+8c9f6d1, PUSHED (no PR yet).** The fix list in #510 comment 6478205562 is DONE (974e921, e27ff56),
+and ours ch03 careful's stall turned out to be four bot faults, fixed (c742425, 8c9f6d1). Read
+today's two summaries: <https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6478944227>
+(items 1-5, with the Mogall's fights read as a pair) and
+<https://github.com/NicoviGH/manchego-stars/issues/510#issuecomment-6480158861> (the four planner
+faults, the vanilla regression, the Seth-benched experiment, and the weights ruling).
+- **Ch3 attempts 1-8 at 8c9f6d1:** vanilla 8/8 won all alive; ours careful 2/2 won t13 all alive,
+  even 3/3 won (Trex to a Grunt t7), bold 3/3 won (2 to the Mogall). Same-style attempts replay
+  identically (one saved start, RNG included): ~3 distinct games per side, not 8.
+- **Bot vs level (Nicolas's question):** ch03 is winnable clean by the bot; every failure traced
+  was a bot fault. **Validate the bot on vanilla first** (if vanilla clears and the bot is sound, a
+  failure on ours is the level), but vanilla only exercises vanilla's situations, so when ours
+  fails, read the trace for a move a human would have seen. No cell run for ch03 now: the lord
+  class and Baxby-as-Seth changes are coming (Nicolas).
+- **Weights: no value to declare** (Nicolas): the styles ARE the variation (death 1000/300/60);
+  adjust only if verdicts or traces show the spread is off.
+- **Regression check after every planner change: vanilla Ch3 attempts 1-8** (~50 s wall, the env
+  recipe in comment 6478205562). It caught 8c9f6d1's fault.
+- Fixed but not proven in the ROM: `sight.legal` refusing an act (it refused none in ~40 runs; the
+  refusal path is unit-tested only).
+**Read every result as a pair, ours beside vanilla (Nicolas, 2026-10-28).** Saved starts: vanilla
+Ch3 `references/sim/vanilla/c25b145e3745/states/e1-vanilla-ch3/3.ss`; ours ch03
+`references/sim/ours/fd3cb9d8dca6/states/e1-ours-ch07/4.ss` (ch02 = `3.ss`).
 #546's pre-merge `SUITE=gate` run is still DEFERRED to #510 step 10 (ch01's goblins L1 -> L2-3,
 `lordfloor` +10 HP, not yet run in the emulator).
 **The parity model is being
@@ -75,7 +84,7 @@ G3 #537 78105ed; the summary is on #531).
      (retail Prologue + Ch1). At 70e01bb's last fix: ours ch01 won t9 all alive (23,910 frames);
      retail won both, all alive. The review summary is on the PR.
 3. **NOW: PR E (campaigns) and PR F (the runner), one branch: `feat/510-step9-e-campaigns`**
-   (pushed, **76c3a33**, NO PR yet). Read in the plan comment (link at the top): "Party
+   (pushed, **8c9f6d1**, NO PR yet). Read in the plan comment (link at the top): "Party
    selection, SETTLED", "Lords, SETTLED", "The planner", and Tasks 11-13 (F1-F3; F2 and F3
    were amended 2026-10-27).
    - **Built, E:** `Bot.team` picks the team by the map's DEMANDS, read at the prep screen
@@ -161,13 +170,12 @@ G3 #537 78105ed; the summary is on #531).
             every boss carries it now, and the goal read stays).
           - The judge CHAINS the counter with the enemy phase. Averaging it had let the lord
             strike the grell alone and die.
-        **The NEXT list is #510 comment 6478205562** (see the top of this file). Done today from the
-        old list: the item crash (a heal priced on the start board), the exploring trip (sticky
-        sends), and the kept-plan attack crash (a broken wall; the general fix is the legality
-        check). Still owed from it:
-        - The stall rule can CYCLE: a unit steps into the boss's 2-range, is hit, retreats, and the
-          board comes back with other HP, so each repeat is "new". ch03 careful now stalls after
-          the 4th chest (#510 fix list item 4).
+        **Done 2026-10-28 (late):** the fix list of #510 comment 6478205562, and the boss
+        assault's starvation, ally swaps, three holds, free-tile march (see the top of this file).
+        Still owed:
+        - Ours ch02 even/bold leave (1,12) unvisited (`left_open`, 3 of 8).
+        - Ours bold lone-strikes the Mogall and loses units: the planner has no "chip now, finish
+          next turn" plan (record 0021's whole-turn planning, NEXT item 6).
         - Nicolas: **use convoy items before buying anything** (between chapters; drive the prep
           Supply screen). And: promote at level 10, between chapters, configured separately.
           Seals found in battle go to the convoy for now.
