@@ -3347,7 +3347,9 @@ INSPECT.campaignApi = function(game)
         shops = nil
         -- cfg.from: resume at that chapter's start as an earlier run of this campaign id saved
         -- it, rather than replaying every chapter before it. The state holds the game's RNG, so
-        -- nothing is seeded; no team is carried (a resumed pick has no last clear to keep).
+        -- nothing is seeded, unless cfg.reseed: a Monte Carlo cell's run (montecarlo.py `cell`)
+        -- seeds the game with PT_SEED there, so its pairs differ by seed as well as by style (the
+        -- #510 plan's Task 12). No team is carried (a resumed pick has no last clear to keep).
         if played == nil and cfg.from then
             local f = io.open(string.format("%s/%d.ss", dir, cfg.from), "rb")
             if not f then return nil, string.format("no saved start for chapter %d in %s", cfg.from, dir) end
@@ -3355,7 +3357,12 @@ INSPECT.campaignApi = function(game)
             f:close()
             wait(2)
             played = cfg.from
-            log(string.format("campaign: chapter %d resumes (%s)", played, controllerState()))
+            if cfg.reseed then
+                local sapi = INSPECT.sightApi()   -- loads INSPECT.Sight
+                INSPECT.Sight.seed(sapi, seed)
+            end
+            log(string.format("campaign: chapter %d resumes (%s)%s", played, controllerState(),
+                cfg.reseed and string.format(", seeded %d", seed) or ""))
             return { chapter = played }
         end
         local stalled = INSPECT.watch("arrive")

@@ -121,6 +121,14 @@ if [ "${PT_VANILLA:-0}" = "1" ]; then
     ROM="$REPO/build/vanilla-fe8/fireemblem8.gba"
     export PT_ELF="$REPO/build/vanilla-fe8/fireemblem8.elf" MX_SKIP_ROM_CHECK=1
 fi
+# Where this game's runs and chapter-start states live for a ROM hash: references/sim/<game>/
+# <hash>, or PT_SIMDIR. `run.sh --simdir` prints it for the current ROM and exits (montecarlo.py
+# reads its kept runs there before it plays any).
+simdir() { echo "${PT_SIMDIR:-$REPO/references/sim/$([ "${PT_VANILLA:-0}" = 1 ] && echo vanilla || echo ours)/$1}"; }
+if [ "${1:-}" = "--simdir" ]; then
+    simdir "$(shasum "$ROM" | cut -c1-12)"
+    exit 0
+fi
 SCENARIO="${1:?usage: run.sh <scenario>  (see header: win|ch01win|recordscene|...)}"
 KEEP_OPEN="${2:-}"
 # PT_RUN_TAG=<tag>: one of several copies of THIS scenario running at once (montecarlo.py's
@@ -285,7 +293,7 @@ PLAYTEST_SEED = "${PT_SEED:-1}"
 PLAYTEST_STYLE = os.getenv("PT_STYLE") or ""
 PLAYTEST_CLAIMS = os.getenv("PT_CLAIMS") or ""
 PLAYTEST_CAMPAIGN = os.getenv("PT_CAMPAIGN") or ""
-PLAYTEST_SIMDIR = "${PT_SIMDIR:-$REPO/references/sim/$([ "${PT_VANILLA:-0}" = 1 ] && echo vanilla || echo ours)/$ROMHASH}"
+PLAYTEST_SIMDIR = "$(simdir "$ROMHASH")"
 PLAYTEST_VANILLA = "${PT_VANILLA:-0}"
 PLAYTEST_ROMHASH = "$ROMHASH"
 PLAYTEST_HOST_CHAPTER = ${PT_HOST_CHAPTER:-${MX_HOST_CHAPTER:-1}}

@@ -21,9 +21,23 @@ says the chapter start has fewer styles than the attempt asked for.
 `paired_verdict` says where one chapter-and-mode cell stands from its ours/vanilla pairs: looked
 at only at planned sizes, tested on the pairs that disagree, with score intervals (research
 record 0022; the #510 plan's Task 12, amended 2026-10-27).
+
+    python3 tools/playtest/montecarlo.py cell --ours <env .json> --vanilla <env .json> \
+        [--mode normal] [--jobs 4]
+
+`cell` plays one chapter-and-mode cell to its verdict. Pair s is run s of each side: the
+chapter's saved start loaded, the game seeded with s (env `reseed`, harness.lua) and attempt 1's
+style drawn from s, so pairs differ by seed and by style alike; one chapter start has only
+3 x 2^claims styles, too few for 200 pairs without the seed. Runs are kept in each game's store
+(`run.sh --simdir`/runs.jsonl), stamped with the cell they belong to and the bot code they ran;
+a kept run with the same stamp is read, never played again, so vanilla, which rarely changes,
+is mostly read. A crashed run is no game result: its pair is left out, counted, and a further
+seed played in its place, never the same one again.
 """
 import argparse
 import concurrent.futures
+import glob
+import hashlib
 import json
 import math
 import os
@@ -74,6 +88,8 @@ def launch(task, tag, log_path):
         env['PT_CAMPAIGN'] = json.dumps(task['campaign'])
     if task.get('vanilla'):
         env['PT_VANILLA'] = '1'
+    if task.get('mode'):
+        env['PT_DIFFICULTY'] = task['mode']
     with open(log_path, 'w') as log:
         subprocess.run([RUN_SH, scenario], env=env, stdout=log, stderr=subprocess.STDOUT,
                        check=False)
@@ -96,15 +112,16 @@ def records_of(task, text, where, log_path):
     attempt = (task.get('campaign') or {}).get('attempt')
     for c in parse_lines(text, CAMPAIGN):
         if c.get('outcome') == 'no_style':
-            return [{'outcome': 'no_style', 'attempt': attempt, 'chapter': c.get('chapter'),
-                     'run_dir': where}]
-    return [{'outcome': 'crashed', 'attempt': attempt, 'run_dir': where, 'log': log_path,
-             'why': 'the worker left no BOTRUN record'}]
+            return [{'outcome': 'no_style', 'attempt': attempt, 'seed': task.get('seed'),
+                     'chapter': c.get('chapter'), 'run_dir': where}]
+    return [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'), 'run_dir': where,
+             'log': log_path, 'why': 'the worker left no BOTRUN record'}]
 
 
 class Pool:
     """`jobs` workers at once. `launch(task, tag, log_path) -> (stdout text, run dir)` runs one
-    task (the real one drives run.sh; tests pass a fake)."""
+    task (the real one drives run.sh; tests pass a fake). A task's `stamp` is written into
+    each of its records."""
 
     def __init__(self, jobs=8, out='runs.jsonl', log_dir=None, launch=launch):
         self.jobs, self.out, self.launch = jobs, out, launch
@@ -122,10 +139,15 @@ class Pool:
                 text, where = self.launch(task, tag, log_path)
             except Exception as err:   # a worker that dies is a record, never a lost run
                 attempt = (task.get('campaign') or {}).get('attempt')
-                return [{'outcome': 'crashed', 'attempt': attempt, 'log': log_path,
+                recs = [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'),
+                         'log': log_path,
                          'run_dir': run_dir(task.get('scenario', 'campaign'), tag),
                          'why': '%s: %s' % (type(err).__name__, err)}]
-            return records_of(task, text, where, log_path)
+            else:
+                recs = records_of(task, text, where, log_path)
+            for r in recs:
+                r.update(task.get('stamp') or {})
+            return recs
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=self.jobs) as ex:
             futures = [ex.submit(one, i, t) for i, t in enumerate(tasks)]
@@ -240,6 +262,138 @@ def paired_verdict(pairs):
     return out
 
 
+# ---- one cell, played to its verdict (PR F2) ----
+
+UNUSABLE = ('crashed', 'no_style')   # no game result: the pair is left out
+
+
+def simdir(vanilla):
+    """This game's store for the ROM built now: run.sh owns the path (`--simdir`)."""
+    env = dict(os.environ, PT_VANILLA='1' if vanilla else '0')
+    return subprocess.run([RUN_SH, '--simdir'], env=env, check=True, capture_output=True,
+                          text=True).stdout.strip()
+
+
+def bot_hash(root=HERE):
+    """The bot code a run ran: every Lua file of the playtest harness, hashed. A change to any
+    of them makes kept runs another cell's."""
+    h = hashlib.sha1()
+    for path in sorted(glob.glob(os.path.join(root, '*.lua'))):
+        h.update(os.path.basename(path).encode() + b'\0')
+        with open(path, 'rb') as fh:
+            h.update(fh.read())
+    return h.hexdigest()[:12]
+
+
+def cell_stamp(env, mode, bot):
+    """What makes two runs the same cell's: the start they load and how they were played."""
+    return {'cell': {'campaign': env.get('id'), 'from': env['from'], 'mode': mode, 'bot': bot}}
+
+
+def cell_tasks(env, seeds, mode, stamp, vanilla=False):
+    """Run s of a cell for each seed s: its chapter alone from the saved start, the game seeded
+    with s, attempt 1's style."""
+    if env.get('from') is None:
+        raise ValueError('montecarlo: a cell needs an env with `from` (a saved chapter start)')
+    camp = dict(env, last=[env['from']], attempt=1, reseed=True)
+    return [{'campaign': camp, 'seed': s, 'mode': mode, 'vanilla': vanilla, 'stamp': stamp}
+            for s in seeds]
+
+
+def kept_runs(path, stamp):
+    """{seed: record} of the runs in `path` with this stamp; a later line wins."""
+    out = {}
+    if not os.path.exists(path):
+        return out
+    with open(path) as fh:
+        for line in fh:
+            rec = json.loads(line)
+            if all(rec.get(k) == v for k, v in stamp.items()) and rec.get('seed') is not None:
+                out[rec['seed']] = rec
+    return out
+
+
+def run_cell(sides, play, looks=LOOKS):
+    """Play a cell to its verdict. `sides` = {'ours': side, 'vanilla': side}, each side
+    {'env', 'store', 'stamp', 'mode', 'vanilla'}; `play(side, tasks) -> records` runs tasks and
+    keeps their records in the side's store. Returns the verdict plus `played` (runs played
+    now, per side), `read` (kept runs used) and `left_out` (pairs with a crashed run)."""
+    names = ('ours', 'vanilla')
+    have = {n: kept_runs(sides[n]['store'], sides[n]['stamp']) for n in names}
+    played, left_out = {n: 0 for n in names}, []
+    used = {n: set() for n in names}
+    usable, seed = [], 0
+    verdict = paired_verdict([])
+    for look in looks:
+        while len(usable) < look:
+            want = range(seed + 1, seed + 1 + look - len(usable))
+            seed = want[-1]
+            for n in names:
+                side = sides[n]
+                missing = [s for s in want if s not in have[n]]
+                if missing:
+                    for rec in play(side, cell_tasks(side['env'], missing, side['mode'],
+                                                     side['stamp'], side['vanilla'])):
+                        if rec.get('seed') is None:   # a worker that died says no seed
+                            raise RuntimeError('montecarlo: a run record without its seed: %r'
+                                               % rec)
+                        have[n][rec['seed']] = rec
+                    played[n] += len(missing)
+            before = len(usable)
+            for s in want:
+                recs = {n: have[n].get(s) for n in names}
+                for n in names:
+                    used[n].add(s)
+                bad = [n for n in names if recs[n] is None or recs[n].get('outcome') in UNUSABLE]
+                if bad:
+                    left_out.append({'seed': s, 'sides': bad,
+                                     'runs': [(recs[n] or {}).get('run_dir') for n in bad]})
+                else:
+                    usable.append((bool(recs['ours'].get('all_alive')),
+                                   bool(recs['vanilla'].get('all_alive'))))
+            if len(usable) == before:
+                verdict = paired_verdict(usable)
+                verdict['settled'] = False
+                verdict['reason'] = ('stopped: no run of seeds %d-%d gave a game result on both '
+                                     'sides (%d pairs left out)' % (want[0], want[-1],
+                                                                     len(left_out)))
+                return dict(verdict, played=played, left_out=left_out,
+                            read={n: len(used[n]) - played[n] for n in names})
+        verdict = paired_verdict(usable)
+        if verdict['settled']:
+            break
+    return dict(verdict, played=played, left_out=left_out,
+                read={n: len(used[n]) - played[n] for n in names})
+
+
+def pool_play(jobs):
+    """The real `play`: a Pool appending to the side's store."""
+    def play(side, tasks):
+        os.makedirs(os.path.dirname(side['store']), exist_ok=True)
+        return list(Pool(jobs=jobs, out=side['store']).run(tasks))
+    return play
+
+
+def cell_main(args):
+    bot = bot_hash()
+    sides = {}
+    for name, path in (('ours', args.ours), ('vanilla', args.vanilla)):
+        with open(path) as fh:
+            env = json.load(fh)
+        sides[name] = {'env': env, 'mode': args.mode, 'vanilla': name == 'vanilla',
+                       'store': os.path.join(simdir(name == 'vanilla'), 'runs.jsonl'),
+                       'stamp': cell_stamp(env, args.mode, bot)}
+    v = run_cell(sides, pool_play(args.jobs))
+    print(v['reason'])
+    if v.get('look'):
+        print('clean clears: ours %.0f%%, vanilla %.0f%%; gap %+.0f points (%+.0f to %+.0f)' % (
+            100 * v['ours'], 100 * v['vanilla'], 100 * v['diff'], 100 * v['lo'], 100 * v['hi']))
+    print('runs played: ours %(ours)d, vanilla %(vanilla)d' % v['played']
+          + '; read from the store: ours %(ours)d, vanilla %(vanilla)d' % v['read']
+          + '; pairs left out (a crash): %d' % len(v['left_out']))
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     sub = ap.add_subparsers(dest='cmd', required=True)
@@ -250,7 +404,14 @@ def main(argv=None):
     a.add_argument('--out', default='runs.jsonl')
     a.add_argument('--seed', type=int, default=1)
     a.add_argument('--vanilla', action='store_true')
+    c = sub.add_parser('cell', help='one chapter-and-mode cell, ours vs vanilla, to its verdict')
+    c.add_argument('--ours', required=True, help="ours' campaign env .json with `from`")
+    c.add_argument('--vanilla', required=True, help="the twin's campaign env .json with `from`")
+    c.add_argument('--mode', default='normal')
+    c.add_argument('--jobs', type=int, default=4)
     args = ap.parse_args(argv)
+    if args.cmd == 'cell':
+        return cell_main(args)
     with open(args.env) as fh:
         env = json.load(fh)
     pool = Pool(jobs=args.jobs, out=args.out)

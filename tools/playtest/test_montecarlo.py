@@ -1,4 +1,5 @@
-"""montecarlo.py: the bot's run pool (#510 step 9 PR F, Task 11)."""
+"""montecarlo.py: the bot's run pool (#510 step 9 PR F, Task 11), its paired verdict and the
+cell driver (Task 12)."""
 import json
 import multiprocessing
 import os
@@ -168,6 +169,109 @@ class Verdict(unittest.TestCase):
         self.assertLess(lo, 0)
         self.assertGreater(hi, 0)
         self.assertAlmostEqual(lo, -hi)
+
+
+class Cell(unittest.TestCase):
+    """run_cell over a fake `play`: `fate(name, seed) -> record fields` decides each run."""
+
+    def sides(self, store_dir=None, stamp=None):
+        d = store_dir or tempfile.mkdtemp()
+        out = {}
+        for n in ('ours', 'vanilla'):
+            env = {'id': 'c-' + n, 'from': 4}
+            out[n] = {'env': env, 'mode': 'normal', 'vanilla': n == 'vanilla',
+                      'store': os.path.join(d, n + '.jsonl'),
+                      'stamp': stamp or mc.cell_stamp(env, 'normal', 'bot1')}
+        return out
+
+    def play(self, fate, log):
+        def play(side, tasks):
+            name = 'vanilla' if side['vanilla'] else 'ours'
+            for t in tasks:
+                log.append((name, t['seed']))
+            return [dict(fate(name, t['seed']), seed=t['seed']) for t in tasks]
+        return play
+
+    def test_vanilla_pairs_read_from_the_store_first(self):
+        sides = self.sides()
+        for s in range(1, 51):
+            mc.append_record(sides['vanilla']['store'],
+                             dict(sides['vanilla']['stamp'], seed=s, all_alive=True,
+                                  outcome='won'))
+        log = []
+        v = mc.run_cell(sides, self.play(lambda n, s: {'outcome': 'lost', 'all_alive': False},
+                                         log))
+        self.assertTrue(v['settled'], 'ours 0/50 vs vanilla 50/50 settles at the first look')
+        self.assertEqual(v['played'], {'ours': 50, 'vanilla': 0})
+        self.assertEqual(v['read'], {'ours': 0, 'vanilla': 50})
+        self.assertNotIn('vanilla', {n for n, _ in log})
+
+    def test_a_kept_run_of_other_bot_code_is_played_again(self):
+        sides = self.sides()
+        old = mc.cell_stamp(sides['vanilla']['env'], 'normal', 'bot0')
+        for s in range(1, 51):
+            mc.append_record(sides['vanilla']['store'], dict(old, seed=s, all_alive=True))
+        v = mc.run_cell(sides, self.play(
+            lambda n, s: {'outcome': 'won', 'all_alive': n == 'vanilla'}, []))
+        self.assertEqual(v['played']['vanilla'], 50)
+
+    def test_identical_cell_runs_to_the_last_look(self):
+        v = mc.run_cell(self.sides(), self.play(
+            lambda n, s: {'outcome': 'won', 'all_alive': s % 2 == 0}, []))
+        self.assertEqual(v['look'], 200)
+        self.assertTrue(v['settled'])
+        self.assertFalse(v['differs'])
+        self.assertEqual(v['played'], {'ours': 200, 'vanilla': 200})
+
+    def test_a_crashed_pair_is_left_out_and_a_new_seed_played(self):
+        log = []
+        v = mc.run_cell(self.sides(), self.play(
+            lambda n, s: {'outcome': 'crashed'} if (n, s) == ('ours', 3)
+            else {'outcome': 'won', 'all_alive': n == 'vanilla'}, log))
+        self.assertEqual(v['look'], 50)
+        self.assertEqual([x['seed'] for x in v['left_out']], [3])
+        self.assertEqual(v['left_out'][0]['sides'], ['ours'])
+        self.assertEqual(log.count(('ours', 3)), 1, 'a crash is never replayed')
+        self.assertIn(('ours', 51), log, 'seed 51 stands in for it')
+
+    def test_a_cell_whose_runs_all_crash_stops_unsettled(self):
+        v = mc.run_cell(self.sides(), self.play(lambda n, s: {'outcome': 'crashed'}, []))
+        self.assertFalse(v['settled'])
+        self.assertIn('stopped', v['reason'])
+        self.assertEqual(len(v['left_out']), 50)
+
+    def test_cell_tasks_seed_the_game_and_play_the_chapter_alone(self):
+        tasks = mc.cell_tasks({'id': 'c', 'from': 4, 'last': [7]}, [5, 6], 'difficult',
+                              {'cell': 1}, vanilla=True)
+        self.assertEqual([t['seed'] for t in tasks], [5, 6])
+        camp = tasks[0]['campaign']
+        self.assertEqual((camp['last'], camp['attempt'], camp['reseed']), ([4], 1, True))
+        self.assertEqual((tasks[0]['mode'], tasks[0]['vanilla']), ('difficult', True))
+        with self.assertRaises(ValueError):
+            mc.cell_tasks({'id': 'c'}, [1], 'normal', {})
+
+    def test_a_tasks_stamp_reaches_every_record_crashed_too(self):
+        d = tempfile.mkdtemp()
+        out = os.path.join(d, 'runs.jsonl')
+
+        def launch(task, tag, log_path):
+            if task['seed'] == 2:
+                raise RuntimeError('died')
+            return 'BOTRUN {"seed": %d, "outcome": "won"}\n' % task['seed'], '/tmp/x'
+        tasks = mc.cell_tasks({'id': 'c', 'from': 4}, [1, 2], 'normal', {'cell': {'bot': 'b'}})
+        list(mc.Pool(jobs=2, out=out, launch=launch).run(tasks))
+        kept = mc.kept_runs(out, {'cell': {'bot': 'b'}})
+        self.assertEqual(sorted(kept), [1, 2])
+        self.assertEqual(kept[2]['outcome'], 'crashed')
+
+    def test_bot_hash_follows_the_lua(self):
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, 'bot.lua'), 'w') as fh:
+            fh.write('return 1')
+        h1 = mc.bot_hash(d)
+        with open(os.path.join(d, 'bot.lua'), 'w') as fh:
+            fh.write('return 2')
+        self.assertNotEqual(h1, mc.bot_hash(d))
 
 
 if __name__ == '__main__':
